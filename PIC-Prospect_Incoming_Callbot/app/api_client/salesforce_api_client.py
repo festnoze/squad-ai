@@ -1027,6 +1027,133 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                 # Not a 401 error, re-raise original exception
                 raise http_err
 
+    async def _create_opportunity_contact_role(
+        self,
+        opportunity_id: str,
+        contact_id: str,
+        role: str,
+        client: httpx.AsyncClient,
+        headers: dict
+    ) -> bool:
+        """
+        Internal helper to create an OpportunityContactRole.
+
+        Args:
+            opportunity_id: ID of the Opportunity
+            contact_id: ID of the Contact
+            role: Role of the contact (e.g., "Decision Maker", "Influencer", "Economic Buyer")
+            client: HTTP client instance
+            headers: HTTP headers for the request
+
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            # Prepare OpportunityContactRole payload
+            role_payload = {
+                "OpportunityId": opportunity_id,
+                "ContactId": contact_id,
+                "Role": role,
+                "IsPrimary": True  # Mark as primary contact for this opportunity
+            }
+
+            url_create_role = f"{self._instance_url}/services/data/{self._version_api}/sobjects/OpportunityContactRole/"
+
+            resp = await client.post(url_create_role, headers=headers, json=role_payload)
+            resp.raise_for_status()
+
+            role_data = resp.json()
+            role_id = role_data.get("id")
+
+            if role_id:
+                self.logger.info(f"OpportunityContactRole created successfully! Role ID: {role_id}")
+                return True
+            else:
+                self.logger.error("OpportunityContactRole creation failed - no ID returned")
+                return False
+
+        except httpx.HTTPStatusError as http_err:
+            self.logger.error(f"Error creating OpportunityContactRole: {http_err.response.status_code}")
+            try:
+                self.logger.error(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except Exception:
+                self.logger.error(http_err.response.text)
+            return False
+        except Exception as e:
+            self.logger.error(f"Error creating OpportunityContactRole: {e!s}")
+            return False
+
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
+    async def add_contact_role_to_opportunity_async(
+        self,
+        opportunity_id: str,
+        contact_id: str,
+        role: str = "Decision Maker",
+        is_primary: bool = False
+    ) -> str | None:
+        """
+        Add a Contact role to an existing Opportunity by creating an OpportunityContactRole.
+
+        Args:
+            opportunity_id: ID of the Opportunity (required)
+            contact_id: ID of the Contact (required)
+            role: Role of the contact (default: "Decision Maker")
+                  Common values: "Decision Maker", "Economic Buyer", "Economic Decision Maker",
+                  "Technical Buyer", "Influencer", "User", "Other"
+            is_primary: Whether this should be the primary contact for the opportunity
+
+        Returns:
+            The ID of the created OpportunityContactRole if successful, None otherwise
+        """
+        await self._ensure_authenticated_async()
+
+        if not opportunity_id or not contact_id:
+            self.logger.error("Error: opportunity_id and contact_id are required")
+            return None
+
+        self.logger.info(f"Adding Contact {contact_id} to Opportunity {opportunity_id} with role: {role}")
+
+        async def _execute_role_creation():
+            headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
+
+            # Prepare OpportunityContactRole payload
+            role_payload = {
+                "OpportunityId": opportunity_id,
+                "ContactId": contact_id,
+                "Role": role,
+                "IsPrimary": is_primary
+            }
+
+            url_create_role = f"{self._instance_url}/services/data/{self._version_api}/sobjects/OpportunityContactRole/"
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url_create_role, headers=headers, json=role_payload)
+                resp.raise_for_status()
+
+                role_data = resp.json()
+                role_id = role_data.get("id")
+
+                if role_id:
+                    self.logger.info("OpportunityContactRole created successfully!")
+                    self.logger.info(f"Role ID: {role_id}")
+                    return role_id
+                else:
+                    self.logger.error("OpportunityContactRole creation failed - no ID returned")
+                    return None
+
+        try:
+            return await self._with_auth_retry(_execute_role_creation)
+        except httpx.HTTPStatusError as http_err:
+            self.logger.error(f"Error creating OpportunityContactRole: {http_err.response.status_code}")
+            try:
+                self.logger.error(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except Exception:
+                self.logger.error(http_err.response.text)
+            return None
+        except Exception as e:
+            self.logger.error(f"Error creating OpportunityContactRole: {e!s}")
+            return None
+
     ## Internal helpers ##
 
     def _get_french_datetime_from_str(self, datetime_str: str) -> datetime | None:
@@ -1524,7 +1651,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         return result
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
-    async def get_appointment_slots_async(
+    async def get_appointment_slots_with_lightning_scheduler_async(
         self,
         start_datetime: str,
         end_datetime: str,
@@ -1681,7 +1808,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         search_start_str = self._get_str_from_datetime(search_start_time)
         search_end_str = self._get_str_from_datetime(search_end_time)
         
-        available_slots = await self.get_appointment_slots_async(
+        available_slots = await self.get_appointment_slots_with_lightning_scheduler_async(
             start_datetime=search_start_str,
             end_datetime=search_end_str,
             work_type_id=work_type_id,
@@ -1805,10 +1932,10 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
     async def get_phone_numbers_async(self, limit: int = 10) -> list[dict] | None:
         """
         Retrieve the first x phone numbers from both Contacts and Leads in Salesforce.
-        
+
         Args:
             limit: Number of phone numbers to retrieve (default: 10)
-            
+
         Returns:
             A list of dictionaries containing phone numbers and associated person data,
             or None if an error occurs.
@@ -1843,7 +1970,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                     resp.raise_for_status()
                     data = resp.json()
                     contact_records = data.get("records", [])
-                    
+
                     for contact in contact_records:
                         # Add Phone if available
                         if contact.get("Phone"):
@@ -1858,7 +1985,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                                 "owner_name": contact.get("Owner", {}).get("Name") if contact.get("Owner") else None,
                                 "phone_type": "Phone"
                             })
-                        
+
                         # Add MobilePhone if available and different from Phone
                         if contact.get("MobilePhone") and contact.get("MobilePhone") != contact.get("Phone"):
                             phone_numbers.append({
@@ -1903,7 +2030,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                         resp.raise_for_status()
                         data = resp.json()
                         lead_records = data.get("records", [])
-                        
+
                         for lead in lead_records:
                             # Add Phone if available
                             if lead.get("Phone"):
@@ -1919,7 +2046,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                                     "status": lead.get("Status"),
                                     "phone_type": "Phone"
                                 })
-                            
+
                             # Add MobilePhone if available and different from Phone
                             if lead.get("MobilePhone") and lead.get("MobilePhone") != lead.get("Phone"):
                                 phone_numbers.append({
@@ -1955,4 +2082,275 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             return await self._with_auth_retry(_execute_phone_numbers_search)
         except (httpx.RequestError, Exception) as e:
             self.logger.info(f"Error retrieving phone numbers: {e!s}")
+            return None
+
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
+    async def create_contact_async(
+        self,
+        first_name: str,
+        last_name: str,
+        email: str | None = None,
+        phone: str | None = None,
+        mobile_phone: str | None = None,
+        account_id: str | None = None,
+        owner_id: str | None = None,
+        title: str | None = None,
+        department: str | None = None,
+        description: str | None = None,
+        **additional_fields
+    ) -> str | None:
+        """
+        Create a new Contact in Salesforce.
+
+        Args:
+            first_name: Contact's first name (required)
+            last_name: Contact's last name (required)
+            email: Contact's email address
+            phone: Contact's phone number
+            mobile_phone: Contact's mobile phone number
+            account_id: ID of the Account to associate with the contact
+            owner_id: ID of the User who will own this contact
+            title: Contact's job title
+            department: Contact's department
+            description: Additional description or notes
+            **additional_fields: Any additional custom fields to set
+
+        Returns:
+            The ID of the created Contact if successful, None otherwise
+        """
+        await self._ensure_authenticated_async()
+
+        if not first_name or not last_name:
+            self.logger.error("Error: first_name and last_name are required to create a contact")
+            return None
+
+        self.logger.info(f"Creating new Contact: {first_name} {last_name}")
+
+        async def _execute_contact_creation():
+            headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
+
+            # Prepare contact payload with required fields
+            contact_payload = {
+                "FirstName": first_name,
+                "LastName": last_name
+            }
+
+            # Add optional fields if provided
+            if email:
+                contact_payload["Email"] = email
+            if phone:
+                contact_payload["Phone"] = phone
+            if mobile_phone:
+                contact_payload["MobilePhone"] = mobile_phone
+            if account_id:
+                contact_payload["AccountId"] = account_id
+            if owner_id:
+                contact_payload["OwnerId"] = owner_id
+            if title:
+                contact_payload["Title"] = title
+            if department:
+                contact_payload["Department"] = department
+            if description:
+                contact_payload["Description"] = description
+
+            # Add any additional custom fields
+            for field_name, field_value in additional_fields.items():
+                if field_value is not None:
+                    contact_payload[field_name] = field_value
+
+            url_create_contact = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Contact/"
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url_create_contact, headers=headers, json=contact_payload)
+                resp.raise_for_status()
+
+                contact_data = resp.json()
+                contact_id = contact_data.get("id")
+
+                if contact_id:
+                    self.logger.info("Contact created successfully!")
+                    self.logger.info(f"Contact ID: {contact_id}")
+                    self.logger.info(f"View URL: {self._instance_url}/lightning/r/Contact/{contact_id}/view")
+                    return contact_id
+                else:
+                    self.logger.error("Contact creation failed - no ID returned")
+                    return None
+
+        try:
+            return await self._with_auth_retry(_execute_contact_creation)
+        except httpx.HTTPStatusError as http_err:
+            self.logger.error(f"Error creating Contact: {http_err.response.status_code}")
+            try:
+                self.logger.error(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except Exception:
+                self.logger.error(http_err.response.text)
+            return None
+        except Exception as e:
+            self.logger.error(f"Error creating Contact: {e!s}")
+            return None
+
+    @measure_latency(OperationType.SALESFORCE, provider="salesforce")
+    async def create_opportunity_async(
+        self,
+        name: str,
+        stage_name: str,
+        close_date: str,
+        account_id: str | None = None,
+        owner_id: str | None = None,
+        contact_id: str | None = None,
+        contact_role: str | None = "Decision Maker",
+        converted_from_lead_id: str | None = None,
+        amount: float | None = None,
+        probability: int | None = None,
+        description: str | None = None,
+        lead_source: str | None = None,
+        type_: str | None = None,
+        next_step: str | None = None,
+        **additional_fields
+    ) -> str | None:
+        """
+        Create a new Opportunity in Salesforce with prospect linking support.
+
+        Args:
+            name: Opportunity name (required)
+            stage_name: Sales stage name (required, e.g., "Prospecting", "Qualification", "Closed Won")
+            close_date: Expected close date in YYYY-MM-DD format (required)
+            account_id: ID of the Account associated with the opportunity
+            owner_id: ID of the User who will own this opportunity
+            contact_id: ID of the Contact to link directly to this opportunity (creates OpportunityContactRole)
+            contact_role: Role of the contact in the opportunity (default: "Decision Maker")
+            converted_from_lead_id: ID of the Lead this opportunity was converted from (for tracking)
+            amount: Opportunity amount/value
+            probability: Probability percentage (0-100)
+            description: Opportunity description
+            lead_source: Lead source (e.g., "Web", "Phone Inquiry", "Partner Referral")
+            type_: Opportunity type (e.g., "Existing Customer - Upgrade", "New Customer")
+            next_step: Next step in the sales process
+            **additional_fields: Any additional custom fields to set
+
+        Prospect Linking Options:
+            1. Via Account: Pass account_id to link indirectly through Account relationship
+            2. Via Contact: Pass contact_id to create direct Contact-Opportunity relationship
+            3. Via Lead: Pass converted_from_lead_id to track lead conversion
+            4. Combined: Use multiple linking methods for comprehensive tracking
+
+        Examples:
+            # Link via Account only
+            opp_id = await client.create_opportunity_async(
+                name="New Deal", stage_name="Prospecting", close_date="2025-12-31",
+                account_id="001XXXXXXXXX"
+            )
+
+            # Link directly to Contact
+            opp_id = await client.create_opportunity_async(
+                name="New Deal", stage_name="Prospecting", close_date="2025-12-31",
+                contact_id="003XXXXXXXXX", contact_role="Decision Maker"
+            )
+
+            # Track lead conversion
+            opp_id = await client.create_opportunity_async(
+                name="Converted Lead Deal", stage_name="Qualification", close_date="2025-12-31",
+                account_id="001XXXXXXXXX", contact_id="003XXXXXXXXX",
+                converted_from_lead_id="00QXXXXXXXXX"
+            )
+
+        Returns:
+            The ID of the created Opportunity if successful, None otherwise
+        """
+        await self._ensure_authenticated_async()
+
+        if not name or not stage_name or not close_date:
+            self.logger.error("Error: name, stage_name, and close_date are required to create an opportunity")
+            return None
+
+        # Validate close_date format
+        try:
+            datetime.strptime(close_date, "%Y-%m-%d")
+        except ValueError:
+            self.logger.error("Error: close_date must be in YYYY-MM-DD format")
+            return None
+
+        self.logger.info(f"Creating new Opportunity: {name}")
+
+        async def _execute_opportunity_creation():
+            headers = {"Authorization": f"Bearer {self._access_token}", "Content-Type": "application/json"}
+
+            # Prepare opportunity payload with required fields
+            opportunity_payload = {
+                "Name": name,
+                "StageName": stage_name,
+                "CloseDate": close_date
+            }
+
+            # Add optional fields if provided
+            if account_id:
+                opportunity_payload["AccountId"] = account_id
+            if owner_id:
+                opportunity_payload["OwnerId"] = owner_id
+            if amount is not None:
+                opportunity_payload["Amount"] = amount
+            if probability is not None:
+                if 0 <= probability <= 100:
+                    opportunity_payload["Probability"] = probability
+                else:
+                    self.logger.warning("Probability must be between 0 and 100, skipping this field")
+            if description:
+                opportunity_payload["Description"] = description
+            if lead_source:
+                opportunity_payload["LeadSource"] = lead_source
+            if type_:
+                opportunity_payload["Type"] = type_
+            if next_step:
+                opportunity_payload["NextStep"] = next_step
+
+            # Add lead tracking if provided
+            if converted_from_lead_id:
+                # Note: This is for custom tracking, not a standard Salesforce field
+                # Organizations may have custom fields like "Converted_From_Lead__c"
+                opportunity_payload["Converted_From_Lead__c"] = converted_from_lead_id
+
+            # Add any additional custom fields
+            for field_name, field_value in additional_fields.items():
+                if field_value is not None:
+                    opportunity_payload[field_name] = field_value
+
+            url_create_opportunity = f"{self._instance_url}/services/data/{self._version_api}/sobjects/Opportunity/"
+
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(url_create_opportunity, headers=headers, json=opportunity_payload)
+                resp.raise_for_status()
+
+                opportunity_data = resp.json()
+                opportunity_id = opportunity_data.get("id")
+
+                if opportunity_id:
+                    self.logger.info("Opportunity created successfully!")
+                    self.logger.info(f"Opportunity ID: {opportunity_id}")
+                    self.logger.info(f"View URL: {self._instance_url}/lightning/r/Opportunity/{opportunity_id}/view")
+
+                    # Create OpportunityContactRole if contact_id is provided
+                    if contact_id:
+                        self.logger.info(f"Creating OpportunityContactRole for Contact: {contact_id}")
+                        role_created = await self._create_opportunity_contact_role(
+                            opportunity_id, contact_id, contact_role or "Decision Maker", client, headers
+                        )
+                        if not role_created:
+                            self.logger.warning("Opportunity created but OpportunityContactRole creation failed")
+
+                    return opportunity_id
+                else:
+                    self.logger.error("Opportunity creation failed - no ID returned")
+                    return None
+
+        try:
+            return await self._with_auth_retry(_execute_opportunity_creation)
+        except httpx.HTTPStatusError as http_err:
+            self.logger.error(f"Error creating Opportunity: {http_err.response.status_code}")
+            try:
+                self.logger.error(json.dumps(http_err.response.json(), indent=2, ensure_ascii=False))
+            except Exception:
+                self.logger.error(http_err.response.text)
+            return None
+        except Exception as e:
+            self.logger.error(f"Error creating Opportunity: {e!s}")
             return None

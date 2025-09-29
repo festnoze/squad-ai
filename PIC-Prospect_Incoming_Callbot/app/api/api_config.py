@@ -17,6 +17,7 @@ from routers.callbot_router import callbot_router
 from routers.conversation_router import conversation_router
 from routers.logs_router import logs_router
 from routers.test_router import test_router
+from routers.salesforce_router import salesforce_router
 
 
 class ApiConfig:
@@ -59,6 +60,7 @@ class ApiConfig:
         app.include_router(logs_router)
         app.include_router(conversation_router)
         app.include_router(test_router)
+        app.include_router(salesforce_router)
 
         # Serve documentation as static files
         ApiConfig._setup_documentation_serving(app)
@@ -143,7 +145,8 @@ class ApiConfig:
                     "health": "/ping",
                     "callbot": "/api/callbot/",
                     "logs": "/api/logs/",
-                    "test": "/api/test/"
+                    "test": "/api/test/",
+                    "salesforce": "/api/salesforce/"
                 }
             })
 
