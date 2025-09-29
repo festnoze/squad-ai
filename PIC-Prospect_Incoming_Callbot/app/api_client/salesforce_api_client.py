@@ -1651,7 +1651,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         return result
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
-    async def get_appointment_slots_with_lightning_scheduler_async(
+    async def get_appointment_slots_async(
         self,
         start_datetime: str,
         end_datetime: str,
@@ -1808,7 +1808,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         search_start_str = self._get_str_from_datetime(search_start_time)
         search_end_str = self._get_str_from_datetime(search_end_time)
         
-        available_slots = await self.get_appointment_slots_with_lightning_scheduler_async(
+        available_slots = await self.get_appointment_slots_async(
             start_datetime=search_start_str,
             end_datetime=search_end_str,
             work_type_id=work_type_id,
