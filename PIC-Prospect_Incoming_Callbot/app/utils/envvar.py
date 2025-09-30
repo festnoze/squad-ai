@@ -469,3 +469,14 @@ class EnvHelper:
         """
         value = EnvHelper.get_env_variable_value_by_name("BUSINESS_APPOINTMENT_DURATION", fails_if_missing=False)
         return int(value) if value else 30
+
+    @staticmethod
+    def get_sms_appointment_confirmation_enabled() -> bool:
+        """
+        Get whether to send SMS confirmation when an appointment is created.
+
+        Returns:
+            bool: True if SMS confirmation should be sent, False otherwise (default: False)
+        """
+        value = EnvHelper.get_env_variable_value_by_name("SMS_APPOINTMENT_CONFIRMATION", fails_if_missing=False)
+        return value is not None and value.lower() == "true"

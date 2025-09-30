@@ -11,7 +11,9 @@ from langchain.tools import tool
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from services.outgoing_call_service import OutgoingCallService
 from utils.business_hours_config import BusinessHoursConfig, ValidationResult
+from utils.envvar import EnvHelper
 
 from agents.text_registry import TextRegistry
 
@@ -53,7 +55,7 @@ class CalendarAgent:
         agent = create_tool_calling_agent(self.available_timeframes_llm, tools_available_timeframes, available_timeframes_prompts)
         self.available_timeframes_agent = AgentExecutor(agent=agent, tools=tools_available_timeframes, verbose=True)
 
-    async def schedule_new_appointement_async(self, user_input: str, chat_history: list[dict] | None = None) -> str:
+    async def process_to_schedule_new_appointement_async(self, user_input: str, chat_history: list[dict] | None = None) -> str:
         """High-level dispatcher orchestrating calendar actions according to the category.
 
         Args:
@@ -193,7 +195,7 @@ class CalendarAgent:
     def get_current_date_tool() -> str:
         return CalendarAgent._to_french_date(CalendarAgent.now, include_weekday=True, include_year=True, include_hour=True)
 
-    @tool
+    @staticmethod
     async def get_appointments_async(start_date: str, end_date: str) -> list[dict[str, any]]:
         """Get the existing appointments between the start and end dates for the owner.
 
@@ -248,26 +250,6 @@ class CalendarAgent:
 
         scheduled_slots = await CalendarAgent.salesforce_api_client.get_scheduled_appointments_async(start_date, end_date, CalendarAgent.owner_id)
         return CalendarAgent.get_available_timeframes_from_scheduled_slots(start_date, end_date, scheduled_slots, business_hours_config=CalendarAgent.business_hours_config)
-
-    @staticmethod
-    @tool
-    async def schedule_new_appointment_tool(
-        date_and_time: str,
-        user_subject: str | None = None,
-        description: str | None = None,
-    ) -> str | None:
-        """Schedule a new appointment with the owner at the specified date and time.
-
-        Args:
-            date_and_time: Date and time for the new appointment
-            user_subject: Optional subject defined by the user for the appointment
-            description: Optional description for the appointment
-
-        Returns:
-            The scheduled appointment details
-        """
-        duration = 30  # Default duration in minutes
-        return await CalendarAgent.schedule_new_appointment_async(date_and_time, duration, user_subject, description)
 
     @staticmethod
     async def schedule_new_appointment_async(date_and_time: str, duration: int = 30, user_subject: str | None = None, description: str | None = None) -> str | None:

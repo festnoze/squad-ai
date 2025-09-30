@@ -443,7 +443,7 @@ class TestCalendarAgentBusinessHoursIntegration:
                     mock_extract.return_value = weekend_appointment
                     mock_categorize.return_value = "Demande de confirmation du rendez-vous"
 
-                    result = await self.agent.schedule_new_appointement_async("Je veux un rendez-vous samedi", [])
+                    result = await self.agent.process_to_schedule_new_appointement_async("Je veux un rendez-vous samedi", [])
 
                     # Should return weekend error message
                     assert result == TextRegistry.appointment_weekend_text
@@ -465,7 +465,7 @@ class TestCalendarAgentBusinessHoursIntegration:
                     mock_extract.return_value = outside_hours_appointment
                     mock_categorize.return_value = "Demande de confirmation du rendez-vous"
 
-                    result = await self.agent.schedule_new_appointement_async("Je veux un rendez-vous à 8h", [])
+                    result = await self.agent.process_to_schedule_new_appointement_async("Je veux un rendez-vous à 8h", [])
 
                     # Should return outside hours error with business hours info
                     assert "les rendez-vous ne peuvent être pris qu'aux heures ouvrées" in result

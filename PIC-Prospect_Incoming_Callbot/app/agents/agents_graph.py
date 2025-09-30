@@ -6,6 +6,7 @@ from datetime import timedelta
 from typing import Hashable
 from uuid import UUID
 
+from api_client.calendar_client_interface import CalendarClientInterface
 from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 from api_client.rag_query_interface import RagQueryInterface
 from api_client.request_models.conversation_request_model import ConversationRequestModel
@@ -13,7 +14,6 @@ from api_client.request_models.query_asking_request_model import QueryAskingRequ
 from api_client.request_models.user_request_model import DeviceInfoRequestModel, UserRequestModel
 from api_client.salesforce_api_client import SalesforceApiClient
 from api_client.salesforce_user_client_interface import SalesforceUserClientInterface
-from api_client.calendar_client_interface import CalendarClientInterface
 
 # Clients
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
@@ -23,6 +23,7 @@ from langgraph.graph.state import CompiledStateGraph
 from managers.consecutive_error_manager import ConsecutiveErrorManager
 from managers.outgoing_audio_manager import OutgoingAudioManager
 from managers.outgoing_manager import OutgoingManager
+from services.outgoing_call_service import OutgoingCallService
 from utils.envvar import EnvHelper
 from utils.twilio_sid_converter import TwilioCallSidConverter
 
@@ -70,8 +71,12 @@ class AgentsGraph:
             self.conversation_persistence = ConversationPersistenceServiceFactory.create_conversation_persistence_service(self.conversation_persistence_type, self.available_actions)
 
         self.rag_query_service = rag_query_service or StudiRAGInferenceApiClient()
+        if not salesforce_client and not calendar_client:
+            new_salesforce_client = SalesforceApiClient()
+            salesforce_client = new_salesforce_client
+            calendar_client = new_salesforce_client
         self.salesforce_api_client: SalesforceUserClientInterface = salesforce_client or SalesforceApiClient()
-        self.calendar_api_client: CalendarClientInterface = calendar_client or SalesforceApiClient() if salesforce_client else self.salesforce_api_client
+        self.calendar_api_client: CalendarClientInterface = calendar_client or SalesforceApiClient()
         self.outgoing_manager: OutgoingManager = outgoing_manager
         self.has_waiting_music_on_calendar: bool = EnvHelper.get_waiting_music_on_calendar()
         self.has_waiting_music_on_rag: bool = EnvHelper.get_waiting_music_on_rag()
@@ -480,7 +485,7 @@ class AgentsGraph:
         middle_welcome_text += f" votre conseiller, {salesman_first_name}, est actuellement indisponible."
 
         await self.add_AI_response_message_to_conversation_async(middle_welcome_text, state)
-        
+
         # Ends call if user has an existing appointment (and single action available)
         if len(self.available_actions) == 1 and "schedule_appointement" in self.available_actions:
             existing_appointments = await self.get_existing_user_appointments_async(state)
@@ -514,7 +519,7 @@ class AgentsGraph:
         return state
 
     async def get_existing_user_appointments_async(self, state: PhoneConversationState) -> list[dict]:
-        """Check for existing appointments in next 30 days before scheduling new one """
+        """Check for existing appointments in next 30 days before scheduling new one"""
         call_sid = state.get("call_sid", "N/A")
         sf_account_info: dict = state.get("agent_scratchpad", {}).get("sf_account_info", {})
         user_id = sf_account_info.get("Id", "")
@@ -527,7 +532,6 @@ class AgentsGraph:
             existing_appointments = await self.calendar_api_client.get_scheduled_appointments_async(start_date, end_date, user_id=user_id)
             return existing_appointments
         return []
-
 
     async def user_new_node(self, state: PhoneConversationState) -> PhoneConversationState:
         """For new user: Case not handled. Ask the user to call during the opening hours"""
@@ -576,8 +580,14 @@ class AgentsGraph:
                 if self.has_waiting_music_on_calendar:
                     waiting_music_task = await self._start_waiting_music_async()
 
-                calendar_agent_answer = await self.calendar_agent_instance.schedule_new_appointement_async(user_input, chat_history)
+                calendar_agent_answer = await self.calendar_agent_instance.process_to_schedule_new_appointement_async(user_input, chat_history)
 
+                # Send confirmation SMS if new appointment has just been created
+                has_appointment_been_created = calendar_agent_answer.startswith(TextRegistry.appointment_confirmed_prefix_text)
+                if has_appointment_been_created and EnvHelper.get_sms_appointment_confirmation_enabled():
+                    appointement_date_str = calendar_agent_answer.split(TextRegistry.appointment_confirmed_prefix_text)[1].split(".")[0].strip()
+                    await self.send_sms_for_appointment_confirmation_async(appointement_date_str, state)
+                
                 if self.calendar_speech_cannot_be_interupted:
                     self.outgoing_manager.can_speech_be_interupted = False
 
@@ -592,7 +602,23 @@ class AgentsGraph:
                 self.logger.error(f"[{call_sid[-4:]}] Error in Calendar Agent node: {e}", exc_info=True)
                 self.consecutive_error_manager.increment_consecutive_error_count(state)
         return state
-
+    
+    async def send_sms_for_appointment_confirmation_async(self, appointement_date_str: str, state: PhoneConversationState):
+        """Send an SMS to the owner to confirm the appointment."""
+        outgoing_call_service = OutgoingCallService()
+        user_firstname = state.get("agent_scratchpad", {}).get("sf_account_info", {}).get("FirstName", "")
+        sales_firstname = state.get("agent_scratchpad", {}).get("sf_account_info", {}).get("Owner", {}).get("Name", "")
+        user_phone_number = state.get("agent_scratchpad", {}).get("sf_account_info", {}).get("MobilePhone", None)\
+                         or state.get("agent_scratchpad", {}).get("sf_account_info", {}).get("Phone", None)
+                        
+        if not user_phone_number:
+            call_sid = state.get("call_sid", "N/A")
+            self.logger.error(f"[{call_sid[-4:]}] No phone number found for user {user_firstname} to send appointment confirmation SMS.")
+            return
+        sms_message = f"Bonjour {user_firstname}, \nVotre rendez-vous avec {sales_firstname},  votre conseiller en formation chez {EnvHelper.get_company_name()}, est confirmé pour le {appointement_date_str}.\n Merci de votre confiance et à très vite !\nL'équipe {EnvHelper.get_company_name()}."
+        message_sid = await outgoing_call_service.send_sms_async(to_phone_number=user_phone_number, message=sms_message)
+        return message_sid
+    
     async def router_decide_next_step(self, state: PhoneConversationState) -> str:
         """Determines the next node to visit based on the current state."""
         call_sid = state.get("call_sid", "N/A")

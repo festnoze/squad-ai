@@ -209,7 +209,6 @@ async def handle_websocket_connection(ws: WebSocket, calling_phone_number: str, 
 async def twilio_incoming_sms(request: Request):
     return await handle_incoming_sms_async(request)
 
-
 async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
     """Handle incoming SMS messages from Twilio"""
     logger.info("Received POST request for SMS webhook")

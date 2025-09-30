@@ -147,7 +147,7 @@ class TestCalendarAgentTimeframesRule:
 
         # Mock the available timeframes tool to return empty results
         with patch.object(CalendarAgent, "get_available_timeframes_async", return_value=[]):
-            await agent.schedule_new_appointement_async("Je voudrais prendre rendez-vous", [])
+            await agent.process_to_schedule_new_appointement_async("Je voudrais prendre rendez-vous", [])
 
         # Verify that the LLM was called with the current date context
         assert len(captured_args) > 0, "LLM should have been called"

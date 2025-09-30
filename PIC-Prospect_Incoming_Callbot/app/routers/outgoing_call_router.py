@@ -40,10 +40,33 @@ class InitiateCallResponse(BaseModel):
     message: str
 
 
+class SendSmsRequest(BaseModel):
+    """Request model for sending an outgoing SMS"""
+    to_phone_number: str = Field(
+        ...,
+        description="Target phone number in E.164 format (e.g., +33123456789)",
+        example="+33668422388"
+    )
+    message: str = Field(
+        ...,
+        description="SMS message content to send",
+        example="Hello, this is a test message"
+    )
+
+
+class SendSmsResponse(BaseModel):
+    """Response model for sent SMS"""
+    success: bool
+    message_sid: str
+    to_phone_number: str
+    from_phone_number: str
+    message: str
+
+
 @outgoing_call_router.post("", response_model=InitiateCallResponse)
 @outgoing_call_router.post("/", response_model=InitiateCallResponse)
 @api_key_required
-async def initiate_outgoing_call_endpoint(request: Request, call_request: InitiateCallRequest) -> JSONResponse:
+async def outgoing_call_initiate_endpoint(request: Request, call_request: InitiateCallRequest) -> JSONResponse:
     """
     Initiate an outgoing phone call via Twilio.
 
@@ -182,4 +205,79 @@ async def outgoing_call_twiml_callback_endpoint(request: Request) -> HTMLRespons
             content=str(response),
             media_type="application/xml",
             status_code=500
+        )
+
+
+@outgoing_call_router.post("/sms", response_model=SendSmsResponse)
+@api_key_required
+async def send_outgoing_sms_endpoint(request: Request, sms_request: SendSmsRequest) -> JSONResponse:
+    """
+    Send an outgoing SMS via Twilio.
+
+    This endpoint sends an SMS message to the specified phone number using Twilio's
+    messaging API.
+
+    **Authentication**: Requires API key via X-API-Key header or api_key query parameter.
+
+    **Phone Number Format**: Phone number must be in E.164 format (e.g., +33123456789)
+
+    **Example Request**:
+    ```json
+    {
+        "to_phone_number": "+33123456789",
+        "message": "Hello, this is a test message"
+    }
+    ```
+
+    **Example Response**:
+    ```json
+    {
+        "success": true,
+        "message_sid": "SMxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "to_phone_number": "+33123456789",
+        "from_phone_number": "+33987654321",
+        "message": "SMS sent successfully"
+    }
+    ```
+    """
+    logger.info(f"Received request to send SMS to {sms_request.to_phone_number}")
+
+    try:
+        outgoing_call_service = OutgoingCallService()
+        message_sid = await outgoing_call_service.send_sms_async(
+            to_phone_number=sms_request.to_phone_number,
+            message=sms_request.message
+        )
+
+        from_phone_number = outgoing_call_service.twilio_phone_number
+
+        logger.info(f"SMS sent successfully. Message SID: {message_sid}")
+
+        return JSONResponse(
+            status_code=200,
+            content=SendSmsResponse(
+                success=True,
+                message_sid=message_sid,
+                to_phone_number=sms_request.to_phone_number,
+                from_phone_number=from_phone_number,
+                message="SMS sent successfully"
+            ).dict()
+        )
+
+    except ValueError as ve:
+        logger.error(f"Validation error: {ve}")
+        raise HTTPException(status_code=400, detail=str(ve))
+
+    except TwilioRestException as te:
+        logger.error(f"Twilio API error: {te.msg} (Code: {te.code})")
+        raise HTTPException(
+            status_code=502,
+            detail=f"Twilio API error: {te.msg} (Code: {te.code})"
+        )
+
+    except Exception as e:
+        logger.error(f"Unexpected error sending SMS: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal error: {str(e)}"
         )

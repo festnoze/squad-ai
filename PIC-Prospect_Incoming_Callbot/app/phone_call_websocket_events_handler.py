@@ -163,7 +163,6 @@ class PhoneCallWebsocketEventsHandler:
 
         # Update existing context manager with call information or create new one
         if self.call_duration_context:
-            # Update the existing context manager with call info
             self.call_duration_context.call_sid = call_sid
             self.call_duration_context.phone_number = phone_number
         else:
