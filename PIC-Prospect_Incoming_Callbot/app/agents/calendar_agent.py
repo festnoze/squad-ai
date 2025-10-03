@@ -17,13 +17,13 @@ from utils.envvar import EnvHelper
 
 from agents.text_registry import TextRegistry
 
-
 class CalendarAgent:
     salesforce_api_client: CalendarClientInterface
     owner_id: str | None = None
     owner_name: str | None = None
     now: datetime = datetime.now(tz=pytz.timezone("Europe/Paris"))
-    business_hours_config: BusinessHoursConfig | None = None
+    business_hours_config: BusinessHoursConfig
+    logger = logging.getLogger(__name__)
 
     def __init__(
         self,
@@ -32,7 +32,7 @@ class CalendarAgent:
         available_timeframes_llm: BaseLanguageModel | None = None,
         date_extractor_llm: BaseLanguageModel | None = None,
     ):
-        self.logger = logging.getLogger(__name__)
+        self.logger = CalendarAgent.logger
         self.classifier_llm = classifier_llm
         self.available_timeframes_llm = available_timeframes_llm if available_timeframes_llm else classifier_llm
         self.date_extractor_llm = date_extractor_llm if date_extractor_llm else self.available_timeframes_llm
@@ -70,29 +70,13 @@ class CalendarAgent:
         category = await self.categorize_request_for_dispatch_async(user_input, chat_history)
         self.logger.info(f"Category detected: {category}")
 
-        # Check first if user is requesting a date more than 30 days from now
+        # Check if user is requesting a valid date
         requested_date: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
         if requested_date:
-            days_from_now = (requested_date.date() - CalendarAgent.now.date()).days
-            if days_from_now > 30:
-                return TextRegistry.appointment_too_far_text
-
-            # Validate business hours for the requested appointment time
             validation_result = self.validate_appointment_time_async(requested_date)
             if validation_result != "valid":
-                if validation_result.startswith("outside_hours:"):
-                    business_hours = validation_result.split(":", 1)[1]
-                    return TextRegistry.appointment_outside_hours_text.format(business_hours=business_hours)
-                elif validation_result == "weekend":
-                    return TextRegistry.appointment_weekend_text
-                elif validation_result == "in_past":
-                    return TextRegistry.appointment_in_past_text
-                elif validation_result == "holiday":
-                    return TextRegistry.appointment_holiday_text
-                elif validation_result.startswith("too_far_future:"):
-                    # This should already be caught above, but handle it just in case
-                    return TextRegistry.appointment_too_far_text
-
+                return self._get_text_time_validation_error(validation_result)
+    
         # === Category-specific handling === #
         if category == "Proposition de créneaux":
             formatted_history = []
@@ -146,27 +130,15 @@ class CalendarAgent:
                 return TextRegistry.date_not_found_text
 
         if category == "Rendez-vous confirmé":
-            confirmed_date: datetime | None = await self._extract_appointment_selected_date_and_time_async(user_input, chat_history)
-            if confirmed_date:
-                # Validate business hours for the confirmed appointment time
-                validation_result = self.validate_appointment_time_async(confirmed_date)
+            if requested_date:
+                validation_result = self.validate_appointment_time_async(requested_date)
                 if validation_result != "valid":
-                    if validation_result.startswith("outside_hours:"):
-                        business_hours = validation_result.split(":", 1)[1]
-                        return TextRegistry.appointment_outside_hours_text.format(business_hours=business_hours)
-                    elif validation_result == "weekend":
-                        return TextRegistry.appointment_weekend_text
-                    elif validation_result == "in_past":
-                        return TextRegistry.appointment_in_past_text
-                    elif validation_result == "holiday":
-                        return TextRegistry.appointment_holiday_text
-                    elif validation_result.startswith("too_far_future:"):
-                        return TextRegistry.appointment_too_far_text
+                    return self._get_text_time_validation_error(validation_result)
 
-                confirmed_date_str = self._to_str_iso(confirmed_date)
+                confirmed_date_str = self._to_str_iso(requested_date)
                 success = await CalendarAgent.schedule_new_appointment_async(confirmed_date_str)
                 if success:
-                    return TextRegistry.appointment_confirmed_prefix_text + self._to_french_date(confirmed_date, include_weekday=True, include_year=False, include_hour=True) + ". " + TextRegistry.end_call_suffix_text
+                    return TextRegistry.appointment_confirmed_prefix_text + self._to_french_date(requested_date, include_weekday=True, include_year=False, include_hour=True) + ". " + TextRegistry.end_call_suffix_text
             return TextRegistry.appointment_failed_text
 
         if category == "Demande de modification":
@@ -176,6 +148,21 @@ class CalendarAgent:
             return TextRegistry.cancellation_not_supported_text
 
         return TextRegistry.ask_to_repeat_text
+
+    def _get_text_time_validation_error(self, validation_result: str) -> str:
+        if validation_result.startswith("outside_hours:"):
+            business_hours = validation_result.split(":", 1)[1]
+            return TextRegistry.appointment_outside_hours_text.format(business_hours=business_hours)
+        elif validation_result == "weekend":
+            return TextRegistry.appointment_weekend_text
+        elif validation_result == "in_past":
+            return TextRegistry.appointment_in_past_text
+        elif validation_result == "holiday":
+            return TextRegistry.appointment_holiday_text
+        elif validation_result == "too_far_future:":
+            # This should already be caught above, but handle it just in case
+            return TextRegistry.appointment_too_far_text
+        return ""
 
     @tool
     def get_owner_name() -> str:
@@ -261,7 +248,11 @@ class CalendarAgent:
             date_and_time += "Z"
 
         # TODO: manage "CalendarAgent.*" variables another way for multi-calls handling.
-        return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(subject, date_and_time, duration, description, owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id)
+        try:
+            return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(subject, date_and_time, duration, description, owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id)
+        except Exception as e:
+            CalendarAgent.logger.error(f"Error scheduling appointment: {str(e)}")
+            return None
 
     def _set_user_info(self, user_id, first_name, last_name, email, owner_id, owner_name):
         """

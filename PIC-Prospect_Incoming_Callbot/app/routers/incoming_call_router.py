@@ -2,7 +2,7 @@ import logging
 import os
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from incoming_sms_handler import IncomingSMSHandler
 
 #
@@ -214,33 +214,15 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
     logger.info("Received POST request for SMS webhook")
     try:
         phone_number, _, body = await _extract_request_data_async(request)
-        logger.info(f'SMS from: {phone_number}. Received message: "{body}"')
+        logger.info(f'* SMS received from: {phone_number}. Message content: "{body}"')
 
-        incoming_sms_handler = IncomingSMSHandler()
-        conversation_id = await incoming_sms_handler.init_user_and_conversation_upon_incoming_sms(phone_number)
-        if conversation_id:
-            rag_answer = await incoming_sms_handler.get_rag_response_to_sms_query_async(conversation_id, body)
-        else:
-            rag_answer = "Je suis désolé, je ne peux pas répondre à votre message."
-
-        logger.info(f'Original RAG answer: "{rag_answer}"')
-
-        # Clean the RAG answer for SMS - basic cleaning
-        logger.info(f'Basic cleaned RAG answer: "{rag_answer}"')
-
-        # Ensure GSM-7 encoding for SMS compatibility
-        gsm_rag_answer = rag_answer.encode("utf-8", errors="ignore").decode("utf-8")
-        logger.info(f'GSM-7 encoded RAG answer: "{gsm_rag_answer}"')
-
-        gsm_rag_answer = gsm_rag_answer.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'").replace("—", "-").replace("–", "-").replace("…", "...").replace(",", " ")
-        gsm_rag_answer = "".join(c for c in gsm_rag_answer if c in " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\n€£¥¤§¿¡ÄÅÆÇÉÑÖØÜßàäåæçèéìñòöøùü")
-
-        # gsm_rag_answer = "Merci pour votre message, un conseiller vous contactera prochainement. Il s'appelle étienne et est très sympa. Il est disponible sur WhatsApp et Telegram.\n\n A très 'vite'!"
-        logger.info(f'SMS answer: "{gsm_rag_answer}"')
+        #gsm_answer = await _create_sms_answer_async(phone_number, body)
+        gsm_answer = f"Bonjour,\nVous venez d'envoyer un message à un numéro de type 'no-reply'.\nIl n'est pas possible de poser de question via ce numéro.\nMerci de nous contacter par email ou par téléphone pour toute demande.\n\nMerci de votre compréhension,\nL'équipe {EnvHelper.get_company_name()}."
+        logger.info(f'* SMS answer: "{gsm_answer}"')
 
         # Create Twilio response with proper encoding
         response = MessagingResponse()
-        response.message(gsm_rag_answer)
+        response.message(gsm_answer)
         return HTMLResponse(content=str(response), media_type="application/xml")
 
     except Exception as e:
@@ -249,9 +231,39 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
         response.message("Une erreur s'est produite. Veuillez réessayer plus tard.")
         return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
 
+async def _create_sms_answer_async(phone_number: str, body: str) -> str:
+    incoming_sms_handler = IncomingSMSHandler()
+    conversation_id = await incoming_sms_handler.init_user_and_conversation_upon_incoming_sms(phone_number)
+    if conversation_id:
+        rag_answer = await incoming_sms_handler.get_rag_response_to_sms_query_async(conversation_id, body)
+    else:
+        rag_answer = "Je suis désolé, je ne suis pas mesure de répondre à votre message."
+    logger.info(f'Original RAG answer: "{rag_answer}"')
+
+    # Ensure GSM-7 encoding for SMS compatibility
+    gsm_answer = rag_answer.encode("utf-8", errors="ignore").decode("utf-8")
+    gsm_answer = gsm_answer.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'").replace("—", "-").replace("–", "-").replace("…", "...").replace(",", " ")
+    gsm_answer = "".join(c for c in gsm_answer if c in " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\n€£¥¤§¿¡ÄÅÆÇÉÑÖØÜßàäåæçèéìñòöøùü")
+    logger.info(f'GSM-7 encoded RAG answer: "{gsm_answer}"')
+    return gsm_answer
+
 
 # ========= Hot Change of Environment Variables Endpoint ========= #
-@incoming_call_router.get("/change_env_var")
+@incoming_call_router.get("/env_var/all")
+@api_key_required
+async def get_all_env_var_endpoint(request: Request):
+    """Change environment variable value via query parameter"""
+    env_vars = {}
+    with open(".env", "r") as env_file:
+        for line in env_file:
+            if '=' in line:
+                var_name, _ = line.strip().split("=", 1)
+                if var_name in os.environ:
+                    env_vars[var_name] = os.environ[var_name]
+    return JSONResponse(content=env_vars, media_type="application/json", status_code=200)
+    
+
+@incoming_call_router.post("/change_env_var")
 @api_key_required
 async def change_env_var_endpoint(request: Request):
     """Change environment variable value via query parameter"""

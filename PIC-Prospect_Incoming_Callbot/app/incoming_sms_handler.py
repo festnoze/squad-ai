@@ -4,11 +4,12 @@ from uuid import UUID
 from api_client.request_models.conversation_request_model import ConversationRequestModel
 from api_client.request_models.query_asking_request_model import QueryAskingRequestModel
 from api_client.request_models.user_request_model import DeviceInfoRequestModel, UserRequestModel
-
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 
 class IncomingSMSHandler:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.studi_rag_inference_api_client = StudiRAGInferenceApiClient()
 
     async def init_user_and_conversation_upon_incoming_sms(self, phone_number: str) -> str | None:
         """Initialize the user session: retrieve or create user and conversation and send a welcome message"""

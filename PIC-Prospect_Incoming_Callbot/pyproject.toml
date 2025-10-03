@@ -36,6 +36,9 @@ dependencies = [
     "langchain-openai>=0.3.21",
     "sqlalchemy>=2.0.41",
     "aiosqlite>=0.21.0",
+    "ga4mp>=2.0.4",
+    "httpx>=0.27.0",
+    "google-analytics-data>=0.18.19",
 ]
 
 [tool.setuptools]

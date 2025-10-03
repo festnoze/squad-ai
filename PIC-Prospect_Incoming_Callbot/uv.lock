@@ -519,6 +519,15 @@ wheels = [
 ]
 
 [[package]]
+name = "ga4mp"
+version = "2.0.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/4a/bd80440ed3c020c6c3e7e5e069792669af6110464771f77e1c709d2a6035/ga4mp-2.0.4.tar.gz", hash = "sha256:2fdcf275e643c5c3ab2c3a03e82edc3551109f7e9175b3604aea8c8e015c15ad", size = 17648 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/e8/a0/c80f9427e059d42d7d08c2a251533d42e8a4d2b235fc8d9a1c51cd002bcf/ga4mp-2.0.4-py3-none-any.whl", hash = "sha256:11e5072b33a93917bbfcf5b44ee48d21e45124ef18e2a0f1275e1529df340de8", size = 15295 },
+]
+
+[[package]]
 name = "gevent"
 version = "25.4.2"
 source = { registry = "https://pypi.org/simple" }
@@ -559,6 +568,21 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d9/29/d40217cbe2f6b1359e00c6c307bb3fc876ba74068cbab3dde77f03ca0dc4/ghp-import-2.1.0.tar.gz", hash = "sha256:9c535c4c61193c2df8871222567d7fd7e5014d835f97dc7b7439069e2413d343", size = 10943 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/f7/ec/67fbef5d497f86283db54c22eec6f6140243aae73265799baaaa19cd17fb/ghp_import-2.1.0-py3-none-any.whl", hash = "sha256:8337dd7b50877f163d4c0289bc1f1c7f127550241988d568c1db512c4324a619", size = 11034 },
+]
+
+[[package]]
+name = "google-analytics-data"
+version = "0.18.19"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/21/d7/9b4def878551453bab0b6d8e4a0e4ce3be9ab1f2bc7af05516c936fb89ef/google_analytics_data-0.18.19.tar.gz", hash = "sha256:f7259d06cae595c6fef04d3ad443ef4f722222af50adbfc83c5a5fba20596674", size = 219877 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/60/71/b297baa7385f51176e52726d5aa2ff6db8cb1804b71d1e9a0ab0df7511be/google_analytics_data-0.18.19-py3-none-any.whl", hash = "sha256:a5a3fbc3247725d18d5a7ccb857cc68bc7f8f35a980eaa09ea45b5f4f36fb5b7", size = 188999 },
 ]
 
 [[package]]
@@ -1653,10 +1677,13 @@ dependencies = [
     { name = "dotenv" },
     { name = "fastapi" },
     { name = "flask" },
+    { name = "ga4mp" },
     { name = "gevent" },
+    { name = "google-analytics-data" },
     { name = "google-api-python-client" },
     { name = "google-cloud-speech" },
     { name = "google-cloud-texttospeech" },
+    { name = "httpx" },
     { name = "langchain" },
     { name = "langchain-core" },
     { name = "langchain-openai" },
@@ -1699,10 +1726,13 @@ requires-dist = [
     { name = "dotenv", specifier = ">=0.9.9" },
     { name = "fastapi", specifier = ">=0.115.12" },
     { name = "flask", specifier = ">=3.1.0" },
+    { name = "ga4mp", specifier = ">=2.0.4" },
     { name = "gevent", specifier = ">=25.4.2" },
+    { name = "google-analytics-data", specifier = ">=0.18.19" },
     { name = "google-api-python-client", specifier = ">=2.167.0" },
     { name = "google-cloud-speech", specifier = ">=2.32.0" },
     { name = "google-cloud-texttospeech", specifier = ">=2.26.0" },
+    { name = "httpx", specifier = ">=0.27.0" },
     { name = "langchain", specifier = ">=0.3.25" },
     { name = "langchain-core", specifier = ">=0.3.57" },
     { name = "langchain-openai", specifier = ">=0.3.21" },

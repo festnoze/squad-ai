@@ -480,3 +480,34 @@ class EnvHelper:
         """
         value = EnvHelper.get_env_variable_value_by_name("SMS_APPOINTMENT_CONFIRMATION", fails_if_missing=False)
         return value is not None and value.lower() == "true"
+
+    @staticmethod
+    def get_ga4_tracking_enabled() -> bool:
+        """
+        Get whether Google Analytics 4 tracking is enabled.
+
+        Returns:
+            bool: True if GA4 tracking is enabled, False otherwise (default: False)
+        """
+        value = EnvHelper.get_env_variable_value_by_name("GA4_TRACKING_ENABLED", fails_if_missing=False)
+        return value is not None and value.lower() == "true"
+
+    @staticmethod
+    def get_ga4_measurement_id() -> str:
+        """
+        Get the Google Analytics 4 Measurement ID.
+
+        Returns:
+            str: The GA4 Measurement ID (e.g., G-XXXXXXXXXX)
+        """
+        return EnvHelper.get_env_variable_value_by_name("GA4_MEASUREMENT_ID", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_ga4_api_secret() -> str:
+        """
+        Get the Google Analytics 4 API Secret.
+
+        Returns:
+            str: The GA4 API Secret for Measurement Protocol
+        """
+        return EnvHelper.get_env_variable_value_by_name("GA4_API_SECRET", fails_if_missing=False) or ""

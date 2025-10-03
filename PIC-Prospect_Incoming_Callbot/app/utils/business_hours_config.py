@@ -126,13 +126,6 @@ class BusinessHoursConfig:
             except Exception as e:
                 self.logger.warning(f"Could not parse time_slots from YAML: {e}")
 
-        # Try legacy YAML config (single start/end)
-        if 'start' in working_hours_config and 'end' in working_hours_config:
-            start_time = working_hours_config['start']
-            end_time = working_hours_config['end']
-            # Convert single time range to two slots (morning and afternoon)
-            return [(start_time, "12:00"), ("13:00", end_time)]
-
         # Use default
         return self._default_time_slots
 

@@ -24,6 +24,7 @@ from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency_context
 from utils.latency_metric import OperationType
 from utils.latency_tracker import latency_tracker
+from services.analytics_service import AnalyticsService
 
 
 class PhoneCallWebsocketEventsHandler:
@@ -60,6 +61,9 @@ class PhoneCallWebsocketEventsHandler:
         self.current_call_sid = None
         self.current_phone_number = None
         self.media_event_counter = 0  # Counter for periodic call duration checks
+
+        # Analytics service
+        self.analytics_service = AnalyticsService()
 
         # Set audio processing parameters as instance variables
         self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
@@ -184,6 +188,12 @@ class PhoneCallWebsocketEventsHandler:
         """Finish call duration tracking and record the metric."""
         if self.call_duration_context:
             try:
+                # Calculate duration before exiting context
+                import time
+                duration_seconds = 0
+                if hasattr(self.call_duration_context, "start_time") and self.call_duration_context.start_time:
+                    duration_seconds = time.time() - self.call_duration_context.start_time
+
                 # Update metadata with disconnect reason
                 if hasattr(self.call_duration_context, "metadata"):
                     self.call_duration_context.metadata["disconnect_reason"] = disconnect_reason
@@ -191,6 +201,18 @@ class PhoneCallWebsocketEventsHandler:
                 # Exit the context manager to record the metric
                 self.call_duration_context.__exit__(None, None, None)
                 self.logger.debug(f"[{self.current_call_sid or 'N/A'}] Finished call duration tracking - {disconnect_reason}")
+
+                # Track call ended event
+                if self.current_call_sid and self.current_phone_number:
+                    import asyncio
+                    asyncio.create_task(
+                        self.analytics_service.track_call_ended_async(
+                            call_sid=self.current_call_sid,
+                            phone_number=self.current_phone_number,
+                            duration_seconds=duration_seconds,
+                            disconnect_reason=disconnect_reason
+                        )
+                    )
             except Exception as e:
                 self.logger.error(f"Error finishing call duration tracking: {e}")
             finally:
@@ -240,6 +262,15 @@ class PhoneCallWebsocketEventsHandler:
         self.incoming_audio_processing.set_call_sid(call_sid)
         self.incoming_audio_processing.set_phone_number(calling_phone_number, call_sid)
         self._start_call_duration_tracking(call_sid, calling_phone_number)
+
+        # Track call started event
+        call_type = "outgoing" if self.is_outgoing_call else "incoming"
+        await self.analytics_service.track_call_started_async(
+            call_sid=call_sid,
+            phone_number=calling_phone_number,
+            call_type=call_type,
+            provider=self.phone_provider.provider_type.value
+        )
 
         self.outgoing_audio_processing.run_background_streaming_worker()
         self.logger.info("Audio stream manager initialized and started with optimized parameters")
