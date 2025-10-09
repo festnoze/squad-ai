@@ -254,7 +254,7 @@ async def _create_sms_answer_async(phone_number: str, body: str) -> str:
 async def get_all_env_var_endpoint(request: Request):
     """Change environment variable value via query parameter"""
     env_vars = {}
-    with open(".env", "r") as env_file:
+    with open(".env") as env_file:
         for line in env_file:
             if '=' in line:
                 var_name, _ = line.strip().split("=", 1)

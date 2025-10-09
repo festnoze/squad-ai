@@ -1,15 +1,12 @@
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel, Field
-from twilio.base.exceptions import TwilioRestException
-
-from services.outgoing_call_service import OutgoingCallService
 from providers.twilio_provider import TwilioProvider
+from pydantic import BaseModel, Field
+from services.outgoing_call_service import OutgoingCallService
+from twilio.base.exceptions import TwilioRestException
 from utils.endpoints_api_key_required_decorator import api_key_required
-from utils.phone_provider_type import PhoneProviderType
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +21,7 @@ class InitiateCallRequest(BaseModel):
         description="Target phone number in E.164 format (e.g., +33123456789)",
         example="+33668422388"
     )
-    from_phone_number: Optional[str] = Field(
+    from_phone_number: str | None = Field(
         None,
         description="Optional caller ID in E.164 format (defaults to TWILIO_PHONE_NUMBER)",
         example="+33987654321"
@@ -155,7 +152,7 @@ async def outgoing_call_initiate_endpoint(request: Request, call_request: Initia
         logger.error(f"Unexpected error initiating outgoing call: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Internal error: {str(e)}"
+            detail=f"Internal error: {e!s}"
         )
 
 
@@ -279,5 +276,5 @@ async def send_outgoing_sms_endpoint(request: Request, sms_request: SendSmsReque
         logger.error(f"Unexpected error sending SMS: {e}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail=f"Internal error: {str(e)}"
+            detail=f"Internal error: {e!s}"
         )

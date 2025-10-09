@@ -6,6 +6,7 @@ import asyncio
 import os
 import time
 from collections import deque
+from datetime import UTC
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -227,12 +228,12 @@ class TestLatencyTracker:
 
     def test_get_average_latency_old_metrics(self):
         """Test calcul de latence moyenne avec métriques anciennes"""
-        from datetime import datetime, timedelta, timezone
+        from datetime import datetime, timedelta
 
         # Créer une métrique ancienne (plus de 5 minutes)
         old_metric = LatencyMetric(operation_type=OperationType.STT, operation_name="test", latency_ms=2000.0, status=OperationStatus.SUCCESS)
         # Modifier le timestamp pour qu'il soit ancien
-        old_metric.timestamp = datetime.now(timezone.utc) - timedelta(minutes=10)
+        old_metric.timestamp = datetime.now(UTC) - timedelta(minutes=10)
 
         # Créer une métrique récente
         recent_metric = LatencyMetric(operation_type=OperationType.STT, operation_name="test", latency_ms=1000.0, status=OperationStatus.SUCCESS)
@@ -331,7 +332,7 @@ class TestLatencyTracker:
             latency_tracker.export_metrics(temp_path, format="json")
 
             # Vérifier le contenu exporté
-            with open(temp_path, "r") as f:
+            with open(temp_path) as f:
                 exported_data = json.load(f)
 
             assert len(exported_data) == 2
@@ -1129,7 +1130,7 @@ class TestLatencySystemIntegration:
             latency_tracker.export_metrics(temp_path, format="json")
 
             # Vérifier le contenu exporté
-            with open(temp_path, "r") as f:
+            with open(temp_path) as f:
                 exported_data = json.load(f)
 
             assert len(exported_data) == 1

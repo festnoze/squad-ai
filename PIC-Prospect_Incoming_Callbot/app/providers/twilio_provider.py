@@ -1,13 +1,15 @@
 import logging
-from typing import Dict, Any, Tuple
-from fastapi import Request, WebSocket, HTTPException
+from typing import Any
+
+from fastapi import HTTPException, Request, WebSocket
 from fastapi.responses import HTMLResponse
 from twilio.request_validator import RequestValidator
 from twilio.rest import Client
 from twilio.twiml.voice_response import Connect, VoiceResponse
 from utils.envvar import EnvHelper
-from providers.phone_provider_base import PhoneProvider
 from utils.phone_provider_type import PhoneProviderType
+
+from providers.phone_provider_base import PhoneProvider
 
 
 class TwilioProvider(PhoneProvider):
@@ -68,7 +70,7 @@ class TwilioProvider(PhoneProvider):
         response.append(connect)
         return HTMLResponse(content=str(response), media_type="application/xml")
     
-    async def extract_call_data(self, request: Request) -> Tuple[str, str, str]:
+    async def extract_call_data(self, request: Request) -> tuple[str, str, str]:
         """Extract phone number, call SID, and body from Twilio request"""
         phone_number: str = "Unknown From"
         call_sid: str = "Unknown CallSid"
@@ -96,7 +98,7 @@ class TwilioProvider(PhoneProvider):
         call_type_param = "?call_type=outgoing" if is_outgoing else ""
         return f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/sid/{call_id}{call_type_param}"
     
-    def parse_websocket_event(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_websocket_event(self, data: dict[str, Any]) -> dict[str, Any]:
         """Parse Twilio websocket event and normalize to common format"""
         event = data.get("event")
         
@@ -130,7 +132,7 @@ class TwilioProvider(PhoneProvider):
         
         return {"event": "unknown", "raw_data": data}
     
-    def create_media_message(self, stream_id: str, payload: str) -> Dict[str, Any]:
+    def create_media_message(self, stream_id: str, payload: str) -> dict[str, Any]:
         """Create Twilio media message for sending audio"""
         return {
             "event": "media",
@@ -138,7 +140,7 @@ class TwilioProvider(PhoneProvider):
             "media": {"payload": payload}
         }
     
-    def get_audio_format(self) -> Dict[str, Any]:
+    def get_audio_format(self) -> dict[str, Any]:
         """Get Twilio audio format specifications"""
         return {
             "encoding": "mulaw",

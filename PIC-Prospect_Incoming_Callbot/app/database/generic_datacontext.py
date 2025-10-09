@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload, sessionmaker
 from sqlalchemy.sql.expression import BinaryExpression
 from utils.envvar import EnvHelper
 
+
 class GenericDataContext:
     def __init__(self, base_entities, db_path_or_url="database.db", log_queries_to_terminal=False):
         db_full_path_and_name = None

@@ -15,16 +15,15 @@ from managers.outgoing_audio_manager import OutgoingAudioManager
 from openai import OpenAI
 from providers.phone_provider_base import PhoneProvider
 from providers.twilio_provider import TwilioProvider
+from services.analytics_service import AnalyticsService
 from speech.speech_to_text import get_speech_to_text_provider
 from speech.text_to_speech import get_text_to_speech_provider
-
-#
-from utils.latency_metric import LatencyMetric, OperationStatus
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency_context
-from utils.latency_metric import OperationType
+
+#
+from utils.latency_metric import LatencyMetric, OperationStatus, OperationType
 from utils.latency_tracker import latency_tracker
-from services.analytics_service import AnalyticsService
 
 
 class PhoneCallWebsocketEventsHandler:

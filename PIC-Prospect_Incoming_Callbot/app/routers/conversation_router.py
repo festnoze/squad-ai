@@ -1,12 +1,13 @@
 import re
 from uuid import UUID
 
-from database.conversation_persistence_service_factory import ConversationPersistenceServiceFactory
-from database.conversation_repository import ConversationRepository
-from database.user_repository import UserRepository
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from utils.endpoints_api_key_required_decorator import api_key_required
+
+from database.conversation_persistence_service_factory import ConversationPersistenceServiceFactory
+from database.conversation_repository import ConversationRepository
+from database.user_repository import UserRepository
 
 conversation_router = APIRouter(prefix="/conversation")
 
@@ -41,7 +42,7 @@ async def get_conversation_by_id_async(request: Request, conversation_id: str) -
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid conversation ID format")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving conversation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving conversation: {e!s}")
 
 
 @conversation_router.get("/all/user/{phone_number}")
@@ -77,7 +78,7 @@ async def get_all_user_conversations_by_phone_async(request: Request, phone_numb
             }
         )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving latest conversation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving latest conversation: {e!s}")
 
 
 @conversation_router.get("/all/plain/user/{phone_number}")
@@ -116,7 +117,7 @@ async def get_all_user_conversations_as_plain_text_by_phone_async(request: Reque
 
         return PlainTextResponse('\n'.join(all_conversations_text))
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving user conversations: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving user conversations: {e!s}")
 
 
 @conversation_router.get("/latest/user/{phone_number}")
@@ -147,4 +148,4 @@ async def get_user_latest_conversation_by_phone_async(request: Request, phone_nu
         else:
             return PlainTextResponse("No messages found for this user")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving latest conversation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving latest conversation: {e!s}")

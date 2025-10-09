@@ -2,6 +2,7 @@
 
 from llms.langchain_adapter_type import LangChainAdapterType
 
+
 class LlmInfo:
     def __init__(self, type:LangChainAdapterType, model:str, timeout:int, temperature:float, is_chat_model:bool = True, is_reasoning_model:bool = False, api_key:str = None, extra_params: dict[str, any] = {}):
         self.type = type
@@ -34,9 +35,9 @@ class LlmInfo:
             llm_type_enum = LangChainAdapterType[llm_type_str]
 
         llm_info = LlmInfo(
-                        type=llm_type_enum, 
-                        model=model, 
-                        timeout=timeout, 
+                        type=llm_type_enum,
+                        model=model,
+                        timeout=timeout,
                         temperature=llms_temp,
                         is_chat_model=is_chat_model,
                         is_reasoning_model=is_reasoning_model,
@@ -46,4 +47,4 @@ class LlmInfo:
         return llm_info
     
     def __str__(self):
-        return f"LlmInfo(type='{self.type}', model='{self.model}', timeout='{self.timeout}', temperature='{str(self.temperature)}', is_chat_model='{str(self.is_chat_model)}', api_key='{self.api_key[:5]+'*****' if self.api_key else 'Not provided'}')"
+        return f"LlmInfo(type='{self.type}', model='{self.model}', timeout='{self.timeout}', temperature='{self.temperature!s}', is_chat_model='{self.is_chat_model!s}', api_key='{self.api_key[:5]+'*****' if self.api_key else 'Not provided'}')"

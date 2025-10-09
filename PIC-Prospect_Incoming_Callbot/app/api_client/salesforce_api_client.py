@@ -9,12 +9,12 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import jwt
 import pytz
-from .calendar_client_interface import CalendarClientInterface
-from .salesforce_user_client_interface import SalesforceUserClientInterface
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency
 from utils.latency_metric import OperationType
 
+from .calendar_client_interface import CalendarClientInterface
+from .salesforce_user_client_interface import SalesforceUserClientInterface
 
 class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface):
     _client_id = "3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3"
@@ -88,7 +88,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         """Authenticate with Salesforce using JWT or password method based on configuration"""
         # Check if already authenticated
         if self._is_authenticated():
-            self.logger.info(f"Already authenticated with Salesforce, skipping authentication")
+            self.logger.info("Already authenticated with Salesforce, skipping authentication")
             return True
 
         self.logger.info(f"Salesforce Authentication in progress using {self._auth_method} method...")
@@ -118,7 +118,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
         try:
             # Read private key file
-            with open(self._private_key_file_jwt, 'r', encoding='utf-8') as f:
+            with open(self._private_key_file_jwt, encoding='utf-8') as f:
                 private_key = f.read()
 
             self.logger.debug(f"Using private key from: {self._private_key_file_jwt}")
@@ -331,7 +331,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
         # Check the calendar availability before creating the appointement
         verified_event_id = await self.verify_appointment_existance_async(
-            event_id=None, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes
+            event_id=None, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes, owner_id=owner_id
         )
         if verified_event_id:
             self.logger.error(f"Error during scheduling new appointment: an appointment already exists at the same time {start_datetime}, of Id: {verified_event_id}")
@@ -399,7 +399,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                 self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
 
                 # Verify the appointment was created successfully
-                verified_event_id = await self.verify_appointment_existance_async(event_id=event_id, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes)
+                verified_event_id = await self.verify_appointment_existance_async(event_id=event_id, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes, owner_id=owner_id, user_id=who_id)
                 if verified_event_id:
                     return verified_event_id
                 else:
@@ -450,7 +450,15 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         return event_id
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
-    async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
+    async def verify_appointment_existance_async(
+        self,
+        event_id: str | None = None,
+        expected_subject: str | None = None,
+        start_datetime: str = "",
+        duration_minutes: int = 30,
+        owner_id: str | None = None,
+        user_id: str | None = None,
+    ) -> str | None:
         """Check if an appointment exists based on provided criteria
 
         Args:
@@ -464,7 +472,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             - If expected_subject is specified: returns event_id of the first appointment matching subject, None if not found
             - If neither is specified: returns event_id of the first appointment found in time window, None if none found
         """
-        if not start_datetime.endswith("Z"): 
+        if not start_datetime.endswith("Z"):
             start_datetime += "Z"
         
         # Calculate end datetime for the search window
@@ -498,7 +506,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
         try:
             # Get appointments in the time window
-            appointments = await self.get_scheduled_appointments_async(search_start_str, search_end_str)
+            appointments = await self.get_scheduled_appointments_async(search_start_str, search_end_str, owner_id=owner_id, user_id=user_id)
 
             if appointments is None:
                 self.logger.info("Error: Failed to retrieve appointments for verification")
@@ -1171,7 +1179,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             return dt.astimezone(UTC)
         return dt.astimezone(UTC)
 
-    def _calculate_end_datetime(self, start_datetime: datetime, duration_minutes: int) -> datetime | None:
+    def _calculate_end_datetime(self, start_datetime: datetime, duration_minutes: int) -> datetime:
         return start_datetime + timedelta(minutes=duration_minutes)
 
     async def _query_salesforce(self, soql_query: str) -> dict | None:
@@ -1429,10 +1437,10 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             return None
 
     def _get_owner_by_strategy(
-        self, 
-        person_type: str, 
-        contact_info: dict, 
-        opportunities: list | None, 
+        self,
+        person_type: str,
+        contact_info: dict,
+        opportunities: list | None,
         strategy: str
     ) -> tuple[str | None, str | None]:
         """
@@ -1475,7 +1483,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                         user_source = "opportunity"
                         self.logger.info(f"Strategy 'opport_only': Using opportunity owner: {user_id}")
             if not user_id:
-                self.logger.info(f"Strategy 'opport_only': No opportunity owner found, no fallback")
+                self.logger.info("Strategy 'opport_only': No opportunity owner found, no fallback")
             return user_id, user_source
             
         # Strategy: both (default) - Try opportunity first, fallback to contact/lead owner
@@ -1814,7 +1822,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                         slot_end_dt = datetime.fromisoformat(slot_end.replace('Z', '+00:00')).replace(tzinfo=UTC)
                         
                         # Check if requested appointment fits within any available slot
-                        if (slot_start_dt <= start_datetime_utc and 
+                        if (slot_start_dt <= start_datetime_utc and
                             slot_end_dt >= end_datetime_utc):
                             slot_available = True
                             self.logger.info(f"✓ Slot verified: Available from {slot_start} to {slot_end}")

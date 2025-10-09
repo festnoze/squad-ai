@@ -1,5 +1,7 @@
 import pytest
+
 from app.speech.text_processing import ProcessText
+
 
 @pytest.mark.parametrize("test_input,max_words,max_chars,expected", [
     # Test case 1: Simple case of sentence splitting within limits
@@ -48,8 +50,8 @@ from app.speech.text_processing import ProcessText
 def test_chunk_text_by_sized_sentences(test_input, max_words, max_chars, expected):
     """Test the chunk_text_by_sentences_size method with simplified splitting behavior."""
     result = ProcessText.chunk_text_by_sentences_size(
-        test_input, 
-        max_words_by_sentence=max_words, 
+        test_input,
+        max_words_by_sentence=max_words,
         max_chars_by_sentence=max_chars
     )
     assert result == expected, f"Expected {expected}, got {result}"

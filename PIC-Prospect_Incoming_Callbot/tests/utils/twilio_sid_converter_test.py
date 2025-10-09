@@ -1,7 +1,9 @@
 import uuid
-import pytest
 from uuid import UUID
+
+import pytest
 from utils.twilio_sid_converter import TwilioCallSidConverter
+
 
 def test_bijection_roundtrip():
     original_uid: uuid.UUID = uuid.uuid4()

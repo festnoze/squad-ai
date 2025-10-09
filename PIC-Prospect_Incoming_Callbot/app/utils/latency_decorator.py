@@ -2,20 +2,21 @@ import asyncio
 import functools
 import inspect
 import time
-from typing import Any, Callable, Optional, Union
+from collections.abc import Callable
+from typing import Any
 
-from utils.latency_metric import LatencyMetric, OperationType, OperationStatus
+from utils.latency_metric import LatencyMetric, OperationStatus, OperationType
 from utils.latency_tracker import latency_tracker
 
 
 def measure_latency(
     operation_type: OperationType,
-    operation_name: Optional[str] = None,
-    provider: Optional[str] = None,
-    call_sid_attr: Optional[str] = None,
-    stream_sid_attr: Optional[str] = None,
-    phone_number_attr: Optional[str] = None,
-    metadata: Optional[dict] = None
+    operation_name: str | None = None,
+    provider: str | None = None,
+    call_sid_attr: str | None = None,
+    stream_sid_attr: str | None = None,
+    phone_number_attr: str | None = None,
+    metadata: dict | None = None
 ):
     """
     Décorateur pour mesurer la latence des méthodes synchrones et asynchrones.
@@ -130,11 +131,11 @@ class LatencyContextManager:
         self,
         operation_type: OperationType,
         operation_name: str,
-        provider: Optional[str] = None,
-        call_sid: Optional[str] = None,
-        stream_sid: Optional[str] = None,
-        phone_number: Optional[str] = None,
-        metadata: Optional[dict] = None
+        provider: str | None = None,
+        call_sid: str | None = None,
+        stream_sid: str | None = None,
+        phone_number: str | None = None,
+        metadata: dict | None = None
     ):
         self.operation_type = operation_type
         self.operation_name = operation_name
@@ -143,7 +144,7 @@ class LatencyContextManager:
         self.stream_sid = stream_sid
         self.phone_number = phone_number
         self.metadata = metadata or {}
-        self.start_time: Optional[float] = None
+        self.start_time: float | None = None
     
     def __enter__(self) -> "LatencyContextManager":
         self.start_time = time.perf_counter()
@@ -182,11 +183,11 @@ class LatencyContextManager:
 def measure_latency_context(
     operation_type: OperationType,
     operation_name: str,
-    provider: Optional[str] = None,
-    call_sid: Optional[str] = None,
-    stream_sid: Optional[str] = None,
-    phone_number: Optional[str] = None,
-    metadata: Optional[dict] = None
+    provider: str | None = None,
+    call_sid: str | None = None,
+    stream_sid: str | None = None,
+    phone_number: str | None = None,
+    metadata: dict | None = None
 ) -> LatencyContextManager:
     """
     Créer un context manager pour mesurer la latence.
@@ -236,12 +237,12 @@ def _extract_call_stream_ids_and_phone(args, call_sid_attr, stream_sid_attr, pho
             if phone_number_attr and hasattr(obj, phone_number_attr):
                 phone_number = getattr(obj, phone_number_attr)
             elif call_sid and hasattr(obj, 'phones_by_call_sid'):
-                phones_by_call_sid = getattr(obj, 'phones_by_call_sid')
+                phones_by_call_sid = obj.phones_by_call_sid
                 if isinstance(phones_by_call_sid, dict):
                     phone_number = phones_by_call_sid.get(call_sid)
             elif hasattr(obj, 'phone_number'):
                 # Fallback direct attribute
-                phone_number = getattr(obj, 'phone_number')
+                phone_number = obj.phone_number
             
     return call_sid, stream_sid, phone_number
 
@@ -249,12 +250,12 @@ def _extract_call_stream_ids_and_phone(args, call_sid_attr, stream_sid_attr, pho
 
 def measure_streaming_latency(
     operation_type: OperationType,
-    operation_name: Optional[str] = None,
-    provider: Optional[str] = None,
-    call_sid_attr: Optional[str] = None,
-    stream_sid_attr: Optional[str] = None,
-    phone_number_attr: Optional[str] = None,
-    metadata: Optional[dict] = None
+    operation_name: str | None = None,
+    provider: str | None = None,
+    call_sid_attr: str | None = None,
+    stream_sid_attr: str | None = None,
+    phone_number_attr: str | None = None,
+    metadata: dict | None = None
 ):
     """
     Décorateur spécialisé pour mesurer la latence "time to first token" 

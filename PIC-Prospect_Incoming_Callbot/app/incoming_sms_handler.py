@@ -6,6 +6,7 @@ from api_client.request_models.query_asking_request_model import QueryAskingRequ
 from api_client.request_models.user_request_model import DeviceInfoRequestModel, UserRequestModel
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 
+
 class IncomingSMSHandler:
     def __init__(self):
         self.logger = logging.getLogger(__name__)

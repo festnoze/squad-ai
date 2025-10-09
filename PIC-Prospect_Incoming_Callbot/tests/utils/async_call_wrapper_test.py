@@ -1,8 +1,10 @@
 import asyncio
-import pytest
 import time
 from concurrent.futures import ThreadPoolExecutor
+
+import pytest
 from utils.async_call_wrapper import AsyncCallWrapper
+
 
 # Test helper functions
 async def example_async_function(delay: float, value: str) -> str:
@@ -56,8 +58,8 @@ def test_run_in_thread():
     
 def test_parallel_thread_execution():
     """Test that two methods running in parallel threads complete faster than sequential execution."""
-    import time
     import threading
+    import time
     
     # Create two futures to store results
     results = [None, None]
@@ -94,8 +96,8 @@ def test_parallel_thread_execution():
 
 def test_parallel_run_in_thread():
     """Test that AsyncCallWrapper.run_in_thread actually runs tasks in parallel."""
-    import time
     import concurrent.futures
+    import time
     
     # Define tasks that will each take 1 second
     async def task_one_second(task_id):

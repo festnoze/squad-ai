@@ -2,8 +2,8 @@ import asyncio
 import logging
 import os
 from asyncio import Task
-from datetime import UTC, datetime, timedelta
-from typing import Hashable
+from collections.abc import Hashable
+from datetime import UTC, timedelta
 from uuid import UUID
 
 from api_client.calendar_client_interface import CalendarClientInterface
@@ -23,6 +23,7 @@ from langgraph.graph.state import CompiledStateGraph
 from managers.consecutive_error_manager import ConsecutiveErrorManager
 from managers.outgoing_audio_manager import OutgoingAudioManager
 from managers.outgoing_manager import OutgoingManager
+from services.analytics_service import AnalyticsService
 from services.outgoing_call_service import OutgoingCallService
 from utils.envvar import EnvHelper
 from utils.twilio_sid_converter import TwilioCallSidConverter
@@ -36,7 +37,6 @@ from database.conversation_persistence_service_factory import ConversationPersis
 from llms.langchain_adapter_type import LangChainAdapterType
 from llms.langchain_factory import LangChainFactory
 from llms.llm_info import LlmInfo
-from services.analytics_service import AnalyticsService
 
 
 class AgentsGraph:

@@ -1,5 +1,6 @@
 from typing import Any, TypedDict
 
+
 class ConversationState(TypedDict):
     """Represents the state of the conversation at any point."""
 

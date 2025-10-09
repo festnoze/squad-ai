@@ -142,7 +142,7 @@
         
 #         # Verify the method was called with the correct parameters
 #         mock_incoming_instance.init_conversation_async.assert_called_once_with(
-#             mock_environment['call_sid'], 
+#             mock_environment['call_sid'],
 #             mock_environment['stream_sid']
 #         )
 #         # Verify the return value

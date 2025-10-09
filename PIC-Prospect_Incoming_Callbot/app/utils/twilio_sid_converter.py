@@ -2,6 +2,7 @@ import re
 import uuid
 from uuid import UUID
 
+
 class TwilioCallSidConverter:
     @staticmethod
     def uuid_to_call_sid(uuid_value: str | UUID) -> str:

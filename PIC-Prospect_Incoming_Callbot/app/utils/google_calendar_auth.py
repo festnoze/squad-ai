@@ -7,14 +7,12 @@ This module provides authentication utilities for Google Calendar API using serv
 import json
 import logging
 from pathlib import Path
-from typing import Any
 
 from google.auth.exceptions import GoogleAuthError
 from google.auth.transport.requests import Request
 from google.oauth2 import service_account
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
-
 from utils.envvar import EnvHelper
 
 

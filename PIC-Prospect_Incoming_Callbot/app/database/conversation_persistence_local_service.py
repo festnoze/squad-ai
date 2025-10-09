@@ -11,6 +11,7 @@ from database.models.message import Message
 from database.models.user import User
 from database.user_repository import UserRepository
 
+
 class QuotaOverloadException(Exception):
     pass
 

@@ -37,8 +37,9 @@ def test_api_integration():
         os.environ.setdefault('ENVIRONMENT', 'development')
 
         # Import and test the API
-        from app.api.startup import app
         from fastapi.testclient import TestClient
+
+        from app.api.startup import app
 
         client = TestClient(app)
 

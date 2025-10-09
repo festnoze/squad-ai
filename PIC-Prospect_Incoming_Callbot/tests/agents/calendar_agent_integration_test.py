@@ -438,6 +438,8 @@ def sf_client_mock():
             expected_subject: str | None = None,
             start_datetime: str = "",
             duration_minutes: int = 30,
+            owner_id: str | None = None,
+            user_id: str | None = None,
         ) -> str | None:
             return "001" if self.exist_appointment else None
 

@@ -2,9 +2,8 @@
 """
 Build MkDocs documentation for serving as static files.
 """
-import os
-import subprocess
 import shutil
+import subprocess
 from pathlib import Path
 
 

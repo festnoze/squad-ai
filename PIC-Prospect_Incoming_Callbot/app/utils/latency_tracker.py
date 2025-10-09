@@ -2,12 +2,13 @@ import json
 import logging
 import threading
 from collections import defaultdict, deque
-from datetime import datetime, timedelta, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Callable
 
 from utils.envvar import EnvHelper
-from utils.latency_metric import LatencyMetric, OperationType, OperationStatus
+from utils.latency_metric import LatencyMetric, OperationStatus, OperationType
+
 
 class LatencyThresholds:
     """Latency threshold configuration for each operation type"""
@@ -185,9 +186,9 @@ class LatencyTracker:
     
     def get_average_latency(self, operation_type: OperationType, minutes: int = 5) -> float | None:
         """Return average latency over the last X minutes"""
-        cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+        cutoff_time = datetime.now(UTC) - timedelta(minutes=minutes)
         recent_metrics = [
-            m for m in self.metrics 
+            m for m in self.metrics
             if m.operation_type == operation_type and m.timestamp > cutoff_time
         ]
         

@@ -1,12 +1,9 @@
 import logging
 import re
-from typing import Optional
 
-from twilio.rest import Client
 from twilio.base.exceptions import TwilioRestException
-
+from twilio.rest import Client
 from utils.envvar import EnvHelper
-
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +30,7 @@ class OutgoingCallService:
         e164_pattern = r'^\+[1-9]\d{1,14}$'
         return re.match(e164_pattern, phone_number) is not None
 
-    async def make_call_async(self, to_phone_number: str, twiml_callback_url: str, from_phone_number: Optional[str] = None) -> str:
+    async def make_call_async(self, to_phone_number: str, twiml_callback_url: str, from_phone_number: str | None = None) -> str:
         """
         Initiate an outgoing call via Twilio REST API.
 

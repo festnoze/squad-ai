@@ -1,13 +1,13 @@
-import pytest
-import sys
 import os
-from unittest.mock import Mock, AsyncMock, patch
+import sys
+from unittest.mock import AsyncMock
+
+import pytest
 from pyshould import should
 
 # Add the parent directory to sys.path to allow importing app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from agents.agents_graph import AgentsGraph
 from managers.incoming_text_manager import IncomingTextManager
 from managers.outgoing_text_manager import OutgoingTextManager
     
@@ -17,7 +17,7 @@ calling_phone_number = '+123456789'
 @pytest.fixture
 def incoming_text_manager():
     """Fixture to create a mock IncomingTextManager with mocked dependencies."""
-    # Create mocks        
+    # Create mocks
     mock_outgoing_manager = AsyncMock(spec=OutgoingTextManager)
     mock_agents_graph = AsyncMock()
     incoming_text_manager = IncomingTextManager(
@@ -70,7 +70,7 @@ def test_set_phone_number(incoming_text_manager  : IncomingTextManager):
 
 
 async def test_process_incoming_data_is_processing(incoming_text_manager : IncomingTextManager):
-    """Test that process_incoming_data_async processes data when is_processing is True."""        
+    """Test that process_incoming_data_async processes data when is_processing is True."""
     # Arrange
     test_message = "Test message"
     
@@ -88,7 +88,7 @@ async def test_process_incoming_data_is_processing(incoming_text_manager : Incom
 
 
 async def test_process_incoming_data_exception(incoming_text_manager : IncomingTextManager):
-    """Test that process_incoming_data_async handles exceptions gracefully."""        
+    """Test that process_incoming_data_async handles exceptions gracefully."""
     # Arrange
     incoming_text_manager.is_processing = True
     incoming_text_manager.agents_graph.ainvoke.side_effect = Exception("Test exception")
@@ -101,7 +101,7 @@ async def test_process_incoming_data_exception(incoming_text_manager : IncomingT
         
 
 async def test_process_incoming_data_with_different_user_input(incoming_text_manager : IncomingTextManager):
-    """Test that process_incoming_data_async handles different user inputs correctly."""        
+    """Test that process_incoming_data_async handles different user inputs correctly."""
     # Test with empty input
     await incoming_text_manager.process_incoming_data_async("")
     # Test with very long input

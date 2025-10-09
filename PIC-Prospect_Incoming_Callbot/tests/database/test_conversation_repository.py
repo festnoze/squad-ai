@@ -1,13 +1,13 @@
-import pytest
-import asyncio
 import os
-import tempfile
-from uuid import uuid4, UUID
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+from uuid import uuid4
+
+import pytest
 
 from database.conversation_repository import ConversationRepository
+from database.entities import DeviceInfoEntity, UserEntity
 from database.models.conversation import Conversation, Message
-from database.entities import UserEntity, DeviceInfoEntity
+
 
 @pytest.fixture
 async def conversation_repository():
@@ -42,17 +42,17 @@ async def sample_user(conversation_repository):
         os="Windows 10",
         browser="Chrome",
         is_mobile=False,
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC)
     )
     
     user_entity = UserEntity(
         id=user_id,
         name="Test User",
         device_infos=[device_info],
-        created_at=datetime.now(timezone.utc)
+        created_at=datetime.now(UTC)
     )
     
-    await conversation_repository.data_context.add_entity_async(user_entity)    
+    await conversation_repository.data_context.add_entity_async(user_entity)
     return user_entity
 
 

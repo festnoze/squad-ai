@@ -1,8 +1,9 @@
 import hashlib
 import logging
 from typing import Optional
-from utils.envvar import EnvHelper
+
 from ga4mp import GtagMP
+from utils.envvar import EnvHelper
 
 logger = logging.getLogger(__name__)
 
@@ -10,7 +11,7 @@ class AnalyticsService:
     """Service for tracking events to Google Analytics 4 using Measurement Protocol"""
 
     _instance: Optional["AnalyticsService"] = None
-    _tracker: Optional[GtagMP] = None
+    _tracker: GtagMP | None = None
     _enabled: bool = False
 
     def __new__(cls):
@@ -102,8 +103,8 @@ class AnalyticsService:
         self,
         call_sid: str,
         is_recognized: bool,
-        user_id: Optional[str] = None,
-        owner_name: Optional[str] = None
+        user_id: str | None = None,
+        owner_name: str | None = None
     ) -> None:
         """Track user identification with recognition status"""
         if not self._enabled or not self._tracker:
@@ -127,7 +128,7 @@ class AnalyticsService:
         self,
         call_sid: str,
         consent_given: bool,
-        user_input: Optional[str] = None
+        user_input: str | None = None
     ) -> None:
         """Track user response to appointment consent question"""
         if not self._enabled or not self._tracker:
@@ -150,7 +151,7 @@ class AnalyticsService:
         self,
         call_sid: str,
         agent_type: str,
-        user_input_category: Optional[str] = None
+        user_input_category: str | None = None
     ) -> None:
         """Track when user is routed to a specific agent"""
         if not self._enabled or not self._tracker:
@@ -216,7 +217,7 @@ class AnalyticsService:
         self,
         call_sid: str,
         query_length: int,
-        response_length: Optional[int] = None
+        response_length: int | None = None
     ) -> None:
         """Track RAG query processing"""
         if not self._enabled or not self._tracker:
@@ -294,7 +295,7 @@ class AnalyticsService:
             event.set_event_param(name="initiated_via", value=initiated_via)
 
             self._tracker.send(events=[event])
-            logger.debug(f"Tracked outgoing_call_initiated event")
+            logger.debug("Tracked outgoing_call_initiated event")
         except Exception as e:
             logger.error(f"Failed to track outgoing_call_initiated event: {e}")
 
@@ -313,6 +314,6 @@ class AnalyticsService:
             event.set_event_param(name="message_length", value=message_length)
 
             self._tracker.send(events=[event])
-            logger.debug(f"Tracked sms_received event")
+            logger.debug("Tracked sms_received event")
         except Exception as e:
             logger.error(f"Failed to track sms_received event: {e}")

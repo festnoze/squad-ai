@@ -11,11 +11,10 @@ from langchain.tools import tool
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from services.outgoing_call_service import OutgoingCallService
 from utils.business_hours_config import BusinessHoursConfig, ValidationResult
-from utils.envvar import EnvHelper
 
 from agents.text_registry import TextRegistry
+
 
 class CalendarAgent:
     salesforce_api_client: CalendarClientInterface
@@ -110,7 +109,7 @@ class CalendarAgent:
 
         if category == "Demande de confirmation du rendez-vous":
             if requested_date:
-                existing_event_id = await self.salesforce_api_client.verify_appointment_existance_async(event_id=None, start_datetime=requested_date.isoformat(), duration_minutes=30)
+                existing_event_id = await self.salesforce_api_client.verify_appointment_existance_async(event_id=None, start_datetime=requested_date.isoformat(), duration_minutes=30, owner_id=CalendarAgent.owner_id)
                 if existing_event_id:
                     available_timeframes_answer = await self.available_timeframes_agent.ainvoke(
                         {
@@ -251,7 +250,7 @@ class CalendarAgent:
         try:
             return await CalendarAgent.salesforce_api_client.schedule_new_appointment_async(subject, date_and_time, duration, description, owner_id=CalendarAgent.owner_id, who_id=CalendarAgent.user_id)
         except Exception as e:
-            CalendarAgent.logger.error(f"Error scheduling appointment: {str(e)}")
+            CalendarAgent.logger.error(f"Error scheduling appointment: {e!s}")
             return None
 
     def _set_user_info(self, user_id, first_name, last_name, email, owner_id, owner_name):

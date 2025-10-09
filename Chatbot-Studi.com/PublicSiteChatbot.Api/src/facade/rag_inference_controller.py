@@ -75,7 +75,7 @@ async def get_user_last_conversation(user_id: str):
 @inference_router.post("/conversation/ask-question/stream")
 async def rag_query_stream_async(user_query_request_model: QueryAskingRequestModel):
     try:
-        conversation = await AvailableService.prepare_conversation_for_user_query_answer_async(
+        conversation = await AvailableService.get_conversation_and_add_user_query_async(
                                                     user_query_request_model.conversation_id,
                                                     user_query_request_model.user_query_content
                                                 )        
@@ -97,7 +97,7 @@ async def rag_query_stream_async(user_query_request_model: QueryAskingRequestMod
 @inference_router.post("/conversation/ask-question/phone/stream")
 async def rag_query_by_phone_stream_async(user_query_request_model: QueryAskingRequestModel):
     try:
-        conversation = await AvailableService.prepare_conversation_for_user_query_answer_async(
+        conversation = await AvailableService.get_conversation_and_add_user_query_async(
                                                     user_query_request_model.conversation_id,
                                                     user_query_request_model.user_query_content
                                                 )        

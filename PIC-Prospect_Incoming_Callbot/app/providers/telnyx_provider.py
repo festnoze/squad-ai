@@ -1,11 +1,13 @@
-import logging
 import json
-from typing import Dict, Any, Tuple
-from fastapi import Request, WebSocket, HTTPException
-from fastapi.responses import HTMLResponse, JSONResponse
+import logging
+from typing import Any
+
+from fastapi import HTTPException, Request, WebSocket
+from fastapi.responses import HTMLResponse
 from utils.envvar import EnvHelper
-from providers.phone_provider_base import PhoneProvider
 from utils.phone_provider_type import PhoneProviderType
+
+from providers.phone_provider_base import PhoneProvider
 
 
 class TelnyxProvider(PhoneProvider):
@@ -58,7 +60,7 @@ class TelnyxProvider(PhoneProvider):
         
         return HTMLResponse(content=texml_response, media_type="application/xml")
     
-    async def extract_call_data(self, request: Request) -> Tuple[str, str, str]:
+    async def extract_call_data(self, request: Request) -> tuple[str, str, str]:
         """Extract phone number, call control ID, and body from Telnyx request"""
         phone_number: str = "Unknown From"
         call_control_id: str = "Unknown Call Control ID"
@@ -98,7 +100,7 @@ class TelnyxProvider(PhoneProvider):
         clean_call_id = call_id.split(":", 1)[-1] if ":" in call_id else call_id
         return f"{ws_scheme}://{request.url.netloc}/ws/phone/{phone_number}/call_control_id/{clean_call_id}"
     
-    def parse_websocket_event(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_websocket_event(self, data: dict[str, Any]) -> dict[str, Any]:
         """Parse Telnyx websocket event and normalize to common format"""
         event = data.get("event")
         
@@ -134,7 +136,7 @@ class TelnyxProvider(PhoneProvider):
         
         return {"event": "unknown", "raw_data": data}
     
-    def create_media_message(self, stream_id: str, payload: str) -> Dict[str, Any]:
+    def create_media_message(self, stream_id: str, payload: str) -> dict[str, Any]:
         """Create Telnyx media message for sending audio"""
         return {
             "event": "media",
@@ -142,7 +144,7 @@ class TelnyxProvider(PhoneProvider):
             "media": {"payload": payload}
         }
     
-    def get_audio_format(self) -> Dict[str, Any]:
+    def get_audio_format(self) -> dict[str, Any]:
         """Get Telnyx audio format specifications"""
         return {
             "encoding": "rtp_pcmu",  # Telnyx uses RTP PCMU by default

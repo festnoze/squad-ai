@@ -87,7 +87,15 @@ class SalesforceApiClientFake(CalendarClientInterface, SalesforceUserClientInter
         await self._ensure_authenticated_async()
         return True
 
-    async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
+    async def verify_appointment_existance_async(
+        self,
+        event_id: str | None = None,
+        expected_subject: str | None = None,
+        start_datetime: str = "",
+        duration_minutes: int = 30,
+        owner_id: str | None = None,
+        user_id: str | None = None,
+    ) -> str | None:
         await self._ensure_authenticated_async()
         # Return None to simulate no existing appointment found
         return None

@@ -10,12 +10,11 @@ from agents.calendar_agent import CalendarAgent
 from agents.phone_conversation_state_model import PhoneConversationState
 from agents.text_registry import TextRegistry
 from api_client.calendar_client_interface import CalendarClientInterface
-from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from api_client.salesforce_user_client_interface import SalesforceUserClientInterface
+from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from managers.outgoing_manager import OutgoingManager
-from utils.envvar import EnvHelper
-
 from routers.callbot_router import change_env_var_values
+from utils.envvar import EnvHelper
 
 
 async def test_graph_init_conversation_and_welcome_message(agents_graph_mockings):

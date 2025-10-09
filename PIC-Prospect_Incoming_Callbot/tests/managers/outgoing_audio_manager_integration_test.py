@@ -1,11 +1,12 @@
 import asyncio
 import logging
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock
+
 from fastapi import WebSocket
 
+from app.managers.outgoing_audio_manager import OutgoingAudioManager
 from app.speech.text_to_speech import TextToSpeechProvider
 from app.speech.twilio_audio_sender import TwilioAudioSender
-from app.managers.outgoing_audio_manager import OutgoingAudioManager
 
 # Configure logging for tests
 logging.basicConfig(level=logging.DEBUG)
@@ -13,7 +14,7 @@ logging.basicConfig(level=logging.DEBUG)
 
 async def test_all_chunks_processing():
     """Test that all chunks in the queue gets processed and sent."""
-    # Arrange        
+    # Arrange
     audio_sender = MagicMock(spec=TwilioAudioSender)
     audio_sender.send_audio_chunk_async = AsyncMock(return_value=True)
     audio_sender.stream_sid = "mock_stream_sid"

@@ -2,8 +2,8 @@
 """
 Verify documentation setup is working correctly
 """
-import os
 from pathlib import Path
+
 
 def verify_docs_built():
     """Verify that documentation has been built"""

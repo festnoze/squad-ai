@@ -10,10 +10,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
-from routers.incoming_call_router import incoming_call_router
-from routers.outgoing_call_router import outgoing_call_router
 from routers.conversation_router import conversation_router
+from routers.incoming_call_router import incoming_call_router
 from routers.logs_router import logs_router
+from routers.outgoing_call_router import outgoing_call_router
 from routers.salesforce_router import salesforce_router
 from routers.test_router import test_router
 from speech.pregenerated_audio import PreGeneratedAudio
