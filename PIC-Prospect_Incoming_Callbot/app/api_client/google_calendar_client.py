@@ -6,16 +6,15 @@ This module provides a Google Calendar implementation of the CalendarClientInter
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any
 
 import pytz
 from googleapiclient.errors import HttpError
-
-from .calendar_client_interface import CalendarClientInterface
 from utils.envvar import EnvHelper
 from utils.google_calendar_auth import GoogleCalendarAuth
 from utils.latency_decorator import measure_latency
 from utils.latency_metric import OperationType
+
+from .calendar_client_interface import CalendarClientInterface
 
 
 class GoogleCalendarClient(CalendarClientInterface):
@@ -188,11 +187,13 @@ class GoogleCalendarClient(CalendarClientInterface):
     
     @measure_latency(OperationType.CALENDAR, provider="google")
     async def verify_appointment_existance_async(
-        self, 
-        event_id: str | None = None, 
-        expected_subject: str | None = None, 
-        start_datetime: str = "", 
-        duration_minutes: int = 30
+        self,
+        event_id: str | None = None,
+        expected_subject: str | None = None,
+        start_datetime: str = "",
+        duration_minutes: int = 30,
+        owner_id: str | None = None,
+        user_id: str | None = None,
     ) -> str | None:
         """Check if an appointment exists based on provided criteria"""
         await self._ensure_authenticated_async()
@@ -227,7 +228,9 @@ class GoogleCalendarClient(CalendarClientInterface):
                 # Search for events in time window
                 events = await self.get_scheduled_appointments_async(
                     start_datetime=start_dt.isoformat(),
-                    end_datetime=end_dt.isoformat()
+                    end_datetime=end_dt.isoformat(),
+                    owner_id=owner_id,
+                    user_id=user_id,
                 )
                 
                 for event in events:

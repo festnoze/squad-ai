@@ -2,25 +2,25 @@ import logging
 import os
 
 from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from incoming_sms_handler import IncomingSMSHandler
 
 #
 from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandler, PhoneCallWebsocketEventsHandlerFactory
 from providers.phone_provider_base import PhoneProvider
-from providers.twilio_provider import TwilioProvider
 from providers.telnyx_provider import TelnyxProvider
-from utils.phone_provider_type import PhoneProviderType
+from providers.twilio_provider import TwilioProvider
 from twilio.request_validator import RequestValidator
 from twilio.rest import Client
 from twilio.twiml.messaging_response import MessagingResponse
-from twilio.twiml.voice_response import Connect, VoiceResponse
+from twilio.twiml.voice_response import VoiceResponse
 from utils.endpoints_api_key_required_decorator import api_key_required
 from utils.envvar import EnvHelper
+from utils.phone_provider_type import PhoneProviderType
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-callbot_router = APIRouter()
+incoming_call_router = APIRouter()
 
 # Instanciate after app startup
 phone_call_websocket_events_handler_factory: PhoneCallWebsocketEventsHandlerFactory = PhoneCallWebsocketEventsHandlerFactory()
@@ -66,18 +66,20 @@ async def verify_twilio_call_sid(call_sid: str, from_number: str) -> None:
 
 
 # ========= Incoming phone call endpoints ========= #
-@callbot_router.post("/")
-@callbot_router.post("/twilio")
+@incoming_call_router.post("/")
+@incoming_call_router.post("/twilio")
 async def twilio_voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     logger.info("Received POST request for Twilio voice endpoint")
     return await create_websocket_for_incoming_call_async(request, PhoneProviderType.TWILIO)
 
-@callbot_router.post("/telnyx")
+
+@incoming_call_router.post("/telnyx")
 async def telnyx_voice_incoming_call_endpoint(request: Request) -> HTMLResponse:
     logger.info("Received POST request for Telnyx voice endpoint")
     return await create_websocket_for_incoming_call_async(request, PhoneProviderType.TELNYX)
 
-@callbot_router.get("/websocket-url")
+
+@incoming_call_router.get("/websocket-url")
 @api_key_required
 async def get_websocket_url_for_incoming_call(request: Request) -> HTMLResponse:
     logger.info("Received GET request for websocket URL endpoint")
@@ -93,9 +95,10 @@ async def get_websocket_url_for_incoming_call_async(request: Request, provider: 
     ws_url = provider.get_websocket_url(request, phone_number, call_id)
     return ws_url, phone_number, call_id
 
+
 async def create_websocket_for_incoming_call_async(request: Request, phone_provider_type: PhoneProviderType) -> HTMLResponse:
     """Handle incoming phone calls from any provider"""
-    
+
     phone_provider = get_phone_provider(phone_provider_type)
     logger.info(f"Received POST request for {phone_provider.provider_type.value} voice webhook")
     try:
@@ -110,10 +113,10 @@ async def create_websocket_for_incoming_call_async(request: Request, phone_provi
             return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
         else:
             # For Telnyx, return TeXML error response
-            texml_error = '''<?xml version="1.0" encoding="UTF-8"?>
+            texml_error = """<?xml version="1.0" encoding="UTF-8"?>
 <Response>
     <Say>An error occurred processing your call. Please try again later.</Say>
-</Response>'''
+</Response>"""
             return HTMLResponse(content=texml_error, media_type="application/xml", status_code=500)
 
 
@@ -139,37 +142,41 @@ async def _extract_request_data_async(request: Request) -> tuple:
 
 
 # ========= Incoming phone call WebSocket endpoint ========= #
-@callbot_router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
-async def twilio_websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str) -> None:
+@incoming_call_router.websocket("/ws/phone/{calling_phone_number}/sid/{call_sid}")
+async def twilio_websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_sid: str, call_type: str = "incoming") -> None:
     """WebSocket endpoint for Twilio calls"""
     provider = get_phone_provider(PhoneProviderType.TWILIO)
-    await handle_websocket_connection(ws, calling_phone_number, call_sid, provider)
+    is_outgoing = call_type == "outgoing"
+    await handle_websocket_connection(ws, calling_phone_number, call_sid, provider, is_outgoing)
 
-@callbot_router.websocket("/ws/phone/{calling_phone_number}/call_control_id/{call_control_id}")
+
+@incoming_call_router.websocket("/ws/phone/{calling_phone_number}/call_control_id/{call_control_id}")
 async def telnyx_websocket_endpoint(ws: WebSocket, calling_phone_number: str, call_control_id: str) -> None:
     """WebSocket endpoint for Telnyx calls"""
     provider = get_phone_provider(PhoneProviderType.TELNYX)
     await handle_websocket_connection(ws, calling_phone_number, call_control_id, provider)
 
-async def handle_websocket_connection(ws: WebSocket, calling_phone_number: str, call_id: str, provider: PhoneProvider) -> None:
+
+async def handle_websocket_connection(ws: WebSocket, calling_phone_number: str, call_id: str, provider: PhoneProvider, is_outgoing: bool = False) -> None:
     """Generic WebSocket connection handler for any provider"""
     # Provider-specific authentication and verification
     if provider.provider_type == PhoneProviderType.TWILIO:
         await verify_twilio_call_sid(call_id, calling_phone_number)
     else:
         await provider.verify_call(call_id, calling_phone_number)
-    
-    logger.info(f"WebSocket connection for {provider.provider_type.value} call ID {call_id} from {ws.client.host if ws.client else 'unknown websocket client (and host)'}.")
+
+    call_type_str = "outgoing" if is_outgoing else "incoming"
+    logger.info(f"WebSocket connection for {provider.provider_type.value} {call_type_str} call ID {call_id} from {ws.client.host if ws.client else 'unknown websocket client (and host)'}.")
     try:
         await ws.accept()
-        logger.info(f"[SUCCESS] WebSocket connection accepted for {provider.provider_type.value} call ID {call_id}.")
+        logger.info(f"[SUCCESS] WebSocket connection accepted for {provider.provider_type.value} {call_type_str} call ID {call_id}.")
     except Exception as e:
         logger.error(f"[FAIL] Failed to accept WebSocket connection for call ID {call_id}: {e}", exc_info=True)
         return
 
     call_handler: PhoneCallWebsocketEventsHandler
     try:
-        call_handler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws, provider=provider)
+        call_handler = phone_call_websocket_events_handler_factory.get_new_phone_call_websocket_events_handler(websocket=ws, provider=provider, is_outgoing=is_outgoing)
         await call_handler.handle_websocket_all_receieved_events_async(calling_phone_number, call_id)
         logger.info(f"WebSocket handler finished for {provider.provider_type.value} call ID {call_id}.")
 
@@ -198,43 +205,24 @@ async def handle_websocket_connection(ws: WebSocket, calling_phone_number: str, 
 
 
 # ========= Incoming SMS endpoint ========= #
-@callbot_router.api_route("/incoming-sms", methods=["GET", "POST"])
+@incoming_call_router.api_route("/incoming-sms", methods=["GET", "POST"])
 async def twilio_incoming_sms(request: Request):
     return await handle_incoming_sms_async(request)
-
 
 async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
     """Handle incoming SMS messages from Twilio"""
     logger.info("Received POST request for SMS webhook")
     try:
         phone_number, _, body = await _extract_request_data_async(request)
-        logger.info(f'SMS from: {phone_number}. Received message: "{body}"')
+        logger.info(f'* SMS received from: {phone_number}. Message content: "{body}"')
 
-        incoming_sms_handler = IncomingSMSHandler()
-        conversation_id = await incoming_sms_handler.init_user_and_conversation_upon_incoming_sms(phone_number)
-        if conversation_id:
-            rag_answer = await incoming_sms_handler.get_rag_response_to_sms_query_async(conversation_id, body)
-        else:
-            rag_answer = "Je suis désolé, je ne peux pas répondre à votre message."
-
-        logger.info(f'Original RAG answer: "{rag_answer}"')
-
-        # Clean the RAG answer for SMS - basic cleaning
-        logger.info(f'Basic cleaned RAG answer: "{rag_answer}"')
-
-        # Ensure GSM-7 encoding for SMS compatibility
-        gsm_rag_answer = rag_answer.encode("utf-8", errors="ignore").decode("utf-8")
-        logger.info(f'GSM-7 encoded RAG answer: "{gsm_rag_answer}"')
-
-        gsm_rag_answer = gsm_rag_answer.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'").replace("—", "-").replace("–", "-").replace("…", "...").replace(",", " ")
-        gsm_rag_answer = "".join(c for c in gsm_rag_answer if c in " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\n€£¥¤§¿¡ÄÅÆÇÉÑÖØÜßàäåæçèéìñòöøùü")
-
-        # gsm_rag_answer = "Merci pour votre message, un conseiller vous contactera prochainement. Il s'appelle étienne et est très sympa. Il est disponible sur WhatsApp et Telegram.\n\n A très 'vite'!"
-        logger.info(f'SMS answer: "{gsm_rag_answer}"')
+        #gsm_answer = await _create_sms_answer_async(phone_number, body)
+        gsm_answer = f"Bonjour,\nVous venez d'envoyer un message à un numéro de type 'no-reply'.\nIl n'est pas possible de poser de question via ce numéro.\nMerci de nous contacter par email ou par téléphone pour toute demande.\n\nMerci de votre compréhension,\nL'équipe {EnvHelper.get_company_name()}."
+        logger.info(f'* SMS answer: "{gsm_answer}"')
 
         # Create Twilio response with proper encoding
         response = MessagingResponse()
-        response.message(gsm_rag_answer)
+        response.message(gsm_answer)
         return HTMLResponse(content=str(response), media_type="application/xml")
 
     except Exception as e:
@@ -243,9 +231,39 @@ async def handle_incoming_sms_async(request: Request) -> HTMLResponse:
         response.message("Une erreur s'est produite. Veuillez réessayer plus tard.")
         return HTMLResponse(content=str(response), media_type="application/xml", status_code=500)
 
+async def _create_sms_answer_async(phone_number: str, body: str) -> str:
+    incoming_sms_handler = IncomingSMSHandler()
+    conversation_id = await incoming_sms_handler.init_user_and_conversation_upon_incoming_sms(phone_number)
+    if conversation_id:
+        rag_answer = await incoming_sms_handler.get_rag_response_to_sms_query_async(conversation_id, body)
+    else:
+        rag_answer = "Je suis désolé, je ne suis pas mesure de répondre à votre message."
+    logger.info(f'Original RAG answer: "{rag_answer}"')
+
+    # Ensure GSM-7 encoding for SMS compatibility
+    gsm_answer = rag_answer.encode("utf-8", errors="ignore").decode("utf-8")
+    gsm_answer = gsm_answer.replace("“", '"').replace("”", '"').replace("‘", "'").replace("’", "'").replace("—", "-").replace("–", "-").replace("…", "...").replace(",", " ")
+    gsm_answer = "".join(c for c in gsm_answer if c in " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\n€£¥¤§¿¡ÄÅÆÇÉÑÖØÜßàäåæçèéìñòöøùü")
+    logger.info(f'GSM-7 encoded RAG answer: "{gsm_answer}"')
+    return gsm_answer
+
 
 # ========= Hot Change of Environment Variables Endpoint ========= #
-@callbot_router.get("/change_env_var")
+@incoming_call_router.get("/env_var/all")
+@api_key_required
+async def get_all_env_var_endpoint(request: Request):
+    """Change environment variable value via query parameter"""
+    env_vars = {}
+    with open(".env") as env_file:
+        for line in env_file:
+            if '=' in line:
+                var_name, _ = line.strip().split("=", 1)
+                if var_name in os.environ:
+                    env_vars[var_name] = os.environ[var_name]
+    return JSONResponse(content=env_vars, media_type="application/json", status_code=200)
+    
+
+@incoming_call_router.post("/change_env_var")
 @api_key_required
 async def change_env_var_endpoint(request: Request):
     """Change environment variable value via query parameter"""

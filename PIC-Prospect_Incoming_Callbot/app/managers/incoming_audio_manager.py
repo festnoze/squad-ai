@@ -8,10 +8,12 @@ import random
 import time
 import uuid
 import wave
+from typing import cast
+
 import webrtcvad
+
 #
 from agents.agents_graph import AgentsGraph
-from typing import cast
 from agents.phone_conversation_state_model import ConversationState, PhoneConversationState
 from agents.text_registry import TextRegistry
 from api_client.conversation_persistence_interface import ConversationPersistenceInterface
@@ -21,10 +23,12 @@ from pydub import AudioSegment
 from pydub.effects import normalize
 from speech.speech_to_text import SpeechToTextProvider
 from utils.envvar import EnvHelper
+
 from database.conversation_persistence_local_service import ConversationPersistenceLocalService
 from database.conversation_persistence_service_fake import ConversationPersistenceServiceFake
 from managers.incoming_manager import IncomingManager
 from managers.outgoing_audio_manager import OutgoingManager
+
 
 class IncomingAudioManager(IncomingManager):
     """Audio processing utilities for improving speech recognition quality and handling Twilio events"""

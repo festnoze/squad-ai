@@ -1,21 +1,22 @@
-from typing import Dict, Any, Optional
+from typing import Any
+
 from pydantic import BaseModel, Field
 
 
 class CreateContactRequest(BaseModel):
     first_name: str = Field(..., description="Contact's first name")
     last_name: str = Field(..., description="Contact's last name")
-    email: Optional[str] = Field(None, description="Contact's email address")
-    phone: Optional[str] = Field(None, description="Contact's phone number")
-    mobile_phone: Optional[str] = Field(None, description="Contact's mobile phone number")
-    account_id: Optional[str] = Field(None, description="ID of the Account to associate with the contact")
-    owner_id: Optional[str] = Field(None, description="ID of the User who will own this contact")
-    title: Optional[str] = Field(None, description="Contact's job title")
-    department: Optional[str] = Field(None, description="Contact's department")
-    description: Optional[str] = Field(None, description="Additional description or notes")
-    additional_fields: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Any additional custom fields")
+    email: str | None = Field(None, description="Contact's email address")
+    phone: str | None = Field(None, description="Contact's phone number")
+    mobile_phone: str | None = Field(None, description="Contact's mobile phone number")
+    account_id: str | None = Field(None, description="ID of the Account to associate with the contact")
+    owner_id: str | None = Field(None, description="ID of the User who will own this contact")
+    title: str | None = Field(None, description="Contact's job title")
+    department: str | None = Field(None, description="Contact's department")
+    description: str | None = Field(None, description="Additional description or notes")
+    additional_fields: dict[str, Any] | None = Field(default_factory=dict, description="Any additional custom fields")
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "first_name": self.first_name,
             "last_name": self.last_name
@@ -48,23 +49,23 @@ class CreateOpportunityRequest(BaseModel):
     name: str = Field(..., description="Opportunity name")
     stage_name: str = Field(..., description="Sales stage name (e.g., 'Prospecting', 'Qualification', 'Closed Won')")
     close_date: str = Field(..., description="Expected close date in YYYY-MM-DD format")
-    account_id: Optional[str] = Field(None, description="ID of the Account associated with the opportunity")
-    owner_id: Optional[str] = Field(None, description="ID of the User who will own this opportunity")
-    contact_id: Optional[str] = Field(None, description="ID of the Contact to link directly to this opportunity")
-    contact_role: Optional[str] = Field("Decision Maker", description="Role of the contact in the opportunity")
-    converted_from_lead_id: Optional[str] = Field(None, description="ID of the Lead this opportunity was converted from")
-    amount: Optional[float] = Field(None, description="Opportunity amount/value")
-    probability: Optional[int] = Field(None, ge=0, le=100, description="Probability percentage (0-100)")
-    description: Optional[str] = Field(None, description="Opportunity description")
-    lead_source: Optional[str] = Field(None, description="Lead source (e.g., 'Web', 'Phone Inquiry', 'Partner Referral')")
-    type_: Optional[str] = Field(None, alias="type", description="Opportunity type (e.g., 'Existing Customer - Upgrade', 'New Customer')")
-    next_step: Optional[str] = Field(None, description="Next step in the sales process")
-    additional_fields: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Any additional custom fields")
+    account_id: str | None = Field(None, description="ID of the Account associated with the opportunity")
+    owner_id: str | None = Field(None, description="ID of the User who will own this opportunity")
+    contact_id: str | None = Field(None, description="ID of the Contact to link directly to this opportunity")
+    contact_role: str | None = Field("Decision Maker", description="Role of the contact in the opportunity")
+    converted_from_lead_id: str | None = Field(None, description="ID of the Lead this opportunity was converted from")
+    amount: float | None = Field(None, description="Opportunity amount/value")
+    probability: int | None = Field(None, ge=0, le=100, description="Probability percentage (0-100)")
+    description: str | None = Field(None, description="Opportunity description")
+    lead_source: str | None = Field(None, description="Lead source (e.g., 'Web', 'Phone Inquiry', 'Partner Referral')")
+    type_: str | None = Field(None, alias="type", description="Opportunity type (e.g., 'Existing Customer - Upgrade', 'New Customer')")
+    next_step: str | None = Field(None, description="Next step in the sales process")
+    additional_fields: dict[str, Any] | None = Field(default_factory=dict, description="Any additional custom fields")
 
     class Config:
         allow_population_by_field_name = True
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         result = {
             "name": self.name,
             "stage_name": self.stage_name,
@@ -109,14 +110,14 @@ class AddContactRoleRequest(BaseModel):
 
 class SalesforceResponse(BaseModel):
     success: bool = Field(..., description="Whether the operation was successful")
-    id: Optional[str] = Field(None, description="ID of the created/modified record")
+    id: str | None = Field(None, description="ID of the created/modified record")
     message: str = Field(..., description="Status message")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional details about the operation")
+    details: dict[str, Any] | None = Field(None, description="Additional details about the operation")
 
     @classmethod
-    def success_response(cls, record_id: str, message: str, details: Optional[Dict[str, Any]] = None):
+    def success_response(cls, record_id: str, message: str, details: dict[str, Any] | None = None):
         return cls(success=True, id=record_id, message=message, details=details)
 
     @classmethod
-    def error_response(cls, message: str, details: Optional[Dict[str, Any]] = None):
+    def error_response(cls, message: str, details: dict[str, Any] | None = None):
         return cls(success=False, message=message, details=details)

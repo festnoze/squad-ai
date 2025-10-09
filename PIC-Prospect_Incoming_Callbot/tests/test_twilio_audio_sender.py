@@ -1,12 +1,14 @@
-import pytest
 import asyncio
-import json
-import base64
 import audioop
+import base64
+import json
 import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
+import pytest
+
 from app.speech.twilio_audio_sender import TwilioAudioSender
+
 
 @pytest.fixture
 def mock_websocket():
@@ -25,7 +27,7 @@ def audio_sender(mock_websocket):
 def generate_pcm_audio(duration_ms, sample_rate=16000, bit_depth=16):
     num_samples = int(sample_rate * (duration_ms / 1000.0))
     # Each sample is 2 bytes for 16-bit PCM
-    return b'\x00\x00' * num_samples 
+    return b'\x00\x00' * num_samples
 
 
 async def test_initialization(audio_sender: TwilioAudioSender, mock_websocket):
@@ -69,7 +71,7 @@ async def test_send_audio_chunk_lin2ulaw_error(mock_lin2ulaw, audio_sender: Twil
 
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
-@patch('time.time') 
+@patch('time.time')
 async def test_send_audio_chunk_single_segment_success(mock_time, mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket):
     mock_current_time = 1000.0
     audio_sender.start_time = mock_current_time # Align start time for duration metrics
@@ -108,7 +110,7 @@ async def test_send_audio_chunk_multiple_segments_success(mock_time, mock_lin2ul
     mock_current_time = 2000.0
     audio_sender.start_time = mock_current_time
     # Provide enough time values for each segment + initial + final
-    time_sequence = [mock_current_time] + [mock_current_time + 0.05 * (i+1) for i in range(8)] 
+    time_sequence = [mock_current_time] + [mock_current_time + 0.05 * (i+1) for i in range(8)]
     mock_time.side_effect = time_sequence
 
     pcm_audio = generate_pcm_audio(250) # 250ms -> 8000 bytes PCM -> 4000 bytes mulaw -> 8 segments
@@ -177,7 +179,7 @@ async def test_send_audio_chunk_interruption(mock_lin2ulaw, mock_async_sleep, au
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
 async def test_send_audio_chunk_websocket_send_error_once(mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket, caplog):
-    pcm_audio = generate_pcm_audio(50) 
+    pcm_audio = generate_pcm_audio(50)
     mulaw_audio = b'\xCC' * (len(pcm_audio) // 2)
     mock_lin2ulaw.return_value = mulaw_audio
     audio_sender.consecutive_errors = 0 # Reset for test
@@ -190,7 +192,7 @@ async def test_send_audio_chunk_websocket_send_error_once(mock_lin2ulaw, mock_as
     assert mock_websocket.send_text.call_count == 1
     assert "Error sending audio segment to Twilio: Send failed!" in caplog.text
     assert audio_sender.consecutive_errors == 1
-    assert audio_sender.total_bytes_sent == 0 
+    assert audio_sender.total_bytes_sent == 0
     assert audio_sender.chunks_sent == 0
     audio_sender.consecutive_errors = 0 # Reset
 
@@ -198,25 +200,25 @@ async def test_send_audio_chunk_websocket_send_error_once(mock_lin2ulaw, mock_as
 @patch('asyncio.sleep', new_callable=AsyncMock)
 @patch('audioop.lin2ulaw')
 async def test_send_audio_chunk_websocket_send_error_max_attempts_in_chunk(mock_lin2ulaw, mock_async_sleep, audio_sender: TwilioAudioSender, mock_websocket, caplog):
-    pcm_audio = generate_pcm_audio(250) 
+    pcm_audio = generate_pcm_audio(250)
     mulaw_audio_full = b'\xDD' * (len(pcm_audio) // 2)
     mock_lin2ulaw.return_value = mulaw_audio_full
 
-    audio_sender.max_consecutive_errors = 3 
+    audio_sender.max_consecutive_errors = 3
     audio_sender.consecutive_errors = 0 # Start fresh for this test logic
     
     mock_websocket.send_text.side_effect = Exception("Network error on first segment")
 
     result = await audio_sender.send_audio_chunk_async(pcm_audio)
-    assert not result 
+    assert not result
 
-    assert mock_websocket.send_text.call_count == 1 
+    assert mock_websocket.send_text.call_count == 1
     assert "Error sending audio segment to Twilio: Network error on first segment" in caplog.text
-    assert audio_sender.consecutive_errors == 1 
-    assert "Max consecutive errors (3) reached" not in caplog.text 
+    assert audio_sender.consecutive_errors == 1
+    assert "Max consecutive errors (3) reached" not in caplog.text
 
-    audio_sender.consecutive_errors = 0 
-    audio_sender.max_consecutive_errors = 5 
+    audio_sender.consecutive_errors = 0
+    audio_sender.max_consecutive_errors = 5
 
 
 @patch('asyncio.sleep', new_callable=AsyncMock)
@@ -227,20 +229,20 @@ async def test_send_audio_chunk_max_errors_across_calls(mock_lin2ulaw, mock_asyn
     mock_lin2ulaw.return_value = mulaw_audio
     mock_websocket.send_text.side_effect = Exception("Persistent failure")
     audio_sender.max_consecutive_errors = 2
-    audio_sender.consecutive_errors = 0 
+    audio_sender.consecutive_errors = 0
 
-    await audio_sender.send_audio_chunk_async(pcm_audio) 
+    await audio_sender.send_audio_chunk_async(pcm_audio)
     assert audio_sender.consecutive_errors == 1
-    assert "Max consecutive errors (2) reached" not in caplog.text 
+    assert "Max consecutive errors (2) reached" not in caplog.text
 
-    await audio_sender.send_audio_chunk_async(pcm_audio) 
+    await audio_sender.send_audio_chunk_async(pcm_audio)
     assert audio_sender.consecutive_errors == 2
     assert "Max consecutive errors (2) reached while sending segment" in caplog.text
     
-    assert mock_websocket.send_text.call_count == 2 
+    assert mock_websocket.send_text.call_count == 2
 
-    audio_sender.consecutive_errors = 0 
-    audio_sender.max_consecutive_errors = 5 
+    audio_sender.consecutive_errors = 0
+    audio_sender.max_consecutive_errors = 5
 
 
 def test_get_sender_stats(audio_sender: TwilioAudioSender):
@@ -252,7 +254,7 @@ def test_get_sender_stats(audio_sender: TwilioAudioSender):
     audio_sender.is_sending = True
     audio_sender.last_chunk_time = current_t - 10
     audio_sender.start_time = current_t - 60
-    audio_sender.total_send_duration = 5.0 
+    audio_sender.total_send_duration = 5.0
 
     with patch('time.time', return_value=current_t):
         stats = audio_sender.get_sender_stats()
@@ -264,8 +266,8 @@ def test_get_sender_stats(audio_sender: TwilioAudioSender):
     assert stats['consecutive_errors'] == 1
     assert stats['is_sending'] == True
     assert stats['stream_sid'] == "test_stream_sid_123"
-    assert abs(stats['time_since_last_chunk'] - 10) < 0.1 
-    assert abs(stats['total_duration'] - 60) < 0.1 
+    assert abs(stats['time_since_last_chunk'] - 10) < 0.1
+    assert abs(stats['total_duration'] - 60) < 0.1
     assert abs(stats['send_duration'] - 5.0) < 1e-9
 
 def test_get_sending_stats(audio_sender: TwilioAudioSender):

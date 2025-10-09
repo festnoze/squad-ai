@@ -1,13 +1,15 @@
-import pytest
-import sys
 import os
-from unittest.mock import Mock, AsyncMock
+import sys
+from unittest.mock import AsyncMock, Mock
+
+import pytest
 
 # Add the parent directory to sys.path to allow importing app modules
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from speech.text_processing import ProcessText
 from managers.outgoing_audio_manager import OutgoingAudioManager
+from speech.text_processing import ProcessText
+
 
 @pytest.fixture
 def mock_outgoing_audio_manager():
@@ -121,8 +123,8 @@ async def test_send_text_to_speak_to_twilio(mock_outgoing_audio_manager, mock_lo
             
         # Use the actual text chunking utilities from ProcessText
         text_chunks = ProcessText.chunk_text_by_sentences_size(
-            text_buffer, 
-            max_words_by_sentence=max_words_per_chunk, 
+            text_buffer,
+            max_words_by_sentence=max_words_per_chunk,
             max_chars_by_sentence=max_chars_per_chunk
         )
         

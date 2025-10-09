@@ -2,10 +2,7 @@
 """
 Development script to run both API and documentation server simultaneously.
 """
-import asyncio
 import subprocess
-import sys
-import signal
 import time
 from pathlib import Path
 

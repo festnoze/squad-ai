@@ -191,7 +191,7 @@ class AvailableService:
         return conversation
     
     @staticmethod
-    async def prepare_conversation_for_user_query_answer_async(conversation_id:UUID, user_query_content:str) -> Conversation:
+    async def get_conversation_and_add_user_query_async(conversation_id:UUID, user_query_content:str) -> Conversation:
         # Wait for tasks on this conversation to be finished before adding a new message
         while task_handler.is_task_ongoing(conversation_id):
             await asyncio.sleep(0.5)

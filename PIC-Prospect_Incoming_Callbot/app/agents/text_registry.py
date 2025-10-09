@@ -48,6 +48,9 @@ class TextRegistry:
     # Existing appointment management texts
     existing_appointment_found_text = "Je vois que vous avez déjà un rendez-vous prévu avec votre conseiller. Je vous confirme que votre rendez-vous est planifié pour le "  # Souhaitez-vous le déplacer ou l'annuler ?"
 
+    # Outgoing call texts
+    outgoing_call_welcome_text = "Bonjour, je vous rappelle que la vie est belle !"
+
     @classmethod
     def get_all_texts(cls) -> list[str]:
         """Get all text values for pregeneration."""

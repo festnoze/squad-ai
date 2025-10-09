@@ -149,7 +149,7 @@ class OutgoingAudioManager(OutgoingManager):
                     # All text was found in cache parts
                     combined_audio = self._combine_audio_parts(audio_parts_found)
                     if combined_audio:
-                        self.logger.info(f">>>>>> Using combined cached parts for: '{text}' (parts: {[p[:30] + '...' for p in parts_used]})")
+                        self.logger.info(f">>> Using combined cached parts for: '{text}' (parts: {[p[:30] + '...' for p in parts_used]})")
 
                         # Cache the combined result for future use (store clean audio without background noise)
                         self.add_synthesized_audio_to_cache(text, combined_audio)
@@ -301,7 +301,7 @@ class OutgoingAudioManager(OutgoingManager):
             # Step 1: Try exact cache match first (fastest path)
             cached_bytes = self.get_synthesized_audio_from_cache(speech_chunk, allow_partial=False)
             if cached_bytes:
-                self.logger.info(f">>>>>> Using exact cached synthesis for: '{speech_chunk}'")
+                self.logger.info(f">>> Using exact cached synthesis for: '{speech_chunk}'")
                 return self._apply_background_noise_if_any(cached_bytes)
 
             # Step 2: Try partial cache matching with intelligent combination
@@ -319,7 +319,7 @@ class OutgoingAudioManager(OutgoingManager):
 
                     # Synthesize remaining text if any
                     if remaining_text.strip():
-                        self.logger.info(f">>>>>> Synthesizing remaining text: '{remaining_text}'")
+                        self.logger.info(f">>> Synthesizing remaining text: '{remaining_text}'")
                         remaining_audio = await self.tts_provider.synthesize_speech_to_bytes_async(
                             remaining_text,
                             call_sid=self.call_sid,
@@ -343,7 +343,7 @@ class OutgoingAudioManager(OutgoingManager):
                     if len(final_audio_parts) > 1:
                         combined_audio = self._combine_audio_parts(final_audio_parts)
                         if combined_audio:
-                            self.logger.info(f">>>>>> Combined audio from: {synthesis_info}")
+                            self.logger.info(f">>> Combined audio from: {synthesis_info}")
 
                             # Cache the complete combined result (without background noise)
                             OutgoingAudioManager.add_synthesized_audio_to_cache(speech_chunk, combined_audio)

@@ -297,7 +297,7 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(
     assert actual_category == expected_category, f"Expected category '{expected_category}', but got '{actual_category}' for input '{user_input}'."
 
     # Then, verify the agent's full response
-    actual_response = await agent.schedule_new_appointement_async(user_input, chat_history)
+    actual_response = await agent.process_to_schedule_new_appointement_async(user_input, chat_history)
 
     if await_exact_match:
         assert actual_response == expected_answer, f"Expected exact response:\n{expected_answer}\nGot:\n{actual_response}"
@@ -368,7 +368,7 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
         # Mock the categorize_request_for_dispatch_async method to return our predefined category for this step
         with patch.object(agent, "categorize_request_for_dispatch_async", return_value=step["category"]):
             # Call the method under test
-            actual_response = await agent.schedule_new_appointement_async(step["user_input"], chat_history)
+            actual_response = await agent.process_to_schedule_new_appointement_async(step["user_input"], chat_history)
 
             # Verify the response using exact match or semantic similarity based on the parameter
             if step["await_exact_match"]:
@@ -438,6 +438,8 @@ def sf_client_mock():
             expected_subject: str | None = None,
             start_datetime: str = "",
             duration_minutes: int = 30,
+            owner_id: str | None = None,
+            user_id: str | None = None,
         ) -> str | None:
             return "001" if self.exist_appointment else None
 

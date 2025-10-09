@@ -1,8 +1,10 @@
 import os
 import shutil
-from api.api_config import ApiConfig
+
 from utils.envvar import EnvHelper
 from utils.latency_config import latency_config
+
+from api.api_config import ApiConfig
 
 # # Analyse upon startup the whole project to find all types and generate strong typing
 # from strong_types.dynamic_type_analyzer import DynamicTypeAnalyzer

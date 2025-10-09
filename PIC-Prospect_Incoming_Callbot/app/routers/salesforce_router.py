@@ -1,13 +1,14 @@
 import logging
-from fastapi import APIRouter, Request, HTTPException
-from fastapi.responses import JSONResponse
+
 from api_client.request_models.salesforce_request_models import (
+    AddContactRoleRequest,
     CreateContactRequest,
     CreateOpportunityRequest,
-    AddContactRoleRequest,
-    SalesforceResponse
+    SalesforceResponse,
 )
 from api_client.salesforce_api_client import SalesforceApiClient
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from utils.endpoints_api_key_required_decorator import api_key_required
 
 logger = logging.getLogger(__name__)
@@ -77,11 +78,11 @@ async def create_contact(request: Request, contact_request: CreateContactRequest
             )
 
     except Exception as e:
-        logger.error(f"Error creating contact: {str(e)}")
+        logger.error(f"Error creating contact: {e!s}")
         return JSONResponse(
             status_code=500,
             content=SalesforceResponse.error_response(
-                message=f"Internal error: {str(e)}"
+                message=f"Internal error: {e!s}"
             ).dict()
         )
 
@@ -168,11 +169,11 @@ async def create_opportunity(request: Request, opportunity_request: CreateOpport
             )
 
     except Exception as e:
-        logger.error(f"Error creating opportunity: {str(e)}")
+        logger.error(f"Error creating opportunity: {e!s}")
         return JSONResponse(
             status_code=500,
             content=SalesforceResponse.error_response(
-                message=f"Internal error: {str(e)}"
+                message=f"Internal error: {e!s}"
             ).dict()
         )
 
@@ -245,11 +246,11 @@ async def add_contact_role_to_opportunity(request: Request, role_request: AddCon
             )
 
     except Exception as e:
-        logger.error(f"Error adding contact role to opportunity: {str(e)}")
+        logger.error(f"Error adding contact role to opportunity: {e!s}")
         return JSONResponse(
             status_code=500,
             content=SalesforceResponse.error_response(
-                message=f"Internal error: {str(e)}"
+                message=f"Internal error: {e!s}"
             ).dict()
         )
 
@@ -311,10 +312,10 @@ async def salesforce_health_check(request: Request) -> JSONResponse:
                 )
 
     except Exception as e:
-        logger.error(f"Salesforce health check failed: {str(e)}")
+        logger.error(f"Salesforce health check failed: {e!s}")
         return JSONResponse(
             status_code=503,
             content=SalesforceResponse.error_response(
-                message=f"Salesforce API error: {str(e)}"
+                message=f"Salesforce API error: {e!s}"
             ).dict()
         )

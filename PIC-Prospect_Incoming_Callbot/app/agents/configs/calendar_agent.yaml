@@ -8,11 +8,8 @@ appointments:
     # Support for multiple time slots throughout the day
     # Format: List of [start_time, end_time] pairs
     time_slots:
-      - ["09:00", "12:00"]  # Morning slot
-      - ["13:00", "16:00"]  # Afternoon slot
-    # Alternative single slot format (for backward compatibility)
-    start: 09:00
-    end: 16:00
+      - ["10:30", "12:00"]  # Morning slot
+      - ["14:00", "16:00"]  # Afternoon slot
     # Timezone for business hours (defaults to Europe/Paris)
     timezone: "Europe/Paris"
   # Allowed weekdays (0=Monday, 6=Sunday)

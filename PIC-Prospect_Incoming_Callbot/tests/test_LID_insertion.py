@@ -1,12 +1,14 @@
-import yaml
 import json
 import os
+
+import yaml
+
 #from api_validator import APIValidator
 
 def load_config():
     project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
     config_path = os.path.join(project_root, 'app/agents/configs/lid_api_config.yaml')
-    with open(config_path, 'r') as file:
+    with open(config_path) as file:
         return yaml.safe_load(file)
 
 def test_lead_injection():
@@ -40,7 +42,7 @@ def test_lead_injection():
     invalid_request = {
         "email": "test@example.com",
         "nom": "Dupont"
-    }    
+    }
     
     # Tester la requête invalide
     print("\nTest de requête invalide:")

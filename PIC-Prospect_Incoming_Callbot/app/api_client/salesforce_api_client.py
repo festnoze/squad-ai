@@ -9,12 +9,12 @@ from datetime import UTC, datetime, timedelta
 import httpx
 import jwt
 import pytz
-from .calendar_client_interface import CalendarClientInterface
-from .salesforce_user_client_interface import SalesforceUserClientInterface
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency
 from utils.latency_metric import OperationType
 
+from .calendar_client_interface import CalendarClientInterface
+from .salesforce_user_client_interface import SalesforceUserClientInterface
 
 class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface):
     _client_id = "3MVG9IKwJOi7clC2.8QIzh9BkM6NhU53bup6EUfFQiXJ01nh.l2YJKF5vbNWqPkFEdjgzAXIqK3U1p2WCBUD3"
@@ -88,7 +88,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         """Authenticate with Salesforce using JWT or password method based on configuration"""
         # Check if already authenticated
         if self._is_authenticated():
-            self.logger.info(f"Already authenticated with Salesforce, skipping authentication")
+            self.logger.info("Already authenticated with Salesforce, skipping authentication")
             return True
 
         self.logger.info(f"Salesforce Authentication in progress using {self._auth_method} method...")
@@ -118,7 +118,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
         try:
             # Read private key file
-            with open(self._private_key_file_jwt, 'r', encoding='utf-8') as f:
+            with open(self._private_key_file_jwt, encoding='utf-8') as f:
                 private_key = f.read()
 
             self.logger.debug(f"Using private key from: {self._private_key_file_jwt}")
@@ -331,12 +331,10 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
         # Check the calendar availability before creating the appointement
         verified_event_id = await self.verify_appointment_existance_async(
-            event_id=None, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes
+            event_id=None, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes, owner_id=owner_id
         )
         if verified_event_id:
-            self.logger.error(
-                f"Error during scheduling new appointment: an appointment already exists at the same time {start_datetime}, of Id: {verified_event_id}"
-            )
+            self.logger.error(f"Error during scheduling new appointment: an appointment already exists at the same time {start_datetime}, of Id: {verified_event_id}")
             return None
 
         # Convert to UTC
@@ -355,9 +353,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         start_datetime_utc = self._to_utc_datetime(start_dt)
 
         if start_datetime_utc <= datetime.now(UTC):
-            err_msg = (
-                "Error: Start datetime to schedule a new appointment must be in the future, but is: {start_datetime}"
-            )
+            err_msg = f"Error: Start datetime to schedule a new appointment must be in the future, but is: {start_datetime}"
             self.logger.info(err_msg)
             raise ValueError(err_msg)
 
@@ -403,7 +399,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                 self.logger.info(f"{self._instance_url}/lightning/r/Event/{event_id}/view")
 
                 # Verify the appointment was created successfully
-                verified_event_id = await self.verify_appointment_existance_async(event_id=event_id, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes)
+                verified_event_id = await self.verify_appointment_existance_async(event_id=event_id, expected_subject=subject, start_datetime=start_datetime, duration_minutes=duration_minutes, owner_id=owner_id, user_id=who_id)
                 if verified_event_id:
                     return verified_event_id
                 else:
@@ -454,7 +450,15 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         return event_id
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
-    async def verify_appointment_existance_async(self, event_id: str | None = None, expected_subject: str | None = None, start_datetime: str = "", duration_minutes: int = 30) -> str | None:
+    async def verify_appointment_existance_async(
+        self,
+        event_id: str | None = None,
+        expected_subject: str | None = None,
+        start_datetime: str = "",
+        duration_minutes: int = 30,
+        owner_id: str | None = None,
+        user_id: str | None = None,
+    ) -> str | None:
         """Check if an appointment exists based on provided criteria
 
         Args:
@@ -468,7 +472,8 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             - If expected_subject is specified: returns event_id of the first appointment matching subject, None if not found
             - If neither is specified: returns event_id of the first appointment found in time window, None if none found
         """
-        if not start_datetime.endswith("Z"): start_datetime += "Z"
+        if not start_datetime.endswith("Z"):
+            start_datetime += "Z"
         
         # Calculate end datetime for the search window
         start_dt = self._get_french_datetime_from_str(start_datetime)
@@ -501,7 +506,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
 
         try:
             # Get appointments in the time window
-            appointments = await self.get_scheduled_appointments_async(search_start_str, search_end_str)
+            appointments = await self.get_scheduled_appointments_async(search_start_str, search_end_str, owner_id=owner_id, user_id=user_id)
 
             if appointments is None:
                 self.logger.info("Error: Failed to retrieve appointments for verification")
@@ -548,12 +553,12 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             return None
 
     @measure_latency(OperationType.SALESFORCE, provider="salesforce")
-    async def get_scheduled_appointments_async(self, start_datetime: str, end_datetime: str, owner_id: str | None = None, user_id: str | None = None) -> list[dict]:
+    async def get_scheduled_appointments_async(self, utc_start_datetime_str: str, utc_end_datetime_str: str, owner_id: str | None = None, user_id: str | None = None) -> list[dict]:
         """Get events from Salesforce calendar between specified start and end datetimes
 
         Args:
-            start_datetime: Start date and time in ISO format (e.g., '2025-05-20T14:00:00Z')
-            end_datetime: End date and time in ISO format (e.g., '2025-05-20T15:00:00Z')
+            utc_start_datetime_str: Start date and time in UTC ISO format (e.g., '2025-05-20T14:00:00Z')
+            utc_end_datetime_str: End date and time in UTC ISO format (e.g., '2025-05-20T15:00:00Z')
             owner_id: Optional Salesforce ID to filter events by owner
             user_id: Optional Salesforce ID to filter events by user (WhoId)
 
@@ -561,7 +566,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             List of events if successful, None otherwise
         """
         await self._ensure_authenticated_async()
-        self.logger.info("Retrieving events...")
+        self.logger.info("Retrieving SF events...")
 
         async def _execute_appointments_query() -> list:
             # Prepare headers
@@ -570,7 +575,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             # Build SOQL query
             query = "SELECT Id, Subject, Description, StartDateTime, EndDateTime, Location, OwnerId, WhatId, WhoId "
             query += "FROM Event "
-            query += f"WHERE StartDateTime >= {start_datetime} AND EndDateTime <= {end_datetime} "
+            query += f"WHERE StartDateTime >= {utc_start_datetime_str} AND EndDateTime <= {utc_end_datetime_str} "
 
             # Add owner filter if specified
             if owner_id:
@@ -589,8 +594,8 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             # Create query URL
             url_query = f"{self._instance_url}/services/data/{self._version_api}/query/?q={encoded_query}"
 
-            start_date_formated = start_datetime if "T" in start_datetime else f"{start_datetime}T"
-            end_date_formated = end_datetime if "T" in end_datetime else f"{end_datetime}T"
+            start_date_formated = utc_start_datetime_str if "T" in utc_start_datetime_str else f"{utc_start_datetime_str}T"
+            end_date_formated = utc_end_datetime_str if "T" in utc_end_datetime_str else f"{utc_end_datetime_str}T"
             #
             if start_date_formated.endswith("T"):
                 start_date_formated += "00:00:00"
@@ -902,18 +907,14 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                         "name": s_name,
                         "describe_url_path": f"/services/data/{self._version_api}/sobjects/{s_name}/describe/",
                     })
-            self.logger.info(
-                f"Will describe {len(target_sobjects_info)} specified SObjects: {', '.join(s_name for s_name in sobjects_to_describe)}"
-            )
+            self.logger.info(f"Will describe {len(target_sobjects_info)} specified SObjects: {', '.join(s_name for s_name in sobjects_to_describe)}")
         else:
             target_sobjects_info = [
                 {"name": s_info["name"], "describe_url_path": s_info["urls"]["describe"]}
                 for s_info in all_sobjects_metadata_list
                 if "name" in s_info and "urls" in s_info and "describe" in s_info["urls"]
             ]
-            self.logger.info(
-                f"Found {len(target_sobjects_info)} SObjects. Describing all can be very slow and consume many API calls."
-            )
+            self.logger.info(f"Found {len(target_sobjects_info)} SObjects. Describing all can be very slow and consume many API calls.")
 
         total_objects_to_describe = len(target_sobjects_info)
         for i, sobject_item in enumerate(target_sobjects_info):
@@ -1178,7 +1179,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             return dt.astimezone(UTC)
         return dt.astimezone(UTC)
 
-    def _calculate_end_datetime(self, start_datetime: datetime, duration_minutes: int) -> datetime | None:
+    def _calculate_end_datetime(self, start_datetime: datetime, duration_minutes: int) -> datetime:
         return start_datetime + timedelta(minutes=duration_minutes)
 
     async def _query_salesforce(self, soql_query: str) -> dict | None:
@@ -1262,9 +1263,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             conditions.append(f"Company = '{company_name}'")
 
         if len(conditions) == 1:  # Only IsConverted = false, no other criteria
-            self.logger.info(
-                "Error: At least one search criterion (email, full name, or company) must be provided for get_leads_by_details_async."
-            )
+            self.logger.info("Error: At least one search criterion (email, full name, or company) must be provided for get_leads_by_details_async.")
             return None  # Or an empty list if that's preferred for bad input
 
         query_filter = " AND " + " AND ".join(f"({c})" for c in conditions[1:])
@@ -1300,9 +1299,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             return None
 
         # Step 1: Get Lead conversion details
-        lead_info_soql = (
-            f"SELECT Id, IsConverted, ConvertedOpportunityId, ConvertedAccountId FROM Lead WHERE Id = '{lead_id}'"
-        )
+        lead_info_soql = f"SELECT Id, IsConverted, ConvertedOpportunityId, ConvertedAccountId FROM Lead WHERE Id = '{lead_id}'"
         lead_response = await self._query_salesforce(lead_info_soql)
 
         if not lead_response or lead_response.get("records") is None:
@@ -1322,21 +1319,13 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         common_opp_fields = "SELECT Id, Name, StageName, Amount, CloseDate, AccountId, Account.Name, Owner.Name, CreatedDate FROM Opportunity"
 
         if is_converted and converted_opp_id:
-            self.logger.info(
-                f"Lead '{lead_id}' was converted to Opportunity ID: '{converted_opp_id}'. Fetching this Opportunity."
-            )
+            self.logger.info(f"Lead '{lead_id}' was converted to Opportunity ID: '{converted_opp_id}'. Fetching this Opportunity.")
             opportunity_soql = f"{common_opp_fields} WHERE Id = '{converted_opp_id}' LIMIT 1"
         elif is_converted and converted_acc_id:
-            self.logger.info(
-                f"Lead '{lead_id}' was converted to Account ID: '{converted_acc_id}'. Searching Opportunities for this Account."
-            )
-            opportunity_soql = (
-                f"{common_opp_fields} WHERE AccountId = '{converted_acc_id}' ORDER BY CreatedDate DESC LIMIT 200"
-            )
+            self.logger.info(f"Lead '{lead_id}' was converted to Account ID: '{converted_acc_id}'. Searching Opportunities for this Account.")
+            opportunity_soql = f"{common_opp_fields} WHERE AccountId = '{converted_acc_id}' ORDER BY CreatedDate DESC LIMIT 200"
         else:
-            self.logger.info(
-                f"Lead '{lead_id}' is not converted, or no ConvertedOpportunityId/ConvertedAccountId found. No direct Opportunities from conversion."
-            )
+            self.logger.info(f"Lead '{lead_id}' is not converted, or no ConvertedOpportunityId/ConvertedAccountId found. No direct Opportunities from conversion.")
             return []
 
         if not opportunity_soql:  # Should not happen if logic above is correct, but as a safeguard.
@@ -1448,10 +1437,10 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
             return None
 
     def _get_owner_by_strategy(
-        self, 
-        person_type: str, 
-        contact_info: dict, 
-        opportunities: list | None, 
+        self,
+        person_type: str,
+        contact_info: dict,
+        opportunities: list | None,
         strategy: str
     ) -> tuple[str | None, str | None]:
         """
@@ -1494,7 +1483,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                         user_source = "opportunity"
                         self.logger.info(f"Strategy 'opport_only': Using opportunity owner: {user_id}")
             if not user_id:
-                self.logger.info(f"Strategy 'opport_only': No opportunity owner found, no fallback")
+                self.logger.info("Strategy 'opport_only': No opportunity owner found, no fallback")
             return user_id, user_source
             
         # Strategy: both (default) - Try opportunity first, fallback to contact/lead owner
@@ -1833,7 +1822,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
                         slot_end_dt = datetime.fromisoformat(slot_end.replace('Z', '+00:00')).replace(tzinfo=UTC)
                         
                         # Check if requested appointment fits within any available slot
-                        if (slot_start_dt <= start_datetime_utc and 
+                        if (slot_start_dt <= start_datetime_utc and
                             slot_end_dt >= end_datetime_utc):
                             slot_available = True
                             self.logger.info(f"✓ Slot verified: Available from {slot_start} to {slot_end}")

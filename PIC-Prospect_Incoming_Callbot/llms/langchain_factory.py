@@ -1,17 +1,21 @@
 #### DUPLICATE FROM COMMON TOOLS ####
 
-import uuid
 import logging
+import uuid
+
 from langchain_core.language_models.chat_models import BaseChatModel
-#
-from llms.llm_info import LlmInfo
+
 from llms.langchain_adapter_type import LangChainAdapterType
 
-class LangChainFactory():
+#
+from llms.llm_info import LlmInfo
+
+
+class LangChainFactory:
     logger = logging.getLogger(__name__)
     @staticmethod
     def create_llms_from_infos(llms_infos: list[LlmInfo]) -> list[BaseChatModel]:
-        LangChainFactory.logger.info(f'Loading LLM models ...')
+        LangChainFactory.logger.info('Loading LLM models ...')
         if isinstance(llms_infos, LlmInfo):
             llms_infos = [llms_infos]
         if len(llms_infos) == 0:
@@ -27,7 +31,7 @@ class LangChainFactory():
     
     @staticmethod
     def create_llm_from_info(llm_info: LlmInfo) -> BaseChatModel:
-        LangChainFactory.logger.info(f'Loading LLM model ...')
+        LangChainFactory.logger.info('Loading LLM model ...')
         llm = LangChainFactory.create_llm(
             adapter_type= llm_info.type,
             llm_model_name= llm_info.model,
@@ -43,7 +47,7 @@ class LangChainFactory():
     def create_llm(adapter_type: LangChainAdapterType, llm_model_name: str, timeout_seconds: int = 50, temperature: float = 0.1, inference_provider_api_key: str = None, extra_body_dict: dict[str, any] = {}) -> BaseChatModel:
         llm: BaseChatModel = None
         if adapter_type == LangChainAdapterType.OpenAI:
-            if not inference_provider_api_key: 
+            if not inference_provider_api_key:
                 raise ValueError(f'"{LangChainFactory.__name__}" requires that "type" of {LlmInfo.__name__} (of type: "{LangChainAdapterType.__name__}") to have its "api_key" property specified for adapter: {LangChainAdapterType.OpenAI}')
             llm = LangChainFactory.create_openai_llm(llm_model_name, inference_provider_api_key, timeout_seconds, temperature)
 
@@ -62,7 +66,7 @@ class LangChainFactory():
         elif adapter_type == LangChainAdapterType.Ollama:
             llm = LangChainFactory.create_ollama_llm(llm_model_name, timeout_seconds, temperature)
 
-        elif adapter_type == LangChainAdapterType.Groq:            
+        elif adapter_type == LangChainAdapterType.Groq:
             if not inference_provider_api_key: inference_provider_api_key = EnvHelper.get_groq_api_key()
             llm = LangChainFactory.create_groq_llm(llm_model_name, inference_provider_api_key, timeout_seconds, temperature)
 
@@ -70,7 +74,7 @@ class LangChainFactory():
             raise ValueError('Google adapter is not implemented yet.')
             llm = LangChainFactory.create_google_llm(llm_model_name, inference_provider_api_key, timeout_seconds, temperature)
 
-        elif adapter_type == LangChainAdapterType.Anthropic:            
+        elif adapter_type == LangChainAdapterType.Anthropic:
             if not inference_provider_api_key: inference_provider_api_key = EnvHelper.get_anthropic_api_key()
             llm = LangChainFactory.create_anthropic_llm(llm_model_name, inference_provider_api_key, timeout_seconds, temperature)
 
@@ -81,8 +85,8 @@ class LangChainFactory():
     @staticmethod
     def create_openai_llm(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> BaseChatModel:
         from langchain_openai import ChatOpenAI
-        return ChatOpenAI(    
-            name= f'openai_chat_{str(uuid.uuid4())}',
+        return ChatOpenAI(
+            name= f'openai_chat_{uuid.uuid4()!s}',
             model_name= llm_model_name,
             request_timeout= timeout_seconds,
             temperature= temperature,
@@ -99,7 +103,7 @@ class LangChainFactory():
         #     }
         # }
         return ChatOpenAI(
-            name=f"generic_openai_chat_{str(uuid.uuid4())}",
+            name=f"generic_openai_chat_{uuid.uuid4()!s}",
             openai_api_key=inference_provider_api_key,
             openai_api_base=inference_provider_base_url,
             model_name=llm_model_name,
@@ -107,13 +111,13 @@ class LangChainFactory():
             temperature=temperature,
             extra_body= extra_body_dict,
             #model_kwargs=base_model_kwargs,
-        )    
+        )
     
     @staticmethod
     def create_ollama_llm(llm_model_name: str, timeout_seconds: int = 50, temperature:float = 0.1) -> BaseChatModel:
         from langchain_ollama import ChatOllama
-        return ChatOllama(    
-            name= f'ollama_chat_{str(uuid.uuid4())}',
+        return ChatOllama(
+            name= f'ollama_chat_{uuid.uuid4()!s}',
             model= llm_model_name,
             timeout= timeout_seconds,
             temperature= temperature
@@ -122,29 +126,29 @@ class LangChainFactory():
     @staticmethod
     def create_anthropic_llm(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> BaseChatModel:
         from langchain_anthropic import ChatAnthropic
-        return ChatAnthropic(    
-            name= f'anthropic_chat_{str(uuid.uuid4())}',
+        return ChatAnthropic(
+            name= f'anthropic_chat_{uuid.uuid4()!s}',
             model= llm_model_name,
             default_request_timeout= timeout_seconds,
             temperature= temperature,
             anthropic_api_key= api_key,
         )
     
-    @staticmethod     
+    @staticmethod
     def create_groq_llm(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> BaseChatModel:
         from langchain_groq import ChatGroq
-        return ChatGroq(    
-            name= f'groq_chat_{str(uuid.uuid4())}',
+        return ChatGroq(
+            name= f'groq_chat_{uuid.uuid4()!s}',
             model_name= llm_model_name,
             request_timeout= timeout_seconds,
             temperature= temperature,
             groq_api_key= api_key,
         )
         
-    @staticmethod     
+    @staticmethod
     def create_llm_google(llm_model_name: str, api_key: str, timeout_seconds: int = 50, temperature:float = 0.1) -> BaseChatModel:
         pass
-        # return GoogleGenerativeAI(    
+        # return GoogleGenerativeAI(
         #     name= f'chat_google_{str(uuid.uuid4())}',
         #     model= llm_model_name,
         #     timeout= timeout_seconds,

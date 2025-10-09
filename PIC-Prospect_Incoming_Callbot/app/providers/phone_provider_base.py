@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Tuple
-from fastapi import Request, WebSocket, HTTPException
+from typing import Any
+
+from fastapi import Request, WebSocket
 from fastapi.responses import HTMLResponse
 from utils.phone_provider_type import PhoneProviderType
 
@@ -27,7 +28,7 @@ class PhoneProvider(ABC):
         pass
     
     @abstractmethod
-    async def extract_call_data(self, request: Request) -> Tuple[str, str, str]:
+    async def extract_call_data(self, request: Request) -> tuple[str, str, str]:
         """Extract phone number, call ID, and body from request"""
         pass
     
@@ -37,17 +38,17 @@ class PhoneProvider(ABC):
         pass
     
     @abstractmethod
-    def parse_websocket_event(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def parse_websocket_event(self, data: dict[str, Any]) -> dict[str, Any]:
         """Parse incoming websocket event and normalize to common format"""
         pass
     
     @abstractmethod
-    def create_media_message(self, stream_id: str, payload: str) -> Dict[str, Any]:
+    def create_media_message(self, stream_id: str, payload: str) -> dict[str, Any]:
         """Create a media message for sending audio back to the provider"""
         pass
     
     @abstractmethod
-    def get_audio_format(self) -> Dict[str, Any]:
+    def get_audio_format(self) -> dict[str, Any]:
         """Get audio format specifications for this provider"""
         pass
     

@@ -16,6 +16,9 @@ ENV HOST_URI=0.0.0.0
 # Set the application listening port
 ENV PORT=8080
 
+# Set the calling phone number
+ENV TWILIO_PHONE_NUMBER=+33757597141
+
 # Set the RAG API port and address
 ENV RAG_API_IS_SSH=true
 ENV RAG_API_HOST=public-website-rag-api-985511623262.europe-west1.run.app

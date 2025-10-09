@@ -2,22 +2,25 @@ import logging
 import os
 from contextlib import asynccontextmanager
 from datetime import datetime
+
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from phone_call_websocket_events_handler import PhoneCallWebsocketEventsHandlerFactory
+from routers.conversation_router import conversation_router
+from routers.incoming_call_router import incoming_call_router
+from routers.logs_router import logs_router
+from routers.outgoing_call_router import outgoing_call_router
+from routers.salesforce_router import salesforce_router
+from routers.test_router import test_router
 from speech.pregenerated_audio import PreGeneratedAudio
 from starlette.responses import Response as StarletteResponse
+
 #
 from utils.envvar import EnvHelper
-from routers.callbot_router import callbot_router
-from routers.conversation_router import conversation_router
-from routers.logs_router import logs_router
-from routers.test_router import test_router
-from routers.salesforce_router import salesforce_router
 
 
 class ApiConfig:
@@ -56,7 +59,8 @@ class ApiConfig:
         load_dotenv()
         EnvHelper.load_all_env_var()
 
-        app.include_router(callbot_router)
+        app.include_router(incoming_call_router)
+        app.include_router(outgoing_call_router)
         app.include_router(logs_router)
         app.include_router(conversation_router)
         app.include_router(test_router)
@@ -77,7 +81,7 @@ class ApiConfig:
         logger = ApiConfig.configure_logging()
 
         # Initialize PhoneCallWebsocketEventsHandlerFactory
-        callbot_router.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
+        incoming_call_router.phone_call_websocket_events_handler_factory = PhoneCallWebsocketEventsHandlerFactory()
 
         logger.info("-----------------------------------------------------")
         logger.info("🌐 PIC (Prospect Incoming Callbot) API 🚀 started 🚀")
@@ -132,23 +136,15 @@ class ApiConfig:
         @app.get("/")
         def root() -> JSONResponse:
             """Root endpoint with API information and documentation links"""
-            return JSONResponse(content={
-                "service": "PIC Prospect Incoming Callbot API",
-                "version": app.version,
-                "status": "running",
-                "documentation": {
-                    "api_docs": "/docs",
-                    "redoc": "/redoc",
-                    "site_documentation": "/docs-site/"
-                },
-                "endpoints": {
-                    "health": "/ping",
-                    "callbot": "/api/callbot/",
-                    "logs": "/api/logs/",
-                    "test": "/api/test/",
-                    "salesforce": "/api/salesforce/"
+            return JSONResponse(
+                content={
+                    "service": "PIC Prospect Incoming Callbot API",
+                    "version": app.version,
+                    "status": "running",
+                    "documentation": {"api_docs": "/docs", "redoc": "/redoc", "site_documentation": "/docs-site/"},
+                    "endpoints": {"health": "/ping", "callbot": "/api/callbot/", "logs": "/api/logs/", "test": "/api/test/", "salesforce": "/api/salesforce/", "outgoing_call": "/api/outgoing-call/"},
                 }
-            })
+            )
 
         return app
 
@@ -183,8 +179,8 @@ class ApiConfig:
                     content={
                         "error": "Documentation not built",
                         "message": "Run 'python scripts/build_docs.py' to build documentation",
-                        "alternative": "For development, use 'python scripts/build_docs.py --dev' to start mkdocs serve"
-                    }
+                        "alternative": "For development, use 'python scripts/build_docs.py --dev' to start mkdocs serve",
+                    },
                 )
 
     @staticmethod

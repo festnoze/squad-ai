@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 
@@ -27,7 +27,7 @@ class LatencyMetric:
     operation_name: str  # e.g., "transcribe_audio_async", "schedule_new_appointment_async"
     latency_ms: float
     status: OperationStatus
-    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    timestamp: datetime = field(default_factory=lambda: datetime.now(UTC))
     call_sid: str | None = None
     stream_sid: str | None = None
     provider: str | None = None  # like: "google", "openai", "salesforce"

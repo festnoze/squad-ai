@@ -15,14 +15,14 @@ from managers.outgoing_audio_manager import OutgoingAudioManager
 from openai import OpenAI
 from providers.phone_provider_base import PhoneProvider
 from providers.twilio_provider import TwilioProvider
+from services.analytics_service import AnalyticsService
 from speech.speech_to_text import get_speech_to_text_provider
 from speech.text_to_speech import get_text_to_speech_provider
-
-#
-from utils.latency_metric import LatencyMetric, OperationStatus
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency_context
-from utils.latency_metric import OperationType
+
+#
+from utils.latency_metric import LatencyMetric, OperationStatus, OperationType
 from utils.latency_tracker import latency_tracker
 
 
@@ -32,9 +32,10 @@ class PhoneCallWebsocketEventsHandler:
     outgoing_audio_processing: OutgoingAudioManager
     incoming_audio_processing: IncomingAudioManager
 
-    def __init__(self, websocket: WebSocket | None = None, phone_provider: PhoneProvider | None = None):
+    def __init__(self, websocket: WebSocket | None = None, phone_provider: PhoneProvider | None = None, is_outgoing: bool = False):
         # Instance variables
         self.websocket = websocket
+        self.is_outgoing_call = is_outgoing
         self.logger = logging.getLogger(__name__)
         self.logger.info("IncomingPhoneCallHandler logger started")
 
@@ -43,7 +44,8 @@ class PhoneCallWebsocketEventsHandler:
             phone_provider = TwilioProvider()
         self.phone_provider = phone_provider
 
-        self.logger.info(f"Initialized with provider: {self.phone_provider.provider_type.value}")
+        call_type_str = "outgoing" if is_outgoing else "incoming"
+        self.logger.info(f"Initialized with provider: {self.phone_provider.provider_type.value}, call type: {call_type_str}")
 
         # State tracking for this instance
         self.openai_client = None
@@ -58,6 +60,9 @@ class PhoneCallWebsocketEventsHandler:
         self.current_call_sid = None
         self.current_phone_number = None
         self.media_event_counter = 0  # Counter for periodic call duration checks
+
+        # Analytics service
+        self.analytics_service = AnalyticsService()
 
         # Set audio processing parameters as instance variables
         self.frame_rate = 8000  # Sample rate in Hz (8kHz is standard for telephony)
@@ -161,7 +166,6 @@ class PhoneCallWebsocketEventsHandler:
 
         # Update existing context manager with call information or create new one
         if self.call_duration_context:
-            # Update the existing context manager with call info
             self.call_duration_context.call_sid = call_sid
             self.call_duration_context.phone_number = phone_number
         else:
@@ -183,6 +187,12 @@ class PhoneCallWebsocketEventsHandler:
         """Finish call duration tracking and record the metric."""
         if self.call_duration_context:
             try:
+                # Calculate duration before exiting context
+                import time
+                duration_seconds = 0
+                if hasattr(self.call_duration_context, "start_time") and self.call_duration_context.start_time:
+                    duration_seconds = time.time() - self.call_duration_context.start_time
+
                 # Update metadata with disconnect reason
                 if hasattr(self.call_duration_context, "metadata"):
                     self.call_duration_context.metadata["disconnect_reason"] = disconnect_reason
@@ -190,6 +200,18 @@ class PhoneCallWebsocketEventsHandler:
                 # Exit the context manager to record the metric
                 self.call_duration_context.__exit__(None, None, None)
                 self.logger.debug(f"[{self.current_call_sid or 'N/A'}] Finished call duration tracking - {disconnect_reason}")
+
+                # Track call ended event
+                if self.current_call_sid and self.current_phone_number:
+                    import asyncio
+                    asyncio.create_task(
+                        self.analytics_service.track_call_ended_async(
+                            call_sid=self.current_call_sid,
+                            phone_number=self.current_phone_number,
+                            duration_seconds=duration_seconds,
+                            disconnect_reason=disconnect_reason
+                        )
+                    )
             except Exception as e:
                 self.logger.error(f"Error finishing call duration tracking: {e}")
             finally:
@@ -239,6 +261,15 @@ class PhoneCallWebsocketEventsHandler:
         self.incoming_audio_processing.set_call_sid(call_sid)
         self.incoming_audio_processing.set_phone_number(calling_phone_number, call_sid)
         self._start_call_duration_tracking(call_sid, calling_phone_number)
+
+        # Track call started event
+        call_type = "outgoing" if self.is_outgoing_call else "incoming"
+        await self.analytics_service.track_call_started_async(
+            call_sid=call_sid,
+            phone_number=calling_phone_number,
+            call_type=call_type,
+            provider=self.phone_provider.provider_type.value
+        )
 
         self.outgoing_audio_processing.run_background_streaming_worker()
         self.logger.info("Audio stream manager initialized and started with optimized parameters")
@@ -295,9 +326,33 @@ class PhoneCallWebsocketEventsHandler:
         """Handle the 'start' event from phone provider which begins a new call."""
         call_id = parsed_start_data.get("call_id", "N.C")
         stream_id = parsed_start_data.get("stream_id", "N.C")
-        await self.incoming_audio_processing.init_conversation_async(call_id, stream_id)
+
+        if self.is_outgoing_call:
+            # For outgoing calls, play welcome message immediately
+            await self._handle_outgoing_call_start_async(call_id, stream_id)
+        else:
+            # For incoming calls, use normal graph-based initialization
+            await self.incoming_audio_processing.init_conversation_async(call_id, stream_id)
+
         self.outgoing_audio_processing.update_stream_sid(stream_id)
         return stream_id
+
+    async def _handle_outgoing_call_start_async(self, call_id: str, stream_id: str) -> None:
+        """Handle the start of an outgoing call by playing the welcome message."""
+        from agents.text_registry import TextRegistry
+
+        self.logger.info(f"Starting outgoing call - CallSid: {call_id}, StreamSid: {stream_id}")
+
+        # Set basic call info
+        self.incoming_audio_processing.set_call_sid(call_id)
+        self.incoming_audio_processing.set_stream_sid(stream_id)
+
+        # Play the outgoing call welcome message
+        welcome_text = TextRegistry.outgoing_call_welcome_text
+        self.logger.info(f"Playing outgoing call welcome message: {welcome_text}")
+
+        # Queue the welcome message for TTS and playback
+        await self.outgoing_audio_processing.queue_text_to_speech_async(welcome_text)
 
     async def _handle_media_event_async(self, parsed_media_data: dict) -> None:
         """Handle the 'media' event from phone provider which contains audio data."""
@@ -367,12 +422,12 @@ class PhoneCallWebsocketEventsHandlerFactory:
     def __init__(self):
         self.build_new_phone_call_websocket_events_handler()
 
-    def build_new_phone_call_websocket_events_handler(self, websocket: WebSocket | None = None, provider: PhoneProvider | None = None):
+    def build_new_phone_call_websocket_events_handler(self, websocket: WebSocket | None = None, provider: PhoneProvider | None = None, is_outgoing: bool = False):
         if not self.websocket_events_handler_instance:
-            self.websocket_events_handler_instance = PhoneCallWebsocketEventsHandler(websocket=websocket, phone_provider=provider)
+            self.websocket_events_handler_instance = PhoneCallWebsocketEventsHandler(websocket=websocket, phone_provider=provider, is_outgoing=is_outgoing)
 
-    def get_new_phone_call_websocket_events_handler(self, websocket: WebSocket | None = None, provider: PhoneProvider | None = None):
-        self.build_new_phone_call_websocket_events_handler(provider=provider)
+    def get_new_phone_call_websocket_events_handler(self, websocket: WebSocket | None = None, provider: PhoneProvider | None = None, is_outgoing: bool = False):
+        self.build_new_phone_call_websocket_events_handler(provider=provider, is_outgoing=is_outgoing)
         websocket_events_handler_to_return: PhoneCallWebsocketEventsHandler = self.websocket_events_handler_instance
         # Set the websocket for the handler
         websocket_events_handler_to_return.set_websocket(websocket)

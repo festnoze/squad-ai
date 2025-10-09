@@ -1,10 +1,13 @@
+from unittest.mock import AsyncMock, MagicMock
+
 import pytest
-from unittest.mock import MagicMock, AsyncMock
-from app.agents.agents_graph import AgentsGraph
-from app.managers.outgoing_manager import OutgoingManager
-from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
-from app.api_client.salesforce_user_client_interface import SalesforceUserClientInterface
 from routers.callbot_router import change_env_var_values
+
+from app.agents.agents_graph import AgentsGraph
+from app.api_client.salesforce_user_client_interface import SalesforceUserClientInterface
+from app.api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
+from app.managers.outgoing_manager import OutgoingManager
+
 
 @pytest.mark.parametrize("awaited_dispatch, user_input, chat_history", [
 
@@ -46,7 +49,7 @@ async def test_agents_dispatching(agents_graph_mockings, user_input: str, chat_h
     agents.graph.rag_interrupt_flag = {"interrupted": False}
 
     # Act
-    result= await agents.analyse_user_input_for_dispatch_async(agents.calendar_classifier_llm, user_input, chat_history)    
+    result= await agents.analyse_user_input_for_dispatch_async(agents.calendar_classifier_llm, user_input, chat_history)
     # Assert
     if '|' in awaited_dispatch:
         assert result in awaited_dispatch.split('|')

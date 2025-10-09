@@ -167,6 +167,10 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name("TWILIO_AUTH", fails_if_missing=False) or ""
 
     @staticmethod
+    def get_twilio_phone_number() -> str:
+        return EnvHelper.get_env_variable_value_by_name("TWILIO_PHONE_NUMBER", fails_if_missing=False) or ""
+
+    @staticmethod
     def get_telnyx_api_key() -> str:
         return EnvHelper.get_env_variable_value_by_name("TELNYX_API_KEY", fails_if_missing=False) or ""
 
@@ -465,3 +469,45 @@ class EnvHelper:
         """
         value = EnvHelper.get_env_variable_value_by_name("BUSINESS_APPOINTMENT_DURATION", fails_if_missing=False)
         return int(value) if value else 30
+
+    @staticmethod
+    def get_sms_appointment_confirmation_enabled() -> bool:
+        """
+        Get whether to send SMS confirmation when an appointment is created.
+
+        Returns:
+            bool: True if SMS confirmation should be sent, False otherwise (default: False)
+        """
+        value = EnvHelper.get_env_variable_value_by_name("SMS_APPOINTMENT_CONFIRMATION", fails_if_missing=False)
+        return value is not None and value.lower() == "true"
+
+    @staticmethod
+    def get_ga4_tracking_enabled() -> bool:
+        """
+        Get whether Google Analytics 4 tracking is enabled.
+
+        Returns:
+            bool: True if GA4 tracking is enabled, False otherwise (default: False)
+        """
+        value = EnvHelper.get_env_variable_value_by_name("GA4_TRACKING_ENABLED", fails_if_missing=False)
+        return value is not None and value.lower() == "true"
+
+    @staticmethod
+    def get_ga4_measurement_id() -> str:
+        """
+        Get the Google Analytics 4 Measurement ID.
+
+        Returns:
+            str: The GA4 Measurement ID (e.g., G-XXXXXXXXXX)
+        """
+        return EnvHelper.get_env_variable_value_by_name("GA4_MEASUREMENT_ID", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_ga4_api_secret() -> str:
+        """
+        Get the Google Analytics 4 API Secret.
+
+        Returns:
+            str: The GA4 API Secret for Measurement Protocol
+        """
+        return EnvHelper.get_env_variable_value_by_name("GA4_API_SECRET", fails_if_missing=False) or ""

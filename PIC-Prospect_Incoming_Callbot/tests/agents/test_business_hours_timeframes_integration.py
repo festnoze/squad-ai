@@ -5,14 +5,14 @@ This module tests that the business hours configuration properly integrates with
 the timeframes calculation, ensuring weekday filtering and time slot validation work correctly.
 """
 
-import pytest
-import tempfile
-import yaml
 import os
-from datetime import datetime
+import sys
+import tempfile
 from unittest.mock import patch
 
-import sys
+import pytest
+import yaml
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'app'))
 
 from agents.calendar_agent import CalendarAgent

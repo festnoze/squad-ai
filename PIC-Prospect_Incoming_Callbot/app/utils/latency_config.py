@@ -10,7 +10,6 @@ from utils.envvar import EnvHelper
 from utils.latency_metric import OperationType
 from utils.latency_reporter import (
     InfluxDBReporter,
-    LatencyReportManager,
     PrometheusReporter,
     SlackReporter,
     report_manager,
@@ -270,7 +269,7 @@ class LatencyConfig:
             "total_metrics": len(latency_tracker.metrics),
             "stats_by_operation": dict(latency_tracker.stats_by_operation),
             "thresholds": {
-                op_type.value: thresholds 
+                op_type.value: thresholds
                 for op_type, thresholds in self.thresholds.thresholds.items()
             }
         }

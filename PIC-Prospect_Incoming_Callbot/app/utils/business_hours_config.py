@@ -6,12 +6,12 @@ including allowed days, time slots, and timezone handling.
 """
 
 import logging
+import os
 from datetime import datetime, time
 from enum import Enum
-from typing import List, Tuple
+
 import pytz
 import yaml
-import os
 
 
 class ValidationResult(Enum):
@@ -58,7 +58,7 @@ class BusinessHoursConfig:
         config_data = {}
         if os.path.exists(self.config_file_path):
             try:
-                with open(self.config_file_path, 'r', encoding='utf-8') as file:
+                with open(self.config_file_path, encoding='utf-8') as file:
                     config_data = yaml.safe_load(file) or {}
             except Exception as e:
                 self.logger.warning(f"Could not load config file {self.config_file_path}: {e}")
@@ -95,7 +95,7 @@ class BusinessHoursConfig:
             self.logger.warning(f"Invalid timezone {timezone_str}: {e}. Using Europe/Paris")
             self.timezone = pytz.timezone("Europe/Paris")
 
-    def _parse_time_slots(self, working_hours_config: dict) -> List[Tuple[str, str]]:
+    def _parse_time_slots(self, working_hours_config: dict) -> list[tuple[str, str]]:
         """Parse time slots from configuration."""
         # Try environment variable first
         env_slots = self._get_env_or_default('BUSINESS_HOURS_SLOTS', None)
@@ -126,17 +126,10 @@ class BusinessHoursConfig:
             except Exception as e:
                 self.logger.warning(f"Could not parse time_slots from YAML: {e}")
 
-        # Try legacy YAML config (single start/end)
-        if 'start' in working_hours_config and 'end' in working_hours_config:
-            start_time = working_hours_config['start']
-            end_time = working_hours_config['end']
-            # Convert single time range to two slots (morning and afternoon)
-            return [(start_time, "12:00"), ("13:00", end_time)]
-
         # Use default
         return self._default_time_slots
 
-    def _parse_allowed_weekdays(self, appointments_config: dict) -> List[int]:
+    def _parse_allowed_weekdays(self, appointments_config: dict) -> list[int]:
         """Parse allowed weekdays from configuration."""
         # Try environment variable first
         env_weekdays = self._get_env_or_default('BUSINESS_WEEKDAYS', None)

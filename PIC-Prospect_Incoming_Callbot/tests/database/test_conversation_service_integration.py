@@ -1,20 +1,16 @@
-import pytest
 import os
 import tempfile
-from uuid import uuid4, UUID
-from datetime import datetime, timezone
+from uuid import UUID
+
+import pytest
+from api_client.conversation_persistence_interface import ConversationPersistenceInterface
+from api_client.request_models.conversation_request_model import ConversationRequestModel, MessageRequestModel
+from api_client.request_models.user_request_model import DeviceInfoRequestModel, UserRequestModel
 
 from database.conversation_persistence_local_service import ConversationPersistenceLocalService, QuotaOverloadException
 from database.conversation_repository import ConversationRepository
-from database.models import conversation
+from database.models.conversation import Conversation
 from database.user_repository import UserRepository
-from api_client.conversation_persistence_interface import ConversationPersistenceInterface
-from database.conversation_persistence_local_service import ConversationPersistenceLocalService
-from api_client.request_models.user_request_model import UserRequestModel, DeviceInfoRequestModel
-from api_client.request_models.conversation_request_model import ConversationRequestModel, MessageRequestModel
-from database.models.conversation import Conversation, Message
-from database.models.user import User
-from database.models.device_info import DeviceInfo
 
 
 @pytest.fixture
@@ -346,7 +342,7 @@ class TestConversationServiceIntegration:
         user_messages = [msg for msg in created_conversation.messages if msg.role == "user"]
         assert any(msg.content == message_content for msg in user_messages)
 
-    @pytest.mark.asyncio 
+    @pytest.mark.asyncio
     async def test_interface_compliance(self, conversation_service: ConversationPersistenceLocalService):
         """Test that ConversationPersistenceLocalService properly implements ConversationPersistenceInterface"""
 
@@ -355,7 +351,7 @@ class TestConversationServiceIntegration:
         # Check that all interface methods are implemented
         interface_methods = [
             'create_or_retrieve_user_async',
-            'create_new_conversation_async', 
+            'create_new_conversation_async',
             'get_user_last_conversation_async',
             'add_message_to_conversation_async'
         ]

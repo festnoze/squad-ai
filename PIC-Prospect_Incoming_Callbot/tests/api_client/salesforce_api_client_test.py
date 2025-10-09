@@ -4,9 +4,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.api_client.calendar_client_interface import CalendarClientInterface
+
 #
 from app.api_client.salesforce_api_client import SalesforceApiClient
-from app.api_client.calendar_client_interface import CalendarClientInterface
 from app.api_client.salesforce_user_client_interface import SalesforceUserClientInterface
 
 
@@ -23,7 +24,7 @@ def calendar_client(salesforce_api_client: SalesforceApiClient) -> CalendarClien
     return salesforce_api_client
 
 
-@pytest.fixture  
+@pytest.fixture
 def user_client(salesforce_api_client: SalesforceApiClient) -> SalesforceUserClientInterface:
     """Fixture returning user client interface"""
     return salesforce_api_client

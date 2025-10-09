@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse
 from utils.endpoints_api_key_required_decorator import api_key_required
 
 test_router = APIRouter(prefix="/test")
@@ -10,6 +10,7 @@ test_router = APIRouter(prefix="/test")
 @api_key_required
 async def test_parallel_incoming_calls(request: Request) -> HTMLResponse:
     import asyncio
+
     from testing.audio_test_simulator import AudioTestManager
 
     test_manager = AudioTestManager()
