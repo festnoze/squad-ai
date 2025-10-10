@@ -7,6 +7,7 @@ from openai import AsyncOpenAI
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency
 from utils.latency_metric import OperationType
+from utils.speech_cost_logger import get_speech_cost_logger
 
 
 class SpeechToTextProvider(ABC):
@@ -37,18 +38,27 @@ class GoogleSTTProvider(SpeechToTextProvider):
     async def transcribe_audio_async(self, file_name: str, call_sid: str | None = None, stream_sid: str | None = None, phone_number: str | None = None) -> str:
         """Transcribe audio file using Google STT API."""
         try:
-            return await GoogleSTTProvider.transcribe_audio_static_async(self.temp_dir, self.speech, self.google_async_client, file_name, self.language_code, self.frame_rate)
+            return await GoogleSTTProvider.transcribe_audio_static_async(
+                self.temp_dir, self.speech, self.google_async_client, file_name,
+                self.language_code, self.frame_rate, call_sid, stream_sid, phone_number
+            )
         except Exception as e:
             self.logger.error(f"Error transcribing audio with Google: {e}", exc_info=True)
             return e.message if isinstance(e, PermissionDenied) else ""
 
     @staticmethod
-    async def transcribe_audio_static_async(temp_dir: str, speech: any, async_client: any, file_name: str, language_code: str, frame_rate: int) -> str:
+    async def transcribe_audio_static_async(temp_dir: str, speech: any, async_client: any, file_name: str, language_code: str, frame_rate: int, call_sid: str | None = None, stream_sid: str | None = None, phone_number: str | None = None) -> str:
         """Transcribe audio file using Google Cloud Speech-to-Text API asynchronously."""
         import os
 
         with open(os.path.join(temp_dir, file_name), "rb") as audio_file:
             content = audio_file.read()
+
+        # Calculate audio duration and cost
+        audio_duration_seconds = len(content) / (frame_rate * 2)  # 16-bit = 2 bytes per sample
+        audio_duration_minutes = audio_duration_seconds / 60
+        # Google STT pricing: $0.024 per minute for enhanced model
+        estimated_cost_usd = audio_duration_minutes * 0.024
 
         audio = speech.RecognitionAudio(content=content)
         config = speech.RecognitionConfig(
@@ -66,6 +76,19 @@ class GoogleSTTProvider(SpeechToTextProvider):
         for result in response.results:
             transcript += result.alternatives[0].transcript
 
+        # Log cost to CSV
+        cost_logger = get_speech_cost_logger()
+        cost_logger.log_operation(
+            operation_type="STT",
+            provider="google",
+            model="phone_call",
+            cost_usd=estimated_cost_usd,
+            stream_id=stream_sid,
+            call_sid=call_sid,
+            phone_number=phone_number,
+            duration_seconds=audio_duration_seconds,
+        )
+
         return transcript
 
 
@@ -81,22 +104,48 @@ class OpenAISTTProvider(SpeechToTextProvider):
     async def transcribe_audio_async(self, file_name: str, call_sid: str | None = None, stream_sid: str | None = None, phone_number: str | None = None) -> str:
         """Transcribe audio file using OpenAI STT API."""
         try:
-            return await OpenAISTTProvider.transcribe_audio_static_async(self.openai_client, self.temp_dir, file_name, self.language_code, self.frame_rate)
+            return await OpenAISTTProvider.transcribe_audio_static_async(
+                self.openai_client, self.temp_dir, file_name,
+                self.language_code, self.frame_rate, call_sid, stream_sid, phone_number
+            )
         except Exception as e:
             self.logger.error(f"Error transcribing audio with OpenAI: {e}", exc_info=True)
             return ""
 
     @staticmethod
-    async def transcribe_audio_static_async(openai_client: AsyncOpenAI, temp_dir: str, file_name: str, language_code: str, frame_rate: int) -> str:
+    async def transcribe_audio_static_async(openai_client: AsyncOpenAI, temp_dir: str, file_name: str, language_code: str, frame_rate: int, call_sid: str | None = None, stream_sid: str | None = None, phone_number: str | None = None) -> str:
         """Transcribe audio file using OpenAI STT API."""
         if not openai_client:
             raise ValueError("OpenAI client not initialized - missing API key")
-        with open(os.path.join(temp_dir, file_name), "rb") as audio_file:
+
+        # Get file size for cost estimation
+        file_path = os.path.join(temp_dir, file_name)
+        file_size_bytes = os.path.getsize(file_path)
+        audio_duration_seconds = file_size_bytes / (frame_rate * 2)  # 16-bit = 2 bytes per sample
+        audio_duration_minutes = audio_duration_seconds / 60
+        # OpenAI GPT-4o-transcribe pricing: $0.006 per minute
+        estimated_cost_usd = audio_duration_minutes * 0.006
+
+        with open(file_path, "rb") as audio_file:
             response = await openai_client.audio.transcriptions.create(
                 model="gpt-4o-transcribe",
                 file=audio_file,
                 language=language_code.split("-")[0] if language_code else "fr",
             )
+
+        # Log cost to CSV
+        cost_logger = get_speech_cost_logger()
+        cost_logger.log_operation(
+            operation_type="STT",
+            provider="openai",
+            model="gpt-4o-transcribe",
+            cost_usd=estimated_cost_usd,
+            stream_id=stream_sid,
+            call_sid=call_sid,
+            phone_number=phone_number,
+            duration_seconds=audio_duration_seconds,
+        )
+
         return response.text
 
 

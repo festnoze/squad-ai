@@ -6,6 +6,7 @@ from speech.text_to_speech_openai import TTS_OpenAI
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency
 from utils.latency_metric import OperationType
+from utils.speech_cost_logger import get_speech_cost_logger
 
 
 class TextToSpeechProvider(ABC):
@@ -66,9 +67,28 @@ class GoogleTTSProvider(TextToSpeechProvider):
     @measure_latency(OperationType.TTS, provider="google")
     async def synthesize_speech_to_bytes_async(self, text: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> bytes:
         try:
+            # Calculate character count for cost estimation
+            character_count = len(text)
+            # Google TTS pricing: $16 per 1M characters for Neural2/Journey/Chirp voices
+            estimated_cost_usd = character_count * 0.000016
+
             synthesis_input = self.google_tts.SynthesisInput(text=text)
             response = self.client.synthesize_speech(input=synthesis_input, voice=self.voice_params, audio_config=self.audio_config)
             audio_bytes = response.audio_content
+
+            # Log cost to CSV
+            cost_logger = get_speech_cost_logger()
+            cost_logger.log_operation(
+                operation_type="TTS",
+                provider="google",
+                model=self.voice,
+                cost_usd=estimated_cost_usd,
+                stream_id=stream_sid,
+                call_sid=call_sid,
+                phone_number=phone_number,
+                character_count=character_count,
+            )
+
             return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=16000, to_frame_rate=self.frame_rate)
 
         except Exception as google_error:
@@ -83,7 +103,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
         channels: int = 1,
         sample_width: int = 2,
         temp_dir: str = "static/outgoing_audio",
-        openai_api_key: str = None,
+        openai_api_key: str = "",
     ):
         from openai import OpenAI
 
@@ -101,6 +121,11 @@ class OpenAITTSProvider(TextToSpeechProvider):
     @measure_latency(OperationType.TTS, provider="openai")
     async def synthesize_speech_to_bytes_async(self, text: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> bytes:
         try:
+            # Calculate character count for cost estimation
+            character_count = len(text)
+            # OpenAI TTS pricing: $15 per 1M characters
+            estimated_cost_usd = character_count * 0.000015
+
             audio_bytes = await TTS_OpenAI.generate_speech_async(
                 model=self.model,
                 response_format="pcm",
@@ -109,6 +134,20 @@ class OpenAITTSProvider(TextToSpeechProvider):
                 instructions=self.instructions,
                 speed=1.0,
             )
+
+            # Log cost to CSV
+            cost_logger = get_speech_cost_logger()
+            cost_logger.log_operation(
+                operation_type="TTS",
+                provider="openai",
+                model=self.model,
+                cost_usd=estimated_cost_usd,
+                stream_id=stream_sid,
+                call_sid=call_sid,
+                phone_number=phone_number,
+                character_count=character_count,
+            )
+
             return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=24000, to_frame_rate=self.frame_rate)
 
         except Exception as openai_error:
