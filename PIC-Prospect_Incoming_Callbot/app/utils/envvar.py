@@ -24,10 +24,6 @@ class EnvHelper:
         return EnvHelper.get_env_variable_value_by_name("SALESFORCE_CLIENT_SECRET", fails_if_missing=False) or ""
 
     @staticmethod
-    def get_salesforce_private_key_file_path() -> str:
-        return EnvHelper.get_env_variable_value_by_name("SALESFORCE_PRIVATE_KEY_FILE_PATH", fails_if_missing=False) or ""
-
-    @staticmethod
     def get_salesforce_private_key_file() -> str:
         return EnvHelper.get_env_variable_value_by_name("SALESFORCE_PRIVATE_KEY_FILE", fails_if_missing=False) or ""
 

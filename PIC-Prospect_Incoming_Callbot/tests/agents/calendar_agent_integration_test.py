@@ -280,6 +280,10 @@ async def test_calendar_agent_integration_classification_plus_outputed_answer(
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(sf_client_mock, llm_instance)
+
+    # Set hard-coded now / business opening days & hours / user infos, for the test consistency
+    agent.business_hours_config.time_slots = [("09:00", "12:00"), ("13:00", "16:00")]
+    agent.business_hours_config.allowed_weekdays = [0, 1, 2, 3, 4]
     CalendarAgent.now = datetime(2024, 6, 19, 19, 0, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info(
         "test_user_id",
@@ -313,6 +317,8 @@ async def test_complete_conversation_exchange(sf_client_mock, llm_instance, simi
     """
     # Create the agent with mocked dependencies
     agent = CalendarAgent(sf_client_mock, llm_instance)
+    agent.business_hours_config.time_slots = [("09:00", "12:00"), ("13:00", "16:00")]
+    agent.business_hours_config.allowed_weekdays = [0, 1, 2, 3, 4]
     CalendarAgent.now = datetime(2024, 6, 19, 20, 0, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info(
         "test_user_id",

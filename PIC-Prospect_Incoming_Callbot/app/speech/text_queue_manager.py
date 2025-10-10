@@ -58,6 +58,8 @@ class TextQueueManager:
         next_text_chunk = ""
         async with self.lock:
             splitted_text = ProcessText.chunk_text_by_sentences_size(self.text_queue, max_words_by_sentence, max_chars_by_sentence)
+            if not any(splitted_text):
+                return None
             next_text_chunk = splitted_text[0]
             next_text_chunk_len = len(next_text_chunk)
             # If queue is empty or first chunk is not a sentence and is not long enough

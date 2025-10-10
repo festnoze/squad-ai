@@ -35,8 +35,8 @@ def test_authenticate(salesforce_api_client: SalesforceApiClient):
     assert salesforce_api_client._access_token is not None, "Access token should be available after initialization"
     assert salesforce_api_client._instance_url is not None, "Instance URL should be available after initialization"
 
-    salesforce_api_client._access_token = None
-    salesforce_api_client._instance_url = None
+    salesforce_api_client.__class__._static_access_token = None
+    salesforce_api_client.__class__._static_instance_url = None
     result = salesforce_api_client.authenticate()
     assert result is True, "Re-authentication should succeed"
     assert salesforce_api_client._access_token is not None, "Access token should be available after re-authentication"
@@ -175,7 +175,7 @@ async def test_get_scheduled_appointments_async(salesforce_api_client: Salesforc
     owner_id = "005Aa00000K990ZIAR"
 
     # Get appointments without specifying an owner
-    appointments = await salesforce_api_client.get_scheduled_appointments_async(start_datetime=start_datetime, end_datetime=end_datetime, owner_id=owner_id)
+    appointments = await salesforce_api_client.get_scheduled_appointments_async(utc_start_datetime_str=start_datetime, utc_end_datetime_str=end_datetime, owner_id=owner_id)
 
     # Verify we got a valid response
     assert appointments is not None, "Should receive a list of appointments"
@@ -224,11 +224,14 @@ def mock_salesforce_client():
 class TestCheckForAppointmentCreation:
     """Unit tests for verify_appointment_existance_async method"""
 
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
     async def test_verify_appointment_existance_with_valid_event_id(self):
         """Test successful verification with a valid event_id"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock the get_scheduled_appointments_async method
         mock_appointments = [
@@ -240,10 +243,10 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id="event_123",
                 expected_subject="Test Meeting",
                 start_datetime="2025-05-20T14:00:00Z",
@@ -255,9 +258,6 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_with_none_event_id_found(self):
         """Test searching by subject when event_id is None and appointment is found"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock the get_scheduled_appointments_async method
         mock_appointments = [
@@ -269,10 +269,10 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id=None,
                 expected_subject="Team Standup",
                 start_datetime="2025-05-20T09:00:00Z",
@@ -284,9 +284,6 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_with_none_event_id_not_found(self):
         """Test searching by subject when event_id is None and appointment is not found"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock the get_scheduled_appointments_async method with different appointment
         mock_appointments = [
@@ -298,10 +295,10 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id=None,
                 expected_subject="Expected Meeting",
                 start_datetime="2025-05-20T10:00:00Z",
@@ -313,9 +310,6 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_appointment_not_found(self):
         """Test when appointment is not found with valid event_id"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock the get_scheduled_appointments_async method with different appointment
         mock_appointments = [
@@ -327,10 +321,10 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id="event_123",
                 expected_subject="Test Meeting",
                 start_datetime="2025-05-20T14:00:00Z",
@@ -342,14 +336,11 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_empty_appointments(self):
         """Test when get_scheduled_appointments_async returns empty list"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = []
 
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id="event_123",
                 expected_subject="Test Meeting",
                 start_datetime="2025-05-20T14:00:00Z",
@@ -361,11 +352,8 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_invalid_datetime(self):
         """Test with invalid start_datetime format"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
-        result = await client.verify_appointment_existance_async(
+        result = await self.client.verify_appointment_existance_async(
             event_id="event_123",
             expected_subject="Test Meeting",
             start_datetime="invalid-datetime-format",
@@ -376,14 +364,11 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_api_error(self):
         """Test when get_scheduled_appointments_async returns None (API error)"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = None
 
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id="event_123",
                 expected_subject="Test Meeting",
                 start_datetime="2025-05-20T14:00:00Z",
@@ -395,14 +380,11 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_exception_handling(self):
         """Test exception handling in verify_appointment_existance_async"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.side_effect = Exception("API connection error")
 
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id="event_123",
                 expected_subject="Test Meeting",
                 start_datetime="2025-05-20T14:00:00Z",
@@ -414,9 +396,6 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_subject_mismatch(self):
         """Test when event_id matches but subject doesn't match"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock appointment with correct ID but wrong subject
         mock_appointments = [
@@ -428,10 +407,10 @@ class TestCheckForAppointmentCreation:
             }
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id="event_123",
                 expected_subject="Expected Subject",
                 start_datetime="2025-05-20T14:00:00Z",
@@ -443,9 +422,6 @@ class TestCheckForAppointmentCreation:
 
     async def test_verify_appointment_existance_multiple_appointments_found(self):
         """Test when multiple appointments match the criteria"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock multiple appointments with same subject
         mock_appointments = [
@@ -463,11 +439,11 @@ class TestCheckForAppointmentCreation:
             },
         ]
 
-        with patch.object(client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
+        with patch.object(self.client, "get_scheduled_appointments_async", new_callable=AsyncMock) as mock_get_appointments:
             mock_get_appointments.return_value = mock_appointments
 
             # Test with event_id=None - should return first match
-            result = await client.verify_appointment_existance_async(
+            result = await self.client.verify_appointment_existance_async(
                 event_id=None,
                 expected_subject="Daily Standup",
                 start_datetime="2025-05-20T09:00:00Z",
@@ -482,11 +458,14 @@ class TestCheckForAppointmentCreation:
 class TestScheduleAppointmentRetryMechanism:
     """Unit tests for retry mechanism in schedule_new_appointment_async method"""
 
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
     async def test_retry_on_verification_failure_then_success(self):
         """Test that the method retries when verification fails, then succeeds"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
         verify_count = 0
@@ -515,10 +494,10 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Retry",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -532,9 +511,6 @@ class TestScheduleAppointmentRetryMechanism:
 
     async def test_retry_exhaustion_returns_none(self):
         """Test that method returns None when all retries are exhausted"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -553,10 +529,10 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification_always_fail
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Retry Exhaustion",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -569,9 +545,6 @@ class TestScheduleAppointmentRetryMechanism:
 
     async def test_no_retry_on_immediate_success(self):
         """Test that no retry occurs when verification succeeds immediately"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -597,10 +570,10 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification_success
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Immediate Success",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -613,9 +586,6 @@ class TestScheduleAppointmentRetryMechanism:
 
     async def test_retry_with_zero_max_retries(self):
         """Test that no retry occurs when max_retries is 0"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -634,10 +604,10 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification_fail
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Zero Retries",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -650,9 +620,6 @@ class TestScheduleAppointmentRetryMechanism:
 
     async def test_retry_with_creation_exception_then_success(self):
         """Test retry when creation fails with exception, then succeeds"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -678,10 +645,10 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification_success
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Exception Recovery",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -694,9 +661,6 @@ class TestScheduleAppointmentRetryMechanism:
 
     async def test_retry_with_http_error_then_success(self):
         """Test retry when creation fails with HTTP error, then succeeds"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -720,10 +684,10 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification_success
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test HTTP Error Recovery",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -738,9 +702,6 @@ class TestScheduleAppointmentRetryMechanism:
         """Test that retry delay is properly applied"""
         import time
 
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         start_time = None
         retry_time = None
@@ -778,10 +739,10 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                await client.schedule_new_appointment_async(
+                await self.client.schedule_new_appointment_async(
                     subject="Test Delay Timing",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -797,9 +758,6 @@ class TestScheduleAppointmentRetryMechanism:
 
     async def test_retry_with_mixed_failure_scenarios(self):
         """Test complex scenario with creation failure, verification failure, then success"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
         verify_count = 0
@@ -841,10 +799,10 @@ class TestScheduleAppointmentRetryMechanism:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Mixed Failures",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -860,11 +818,14 @@ class TestScheduleAppointmentRetryMechanism:
 class TestScheduleAppointmentRetryParameterValidation:
     """Tests for retry parameter validation and edge cases"""
 
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
     async def test_negative_max_retries(self):
         """Test that negative max_retries behaves like zero retries"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -883,10 +844,10 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification_fail
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Negative Retries",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -899,9 +860,6 @@ class TestScheduleAppointmentRetryParameterValidation:
 
     async def test_very_large_max_retries(self):
         """Test with large max_retries value (should work but be reasonable)"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -936,10 +894,10 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Large Retries",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -953,9 +911,6 @@ class TestScheduleAppointmentRetryParameterValidation:
 
     async def test_zero_retry_delay(self):
         """Test with zero retry delay"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -987,10 +942,10 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Zero Delay",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -1004,9 +959,6 @@ class TestScheduleAppointmentRetryParameterValidation:
 
     async def test_negative_retry_delay(self):
         """Test with negative retry delay (should still work, delay treated as zero)"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -1038,10 +990,10 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Negative Delay",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -1055,9 +1007,6 @@ class TestScheduleAppointmentRetryParameterValidation:
 
     async def test_default_retry_parameters(self):
         """Test that default retry parameters work as expected"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -1092,11 +1041,11 @@ class TestScheduleAppointmentRetryParameterValidation:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
                 # Call without specifying retry parameters (use defaults)
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Test Default Parameters",
                     start_datetime="2025-12-01T10:00:00Z",
                     duration_minutes=30,
@@ -1110,14 +1059,17 @@ class TestScheduleAppointmentRetryParameterValidation:
 
 class TestScheduleAppointmentOverlapDetection:
     """Tests for overlapping appointment detection in schedule_new_appointment_async"""
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
 
     async def test_schedule_new_appointment_fails_when_overlapping_appointment_exists(
         self,
     ):
         """Test that schedule_new_appointment_async fails when trying to create an overlapping appointment"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock the verify_appointment_existance_async method to simulate finding an existing appointment
         existing_event_id = "existing_event_123"
@@ -1135,10 +1087,10 @@ class TestScheduleAppointmentOverlapDetection:
                 # This shouldn't be reached since method should return None due to overlap
                 return event_id
 
-        with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+        with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
             mock_verify.side_effect = mock_verification
 
-            result = await client.schedule_new_appointment_async(
+            result = await self.client.schedule_new_appointment_async(
                 subject="Overlapping Meeting",
                 start_datetime="2025-12-01T10:00:00Z",
                 duration_minutes=30,
@@ -1155,15 +1107,13 @@ class TestScheduleAppointmentOverlapDetection:
                 expected_subject="Overlapping Meeting",
                 start_datetime="2025-12-01T10:00:00Z",
                 duration_minutes=30,
+                owner_id=None,
             )
 
     async def test_schedule_new_appointment_succeeds_when_no_overlapping_appointment(
         self,
     ):
         """Test that schedule_new_appointment_async succeeds when no overlapping appointment exists"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         verify_call_count = 0
         post_call_count = 0
@@ -1192,10 +1142,10 @@ class TestScheduleAppointmentOverlapDetection:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Non-Overlapping Meeting",
                     start_datetime="2025-12-01T14:00:00Z",
                     duration_minutes=60,
@@ -1213,9 +1163,6 @@ class TestScheduleAppointmentOverlapDetection:
         self,
     ):
         """Test that appointments with different subjects at same time are considered overlapping"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         existing_event_id = "existing_different_subject_789"
 
@@ -1235,10 +1182,10 @@ class TestScheduleAppointmentOverlapDetection:
             else:
                 return event_id
 
-        with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+        with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
             mock_verify.side_effect = mock_verification
 
-            result = await client.schedule_new_appointment_async(
+            result = await self.client.schedule_new_appointment_async(
                 subject="New Meeting Subject",
                 start_datetime="2025-12-01T15:00:00Z",
                 duration_minutes=30,
@@ -1249,9 +1196,6 @@ class TestScheduleAppointmentOverlapDetection:
 
     async def test_schedule_new_appointment_overlap_with_partial_time_overlap(self):
         """Test that appointments with partial time overlap are detected"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         existing_event_id = "partially_overlapping_event"
 
@@ -1268,10 +1212,10 @@ class TestScheduleAppointmentOverlapDetection:
             else:
                 return event_id
 
-        with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+        with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
             mock_verify.side_effect = mock_verification
 
-            result = await client.schedule_new_appointment_async(
+            result = await self.client.schedule_new_appointment_async(
                 subject="Partially Overlapping Meeting",
                 start_datetime="2025-12-01T16:30:00Z",  # Starts when existing appointment ends
                 duration_minutes=45,
@@ -1284,9 +1228,6 @@ class TestScheduleAppointmentOverlapDetection:
         self,
     ):
         """Test that appointment creation fails gracefully when overlap check encounters an error"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         async def mock_verification(*args, **kwargs):
             event_id = kwargs.get("event_id")
@@ -1297,12 +1238,12 @@ class TestScheduleAppointmentOverlapDetection:
             else:
                 return event_id
 
-        with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+        with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
             mock_verify.side_effect = mock_verification
 
             # The method should handle the error gracefully
             with pytest.raises(Exception, match="Salesforce API error during overlap check"):
-                await client.schedule_new_appointment_async(
+                await self.client.schedule_new_appointment_async(
                     subject="Error Test Meeting",
                     start_datetime="2025-12-01T17:00:00Z",
                     duration_minutes=30,
@@ -1311,12 +1252,15 @@ class TestScheduleAppointmentOverlapDetection:
 
 class TestScheduleAppointmentRetryIntegration:
     """Integration tests for complete retry workflow scenarios"""
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
 
     async def test_realistic_transient_failure_scenario(self):
         """Test a realistic scenario where Salesforce has temporary issues"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -1369,10 +1313,10 @@ class TestScheduleAppointmentRetryIntegration:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Important Client Meeting",
                     start_datetime="2025-12-01T14:00:00Z",
                     duration_minutes=60,
@@ -1388,9 +1332,6 @@ class TestScheduleAppointmentRetryIntegration:
 
     async def test_network_timeout_recovery(self):
         """Test recovery from network timeouts and connection issues"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -1422,10 +1363,10 @@ class TestScheduleAppointmentRetryIntegration:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+            with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                 mock_verify.side_effect = mock_verification
 
-                result = await client.schedule_new_appointment_async(
+                result = await self.client.schedule_new_appointment_async(
                     subject="Network Recovery Test",
                     start_datetime="2025-12-01T15:00:00Z",
                     duration_minutes=30,
@@ -1438,9 +1379,8 @@ class TestScheduleAppointmentRetryIntegration:
 
     async def test_authentication_reauth_during_retry(self):
         """Test that authentication is refreshed during retry attempts"""
-        client = SalesforceApiClient()
-        client._access_token = "initial_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
+        self.client.__class__._static_access_token = "initial_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
         auth_call_count = 0
@@ -1454,12 +1394,12 @@ class TestScheduleAppointmentRetryIntegration:
             return mock_response
 
         # Mock the _ensure_authenticated_async method to track calls
-        original_ensure_auth = client._ensure_authenticated_async
+        original_ensure_auth = self.client._ensure_authenticated_async
 
         async def mock_ensure_auth():
             nonlocal auth_call_count
             auth_call_count += 1
-            client._access_token = f"refreshed_token_{auth_call_count}"
+            self.client.__class__._static_access_token = f"refreshed_token_{auth_call_count}"
             # Don't call original to avoid actual authentication
 
         verify_count = 0
@@ -1482,13 +1422,13 @@ class TestScheduleAppointmentRetryIntegration:
             mock_client = mock_client_class.return_value.__aenter__.return_value
             mock_client.post = mock_post
 
-            with patch.object(client, "_ensure_authenticated_async", new_callable=AsyncMock) as mock_auth:
+            with patch.object(self.client, "_ensure_authenticated_async", new_callable=AsyncMock) as mock_auth:
                 mock_auth.side_effect = mock_ensure_auth
 
-                with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+                with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                     mock_verify.side_effect = mock_verification
 
-                    result = await client.schedule_new_appointment_async(
+                    result = await self.client.schedule_new_appointment_async(
                         subject="Auth Refresh Test",
                         start_datetime="2025-12-01T16:00:00Z",
                         duration_minutes=30,
@@ -1513,9 +1453,6 @@ class TestScheduleAppointmentRetryIntegration:
         logger.addHandler(handler)
         logger.setLevel(logging.INFO)
 
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         call_count = 0
 
@@ -1543,10 +1480,10 @@ class TestScheduleAppointmentRetryIntegration:
                 mock_client = mock_client_class.return_value.__aenter__.return_value
                 mock_client.post = mock_post
 
-                with patch.object(client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
+                with patch.object(self.client, "verify_appointment_existance_async", new_callable=AsyncMock) as mock_verify:
                     mock_verify.side_effect = mock_verification
 
-                    result = await client.schedule_new_appointment_async(
+                    result = await self.client.schedule_new_appointment_async(
                         subject="Complete Failure Test",
                         start_datetime="2025-12-01T17:00:00Z",
                         duration_minutes=30,
@@ -1569,12 +1506,15 @@ class TestScheduleAppointmentRetryIntegration:
 
 class TestOpportunitiesByContactAsync:
     """Unit tests for get_opportunities_by_contact_async method"""
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
 
     async def test_get_opportunities_by_contact_with_zero_opportunities(self):
         """Test retrieving opportunities for a contact with no associated opportunities"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock the _query_salesforce method
         query_call_count = 0
@@ -1593,10 +1533,10 @@ class TestOpportunitiesByContactAsync:
                     return {"records": [], "totalSize": 0}
             return None
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_opportunities_by_contact_async("contact_123")
+            result = await self.client.get_opportunities_by_contact_async("contact_123")
 
             assert result == []  # Should return empty list when no opportunities found
             assert query_call_count == 2  # Should make both queries
@@ -1604,9 +1544,6 @@ class TestOpportunitiesByContactAsync:
 
     async def test_get_opportunities_by_contact_with_single_opportunity(self):
         """Test retrieving opportunities for a contact with one associated opportunity"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock the _query_salesforce method
         query_call_count = 0
@@ -1639,10 +1576,10 @@ class TestOpportunitiesByContactAsync:
                 }
             return None
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_opportunities_by_contact_async("contact_123")
+            result = await self.client.get_opportunities_by_contact_async("contact_123")
 
             assert result is not None
             assert len(result) == 1
@@ -1653,9 +1590,6 @@ class TestOpportunitiesByContactAsync:
 
     async def test_get_opportunities_by_contact_with_multiple_opportunities(self):
         """Test retrieving opportunities for a contact with multiple associated opportunities"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock the _query_salesforce method
         query_call_count = 0
@@ -1709,10 +1643,10 @@ class TestOpportunitiesByContactAsync:
                 }
             return None
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_opportunities_by_contact_async("contact_123")
+            result = await self.client.get_opportunities_by_contact_async("contact_123")
 
             assert result is not None
             assert len(result) == 3
@@ -1729,77 +1663,68 @@ class TestOpportunitiesByContactAsync:
 
     async def test_get_opportunities_by_contact_with_no_account(self):
         """Test retrieving opportunities for a contact with no associated account"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         async def mock_query_salesforce(query: str):
             # Return contact with no AccountId
             return {"records": [{"Id": "contact_123", "AccountId": None}], "totalSize": 1}
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_opportunities_by_contact_async("contact_123")
+            result = await self.client.get_opportunities_by_contact_async("contact_123")
 
             assert result == []  # Should return empty list when contact has no account
             assert mock_query.call_count == 1  # Should only make one query (contact lookup)
 
     async def test_get_opportunities_by_contact_with_invalid_contact_id(self):
         """Test retrieving opportunities for a non-existent contact"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         async def mock_query_salesforce(query: str):
             # Return empty result for non-existent contact
             return {"records": [], "totalSize": 0}
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_opportunities_by_contact_async("invalid_contact")
+            result = await self.client.get_opportunities_by_contact_async("invalid_contact")
 
             assert result == []  # Should return empty list when contact not found
             assert mock_query.call_count == 1
 
     async def test_get_opportunities_by_contact_with_api_error(self):
         """Test handling API errors during opportunity retrieval"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         async def mock_query_salesforce(query: str):
             # Return None to simulate API error
             return None
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_opportunities_by_contact_async("contact_123")
+            result = await self.client.get_opportunities_by_contact_async("contact_123")
 
             assert result is None  # Should return None when API error occurs
             assert mock_query.call_count == 1
 
     async def test_get_opportunities_by_contact_with_empty_contact_id(self):
         """Test providing empty contact ID"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
-        result = await client.get_opportunities_by_contact_async("")
+        result = await self.client.get_opportunities_by_contact_async("")
 
         assert result is None  # Should return None for empty contact ID
 
 
 class TestGetUserByIdAsync:
     """Unit tests for get_user_by_id_async method"""
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
 
     async def test_get_user_by_id_with_valid_user(self):
         """Test retrieving a user with valid user ID"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         async def mock_query_salesforce(query: str):
             return {
@@ -1820,10 +1745,10 @@ class TestGetUserByIdAsync:
                 "totalSize": 1,
             }
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_user_by_id_async("user_123")
+            result = await self.client.get_user_by_id_async("user_123")
 
             assert result is not None
             assert result["Id"] == "user_123"
@@ -1834,55 +1759,49 @@ class TestGetUserByIdAsync:
 
     async def test_get_user_by_id_with_invalid_user(self):
         """Test retrieving a non-existent user"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         async def mock_query_salesforce(query: str):
             return {"records": [], "totalSize": 0}
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_user_by_id_async("invalid_user")
+            result = await self.client.get_user_by_id_async("invalid_user")
 
             assert result is None  # Should return None when user not found
 
     async def test_get_user_by_id_with_api_error(self):
         """Test handling API errors during user retrieval"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         async def mock_query_salesforce(query: str):
             return None  # Simulate API error
 
-        with patch.object(client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
+        with patch.object(self.client, "_query_salesforce", new_callable=AsyncMock) as mock_query:
             mock_query.side_effect = mock_query_salesforce
 
-            result = await client.get_user_by_id_async("user_123")
+            result = await self.client.get_user_by_id_async("user_123")
 
             assert result is None  # Should return None when API error occurs
 
     async def test_get_user_by_id_with_empty_user_id(self):
         """Test providing empty user ID"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
-        result = await client.get_user_by_id_async("")
+        result = await self.client.get_user_by_id_async("")
 
         assert result is None  # Should return None for empty user ID
 
 
 class TestGetCompleteContactInfoByPhoneAsync:
     """Unit tests for get_complete_contact_info_by_phone_async method"""
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
 
     async def test_complete_contact_info_with_contact_and_zero_opportunities(self):
         """Test retrieving complete contact info for a contact with no opportunities"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data
         contact_data = {
@@ -1901,14 +1820,14 @@ class TestGetCompleteContactInfoByPhoneAsync:
                 return {"Id": "user_original", "Name": "Original Owner", "Email": "original@company.com"}
             return None
 
-        with patch.object(client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
-            with patch.object(client, "get_opportunities_by_contact_async", new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, "get_opportunities_by_contact_async", new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
                     mock_person.side_effect = mock_get_person_by_phone
                     mock_opps.side_effect = mock_get_opportunities_by_contact
                     mock_user.side_effect = mock_get_user_by_id
 
-                    result = await client.get_complete_contact_info_by_phone_async("+33123456789")
+                    result = await self.client.get_complete_contact_info_by_phone_async("+33123456789")
 
                     assert result is not None
                     assert result["contact"]["Id"] == "contact_123"
@@ -1920,9 +1839,6 @@ class TestGetCompleteContactInfoByPhoneAsync:
 
     async def test_complete_contact_info_with_contact_and_single_opportunity(self):
         """Test retrieving complete contact info for a contact with one opportunity"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data
         contact_data = {
@@ -1946,14 +1862,14 @@ class TestGetCompleteContactInfoByPhoneAsync:
                 return {"Id": "user_original", "Name": "Original Owner", "Email": "original@company.com"}
             return None
 
-        with patch.object(client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
-            with patch.object(client, "get_opportunities_by_contact_async", new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, "get_opportunities_by_contact_async", new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
                     mock_person.side_effect = mock_get_person_by_phone
                     mock_opps.side_effect = mock_get_opportunities_by_contact
                     mock_user.side_effect = mock_get_user_by_id
 
-                    result = await client.get_complete_contact_info_by_phone_async("+33987654321")
+                    result = await self.client.get_complete_contact_info_by_phone_async("+33987654321")
 
                     assert result is not None
                     assert result["contact"]["Id"] == "contact_123"
@@ -1965,9 +1881,6 @@ class TestGetCompleteContactInfoByPhoneAsync:
 
     async def test_complete_contact_info_with_contact_and_multiple_opportunities(self):
         """Test retrieving complete contact info for a contact with multiple opportunities"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data
         contact_data = {
@@ -1997,14 +1910,14 @@ class TestGetCompleteContactInfoByPhoneAsync:
             }
             return users.get(user_id)
 
-        with patch.object(client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
-            with patch.object(client, "get_opportunities_by_contact_async", new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, "get_opportunities_by_contact_async", new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
                     mock_person.side_effect = mock_get_person_by_phone
                     mock_opps.side_effect = mock_get_opportunities_by_contact
                     mock_user.side_effect = mock_get_user_by_id
 
-                    result = await client.get_complete_contact_info_by_phone_async("+33555666777")
+                    result = await self.client.get_complete_contact_info_by_phone_async("+33555666777")
 
                     assert result is not None
                     assert result["contact"]["Id"] == "contact_789"
@@ -2015,9 +1928,6 @@ class TestGetCompleteContactInfoByPhoneAsync:
 
     async def test_complete_contact_info_with_lead_and_converted_opportunities(self):
         """Test retrieving complete contact info for a converted lead with opportunities"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock lead data
         lead_data = {
@@ -2041,14 +1951,14 @@ class TestGetCompleteContactInfoByPhoneAsync:
             }
             return users.get(user_id)
 
-        with patch.object(client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
-            with patch.object(client, "get_opportunities_for_lead_async", new_callable=AsyncMock) as mock_lead_opps:
-                with patch.object(client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, "get_opportunities_for_lead_async", new_callable=AsyncMock) as mock_lead_opps:
+                with patch.object(self.client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
                     mock_person.side_effect = mock_get_person_by_phone
                     mock_lead_opps.side_effect = mock_get_opportunities_for_lead
                     mock_user.side_effect = mock_get_user_by_id
 
-                    result = await client.get_complete_contact_info_by_phone_async("+33777888999")
+                    result = await self.client.get_complete_contact_info_by_phone_async("+33777888999")
 
                     assert result is not None
                     assert result["contact"]["Id"] == "lead_456"
@@ -2060,25 +1970,19 @@ class TestGetCompleteContactInfoByPhoneAsync:
 
     async def test_complete_contact_info_with_no_contact_found(self):
         """Test retrieving complete contact info when no contact is found"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         async def mock_get_person_by_phone(phone):
             return None  # No contact found
 
-        with patch.object(client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
+        with patch.object(self.client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
             mock_person.side_effect = mock_get_person_by_phone
 
-            result = await client.get_complete_contact_info_by_phone_async("+33999888777")
+            result = await self.client.get_complete_contact_info_by_phone_async("+33999888777")
 
             assert result is None
 
     async def test_complete_contact_info_with_opportunity_api_error(self):
         """Test retrieving complete contact info when opportunity retrieval fails"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data
         contact_data = {
@@ -2097,14 +2001,14 @@ class TestGetCompleteContactInfoByPhoneAsync:
                 return {"Id": "user_fallback", "Name": "Fallback Owner", "Email": "fallback@company.com"}
             return None
 
-        with patch.object(client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
-            with patch.object(client, "get_opportunities_by_contact_async", new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, "get_person_by_phone_async", new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, "get_opportunities_by_contact_async", new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, "get_user_by_id_async", new_callable=AsyncMock) as mock_user:
                     mock_person.side_effect = mock_get_person_by_phone
                     mock_opps.side_effect = mock_get_opportunities_by_contact
                     mock_user.side_effect = mock_get_user_by_id
 
-                    result = await client.get_complete_contact_info_by_phone_async("+33111222333")
+                    result = await self.client.get_complete_contact_info_by_phone_async("+33111222333")
 
                     assert result is not None
                     assert result["contact"]["Id"] == "contact_error"
@@ -2115,11 +2019,8 @@ class TestGetCompleteContactInfoByPhoneAsync:
 
     async def test_complete_contact_info_with_empty_phone_number(self):
         """Test retrieving complete contact info with empty phone number"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
-        result = await client.get_complete_contact_info_by_phone_async("")
+        result = await self.client.get_complete_contact_info_by_phone_async("")
 
         assert result is None
 
@@ -2308,12 +2209,15 @@ class TestAdapterMethod:
 
 class TestSalesforceOwnerStrategy:
     """Unit tests for Salesforce owner retrieval strategies"""
+    def setup_method(self):
+        """Setup for each test method"""
+        self.client = SalesforceApiClient()
+        self.client.__class__._static_access_token = "mock_token"
+        self.client.__class__._static_instance_url = "https://mock-instance.salesforce.com"
+
 
     async def test_strategy_both_with_opportunity(self):
         """Test 'both' strategy when opportunities exist - should use opportunity owner"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data with opportunity
         contact_data = {
@@ -2339,15 +2243,15 @@ class TestSalesforceOwnerStrategy:
         }
 
         # Mock the methods
-        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
-            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
                     with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='both'):
                         mock_person.return_value = contact_data
                         mock_opps.return_value = opportunity_data
                         mock_user.side_effect = lambda user_id: user_data.get(user_id)
 
-                        result = await client.get_complete_contact_info_by_phone_async("+33123456789")
+                        result = await self.client.get_complete_contact_info_by_phone_async("+33123456789")
 
                         assert result is not None
                         assert result["assigned_user"]["Id"] == "opportunity_owner"
@@ -2356,9 +2260,6 @@ class TestSalesforceOwnerStrategy:
 
     async def test_strategy_both_without_opportunity(self):
         """Test 'both' strategy when no opportunities - should fallback to contact owner"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data without opportunities
         contact_data = {
@@ -2373,15 +2274,15 @@ class TestSalesforceOwnerStrategy:
 
         user_data = {"contact_owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
 
-        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
-            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
                     with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='both'):
                         mock_person.return_value = contact_data
                         mock_opps.return_value = []  # No opportunities
                         mock_user.side_effect = lambda user_id: user_data.get(user_id)
 
-                        result = await client.get_complete_contact_info_by_phone_async("+33987654321")
+                        result = await self.client.get_complete_contact_info_by_phone_async("+33987654321")
 
                         assert result is not None
                         assert result["assigned_user"]["Id"] == "contact_owner"
@@ -2390,9 +2291,6 @@ class TestSalesforceOwnerStrategy:
 
     async def test_strategy_opport_only_with_opportunity(self):
         """Test 'opport_only' strategy with opportunities - should use opportunity owner"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data with opportunity
         contact_data = {
@@ -2414,15 +2312,15 @@ class TestSalesforceOwnerStrategy:
 
         user_data = {"opportunity_owner": {"Id": "opportunity_owner", "Name": "Opportunity Owner"}}
 
-        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
-            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
                     with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='opport_only'):
                         mock_person.return_value = contact_data
                         mock_opps.return_value = opportunity_data
                         mock_user.side_effect = lambda user_id: user_data.get(user_id)
 
-                        result = await client.get_complete_contact_info_by_phone_async("+33555666777")
+                        result = await self.client.get_complete_contact_info_by_phone_async("+33555666777")
 
                         assert result is not None
                         assert result["assigned_user"]["Id"] == "opportunity_owner"
@@ -2431,9 +2329,6 @@ class TestSalesforceOwnerStrategy:
 
     async def test_strategy_opport_only_without_opportunity(self):
         """Test 'opport_only' strategy without opportunities - should have no assigned user"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data without opportunities
         contact_data = {
@@ -2446,15 +2341,15 @@ class TestSalesforceOwnerStrategy:
             }
         }
 
-        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
-            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
                     with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='opport_only'):
                         mock_person.return_value = contact_data
                         mock_opps.return_value = []  # No opportunities
                         mock_user.return_value = None  # Should not be called
 
-                        result = await client.get_complete_contact_info_by_phone_async("+33111222333")
+                        result = await self.client.get_complete_contact_info_by_phone_async("+33111222333")
 
                         assert result is not None
                         assert result["assigned_user"] is None
@@ -2464,9 +2359,6 @@ class TestSalesforceOwnerStrategy:
 
     async def test_strategy_direct_only_with_contact(self):
         """Test 'direct_only' strategy - should skip opportunities and use contact owner"""
-        client = SalesforceApiClient()
-        client._access_token = "mock_token"
-        client._instance_url = "https://mock-instance.salesforce.com"
 
         # Mock contact data
         contact_data = {
@@ -2481,14 +2373,14 @@ class TestSalesforceOwnerStrategy:
 
         user_data = {"contact_owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
 
-        with patch.object(client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
-            with patch.object(client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
-                with patch.object(client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
+        with patch.object(self.client, 'get_person_by_phone_async', new_callable=AsyncMock) as mock_person:
+            with patch.object(self.client, 'get_opportunities_by_contact_async', new_callable=AsyncMock) as mock_opps:
+                with patch.object(self.client, 'get_user_by_id_async', new_callable=AsyncMock) as mock_user:
                     with patch('utils.envvar.EnvHelper.get_salesforce_owner_strategy', return_value='direct_only'):
                         mock_person.return_value = contact_data
                         mock_user.side_effect = lambda user_id: user_data.get(user_id)
 
-                        result = await client.get_complete_contact_info_by_phone_async("+33999888777")
+                        result = await self.client.get_complete_contact_info_by_phone_async("+33999888777")
 
                         assert result is not None
                         assert result["assigned_user"]["Id"] == "contact_owner"
@@ -2498,36 +2390,33 @@ class TestSalesforceOwnerStrategy:
 
     def test_get_owner_by_strategy_method_direct_only(self):
         """Test the _get_owner_by_strategy method with direct_only strategy"""
-        client = SalesforceApiClient()
-        
+
         contact_info = {"Owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
         opportunities = [{"Id": "opp_1", "OwnerId": "opp_owner"}]
-        
-        user_id, user_source = client._get_owner_by_strategy("Contact", contact_info, opportunities, "direct_only")
-        
+
+        user_id, user_source = self.client._get_owner_by_strategy("Contact", contact_info, opportunities, "direct_only")
+
         assert user_id == "contact_owner"
         assert user_source == "contact"
 
     def test_get_owner_by_strategy_method_opport_only_with_opps(self):
         """Test the _get_owner_by_strategy method with opport_only strategy and opportunities"""
-        client = SalesforceApiClient()
-        
+
         contact_info = {"Owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
         opportunities = [{"Id": "opp_1", "OwnerId": "opp_owner"}]
-        
-        user_id, user_source = client._get_owner_by_strategy("Contact", contact_info, opportunities, "opport_only")
-        
+
+        user_id, user_source = self.client._get_owner_by_strategy("Contact", contact_info, opportunities, "opport_only")
+
         assert user_id == "opp_owner"
         assert user_source == "opportunity"
 
     def test_get_owner_by_strategy_method_opport_only_without_opps(self):
         """Test the _get_owner_by_strategy method with opport_only strategy and no opportunities"""
-        client = SalesforceApiClient()
-        
+
         contact_info = {"Owner": {"Id": "contact_owner", "Name": "Contact Owner"}}
         opportunities = []
-        
-        user_id, user_source = client._get_owner_by_strategy("Contact", contact_info, opportunities, "opport_only")
-        
+
+        user_id, user_source = self.client._get_owner_by_strategy("Contact", contact_info, opportunities, "opport_only")
+
         assert user_id is None
         assert user_source is None

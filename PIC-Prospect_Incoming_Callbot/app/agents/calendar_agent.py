@@ -158,8 +158,7 @@ class CalendarAgent:
             return TextRegistry.appointment_in_past_text
         elif validation_result == "holiday":
             return TextRegistry.appointment_holiday_text
-        elif validation_result == "too_far_future:":
-            # This should already be caught above, but handle it just in case
+        elif validation_result.startswith("too_far_future:"):
             return TextRegistry.appointment_too_far_text
         return ""
 

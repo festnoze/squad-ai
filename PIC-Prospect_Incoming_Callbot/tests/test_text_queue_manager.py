@@ -102,7 +102,7 @@ async def test_get_text_chunk_word_limit(text_queue_manager : TextQueueManager):
 async def test_get_text_chunk_empty_queue(text_queue_manager : TextQueueManager):
     """Test getting a chunk from an empty queue"""
     chunk = await text_queue_manager.get_next_text_chunk_async()
-    assert chunk == None
+    assert chunk is None
 
 
 async def test_is_empty(text_queue_manager : TextQueueManager):

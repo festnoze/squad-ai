@@ -52,7 +52,7 @@ This is a **Prospect Incoming Callbot** - an AI-powered phone conversation syste
    - Uses WebRTC VAD for voice activity detection
 
 3. **API Layer**:
-   - `app/routers` - FastAPI routes: 'callbot_router.py' for Twilio webhooks and WebSocket connections, 'logs_router' for accessing latest logs, 'test_router' for run live testing of fake parallel incoming calls
+   - `app/routers` - FastAPI routes: 'incoming_call_router.py' for Twilio webhooks and WebSocket connections, 'logs_router' for accessing latest logs, 'test_router' for run live testing of fake parallel incoming calls
    - `app/api/startup.py` - Application initialization and cleanup
    - `app/phone_call_websocket_events_handler.py` - WebSocket event handling
 

@@ -148,6 +148,9 @@ class TestBusinessHoursTimeframesIntegration:
         # Create config with only some values set
         config = BusinessHoursConfig()
         config.appointment_duration = 15  # Only override duration
+        # Set hard-coded business opening days & hours, for the test consistency
+        config.time_slots = [("09:00", "12:00"), ("13:00", "16:00")]
+        config.allowed_weekdays = [0, 1, 2, 3, 4]
 
         start_date = "2025-01-06T00:00:00Z"  # Monday
         end_date = "2025-01-06T23:59:59Z"    # Monday

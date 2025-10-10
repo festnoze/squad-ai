@@ -21,7 +21,7 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
     _username = EnvHelper.get_salesforce_username()
     _password = EnvHelper.get_salesforce_password()
     _client_secret = EnvHelper.get_salesforce_client_secret()
-    _private_key_file = EnvHelper.get_salesforce_private_key_file_path()
+    _private_key_file = EnvHelper.get_salesforce_private_key_file()
     _consumer_key = EnvHelper.get_salesforce_consumer_key()
     _private_key_file_jwt = EnvHelper.get_salesforce_private_key_file()
     _auth_method = EnvHelper.get_salesforce_auth_method()

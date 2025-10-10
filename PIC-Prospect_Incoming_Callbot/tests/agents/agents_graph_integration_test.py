@@ -13,7 +13,7 @@ from api_client.calendar_client_interface import CalendarClientInterface
 from api_client.salesforce_user_client_interface import SalesforceUserClientInterface
 from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from managers.outgoing_manager import OutgoingManager
-from routers.callbot_router import change_env_var_values
+from routers.incoming_call_router import change_env_var_values
 from utils.envvar import EnvHelper
 
 
@@ -128,7 +128,7 @@ async def test_query_response_about_courses(agents_graph_mockings):
     # Verify outgoing_manager was called with the response (if the flow supports it)
     # Note: This might not be called in all flows, so we check if it was called at least 0 times
     assert agents_graph_mockings["outgoing_manager"].enqueue_text_async.call_count >= 0
-    
+
     assert EnvHelper.get_available_actions() == [action.strip() for action in available_actions.split(",")]
     await change_env_var_values({"AVAILABLE_ACTIONS": available_actions})
     EnvHelper.load_all_env_var(force_load_from_env_file=True)
@@ -356,13 +356,7 @@ def agents_graph_mockings():
     ]
 
     mock_salesforce_client.get_complete_contact_info_by_phone_async.return_value = {
-        "contact": {
-            "Id": "003XX000004TmiQIAS",
-            "FirstName": "Test",
-            "LastName": "Contact",
-            "Email": "test.contact@example.com",
-            "Owner": {"Id": "005XX000001S8ptYAC", "Name": "Test Contact Owner"}
-        },
+        "contact": {"Id": "003XX000004TmiQIAS", "FirstName": "Test", "LastName": "Contact", "Email": "test.contact@example.com", "Owner": {"Id": "005XX000001S8ptYAC", "Name": "Test Contact Owner"}},
         "assigned_user": {"Id": "005XX000001S8ptYAC", "Name": "Test Contact Owner"},
         "user_source": "contact",
     }

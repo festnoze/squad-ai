@@ -6,7 +6,7 @@ The PIC Prospect Incoming Callbot exposes several FastAPI endpoints for handling
 
 The application uses FastAPI routers to organize endpoints:
 
-- **Callbot Router** (`app/routers/callbot_router.py`) - Main Twilio webhooks and WebSocket connections
+- **Callbot Router** (`app/routers/incoming_call_router.py`) - Main Twilio webhooks and WebSocket connections
 - **Logs Router** (`app/routers/logs_router.py`) - Access to application logs
 - **Test Router** (`app/routers/test_router.py`) - Testing endpoints for parallel call simulation
 
@@ -130,7 +130,7 @@ async def audio_stream_websocket(websocket: WebSocket):
             "level": "INFO",
             "message": "Call initiated from +1234567890",
             "call_id": "call_123",
-            "module": "callbot_router"
+            "module": "incoming_call_router"
         }
     ],
     "total_lines": 45,

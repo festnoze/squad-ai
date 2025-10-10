@@ -140,10 +140,19 @@ async def test_proposition_de_creneaux_calls_get_appointments(sf_client_mock):
     ],
 )
 async def test_user_confirmation_calls_schedule_new_appointment(sf_client_mock, user_input, chat_history):
+    # Arrange
     agent = CalendarAgent(sf_client_mock, FakeLLM("Rendez-vous confirmé"), FakeLLM(""), FakeLLM("2025-06-10T10:00:00Z"))
+
+    # Set hard-coded now / business opening days & hours / user infos, for the test consistency
     CalendarAgent.now = datetime(2025, 6, 9, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
+    agent.business_hours_config.time_slots = [("09:00", "12:00"), ("13:00", "16:00")]
+    agent.business_hours_config.allowed_weekdays = [0, 1, 2, 3, 4]
+    
+    # Act
     await agent.process_to_schedule_new_appointement_async(user_input, chat_history)
+
+    # Assert
     sf_client_mock.schedule_new_appointment_async.assert_awaited()
 
 
@@ -180,7 +189,9 @@ async def test_appointment_too_far_validation(sf_client_mock, user_input, chat_h
 
     agent = CalendarAgent(sf_client_mock, classifier_llm, None, date_extractor_llm)
 
-    # Set a fixed "now" date for consistent testing - June 19, 2025
+    # Set hard-coded now / business opening days & hours / user infos, for the test consistency
+    agent.business_hours_config.time_slots = [("09:00", "12:00"), ("13:00", "16:00")]
+    agent.business_hours_config.allowed_weekdays = [0, 1, 2, 3, 4]
     CalendarAgent.now = datetime(2025, 6, 19, tzinfo=pytz.timezone("Europe/Paris"))
     agent._set_user_info("uid", "John", "Doe", "john@ex.com", "ownerId", "Alice")
 
@@ -190,5 +201,7 @@ async def test_appointment_too_far_validation(sf_client_mock, user_input, chat_h
     # Validate the result based on expected behavior
     if expected_result == "too_far":
         assert result == TextRegistry.appointment_too_far_text
-    else:
+    elif expected_result == "normal_flow":
         assert result != TextRegistry.appointment_too_far_text
+    else:
+        assert result == ""
