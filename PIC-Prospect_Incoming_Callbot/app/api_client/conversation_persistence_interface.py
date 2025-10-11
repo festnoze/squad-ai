@@ -82,3 +82,38 @@ class ConversationPersistenceInterface(ABC):
             Dictionary containing the response from adding the message
         """
         pass
+
+    @abstractmethod
+    async def add_llm_operation_async(
+        self,
+        operation_type_name: str,
+        provider: str,
+        model: str,
+        tokens_or_duration: float,
+        price_per_unit: float,
+        cost_usd: float,
+        conversation_id: UUID | None = None,
+        message_id: UUID | None = None,
+        stream_id: str | None = None,
+        call_sid: str | None = None,
+        phone_number: str | None = None,
+    ) -> bool:
+        """Add a new LLM operation (STT, TTS, etc.) to track costs.
+
+        Args:
+            operation_type_name: Type of operation ("STT", "TTS", etc.)
+            provider: Provider name (e.g., "google", "openai")
+            model: Model name used
+            tokens_or_duration: Number of tokens/characters or duration in seconds
+            price_per_unit: Price per unit in USD
+            cost_usd: Total cost in USD
+            conversation_id: Optional conversation ID
+            message_id: Optional message ID
+            stream_id: Optional stream ID for tracking
+            call_sid: Optional Twilio call SID
+            phone_number: Optional phone number
+
+        Returns:
+            True if operation was added successfully, False otherwise
+        """
+        pass

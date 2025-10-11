@@ -461,7 +461,8 @@ class IncomingAudioManager(IncomingManager):
                 self._rename_incoming_speech_file(user_query_audio_filename, user_query_msg_id + ".wav")
 
             # Invoke the graph with current state to get the AI-generated welcome message
-            updated_state: PhoneConversationState = cast(PhoneConversationState, await self.agents_graph.ainvoke(current_state))
+            agents_graph_result = await self.agents_graph.ainvoke(current_state)
+            updated_state: PhoneConversationState = cast(PhoneConversationState, agents_graph_result)
             self.stream_states[self.stream_sid] = updated_state
             self.agents_graph.consecutive_error_manager.reset_consecutive_error_count(updated_state)
             await self._hangup_upon_goodbye_async(updated_state)

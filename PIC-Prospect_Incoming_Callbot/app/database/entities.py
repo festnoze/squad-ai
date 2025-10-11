@@ -1,7 +1,7 @@
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
+from sqlalchemy import Boolean, Column, DateTime, Float, ForeignKey, Integer, String
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import declarative_base, relationship
 
@@ -52,6 +52,9 @@ class ConversationEntity(Base):
 
     user = relationship("UserEntity", back_populates="conversations", lazy="joined")
     messages = relationship("MessageEntity", back_populates="conversation", cascade="all, delete-orphan", lazy="joined")
+    llm_operations = relationship(
+        "LlmOperationEntity", back_populates="conversation", cascade="all, delete-orphan", lazy="select"
+    )
 
 
 class MessageEntity(Base):
@@ -65,3 +68,40 @@ class MessageEntity(Base):
     created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
 
     conversation = relationship("ConversationEntity", back_populates="messages")
+    llm_operations = relationship(
+        "LlmOperationEntity", back_populates="message", cascade="all, delete-orphan", lazy="select"
+    )
+
+
+class LlmOperationTypeEntity(Base):
+    __tablename__ = "llm_operation_types"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    name = Column(String, nullable=False, unique=True)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
+
+    llm_operations = relationship(
+        "LlmOperationEntity", back_populates="operation_type", cascade="all, delete-orphan", lazy="select"
+    )
+
+
+class LlmOperationEntity(Base):
+    __tablename__ = "llm_operations"
+
+    id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
+    llm_operation_type_id = Column(PG_UUID(as_uuid=True), ForeignKey("llm_operation_types.id"), nullable=False)
+    conversation_id = Column(PG_UUID(as_uuid=True), ForeignKey("conversations.id"), nullable=True)
+    message_id = Column(PG_UUID(as_uuid=True), ForeignKey("messages.id"), nullable=True)
+    tokens_or_duration = Column(Float, nullable=False)
+    provider = Column(String, nullable=False)
+    model = Column(String, nullable=False)
+    price_per_unit = Column(Float, nullable=False)
+    cost_dollar_cents = Column(Float, nullable=False)
+    stream_id = Column(String, nullable=True)
+    call_sid = Column(String, nullable=True)
+    phone_number = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.now(UTC), nullable=False)
+
+    operation_type = relationship("LlmOperationTypeEntity", back_populates="llm_operations")
+    conversation = relationship("ConversationEntity", back_populates="llm_operations")
+    message = relationship("MessageEntity", back_populates="llm_operations")

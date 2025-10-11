@@ -262,6 +262,26 @@ class StudiRAGInferenceApiClient(ConversationPersistenceInterface, RagQueryInter
     async def close_client_async(self):
         await self.client.aclose()
 
+    async def add_llm_operation_async(
+        self,
+        operation_type_name: str,
+        provider: str,
+        model: str,
+        tokens_or_duration: float,
+        price_per_unit: float,
+        cost_usd: float,
+        conversation_id: UUID | None = None,
+        message_id: UUID | None = None,
+        stream_id: str | None = None,
+        call_sid: str | None = None,
+        phone_number: str | None = None,
+    ) -> bool:
+        """
+        Not implemented - the remote RAG server manages its own LLM operations.
+        This client delegates all conversation persistence to the remote server.
+        """
+        return True
+
     ### TOOLS ###
 
     @staticmethod

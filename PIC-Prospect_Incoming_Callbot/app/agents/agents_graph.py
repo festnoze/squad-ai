@@ -243,7 +243,7 @@ class AgentsGraph:
 
         # Multiple possible actions: schedule appointment or ask RAG for training infos
         elif len(self.available_actions) >= 1:
-            category = await self.analyse_user_input_for_dispatch_async(self.calendar_classifier_llm, user_input, state["history"])
+            category = await self.analyse_user_input_for_dispatch_async(self.calendar_classifier_llm, user_input, state["history"], state)
             call_sid = state.get("call_sid", "N/A")
 
             if category == "schedule_calendar_appointment":
@@ -272,7 +272,7 @@ class AgentsGraph:
                 state["agent_scratchpad"]["next_agent_needed"] = "other_inquery"
         return state
 
-    async def analyse_user_input_for_dispatch_async(self, llm: any, user_input: str, chat_history: list[dict[str, str]]) -> str:
+    async def analyse_user_input_for_dispatch_async(self, llm: any, user_input: str, chat_history: list[dict[str, str]], state: PhoneConversationState | None = None) -> str:
         """Analyse the user input and dispatch to the right agent"""
         with open(
             "app/agents/prompts/analyse_user_general_classifier_prompt.txt",
@@ -311,6 +311,11 @@ class AgentsGraph:
         response = await llm.ainvoke(prompt)
 
         self.logger.info(f"#> Router Analysis decide to dispatch to: |###> {response.content} <###|")
+
+        # Log LLM operation cost for classification (if enabled)
+        if EnvHelper.get_track_llm_operations_cost():
+            await self._log_classification_llm_operation_async(prompt, response.content, state)
+
         return response.content
 
     async def _check_appointment_consent_request(self, user_input: str, history: list) -> tuple[bool, bool]:
@@ -640,6 +645,7 @@ class AgentsGraph:
                     self.outgoing_manager.can_speech_be_interupted = False
 
                 await self.add_AI_response_message_to_conversation_async(calendar_agent_answer, state)
+                
 
                 # Calendar agent successful response - reset error counter
                 self.consecutive_error_manager.reset_consecutive_error_count(state)
@@ -840,6 +846,58 @@ class AgentsGraph:
         return TextRegistry.existing_appointment_found_text + appointment_date_formatted + "."
 
     ### Helper methods ###
+
+    async def _log_classification_llm_operation_async(
+        self,
+        prompt: str,
+        response_content: str,
+        state: PhoneConversationState | None = None,
+    ) -> None:
+        """
+        Log LLM operation cost for classification to the database.
+
+        Args:
+            prompt: The input prompt sent to the LLM
+            response_content: The response content from the LLM
+            state: The conversation state (optional, used to get conversation_id)
+        """
+        try:
+            # Estimate input tokens (rough approximation: ~4 characters per token)
+            input_tokens = len(prompt) / 4
+            # Estimate output tokens
+            output_tokens = len(response_content) / 4
+            total_tokens = input_tokens + output_tokens
+
+            # GPT-4.1 pricing (hardcoded for now): $0.03 per 1K input tokens, $0.06 per 1K output tokens
+            input_cost = (input_tokens / 1000) * 0.03
+            output_cost = (output_tokens / 1000) * 0.06
+            total_cost_usd = input_cost + output_cost
+
+            # Price per token (blended rate for simplicity)
+            price_per_token = total_cost_usd / total_tokens if total_tokens > 0 else 0
+
+            # Get conversation_id from state if available
+            conversation_id = None
+            if state:
+                conversation_id = state.get("agent_scratchpad", {}).get("conversation_id", None)
+
+            if hasattr(self, 'conversation_persistence'):
+                # This is a classification operation at the router level
+                await self.conversation_persistence.add_llm_operation_async(
+                    operation_type_name="classification",
+                    provider="openai",
+                    model="gpt-4.1",
+                    tokens_or_duration=total_tokens,
+                    price_per_unit=price_per_token,
+                    cost_usd=total_cost_usd,
+                    conversation_id=UUID(conversation_id) if conversation_id else None,
+                    message_id=None,
+                    stream_id=None,
+                    call_sid=self.call_sid,
+                    phone_number=None,
+                )
+        except Exception as e:
+            self.logger.error(f"Failed to log classification LLM operation: {e}")
 
     async def add_AI_response_message_to_conversation_async(
         self,

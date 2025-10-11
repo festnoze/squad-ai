@@ -507,3 +507,14 @@ class EnvHelper:
             str: The GA4 API Secret for Measurement Protocol
         """
         return EnvHelper.get_env_variable_value_by_name("GA4_API_SECRET", fails_if_missing=False) or ""
+
+    @staticmethod
+    def get_track_llm_operations_cost() -> bool:
+        """
+        Get whether to track LLM operations costs to database.
+
+        Returns:
+            bool: True if cost tracking is enabled, False otherwise (default: False)
+        """
+        value = EnvHelper.get_env_variable_value_by_name("TRACK_LLM_OPERATIONS_COST", fails_if_missing=False)
+        return value is not None and value.lower() == "true"

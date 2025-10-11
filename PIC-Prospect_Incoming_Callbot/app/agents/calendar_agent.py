@@ -1,17 +1,20 @@
 import datetime
 import logging
 from datetime import datetime, timedelta
+from uuid import UUID
 
 import pytz
 
 #
 from api_client.calendar_client_interface import CalendarClientInterface
+from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.tools import tool
 from langchain_core.language_models import BaseLanguageModel
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from utils.business_hours_config import BusinessHoursConfig, ValidationResult
+from utils.envvar import EnvHelper
 
 from agents.text_registry import TextRegistry
 
@@ -30,11 +33,13 @@ class CalendarAgent:
         classifier_llm: BaseLanguageModel,
         available_timeframes_llm: BaseLanguageModel | None = None,
         date_extractor_llm: BaseLanguageModel | None = None,
+        conversation_persistence: ConversationPersistenceInterface | None = None,
     ):
         self.logger = CalendarAgent.logger
         self.classifier_llm = classifier_llm
         self.available_timeframes_llm = available_timeframes_llm if available_timeframes_llm else classifier_llm
         self.date_extractor_llm = date_extractor_llm if date_extractor_llm else self.available_timeframes_llm
+        self.conversation_persistence = conversation_persistence
         CalendarAgent.salesforce_api_client = salesforce_api_client
         CalendarAgent.now = datetime.now(tz=pytz.timezone("Europe/Paris"))
 
@@ -316,38 +321,16 @@ class CalendarAgent:
         try:
             resp = await self.classifier_llm.ainvoke(classifier_prompt)
             llm_category = resp.content.strip() if hasattr(resp, "content") else str(resp).strip()
+
+            # Log LLM operation cost for classification (if enabled)
+            if EnvHelper.get_track_llm_operations_cost():
+                response_content = resp.content if hasattr(resp, "content") else str(resp)
+                await self._log_calendar_classification_llm_operation_async(classifier_prompt, response_content)
+
             return llm_category
         except Exception as e:
             self.logger.warning(f"CalendarAgent categorisation failed: {e}")
             return "Proposition de créneaux"
-
-    # OBSOLETE: TODO to remove
-    # def _get_french_slots(self, slots: list[str]) -> list[str]:
-    #     results : list[str] = []
-    #     for slot in slots:
-    #         results.append(self._get_french_slot(slot))
-    #     return results
-
-    # def _get_french_slot(self, slot: str) -> str:
-    #     # Expects slot in "YYYY-MM-DD HH:MM-HH:MM"
-    #     date_part, time_part = slot.split(" ")
-    #     start_time, end_time = time_part.split("-")
-    #     dt = datetime.strptime(date_part, "%Y-%m-%d")
-    #     jours = [
-    #         "lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"
-    #     ]
-    #     mois = [
-    #         "", "janvier", "février", "mars", "avril", "mai", "juin",
-    #         "juillet", "août", "septembre", "octobre", "novembre", "décembre"
-    #     ]
-    #     jour = jours[dt.weekday()]
-    #     mois_nom = mois[dt.month]
-    #     jour_num = str(dt.day) # Remove leading zero for day
-    #     debut_h, debut_m = start_time.split(":")
-    #     fin_h, fin_m = end_time.split(":")
-    #     debut_m_str = '' if debut_m == '00' else f' {debut_m}'
-    #     fin_m_str = '' if fin_m == '00' else f' {fin_m}'
-    #     return f"{jour} {jour_num} {mois_nom} entre {int(debut_h)} heure{'s' if int(debut_h) != 1 else ''}{debut_m_str} et {int(fin_h)} heure{'s' if int(fin_h) != 1 else ''}{fin_m_str}"
 
     def _to_french_date(self, dt: datetime, include_weekday: bool = True, include_year: bool = False, include_hour: bool = False) -> str:
         french_days = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
@@ -594,3 +577,48 @@ class CalendarAgent:
             return "holiday"
         else:
             return "invalid"
+
+    async def _log_calendar_classification_llm_operation_async(
+        self,
+        prompt: str,
+        response_content: str,
+    ) -> None:
+        """
+        Log LLM operation cost for calendar classification to the database.
+
+        Args:
+            prompt: The input prompt sent to the LLM
+            response_content: The response content from the LLM
+        """
+        try:
+            # Estimate input tokens (rough approximation: ~4 characters per token)
+            input_tokens = len(prompt) / 4
+            # Estimate output tokens
+            output_tokens = len(response_content) / 4
+            total_tokens = input_tokens + output_tokens
+
+            # GPT-4.1 pricing (hardcoded for now): $0.03 per 1K input tokens, $0.06 per 1K output tokens
+            input_cost = (input_tokens / 1000) * 0.03
+            output_cost = (output_tokens / 1000) * 0.06
+            total_cost_usd = input_cost + output_cost
+
+            # Price per token (blended rate for simplicity)
+            price_per_token = total_cost_usd / total_tokens if total_tokens > 0 else 0
+
+            if self.conversation_persistence:
+                # Note: We don't have conversation_id or call_sid available in CalendarAgent context
+                await self.conversation_persistence.add_llm_operation_async(
+                    operation_type_name="classification",
+                    provider="openai",
+                    model="gpt-4.1",
+                    tokens_or_duration=total_tokens,
+                    price_per_unit=price_per_token,
+                    cost_usd=total_cost_usd,
+                    conversation_id=None,
+                    message_id=None,
+                    stream_id=None,
+                    call_sid=None,
+                    phone_number=None,
+                )
+        except Exception as e:
+            self.logger.error(f"Failed to log calendar classification LLM operation: {e}")

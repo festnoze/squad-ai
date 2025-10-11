@@ -43,6 +43,41 @@ class GenericDataContext:
         with sync_engine.begin() as conn:
             self.base_entities.metadata.create_all(bind=conn)
         self.logger.info(">>> Database & tables creation completed successfully.")
+        self.fill_static_data()
+
+    def fill_static_data(self):
+        """Fill database with static data (LLM operation types, etc.)"""
+        self.logger.info(">>> Filling static data")
+
+        try:
+            # Import here to avoid circular imports
+            from database.entities import LlmOperationTypeEntity
+            from sqlalchemy.orm import Session
+
+            # Define LLM operation types
+            operation_types = ["STT", "TTS", "classification", "agent"]
+
+            sync_engine = create_engine(self.sqlite_sync_db_path, echo=False)
+
+            # Use a session to check and insert data
+            with Session(sync_engine) as session:
+                # Check if data already exists
+                existing_count = session.query(LlmOperationTypeEntity).count()
+
+                if existing_count == 0:
+                    # Insert operation types
+                    for op_type in operation_types:
+                        operation_type_entity = LlmOperationTypeEntity(name=op_type)
+                        session.add(operation_type_entity)
+
+                    session.commit()
+                    self.logger.info(f">>> Created {len(operation_types)} LLM operation types: {', '.join(operation_types)}")
+                else:
+                    self.logger.info(f">>> Static data already exists ({existing_count} operation types found), skipping insertion")
+
+            self.logger.info(">>> Static data filling completed successfully.")
+        except Exception as e:
+            self.logger.error(f"Error filling static data: {e}", exc_info=True)
 
     @asynccontextmanager
     async def new_transaction_async(self):

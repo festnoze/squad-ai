@@ -1,12 +1,16 @@
 import audioop
 import logging
 from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING
+from uuid import UUID
 
 from speech.text_to_speech_openai import TTS_OpenAI
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency
 from utils.latency_metric import OperationType
-from utils.speech_cost_logger import get_speech_cost_logger
+
+if TYPE_CHECKING:
+    from api_client.conversation_persistence_interface import ConversationPersistenceInterface
 
 
 class TextToSpeechProvider(ABC):
@@ -16,10 +20,19 @@ class TextToSpeechProvider(ABC):
     channels: int = None  # default: 1 = Mono channel
     sample_width: int = None  # default: 2 (x bytes = x*8 bits per sample) = 16-bit signed PCM (little-endian)
     temp_dir: str = None
+    conversation_persistence: "ConversationPersistenceInterface | None" = None
 
     @abstractmethod
     @measure_latency(OperationType.TTS)
-    async def synthesize_speech_to_bytes_async(self, text: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> bytes:
+    async def synthesize_speech_to_bytes_async(
+        self,
+        text: str,
+        call_sid: str | None = None,
+        stream_sid: str | None = None,
+        phone_number: str | None = None,
+        conversation_id: UUID | None = None,
+        message_id: UUID | None = None,
+    ) -> bytes:
         """Speech-to-text using specified the provider, and return it as bytes"""
         pass
 
@@ -50,7 +63,14 @@ class TextToSpeechProvider(ABC):
 
 
 class GoogleTTSProvider(TextToSpeechProvider):
-    def __init__(self, frame_rate: int = 8000, channels: int = 1, sample_width: int = 2, temp_dir: str = "static/outgoing_audio"):
+    def __init__(
+        self,
+        frame_rate: int = 8000,
+        channels: int = 1,
+        sample_width: int = 2,
+        temp_dir: str = "static/outgoing_audio",
+        conversation_persistence: "ConversationPersistenceInterface | None" = None,
+    ):
         from google.cloud import texttospeech as google_tts
 
         self.google_tts = google_tts
@@ -60,34 +80,47 @@ class GoogleTTSProvider(TextToSpeechProvider):
         self.channels = channels
         self.sample_width = sample_width
         self.temp_dir = temp_dir
+        self.conversation_persistence = conversation_persistence
         self.voice = EnvHelper.get_text_to_speech_voice() or "fr-FR-Chirp3-HD-Charon"
         self.voice_params = self.google_tts.VoiceSelectionParams(language_code="fr-FR", ssml_gender=self.google_tts.SsmlVoiceGender.FEMALE, name=self.voice)
         self.audio_config = self.google_tts.AudioConfig(audio_encoding=self.google_tts.AudioEncoding.LINEAR16, sample_rate_hertz=16000)
 
     @measure_latency(OperationType.TTS, provider="google")
-    async def synthesize_speech_to_bytes_async(self, text: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> bytes:
+    async def synthesize_speech_to_bytes_async(
+        self,
+        text: str,
+        call_sid: str | None = None,
+        stream_sid: str | None = None,
+        phone_number: str | None = None,
+        conversation_id: UUID | None = None,
+        message_id: UUID | None = None,
+    ) -> bytes:
         try:
             # Calculate character count for cost estimation
             character_count = len(text)
             # Google TTS pricing: $16 per 1M characters for Neural2/Journey/Chirp voices
-            estimated_cost_usd = character_count * 0.000016
+            price_per_character = 0.000016
+            estimated_cost_usd = character_count * price_per_character
 
             synthesis_input = self.google_tts.SynthesisInput(text=text)
             response = self.client.synthesize_speech(input=synthesis_input, voice=self.voice_params, audio_config=self.audio_config)
             audio_bytes = response.audio_content
 
-            # Log cost to CSV
-            cost_logger = get_speech_cost_logger()
-            cost_logger.log_operation(
-                operation_type="TTS",
-                provider="google",
-                model=self.voice,
-                cost_usd=estimated_cost_usd,
-                stream_id=stream_sid,
-                call_sid=call_sid,
-                phone_number=phone_number,
-                character_count=character_count,
-            )
+            # Log cost to database via conversation persistence
+            if self.conversation_persistence:
+                await self.conversation_persistence.add_llm_operation_async(
+                    operation_type_name="TTS",
+                    provider="google",
+                    model=self.voice,
+                    tokens_or_duration=float(character_count),
+                    price_per_unit=price_per_character,
+                    cost_usd=estimated_cost_usd,
+                    conversation_id=conversation_id,
+                    message_id=message_id,
+                    stream_id=stream_sid,
+                    call_sid=call_sid,
+                    phone_number=phone_number,
+                )
 
             return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=16000, to_frame_rate=self.frame_rate)
 
@@ -104,6 +137,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
         sample_width: int = 2,
         temp_dir: str = "static/outgoing_audio",
         openai_api_key: str = "",
+        conversation_persistence: "ConversationPersistenceInterface | None" = None,
     ):
         from openai import OpenAI
 
@@ -114,17 +148,27 @@ class OpenAITTSProvider(TextToSpeechProvider):
         self.channels = channels
         self.sample_width = sample_width
         self.temp_dir = temp_dir
+        self.conversation_persistence = conversation_persistence
         self.voice = EnvHelper.get_text_to_speech_voice() or "nova"
         self.instructions = EnvHelper.get_text_to_speech_instructions() or "Parle d'une voix calme mais positive, avec une diction rapide mais claire"
         self.model = EnvHelper.get_text_to_speech_model() or "tts-1"
 
     @measure_latency(OperationType.TTS, provider="openai")
-    async def synthesize_speech_to_bytes_async(self, text: str, call_sid: str = None, stream_sid: str = None, phone_number: str = None) -> bytes:
+    async def synthesize_speech_to_bytes_async(
+        self,
+        text: str,
+        call_sid: str | None = None,
+        stream_sid: str | None = None,
+        phone_number: str | None = None,
+        conversation_id: UUID | None = None,
+        message_id: UUID | None = None,
+    ) -> bytes:
         try:
             # Calculate character count for cost estimation
             character_count = len(text)
             # OpenAI TTS pricing: $15 per 1M characters
-            estimated_cost_usd = character_count * 0.000015
+            price_per_character = 0.000015
+            estimated_cost_usd = character_count * price_per_character
 
             audio_bytes = await TTS_OpenAI.generate_speech_async(
                 model=self.model,
@@ -135,18 +179,21 @@ class OpenAITTSProvider(TextToSpeechProvider):
                 speed=1.0,
             )
 
-            # Log cost to CSV
-            cost_logger = get_speech_cost_logger()
-            cost_logger.log_operation(
-                operation_type="TTS",
-                provider="openai",
-                model=self.model,
-                cost_usd=estimated_cost_usd,
-                stream_id=stream_sid,
-                call_sid=call_sid,
-                phone_number=phone_number,
-                character_count=character_count,
-            )
+            # Log cost to database via conversation persistence
+            if self.conversation_persistence:
+                await self.conversation_persistence.add_llm_operation_async(
+                    operation_type_name="TTS",
+                    provider="openai",
+                    model=self.model,
+                    tokens_or_duration=float(character_count),
+                    price_per_unit=price_per_character,
+                    cost_usd=estimated_cost_usd,
+                    conversation_id=conversation_id,
+                    message_id=message_id,
+                    stream_id=stream_sid,
+                    call_sid=call_sid,
+                    phone_number=phone_number,
+                )
 
             return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=24000, to_frame_rate=self.frame_rate)
 
@@ -161,9 +208,22 @@ def get_text_to_speech_provider(
     channels: int = 1,
     sample_width: int = 2,
     temp_dir: str = "static/outgoing_audio",
+    conversation_persistence: "ConversationPersistenceInterface | None" = None,
 ) -> TextToSpeechProvider:
     if tts_provider_name.lower() == "google":
-        return GoogleTTSProvider(frame_rate=frame_rate, channels=channels, sample_width=sample_width, temp_dir=temp_dir)
+        return GoogleTTSProvider(
+            frame_rate=frame_rate,
+            channels=channels,
+            sample_width=sample_width,
+            temp_dir=temp_dir,
+            conversation_persistence=conversation_persistence,
+        )
     if tts_provider_name.lower() == "openai":
-        return OpenAITTSProvider(frame_rate=frame_rate, channels=channels, sample_width=sample_width, temp_dir=temp_dir)
+        return OpenAITTSProvider(
+            frame_rate=frame_rate,
+            channels=channels,
+            sample_width=sample_width,
+            temp_dir=temp_dir,
+            conversation_persistence=conversation_persistence,
+        )
     raise ValueError(f"Invalid TTS provider: {tts_provider_name}")

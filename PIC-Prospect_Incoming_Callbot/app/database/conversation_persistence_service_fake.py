@@ -42,3 +42,20 @@ class ConversationPersistenceServiceFake(ConversationPersistenceInterface):
     ) -> dict | None:
         conversation_uuid = UUID(conversation_id)
         return {"conversation_id": str(conversation_uuid), "user_id": None, "message_count": 1, "created_at": None}
+
+    async def add_llm_operation_async(
+        self,
+        operation_type_name: str,
+        provider: str,
+        model: str,
+        tokens_or_duration: float,
+        price_per_unit: float,
+        cost_usd: float,
+        conversation_id: UUID | None = None,
+        message_id: UUID | None = None,
+        stream_id: str | None = None,
+        call_sid: str | None = None,
+        phone_number: str | None = None,
+    ) -> bool:
+        """Fake implementation - does nothing."""
+        return True

@@ -5,6 +5,7 @@ from api_client.request_models.conversation_request_model import ConversationReq
 from api_client.request_models.user_request_model import UserRequestModel
 
 from database.conversation_repository import ConversationRepository
+from database.llm_operation_repository import LlmOperationRepository
 from database.models.conversation import Conversation
 from database.models.device_info import DeviceInfo
 from database.models.message import Message
@@ -20,6 +21,7 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
     def __init__(self) -> None:
         self.user_repository: UserRepository = UserRepository()
         self.conversation_repository: ConversationRepository = ConversationRepository()
+        self.llm_operation_repository: LlmOperationRepository = LlmOperationRepository()
         self.max_conversations_by_day: int | None = None
 
     async def create_or_retrieve_user_async(self, user_request_model: UserRequestModel, timeout: int = 10) -> UUID:
@@ -113,3 +115,32 @@ class ConversationPersistenceLocalService(ConversationPersistenceInterface):
             new_message = conversation.add_new_message(role, new_message_content)
             await self.conversation_repository.add_message_to_existing_conversation_async(conversation.id, new_message)
         return {"messages": [message.to_dict() for message in conversation.messages]} if conversation else None
+
+    async def add_llm_operation_async(
+        self,
+        operation_type_name: str,
+        provider: str,
+        model: str,
+        tokens_or_duration: float,
+        price_per_unit: float,
+        cost_usd: float,
+        conversation_id: UUID | None = None,
+        message_id: UUID | None = None,
+        stream_id: str | None = None,
+        call_sid: str | None = None,
+        phone_number: str | None = None,
+    ) -> bool:
+        """Add a new LLM operation (STT, TTS, etc.) to track costs."""
+        return await self.llm_operation_repository.add_llm_operation_async(
+            operation_type_name=operation_type_name,
+            provider=provider,
+            model=model,
+            tokens_or_duration=tokens_or_duration,
+            price_per_unit=price_per_unit,
+            cost_usd=cost_usd,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            stream_id=stream_id,
+            call_sid=call_sid,
+            phone_number=phone_number,
+        )
