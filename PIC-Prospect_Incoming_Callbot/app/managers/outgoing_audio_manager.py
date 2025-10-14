@@ -17,6 +17,7 @@ from utils.audio_mixer import AudioMixer
 from utils.envvar import EnvHelper
 
 from managers.outgoing_manager import OutgoingManager
+from speech.operation_cost_metadata import TTSCostMetadata
 
 
 class OutgoingAudioManager(OutgoingManager):
@@ -30,6 +31,10 @@ class OutgoingAudioManager(OutgoingManager):
 
     # Speech synthesis cache: {text: (audio_bytes, timestamp)}
     _synthesized_audio_cache: dict[str, tuple[bytes, float]] = {}
+
+    # Pending TTS cost metadata waiting to be logged to DB
+    # Key: text that was synthesized, Value: TTSCostMetadata
+    _pending_tts_cost_metadata: dict[str, list[TTSCostMetadata]] = {}
 
     def __init__(
         self,
@@ -112,6 +117,23 @@ class OutgoingAudioManager(OutgoingManager):
     def set_phone_number(self, phone_number: str) -> None:
         """Set the phone number for latency tracking"""
         self.phone_number = phone_number
+
+    def add_pending_tts_cost_metadata(self, text: str, metadata: TTSCostMetadata) -> None:
+        """Store TTS cost metadata to be logged later when message is persisted."""
+        if text not in self._pending_tts_cost_metadata:
+            self._pending_tts_cost_metadata[text] = []
+        self._pending_tts_cost_metadata[text].append(metadata)
+        self.logger.debug(f"Stored TTS cost metadata for text: '{text[:50]}...'")
+
+    def get_pending_tts_cost_metadata(self, text: str) -> list[TTSCostMetadata]:
+        """Retrieve and remove pending TTS cost metadata for a specific text."""
+        return self._pending_tts_cost_metadata.pop(text, [])
+
+    def get_all_pending_tts_cost_metadata(self) -> dict[str, list[TTSCostMetadata]]:
+        """Retrieve all pending TTS cost metadata and clear the storage."""
+        all_metadata = self._pending_tts_cost_metadata.copy()
+        self._pending_tts_cost_metadata.clear()
+        return all_metadata
 
     def get_synthesized_audio_from_cache(self, text: str, allow_partial: bool = False) -> bytes | None:
         """
@@ -320,7 +342,7 @@ class OutgoingAudioManager(OutgoingManager):
                     # Synthesize remaining text if any
                     if remaining_text.strip():
                         self.logger.info(f">>> Synthesizing remaining text: '{remaining_text}'")
-                        remaining_audio = await self.tts_provider.synthesize_speech_to_bytes_async(
+                        remaining_audio, tts_cost_metadata = await self.tts_provider.synthesize_speech_to_bytes_async(
                             remaining_text,
                             call_sid=self.call_sid,
                             stream_sid=self.audio_sender.stream_sid,
@@ -333,6 +355,10 @@ class OutgoingAudioManager(OutgoingManager):
 
                             # Cache the remaining part for future use
                             OutgoingAudioManager.add_synthesized_audio_to_cache(remaining_text.strip(), remaining_audio)
+
+                            # Store TTS cost metadata for later logging
+                            if tts_cost_metadata:
+                                self.add_pending_tts_cost_metadata(remaining_text.strip(), tts_cost_metadata)
                         else:
                             self.logger.error(f"/!\\ Failed to synthesize remaining text: '{remaining_text}'")
 
@@ -387,11 +413,21 @@ class OutgoingAudioManager(OutgoingManager):
         """
         try:
             self.logger.info(f">>>>>> Fallback: Synthesizing complete text: '{text}'")
-            speech_bytes = await self.tts_provider.synthesize_speech_to_bytes_async(text, call_sid=self.call_sid, stream_sid=self.audio_sender.stream_sid, phone_number=self.phone_number)
+            speech_bytes, tts_cost_metadata = await self.tts_provider.synthesize_speech_to_bytes_async(
+                text,
+                call_sid=self.call_sid,
+                stream_sid=self.audio_sender.stream_sid,
+                phone_number=self.phone_number
+            )
 
             if speech_bytes:
                 # Cache the complete synthesis (without background noise)
                 OutgoingAudioManager.add_synthesized_audio_to_cache(text, speech_bytes)
+
+                # Store TTS cost metadata for later logging
+                if tts_cost_metadata:
+                    self.add_pending_tts_cost_metadata(text, tts_cost_metadata)
+
                 return self._apply_background_noise_if_any(speech_bytes)
             else:
                 self.logger.error(f"/!\\ Failed to synthesize complete text: '{text}'")

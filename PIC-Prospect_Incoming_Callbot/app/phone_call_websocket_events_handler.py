@@ -121,6 +121,8 @@ class PhoneCallWebsocketEventsHandler:
 
         self.agents_graph = AgentsGraph(self.outgoing_audio_processing)
         self.compiled_graph = self.agents_graph.graph
+        self.stt_provider.conversation_persistence = self.agents_graph.conversation_persistence
+        self.tts_provider.conversation_persistence = self.agents_graph.conversation_persistence
 
         self.incoming_audio_processing = IncomingAudioManager(
             websocket=self.websocket,

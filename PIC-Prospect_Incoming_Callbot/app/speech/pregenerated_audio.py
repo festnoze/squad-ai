@@ -115,7 +115,7 @@ class PreGeneratedAudio:
                 if not pregenerated_audio:
                     PreGeneratedAudio.logger.info(f"Synthesizing and saving: {text[:50]}...")
                     try:
-                        audio_bytes = await tts_provider.synthesize_speech_to_bytes_async(text)
+                        audio_bytes, _ = await tts_provider.synthesize_speech_to_bytes_async(text)
                         if audio_bytes:
                             # Save to pregenerated file and update index
                             PreGeneratedAudio.save_pregenerated_audio(text, tts_provider_name, tts_provider.voice, audio_bytes)

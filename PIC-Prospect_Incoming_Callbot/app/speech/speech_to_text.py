@@ -6,6 +6,7 @@ from uuid import UUID
 
 from google.api_core.exceptions import PermissionDenied
 from openai import AsyncOpenAI
+from speech.operation_cost_metadata import STTCostMetadata
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency
 from utils.latency_metric import OperationType
@@ -32,8 +33,14 @@ class SpeechToTextProvider(ABC):
         phone_number: str | None = None,
         conversation_id: UUID | None = None,
         message_id: UUID | None = None,
-    ) -> str:
-        """Transcribe audio file to text using the specified provider"""
+    ) -> tuple[str, STTCostMetadata | None]:
+        """Transcribe audio file to text using the specified provider.
+
+        Returns:
+            Tuple of (transcript, cost_metadata)
+            - transcript: The transcribed text
+            - cost_metadata: Cost information to be logged after message persistence
+        """
         pass
 
 
@@ -63,7 +70,7 @@ class GoogleSTTProvider(SpeechToTextProvider):
         phone_number: str | None = None,
         conversation_id: UUID | None = None,
         message_id: UUID | None = None,
-    ) -> str:
+    ) -> tuple[str, STTCostMetadata | None]:
         """Transcribe audio file using Google STT API."""
         try:
             return await GoogleSTTProvider.transcribe_audio_static_async(
@@ -73,7 +80,8 @@ class GoogleSTTProvider(SpeechToTextProvider):
             )
         except Exception as e:
             self.logger.error(f"Error transcribing audio with Google: {e}", exc_info=True)
-            return e.message if isinstance(e, PermissionDenied) else ""
+            error_msg = e.message if isinstance(e, PermissionDenied) else ""
+            return error_msg, None
 
     @staticmethod
     async def transcribe_audio_static_async(
@@ -83,13 +91,7 @@ class GoogleSTTProvider(SpeechToTextProvider):
         file_name: str,
         language_code: str,
         frame_rate: int,
-        conversation_persistence: "ConversationPersistenceInterface | None" = None,
-        call_sid: str | None = None,
-        stream_sid: str | None = None,
-        phone_number: str | None = None,
-        conversation_id: UUID | None = None,
-        message_id: UUID | None = None,
-    ) -> str:
+    ) -> tuple[str, STTCostMetadata | None]:
         """Transcribe audio file using Google Cloud Speech-to-Text API asynchronously."""
         import os
 
@@ -119,23 +121,16 @@ class GoogleSTTProvider(SpeechToTextProvider):
         for result in response.results:
             transcript += result.alternatives[0].transcript
 
-        # Log cost to database via conversation persistence
-        if conversation_persistence:
-            await conversation_persistence.add_llm_operation_async(
-                operation_type_name="STT",
-                provider="google",
-                model="phone_call",
-                tokens_or_duration=audio_duration_seconds,
-                price_per_unit=price_per_minute / 60,  # Convert to price per second
-                cost_usd=estimated_cost_usd,
-                conversation_id=conversation_id,
-                message_id=message_id,
-                stream_id=stream_sid,
-                call_sid=call_sid,
-                phone_number=phone_number,
-            )
+        # Create cost metadata (will be logged later after message persistence)
+        cost_metadata = STTCostMetadata(
+            provider="google",
+            model="phone_call",
+            audio_duration_seconds=audio_duration_seconds,
+            price_per_unit=price_per_minute / 60,  # Convert to price per second
+            cost_usd=estimated_cost_usd,
+        )
 
-        return transcript
+        return transcript, cost_metadata
 
 
 class OpenAISTTProvider(SpeechToTextProvider):
@@ -162,7 +157,7 @@ class OpenAISTTProvider(SpeechToTextProvider):
         phone_number: str | None = None,
         conversation_id: UUID | None = None,
         message_id: UUID | None = None,
-    ) -> str:
+    ) -> tuple[str, STTCostMetadata | None]:
         """Transcribe audio file using OpenAI STT API."""
         try:
             return await OpenAISTTProvider.transcribe_audio_static_async(
@@ -172,7 +167,7 @@ class OpenAISTTProvider(SpeechToTextProvider):
             )
         except Exception as e:
             self.logger.error(f"Error transcribing audio with OpenAI: {e}", exc_info=True)
-            return ""
+            return "", None
 
     @staticmethod
     async def transcribe_audio_static_async(
@@ -181,13 +176,7 @@ class OpenAISTTProvider(SpeechToTextProvider):
         file_name: str,
         language_code: str,
         frame_rate: int,
-        conversation_persistence: "ConversationPersistenceInterface | None" = None,
-        call_sid: str | None = None,
-        stream_sid: str | None = None,
-        phone_number: str | None = None,
-        conversation_id: UUID | None = None,
-        message_id: UUID | None = None,
-    ) -> str:
+    ) -> tuple[str, STTCostMetadata | None]:
         """Transcribe audio file using OpenAI STT API."""
         if not openai_client:
             raise ValueError("OpenAI client not initialized - missing API key")
@@ -208,23 +197,16 @@ class OpenAISTTProvider(SpeechToTextProvider):
                 language=language_code.split("-")[0] if language_code else "fr",
             )
 
-        # Log cost to database via conversation persistence
-        if conversation_persistence:
-            await conversation_persistence.add_llm_operation_async(
-                operation_type_name="STT",
-                provider="openai",
-                model="gpt-4o-transcribe",
-                tokens_or_duration=audio_duration_seconds,
-                price_per_unit=price_per_minute / 60,  # Convert to price per second
-                cost_usd=estimated_cost_usd,
-                conversation_id=conversation_id,
-                message_id=message_id,
-                stream_id=stream_sid,
-                call_sid=call_sid,
-                phone_number=phone_number,
-            )
+        # Create cost metadata (will be logged later after message persistence)
+        cost_metadata = STTCostMetadata(
+            provider="openai",
+            model="gpt-4o-transcribe",
+            audio_duration_seconds=audio_duration_seconds,
+            price_per_unit=price_per_minute / 60,  # Convert to price per second
+            cost_usd=estimated_cost_usd,
+        )
 
-        return response.text
+        return response.text, cost_metadata
 
 
 class HybridSTTProvider(SpeechToTextProvider):
@@ -254,7 +236,7 @@ class HybridSTTProvider(SpeechToTextProvider):
         phone_number: str | None = None,
         conversation_id: UUID | None = None,
         message_id: UUID | None = None,
-    ) -> str:
+    ) -> tuple[str, STTCostMetadata | None]:
         try:
             return await HybridSTTProvider.transcribe_audio_static_async(
                 self.openai_client,
@@ -264,16 +246,10 @@ class HybridSTTProvider(SpeechToTextProvider):
                 file_name,
                 self.language_code,
                 self.frame_rate,
-                self.conversation_persistence,
-                call_sid,
-                stream_sid,
-                phone_number,
-                conversation_id,
-                message_id,
             )
         except Exception as e:
             self.logger.error(f"Error transcribing audio with HybridSTTProvider: {e}", exc_info=True)
-            return ""
+            return "", None
 
     @staticmethod
     async def transcribe_audio_static_async(
@@ -284,30 +260,18 @@ class HybridSTTProvider(SpeechToTextProvider):
         file_name: str,
         language_code: str,
         frame_rate: int,
-        conversation_persistence: "ConversationPersistenceInterface | None" = None,
-        call_sid: str | None = None,
-        stream_sid: str | None = None,
-        phone_number: str | None = None,
-        conversation_id: UUID | None = None,
-        message_id: UUID | None = None,
-    ) -> str:
-        """Transcribe audio file using OpenAI STT API, fallback to Google Cloud Speech-to-Text API."""
+    ) -> tuple[str, STTCostMetadata | None]:
+        """Transcribe audio file using Google STT API, fallback to OpenAI STT API."""
         # Try Google transcription first
-        transcript = await GoogleSTTProvider.transcribe_audio_static_async(
-            temp_dir, speech, client, file_name, language_code, frame_rate,
-            conversation_persistence, call_sid, stream_sid, phone_number, conversation_id, message_id
-        )
+        transcript, cost_metadata = await GoogleSTTProvider.transcribe_audio_static_async(temp_dir, speech, client, file_name, language_code, frame_rate)
         if transcript:
-            return transcript
+            return transcript, cost_metadata
 
         # Fallback to OpenAI transcription
         if openai_client:
-            transcript = await OpenAISTTProvider.transcribe_audio_static_async(
-                openai_client, temp_dir, file_name, language_code, frame_rate,
-                conversation_persistence, call_sid, stream_sid, phone_number, conversation_id, message_id
-            )
-            return transcript
-        return ""
+            transcript, cost_metadata = await OpenAISTTProvider.transcribe_audio_static_async(openai_client, temp_dir, file_name, language_code, frame_rate)
+            return transcript, cost_metadata
+        return "", None
 
         # # Run both transcriptions in parallel
         # transcript_google = GoogleSTTProvider.transcribe_audio_static(temp_dir, speech, client, file_name, language_code, frame_rate)

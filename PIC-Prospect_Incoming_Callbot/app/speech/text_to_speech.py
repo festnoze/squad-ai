@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
 from uuid import UUID
 
+from speech.operation_cost_metadata import TTSCostMetadata
 from speech.text_to_speech_openai import TTS_OpenAI
 from utils.envvar import EnvHelper
 from utils.latency_decorator import measure_latency
@@ -32,8 +33,14 @@ class TextToSpeechProvider(ABC):
         phone_number: str | None = None,
         conversation_id: UUID | None = None,
         message_id: UUID | None = None,
-    ) -> bytes:
-        """Speech-to-text using specified the provider, and return it as bytes"""
+    ) -> tuple[bytes, TTSCostMetadata | None]:
+        """Synthesize text to speech using the specified provider.
+
+        Returns:
+            Tuple of (audio_bytes, cost_metadata)
+            - audio_bytes: The synthesized audio in PCM format
+            - cost_metadata: Cost information to be logged after message persistence
+        """
         pass
 
     def convert_PCM_frame_rate_w_audioop(self, audio_bytes: bytes, from_frame_rate: int, to_frame_rate: int) -> bytes:
@@ -94,7 +101,7 @@ class GoogleTTSProvider(TextToSpeechProvider):
         phone_number: str | None = None,
         conversation_id: UUID | None = None,
         message_id: UUID | None = None,
-    ) -> bytes:
+    ) -> tuple[bytes, TTSCostMetadata | None]:
         try:
             # Calculate character count for cost estimation
             character_count = len(text)
@@ -106,27 +113,21 @@ class GoogleTTSProvider(TextToSpeechProvider):
             response = self.client.synthesize_speech(input=synthesis_input, voice=self.voice_params, audio_config=self.audio_config)
             audio_bytes = response.audio_content
 
-            # Log cost to database via conversation persistence
-            if self.conversation_persistence:
-                await self.conversation_persistence.add_llm_operation_async(
-                    operation_type_name="TTS",
-                    provider="google",
-                    model=self.voice,
-                    tokens_or_duration=float(character_count),
-                    price_per_unit=price_per_character,
-                    cost_usd=estimated_cost_usd,
-                    conversation_id=conversation_id,
-                    message_id=message_id,
-                    stream_id=stream_sid,
-                    call_sid=call_sid,
-                    phone_number=phone_number,
-                )
+            # Create cost metadata (will be logged later after message persistence)
+            cost_metadata = TTSCostMetadata(
+                provider="google",
+                model=self.voice,
+                character_count=character_count,
+                price_per_unit=price_per_character,
+                cost_usd=estimated_cost_usd,
+            )
 
-            return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=16000, to_frame_rate=self.frame_rate)
+            converted_audio = self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=16000, to_frame_rate=self.frame_rate)
+            return converted_audio, cost_metadata
 
         except Exception as google_error:
             self.logger.error(f"Google TTS failed: {google_error}.", exc_info=True)
-            return b""
+            return b"", None
 
 
 class OpenAITTSProvider(TextToSpeechProvider):
@@ -162,7 +163,7 @@ class OpenAITTSProvider(TextToSpeechProvider):
         phone_number: str | None = None,
         conversation_id: UUID | None = None,
         message_id: UUID | None = None,
-    ) -> bytes:
+    ) -> tuple[bytes, TTSCostMetadata | None]:
         try:
             # Calculate character count for cost estimation
             character_count = len(text)
@@ -179,27 +180,21 @@ class OpenAITTSProvider(TextToSpeechProvider):
                 speed=1.0,
             )
 
-            # Log cost to database via conversation persistence
-            if self.conversation_persistence:
-                await self.conversation_persistence.add_llm_operation_async(
-                    operation_type_name="TTS",
-                    provider="openai",
-                    model=self.model,
-                    tokens_or_duration=float(character_count),
-                    price_per_unit=price_per_character,
-                    cost_usd=estimated_cost_usd,
-                    conversation_id=conversation_id,
-                    message_id=message_id,
-                    stream_id=stream_sid,
-                    call_sid=call_sid,
-                    phone_number=phone_number,
-                )
+            # Create cost metadata (will be logged later after message persistence)
+            cost_metadata = TTSCostMetadata(
+                provider="openai",
+                model=self.model,
+                character_count=character_count,
+                price_per_unit=price_per_character,
+                cost_usd=estimated_cost_usd,
+            )
 
-            return self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=24000, to_frame_rate=self.frame_rate)
+            converted_audio = self.convert_PCM_frame_rate_w_audioop(audio_bytes, from_frame_rate=24000, to_frame_rate=self.frame_rate)
+            return converted_audio, cost_metadata
 
         except Exception as openai_error:
             self.logger.error(f"OpenAI TTS failed: {openai_error}.", exc_info=True)
-            return b""
+            return b"", None
 
 
 def get_text_to_speech_provider(

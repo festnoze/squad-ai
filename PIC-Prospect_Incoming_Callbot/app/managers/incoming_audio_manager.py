@@ -21,6 +21,7 @@ from api_client.studi_rag_inference_api_client import StudiRAGInferenceApiClient
 from fastapi import WebSocket
 from pydub import AudioSegment
 from pydub.effects import normalize
+from speech.operation_cost_metadata import STTCostMetadata
 from speech.speech_to_text import SpeechToTextProvider
 from utils.envvar import EnvHelper
 
@@ -352,7 +353,7 @@ class IncomingAudioManager(IncomingManager):
                 self.interuption_asked = False
 
             # 11- Transcribe speech to text
-            user_query_transcript, user_query_audio_filename = await self._perform_speech_to_text_transcription_async(audio_data)
+            user_query_transcript, user_query_audio_filename, stt_cost_metadata = await self._perform_speech_to_text_transcription_async(audio_data)
             self.logger.info(f'>>> Transcription finished. Heard text: "{user_query_transcript}"')
 
             if EnvHelper.get_repeat_user_input():
@@ -363,7 +364,7 @@ class IncomingAudioManager(IncomingManager):
             if user_query_transcript:
                 self.removed_text_to_speak = None
                 await self._send_acknowledgement_message_async()
-                await self.send_user_query_to_agents_graph_async(user_query_transcript, user_query_audio_filename)
+                await self.send_user_query_to_agents_graph_async(user_query_transcript, user_query_audio_filename, stt_cost_metadata)
 
             # 13- If transcript of user query is empty (no speech detected), handle as error and check threshold
             if not user_query_transcript:
@@ -421,7 +422,12 @@ class IncomingAudioManager(IncomingManager):
     def get_current_state(self):
         return self.agents_graph.get_current_state()
 
-    async def send_user_query_to_agents_graph_async(self, user_query: str, user_query_audio_filename: str | None = None):
+    async def send_user_query_to_agents_graph_async(
+        self,
+        user_query: str,
+        user_query_audio_filename: str | None = None,
+        stt_cost_metadata: STTCostMetadata | None = None
+    ):
         try:
             self.logger.info(f"Sending incoming user query to agents graph. Transcription: '{user_query}'")
             current_state: ConversationState | PhoneConversationState
@@ -447,7 +453,7 @@ class IncomingAudioManager(IncomingManager):
             current_state["history"].append(("user", user_query))
             messages: dict | None = await self.conversation_persistence.add_message_to_conversation_async(conv_id, user_query, "user")
             user_query_msg_id: str | None = None
-            
+
             # Handle both local persistance and RAG API conversation format
             if messages and isinstance(messages, dict) and "messages" in messages and messages["messages"]:
                 user_query_msg_id = messages["messages"][-1]["id"]
@@ -459,6 +465,24 @@ class IncomingAudioManager(IncomingManager):
             # Rename incoming speech file to match message id from SQL database
             if user_query_msg_id and user_query_audio_filename:
                 self._rename_incoming_speech_file(user_query_audio_filename, user_query_msg_id + ".wav")
+
+            # Log STT cost now that we have conversation_id and message_id
+            if stt_cost_metadata and user_query_msg_id:
+                from uuid import UUID
+                await self.conversation_persistence.add_llm_operation_async(
+                    operation_type_name="STT",
+                    provider=stt_cost_metadata.provider,
+                    model=stt_cost_metadata.model,
+                    tokens_or_duration=stt_cost_metadata.audio_duration_seconds,
+                    price_per_unit=stt_cost_metadata.price_per_unit,
+                    cost_usd=stt_cost_metadata.cost_usd,
+                    conversation_id=UUID(conv_id) if isinstance(conv_id, str) else conv_id,
+                    message_id=UUID(user_query_msg_id),
+                    stream_id=self.stream_sid,
+                    call_sid=self.call_sid if hasattr(self, "call_sid") else None,
+                    phone_number=self.phones_by_call_sid.get(self.call_sid) if hasattr(self, "call_sid") else None,
+                )
+                self.logger.info(f"Logged STT cost: ${stt_cost_metadata.cost_usd:.6f} for message {user_query_msg_id}")
 
             # Invoke the graph with current state to get the AI-generated welcome message
             agents_graph_result = await self.agents_graph.ainvoke(current_state)
@@ -527,9 +551,15 @@ class IncomingAudioManager(IncomingManager):
 
     async def _perform_speech_to_text_transcription_async(
         self, audio_data: bytes
-    ) -> tuple[str | None, str | None]:
+    ) -> tuple[str | None, str | None, STTCostMetadata | None]:
+        """Transcribe audio to text and return transcript, filename, and cost metadata.
+
+        Returns:
+            Tuple of (transcript, wav_audio_filename, stt_cost_metadata)
+        """
         transcript: str | None = None
         wav_audio_filename: str | None = None
+        stt_cost_metadata: STTCostMetadata | None = None
 
         try:
             # # Check if the audio buffer has a high enough speech to noise ratio
@@ -559,7 +589,7 @@ class IncomingAudioManager(IncomingManager):
                 if hasattr(self, "call_sid")
                 else None
             )
-            transcript = await self.stt_provider.transcribe_audio_async(
+            transcript, stt_cost_metadata = await self.stt_provider.transcribe_audio_async(
                 wav_audio_filename,
                 call_sid=self.call_sid if hasattr(self, "call_sid") else None,
                 stream_sid=self.stream_sid,
@@ -598,13 +628,14 @@ class IncomingAudioManager(IncomingManager):
         except Exception as speech_err:
             self.logger.error(f"Error during transcription: {speech_err}", exc_info=True)
             transcript = None
+            stt_cost_metadata = None
             # Speech-to-text failure - this will be handled as empty transcript in calling method
         finally:
             if wav_audio_filename and not self.keep_incoming_audio_files:
                 self._delete_incoming_speech_file(wav_audio_filename)
                 wav_audio_filename = None
 
-        return transcript, wav_audio_filename
+        return transcript, wav_audio_filename, stt_cost_metadata
 
     def _delete_incoming_speech_file(self, file_name: str):
         try:

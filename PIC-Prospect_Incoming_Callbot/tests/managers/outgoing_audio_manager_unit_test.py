@@ -12,7 +12,8 @@ def fixture(mocker):
     # Create mock objects
     mock_websocket = mocker.Mock()
     mock_tts_provider = mocker.Mock()
-    mock_tts_provider.synthesize_speech_to_bytes_async = mocker.AsyncMock(return_value=b'dummy_audio_bytes' * 100)
+    # TTS provider now returns tuple (audio_bytes, cost_metadata)
+    mock_tts_provider.synthesize_speech_to_bytes_async = mocker.AsyncMock(return_value=(b'dummy_audio_bytes' * 100, None))
     mock_tts_provider.text_queue_manager = mocker.Mock()
     mock_tts_provider.text_queue_manager.get_next_text_chunk_async = mocker.AsyncMock(return_value="dummy_text")
     
