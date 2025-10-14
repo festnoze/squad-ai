@@ -14,7 +14,8 @@
       "WebFetch(domain:www.twilio.com)",
       "Bash(test:*)",
       "Bash(set PYTHONPATH=.)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(.venv/Scripts/python.exe -m pytest:*)"
     ],
     "deny": [],
     "ask": []

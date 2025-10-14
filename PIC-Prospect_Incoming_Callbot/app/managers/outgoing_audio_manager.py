@@ -4,6 +4,7 @@ import os
 import time
 import uuid
 import wave
+from uuid import UUID
 
 from fastapi import WebSocket
 from speech.audio_sender_factory import create_audio_sender
@@ -19,6 +20,11 @@ from utils.envvar import EnvHelper
 from managers.outgoing_manager import OutgoingManager
 from speech.operation_cost_metadata import TTSCostMetadata
 
+# Import for type hints (avoid circular import)
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from api_client.conversation_persistence_interface import ConversationPersistenceInterface
+
 
 class OutgoingAudioManager(OutgoingManager):
     """
@@ -31,10 +37,6 @@ class OutgoingAudioManager(OutgoingManager):
 
     # Speech synthesis cache: {text: (audio_bytes, timestamp)}
     _synthesized_audio_cache: dict[str, tuple[bytes, float]] = {}
-
-    # Pending TTS cost metadata waiting to be logged to DB
-    # Key: text that was synthesized, Value: TTSCostMetadata
-    _pending_tts_cost_metadata: dict[str, list[TTSCostMetadata]] = {}
 
     def __init__(
         self,
@@ -52,6 +54,7 @@ class OutgoingAudioManager(OutgoingManager):
         max_words_by_stream_chunk: int = 20,
         max_chars_by_stream_chunk: int = 100,
         cache_ttl_minutes: int = 5,
+        conversation_persistence: "ConversationPersistenceInterface | None" = None,
     ):
         self.logger = logging.getLogger(__name__)
         super().__init__(output_channel="audio", can_speech_be_interupted=can_speech_be_interupted)
@@ -85,9 +88,11 @@ class OutgoingAudioManager(OutgoingManager):
         # Create temp directory if it doesn't exist
         os.makedirs(self.outgoing_speech_dir, exist_ok=True)
 
-        # Initialize latency tracking attributes
-        self.call_sid = None
-        self.phone_number = None
+        # Initialize cost tracking attributes
+        self.conversation_persistence = conversation_persistence
+        self.conversation_id: UUID | None = None
+        self.call_sid: str | None = None
+        self.phone_number: str | None = None
 
     def set_websocket(self, websocket: WebSocket):
         self.websocket = websocket
@@ -118,22 +123,43 @@ class OutgoingAudioManager(OutgoingManager):
         """Set the phone number for latency tracking"""
         self.phone_number = phone_number
 
-    def add_pending_tts_cost_metadata(self, text: str, metadata: TTSCostMetadata) -> None:
-        """Store TTS cost metadata to be logged later when message is persisted."""
-        if text not in self._pending_tts_cost_metadata:
-            self._pending_tts_cost_metadata[text] = []
-        self._pending_tts_cost_metadata[text].append(metadata)
-        self.logger.debug(f"Stored TTS cost metadata for text: '{text[:50]}...'")
+    def set_conversation_id(self, conversation_id: UUID | str) -> None:
+        """Set the conversation ID for cost tracking"""
+        if isinstance(conversation_id, str):
+            self.conversation_id = UUID(conversation_id)
+        else:
+            self.conversation_id = conversation_id
 
-    def get_pending_tts_cost_metadata(self, text: str) -> list[TTSCostMetadata]:
-        """Retrieve and remove pending TTS cost metadata for a specific text."""
-        return self._pending_tts_cost_metadata.pop(text, [])
+    async def save_tts_cost_to_db_async(self, metadata: TTSCostMetadata) -> None:
+        """Save TTS cost metadata directly to the database."""
+        if not self.conversation_persistence:
+            self.logger.debug("No conversation persistence service available, skipping TTS cost logging")
+            return
 
-    def get_all_pending_tts_cost_metadata(self) -> dict[str, list[TTSCostMetadata]]:
-        """Retrieve all pending TTS cost metadata and clear the storage."""
-        all_metadata = self._pending_tts_cost_metadata.copy()
-        self._pending_tts_cost_metadata.clear()
-        return all_metadata
+        try:
+            # Get stream_sid from audio_sender
+            stream_sid = None
+            if hasattr(self.audio_sender, 'stream_sid'):
+                stream_sid = getattr(self.audio_sender, 'stream_sid', None)
+            elif hasattr(self.audio_sender, 'stream_id'):
+                stream_sid = getattr(self.audio_sender, 'stream_id', None)
+
+            await self.conversation_persistence.add_llm_operation_async(
+                operation_type_name="TTS",
+                provider=metadata.provider,
+                model=metadata.model,
+                tokens_or_duration=metadata.character_count,
+                price_per_unit=metadata.price_per_unit,
+                cost_usd=metadata.cost_usd,
+                conversation_id=self.conversation_id,
+                message_id=None,  # Message ID not available at synthesis time
+                stream_id=stream_sid,
+                call_sid=self.call_sid,
+                phone_number=self.phone_number,
+            )
+            self.logger.info(f"Logged TTS cost to DB: ${metadata.cost_usd:.6f} for {metadata.character_count} characters")
+        except Exception as e:
+            self.logger.error(f"Failed to save TTS cost to database: {e}", exc_info=True)
 
     def get_synthesized_audio_from_cache(self, text: str, allow_partial: bool = False) -> bytes | None:
         """
@@ -342,12 +368,7 @@ class OutgoingAudioManager(OutgoingManager):
                     # Synthesize remaining text if any
                     if remaining_text.strip():
                         self.logger.info(f">>> Synthesizing remaining text: '{remaining_text}'")
-                        remaining_audio, tts_cost_metadata = await self.tts_provider.synthesize_speech_to_bytes_async(
-                            remaining_text,
-                            call_sid=self.call_sid,
-                            stream_sid=self.audio_sender.stream_sid,
-                            phone_number=self.phone_number,
-                        )
+                        remaining_audio, tts_cost_metadata = await self.tts_provider.synthesize_speech_to_bytes_async(remaining_text)
 
                         if remaining_audio:
                             final_audio_parts.append(remaining_audio)
@@ -356,9 +377,9 @@ class OutgoingAudioManager(OutgoingManager):
                             # Cache the remaining part for future use
                             OutgoingAudioManager.add_synthesized_audio_to_cache(remaining_text.strip(), remaining_audio)
 
-                            # Store TTS cost metadata for later logging
+                            # Save TTS cost metadata directly to DB
                             if tts_cost_metadata:
-                                self.add_pending_tts_cost_metadata(remaining_text.strip(), tts_cost_metadata)
+                                await self.save_tts_cost_to_db_async(tts_cost_metadata)
                         else:
                             self.logger.error(f"/!\\ Failed to synthesize remaining text: '{remaining_text}'")
 
@@ -413,20 +434,15 @@ class OutgoingAudioManager(OutgoingManager):
         """
         try:
             self.logger.info(f">>>>>> Fallback: Synthesizing complete text: '{text}'")
-            speech_bytes, tts_cost_metadata = await self.tts_provider.synthesize_speech_to_bytes_async(
-                text,
-                call_sid=self.call_sid,
-                stream_sid=self.audio_sender.stream_sid,
-                phone_number=self.phone_number
-            )
+            speech_bytes, tts_cost_metadata = await self.tts_provider.synthesize_speech_to_bytes_async(text)
 
             if speech_bytes:
                 # Cache the complete synthesis (without background noise)
                 OutgoingAudioManager.add_synthesized_audio_to_cache(text, speech_bytes)
 
-                # Store TTS cost metadata for later logging
+                # Save TTS cost metadata directly to DB
                 if tts_cost_metadata:
-                    self.add_pending_tts_cost_metadata(text, tts_cost_metadata)
+                    await self.save_tts_cost_to_db_async(tts_cost_metadata)
 
                 return self._apply_background_noise_if_any(speech_bytes)
             else:

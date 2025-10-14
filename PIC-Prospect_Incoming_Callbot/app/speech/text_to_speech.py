@@ -28,11 +28,6 @@ class TextToSpeechProvider(ABC):
     async def synthesize_speech_to_bytes_async(
         self,
         text: str,
-        call_sid: str | None = None,
-        stream_sid: str | None = None,
-        phone_number: str | None = None,
-        conversation_id: UUID | None = None,
-        message_id: UUID | None = None,
     ) -> tuple[bytes, TTSCostMetadata | None]:
         """Synthesize text to speech using the specified provider.
 
@@ -96,11 +91,6 @@ class GoogleTTSProvider(TextToSpeechProvider):
     async def synthesize_speech_to_bytes_async(
         self,
         text: str,
-        call_sid: str | None = None,
-        stream_sid: str | None = None,
-        phone_number: str | None = None,
-        conversation_id: UUID | None = None,
-        message_id: UUID | None = None,
     ) -> tuple[bytes, TTSCostMetadata | None]:
         try:
             # Calculate character count for cost estimation
@@ -158,11 +148,6 @@ class OpenAITTSProvider(TextToSpeechProvider):
     async def synthesize_speech_to_bytes_async(
         self,
         text: str,
-        call_sid: str | None = None,
-        stream_sid: str | None = None,
-        phone_number: str | None = None,
-        conversation_id: UUID | None = None,
-        message_id: UUID | None = None,
     ) -> tuple[bytes, TTSCostMetadata | None]:
         try:
             # Calculate character count for cost estimation

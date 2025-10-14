@@ -899,80 +899,6 @@ class AgentsGraph:
         except Exception as e:
             self.logger.error(f"Failed to log classification LLM operation: {e}")
 
-    async def _log_pending_tts_cost_metadata_async(
-        self,
-        text: str,
-        messages: dict | list | None,
-        conv_id: str,
-        state: PhoneConversationState,
-    ) -> None:
-        """
-        Log pending TTS cost metadata to the database after message persistence.
-
-        Args:
-            text: The text that was synthesized and persisted
-            messages: Response from add_message_to_conversation_async containing message IDs
-            conv_id: The conversation ID
-            state: The conversation state
-        """
-        try:
-            # Check if tracking is enabled (consistent with STT which always logs)
-            # TTS/STT are always logged for cost monitoring, unlike LLM classification which is optional
-
-            # Only log if we have an OutgoingAudioManager
-            from managers.outgoing_audio_manager import OutgoingAudioManager
-            if not isinstance(self.outgoing_manager, OutgoingAudioManager):
-                return
-
-            # Get pending TTS metadata for this text
-            tts_metadata_list = self.outgoing_manager.get_pending_tts_cost_metadata(text)
-            if not tts_metadata_list:
-                return
-
-            # Extract message ID from the response
-            message_id = None
-            if messages and isinstance(messages, dict) and "messages" in messages and messages["messages"]:
-                message_id = messages["messages"][-1]["id"]
-            elif messages and isinstance(messages, list) and any(messages):
-                message_id = messages[-1]["id"]
-
-            if not message_id:
-                self.logger.warning(f"Could not extract message_id to log TTS cost for text: '{text[:50]}...'")
-                return
-
-            # Get stream_sid from outgoing_manager
-            stream_sid = None
-            if hasattr(self.outgoing_manager, 'audio_sender'):
-                audio_sender = self.outgoing_manager.audio_sender
-                if hasattr(audio_sender, 'stream_sid'):
-                    stream_sid = getattr(audio_sender, 'stream_sid', None)
-                elif hasattr(audio_sender, 'stream_id'):
-                    stream_sid = getattr(audio_sender, 'stream_id', None)
-
-            # Get call_sid and phone_number
-            call_sid = state.get("call_sid", self.call_sid)
-            phone_number = state.get("caller_phone")
-
-            # Log each TTS operation (there might be multiple if the text was synthesized multiple times)
-            for tts_metadata in tts_metadata_list:
-                await self.conversation_persistence.add_llm_operation_async(
-                    operation_type_name="TTS",
-                    provider=tts_metadata.provider,
-                    model=tts_metadata.model,
-                    tokens_or_duration=tts_metadata.character_count,
-                    price_per_unit=tts_metadata.price_per_unit,
-                    cost_usd=tts_metadata.cost_usd,
-                    conversation_id=UUID(conv_id) if isinstance(conv_id, str) else conv_id,
-                    message_id=UUID(message_id) if isinstance(message_id, str) else message_id,
-                    stream_id=stream_sid,
-                    call_sid=call_sid,
-                    phone_number=phone_number,
-                )
-                self.logger.info(f"Logged TTS cost: ${tts_metadata.cost_usd:.6f} for message {message_id}")
-
-        except Exception as e:
-            self.logger.error(f"Failed to log pending TTS cost metadata: {e}", exc_info=True)
-
     async def add_AI_response_message_to_conversation_async(
         self,
         text: str,
@@ -983,6 +909,20 @@ class AgentsGraph:
         """Send the answer's text, add it to the state history and to the API for persistence"""
         state["history"].append(("assistant", text))
 
+        # Set conversation_id, call_sid, and phone_number on outgoing_manager for TTS cost tracking
+        if isinstance(self.outgoing_manager, OutgoingAudioManager):
+            conv_id = state["agent_scratchpad"].get("conversation_id")
+            if conv_id and self.outgoing_manager.conversation_id != conv_id:
+                self.outgoing_manager.set_conversation_id(conv_id)
+
+            call_sid = state.get("call_sid", self.call_sid)
+            if call_sid and self.outgoing_manager.call_sid != call_sid:
+                self.outgoing_manager.set_call_sid(call_sid)
+
+            phone_number = state.get("caller_phone")
+            if phone_number and self.outgoing_manager.phone_number != phone_number:
+                self.outgoing_manager.set_phone_number(phone_number)
+
         if speak_out_text:
             await self.outgoing_manager.enqueue_text_async(text)
 
@@ -991,10 +931,7 @@ class AgentsGraph:
             if not conv_id:
                 self.logger.error("No conversation_id value setted in graph 'state' prior adding a new message to conversation.")
             else:
-                messages = await self.conversation_persistence.add_message_to_conversation_async(conv_id, text, "assistant")
-
-                # Log pending TTS cost metadata now that message is persisted
-                await self._log_pending_tts_cost_metadata_async(text, messages, conv_id, state)
+                await self.conversation_persistence.add_message_to_conversation_async(conv_id, text, "assistant")
 
         return state
 
