@@ -15,7 +15,10 @@
       "Bash(test:*)",
       "Bash(set PYTHONPATH=.)",
       "Bash(findstr:*)",
-      "Bash(.venv/Scripts/python.exe -m pytest:*)"
+      "Bash(.venv/Scripts/python.exe -m pytest:*)",
+      "Bash(.venv/Scripts/python.exe test_cost_tracking.py:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(del test_cost_tracking.py)"
     ],
     "deny": [],
     "ask": []

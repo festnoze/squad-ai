@@ -47,6 +47,11 @@ class CalendarAgent:
         self.business_hours_config = BusinessHoursConfig()
         CalendarAgent.business_hours_config = self.business_hours_config
 
+        # Initialize conversation context for cost tracking
+        self.current_conversation_id: UUID | None = None
+        self.current_call_sid: str | None = None
+        self.current_phone_number: str | None = None
+
         # Init. calendar agent to retrieve available timeframes
         available_timeframes_prompt = self._load_available_timeframes_prompt()
         available_timeframes_prompts = ChatPromptTemplate.from_messages(
@@ -275,6 +280,28 @@ class CalendarAgent:
         CalendarAgent.user_id = user_id
         CalendarAgent.owner_id = owner_id
         CalendarAgent.owner_name = owner_name
+
+    def set_conversation_context(
+        self,
+        conversation_id: UUID | str | None,
+        call_sid: str | None,
+        phone_number: str | None
+    ) -> None:
+        """
+        Set conversation context for cost tracking.
+
+        Args:
+            conversation_id: The conversation UUID
+            call_sid: The Twilio call SID
+            phone_number: The caller's phone number
+        """
+        if isinstance(conversation_id, str):
+            self.current_conversation_id = UUID(conversation_id)
+        else:
+            self.current_conversation_id = conversation_id
+        self.current_call_sid = call_sid
+        self.current_phone_number = phone_number
+        self.logger.debug(f"Set conversation context: conv_id={conversation_id}, call_sid={call_sid}, phone={phone_number}")
 
     async def categorize_request_for_dispatch_async(self, user_input: str, chat_history: list[dict[str, str]] | None = None) -> str:
         """Classify the user's request into one of the rendez-vous workflow categories.
@@ -606,19 +633,19 @@ class CalendarAgent:
             price_per_token = total_cost_usd / total_tokens if total_tokens > 0 else 0
 
             if self.conversation_persistence:
-                # Note: We don't have conversation_id or call_sid available in CalendarAgent context
                 await self.conversation_persistence.add_llm_operation_async(
-                    operation_type_name="classification",
+                    operation_type_name="calendar_classification",
                     provider="openai",
                     model="gpt-4.1",
                     tokens_or_duration=total_tokens,
                     price_per_unit=price_per_token,
                     cost_usd=total_cost_usd,
-                    conversation_id=None,
+                    conversation_id=self.current_conversation_id,
                     message_id=None,
                     stream_id=None,
-                    call_sid=None,
-                    phone_number=None,
+                    call_sid=self.current_call_sid,
+                    phone_number=self.current_phone_number,
                 )
+                self.logger.info(f"Logged calendar classification cost: ${total_cost_usd:.6f} for conversation {self.current_conversation_id}")
         except Exception as e:
             self.logger.error(f"Failed to log calendar classification LLM operation: {e}")

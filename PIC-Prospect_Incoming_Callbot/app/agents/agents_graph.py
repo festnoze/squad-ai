@@ -610,6 +610,17 @@ class AgentsGraph:
                     owner_id=sf_account_info.get("Owner", {}).get("Id", ""),
                     owner_name=sf_account_info.get("Owner", {}).get("Name", ""),
                 )
+
+                # Set conversation context for cost tracking
+                conv_id = state["agent_scratchpad"].get("conversation_id")
+                call_sid = state.get("call_sid", self.call_sid)
+                phone_number = state.get("caller_phone")
+                self.calendar_agent_instance.set_conversation_context(
+                    conversation_id=conv_id,
+                    call_sid=call_sid,
+                    phone_number=phone_number
+                )
+
                 chat_history = state.get("history", [])
 
                 # Limit the history to the last 10 messages to avoid context overflow
@@ -883,8 +894,11 @@ class AgentsGraph:
             if not hasattr(self, 'conversation_persistence'):
                 return
 
+            # Get phone_number from state if available
+            phone_number = state.get("caller_phone") if state else None
+
             await self.conversation_persistence.add_llm_operation_async(
-                operation_type_name="classification",
+                operation_type_name="router_classification",
                 provider="openai",
                 model="gpt-4.1",
                 tokens_or_duration=total_tokens,
@@ -894,8 +908,9 @@ class AgentsGraph:
                 message_id=None,
                 stream_id=None,
                 call_sid=self.call_sid,
-                phone_number=None,
+                phone_number=phone_number,
             )
+            self.logger.info(f"Logged router classification cost: ${total_cost_usd:.6f} for conversation {conversation_id}")
         except Exception as e:
             self.logger.error(f"Failed to log classification LLM operation: {e}")
 
