@@ -1,7 +1,7 @@
 from models.matiere_content_model import Matiere
 from models.module_content_model import Module
 from models.ressource_content_model import Ressource
-from models.ressource_object_content_model import RessourceObject, RessourceObjectHierarchy
+from models.ressource_object_content_model import RessourceObject
 from models.theme_content_model import Theme
 
 
@@ -46,25 +46,30 @@ class CourseContent:
         if ro and ro.id and not any(r.id == ro.id for r in self.ressource_objects):
             self.ressource_objects.append(ro)
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_user_registration_infos:bool = True) -> dict:
+        result: dict = {
             'parcours_id': self.parcours_id,
             'parcours_code': self.parcours_code,
             'name': self.name,
             'is_demo': self.is_demo,
-            'start_date': self.start_date,
-            'end_date': self.end_date,
-            'inscription_start_date': self.inscription_start_date,
-            'inscription_end_date': self.inscription_end_date,
-            'promotion_name': self.promotion_name,
-            'promotion_id': self.promotion_id,
-            'is_planning_open': self.is_planning_open,
             'matieres': [m.to_dict() for m in self.matieres],
             'modules': [m.to_dict() for m in self.modules],
             'themes': [t.to_dict() for t in self.themes],
             'ressources': [r.to_dict() for r in self.ressources],
             'ressource_objects': [ro.to_dict() for ro in self.ressource_objects]
         }
+
+        if include_user_registration_infos:
+            result.update({
+                'start_date': self.start_date,
+                'end_date': self.end_date,
+                'inscription_start_date': self.inscription_start_date,
+                'inscription_end_date': self.inscription_end_date,
+                'promotion_name': self.promotion_name,
+                'promotion_id': self.promotion_id,
+                'is_planning_open': self.is_planning_open,
+            })
+        return result
 
     @staticmethod
     def from_dict(data):
@@ -74,13 +79,14 @@ class CourseContent:
             parcours_code=data['parcours_code'],
             name=data['name'],
             is_demo=data['is_demo'],
-            start_date=data['start_date'],
-            end_date=data['end_date'],
-            inscription_start_date=data['inscription_start_date'],
-            inscription_end_date=data['inscription_end_date'],
-            promotion_name=data['promotion_name'],
-            promotion_id=data['promotion_id'],
-            is_planning_open=data['is_planning_open']
+            # User registration infos (optional)
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+            inscription_start_date=data.get('inscription_start_date'),
+            inscription_end_date=data.get('inscription_end_date'),
+            promotion_name=data.get('promotion_name'),
+            promotion_id=data.get('promotion_id'),
+            is_planning_open=data.get('is_planning_open')
         )
 
         # --- Step 1: Create all objects without parent nor children relationships.

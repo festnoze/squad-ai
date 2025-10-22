@@ -8,10 +8,7 @@ from models.ressource_object_content_model import RessourceObject, RessourceObje
 class CourseContentParser:
 
     @staticmethod
-    def parse_course_content(course_data):
-        parcours_list = course_data.get('parcours', [])
-        parcours = parcours_list[0]
-
+    def parse_parcour_content(parcours):
         course_content = CourseContent(
             parcours_id=parcours.get('parcoursId'),
             parcours_code=parcours.get('parcoursCode', ''),

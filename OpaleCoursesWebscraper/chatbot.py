@@ -1,8 +1,6 @@
 import json
 import os
-import sys
 import time
-from dotenv import load_dotenv
 from typing import Generator
 import streamlit as st
 import streamlit.components.v1 as components
@@ -120,7 +118,7 @@ class ChatbotFront:
                 if ChatbotFront.parcour_composition_file_path in ChatbotFront.input_json_files:
                     ChatbotFront.parcour_composition_index = ChatbotFront.input_json_files.index(ChatbotFront.parcour_composition_file_path)
                 ChatbotFront.parcour_composition_file_path = st.selectbox("Sélection du fichier de composition de parcours ('*.json' depuis 'inputs')", options=ChatbotFront.input_json_files, index=ChatbotFront.parcour_composition_index)
-                st.button("🧪 1. Analyser la composition du parcours",  on_click=lambda: ChatbotFront.analyse_parcour_composition())   
+                st.button("🧪 1. Analyser la composition du parcours",  on_click=lambda: ChatbotFront.analyse_parcours_file_composition())   
             
             with st.expander("💫 2. Récupération du contenu de tous les cours d'un parcours"):
                 ChatbotFront.output_folder = "outputs/"
@@ -180,13 +178,14 @@ class ChatbotFront:
             st.chat_message(msg['role']).write(msg['content'])
         
         if user_query := st.chat_input(placeholder= 'Ecrivez votre question ici ...'):
-            if not user_query.strip(): user_query = 'comment créer un tableau ?'
+            if not user_query.strip():
+                user_query = 'comment créer un tableau ?'
             st.chat_message('user').write_stream(ChatbotFront._write_text_as_stream(user_query))
             st.session_state.messages.append({'role': 'user', 'content': user_query})
             #st.session_state.conversation.add_new_message('user', user_query)
 
             with st.chat_message('assistant'):
-                start = time.time()
+                #start = time.time()
                 with st.spinner('Je réfléchis à votre question ...'):
                     # streaming_response = ChatbotFront.answer_query_stream(user_query)
                     # st.write_stream(streaming_response)
@@ -212,16 +211,17 @@ class ChatbotFront:
         st.chat_message('assistant').write(f"Le contenu du cours en PDF est extrait depuis l'adresse suivante: {course_content_as_pdf_url}")
         
     @staticmethod
-    def analyse_parcour_composition() -> CourseContent:
-        analysed_parcour_filename, _ = CourseContentScrapingService.analyse_parcour_composition(ChatbotFront.parcour_composition_file_path)
+    def analyse_parcours_file_composition() -> CourseContent:
+        analysed_parcour_content_by_parcour_name = CourseContentScrapingService.analyse_parcours_file_composition(ChatbotFront.parcour_composition_file_path)
         
         st.chat_message('assistant').write(f'Le contenu du parcours suivant à été analysé à partir du fichier de description: "{ChatbotFront.parcour_composition_file_path}"')
-        st.chat_message('assistant').write(f'Le fichier analysé à été enregistré dans les "outputs" sous le nom: "{analysed_parcour_filename}".')
+        for parcour_name in analysed_parcour_content_by_parcour_name.keys():
+            st.chat_message('assistant').write(f'Le fichier analysé contenait le parcours : "{parcour_name}" dont la structure a été enregistré dans "outputs".')
         st.chat_message('assistant').write('Le nom du fichier analysé à été mis dans le champ de sélection de fichier analysé pour le scraping du contenu de tous les cours du parcours.')
         
         # Refresh the list of analysed parcours and select the newly created one
         ChatbotFront.output_json_files = ["-"] + [f for f in os.listdir(ChatbotFront.output_folder) if f.endswith(".json")]
-        if not ChatbotFront.analysed_parcour_file_path in ChatbotFront.output_json_files:
+        if ChatbotFront.analysed_parcour_file_path not in ChatbotFront.output_json_files:
             st.chat_message('assistant').write("/!\\ Le fichier d'analyse du parcours n\'a pas été trouvé dans le dossier 'outputs' /!\\")
         ChatbotFront.analysed_parcour_index = ChatbotFront.output_json_files.index(ChatbotFront.analysed_parcour_file_path)
     

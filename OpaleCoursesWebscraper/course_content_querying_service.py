@@ -5,7 +5,7 @@ from common_tools.helpers.llm_helper import Llm
 from common_tools.helpers.ressource_helper import Ressource
 from common_tools.helpers.execute_helper import Execute
 #
-from langchain_core.runnables import Runnable, RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema.messages import HumanMessage, AIMessage, SystemMessage
 from langchain_core.messages.base import BaseMessage

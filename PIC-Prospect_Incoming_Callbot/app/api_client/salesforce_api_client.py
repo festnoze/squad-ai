@@ -2343,3 +2343,136 @@ class SalesforceApiClient(CalendarClientInterface, SalesforceUserClientInterface
         except Exception as e:
             self.logger.error(f"Error creating Opportunity: {e!s}")
             return None
+
+    async def get_work_types_async(self) -> list[dict] | None:
+        """
+        Retrieve all WorkType records from Salesforce.
+
+        WorkType is used in Field Service Lightning to categorize types of work/services.
+        Common use case: Find the WorkType ID for a specific type like 'orientation'.
+
+        Returns:
+            A list of dictionaries containing WorkType information with fields:
+            - Id: WorkType record ID
+            - Name: Display name of the work type
+            - DurationType: How duration is measured (e.g., 'Minutes', 'Hours')
+            - EstimatedDuration: Standard duration for this work type
+            - Description: Description of the work type
+            Or None if an error occurs.
+
+        Example:
+            work_types = await client.get_work_types_async()
+            orientation_wt = next((wt for wt in work_types if wt['Name'].lower() == 'orientation'), None)
+            if orientation_wt:
+                work_type_id = orientation_wt['Id']
+        """
+        await self._ensure_authenticated_async()
+
+        self.logger.info("Retrieving all WorkType records from Salesforce")
+
+        # Query all active WorkTypes with essential fields
+        work_type_soql = (
+            "SELECT Id, Name, DurationType, EstimatedDuration, Description, IsActive, CreatedDate, LastModifiedDate "
+            "FROM WorkType "
+            "ORDER BY Name ASC"
+        )
+
+        try:
+            work_type_response = await self._query_salesforce(work_type_soql)
+
+            if work_type_response and work_type_response.get("records") is not None:
+                work_types = work_type_response["records"]
+                self.logger.info(f"Found {len(work_types)} WorkType record(s)")
+
+                # Log each work type for debugging
+                for wt in work_types:
+                    self.logger.debug(f"WorkType: {wt.get('Name')} (ID: {wt.get('Id')}) - Active: {wt.get('IsActive')}")
+
+                return work_types
+            elif work_type_response is None:
+                self.logger.error("Error querying WorkType records")
+                return None
+            else:
+                self.logger.info("No WorkType records found")
+                return []
+
+        except Exception as e:
+            self.logger.error(f"Error retrieving WorkType records: {e!s}")
+            return None
+
+    async def get_service_territories_for_user_async(self, user_id: str) -> list[dict] | None:
+        """
+        Retrieve all ServiceTerritories associated with a specific user in Salesforce.
+
+        ServiceTerritory represents a geographical area or organizational unit in Field Service Lightning.
+        Users are linked to ServiceTerritories through ServiceTerritoryMember records.
+
+        Args:
+            user_id: The ID of the Salesforce User
+
+        Returns:
+            A list of dictionaries containing ServiceTerritory information with fields:
+            - Id: ServiceTerritory record ID
+            - Name: Name/code of the service territory (e.g., 'principal')
+            - Description: Description of the territory
+            - IsActive: Whether the territory is active
+            - ParentTerritoryId: ID of parent territory if hierarchical
+            Or None if an error occurs, or empty list if no territories found.
+
+        Example:
+            territories = await client.get_service_territories_for_user_async(user_id='005XXXXXXXXX')
+            principal_territory = next((t for t in territories if t['Name'].lower() == 'principal'), None)
+            if principal_territory:
+                service_territory_id = principal_territory['Id']
+        """
+        await self._ensure_authenticated_async()
+
+        if not user_id:
+            self.logger.error("Error: user_id must be provided to retrieve ServiceTerritories")
+            return None
+
+        self.logger.info(f"Retrieving ServiceTerritories for User ID: {user_id}")
+
+        # Query ServiceTerritories through ServiceTerritoryMember junction object
+        # ServiceTerritoryMember links Users to ServiceTerritories
+        territory_soql = (
+            "SELECT ServiceTerritoryId, ServiceTerritory.Id, ServiceTerritory.Name, "
+            "ServiceTerritory.Description, ServiceTerritory.IsActive, ServiceTerritory.ParentTerritoryId "
+            "FROM ServiceTerritoryMember "
+            f"WHERE ServiceResource.RelatedRecordId = '{user_id}' "
+            "AND ServiceTerritory.IsActive = true "
+            "ORDER BY ServiceTerritory.Name ASC"
+        )
+
+        try:
+            territory_response = await self._query_salesforce(territory_soql)
+
+            if territory_response and territory_response.get("records") is not None:
+                territory_members = territory_response["records"]
+                self.logger.info(f"Found {len(territory_members)} ServiceTerritory record(s) for user {user_id}")
+
+                # Extract ServiceTerritory information from the junction records
+                territories = []
+                for member in territory_members:
+                    if member.get("ServiceTerritory"):
+                        territory_data = {
+                            "Id": member["ServiceTerritory"].get("Id"),
+                            "Name": member["ServiceTerritory"].get("Name"),
+                            "Description": member["ServiceTerritory"].get("Description"),
+                            "IsActive": member["ServiceTerritory"].get("IsActive"),
+                            "ParentTerritoryId": member["ServiceTerritory"].get("ParentTerritoryId")
+                        }
+                        territories.append(territory_data)
+                        self.logger.debug(f"ServiceTerritory: {territory_data['Name']} (ID: {territory_data['Id']})")
+
+                return territories
+            elif territory_response is None:
+                self.logger.error(f"Error querying ServiceTerritories for user {user_id}")
+                return None
+            else:
+                self.logger.info(f"No ServiceTerritories found for user {user_id}")
+                return []
+
+        except Exception as e:
+            self.logger.error(f"Error retrieving ServiceTerritories for user {user_id}: {e!s}")
+            return None
