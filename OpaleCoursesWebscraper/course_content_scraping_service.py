@@ -26,21 +26,22 @@ class CourseContentScrapingService:
         return CourseContentScrapingService.scraper.convert_html_to_markdown(html_content)
 
     @staticmethod
-    def scrape_and_save_course_content_from_url(opale_course_url:str, ressource_name:str = None, relative_path:str = "outputs/"):
+    def scrape_course_content_from_url(opale_course_url:str, ressource_name:str = None, save_html_and_md_as_files: bool = False, relative_path:str = "outputs/"):
         if file.exists(relative_path + ressource_name + ".md"):
             return
         pdf_url = CourseContentScrapingService.get_opale_course_pdf_from_url(opale_course_url)
-        course_content_md, course_content_html = CourseContentScrapingService.build_and_save_html_and_md_from_pdf_url(pdf_url, ressource_name, relative_path)
+        course_content_md, course_content_html = CourseContentScrapingService.build_and_save_html_and_md_from_pdf_url(pdf_url, ressource_name, save_html_and_md_as_files, relative_path)
         return pdf_url, course_content_md, course_content_html
         
     @staticmethod
-    def build_and_save_html_and_md_from_pdf_url(pdf_url:str, ressource_name:str = None, relative_path:str = "outputs/"):
+    def build_and_save_html_and_md_from_pdf_url(pdf_url:str, ressource_name:str = None, save_html_and_md_as_files: bool = False, relative_path:str = "outputs/"):
         course_content_html = CourseContentScrapingService.get_html_from_pdf_url(pdf_url)
-        with open(f"{relative_path}{ressource_name or ("course_content_" + uuid.uuid4().hex[:8])}.html", "w", encoding="utf-8") as html_file:
-            html_file.write(course_content_html)
-
         course_content_md = CourseContentScrapingService.get_md_from_html(course_content_html)
-        with open(f"{relative_path}{ressource_name or ("course_content_" + uuid.uuid4().hex[:8])}.md", "w", encoding="utf-8") as md_file:
+
+        if save_html_and_md_as_files:
+            with open(f"{relative_path}{ressource_name or ("course_content_" + uuid.uuid4().hex[:8])}.html", "w", encoding="utf-8") as html_file:
+                html_file.write(course_content_html)
+            with open(f"{relative_path}{ressource_name or ("course_content_" + uuid.uuid4().hex[:8])}.md", "w", encoding="utf-8") as md_file:
                 md_file.write(course_content_md)
         
         return course_content_md, course_content_html
@@ -103,7 +104,7 @@ class CourseContentScrapingService:
                     _, _ = CourseContentScrapingService.build_and_save_html_and_md_from_pdf_url(ressource.url, ressource.name, parcour_out_dir)
                     print(f"  - PDF course content scraped & saved for: '{ressource.name}'")
                 elif ressource.type == "opale":                    
-                    if CourseContentScrapingService.scrape_and_save_course_content_from_url(ressource.url, valid_course_content_filename, parcour_out_dir):
+                    if CourseContentScrapingService.scrape_course_content_from_url(ressource.url, valid_course_content_filename, True, parcour_out_dir):
                         print(f"  - Opale course content scraped & saved for: '{ressource.name}'")
                 else:
                     print(f"  - /!\\ Course content of type: '{ressource.type}' was not scraped. It is not an opale or pdf course: {ressource.name}")

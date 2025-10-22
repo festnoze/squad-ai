@@ -207,7 +207,7 @@ class ChatbotFront:
 
     @staticmethod
     def scrape_and_save_opale_course_from_url(opale_course_url:str):
-        course_content_as_pdf_url, _, _ = CourseContentScrapingService.scrape_and_save_course_content_from_url(opale_course_url)   
+        course_content_as_pdf_url, _, _ = CourseContentScrapingService.scrape_course_content_from_url(opale_course_url, save_html_and_md_as_files=True)   
         st.chat_message('assistant').write(f"Le contenu du cours en PDF est extrait depuis l'adresse suivante: {course_content_as_pdf_url}")
         
     @staticmethod
