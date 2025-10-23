@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(uv tool run cookiecutter:*)",
+      "Bash(uv sync:*)",
+      "Read(//c/Dev/IA/AzureDevOps/**)",
+      "Read(//c/Dev/squad-ai/OpaleCoursesWebscraper/outputs/**)",
+      "Bash(cmd /c \"mklink /D outputs \"\"C:\\Dev\\squad-ai\\OpaleCoursesWebscraper\\outputs\"\"\")",
+      "Bash(uv run:*)",
+      "Read(//c/Dev/squad-ai/OpaleCoursesWebscraper/**)",
+      "Bash(python -m streamlit:*)",
+      "Bash(del test_sidebar.py)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(.venv\\Scripts\\python.exe:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

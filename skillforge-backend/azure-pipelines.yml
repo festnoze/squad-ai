@@ -1,0 +1,166 @@
+name: SkillForge API CI/CD
+
+trigger:
+  branches:
+    include:
+    - main
+    - develop
+  tags:
+    include:
+    - v*
+
+pr:
+  branches:
+    include:
+    - main
+
+variables:
+  CI: 'true'
+  PYTHON_VERSION: '3.12'
+  ENVIRONMENT: 'production'
+  COMMON_TOOLS_INSTALL_MODE: 'database,advanced,qdrant'
+  # Azure Artifacts configuration for common_tools library
+  AZURE_ARTIFACTS_FEED_NAME: 'your-feed-name'  # TODO: Replace with your actual feed name
+  AZURE_DEVOPS_ORG: 'studi-ai'  # Your Azure DevOps organization
+  AZURE_ARTIFACTS_PROJECT: 'Skillforge'  # Your Azure DevOps project name
+
+stages:
+- stage: Test
+  displayName: 'Test & Quality'
+  jobs:
+  - job: TestAndLint
+    displayName: 'Tests and Linting'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      - checkout: self
+        fetchDepth: 0
+
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: $(PYTHON_VERSION)
+        displayName: 'Setup Python $(PYTHON_VERSION)'
+
+      - script: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "##vso[task.prependpath]$HOME/.cargo/bin"
+        displayName: 'Install UV'
+
+      # Authenticate with Azure Artifacts for common_tools
+      - task: PipAuthenticate@1
+        displayName: 'Authenticate with Azure Artifacts'
+        inputs:
+          artifactFeeds: '$(AZURE_ARTIFACTS_PROJECT)/$(AZURE_ARTIFACTS_FEED_NAME)'
+          onlyAddExtraIndex: false
+
+      # Set environment variables for common_tools installation
+      - script: |
+          echo "##vso[task.setvariable variable=AZURE_ARTIFACT_FEED_URL]https://pkgs.dev.azure.com/$(AZURE_DEVOPS_ORG)/$(AZURE_ARTIFACTS_PROJECT)/_packaging/$(AZURE_ARTIFACTS_FEED_NAME)/pypi/simple/"
+          echo "##vso[task.setvariable variable=AZURE_ARTIFACT_FEED_TOKEN]$(System.AccessToken)"
+        displayName: 'Set Azure Artifacts Environment Variables'
+
+      - script: uv sync
+        displayName: 'Install Dependencies'
+
+      # Install common_tools from Azure Artifacts
+      - script: uv run python scripts/install_aicommontools.py
+        displayName: 'Install AICommonTools from Azure Artifacts'
+        env:
+          AZURE_ARTIFACT_FEED_URL: $(AZURE_ARTIFACT_FEED_URL)
+          AZURE_ARTIFACT_FEED_TOKEN: $(AZURE_ARTIFACT_FEED_TOKEN)
+          COMMON_TOOLS_INSTALL_MODE: $(COMMON_TOOLS_INSTALL_MODE)
+
+      - script: uv run pre-commit install
+        displayName: 'Setup Pre-commit Hooks'
+
+      # Lint and Type Check
+      - script: uv run ruff check .
+        displayName: 'Run Ruff Linting'
+
+      - script: uv run mypy
+        displayName: 'Run MyPy Type Checking'
+
+      - script: uv run deptry src
+        displayName: 'Check for Obsolete Dependencies'
+
+      # Run Tests
+      - script: uv run python -m pytest --cov --cov-config=pyproject.toml --cov-report=xml --cov-report=html --junitxml=junit/test-results.xml
+        displayName: 'Run Tests with Coverage'
+
+      - task: PublishTestResults@2
+        inputs:
+          testResultsFormat: 'JUnit'
+          testResultsFiles: '**/test-results.xml'
+        condition: always()
+        displayName: 'Publish Test Results'
+
+      - task: PublishCodeCoverageResults@2
+        inputs:
+          codeCoverageTool: 'Cobertura'
+          summaryFileLocation: '$(System.DefaultWorkingDirectory)/coverage.xml'
+        condition: always()
+        displayName: 'Publish Coverage Results'
+
+- stage: Build
+  displayName: 'Build & Docker'
+  dependsOn: Test
+  jobs:
+  - job: BuildDocker
+    displayName: 'Build Docker Image'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+      - checkout: self
+        fetchDepth: 0
+
+      # Authenticate with Azure Artifacts for Docker build
+      - task: PipAuthenticate@1
+        displayName: 'Authenticate with Azure Artifacts'
+        inputs:
+          artifactFeeds: '$(AZURE_ARTIFACTS_PROJECT)/$(AZURE_ARTIFACTS_FEED_NAME)'
+          onlyAddExtraIndex: false
+
+      - task: Docker@2
+        displayName: 'Build Docker Image'
+        inputs:
+          command: 'build'
+          Dockerfile: 'Dockerfile'
+          arguments: |
+            --build-arg AZURE_ARTIFACT_FEED_URL=https://pkgs.dev.azure.com/$(AZURE_DEVOPS_ORG)/$(AZURE_ARTIFACTS_PROJECT)/_packaging/$(AZURE_ARTIFACTS_FEED_NAME)/pypi/simple/
+            --build-arg AZURE_ARTIFACT_FEED_TOKEN=$(System.AccessToken)
+            --build-arg COMMON_TOOLS_INSTALL_MODE=$(COMMON_TOOLS_INSTALL_MODE)
+          tags: |
+            $(Build.BuildId)
+            latest
+
+      - task: Docker@2
+        displayName: 'Push Docker Image'
+        inputs:
+          command: 'push'
+          containerRegistry: 'YOUR_DOCKER_REGISTRY_CONNECTION'
+          repository: 'skillforge-api'
+          tags: |
+            $(Build.BuildId)
+            latest
+        condition: and(succeeded(), in(variables['Build.SourceBranch'], 'refs/heads/main', 'refs/heads/develop'))
+
+- stage: Deploy
+  displayName: 'Deploy to Azure'
+  dependsOn: Build
+  condition: and(succeeded(), in(variables['Build.SourceBranch'], 'refs/heads/main', 'refs/heads/develop'))
+  jobs:
+  - deployment: DeployToAzure
+    displayName: 'Deploy to Azure Container Apps'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'production'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: AzureWebAppContainer@1
+              displayName: 'Deploy to Azure Web App for Containers'
+              inputs:
+                azureSubscription: 'YOUR_AZURE_SERVICE_CONNECTION'
+                appName: 'skillforge-api'
+                containers: 'YOUR_REGISTRY/skillforge-api:$(Build.BuildId)'

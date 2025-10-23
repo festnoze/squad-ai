@@ -1,0 +1,41 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(\".venv\\Scripts\\python.exe\" -c \"from infrastructure.entities.thread_entity import ThreadEntity; print(''ThreadEntity imported successfully'')\")",
+      "Read(//c/Dev/IA/AzureDevOps/ai-commun-tools/**)",
+      "Bash(\".venv\\Scripts\\python.exe\" -c \"from lagom import injectable; print(injectable)\")",
+      "Bash(.venv/Scripts/activate)",
+      "Bash(uv run:*)",
+      "Bash(\".venv/Scripts/python.exe\" -m pytest tests/ -v --tb=short)",
+      "Bash(\".venv/Scripts/python.exe\" -m pytest tests/user/unit/test_user_repository.py::TestUserRepository::test_acreate_user_already_exists_async -vv)",
+      "Bash(\".venv/Scripts/python.exe\" -m pytest tests/user/unit/test_user_repository.py::TestUserRepository::test_aget_user_by_lms_id_success_async -vv)",
+      "Bash(\".venv/Scripts/python.exe\" -m pytest tests/ -v --tb=line)",
+      "Bash(\".venv/Scripts/python.exe\" -m pytest tests/ -v --tb=line -k \"not integration\")",
+      "Bash(\".venv/Scripts/python.exe\" -m pytest tests/user/unit/test_user_repository.py::TestUserRepository::test_acreate_success_async -vv)",
+      "Bash(\".venv/Scripts/python.exe\" -m pytest tests/thread/unit/test_thread_repository.py::TestThreadRepository::test_acreate_thread_user_not_exists_async -vv)",
+      "Bash(\".venv/Scripts/python.exe\" -m pytest tests/thread/unit/test_thread_repository.py -v --tb=line)",
+      "Bash(.venvScriptsactivate)",
+      "Bash(python:*)",
+      "Bash(.venv/Scripts/python.exe:*)",
+      "Bash(.venvScriptspython.exe -c \"from infrastructure.entities.thread_entity import ThreadEntity; print(''ThreadEntity imported successfully'')\")",
+      "Bash(mkdir:*)",
+      "Bash(.venvScriptspython.exe -m pytest tests/security/test_jwt_helper.py -v)",
+      "Read(//c/Users/e.millerioux/.claude/**)",
+      "Bash(.venvScriptspython.exe -m pytest tests/thread/unit/test_thread_repository.py -v --tb=short)",
+      "Bash(.venvScriptspython.exe -m pytest tests/ -v --tb=short)",
+      "Bash(del:*)",
+      "Bash(.venv\\Scripts\\python.exe -m pytest:*)",
+      "Bash(.venvScriptspython.exe -m pytest tests/thread/unit/test_thread_router.py::TestThreadRouter::test_aanswer_user_query_into_thread_success -vv)",
+      "Bash(.venvScriptspython.exe -m pytest tests/e2e/test_complete_user_flow.py -v --tb=short)",
+      "Bash(c:Python312python.exe -c \"import sys; print(sys.path)\")",
+      "Bash(where python)",
+      "Read(//c/Dev/squad-ai/OpaleCoursesWebscraper/**)",
+      "Bash(.venvScriptspython.exe test_context_discriminator.py)",
+      "Bash(git add:*)",
+      "Bash(timeout 15 bash -c \"while ! git push origin feature/live-scraping 2>&1; do sleep 1; done\")",
+      "Bash(curl:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

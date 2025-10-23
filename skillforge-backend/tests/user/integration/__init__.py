@@ -1,0 +1,1 @@
+"""User integration tests package"""

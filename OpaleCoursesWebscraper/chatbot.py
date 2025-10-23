@@ -111,7 +111,7 @@ class ChatbotFront:
             st.divider()
             st.subheader("💫 Actions disponibles :")
 
-            with st.expander("💫 1. Analyse de la composition d'un parcours"):  
+            with st.expander("💫 Analyse du json réponse du endpoint /parcours du LMS"):  
                 ChatbotFront.input_folder = "inputs/"
                 ChatbotFront.input_json_files = ["-"] + [f for f in os.listdir(ChatbotFront.input_folder) if f.endswith(".json")]
                 ChatbotFront.parcour_composition_index = 0

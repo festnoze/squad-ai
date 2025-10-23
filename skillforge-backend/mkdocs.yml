@@ -1,0 +1,59 @@
+site_name: skillforge-api
+repo_url: https://github.com/https://studi-ai@dev.azure.com/studi-ai/Skillforge/_git/ai-commun-tools/skillforge-api
+site_url: https://https://studi-ai@dev.azure.com/studi-ai/Skillforge/_git/ai-commun-tools.github.io/skillforge-api
+site_description: this is the backend API for the skillforge project to provide the students with one-to-one learning tutor help
+site_author: Etienne MILLERIOUX
+edit_uri: edit/main/docs/
+repo_name: https://studi-ai@dev.azure.com/studi-ai/Skillforge/_git/ai-commun-tools/skillforge-api
+copyright: Maintained by <a href="https://https://studi-ai@dev.azure.com/studi-ai/Skillforge/_git/ai-commun-tools.com">https://studi-ai@dev.azure.com/studi-ai/Skillforge/_git/ai-commun-tools</a>.
+
+nav:
+  - Home: index.md
+  - Modules: modules.md
+  - Setup Guides:
+      - AICommonTools Installation: aicommontools-setup.md
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: ["src"]
+          options:
+            show_source: true
+            show_root_heading: true
+            show_root_full_path: false
+            heading_level: 2
+theme:
+  name: material
+  feature:
+    tabs: true
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: white
+      accent: deep orange
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: black
+      accent: deep orange
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/https://studi-ai@dev.azure.com/studi-ai/Skillforge/_git/ai-commun-tools/skillforge-api
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/skillforge-api
+
+markdown_extensions:
+  - toc:
+      permalink: true
+  - pymdownx.arithmatex:
+      generic: true
