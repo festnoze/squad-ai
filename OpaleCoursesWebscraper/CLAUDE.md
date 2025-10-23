@@ -30,7 +30,7 @@ libs_install.bat
 ```bash
 python startup.py
 ```
-This launches the Streamlit web UI at the default port (8501).
+This launches the Streamlit web UI at the specific port (8558).
 
 ## Architecture
 

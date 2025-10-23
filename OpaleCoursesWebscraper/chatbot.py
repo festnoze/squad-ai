@@ -187,10 +187,10 @@ class ChatbotFront:
             with st.chat_message('assistant'):
                 #start = time.time()
                 with st.spinner('Je réfléchis à votre question ...'):
-                    # streaming_response = ChatbotFront.answer_query_stream(user_query)
-                    # st.write_stream(streaming_response)
-                    # full_response = streaming_response
-                    full_response = ChatbotFront.answer_query_stream(user_query)
+                    all_chunks_output = []
+                    streaming_response = ChatbotFront.answer_query_stream(user_query, all_chunks_output)
+                    st.write_stream(streaming_response)
+                    full_response = "".join(all_chunks_output)
                 #st.session_state.conversation.add_new_message('assistant', full_response)
                 st.session_state.messages.append({'role': 'assistant', 'content': full_response})
 
@@ -232,7 +232,7 @@ class ChatbotFront:
         if course_scraping_fails_count > 0:
             st.chat_message('assistant').write(f"/!\\ Echec de l'extraction pour {course_scraping_fails_count} cours. Relancer le scraping pour essayer à nouveau l'extraction.")
 
-    def answer_query_stream(user_query: str) -> Generator[str, None, None]:
+    def answer_query_stream(user_query: str, all_chunks_output: list[str] = []) -> Generator[str, None, None]:
         if not ChatbotFront.loaded_course_content_md:
             st.session_state.messages.append({'role': 'assistant', 'content': "Sélectionner d'abord un cours à charger (section 4. menu à gauche)."})
             return
@@ -242,8 +242,8 @@ class ChatbotFront:
             ChatbotFront.llm = LangChainFactory.create_llms_from_infos(llms_infos)[-1]
             st.session_state.messages.append({'role': 'assistant', 'content': "Modèle de langage initialisé avec succès."})
         
-        answer_generator = CourseContentQueryingService.answer_user_query_on_specified_course_sync_streaming(ChatbotFront.llm, user_query, ChatbotFront.selected_parcour_content_dir, '',  ChatbotFront.loaded_course_content_md, True)
-        st.write_stream(answer_generator)
+        answer_generator = CourseContentQueryingService.answer_user_query_on_specified_course_sync_streaming(ChatbotFront.llm, user_query, ChatbotFront.selected_parcour_content_dir, '',  ChatbotFront.loaded_course_content_md, True, all_chunks_output)
+        return answer_generator
 
     def load_course_content_from_file(course_content_path:str, selected_course_content_filename_wo_extension:str):
         if ChatbotFront.loaded_course_content_filename == selected_course_content_filename_wo_extension and ChatbotFront.loaded_course_content_md:

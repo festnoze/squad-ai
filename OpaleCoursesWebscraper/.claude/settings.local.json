@@ -1,14 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(cat models/ressource_object_content_model.py)",
-      "Bash(cat models/matiere_content_model.py)",
-      "Bash(cat models/module_content_model.py)",
-      "Bash(cat models/theme_content_model.py)",
-      "Read(//c/Dev/squad-ai/**)",
-      "Bash(cat course_content_scraping_service.py)",
-      "Bash(cat README.md)",
-      "Bash(cat **)"
+      "Read(//c/Dev/IA/CommonTools/**)"
     ],
     "deny": [],
     "ask": []

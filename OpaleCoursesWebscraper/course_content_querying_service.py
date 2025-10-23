@@ -49,14 +49,7 @@ class CourseContentQueryingService:
             messages.append(SystemMessage(message))
         messages.append(HumanMessage(user_query))
 
-        #rag_custom_prompt = ChatPromptTemplate.from_template(CourseContentQueryingService.course_query_system_messages)
-
-        #llm_chain = rag_custom_prompt | llm | RunnablePassthrough()
-
-        all_chunks = []
-        #sync_generator = Execute.async_generator_wrapper_to_sync(Llm.invoke_as_async_stream, 'Answer user course query', llm_chain, input_variables, all_chunks, False)
-        
-        sync_generator = Execute.async_generator_wrapper_to_sync(Llm.invoke_as_async_stream, 'Answer user course query', llm, messages, all_chunks, False)
+        sync_generator = Execute.async_generator_wrapper_to_sync(Llm.invoke_as_async_stream, 'Answer user course query', llm, messages, all_chunks_output, False)
         return sync_generator
 
     @staticmethod
