@@ -3,18 +3,6 @@ from datetime import datetime
 from uuid import UUID
 
 
-class RoleResponse(BaseModel):
-    """Response model for Role information.
-
-    Attributes:
-        id: Unique identifier (UUID)
-        name: Role name (e.g., 'user', 'assistant')
-    """
-
-    id: UUID
-    name: str
-
-
 class MessageResponse(BaseModel):
     """Response model for Message information.
 
@@ -31,7 +19,7 @@ class MessageResponse(BaseModel):
 
     id: UUID | None = None
     thread_id: UUID
-    role: RoleResponse
+    role: str
     content: str
     elapsed_seconds: int = 0
     created_at: datetime | None = None

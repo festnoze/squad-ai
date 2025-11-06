@@ -8,8 +8,12 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from '.env' file - if it exists
+try:
+    load_dotenv()
+except Exception as e:
+    if os.getenv("ENVIRONMENT", "").lower() != "production":
+        print(f"Missing '.env' file: {e}")
 
 
 class Config:

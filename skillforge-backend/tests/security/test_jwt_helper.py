@@ -24,7 +24,7 @@ class TestJWTTokenCreation:
         expires_in_hours = 24
 
         # Act
-        token = JWTHelper.acreate_token(client, school_id, issuer, expires_in_hours)
+        token = JWTHelper.create_token(client, school_id, issuer, expires_in_hours)
 
         # Assert
         assert token is not None
@@ -40,7 +40,7 @@ class TestJWTTokenCreation:
         expires_in_hours = 1
 
         # Act
-        token = JWTHelper.acreate_token(client, school_id, issuer, expires_in_hours)
+        token = JWTHelper.create_token(client, school_id, issuer, expires_in_hours)
 
         # Assert - should be able to decode from base64 without errors
         try:
@@ -59,7 +59,7 @@ class TestJWTTokenCreation:
         expires_in_hours = 24
 
         # Act
-        token = JWTHelper.acreate_token(client, school_id, issuer, expires_in_hours)
+        token = JWTHelper.create_token(client, school_id, issuer, expires_in_hours)
         payload = JWTHelper.adecode_token(token, verify_signature=False)
 
         # Assert
@@ -78,8 +78,8 @@ class TestJWTTokenCreation:
         issuer = "test-issuer"
 
         # Act
-        token1 = JWTHelper.acreate_token(client, school_id, issuer, 1)
-        token2 = JWTHelper.acreate_token(client, school_id, issuer, 1)
+        token1 = JWTHelper.create_token(client, school_id, issuer, 1)
+        token2 = JWTHelper.create_token(client, school_id, issuer, 1)
 
         payload1 = JWTHelper.adecode_token(token1, verify_signature=False)
         payload2 = JWTHelper.adecode_token(token2, verify_signature=False)
@@ -97,7 +97,7 @@ class TestJWTTokenCreation:
 
         # Act
         before_creation = datetime.now()
-        token = JWTHelper.acreate_token(client, school_id, issuer, expires_in_hours)
+        token = JWTHelper.create_token(client, school_id, issuer, expires_in_hours)
         after_creation = datetime.now()
 
         payload = JWTHelper.adecode_token(token, verify_signature=False)
@@ -116,7 +116,7 @@ class TestJWTTokenDecoding:
     @pytest.fixture
     def sample_token(self):
         """Create a sample token for testing."""
-        return JWTHelper.acreate_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
+        return JWTHelper.create_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
 
     def test_decode_token_with_base64_only_async(self, sample_token):
         """Test decoding a token that is only base64 encoded (no Bearer prefix)."""
@@ -221,7 +221,7 @@ class TestJWTSignatureValidation:
     def test_decode_with_signature_verification_enabled_async(self):
         """Test decoding with signature verification enabled (should succeed with valid token)."""
         # Arrange
-        token = JWTHelper.acreate_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
+        token = JWTHelper.create_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
 
         # Act
         payload = JWTHelper.adecode_token(token, verify_signature=True)
@@ -233,7 +233,7 @@ class TestJWTSignatureValidation:
     def test_decode_with_signature_verification_disabled_async(self):
         """Test decoding with signature verification disabled."""
         # Arrange
-        token = JWTHelper.acreate_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
+        token = JWTHelper.create_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
 
         # Act
         payload = JWTHelper.adecode_token(token, verify_signature=False)
@@ -245,7 +245,7 @@ class TestJWTSignatureValidation:
     def test_decode_with_invalid_signature_fails_async(self):
         """Test that decoding with invalid signature fails when verification is enabled."""
         # Arrange - create a token
-        token = JWTHelper.acreate_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
+        token = JWTHelper.create_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
 
         # Decode base64 to get JWT
         jwt_token = base64.b64decode(token).decode("utf-8")
@@ -263,10 +263,11 @@ class TestJWTSignatureValidation:
     def test_decode_with_wrong_secret_key_fails_async(self):
         """Test that decoding with wrong secret key fails."""
         # Arrange - create a token with one secret
-        token = JWTHelper.acreate_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
+        token = JWTHelper.create_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
 
         # Mock a different secret key
-        with patch("envvar.EnvHelper.get_jwt_secret_key", return_value="different-secret-key"):
+        wrong_secret_key = "ZZaaaaaaaaaaaaaaAAAAAAAAAAaaaaaaaaaaAAAAAAAAAAaaaaaaaaaaAAAAAAAAAAaaaaaaaaaaAAAAAAAAAA=="
+        with patch("envvar.EnvHelper.get_jwt_secret_key", return_value=wrong_secret_key):
             # Act & Assert
             with pytest.raises(jwt.InvalidTokenError):
                 JWTHelper.adecode_token(token, verify_signature=True)
@@ -287,7 +288,7 @@ class TestJWTErrorCases:
     def test_decode_expired_token_fails_async(self):
         """Test that decoding an expired token fails."""
         # Arrange - create a token that expires immediately
-        token = JWTHelper.acreate_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=0)
+        token = JWTHelper.create_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=0)
 
         # Wait a moment to ensure expiration
         import time
@@ -373,7 +374,7 @@ class TestJWTDecodeFromHeader:
     def test_decode_from_header_success_async(self):
         """Test successful decode from Authorization header."""
         # Arrange
-        token = JWTHelper.acreate_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
+        token = JWTHelper.create_token(client=199520, school_id=1009, issuer="test-issuer", expires_in_hours=24)
         header = f"Bearer {token}"
 
         # Act

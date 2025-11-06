@@ -302,7 +302,8 @@ class EnvHelper:
     @staticmethod
     def load_all_env_var(force_load_from_env_file: bool = False):
         if not EnvHelper.is_env_loaded or force_load_from_env_file:
-            load_dotenv()
+            env_file = os.getenv("DOTENV_PATH") or "/etc/secrets/.env" if os.path.exists("/etc/secrets/.env") else ".env"
+            load_dotenv(env_file)
             EnvHelper._load_custom_env_files()
             EnvHelper.is_env_loaded = True
 

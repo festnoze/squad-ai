@@ -1,3 +1,5 @@
+from typing import Any
+
 from data_ingestion.models.matiere_content_model import Matiere
 from data_ingestion.models.module_content_model import Module
 from data_ingestion.models.ressource_content_model import Ressource
@@ -6,7 +8,20 @@ from data_ingestion.models.theme_content_model import Theme
 
 
 class CourseContent:
-    def __init__(self, parcours_id, parcours_code, name, is_demo, start_date, end_date, inscription_start_date, inscription_end_date, promotion_name, promotion_id, is_planning_open):
+    def __init__(
+        self,
+        parcours_id: str,
+        parcours_code: str,
+        name: str,
+        is_demo: bool,
+        start_date: str | None,
+        end_date: str | None,
+        inscription_start_date: str | None,
+        inscription_end_date: str | None,
+        promotion_name: str | None,
+        promotion_id: str | None,
+        is_planning_open: bool | None,
+    ) -> None:
         self.parcours_id = parcours_id
         self.parcours_code = parcours_code
         self.name = name
@@ -25,23 +40,23 @@ class CourseContent:
         self.ressources: list[Ressource] = []
         self.ressource_objects: list[RessourceObject] = []
 
-    def add_matiere(self, matiere):
+    def add_matiere(self, matiere: Matiere) -> None:
         if matiere and matiere.id and not any(m.id == matiere.id for m in self.matieres):
             self.matieres.append(matiere)
 
-    def add_module(self, module):
+    def add_module(self, module: Module) -> None:
         if module and module.id and not any(m.id == module.id for m in self.modules):
             self.modules.append(module)
 
-    def add_theme(self, theme):
+    def add_theme(self, theme: Theme) -> None:
         if theme and theme.id and not any(t.id == theme.id for t in self.themes):
             self.themes.append(theme)
 
-    def add_ressource(self, ressource):
+    def add_ressource(self, ressource: Ressource) -> None:
         if ressource and ressource.id and not any(r.id == ressource.id for r in self.ressources):
             self.ressources.append(ressource)
 
-    def add_ressource_object(self, ro):
+    def add_ressource_object(self, ro: RessourceObject) -> None:
         if ro and ro.id and not any(r.id == ro.id for r in self.ressource_objects):
             self.ressource_objects.append(ro)
 
@@ -73,7 +88,7 @@ class CourseContent:
         return result
 
     @staticmethod
-    def from_dict(data):
+    def from_dict(data: dict[str, Any]) -> "CourseContent":
         # Create the top-level CourseContent instance.
         course = CourseContent(
             parcours_id=data["parcours_id"],
@@ -126,8 +141,10 @@ class CourseContent:
         # For Matiere, assign modules from the list of module IDs.
         for mdata in data.get("matieres", []):
             matiere = all_matieres_dict.get(mdata["matiere_id"])
+            if not matiere:
+                continue  # Skip if matiere not found
             for mod_id in mdata.get("modules", []):
-                mod = all_modules_dict.get(mod_id)
+                mod = all_modules_dict.get(mod_id)  # type: ignore[assignment]
                 if mod:
                     mod.matiere = matiere  # Assign parent
                     if mod not in matiere.modules:
@@ -135,9 +152,11 @@ class CourseContent:
 
         # For Module, assign themes.
         for mod_data in data.get("modules", []):
-            mod = all_modules_dict.get(mod_data["module_id"])
+            mod = all_modules_dict.get(mod_data["module_id"])  # type: ignore[assignment]
+            if not mod:
+                continue  # Skip if module not found
             for theme_id in mod_data.get("themes", []):
-                th = all_themes_dict.get(theme_id)
+                th = all_themes_dict.get(theme_id)  # type: ignore[assignment]
                 if th:
                     th.module = mod  # Assign parent
                     if th not in mod.themes:
@@ -145,7 +164,9 @@ class CourseContent:
 
         # For Theme, assign ressources.
         for tdata in data.get("themes", []):
-            th = all_themes_dict.get(tdata["theme_id"])
+            th = all_themes_dict.get(tdata["theme_id"])  # type: ignore[assignment]
+            if not th:
+                continue  # Skip if theme not found
             for res_id in tdata.get("ressources", []):
                 res = all_ressources_dict.get(res_id)
                 if res:
@@ -156,16 +177,19 @@ class CourseContent:
         # For Ressource, assign ressource_objects.
         for rdata in data.get("ressources", []):
             res = all_ressources_dict.get(rdata["ressource_id"])
+            if not res:
+                continue  # Skip if ressource not found
             for ro_id in rdata.get("ressource_objects", []):
-                ro = all_ressources_object_dict.get(ro_id)
+                ro = all_ressources_object_dict.get(ro_id)  # type: ignore[assignment]
                 if ro:
-                    ro.ressource = res  # Assign parent
+                    # Store the parent ressource reference temporarily using setattr to avoid mypy error
+                    setattr(ro, "ressource", res)  # Assign parent
                     if ro not in res.ressource_objects:
                         res.ressource_objects.append(ro)  # Assign children
 
         # For each RessourceObject, update its hierarchy references.
         for rodata in data.get("ressource_objects", []):
-            ro = all_ressources_object_dict.get(rodata["ressource_object_id"])
+            ro = all_ressources_object_dict.get(rodata["ressource_object_id"])  # type: ignore[assignment]
             if ro and ro.hierarchy:
                 # In the serialized hierarchy we stored parent IDs.
                 hierarchy_data = rodata.get("hierarchy", {})

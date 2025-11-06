@@ -42,7 +42,7 @@ class JWTHelper:
             ValueError: If required configuration is missing or base64 decoding fails
         """
         # Get JWT configuration from environment
-        secret_key = EnvHelper.get_jwt_secret_key()
+        secret_key = base64.b64decode(EnvHelper.get_jwt_secret_key())
         algorithm = EnvHelper.get_jwt_algorithm()
 
         if verify_signature is None:
@@ -86,6 +86,9 @@ class JWTHelper:
                     options={**decode_options, "verify_signature": False},
                     algorithms=[algorithm],
                 )
+
+            # Add original token to payload
+            payload["token"] = token
 
             # Create and return JWTPayload model
             return JWTSkillForgePayload(**payload)
@@ -159,7 +162,7 @@ class JWTHelper:
         return JWTHelper.adecode_token(token, verify_signature)
 
     @staticmethod
-    def acreate_token(client: int, school_id: int, issuer: str, expires_in_hours: int = 24) -> str:
+    def create_token(client: int, school_id: int, issuer: str, expires_in_hours: int = 24) -> str:
         """Create a new JWT token for testing/development purposes.
 
         The JWT token is created and then encoded in base64.
@@ -167,7 +170,7 @@ class JWTHelper:
         Args:
             client: Client ID (integer)
             school_id: School ID (integer)
-            issuer: Issuer string (e.g., "uat-lms-studi.studi.fr")
+            issuer: Issuer string (e.g., "uat-lms-studi.studi.fr" or "api.studi.fr" or "app.studi.fr")
             expires_in_hours: Token expiration time in hours (default: 24)
 
         Returns:
@@ -178,7 +181,7 @@ class JWTHelper:
         """
         try:
             # Get JWT configuration from environment
-            secret_key = EnvHelper.get_jwt_secret_key()
+            secret_key = base64.b64decode(EnvHelper.get_jwt_secret_key())
             algorithm = EnvHelper.get_jwt_algorithm()
 
             # Generate current timestamp
@@ -199,8 +202,8 @@ class JWTHelper:
                 "nbf": nbf,
             }
 
-            # Step 1: Encode the JWT token
-            jwt_token = jwt.encode(payload, secret_key, algorithm=algorithm)
+            # Step 1: Encode the JWT token with custom headers
+            jwt_token = jwt.encode(payload, secret_key, algorithm=algorithm, headers={"kid": "LMS", "typ": "JWT"})
 
             # Step 2: Encode to base64
             base64_token = base64.b64encode(jwt_token.encode("utf-8")).decode("utf-8")

@@ -175,10 +175,10 @@ DEBUG=true
 uv run python -c "from chatbot import ChatbotFront; print('OK')"
 
 # Test API client
-uv run python -c "from src.api import SkillForgeClient; print('OK')"
+uv run python -c "from src.api.skillforge_api_client import SkillForgeAPIClient; print('OK')"
 
 # Test course loader
-uv run python -c "from src.utils import CourseLoader; print('OK')"
+uv run python -c "from src.utils.course_loader import CourseLoader; print('OK')"
 
 # Run tests
 uv run pytest

@@ -4,11 +4,11 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from api_config import ApiConfig
+from API.api_config import ApiConfig
+from API.dependency_injection_config import deps
 from application.user_service import UserService
 from infrastructure.user_repository import UserRepository
 from infrastructure.school_repository import SchoolRepository
-from dependency_injection_config import deps
 from security.auth_dependency import authentication_required
 from security.jwt_skillforge_payload import JWTSkillForgePayload
 

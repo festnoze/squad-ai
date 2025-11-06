@@ -1,12 +1,18 @@
-from uuid import UUID
+import logging
 from infrastructure.user_repository import UserRepository
 from infrastructure.school_repository import SchoolRepository
 from models.user import User
+from models.school import School
 from pydantic import ValidationError
+from api_client import StudiLmsApiClient, StudiLmsApiClientException
+from api_client.models.studi_lms_user_models import StudiLmsUserInfoResponse
+from envvar import EnvHelper
+from security.jwt_skillforge_payload import JWTSkillForgePayload
 
 
 class UserService:
     def __init__(self, user_repository: UserRepository, school_repository: SchoolRepository) -> None:
+        self.logger = logging.getLogger(__name__)
         self.user_repository: UserRepository = user_repository
         self.school_repository: SchoolRepository = school_repository
 
@@ -56,8 +62,59 @@ class UserService:
 
         return await self.user_repository.aservice_activation(user_id)
 
+    async def aretrieve_or_create_user(self, lms_user_id: str, token_payload: JWTSkillForgePayload) -> User | None:
+        """Retrieve a user by their internal LMS ID.
+
+        If the user is not found in the database and on-the-fly LMS retrieval is enabled,
+        this method will attempt to fetch user information from the LMS API.
+
+        Args:
+            lms_user_id: Unique user identifier from LMS
+            token_payload: JWT payload containing user information
+
+        Returns:
+            User model if found, None otherwise
+        """
+        user: User | None = None
+
+        # If user not found and on-the-fly retrieval is enabled, try to fetch from LMS API
+        if EnvHelper.get_allow_on_the_fly_lms_retrieval_of_unknown_user():
+            self.logger.info(f"User {lms_user_id} not found in DB, attempting to retrieve from LMS API")
+            try:
+                original_token = token_payload.get_original_token()
+                school_name = token_payload.get_school_name()
+                if original_token and school_name:
+                    user_profile = await self.aretrieve_user_infos_from_lms_api(original_token)
+                    if user_profile:
+                        self.logger.debug(f"Successfully retrieved user profile for {lms_user_id} from LMS API")
+                        user = user_profile.convert_to_user_model(school_name)
+                        user = await self.acreate_or_update_user(user)
+                        self.logger.debug(f"Successfully persisted user {lms_user_id} in database")
+            except Exception as e:
+                self.logger.warning(f"Failed to retrieve user {lms_user_id} from LMS API: {str(e)}")
+
+        if not user:
+            if EnvHelper.get_fails_on_not_found_user():
+                raise ValueError(f"No user found corresponding to the internal LMS user id: {lms_user_id}")
+            school_name = token_payload.get_school_name() or "Unknown"
+            user = User(
+                lms_user_id=lms_user_id,
+                school=School(name=school_name),
+                civility="",
+                first_name="",
+                last_name="",
+                email="tmp@fake.com",
+            )
+            user = await self.acreate_or_update_user(user)
+            self.logger.debug(f"Successfully persisted user {lms_user_id} in database")
+
+        return user
+
     async def aget_user_by_lms_user_id(self, lms_user_id: str) -> User | None:
         """Retrieve a user by their internal LMS ID.
+
+        If the user is not found in the database and on-the-fly LMS retrieval is enabled,
+        this method will NOT attempt to fetch user information from the LMS API.
 
         Args:
             lms_user_id: Unique user identifier from LMS
@@ -65,15 +122,32 @@ class UserService:
         Returns:
             User model if found, None otherwise
         """
-        return await self.user_repository.aget_user_by_lms_user_id(lms_user_id)
+        user = await self.user_repository.aget_user_by_lms_user_id(lms_user_id)
+        return user
 
-    async def aget_user_by_id(self, user_id: UUID) -> User | None:
-        """Retrieve a user by their UUID.
+    async def aretrieve_user_infos_from_lms_api(self, jwt_token: str) -> StudiLmsUserInfoResponse | None:
+        """Retrieve user profile information from the LMS API.
+
+        This method calls the Studi LMS API /v2/profile/me endpoint to fetch
+        detailed user information including personal details, addresses, phone numbers,
+        and active promotions.
 
         Args:
-            user_id: User's UUID
+            jwt_token: JWT token for authentication with the LMS API
 
         Returns:
-            User model if found, None otherwise
+            StudiLmsUserInfoResponse model if successful, None if retrieval fails
+
+        Raises:
+            StudiLmsApiClientException: If the API request fails
         """
-        return await self.user_repository.aget_user_by_id(user_id)
+        try:
+            client = StudiLmsApiClient(jwt_token=jwt_token)
+            user_profile = await client.aget_user_infos(jwt_token=jwt_token)
+            return user_profile
+        except StudiLmsApiClientException as e:
+            self.logger.error(f"LMS API error while retrieving user infos: {str(e)}")
+            raise
+        except Exception as e:
+            self.logger.error(f"Unexpected error while retrieving user infos from LMS: {str(e)}")
+            raise

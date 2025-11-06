@@ -1,6 +1,8 @@
+from datetime import datetime
 from typing import TYPE_CHECKING
 from uuid import UUID
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, String, DateTime, JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from infrastructure.entities import Base
 
@@ -20,6 +22,8 @@ class UserEntity(Base):
     first_name: Mapped[str] = mapped_column(String(255), nullable=False)
     last_name: Mapped[str] = mapped_column(String(255), nullable=False)
     email: Mapped[str] = mapped_column(String(255), nullable=False)
+    date_of_birth: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    extra_info: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB, "postgresql"), nullable=True)
 
     school: Mapped["SchoolEntity | None"] = relationship("SchoolEntity", back_populates="users", lazy="joined")
     preference: Mapped["UserPreferenceEntity | None"] = relationship("UserPreferenceEntity", back_populates="user", uselist=False, lazy="joined")

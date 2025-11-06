@@ -1,48 +1,183 @@
-image: google/cloud-sdk:slim
+# GitLab CI/CD (Cloud Build + Artifact Registry + Cloud Run + Secret Manager)
+# - Cloud Build async + polling (no log streaming)
+# - Dedicated buckets for source & logs (avoids gs://..._cloudbuild)
+# - Image tag = CI_COMMIT_SHA + 'latest' tag
+# - Deploy DEV/PROD, secret mounted at /app/.env, dedicated execution SA
+
+workflow:
+  rules:
+    - if: '$CI_COMMIT_BRANCH =~ /^(master|develop)$/'
 
 variables:
-  GCP_PROJECT_ID: studi-ai
-  REGION: europe-west1
-  SERVICE_COUNT: studi-ai@studi-ai-454216.iam.gserviceaccount.com
-  REPOSITORY: docker-${GCP_PROJECT_ID}-repo 
-  IMAGE: europe-west1-docker.pkg.dev/$GCP_PROJECT_ID/$REPOSITORY/$SERVICE_NAME
-  ####     VARIABLES SPECIFIQUES :
-  SERVICE_NAME: prospect-incoming-callbot
+  # ---- GCP ----
+  GCP_PROJECT_ID: "studi-ai-454216"
+
+  # Cloud Run + Artifact Registry
+  REGION: "europe-west1"
+  LOCATION: "europe-west1"
+
+  # Cloud Build
+  CLOUD_BUILD_REGION: "europe-west1"
+
+  # Artifact Registry
+  AR_REPO: "fastapi-callbot-hno-repo"
+  IMAGE_PATH: "fastapi-callbot-hno"
+  IMAGE_URI: "$LOCATION-docker.pkg.dev/$GCP_PROJECT_ID/$AR_REPO/$IMAGE_PATH"
+
+  # Dedicated GCS buckets for Cloud Build (source + logs)
+  GCS_SRC_DIR: "gs://studi-ai-454216-cb-src/source"
+  GCS_LOG_DIR: "gs://studi-ai-454216-cb-logs/logs"
+
+  # Cloud Run execution SA
+  RUNTIME_SA_EMAIL: "fastapi-callbot-hno-run@studi-ai-454216.iam.gserviceaccount.com"
 
 stages:
   - build
   - deploy
-  - cleanup
 
-  
-before_script:
-  - echo $GOOGLE_CREDENTIALS > ${CI_PROJECT_DIR}/google_credentials.json
-  - gcloud auth activate-service-account --key-file=${CI_PROJECT_DIR}/google_credentials.json
-  - gcloud config set project $GCP_PROJECT_ID
-  - gcloud --quiet auth configure-docker europe-west1-docker.pkg.dev
+default:
+  image: google/cloud-sdk:498.0.0-alpine
+  tags: [gcloud, docker]
+  before_script:
+    - set -euo pipefail
+    - gcloud --quiet --version
+    - |
+      if [ -n "${SA:-}" ]; then
+        gcloud --quiet auth activate-service-account --key-file="$SA"
+      elif [ -n "${GOOGLE_APPLICATION_CREDENTIALS:-}" ]; then
+        gcloud --quiet auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS"
+      else
+        echo "ERROR: SA file variable not available. Provide SA (Type: File) in GitLab CI variables."
+        exit 1
+      fi
+    - gcloud --quiet config set project "$GCP_PROJECT_ID"
+    - gcloud --quiet config set run/region "$REGION"
+    - gcloud --quiet config set builds/region "$CLOUD_BUILD_REGION"
 
-build:
+# -----------------------------
+# Build (once per branch)
+# -----------------------------
+build-image:
   stage: build
-  tags:
-    - gcloud,docker
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+    - if: '$CI_COMMIT_BRANCH == "master"'
   script:
-    - docker build -t $IMAGE .
-    - docker push $IMAGE
+    - echo "Authenticated as:" && gcloud auth list && gcloud config list account
 
-deploy:
+    - echo "Building image $IMAGE_URI:$CI_COMMIT_SHA via Cloud Build..."
+    - |
+      BUILD_ID="$(gcloud --quiet builds submit . \
+        --region="$CLOUD_BUILD_REGION" \
+        --tag "$IMAGE_URI:$CI_COMMIT_SHA" \
+        --gcs-source-staging-dir="$GCS_SRC_DIR" \
+        --gcs-log-dir="$GCS_LOG_DIR" \
+        --async \
+        --format='value(id)')"
+      echo "Cloud Build ID: ${BUILD_ID}"
+
+    - |
+      echo "Waiting for Cloud Build ${BUILD_ID} to complete..."
+      while true; do
+        STATUS="$(gcloud --quiet builds describe "$BUILD_ID" \
+          --region="$CLOUD_BUILD_REGION" \
+          --format='value(status)')"
+        echo "Status: ${STATUS}"
+        case "$STATUS" in
+          SUCCESS) break ;;
+          FAILURE|CANCELLED|TIMEOUT)
+            echo "Build failed. Log URL:"
+            gcloud --quiet builds describe "$BUILD_ID" \
+              --region="$CLOUD_BUILD_REGION" \
+              --format='value(logUrl)'
+            exit 1 ;;
+        esac
+        sleep 5
+      done
+
+    - |
+      LOG_URL="$(gcloud --quiet builds describe "$BUILD_ID" \
+        --region="$CLOUD_BUILD_REGION" \
+        --format='value(logUrl)')"
+      echo "Cloud Build logs: $LOG_URL"
+
+    - echo "Tagging latest for $IMAGE_URI:$CI_COMMIT_SHA ..."
+    - gcloud --quiet artifacts docker tags add "$IMAGE_URI:$CI_COMMIT_SHA" "$IMAGE_URI:latest"
+
+    # Exported artifact for subsequent steps
+    - |
+      {
+        echo "IMAGE_SHA=$CI_COMMIT_SHA"
+        echo "IMAGE_URI=$IMAGE_URI"
+        echo "CLOUD_BUILD_ID=$BUILD_ID"
+        echo "CLOUD_BUILD_LOG_URL=$LOG_URL"
+      } >> build.env
+
+  artifacts:
+    expire_in: 1 week
+    reports:
+      dotenv: build.env
+
+# -----------------------------
+# Deploy to DEVELOPMENT
+# -----------------------------
+deploy-dev:
   stage: deploy
-  tags:
-    - gcloud,docker
+  environment:
+    name: development
+  needs: ["build-image"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "develop"'
+  variables:
+    SERVICE_NAME: "fastapi-callbot-hno-dev"
+    SECRET_NAME: "fastapi-callbot-hno-env-dev"
   script:
-    - echo "Deploying Cloud Run job..."
-    - gcloud run jobs deploy $SERVICE_NAME --image $IMAGE --region $REGION --service-account=$SERVICE_COUNT --set-env-vars GOOGLE_CLOUD_PROJECT=$GCP_PROJECT_ID,dest_project_id=$DEST_PROJECT_ID --memory 32Gi --cpu 8
+    - echo "Ensuring Secret exists..."
+    - gcloud --quiet secrets create "$SECRET_NAME" --replication-policy="automatic" || echo "Secret '$SECRET_NAME' already exists."
 
-cleanup:
-  stage: cleanup
-  tags:
-    - gcloud,docker
-  needs:
-    - deploy
+    - echo "Adding new secret version from ENV_DEV file..."
+    - gcloud --quiet secrets versions add "$SECRET_NAME" --data-file="$ENV_DEV"
+
+    - echo "Deploying to Cloud Run (DEV)..."
+    - |
+      gcloud --quiet run deploy "$SERVICE_NAME" \
+        --region="$REGION" \
+        --image="$IMAGE_URI:$CI_COMMIT_SHA" \
+        --platform=managed \
+        --service-account="$RUNTIME_SA_EMAIL" \
+        --allow-unauthenticated \
+        --update-secrets=/etc/secrets/.env="$SECRET_NAME:latest" \
+        --cpu=1 --memory=1Gi --min-instances=0 --max-instances=8 \
+        --concurrency=16
+
+# -----------------------------
+# Deploy to PRODUCTION
+# -----------------------------
+deploy-prod:
+  stage: deploy
+  environment:
+    name: production
+  needs: ["build-image"]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+  variables:
+    SERVICE_NAME: "fastapi-callbot-hno-prod"
+    SECRET_NAME: "fastapi-callbot-hno-env-prod"
   script:
-    - docker rmi -f $IMAGE
-  when: always
+    - echo "Ensuring Secret exists..."
+    - gcloud --quiet secrets create "$SECRET_NAME" --replication-policy="automatic" || echo "Secret '$SECRET_NAME' already exists."
+
+    - echo "Adding new secret version from ENV_PROD file..."
+    - gcloud --quiet secrets versions add "$SECRET_NAME" --data-file="$ENV_PROD"
+
+    - echo "Deploying to Cloud Run (PROD)..."
+    - |
+      gcloud --quiet run deploy "$SERVICE_NAME" \
+        --region="$REGION" \
+        --image="$IMAGE_URI:$CI_COMMIT_SHA" \
+        --platform=managed \
+        --service-account="$RUNTIME_SA_EMAIL" \
+        --allow-unauthenticated \
+        --update-secrets=/etc/secrets/.env="$SECRET_NAME:latest" \
+        --cpu=1 --memory=1Gi --min-instances=0 --max-instances=8 \
+        --concurrency=16

@@ -9,9 +9,16 @@ from fastapi.testclient import TestClient
 
 from lagom import Container
 from lagom.integrations.fast_api import FastApiIntegration
+from pathlib import Path
+import sys
 
-from dependency_injection_config import deps
-from api_config import ApiConfig
+# Add "/src" dir to Python path to auto-import from 'src/'
+src_path = Path(__file__).parent.parent / "src"
+if str(src_path) not in sys.path:
+    sys.path.insert(0, str(src_path))
+
+from API.dependency_injection_config import deps
+from API.api_config import ApiConfig
 
 from models.user import User
 from models.thread import Thread
@@ -25,8 +32,7 @@ from infrastructure.user_repository import UserRepository
 from infrastructure.school_repository import SchoolRepository
 from infrastructure.context_repository import ContextRepository
 from infrastructure.fill_static_data_in_database_repository import DatabaseAdministrationRepository
-from infrastructure.llm_repository import LlmRepository
-
+from infrastructure.llm_service import LlmService
 
 # Import all entities to ensure SQLAlchemy relationships are registered
 from infrastructure.entities.user_entity import UserEntity  # noqa: F401
@@ -77,6 +83,7 @@ def mock_thread(mock_user: User) -> Thread:
 def mock_context_filter_request() -> dict:
     """Default context filter request fixture (text resource)"""
     return {
+        "context_type": "studi",
         "ressource": {"ressource_id": "res_001", "ressource_type": "text", "ressource_code": "code_001", "ressource_title": "Test Resource", "ressource_url": "http://example.com", "ressource_path": "/path/to/resource"},
         "theme_id": "theme_001",
         "module_id": "module_001",
@@ -89,6 +96,7 @@ def mock_context_filter_request() -> dict:
 def mock_context_filter_video() -> dict:
     """Context filter request fixture for video resource"""
     return {
+        "context_type": "studi",
         "ressource": {
             "ressource_id": "res_video_001",
             "ressource_type": "video",
@@ -108,6 +116,7 @@ def mock_context_filter_video() -> dict:
 def mock_context_filter_pdf() -> dict:
     """Context filter request fixture for PDF resource"""
     return {
+        "context_type": "studi",
         "ressource": {"ressource_id": "res_pdf_001", "ressource_type": "pdf", "ressource_code": "code_pdf_001", "ressource_title": "Test PDF", "ressource_url": "http://example.com/pdf", "ressource_path": "/path/to/pdf"},
         "theme_id": "theme_pdf_001",
         "module_id": "module_pdf_001",
@@ -222,12 +231,14 @@ def mock_generic_datacontext() -> Mock:
 async def test_fill_static_data_in_database_repository() -> DatabaseAdministrationRepository:
     """Fixture providing DatabaseAdministrationRepository with temporary SQLite database"""
     import tempfile
+    from infrastructure.role_repository import RoleRepository
 
     # Create a temporary database file
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
 
-    repo: DatabaseAdministrationRepository = DatabaseAdministrationRepository(db_path_or_url=db_path)
+    role_repository = RoleRepository(db_path_or_url=db_path)
+    repo: DatabaseAdministrationRepository = DatabaseAdministrationRepository(role_repository=role_repository, db_path_or_url=db_path)
     # Create tables asynchronously for async SQLite
     await repo.data_context.create_database_async()
     # Fill static data (roles)
@@ -270,23 +281,74 @@ def test_user_service(test_user_repository: UserRepository, test_school_reposito
 
 
 @pytest.fixture
-def test_llm_repository() -> LlmRepository:
-    """Fixture providing a mocked LlmRepository for integration tests"""
+def test_llm_service() -> LlmService:
+    """Fixture providing a mocked LlmService for integration tests"""
     mock_repo = Mock()
 
     # Mock the aquery method to return an async generator
-    async def mock_llm_response():
-        yield "This is a test response "
-        yield "from the LLM."
+    # aquery signature: thread, context_content, ressource_name, parcours_name, is_stream_decoded, all_response_chunks
+    async def mock_llm_response_generator(thread, context_content, ressource_name, parcours_name, is_stream_decoded=False, all_response_chunks=None):
+        chunks = ["This is a test response ", "from the LLM."]
+        for chunk in chunks:
+            # Append to all_response_chunks if provided (this is how the real implementation works)
+            if all_response_chunks is not None:
+                all_response_chunks.append(chunk)
+            yield chunk
 
-    mock_repo.aquery = Mock(side_effect=lambda thread: mock_llm_response())
+    mock_repo.aquery = mock_llm_response_generator
     return mock_repo
 
 
 @pytest.fixture
-def test_thread_service(test_thread_repository: ThreadRepository, test_user_repository: UserRepository, test_context_repository: ContextRepository, test_llm_repository) -> ThreadService:
+def test_content_service() -> Mock:
+    """Fixture providing a mocked ContentService for integration tests"""
+    from models.content import Content
+
+    mock_content = Mock(spec=Content)
+    mock_content.content_full = "Test content"
+    mock_content.content_summary_full = "Test summary full"
+    mock_content.content_summary_compact = "Test summary compact"
+    mock_content.content_summary_light = "Test summary light"
+
+    mock_service = Mock()
+    mock_service.aget_content = AsyncMock(return_value=mock_content)
+    mock_service.aget_content_by_filter = AsyncMock(return_value=mock_content)
+
+    return mock_service
+
+
+@pytest.fixture
+def test_course_hierarchy_repository() -> Mock:
+    """Fixture providing a mocked CourseHierarchyRepository for integration tests"""
+    from models.course_hierarchy import CourseHierarchy
+
+    mock_repo = Mock()
+    mock_course = Mock(spec=CourseHierarchy)
+    mock_course.course_hierarchy = {}
+    mock_repo.aget_course_hierarchy_by_partial_filter = AsyncMock(return_value=mock_course)
+    return mock_repo
+
+
+@pytest.fixture
+def test_thread_service(
+    test_user_service: UserService,
+    test_thread_repository: ThreadRepository,
+    test_user_repository: UserRepository,
+    test_context_repository: ContextRepository,
+    test_llm_service,
+    test_content_service,
+    test_course_hierarchy_repository,
+) -> ThreadService:
     """Fixture providing ThreadService with test repositories"""
-    return ThreadService(thread_repository=test_thread_repository, user_repository=test_user_repository, context_repository=test_context_repository, llm_repository=test_llm_repository)
+    return ThreadService(
+        user_service=test_user_service,
+        thread_repository=test_thread_repository,
+        user_repository=test_user_repository,
+        context_repository=test_context_repository,
+        llm_service=test_llm_service,
+        content_service=test_content_service,
+        course_hierarchy_repository=test_course_hierarchy_repository,
+    )
 
 
 @pytest.fixture

@@ -1,10 +1,8 @@
 from models.thread import Thread
 from models.message import Message
-from models.role import Role
 from facade.response_models.thread_response import (
     ThreadResponse,
     MessageResponse,
-    RoleResponse,
     ThreadCreatedResponse,
     ThreadIdsResponse,
     ThreadMessagesResponse,
@@ -45,30 +43,16 @@ class ThreadResponseConverter:
         Returns:
             MessageResponse model for API response
         """
-        role_response = ThreadResponseConverter.convert_role_to_response(message.role)
-
         return MessageResponse(
             id=message.id,
             thread_id=message.thread_id,
-            role=role_response,
+            role=message.role.name,
             content=message.content,
             elapsed_seconds=message.elapsed_seconds,
             created_at=message.created_at,
             updated_at=message.updated_at,
             deleted_at=message.deleted_at,
         )
-
-    @staticmethod
-    def convert_role_to_response(role: Role) -> RoleResponse:
-        """Convert Role domain model to RoleResponse.
-
-        Args:
-            role: The domain model containing role information
-
-        Returns:
-            RoleResponse model for API response
-        """
-        return RoleResponse(id=role.id, name=role.name)
 
     @staticmethod
     def convert_thread_to_created_response(thread: Thread) -> ThreadCreatedResponse:

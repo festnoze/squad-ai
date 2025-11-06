@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from envvar import EnvHelper
+
 baserouter = APIRouter(prefix="", tags=["Base"])
 
 
@@ -11,7 +13,7 @@ async def ahealth_check(request: Request) -> JSONResponse:
         content={
             "authenticated": False,
             "instance_url": request.base_url._url,
-            "sandbox": True,
+            "environment": EnvHelper.get_environment(),
             "auth_method": "JWT",
         },
     )

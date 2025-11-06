@@ -8,7 +8,7 @@ from facade.request_models.user_infos_request import UserInfosRequest, UserPrefe
 from facade.response_models.user_response import UserResponse
 from facade.converters.user_request_converter import UserRequestConverter
 from facade.converters.user_response_converter import UserResponseConverter
-from dependency_injection_config import deps
+from API.dependency_injection_config import deps
 from common_tools.helpers.validation_helper import Validate  # type: ignore[import-untyped]
 from security.auth_dependency import authentication_required
 from security.jwt_skillforge_payload import JWTSkillForgePayload
@@ -81,6 +81,6 @@ async def aset_user_preferences(preferences: UserPreferencesRequest, token_paylo
 async def aactivate_service(token_payload: JWTSkillForgePayload = Depends(authentication_required), user_service: UserService = deps.depends(UserService)) -> bool:
     """Activate the SkillForge service for a user."""
     lms_user_id = token_payload.get_lms_user_id()
-    if not Validate.is_int(lms_user_id):
+    if not lms_user_id or not Validate.is_int(lms_user_id):
         raise ValueError(f"Provided user LMS id value: '{lms_user_id}' isn't a valid integer.")
     return await user_service.aservice_activation(lms_user_id)

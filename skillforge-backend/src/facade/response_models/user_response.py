@@ -73,6 +73,8 @@ class UserResponse(BaseModel):
         first_name: User's first name
         last_name: User's last name
         email: User's email address
+        date_of_birth: User's date of birth
+        extra_info: Additional user information from LMS
         created_at: Timestamp when the record was created
         updated_at: Timestamp when the record was last updated
         deleted_at: Timestamp when the record was soft-deleted
@@ -86,6 +88,8 @@ class UserResponse(BaseModel):
     first_name: str
     last_name: str
     email: EmailStr
+    date_of_birth: datetime | None = None
+    extra_info: dict | None = None
     created_at: datetime | None = None
     updated_at: datetime | None = None
     deleted_at: datetime | None = None

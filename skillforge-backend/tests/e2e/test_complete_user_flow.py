@@ -86,13 +86,13 @@ class TestCompleteUserFlow:
                 "query": {"query_text_content": "What is machine learning and how does it work?", "query_selected_text": "", "query_quick_action": None, "query_attachments": None},
                 "course_context": mock_context_filter_request,
             }
-            query_response = client.post(f"/thread/{thread_id}/query", json=query_data)
-
-            # Assert Step 5
-            assert query_response.status_code == 200
-            # Streaming response - verify we can read the content
-            response_content = query_response.text
-            assert len(response_content) > 0
+            # Use stream to properly consume streaming response
+            with client.stream("POST", f"/thread/{thread_id}/query", json=query_data) as query_response:
+                # Assert Step 5
+                assert query_response.status_code == 200
+                # Streaming response - verify we can read the content
+                response_content = b"".join(query_response.iter_bytes())
+                assert len(response_content) > 0
 
             # Step 6: Retrieve messages from the thread
             messages_response = client.get(f"/thread/{thread_id}/messages")
@@ -108,11 +108,11 @@ class TestCompleteUserFlow:
 
             # Verify message structure
             user_message = messages_data["messages"][0]
-            assert user_message["role"]["name"] == "user"
+            assert user_message["role"] == "user"
             assert user_message["content"] == "What is machine learning and how does it work?"
 
             assistant_message = messages_data["messages"][1]
-            assert assistant_message["role"]["name"] == "assistant"
+            assert assistant_message["role"] == "assistant"
             assert len(assistant_message["content"]) > 0
 
         finally:
@@ -159,8 +159,11 @@ class TestCompleteUserFlow:
                     "query": {"query_text_content": query_text, "query_selected_text": "", "query_quick_action": None, "query_attachments": None},
                     "course_context": mock_context_filter_video,
                 }
-                query_response = client.post(f"/thread/{thread_id}/query", json=query_data)
-                assert query_response.status_code == 200
+                # Use stream to properly consume streaming response
+                with client.stream("POST", f"/thread/{thread_id}/query", json=query_data) as query_response:
+                    assert query_response.status_code == 200
+                    # Consume the stream
+                    _ = b"".join(query_response.iter_bytes())
 
             # Step 6: Retrieve all messages
             messages_response = client.get(f"/thread/{thread_id}/messages")
@@ -174,7 +177,7 @@ class TestCompleteUserFlow:
             # Verify alternating user/assistant pattern
             for i, message in enumerate(messages_data["messages"]):
                 expected_role = "user" if i % 2 == 0 else "assistant"
-                assert message["role"]["name"] == expected_role
+                assert message["role"] == expected_role
 
         finally:
             app.dependency_overrides.clear()
@@ -237,10 +240,10 @@ class TestCompleteUserFlow:
 
             # Verify page 1 contains the MOST RECENT messages in chronological order: A3, Q4, A4
             page1_messages = page1_data["messages"]
-            assert page1_messages[0]["role"]["name"] == "assistant", "Page 1, message 0 should be assistant (A3)"
-            assert page1_messages[1]["role"]["name"] == "user", "Page 1, message 1 should be user (Q4)"
+            assert page1_messages[0]["role"] == "assistant", "Page 1, message 0 should be assistant (A3)"
+            assert page1_messages[1]["role"] == "user", "Page 1, message 1 should be user (Q4)"
             assert "Question 4" in page1_messages[1]["content"], "Page 1, message 1 should be 'Question 4'"
-            assert page1_messages[2]["role"]["name"] == "assistant", "Page 1, message 2 should be assistant (A4)"
+            assert page1_messages[2]["role"] == "assistant", "Page 1, message 2 should be assistant (A4)"
             # Verify these are the most recent by checking they come after Q3
             assert "Question 3" not in page1_messages[1]["content"], "Page 1 should not contain Q3"
 
@@ -253,10 +256,10 @@ class TestCompleteUserFlow:
 
             # Verify page 2 contains the MIDDLE messages in chronological order: Q2, A2, Q3
             page2_messages = page2_data["messages"]
-            assert page2_messages[0]["role"]["name"] == "user", "Page 2, message 0 should be user (Q2)"
+            assert page2_messages[0]["role"] == "user", "Page 2, message 0 should be user (Q2)"
             assert "Question 2" in page2_messages[0]["content"], "Page 2, message 0 should be 'Question 2'"
-            assert page2_messages[1]["role"]["name"] == "assistant", "Page 2, message 1 should be assistant (A2)"
-            assert page2_messages[2]["role"]["name"] == "user", "Page 2, message 2 should be user (Q3)"
+            assert page2_messages[1]["role"] == "assistant", "Page 2, message 1 should be assistant (A2)"
+            assert page2_messages[2]["role"] == "user", "Page 2, message 2 should be user (Q3)"
             assert "Question 3" in page2_messages[2]["content"], "Page 2, message 2 should be 'Question 3'"
 
             # Get third page (3 messages) - offset = max(0, 8 - 3*3) = 0, limit 3 → messages at indices 0, 1, 2: Q1, A1, Q2
@@ -268,10 +271,10 @@ class TestCompleteUserFlow:
 
             # Verify page 3 contains the OLDEST messages in chronological order: Q1, A1, Q2
             page3_messages = page3_data["messages"]
-            assert page3_messages[0]["role"]["name"] == "user", "Page 3, message 0 should be user (Q1)"
+            assert page3_messages[0]["role"] == "user", "Page 3, message 0 should be user (Q1)"
             assert "Question 1" in page3_messages[0]["content"], "Page 3, message 0 should be 'Question 1' (oldest)"
-            assert page3_messages[1]["role"]["name"] == "assistant", "Page 3, message 1 should be assistant (A1)"
-            assert page3_messages[2]["role"]["name"] == "user", "Page 3, message 2 should be user (Q2)"
+            assert page3_messages[1]["role"] == "assistant", "Page 3, message 1 should be assistant (A1)"
+            assert page3_messages[2]["role"] == "user", "Page 3, message 2 should be user (Q2)"
             assert "Question 2" in page3_messages[2]["content"], "Page 3, message 2 should be 'Question 2'"
 
             # Verify chronological order within each page by checking timestamps
@@ -335,8 +338,11 @@ class TestCompleteUserFlow:
                 "query": {"query_text_content": "Question about text resource", "query_selected_text": "", "query_quick_action": None, "query_attachments": None},
                 "course_context": mock_context_filter_request,
             }
-            query_response1 = client.post(f"/thread/{thread_id1}/query", json=query_data1)
-            assert query_response1.status_code == 200
+            # Use stream to properly consume streaming response
+            with client.stream("POST", f"/thread/{thread_id1}/query", json=query_data1) as query_response1:
+                assert query_response1.status_code == 200
+                # Consume the stream
+                _ = b"".join(query_response1.iter_bytes())
 
             # Step 4b: Get thread IDs for second context (should be different)
             thread_ids_response2 = client.post("/thread/get-all/ids", json=mock_context_filter_video)
@@ -351,8 +357,11 @@ class TestCompleteUserFlow:
                 "query": {"query_text_content": "Question about video resource", "query_selected_text": "", "query_quick_action": None, "query_attachments": None},
                 "course_context": mock_context_filter_video,
             }
-            query_response2 = client.post(f"/thread/{thread_id2}/query", json=query_data2)
-            assert query_response2.status_code == 200
+            # Use stream to properly consume streaming response
+            with client.stream("POST", f"/thread/{thread_id2}/query", json=query_data2) as query_response2:
+                assert query_response2.status_code == 200
+                # Consume the stream
+                _ = b"".join(query_response2.iter_bytes())
 
             # Step 6: Retrieve messages from both threads
             messages_response1 = client.get(f"/thread/{thread_id1}/messages")

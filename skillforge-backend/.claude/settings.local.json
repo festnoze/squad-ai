@@ -32,8 +32,16 @@
       "Read(//c/Dev/squad-ai/OpaleCoursesWebscraper/**)",
       "Bash(.venvScriptspython.exe test_context_discriminator.py)",
       "Bash(git add:*)",
-      "Bash(timeout 15 bash -c \"while ! git push origin feature/live-scraping 2>&1; do sleep 1; done\")",
-      "Bash(curl:*)"
+      "Bash(../.venv/Scripts/python.exe:*)",
+      "Read(//c/Dev/Studi.Api.Parcours.Client/**)",
+      "Read(//c/Dev/studi.api.parcours.exchangedatacontract/**)",
+      "Bash(cat:*)",
+      "Bash(.venvScriptspython.exe -m pip install httpx)",
+      "Bash(uv sync:*)",
+      "Bash(.venvScriptspython.exe -m pytest tests/ -v --tb=line)",
+      "Bash(test:*)",
+      "Bash(.venvScriptspython.exe -m mypy src/application/content_service.py src/facade/admin_router.py --no-error-summary)",
+      "Bash(ping:*)"
     ],
     "deny": [],
     "ask": []

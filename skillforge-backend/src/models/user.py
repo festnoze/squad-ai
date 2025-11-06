@@ -1,4 +1,5 @@
 from pydantic import EmailStr
+from datetime import datetime
 from models.base_model import IdStatefulBaseModel
 from models.school import School
 from models.user_preference import UserPreference
@@ -26,3 +27,5 @@ class User(IdStatefulBaseModel):
     first_name: str
     last_name: str
     email: EmailStr
+    date_of_birth: datetime | None = None
+    extra_info: dict | None = None

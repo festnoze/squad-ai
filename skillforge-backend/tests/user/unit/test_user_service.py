@@ -1,7 +1,6 @@
 """Unit tests for UserService"""
 
 import pytest
-from uuid import uuid4
 from unittest.mock import Mock
 
 from application.user_service import UserService
@@ -51,32 +50,6 @@ class TestUserService:
         # Assert
         assert result is None
         mock_user_repository.aget_user_by_lms_user_id.assert_called_once_with("nonexistent_lms_id")
-
-    async def test_aget_user_by_id_found_async(self, service: UserService, mock_user_repository: Mock, mock_user: User):
-        """Test retrieving user by UUID when user exists"""
-        # Arrange
-        user_id = uuid4()
-        mock_user_repository.aget_user_by_id.return_value = mock_user
-
-        # Act
-        result = await service.aget_user_by_id(user_id)
-
-        # Assert
-        assert result == mock_user
-        mock_user_repository.aget_user_by_id.assert_called_once_with(user_id)
-
-    async def test_aget_user_by_id_not_found_async(self, service: UserService, mock_user_repository: Mock):
-        """Test retrieving user by UUID when user doesn't exist"""
-        # Arrange
-        user_id = uuid4()
-        mock_user_repository.aget_user_by_id.return_value = None
-
-        # Act
-        result = await service.aget_user_by_id(user_id)
-
-        # Assert
-        assert result is None
-        mock_user_repository.aget_user_by_id.assert_called_once_with(user_id)
 
     async def test_acreate_or_update_user_propagates_exception_async(self, service: UserService, mock_user_repository: Mock, mock_user: User):
         """Test that exceptions from repository are propagated"""

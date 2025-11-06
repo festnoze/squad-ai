@@ -1,29 +1,30 @@
+import logging
 from uuid import UUID
 from sqlalchemy import select
 from common_tools.database.generic_datacontext import GenericDataContext  # type: ignore[import-untyped]
 from infrastructure.entities import Base
 from infrastructure.entities.thread_entity import ThreadEntity
 from infrastructure.entities.message_entity import MessageEntity
-from infrastructure.entities.role_entity import RoleEntity
 from infrastructure.converters.thread_converters import ThreadConverters
 from infrastructure.converters.message_converters import MessageConverters
 from models.thread import Thread
 from models.message import Message
 from envvar import EnvHelper
+from infrastructure.caching.cache_service import CacheService
+from infrastructure.caching.caching_decorator import cache_retrieval_or_caching
+from infrastructure.role_repository import RoleRepository
+from infrastructure.helpers.database_helper import DatabaseHelper
 
 
 class ThreadRepository:
     def __init__(self, db_path_or_url: str | None = None) -> None:
-        if db_path_or_url:
-            self.db_path_or_url = db_path_or_url
-        else:
-            username = EnvHelper.get_postgres_username()
-            password = EnvHelper.get_postgres_password()
-            host = EnvHelper.get_postgres_host()
-            dbname = EnvHelper.get_postgres_database_name()
-            self.db_path_or_url = f"postgresql://{username}:{password}@{host}/{dbname}"
-        #
+        self.logger = logging.getLogger(__name__)
+        self.db_path_or_url = DatabaseHelper.build_postgres_connection_url(db_path_or_url)
         self.data_context = GenericDataContext(Base, self.db_path_or_url)
+        self.role_repository = RoleRepository(db_path_or_url=self.db_path_or_url)
+        host = EnvHelper.get_postgres_host()
+        dbname = EnvHelper.get_postgres_database_name()
+        self.logger.debug(f"ThreadRepository initialized with database: {host}/{dbname}")
 
     async def acreate_thread(self, user_id: UUID, thread_id: UUID | None = None, context_id: UUID | None = None) -> Thread:
         """Create a new empty thread for a user.
@@ -51,7 +52,7 @@ class ThreadRepository:
             # GenericDataContext wraps ValueError in RuntimeError - handle both
             raise ValueError(f"User with id {user_id} does not exist") from e
         except Exception as e:
-            print(f"Failed to create thread: {e}")
+            self.logger.error(f"Failed to create thread: {e}")
             raise
 
     async def aadd_message_to_thread(self, thread_id: UUID, content: str, role_name: str) -> Message:
@@ -74,36 +75,35 @@ class ThreadRepository:
                 raise ValueError("Content is required. Message cannot be added to thread without content")
 
             # Check if thread exists - get_entity_by_id will raise ValueError if not found
-            await self.data_context.get_entity_by_id_async(ThreadEntity, thread_id, fails_if_not_found=True)
+            if not await self.aget_thread_by_id(thread_id):
+                raise ValueError(f"Cannot add messages because thread with id {thread_id} does not exist")
 
-            # Lookup role by name
+            # Lookup role by name using RoleRepository
+            role = await self.role_repository.aget_by_name(role_name)
+            if not role:
+                raise ValueError(f"Role '{role_name}' not found.")
+
+            # Create and add message
             async with self.data_context.get_session_async() as session:
-                stmt = select(RoleEntity).where(RoleEntity.name == role_name)
-                result = await session.execute(stmt)
-                role_entity = result.scalar_one_or_none()
-
-                if not role_entity:
-                    raise ValueError(f"Role '{role_name}' not found. Please fill static data first.")
-
-                # Create and add message
-                message_entity = MessageEntity(thread_id=thread_id, role_id=role_entity.id, content=content)
+                message_entity = MessageEntity(thread_id=thread_id, role_id=role.id, content=content)
                 session.add(message_entity)
                 await session.commit()
                 await session.refresh(message_entity)
 
             # Fetch the message with joined role for conversion
             message_entity_with_role = await self.data_context.get_entity_by_id_async(MessageEntity, message_entity.id)
+
+            # Invalidate all cached versions of this thread (all pagination variants)
+            invalidated_count = await CacheService.adelete_pattern(f"thread:{thread_id}:*")
+            if invalidated_count > 0:
+                self.logger.debug(f"Invalidated {invalidated_count} cached entries for thread {thread_id}")
+
             return MessageConverters.convert_message_entity_to_model(message_entity_with_role)
 
-        except (ValueError, RuntimeError) as e:
-            # GenericDataContext wraps ValueError in RuntimeError - handle both
-            if "does not exist" in str(e):
-                raise ValueError(f"Thread with id {thread_id} does not exist") from e
-            raise
-        except Exception as e:
-            print(f"Failed to add message to thread: {e}")
+        except (ValueError, RuntimeError, Exception):
             raise
 
+    @cache_retrieval_or_caching("thread:{thread_id}:page:{page_number}:size:{page_size}", ttl=600)
     async def aget_thread_by_id(self, thread_id: UUID, page_number: int = 0, page_size: int = 0) -> Thread | None:
         """Retrieve a thread by its UUID with optional message pagination.
 
@@ -146,10 +146,11 @@ class ThreadRepository:
                 return ThreadConverters.convert_thread_entity_to_model(thread_entity)
             else:
                 # Default behavior: load all messages (eager loading via relationship)
-                thread_entity: ThreadEntity = await self.data_context.get_entity_by_id_async(ThreadEntity, thread_id)
-                return ThreadConverters.convert_thread_entity_to_model(thread_entity) if thread_entity else None
+                thread_entity_default: ThreadEntity | None = await self.data_context.get_entity_by_id_async(ThreadEntity, thread_id)
+                return ThreadConverters.convert_thread_entity_to_model(thread_entity_default) if thread_entity_default else None
+
         except Exception as e:
-            print(f"Failed to get thread by id: {e}")
+            self.logger.error(f"Failed to get thread by id: {e}")
             return None
 
     async def adoes_thread_exist(self, thread_id: UUID) -> bool:
@@ -165,7 +166,7 @@ class ThreadRepository:
             retrieved_thread_id: UUID | None = await self.data_context.get_entity_by_id_async(ThreadEntity, thread_id, [ThreadEntity.id], fails_if_not_found=False)
             return True if retrieved_thread_id else False
         except Exception as e:
-            print(f"Failed to check if thread exists: {e}")
+            self.logger.error(f"Failed to check if thread exists: {e}")
             return False
 
     async def aget_threads_ids_by_user_and_context(self, user_id: UUID, context_id: UUID) -> list[UUID]:
@@ -185,7 +186,7 @@ class ThreadRepository:
                 thread_ids: list[UUID] = list(result.scalars().all())
                 return thread_ids
         except Exception as e:
-            print(f"Failed to get user threads: {e}")
+            self.logger.error(f"Failed to get user threads: {e}")
             return []
 
     async def aget_thread_messages_count(self, thread_id: UUID) -> int:
@@ -206,5 +207,5 @@ class ThreadRepository:
                 total_messages: int = count_result.scalar() or 0
                 return total_messages
         except Exception as e:
-            print(f"Failed to get thread messages count: {e}")
+            self.logger.error(f"Failed to get thread messages count: {e}")
             return 0

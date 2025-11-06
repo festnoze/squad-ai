@@ -1,9 +1,10 @@
+import asyncio
 from fastapi import APIRouter, Depends
 from fastapi.responses import StreamingResponse
 from uuid import UUID
 from application.thread_service import ThreadService
 from common_tools.helpers.validation_helper import Validate  # type: ignore[import-untyped]
-from dependency_injection_config import deps
+from API.dependency_injection_config import deps
 from facade.request_models.user_query_request import UserAskNewQueryRequest
 from facade.request_models.context_request import CourseContextStudiRequest
 from facade.response_models.thread_response import ThreadIdsResponse, ThreadMessagesResponse
@@ -13,21 +14,6 @@ from security.auth_dependency import authentication_required
 from security.jwt_skillforge_payload import JWTSkillForgePayload
 
 thread_router = APIRouter(prefix="/thread", tags=["Thread"])
-
-
-# @thread_router.post(
-#     "/new",
-#     description="Create a new conversation thread for a user",
-#     response_model=ThreadCreatedResponse,
-#     status_code=200,
-# )
-# async def acreate_new_thread(token_payload: JWTSkillForgePayload = Depends(authentication_required), thread_service: ThreadService = deps.depends(ThreadService)) -> ThreadCreatedResponse:
-#     user_internal_id = token_payload.get_user_id()
-#     if not Validate.is_int(user_internal_id):
-#         raise ValueError(f"Provided user id value: '{user_external_id}' isn't a valid integer.")
-
-#     thread = await thread_service.acreate_new_thread(user_internal_id)
-#     return ThreadResponseConverter.convert_thread_to_created_response(thread)
 
 
 @thread_router.post(
@@ -43,8 +29,12 @@ async def aget_all_threads_ids_or_create_new(
     if not lms_user_id or not Validate.is_int(lms_user_id):
         raise ValueError(f"Provided user LMS id value: '{lms_user_id}' isn't a valid integer.")
 
-    threads_ids = await thread_service.aget_threads_ids_by_user_and_context(token_payload, lms_user_id, body)
-    return ThreadResponseConverter.convert_thread_ids_to_response(threads_ids)
+    try:
+        # Set timeout of 30 seconds for this operation to prevent hanging requests
+        threads_ids = await asyncio.wait_for(thread_service.aget_threads_ids_by_user_and_context(token_payload, lms_user_id, body), timeout=30.0)
+        return ThreadResponseConverter.convert_thread_ids_to_response(threads_ids)
+    except asyncio.TimeoutError:
+        raise ValueError("Request timed out while fetching thread IDs. The operation took too long to complete.")
 
 
 @thread_router.get(
@@ -64,7 +54,7 @@ async def aget_thread_messages(
         raise ValueError("User LMS ID not found in token")
 
     # Pass pagination parameters to the service/repository layer for database-level pagination
-    thread: Thread = await thread_service.aget_thread_by_id_or_create(UUID(thread_id), lms_user_id, persist_thread_if_created=False, page_number=page_number, page_size=page_size)
+    thread: Thread = await thread_service.aget_thread_by_id_or_create(token_payload, UUID(thread_id), lms_user_id, persist_thread_if_created=False, page_number=page_number, page_size=page_size)
 
     # Get total count of messages for proper pagination metadata
     total_messages_count = await thread_service.aget_thread_messages_count(UUID(thread_id))
@@ -73,11 +63,7 @@ async def aget_thread_messages(
     return ThreadResponseConverter.convert_thread_to_messages_response(thread, 0, len(thread.messages), total_messages_count)
 
 
-@thread_router.post(
-    "/{thread_id}/query",
-    description="Add a new user query to a existing thread, generate AI response and return it as a stream",
-    status_code=200,
-)
+@thread_router.post("/{thread_id}/query", description="Add a new user query to a existing thread, generate AI response and return it as a stream", status_code=200)
 async def aanswer_user_query_into_thread(
     thread_id: str, body: UserAskNewQueryRequest, token_payload: JWTSkillForgePayload = Depends(authentication_required), thread_service: ThreadService = deps.depends(ThreadService)
 ) -> StreamingResponse:

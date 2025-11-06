@@ -6,12 +6,15 @@ This module provides authentication-related endpoints including JWT token operat
 from fastapi import APIRouter, Depends
 from datetime import datetime
 
+#
 from application.user_service import UserService
 from facade.request_models.token_request import CreateTokenRequest
 from facade.response_models.user_response import UserResponse
 from facade.response_models.token_response import TokenResponse
 from facade.converters.user_response_converter import UserResponseConverter
-from dependency_injection_config import deps
+from API.dependency_injection_config import deps
+
+#
 from security.auth_dependency import authentication_required, authentication_optional
 from security.jwt_skillforge_payload import JWTSkillForgePayload
 from security.jwt_helper import JWTHelper
@@ -21,11 +24,11 @@ auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 @auth_router.get(
     "/me",
-    description="Get current authenticated user information from database",
+    description="Get current authenticated user information",
     response_model=UserResponse,
     status_code=200,
 )
-async def get_current_user_info_from_database(token_payload: JWTSkillForgePayload = Depends(authentication_required), user_service: UserService = deps.depends(UserService)) -> UserResponse:
+async def get_current_user_info(token_payload: JWTSkillForgePayload = Depends(authentication_required), user_service: UserService = deps.depends(UserService)) -> UserResponse:
     """Get the current authenticated user's information.
 
     This endpoint demonstrates JWT authentication usage.
@@ -35,15 +38,15 @@ async def get_current_user_info_from_database(token_payload: JWTSkillForgePayloa
         Authorization: Bearer ZEJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
     """
     # Get user ID from JWT payload
-    user_id = token_payload.get_token_uuid()
-    if not user_id:
-        raise ValueError("User ID not found in JWT token")
+    lms_user_id = token_payload.get_lms_user_id()
+    if not lms_user_id:
+        raise ValueError("User ID not found in provided JWT authentication token")
 
-    # Fetch user from database
-    user = await user_service.aget_user_by_id(user_id)
+    user = await user_service.aget_user_by_lms_user_id(lms_user_id)
     if not user:
-        raise ValueError(f"User not found with ID: {user_id}")
-
+        user = await user_service.aretrieve_or_create_user(lms_user_id, token_payload)
+    if not user:
+        raise ValueError(f"Failed to retrieve or create user for {lms_user_id}")
     return UserResponseConverter.convert_user_to_response(user)
 
 
@@ -93,7 +96,7 @@ async def forge_new_token(token_request: CreateTokenRequest) -> TokenResponse:
         {
             "client": 199520,
             "schoolId": 1009,
-            "issuer": "uat-lms-studi.studi.fr",
+            "issuer": "app.studi.fr",
             "expires_in_hours": 24
         }
 
@@ -103,7 +106,7 @@ async def forge_new_token(token_request: CreateTokenRequest) -> TokenResponse:
     WARNING: This endpoint should be disabled or protected in production!
     """
     # Create the JWT token
-    token = JWTHelper.acreate_token(client=token_request.client, school_id=token_request.school_id, issuer=token_request.issuer, expires_in_hours=token_request.expires_in_hours)
+    token = JWTHelper.create_token(client=token_request.client, school_id=token_request.school_id, issuer=token_request.issuer, expires_in_hours=token_request.expires_in_hours)
 
     # Decode the token to get the generated sid
     decoded = JWTHelper.adecode_token(token, verify_signature=False)

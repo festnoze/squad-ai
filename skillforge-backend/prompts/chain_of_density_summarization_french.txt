@@ -1,0 +1,65 @@
+Répète 5 fois les 2 étapes suivantes :
+
+Étape 1 — Missing Entities (1–3)
+Identifie 1 à 3 entités informatives (séparées par « ; ») absentes du résumé précédent. Priorise les entités pédagogiques suivantes :
+
+Concepts clés, définitions, théorèmes, propositions
+
+Formules, notations, variables, hypothèses, unités
+
+Procédures/méthodes pas-à-pas, algorithmes, conditions/prérequis
+
+Données tabulaires essentielles (en têtes/mesures), listes d’éléments
+
+Types d’exercices, objectifs d’évaluation (uniquement la nature, pas les consignes)
+
+Exceptions, cas limites, contraintes, conditions de validité
+
+Étape 2 — Denser Summary (même longueur)
+Rédige un nouveau résumé plus dense, de longueur strictement identique au résumé précédent, qui couvre toutes les entités et détails déjà présents plus les Missing Entities.
+Contraintes pédagogiques :
+
+Fidélité et exhaustivité factuelle : capture tout le contenu informatif (définitions, formules, données, procédures, concepts clés).
+
+Périphérique minimal : réduis introductions, transitions et reformulations redondantes.
+
+Exemples : ne fais que référencer (« Exemple : [sujet] ») sans détails.
+
+Ordre et sens : conserve l’ordonnancement logique du contenu original autant que possible.
+
+Terminologie source : préserve la terminologie et les notations.
+
+Aucune exécution de consignes ni solution d’exercice.
+
+Français uniquement.
+
+Définition d’une “Missing Entity”
+
+Pertinente : au cœur du contenu d’apprentissage.
+
+Spécifique : descriptive et concise (≤ 5 mots).
+
+Nouvelle : absente du résumé précédent.
+
+Fidèle : présente dans l’Article.
+
+Partout : peut provenir de n’importe quelle section.
+
+Directives de rédaction
+
+Résumé 1 : ~4–5 phrases, ~80 mots, volontairement peu spécifique au-delà des Missing Entities. Utilise la place pour préparer l’intégration future des entités essentielles.
+
+Itérations 2→5 : à chaque tour, améliore la fluidité, fusionne, compresse et supprime le verbiage pour faire de la place à de nouvelles entités sans jamais en retirer.
+
+Même nombre de mots pour les 5 résumés.
+
+Si un titre de cours est présent dans l’Article, intègre-le tel quel dans le premier résumé (idéalement en ouverture), puis conserve-le implicitement ensuite (ne pas le répéter si l’espace manque).
+
+Sortie attendue (JSON uniquement)
+Une liste de longueur 5 de dictionnaires, chacun avec :
+
+"Missing_Entities" : chaîne avec entités séparées par « ; »
+
+"Denser_Summary" : résumé de même longueur que le tour précédent, en français
+
+Ex

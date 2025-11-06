@@ -6,10 +6,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from api_config import ApiConfig
+#
+from API.api_config import ApiConfig
+from API.dependency_injection_config import deps
 from application.user_service import UserService
 from models.user import User
-from dependency_injection_config import deps
 
 
 class TestUserRouter:

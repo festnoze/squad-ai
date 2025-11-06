@@ -25,6 +25,8 @@ class UserConverters:
             first_name=user_entity.first_name,
             last_name=user_entity.last_name,
             email=user_entity.email,
+            date_of_birth=user_entity.date_of_birth.replace(tzinfo=timezone.utc) if user_entity.date_of_birth else None,
+            extra_info=user_entity.extra_info,
             created_at=user_entity.created_at.replace(tzinfo=timezone.utc),
             updated_at=user_entity.updated_at.replace(tzinfo=timezone.utc) if user_entity.updated_at else None,
             deleted_at=user_entity.deleted_at.replace(tzinfo=timezone.utc) if user_entity.deleted_at else None,
@@ -47,12 +49,12 @@ class UserConverters:
             id=user.id,
             lms_user_id=user.lms_user_id,
             school_id=user.school.id if user.school else None,
-            # NOTE: Do NOT set 'school' or 'preference' relationship objects here
-            # Only set the foreign key IDs. SQLAlchemy will load relationships on read.
             civility=user.civility,
             first_name=user.first_name,
             last_name=user.last_name,
             email=user.email,
+            date_of_birth=user.date_of_birth.replace(tzinfo=None) if user.date_of_birth else None,
+            extra_info=user.extra_info,
             created_at=user.created_at.replace(tzinfo=None) if user.created_at else None,
             updated_at=user.updated_at.replace(tzinfo=None) if user.updated_at else None,
             deleted_at=user.deleted_at.replace(tzinfo=None) if user.deleted_at else None,

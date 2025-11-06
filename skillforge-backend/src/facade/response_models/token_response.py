@@ -28,7 +28,7 @@ class TokenResponse(BaseModel):
             "sid": "3039aaca-d954-4364-95e3-537f7f421c57",
             "client": 199520,
             "school_id": 1009,
-            "issuer": "uat-lms-studi.studi.fr"
+            "issuer": "api.studi.fr"
         }
     """
 

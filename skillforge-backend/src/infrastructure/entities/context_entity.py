@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING
+from sqlalchemy import JSON
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from infrastructure.entities import Base
@@ -11,7 +12,8 @@ class ContextEntity(Base):
     __tablename__ = "contexts"
 
     # id, created_at, updated_at, deleted_at inherited from Base (StatefulBase)
-    context_filter: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    context_full: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    # Use JSON.with_variant to handle both PostgreSQL (JSONB) and SQLite (JSON)
+    context_filter: Mapped[dict] = mapped_column(JSON().with_variant(JSONB, "postgresql"), nullable=False)
+    context_full: Mapped[dict] = mapped_column(JSON().with_variant(JSONB, "postgresql"), nullable=False)
 
     threads: Mapped[list["ThreadEntity"]] = relationship("ThreadEntity", back_populates="context", cascade="all, delete-orphan", lazy="joined")

@@ -178,9 +178,9 @@ uv run streamlit run startup.py
 
 ```python
 import asyncio
-from src.api.skillforge_client import SkillForgeClient
+from src.api.skillforge_api_client import SkillForgeAPIClient
 
-client = SkillForgeClient()
+client = SkillForgeAPIClient()
 success, message = asyncio.run(client.aping())
 print(f"Success: {success}")
 print(f"Message: {message}")

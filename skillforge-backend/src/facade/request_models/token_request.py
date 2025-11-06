@@ -12,14 +12,14 @@ class CreateTokenRequest(BaseModel):
     Attributes:
         client: Client ID (integer)
         school_id: School ID (integer)
-        issuer: Issuer string (e.g., "uat-lms-studi.studi.fr")
+        issuer: Issuer string (e.g., "api.studi.fr")
         expires_in_hours: Token expiration time in hours (default: 24)
 
     Example:
         {
             "client": 199520,
             "school_id": 1009,
-            "issuer": "uat-lms-studi.studi.fr",
+            "issuer": "api.studi.fr",
             "expires_in_hours": 24
         }
     """

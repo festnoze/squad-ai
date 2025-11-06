@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 from uuid import UUID
 from sqlalchemy import select
@@ -6,20 +7,13 @@ from infrastructure.entities import Base
 from infrastructure.entities.school_entity import SchoolEntity
 from infrastructure.converters.school_converters import SchoolConverters
 from models.school import School
-from envvar import EnvHelper
+from infrastructure.helpers.database_helper import DatabaseHelper
 
 
 class SchoolRepository:
     def __init__(self, db_path_or_url: str | None = None) -> None:
-        if db_path_or_url:
-            self.db_path_or_url = db_path_or_url
-        else:
-            username = EnvHelper.get_postgres_username()
-            password = EnvHelper.get_postgres_password()
-            host = EnvHelper.get_postgres_host()
-            dbname = EnvHelper.get_postgres_database_name()
-            self.db_path_or_url = f"postgresql://{username}:{password}@{host}/{dbname}"
-        #
+        self.logger = logging.getLogger(__name__)
+        self.db_path_or_url = DatabaseHelper.build_postgres_connection_url(db_path_or_url)
         self.data_context = GenericDataContext(Base, self.db_path_or_url)
 
     async def acreate_or_get_by_name(self, school_name: str) -> School:
@@ -41,7 +35,7 @@ class SchoolRepository:
             return created_school
 
         except Exception as e:
-            print(f"Failed to create or get school: {e}")
+            self.logger.error(f"Failed to create or get school: {e}")
             raise
 
     async def aget_school_by_name(self, school_name: str) -> School | None:
@@ -53,7 +47,7 @@ class SchoolRepository:
                 school_entity = result.unique().scalar_one_or_none()
                 return SchoolConverters.convert_school_entity_to_model(school_entity) if school_entity else None
         except Exception as e:
-            print(f"Failed to get school by name: {e}")
+            self.logger.error(f"Failed to get school by name: {e}")
             return None
 
     async def aget_school_by_id(self, school_id: UUID) -> School | None:
@@ -62,7 +56,7 @@ class SchoolRepository:
             school_entity: SchoolEntity = await self.data_context.get_entity_by_id_async(SchoolEntity, school_id)
             return SchoolConverters.convert_school_entity_to_model(school_entity) if school_entity else None
         except Exception as e:
-            print(f"Failed to get school by id: {e}")
+            self.logger.error(f"Failed to get school by id: {e}")
             return None
 
     async def acreate_school(self, school: School) -> School:
@@ -84,7 +78,7 @@ class SchoolRepository:
             return created_school
 
         except Exception as e:
-            print(f"Failed to create school: {e}")
+            self.logger.error(f"Failed to create school: {e}")
             raise
 
     async def aupdate_school(self, school_id: UUID, **kwargs: Any) -> School:
@@ -96,5 +90,5 @@ class SchoolRepository:
                 raise ValueError(f"Failed to retrieve updated school with id {school_id}")
             return updated_school
         except Exception as e:
-            print(f"Failed to update school: {e}")
+            self.logger.error(f"Failed to update school: {e}")
             raise

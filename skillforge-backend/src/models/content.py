@@ -9,6 +9,9 @@ class Content(IdStatefulBaseModel):
     Attributes:
         filter: JSON object containing content filter information (e.g., url, resource_name)
         content_full: string containing full content information in markdown
+        content_summary_full: Full summary of the content
+        content_summary_light: Light summary of the content
+        content_summary_compact: Compact summary of the content
     """
 
     filter: dict = {}
@@ -16,3 +19,6 @@ class Content(IdStatefulBaseModel):
     content_full: str = ""
     content_html: str = ""
     content_media: dict = {}
+    content_summary_full: str = ""
+    content_summary_light: str = ""
+    content_summary_compact: str = ""

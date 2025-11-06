@@ -1,3 +1,6 @@
+inputs/
+outputs*/
+
 docs/source
 docs-site/
 *.db

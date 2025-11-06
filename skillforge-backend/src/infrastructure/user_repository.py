@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 from sqlalchemy import select
 from common_tools.database.generic_datacontext import GenericDataContext  # type: ignore[import-untyped]
@@ -10,20 +11,17 @@ from models.user import User
 from models.user_preference import UserPreference
 from envvar import EnvHelper
 from datetime import datetime
+from infrastructure.helpers.database_helper import DatabaseHelper
 
 
 class UserRepository:
     def __init__(self, db_path_or_url: str | None = None) -> None:
-        if db_path_or_url:
-            self.db_path_or_url = db_path_or_url
-        else:
-            username = EnvHelper.get_postgres_username()
-            password = EnvHelper.get_postgres_password()
-            host = EnvHelper.get_postgres_host()
-            dbname = EnvHelper.get_postgres_database_name()
-            self.db_path_or_url = f"postgresql://{username}:{password}@{host}/{dbname}"
-        #
+        self.logger = logging.getLogger(__name__)
+        self.db_path_or_url = DatabaseHelper.build_postgres_connection_url(db_path_or_url)
         self.data_context = GenericDataContext(Base, self.db_path_or_url)
+        host = EnvHelper.get_postgres_host()
+        dbname = EnvHelper.get_postgres_database_name()
+        self.logger.debug(f"UserRepository initialized with database: {host}/{dbname}")
 
     async def acreate_user(self, user: User) -> User:
         """Create a new user into the database from a User model.
@@ -55,7 +53,7 @@ class UserRepository:
             return created_user
 
         except Exception as e:
-            print(f"Failed to create user: {e}")
+            self.logger.error(f"Failed to create user: {e}")
             raise
 
     async def aupdate_user(self, user: User) -> User:
@@ -90,7 +88,7 @@ class UserRepository:
             return updated_user
 
         except Exception as e:
-            print(f"Failed to update user: {e}")
+            self.logger.error(f"Failed to update user: {e}")
             raise
 
     async def acreate_or_update(self, user: User) -> User:
@@ -110,7 +108,7 @@ class UserRepository:
                 return await self.acreate_user(user)
 
         except Exception as e:
-            print(f"Failed to create or update user: {e}")
+            self.logger.error(f"Failed to create or update user: {e}")
             raise
 
     async def aservice_activation(self, user_id: UUID) -> bool:
@@ -125,7 +123,7 @@ class UserRepository:
             await self.data_context.update_entity_async(UserEntity, user_id, service_activation_date=now)
             return True
         except Exception as e:
-            print(f"Failed to activate service for user: {e}")
+            self.logger.error(f"Failed to activate service for user: {e}")
             return False
 
     async def aget_user_by_id(self, user_id: UUID) -> User | None:
@@ -141,7 +139,7 @@ class UserRepository:
             user_entity: UserEntity = await self.data_context.get_entity_by_id_async(UserEntity, user_id)
             return UserConverters.convert_user_entity_to_model(user_entity) if user_entity else None
         except Exception as e:
-            print(f"Failed to get user by id: {e}")
+            self.logger.error(f"Failed to get user by id: {e}")
             return None
 
     async def aget_user_by_lms_user_id(self, lms_user_id: str) -> User | None:
@@ -158,7 +156,7 @@ class UserRepository:
             result: User | None = UserConverters.convert_user_entity_to_model(user_entity) if user_entity else None
             return result
         except Exception as e:
-            print(f"Failed to get user by LMS ID: {e}")
+            self.logger.error(f"Failed to get user by LMS ID: {e}")
             return None
 
     async def adoes_user_exists_by_id(self, user_id: UUID) -> bool:
@@ -174,7 +172,7 @@ class UserRepository:
             retrieved_user_id: UUID | None = await self.data_context.get_entity_by_id_async(UserEntity, user_id, [UserEntity.id], fails_if_not_found=False)
             return True if retrieved_user_id else False
         except Exception as e:
-            print(f"Failed to check if user exists: {e}")
+            self.logger.error(f"Failed to check if user exists: {e}")
             return False
 
     async def aget_user_id_by_lms_user_id(self, lms_user_id: str) -> UUID | None:
@@ -190,7 +188,7 @@ class UserRepository:
             retrieved_user_id = await self.data_context.get_first_entity_async(UserEntity, filters=[UserEntity.lms_user_id == lms_user_id], selected_columns=[UserEntity.id], fails_if_not_found=False)
             return retrieved_user_id if isinstance(retrieved_user_id, UUID) else None
         except Exception as e:
-            print(f"Failed to check if user exists: {e}")
+            self.logger.error(f"Failed to check if user exists: {e}")
             return None
 
     # User Preference Methods
@@ -236,7 +234,7 @@ class UserRepository:
                 return created_preference
 
         except Exception as e:
-            print(f"Failed to create or update user preference: {e}")
+            self.logger.error(f"Failed to create or update user preference: {e}")
             raise
 
     async def aget_user_preference(self, user_id: UUID) -> UserPreference | None:
@@ -255,7 +253,7 @@ class UserRepository:
                 preference_entity = result.unique().scalar_one_or_none()
                 return UserPreferenceConverters.convert_user_preference_entity_to_model(preference_entity) if preference_entity else None
         except Exception as e:
-            print(f"Failed to get user preference: {e}")
+            self.logger.error(f"Failed to get user preference: {e}")
             return None
 
     async def adelete_user_preference(self, user_id: UUID) -> bool:
@@ -274,5 +272,5 @@ class UserRepository:
                 return True
             return False
         except Exception as e:
-            print(f"Failed to delete user preference: {e}")
+            self.logger.error(f"Failed to delete user preference: {e}")
             return False

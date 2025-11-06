@@ -15,7 +15,7 @@ class JWTSkillForgePayload(BaseModel):
     specific to the SkillForge application and Studi LMS.
 
     Standard JWT Claims:
-        iss: Issuer (e.g., "uat-lms-studi.studi.fr")
+        iss: Issuer (e.g., "uat-lms-studi.studi.fr" or "api.studi.fr" or "app.studi.fr")
         exp: Expiration time (unix timestamp)
         nbf: Not before time (unix timestamp)
 
@@ -29,7 +29,7 @@ class JWTSkillForgePayload(BaseModel):
             "sid": "3039aaca-d954-4364-95e3-537f7f421c57",
             "client": 199520,
             "schoolId": 1009,
-            "iss": "uat-lms-studi.studi.fr",
+            "iss": "api.studi.fr",
             "exp": 1760705630,
             "nbf": 1760697530
         }
@@ -47,6 +47,7 @@ class JWTSkillForgePayload(BaseModel):
 
     # Additional optional claims (for backward compatibility or future use)
     roles: list[str] = []  # User roles (e.g., ['student', 'admin'])
+    token: str | None = None
 
     def get_token_uuid(self) -> UUID | None:
         """Convert sid (session/user ID) to UUID if present.
@@ -162,3 +163,11 @@ class JWTSkillForgePayload(BaseModel):
             True if user has the role, False otherwise
         """
         return role in self.roles
+
+    def get_original_token(self) -> str | None:
+        """Get the token.
+
+        Returns:
+            Token as string or None if not set
+        """
+        return self.token

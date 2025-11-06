@@ -4,7 +4,7 @@ from typing import Literal
 
 class RessourceDescriptionRequest(BaseModel):
     ressource_id: str | None = None
-    ressource_type: Literal["text", "video", "pdf", "image", "interactive"] | None = None
+    ressource_type: str | None = None  # Allow string to handle exotic type: (chapitre, ...) | Literal["text", "video", "pdf", "image", "interactive"]
     ressource_code: str | None = None
     ressource_title: str | None = None
     ressource_url: str | None = None

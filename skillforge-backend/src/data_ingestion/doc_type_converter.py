@@ -1,17 +1,21 @@
-import requests
+import requests  # type: ignore[import-untyped]
 from io import BytesIO
 from pdfminer.high_level import extract_text_to_fp
 from pdfminer.layout import LAParams
-import markdownify
+import markdownify  # type: ignore[import-untyped]
 import unicodedata
 import re
+import logging
+
+# Suppress pdfminer warnings (invalid color values, etc.)
+logging.getLogger("pdfminer").setLevel(logging.ERROR)
 
 
 class DocTypeConverter:
-    def __init__(self):
+    def __init__(self) -> None:
         self.texts_to_remove = ["Tous droits réservés à STUDI - Reproduction interdite", "© Studi – Reproduction interdite"]
 
-    def get_html_from_pdf_url(self, pdf_url: str) -> str:
+    def get_html_from_pdf_url(self, pdf_url: str) -> str | None:
         try:
             response = requests.get(pdf_url)
             response.raise_for_status()

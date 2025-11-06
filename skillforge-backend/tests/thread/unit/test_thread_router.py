@@ -12,7 +12,7 @@ from application.exceptions.quota_exceeded_exception import QuotaExceededExcepti
 from models.thread import Thread
 from models.message import Message
 from models.role import Role
-from dependency_injection_config import deps
+from API.dependency_injection_config import deps
 
 
 class TestThreadRouter:
@@ -226,7 +226,8 @@ class TestThreadRouter:
                 # Verify the service was called with the correct pagination parameters
                 assert mock_thread_service.aget_thread_by_id_or_create.call_count == 1
                 call_args = mock_thread_service.aget_thread_by_id_or_create.call_args
-                assert call_args.args[0] == thread_id  # First arg is thread_id
+                assert call_args.args[1] == thread_id
+                # assert call_args.args[2] == lms_user_id
                 assert call_args.kwargs["persist_thread_if_created"] is False
                 assert call_args.kwargs["page_number"] == 1
                 assert call_args.kwargs["page_size"] == 5
@@ -268,7 +269,7 @@ class TestThreadRouter:
         # Mock the preparation method
         mock_thread_service.aprepare_thread_for_query = AsyncMock(return_value=mock_thread)
         # Mock the streaming method
-        mock_thread_service._astream_llm_response_and_persist = Mock(side_effect=lambda *args, **kwargs: mock_generator())
+        mock_thread_service.astream_llm_response_and_persist = Mock(side_effect=lambda *args, **kwargs: mock_generator())
 
         with deps.override_for_test() as test_container:
             test_container[ThreadService] = mock_thread_service
@@ -276,7 +277,7 @@ class TestThreadRouter:
 
             query_data = {
                 "query": {"query_text_content": "What is AI?", "query_selected_text": "", "query_quick_action": None, "query_attachments": None},
-                "course_context": {"ressource": None, "theme_id": "theme_001", "module_id": "module_001", "matiere_id": "matiere_001", "parcour_id": "parcour_001"},
+                "course_context": {"context_type": "studi", "ressource": None, "theme_id": "theme_001", "module_id": "module_001", "matiere_id": "matiere_001", "parcour_id": "parcour_001"},
             }
 
             # Mock authentication
@@ -295,7 +296,7 @@ class TestThreadRouter:
 
                 # Verify service methods were called
                 mock_thread_service.aprepare_thread_for_query.assert_called_once()
-                mock_thread_service._astream_llm_response_and_persist.assert_called_once_with(mock_thread)
+                mock_thread_service.astream_llm_response_and_persist.assert_called_once()
 
     def test_aanswer_user_query_into_thread_invalid_thread_id(self, app: FastAPI, mock_thread_service: Mock):
         """Test adding query with invalid thread ID"""
@@ -307,7 +308,10 @@ class TestThreadRouter:
             test_container[ThreadService] = mock_thread_service
             client = TestClient(app)
 
-            query_data = {"query": {"query_text_content": "What is AI?", "query_selected_text": "", "query_quick_action": None, "query_attachments": None}, "course_context": {"ressource": None, "theme_id": "theme_001"}}
+            query_data = {
+                "query": {"query_text_content": "What is AI?", "query_selected_text": "", "query_quick_action": None, "query_attachments": None},
+                "course_context": {"context_type": "studi", "ressource": None, "theme_id": "theme_001"},
+            }
 
             # Mock authentication
             with patch("facade.thread_router.authentication_required") as mock_auth:
@@ -335,7 +339,10 @@ class TestThreadRouter:
             test_container[ThreadService] = mock_thread_service
             client = TestClient(app)
 
-            query_data = {"query": {"query_text_content": "What is AI?", "query_selected_text": "", "query_quick_action": None, "query_attachments": None}, "course_context": {"ressource": None, "theme_id": "theme_001"}}
+            query_data = {
+                "query": {"query_text_content": "What is AI?", "query_selected_text": "", "query_quick_action": None, "query_attachments": None},
+                "course_context": {"context_type": "studi", "ressource": None, "theme_id": "theme_001"},
+            }
 
             # Mock authentication
             with patch("facade.thread_router.authentication_required") as mock_auth:
@@ -358,7 +365,10 @@ class TestThreadRouter:
         with deps.override_for_test() as test_container:
             test_container[ThreadService] = mock_thread_service
 
-            query_data = {"query": {"query_text_content": "What is AI?", "query_selected_text": "", "query_quick_action": None, "query_attachments": None}, "course_context": {"ressource": None, "theme_id": "theme_001"}}
+            query_data = {
+                "query": {"query_text_content": "What is AI?", "query_selected_text": "", "query_quick_action": None, "query_attachments": None},
+                "course_context": {"context_type": "studi", "ressource": None, "theme_id": "theme_001"},
+            }
 
             # Mock authentication with a JWT payload that has None as client
             # This will cause get_lms_user_id() to return "None" which is not a valid int

@@ -6,7 +6,7 @@ from typing import Literal, Any, Annotated, Union
 class QueryRequest(BaseModel):
     query_text_content: str
     query_selected_text: str
-    query_quick_action: Literal["reformulation", "explanation", "summary", "translation"] | None = None
+    query_quick_action: Literal["question", "reformulation", "explanation", "summary", "translation"] | None = None
     query_attachments: list[dict[str, Any]] | None = None
 
 

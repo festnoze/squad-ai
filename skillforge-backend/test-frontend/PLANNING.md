@@ -61,7 +61,7 @@
 
 **Key Methods:**
 ```python
-class SkillForgeClient:
+class SkillForgeAPIClient:
     def __init__(self, base_url: str, jwt_token: str)
     async def get_or_create_thread(self, course_context: dict) -> str  # Returns thread_id
     async def get_thread_messages(self, thread_id: str, page: int, page_size: int) -> list

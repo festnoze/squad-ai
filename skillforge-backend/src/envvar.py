@@ -1,6 +1,7 @@
 # /!\ 'load_dotenv()'  Must be done beforehand in the main script!
 import os
 from pathlib import Path
+from typing import Any
 from dotenv import load_dotenv
 
 
@@ -32,10 +33,21 @@ class EnvHelper:
         if not EnvHelper.is_env_loaded or force_load_from_env_file:
             env_file = Path(".env")
             if not env_file.exists():
-                raise FileNotFoundError(f"❌ '.env' file not found at: '{env_file.absolute().parent}'. Please create it by copying '.env.sample'.")
-            load_dotenv()
+                EnvHelper.handle_missing_dotenv_file()
+            else:
+                load_dotenv()
             EnvHelper._load_custom_env_files()
             EnvHelper.is_env_loaded = True
+
+    @staticmethod
+    def handle_missing_dotenv_file(logger: Any = None, e: Exception | None = None) -> None:
+        if not logger:
+            logger.warning(f"Missing '.env' file: {e}")
+        if EnvHelper.get_environment() == "development":
+            if e:
+                raise e
+            else:
+                raise FileNotFoundError("❌ '.env' file or custom env file is missing and is needed for 'development' environment. Please create it by copying: '.env.sample'.")
 
     @staticmethod
     def get_remove_logs_upon_startup() -> bool:
@@ -56,7 +68,7 @@ class EnvHelper:
             return value.lower() == "true"
 
         # Default behavior: serve docs in development, not in production
-        environment = EnvHelper._get_env_variable_value_by_name("ENVIRONMENT", fails_if_missing=False) or "development"
+        environment = EnvHelper.get_environment()
         return environment.lower() == "development"
 
     @staticmethod
@@ -207,18 +219,186 @@ class EnvHelper:
         return EnvHelper._get_env_variable_value_by_name("DEV_TOKEN", fails_if_missing=False)
 
     @staticmethod
-    def get_fails_on_unfound_user() -> bool:
+    def get_allow_on_the_fly_lms_retrieval_of_unknown_user() -> bool:
         """
-        Get whether to fail on unfound user.
+        Get whether to allow on-the-fly retrieval from LMS for unknown users.
 
         Returns:
-            bool: True if fail on unfound user, False otherwise.
-                  Defaults to True for security.
+            bool: True if on-the-fly LMS retrieval is allowed for unknown users, False otherwise.
+                  Defaults to True.
         """
-        value = EnvHelper._get_env_variable_value_by_name("FAILS_ON_UNFOUND_USER", fails_if_missing=False)
+        value = EnvHelper._get_env_variable_value_by_name("ALLOW_ON_THE_FLY_LMS_RETRIEVAL_OF_UNKNOWN_USER", fails_if_missing=False)
         if value is not None:
-            return value.lower() != "false"
-        return True  # Default to True for security
+            return value.lower() == "true"
+        return True  # Default to enabled
+
+    @staticmethod
+    def get_allow_on_the_fly_lms_retrieval_of_unknown_course_hierarchy() -> bool:
+        """
+        Get whether to allow on-the-fly retrieval from LMS for unknown course hierarchies.
+
+        Returns:
+            bool: True if on-the-fly LMS retrieval is allowed for unknown course hierarchies, False otherwise.
+                  Defaults to True.
+        """
+        value = EnvHelper._get_env_variable_value_by_name("ALLOW_ON_THE_FLY_LMS_RETRIEVAL_OF_UNKNOWN_COURSE_HIERARCHY", fails_if_missing=False)
+        if value is not None:
+            return value.lower() == "true"
+        return True  # Default to enabled
+
+    @staticmethod
+    def get_allow_on_the_fly_lms_retrieval_of_unknown_lesson_content() -> bool:
+        """
+        Get whether to allow on-the-fly retrieval from LMS for unknown lesson content.
+
+        Returns:
+            bool: True if on-the-fly LMS retrieval is allowed for unknown lesson content, False otherwise.
+                  Defaults to False.
+        """
+        value = EnvHelper._get_env_variable_value_by_name("ALLOW_ON_THE_FLY_LMS_RETRIEVAL_OF_UNKNOWN_LESSON_CONTENT", fails_if_missing=False)
+        if value is not None:
+            return value.lower() == "true"
+        return False  # Default to disabled
+
+    @staticmethod
+    def get_fails_on_not_found_user() -> bool:
+        """
+        Get whether to fail when a user is not found.
+
+        Returns:
+            bool: True if should fail on not found user, False otherwise.
+                  Defaults to False.
+        """
+        value = EnvHelper._get_env_variable_value_by_name("FAILS_ON_NOT_FOUND_USER", fails_if_missing=False)
+        if value is not None:
+            return value.lower() == "true"
+        return False  # Default to False
+
+    @staticmethod
+    def get_fails_on_not_found_course_hierarchy() -> bool:
+        """
+        Get whether to fail when course hierarchy is not found.
+
+        Returns:
+            bool: True if should fail on not found course hierarchy, False otherwise.
+                  Defaults to False.
+        """
+        value = EnvHelper._get_env_variable_value_by_name("FAILS_ON_NOT_FOUND_COURSE_HIERARCHY", fails_if_missing=False)
+        if value is not None:
+            return value.lower() == "true"
+        return False  # Default to False
+
+    @staticmethod
+    def get_fails_on_not_found_lesson_content() -> bool:
+        """
+        Get whether to fail when lesson content is not found.
+
+        Returns:
+            bool: True if should fail on not found lesson content, False otherwise.
+                  Defaults to False.
+        """
+        value = EnvHelper._get_env_variable_value_by_name("FAILS_ON_NOT_FOUND_LESSON_CONTENT", fails_if_missing=False)
+        if value is not None:
+            return value.lower() == "true"
+        return False  # Default to False
+
+    @staticmethod
+    def get_other_api_base_url() -> str:
+        """
+        Get the base URL for the Studi Parcours API.
+
+        Returns:
+            str: Base URL for Parcours API (e.g., "https://api.studi.fr")
+        """
+        return EnvHelper._get_env_variable_value_by_name("OTHERS_API_BASE_URL", fails_if_missing=False) or "https://api.studi.fr"
+
+    @staticmethod
+    def get_lms_api_base_url() -> str:
+        """
+        Get the base URL for the Studi LMS API.
+
+        Returns:
+            str: Base URL for LMS API (e.g., "https://app.studi.fr/ws/api"), defaults to "https://app.studi.fr/ws/api"
+        """
+        return EnvHelper._get_env_variable_value_by_name("LMS_API_BASE_URL", fails_if_missing=False) or "https://app.studi.fr/ws/api"
+
+    @staticmethod
+    def get_redis_host() -> str:
+        """
+        Get the Redis server host.
+
+        Returns:
+            str: Redis host address, defaults to "localhost"
+        """
+        return EnvHelper._get_env_variable_value_by_name("REDIS_HOST", fails_if_missing=False) or "localhost"
+
+    @staticmethod
+    def get_redis_port() -> int:
+        """
+        Get the Redis server port.
+
+        Returns:
+            int: Redis port number, defaults to 6379
+        """
+        port_str = EnvHelper._get_env_variable_value_by_name("REDIS_PORT", fails_if_missing=False)
+        return int(port_str) if port_str else 6379
+
+    @staticmethod
+    def get_redis_db() -> int:
+        """
+        Get the Redis database number.
+
+        Returns:
+            int: Redis database index (0-15), defaults to 0
+        """
+        db_str = EnvHelper._get_env_variable_value_by_name("REDIS_DB", fails_if_missing=False)
+        return int(db_str) if db_str else 0
+
+    @staticmethod
+    def get_redis_password() -> str | None:
+        """
+        Get the Redis server password.
+
+        Returns:
+            str | None: Redis password or None if not set
+        """
+        password = EnvHelper._get_env_variable_value_by_name("REDIS_PASSWORD", fails_if_missing=False)
+        return password if password and password.strip() else None
+
+    @staticmethod
+    def get_redis_ttl() -> int:
+        """
+        Get the default Redis cache TTL (time-to-live) in seconds.
+
+        Returns:
+            int: Cache TTL in seconds, defaults to 3600 (1 hour)
+        """
+        ttl_str = EnvHelper._get_env_variable_value_by_name("REDIS_TTL", fails_if_missing=False)
+        return int(ttl_str) if ttl_str else 3600
+
+    @staticmethod
+    def get_redis_enabled() -> bool:
+        """
+        Get whether Redis caching is enabled.
+
+        Returns:
+            bool: True if Redis caching is enabled, False otherwise.
+                  Defaults to True.
+        """
+        value = EnvHelper._get_env_variable_value_by_name("REDIS_ENABLED", fails_if_missing=False)
+        if value is not None:
+            return value.lower() == "true"
+        return True  # Default to enabled
+
+    @staticmethod
+    def get_lms_type() -> str:
+        """
+        Get the Learning Management System (LMS) type ("studi", "blackboard", etc.), defaults to "studi"
+        """
+        value = EnvHelper._get_env_variable_value_by_name("LMS_TYPE", fails_if_missing=False)
+        if value is not None:
+            return value.lower()
+        return "studi"  # Default LMS type to studi
 
     ########################
     ### Internal methods ###
@@ -243,8 +423,9 @@ class EnvHelper:
         custom_env_filenames = [filename.strip() for filename in custom_env_files.split(",")]
         for custom_env_filename in custom_env_filenames:
             if not os.path.exists(custom_env_filename):
-                raise FileNotFoundError(f"/!\\ Environment file: '{custom_env_filename}' was not found at the project root.")
-            load_dotenv(custom_env_filename)
+                EnvHelper.handle_missing_dotenv_file()
+            else:
+                load_dotenv(custom_env_filename)
 
     @staticmethod
     def _get_env_variable_value_by_name(variable_name: str, load_env: bool = True, fails_if_missing: bool = True, remove_comments: bool = True, force_load_from_env_file: bool = False) -> str | None:
