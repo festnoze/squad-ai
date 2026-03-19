@@ -28,6 +28,7 @@
   <script src="data/experience.js"></script>
   <script src="data/education.js"></script>
   <script src="data/languages.js"></script>
+  <script src="data/sidebar_skills.js"></script>
 </head>
 
 <body>
@@ -57,14 +58,19 @@
       <div id="cv-contact"></div>
 
       <div>
-        <h2 class="section-title" style="background: linear-gradient(to right, #a8bec6, #c8d8dd 60%);">Langues</h2>
+        <h2 class="section-title section-title-left">Outils</h2>
+        <div id="cv-sidebar-skills"></div>
+      </div>
+
+      <div>
+        <h2 class="section-title section-title-left">Langues</h2>
         <div id="cv-languages"></div>
       </div>
 
-      <!-- <div>
-        <h2 class="section-title">Formation</h2>
+      <div>
+        <h2 class="section-title section-title-left">Formation</h2>
         <div id="cv-education"></div>
-      </div> -->
+      </div>
 
     </div>
 
@@ -123,9 +129,16 @@
     // ── Compétences ───────────────────────────────────────────────────────
     const skillsEl = document.getElementById('cv-skills');
     SKILLS.forEach(skill => {
-      const li = document.createElement('li');
-      li.innerHTML = skill;
-      skillsEl.appendChild(li);
+      if (skill && typeof skill === 'object' && skill.group) {
+        const li = document.createElement('li');
+        li.className = 'skills-group';
+        li.innerHTML = skill.group;
+        skillsEl.appendChild(li);
+      } else {
+        const li = document.createElement('li');
+        li.innerHTML = skill + '.';
+        skillsEl.appendChild(li);
+      }
     });
 
     // ── Expériences ───────────────────────────────────────────────────────
@@ -150,18 +163,30 @@
     });
 
     // ── Formation ─────────────────────────────────────────────────────────
-    // const eduEl = document.getElementById('cv-education');
-    // EDUCATION.forEach(edu => {
-    //   const div = document.createElement('div');
-    //   div.className = 'edu-item';
-    //   div.innerHTML = `
-    //     <span class="edu-degree">${edu.degree}</span>
-    //     <span class="edu-sep"> — </span>
-    //     <span class="edu-dates">${esc(edu.period)}</span>
-    //     ${edu.school ? `<span class="edu-school">&nbsp;(${esc(edu.school)})</span>` : ''}
-    //   `;
-    //   eduEl.appendChild(div);
-    // });
+    const eduEl = document.getElementById('cv-education');
+    EDUCATION.forEach(edu => {
+      const div = document.createElement('div');
+      div.className = 'edu-item';
+      div.innerHTML = `
+        <span class="edu-degree">${edu.degree}</span>
+        <span class="edu-sep"> — </span>
+        <span class="edu-dates">${esc(edu.period)}</span>
+        ${edu.school ? `<span class="edu-school">&nbsp;(${esc(edu.school)})</span>` : ''}
+      `;
+      eduEl.appendChild(div);
+    });
+
+    // ── Skills sidebar ────────────────────────────────────────────────────
+    const sideSkillsEl = document.getElementById('cv-sidebar-skills');
+    TOOLS.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'sidebar-skill-item';
+      div.innerHTML = `
+        <span class="sidebar-skill-label">${item.label}</span>
+        <span class="sidebar-skill-tags">${item.tags}</span>
+      `;
+      sideSkillsEl.appendChild(div);
+    });
 
     // ── Langues ───────────────────────────────────────────────────────────
     const langEl = document.getElementById('cv-languages');
