@@ -1,0 +1,25 @@
+{
+  "vibe": {
+    "executable_path": "C:\\Users\\e.millerioux\\AppData\\Local\\vibe\\vibe.exe",
+    "watch_folder": "",
+    "output_formats": ["txt", "srt", "vtt"]
+  },
+  "output": {
+    "auto_clipboard": true,
+    "auto_inject": false,
+    "notification_enabled": true,
+    "notification_sound": true
+  },
+  "whisper": {
+    "model_size": "base",
+    "device": "cpu",
+    "compute_type": "int8",
+    "language": "fr"
+  },
+  "hotkeys": {
+    "enabled": false,
+    "start_transcription": "ctrl+shift+t",
+    "copy_last": "ctrl+shift+c",
+    "inject_last": "ctrl+shift+v"
+  }
+}

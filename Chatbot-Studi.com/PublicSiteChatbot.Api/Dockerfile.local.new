@@ -1,0 +1,48 @@
+# Utilise l'image Python 3.12-slim comme base
+FROM python:3.12-slim
+
+# Définit le répertoire de travail à la racine du container
+WORKDIR /app
+
+# Définit le chemin par défaut pour Python dans le container
+ENV PYTHONPATH=/app/src
+
+# Définit le port d'écoute de l'application
+ENV PORT=8281
+
+# Définit l'adresse d'écoute de l'application
+ENV HOST_URI=0.0.0.0
+
+# Désactive le tracing LangChain par défaut
+ENV LANGCHAIN_TRACING_V2=false
+
+# Installe UV pour la gestion des dépendances
+RUN pip install --no-cache-dir uv
+
+# Copie les fichiers de configuration des dépendances
+COPY pyproject.toml uv.lock* ./
+
+# Copie le dossier wheels contenant common-tools
+COPY wheels/ /app/wheels/
+
+# Synchronise les dépendances avec UV (sans les dépendances de dev)
+# Utilise --no-install-project pour installer uniquement les dépendances
+RUN uv sync --frozen --no-dev --no-install-project
+
+# Copie l'intégralité du projet dans le container (hors .dockerignore)
+COPY . .
+
+# Nettoie le répertoire storage des données existantes (hors fichiers du sparse vectorizer : .pkl)
+RUN find /app/storage -type f -not \( -name "*.pkl" \) -delete 2>/dev/null || true
+
+# Crée le répertoire outputs s'il n'existe pas
+RUN mkdir -p /app/outputs
+
+# Nettoie le répertoire outputs des logs existants
+RUN rm -rf /app/outputs/logs/* 2>/dev/null || true
+
+# Expose le port défini pour permettre l'accès externe à l'application
+EXPOSE $PORT
+
+# Démarre l'application FastAPI via Uvicorn avec UV
+CMD ["sh", "-c", "uv run uvicorn src.api.startup:app --host $HOST_URI --port $PORT --log-level error"]

@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:jamey.thesharps.us)",
+      "Bash(python -m venv:*)",
+      "Bash(venv/Scripts/activate:*)",
+      "Bash(pip install:*)",
+      "Bash(python -m pytest:*)",
+      "Bash(venv/Scripts/pip list:*)",
+      "Bash(venv/Scripts/python:*)",
+      "Bash(venv/Scripts/pip install:*)"
+    ]
+  }
+}

@@ -1,0 +1,490 @@
+{
+  "version": "1.0",
+  "description": "Skill activation triggers for Claude Code in SkillForge backend. Controls when skills automatically suggest or block actions. Supports English and French triggers.",
+  "skills": {
+    "db-entity-change": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Create new database entities or modify existing ones with automatic migration generation",
+      "promptTriggers": {
+        "keywords": [
+          "create entity",
+          "add column",
+          "modify entity",
+          "new table",
+          "database schema change",
+          "add property to entity",
+          "alter table",
+          "create migration",
+          "add field",
+          "new entity",
+          "sqlalchemy entity",
+          "orm entity",
+          "database model",
+          "mapped column",
+          "table schema",
+          "creer entite",
+          "ajouter colonne",
+          "modifier entite",
+          "nouvelle table",
+          "changement schema",
+          "ajouter propriete",
+          "ajouter champ",
+          "nouvelle entite",
+          "creer migration",
+          "modele base de donnees",
+          "schema table"
+        ],
+        "intentPatterns": [
+          "(create|add|modify|alter).*?(entity|table|column|field|property)",
+          "(cr[\u00e9e]e|ajoute|modifie|alt[e\u00e8]re).*?(entit[\u00e9e]|table|colonne|champ|propri[\u00e9e]t[\u00e9e])",
+          "entity.*?(create|add|modify|new)",
+          "entit[\u00e9e].*?(cr[\u00e9e]er|ajouter|modifier|nouvelle?)",
+          "(database|db|schema).*?(change|migration|update|alter)",
+          "(base de donn[\u00e9e]es|bdd|sch[\u00e9e]ma).*?(changement|migration|mise [\u00e0a] jour|modifier)",
+          "sqlalchemy.*?(entity|model|table|entit[\u00e9e]|mod[e\u00e8]le)",
+          "migration.*?(create|generate|add|script|cr[\u00e9e]er|g[\u00e9e]n[\u00e9e]rer|ajouter)"
+        ]
+      }
+    },
+    "repo-search-or-create": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Search existing repositories for CRUD methods, create if not found",
+      "promptTriggers": {
+        "keywords": [
+          "repository method",
+          "CRUD operation",
+          "database access",
+          "get method",
+          "create method",
+          "update method",
+          "delete method",
+          "find or create repo",
+          "DRY repository",
+          "data layer operation",
+          "repository pattern",
+          "aget_",
+          "acreate_",
+          "aupdate_",
+          "adelete_",
+          "methode repository",
+          "operation CRUD",
+          "acces base de donnees",
+          "methode de recuperation",
+          "methode de creation",
+          "methode de suppression",
+          "chercher ou creer repo",
+          "couche donnees"
+        ],
+        "intentPatterns": [
+          "(create|add|find|search).*?repository.*?(method|operation)",
+          "(cr[\u00e9e]e|ajoute|cherche|trouve).*?repository.*?(m[\u00e9e]thode|op[\u00e9e]ration)",
+          "repository.*?(method|CRUD|operation|create|find|search)",
+          "repository.*?(m[\u00e9e]thode|CRUD|op[\u00e9e]ration|cr[\u00e9e]er|chercher|trouver)",
+          "(aget|acreate|aupdate|adelete).*?(method|repository|m[\u00e9e]thode)",
+          "data.*?(layer|access).*?(operation|method)",
+          "(donn[\u00e9e]es|couche).*?(acc[e\u00e8]s|op[\u00e9e]ration|m[\u00e9e]thode)",
+          "(get|create|update|delete).*?(from|in|to).*?(database|db|repo)",
+          "(r[\u00e9e]cup[\u00e9e]rer|cr[\u00e9e]er|mettre [\u00e0a] jour|supprimer).*?(dans|depuis|de).*?(base|bdd|repo)"
+        ]
+      }
+    },
+    "service-search-or-create": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Search existing services for use-case methods, create if not found",
+      "promptTriggers": {
+        "keywords": [
+          "service method",
+          "use-case",
+          "business logic",
+          "application layer",
+          "create service",
+          "orchestration",
+          "service layer",
+          "service class",
+          "business rule",
+          "methode service",
+          "cas d'utilisation",
+          "logique metier",
+          "couche application",
+          "creer service",
+          "classe service",
+          "regle metier"
+        ],
+        "intentPatterns": [
+          "(create|add|find|search).*?service.*?(method|class)",
+          "(cr[\u00e9e]e|ajoute|cherche|trouve).*?service.*?(m[\u00e9e]thode|classe)",
+          "service.*?(method|create|find|search|layer)",
+          "service.*?(m[\u00e9e]thode|cr[\u00e9e]er|chercher|trouver|couche)",
+          "(business|application).*?(logic|layer|rule).*?(create|implement)",
+          "(m[\u00e9e]tier|application).*?(logique|couche|r[e\u00e8]gle).*?(cr[\u00e9e]er|impl[\u00e9e]menter)",
+          "use[- ]?case.*?(implement|create|add)",
+          "cas d.utilisation.*?(impl[\u00e9e]menter|cr[\u00e9e]er|ajouter)",
+          "orchestrat.*?(service|logic|method|logique|m[\u00e9e]thode)"
+        ]
+      }
+    },
+    "endpoint-search-or-create": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Search existing endpoints in routers, create if not found, including request/response models",
+      "promptTriggers": {
+        "keywords": [
+          "create endpoint",
+          "add route",
+          "new API",
+          "HTTP endpoint",
+          "router method",
+          "REST API",
+          "request model",
+          "response model",
+          "FastAPI route",
+          "facade endpoint",
+          "pydantic model",
+          "API endpoint",
+          "creer endpoint",
+          "ajouter route",
+          "nouvelle API",
+          "methode routeur",
+          "modele requete",
+          "modele reponse",
+          "point d'entree",
+          "nouvel endpoint"
+        ],
+        "intentPatterns": [
+          "(create|add|new).*?(endpoint|route|API)",
+          "(cr[\u00e9e]e|ajoute|nouveau|nouvelle?).*?(endpoint|route|API|point d.entr[\u00e9e]e)",
+          "endpoint.*?(create|add|search|find|new)",
+          "endpoint.*?(cr[\u00e9e]er|ajouter|chercher|trouver|nouveau)",
+          "(router|facade).*?(method|endpoint|route)",
+          "(routeur|facade).*?(m[\u00e9e]thode|endpoint|route)",
+          "(request|response).*?(model|schema|pydantic)",
+          "(requ[e\u00ea]te|r[\u00e9e]ponse).*?(mod[e\u00e8]le|sch[\u00e9e]ma)",
+          "(GET|POST|PUT|PATCH|DELETE).*?(endpoint|route|API)",
+          "FastAPI.*?(route|endpoint|router|routeur)"
+        ]
+      }
+    },
+    "project-context": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "critical",
+      "description": "Provides comprehensive project architecture overview, naming conventions, codebase map, and registration guide",
+      "promptTriggers": {
+        "keywords": [
+          "project context",
+          "architecture overview",
+          "codebase map",
+          "naming conventions",
+          "how to register",
+          "project structure",
+          "what exists",
+          "list components",
+          "existing patterns",
+          "3-layer architecture",
+          "component registration",
+          "dependency injection",
+          "contexte projet",
+          "vue d'ensemble architecture",
+          "carte du code",
+          "conventions de nommage",
+          "comment enregistrer",
+          "structure du projet",
+          "qu'est-ce qui existe",
+          "lister composants",
+          "patterns existants",
+          "architecture 3 couches",
+          "enregistrement composant",
+          "injection de dependances"
+        ],
+        "intentPatterns": [
+          "(project|codebase).*?(context|structure|overview|map|architecture)",
+          "(projet|code).*?(contexte|structure|vue d.ensemble|carte|architecture)",
+          "(naming|coding).*?convention",
+          "(nommage|codage).*?convention",
+          "(register|registration).*?(component|router|service|repository)",
+          "(enregistrer|enregistrement).*?(composant|routeur|service|repository)",
+          "(what|which).*?(exist|component|router|service|repository)",
+          "(qu.est-ce qui|quel).*?(existe|composant|routeur|service|repository)",
+          "architecture.*?(overview|pattern|layer|vue|couche)",
+          "dependency.*?injection.*?(config|setup|register)",
+          "injection.*?d[\u00e9e]pendance.*?(config|setup|enregistrer)"
+        ]
+      }
+    },
+    "test-generator": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Generate tests for different component types following project conventions",
+      "promptTriggers": {
+        "keywords": [
+          "generate tests",
+          "create tests",
+          "add tests",
+          "unit tests",
+          "integration tests",
+          "e2e tests",
+          "test router",
+          "test service",
+          "test repository",
+          "pytest",
+          "test coverage",
+          "test file",
+          "write tests",
+          "generer tests",
+          "creer tests",
+          "ajouter tests",
+          "tests unitaires",
+          "tests integration",
+          "tests bout en bout",
+          "tester routeur",
+          "tester service",
+          "couverture tests",
+          "fichier test",
+          "ecrire tests"
+        ],
+        "intentPatterns": [
+          "(generate|create|add|write).*?test",
+          "(g[\u00e9e]n[\u00e9e]rer|cr[\u00e9e]er|ajouter|[\u00e9e]crire).*?test",
+          "test.*?(generate|create|add|write|file)",
+          "test.*?(g[\u00e9e]n[\u00e9e]rer|cr[\u00e9e]er|ajouter|[\u00e9e]crire|fichier)",
+          "(unit|integration|e2e|end-to-end).*?test",
+          "(unitaire|int[\u00e9e]gration|bout en bout).*?test",
+          "test.*?(router|service|repository|endpoint)",
+          "test.*?(routeur|service|repository|endpoint)",
+          "pytest.*?(generate|create|run|add|g[\u00e9e]n[\u00e9e]rer|cr[\u00e9e]er|lancer|ajouter)",
+          "coverage.*?(test|generate|improve)",
+          "couverture.*?(test|g[\u00e9e]n[\u00e9e]rer|am[\u00e9e]liorer)"
+        ]
+      }
+    },
+    "skill-creator": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "description": "Guide for creating effective skills that extend Claude's capabilities",
+      "promptTriggers": {
+        "keywords": [
+          "create skill",
+          "new skill",
+          "build skill",
+          "skill system",
+          "skill triggers",
+          "skill metadata",
+          "skill-rules.json",
+          "skill.md",
+          "skill development",
+          "creer skill",
+          "nouveau skill",
+          "construire skill",
+          "systeme de skills",
+          "declencheurs skill",
+          "developpement skill"
+        ],
+        "intentPatterns": [
+          "(create|build|add|new).*?skill",
+          "(cr[\u00e9e]er|construire|ajouter|nouveau).*?skill",
+          "skill.*?(create|build|develop|trigger|metadata|system)",
+          "skill.*?(cr[\u00e9e]er|construire|d[\u00e9e]velopper|d[\u00e9e]clencheur|syst[e\u00e8]me)",
+          "skill-rules\\.json",
+          "SKILL\\.md"
+        ]
+      }
+    },
+    "debugging": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "description": "Systematic debugging approach for Python/FastAPI applications",
+      "promptTriggers": {
+        "keywords": [
+          "debug",
+          "debugging",
+          "performance analysis",
+          "profiling",
+          "trace error",
+          "find bug",
+          "fix bug",
+          "troubleshoot",
+          "debogage",
+          "deboguer",
+          "analyse performance",
+          "profilage",
+          "tracer erreur",
+          "trouver bug",
+          "corriger bug",
+          "depanner",
+          "resoudre probleme"
+        ],
+        "intentPatterns": [
+          "debug(ging)?",
+          "d[\u00e9e]bogu(er|age)",
+          "performance.*?(analys|profil)",
+          "(find|fix|trace|hunt).*?(bug|error|issue)",
+          "(trouver|corriger|tracer|chercher).*?(bug|erreur|probl[e\u00e8]me)",
+          "troubleshoot",
+          "d[\u00e9e]pann(er|age)",
+          "r[\u00e9e]soudre.*?probl[e\u00e8]me"
+        ]
+      }
+    },
+    "postgresql-psql": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "description": "PostgreSQL database management, queries, and optimization",
+      "promptTriggers": {
+        "keywords": [
+          "postgresql",
+          "postgres",
+          "psql",
+          "sql queries",
+          "database management",
+          "database optimization",
+          "sql index",
+          "query optimization",
+          "requetes sql",
+          "gestion base de donnees",
+          "optimisation base de donnees",
+          "index sql",
+          "optimisation requetes"
+        ],
+        "intentPatterns": [
+          "postgres(ql)?",
+          "psql",
+          "sql.*?(quer|database|index|optimiz)",
+          "sql.*?(requ[e\u00ea]te|base|index|optimis)",
+          "database.*?(management|optimization|tuning)",
+          "base de donn[\u00e9e]es.*?(gestion|optimisation|tuning)"
+        ]
+      }
+    },
+    "docker": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "description": "Docker containerization for the SkillForge application",
+      "promptTriggers": {
+        "keywords": [
+          "docker",
+          "dockerfile",
+          "docker compose",
+          "containerize",
+          "container",
+          "conteneuriser",
+          "conteneur"
+        ],
+        "intentPatterns": [
+          "docker(file|compose|-compose)?",
+          "containeriz(e|ing|ation)",
+          "conteneuris(er|ation)"
+        ]
+      }
+    },
+    "planning-methodology": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "critical",
+      "description": "Feature planning, architecture design, and implementation strategy",
+      "promptTriggers": {
+        "keywords": [
+          "create plan",
+          "make plan",
+          "strategy",
+          "architecture",
+          "implementation plan",
+          "roadmap",
+          "plan feature",
+          "plan implementation",
+          "approach for",
+          "creer plan",
+          "faire plan",
+          "strategie",
+          "plan implementation",
+          "feuille de route",
+          "planifier fonctionnalite",
+          "approche pour"
+        ],
+        "intentPatterns": [
+          "(create|make|build|develop|design).*?(plan|strategy|roadmap)",
+          "(cr[\u00e9e]er|faire|construire|d[\u00e9e]velopper|concevoir).*?(plan|strat[\u00e9e]gie|feuille de route)",
+          "(how should|what's the best|what's the approach).*?(implement|build|approach)",
+          "(comment|quelle est la meilleure|quelle approche).*?(impl[\u00e9e]menter|construire|approche)",
+          "plan.*?(feature|implementation|architecture)",
+          "plan.*?(fonctionnalit[\u00e9e]|impl[\u00e9e]mentation|architecture)",
+          "implementation.*?(strategy|approach)",
+          "impl[\u00e9e]mentation.*?(strat[\u00e9e]gie|approche)"
+        ]
+      }
+    },
+    "brainstorming": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Explore ideas, discuss options, and brainstorm approaches",
+      "promptTriggers": {
+        "keywords": [
+          "brainstorm",
+          "explore ideas",
+          "discuss options",
+          "figure out",
+          "not sure how",
+          "thinking about",
+          "could we",
+          "what if",
+          "help me think",
+          "explore approach",
+          "explorer idees",
+          "discuter options",
+          "trouver comment",
+          "pas sur comment",
+          "je reflechis a",
+          "et si on",
+          "aide moi a reflechir",
+          "explorer approche"
+        ],
+        "intentPatterns": [
+          "^(brainstorm|explore|discuss)",
+          "^(brainstorm|explorer|discuter)",
+          "(maybe|thinking about|could we|what if|not sure|help me think)",
+          "(peut-[e\u00ea]tre|je r[\u00e9e]fl[\u00e9e]chis|on pourrait|et si|pas s[u\u00fb]r|aide.moi [\u00e0a] r[\u00e9e]fl[\u00e9e]chir)",
+          "explore.*?(idea|option|approach|solution)",
+          "explore.*?(id[\u00e9e]e|option|approche|solution)",
+          "figure.*?out",
+          "trouver.*?comment"
+        ]
+      }
+    },
+    "introspection": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "low",
+      "description": "Explain reasoning, show thinking, analyze decisions",
+      "promptTriggers": {
+        "keywords": [
+          "explain reasoning",
+          "show thinking",
+          "why did you",
+          "decision analysis",
+          "expliquer raisonnement",
+          "montrer reflexion",
+          "pourquoi as-tu",
+          "analyse decision"
+        ],
+        "intentPatterns": [
+          "(explain|show).*?(reasoning|thinking|decision)",
+          "(expliquer|montrer).*?(raisonnement|r[\u00e9e]flexion|d[\u00e9e]cision)",
+          "why did you (choose|decide|pick)",
+          "pourquoi (as-tu|avez-vous) (choisi|d[\u00e9e]cid[\u00e9e]|pris)"
+        ]
+      }
+    }
+  }
+}

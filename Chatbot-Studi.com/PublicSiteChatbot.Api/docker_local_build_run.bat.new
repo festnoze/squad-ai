@@ -1,0 +1,94 @@
+@echo off
+setlocal enabledelayedexpansion
+
+REM Define the image name prefix (can be modified)
+set "repo_name=publicsitechatbot_api"
+
+REM Check if the script is running with administrative privileges
+net session >nul 2>&1
+if %errorLevel% neq 0 (
+    echo WARNING: This script may require administrative privileges to run. Please log in as administrator.
+    pause
+    exit /b
+)
+
+REM Define the path to common-tools (ai-commun-tools) repository
+set "COMMON_TOOLS_PATH=C:\Dev\IA\AzureDevOps\ai-commun-tools"
+
+echo.
+echo [1/5] Checking if common-tools repository exists...
+if not exist "%COMMON_TOOLS_PATH%" (
+    echo ERROR: common-tools repository not found at: %COMMON_TOOLS_PATH%
+    echo Please clone the ai-commun-tools repository or update the path in this script.
+    pause
+    exit /b 1
+)
+echo common-tools repository found at: %COMMON_TOOLS_PATH%
+
+echo.
+echo [2/5] Building common-tools wheel package...
+pushd "%COMMON_TOOLS_PATH%"
+call uv build
+if %errorLevel% neq 0 (
+    echo ERROR: Failed to build common-tools wheel package.
+    popd
+    pause
+    exit /b 1
+)
+popd
+
+echo.
+echo [3/5] Copying the latest common-tools wheel to wheels directory...
+if not exist "%~dp0wheels" mkdir "%~dp0wheels"
+if exist "%~dp0wheels\common_tools-latest-py3-none-any.whl" del "%~dp0wheels\common_tools-latest-py3-none-any.whl"
+for /f "delims=" %%F in ('dir /b /o-d "%COMMON_TOOLS_PATH%\dist\common_tools-*-py3-none-any.whl" 2^>nul') do (
+    echo Copying package: %%F
+    copy /y "%COMMON_TOOLS_PATH%\dist\%%F" "%~dp0wheels\common_tools-latest-py3-none-any.whl"
+    goto :afterCopy
+)
+:afterCopy
+
+echo.
+echo [4/5] Checking if Docker network 'my_network' exists...
+docker network inspect my_network >nul 2>&1
+if %errorLevel% neq 0 (
+    echo Network 'my_network' does not exist. Creating it...
+    docker network create my_network
+) else (
+    echo Network 'my_network' already exists.
+)
+
+echo.
+echo [5/5] Building Local Docker image %repo_name% ...
+echo.
+
+docker build -f Dockerfile.local.new -t %repo_name% .
+
+echo.
+echo Running Local Docker image %repo_name% on my_network ...
+echo.
+
+REM Stop and remove existing container if it exists
+docker stop %repo_name% >nul 2>&1
+docker rm %repo_name% >nul 2>&1
+
+REM Run the container with the .env file for environment variables (if it exists)
+if exist ".env" (
+    echo Running with .env file for environment variables...
+    docker run -d --name %repo_name% --network my_network -p 8281:8281 --env-file .env %repo_name%
+) else (
+    echo WARNING: No .env file found. Running without environment variables.
+    docker run -d --name %repo_name% --network my_network -p 8281:8281 %repo_name%
+)
+
+echo.
+echo Container %repo_name% is now running on http://localhost:8281
+echo API documentation available at http://localhost:8281/docs
+echo.
+echo Useful commands:
+echo   - View logs: docker logs -f %repo_name%
+echo   - Stop container: docker stop %repo_name%
+echo   - Remove container: docker rm %repo_name%
+echo.
+
+endlocal

@@ -1,0 +1,4 @@
+watchdog
+pyautogui
+pyperclip
+plyer

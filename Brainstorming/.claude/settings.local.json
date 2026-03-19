@@ -1,0 +1,52 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(npx skills:*)",
+      "WebFetch(domain:skills.sh)",
+      "Bash(dir:*)",
+      "Bash(pip install:*)",
+      "Bash(python:*)",
+      "Bash(pip show:*)",
+      "Bash(set:*)",
+      "Bash(source \"C:\\\\Dev\\\\squad-ai\\\\Brainstorming\\\\.env\")",
+      "Bash(GOOGLE_API_KEY=AIzaSyDp80RofzWTYf6T9K8PbxREjuINyx27GwI python \"C:\\\\Users\\\\e.millerioux\\\\.agents\\\\skills\\\\gemini-tts\\\\scripts\\\\tts.py\" \"Bonjour Etienne, le text to speech Gemini fonctionne correctement.\" --voice Kore --output test-tts --output-dir \"C:\\\\Dev\\\\squad-ai\\\\Brainstorming\\\\_bmad-output\\\\audio\")",
+      "WebSearch",
+      "Bash(npx agentvibes install:*)",
+      "Bash(npx agentvibes:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(wsl bash -c \"which node && node --version && which npx\")",
+      "Bash(wsl --list:*)",
+      "Bash(wsl.exe:*)",
+      "WebFetch(domain:docs.cloud.google.com)",
+      "WebFetch(domain:docs.google.com)",
+      "Bash(powershell -Command:*)",
+      "Bash(powershell -NoProfile -Command \"Get-ChildItem -Path ''C:\\\\Users\\\\e.millerioux\\\\.claude\\\\projects\\\\c--Dev-IA-AzureDevOps-skillforge-backend'' -Filter ''*.jsonl'' | Where-Object { -not \\($_Name.StartsWith\\(''agent-''\\)\\) } | Sort-Object Length -Descending | Select-Object -First 5 Name, Length\")",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(where:*)",
+      "Bash(uv:*)",
+      "Bash(source:*)",
+      "Bash(del \"C:\\\\Dev\\\\squad-ai\\\\Brainstorming\\\\aculifting-site\\\\part2.html\" \"C:\\\\Dev\\\\squad-ai\\\\Brainstorming\\\\aculifting-site\\\\part3.html\")",
+      "Bash(tail:*)",
+      "Bash(npx expo:*)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python TTS/tts_hook.py",
+            "timeout": 60,
+            "async": true
+          }
+        ]
+      }
+    ]
+  },
+  "defaultMode": "bypassPermissions",
+  "dangerouslySkipPermissions": true
+}

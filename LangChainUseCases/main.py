@@ -14,7 +14,6 @@ from common_tools.helpers.groq_helper import GroqHelper
 from common_tools.langchains.langchain_factory import LangChainFactory
 from common_tools.models.langchain_adapter_type import LangChainAdapterType
 from common_tools.models.langgraph_agent_state import AgentState
-from common_tools.langchains.langsmith_client import Langsmith
 from common_tools.models.llm_info import LlmInfo
 from common_tools.helpers.env_helper import EnvHelper
 
@@ -51,9 +50,6 @@ async def main_async():
     # for model in models:
     #     print(model.id)
     # exit()
-
-    langsmith = Langsmith()
-    langsmith.create_project()
 
     txt.activate_print = True
     llms_infos = EnvHelper.get_llms_infos_from_env_config()

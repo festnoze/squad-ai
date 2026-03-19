@@ -1,0 +1,34 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flood-It Bot",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/venv/Scripts/python.exe",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Flood-It Bot (dry-run)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "args": ["--dry-run"],
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/venv/Scripts/python.exe",
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "name": "Run Tests",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "args": ["tests/", "-v"],
+      "console": "integratedTerminal",
+      "python": "${workspaceFolder}/venv/Scripts/python.exe",
+      "cwd": "${workspaceFolder}"
+    }
+  ]
+}

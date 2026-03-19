@@ -1,0 +1,451 @@
+{
+  "version": "1.0",
+  "description": "Agent activation triggers for Claude Code sub-agents in SkillForge backend. Controls when agents are automatically suggested for delegation. Supports English and French triggers.",
+  "defaultModel": "opus",
+  "agents": {
+    "analyst": {
+      "type": "research",
+      "enforcement": "suggest",
+      "priority": "high",
+      "model": "opus",
+      "description": "Research & discovery agent for codebase exploration and feature analysis",
+      "promptTriggers": {
+        "keywords": [
+          "analyze codebase",
+          "explore code",
+          "find patterns",
+          "investigate",
+          "research feature",
+          "impact assessment",
+          "dependency analysis",
+          "codebase exploration",
+          "existing implementation",
+          "what exists for",
+          "how does it work",
+          "understand code",
+          "map dependencies",
+          "trace flow",
+          "analyser code",
+          "explorer code",
+          "trouver patterns",
+          "investiguer",
+          "rechercher fonctionnalite",
+          "analyse d'impact",
+          "analyse dependances",
+          "exploration du code",
+          "implementation existante",
+          "qu'est-ce qui existe pour",
+          "comment ca marche",
+          "comprendre le code",
+          "cartographier dependances",
+          "tracer le flux"
+        ],
+        "intentPatterns": [
+          "(analyze|explore|investigate|research).*?(codebase|code|feature|pattern|implementation)",
+          "(analyser|explorer|investiguer|rechercher).*?(codebase|code|fonctionnalit[\u00e9e]|pattern|impl[\u00e9e]mentation)",
+          "(find|search|discover).*?(pattern|implementation|usage|dependency)",
+          "(trouver|chercher|d[\u00e9e]couvrir).*?(pattern|impl[\u00e9e]mentation|utilisation|d[\u00e9e]pendance)",
+          "(impact|dependency).*?(analysis|assessment|mapping)",
+          "(impact|d[\u00e9e]pendance).*?(analyse|[\u00e9e]valuation|cartographie)",
+          "(understand|how does|trace).*?(code|flow|work|implementation)",
+          "(comprendre|comment|tracer).*?(code|flux|fonctionne|impl[\u00e9e]mentation)",
+          "(what|which).*?(exist|pattern|implementation).*?for",
+          "(qu.est-ce qui|quel).*?(existe|pattern|impl[\u00e9e]mentation).*?pour",
+          "map.*?(dependency|architecture|flow|component)",
+          "cartographi.*?(d[\u00e9e]pendance|architecture|flux|composant)"
+        ]
+      },
+      "delegationCriteria": {
+        "when": [
+          "Need to understand existing patterns before implementing",
+          "Feature request requires impact assessment",
+          "Multiple files need exploration to understand scope",
+          "Need to research best practices for a specific approach"
+        ],
+        "parallelWith": [
+          "architect",
+          "test-dev"
+        ]
+      }
+    },
+    "architect": {
+      "type": "design",
+      "enforcement": "suggest",
+      "priority": "critical",
+      "model": "opus",
+      "description": "Technical architecture designer, blueprint generator, and task planner",
+      "promptTriggers": {
+        "keywords": [
+          "design architecture",
+          "technical design",
+          "blueprint",
+          "system design",
+          "component design",
+          "database design",
+          "API design",
+          "task breakdown",
+          "implementation plan",
+          "feature architecture",
+          "schema design",
+          "ADR",
+          "architecture decision",
+          "concevoir architecture",
+          "conception technique",
+          "plan technique",
+          "conception systeme",
+          "conception composant",
+          "conception base de donnees",
+          "conception API",
+          "decoupage taches",
+          "plan implementation",
+          "architecture fonctionnalite",
+          "conception schema",
+          "decision architecture"
+        ],
+        "intentPatterns": [
+          "(design|architect).*?(system|component|feature|database|API|schema)",
+          "(concevoir|architecturer).*?(syst[e\u00e8]me|composant|fonctionnalit[\u00e9e]|base de donn[\u00e9e]es|API|sch[\u00e9e]ma)",
+          "(blueprint|plan).*?(generate|create|implementation)",
+          "(blueprint|plan).*?(g[\u00e9e]n[\u00e9e]rer|cr[\u00e9e]er|impl[\u00e9e]mentation)",
+          "(task|work).*?(breakdown|decompose|plan)",
+          "(t[a\u00e2]che|travail).*?(d[\u00e9e]coupage|d[\u00e9e]composer|planifier)",
+          "architecture.*?(design|decision|review|document)",
+          "architecture.*?(conception|d[\u00e9e]cision|revue|documenter)",
+          "(ADR|architecture decision record).*?(create|write|document)",
+          "(ADR|decision architecture).*?(cr[\u00e9e]er|[\u00e9e]crire|documenter)",
+          "technical.*?(design|specification|blueprint)",
+          "technique.*?(conception|sp[\u00e9e]cification|blueprint)"
+        ]
+      },
+      "delegationCriteria": {
+        "when": [
+          "New feature requires architectural planning",
+          "Need to generate implementation blueprint and tasks",
+          "Database schema design needed",
+          "API contract design required",
+          "Significant architectural decisions to document"
+        ],
+        "parallelWith": [
+          "analyst"
+        ]
+      }
+    },
+    "code-review-dev": {
+      "type": "quality",
+      "enforcement": "suggest",
+      "priority": "high",
+      "model": "opus",
+      "description": "Code review specialist using ReAct loop for quality assurance",
+      "promptTriggers": {
+        "keywords": [
+          "code review",
+          "review code",
+          "quality check",
+          "SRP check",
+          "DRY check",
+          "SoC check",
+          "SOLID check",
+          "verify implementation",
+          "review PR",
+          "review changes",
+          "code quality",
+          "pattern compliance",
+          "revue de code",
+          "revoir le code",
+          "verification qualite",
+          "verifier implementation",
+          "revoir PR",
+          "revoir changements",
+          "qualite du code",
+          "conformite patterns"
+        ],
+        "intentPatterns": [
+          "(code|implementation).*?review",
+          "(code|impl[\u00e9e]mentation).*?revue",
+          "review.*?(code|implementation|changes|PR)",
+          "(revoir|revue).*?(code|impl[\u00e9e]mentation|changements|PR)",
+          "(quality|pattern|compliance).*?(check|verify|audit)",
+          "(qualit[\u00e9e]|pattern|conformit[\u00e9e]).*?(v[\u00e9e]rifier|audit)",
+          "(SRP|DRY|SoC|SOLID|KISS|YAGNI).*?(check|verify|review|v[\u00e9e]rifier|revue)",
+          "verify.*?(implementation|code|quality|pattern)",
+          "v[\u00e9e]rifier.*?(impl[\u00e9e]mentation|code|qualit[\u00e9e]|pattern)",
+          "(check|audit).*?(code|quality|pattern|convention)",
+          "(v[\u00e9e]rifier|auditer).*?(code|qualit[\u00e9e]|pattern|convention)"
+        ]
+      },
+      "delegationCriteria": {
+        "when": [
+          "Feature implementation complete, needs quality review",
+          "Want to verify code follows project patterns",
+          "Need to check for code smells or anti-patterns",
+          "Post-implementation verification required"
+        ],
+        "parallelWith": []
+      }
+    },
+    "task-orchestrator": {
+      "type": "orchestration",
+      "enforcement": "suggest",
+      "priority": "critical",
+      "model": "opus",
+      "description": "Task orchestrator using skills-first implementation with parallel execution",
+      "promptTriggers": {
+        "keywords": [
+          "implement feature",
+          "build feature",
+          "execute blueprint",
+          "run tasks",
+          "implement tasks",
+          "skills-first",
+          "parallel implementation",
+          "execute plan",
+          "implement plan",
+          "start implementation",
+          "implementer fonctionnalite",
+          "construire fonctionnalite",
+          "executer blueprint",
+          "executer taches",
+          "implementer taches",
+          "implementation parallele",
+          "executer plan",
+          "implementer plan",
+          "lancer implementation",
+          "demarrer implementation"
+        ],
+        "intentPatterns": [
+          "(implement|build|execute|start).*?(feature|blueprint|plan|task)",
+          "(impl[\u00e9e]menter|construire|ex[\u00e9e]cuter|d[\u00e9e]marrer|lancer).*?(fonctionnalit[\u00e9e]|blueprint|plan|t[a\u00e2]che)",
+          "task.*?(orchestrat|execut|implement|run)",
+          "t[a\u00e2]che.*?(orchestr|ex[\u00e9e]cut|impl[\u00e9e]ment|lancer)",
+          "(skill|parallel).*?(implementation|execution)",
+          "(skill|parall[e\u00e8]le).*?(impl[\u00e9e]mentation|ex[\u00e9e]cution)",
+          "implement.*?(from|using).*?(blueprint|plan|task)",
+          "impl[\u00e9e]menter.*?(depuis|avec|en utilisant).*?(blueprint|plan|t[a\u00e2]che)",
+          "(launch|start|begin).*?implementation",
+          "(lancer|d[\u00e9e]marrer|commencer).*?impl[\u00e9e]mentation"
+        ]
+      },
+      "delegationCriteria": {
+        "when": [
+          "Blueprint approved and ready for implementation",
+          "Multiple tasks need coordinated execution",
+          "Need skills-first approach with parallel test generation",
+          "Complex feature with multiple layers to implement"
+        ],
+        "parallelWith": [
+          "test-dev"
+        ]
+      }
+    },
+    "test-dev": {
+      "type": "testing",
+      "enforcement": "suggest",
+      "priority": "high",
+      "model": "opus",
+      "description": "Test developer specializing in unit, integration, and E2E tests",
+      "promptTriggers": {
+        "keywords": [
+          "write tests",
+          "generate tests",
+          "create tests",
+          "unit test",
+          "integration test",
+          "e2e test",
+          "end-to-end test",
+          "test coverage",
+          "TDD",
+          "test-driven",
+          "BDD",
+          "test file",
+          "pytest",
+          "test router",
+          "test service",
+          "test repository",
+          "ecrire tests",
+          "generer tests",
+          "creer tests",
+          "test unitaire",
+          "test integration",
+          "test bout en bout",
+          "couverture tests",
+          "fichier test",
+          "tester routeur",
+          "tester service",
+          "tester repository"
+        ],
+        "intentPatterns": [
+          "(write|generate|create|add).*?test",
+          "([\u00e9e]crire|g[\u00e9e]n[\u00e9e]rer|cr[\u00e9e]er|ajouter).*?test",
+          "test.*?(write|generate|create|add|file|coverage)",
+          "test.*?([\u00e9e]crire|g[\u00e9e]n[\u00e9e]rer|cr[\u00e9e]er|ajouter|fichier|couverture)",
+          "(unit|integration|e2e|end-to-end).*?test",
+          "(unitaire|int[\u00e9e]gration|bout en bout).*?test",
+          "test.*?(router|service|repository|endpoint|workflow)",
+          "test.*?(routeur|service|repository|endpoint|workflow)",
+          "(TDD|BDD|test-driven|behavior-driven).*?(development|approach)",
+          "(TDD|BDD).*?(d[\u00e9e]veloppement|approche)",
+          "pytest.*?(generate|create|write|g[\u00e9e]n[\u00e9e]rer|cr[\u00e9e]er|[\u00e9e]crire)"
+        ]
+      },
+      "delegationCriteria": {
+        "when": [
+          "Need tests for a specific component (router, service, repository)",
+          "TDD approach - write failing tests before implementation",
+          "Comprehensive test coverage needed for a feature",
+          "E2E workflow tests required"
+        ],
+        "parallelWith": [
+          "task-orchestrator"
+        ]
+      }
+    },
+    "prd-writer": {
+      "type": "documentation",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "model": "opus",
+      "description": "Product Requirements Document generator for feature specifications",
+      "promptTriggers": {
+        "keywords": [
+          "PRD",
+          "product requirements",
+          "requirements document",
+          "feature specification",
+          "user stories",
+          "acceptance criteria",
+          "functional requirements",
+          "non-functional requirements",
+          "feature brief",
+          "scope document",
+          "exigences produit",
+          "document exigences",
+          "specification fonctionnalite",
+          "recits utilisateur",
+          "criteres acceptation",
+          "exigences fonctionnelles",
+          "exigences non fonctionnelles",
+          "brief fonctionnalite",
+          "document perimetre",
+          "cahier des charges"
+        ],
+        "intentPatterns": [
+          "(PRD|product requirement|requirement document).*?(create|write|generate)",
+          "(PRD|exigence produit|document exigence|cahier des charges).*?(cr[\u00e9e]er|[\u00e9e]crire|g[\u00e9e]n[\u00e9e]rer|r[\u00e9e]diger)",
+          "(create|write|generate).*?(PRD|requirement|specification)",
+          "(cr[\u00e9e]er|[\u00e9e]crire|g[\u00e9e]n[\u00e9e]rer|r[\u00e9e]diger).*?(PRD|exigence|sp[\u00e9e]cification|cahier des charges)",
+          "(user stor|acceptance criteria).*?(write|create|define)",
+          "(r[\u00e9e]cit utilisateur|crit[e\u00e8]re.? d.acceptation).*?([\u00e9e]crire|cr[\u00e9e]er|d[\u00e9e]finir)",
+          "(functional|non-functional).*?requirement",
+          "(fonctionnel|non.fonctionnel).*?exigence",
+          "feature.*?(specification|brief|scope|requirement)",
+          "fonctionnalit[\u00e9e].*?(sp[\u00e9e]cification|brief|p[\u00e9e]rim[e\u00e8]tre|exigence)",
+          "scope.*?document",
+          "p[\u00e9e]rim[e\u00e8]tre.*?document"
+        ]
+      },
+      "delegationCriteria": {
+        "when": [
+          "New feature needs formal requirements documentation",
+          "User stories and acceptance criteria needed",
+          "Feature scope needs to be clearly defined",
+          "Complex feature workflow - Phase 1 (Analysis)"
+        ],
+        "parallelWith": [
+          "analyst"
+        ]
+      }
+    },
+    "workflow-orchestrator": {
+      "type": "orchestration",
+      "enforcement": "suggest",
+      "priority": "critical",
+      "model": "opus",
+      "description": "Master orchestrator for complete feature workflows from analysis to verification",
+      "promptTriggers": {
+        "keywords": [
+          "workflow",
+          "full feature",
+          "complete implementation",
+          "end-to-end feature",
+          "feature lifecycle",
+          "analysis to implementation",
+          "feature workflow",
+          "orchestrate feature",
+          "phase management",
+          "fonctionnalite complete",
+          "implementation complete",
+          "fonctionnalite bout en bout",
+          "cycle de vie fonctionnalite",
+          "analyse a implementation",
+          "workflow fonctionnalite",
+          "orchestrer fonctionnalite",
+          "gestion des phases"
+        ],
+        "intentPatterns": [
+          "workflow.*?(orchestrat|manage|start|launch|run)",
+          "workflow.*?(orchestr|g[\u00e9e]rer|d[\u00e9e]marrer|lancer)",
+          "(full|complete|end-to-end).*?(feature|implementation|workflow)",
+          "(compl[e\u00e8]te?|bout en bout|enti[e\u00e8]re?).*?(fonctionnalit[\u00e9e]|impl[\u00e9e]mentation|workflow)",
+          "feature.*?(lifecycle|workflow|orchestrat)",
+          "fonctionnalit[\u00e9e].*?(cycle de vie|workflow|orchestr)",
+          "(analysis|design|blueprint|implementation|verification).*?phase",
+          "(analyse|conception|blueprint|impl[\u00e9e]mentation|v[\u00e9e]rification).*?phase",
+          "orchestrat.*?(feature|workflow|implementation)",
+          "orchestr.*?(fonctionnalit[\u00e9e]|workflow|impl[\u00e9e]mentation)",
+          "phase.*?(management|transition|execution)",
+          "phase.*?(gestion|transition|ex[\u00e9e]cution)"
+        ]
+      },
+      "delegationCriteria": {
+        "when": [
+          "Complex feature requiring all phases (analysis -> design -> blueprint -> implementation -> review)",
+          "Need coordinated multi-phase workflow",
+          "Feature with human validation checkpoints",
+          "Need state tracking across sessions"
+        ],
+        "parallelWith": []
+      }
+    }
+  },
+  "parallelExecutionGuide": {
+    "description": "Guide for when to launch agents in parallel vs sequentially",
+    "patterns": [
+      {
+        "name": "Research Phase",
+        "parallel": [
+          "analyst",
+          "architect"
+        ],
+        "description": "Explore codebase and design architecture simultaneously"
+      },
+      {
+        "name": "Implementation Phase",
+        "parallel": [
+          "task-orchestrator",
+          "test-dev"
+        ],
+        "description": "Implement features and generate tests in parallel"
+      },
+      {
+        "name": "Multi-Search",
+        "parallel": [
+          "analyst",
+          "analyst",
+          "analyst"
+        ],
+        "description": "Multiple independent codebase searches (different keywords/areas)"
+      }
+    ],
+    "sequential": [
+      {
+        "order": [
+          "analyst",
+          "architect",
+          "task-orchestrator",
+          "code-review-dev"
+        ],
+        "description": "Full feature workflow: Research -> Design -> Implement -> Review"
+      }
+    ]
+  }
+}

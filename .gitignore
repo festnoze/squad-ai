@@ -7,6 +7,7 @@ supabase/
 docs-site/
 processed_data/
 data/
+_bmad/
 
 *.egg-info/
 *.save*/

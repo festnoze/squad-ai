@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config (optionnel - décommenter si vous ne voulez pas versionner)
+# config/settings.json
+
+# Temporary files
+*.tmp
+*.bak
+
+# Watched folder contents (on ne veut pas versionner les transcriptions)
+watched_folder/*
+!watched_folder/.gitkeep
+
+# Models (si vous téléchargez des modèles Whisper localement)
+models/
+*.pt
+*.bin
+
+# Test outputs
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Transcription outputs (examples)
+*.srt
+*.vtt
+transcription_*.txt
+
+# Windows reserved device name accidentally created
+nul

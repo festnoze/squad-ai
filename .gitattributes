@@ -1,0 +1,15 @@
+# Normalize line endings to LF in the repository, CRLF on Windows checkout
+* text=auto eol=lf
+
+# Force binary files to not be modified
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.rar binary
+*.zip binary
+*.exe binary
+*.dll binary
+*.whl binary

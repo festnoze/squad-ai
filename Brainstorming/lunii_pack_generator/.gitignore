@@ -1,0 +1,7 @@
+.venv/
+bin/studio-pack-generator*
+source/
+output/
+__pycache__/
+*.pyc
+.pytest_cache/

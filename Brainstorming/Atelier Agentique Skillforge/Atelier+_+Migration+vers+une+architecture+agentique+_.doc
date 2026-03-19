@@ -1,0 +1,423 @@
+Date: Thu, 19 Mar 2026 09:05:49 +0000 (UTC)
+Message-ID: <1014299029.63.1773911149502@7bda60def510>
+Subject: Exported From Confluence
+MIME-Version: 1.0
+Content-Type: multipart/related; 
+	boundary="----=_Part_62_678726228.1773911149501"
+
+------=_Part_62_678726228.1773911149501
+Content-Type: text/html; charset=UTF-8
+Content-Transfer-Encoding: quoted-printable
+Content-Location: file:///C:/exported.html
+
+<html xmlns:o=3D'urn:schemas-microsoft-com:office:office'
+      xmlns:w=3D'urn:schemas-microsoft-com:office:word'
+      xmlns:v=3D'urn:schemas-microsoft-com:vml'
+      xmlns=3D'urn:w3-org-ns:HTML'>
+<head>
+    <meta http-equiv=3D"Content-Type" content=3D"text/html; charset=3Dutf-8=
+">
+    <title>Atelier : Migration vers une architecture agentique ?</title>
+    <!--[if gte mso 9]>
+    <xml>
+        <o:OfficeDocumentSettings>
+            <o:TargetScreenSize>1024x640</o:TargetScreenSize>
+            <o:PixelsPerInch>72</o:PixelsPerInch>
+            <o:AllowPNG/>
+        </o:OfficeDocumentSettings>
+        <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>90</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+    </xml>
+    <![endif]-->
+    <style>
+                <!--
+        @page Section1 {
+            size: 8.5in 11.0in;
+            margin: 1.0in;
+            mso-header-margin: .5in;
+            mso-footer-margin: .5in;
+            mso-paper-source: 0;
+        }
+
+        table {
+            border: solid 1px;
+            border-collapse: collapse;
+        }
+
+        table td, table th {
+            border: solid 1px;
+            padding: 5px;
+        }
+
+        td {
+            page-break-inside: avoid;
+        }
+
+        tr {
+            page-break-after: avoid;
+        }
+
+        div.Section1 {
+            page: Section1;
+        }
+
+        /* Confluence print stylesheet. Common to all themes for print medi=
+a */
+/* Full of !important until we improve batching for print CSS */
+
+@media print {
+    #main {
+        padding-bottom: 1em !important; /* The default padding of 6em is to=
+o much for printouts */
+    }
+
+    body {
+        font: var(--ds-font-body-small, Arial, Helvetica, FreeSans, sans-se=
+rif);
+    }
+
+    body, #full-height-container, #main, #page, #content, .has-personal-sid=
+ebar #content {
+        background: var(--ds-surface, #fff) !important;
+        color: var(--ds-text, #000) !important;
+        border: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        min-height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        display: block !important;
+    }
+
+    a, a:link, a:visited, a:focus, a:hover, a:active {
+        color: var(--ds-text, #000);
+    }
+
+    #content h1,
+    #content h2,
+    #content h3,
+    #content h4,
+    #content h5,
+    #content h6 {
+        page-break-after: avoid;
+    }
+
+    pre {
+        font: var(--ds-font-code, Monaco, "Courier New", monospace);
+    }
+
+    #header,
+    .aui-header-inner,
+    #navigation,
+    #sidebar,
+    .sidebar,
+    #personal-info-sidebar,
+    .ia-fixed-sidebar,
+    .page-actions,
+    .navmenu,
+    .ajs-menu-bar,
+    .noprint,
+    .inline-control-link,
+    .inline-control-link a,
+    a.show-labels-editor,
+    .global-comment-actions,
+    .comment-actions,
+    .quick-comment-container,
+    #addcomment {
+        display: none !important;
+    }
+
+    /* CONF-28544 cannot print multiple pages in IE */
+    #splitter-content {
+        position: relative !important;
+    }
+
+    .comment .date::before {
+        content: none !important; /* remove middot for print view */
+    }
+
+    h1.pagetitle img {
+        height: auto;
+        width: auto;
+    }
+
+    .print-only {
+        display: block;
+    }
+
+    #footer {
+        position: relative !important; /* CONF-17506 Place the footer at en=
+d of the content */
+        margin: 0;
+        padding: 0;
+        background: none;
+        clear: both;
+    }
+
+    #poweredby {
+        border-top: none;
+        background: none;
+    }
+
+    #poweredby li.print-only {
+        display: list-item;
+        font-style: italic;
+    }
+
+    #poweredby li.noprint {
+        display: none;
+    }
+
+    /* no width controls in print */
+    .wiki-content .table-wrap,
+    .wiki-content p,
+    .panel .codeContent,
+    .panel .codeContent pre,
+    .image-wrap {
+        overflow: visible !important;
+    }
+
+    /* TODO - should this work? */
+    #children-section,
+    #comments-section .comment,
+    #comments-section .comment .comment-body,
+    #comments-section .comment .comment-content,
+    #comments-section .comment p {
+        page-break-inside: avoid;
+    }
+
+    #page-children a {
+        text-decoration: none;
+    }
+
+    /**
+     hide twixies
+
+     the specificity here is a hack because print styles
+     are getting loaded before the base styles. */
+    #comments-section.pageSection .section-header,
+    #comments-section.pageSection .section-title,
+    #children-section.pageSection .section-header,
+    #children-section.pageSection .section-title,
+    .children-show-hide {
+        padding-left: 0;
+        margin-left: 0;
+    }
+
+    .children-show-hide.icon {
+        display: none;
+    }
+
+    /* personal sidebar */
+    .has-personal-sidebar #content {
+        margin-right: 0px;
+    }
+
+    .has-personal-sidebar #content .pageSection {
+        margin-right: 0px;
+    }
+
+    .no-print, .no-print * {
+        display: none !important;
+    }
+}
+-->
+    </style>
+</head>
+<body>
+    <h1>Atelier : Migration vers une architecture agentique ?</h1>
+    <div class=3D"Section1">
+        <p local-id=3D"5562d25801d0">
+<style>[data-colorid=3Dvafd4heux9]{color:#bf2600} html[data-color-mode=3Dda=
+rk] [data-colorid=3Dvafd4heux9]{color:#ff6640}[data-colorid=3Da8y5lwx8mv]{c=
+olor:#bf2600} html[data-color-mode=3Ddark] [data-colorid=3Da8y5lwx8mv]{colo=
+r:#ff6640}</style></p>
+<p local-id=3D"eef45e2fcca8"><strong>Objectif de l'atelier :</strong> compr=
+endre ce qu'est une architecture agentique, identifier pourquoi elle r=C3=
+=A9pond aux limites actuelles de Skillforge, et ressortir avec une liste de=
+ propositions concr=C3=A8tes d'agents par lesquels commencer =E2=80=94 sans=
+ chercher =C3=A0 poser une architecture d=C3=A9finitive.</p>
+<p local-id=3D"9a73c8da1b2c"><strong>Format :</strong> Workshop technique =
+=C2=B7 2h <strong>Pr=C3=A9requis :</strong> Connaissance de l'archi actuell=
+e (master prompt + mod=C3=A8le unique : GPT-4.1 Mini)</p>
+<hr local-id=3D"cccbd5b5-bb73-4e47-bf10-4654ac77879c">
+<h2 local-id=3D"c344496da3f9" id=3D"Atelier:Migrationversunearchitectureage=
+ntique?-MODULE1=E2=80=94C'estquoiunearchiagentique?20min">MODULE 1 =E2=80=
+=94 C'est quoi une archi agentique ? <code>20 min</code></h2>
+<p local-id=3D"f6d966dd53ac"><strong>Objectif :</strong> s'aligner sur le v=
+ocabulaire et les concepts avant de concevoir quoi que ce soit.</p>
+<p local-id=3D"693add1b2abd">Questions de lancement :</p>
+<ul local-id=3D"f1cc75a8-47ef-46fb-aec0-5bbb7cf050c5">
+<li local-id=3D"d416df08-6ed4-4bb9-b731-8a1cc103737c">
+<p local-id=3D"acd2bfb741dc">Quelle diff=C3=A9rence entre un chatbot =C3=A0=
+ prompt unique et un agent ?</p></li>
+<li local-id=3D"9ac2fba6-72ec-4d07-9afc-1582502e61cd">
+<p local-id=3D"73a962d00a7c">Avez-vous d=C3=A9j=C3=A0 utilis=C3=A9 un outil=
+ qui vous semblait "agentique" ?</p></li>
+</ul>
+<p local-id=3D"7a32b0107d50">Points th=C3=A9oriques si besoin :</p>
+<ul local-id=3D"f82614b7-f5c7-46ba-8ce1-0c95abf8880d">
+<li local-id=3D"a3574393-ae44-40a6-bcf8-7bff3ebec881">
+<p local-id=3D"6b6d41211c9e"><strong>D=C3=A9finition :</strong> un agent =
+=3D LLM + m=C3=A9moire + outils + boucle de raisonnement (ReAct, Plan-and-E=
+xecute=E2=80=A6)</p></li>
+<li local-id=3D"5ab2fa35-cda7-4c73-8a47-22bb66c4effa">
+<p local-id=3D"127b05819c15"><strong>Les 3 composants cl=C3=A9s :</strong> =
+Orchestrateur (chef d'orchestre), Agents sp=C3=A9cialis=C3=A9s (sous-traita=
+nts), Outils/Tools (actions sur le monde)</p></li>
+<li local-id=3D"c5f06654-f838-4998-8cc3-5212d6e13734">
+<p local-id=3D"45dabb5aeca5"><strong>Patterns courants :</strong> single-ag=
+ent avec tools, multi-agents avec router, pipeline s=C3=A9quentiel, paralle=
+l dispatch</p></li>
+<li local-id=3D"8faa08e0-3382-4106-b8fe-061669d54872">
+<p local-id=3D"e0f46f5c0a24"><strong>Frameworks de r=C3=A9f=C3=A9rence :</s=
+trong> LangGraph, AutoGen, CrewAI, ou natif via Anthropic Tool Use / OpenAI=
+ function calling</p></li>
+<li local-id=3D"3bdc4fda-274d-4edf-bd27-09c6eac4f18a">
+<p local-id=3D"de1e7b9a2279"><strong>Ce que =C3=A7a N'est pas :</strong> un=
+ simple encha=C3=AEnement de prompts hardcod=C3=A9s, insister sur la boucle=
+ de d=C3=A9cision dynamique</p></li>
+</ul>
+<hr local-id=3D"93337fe2-d7cc-4a8d-8464-8b4d267f2e7d">
+<h2 local-id=3D"47fe8d20abde" id=3D"Atelier:Migrationversunearchitectureage=
+ntique?-MODULE2=E2=80=94PourquoipourSkillforge?25min">MODULE 2 =E2=80=94 Po=
+urquoi pour Skillforge ? <code>25 min</code></h2>
+<p local-id=3D"3d832d0904b1"><strong>Objectif :</strong> rendre les limites=
+ du master prompt monolithique visibles et douloureuses.</p>
+<p local-id=3D"6f6e1166257f">Questions =C3=A0 se poser :</p>
+<ul local-id=3D"0b614f15-dcba-429c-b98f-3096ef3b7cb6">
+<li local-id=3D"52e47fee-3a74-4373-b8d5-74c6a8030a3a">
+<p local-id=3D"947c6048c572">Quelles t=C3=A2ches Skillforge fait mal ou de =
+fa=C3=A7on incoh=C3=A9rente ?</p></li>
+<li local-id=3D"f069dada-5568-474b-9e1a-c41a822b1a42">
+<p local-id=3D"5b488ec7bde4">Quelles fonctionnalit=C3=A9s sont aujourd'hui =
+impossibles =C3=A0 ajouter sans tout casser ?</p></li>
+</ul>
+<p local-id=3D"2469601ba97c">Liste des limites :</p>
+<ul local-id=3D"c5440503-6375-486f-9bcf-ac8cf997f692">
+<li local-id=3D"e64bd889-0a7f-4bea-aefd-ad5e52f14c5f">
+<p local-id=3D"c954c70f6830"><strong>Context window satur=C3=A9e :</strong>=
+ cours + historique + instructions dans la m=C3=AAme passe =3D d=C3=A9grada=
+tion</p></li>
+<li local-id=3D"95fde21d-b978-4a60-8c2c-302d317892bb">
+<p local-id=3D"8c5be19ee905"><strong>Pas de sp=C3=A9cialisation :</strong> =
+un prompt qui fait tout fait tout moins bien</p></li>
+<li local-id=3D"aedae38e-486f-4861-a1a5-e6491b4de16c">
+<p local-id=3D"73d214e2f0a2"><strong>Pas de m=C3=A9moire long-terme :</stro=
+ng> l'apprenant repart de z=C3=A9ro =C3=A0 chaque cours / conversation</p><=
+/li>
+<li local-id=3D"5168dc7c-5bf0-4cb8-8556-77844d9a227a">
+<p local-id=3D"59b5d66b6dcc"><strong>Co=C3=BBt :</strong> injecter le cours=
+ entier =C3=A0 chaque requ=C3=AAte + tout l'historique =3D co=C3=BBteux</p>=
+</li>
+</ul>
+<hr local-id=3D"14b03821-69ca-4908-be06-516bfaecac8e">
+<h2 local-id=3D"ba5118c14747" id=3D"Atelier:Migrationversunearchitectureage=
+ntique?-MODULE3=E2=80=94QuelsagentspourSkillforge?45min">MODULE 3 =E2=80=94=
+ Quels agents pour Skillforge ? <code>45 min</code></h2>
+<p local-id=3D"3efc4dae2ca7"><strong>Objectif :</strong> co-construire une =
+architecture adapt=C3=A9e =C3=A0 Skillforge, pas g=C3=A9n=C3=A9rique.</p>
+<p local-id=3D"d49a1a39b34f"><strong><span data-colorid=3D"a8y5lwx8mv">!! L=
+iste non exhaustive d=E2=80=99agents =C3=A0 discuter et =C3=A0 compl=C3=A9t=
+er ou =C3=A0 revoir !!</span></strong></p>
+<ul local-id=3D"fd0fa98f-98e7-409a-85f2-d1720e214990">
+<li local-id=3D"9d8cb92c-be0a-47f1-b4f4-c8620ba4016c">
+<p local-id=3D"e54c741a1e90"><strong>Router :</strong> comprend l'intention=
+, dispatch vers le bon agent</p></li>
+<li local-id=3D"1038bb0f-0e3f-49f8-b6eb-7867de7e0f7a">
+<p local-id=3D"6d8cc64cfbc3"><strong>Pedagogy Agent :</strong> explique le =
+cours via RAG ou autre (plus de full context)</p></li>
+<li local-id=3D"d25ff936-51d9-432f-8790-0af4562d7e9b">
+<p local-id=3D"7fa2d0aacabc"><strong>Exercise Agent :</strong> g=C3=A9n=C3=
+=A8re des exercices, =C3=A9value, donne du feedback</p></li>
+<li local-id=3D"3766c912-dae7-4795-899b-5bdb37e2329d">
+<p local-id=3D"5abd5cb39e09"><strong>Memory Agent :</strong> profil apprena=
+nt persistant entre les sessions</p></li>
+</ul>
+<p local-id=3D"52304dda58f2">Questions de design =C3=A0 trancher :</p>
+<ul local-id=3D"36fb64b3-a5a3-4cd6-be5e-6185c6f5d855">
+<li local-id=3D"222be3a9-12ed-428c-bc1f-6fb1d6f764ef">
+<p local-id=3D"d47fb876edfc">Quel mod=C3=A8le par agent ? (l=C3=A9ger pour =
+le router, plus puissant pour la p=C3=A9dagogie ?)</p></li>
+<li local-id=3D"39669d51-f165-4fc1-98e8-c7b06a22361f">
+<p local-id=3D"8c084fc927c8">O=C3=B9 vit la m=C3=A9moire ? (vector DB, SQL,=
+ profil JSON ?)</p></li>
+<li local-id=3D"fa3c26a4-d514-42bd-b487-58cee7fde2ee">
+<p local-id=3D"0809916fbab7">RAG ou chunking pour r=C3=A9cup=C3=A9rer le co=
+ntenu du cours ?</p></li>
+</ul>
+<hr local-id=3D"8fd31770-9086-4229-ae46-8c2d9787591b">
+<h2 local-id=3D"468b0d14180f" id=3D"Atelier:Migrationversunearchitectureage=
+ntique?-MODULE4=E2=80=94Paro=C3=B9commencer30min">MODULE 4 =E2=80=94 Par o=
+=C3=B9 commencer <code>30 min</code></h2>
+<p local-id=3D"d6869c7d4866"><strong>Objectif :</strong> sortir avec une li=
+ste de propositions d'agents candidats pour une premi=C3=A8re brique, avec =
+leurs avantages et risques associ=C3=A9s, sans d=C3=A9cision d=C3=A9finitiv=
+e.</p>
+<p local-id=3D"db64ece0c690"><strong>Principe de migration (5 min) :</stron=
+g></p>
+<blockquote local-id=3D"80654438-60c2-4f8c-8364-16c99b3eb83b">
+<p local-id=3D"fe41b474a2ee">R=C3=A8gle d'or : un agent =C3=A0 la fois, tes=
+t=C3=A9 en shadow mode (parall=C3=A8le =C3=A0 l'archi actuelle), valid=C3=
+=A9, puis bascul=C3=A9.</p>
+</blockquote>
+<p local-id=3D"4744182b88fe"><strong>Propositions d'agents candidats pour d=
+=C3=A9marrer (25 min) :</strong></p>
+<p local-id=3D"0d102aa321da">Chaque proposition est =C3=A0 =C3=A9valuer col=
+lectivement sur trois crit=C3=A8res : valeur per=C3=A7ue, complexit=C3=A9 d=
+'impl=C3=A9mentation, risque.</p>
+<p local-id=3D"f19c8255c6d9"><strong><span data-colorid=3D"vafd4heux9">!! E=
+xemples de propositions se basant sur la pr=C3=A9c=C3=A9dente liste (pouvan=
+t =C3=AAtre compl=C3=A9t=C3=A9e et revue) !!</span></strong></p>
+<p local-id=3D"7fc85fa564a5"><strong>Proposition A =E2=80=94 Router Agent e=
+n premier</strong></p>
+<ul local-id=3D"9f4b0177-a958-46c0-96f9-333cb033c142">
+<li local-id=3D"c3bfac62-4de6-4457-a543-6870d56656ca">
+<p local-id=3D"67b6cd198243">Ce que =C3=A7a apporte :</p></li>
+<li local-id=3D"42df89ca-d481-40d5-864b-d1814bb885aa">
+<p local-id=3D"38ef094d42d5">Complexit=C3=A9 :</p></li>
+<li local-id=3D"9500bc21b607">
+<p local-id=3D"5ab63ced9f48">Risque principal :</p></li>
+</ul>
+<p local-id=3D"97fbe9e94862"><strong>Proposition B =E2=80=94 Exercise Agent=
+ en premier</strong></p>
+<ul local-id=3D"0e4a9248-5c82-40d9-9454-ccdaaedfcdcd">
+<li local-id=3D"35df660b-dace-49ae-8a45-f02e39d82a95">
+<p local-id=3D"2429ec3122a1">Ce que =C3=A7a apporte :</p></li>
+<li local-id=3D"79ff5e41-5ea8-4914-b55e-fb3a27b6ad31">
+<p local-id=3D"805699352678">Complexit=C3=A9 :</p></li>
+<li local-id=3D"2f186ea6-ea93-4940-a118-626afd07ab0a">
+<p local-id=3D"2d56d52a9e70">Risque principal</p></li>
+</ul>
+<p local-id=3D"78f98c46909e"><strong>Proposition C =E2=80=94 Memory Agent e=
+n premier</strong></p>
+<ul local-id=3D"d8c71997-fd99-4315-8834-1ac9d389619c">
+<li local-id=3D"13d25809-6e0d-4e4e-b8aa-502316fdad36">
+<p local-id=3D"0ba2d85ddba2">Ce que =C3=A7a apporte :</p></li>
+<li local-id=3D"4554e8d1-769f-4830-a085-097f49768b38">
+<p local-id=3D"83535757513a">Complexit=C3=A9 :</p></li>
+<li local-id=3D"3e5528a6-40d5-4ccb-8a7b-7eec8df983fc">
+<p local-id=3D"cab1f0b5d649">Risque principal</p></li>
+</ul>
+<p local-id=3D"2291965af661"><strong>Proposition D =E2=80=94 Pedagogy Agent=
+ + RAG en premier</strong></p>
+<ul local-id=3D"e3940eea-7bc4-4574-902b-85c6df5b2497">
+<li local-id=3D"3e277e5c-be22-4fd2-92e0-3164b0d71f07">
+<p local-id=3D"268a92232b56">Ce que =C3=A7a apporte :</p></li>
+<li local-id=3D"2958c693-cf83-453a-9104-64a4e76bb237">
+<p local-id=3D"61c3e267ec16">Complexit=C3=A9 :</p></li>
+<li local-id=3D"9b4c7c9a-4c84-4748-9b27-09edae5b3d92">
+<p local-id=3D"584223e3bca4">Risque principal</p></li>
+</ul>
+<hr local-id=3D"07f7aeda-8796-45a5-8f21-ef69969e5b59">
+<p local-id=3D"12fda4071d7b"><strong>Livrables attendus en sortie d'atelier=
+ :</strong> liste des agents candidats prioris=C3=A9s par l'=C3=A9quipe =C2=
+=B7 crit=C3=A8res de choix document=C3=A9s =C2=B7 prochaine session pour tr=
+ancher et poser l'archi</p>
+    </div>
+</body>
+</html>
+------=_Part_62_678726228.1773911149501--

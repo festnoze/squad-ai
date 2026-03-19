@@ -1,0 +1,55 @@
+{
+  "iteration": 1,
+  "timestamp": "2026-02-23T02:04:36.438043+00:00",
+  "coder": {
+    "code_length": 4011,
+    "session_id": "24f91b33-ada0-4409-a41e-eaf593abe48c",
+    "cost_usd": 0.11729,
+    "duration_ms": 45230
+  },
+  "evaluator": {
+    "tests_passed": 59,
+    "tests_failed": 0,
+    "test_output": "============================= test session starts =============================\nplatform win32 -- Python 3.13.7, pytest-9.0.2, pluggy-1.6.0\ncollected 60 items\n\nTestCorrectness::test_zero_returns_empty_list                  PASSED\nTestCorrectness::test_one_returns_first_prime                  PASSED\nTestCorrectness::test_two_returns_first_two_primes             PASSED\nTestCorrectness::test_five_returns_first_five_primes           PASSED\nTestCorrectness::test_ten_returns_first_ten_primes             PASSED\nTestCorrectness::test_twenty_five_primes                       PASSED\nTestCorrectness::test_100th_prime                              PASSED\nTestCorrectness::test_1000th_prime                             PASSED\nTestCorrectness::test_result_length_matches_n                  PASSED\nTestCorrectness::test_results_are_sorted_ascending             PASSED\nTestCorrectness::test_no_duplicates                            PASSED\nTestCorrectness::test_all_results_are_prime                    PASSED\nTestCorrectness::test_no_composite_missed                      PASSED\nTestCorrectness::test_return_type_is_list                      PASSED\nTestCorrectness::test_elements_are_integers                    PASSED\nTestCorrectness::test_all_results_greater_than_one             PASSED\nTestCorrectness::test_first_prime_is_two                       PASSED\nTestCorrectness::test_nth_prime_parametrized[1-2]              PASSED\nTestCorrectness::test_nth_prime_parametrized[2-3]              PASSED\nTestCorrectness::test_nth_prime_parametrized[3-5]              PASSED\nTestCorrectness::test_nth_prime_parametrized[4-7]              PASSED\nTestCorrectness::test_nth_prime_parametrized[5-11]             PASSED\nTestCorrectness::test_nth_prime_parametrized[6-13]             PASSED\nTestCorrectness::test_nth_prime_parametrized[10-29]            PASSED\nTestCorrectness::test_nth_prime_parametrized[20-71]            PASSED\nTestCorrectness::test_nth_prime_parametrized[25-97]            PASSED\nTestEdgeCases::test_float_raises_type_error                    PASSED\nTestEdgeCases::test_string_raises_type_error                   PASSED\nTestEdgeCases::test_none_raises_type_error                     PASSED\nTestEdgeCases::test_list_raises_type_error                     PASSED\nTestEdgeCases::test_bool_raises_type_error                     PASSED\nTestEdgeCases::test_complex_raises_type_error                  PASSED\nTestEdgeCases::test_negative_one_raises_value_error            PASSED\nTestEdgeCases::test_negative_large_raises_value_error          PASSED\nTestEdgeCases::test_negative_min_int_raises_value_error        PASSED\nTestEdgeCases::test_type_error_message_contains_type_name      PASSED\nTestEdgeCases::test_value_error_message_contains_value         PASSED\nTestEdgeCases::test_large_n_returns_correct_count              PASSED\nTestEdgeCases::test_large_n_last_prime                         PASSED\nTestEdgeCases::test_very_large_n_returns_correct_count         PASSED\nTestEdgeCases::test_very_large_n_last_prime                    PASSED\nTestEdgeCases::test_n_equals_6_boundary                        PASSED\nTestEdgeCases::test_n_equals_5_boundary                        PASSED\nTestPerformance::test_performance[100]                         PASSED\nTestPerformance::test_performance[1000]                        PASSED\nTestPerformance::test_performance[10000]                       PASSED\nTestPerformance::test_performance[100000]                      PASSED\nTestPerformance::test_performance_100                          SKIPPED (pytest-benchmark non installe)\nTestPerformance::test_idempotency_performance                  PASSED\nTestPerformance::test_timing_reported[100]    -> 0.000034s     PASSED\nTestPerformance::test_timing_reported[1000]   -> 0.000316s     PASSED\nTestPerformance::test_timing_reported[10000]  -> 0.003820s     PASSED\nTestPerformance::test_timing_reported[100000] -> 0.050203s     PASSED\nTestInternals::test_sieve_below_two                            PASSED\nTestInternals::test_sieve_exact_prime                          PASSED\nTestInternals::test_sieve_exact_composite                      PASSED\nTestInternals::test_sieve_includes_limit_if_prime              PASSED\nTestInternals::test_upper_bound_small_n                        PASSED\nTestInternals::test_upper_bound_strictly_above_nth_prime       PASSED\nTestInternals::test_upper_bound_grows_with_n                   PASSED\n\n======================== 59 passed, 1 skipped in 0.31s ========================",
+    "performance_metrics": [
+      {
+        "n": 100,
+        "duration_seconds": 3.4e-05,
+        "result_count": 100
+      },
+      {
+        "n": 1000,
+        "duration_seconds": 0.000316,
+        "result_count": 1000
+      },
+      {
+        "n": 10000,
+        "duration_seconds": 0.00382,
+        "result_count": 10000
+      },
+      {
+        "n": 100000,
+        "duration_seconds": 0.0502,
+        "result_count": 100000
+      }
+    ],
+    "code_quality_issues": [
+      "Aucun defaut fonctionnel detecte : correction, types de retour, gestion des erreurs et performance sont conformes aux specifications.",
+      "Le test test_bool_raises_type_error accepte les deux comportements (TypeError ou resultat coherent) car bool est sous-classe de int en Python ; la spec pourrait clarifier si True/False doivent etre rejetes explicitement.",
+      "Le test test_performance_100 est sauté (SKIPPED) faute de pytest-benchmark installe dans le venv du projet."
+    ],
+    "improvement_suggestions": [
+      "Installer pytest-benchmark pour obtenir des statistiques de microbenchmark (min/max/stddev) sur find_primes, actuellement le test benchmark est skippé.",
+      "Ajouter un test de regression memoire (tracemalloc) pour verifier que le bytearray du crible ne depasse pas O(limit) octets pour de grands N.",
+      "Tester find_primes(1_000_000) pour valider la tenue a tres grande echelle (le 1 000 000e premier est 15 485 863) ; actuellement le test le plus grand est N=100 000.",
+      "Ajouter un test de thread-safety : appels concurrents via concurrent.futures.ThreadPoolExecutor pour verifier l'absence d'effets de bord globaux.",
+      "Parametriser le test test_all_results_are_prime sur des N plus grands (ex: 500, 1000) pour augmenter la confiance sans exploser la duree.",
+      "Verifier le comportement avec n=sys.maxsize pour documenter la limite pratique d'utilisation et eviter un OOM silencieux."
+    ],
+    "overall_assessment": "EXCELLENT — 59/59 tests fonctionnels passent (100 %), 1 skippé pour cause de dépendance optionnelle absente (pytest-benchmark). La solution find_primes est correcte sur toutes les valeurs connues (p(100)=541, p(1000)=7919, p(10000)=104729, p(100000)=1299709), sans doublons, triée, typée. La gestion des erreurs (TypeError/ValueError avec messages informatifs) est conforme. Les performances sont excellentes : N=100 en 34 µs, N=100 000 en 50 ms, soit bien en deçà des seuils CI fixés (100 ms à 5 s respectivement). L'algorithme (crible d'Ératosthène + borne de Rosser-Schoenfeld) est industriellement valide.",
+    "should_continue": false,
+    "session_id": "48f0942a-eac2-41c0-869f-119fa8510972",
+    "cost_usd": 0.5974925,
+    "duration_ms": 183538
+  }
+}

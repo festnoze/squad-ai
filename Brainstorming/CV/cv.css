@@ -1,0 +1,304 @@
+/* ============================================================
+   CV — Etienne Millerioux
+   Palette 4 sections :
+     Cell 1 (top-left)     : #3b6070  — teal sombre (identité)
+     Cell 2 (top-right)    : #c8d8dd  — bleu-gris clair (synthèse)
+     Cell 3 (bottom-left)  : #4d7585  — teal moyen (compétences…)
+     Cell 4 (bottom-right) : #ffffff  — blanc (expérience)
+   ============================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Segoe UI', 'Calibri', Arial, sans-serif;
+  font-size: 12px;
+  background: #b8c8ce;
+  display: flex;
+  justify-content: center;
+  padding: 30px 20px;
+  color: #333;
+}
+
+/* ─── Page A4 — grille 2×2 ──────────────────────────────────── */
+.cv-page {
+  width: 210mm;
+  min-height: 297mm;
+  display: grid;
+  grid-template-columns: 37% 63%;
+  grid-template-rows: auto 1fr;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* ─── Cellule 1 — Identité (top-left) ──────────────────────── */
+.cell-identity {
+  grid-column: 1;
+  grid-row: 1;
+  background: #3b6070;
+  color: white;
+  padding: 28px 22px 24px;
+}
+
+/* ─── Cellule 2 — Synthèse (top-right) ─────────────────────── */
+.cell-summary {
+  grid-column: 2;
+  grid-row: 1;
+  background: #c8d8dd;
+  padding: 28px 26px 24px;
+}
+
+/* ─── Cellule 3 — Infos (bottom-left) ──────────────────────── */
+.cell-sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  background: #4d7585;
+  color: white;
+  padding: 24px 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+/* ─── Cellule 4 — Expérience (bottom-right) ─────────────────── */
+.cell-experience {
+  grid-column: 2;
+  grid-row: 2;
+  background: #ffffff;
+  padding: 24px 26px 28px;
+}
+
+/* ─── Nom & titre (cell 1) ──────────────────────────────────── */
+.name-block h1 {
+  font-size: 23px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  line-height: 1.15;
+  color: white;
+  word-break: break-word;
+}
+
+.job-title {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+  color: rgba(255, 255, 255, 0.75);
+  margin-top: 6px;
+}
+
+.cell-divider {
+  width: 45px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  margin-top: 14px;
+  margin-bottom: 18px;
+}
+
+/* ─── Contact ───────────────────────────────────────────────── */
+.contact-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.88);
+  line-height: 1.45;
+  margin-bottom: 7px;
+}
+
+.contact-item i {
+  width: 14px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.6);
+  margin-top: 2px;
+  text-align: center;
+}
+
+.contact-item a {
+  color: rgba(255, 255, 255, 0.88);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.contact-item a:hover {
+  color: white;
+  text-decoration: underline;
+}
+
+/* ─── Titres de sections — sidebar (teal) ───────────────────── */
+.section-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1.8px;
+  padding-bottom: 5px;
+  margin-bottom: 12px;
+  border-bottom: 2px solid rgba(255, 255, 255, 0.35);
+  color: white;
+}
+
+/* Titres dans les cellules claires (synthèse + expérience) */
+.cell-summary   .section-title,
+.cell-experience .section-title {
+  color: #2c4a56;
+  border-bottom-color: #4d7585;
+}
+
+/* ─── Compétences ───────────────────────────────────────────── */
+#cv-skills {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+#cv-skills li {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.88);
+  padding-left: 14px;
+  position: relative;
+  line-height: 1.4;
+}
+
+#cv-skills li::before {
+  content: '•';
+  position: absolute;
+  left: 0;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* ─── Formation ─────────────────────────────────────────────── */
+.edu-item {
+  margin-bottom: 11px;
+  line-height: 1.4;
+}
+
+.edu-school {
+  font-weight: 700;
+  font-size: 11px;
+  color: white;
+}
+
+.edu-dates {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  margin-top: 1px;
+}
+
+.edu-degree {
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.88);
+  margin-top: 2px;
+}
+
+.edu-degree small {
+  font-size: 9.5px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+/* ─── Langues (sidebar) ─────────────────────────────────────── */
+.lang-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding-bottom: 4px;
+  margin-bottom: 7px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.lang-name {
+  font-weight: 700;
+  font-size: 11px;
+  color: white;
+}
+
+.lang-level {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+}
+
+/* ─── Synthèse (cell 2) ─────────────────────────────────────── */
+#cv-summary {
+  font-size: 13px;       /* plus grande que le reste */
+  font-style: normal;    /* pas d'italique */
+  color: #2c4a56;
+  line-height: 1.6;
+}
+
+/* ─── Expériences (cell 4) ──────────────────────────────────── */
+.exp-item {
+  margin-bottom: 11px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid #e0e8ec;
+  line-height: 1.4;
+}
+
+.exp-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.exp-header {
+  font-size: 11px;
+  font-weight: 700;
+  color: #2c4a56;
+  margin-bottom: 1px;
+}
+
+.exp-company {
+  color: #2c4a56;
+}
+
+.exp-title-inline {
+  font-weight: 400;
+  color: #3d5a65;
+}
+
+.exp-dates {
+  font-size: 10px;
+  color: #7a9aaa;
+  font-style: italic;
+  margin-bottom: 3px;
+}
+
+.exp-description {
+  font-size: 10.5px;
+  color: #444;
+  margin-bottom: 3px;
+}
+
+.exp-techs {
+  font-size: 10px;
+  color: #5a8090;
+  line-height: 1.45;
+}
+
+.exp-techs-label {
+  font-weight: 600;
+}
+
+/* ─── Impression ────────────────────────────────────────────── */
+@media print {
+  body {
+    background: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .cv-page {
+    box-shadow: none;
+    width: 100%;
+    min-height: 0;
+  }
+
+  a {
+    text-decoration: none !important;
+    color: inherit !important;
+  }
+}

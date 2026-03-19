@@ -1,0 +1,92 @@
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+senv/
+ENV/
+env/
+
+# UV cache
+.uv/
+
+# IDE settings
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+tests/
+
+# Documentation
+docs/
+documentation/
+
+# Docker files (no need to copy them into the image)
+Dockerfile*
+docker-compose*.yml
+.dockerignore*
+*.bat
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files (will be passed via --env-file)
+.env
+.env.local
+.env.*.local
+.env.sample
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Output files from local runs
+outputs/
+
+# Database files (will be recreated or managed separately)
+database_conversations/
+database_retrieved_data/
+storage/*.db
+storage/*.sqlite
+
+# Service account files (sensitive)
+service-account*.json
+
+# Old scripts and deprecated files
+old_*.bat
+libs_install.bat
+activate_venv.bat
