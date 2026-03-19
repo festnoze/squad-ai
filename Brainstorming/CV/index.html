@@ -18,10 +18,10 @@
   <!--
     ╔══════════════════════════════════════════════════════════╗
     ║  DONNÉES — éditez uniquement ces fichiers pour mettre   ║
-    ║  à jour le contenu du CV. Chaque fichier exporte une   ║
-    ║  constante JS globale utilisée par le template.         ║
+    ║  à jour le contenu du CV.                               ║
     ╚══════════════════════════════════════════════════════════╝
   -->
+  <script src="data/name.js"></script>
   <script src="data/contact.js"></script>
   <script src="data/summary.js"></script>
   <script src="data/skills.js"></script>
@@ -34,51 +34,54 @@
   <div class="cv-page">
 
     <!-- ══════════════════════════════════════════════════════
-         CELLULE 1 — top-left  : Identité & contact
+         CELLULE 1 — top-left  : Nom
          ══════════════════════════════════════════════════════ -->
-    <div class="cell-identity">
-      <div class="name-block">
-        <h1 id="cv-name"></h1>
-        <p  id="cv-title" class="job-title"></p>
+    <div class="cell-nom">
+      <h1 id="cv-name"></h1>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         CELLULE 2 — top-right : Titre / poste visé
+         ══════════════════════════════════════════════════════ -->
+    <div class="cell-titre">
+      <div class="cv-title-block">
+        <p class="cv-main-title" id="cv-main-title"></p>
+        <p class="cv-sub-title"  id="cv-sub-title"></p>
       </div>
-      <div class="cell-divider"></div>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         CELLULE 3 — mid-left : Contact
+         ══════════════════════════════════════════════════════ -->
+    <div class="cell-contact">
       <div id="cv-contact"></div>
     </div>
 
     <!-- ══════════════════════════════════════════════════════
-         CELLULE 2 — top-right : Synthèse professionnelle
+         CELLULE 4 — bottom-left : Compétences / Formation / Langues
          ══════════════════════════════════════════════════════ -->
-    <div class="cell-summary">
-      <h2 class="section-title">Synthèse professionnelle</h2>
-      <p id="cv-summary"></p>
+    <div class="cell-skills">
+
+      <div>
+        <h2 class="section-title" style="background: linear-gradient(to right, #a8bec6, #c8d8dd 80%);">Langues</h2>
+        <div id="cv-languages"></div>
+      </div>
+
+      <!-- <div>
+        <h2 class="section-title">Formation</h2>
+        <div id="cv-education"></div>
+      </div> -->
+
     </div>
 
     <!-- ══════════════════════════════════════════════════════
-         CELLULE 3 — bottom-left : Compétences / Formation / Langues
+         CELLULE 5 — right (rows 2-3) : Expérience
          ══════════════════════════════════════════════════════ -->
-    <div class="cell-sidebar">
-
+    <div class="cell-experience">
       <div>
         <h2 class="section-title">Compétences</h2>
         <ul id="cv-skills"></ul>
       </div>
-
-      <div>
-        <h2 class="section-title">Formation</h2>
-        <div id="cv-education"></div>
-      </div>
-
-      <div>
-        <h2 class="section-title">Langues</h2>
-        <div id="cv-languages"></div>
-      </div>
-
-    </div>
-
-    <!-- ══════════════════════════════════════════════════════
-         CELLULE 4 — bottom-right : Expérience
-         ══════════════════════════════════════════════════════ -->
-    <div class="cell-experience">
       <h2 class="section-title">Expérience</h2>
       <div id="cv-experience"></div>
     </div>
@@ -86,7 +89,7 @@
   </div><!-- /.cv-page -->
 
   <script>
-    // ── Utilitaire : échappe les caractères HTML pour le texte brut ──────
+    // ── Utilitaire : échappe les caractères HTML ──────────────────────────
     function esc(str) {
       if (!str) return '';
       return str
@@ -95,25 +98,26 @@
         .replace(/>/g, '&gt;');
     }
 
-    // ── Nom & titre ───────────────────────────────────────────────────────
-    document.getElementById('cv-name').textContent  = CONTACT.name;
-    document.getElementById('cv-title').textContent = CONTACT.jobTitle;
+    // ── Nom ───────────────────────────────────────────────────────────────
+    document.getElementById('cv-name').textContent = NAME.firstName + ' ' + NAME.lastName;
 
-    // ── Contact ───────────────────────────────────────────────────────────
+    // ── Titre / poste visé (cellule 2) ────────────────────────────────────
+    document.getElementById('cv-main-title').textContent = SUMMARY.main;
+    document.getElementById('cv-sub-title').textContent  = SUMMARY.sub;
+
+    // ── Contact (cellule 3) ───────────────────────────────────────────────
     const contactEl = document.getElementById('cv-contact');
     CONTACT.items.forEach(item => {
       const div  = document.createElement('div');
       div.className = 'contact-item';
-
       const icon = document.createElement('i');
       icon.className = item.icon;
       div.appendChild(icon);
-
       const span = document.createElement('span');
       if (item.href) {
         const a = document.createElement('a');
-        a.href    = item.href;
-        a.innerHTML = item.value;   // innerHTML pour autoriser <br>
+        a.href      = item.href;
+        a.innerHTML = item.value;
         span.appendChild(a);
       } else {
         span.innerHTML = item.value;
@@ -121,9 +125,6 @@
       div.appendChild(span);
       contactEl.appendChild(div);
     });
-
-    // ── Synthèse (innerHTML : accepte du HTML dans summary.js) ───────────
-    document.getElementById('cv-summary').innerHTML = SUMMARY;
 
     // ── Compétences ───────────────────────────────────────────────────────
     const skillsEl = document.getElementById('cv-skills');
@@ -155,17 +156,18 @@
     });
 
     // ── Formation ─────────────────────────────────────────────────────────
-    const eduEl = document.getElementById('cv-education');
-    EDUCATION.forEach(edu => {
-      const div = document.createElement('div');
-      div.className = 'edu-item';
-      div.innerHTML = `
-        ${edu.school ? `<div class="edu-school">${esc(edu.school)}</div>` : ''}
-        <div class="edu-dates">${esc(edu.period)}</div>
-        <div class="edu-degree">${edu.degree}</div>
-      `;
-      eduEl.appendChild(div);
-    });
+    // const eduEl = document.getElementById('cv-education');
+    // EDUCATION.forEach(edu => {
+    //   const div = document.createElement('div');
+    //   div.className = 'edu-item';
+    //   div.innerHTML = `
+    //     <span class="edu-degree">${edu.degree}</span>
+    //     <span class="edu-sep"> — </span>
+    //     <span class="edu-dates">${esc(edu.period)}</span>
+    //     ${edu.school ? `<span class="edu-school">&nbsp;(${esc(edu.school)})</span>` : ''}
+    //   `;
+    //   eduEl.appendChild(div);
+    // });
 
     // ── Langues ───────────────────────────────────────────────────────────
     const langEl = document.getElementById('cv-languages');

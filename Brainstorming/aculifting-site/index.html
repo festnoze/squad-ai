@@ -21,7 +21,7 @@
       "name": "Yamina Heinrich - Aculifting",
       "description": "Spécialiste en Aculifting, techniques esthétiques non invasives",
       "telephone": "+33613238681",
-      "email": "yaminahinrich@yahoo.fr",
+      "email": "aculifting.mtc@gmail.com",
       "address": {
         "@type": "PostalAddress",
         "streetAddress": "622 avenue Xavier de Ricard",
@@ -50,7 +50,7 @@ const SITE_CONFIG = {
         specialtySubtitle: "Techniques esthétiques non invasives",
         phone: "06 13 23 86 81",
         phoneLink: "0613238681",
-        email: "yaminahinrich@yahoo.fr",
+        email: "aculifting.mtc@gmail.com",
         address: "622 avenue Xavier de Ricard"
     },
     navigation: {
@@ -115,15 +115,18 @@ const SITE_CONFIG = {
     </div>
 </nav>
 
+<!-- ===== HERO + ABOUT SHARED BACKGROUND ===== -->
+<div class="hero-about-bg">
+<img class="hero-logo" src="image carte visite transparente.svg" alt="Yamina Heinrich - Aculifting">
+
 <!-- ===== HERO SECTION ===== -->
 <section class="hero" id="hero">
-    <img class="hero-logo" src="image carte visite transparente.svg" alt="Yamina Heinrich - Aculifting">
     <div class="hero-content">
         <h1 class="hero-title" id="heroTitle"></h1>
         <p class="hero-specialty" id="heroSpecialty"></p>
         <p class="hero-tagline" id="heroTagline"></p>
         <div class="hero-cta">
-            <a href="#rdv" class="btn btn-primary" id="heroCtaPrimary"></a>
+            <a href="#contact" class="btn btn-primary" id="heroCtaPrimary"></a>
             <a href="#aculifting" class="btn btn-secondary" id="heroCtaSecondary"></a>
         </div>
     </div>
@@ -159,6 +162,8 @@ const SITE_CONFIG = {
         </div>
     </div>
 </section>
+
+</div><!-- /.hero-about-bg -->
 
 <!-- ===== ACULIFTING SECTION ===== -->
 <section class="aculifting section" id="aculifting">
@@ -353,7 +358,7 @@ const SITE_CONFIG = {
                     </svg>
                     <div class="info-details">
                         <h4>Email</h4>
-                        <p><a href="mailto:yaminahinrich@yahoo.fr">yaminahinrich@yahoo.fr</a></p>
+                        <p><a href="mailto:aculifting.mtc@gmail.com">aculifting.mtc@gmail.com</a></p>
                     </div>
                 </div>
                 <div class="info-item">
@@ -378,25 +383,31 @@ const SITE_CONFIG = {
             </div>
             <div class="contact-form fade-in">
                 <h3>Envoyez-moi un message</h3>
-                <form action="https://formsubmit.co/yaminahinrich@yahoo.fr" method="POST">
+                <form action="https://formsubmit.co/aculifting.mtc@gmail.com" method="POST">
                     <div class="form-group">
                         <label for="name">Nom complet</label>
-                        <input type="text" id="name" name="name" required>
+                        <input type="text" id="name" name="name" disabled>
                     </div>
                     <div class="form-group">
                         <label for="email">Email</label>
-                        <input type="email" id="email" name="email" required>
+                        <input type="email" id="email" name="email" disabled>
                     </div>
                     <div class="form-group">
                         <label for="phone">Téléphone</label>
-                        <input type="tel" id="phone" name="phone">
+                        <input type="tel" id="phone" name="phone" disabled>
                     </div>
                     <div class="form-group">
                         <label for="message">Message</label>
-                        <textarea id="message" name="message" required></textarea>
+                        <textarea id="message" name="message" disabled></textarea>
                     </div>
-                    <button type="submit" class="form-submit">Envoyer</button>
+                    <button type="submit" class="form-submit" disabled>Envoyer</button>
                 </form>
+                <div class="mailto-cta">
+                    <p>En attendant, contactez-moi directement par email :</p>
+                    <a href="mailto:aculifting.mtc@gmail.com?subject=Prise%20de%20rendez-vous%20Aculifting" class="btn btn-primary mailto-btn">
+                        Écrire un email
+                    </a>
+                </div>
             </div>
         </div>
         <div class="map-container fade-in">
@@ -425,7 +436,7 @@ const SITE_CONFIG = {
                 <li><a href="#deroulement">Déroulement</a></li>
                 <li><a href="#tarifs">Tarifs</a></li>
                 <li><a href="#testimonials">Témoignages</a></li>
-                <li><a href="#rdv">Rendez-vous</a></li>
+                <li><a href="#contact">Contact</a></li>
                 <li><a href="#contact">Contact</a></li>
             </ul>
         </div>
@@ -452,7 +463,7 @@ const SITE_CONFIG = {
 
 <!-- ===== FLOATING CTA BUTTON (MOBILE) ===== -->
 <div class="floating-cta">
-    <a href="#rdv">Prendre RDV</a>
+    <a href="#contact">Prendre RDV</a>
 </div>
 
 <!-- ===== JAVASCRIPT ===== -->
@@ -504,296 +515,6 @@ const SITE_CONFIG = {
         });
     }
 
-    // ===== RDV / BOOKING MODULE =====
-    var rdvState = {
-        currentMonth: new Date().getMonth(),
-        currentYear: new Date().getFullYear(),
-        selectedDate: null,
-        selectedSlot: null,
-        step: 1 // 1=date, 2=time, 3=confirm
-    };
-
-    var FRENCH_MONTHS = [
-        'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
-        'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'
-    ];
-
-    var FRENCH_DAYS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
-
-    var FRENCH_DAYS_FULL = [
-        'Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'
-    ];
-
-    var FRENCH_MONTHS_FULL = [
-        'janvier', 'février', 'mars', 'avril', 'mai', 'juin',
-        'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'
-    ];
-
-    var TIME_SLOTS = ['9:00', '10:30', '12:00', '13:30', '15:00', '16:30'];
-
-    function formatFrenchDate(date) {
-        return FRENCH_DAYS_FULL[date.getDay()] + ' ' + date.getDate() + ' ' + FRENCH_MONTHS_FULL[date.getMonth()] + ' ' + date.getFullYear();
-    }
-
-    function getDaysInMonth(year, month) {
-        return new Date(year, month + 1, 0).getDate();
-    }
-
-    function getFirstDayOfMonth(year, month) {
-        var day = new Date(year, month, 1).getDay();
-        // Convert from Sun=0 to Mon=0
-        return day === 0 ? 6 : day - 1;
-    }
-
-    function isToday(year, month, day) {
-        var today = new Date();
-        return today.getFullYear() === year && today.getMonth() === month && today.getDate() === day;
-    }
-
-    function isPast(year, month, day) {
-        var today = new Date();
-        today.setHours(0, 0, 0, 0);
-        var check = new Date(year, month, day);
-        return check < today;
-    }
-
-    function isWeekend(year, month, day) {
-        var d = new Date(year, month, day).getDay();
-        return d === 0 || d === 6;
-    }
-
-    function renderRdvSteps() {
-        var html = '<div class="rdv-steps">';
-        var steps = [
-            { num: 1, label: 'Date' },
-            { num: 2, label: 'Horaire' },
-            { num: 3, label: 'Confirmation' }
-        ];
-        steps.forEach(function(s) {
-            var cls = 'rdv-step-indicator';
-            if (s.num === rdvState.step) cls += ' active';
-            else if (s.num < rdvState.step) cls += ' completed';
-            html += '<div class="' + cls + '">';
-            html += '<span class="rdv-step-number">' + s.num + '</span>';
-            html += '<span class="rdv-step-label">' + s.label + '</span>';
-            html += '</div>';
-        });
-        html += '</div>';
-        return html;
-    }
-
-    function renderCalendar() {
-        var year = rdvState.currentYear;
-        var month = rdvState.currentMonth;
-        var daysInMonth = getDaysInMonth(year, month);
-        var firstDay = getFirstDayOfMonth(year, month);
-
-        var html = '<div class="rdv-calendar">';
-        html += '<div class="rdv-calendar-header">';
-        html += '<button class="rdv-calendar-nav" id="rdvPrevMonth" aria-label="Mois précédent">&#8249;</button>';
-        html += '<h3>' + FRENCH_MONTHS[month] + ' ' + year + '</h3>';
-        html += '<button class="rdv-calendar-nav" id="rdvNextMonth" aria-label="Mois suivant">&#8250;</button>';
-        html += '</div>';
-
-        html += '<div class="rdv-calendar-grid">';
-        // Day names
-        FRENCH_DAYS.forEach(function(d) {
-            html += '<div class="rdv-calendar-day-name">' + d + '</div>';
-        });
-
-        // Empty cells before first day
-        for (var e = 0; e < firstDay; e++) {
-            html += '<div class="rdv-calendar-day empty"></div>';
-        }
-
-        // Days
-        for (var d = 1; d <= daysInMonth; d++) {
-            var cls = 'rdv-calendar-day';
-            var disabled = false;
-
-            if (isPast(year, month, d)) {
-                cls += ' disabled';
-                disabled = true;
-            } else if (isWeekend(year, month, d)) {
-                cls += ' disabled';
-                disabled = true;
-            }
-
-            if (isToday(year, month, d) && !disabled) {
-                cls += ' today';
-            }
-
-            if (rdvState.selectedDate &&
-                rdvState.selectedDate.getFullYear() === year &&
-                rdvState.selectedDate.getMonth() === month &&
-                rdvState.selectedDate.getDate() === d) {
-                cls += ' selected';
-            }
-
-            html += '<button class="' + cls + '"' + (disabled ? ' disabled' : '') + ' data-day="' + d + '">' + d + '</button>';
-        }
-
-        html += '</div></div>';
-        return html;
-    }
-
-    function renderTimeSlots() {
-        if (!rdvState.selectedDate) return '';
-
-        var dateStr = formatFrenchDate(rdvState.selectedDate);
-        var html = '<div class="rdv-slots">';
-        html += '<p class="rdv-slots-title">Créneaux disponibles le ' + dateStr + '</p>';
-        html += '<div class="rdv-slots-grid">';
-
-        TIME_SLOTS.forEach(function(slot) {
-            var cls = 'rdv-slot';
-            if (rdvState.selectedSlot === slot) cls += ' selected';
-            html += '<div class="' + cls + '" data-slot="' + slot + '">';
-            html += '<span class="rdv-slot-time">' + slot + '</span>';
-            html += '<span class="rdv-slot-duration">1h30</span>';
-            html += '</div>';
-        });
-
-        html += '</div></div>';
-        return html;
-    }
-
-    function renderConfirmation() {
-        var dateStr = formatFrenchDate(rdvState.selectedDate);
-        // Capitalize first letter
-        dateStr = dateStr.charAt(0).toUpperCase() + dateStr.slice(1);
-
-        var html = '<div class="rdv-confirm">';
-        html += '<span class="rdv-confirm-icon">&#128197;</span>';
-        html += '<p class="rdv-confirm-date">' + dateStr + '</p>';
-        html += '<p class="rdv-confirm-time">' + rdvState.selectedSlot + ' — 1h30</p>';
-        html += '<div class="rdv-confirm-actions">';
-        html += '<button class="rdv-btn rdv-btn-primary" id="rdvConfirmBtn">Confirmer</button>';
-        html += '<button class="rdv-btn rdv-btn-secondary" id="rdvModifyBtn">Modifier</button>';
-        html += '</div></div>';
-        return html;
-    }
-
-    function renderSuccess() {
-        var html = '<div class="rdv-success">';
-        html += '<div class="rdv-success-icon"><svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg></div>';
-        html += '<h3>Demande enregistrée !</h3>';
-        html += '<p>Votre demande de rendez-vous a bien été enregistrée. Nous vous contacterons au plus vite pour confirmer votre créneau. Vous pouvez également nous appeler au <a href="tel:+33613238681">06 13 23 86 81</a>.</p>';
-        html += '<button class="rdv-btn rdv-btn-secondary" id="rdvNewBooking">Nouveau rendez-vous</button>';
-        html += '</div>';
-        return html;
-    }
-
-    function renderRdv() {
-        var container = document.getElementById('rdvContainer');
-        if (!container) return;
-
-        var html = renderRdvSteps();
-
-        if (rdvState.step === 1) {
-            html += renderCalendar();
-            if (rdvState.selectedDate) {
-                html += renderTimeSlots();
-            }
-        } else if (rdvState.step === 2) {
-            html += renderConfirmation();
-        } else if (rdvState.step === 3) {
-            html += renderSuccess();
-        }
-
-        container.innerHTML = html;
-        attachRdvEvents();
-
-        // Re-observe any new fade-in elements
-        var newFadeIns = container.querySelectorAll('.fade-in');
-        newFadeIns.forEach(function(el) {
-            if (window.rdvObserver) window.rdvObserver.observe(el);
-        });
-    }
-
-    function attachRdvEvents() {
-        // Month navigation
-        var prevBtn = document.getElementById('rdvPrevMonth');
-        var nextBtn = document.getElementById('rdvNextMonth');
-
-        if (prevBtn) {
-            prevBtn.addEventListener('click', function() {
-                var today = new Date();
-                // Don't navigate before current month
-                if (rdvState.currentYear === today.getFullYear() && rdvState.currentMonth === today.getMonth()) return;
-                rdvState.currentMonth--;
-                if (rdvState.currentMonth < 0) {
-                    rdvState.currentMonth = 11;
-                    rdvState.currentYear--;
-                }
-                renderRdv();
-            });
-        }
-
-        if (nextBtn) {
-            nextBtn.addEventListener('click', function() {
-                rdvState.currentMonth++;
-                if (rdvState.currentMonth > 11) {
-                    rdvState.currentMonth = 0;
-                    rdvState.currentYear++;
-                }
-                renderRdv();
-            });
-        }
-
-        // Day selection
-        var dayButtons = document.querySelectorAll('.rdv-calendar-day:not(.disabled):not(.empty)');
-        dayButtons.forEach(function(btn) {
-            btn.addEventListener('click', function() {
-                var day = parseInt(this.getAttribute('data-day'));
-                rdvState.selectedDate = new Date(rdvState.currentYear, rdvState.currentMonth, day);
-                rdvState.selectedSlot = null;
-                renderRdv();
-            });
-        });
-
-        // Slot selection
-        var slots = document.querySelectorAll('.rdv-slot');
-        slots.forEach(function(slot) {
-            slot.addEventListener('click', function() {
-                rdvState.selectedSlot = this.getAttribute('data-slot');
-                rdvState.step = 2;
-                renderRdv();
-            });
-        });
-
-        // Confirm button
-        var confirmBtn = document.getElementById('rdvConfirmBtn');
-        if (confirmBtn) {
-            confirmBtn.addEventListener('click', function() {
-                rdvState.step = 3;
-                renderRdv();
-            });
-        }
-
-        // Modify button
-        var modifyBtn = document.getElementById('rdvModifyBtn');
-        if (modifyBtn) {
-            modifyBtn.addEventListener('click', function() {
-                rdvState.step = 1;
-                renderRdv();
-            });
-        }
-
-        // New booking button
-        var newBookingBtn = document.getElementById('rdvNewBooking');
-        if (newBookingBtn) {
-            newBookingBtn.addEventListener('click', function() {
-                rdvState.selectedDate = null;
-                rdvState.selectedSlot = null;
-                rdvState.step = 1;
-                rdvState.currentMonth = new Date().getMonth();
-                rdvState.currentYear = new Date().getFullYear();
-                renderRdv();
-            });
-        }
-    }
-
     function renderAculifting() {
         document.getElementById('aculiftingTitle').textContent = SITE_CONFIG.aculifting.title;
         document.getElementById('aculiftingSubtitle').textContent = SITE_CONFIG.aculifting.subtitle;
@@ -824,7 +545,6 @@ const SITE_CONFIG = {
         renderHero();
         renderAbout();
         renderAculifting();
-        renderRdv();
 
         // Mobile menu toggle
         var navToggle = document.getElementById('navToggle');
@@ -909,7 +629,6 @@ const SITE_CONFIG = {
                 }
             });
         }, observerOptions);
-        window.rdvObserver = observer;
         document.querySelectorAll('.fade-in').forEach(function(el) {
             observer.observe(el);
         });
@@ -929,22 +648,8 @@ const SITE_CONFIG = {
             }
         });
 
-        // FormSubmit hidden fields
-        var contactForm = document.querySelector('.contact-form form');
-        if (contactForm) {
-            var fields = [
-                { name: '_captcha', value: 'false' },
-                { name: '_next', value: window.location.href + '#contact' },
-                { name: '_subject', value: 'Nouveau message depuis le site Aculifting' }
-            ];
-            fields.forEach(function(f) {
-                var input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = f.name;
-                input.value = f.value;
-                contactForm.appendChild(input);
-            });
-        }
+        // FormSubmit hidden fields (désactivé - formulaire en cours de configuration)
+        // var contactForm = document.querySelector('.contact-form form');
 
         // Font preload
         if ('fonts' in document) {

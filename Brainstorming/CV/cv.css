@@ -1,10 +1,11 @@
 /* ============================================================
    CV — Etienne Millerioux
-   Palette 4 sections :
-     Cell 1 (top-left)     : #3b6070  — teal sombre (identité)
-     Cell 2 (top-right)    : #c8d8dd  — bleu-gris clair (synthèse)
-     Cell 3 (bottom-left)  : #4d7585  — teal moyen (compétences…)
-     Cell 4 (bottom-right) : #ffffff  — blanc (expérience)
+   Palette 5 cellules (grille 3 lignes × 2 colonnes) :
+     cell-nom      (col1 row1) : #3b6070  — teal sombre
+     cell-titre    (col2 row1) : #c8d8dd  — bleu-gris clair
+     cell-contact  (col1 row2) : #4d7585  — teal moyen
+     cell-skills   (col1 row3) : #c8d8dd  — bleu-gris clair
+     cell-experience(col2 r2-3): #ffffff  — blanc
    ============================================================ */
 
 * {
@@ -14,110 +15,150 @@
 }
 
 body {
-  font-family: 'Segoe UI', 'Calibri', Arial, sans-serif;
-  font-size: 12px;
+  font-family: 'Verdana', sans-serif;
   background: #b8c8ce;
   display: flex;
   justify-content: center;
-  padding: 30px 20px;
+  padding: 50px 20px 30px;
   color: #333;
 }
 
-/* ─── Page A4 — grille 2×2 ──────────────────────────────────── */
+/* ─── Page A4 — grille 3 lignes × 2 colonnes ────────────────── */
 .cv-page {
   width: 210mm;
   min-height: 297mm;
   display: grid;
   grid-template-columns: 37% 63%;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto auto 1fr;
   box-shadow: 0 6px 30px rgba(0, 0, 0, 0.3);
 }
 
-/* ─── Cellule 1 — Identité (top-left) ──────────────────────── */
-.cell-identity {
+/* ─── Cellule 1 — Nom (col1, row1) ─────────────────────────── */
+.cell-nom {
   grid-column: 1;
   grid-row: 1;
   background: #3b6070;
   color: white;
-  padding: 28px 22px 24px;
+  padding: 16px 22px 14px;
+  display: flex;
+  align-items: center;
 }
 
-/* ─── Cellule 2 — Synthèse (top-right) ─────────────────────── */
-.cell-summary {
+.cell-nom h1 {
+  font-size: 18px;
+  font-weight: 700;
+  color: white;
+  /* text-transform: uppercase; */
+  letter-spacing: 1px;
+  text-shadow: 5px 5px 8px rgba(80, 80, 80, 0.6);
+}
+
+/* ─── Cellule 2 — Titre / poste visé (col2, row1) ──────────── */
+.cell-titre {
   grid-column: 2;
   grid-row: 1;
-  background: #c8d8dd;
-  padding: 28px 26px 24px;
+  background: linear-gradient(to right, #c8d8dd 40%, #ffffff);
+  padding: 30px 28px 22px 68px;
+  display: flex;
+  align-items: center;
 }
 
-/* ─── Cellule 3 — Infos (bottom-left) ──────────────────────── */
-.cell-sidebar {
+/* ─── Cellule 3 — Contact (col1, row2) ─────────────────────── */
+.cell-contact {
   grid-column: 1;
   grid-row: 2;
-  background: #4d7585;
-  color: white;
-  padding: 24px 22px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
+  background: #a8bec6;
+  color: black;
+  padding: 16px 20px;
 }
 
-/* ─── Cellule 4 — Expérience (bottom-right) ─────────────────── */
+/* ─── Cellule 4 — Compétences / Formation / Langues (col1, row3) */
+.cell-skills {
+  grid-column: 1;
+  grid-row: 3;
+  background: #c8d8dd;
+  padding: 20px 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ─── Cellule 5 — Expérience (col2, rows 2-3) ──────────────── */
 .cell-experience {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 2 / span 2;
   background: #ffffff;
   padding: 24px 26px 28px;
 }
 
-/* ─── Nom & titre (cell 1) ──────────────────────────────────── */
-.name-block h1 {
-  font-size: 23px;
+/* ─── Titre / poste visé ────────────────────────────────────── */
+.cv-title-block {
+  padding: 0 4px;
+}
+
+.cv-main-title {
+  font-size: 26px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
-  line-height: 1.15;
-  color: white;
-  word-break: break-word;
+  letter-spacing: 1px;
+  color: #284652;
+  line-height: 1.05;
+  text-shadow: 3px 5px 8px rgba(77, 117, 133, 0.65);
 }
 
-.job-title {
-  font-size: 10px;
+.cv-sub-title {
+  font-size: 14px;
+  font-weight: 400;
+  color: #4d7585;
+  margin-top: 10px;
+  letter-spacing: 0.3px;
+}
+
+/* ─── Titres de sections ────────────────────────────────────── */
+
+/* Par défaut : cellules sombres (contact) → texte blanc */
+.section-title {
+  font-size: 14px;
+  font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 2.5px;
-  color: rgba(255, 255, 255, 0.75);
-  margin-top: 6px;
+  padding: 10px 0px;
+  margin-bottom: 12px;
 }
 
-.cell-divider {
-  width: 45px;
-  height: 2px;
-  background: rgba(255, 255, 255, 0.4);
-  margin-top: 14px;
-  margin-bottom: 18px;
+/* Cellules claires (skills + experience) → texte teal sombre + gradient */
+.cell-skills    .section-title,
+.cell-experience .section-title {
+  color: #2c4a56;
+  border-bottom: none;
+  background: linear-gradient(to right, #a8bec6, #ffffff 60%);
+  padding: 6px 10px;
+  margin-left: -10px;
+  margin-right: -10px;
+  border-radius: 4px;
 }
 
-/* ─── Contact ───────────────────────────────────────────────── */
+/* ─── Contact (cellule 3, fond teal, texte blanc) ───────────── */
 .contact-item {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.88);
-  line-height: 1.45;
-  margin-bottom: 7px;
+  color: rgba(49, 49, 49, 0.81);
+  line-height: 1.4;
+  margin-bottom: 4px;
 }
 
 .contact-item i {
   width: 14px;
   flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.6);
+  color: white;
   margin-top: 2px;
   text-align: center;
 }
 
 .contact-item a {
-  color: rgba(255, 255, 255, 0.88);
+  color: rgba(49, 49, 49, 0.81);
   text-decoration: none;
   word-break: break-all;
 }
@@ -127,26 +168,7 @@ body {
   text-decoration: underline;
 }
 
-/* ─── Titres de sections — sidebar (teal) ───────────────────── */
-.section-title {
-  font-size: 10.5px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 1.8px;
-  padding-bottom: 5px;
-  margin-bottom: 12px;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.35);
-  color: white;
-}
-
-/* Titres dans les cellules claires (synthèse + expérience) */
-.cell-summary   .section-title,
-.cell-experience .section-title {
-  color: #2c4a56;
-  border-bottom-color: #4d7585;
-}
-
-/* ─── Compétences ───────────────────────────────────────────── */
+/* ─── Compétences (cellule 4, fond clair) ───────────────────── */
 #cv-skills {
   list-style: none;
   padding: 0;
@@ -157,7 +179,7 @@ body {
 
 #cv-skills li {
   font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.88);
+  color: #2c4a56;
   padding-left: 14px;
   position: relative;
   line-height: 1.4;
@@ -167,70 +189,65 @@ body {
   content: '•';
   position: absolute;
   left: 0;
-  color: rgba(255, 255, 255, 0.5);
+  color: #4d7585;
 }
 
-/* ─── Formation ─────────────────────────────────────────────── */
+/* ─── Formation (cellule 4, fond clair) ─────────────────────── */
 .edu-item {
-  margin-bottom: 11px;
-  line-height: 1.4;
-}
-
-.edu-school {
-  font-weight: 700;
-  font-size: 11px;
-  color: white;
+  margin-bottom: 7px;
+  line-height: 1.5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0;
 }
 
 .edu-dates {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
+  color: #5a7a88;
   font-style: italic;
-  margin-top: 1px;
+  white-space: nowrap;
+}
+
+.edu-sep {
+  font-size: 10px;
+  color: #5a7a88;
 }
 
 .edu-degree {
   font-size: 10.5px;
-  color: rgba(255, 255, 255, 0.88);
-  margin-top: 2px;
+  color: #333;
 }
 
-.edu-degree small {
-  font-size: 9.5px;
-  color: rgba(255, 255, 255, 0.65);
+.edu-school {
+  font-size: 10px;
+  font-weight: 400;
+  color: #5a7a88;
 }
 
-/* ─── Langues (sidebar) ─────────────────────────────────────── */
+/* ─── Langues (cellule 4, fond clair) ──────────────────────── */
 .lang-item {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
   padding-bottom: 4px;
   margin-bottom: 7px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  border-bottom: 1px solid rgba(77, 117, 133, 0.35);
 }
 
 .lang-name {
   font-weight: 700;
   font-size: 11px;
-  color: white;
+  color: #2c4a56;
 }
 
 .lang-level {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.7);
+  color: #5a7a88;
   font-style: italic;
 }
 
-/* ─── Synthèse (cell 2) ─────────────────────────────────────── */
-#cv-summary {
-  font-size: 13px;       /* plus grande que le reste */
-  font-style: normal;    /* pas d'italique */
-  color: #2c4a56;
-  line-height: 1.6;
-}
-
-/* ─── Expériences (cell 4) ──────────────────────────────────── */
+/* ─── Expériences (cellule 5, fond blanc) ───────────────────── */
 .exp-item {
   margin-bottom: 11px;
   padding-bottom: 11px;

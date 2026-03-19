@@ -268,15 +268,21 @@ opacity: 0;
 transform: rotate(-45deg) translate(6px, -6px);
 }
 
+/* ===== HERO + ABOUT SHARED BACKGROUND WRAPPER ===== */
+.hero-about-bg {
+background: linear-gradient(135deg, var(--color-hero-bg) 0%, var(--color-light-rose) 100%);
+position: relative;
+overflow: hidden;
+}
+
 /* ===== HERO SECTION ===== */
 .hero {
 min-height: 100vh;
 display: flex;
 align-items: center;
 justify-content: center;
-background: linear-gradient(135deg, var(--color-hero-bg) 0%, var(--color-light-rose) 100%);
+background: transparent;
 position: relative;
-overflow: hidden;
 padding-top: 80px;
 }
 
@@ -303,7 +309,7 @@ padding: var(--spacing-md);
 
 .hero-logo {
 position: absolute;
-top: 50%;
+top: 50vh;
 left: 50%;
 transform: translate(-50%, -50%);
 width: 80%;
@@ -379,7 +385,7 @@ height: 24px;
 
 /* ===== ABOUT SECTION ===== */
 .about {
-background-color: var(--color-white);
+background-color: transparent;
 }
 
 .about-content {
@@ -1020,6 +1026,25 @@ color: var(--color-brown-rose);
 margin-bottom: 30px;
 }
 
+.mailto-cta {
+text-align: center;
+padding: 40px 20px;
+}
+
+.mailto-cta p {
+font-family: var(--font-body);
+font-size: 1.05rem;
+color: var(--color-brown-rose);
+margin-bottom: 30px;
+line-height: 1.6;
+}
+
+.mailto-btn {
+display: inline-block;
+font-size: 1.1rem;
+padding: 16px 40px;
+}
+
 .form-group {
 margin-bottom: 20px;
 }
@@ -1455,409 +1480,6 @@ footer {
 }
 }
 
-/* ===== RDV / BOOKING SECTION ===== */
-#rdv {
-background: var(--color-light-rose);
-padding: 100px 0;
-}
-
-.rdv-container {
-max-width: 700px;
-margin: 0 auto;
-padding: 0 20px;
-}
-
-.rdv-steps {
-display: flex;
-justify-content: center;
-gap: 2rem;
-margin-bottom: 2.5rem;
-}
-
-.rdv-step-indicator {
-display: flex;
-align-items: center;
-gap: 0.5rem;
-font-family: var(--font-body);
-font-size: 0.9rem;
-color: var(--color-muted);
-opacity: 0.5;
-transition: var(--transition-smooth);
-}
-
-.rdv-step-indicator.active {
-opacity: 1;
-color: var(--color-gold);
-}
-
-.rdv-step-indicator.completed {
-opacity: 1;
-color: var(--color-brown-rose);
-}
-
-.rdv-step-number {
-width: 32px;
-height: 32px;
-border-radius: 50%;
-display: flex;
-align-items: center;
-justify-content: center;
-font-weight: 700;
-font-size: 0.85rem;
-border: 2px solid var(--color-border);
-background: var(--color-white);
-transition: var(--transition-smooth);
-}
-
-.rdv-step-indicator.active .rdv-step-number {
-background: var(--color-gold);
-color: var(--color-white);
-border-color: var(--color-gold);
-}
-
-.rdv-step-indicator.completed .rdv-step-number {
-background: var(--color-brown-rose);
-color: var(--color-white);
-border-color: var(--color-brown-rose);
-}
-
-/* Calendar */
-.rdv-calendar {
-background: var(--color-white);
-border-radius: var(--radius-md);
-box-shadow: var(--shadow-medium);
-padding: 2rem;
-margin-bottom: 1.5rem;
-}
-
-.rdv-calendar-header {
-display: flex;
-justify-content: space-between;
-align-items: center;
-margin-bottom: 1.5rem;
-}
-
-.rdv-calendar-header h3 {
-font-family: var(--font-subtitle);
-font-size: 1.4rem;
-font-weight: 600;
-color: var(--color-brown-rose);
-text-transform: capitalize;
-}
-
-.rdv-calendar-nav {
-background: none;
-border: 2px solid var(--color-border);
-border-radius: 50%;
-width: 36px;
-height: 36px;
-display: flex;
-align-items: center;
-justify-content: center;
-cursor: pointer;
-transition: var(--transition-smooth);
-color: var(--color-brown-rose);
-font-size: 1.1rem;
-}
-
-.rdv-calendar-nav:hover {
-border-color: var(--color-gold);
-color: var(--color-gold);
-background: var(--color-light-rose);
-}
-
-.rdv-calendar-grid {
-display: grid;
-grid-template-columns: repeat(7, 1fr);
-gap: 4px;
-}
-
-.rdv-calendar-day-name {
-text-align: center;
-font-family: var(--font-body);
-font-size: 0.8rem;
-font-weight: 700;
-color: var(--color-muted);
-padding: 0.5rem 0;
-text-transform: uppercase;
-letter-spacing: 0.5px;
-}
-
-.rdv-calendar-day {
-text-align: center;
-padding: 0.6rem 0.3rem;
-font-family: var(--font-body);
-font-size: 0.95rem;
-border-radius: var(--radius-sm);
-cursor: pointer;
-transition: var(--transition-smooth);
-color: var(--color-brown-rose);
-background: none;
-border: none;
-width: 100%;
-}
-
-.rdv-calendar-day:hover:not(.disabled):not(.empty) {
-background: var(--color-rose-powder);
-color: var(--color-brown-rose);
-}
-
-.rdv-calendar-day.today:not(.selected) {
-border: 2px solid var(--color-gold);
-}
-
-.rdv-calendar-day.selected {
-background: var(--color-gold);
-color: var(--color-white);
-font-weight: 700;
-}
-
-.rdv-calendar-day.disabled {
-color: var(--color-border);
-cursor: default;
-opacity: 0.4;
-}
-
-.rdv-calendar-day.empty {
-cursor: default;
-}
-
-/* Time slots */
-.rdv-slots {
-background: var(--color-white);
-border-radius: var(--radius-md);
-box-shadow: var(--shadow-medium);
-padding: 2rem;
-margin-bottom: 1.5rem;
-}
-
-.rdv-slots-title {
-font-family: var(--font-subtitle);
-font-size: 1.2rem;
-font-weight: 600;
-color: var(--color-brown-rose);
-margin-bottom: 1rem;
-text-align: center;
-}
-
-.rdv-slots-grid {
-display: grid;
-grid-template-columns: repeat(3, 1fr);
-gap: 12px;
-}
-
-.rdv-slot {
-background: var(--color-bg-warm);
-border: 2px solid var(--color-border);
-border-radius: var(--radius-sm);
-padding: 1rem 0.75rem;
-text-align: center;
-cursor: pointer;
-transition: var(--transition-smooth);
-}
-
-.rdv-slot:hover {
-border-color: var(--color-gold);
-background: var(--color-rose-powder);
-transform: translateY(-2px);
-box-shadow: var(--shadow-light);
-}
-
-.rdv-slot.selected {
-border-color: var(--color-gold);
-background: var(--color-gold);
-color: var(--color-white);
-box-shadow: var(--shadow-medium);
-}
-
-.rdv-slot-time {
-font-family: var(--font-title);
-font-size: 1.2rem;
-font-weight: 600;
-display: block;
-margin-bottom: 2px;
-}
-
-.rdv-slot.selected .rdv-slot-time {
-color: var(--color-white);
-}
-
-.rdv-slot-duration {
-font-family: var(--font-body);
-font-size: 0.8rem;
-color: var(--color-muted);
-display: block;
-}
-
-.rdv-slot.selected .rdv-slot-duration {
-color: rgba(255,255,255,0.85);
-}
-
-/* Confirmation */
-.rdv-confirm {
-background: var(--color-white);
-border-radius: var(--radius-md);
-box-shadow: var(--shadow-medium);
-padding: 2.5rem 2rem;
-text-align: center;
-}
-
-.rdv-confirm-icon {
-font-size: 3rem;
-margin-bottom: 1rem;
-display: block;
-}
-
-.rdv-confirm-date {
-font-family: var(--font-title);
-font-size: 1.5rem;
-font-weight: 600;
-color: var(--color-brown-rose);
-margin-bottom: 0.25rem;
-}
-
-.rdv-confirm-time {
-font-family: var(--font-subtitle);
-font-size: 1.3rem;
-color: var(--color-gold);
-margin-bottom: 2rem;
-}
-
-.rdv-confirm-actions {
-display: flex;
-gap: 1rem;
-justify-content: center;
-flex-wrap: wrap;
-}
-
-.rdv-btn {
-display: inline-block;
-padding: 0.85rem 2rem;
-font-family: var(--font-body);
-font-size: 1rem;
-font-weight: 600;
-border-radius: 50px;
-cursor: pointer;
-transition: var(--transition-smooth);
-border: 2px solid transparent;
-}
-
-.rdv-btn-primary {
-background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-dark-gold) 100%);
-color: var(--color-white);
-border-color: var(--color-gold);
-box-shadow: 0 4px 15px rgba(196, 149, 106, 0.3);
-}
-
-.rdv-btn-primary:hover {
-transform: translateY(-2px);
-box-shadow: 0 6px 20px rgba(196, 149, 106, 0.4);
-}
-
-.rdv-btn-secondary {
-background: transparent;
-color: var(--color-brown-rose);
-border-color: var(--color-brown-rose);
-}
-
-.rdv-btn-secondary:hover {
-background: var(--color-brown-rose);
-color: var(--color-white);
-}
-
-/* Success message */
-.rdv-success {
-background: var(--color-white);
-border-radius: var(--radius-md);
-box-shadow: var(--shadow-medium);
-padding: 2.5rem 2rem;
-text-align: center;
-border-top: 4px solid var(--color-gold);
-}
-
-.rdv-success-icon {
-width: 64px;
-height: 64px;
-background: var(--color-gold);
-border-radius: 50%;
-display: flex;
-align-items: center;
-justify-content: center;
-margin: 0 auto 1.5rem;
-}
-
-.rdv-success-icon svg {
-width: 32px;
-height: 32px;
-fill: var(--color-white);
-}
-
-.rdv-success h3 {
-font-family: var(--font-title);
-font-size: 1.5rem;
-color: var(--color-brown-rose);
-margin-bottom: 1rem;
-}
-
-.rdv-success p {
-font-family: var(--font-body);
-font-size: 1rem;
-line-height: 1.8;
-color: var(--color-muted);
-margin-bottom: 1.5rem;
-max-width: 500px;
-margin-left: auto;
-margin-right: auto;
-}
-
-.rdv-success a {
-color: var(--color-gold);
-font-weight: 700;
-text-decoration: none;
-}
-
-.rdv-success a:hover {
-color: var(--color-brown-rose);
-}
-
-/* RDV Responsive */
-@media (max-width: 768px) {
-#rdv {
-    padding: 60px 0;
-}
-
-.rdv-steps {
-    gap: 1rem;
-}
-
-.rdv-step-label {
-    display: none;
-}
-
-.rdv-calendar {
-    padding: 1.25rem;
-}
-
-.rdv-calendar-day {
-    padding: 0.45rem 0.15rem;
-    font-size: 0.85rem;
-}
-
-.rdv-slots-grid {
-    grid-template-columns: repeat(2, 1fr);
-}
-
-.rdv-confirm-actions {
-    flex-direction: column;
-    align-items: center;
-}
-
-.rdv-btn {
-    width: 100%;
-    max-width: 280px;
-    text-align: center;
-}
-}
 
 @media (min-width: 769px) and (max-width: 1024px) {
 .timeline-container {
