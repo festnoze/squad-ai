@@ -23,16 +23,17 @@ body {
   color: #333;
 }
 
-/* ─── Page A4 — grille 3 lignes × 2 colonnes ────────────────── */
-/*   row1 : Nom | Titre
-     row2 : Sidebar | Compétences
-     row3 : Expériences (pleine largeur)                         */
+/* ─── Page A4 — grille 4 lignes × 2 colonnes ────────────────── */
+/*   row1 : Nom        | Titre
+     row2 : Contact    | Compétences (row2-3)
+     row3 : Outils+Lng |
+     row4 : Expériences (pleine largeur)                         */
 .cv-page {
   width: 210mm;
   min-height: 297mm;
   display: grid;
-  grid-template-columns: 36% 64%;
-  grid-template-rows: auto auto 1fr;
+  grid-template-columns: 35% 65%;
+  grid-template-rows: auto auto auto 1fr;
   box-shadow: 0 6px 30px rgba(0, 0, 0, 0.3);
 }
 
@@ -48,7 +49,7 @@ body {
 }
 
 .cell-nom h1 {
-  font-size: 17.8px;
+  font-size: 17.2px;
   font-weight: 700;
   color: white;
   text-transform: uppercase;
@@ -66,36 +67,37 @@ body {
   align-items: center;
 }
 
-/* ─── Cellule 3 — Sidebar (col1, row2) ─────────────────────── */
-.cell-sidebar {
+/* ─── Cellule 3 — Contact (col1, row2) ─────────────────────── */
+.cell-contact {
   grid-column: 1;
   grid-row: 2;
-  background: linear-gradient(to bottom, #83a9b697, #ffffff 40%);
+  background: linear-gradient(to bottom, #83a9b697, #c8d8dd 100%);
+  padding: 12px 20px 0px;
+}
+
+/* ─── Cellule 3b — Outils + Langues (col1, row3) ────────────── */
+.cell-sidebar-tools {
+  grid-column: 1;
+  grid-row: 3;
+  background: #ffffff;
   padding: 16px 20px 20px;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-/* Séparateur pleine largeur entre contact et sections */
-.cell-sidebar hr {
-  border: none;
-  border-top: 1px solid rgba(255, 255, 255, 0.814);
-  margin: -10px -20px 15px -20px;
-}
-
-/* ─── Cellule 4 — Compétences (col2, row2) ──────────────────── */
+/* ─── Cellule 4 — Compétences (col2, rows 2-3) ──────────────── */
 .cell-skills {
   grid-column: 2;
-  grid-row: 2;
+  grid-row: 2 / 4;
   background: #ffffff;
   padding: 24px 30px 20px;
 }
 
-/* ─── Cellule 5 — Expériences (pleine largeur, row3) ────────── */
+/* ─── Cellule 5 — Expériences (pleine largeur, row4) ────────── */
 .cell-experience {
   grid-column: 1 / -1;
-  grid-row: 3;
+  grid-row: 4;
   background: #ffffff;
   padding: 0px 26px 28px 20px;
   /* border-top: 1px solid #e0e8ec; */
@@ -136,10 +138,10 @@ body {
   margin-bottom: 12px;
 }
 
-/* Cellules claires (sidebar + skills + experience) → texte teal sombre + gradient */
-.cell-sidebar    .section-title,
-.cell-skills     .section-title,
-.cell-experience .section-title {
+/* Cellules claires (sidebar-tools + skills + experience) → texte teal sombre + gradient */
+.cell-sidebar-tools .section-title,
+.cell-skills        .section-title,
+.cell-experience    .section-title {
   color: #2c4a56;
   border-bottom: none;
   background: linear-gradient(to right, #a8bec6, #ffffff 60%);
@@ -163,13 +165,13 @@ body {
   font-size: 10.5px;
   color: rgba(49, 49, 49, 0.81);
   line-height: 1.4;
-  margin-bottom: 8px;
+  margin-bottom: 3px;
 }
 
 .contact-item i {
   width: 14px;
   flex-shrink: 0;
-  color: #3b6070;
+  color: #ffffff;
   margin-top: 2px;
   text-align: center;
 }
@@ -242,6 +244,8 @@ body {
   font-weight: 700;
   padding: 2px 0px;
   color: #4d7585;
+  border-bottom: 1px solid rgba(77, 117, 133, 0.3);
+  margin-bottom: 2px;
 }
 
 .sidebar-skill-tags {
