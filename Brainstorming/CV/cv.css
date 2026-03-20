@@ -359,17 +359,27 @@ body {
 }
 
 /* ─── Impression ────────────────────────────────────────────── */
+@page {
+  size: A4;
+  margin: 0;
+}
+
 @media print {
-  body {
+  html, body {
     background: none;
     padding: 0;
     margin: 0;
+    height: auto;
+    overflow: hidden;
   }
 
   .cv-page {
     box-shadow: none;
-    width: 100%;
+    width: 210mm;
     min-height: 0;
+    height: auto;
+    page-break-after: avoid;
+    break-after: avoid;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
