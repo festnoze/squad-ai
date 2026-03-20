@@ -68,23 +68,25 @@
         <div id="cv-languages"></div>
       </div>
 
-      <div>
-        <h2 class="section-title section-title-left">Formation</h2>
-        <div id="cv-education"></div>
-      </div>
-
     </div>
 
     <!-- ══════════════════════════════════════════════════════
-         CELLULE 5 — right (rows 2-3) : Expérience
+         CELLULE 4 — right (row2) : Compétences
+         ══════════════════════════════════════════════════════ -->
+    <div class="cell-skills">
+      <h2 class="section-title">Compétences</h2>
+      <ul id="cv-skills"></ul>
+    </div>
+
+    <!-- ══════════════════════════════════════════════════════
+         CELLULE 5 — pleine largeur (row3) : Expériences
          ══════════════════════════════════════════════════════ -->
     <div class="cell-experience">
-      <div>
-        <h2 class="section-title">Compétences</h2>
-        <ul id="cv-skills"></ul>
-      </div>
       <h2 class="section-title">Expérience</h2>
       <div id="cv-experience"></div>
+
+      <h2 class="section-title" style="margin-top: 20px;">Formation</h2>
+      <div id="cv-education"></div>
     </div>
 
   </div><!-- /.cv-page -->
@@ -157,7 +159,7 @@
           ? `<div class="exp-description">${job.description}</div>`
           : ''}
         ${job.techs
-          ? `<div class="exp-techs"><span class="exp-techs-label"># </span>${esc(job.techs)}</div>`
+          ? `<div class="exp-techs"><span class="exp-techs-label">Stack: </span>${esc(job.techs)}</div>`
           : ''}
       `;
       expEl.appendChild(div);
@@ -170,7 +172,7 @@
       div.className = 'edu-item';
       div.innerHTML = `
         <span class="edu-degree">${edu.degree}</span>
-        <span class="edu-sep"> — </span>
+        <span class="edu-sep">&nbsp;—&nbsp;</span>
         <span class="edu-dates">${esc(edu.period)}</span>
         ${edu.school ? `<span class="edu-school">&nbsp;(${esc(edu.school)})</span>` : ''}
       `;
