@@ -48,7 +48,7 @@ body {
 }
 
 .cell-nom h1 {
-  font-size: 18px;
+  font-size: 17.8px;
   font-weight: 700;
   color: white;
   text-transform: uppercase;
@@ -306,14 +306,42 @@ body {
 }
 
 /* ─── Expériences (cellule 5, fond blanc) ───────────────────── */
-.exp-item {
-  margin-bottom: 11px;
-  padding-bottom: 11px;
+
+/* Groupe entreprise */
+.exp-group {
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid #e0e8ec;
+}
+
+.exp-group:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+/* Header entreprise */
+.exp-company-header {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #2c4a56;
+  border-left: 3px solid #4d7585;
+  padding-left: 7px;
+  margin-bottom: 6px;
+}
+
+/* Poste individuel */
+.exp-role {
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed #e8eff2;
+  padding-left: 10px;
   line-height: 1.4;
 }
 
-.exp-item:last-child {
+.exp-role.exp-role-last {
   border-bottom: none;
   margin-bottom: 0;
   padding-bottom: 0;
@@ -321,13 +349,9 @@ body {
 
 .exp-header {
   font-size: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: #2c4a56;
   margin-bottom: 1px;
-}
-
-.exp-company {
-  color: #2c4a56;
 }
 
 .exp-title-inline {
@@ -336,20 +360,20 @@ body {
 }
 
 .exp-dates {
-  font-size: 12px;
+  font-size: 13px;
   color: #7a9aaa;
   font-style: italic;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .exp-description {
   font-size: 10.5px;
   color: #444;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .exp-techs {
-  font-size: 12px;
+  font-size: 11px;
   color: #5a8090;
   line-height: 1.45;
 }
