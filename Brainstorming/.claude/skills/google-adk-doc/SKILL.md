@@ -1,237 +1,135 @@
-# Google ADK Python Skill
+---
+name: google-adk-doc
+description: "Expert guide for Google's Agent Development Kit (ADK) Python - an open-source, code-first toolkit for building, evaluating, and deploying AI agents. Use when building ADK agents, creating multi-agent systems, implementing workflow agents (sequential, parallel, loop), integrating tools (google_search, code_execution, custom functions), deploying to Cloud Run or Vertex AI, managing sessions/state/memory, using callbacks for guardrails, or any task involving google.adk imports. Triggers on ADK, google adk, Agent Development Kit, adk agent, adk web, adk run, google.adk, LlmAgent, SequentialAgent, ParallelAgent, LoopAgent."
+---
 
-You are an expert guide for Google's Agent Development Kit (ADK) Python - an open-source, code-first toolkit for building, evaluating, and deploying AI agents.
+# Google ADK Python
 
-## When to Use This Skill
+Code-first toolkit for building, evaluating, and deploying AI agents. Optimized for Gemini models.
 
-Use this skill when users need to:
-- Build AI agents with tool integration and orchestration capabilities
-- Create multi-agent systems with hierarchical coordination
-- Implement workflow agents (sequential, parallel, loop) for predictable pipelines
-- Integrate LLM-powered agents with Google Search, Code Execution, or custom tools
-- Deploy agents to Vertex AI Agent Engine, Cloud Run, or custom infrastructure
-- Evaluate and test agent performance systematically
-- Implement human-in-the-loop approval flows for tool execution
-
-## Core Concepts
-
-### Agent Types
-
-**LlmAgent**: LLM-powered agents capable of dynamic routing and adaptive behavior
-- Define with name, model, instruction, description, and tools
-- Supports sub-agents for delegation and coordination
-- Intelligent decision-making based on context
-
-**Workflow Agents**: Structured, predictable orchestration patterns
-- **SequentialAgent**: Execute agents in defined order
-- **ParallelAgent**: Run multiple agents concurrently
-- **LoopAgent**: Repeat execution with iteration logic
-
-**BaseAgent**: Foundation for custom agent implementations
-
-### Key Components
-
-**Tools Ecosystem**:
-- Pre-built tools (google_search, code_execution)
-- Custom Python functions as tools
-- OpenAPI specification integration
-- Tool confirmation flows for human approval
-
-**Multi-Agent Architecture**:
-- Hierarchical agent composition
-- Specialized agents for specific domains
-- Coordinator agents for delegation
-
-## Installation
+## Quick Reference
 
 ```bash
-# Stable release (recommended)
-pip install google-adk
-
-# Development version (latest features)
-pip install git+https://github.com/google/adk-python.git@main
+pip install google-adk          # Install
+adk web                         # Dev UI at http://localhost:8000
+adk run my_agent                # Terminal interaction
+adk api_server                  # RESTful API server
 ```
 
-## Implementation Patterns
+## Project Structure
 
-### Single Agent with Tools
+```
+parent_folder/           # Run `adk web` from here
+  my_agent/              # Agent package (folder name = agent name)
+    __init__.py          # from . import agent
+    agent.py             # Agent definition with root_agent variable
+    .env                 # GOOGLE_API_KEY or Vertex AI config
+```
+
+`.env` (Google AI Studio):
+```
+GOOGLE_GENAI_USE_VERTEXAI=FALSE
+GOOGLE_API_KEY=YOUR_KEY_HERE
+```
+
+## Agent Types
+
+### LlmAgent (aka Agent)
+LLM-powered agent with dynamic routing, tool use, and adaptive behavior.
 
 ```python
-from google.adk.agents import LlmAgent
-from google.adk.tools import google_search
+from google.adk.agents import Agent
 
-agent = LlmAgent(
-    name="search_assistant",
+root_agent = Agent(
+    name="assistant",
     model="gemini-2.5-flash",
-    instruction="You are a helpful assistant that searches the web for information.",
-    description="Search assistant for web queries",
-    tools=[google_search]
+    description="A helpful assistant.",        # Used by parent agents for routing
+    instruction="Answer user questions.",       # Supports {state_var} templating
+    tools=[my_tool],                           # Functions auto-wrapped as FunctionTool
+    output_key="result",                       # Store response in session state
 )
 ```
 
-### Multi-Agent System
+For full constructor parameters, dynamic instructions, and advanced config: see [references/agent-types.md](references/agent-types.md)
+
+### Workflow Agents (non-LLM, deterministic)
+
+- **SequentialAgent**: Execute sub-agents in order. Share data via `output_key` + `{state_var}`.
+- **ParallelAgent**: Execute sub-agents concurrently. No automatic state sharing between branches.
+- **LoopAgent**: Iterate sub-agents until `max_iterations` or `tool_context.actions.escalate = True`.
+
+For patterns, examples, and data sharing: see [references/agent-types.md](references/agent-types.md)
+
+## Tools
+
+Plain Python functions are auto-wrapped as tools. Docstrings become tool descriptions.
 
 ```python
-from google.adk.agents import LlmAgent
+def get_weather(city: str) -> dict:
+    """Retrieves weather for a city.
 
-# Specialized agents
-researcher = LlmAgent(
-    name="Researcher",
-    model="gemini-2.5-flash",
-    instruction="Research topics thoroughly using web search.",
-    tools=[google_search]
-)
+    Args:
+        city (str): The city name.
+    """
+    return {"status": "success", "report": f"Sunny in {city}."}
 
-writer = LlmAgent(
-    name="Writer",
-    model="gemini-2.5-flash",
-    instruction="Write clear, engaging content based on research.",
-)
-
-# Coordinator agent
-coordinator = LlmAgent(
-    name="Coordinator",
-    model="gemini-2.5-flash",
-    instruction="Delegate tasks to researcher and writer agents.",
-    sub_agents=[researcher, writer]
-)
+agent = Agent(name="weather", model="gemini-2.5-flash", tools=[get_weather])
 ```
 
-### Custom Tool Creation
+**Key rules:**
+- Type hints + docstrings = LLM schema (critical for tool selection)
+- Return `dict` with `"status"` key preferred
+- Use `ToolContext` param for state access and flow control
+- `LongRunningFunctionTool` for async/human-approval operations
+- Built-in: `google_search`, `code_execution`
+- `AgentTool` to nest agents as tools
 
-```python
-from google.adk.tools import Tool
+For full tool patterns, ToolContext, and best practices: see [references/tools.md](references/tools.md)
 
-def calculate_sum(a: int, b: int) -> int:
-    """Calculate the sum of two numbers."""
-    return a + b
+## Sessions and State
 
-# Convert function to tool
-sum_tool = Tool.from_function(calculate_sum)
+State is a key-value scratchpad scoped by prefix:
 
-agent = LlmAgent(
-    name="calculator",
-    model="gemini-2.5-flash",
-    tools=[sum_tool]
-)
-```
+| Prefix | Scope | Persistence |
+|--------|-------|-------------|
+| (none) | Current session | Service-dependent |
+| `user:` | All sessions for user | DB/VertexAI |
+| `app:` | All users/sessions | DB/VertexAI |
+| `temp:` | Current invocation only | Never |
 
-### Sequential Workflow
+Access state in instructions via `{key}` templating. Store output via `output_key`. Modify state through `CallbackContext.state` or `ToolContext.state` (never directly on session objects).
 
-```python
-from google.adk.agents import SequentialAgent
+For session services, state management patterns, and memory: see [references/sessions-state.md](references/sessions-state.md)
 
-workflow = SequentialAgent(
-    name="research_workflow",
-    agents=[researcher, summarizer, writer]
-)
-```
+## Callbacks
 
-### Parallel Workflow
+Six callback types control agent behavior at execution checkpoints:
 
-```python
-from google.adk.agents import ParallelAgent
+| Callback | Return None | Return Value |
+|----------|-------------|--------------|
+| `before/after_agent_callback` | Proceed | `Content` overrides |
+| `before/after_model_callback` | Proceed | `LlmResponse` overrides |
+| `before/after_tool_callback` | Proceed | `dict` overrides |
 
-parallel_research = ParallelAgent(
-    name="parallel_research",
-    agents=[web_researcher, paper_researcher, expert_researcher]
-)
-```
+For callback signatures, guardrail examples, and patterns: see [references/callbacks.md](references/callbacks.md)
 
-### Human-in-the-Loop
-
-```python
-from google.adk.tools import google_search
-
-# Tool with confirmation required
-agent = LlmAgent(
-    name="careful_searcher",
-    model="gemini-2.5-flash",
-    tools=[google_search],
-    tool_confirmation=True  # Requires approval before execution
-)
-```
-
-## Deployment Options
-
-### Cloud Run Deployment
+## Deployment
 
 ```bash
-# Containerize agent
-docker build -t my-agent .
+# Cloud Run (recommended)
+adk deploy cloud_run --project=$PROJECT --region=$REGION --with_ui ./my_agent
 
-# Deploy to Cloud Run
-gcloud run deploy my-agent --image my-agent
+# Evaluation
+adk eval my_agent my_agent/eval_set.evalset.json
 ```
 
-### Vertex AI Agent Engine
-
-```python
-# Deploy to Vertex AI for scalable agent hosting
-# Integrates with Google Cloud's managed infrastructure
-```
-
-### Custom Infrastructure
-
-```python
-# Run agents locally or on custom servers
-# Full control over deployment environment
-```
+For Cloud Run with gcloud, Dockerfile, Vertex AI, and API testing: see [references/deployment.md](references/deployment.md)
 
 ## Model Support
 
-**Optimized for Gemini**:
-- gemini-2.5-flash
-- gemini-2.5-pro
-- gemini-1.5-flash
-- gemini-1.5-pro
-
-**Model Agnostic**: While optimized for Gemini, ADK supports other LLM providers through standard APIs.
-
-## Best Practices
-
-1. **Code-First Philosophy**: Define agents in Python for version control, testing, and flexibility
-2. **Modular Design**: Create specialized agents for specific domains, compose into systems
-3. **Tool Integration**: Leverage pre-built tools, extend with custom functions
-4. **Evaluation**: Test agents systematically against test cases
-5. **Safety**: Implement confirmation flows for sensitive operations
-6. **Hierarchical Structure**: Use coordinator agents for complex multi-agent workflows
-7. **Workflow Selection**: Choose workflow agents for predictable pipelines, LLM agents for dynamic routing
-
-## Common Use Cases
-
-- **Research Assistants**: Web search + summarization + report generation
-- **Code Assistants**: Code execution + documentation + debugging
-- **Customer Support**: Query routing + knowledge base + escalation
-- **Content Creation**: Research + writing + editing pipelines
-- **Data Analysis**: Data fetching + processing + visualization
-- **Task Automation**: Multi-step workflows with conditional logic
-
-## Development UI
-
-ADK includes built-in interface for:
-- Testing agent behavior interactively
-- Debugging tool calls and responses
-- Evaluating agent performance
-- Iterating on agent design
+Optimized for Gemini: `gemini-2.5-flash` (recommended), `gemini-2.5-pro`, `gemini-2.0-flash`. Model-agnostic via standard APIs.
 
 ## Resources
 
 - GitHub: https://github.com/google/adk-python
-- Documentation: https://google.github.io/adk-docs/
-- llms.txt: https://raw.githubusercontent.com/google/adk-python/refs/heads/main/llms.txt
-
-## Implementation Workflow
-
-When implementing ADK-based agents:
-
-1. **Define Requirements**: Identify agent capabilities and tools needed
-2. **Choose Architecture**: Single agent, multi-agent, or workflow-based
-3. **Select Tools**: Pre-built, custom functions, or OpenAPI integrations
-4. **Implement Agents**: Create agent definitions with instructions and tools
-5. **Test Locally**: Use development UI for iteration
-6. **Add Evaluation**: Create test cases for systematic validation
-7. **Deploy**: Choose Cloud Run, Vertex AI, or custom infrastructure
-8. **Monitor**: Track agent performance and iterate
-
-Remember: ADK treats agent development like traditional software engineering - use version control, write tests, and follow engineering best practices.
+- Docs: https://google.github.io/adk-docs/

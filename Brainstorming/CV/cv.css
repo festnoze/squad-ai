@@ -61,7 +61,7 @@ body {
 .cell-titre {
   grid-column: 2;
   grid-row: 1;
-  background: linear-gradient(to right, #c8d8dd 40%, #ffffff);
+  background: linear-gradient(to right, #c8d8dd 40%, #9cb7bd 95%);
   padding: 30px 28px 22px 68px;
   display: flex;
   align-items: center;
@@ -153,17 +153,17 @@ body {
 
 /* Variante sidebar gauche : gradient inversé (fonce à droite) */
 .section-title-left {
-  background: #c8d8dd !important;
-  /* background: linear-gradient(to right, #c8d8dd, #ffffff 80%) !important; */
+  /* background: #c8d8dd !important; */
+   background: linear-gradient(to right, #ffffff, #c8d8dd 70%) !important;
 }
 
 /* ─── Contact (cellule 3, fond teal, texte blanc) ───────────── */
 .contact-item {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
-  font-size: 10.5px;
-  color: rgba(49, 49, 49, 0.81);
+  gap: 8px;
+  font-size: 11px;
+  color: #4d7585;
   line-height: 1.4;
   margin-bottom: 3px;
 }
@@ -171,13 +171,13 @@ body {
 .contact-item i {
   width: 14px;
   flex-shrink: 0;
-  color: #ffffff;
-  margin-top: 2px;
+  color: #3b6070;
+  margin-top: 3px;
   text-align: center;
 }
 
 .contact-item a {
-  color: rgba(49, 49, 49, 0.81);
+  color: #4d7585;
   text-decoration: none;
   word-break: break-all;
 }
@@ -219,7 +219,7 @@ body {
   color: #51889e;
   padding-left: 0;
   margin-top: 20px;
-  border-bottom: 1px solid rgba(77, 117, 133, 0.3);
+  border-bottom: 1px solid rgb(223 223 223);
   padding-bottom: 2px;
   margin-bottom: 3px;
 }
