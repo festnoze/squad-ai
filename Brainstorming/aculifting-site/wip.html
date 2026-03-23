@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Yamina Heinrich, spécialiste en Aculifting. Site en construction. Contactez-moi pour prendre rendez-vous.">
+    <meta name="author" content="Yamina Heinrich">
+    <title>Yamina Heinrich - Aculifting | Site en construction</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@300;400;500;600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <style>
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --color-white: #FFFFFF;
+            --color-rose-powder: #F5E6E0;
+            --color-gold: #C4956A;
+            --color-brown-rose: #5A3E36;
+            --color-light-rose: #FAF3F0;
+            --color-dark-gold: #A67C52;
+            --color-muted: #8B6F66;
+            --color-border: #E8D5CC;
+            --color-bg-warm: #FDF8F6;
+        }
+
+        body {
+            font-family: 'Lato', sans-serif;
+            color: var(--color-brown-rose);
+            line-height: 1.7;
+            background: linear-gradient(160deg, var(--color-bg-warm) 0%, var(--color-rose-powder) 50%, var(--color-light-rose) 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem;
+        }
+
+        .card {
+            background: var(--color-white);
+            border-radius: 20px;
+            box-shadow: 0 8px 40px rgba(90, 62, 54, 0.12);
+            max-width: 600px;
+            width: 100%;
+            padding: 3rem 2.5rem;
+            text-align: center;
+            animation: fadeUp 0.8s ease-out;
+        }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .logo {
+            width: 120px;
+            height: auto;
+            margin: 0 auto 1.5rem;
+        }
+
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-weight: 600;
+            font-size: 2rem;
+            color: var(--color-brown-rose);
+            margin-bottom: 0.25rem;
+        }
+
+        .specialty {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.2rem;
+            color: var(--color-gold);
+            font-weight: 500;
+            margin-bottom: 2rem;
+        }
+
+        .wip-badge {
+            display: inline-block;
+            background: var(--color-rose-powder);
+            color: var(--color-dark-gold);
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 0.6rem 1.8rem;
+            border-radius: 50px;
+            margin-bottom: 1rem;
+            letter-spacing: 0.05em;
+        }
+
+        .wip-text {
+            color: var(--color-muted);
+            font-size: 0.95rem;
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
+        }
+
+        .divider {
+            width: 60px;
+            height: 2px;
+            background: var(--color-gold);
+            margin: 0 auto 2rem;
+            border-radius: 2px;
+        }
+
+        .contact-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.15rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        .contact-list {
+            list-style: none;
+            text-align: left;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .contact-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.85rem;
+        }
+
+        .contact-icon {
+            flex-shrink: 0;
+            width: 20px;
+            height: 20px;
+            margin-top: 3px;
+            fill: var(--color-gold);
+        }
+
+        .contact-item .label {
+            font-weight: 700;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--color-muted);
+            margin-bottom: 0.1rem;
+        }
+
+        .contact-item .value {
+            font-size: 0.95rem;
+            color: var(--color-brown-rose);
+        }
+
+        .contact-item a {
+            color: var(--color-brown-rose);
+            text-decoration: none;
+            border-bottom: 1px solid var(--color-border);
+            transition: border-color 0.3s ease, color 0.3s ease;
+        }
+
+        .contact-item a:hover {
+            color: var(--color-gold);
+            border-color: var(--color-gold);
+        }
+
+        .cta-buttons {
+            display: flex;
+            gap: 0.75rem;
+            margin-top: 2rem;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            letter-spacing: 0.02em;
+        }
+
+        .btn-primary {
+            background: var(--color-gold);
+            color: var(--color-white);
+        }
+        .btn-primary:hover {
+            background: var(--color-dark-gold);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(196, 149, 106, 0.4);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            color: var(--color-gold);
+            border: 1.5px solid var(--color-gold);
+        }
+        .btn-secondary:hover {
+            background: var(--color-rose-powder);
+            transform: translateY(-2px);
+        }
+
+        .footer-note {
+            margin-top: 2.5rem;
+            font-size: 0.78rem;
+            color: var(--color-muted);
+        }
+
+        @media (max-width: 480px) {
+            .card { padding: 2rem 1.5rem; }
+            h1 { font-size: 1.6rem; }
+            .cta-buttons { flex-direction: column; }
+            .btn { width: 100%; text-align: center; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <img class="logo" src="image carte visite transparente.svg" alt="Yamina Heinrich - Aculifting">
+
+    <h1>Yamina Heinrich</h1>
+    <p class="specialty">Spécialiste en Aculifting</p>
+
+    <span class="wip-badge">Site en construction</span>
+    <p class="wip-text">
+        Mon nouveau site arrive bientôt.<br>
+        En attendant, n'hésitez pas à me contacter pour toute question ou prise de rendez-vous.
+    </p>
+
+    <div class="divider"></div>
+    <p class="contact-title">Me contacter</p>
+
+    <ul class="contact-list">
+        <li class="contact-item">
+            <svg class="contact-icon" viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+            <div>
+                <p class="label">Telephone</p>
+                <p class="value"><a href="tel:+33613238681">06 13 23 86 81</a></p>
+            </div>
+        </li>
+        <li class="contact-item">
+            <svg class="contact-icon" viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+            <div>
+                <p class="label">Email</p>
+                <p class="value"><a href="mailto:aculifting.mtc@gmail.com">aculifting.mtc@gmail.com</a></p>
+            </div>
+        </li>
+        <li class="contact-item">
+            <svg class="contact-icon" viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            <div>
+                <p class="label">Adresse</p>
+                <p class="value">622 avenue Xavier de Ricard<br>Les Aubes &mdash; Montpellier (34)</p>
+            </div>
+        </li>
+        <li class="contact-item">
+            <svg class="contact-icon" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+            <div>
+                <p class="label">Horaires</p>
+                <p class="value">Lundi &ndash; Vendredi : 9h &ndash; 18h<br>Sur rendez-vous uniquement</p>
+            </div>
+        </li>
+    </ul>
+
+    <div class="cta-buttons">
+        <a href="tel:+33613238681" class="btn btn-primary">Appeler</a>
+        <a href="mailto:aculifting.mtc@gmail.com?subject=Prise%20de%20rendez-vous%20Aculifting" class="btn btn-secondary">Envoyer un email</a>
+    </div>
+
+    <p class="footer-note">&copy; 2026 Yamina Heinrich &mdash; Tous droits reserves.</p>
+</div>
+
+</body>
+</html>
