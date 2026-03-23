@@ -75,9 +75,9 @@ body {
   right: 25px;
   height: 110px;
   object-fit: cover;
-  border: 2px solid #ffffff;
+  border: 3px solid #ffffff;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(59, 96, 112, 0.25);
-  border-radius: 8px;
+  border-radius: 10px;
   z-index: 10;
 }
 
@@ -211,18 +211,16 @@ body {
 }
 
 #cv-skills li {
-  font-size: 14px;
-  color: #223d48;
-  padding-left: 5px;
-  position: relative;
+  font-size: 13.75px;
+  color: #294a57;
   line-height: 1.4;
 }
 
-#cv-skills li::before {
-  content: '•';
-  position: absolute;
-  left: -8px;
-  color: #4d7585;
+.skill-title {
+  font-weight: 600;
+  color: #2c4a56;
+  border-left: 3px solid #4d7585;
+  padding-left: 6px;
 }
 
 #cv-skills li.skills-group {
@@ -242,9 +240,6 @@ body {
   margin-top: 0;
 }
 
-#cv-skills li.skills-group::before {
-  content: none;
-}
 
 /* ─── Skills sidebar (synthèse compacte) ───────────────────── */
 .sidebar-skill-item {
@@ -366,38 +361,45 @@ body {
 }
 
 .exp-header {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #2c4a56;
-  margin-bottom: 1px;
+  margin-bottom: 2px;
 }
 
 .exp-title-inline {
-  font-weight: 400;
-  color: #3d5a65;
+  font-weight: 600;
+  color: #2c4a56;
 }
 
 .exp-dates {
-  font-size: 13px;
-  color: #7a9aaa;
+  font-size: 11px;
+  color: #8aa5b2;
   font-style: italic;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
+  letter-spacing: 0.3px;
 }
 
 .exp-description {
-  font-size: 10.5px;
-  color: #444;
-  margin-bottom: 2px;
+  font-size: 11px;
+  color: #3a3a3a;
+  margin-bottom: 4px;
+  line-height: 1.55;
+  padding-left: 2px;
 }
 
 .exp-techs {
-  font-size: 11px;
-  color: #5a8090;
-  line-height: 1.45;
+  font-size: 10px;
+  max-width: 600px;
+  color: #7a9aaa;
+  line-height: 1.5;
+  font-style: italic;
 }
 
 .exp-techs-label {
+  font-size: 11px;
   font-weight: 600;
+  font-style: normal;
 }
 
 /* ─── Impression ────────────────────────────────────────────── */

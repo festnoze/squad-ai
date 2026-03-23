@@ -138,16 +138,14 @@
     // ── Compétences ───────────────────────────────────────────────────────
     const skillsEl = document.getElementById('cv-skills');
     SKILLS.forEach(skill => {
-      if (skill && typeof skill === 'object' && skill.group) {
-        const li = document.createElement('li');
+      const li = document.createElement('li');
+      if (skill.group) {
         li.className = 'skills-group';
         li.innerHTML = skill.group;
-        skillsEl.appendChild(li);
       } else {
-        const li = document.createElement('li');
-        li.innerHTML = skill + '.';
-        skillsEl.appendChild(li);
+        li.innerHTML = `<span class="skill-title">${skill.title}</span> : ${skill.desc}.`;
       }
+      skillsEl.appendChild(li);
     });
 
     // ── Expériences ───────────────────────────────────────────────────────
@@ -161,19 +159,19 @@
       companyDiv.textContent = group.company;
       groupDiv.appendChild(companyDiv);
 
-      group.roles.forEach((role, i) => {
+      group.positions.forEach((role, i) => {
         const roleDiv = document.createElement('div');
-        roleDiv.className = 'exp-role' + (i === group.roles.length - 1 ? ' exp-role-last' : '');
+        roleDiv.className = 'exp-role' + (i === group.positions.length - 1 ? ' exp-role-last' : '');
         roleDiv.innerHTML = `
+          <div class="exp-dates">${esc(role.period)}</div>
           <div class="exp-header">
             <span class="exp-title-inline">${role.title}</span>
           </div>
-          <div class="exp-dates">${esc(role.period)}</div>
           ${role.description
             ? `<div class="exp-description">${role.description}</div>`
             : ''}
           ${role.techs
-            ? `<div class="exp-techs"><span class="exp-techs-label">Stack: </span>${esc(role.techs)}</div>`
+            ? `<div class="exp-techs"><span class="exp-techs-label">Stack : </span>${esc(role.techs)}</div>`
             : ''}
         `;
         groupDiv.appendChild(roleDiv);
