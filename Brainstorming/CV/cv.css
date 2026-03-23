@@ -62,9 +62,21 @@ body {
   grid-column: 2;
   grid-row: 1;
   background: linear-gradient(to right, #c8d8dd 40%, #9cb7bd 95%);
-  padding: 30px 28px 22px 68px;
+  padding: 20px 28px 20px 10px;
   display: flex;
   align-items: center;
+  gap: 35px;
+}
+
+.cv-photo {
+  align-self: stretch;
+  height: 90px;
+  margin: -10px 0;
+  flex-shrink: 0;
+  object-fit: cover;
+  border: 3px solid #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(59, 96, 112, 0.25);
+  border-radius: 4px;
 }
 
 /* ─── Cellule 3 — Contact (col1, row2) ─────────────────────── */
