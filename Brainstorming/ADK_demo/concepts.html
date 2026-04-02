@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ADK Concepts - Visual Review</title>
+  <style>
+    :root {
+      --bg:#0a0e14; --surface:#131920; --card:#1a2230; --border:#2a3444;
+      --text:#d4dae3; --muted:#6b7a8d; --heading:#f0f4f8;
+      --blue:#58a6ff; --green:#3fb950; --purple:#bc8cff; --orange:#f0883e;
+      --yellow:#d29922; --red:#f85149; --cyan:#79c0ff; --pink:#f778ba;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Inter',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif; background:var(--bg); color:var(--text); }
+
+    /* Header */
+    .hero { text-align:center; padding:3rem 1.5rem 2rem; background:linear-gradient(180deg,#131920 0%,var(--bg) 100%); }
+    .hero h1 { font-size:2.2rem; color:var(--heading); font-weight:800; letter-spacing:-0.5px; }
+    .hero h1 span { background:linear-gradient(135deg,var(--blue),var(--purple)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+    .hero p { color:var(--muted); margin-top:0.5rem; font-size:0.95rem; }
+    .hero .nav { display:flex; flex-wrap:wrap; justify-content:center; gap:0.4rem; margin-top:1.5rem; }
+    .hero .nav a { padding:0.4rem 0.9rem; border-radius:20px; font-size:0.78rem; font-weight:600; text-decoration:none; border:1px solid var(--border); color:var(--muted); transition:all 0.2s; }
+    .hero .nav a:hover { border-color:var(--blue); color:var(--blue); }
+
+    /* Step sections */
+    .step-section { max-width:1100px; margin:0 auto; padding:2rem 1.5rem; }
+    .step-header { display:flex; align-items:center; gap:0.75rem; margin-bottom:1.2rem; }
+    .step-num { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:0.9rem; flex-shrink:0; }
+    .step-header h2 { font-size:1.25rem; color:var(--heading); font-weight:700; }
+    .step-header .tag { font-size:0.7rem; padding:0.2rem 0.6rem; border-radius:10px; font-weight:600; margin-left:0.5rem; }
+
+    /* Tiles grid */
+    .tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:0.75rem; margin-bottom:1rem; }
+    .tile { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:1rem 1.1rem; transition:all 0.2s; position:relative; overflow:hidden; }
+    .tile:hover { border-color:var(--blue); transform:translateY(-2px); box-shadow:0 4px 20px rgba(0,0,0,0.3); }
+    .tile-icon { font-size:1.3rem; margin-bottom:0.4rem; }
+    .tile h3 { font-size:0.88rem; color:var(--heading); font-weight:700; margin-bottom:0.35rem; }
+    .tile p { font-size:0.8rem; color:var(--muted); line-height:1.5; }
+    .tile code { background:var(--bg); padding:0.1rem 0.35rem; border-radius:3px; font-size:0.75rem; color:var(--cyan); font-family:'Cascadia Code','Fira Code',monospace; }
+    .tile pre { background:var(--bg); border:1px solid var(--border); border-radius:5px; padding:0.5rem; margin-top:0.4rem; overflow-x:auto; font-size:0.72rem; line-height:1.45; color:var(--cyan); font-family:'Cascadia Code','Fira Code',monospace; }
+    .tile .accent-line { position:absolute; top:0; left:0; right:0; height:2px; }
+
+    /* Wide tile */
+    .tile.wide { grid-column:1/-1; }
+    .tile.wide .diagram { display:flex; justify-content:center; }
+
+    /* Diagram styles */
+    .diagram { margin-top:0.5rem; }
+    .flow { display:flex; align-items:center; gap:0.3rem; flex-wrap:wrap; }
+    .flow-box { padding:0.3rem 0.7rem; border-radius:6px; font-size:0.75rem; font-weight:600; border:1px solid; white-space:nowrap; }
+    .flow-arrow { color:var(--muted); font-size:0.9rem; }
+    .flow-group { border:1px dashed var(--border); border-radius:8px; padding:0.4rem; display:flex; gap:0.3rem; align-items:center; }
+    .flow-label { font-size:0.65rem; color:var(--muted); text-transform:uppercase; font-weight:700; margin-right:0.3rem; }
+
+    /* Separator */
+    .sep { border:none; border-top:1px solid var(--border); max-width:1100px; margin:0 auto; }
+
+    /* Colors per step */
+    .s1 .step-num { background:rgba(88,166,255,0.15); color:var(--blue); }
+    .s1 .accent-line { background:var(--blue); }
+    .s1 .tag { background:rgba(88,166,255,0.15); color:var(--blue); }
+    .s2 .step-num { background:rgba(121,192,255,0.15); color:var(--cyan); }
+    .s2 .accent-line { background:var(--cyan); }
+    .s2 .tag { background:rgba(121,192,255,0.15); color:var(--cyan); }
+    .s3 .step-num { background:rgba(63,185,80,0.15); color:var(--green); }
+    .s3 .accent-line { background:var(--green); }
+    .s3 .tag { background:rgba(63,185,80,0.15); color:var(--green); }
+    .s4 .step-num { background:rgba(188,140,255,0.15); color:var(--purple); }
+    .s4 .accent-line { background:var(--purple); }
+    .s4 .tag { background:rgba(188,140,255,0.15); color:var(--purple); }
+    .s5 .step-num { background:rgba(240,136,62,0.15); color:var(--orange); }
+    .s5 .accent-line { background:var(--orange); }
+    .s5 .tag { background:rgba(240,136,62,0.15); color:var(--orange); }
+    .s6 .step-num { background:rgba(210,153,34,0.15); color:var(--yellow); }
+    .s6 .accent-line { background:var(--yellow); }
+    .s6 .tag { background:rgba(210,153,34,0.15); color:var(--yellow); }
+    .s7 .step-num { background:rgba(248,81,73,0.15); color:var(--red); }
+    .s7 .accent-line { background:var(--red); }
+    .s7 .tag { background:rgba(248,81,73,0.15); color:var(--red); }
+    .s8 .step-num { background:rgba(247,120,186,0.15); color:var(--pink); }
+    .s8 .accent-line { background:var(--pink); }
+    .s8 .tag { background:rgba(247,120,186,0.15); color:var(--pink); }
+    .s3 .step-num { background:rgba(63,185,80,0.15); color:var(--green); }
+    .s3 .accent-line { background:var(--green); }
+    .s3 .tag { background:rgba(63,185,80,0.15); color:var(--green); }
+    .s10 .step-num { background:linear-gradient(135deg,rgba(88,166,255,0.2),rgba(188,140,255,0.2)); color:var(--heading); }
+    .s10 .accent-line { background:linear-gradient(90deg,var(--blue),var(--purple),var(--green)); }
+    .s10 .tag { background:linear-gradient(135deg,rgba(88,166,255,0.15),rgba(188,140,255,0.15)); color:var(--purple); }
+    .s11 .step-num { background:rgba(210,153,34,0.15); color:var(--yellow); }
+    .s11 .accent-line { background:var(--yellow); }
+    .s11 .tag { background:rgba(210,153,34,0.15); color:var(--yellow); }
+
+    .fb1 { background:rgba(88,166,255,0.1); border-color:var(--blue); color:var(--blue); }
+    .fb2 { background:rgba(121,192,255,0.1); border-color:var(--cyan); color:var(--cyan); }
+    .fb3 { background:rgba(63,185,80,0.1); border-color:var(--green); color:var(--green); }
+    .fb4 { background:rgba(188,140,255,0.1); border-color:var(--purple); color:var(--purple); }
+    .fb5 { background:rgba(240,136,62,0.1); border-color:var(--orange); color:var(--orange); }
+    .fb6 { background:rgba(210,153,34,0.1); border-color:var(--yellow); color:var(--yellow); }
+    .fb7 { background:rgba(248,81,73,0.1); border-color:var(--red); color:var(--red); }
+    .fb8 { background:rgba(247,120,186,0.1); border-color:var(--pink); color:var(--pink); }
+
+    @media(max-width:600px) {
+      .tiles { grid-template-columns:1fr; }
+      .hero h1 { font-size:1.5rem; }
+      .tile.wide { grid-column:1; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Flash cards <span>Google ADK - Les concepts</span></h1>
+  <p>Révision visuelle - Les concepts clés de Google ADK en un coup d'oeil</p>
+  <div class="nav">
+    <a href="#s1">1. Agent</a><a href="#s2">2. Multi-Tools</a><a href="#s3">3. Runtime</a><a href="#s4">4. State</a>
+    <a href="#s5">5. Délégation</a><a href="#s6">6. Sequential</a><a href="#s7">7. Parallel</a>
+    <a href="#s8">8. Loop</a><a href="#s9">9. Callbacks</a><a href="#s10">10. Assembly</a><a href="#s11">11. Advanced</a>
+  </div>
+</div>
+
+<!-- ============ STEP 1 ============ -->
+<div class="step-section s1" id="s1">
+  <div class="step-header">
+    <div class="step-num">1</div>
+    <h2>Agent basique + 1 Tool</h2>
+    <span class="tag">Fondation</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📁</div>
+      <h3>Structure obligatoire</h3>
+      <pre>mon_agent/
+  __init__.py   # from . import agent
+  agent.py      # root_agent = Agent(...)
+  .env          # GOOGLE_API_KEY=...</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🤖</div>
+      <h3>root_agent</h3>
+      <p>Variable <b>obligatoire</b> qu'ADK cherche. <code>Agent</code> = alias de <code>LlmAgent</code>.</p>
+      <pre>root_agent = Agent(
+  name, model, description,
+  instruction, tools
+)</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔧</div>
+      <h3>Tool = fonction Python</h3>
+      <p><b>Nom</b> = nom du tool. <b>Docstring</b> = description pour le LLM. <b>Type hints</b> = schéma JSON.</p>
+      <p>Retour préféré : <code>dict</code> avec <code>"status"</code></p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">💡</div>
+      <h3>Règle d'or (mock tools)</h3>
+      <p>Un tool mock qui <b>prétend</b> générer du contenu mais retourne toujours la même chose confond le LLM. Dans un tuto : le tool <b>sauvegarde</b>, le LLM <b>génère</b>. En production, un tool peut générer du contenu réel (API, DB, etc.).</p>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 2 ============ -->
+<div class="step-section s2" id="s2">
+  <div class="step-header">
+    <div class="step-num">2</div>
+    <h2>Plusieurs Tools</h2>
+    <span class="tag">Sélection LLM</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🎯</div>
+      <h3>Le LLM choisit</h3>
+      <p>Le LLM reçoit le schéma de <b>tous</b> les tools et sélectionne le plus pertinent selon la requête.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📝</div>
+      <h3>Docstring = guide de sélection</h3>
+      <p>Des docstrings <b>vagues</b> = routing ambigu. Des docstrings <b>spécifiques</b> = choix précis.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">⚡</div>
+      <h3>Tool sans paramètre</h3>
+      <p><code>def list_templates() -> dict</code> est valide. Le LLM l'appelle quand c'est pertinent.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔗</div>
+      <h3>Chainage dans un tour</h3>
+      <p>Le LLM peut appeler <b>plusieurs tools</b> dans le meme tour si la requete le demande.</p>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 3 ============ -->
+<div class="step-section s3" id="s3">
+  <div class="step-header">
+    <div class="step-num">3</div>
+    <h2>Runtime, Config & Données</h2>
+    <span class="tag">Production</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🌡️</div>
+      <h3>generate_content_config</h3>
+      <p><code>temperature=0.2</code> = précis.<br><code>temperature=0.9</code> = créatif.<br><code>max_output_tokens</code> = limite.</p>
+      <pre>GenerateContentConfig(
+  temperature=0.2,
+  max_output_tokens=500
+)</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📐</div>
+      <h3>output_schema (Pydantic)</h3>
+      <p>Force le LLM à retourner du <b>JSON structuré</b>.</p>
+      <pre>class Analysis(BaseModel):
+    score: int
+    issues: list[str]
+
+Agent(output_schema=Analysis)</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📎</div>
+      <h3>Artifacts vs State</h3>
+      <p><b>State</b> = key-value texte.<br><b>Artifacts</b> = fichiers binaires versionnés.</p>
+      <pre>await ctx.save_artifact("report.pdf", part)
+await ctx.load_artifact("report.pdf")</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🧠</div>
+      <h3>Memory vs State</h3>
+      <p><b>State</b> = 1 session.<br><b>Memory</b> = cross-sessions, recherche sémantique.</p>
+      <pre>from google.adk.tools import load_memory
+Agent(tools=[load_memory])</pre>
+    </div>
+    <div class="tile wide">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🏭</div>
+      <h3>Runner : exécution programmatique</h3>
+      <p><code>adk web</code> = dev. <b>Runner</b> = production.</p>
+      <pre>runner = Runner(agent=root_agent, app_name="app", session_service=InMemorySessionService())
+async for event in runner.run_async(user_id="u1", session_id="s1", new_message=...):
+    if event.is_final_response(): print(event.content.parts[0].text)</pre>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 4 ============ -->
+<div class="step-section s4" id="s4">
+  <div class="step-header">
+    <div class="step-num">4</div>
+    <h2>Session State & ToolContext</h2>
+    <span class="tag">Mémoire</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔌</div>
+      <h3>ToolContext</h3>
+      <p>Ajouter <code>tool_context: ToolContext</code> comme <b>dernier paramètre</b>. Auto-injecté par ADK, invisible pour le LLM.</p>
+      <pre>def my_tool(x: str, tool_context: ToolContext):
+    tool_context.state["key"] = val</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🏷️</div>
+      <h3>Préfixes de state</h3>
+      <pre>(aucun)  → session courante
+user:    → toutes sessions user
+app:     → global
+temp:    → invocation seule ⚠️</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📥</div>
+      <h3>output_key</h3>
+      <p>Sauvegarde auto la réponse texte de l'agent dans le state.</p>
+      <pre>Agent(output_key="result")
+# → state["result"] = reponse</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📤</div>
+      <h3>{state_var} templating</h3>
+      <p>Les <code>{clés}</code> dans l'instruction sont remplacées au runtime par les valeurs du state.</p>
+      <pre>instruction="Theme: {topic}"
+# state["topic"]="Python" → "Theme: Python"</pre>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 4 ============ -->
+<div class="step-section s5" id="s5">
+  <div class="step-header">
+    <div class="step-num">5</div>
+    <h2>Délégation Multi-Agent</h2>
+    <span class="tag">Équipe</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">👔</div>
+      <h3>Coordinateur</h3>
+      <p><b>Pas de tools</b>. Route les requêtes aux spécialistes via <code>sub_agents</code>.</p>
+      <pre>Agent(sub_agents=[a, b, c])
+# PAS de tools=[]</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🏷️</div>
+      <h3>description = routing</h3>
+      <p>Le LLM du coordinateur lit le <code>description</code> de chaque sub-agent pour décider. Sois <b>spécifique</b>.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">↗️</div>
+      <h3>transfer_to_agent</h3>
+      <p>Généré automatiquement par le LLM. Tu n'as rien à coder.</p>
+      <pre># Le LLM fait tout seul :
+transfer_to_agent("code_writer")</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔧</div>
+      <h3>AgentTool</h3>
+      <p><code>sub_agents</code> = transfère le contrôle.<br><code>AgentTool</code> = appel comme un tool, le parent <b>garde le contrôle</b>.</p>
+      <pre>from google.adk.tools import AgentTool
+tools=[AgentTool(agent=specialist)]</pre>
+    </div>
+    <div class="tile wide">
+      <div class="accent-line"></div>
+      <div class="diagram">
+        <div class="flow">
+          <div class="flow-box fb4">User</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-box fb4">Coordinator</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-group">
+            <div class="flow-box fb1">Writer</div>
+            <div class="flow-box fb3">Reviewer</div>
+            <div class="flow-box fb6">Greeter</div>
+          </div>
+        </div>
+      </div>
+      <p style="text-align:center;font-size:0.75rem;color:var(--muted);margin-top:0.3rem;">sub_agents: le LLM transfère le contrôle &nbsp;|&nbsp; AgentTool: le parent appelle et garde le contrôle</p>
+      <div class="flow" style="margin-top:0.4rem;justify-content:center;">
+        <div class="flow-box fb4">Coordinator</div>
+        <span class="flow-arrow">→ tool call →</span>
+        <div class="flow-box fb1">Explainer (AgentTool)</div>
+        <span class="flow-arrow">→ result →</span>
+        <div class="flow-box fb4">Coordinator répond</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 5 ============ -->
+<div class="step-section s6" id="s6">
+  <div class="step-header">
+    <div class="step-num">6</div>
+    <h2>SequentialAgent</h2>
+    <span class="tag">Pipeline</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">➡️</div>
+      <h3>Ordre fixe, déterministe</h3>
+      <p><b>Pas de model, pas d'instruction.</b> Execute les sub-agents dans l'ordre de la liste. Toujours le meme flux.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔄</div>
+      <h3>Data flow</h3>
+      <p>Agent N ecrit via <code>output_key</code>, Agent N+1 lit via <code>{state_var}</code>.</p>
+      <pre>writer:     output_key="code"
+reviewer:   instruction="{code}"</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">⚖️</div>
+      <h3>Sequential vs Délégation</h3>
+      <p><b>Sequential</b> = ordre fixe, pas de LLM pour router.<br><b>Délégation</b> = le LLM choisit dynamiquement.</p>
+    </div>
+    <div class="tile wide">
+      <div class="accent-line"></div>
+      <div class="diagram">
+        <div class="flow">
+          <div class="flow-box fb5">Writer</div>
+          <span class="flow-arrow">→ state["code"] →</span>
+          <div class="flow-box fb5">Reviewer</div>
+          <span class="flow-arrow">→ state["feedback"] →</span>
+          <div class="flow-box fb5">Refactorer</div>
+          <span class="flow-arrow">→ state["final"]</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 6 ============ -->
+<div class="step-section s7" id="s7">
+  <div class="step-header">
+    <div class="step-num">7</div>
+    <h2>ParallelAgent</h2>
+    <span class="tag">Concurrent</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">⚡</div>
+      <h3>Exécution simultanée</h3>
+      <p>Tous les sub-agents demarrent en meme temps. L'ordre dans la liste est <b>irrélevant</b>.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🚫</div>
+      <h3>Pas de partage de state</h3>
+      <p>Pendant l'exécution, les branches <b>ne voient PAS</b> les changements des autres. Les <code>output_key</code> sont mergés après.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🧱</div>
+      <h3>Pattern classique</h3>
+      <pre>SequentialAgent([
+  writer,
+  ParallelAgent([a, b, c]),
+  synthesizer
+])</pre>
+    </div>
+    <div class="tile wide">
+      <div class="accent-line"></div>
+      <div class="diagram">
+        <div class="flow">
+          <div class="flow-box fb5">Writer</div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-group">
+            <div class="flow-label">Parallel</div>
+            <div style="display:flex;flex-direction:column;gap:0.2rem;">
+              <div class="flow-box fb6">Security</div>
+              <div class="flow-box fb6">Performance</div>
+              <div class="flow-box fb6">Style</div>
+            </div>
+          </div>
+          <span class="flow-arrow">→</span>
+          <div class="flow-box fb3">Synthesizer</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 7 ============ -->
+<div class="step-section s8" id="s8">
+  <div class="step-header">
+    <div class="step-num">8</div>
+    <h2>LoopAgent</h2>
+    <span class="tag">Itération</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔁</div>
+      <h3>Boucle création/critique</h3>
+      <p>Execute ses sub-agents en sequence, puis <b>recommence</b>. Parfait pour l'amélioration itérative.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🛑</div>
+      <h3>2 façons de sortir</h3>
+      <p><code>max_iterations</code> = sécurité anti-boucle infinie.<br><code>escalate = True</code> = sortie anticipée (le reviewer décide).</p>
+      <pre>tool_context.actions.escalate = True</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">💾</div>
+      <h3>State persiste entre itérations</h3>
+      <p>Le feedback de l'itération N est lisible en N+1. C'est ce qui permet l'amélioration progressive.</p>
+    </div>
+    <div class="tile wide">
+      <div class="accent-line"></div>
+      <div class="diagram">
+        <div class="flow" style="justify-content:center;">
+          <div class="flow-group" style="border-color:var(--red);">
+            <div class="flow-label" style="color:var(--red);">Loop</div>
+            <div class="flow-box fb7">Writer</div>
+            <span class="flow-arrow">→</span>
+            <div class="flow-box fb7">Reviewer</div>
+            <span class="flow-arrow" style="font-size:0.7rem;">score&lt;8 →</span>
+            <span class="flow-arrow" style="color:var(--red);">↩ retry</span>
+          </div>
+          <span class="flow-arrow">score≥8</span>
+          <div class="flow-box fb3" style="font-weight:700;">ESCALATE ✓</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 8 ============ -->
+<div class="step-section s9" id="s9">
+  <div class="step-header">
+    <div class="step-num">9</div>
+    <h2>Callbacks</h2>
+    <span class="tag">Guardrails</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🛡️</div>
+      <h3>before_model_callback</h3>
+      <p>Intercepte <b>avant</b> le LLM. Bloque les prompts dangereux.</p>
+      <pre>(Context, LlmRequest)
+  → None (passe)
+  → LlmResponse (bloque)</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔍</div>
+      <h3>before_tool_callback</h3>
+      <p>Valide les arguments <b>avant</b> l'exécution du tool.</p>
+      <pre>(BaseTool, dict, Context)
+  → None (passe)
+  → dict (bloque)</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📋</div>
+      <h3>after_model / after_tool</h3>
+      <p>Post-traitement : logger, filtrer, modifier les réponses. Même logique : <code>None</code> = garder, valeur = remplacer.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔑</div>
+      <h3>Règle universelle</h3>
+      <p><code>return None</code> = laisser passer.<br>Retourner une valeur = <b>bloquer/remplacer</b>.<br>Les callbacks sont <b>transversaux</b> (un seul protege tout).</p>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 9 ============ -->
+<div class="step-section s10" id="s10">
+  <div class="step-header">
+    <div class="step-num">10</div>
+    <h2>Code Forge - Assemblage</h2>
+    <span class="tag">Tout combiné</span>
+  </div>
+  <div class="tiles">
+    <div class="tile wide">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🏗️</div>
+      <h3>Architecture complète - 4 niveaux d'imbrication</h3>
+      <div class="diagram">
+        <div style="display:flex;flex-direction:column;gap:0.4rem;margin-top:0.5rem;">
+          <div class="flow">
+            <div class="flow-group" style="border-color:var(--orange);flex:1;">
+              <div class="flow-label" style="color:var(--orange);">Sequential</div>
+              <div class="flow-group" style="border-color:var(--red);">
+                <div class="flow-label" style="color:var(--red);">Loop ×3</div>
+                <div class="flow-box fb1">Writer 🛡️</div>
+                <span class="flow-arrow">→</span>
+                <div class="flow-group" style="border-color:var(--orange);">
+                  <div class="flow-label" style="color:var(--orange);">Seq</div>
+                  <div class="flow-group" style="border-color:var(--yellow);">
+                    <div class="flow-label" style="color:var(--yellow);">∥</div>
+                    <div style="display:flex;flex-direction:column;gap:0.15rem;">
+                      <div class="flow-box fb6" style="font-size:0.65rem;">Sec</div>
+                      <div class="flow-box fb6" style="font-size:0.65rem;">Perf</div>
+                      <div class="flow-box fb6" style="font-size:0.65rem;">Style</div>
+                    </div>
+                  </div>
+                  <span class="flow-arrow">→</span>
+                  <div class="flow-box fb3" style="font-size:0.7rem;">Judge</div>
+                </div>
+              </div>
+              <span class="flow-arrow">→</span>
+              <div class="flow-box fb4">Tests</div>
+              <span class="flow-arrow">→</span>
+              <div class="flow-box fb4">Present</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🧩</div>
+      <h3>8 concepts en 1</h3>
+      <p>Agent + tools + ToolContext + state + sub_agents + Sequential + Parallel + Loop + Callbacks</p>
+      <p style="margin-top:0.3rem;color:var(--green);font-weight:600;">Si tu comprends Step 9, tu maîtrises ADK.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📊</div>
+      <h3>Flux de données</h3>
+      <pre>writer    → state["current_code"]
+reviewers → state["*_review"]
+judge     → state["synthesis"]
+          → escalate si score≥8
+tests     → state["tests"]
+presenter → rapport final</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🎓</div>
+      <h3>Principes clés à retenir</h3>
+      <p>• Tools <b>sauvegardent</b>, LLM <b>génère</b><br>
+         • <code>output_key</code> + <code>{var}</code> = data flow<br>
+         • <code>description</code> = routing guide<br>
+         • <code>None</code> = passe, valeur = bloque<br>
+         • <code>escalate</code> = sortie de boucle</p>
+    </div>
+  </div>
+</div>
+
+<hr class="sep">
+
+<!-- ============ STEP 11 ============ -->
+<div class="step-section s11" id="s11">
+  <div class="step-header">
+    <div class="step-num">11</div>
+    <h2>Concepts avancés</h2>
+    <span class="tag">Expert</span>
+  </div>
+  <div class="tiles">
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🧬</div>
+      <h3>BaseAgent</h3>
+      <p>Logique d'orchestration <b>arbitraire</b>. Surcharger <code>_run_async_impl</code> pour des patterns non-standard (conditions, routing dynamique).</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">⏳</div>
+      <h3>LongRunningFunctionTool</h3>
+      <p>Pour les ops longues (approbation humaine). Retourne <code>"pending"</code>, l'agent <b>pause</b>.</p>
+      <pre>LongRunningFunctionTool(func=my_fn)</pre>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🔐</div>
+      <h3>Plugins sécurité</h3>
+      <p><b>Gemini-as-Judge</b> (prompt injection), <b>PII Redaction</b> (données perso), <b>Model Armor</b>. Transversaux (protègent tout).</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">📊</div>
+      <h3>Evaluation</h3>
+      <pre>adk eval agent/ eval_set.json</pre>
+      <p>Tests systématiques avec fichier JSON de cas de test.</p>
+    </div>
+    <div class="tile">
+      <div class="accent-line"></div>
+      <div class="tile-icon">🌊</div>
+      <h3>Streaming + MCP + OpenAPI + A2A</h3>
+      <p>Streaming (SSE), MCP (protocol standard), OpenAPI (API REST), A2A (inter-systemes). Pour la production avancée.</p>
+    </div>
+  </div>
+</div>
+
+<div style="text-align:center;padding:2rem;color:var(--muted);font-size:0.8rem;">
+  Code Forge ADK Tutorial &mdash; <a href="cheatsheet.html" style="color:var(--blue);text-decoration:none;">Cheat Sheet</a> &bull; <a href="quiz/index.html" style="color:var(--blue);text-decoration:none;">Quiz</a>
+</div>
+
+</body>
+</html>

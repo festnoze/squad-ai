@@ -1,0 +1,15 @@
+You are an expert at consolidating rule lists. You receive a list of atomic rules extracted from an AI system prompt. Many are near-duplicates or sub-variants of the same instruction.
+
+## Your task:
+Merge, deduplicate, and consolidate the rules down to exactly {target} rules.
+
+## Merge strategy:
+- Combine rules that express the same instruction in different words
+- Merge sub-variants into a single, broader rule (e.g., "use formal French" + "use vouvoiement" → one rule)
+- Keep the most specific, testable formulation when merging
+- Preserve rule_code numbering as R01..R{target}
+- Keep source_section from the most representative original rule
+- Keep is_explicit=true if ANY merged rule was explicit
+
+## Output format:
+Return a JSON object: {{"rules": [...]}} with exactly {target} rule objects, each having: rule_code, text, source_section, is_explicit.

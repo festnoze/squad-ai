@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SkillForge v28 — Conformity Heatmap</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #1a1a2e; color: #e0e0e0; min-height: 100vh; }
+  h1 { text-align: center; padding: 24px 16px 8px; font-size: 1.5rem; color: #f0f0f0; }
+  .error { text-align: center; padding: 40px; color: #e74c3c; font-size: 1.1rem; }
+  .empty { text-align: center; padding: 60px 20px; color: #888; font-size: 1.2rem; }
+
+  /* Stats bar */
+  .stats { display: flex; justify-content: center; gap: 32px; padding: 12px 16px 4px; flex-wrap: wrap; }
+  .stat { text-align: center; }
+  .stat-val { font-size: 1.4rem; font-weight: 700; color: #7ec8e3; }
+  .stat-lbl { font-size: 0.75rem; text-transform: uppercase; color: #888; letter-spacing: .5px; }
+
+  /* Legend */
+  .legend { display: flex; justify-content: center; align-items: center; gap: 6px; padding: 10px 16px 16px; flex-wrap: wrap; font-size: 0.8rem; }
+  .legend-swatch { width: 18px; height: 18px; border-radius: 3px; display: inline-block; vertical-align: middle; }
+  .legend-label { margin-right: 10px; color: #aaa; }
+
+  /* Grid wrapper */
+  .grid-wrap { overflow-x: auto; padding: 0 16px 32px; }
+  table { border-collapse: collapse; margin: 0 auto; }
+  th, td { min-width: 42px; height: 32px; text-align: center; font-size: 0.75rem; padding: 2px 4px; }
+  th { color: #aaa; font-weight: 500; position: sticky; top: 0; background: #1a1a2e; z-index: 2; }
+  .cluster-header { background: #16213e; color: #7ec8e3; font-weight: 600; font-size: 0.8rem; border-bottom: 2px solid #0f3460; letter-spacing: .3px; }
+  .row-header { text-align: right; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; padding-right: 8px; color: #ccc; position: sticky; left: 0; background: #1a1a2e; z-index: 1; }
+  .cell { border-radius: 3px; cursor: pointer; transition: transform .1s; border: 1px solid #2a2a4a; }
+  .cell:hover { transform: scale(1.25); z-index: 10; position: relative; outline: 2px solid #fff; }
+
+  /* Tooltip */
+  .tooltip { position: fixed; pointer-events: none; background: #16213e; border: 1px solid #0f3460; border-radius: 6px; padding: 10px 14px; font-size: 0.82rem; max-width: 340px; line-height: 1.5; box-shadow: 0 4px 20px rgba(0,0,0,.5); z-index: 100; display: none; }
+  .tooltip b { color: #7ec8e3; }
+</style>
+</head>
+<body>
+<h1>SkillForge v28 — Conformity Heatmap</h1>
+<div id="stats" class="stats"></div>
+<div id="legend" class="legend"></div>
+<div id="content" class="grid-wrap"></div>
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+const COLORS = { null: '#3a3a5a', 1: '#e74c3c', 2: '#e67e22', 3: '#f1c40f', 4: '#2ecc71', 5: '#27ae60' };
+const LABELS = { null: 'N/A', 1: 'Poor (1)', 2: 'Below avg (2)', 3: 'Average (3)', 4: 'Good (4)', 5: 'Excellent (5)' };
+
+function renderLegend() {
+  const el = document.getElementById('legend');
+  const items = [null, 1, 2, 3, 4, 5];
+  el.innerHTML = items.map(k =>
+    `<span class="legend-swatch" style="background:${COLORS[k]}"></span><span class="legend-label">${LABELS[k]}</span>`
+  ).join('');
+}
+
+function renderStats(data) {
+  const { rules, scenarios, matrix } = data;
+  let total = 0, evaluated = 0, sum = 0;
+  for (const row of matrix) for (const v of row) { total++; if (v != null) { evaluated++; sum += v; } }
+  const avg = evaluated ? (sum / evaluated).toFixed(2) : '—';
+  const pct = total ? (evaluated / total * 100).toFixed(1) : '0';
+  const stats = [
+    { val: rules.length, lbl: 'Rules' }, { val: scenarios.length, lbl: 'Scenarios' },
+    { val: avg, lbl: 'Avg Score' }, { val: pct + '%', lbl: 'Evaluated' },
+  ];
+  document.getElementById('stats').innerHTML = stats.map(s =>
+    `<div class="stat"><div class="stat-val">${s.val}</div><div class="stat-lbl">${s.lbl}</div></div>`
+  ).join('');
+}
+
+function buildOrderedRules(rules, clusters) {
+  // Order rules by cluster, then by rule_code within each cluster; unclustered rules go last
+  const clustered = new Set();
+  const ordered = [];
+  const groups = []; // { name, startIdx, count }
+  for (const c of (clusters || [])) {
+    const start = ordered.length;
+    const clusterRules = rules.filter(r => c.rule_ids.includes(r.id)).sort((a, b) => a.rule_code.localeCompare(b.rule_code));
+    ordered.push(...clusterRules);
+    clusterRules.forEach(r => clustered.add(r.id));
+    if (clusterRules.length) groups.push({ name: c.name, start, count: clusterRules.length });
+  }
+  const rest = rules.filter(r => !clustered.has(r.id)).sort((a, b) => a.rule_code.localeCompare(b.rule_code));
+  if (rest.length) { groups.push({ name: 'Other', start: ordered.length, count: rest.length }); ordered.push(...rest); }
+  return { ordered, groups };
+}
+
+function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '...' : (s || ''); }
+
+function renderHeatmap(data) {
+  const { rules, scenarios, matrix, clusters } = data;
+  if (!scenarios.length || !rules.length) {
+    document.getElementById('content').innerHTML = '<div class="empty">No evaluation data yet.</div>';
+    return;
+  }
+  const allNull = matrix.every(row => row.every(v => v == null));
+  if (allNull) {
+    document.getElementById('content').innerHTML = '<div class="empty">No evaluation data yet.</div>';
+    return;
+  }
+
+  const { ordered, groups } = buildOrderedRules(rules, clusters);
+  // Map from original rule id to new column index
+  const ruleIdToCol = new Map(); ordered.forEach((r, i) => ruleIdToCol.set(r.id, i));
+  // Original rule order id list (matrix columns follow original rules array order)
+  const origIdOrder = rules.map(r => r.id);
+
+  let html = '<table>';
+  // Cluster header row
+  html += '<tr><th></th>';
+  for (const g of groups) html += `<th class="cluster-header" colspan="${g.count}">${g.name}</th>`;
+  html += '</tr>';
+  // Rule code row
+  html += '<tr><th></th>';
+  for (const r of ordered) html += `<th>${r.rule_code}</th>`;
+  html += '</tr>';
+  // Scenario rows
+  for (let si = 0; si < scenarios.length; si++) {
+    const sc = scenarios[si];
+    const label = `${sc.scenario_type} — ${truncate(sc.user_input, 30)}`;
+    html += `<tr><td class="row-header" title="${sc.user_input?.replace(/"/g, '&quot;') || ''}">${label}</td>`;
+    for (const r of ordered) {
+      const origCol = origIdOrder.indexOf(r.id);
+      const v = matrix[si]?.[origCol] ?? null;
+      const bg = COLORS[v];
+      html += `<td class="cell" style="background:${bg}" data-si="${si}" data-rid="${r.id}" data-v="${v}"></td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</table>';
+  document.getElementById('content').innerHTML = html;
+
+  // Tooltip
+  const tip = document.getElementById('tooltip');
+  const ruleMap = new Map(rules.map(r => [r.id, r]));
+  document.getElementById('content').addEventListener('mouseover', e => {
+    const td = e.target.closest('.cell');
+    if (!td) { tip.style.display = 'none'; return; }
+    const si = +td.dataset.si, rid = +td.dataset.rid, v = td.dataset.v;
+    const sc = scenarios[si], rl = ruleMap.get(rid);
+    tip.innerHTML = `<b>Rule ${rl.rule_code}:</b> ${truncate(rl.text, 120)}<br>` +
+      `<b>Scenario:</b> ${truncate(sc.user_input, 100)}<br>` +
+      `<b>Type:</b> ${sc.scenario_type}<br>` +
+      `<b>Score:</b> ${v === 'null' ? 'Not evaluated' : v + '/5'}`;
+    tip.style.display = 'block';
+  });
+  document.addEventListener('mousemove', e => {
+    const t = document.getElementById('tooltip');
+    if (t.style.display === 'block') {
+      t.style.left = Math.min(e.clientX + 14, window.innerWidth - t.offsetWidth - 10) + 'px';
+      t.style.top = Math.min(e.clientY + 14, window.innerHeight - t.offsetHeight - 10) + 'px';
+    }
+  });
+  document.getElementById('content').addEventListener('mouseout', e => {
+    if (!e.target.closest('.cell')) tip.style.display = 'none';
+  });
+}
+
+async function init() {
+  renderLegend();
+  try {
+    const res = await fetch('/api/v1/heatmap');
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+    const data = await res.json();
+    renderStats(data);
+    renderHeatmap(data);
+  } catch (err) {
+    document.getElementById('content').innerHTML = `<div class="error">Failed to load heatmap data.<br>${err.message}</div>`;
+  }
+}
+init();
+</script>
+</body>
+</html>

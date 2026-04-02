@@ -10,25 +10,30 @@ Try in adk web:
 from google.adk.agents import Agent
 
 
-def generate_code_snippet(specification: str) -> dict:
-    """Generates a Python code snippet from a natural-language specification.
+def save_code_snippet(code: str, language: str = "python") -> dict:
+    """Saves a code snippet and returns confirmation with metadata.
+
+    Use this tool after writing code to save it and get a quality summary.
 
     Args:
-        specification: A plain-English description of the desired functionality.
+        code: The source code to save.
+        language: The programming language of the code. Defaults to "python".
 
     Returns:
-        A dictionary containing the generated Python code.
+        A dictionary with save confirmation and code metrics.
     """
-    # Mock implementation - returns a simple function scaffold
-    mock_code = (
-        f"def solution(data):\n"
-        f'    """Generated from spec: {specification}"""\n'
-        f"    result = []\n"
-        f"    for item in data:\n"
-        f"        result.append(item)\n"
-        f"    return result\n"
-    )
-    return {"status": "success", "code": mock_code}
+    line_count = len(code.strip().splitlines())
+    has_docstring = '"""' in code or "'''" in code
+    has_type_hints = "->" in code or ": str" in code or ": int" in code or ": list" in code
+    return {
+        "status": "success",
+        "message": f"Code saved successfully ({line_count} lines, {language})",
+        "metrics": {
+            "line_count": line_count,
+            "has_docstring": has_docstring,
+            "has_type_hints": has_type_hints,
+        },
+    }
 
 
 root_agent = Agent(
@@ -37,8 +42,10 @@ root_agent = Agent(
     description="An agent that writes Python code from specifications.",
     instruction=(
         "You are CodeWriter, a Python code generation assistant.\n"
-        "When the user gives you a specification, use the generate_code_snippet tool "
-        "to produce the code. Then present the code to the user with a brief explanation."
+        "When the user asks you to write code:\n"
+        "1. Write the Python code yourself based on their specification\n"
+        "2. Use the save_code_snippet tool to save it and get quality metrics\n"
+        "3. Present the code and metrics to the user"
     ),
-    tools=[generate_code_snippet],
+    tools=[save_code_snippet],
 )

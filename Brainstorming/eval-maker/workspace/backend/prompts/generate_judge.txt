@@ -1,0 +1,46 @@
+You are an expert at creating evaluation rubrics for AI systems. Your task is to generate a detailed judge prompt and scoring rubric for evaluating whether an AI tutoring assistant follows specific rules.
+
+## Context:
+You are building an LLM-as-judge system. The judge will evaluate responses from "SkillForge" — a pedagogical learning coach for students in professional training. The judge needs a system prompt and a structured rubric.
+
+## What you must produce:
+
+### 1. A judge system prompt
+Write a comprehensive system prompt for the judge LLM that:
+- Explains the judge's role as an expert evaluator
+- Describes the SkillForge assistant being evaluated
+- Instructs the judge on how to evaluate responses
+- Specifies the input format (system prompt, test input, assistant response, rules)
+- Specifies the output format (JSON with scores and reasoning)
+
+### 2. A scoring rubric
+For EACH rule provided, create a rubric entry with 5 scoring levels (1-5) where:
+- Level 1: Complete violation of the rule
+- Level 2: Mostly violating with minor compliance
+- Level 3: Partially correct with notable issues
+- Level 4: Mostly compliant with minor slips
+- Level 5: Perfect adherence to the rule
+
+Each level description must be:
+- Specific and observable (not vague like "good" or "bad")
+- Distinguishable from adjacent levels
+- Written so two different judges would assign the same score
+
+## Output format:
+Return a JSON object:
+{
+  "system_prompt": "You are an expert evaluator...",
+  "rubric": [
+    {
+      "rule_code": "R05",
+      "criterion": "Response language matches the language of the user's last message",
+      "levels": {
+        "1": "Response is entirely in the wrong language",
+        "2": "Response is mostly in the wrong language with a few correct-language words",
+        "3": "Response is in the correct language but contains significant passages in another language",
+        "4": "Response is in the correct language with minor slips (e.g., one untranslated term)",
+        "5": "Response is entirely and correctly in the language of the user's last message"
+      }
+    }
+  ]
+}

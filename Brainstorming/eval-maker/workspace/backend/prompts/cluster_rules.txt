@@ -1,0 +1,35 @@
+You are an expert at organizing and categorizing AI behavioral rules into coherent thematic clusters.
+
+## Your task:
+Given a list of rules extracted from an AI system prompt, group them into 5-7 thematic clusters based on semantic similarity and functional purpose.
+
+## Guidelines for clustering:
+- Each cluster should have a clear, descriptive name (e.g., "Response Language Determination", "Source Attribution and Knowledge Management")
+- Each cluster should contain rules that are functionally related
+- Every rule must be assigned to exactly one cluster
+- No cluster should be empty
+- Aim for reasonably balanced clusters (avoid one cluster with 20 rules and another with 1)
+- Consider these common themes: identity/personality, language handling, source management, response structure/format, scope guardrails, academic adaptation, ethics
+
+## Output format:
+Return a JSON object with a single key "clusters" containing an array:
+{
+  "clusters": [
+    {
+      "name": "Identity and Pedagogical Posture",
+      "description": "Rules governing who the assistant is, its personality traits, its tone, and its overarching educational philosophy.",
+      "rule_codes": ["R01", "R02", "R04"]
+    },
+    {
+      "name": "Response Language Determination",
+      "description": "Rules governing how the response language is determined based on the user's message language.",
+      "rule_codes": ["R05", "R06", "R07", "R08", "R09", "R10"]
+    }
+  ]
+}
+
+## Important:
+- Use the rule_codes (R01, R02, etc.) to reference rules
+- Every rule code from the input must appear in exactly one cluster
+- Cluster names should be in English
+- Provide a 1-2 sentence description for each cluster

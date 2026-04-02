@@ -3,7 +3,7 @@
 Concepts: Multiple tools on one agent, LLM-driven tool selection, docstrings as schema.
 
 Try in adk web:
-  - "Write a sorting function"              -> generate_code_snippet
+  - "Write a sorting function"              -> save_code_snippet
   - "Analyze the complexity of this code"   -> analyze_code_complexity
   - "What templates are available?"          -> list_code_templates
 """
@@ -11,21 +11,30 @@ Try in adk web:
 from google.adk.agents import Agent
 
 
-def generate_code_snippet(specification: str) -> dict:
-    """Generates a Python code snippet from a natural-language specification.
+def save_code_snippet(code: str, language: str = "python") -> dict:
+    """Saves a code snippet and returns confirmation with metadata.
+
+    Use this tool after writing code to save it and get a quality summary.
 
     Args:
-        specification: A plain-English description of the desired functionality.
+        code: The source code to save.
+        language: The programming language of the code. Defaults to "python".
 
     Returns:
-        A dictionary containing the generated Python code.
+        A dictionary with save confirmation and code metrics.
     """
-    mock_code = (
-        f"def solution(data):\n"
-        f'    """Generated for: {specification}"""\n'
-        f"    return data\n"
-    )
-    return {"status": "success", "code": mock_code}
+    line_count = len(code.strip().splitlines())
+    has_docstring = '"""' in code or "'''" in code
+    has_type_hints = "->" in code
+    return {
+        "status": "success",
+        "message": f"Code saved ({line_count} lines, {language})",
+        "metrics": {
+            "line_count": line_count,
+            "has_docstring": has_docstring,
+            "has_type_hints": has_type_hints,
+        },
+    }
 
 
 def analyze_code_complexity(code: str) -> dict:
@@ -38,12 +47,17 @@ def analyze_code_complexity(code: str) -> dict:
         A dictionary with complexity metrics.
     """
     line_count = len(code.strip().splitlines())
+    # Simple heuristic-based mock analysis
+    indent_levels = max(line.count("    ") for line in code.splitlines() if line.strip())
+    branch_keywords = sum(1 for word in ["if ", "elif ", "else:", "for ", "while ", "try:", "except"]
+                          if word in code)
+    complexity = max(1, branch_keywords + 1)
     return {
         "status": "success",
         "line_count": line_count,
-        "cyclomatic_complexity": 3,
-        "maintainability_index": 72.5,
-        "rating": "A",
+        "cyclomatic_complexity": complexity,
+        "nesting_depth": indent_levels,
+        "rating": "A" if complexity <= 5 else "B" if complexity <= 10 else "C",
     }
 
 
@@ -70,10 +84,10 @@ root_agent = Agent(
     description="An agent that writes, analyzes, and manages Python code.",
     instruction=(
         "You are CodeWriter v2, a Python code assistant with three capabilities:\n"
-        "1. Generate code from specifications using generate_code_snippet\n"
+        "1. Write code yourself, then use save_code_snippet to save it\n"
         "2. Analyze code complexity using analyze_code_complexity\n"
         "3. List available templates using list_code_templates\n\n"
         "Choose the right tool based on the user's request."
     ),
-    tools=[generate_code_snippet, analyze_code_complexity, list_code_templates],
+    tools=[save_code_snippet, analyze_code_complexity, list_code_templates],
 )
