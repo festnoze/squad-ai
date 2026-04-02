@@ -154,7 +154,7 @@ class TestSiteConfig(unittest.TestCase):
         self.assertIn('"Yamina Heinrich"', self.html, "Le nom de la praticienne doit être dans SITE_CONFIG")
 
     def test_practitioner_phone(self):
-        self.assertIn("06 13 23 86 81", self.html, "Le téléphone doit être présent")
+        self.assertIn("06 11 36 92 16", self.html, "Le téléphone doit être présent")
 
     def test_practitioner_email(self):
         self.assertIn("yaminahinrich@yahoo.fr", self.html, "L'email doit être présent")
@@ -329,7 +329,7 @@ class TestNavigation(unittest.TestCase):
         self.assertIn('rel="noopener noreferrer"', self.html, "Les liens externes doivent avoir rel=noopener noreferrer")
 
     def test_tel_link(self):
-        self.assertIn("tel:+33613238681", self.html, "Le lien téléphone doit exister")
+        self.assertIn("tel:+33611369216", self.html, "Le lien téléphone doit exister")
 
     def test_mailto_link(self):
         self.assertIn("mailto:yaminahinrich@yahoo.fr", self.html, "Le lien email doit exister")

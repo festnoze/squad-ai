@@ -6,11 +6,11 @@ const DEROULEMENT = {
     steps: [
         {
             title: "Bilan énergétique",
-            description: "Chaque séance débute par un bilan énergétique. Il permet d'orienter le travail."
+            description: "Chaque séance débute par un bilan énergétique qui permet d'orienter le travail."
         },
         {
             title: "Préparation du visage",
-            description: "Massage et outils issus de la Médecine Traditionnelle Chinoise pour préparer le visage."
+            description: "Massage et utilisation d'outils issus de la Médecine Traditionnelle Chinoise pour préparer le visage."
         },
         {
             title: "Stimulation ciblée",

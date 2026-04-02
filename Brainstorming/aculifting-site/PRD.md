@@ -492,7 +492,7 @@ CONTENU:
 {
   "contact_title": "Prenez rendez-vous",
   "contact_subtitle": "Je vous accueille sur rendez-vous pour un soin personnalisé",
-  "contact_phone": "06 13 23 86 81",
+  "contact_phone": "06 11 36 92 16",
   "contact_email": "yaminahinrich@yahoo.fr",
   "contact_address": "622 avenue Xavier de Ricard",
   "contact_city": "",

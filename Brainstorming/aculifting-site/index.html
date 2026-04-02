@@ -3,19 +3,699 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Yamina Heinrich - Aculifting</title>
+    <meta name="description" content="Yamina Heinrich, spécialiste en Aculifting. Techniques esthétiques non invasives pour redonner éclat et jeunesse à votre visage naturellement.">
+    <meta name="keywords" content="aculifting, acupuncture esthétique, lifting naturel, rajeunissement visage, techniques non invasives, médecine traditionnelle chinoise, MTC">
+    <meta name="author" content="Yamina Heinrich">
 
-    <!-- Configuration chargee depuis config.js -->
-    <script src="config.js"></script>
-    <script>
-        window.location.replace(MODE === "live" ? "site.html" : "wip.html");
+    <!-- Open Graph -->
+    <meta property="og:title" content="Yamina Heinrich - Praticienne en MTC">
+    <meta property="og:description" content="Redonnez éclat et jeunesse à votre visage naturellement avec l'Aculifting">
+    <meta property="og:type" content="website">
+    <meta property="og:locale" content="fr_FR">
+
+    <!-- Schema.org -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "MedicalBusiness",
+      "name": "Yamina Heinrich - Aculifting",
+      "description": "Spécialiste en Aculifting, techniques esthétiques non invasives",
+      "telephone": "+33611369216",
+      "email": "aculifting.mtc@gmail.com",
+      "address": {
+        "@type": "PostalAddress",
+        "streetAddress": "622 avenue Xavier de Ricard",
+        "addressLocality": "France"
+      }
+    }
     </script>
 
-    <noscript>
-        <meta http-equiv="refresh" content="0;url=wip.html">
-    </noscript>
+    <title>Yamina Heinrich - Spécialiste en Aculifting | Techniques esthétiques non invasives</title>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@300;400;500;600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Data files -->
+    <script src="data/practitioner.js"></script>
+    <script src="data/navigation.js"></script>
+    <script src="data/hero.js"></script>
+    <script src="data/aculifting.js"></script>
+    <script src="data/mtc.js"></script>
+    <script src="data/deroulement.js"></script>
+    <script src="data/faq.js"></script>
 </head>
 <body>
-    <p>Redirection en cours...</p>
+
+<!--
+<div id="colorPickerPanel" style="
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    background: #1a1a1a; color: #eee; font-family: monospace; font-size: 13px;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    transition: transform 0.3s ease;
+">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 16px; background:#111; cursor:pointer;" onclick="
+        var body = document.getElementById('colorPickerBody');
+        var arrow = document.getElementById('colorPickerArrow');
+        if (body.style.display === 'none') { body.style.display = 'block'; arrow.textContent = '\u25BC'; }
+        else { body.style.display = 'none'; arrow.textContent = '\u25B6'; }
+    ">
+        <strong>Palette Editor</strong>
+        <span id="colorPickerArrow" style="font-size:16px;">&#9660;</span>
+    </div>
+    <div id="colorPickerBody" style="padding: 12px 16px;">
+        <div id="colorSliders" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px;"></div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+            <button onclick="exportPalette()" style="padding:6px 14px; background:#7A9B8D; color:#fff; border:none; border-radius:4px; cursor:pointer; font-family:monospace;">Copier CSS</button>
+            <button onclick="resetPalette()" style="padding:6px 14px; background:#555; color:#fff; border:none; border-radius:4px; cursor:pointer; font-family:monospace;">Reset</button>
+        </div>
+        <pre id="colorExport" style="display:none; margin-top:8px; padding:8px; background:#000; border-radius:4px; white-space:pre-wrap; font-size:12px;"></pre>
+    </div>
+</div> -->
+<script>
+(function() {
+    var PALETTE = [
+        { varName: '--color-white',        label: 'Blanc',          default: '#FFFFFF' },
+        { varName: '--color-cream',        label: 'Crème',          default: '#F2EDE7' },
+        { varName: '--color-cream-light',  label: 'Crème clair',    default: '#F7F4F0' },
+        { varName: '--color-bg-warm',      label: 'Fond chaud',     default: '#FAFAF7' },
+        { varName: '--color-bg-hero',      label: 'Fond hero',      default: '#FBFBF9' },
+        { varName: '--color-border',       label: 'Bordure',        default: '#DDD8D2' },
+        { varName: '--color-muted',        label: 'Discret',        default: '#B8A99A' },
+        { varName: '--color-primary',      label: 'Primaire',       default: '#7A9B8D' },
+        { varName: '--color-primary-dark', label: 'Primaire foncé', default: '#5E8275' },
+        { varName: '--color-text',         label: 'Texte',          default: '#2E3D35' }
+    ];
+
+    var container = document.getElementById('colorSliders');
+
+    PALETTE.forEach(function(c) {
+        var current = getComputedStyle(document.documentElement).getPropertyValue(c.varName).trim() || c.default;
+
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; gap:8px;';
+
+        var label = document.createElement('span');
+        label.textContent = c.label;
+        label.style.cssText = 'width:110px; flex-shrink:0; font-size:12px; color:#aaa;';
+
+        var picker = document.createElement('input');
+        picker.type = 'color';
+        picker.value = current;
+        picker.style.cssText = 'width:40px; height:30px; border:1px solid #555; border-radius:4px; cursor:pointer; background:none; padding:0;';
+
+        var hex = document.createElement('input');
+        hex.type = 'text';
+        hex.value = current.toUpperCase();
+        hex.maxLength = 7;
+        hex.style.cssText = 'width:80px; padding:4px 6px; background:#333; color:#eee; border:1px solid #555; border-radius:4px; font-family:monospace; font-size:13px;';
+
+        var preview = document.createElement('div');
+        preview.style.cssText = 'width:30px; height:30px; border-radius:4px; border:1px solid #555; background:' + current + ';';
+
+        function updateColor(val) {
+            if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                document.documentElement.style.setProperty(c.varName, val);
+                picker.value = val;
+                hex.value = val.toUpperCase();
+                preview.style.background = val;
+            }
+        }
+
+        picker.addEventListener('input', function() { updateColor(this.value); });
+        hex.addEventListener('input', function() { updateColor(this.value); });
+        hex.addEventListener('blur', function() {
+            if (!/^#[0-9A-Fa-f]{6}$/.test(this.value)) this.value = picker.value.toUpperCase();
+        });
+
+        row.appendChild(label);
+        row.appendChild(picker);
+        row.appendChild(hex);
+        row.appendChild(preview);
+        container.appendChild(row);
+    });
+
+    window.exportPalette = function() {
+        var out = '';
+        PALETTE.forEach(function(c) {
+            var val = getComputedStyle(document.documentElement).getPropertyValue(c.varName).trim();
+            out += c.varName + ': ' + val + ';\n';
+        });
+        var el = document.getElementById('colorExport');
+        el.textContent = out;
+        el.style.display = 'block';
+        if (navigator.clipboard) navigator.clipboard.writeText(out);
+    };
+
+    window.resetPalette = function() {
+        PALETTE.forEach(function(c) {
+            document.documentElement.style.setProperty(c.varName, c.default);
+        });
+        container.innerHTML = '';
+        PALETTE.forEach(function(c) {
+            // Re-render — simple reload
+        });
+        location.reload();
+    };
+})();
+</script>
+
+<!-- ===== NAVIGATION ===== -->
+<nav class="navbar" id="navbar">
+    <div class="nav-container">
+        <a href="#hero" class="nav-logo" id="navLogo">
+            <img src="initiales_YH.png" alt="Yamina Heinrich - Logo">
+            <div class="nav-logo-text">
+                <span class="nav-logo-name" id="navLogoName"></span>
+                <span class="nav-logo-subtitle" id="navLogoSubtitle"></span>
+            </div>
+        </a>
+        <button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+            <span></span>
+            <span></span>
+            <span></span>
+        </button>
+        <ul class="nav-menu" id="navMenu"></ul>
+    </div>
+</nav>
+
+<!-- ===== HERO + INTRO (carte de visite) ===== -->
+<div class="hero-about-bg">
+<img class="hero-logo" src="dessin_YH.svg" alt="Yamina Heinrich - Aculifting">
+
+<section class="hero" id="hero">
+    <div class="hero-content">
+        <h1 class="hero-title" id="heroTitle"></h1>
+        <p class="hero-specialty" id="heroSpecialty"></p>
+        <p class="hero-tagline" id="heroTagline"></p>
+        <div class="hero-cta">
+            <a href="#contact" class="btn btn-primary" id="heroCtaPrimary"></a>
+            <a href="#aculifting" class="btn btn-secondary" id="heroCtaSecondary"></a>
+        </div>
+    </div>
+    <a href="#aculifting" class="hero-scroll">
+        <span id="heroScrollText"></span>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 5v14m0 0l7-7m-7 7l-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+    </a>
+</section>
+</div>
+
+<!-- ===== ACULIFTING SECTION ===== -->
+<section class="aculifting section" id="aculifting">
+    <div class="container">
+        <h2 class="section-title fade-in" id="aculiftingTitle"></h2>
+        <p class="section-subtitle fade-in" id="aculiftingSubtitle"></p>
+        <p class="aculifting-intro fade-in" id="aculiftingIntro"></p>
+        <!-- Benefit cards — en dur (éléments visuels imbriqués) -->
+        <div class="benefits-grid">
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 2C12 2 5 11 5 15.5C5 19.64 8.13 23 12 23C15.87 23 19 19.64 19 15.5C19 11 12 2 12 2z" stroke="currentColor" stroke-width="1.5" fill="currentColor" opacity="0.2" stroke-linejoin="round"/>
+                        <path d="M12 2C12 2 5 11 5 15.5C5 19.64 8.13 23 12 23C15.87 23 19 19.64 19 15.5C19 11 12 2 12 2z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+                        <path d="M9 16c0 2.2 1.3 4 3 4" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" fill="none" opacity="0.6"/>
+                    </svg>
+                </div>
+                <h4 class="benefit-title">Soin naturel</h4>
+                <p class="benefit-description">Stimule la production naturelle de collagène</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8.5" cy="10" r="1.5" fill="currentColor"/><circle cx="15.5" cy="10" r="1.5" fill="currentColor"/><path d="M7 8C7 8 8 7 9.5 7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><path d="M17 8C17 8 16 7 14.5 7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+                </div>
+                <h4 class="benefit-title">Effet lifting doux</h4>
+                <p class="benefit-description">Tonification des muscles du visage pour un ovale redéfini et des traits raffermis</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <h4 class="benefit-title">Éclat du teint</h4>
+                <p class="benefit-description">Amélioration de la circulation sanguine pour une peau lumineuse et revitalisée</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Main protectrice ouverte / non invasif -->
+                        <path d="M12 3C7 3 4 7 4 11c0 5 4 8 8 10 4-2 8-5 8-10 0-4-3-8-8-8z" stroke="currentColor" stroke-width="1.5" fill="currentColor" opacity="0.15" stroke-linejoin="round"/>
+                        <path d="M12 3C7 3 4 7 4 11c0 5 4 8 8 10 4-2 8-5 8-10 0-4-3-8-8-8z" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linejoin="round"/>
+                        <path d="M9 11l2 2 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </div>
+                <h4 class="benefit-title">Non invasif</h4>
+                <p class="benefit-description">Aucune chirurgie, juste une méthode douce et naturelle</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 6v6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h4 class="benefit-title">Résultats durables</h4>
+                <p class="benefit-description">Des effets progressifs et durables avec un programme de séances adapté</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
+                </div>
+                <h4 class="benefit-title">Bien-être global</h4>
+                <p class="benefit-description">Une approche holistique qui agit également sur le stress et l'équilibre énergétique</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== DEROULEMENT SECTION ===== -->
+<section id="deroulement">
+    <div class="container">
+        <h2 class="section-title fade-in" id="deroulementTitle"></h2>
+        <div class="timeline-container" id="timelineContainer"></div>
+    </div>
+</section>
+
+<div class="disclaimer-banner fade-in">
+    <p>L'aculifting est une technique à visée esthétique et de bien-être.<br>Elle ne constitue pas un acte médical.</p>
+</div>
+
+<!-- ===== MTC SECTION ===== -->
+<section class="mtc section" id="mtc">
+    <div class="container">
+        <h2 class="section-title fade-in" id="mtcTitle"></h2>
+        <p class="section-subtitle fade-in" id="mtcSubtitle"></p>
+        <div class="mtc-content fade-in" id="mtcParagraphs"></div>
+        <p class="mtc-disclaimer fade-in" id="mtcDisclaimer"></p>
+    </div>
+</section>
+
+<!-- ===== TARIFS SECTION ===== -->
+<section id="tarifs">
+    <div class="container">
+        <h2 class="section-title fade-in">Tarifs</h2>
+        <!-- Tarifs cards — en dur (éléments visuels imbriqués) -->
+        <h3 class="pricing-category fade-in">Aculifting</h3>
+        <div class="pricing-grid">
+            <div class="pricing-card fade-in">
+                <h3>Séance Aculifting</h3>
+                <div class="price">80 &euro;</div>
+                <div class="duration">1h15 environ</div>
+                <p class="description">Soin complet du visage</p>
+            </div>
+            <div class="pricing-card featured fade-in">
+                <h3>Cure 3 séances</h3>
+                <div class="price">225 &euro;</div>
+                <div class="duration">3&times;1h15</div>
+                <p class="description">Accompagnement sur plusieurs séances</p>
+            </div>
+            <div class="pricing-card featured fade-in">
+                <h3>Cure 5 séances</h3>
+                <div class="price">350 &euro;</div>
+                <div class="duration">5&times;1h15</div>
+                <p class="description">C'est dans la régularité que le soin prend tout son sens</p>
+            </div>
+        </div>
+        <h3 class="pricing-category fade-in">Médecine Traditionnelle Chinoise</h3>
+        <div class="pricing-grid pricing-grid--centered">
+            <div class="pricing-card fade-in">
+                <h3>Séance MTC</h3>
+                <div class="price">60 &euro;</div>
+                <div class="duration">1h (1h30 la première fois)</div>
+                <p class="description">Consultation et soin adapté à vos besoins</p>
+            </div>
+        </div>
+        <div class="pricing-note fade-in">
+            <p>La plupart des mutuelles remboursent les séances les soins de médecine traditionnelle chinoise.</p>
+        </div>
+    </div>
+</section>
+
+<!-- ===== FAQ SECTION ===== -->
+<section id="faq">
+    <div class="faq-container">
+        <h2 class="fade-in" id="faqTitle"></h2>
+        <div id="faqItems"></div>
+    </div>
+</section>
+
+<!-- ===== CONTACT SECTION ===== -->
+<section id="contact">
+    <div class="contact-container">
+        <h2 class="fade-in">Contact et prise de rendez-vous</h2>
+        <p class="contact-subtitle fade-in">Je vous accueille sur rendez-vous dans mon cabinet, à Montpellier. Contactez-moi par téléphone pour toute réservation ou demande d'informations.</p>
+        <div class="contact-content">
+            <!-- Contact info — en dur (éléments visuels imbriqués) -->
+            <div class="contact-info fade-in">
+                <h3>Informations de contact</h3>
+                <div class="info-item">
+                    <svg class="info-icon" viewBox="0 0 24 24">
+                        <path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/>
+                    </svg>
+                    <div class="info-details">
+                        <h4>Téléphone</h4>
+                        <p><a href="tel:+33611369216">06 11 36 92 16</a></p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <svg class="info-icon" viewBox="0 0 24 24">
+                        <path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                    </svg>
+                    <div class="info-details">
+                        <h4>Email</h4>
+                        <p><a href="mailto:aculifting.mtc@gmail.com">aculifting.mtc@gmail.com</a></p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <svg class="info-icon" viewBox="0 0 24 24">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+                    </svg>
+                    <div class="info-details">
+                        <h4>Adresse</h4>
+                        <p>Quartier Les Aubes</p>
+                        <p>622 avenue Xavier de Ricard</p>
+                        <p>34000 MONTPELLIER</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <svg class="info-icon" viewBox="0 0 24 24">
+                        <path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/>
+                    </svg>
+                    <div class="info-details">
+                        <h4>Horaires</h4>
+                        <p>Lundi - Vendredi</p>
+                        <p> 9h - 19h</p>
+                        <p>Sur rendez-vous</p>
+                    </div>
+                </div>
+                <div class="info-item">
+                    <svg class="info-icon" viewBox="0 0 24 24">
+                        <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+                    </svg>
+                    <div class="info-details">
+                        <h4>Stationnement</h4>
+                        <p>Facilité de stationnement gratuit à côté du cabinet</p>
+                    </div>
+                </div>
+                <div class="contact-cta">
+                    <a href="tel:+33611369216" class="btn btn-primary">Appeler maintenant</a>
+                </div>
+            </div>
+        </div>
+        <div class="map-container fade-in">
+            <iframe
+                src="https://maps.google.com/maps?q=622+Avenue+Xavier+de+Ricard,+Montpellier,+France&output=embed&z=15"
+                allowfullscreen=""
+                loading="lazy"
+                referrerpolicy="no-referrer-when-downgrade">
+            </iframe>
+        </div>
+    </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+    <div class="footer-content">
+        <div class="footer-brand">
+            <h3 id="footerName"></h3>
+            <p>Redonnez éclat et jeunesse à votre visage naturellement grâce à l'aculifting, une technique douce et efficace qui respecte votre beauté naturelle.</p>
+        </div>
+        <div class="footer-links">
+            <h4>Liens rapides</h4>
+            <ul>
+                <li><a href="#hero">Accueil</a></li>
+                <li><a href="#aculifting">L'aculifting</a></li>
+                <li><a href="#mtc">La MTC</a></li>
+                <li><a href="#deroulement">Déroulement</a></li>
+                <li><a href="#tarifs">Tarifs</a></li>
+                <li><a href="#contact">Contact</a></li>
+            </ul>
+        </div>
+    </div>
+    <div class="footer-bottom">
+        <p>&copy; 2026 Yamina Heinrich &mdash; Praticienne en Médecine Traditionnelle Chinoise et Aculifting &mdash; Tous droits réservés.</p>
+    </div>
+</footer>
+
+<!-- ===== FLOATING CTA BUTTON (MOBILE) ===== -->
+<div class="floating-cta">
+    <a href="tel:+33611369216">Prendre RDV</a>
+</div>
+
+<!-- ===== JAVASCRIPT - Rendering ===== -->
+<script>
+(function() {
+    // --- Render Navigation ---
+    function renderNavigation() {
+        document.getElementById('navLogoName').textContent = PRACTITIONER.name;
+        document.getElementById('navLogoSubtitle').textContent = PRACTITIONER.specialty;
+        var navMenu = document.getElementById('navMenu');
+        NAVIGATION.forEach(function(link) {
+            var li = document.createElement('li');
+            var a = document.createElement('a');
+            a.href = link.href;
+            a.className = 'nav-link';
+            a.textContent = link.text;
+            li.appendChild(a);
+            navMenu.appendChild(li);
+        });
+    }
+
+    // --- Render Hero ---
+    function renderHero() {
+        document.getElementById('heroTitle').textContent = PRACTITIONER.name;
+        document.getElementById('heroSpecialty').textContent = PRACTITIONER.specialtySubtitle;
+        document.getElementById('heroTagline').textContent = HERO.tagline;
+        document.getElementById('heroCtaPrimary').textContent = HERO.ctaPrimary;
+        var isMobile = /Android|iPhone|iPad|iPod|Opera Mini|IEMobile/i.test(navigator.userAgent) || window.innerWidth <= 768;
+        if (isMobile) {
+            document.getElementById('heroCtaPrimary').href = 'tel:' + PRACTITIONER.phoneLink;
+        }
+        document.getElementById('heroCtaSecondary').textContent = HERO.ctaSecondary;
+        document.getElementById('heroScrollText').textContent = HERO.scrollText;
+    }
+
+    // --- Render Aculifting (text only, cards are in HTML) ---
+    function renderAculifting() {
+        document.getElementById('aculiftingTitle').textContent = ACULIFTING.title;
+        document.getElementById('aculiftingSubtitle').textContent = ACULIFTING.subtitle;
+        document.getElementById('aculiftingIntro').textContent = ACULIFTING.intro;
+    }
+
+    // --- Render MTC ---
+    function renderMtc() {
+        document.getElementById('mtcTitle').textContent = MTC.title;
+        document.getElementById('mtcSubtitle').textContent = MTC.subtitle;
+        var container = document.getElementById('mtcParagraphs');
+        MTC.paragraphs.forEach(function(text) {
+            var p = document.createElement('p');
+            p.textContent = text;
+            container.appendChild(p);
+        });
+        if (MTC.disclaimer) {
+            document.getElementById('mtcDisclaimer').textContent = MTC.disclaimer;
+        }
+    }
+
+    // --- Render Déroulement (auto-numbered timeline) ---
+    function renderDeroulement() {
+        document.getElementById('deroulementTitle').textContent = DEROULEMENT.title;
+        var timeline = document.getElementById('timelineContainer');
+        DEROULEMENT.steps.forEach(function(step, index) {
+            var stepDiv = document.createElement('div');
+            stepDiv.className = 'timeline-step fade-in';
+
+            var numberDiv = document.createElement('div');
+            numberDiv.className = 'timeline-number';
+            var span = document.createElement('span');
+            span.textContent = String(index + 1).padStart(2, '0');
+            numberDiv.appendChild(span);
+
+            var contentDiv = document.createElement('div');
+            contentDiv.className = 'timeline-content';
+            var h3 = document.createElement('h3');
+            h3.textContent = step.title;
+            var p = document.createElement('p');
+            p.textContent = step.description;
+            contentDiv.appendChild(h3);
+            contentDiv.appendChild(p);
+
+            stepDiv.appendChild(numberDiv);
+            stepDiv.appendChild(contentDiv);
+            timeline.appendChild(stepDiv);
+        });
+
+    }
+
+    // --- Render FAQ (question/answer pairs, accordion) ---
+    function renderFaq() {
+        document.getElementById('faqTitle').textContent = FAQ.title;
+        var container = document.getElementById('faqItems');
+        FAQ.items.forEach(function(item) {
+            var div = document.createElement('div');
+            div.className = 'faq-item fade-in';
+
+            var question = document.createElement('div');
+            question.className = 'faq-question';
+            question.textContent = item.question;
+
+            var answer = document.createElement('div');
+            answer.className = 'faq-answer';
+            answer.textContent = item.answer;
+
+            div.appendChild(question);
+            div.appendChild(answer);
+            container.appendChild(div);
+        });
+    }
+
+    // --- Render Footer ---
+    function renderFooter() {
+        document.getElementById('footerName').textContent = PRACTITIONER.name;
+    }
+
+    // --- Init ---
+    document.addEventListener('DOMContentLoaded', function() {
+        renderNavigation();
+        renderHero();
+        renderAculifting();
+        renderMtc();
+        renderDeroulement();
+        renderFaq();
+        renderFooter();
+
+        // Mobile menu toggle
+        var navToggle = document.getElementById('navToggle');
+        var navMenu = document.getElementById('navMenu');
+        navToggle.addEventListener('click', function() {
+            this.classList.toggle('active');
+            navMenu.classList.toggle('active');
+        });
+
+        // Smooth scroll for all anchor links
+        document.addEventListener('click', function(e) {
+            var anchor = e.target.closest('a[href^="#"]');
+            if (!anchor) return;
+            e.preventDefault();
+            var target = document.querySelector(anchor.getAttribute('href'));
+            if (target) {
+                var navHeight = document.getElementById('navbar').offsetHeight;
+                window.scrollTo({ top: target.offsetTop - navHeight, behavior: 'smooth' });
+                navToggle.classList.remove('active');
+                navMenu.classList.remove('active');
+            }
+        });
+
+        // Navbar scroll effect
+        window.addEventListener('scroll', function() {
+            var navbar = document.getElementById('navbar');
+            if (window.pageYOffset > 50) {
+                navbar.classList.add('scrolled');
+            } else {
+                navbar.classList.remove('scrolled');
+            }
+        });
+
+        // Hero logo parallax
+        var heroLogo = document.querySelector('.hero-logo');
+        if (heroLogo) {
+            window.addEventListener('scroll', function() {
+                heroLogo.style.transform = 'translateX(-50%) scale(1.5) translateY(' + (window.pageYOffset * 0.5) + 'px)';
+            });
+        }
+
+        // Active nav link on scroll
+        var sections = document.querySelectorAll('section[id]');
+        var navLinks = document.querySelectorAll('.nav-link');
+        window.addEventListener('scroll', function() {
+            var current = '';
+            sections.forEach(function(section) {
+                if (window.pageYOffset >= section.offsetTop - 200) {
+                    current = section.getAttribute('id');
+                }
+            });
+            navLinks.forEach(function(link) {
+                link.classList.remove('active');
+                if (link.getAttribute('href') === '#' + current) {
+                    link.classList.add('active');
+                }
+            });
+        });
+
+        // FAQ accordion
+        document.addEventListener('click', function(e) {
+            var question = e.target.closest('.faq-question');
+            if (!question) return;
+            var item = question.parentElement;
+            document.querySelectorAll('.faq-item').forEach(function(other) {
+                if (other !== item && other.classList.contains('active')) {
+                    other.classList.remove('active');
+                }
+            });
+            item.classList.toggle('active');
+        });
+
+        // Scroll animations (Intersection Observer)
+        var observerOptions = { threshold: 0.15, rootMargin: '0px 0px -50px 0px' };
+        var observer = new IntersectionObserver(function(entries) {
+            entries.forEach(function(entry) {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('visible');
+                }
+            });
+        }, observerOptions);
+        document.querySelectorAll('.fade-in').forEach(function(el) {
+            observer.observe(el);
+        });
+
+        // Floating CTA visibility
+        var floatingCta = document.querySelector('.floating-cta');
+        window.addEventListener('scroll', function() {
+            var contactSection = document.getElementById('contact');
+            if (floatingCta && contactSection) {
+                if (contactSection.getBoundingClientRect().top < window.innerHeight) {
+                    floatingCta.style.opacity = '0';
+                    floatingCta.style.pointerEvents = 'none';
+                } else {
+                    floatingCta.style.opacity = '1';
+                    floatingCta.style.pointerEvents = 'auto';
+                }
+            }
+        });
+
+        // Font preload
+        if ('fonts' in document) {
+            Promise.all([
+                document.fonts.load('1em Playfair Display'),
+                document.fonts.load('1em Cormorant Garamond'),
+                document.fonts.load('1em Lato')
+            ]).then(function() {
+                document.body.classList.add('fonts-loaded');
+            });
+        }
+
+        // Lazy load images
+        if ('IntersectionObserver' in window) {
+            var imageObserver = new IntersectionObserver(function(entries, obs) {
+                entries.forEach(function(entry) {
+                    if (entry.isIntersecting) {
+                        var img = entry.target;
+                        if (img.dataset.src) {
+                            img.src = img.dataset.src;
+                            img.classList.add('loaded');
+                            obs.unobserve(img);
+                        }
+                    }
+                });
+            });
+            document.querySelectorAll('img[data-src]').forEach(function(img) {
+                imageObserver.observe(img);
+            });
+        }
+    });
+})();
+</script>
+
 </body>
 </html>

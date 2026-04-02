@@ -7,6 +7,7 @@ box-sizing: border-box;
 
 html {
 scroll-behavior: smooth;
+color-scheme: light;
 }
 
 img {
@@ -93,7 +94,7 @@ padding: 0 var(--spacing-md);
 }
 
 .section {
-padding: var(--spacing-xl) 0;
+padding: 40px;
 }
 
 .section-title {
@@ -467,6 +468,10 @@ margin-top: var(--spacing-md);
 background-color: var(--color-white);
 }
 
+.mtc .section-subtitle {
+margin-bottom: 30px;
+}
+
 .mtc-content {
 max-width: 800px;
 margin: 0 auto;
@@ -483,14 +488,29 @@ text-align: center;
 max-width: 600px;
 margin: var(--spacing-lg) auto 0;
 text-align: center;
-font-size: 0.85rem;
 font-style: italic;
 color: var(--color-muted);
+}
+
+.disclaimer-banner {
+max-width: 700px;
+margin: 0 auto;
+padding: var(--spacing-md) var(--spacing-lg);
+text-align: center;
+font-style: italic;
+color: var(--color-muted);
+font-size: 1.0rem;
+line-height: 1.6;
 }
 
 /* ===== ACULIFTING SECTION ===== */
 .aculifting {
 background-color: var(--color-bg-hero);
+padding-top: 40px;
+}
+
+.aculifting .section-subtitle {
+margin-bottom: 30px;
 }
 
 .aculifting-intro {
@@ -529,6 +549,12 @@ margin: 0 auto var(--spacing-sm);
 fill: var(--color-primary);
 }
 
+.benefit-icon svg {
+width: 100%;
+height: 100%;
+color: var(--color-primary);
+}
+
 .benefit-title {
 font-family: var(--font-subtitle);
 font-size: 1.3rem;
@@ -546,7 +572,7 @@ line-height: 1.6;
 /* ===== DEROULEMENT SECTION - Timeline ===== */
 #deroulement {
 background: var(--color-white);
-padding: 100px 0;
+padding-top: 50px;
 }
 
 .timeline-container {
@@ -693,7 +719,7 @@ margin: 0;
 /* ===== TARIFS SECTION ===== */
 #tarifs {
 background: var(--color-cream);
-padding: 100px 0;
+padding: 50px 0;
 }
 
 .pricing-category {
@@ -701,7 +727,7 @@ font-family: var(--font-subtitle);
 font-size: 1.5rem;
 color: var(--color-primary);
 text-align: center;
-margin-top: var(--spacing-lg);
+margin-top: 30px;
 margin-bottom: 0;
 }
 
@@ -715,8 +741,10 @@ padding: 0 20px;
 }
 
 .pricing-grid.pricing-grid--centered {
-grid-template-columns: minmax(280px, 380px);
-justify-content: center;
+grid-template-columns: 1fr;
+max-width: 380px;
+margin-left: auto;
+margin-right: auto;
 }
 
 .pricing-card {

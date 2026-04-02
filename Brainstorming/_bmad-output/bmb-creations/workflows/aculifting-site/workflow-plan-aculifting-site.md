@@ -16,7 +16,7 @@ Créer un workflow en deux phases majeures :
 **Who It's For:**
 - **Praticienne** : Yamina Heinrich, spécialiste en Aculifting, techniques esthétiques non invasives
 - **Localisation** : 622 avenue Xavier de Ricard
-- **Contact** : 06 13 23 86 81 / yaminahinrich@yahoo.fr
+- **Contact** : 06 11 36 92 16 / yaminahinrich@yahoo.fr
 
 **What It Produces:**
 1. Un rapport d'analyse concurrentielle de 5+ sites d'aculifting français

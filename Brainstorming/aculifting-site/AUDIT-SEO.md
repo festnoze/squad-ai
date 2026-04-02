@@ -96,7 +96,7 @@ Concretement :
   "@type": "MedicalBusiness",
   "name": "Yamina Heinrich - Aculifting",
   "description": "...",
-  "telephone": "+33613238681",
+  "telephone": "+33611369216",
   "email": "aculifting.mtc@gmail.com",
   "address": {
     "streetAddress": "622 avenue Xavier de Ricard",
@@ -124,7 +124,7 @@ Concretement :
   "name": "Yamina Heinrich - Aculifting",
   "description": "Specialiste en Aculifting a Montpellier. Techniques esthetiques non invasives pour le rajeunissement naturel du visage.",
   "url": "https://www.URL-DU-SITE.fr",
-  "telephone": "+33613238681",
+  "telephone": "+33611369216",
   "email": "aculifting.mtc@gmail.com",
   "image": "https://www.URL-DU-SITE.fr/photo-yamina-heinrich.jpg",
   "priceRange": "$$",
