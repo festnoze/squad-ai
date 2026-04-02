@@ -3,7 +3,7 @@
 const PRACTITIONER = {
     name: "Yamina Heinrich",
     specialty: "Spécialiste en Aculifting",
-    specialtySubtitle: "Techniques esthétiques non invasives",
+    specialtySubtitle: "Aculifting & Médecine Traditionnelle Chinoise",
     phone: "06 13 23 86 81",
     phoneLink: "+33613238681",
     email: "aculifting.mtc@gmail.com",
