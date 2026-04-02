@@ -448,6 +448,23 @@ color: var(--color-gold);
 margin-top: var(--spacing-md);
 }
 
+/* ===== MTC SECTION ===== */
+.mtc {
+background-color: var(--color-white);
+}
+
+.mtc-content {
+max-width: 800px;
+margin: 0 auto;
+}
+
+.mtc-content p {
+font-size: 1.05rem;
+line-height: 1.8;
+margin-bottom: var(--spacing-sm);
+text-align: center;
+}
+
 /* ===== ACULIFTING SECTION ===== */
 .aculifting {
 background-color: var(--color-hero-bg);
@@ -1021,6 +1038,11 @@ transition: color 0.3s ease;
 color: var(--color-brown-rose);
 }
 
+.contact-cta {
+margin-top: 30px;
+text-align: center;
+}
+
 .contact-form h3 {
 font-family: var(--font-subtitle);
 font-size: 1.6rem;
@@ -1091,7 +1113,7 @@ font-family: var(--font-body);
 font-size: 1rem;
 font-weight: 600;
 color: var(--color-white);
-background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-muted) 100%);
+background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-brown-rose) 100%);
 border: none;
 padding: 15px 40px;
 border-radius: 50px;
@@ -1234,7 +1256,7 @@ display: flex;
 align-items: center;
 justify-content: center;
 padding: 15px 25px;
-background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-muted) 100%);
+background: linear-gradient(135deg, var(--color-gold) 0%, var(--color-brown-rose) 100%);
 color: var(--color-white);
 font-family: var(--font-body);
 font-size: 0.95rem;

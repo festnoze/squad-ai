@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Yamina Heinrich, spécialiste en Aculifting. Techniques esthétiques non invasives pour redonner éclat et jeunesse à votre visage naturellement.">
-    <meta name="keywords" content="aculifting, acupuncture esthétique, lifting naturel, rajeunissement visage, techniques non invasives">
+    <meta name="keywords" content="aculifting, acupuncture esthétique, lifting naturel, rajeunissement visage, techniques non invasives, médecine traditionnelle chinoise, MTC">
     <meta name="author" content="Yamina Heinrich">
 
     <!-- Open Graph -->
@@ -38,63 +38,18 @@
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@300;400;500;600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">
+
+    <!-- Data files -->
+    <script src="data/practitioner.js"></script>
+    <script src="data/navigation.js"></script>
+    <script src="data/hero.js"></script>
+    <script src="data/aculifting.js"></script>
+    <script src="data/mtc.js"></script>
+    <script src="data/deroulement.js"></script>
+    <script src="data/about.js"></script>
+    <script src="data/faq.js"></script>
 </head>
 <body>
-
-<!-- ===== CONFIGURATION JavaScript ===== -->
-<script>
-const SITE_CONFIG = {
-    practitioner: {
-        name: "Yamina Heinrich",
-        specialty: "Spécialiste en Aculifting",
-        specialtySubtitle: "Techniques esthétiques non invasives",
-        phone: "06 13 23 86 81",
-        phoneLink: "0613238681",
-        email: "aculifting.mtc@gmail.com",
-        address: "622 avenue Xavier de Ricard"
-    },
-    navigation: {
-        links: [
-            { text: "Accueil", href: "#hero" },
-            { text: "À propos", href: "#about" },
-            { text: "L'Aculifting", href: "#aculifting" },
-            { text: "Tarifs", href: "#tarifs" },
-            { text: "Témoignages", href: "#testimonials" },
-            { text: "Contact", href: "#contact" }
-        ]
-    },
-    hero: {
-        tagline: "Redonnez éclat et jeunesse à votre visage naturellement",
-        ctaPrimary: "Prendre rendez-vous",
-        ctaSecondary: "En savoir plus",
-        scrollText: "Découvrir"
-    },
-    about: {
-        title: "À propos de moi",
-        subtitle: "Votre spécialiste en Aculifting",
-        paragraphs: [
-            "Passionnée par les techniques de bien-être et de rajeunissement naturel, je me suis spécialisée dans l'Aculifting, une méthode douce et non invasive qui allie les principes millénaires de l'acupuncture aux besoins esthétiques modernes.",
-            "Mon approche personnalisée vise à révéler la beauté naturelle de chaque personne en respectant l'harmonie du visage et du corps. Chaque séance est un moment privilégié où je mets mon expertise et mon écoute à votre service pour des résultats visibles et durables.",
-            "Je vous accueille dans un cadre apaisant et professionnel, où votre bien-être est ma priorité absolue."
-        ],
-        signature: "Yamina Heinrich",
-        imagePlaceholder: "Photo professionnelle de Yamina Heinrich"
-    },
-    aculifting: {
-        title: "L'Aculifting",
-        subtitle: "Une alternative naturelle au lifting chirurgical",
-        intro: "L'Aculifting est une technique innovante qui utilise de fines aiguilles d'acupuncture pour stimuler les points énergétiques du visage. Cette méthode douce permet de tonifier les muscles, améliorer la circulation sanguine et favoriser la production naturelle de collagène pour un effet lifting naturel et progressif.",
-        benefits: [
-            { title: "Rajeunissement naturel", description: "Réduction visible des rides et ridules grâce à la stimulation naturelle du collagène", icon: "sparkles" },
-            { title: "Effet lifting doux", description: "Tonification des muscles du visage pour un ovale redéfini et des traits raffermis", icon: "face" },
-            { title: "Éclat du teint", description: "Amélioration de la circulation sanguine pour une peau lumineuse et revitalisée", icon: "sun" },
-            { title: "Non invasif", description: "Aucune chirurgie, aucune éviction sociale, juste une méthode douce et naturelle", icon: "leaf" },
-            { title: "Résultats durables", description: "Des effets progressifs et durables avec un programme de séances adapté", icon: "clock" },
-            { title: "Bien-être global", description: "Une approche holistique qui agit également sur le stress et l'équilibre énergétique", icon: "heart" }
-        ]
-    }
-};
-</script>
 
 <!-- ===== NAVIGATION ===== -->
 <nav class="navbar" id="navbar">
@@ -115,30 +70,102 @@ const SITE_CONFIG = {
     </div>
 </nav>
 
-<!-- ===== HERO + ABOUT SHARED BACKGROUND ===== -->
+<!-- ===== HERO + INTRO (carte de visite) ===== -->
 <div class="hero-about-bg">
 <img class="hero-logo" src="dessin_YH.svg" alt="Yamina Heinrich - Aculifting">
 
-<!-- ===== HERO SECTION ===== -->
 <section class="hero" id="hero">
     <div class="hero-content">
         <h1 class="hero-title" id="heroTitle"></h1>
         <p class="hero-specialty" id="heroSpecialty"></p>
         <p class="hero-tagline" id="heroTagline"></p>
         <div class="hero-cta">
-            <a href="#contact" class="btn btn-primary" id="heroCtaPrimary"></a>
+            <a href="tel:+33613238681" class="btn btn-primary" id="heroCtaPrimary"></a>
             <a href="#aculifting" class="btn btn-secondary" id="heroCtaSecondary"></a>
         </div>
     </div>
-    <a href="#about" class="hero-scroll">
+    <a href="#aculifting" class="hero-scroll">
         <span id="heroScrollText"></span>
         <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M12 5v14m0 0l7-7m-7 7l-7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
     </a>
 </section>
+</div>
 
-<!-- ===== ABOUT SECTION ===== -->
+<!-- ===== ACULIFTING SECTION ===== -->
+<section class="aculifting section" id="aculifting">
+    <div class="container">
+        <h2 class="section-title fade-in" id="aculiftingTitle"></h2>
+        <p class="section-subtitle fade-in" id="aculiftingSubtitle"></p>
+        <p class="aculifting-intro fade-in" id="aculiftingIntro"></p>
+        <!-- Benefit cards — en dur (éléments visuels imbriqués) -->
+        <div class="benefits-grid">
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="currentColor"/><path d="M5 3L6 6L9 7L6 8L5 11L4 8L1 7L4 6L5 3Z" fill="currentColor" opacity="0.6"/><path d="M19 4L19.5 5.5L21 6L19.5 6.5L19 8L18.5 6.5L17 6L18.5 5.5L19 4Z" fill="currentColor" opacity="0.6"/></svg>
+                </div>
+                <h4 class="benefit-title">Rajeunissement naturel</h4>
+                <p class="benefit-description">Réduction visible des rides et ridules grâce à la stimulation naturelle du collagène</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8.5" cy="10" r="1.5" fill="currentColor"/><circle cx="15.5" cy="10" r="1.5" fill="currentColor"/><path d="M7 8C7 8 8 7 9.5 7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><path d="M17 8C17 8 16 7 14.5 7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>
+                </div>
+                <h4 class="benefit-title">Effet lifting doux</h4>
+                <p class="benefit-description">Tonification des muscles du visage pour un ovale redéfini et des traits raffermis</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <h4 class="benefit-title">Éclat du teint</h4>
+                <p class="benefit-description">Amélioration de la circulation sanguine pour une peau lumineuse et revitalisée</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8 2 4 6 4 10C4 14 7 17 11 18C11 18 11 18 11 20C11 21.1 11.9 22 13 22C14.1 22 15 21.1 15 20C15 18 15 18 15 18C19 17 22 14 22 10C22 6 18 2 14 2H12Z" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 6C12 6 14 8 14 12C14 14 13 15 12 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+                </div>
+                <h4 class="benefit-title">Non invasif</h4>
+                <p class="benefit-description">Aucune chirurgie, aucune éviction sociale, juste une méthode douce et naturelle</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 6v6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </div>
+                <h4 class="benefit-title">Résultats durables</h4>
+                <p class="benefit-description">Des effets progressifs et durables avec un programme de séances adapté</p>
+            </div>
+            <div class="benefit-card fade-in">
+                <div class="benefit-icon">
+                    <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
+                </div>
+                <h4 class="benefit-title">Bien-être global</h4>
+                <p class="benefit-description">Une approche holistique qui agit également sur le stress et l'équilibre énergétique</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ===== MTC SECTION ===== -->
+<section class="mtc section" id="mtc">
+    <div class="container">
+        <h2 class="section-title fade-in" id="mtcTitle"></h2>
+        <p class="section-subtitle fade-in" id="mtcSubtitle"></p>
+        <div class="mtc-content fade-in" id="mtcParagraphs"></div>
+    </div>
+</section>
+
+<!-- ===== DEROULEMENT SECTION ===== -->
+<section id="deroulement">
+    <div class="container">
+        <h2 class="section-title fade-in" id="deroulementTitle"></h2>
+        <div class="timeline-container" id="timelineContainer"></div>
+        <div class="session-highlights" id="sessionHighlights"></div>
+    </div>
+</section>
+
+<!-- ===== ABOUT SECTION (Praticien & Cabinet) ===== -->
 <section class="about section" id="about">
     <div class="container">
         <div class="about-content">
@@ -163,73 +190,11 @@ const SITE_CONFIG = {
     </div>
 </section>
 
-</div><!-- /.hero-about-bg -->
-
-<!-- ===== ACULIFTING SECTION ===== -->
-<section class="aculifting section" id="aculifting">
-    <div class="container">
-        <h2 class="section-title fade-in" id="aculiftingTitle"></h2>
-        <p class="section-subtitle fade-in" id="aculiftingSubtitle"></p>
-        <p class="aculifting-intro fade-in" id="aculiftingIntro"></p>
-        <div class="benefits-grid" id="benefitsGrid"></div>
-    </div>
-</section>
-
-<!-- ===== DEROULEMENT SECTION ===== -->
-<section id="deroulement">
-    <div class="container">
-        <h2 class="section-title fade-in">Déroulement d'une séance</h2>
-        <div class="timeline-container">
-            <div class="timeline-step fade-in">
-                <div class="timeline-number"><span>01</span></div>
-                <div class="timeline-content">
-                    <h3>Bilan personnalisé</h3>
-                    <p>Analyse de votre peau, de vos besoins et définition d'un protocole adapté à votre visage.</p>
-                </div>
-            </div>
-            <div class="timeline-step fade-in">
-                <div class="timeline-number"><span>02</span></div>
-                <div class="timeline-content">
-                    <h3>Préparation du visage</h3>
-                    <p>Massage doux et drainant pour détendre la peau et préparer les muscles du visage.</p>
-                </div>
-            </div>
-            <div class="timeline-step fade-in">
-                <div class="timeline-number"><span>03</span></div>
-                <div class="timeline-content">
-                    <h3>Pose des aiguilles</h3>
-                    <p>Implantation délicate de fines aiguilles d'acupuncture sur les points stratégiques du visage, laissées en place 20 à 30 minutes.</p>
-                </div>
-            </div>
-            <div class="timeline-step fade-in">
-                <div class="timeline-number"><span>04</span></div>
-                <div class="timeline-content">
-                    <h3>Massage final et conseils</h3>
-                    <p>Massage relaxant du visage et conseils personnalisés pour prolonger les bienfaits du soin.</p>
-                </div>
-            </div>
-        </div>
-        <div class="session-highlights">
-            <div class="highlight-item fade-in">
-                <div class="icon">&#9201;&#65039;</div>
-                <p>Durée : environ 1 heure</p>
-            </div>
-            <div class="highlight-item fade-in">
-                <div class="icon">&#127800;</div>
-                <p>Indolore et sans effets secondaires</p>
-            </div>
-            <div class="highlight-item fade-in">
-                <div class="icon">&#10024;</div>
-                <p>Reprise immédiate de vos activités</p>
-            </div>
-        </div>
-    </div>
-</section>
-
 <!-- ===== TARIFS SECTION ===== -->
 <section id="tarifs">
     <div class="container">
         <h2 class="section-title fade-in">Tarifs</h2>
+        <!-- Tarifs cards — en dur (éléments visuels imbriqués) -->
         <div class="pricing-grid">
             <div class="pricing-card fade-in">
                 <h3>Première consultation</h3>
@@ -274,64 +239,11 @@ const SITE_CONFIG = {
     </div>
 </section>
 
-<!-- ===== TEMOIGNAGES SECTION ===== -->
-<section id="testimonials">
-    <div class="container">
-        <h2 class="section-title fade-in">Ce qu'en disent mes clientes</h2>
-        <div class="testimonials-grid">
-            <div class="testimonial-card fade-in">
-                <div class="testimonial-stars">
-                    <span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span>
-                </div>
-                <p class="testimonial-text">Dès la première séance, j'ai retrouvé un teint lumineux. Yamina est douce, professionnelle et à l'écoute. Je recommande vivement !</p>
-                <p class="testimonial-author">&mdash; Sophie M.</p>
-            </div>
-            <div class="testimonial-card fade-in">
-                <div class="testimonial-stars">
-                    <span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span>
-                </div>
-                <p class="testimonial-text">Une alternative naturelle au botox qui fonctionne vraiment. Après 3 séances, mes rides sont visiblement atténuées et mon visage est plus tonique.</p>
-                <p class="testimonial-author">&mdash; Catherine L.</p>
-            </div>
-            <div class="testimonial-card fade-in">
-                <div class="testimonial-stars">
-                    <span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span><span class="star">&#9733;</span>
-                </div>
-                <p class="testimonial-text">Un moment de détente absolue avec des résultats bluffants. L'ovale de mon visage est redessiné et ma peau est plus éclatante.</p>
-                <p class="testimonial-author">&mdash; Marie D.</p>
-            </div>
-        </div>
-    </div>
-</section>
-
 <!-- ===== FAQ SECTION ===== -->
 <section id="faq">
     <div class="faq-container">
-        <h2 class="fade-in">Questions fréquentes</h2>
-        <div class="faq-item fade-in">
-            <div class="faq-question">L'aculifting est-il douloureux ?</div>
-            <div class="faq-answer">Non, l'aculifting est indolore. Les aiguilles utilisées sont extrêmement fines. Vous pouvez ressentir de légers picotements, mais la plupart des patientes trouvent la séance très relaxante.</div>
-        </div>
-        <div class="faq-item fade-in">
-            <div class="faq-question">Combien de séances sont nécessaires ?</div>
-            <div class="faq-answer">Les résultats sont visibles dès la première séance. Pour un effet optimal et durable, un protocole de 3 à 5 séances rapprochées (tous les 10-15 jours) est recommandé, suivi d'une séance d'entretien tous les 2-3 mois.</div>
-        </div>
-        <div class="faq-item fade-in">
-            <div class="faq-question">Y a-t-il des contre-indications ?</div>
-            <div class="faq-answer">L'aculifting est une technique naturelle sans effets secondaires. Cependant, il est déconseillé pendant la grossesse, en cas de troubles de la coagulation ou de traitement anticoagulant.</div>
-        </div>
-        <div class="faq-item fade-in">
-            <div class="faq-question">À partir de quel âge ?</div>
-            <div class="faq-answer">Dès 25 ans en prévention, à 30 ans pour retarder le relâchement cutané, et après 50 ans en action curative.</div>
-        </div>
-        <div class="faq-item fade-in">
-            <div class="faq-question">Les résultats durent combien de temps ?</div>
-            <div class="faq-answer">Les effets sont visibles immédiatement et durent de 1 à 3 semaines. Avec un protocole complet, les résultats sont durables.</div>
-        </div>
-        <div class="faq-item fade-in">
-            <div class="faq-question">L'aculifting est-il remboursé ?</div>
-            <div class="faq-answer">De nombreuses mutuelles prennent en charge les séances d'acupuncture.</div>
-        </div>
+        <h2 class="fade-in" id="faqTitle"></h2>
+        <div id="faqItems"></div>
     </div>
 </section>
 
@@ -339,8 +251,9 @@ const SITE_CONFIG = {
 <section id="contact">
     <div class="contact-container">
         <h2 class="fade-in">Contact et prise de rendez-vous</h2>
-        <p class="contact-subtitle fade-in">Je vous accueille sur rendez-vous pour un soin personnalisé</p>
+        <p class="contact-subtitle fade-in">Je vous accueille sur rendez-vous. Contactez-moi par téléphone pour toute réservation ou demande d'informations.</p>
         <div class="contact-content">
+            <!-- Contact info — en dur (éléments visuels imbriqués) -->
             <div class="contact-info fade-in">
                 <h3>Informations de contact</h3>
                 <div class="info-item">
@@ -377,36 +290,11 @@ const SITE_CONFIG = {
                     </svg>
                     <div class="info-details">
                         <h4>Horaires</h4>
-                        <p>Lundi - Vendredi : 9h - 19h<br>Samedi sur rendez-vous</p>
+                        <p>Lundi - Vendredi : 9h - 19h - sur rendez-vous</p>
                     </div>
                 </div>
-            </div>
-            <div class="contact-form fade-in">
-                <h3>Envoyez-moi un message</h3>
-                <form action="https://formsubmit.co/aculifting.mtc@gmail.com" method="POST">
-                    <div class="form-group">
-                        <label for="name">Nom complet</label>
-                        <input type="text" id="name" name="name" disabled>
-                    </div>
-                    <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" disabled>
-                    </div>
-                    <div class="form-group">
-                        <label for="phone">Téléphone</label>
-                        <input type="tel" id="phone" name="phone" disabled>
-                    </div>
-                    <div class="form-group">
-                        <label for="message">Message</label>
-                        <textarea id="message" name="message" disabled></textarea>
-                    </div>
-                    <button type="submit" class="form-submit" disabled>Envoyer</button>
-                </form>
-                <div class="mailto-cta">
-                    <p>En attendant, contactez-moi directement par email :</p>
-                    <a href="mailto:aculifting.mtc@gmail.com?subject=Prise%20de%20rendez-vous%20Aculifting" class="btn btn-primary mailto-btn">
-                        Écrire un email
-                    </a>
+                <div class="contact-cta">
+                    <a href="tel:+33613238681" class="btn btn-primary">Appeler maintenant</a>
                 </div>
             </div>
         </div>
@@ -425,7 +313,7 @@ const SITE_CONFIG = {
 <footer>
     <div class="footer-content">
         <div class="footer-brand">
-            <h3>Yamina Heinrich</h3>
+            <h3 id="footerName"></h3>
             <p>Redonnez éclat et jeunesse à votre visage naturellement grâce à l'aculifting, une technique douce et efficace qui respecte votre beauté naturelle.</p>
         </div>
         <div class="footer-links">
@@ -433,10 +321,10 @@ const SITE_CONFIG = {
             <ul>
                 <li><a href="#hero">Accueil</a></li>
                 <li><a href="#aculifting">L'aculifting</a></li>
+                <li><a href="#mtc">La MTC</a></li>
                 <li><a href="#deroulement">Déroulement</a></li>
+                <li><a href="#about">À propos</a></li>
                 <li><a href="#tarifs">Tarifs</a></li>
-                <li><a href="#testimonials">Témoignages</a></li>
-                <li><a href="#contact">Contact</a></li>
                 <li><a href="#contact">Contact</a></li>
             </ul>
         </div>
@@ -463,27 +351,18 @@ const SITE_CONFIG = {
 
 <!-- ===== FLOATING CTA BUTTON (MOBILE) ===== -->
 <div class="floating-cta">
-    <a href="#contact">Prendre RDV</a>
+    <a href="tel:+33613238681">Prendre RDV</a>
 </div>
 
-<!-- ===== JAVASCRIPT ===== -->
+<!-- ===== JAVASCRIPT - Rendering ===== -->
 <script>
 (function() {
-    // SVG Icons pour les benefices
-    var BENEFIT_ICONS = {
-        sparkles: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2L14.5 9.5L22 12L14.5 14.5L12 22L9.5 14.5L2 12L9.5 9.5L12 2Z" fill="currentColor"/><path d="M5 3L6 6L9 7L6 8L5 11L4 8L1 7L4 6L5 3Z" fill="currentColor" opacity="0.6"/><path d="M19 4L19.5 5.5L21 6L19.5 6.5L19 8L18.5 6.5L17 6L18.5 5.5L19 4Z" fill="currentColor" opacity="0.6"/></svg>',
-        face: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 14C8 14 9.5 16 12 16C14.5 16 16 14 16 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8.5" cy="10" r="1.5" fill="currentColor"/><circle cx="15.5" cy="10" r="1.5" fill="currentColor"/><path d="M7 8C7 8 8 7 9.5 7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/><path d="M17 8C17 8 16 7 14.5 7" stroke="currentColor" stroke-width="1" stroke-linecap="round"/></svg>',
-        sun: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="4" fill="currentColor"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M4.93 19.07l1.41-1.41m11.32-11.32l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
-        leaf: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8 2 4 6 4 10C4 14 7 17 11 18C11 18 11 18 11 20C11 21.1 11.9 22 13 22C14.1 22 15 21.1 15 20C15 18 15 18 15 18C19 17 22 14 22 10C22 6 18 2 14 2H12Z" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 6C12 6 14 8 14 12C14 14 13 15 12 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>',
-        clock: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 6v6l4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
-        heart: '<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>'
-    };
-
+    // --- Render Navigation ---
     function renderNavigation() {
+        document.getElementById('navLogoName').textContent = PRACTITIONER.name;
+        document.getElementById('navLogoSubtitle').textContent = PRACTITIONER.specialty;
         var navMenu = document.getElementById('navMenu');
-        document.getElementById('navLogoName').textContent = SITE_CONFIG.practitioner.name;
-        document.getElementById('navLogoSubtitle').textContent = SITE_CONFIG.practitioner.specialty;
-        SITE_CONFIG.navigation.links.forEach(function(link) {
+        NAVIGATION.forEach(function(link) {
             var li = document.createElement('li');
             var a = document.createElement('a');
             a.href = link.href;
@@ -494,68 +373,138 @@ const SITE_CONFIG = {
         });
     }
 
+    // --- Render Hero ---
     function renderHero() {
-        document.getElementById('heroTitle').textContent = SITE_CONFIG.practitioner.name;
-        document.getElementById('heroSpecialty').textContent = SITE_CONFIG.practitioner.specialtySubtitle;
-        document.getElementById('heroTagline').textContent = SITE_CONFIG.hero.tagline;
-        document.getElementById('heroCtaPrimary').textContent = SITE_CONFIG.hero.ctaPrimary;
-        document.getElementById('heroCtaSecondary').textContent = SITE_CONFIG.hero.ctaSecondary;
-        document.getElementById('heroScrollText').textContent = SITE_CONFIG.hero.scrollText;
+        document.getElementById('heroTitle').textContent = PRACTITIONER.name;
+        document.getElementById('heroSpecialty').textContent = PRACTITIONER.specialtySubtitle;
+        document.getElementById('heroTagline').textContent = HERO.tagline;
+        document.getElementById('heroCtaPrimary').textContent = HERO.ctaPrimary;
+        document.getElementById('heroCtaSecondary').textContent = HERO.ctaSecondary;
+        document.getElementById('heroScrollText').textContent = HERO.scrollText;
     }
 
-    function renderAbout() {
-        document.getElementById('aboutTitle').textContent = SITE_CONFIG.about.title;
-        document.getElementById('aboutSubtitle').textContent = SITE_CONFIG.about.subtitle;
-        document.getElementById('aboutSignature').textContent = SITE_CONFIG.about.signature;
-        var container = document.getElementById('aboutParagraphs');
-        SITE_CONFIG.about.paragraphs.forEach(function(text) {
+    // --- Render Aculifting (text only, cards are in HTML) ---
+    function renderAculifting() {
+        document.getElementById('aculiftingTitle').textContent = ACULIFTING.title;
+        document.getElementById('aculiftingSubtitle').textContent = ACULIFTING.subtitle;
+        document.getElementById('aculiftingIntro').textContent = ACULIFTING.intro;
+    }
+
+    // --- Render MTC ---
+    function renderMtc() {
+        document.getElementById('mtcTitle').textContent = MTC.title;
+        document.getElementById('mtcSubtitle').textContent = MTC.subtitle;
+        var container = document.getElementById('mtcParagraphs');
+        MTC.paragraphs.forEach(function(text) {
             var p = document.createElement('p');
             p.textContent = text;
             container.appendChild(p);
         });
     }
 
-    function renderAculifting() {
-        document.getElementById('aculiftingTitle').textContent = SITE_CONFIG.aculifting.title;
-        document.getElementById('aculiftingSubtitle').textContent = SITE_CONFIG.aculifting.subtitle;
-        document.getElementById('aculiftingIntro').textContent = SITE_CONFIG.aculifting.intro;
-        var grid = document.getElementById('benefitsGrid');
-        SITE_CONFIG.aculifting.benefits.forEach(function(benefit) {
-            var card = document.createElement('div');
-            card.className = 'benefit-card fade-in';
-            var iconWrapper = document.createElement('div');
-            iconWrapper.className = 'benefit-icon';
-            iconWrapper.innerHTML = BENEFIT_ICONS[benefit.icon];
-            var title = document.createElement('h4');
-            title.className = 'benefit-title';
-            title.textContent = benefit.title;
-            var desc = document.createElement('p');
-            desc.className = 'benefit-description';
-            desc.textContent = benefit.description;
-            card.appendChild(iconWrapper);
-            card.appendChild(title);
-            card.appendChild(desc);
-            grid.appendChild(card);
+    // --- Render Déroulement (auto-numbered timeline) ---
+    function renderDeroulement() {
+        document.getElementById('deroulementTitle').textContent = DEROULEMENT.title;
+        var timeline = document.getElementById('timelineContainer');
+        DEROULEMENT.steps.forEach(function(step, index) {
+            var stepDiv = document.createElement('div');
+            stepDiv.className = 'timeline-step fade-in';
+
+            var numberDiv = document.createElement('div');
+            numberDiv.className = 'timeline-number';
+            var span = document.createElement('span');
+            span.textContent = String(index + 1).padStart(2, '0');
+            numberDiv.appendChild(span);
+
+            var contentDiv = document.createElement('div');
+            contentDiv.className = 'timeline-content';
+            var h3 = document.createElement('h3');
+            h3.textContent = step.title;
+            var p = document.createElement('p');
+            p.textContent = step.description;
+            contentDiv.appendChild(h3);
+            contentDiv.appendChild(p);
+
+            stepDiv.appendChild(numberDiv);
+            stepDiv.appendChild(contentDiv);
+            timeline.appendChild(stepDiv);
+        });
+
+        var highlights = document.getElementById('sessionHighlights');
+        DEROULEMENT.highlights.forEach(function(item) {
+            var div = document.createElement('div');
+            div.className = 'highlight-item fade-in';
+            var iconDiv = document.createElement('div');
+            iconDiv.className = 'icon';
+            iconDiv.innerHTML = item.icon;
+            var p = document.createElement('p');
+            p.textContent = item.text;
+            div.appendChild(iconDiv);
+            div.appendChild(p);
+            highlights.appendChild(div);
         });
     }
 
+    // --- Render About ---
+    function renderAbout() {
+        document.getElementById('aboutTitle').textContent = ABOUT.title;
+        document.getElementById('aboutSubtitle').textContent = ABOUT.subtitle;
+        document.getElementById('aboutSignature').textContent = ABOUT.signature;
+        var container = document.getElementById('aboutParagraphs');
+        ABOUT.paragraphs.forEach(function(text) {
+            var p = document.createElement('p');
+            p.textContent = text;
+            container.appendChild(p);
+        });
+    }
+
+    // --- Render FAQ (question/answer pairs, accordion) ---
+    function renderFaq() {
+        document.getElementById('faqTitle').textContent = FAQ.title;
+        var container = document.getElementById('faqItems');
+        FAQ.items.forEach(function(item) {
+            var div = document.createElement('div');
+            div.className = 'faq-item fade-in';
+
+            var question = document.createElement('div');
+            question.className = 'faq-question';
+            question.textContent = item.question;
+
+            var answer = document.createElement('div');
+            answer.className = 'faq-answer';
+            answer.textContent = item.answer;
+
+            div.appendChild(question);
+            div.appendChild(answer);
+            container.appendChild(div);
+        });
+    }
+
+    // --- Render Footer ---
+    function renderFooter() {
+        document.getElementById('footerName').textContent = PRACTITIONER.name;
+    }
+
+    // --- Init ---
     document.addEventListener('DOMContentLoaded', function() {
-        // Render dynamic sections
         renderNavigation();
         renderHero();
-        renderAbout();
         renderAculifting();
+        renderMtc();
+        renderDeroulement();
+        renderAbout();
+        renderFaq();
+        renderFooter();
 
         // Mobile menu toggle
         var navToggle = document.getElementById('navToggle');
         var navMenu = document.getElementById('navMenu');
-
         navToggle.addEventListener('click', function() {
             this.classList.toggle('active');
             navMenu.classList.toggle('active');
         });
 
-        // Smooth scroll for all anchor links (including dynamically created ones)
+        // Smooth scroll for all anchor links
         document.addEventListener('click', function(e) {
             var anchor = e.target.closest('a[href^="#"]');
             if (!anchor) return;
@@ -564,7 +513,6 @@ const SITE_CONFIG = {
             if (target) {
                 var navHeight = document.getElementById('navbar').offsetHeight;
                 window.scrollTo({ top: target.offsetTop - navHeight, behavior: 'smooth' });
-                // Close mobile menu
                 navToggle.classList.remove('active');
                 navMenu.classList.remove('active');
             }
@@ -580,18 +528,17 @@ const SITE_CONFIG = {
             }
         });
 
-        // Hero logo parallax (scrolle 2x moins vite que le contenu)
+        // Hero logo parallax
         var heroLogo = document.querySelector('.hero-logo');
         if (heroLogo) {
             window.addEventListener('scroll', function() {
-                heroLogo.style.transform = 'translateX(-50%) scale(1.5) translateY(' + (window.pageYOffset * 0.3) + 'px)';
+                heroLogo.style.transform = 'translateX(-50%) scale(1.5) translateY(' + (window.pageYOffset * 0.5) + 'px)';
             });
         }
 
         // Active nav link on scroll
         var sections = document.querySelectorAll('section[id]');
         var navLinks = document.querySelectorAll('.nav-link');
-
         window.addEventListener('scroll', function() {
             var current = '';
             sections.forEach(function(section) {
@@ -608,16 +555,16 @@ const SITE_CONFIG = {
         });
 
         // FAQ accordion
-        var faqItems = document.querySelectorAll('.faq-item');
-        faqItems.forEach(function(item) {
-            item.querySelector('.faq-question').addEventListener('click', function() {
-                faqItems.forEach(function(other) {
-                    if (other !== item && other.classList.contains('active')) {
-                        other.classList.remove('active');
-                    }
-                });
-                item.classList.toggle('active');
+        document.addEventListener('click', function(e) {
+            var question = e.target.closest('.faq-question');
+            if (!question) return;
+            var item = question.parentElement;
+            document.querySelectorAll('.faq-item').forEach(function(other) {
+                if (other !== item && other.classList.contains('active')) {
+                    other.classList.remove('active');
+                }
             });
+            item.classList.toggle('active');
         });
 
         // Scroll animations (Intersection Observer)
@@ -647,9 +594,6 @@ const SITE_CONFIG = {
                 }
             }
         });
-
-        // FormSubmit hidden fields (désactivé - formulaire en cours de configuration)
-        // var contactForm = document.querySelector('.contact-form form');
 
         // Font preload
         if ('fonts' in document) {
