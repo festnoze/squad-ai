@@ -1462,8 +1462,7 @@ transform: translateY(0);
 }
 
 .timeline-number::after {
-    left: 20px !important;
-    right: auto !important;
+    display: none;
 }
 
 .timeline-content {
@@ -1596,5 +1595,14 @@ footer {
 .testimonials-grid {
     grid-template-columns: 1fr;
     max-width: 600px;
+}
+}
+
+/* ===== FORCE LIGHT MODE (Samsung Internet, etc.) ===== */
+@media (prefers-color-scheme: dark) {
+html, body {
+    background-color: var(--color-white) !important;
+    color: var(--color-text) !important;
+    color-scheme: light !important;
 }
 }
