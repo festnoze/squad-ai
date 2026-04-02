@@ -100,7 +100,7 @@ const SITE_CONFIG = {
 <nav class="navbar" id="navbar">
     <div class="nav-container">
         <a href="#hero" class="nav-logo" id="navLogo">
-            <img src="image carte visite transparente.svg" alt="Yamina Heinrich - Logo">
+            <img src="initiales_YH.png" alt="Yamina Heinrich - Logo">
             <div class="nav-logo-text">
                 <span class="nav-logo-name" id="navLogoName"></span>
                 <span class="nav-logo-subtitle" id="navLogoSubtitle"></span>
@@ -117,7 +117,7 @@ const SITE_CONFIG = {
 
 <!-- ===== HERO + ABOUT SHARED BACKGROUND ===== -->
 <div class="hero-about-bg">
-<img class="hero-logo" src="image carte visite transparente.svg" alt="Yamina Heinrich - Aculifting">
+<img class="hero-logo" src="dessin_YH.svg" alt="Yamina Heinrich - Aculifting">
 
 <!-- ===== HERO SECTION ===== -->
 <section class="hero" id="hero">
@@ -145,8 +145,8 @@ const SITE_CONFIG = {
             <div class="about-image fade-in">
                 <div class="about-image-wrapper">
                     <svg viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="400" height="500" fill="#F5E6E0"/>
-                        <text x="50%" y="50%" text-anchor="middle" fill="#C4956A" font-size="16" font-family="Lato">
+                        <rect width="400" height="500" fill="#E8E4E1"/>
+                        <text x="50%" y="50%" text-anchor="middle" fill="#77815C" font-size="16" font-family="Lato">
                             <tspan x="50%" dy="-10">Photo professionnelle</tspan>
                             <tspan x="50%" dy="20">de Yamina Heinrich</tspan>
                         </text>
@@ -584,7 +584,7 @@ const SITE_CONFIG = {
         var heroLogo = document.querySelector('.hero-logo');
         if (heroLogo) {
             window.addEventListener('scroll', function() {
-                heroLogo.style.transform = 'translate(-50%, calc(-50% + ' + (window.pageYOffset * 0.5) + 'px))';
+                heroLogo.style.transform = 'translateX(-50%) scale(1.5) translateY(' + (window.pageYOffset * 0.3) + 'px)';
             });
         }
 
