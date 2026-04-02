@@ -1,10 +1,12 @@
 // Contenu de la section Médecine Traditionnelle Chinoise
 const MTC = {
-    title: "La Médecine Traditionnelle Chinoise",
-    subtitle: "Un art millénaire au service de votre bien-être",
+    title: "Médecine Traditionnelle Chinoise",
+    subtitle: "Une approche globale du bien-être",
     paragraphs: [
-        "La Médecine Traditionnelle Chinoise (MTC) est un système de santé complet qui existe depuis plus de 2000 ans. Elle repose sur une vision globale de l'être humain et vise à rétablir l'équilibre énergétique du corps pour maintenir ou retrouver la santé.",
-        "La MTC considère que l'énergie vitale (le Qi) circule dans le corps à travers des méridiens. Lorsque cette circulation est perturbée, des déséquilibres apparaissent, pouvant se manifester par divers troubles. L'objectif est de restaurer la libre circulation du Qi.",
-        "En complément de l'aculifting, la MTC permet une prise en charge globale : gestion du stress, troubles du sommeil, douleurs chroniques, troubles digestifs et bien d'autres problématiques."
-    ]
+        "Si vous recherchez une approche globale du bien-être, la Médecine Traditionnelle Chinoise propose une lecture différente du fonctionnement du corps. Elle s'intéresse aux équilibres, aux variations et à ce qui peut influencer votre état au quotidien.",
+        "Chaque séance commence par un temps d'observation. Il permet de mieux comprendre votre état du moment et d'orienter le soin. Le travail est ajusté à chaque séance.",
+        "Selon votre situation, différentes techniques peuvent être utilisées : acupuncture, ventouses, moxa, pharmacopée chinoise. Des conseils peuvent être proposés en complément.",
+        "L'accompagnement peut se faire sur plusieurs séances. Les ajustements se font progressivement, en fonction de l'évolution de vos besoins."
+    ],
+    disclaimer: "Praticienne en Médecine Traditionnelle Chinoise non médecin. Les soins proposés ne remplacent pas un suivi médical."
 };

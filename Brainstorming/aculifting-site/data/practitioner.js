@@ -2,7 +2,7 @@
 // Utilisé dans : navbar, hero, footer, contact
 const PRACTITIONER = {
     name: "Yamina Heinrich",
-    specialty: "Spécialiste en Aculifting",
+    specialty: "Praticienne en MTC",
     specialtySubtitle: "Aculifting & Médecine Traditionnelle Chinoise",
     phone: "06 13 23 86 81",
     phoneLink: "+33613238681",

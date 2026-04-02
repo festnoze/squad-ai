@@ -1,11 +1,10 @@
 // Présentation de la praticienne et du cabinet
 const ABOUT = {
-    title: "À propos de moi",
-    subtitle: "Votre spécialiste en Aculifting",
+    title: "Le cabinet",
+    subtitle: "Votre praticienne",
     paragraphs: [
-        "Passionnée par les techniques de bien-être et de rajeunissement naturel, je me suis spécialisée dans l'Aculifting, une méthode douce et non invasive qui allie les principes millénaires de l'acupuncture aux besoins esthétiques modernes.",
-        "Mon approche personnalisée vise à révéler la beauté naturelle de chaque personne en respectant l'harmonie du visage et du corps. Chaque séance est un moment privilégié où je mets mon expertise et mon écoute à votre service pour des résultats visibles et durables.",
-        "Je vous accueille dans un cadre apaisant et professionnel, où votre bien-être est ma priorité absolue."
+        "Je vous reçois à mon cabinet à domicile, dans un environnement calme, à Montpellier.",
+        "L'aculifting est une technique à visée esthétique et de bien-être. Elle ne constitue pas un acte médical."
     ],
     signature: "Yamina Heinrich",
     imagePlaceholder: "Photo professionnelle de Yamina Heinrich"

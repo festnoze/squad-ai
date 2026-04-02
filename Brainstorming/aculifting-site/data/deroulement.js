@@ -2,22 +2,23 @@
 // Rendu automatiquement avec numérotation (01, 02, 03...)
 const DEROULEMENT = {
     title: "Déroulement d'une séance",
+    intro: "Chaque séance est pensée comme un soin global du visage.",
     steps: [
         {
-            title: "Bilan personnalisé",
-            description: "Analyse de votre peau, de vos besoins et définition d'un protocole adapté à votre visage."
+            title: "Bilan énergétique",
+            description: "Chaque séance débute par un bilan énergétique. Il permet d'orienter le travail."
         },
         {
             title: "Préparation du visage",
-            description: "Massage doux et drainant pour détendre la peau et préparer les muscles du visage."
+            description: "Massage et outils issus de la Médecine Traditionnelle Chinoise pour préparer le visage."
         },
         {
-            title: "Pose des aiguilles",
-            description: "Implantation délicate de fines aiguilles d'acupuncture sur les points stratégiques du visage, laissées en place 20 à 30 minutes."
+            title: "Stimulation ciblée",
+            description: "Stimulation de points spécifiques à l'aide de micro-aiguilles stériles à usage unique."
         },
         {
-            title: "Massage final et conseils",
-            description: "Massage relaxant du visage et conseils personnalisés pour prolonger les bienfaits du soin."
+            title: "Temps de repos",
+            description: "Un temps de repos conclut la séance. L'ensemble se déroule dans un rythme calme, sans rupture."
         }
     ],
     highlights: [

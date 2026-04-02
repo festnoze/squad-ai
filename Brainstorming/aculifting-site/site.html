@@ -8,7 +8,7 @@
     <meta name="author" content="Yamina Heinrich">
 
     <!-- Open Graph -->
-    <meta property="og:title" content="Yamina Heinrich - Spécialiste en Aculifting">
+    <meta property="og:title" content="Yamina Heinrich - Praticienne en MTC">
     <meta property="og:description" content="Redonnez éclat et jeunesse à votre visage naturellement avec l'Aculifting">
     <meta property="og:type" content="website">
     <meta property="og:locale" content="fr_FR">
@@ -50,6 +50,120 @@
     <script src="data/faq.js"></script>
 </head>
 <body>
+
+<!--
+<div id="colorPickerPanel" style="
+    position: fixed; top: 0; left: 0; right: 0; z-index: 9999;
+    background: #1a1a1a; color: #eee; font-family: monospace; font-size: 13px;
+    max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    transition: transform 0.3s ease;
+">
+    <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 16px; background:#111; cursor:pointer;" onclick="
+        var body = document.getElementById('colorPickerBody');
+        var arrow = document.getElementById('colorPickerArrow');
+        if (body.style.display === 'none') { body.style.display = 'block'; arrow.textContent = '\u25BC'; }
+        else { body.style.display = 'none'; arrow.textContent = '\u25B6'; }
+    ">
+        <strong>Palette Editor</strong>
+        <span id="colorPickerArrow" style="font-size:16px;">&#9660;</span>
+    </div>
+    <div id="colorPickerBody" style="padding: 12px 16px;">
+        <div id="colorSliders" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px;"></div>
+        <div style="margin-top:12px; display:flex; gap:8px;">
+            <button onclick="exportPalette()" style="padding:6px 14px; background:#7A9B8D; color:#fff; border:none; border-radius:4px; cursor:pointer; font-family:monospace;">Copier CSS</button>
+            <button onclick="resetPalette()" style="padding:6px 14px; background:#555; color:#fff; border:none; border-radius:4px; cursor:pointer; font-family:monospace;">Reset</button>
+        </div>
+        <pre id="colorExport" style="display:none; margin-top:8px; padding:8px; background:#000; border-radius:4px; white-space:pre-wrap; font-size:12px;"></pre>
+    </div>
+</div> -->
+<script>
+(function() {
+    var PALETTE = [
+        { varName: '--color-white',        label: 'Blanc',          default: '#FFFFFF' },
+        { varName: '--color-cream',        label: 'Crème',          default: '#F2EDE7' },
+        { varName: '--color-cream-light',  label: 'Crème clair',    default: '#F7F4F0' },
+        { varName: '--color-bg-warm',      label: 'Fond chaud',     default: '#FAFAF7' },
+        { varName: '--color-bg-hero',      label: 'Fond hero',      default: '#FBFBF9' },
+        { varName: '--color-border',       label: 'Bordure',        default: '#DDD8D2' },
+        { varName: '--color-muted',        label: 'Discret',        default: '#B8A99A' },
+        { varName: '--color-primary',      label: 'Primaire',       default: '#7A9B8D' },
+        { varName: '--color-primary-dark', label: 'Primaire foncé', default: '#5E8275' },
+        { varName: '--color-text',         label: 'Texte',          default: '#2E3D35' }
+    ];
+
+    var container = document.getElementById('colorSliders');
+
+    PALETTE.forEach(function(c) {
+        var current = getComputedStyle(document.documentElement).getPropertyValue(c.varName).trim() || c.default;
+
+        var row = document.createElement('div');
+        row.style.cssText = 'display:flex; align-items:center; gap:8px;';
+
+        var label = document.createElement('span');
+        label.textContent = c.label;
+        label.style.cssText = 'width:110px; flex-shrink:0; font-size:12px; color:#aaa;';
+
+        var picker = document.createElement('input');
+        picker.type = 'color';
+        picker.value = current;
+        picker.style.cssText = 'width:40px; height:30px; border:1px solid #555; border-radius:4px; cursor:pointer; background:none; padding:0;';
+
+        var hex = document.createElement('input');
+        hex.type = 'text';
+        hex.value = current.toUpperCase();
+        hex.maxLength = 7;
+        hex.style.cssText = 'width:80px; padding:4px 6px; background:#333; color:#eee; border:1px solid #555; border-radius:4px; font-family:monospace; font-size:13px;';
+
+        var preview = document.createElement('div');
+        preview.style.cssText = 'width:30px; height:30px; border-radius:4px; border:1px solid #555; background:' + current + ';';
+
+        function updateColor(val) {
+            if (/^#[0-9A-Fa-f]{6}$/.test(val)) {
+                document.documentElement.style.setProperty(c.varName, val);
+                picker.value = val;
+                hex.value = val.toUpperCase();
+                preview.style.background = val;
+            }
+        }
+
+        picker.addEventListener('input', function() { updateColor(this.value); });
+        hex.addEventListener('input', function() { updateColor(this.value); });
+        hex.addEventListener('blur', function() {
+            if (!/^#[0-9A-Fa-f]{6}$/.test(this.value)) this.value = picker.value.toUpperCase();
+        });
+
+        row.appendChild(label);
+        row.appendChild(picker);
+        row.appendChild(hex);
+        row.appendChild(preview);
+        container.appendChild(row);
+    });
+
+    window.exportPalette = function() {
+        var out = '';
+        PALETTE.forEach(function(c) {
+            var val = getComputedStyle(document.documentElement).getPropertyValue(c.varName).trim();
+            out += c.varName + ': ' + val + ';\n';
+        });
+        var el = document.getElementById('colorExport');
+        el.textContent = out;
+        el.style.display = 'block';
+        if (navigator.clipboard) navigator.clipboard.writeText(out);
+    };
+
+    window.resetPalette = function() {
+        PALETTE.forEach(function(c) {
+            document.documentElement.style.setProperty(c.varName, c.default);
+        });
+        container.innerHTML = '';
+        PALETTE.forEach(function(c) {
+            // Re-render — simple reload
+        });
+        location.reload();
+    };
+})();
+</script>
 
 <!-- ===== NAVIGATION ===== -->
 <nav class="navbar" id="navbar">
@@ -127,7 +241,7 @@
                     <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C8 2 4 6 4 10C4 14 7 17 11 18C11 18 11 18 11 20C11 21.1 11.9 22 13 22C14.1 22 15 21.1 15 20C15 18 15 18 15 18C19 17 22 14 22 10C22 6 18 2 14 2H12Z" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M12 6C12 6 14 8 14 12C14 14 13 15 12 16" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
                 </div>
                 <h4 class="benefit-title">Non invasif</h4>
-                <p class="benefit-description">Aucune chirurgie, aucune éviction sociale, juste une méthode douce et naturelle</p>
+                <p class="benefit-description">Aucune chirurgie, juste une méthode douce et naturelle</p>
             </div>
             <div class="benefit-card fade-in">
                 <div class="benefit-icon">
@@ -152,7 +266,6 @@
     <div class="container">
         <h2 class="section-title fade-in" id="deroulementTitle"></h2>
         <div class="timeline-container" id="timelineContainer"></div>
-        <div class="session-highlights" id="sessionHighlights"></div>
     </div>
 </section>
 
@@ -162,6 +275,7 @@
         <h2 class="section-title fade-in" id="mtcTitle"></h2>
         <p class="section-subtitle fade-in" id="mtcSubtitle"></p>
         <div class="mtc-content fade-in" id="mtcParagraphs"></div>
+        <p class="mtc-disclaimer fade-in" id="mtcDisclaimer"></p>
     </div>
 </section>
 
@@ -172,8 +286,8 @@
             <div class="about-image fade-in">
                 <div class="about-image-wrapper">
                     <svg viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg">
-                        <rect width="400" height="500" fill="#E8E4E1"/>
-                        <text x="50%" y="50%" text-anchor="middle" fill="#77815C" font-size="16" font-family="Lato">
+                        <rect width="400" height="500" fill="#F2EDE7"/>
+                        <text x="50%" y="50%" text-anchor="middle" fill="#7A9B8D" font-size="16" font-family="Lato">
                             <tspan x="50%" dy="-10">Photo professionnelle</tspan>
                             <tspan x="50%" dy="20">de Yamina Heinrich</tspan>
                         </text>
@@ -195,41 +309,44 @@
     <div class="container">
         <h2 class="section-title fade-in">Tarifs</h2>
         <!-- Tarifs cards — en dur (éléments visuels imbriqués) -->
+        <h3 class="pricing-category fade-in">Aculifting</h3>
         <div class="pricing-grid">
             <div class="pricing-card fade-in">
-                <h3>Première consultation</h3>
-                <div class="price">XX &euro;</div>
-                <div class="duration">1h15</div>
-                <p class="description">Bilan complet + première séance d'aculifting</p>
-                <ul class="features">
-                    <li>Analyse personnalisée</li>
-                    <li>Première séance</li>
-                    <li>Protocole sur mesure</li>
-                    <li>Conseils personnalisés</li>
-                </ul>
-            </div>
-            <div class="pricing-card featured fade-in">
                 <h3>Séance Aculifting</h3>
-                <div class="price">XX &euro;</div>
-                <div class="duration">1h</div>
-                <p class="description">Séance complète d'aculifting du visage</p>
+                <div class="price">80 &euro;</div>
+                <div class="duration">1h15 environ</div>
+                <p class="description">Soin complet du visage</p>
                 <ul class="features">
-                    <li>Massage préparatoire</li>
-                    <li>Pose des aiguilles</li>
-                    <li>Massage drainant final</li>
-                    <li>Résultats visibles immédiatement</li>
+                    <li>Bilan énergétique</li>
+                    <li>Préparation du visage</li>
+                    <li>Stimulation ciblée</li>
+                    <li>Temps de repos</li>
                 </ul>
             </div>
             <div class="pricing-card fade-in">
+                <h3>Cure 3 séances</h3>
+                <div class="price">225 &euro;</div>
+                <div class="duration">3&times;1h15</div>
+                <p class="description">Accompagnement sur plusieurs séances</p>
+            </div>
+            <div class="pricing-card featured fade-in">
                 <h3>Cure 5 séances</h3>
-                <div class="price">XX &euro;</div>
-                <div class="duration">5&times;1h</div>
-                <p class="description">Programme complet pour des résultats optimaux</p>
+                <div class="price">350 &euro;</div>
+                <div class="duration">5&times;1h15</div>
+                <p class="description">C'est dans la régularité que le soin prend tout son sens</p>
+            </div>
+        </div>
+        <h3 class="pricing-category fade-in">Médecine Traditionnelle Chinoise</h3>
+        <div class="pricing-grid pricing-grid--centered">
+            <div class="pricing-card fade-in">
+                <h3>Séance MTC</h3>
+                <div class="price">60 &euro;</div>
+                <div class="duration">1h &mdash; 1h30 la première fois</div>
+                <p class="description">Consultation et soin adapté à vos besoins</p>
                 <ul class="features">
-                    <li>5 séances d'aculifting</li>
-                    <li>Suivi personnalisé</li>
-                    <li>Tarif préférentiel</li>
-                    <li>Résultats durables</li>
+                    <li>Bilan et observation</li>
+                    <li>Acupuncture, ventouses, moxa</li>
+                    <li>Conseils personnalisés</li>
                 </ul>
             </div>
         </div>
@@ -400,6 +517,9 @@
             p.textContent = text;
             container.appendChild(p);
         });
+        if (MTC.disclaimer) {
+            document.getElementById('mtcDisclaimer').textContent = MTC.disclaimer;
+        }
     }
 
     // --- Render Déroulement (auto-numbered timeline) ---
@@ -430,19 +550,6 @@
             timeline.appendChild(stepDiv);
         });
 
-        var highlights = document.getElementById('sessionHighlights');
-        DEROULEMENT.highlights.forEach(function(item) {
-            var div = document.createElement('div');
-            div.className = 'highlight-item fade-in';
-            var iconDiv = document.createElement('div');
-            iconDiv.className = 'icon';
-            iconDiv.innerHTML = item.icon;
-            var p = document.createElement('p');
-            p.textContent = item.text;
-            div.appendChild(iconDiv);
-            div.appendChild(p);
-            highlights.appendChild(div);
-        });
     }
 
     // --- Render About ---
