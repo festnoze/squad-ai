@@ -9,7 +9,7 @@ const FAQ = {
         },
         {
             question: "L'aculifting est-il douloureux ?",
-            answer: "Les aiguilles utilisées sont extrêmement fines. Vous pouvez ressentir de légers picotements, mais la plupart des personnes trouvent la séance très relaxante."
+            answer: "Les aiguilles utilisées sont extrêmement fines. Vous pouvez ressentir de légers picotements, mais la plupart des personnes trouvent la séance très relaxante. Aucune injection."
         },
         {
             question: "Combien de séances sont nécessaires ?",
@@ -26,10 +26,6 @@ const FAQ = {
         {
             question: "Les résultats durent combien de temps ?",
             answer: "Chaque personne réagit de manière unique. Les effets s'inscrivent dans le temps et la régularité des séances permet de les prolonger."
-        },
-        {
-            question: "Les séances sont-elles remboursées ?",
-            answer: "De nombreuses mutuelles prennent en charge les séances d'acupuncture. Renseignez-vous auprès de la vôtre."
         }
     ]
 };

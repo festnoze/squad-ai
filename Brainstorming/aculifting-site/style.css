@@ -492,6 +492,62 @@ font-style: italic;
 color: var(--color-muted);
 }
 
+/* ===== PRATICIENNE SECTION ===== */
+.praticienne {
+background-color: var(--color-cream-light);
+}
+
+.praticienne .section-title {
+margin-bottom: 30px;
+}
+
+.praticienne-content {
+display: grid;
+grid-template-columns: 450px 1fr;
+gap: var(--spacing-lg);
+align-items: start;
+max-width: 900px;
+margin: 0 auto;
+}
+
+.praticienne-photo img {
+width: 100%;
+border-radius: var(--radius-md);
+box-shadow: var(--shadow-card);
+border: 1px solid rgba(0, 0, 0, 0.12);
+object-fit: cover;
+margin-top: 25px;
+}
+
+.praticienne-text {
+font-size: 1.05rem;
+line-height: 1.8;
+color: var(--color-text);
+}
+
+.praticienne-text p {
+margin-bottom: var(--spacing-xs);
+}
+
+.praticienne-text ul {
+list-style: none;
+padding-left: 0;
+margin-top: var(--spacing-xs);
+}
+
+.praticienne-text ul li {
+position: relative;
+padding-left: 1.2em;
+margin-bottom: 0.5em;
+}
+
+.praticienne-text ul li::before {
+content: "\2022";
+color: var(--color-primary);
+position: absolute;
+left: 0;
+}
+
 .disclaimer-banner {
 max-width: 700px;
 margin: 0 auto;
@@ -738,6 +794,14 @@ display: grid;
 grid-template-columns: repeat(3, 1fr);
 gap: 30px;
 padding: 0 20px;
+}
+
+.pricing-payment {
+text-align: center;
+margin-top: var(--spacing-md);
+font-size: 0.95rem;
+color: var(--color-text-light);
+font-style: italic;
 }
 
 .pricing-grid.pricing-grid--centered {
@@ -1430,6 +1494,21 @@ transform: translateY(0);
 /* Aculifting */
 .benefits-grid {
     grid-template-columns: 1fr;
+}
+
+/* Praticienne */
+.praticienne-content {
+    grid-template-columns: 1fr;
+    text-align: center;
+}
+
+.praticienne-photo img {
+    max-width: 260px;
+    margin: 0 auto;
+}
+
+.praticienne-text ul {
+    text-align: left;
 }
 
 /* Deroulement Timeline */
