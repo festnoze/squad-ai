@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Affiche - Yamina Heinrich</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Cormorant+Garamond:wght@300;400;500;600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        @page { size: A4 portrait; margin: 0; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            width: 210mm;
+            height: 297mm;
+            margin: 0 auto;
+            font-family: 'Lato', sans-serif;
+            color: #2E3D35;
+            background: #FFFFFF;
+            overflow: hidden;
+        }
+
+        .page {
+            width: 210mm;
+            height: 297mm;
+            display: flex;
+            flex-direction: row;
+            position: relative;
+        }
+
+        /* === COLONNE GAUCHE : dessin === */
+        .left {
+            width: 79mm;
+            height: 297mm;
+            position: relative;
+            overflow: hidden;
+            background: #F2EDE7;
+            flex-shrink: 0;
+        }
+
+        .face-drawing {
+            position: absolute;
+            bottom: 80mm;
+            left: 49%;
+            transform: translateX(-50%);
+            height: 150mm;
+            opacity: 0.75;
+        }
+
+        /* === COLONNE DROITE : contenu === */
+        .right {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            padding: 18mm 15mm 12mm 12mm;
+        }
+
+        /* Top */
+        .top {
+            display: flex;
+            align-items: center;
+            gap: 4mm;
+        }
+
+        .logo-yh {
+            width: 16mm;
+        }
+
+        .top-text .name {
+            font-family: 'Playfair Display', serif;
+            font-size: 18pt;
+            font-weight: 500;
+            color: #2E3D35;
+        }
+
+        .top-text .role {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 9pt;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #7A9B8D;
+            margin-top: 1mm;
+        }
+
+        /* Titre principal */
+        .main-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 30pt;
+            font-weight: 600;
+            color: #2E3D35;
+            line-height: 1.25;
+            margin-left: 50px;
+        }
+
+        .main-title em {
+            font-style: normal;
+            color: #5E8275;
+        }
+
+        .main-title .ampersand {
+            display: block;
+            text-align: left;
+            padding-left: 3.2em;
+            font-size: 22pt;
+            color: #2E3D35;
+            margin: 3mm 0;
+        }
+
+        /* Tagline */
+        .tagline {
+            font-family: 'Cormorant Garamond', serif;
+            font-size: 18pt;
+            font-style: italic;
+            color: #7A9B8D;
+            line-height: 1.5;
+            border-left: 0.6mm solid #7A9B8D;
+            padding-left: 5mm;
+        }
+
+        /* Contact */
+        .bottom {
+            border-top: 0.3mm solid #DDD8D2;
+            padding-top: 8mm;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 6mm;
+        }
+
+        .contact-info {
+            display: flex;
+            flex-direction: column;
+            gap: 3mm;
+        }
+
+        .contact-line {
+            display: flex;
+            align-items: center;
+            gap: 3mm;
+            font-size: 9.5pt;
+            color: #2E3D35;
+        }
+
+        .contact-line svg {
+            width: 4mm;
+            height: 4mm;
+            fill: #7A9B8D;
+            flex-shrink: 0;
+        }
+
+        .qr-block {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5mm;
+            flex-shrink: 0;
+        }
+
+        .qr-img {
+            width: 32mm;
+            height: 32mm;
+            margin-bottom: -3mm;
+        }
+
+        .qr-label {
+            font-size: 6pt;
+            color: #B8A99A;
+            text-align: center;
+        }
+
+        @media print {
+            body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+    </style>
+</head>
+<body>
+<div class="page">
+
+    <!-- GAUCHE : dessin visage -->
+    <div class="left">
+        <img src="dessin_YH.svg" alt="" class="face-drawing">
+    </div>
+
+    <!-- DROITE : contenu -->
+    <div class="right">
+
+        <!-- Nom + logo -->
+        <div class="top">
+            <img src="initiales_YH.png" alt="YH" class="logo-yh">
+            <div class="top-text">
+                <div class="name">Yamina Heinrich</div>
+            </div>
+        </div>
+
+        <!-- Titre principal -->
+        <div class="main-title">
+            <div><em>Médecine<br>Traditionnelle<br>Chinoise</em></div>
+            <span class="ampersand">&amp;</span>
+            <div><em>Soin du visage<br>Aculifting<br>&agrave; Montpellier</em></div>
+        </div>
+
+        <!-- Accroche -->
+        <div class="tagline">
+            Pour une beauté naturelle<br>et harmonieuse
+        </div>
+
+        <!-- Contact + QR -->
+        <div class="bottom">
+            <div class="contact-info">
+                <div class="contact-line">
+                    <svg viewBox="0 0 24 24"><path d="M20.01 15.38c-1.23 0-2.42-.2-3.53-.56-.35-.12-.74-.03-1.01.24l-1.57 1.97c-2.83-1.35-5.48-3.9-6.89-6.83l1.95-1.66c.27-.28.35-.67.24-1.02-.37-1.11-.56-2.3-.56-3.53 0-.54-.45-.99-.99-.99H4.19C3.65 3 3 3.24 3 3.99 3 13.28 10.73 21 20.01 21c.71 0 .99-.63.99-1.18v-3.45c0-.54-.45-.99-.99-.99z"/></svg>
+                    <span>06 11 36 92 16</span>
+                </div>
+                <div class="contact-line">
+                    <svg viewBox="0 0 24 24"><path d="M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/></svg>
+                    <span>aculifting.mtc@gmail.com</span>
+                </div>
+                <div class="contact-line">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+                    <span>622 avenue Xavier de Ricard<br>34000 Montpellier</span>
+                </div>
+                <div class="contact-line">
+                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
+                    <span>aculift-mtc.fr</span>
+                </div>
+            </div>
+            <div class="qr-block">
+                <span class="qr-label">Découvrir le site</span>
+                <img src="aculift-qrcode.png" alt="QR Code" class="qr-img">
+            </div>
+        </div>
+
+    </div>
+
+</div>
+</body>
+</html>

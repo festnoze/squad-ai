@@ -1,0 +1,108 @@
+{
+    // VSCode launch configurations for AI Project Manager.
+    // Press F5 and pick one of the entries (or select it once in the
+    // Run & Debug sidebar — the dropdown remembers your choice).
+    //
+    // Configurations:
+    //  - "Backend: FastAPI (uvicorn --reload)" : debugs the FastAPI app with
+    //    hot-reload; breakpoints work anywhere in backend/app.
+    //  - "Backend: Pytest (all tests)"         : runs the whole pytest suite
+    //    with the debugger attached (breakpoints in tests AND app code).
+    //  - "Frontend: Vite dev server"           : launches Chrome against the
+    //    Vite dev server; debugs React/TSX source via sourcemaps.
+    //  - "Full stack: Backend + Frontend"      : compound config that starts
+    //    both debuggers simultaneously (one F5 press).
+    //
+    // Requirements:
+    //  - A Python venv at backend/venv with the project installed
+    //    (see start.md §1.1-1.3).
+    //  - node_modules installed in frontend/ (see start.md §2.1).
+    //  - The Python and JavaScript Debugger extensions (built-in in VSCode).
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Backend: FastAPI (uvicorn --reload)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "uvicorn",
+            "args": [
+                "app.main:app",
+                "--reload",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8000"
+            ],
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            },
+            "envFile": "${workspaceFolder}/backend/.env",
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "jinja": false
+        },
+        {
+            "name": "Backend: Pytest (all tests)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-v",
+                "--no-header"
+            ],
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            },
+            "envFile": "${workspaceFolder}/backend/.env",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Backend: Pytest (current file)",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "pytest",
+            "args": [
+                "-v",
+                "${file}"
+            ],
+            "cwd": "${workspaceFolder}/backend",
+            "python": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+            "env": {
+                "PYTHONUNBUFFERED": "1"
+            },
+            "envFile": "${workspaceFolder}/backend/.env",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        },
+        {
+            "name": "Frontend: Vite dev server",
+            "type": "chrome",
+            "request": "launch",
+            "url": "http://localhost:5173",
+            "webRoot": "${workspaceFolder}/frontend/src",
+            "preLaunchTask": "frontend: npm run dev",
+            "postDebugTask": "frontend: stop dev server",
+            "sourceMaps": true,
+            "sourceMapPathOverrides": {
+                "webpack:///./src/*": "${workspaceFolder}/frontend/src/*",
+                "webpack:///src/*": "${workspaceFolder}/frontend/src/*",
+                "webpack:///*": "*"
+            }
+        }
+    ],
+    "compounds": [
+        {
+            "name": "Full stack: Backend + Frontend",
+            "configurations": [
+                "Backend: FastAPI (uvicorn --reload)",
+                "Frontend: Vite dev server"
+            ],
+            "stopAll": true
+        }
+    ]
+}

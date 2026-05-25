@@ -1,0 +1,9 @@
+{
+  "include": ["app", "tests", "alembic"],
+  "exclude": ["**/__pycache__", "**/node_modules", "venv", ".venv"],
+  "extraPaths": ["."],
+  "pythonVersion": "3.12",
+  "reportMissingImports": "error",
+  "reportMissingTypeStubs": "none",
+  "typeCheckingMode": "basic"
+}

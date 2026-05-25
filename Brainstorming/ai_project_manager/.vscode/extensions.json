@@ -1,0 +1,18 @@
+{
+    // VSCode will pop a toast suggesting these extensions the first time
+    // the workspace is opened. None are strictly required to F5 the
+    // project, but they make the DX noticeably better.
+    "recommendations": [
+        // Python: interpreter selection, debugger (debugpy), test explorer.
+        "ms-python.python",
+        "ms-python.debugpy",
+        // Pylance for fast type checking (consumes backend/pyrightconfig.json).
+        "ms-python.vscode-pylance",
+        // Chrome debugger used by the "Frontend: Vite dev server" launch config.
+        "ms-edgedevtools.vscode-edge-devtools",
+        // Tailwind IntelliSense for class autocompletion in React files.
+        "bradlc.vscode-tailwindcss",
+        // ESLint (if added later to the frontend).
+        "dbaeumer.vscode-eslint"
+    ]
+}

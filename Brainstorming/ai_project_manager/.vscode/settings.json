@@ -1,0 +1,85 @@
+{
+    // ─────────────────────────────────────────────────────────────────────
+    // Python / Pylance / Pyright — point everything at the backend venv
+    // so "Go to definition", autocompletion and type checking all work
+    // without having to manually select an interpreter.
+    // ─────────────────────────────────────────────────────────────────────
+    "python.defaultInterpreterPath": "${workspaceFolder}/backend/venv/Scripts/python.exe",
+    "python.analysis.extraPaths": [
+        "${workspaceFolder}/backend"
+    ],
+    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.diagnosticMode": "workspace",
+    "python.terminal.activateEnvironment": true,
+    // Tell Pytest where tests live so the test explorer picks them up.
+    "python.testing.pytestEnabled": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestArgs": [
+        "backend/tests"
+    ],
+    "python.testing.cwd": "${workspaceFolder}/backend",
+    // ─────────────────────────────────────────────────────────────────────
+    // TypeScript / ESLint / Tailwind for the React frontend.
+    // ─────────────────────────────────────────────────────────────────────
+    "typescript.tsdk": "frontend/node_modules/typescript/lib",
+    "typescript.preferences.importModuleSpecifier": "relative",
+    "tailwindCSS.includeLanguages": {
+        "typescript": "javascript",
+        "typescriptreact": "javascript"
+    },
+    "tailwindCSS.experimental.classRegex": [
+        [
+            "className=\"([^\"]*)\""
+        ]
+    ],
+    // ─────────────────────────────────────────────────────────────────────
+    // Editor conventions shared by backend & frontend.
+    // ─────────────────────────────────────────────────────────────────────
+    "editor.formatOnSave": false,
+    "editor.tabSize": 4,
+    "[python]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
+    },
+    "[typescript]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+    },
+    "[typescriptreact]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+    },
+    "[json]": {
+        "editor.tabSize": 2,
+        "editor.insertSpaces": true
+    },
+    "[jsonc]": {
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true
+    },
+    // ─────────────────────────────────────────────────────────────────────
+    // File explorer polish — hide noisy generated folders.
+    // ─────────────────────────────────────────────────────────────────────
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.mypy_cache": true,
+        "**/*.egg-info": true,
+        "**/.ruff_cache": true
+    },
+    "files.watcherExclude": {
+        "**/venv/**": true,
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/.vite/**": true,
+        "**/__pycache__/**": true
+    },
+    "search.exclude": {
+        "**/venv": true,
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/.vite": true,
+        "**/ai_pm.db": true
+    }
+}

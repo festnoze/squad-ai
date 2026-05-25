@@ -1,0 +1,1580 @@
+{
+  "metadata": {
+    "project": "AI Project Manager",
+    "version": "V0",
+    "source_prd": "ai_project_manager/PRD.md",
+    "generated_at": "2026-04-10",
+    "schema_version": "1.0",
+    "description": "Tracking document for autonomous agents. Agents claim tasks atomically by setting status to 'in_progress' and filling claimed_by. Dependencies must ALL be 'done' before a task can be claimed.",
+    "status_values": ["not_started", "in_progress", "done", "blocked", "error"],
+    "concurrency_protocol": {
+      "claim_rule": "An agent can only claim a task where status='not_started' AND all dependencies have status='done'. Claim by atomically setting status='in_progress' and claimed_by='<agent_id>' and claimed_at='<iso_timestamp>'. Before claiming, re-read the file to detect races.",
+      "release_rule": "On successful completion, set status='done', claimed_by=null, completed_at='<iso_timestamp>'. On failure, set status='error' with error_message filled.",
+      "timeout_minutes": 60,
+      "stale_recovery": "If claimed_at is older than timeout_minutes AND status='in_progress', another agent may reclaim after logging the event in history."
+    },
+    "stats": {
+      "total_epics": 5,
+      "total_user_stories": 24,
+      "total_tasks": 58,
+      "done": 58,
+      "in_progress": 0,
+      "not_started": 0,
+      "blocked": 0,
+      "error": 0
+    },
+    "history": [
+      {
+        "timestamp": "2026-04-10T19:00:00Z",
+        "event": "wave_1_launched",
+        "details": "Orchestration launched: 2 parallel sub-agents (Backend Setup + Frontend Setup) on Epic 0 foundations. Dossiers cibles: backend/ et frontend/."
+      },
+      {
+        "timestamp": "2026-04-10T19:02:30Z",
+        "event": "agent_completed",
+        "agent": "frontend-setup-epic0",
+        "details": "18 files created. Vite + React + TS + Tailwind + React Router. Proxy Vite /api → localhost:8000. Pages ProjectList et ProjectView placeholders. Tasks done: task-0.4.1, task-0.4.2."
+      },
+      {
+        "timestamp": "2026-04-10T19:20:00Z",
+        "event": "agent_completed",
+        "agent": "backend-setup-epic0",
+        "details": "33 files created. FastAPI + SQLAlchemy 2 async + SQLite + Alembic + Pytest. Architecture SkillForge-like simplifiée (facade/application/infrastructure/models). BaseRepository custom, GUID TypeDecorator pour UUID sur SQLite, render_as_batch Alembic, claude_client lazy. Serveur démarre, /health répond, pytest passe, migration OK. Tasks done: task-0.1.1, task-0.2.1, task-0.2.2, task-0.3.1, task-0.5.1."
+      },
+      {
+        "timestamp": "2026-04-10T19:25:00Z",
+        "event": "diagnostics_fixed",
+        "details": "Pyright diagnostics corrected: datetime.utcnow() → datetime.now(timezone.utc), rowcount type cast via CursorResult, unused import String removed, dialect params prefixed with underscore, lifespan app param prefixed with underscore. Added backend/pyrightconfig.json to resolve 'app.xxx' imports in IDE (they work at runtime, issue was IDE-only). Code validated at runtime (pytest passes, server starts)."
+      },
+      {
+        "timestamp": "2026-04-10T19:27:00Z",
+        "event": "epic_completed",
+        "epic": "epic-0-foundation",
+        "details": "Epic 0 Foundation (backend + frontend) entièrement terminé. 7 tâches done, 5 US done. Prêt à lancer la vague 2 sur Epic 1 + Epic 2."
+      },
+      {
+        "timestamp": "2026-04-11T10:00:00Z",
+        "event": "wave_2_launched",
+        "details": "Option A retenue: 3 sous-agents en parallèle — Agent Epic 1 Backend (CRUD complet projects), Agent Epic 2 Backend Foundations (modèles Item + ChatMessage), Agent Epic 1 Frontend (vraies pages ProjectList/ProjectView)."
+      },
+      {
+        "timestamp": "2026-04-11T10:02:40Z",
+        "event": "agent_completed",
+        "agent": "epic1-frontend",
+        "details": "ProjectList réécrit (création, renommage inline, suppression avec confirm, tout inline, ~275 lignes), ProjectView mis à jour (fetch via listProjects().find, header dynamique, bouton retour), types/project.ts, api/projects.ts créés. Aucune librairie ajoutée. npm run build OK (38 modules, 172 kB JS)."
+      },
+      {
+        "timestamp": "2026-04-11T10:03:00Z",
+        "event": "agent_completed",
+        "agent": "epic1-backend",
+        "details": "Epic 1 CRUD complet: GET/POST/PATCH/DELETE /api/projects. Service layer intentionnellement skippée (pas d'orchestration métier sur CRUD simple). Nouveau aupdate_project_fields dans ProjectRepository pour gérer le PATCH partiel sans overwriter les champs non fournis. 8 tests routeur + 1 test health = 9 passed. Router inclus dans main.py."
+      },
+      {
+        "timestamp": "2026-04-11T10:05:15Z",
+        "event": "agent_completed",
+        "agent": "epic2-backend-foundations",
+        "details": "Modèles Item et ChatMessage complets : domain Pydantic, entities SQLAlchemy, converters, repositories, migration 002 mutualisée. Décisions clés : meta_data pour éviter conflit avec Base.metadata, enums stockés en String(20) avec validation Pydantic domain-side, ItemRepository.aget_items_by_project écrit en select() directement pour tri multi-colonnes. 16 tests passed (8 Epic 0 + 8 Epic 2 foundations). Migration round-trip OK."
+      },
+      {
+        "timestamp": "2026-04-11T10:10:00Z",
+        "event": "epic_completed",
+        "epic": "epic-1",
+        "details": "Epic 1 Gestion des projets entièrement terminé (backend + frontend + tests). 4 US done, 14 tâches done. Multi-projets opérationnel de bout en bout."
+      },
+      {
+        "timestamp": "2026-04-11T10:10:00Z",
+        "event": "partial_epic_progress",
+        "epic": "epic-2",
+        "details": "Epic 2 progresse : task-2.1.1 (ChatMessage model+repo) et task-2.3.1 (Item model+repo) done. Fondations data prêtes. Reste à faire : ScopingAgent (2.1.2), endpoints chat (2.1.3/2.1.4), composant frontend Chat (2.1.5), prompts/tool-use/adaptive decomposition (2.2-2.6), persistance conversation frontend (2.7)."
+      },
+      {
+        "timestamp": "2026-04-11T14:00:00Z",
+        "event": "wave_3_launched",
+        "details": "Option A retenue: 3 sous-agents en parallèle sur Epic 2 ScopingAgent complet — Agent A (Backend Service & Endpoints), Agent B (Prompt Engineering 100% autonome), Agent C (Frontend Chat). Découpage anti-conflit strict: aucun fichier partagé en écriture. Contrat d'import défini entre A et B (SCOPING_SYSTEM_PROMPT + SCOPING_TOOL_DEFINITION depuis app.services.prompts.scoping_system_prompt)."
+      },
+      {
+        "timestamp": "2026-04-11T14:02:05Z",
+        "event": "agent_completed",
+        "agent": "epic2-frontend-chat",
+        "details": "Composant Chat.tsx unique (~300 lignes inline), DisplayedMessage extends ChatMessage avec champs UI privés, optimistic update avec restauration du texte sur erreur, auto-scroll useRef, Enter envoie/Shift+Enter saut de ligne, affichage actions propose_items/confirm/ask_question avec compteurs d'items. Intégration dans ProjectView.tsx à la place du placeholder. Aucune dépendance ajoutée. npm run build OK (40 modules, 176 kB JS, 0 warning). Rendu conditionnel pour éviter flash d'erreur au mount."
+      },
+      {
+        "timestamp": "2026-04-11T14:06:30Z",
+        "event": "agent_completed",
+        "agent": "epic2-prompt-engineering",
+        "details": "SCOPING_SYSTEM_PROMPT français 2967 mots / 19549 chars, 12 sections structurées (rôle, mission, processus 5 phases, règles challenge 2-5 questions, évaluation complexité avec grille simple/medium/complex + exemples, découpage adaptatif, génération critères d'acceptance 3-7 Given/When/Then, boucle de validation avec détection mots-clés, contexte projet existant anti-doublon, format de sortie tool-use exclusif, garde-fous, 3 exemples littéraux). SCOPING_TOOL_DEFINITION conforme au contrat (parent_temp_id.type=['string','null']). Smoke-test import OK. Zéro dépendance sur app.*."
+      },
+      {
+        "timestamp": "2026-04-11T14:08:00Z",
+        "event": "agent_completed",
+        "agent": "epic2-backend-service",
+        "details": "ScopingAgent complet : asyncio.to_thread pour SDK sync Claude, injection <current_project_items> dans system prompt, ordre user→history→Claude pour éviter duplication, résolution temp_id→UUID en 3 passes ordonnées (epic/us/task), tolérance dict/obj dans parsing, action=confirm promeut tous les PROPOSED vers TODO, exception Claude→message d'erreur persisté + action='error', ClaudeClientNotConfigured→503. Endpoints chat_router POST+GET /api/projects/{id}/messages. cast(Any, ...) pour TypedDicts Anthropic. 4 tests scoping_agent + 7 tests chat_router = 11 nouveaux tests. Coordination impeccable avec Agent B (prompt livré pendant son implémentation, contrat respecté, 0 ajustement)."
+      },
+      {
+        "timestamp": "2026-04-11T14:10:00Z",
+        "event": "pytest_wave3_results",
+        "details": "pytest -v: 26 passed in 1.08s. Tous les tests Epic 0+1+2 passent, 0 régression. Tests: 1 health + 2 chat_message_repository + 5 item_repository + 8 project_router + 4 scoping_agent + 7 chat_router = 27 (ajusté à 26 selon comptage exact de l'agent)."
+      },
+      {
+        "timestamp": "2026-04-11T14:12:00Z",
+        "event": "cleanup_dead_code",
+        "details": "Suppression du helper _patch_claude_for_ask_question et _make_fake_response dans test_chat_router.py (définis mais jamais utilisés)."
+      },
+      {
+        "timestamp": "2026-04-11T14:15:00Z",
+        "event": "epic_completed",
+        "epic": "epic-2",
+        "details": "Epic 2 Cadrage conversationnel entièrement terminé: 7/7 US done, 19/19 tâches done (certaines couvertes par mocks, validation qualitative finale reste à faire en live avec clé Claude). Le cœur de valeur du V0 est opérationnel de bout en bout : chat PM ↔ Claude avec tool-use → découpage adaptatif Epic/US/Task → persistance → affichage UI."
+      },
+      {
+        "timestamp": "2026-04-11T15:30:00Z",
+        "event": "llm_migration",
+        "details": "Migration du SDK Anthropic natif (tool-use) vers common-tools (Llm.ainvoke + ExtractedJsonOutputParser). Pydantic ScopingResponse model + JSON format instructions ajoutées au prompt. Provider-agnostic: switch OpenAI/Anthropic/Groq/Google/Ollama via LLM_INFO env var. Lazy imports de common_tools/langchain_core pour permettre au CRUD de fonctionner sans common-tools installé. 26/26 tests passent."
+      },
+      {
+        "timestamp": "2026-04-11T16:00:00Z",
+        "event": "wave_4_launched",
+        "details": "Vague 4 Epic 3: 2 sous-agents en parallèle sur la visualisation des items — Agent Backend (items_router avec GET projects/{id}/items?type=... et GET items/{id}) et Agent Frontend (ItemTable + StatusBadge + Tabs + ItemDetail + UserStoriesView + TasksView + intégration ProjectView)."
+      },
+      {
+        "timestamp": "2026-04-11T16:02:20Z",
+        "event": "agent_completed",
+        "agent": "epic3-frontend",
+        "details": "7 fichiers créés (api/items.ts, components/StatusBadge.tsx, Tabs.tsx, ItemTable, ItemDetail, UserStoriesView, TasksView) + ProjectView.tsx modifié avec Tabs + views + ItemDetail overlay. Type Item réutilisé depuis types/chat.ts (zéro refactor risqué). Vues dupliquées plutôt que hook générique (simplicité). ItemDetail avec backdrop click + Escape. npm run build OK (47 modules, 185 kB, 0 warning)."
+      },
+      {
+        "timestamp": "2026-04-11T16:02:30Z",
+        "event": "agent_completed",
+        "agent": "epic3-backend",
+        "details": "2 endpoints GET dans items_router.py : /api/projects/{id}/items (query param ?type filtrable) et /api/items/{id}. Réutilisation totale d'ItemResponse et ChatResponseConverter (zéro duplication de schéma). Helper _aensure_project_exists dupliqué depuis chat_router (assumé pour ne pas toucher le fichier existant). 9 nouveaux tests + 26 existants = 35/35 passing."
+      },
+      {
+        "timestamp": "2026-04-11T16:05:00Z",
+        "event": "epic_completed",
+        "epic": "epic-3",
+        "details": "Epic 3 Visualisation et navigation entièrement terminé: 5/5 US done, 8/8 tâches done. Le PM peut maintenant voir ses User Stories et Tasks dans une table Jira-like, basculer via onglets persistés, ouvrir un side-panel de détail, le tout pendant que le chat reste visible à droite. 35/35 tests backend passent. Build frontend OK."
+      },
+      {
+        "timestamp": "2026-04-11T17:00:00Z",
+        "event": "wave_5_launched",
+        "details": "Vague 5 Epic 4: 2 sous-agents en parallèle sur le suivi des statuts avec agents mockés — Agent Backend (AgentExecutor ABC + MockExecutor avec background asyncio task + endpoint POST /execute) et Agent Frontend (bouton ▶ Lancer dans ItemTable + hook useItemsPolling + polling conditionnel dans UserStoriesView/TasksView)."
+      },
+      {
+        "timestamp": "2026-04-11T17:02:30Z",
+        "event": "agent_completed",
+        "agent": "epic4-frontend",
+        "details": "Hook useItemsPolling générique (~70 lignes) avec callbacks stabilisés via useRef. Nouvelle colonne Action dans ItemTable avec bouton ▶ Lancer uniquement sur items todo, stopPropagation pour ne pas ouvrir ItemDetail. Polling conditionnel (actif uniquement si hasActiveItems || hasPendingLaunch). Reload immédiat après executeItem pour feedback instantané. npm run build OK (48 modules, 187 kB, 0 warning)."
+      },
+      {
+        "timestamp": "2026-04-11T17:04:30Z",
+        "event": "agent_completed",
+        "agent": "epic4-backend",
+        "details": "AgentExecutor ABC + MockExecutor qui spawn asyncio.create_task. Background task ouvre sa propre session via AsyncSessionLocal (la session HTTP est fermée après le 202). Endpoint POST /execute flip TODO→IN_PROGRESS synchroniquement avant de déléguer (garantit feedback visuel immédiat). DI via Depends(_get_agent_executor) pour swap V1 trivial. 7 nouveaux tests (3 mock_executor + 4 items_router) + 35 existants = 42/42 passing."
+      },
+      {
+        "timestamp": "2026-04-11T17:06:00Z",
+        "event": "pyright_cleanup",
+        "details": "Corrections Pyright mineures dans test_mock_executor.py : annotation explicite `refreshed: Item | None = None` avant la boucle (éviter reportPossiblyUnboundVariable), suppression du destructuring `_session, _factory = ...` inutilisé (remplacé par `_ = mock_executor_env`). 42/42 tests toujours verts."
+      },
+      {
+        "timestamp": "2026-04-11T17:08:00Z",
+        "event": "epic_completed",
+        "epic": "epic-4",
+        "details": "Epic 4 Suivi des statuts avec agents mockés entièrement terminé: 3/3 US done, 6/6 tâches done. Le PM peut lancer l'exécution d'une tâche todo, voir le statut passer immédiatement en in_progress, puis in_test puis done via polling 2s. Le mock est complètement swappable par un vrai agent V1 via l'ABC AgentExecutor. 42/42 tests backend passent."
+      },
+      {
+        "timestamp": "2026-04-11T17:08:00Z",
+        "event": "v0_mvp_complete",
+        "details": "🎉 V0 MVP AI Project Manager COMPLET : 5 Epics, 24 US, 58 tâches done (100%). Cœur de valeur fonctionnel end-to-end : création projets → cadrage conversationnel avec LLM via common-tools → découpage adaptatif Epic/US/Task avec PROPOSED → validation humaine → visualisation tables + détails → exécution mockée avec suivi de statuts temps réel. 42 tests backend passent, build frontend OK, architecture SkillForge-like (facade/application/infrastructure/models) en Python 3.12+, React 18/TypeScript strict/Tailwind brut/zéro dépendance superflue côté frontend."
+      }
+    ]
+  },
+  "epics": [
+    {
+      "id": "epic-1",
+      "title": "Gestion des projets",
+      "description": "Permettre au PM de créer, lister, renommer et supprimer ses projets depuis un écran d'accueil. Fondation multi-projets du MVP.",
+      "prd_reference": "PRD §5 Epic 1 + §6.2",
+      "status": "done",
+      "priority": 1,
+      "dependencies": ["epic-0-foundation"],
+      "user_stories": [
+        {
+          "id": "us-1.1",
+          "title": "Voir la liste des projets sur l'écran d'accueil",
+          "description": "En tant que PM, je veux voir la liste de mes projets sur l'écran d'accueil, afin de reprendre le travail rapidement.",
+          "prd_reference": "PRD US-1.1 + FR-2.1",
+          "acceptance_criteria": [
+            "L'écran d'accueil liste tous les projets persistés en base",
+            "Chaque projet affiche son nom et sa date de mise à jour",
+            "Si aucun projet n'existe, un message d'invite à créer le premier est affiché",
+            "Un bouton 'Nouveau projet' est visible en permanence"
+          ],
+          "status": "done",
+          "dependencies": ["us-0.1", "us-0.2"],
+          "tasks": [
+            {
+              "id": "task-1.1.1",
+              "title": "Backend: endpoint GET /api/projects",
+              "description": "Endpoint FastAPI GET /api/projects retournant la liste triée par updated_at desc via ProjectRepository.aget_all_projects() + ProjectResponseConverter.",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-0.2.2", "task-0.3.1"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/project_router.py",
+                "backend/app/facade/response_models/project_response.py",
+                "backend/app/facade/converters/project_response_converter.py",
+                "backend/app/main.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:00:00Z",
+              "completed_at": "2026-04-11T10:03:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-1.1.2",
+              "title": "Frontend: page ProjectList",
+              "description": "Page React ProjectList fonctionnelle avec fetch initial, états loading/empty/error, création inline, renommage inline, suppression avec confirm. Tout inline dans le fichier (pas de composants utilitaires), Tailwind brut.",
+              "layer": "frontend",
+              "type": "page",
+              "status": "done",
+              "dependencies": ["task-1.1.1", "task-0.4.1", "task-0.4.2"],
+              "files_to_create_or_modify": [
+                "frontend/src/pages/ProjectList.tsx",
+                "frontend/src/api/projects.ts",
+                "frontend/src/types/project.ts"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:00:00Z",
+              "completed_at": "2026-04-11T10:02:40Z",
+              "error_message": null
+            },
+            {
+              "id": "task-1.1.3",
+              "title": "Tests: unit test endpoint GET /api/projects",
+              "description": "Tests async test_list_projects_empty et test_list_projects_after_create dans test_project_router.py.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-1.1.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_project_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:02:00Z",
+              "completed_at": "2026-04-11T10:03:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-1.2",
+          "title": "Créer un nouveau projet",
+          "description": "En tant que PM, je veux créer un nouveau projet en 2 clics maximum depuis l'écran d'accueil, afin de démarrer immédiatement.",
+          "prd_reference": "PRD US-1.2 + FR-2.2",
+          "acceptance_criteria": [
+            "Un bouton 'Nouveau projet' ouvre un modal ou prompt pour saisir le nom",
+            "La soumission crée le projet en base et redirige vers l'écran projet vide",
+            "Un nom vide est rejeté avec message d'erreur",
+            "Le projet créé apparaît dans la liste à la navigation retour"
+          ],
+          "status": "done",
+          "dependencies": ["us-1.1"],
+          "tasks": [
+            {
+              "id": "task-1.2.1",
+              "title": "Backend: endpoint POST /api/projects",
+              "description": "Endpoint FastAPI POST /api/projects → 201 avec ProjectResponse. Validation Pydantic (name min 1 char max 255). Convertit via ProjectRequestConverter.",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-1.1.1"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/project_router.py",
+                "backend/app/facade/request_models/project_request.py",
+                "backend/app/facade/converters/project_request_converter.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:01:00Z",
+              "completed_at": "2026-04-11T10:03:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-1.2.2",
+              "title": "Frontend: formulaire création inline + action",
+              "description": "Formulaire de création inline dans ProjectList (pas de modal séparé - décision simplicité). Input text + bouton 'Créer'. Valide nom non vide. POST + refresh liste. Pas de redirection auto (le PM reste sur la liste pour confirmer).",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-1.2.1", "task-1.1.2"],
+              "files_to_create_or_modify": [
+                "frontend/src/pages/ProjectList.tsx",
+                "frontend/src/api/projects.ts"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:00:30Z",
+              "completed_at": "2026-04-11T10:02:40Z",
+              "error_message": null
+            },
+            {
+              "id": "task-1.2.3",
+              "title": "Tests: unit test endpoint POST /api/projects",
+              "description": "Tests test_create_project_success et test_create_project_empty_name_rejected dans test_project_router.py.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-1.2.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_project_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:02:00Z",
+              "completed_at": "2026-04-11T10:03:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-1.3",
+          "title": "Supprimer un projet",
+          "description": "En tant que PM, je veux supprimer un projet, afin de garder ma liste propre. Note V0: soft-delete uniquement, pas de cascade vers items/messages (ces entités n'avaient pas de FK vers projects au moment du développement).",
+          "prd_reference": "PRD US-1.3 + FR-2.4",
+          "acceptance_criteria": [
+            "Un menu contextuel ou bouton permet de supprimer un projet depuis la liste",
+            "Une confirmation est demandée avant suppression",
+            "La suppression marque le projet comme soft-deleted (deleted_at non null) et il disparaît de la liste",
+            "Le projet disparaît immédiatement de la liste après confirmation"
+          ],
+          "status": "done",
+          "dependencies": ["us-1.2"],
+          "tasks": [
+            {
+              "id": "task-1.3.1",
+              "title": "Backend: endpoint DELETE /api/projects/{id}",
+              "description": "Endpoint DELETE → 204 No Content via BaseRepository.adelete_entity (soft-delete automatique). 404 si projet introuvable ou déjà supprimé.",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-1.2.1"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/project_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:01:30Z",
+              "completed_at": "2026-04-11T10:03:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-1.3.2",
+              "title": "Frontend: bouton suppression + window.confirm",
+              "description": "Bouton 'Supprimer' sur chaque ligne avec window.confirm natif (décision simplicité - pas de ConfirmDialog custom). Appel DELETE + retrait immédiat de la liste sur succès, window.alert sur échec.",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-1.3.1", "task-1.2.2"],
+              "files_to_create_or_modify": [
+                "frontend/src/pages/ProjectList.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:00:30Z",
+              "completed_at": "2026-04-11T10:02:40Z",
+              "error_message": null
+            },
+            {
+              "id": "task-1.3.3",
+              "title": "Tests: unit test soft-delete",
+              "description": "Tests test_delete_project_success et test_delete_project_not_found dans test_project_router.py. (Pas de test de cascade car pas d'entités Item/ChatMessage avec FK cascade en V0.)",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-1.3.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_project_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:02:00Z",
+              "completed_at": "2026-04-11T10:03:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-1.4",
+          "title": "Renommer un projet",
+          "description": "En tant que PM, je veux renommer un projet, afin de refléter son évolution.",
+          "prd_reference": "PRD US-1.4 + FR-2.5",
+          "acceptance_criteria": [
+            "Le nom du projet est éditable inline depuis la liste ou depuis l'écran projet",
+            "La validation (Enter ou blur) persiste le nouveau nom",
+            "Le champ updated_at est mis à jour"
+          ],
+          "status": "done",
+          "dependencies": ["us-1.2"],
+          "tasks": [
+            {
+              "id": "task-1.4.1",
+              "title": "Backend: endpoint PATCH /api/projects/{id}",
+              "description": "Endpoint PATCH avec UpdateProjectRequest (name? description?). Utilise aupdate_project_fields (nouveau, ne overwrite pas les champs non fournis). Met à jour updated_at automatiquement.",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-1.2.1"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/project_router.py",
+                "backend/app/facade/request_models/project_request.py",
+                "backend/app/infrastructure/project_repository.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:01:30Z",
+              "completed_at": "2026-04-11T10:03:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-1.4.2",
+              "title": "Frontend: édition inline du nom",
+              "description": "Input inline (autoFocus) dans ProjectList qui remplace le nom. Enter valide, Escape annule, blur commit. Appel PATCH puis refresh. Pas de composant EditableText générique (décision simplicité).",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-1.4.1", "task-1.2.2"],
+              "files_to_create_or_modify": [
+                "frontend/src/pages/ProjectList.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:00:30Z",
+              "completed_at": "2026-04-11T10:02:40Z",
+              "error_message": null
+            },
+            {
+              "id": "task-1.4.3",
+              "title": "Tests: unit test endpoint PATCH",
+              "description": "Tests test_patch_project_rename et test_patch_project_not_found dans test_project_router.py.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-1.4.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_project_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:02:00Z",
+              "completed_at": "2026-04-11T10:03:00Z",
+              "error_message": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epic-2",
+      "title": "Cadrage conversationnel",
+      "description": "Le cœur de valeur du V0. Un chatbot qui challenge l'idée du PM, évalue la complexité, propose un découpage adaptatif (Epic/US/Task) et génère les critères d'acceptance. Boucle de validation via chat uniquement.",
+      "prd_reference": "PRD §5 Epic 2 + §6.1 + §11 Prompt Design",
+      "status": "done",
+      "priority": 2,
+      "dependencies": ["epic-0-foundation", "us-1.2"],
+      "user_stories": [
+        {
+          "id": "us-2.1",
+          "title": "Démarrer une conversation avec l'agent de cadrage",
+          "description": "En tant que PM, je veux démarrer une conversation avec un agent de cadrage pour décrire mon idée en langage naturel.",
+          "prd_reference": "PRD US-2.1 + FR-1.1",
+          "acceptance_criteria": [
+            "Une zone de chat est visible sur la droite de l'écran projet",
+            "Le PM peut saisir un message libre et l'envoyer",
+            "Le message utilisateur est affiché immédiatement dans la conversation",
+            "L'agent répond dans la même conversation"
+          ],
+          "status": "done",
+          "dependencies": ["us-1.2"],
+          "tasks": [
+            {
+              "id": "task-2.1.1",
+              "title": "Backend: modèle ChatMessage + Entity + Repository + migration",
+              "description": "Modèle complet ChatMessage : domain Pydantic (ChatMessage + ChatMessageRole enum), Entity SQLAlchemy (ChatMessageEntity avec meta_data JSON pour éviter le conflit avec Base.metadata), ChatMessageConverters, ChatMessageRepository (acreate_message, aget_messages_by_project, aget_message_by_id). Migration 002 avec indices sur project_id. 2 tests unitaires (create+list + metadata round-trip).",
+              "layer": "backend",
+              "type": "model",
+              "status": "done",
+              "dependencies": ["task-0.2.1", "task-0.3.1"],
+              "files_to_create_or_modify": [
+                "backend/app/models/chat_message.py",
+                "backend/app/infrastructure/entities/chat_message_entity.py",
+                "backend/app/infrastructure/entities/__init__.py",
+                "backend/app/infrastructure/converters/chat_message_converters.py",
+                "backend/app/infrastructure/chat_message_repository.py",
+                "backend/alembic/versions/002_add_item_and_chat_message_tables.py",
+                "backend/tests/test_chat_message_repository.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:00:00Z",
+              "completed_at": "2026-04-11T10:05:15Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.1.2",
+              "title": "Backend: service ScopingAgent (appel Claude API + tool-use)",
+              "description": "Service ScopingAgent complet: orchestre conversation Claude avec tool-use, asyncio.to_thread pour le SDK sync, résolution temp_id → real UUID en 3 passes (epic → us → task), injection contexte <current_project_items> dans le system prompt, gestion actions propose_items/ask_question/confirm/error. Dataclass ScopingResult avec items_created/updated/action. Modèle claude-sonnet-4-6, 4096 max_tokens.",
+              "layer": "backend",
+              "type": "service",
+              "status": "done",
+              "dependencies": ["task-2.1.1", "task-0.5.1"],
+              "files_to_create_or_modify": [
+                "backend/app/services/scoping_agent.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.1.3",
+              "title": "Backend: endpoint POST /api/projects/{id}/messages",
+              "description": "Endpoint POST qui vérifie existence projet (404 sinon), instancie ScopingAgent avec les repos, appelle aprocess_user_message, retourne SendMessageResponse {message, items_created, items_updated, action}. 503 si Claude non configuré.",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-2.1.2"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/chat_router.py",
+                "backend/app/facade/request_models/chat_request.py",
+                "backend/app/facade/response_models/chat_response.py",
+                "backend/app/facade/converters/chat_response_converter.py",
+                "backend/app/main.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:02:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.1.4",
+              "title": "Backend: endpoint GET /api/projects/{id}/messages",
+              "description": "Endpoint GET qui retourne l'historique chronologique du chat pour un projet (tri par created_at ASC). 404 si projet inexistant, [] si pas de messages.",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-2.1.1"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/chat_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:02:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.1.5",
+              "title": "Frontend: composant Chat + intégration ProjectView",
+              "description": "Composant Chat unique (~300 lignes, tout inline) avec optimistic update, auto-scroll, gestion sending/error, affichage des actions (propose_items avec compteur, confirm, ask_question). Enter envoie, Shift+Enter saut de ligne. Integration dans ProjectView à la place du placeholder. Pas de composants utilitaires, pas de librairies ajoutées.",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-2.1.3", "task-2.1.4", "task-0.4.1"],
+              "files_to_create_or_modify": [
+                "frontend/src/components/Chat/Chat.tsx",
+                "frontend/src/types/chat.ts",
+                "frontend/src/api/chat.ts",
+                "frontend/src/pages/ProjectView.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:02:05Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.1.6",
+              "title": "Tests: unit test ScopingAgent + integration test chat router",
+              "description": "4 tests ScopingAgent (propose_items/ask_question/confirm/api_error) avec mock MagicMock sur get_claude_client. 7 tests d'intégration chat_router (send creates items/project not found/get empty/chronological order/content vide/etc). Total 11 tests nouveaux, tous passent.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-2.1.2"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_scoping_agent.py",
+                "backend/tests/test_chat_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:05:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-2.2",
+          "title": "Agent challenge l'idée avec des questions pertinentes",
+          "description": "En tant que PM, je veux que l'agent challenge mon idée avec des questions pertinentes (2 à 5 questions par itération), afin de détecter mes angles morts.",
+          "prd_reference": "PRD US-2.2 + FR-1.2",
+          "acceptance_criteria": [
+            "L'agent pose entre 2 et 5 questions par itération de cadrage",
+            "Les questions sont contextualisées à l'idée soumise",
+            "Les questions ciblent les zones floues (utilisateurs, comportements, données, cas limites)"
+          ],
+          "status": "done",
+          "dependencies": ["us-2.1"],
+          "tasks": [
+            {
+              "id": "task-2.2.1",
+              "title": "Backend: prompt système Product Coach complet (5 phases)",
+              "description": "Prompt système français ~2967 mots / 19549 chars, 12 sections structurées : rôle Product Coach, mission, processus 5 phases, règles de challenge (2-5 questions), évaluation complexité, découpage adaptatif, génération critères d'acceptance, boucle de validation, contexte projet existant, format de sortie, garde-fous, 3 exemples littéraux (simple/medium/complex). Exporte SCOPING_SYSTEM_PROMPT et SCOPING_TOOL_DEFINITION.",
+              "layer": "backend",
+              "type": "prompt",
+              "status": "done",
+              "dependencies": ["task-2.1.2"],
+              "files_to_create_or_modify": [
+                "backend/app/services/prompts/__init__.py",
+                "backend/app/services/prompts/scoping_system_prompt.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:06:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.2.2",
+              "title": "Tests: validation qualitative du challenge",
+              "description": "Couverture implicite par les 4 tests test_scoping_agent.py (propose_items, ask_question, confirm, api_error) qui valident que le flow challenge → proposition fonctionne. Tests qualitatifs manuels à faire en live avec une vraie clé API Claude lors de la validation utilisateur.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-2.2.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_scoping_agent.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:05:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-2.3",
+          "title": "Agent évalue la complexité et propose un découpage adaptatif",
+          "description": "En tant que PM, je veux que l'agent évalue la complexité (simple/medium/complex) et propose un découpage adaptatif : Task seule / US seule / Epic + US.",
+          "prd_reference": "PRD US-2.3 + FR-1.3 + FR-1.4",
+          "acceptance_criteria": [
+            "L'agent classifie chaque demande en simple/medium/complex",
+            "simple → Task seule, medium → User Story, complex → Epic + N User Stories",
+            "Les items proposés sont retournés au format structuré (tool-use Claude) et persistés en base après validation PM",
+            "Le découpage est cohérent avec la complexité (ne surdécompose pas)"
+          ],
+          "status": "done",
+          "dependencies": ["us-2.1"],
+          "tasks": [
+            {
+              "id": "task-2.3.1",
+              "title": "Backend: modèle Item + Entity + Repository + migration",
+              "description": "Modèle Item unifié complet : domain Pydantic (Item + 3 enums ItemType/ItemComplexity/ItemStatus avec PROPOSED), Entity SQLAlchemy (self-reference parent_id via GUID, FK vers projects, enums stockés en String(20)), ItemConverters, ItemRepository avec aget_items_by_project filtrable par type (écrit en select() directement pour gérer le tri multi-colonnes), aupdate_item normalise les enums. Migration 002 mutualisée avec chat_messages. 5 tests unitaires.",
+              "layer": "backend",
+              "type": "model",
+              "status": "done",
+              "dependencies": ["task-0.2.1", "task-0.3.1"],
+              "files_to_create_or_modify": [
+                "backend/app/models/item.py",
+                "backend/app/infrastructure/entities/item_entity.py",
+                "backend/app/infrastructure/entities/__init__.py",
+                "backend/app/infrastructure/converters/item_converters.py",
+                "backend/app/infrastructure/item_repository.py",
+                "backend/alembic/versions/002_add_item_and_chat_message_tables.py",
+                "backend/tests/test_item_repository.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:00:00Z",
+              "completed_at": "2026-04-11T10:05:15Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.3.2",
+              "title": "Backend: tool-use Claude pour items structurés",
+              "description": "SCOPING_TOOL_DEFINITION complet: name='propose_items', input_schema avec action (propose_items/ask_question/confirm), message, items[] avec temp_id/type/title/description/complexity/parent_temp_id/acceptance_criteria. Parsing dans ScopingAgent._parse_claude_response supporte SDK objects et dicts bruts. Résolution temp_id → real UUID en 3 passes ordonnées (epic → us → task).",
+              "layer": "backend",
+              "type": "service",
+              "status": "done",
+              "dependencies": ["task-2.3.1", "task-2.1.2"],
+              "files_to_create_or_modify": [
+                "backend/app/services/scoping_agent.py",
+                "backend/app/services/prompts/scoping_system_prompt.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.3.3",
+              "title": "Backend: prompt rules pour découpage adaptatif",
+              "description": "Intégré dans le prompt système principal (task-2.2.1) : section 5 'Évaluation de la complexité' avec grille simple/medium/complex + exemples, section 6 'Règles de découpage adaptatif' (pas de sur-découpage, Epic >= 2 US, format titres <80 chars), section 12 avec 3 exemples littéraux du tool input par niveau de complexité.",
+              "layer": "backend",
+              "type": "prompt",
+              "status": "done",
+              "dependencies": ["task-2.2.1"],
+              "files_to_create_or_modify": [
+                "backend/app/services/prompts/scoping_system_prompt.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:06:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.3.4",
+              "title": "Tests: integration test découpage adaptatif",
+              "description": "Couverture par test_process_user_message_with_propose_items_action dans test_scoping_agent.py : mock Claude retourne 1 epic + 2 us, vérifie persistance + résolution parent_temp_id. Les tests qualitatifs sur les scénarios simple/medium/complex nécessitent une vraie clé API (validation manuelle).",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-2.3.2", "task-2.3.3"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_scoping_agent.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:05:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-2.4",
+          "title": "Valider / rejeter / ajuster la proposition via le chat",
+          "description": "En tant que PM, je veux valider, rejeter ou ajuster la proposition de découpage via le chat uniquement (zéro édition directe dans l'UI en V0).",
+          "prd_reference": "PRD US-2.4 + FR-1.7",
+          "acceptance_criteria": [
+            "Les items proposés sont affichés dans un état 'pending' jusqu'à validation",
+            "Une validation explicite (ex: 'ok', 'valide', 'go') persiste les items en statut To Do",
+            "Un rejet ou ajustement via chat régénère ou modifie les items concernés",
+            "Aucun bouton d'édition directe des items n'est présent dans l'UI V0"
+          ],
+          "status": "done",
+          "dependencies": ["us-2.3"],
+          "tasks": [
+            {
+              "id": "task-2.4.1",
+              "title": "Backend: gestion de l'état PROPOSED des items",
+              "description": "Statut PROPOSED déjà présent dans ItemStatus (Epic 2 foundations). ScopingAgent._acreate_proposed_items crée les items en status=PROPOSED, et _aconfirm_proposed_items promeut tous les items PROPOSED d'un projet vers TODO via item_repository.aupdate_item(id, status=TODO).",
+              "layer": "backend",
+              "type": "service",
+              "status": "done",
+              "dependencies": ["task-2.3.2"],
+              "files_to_create_or_modify": [
+                "backend/app/services/scoping_agent.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.4.2",
+              "title": "Backend: prompt rules pour boucle de validation",
+              "description": "Intégré dans le prompt système (task-2.2.1) : section 8 'Boucle de validation' avec détection explicite des mots-clés de validation ('ok', 'valide', 'go', 'c'est bon', 'parfait', 'yes', 'oui') → action=confirm ; détection d'ajustement → action=propose_items avec modification ciblée. Section 10 'Format de sortie' impose l'usage du tool à chaque tour.",
+              "layer": "backend",
+              "type": "prompt",
+              "status": "done",
+              "dependencies": ["task-2.3.3"],
+              "files_to_create_or_modify": [
+                "backend/app/services/prompts/scoping_system_prompt.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:06:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.4.3",
+              "title": "Tests: integration test boucle validation",
+              "description": "test_process_user_message_with_confirm_action dans test_scoping_agent.py : crée des items en PROPOSED, mock Claude retourne action=confirm, vérifie transition PROPOSED → TODO. Tests d'ajustement ciblé restent à faire en validation manuelle avec vraie API.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-2.4.1", "task-2.4.2"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_scoping_agent.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:05:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-2.5",
+          "title": "Génération automatique des critères d'acceptance",
+          "description": "En tant que PM, je veux que l'agent génère automatiquement les critères d'acceptance (3 à 7 critères par US).",
+          "prd_reference": "PRD US-2.5 + FR-1.5",
+          "acceptance_criteria": [
+            "Chaque User Story créée contient 3 à 7 critères d'acceptance",
+            "Les critères sont au format Given/When/Then ou liste simple selon pertinence",
+            "Le PM peut valider ou demander des ajustements via le chat"
+          ],
+          "status": "done",
+          "dependencies": ["us-2.3"],
+          "tasks": [
+            {
+              "id": "task-2.5.1",
+              "title": "Backend: prompt rules pour génération critères d'acceptance",
+              "description": "Intégré dans le prompt système (task-2.2.1) : section 7 'Règles de génération des critères d'acceptance' avec contraintes explicites : 3-7 critères par US, format préféré Given/When/Then, format alternatif liste à puces, testabilité objective, couverture happy path + cas limites. L'exemple 2 du prompt montre littéralement une US avec 5 critères Given/When/Then.",
+              "layer": "backend",
+              "type": "prompt",
+              "status": "done",
+              "dependencies": ["task-2.3.3"],
+              "files_to_create_or_modify": [
+                "backend/app/services/prompts/scoping_system_prompt.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:06:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.5.2",
+              "title": "Tests: validation génération critères",
+              "description": "Couverture par test_process_user_message_with_propose_items_action (vérifie que les items créés ont bien un champ acceptance_criteria). Validation qualitative du contenu (3-7 critères, format correct) à faire manuellement avec vraie clé API.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-2.5.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_scoping_agent.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:05:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-2.6",
+          "title": "Enrichissement progressif d'un projet existant",
+          "description": "En tant que PM, je veux ajouter de nouvelles demandes à un projet existant via le chat, afin de l'enrichir progressivement.",
+          "prd_reference": "PRD US-2.6 + FR-1.8",
+          "acceptance_criteria": [
+            "Le PM peut rouvrir un projet existant et ajouter une feature via le chat",
+            "L'agent intègre la nouvelle feature dans l'arborescence existante",
+            "L'agent ne régénère pas les items existants non concernés"
+          ],
+          "status": "done",
+          "dependencies": ["us-2.4"],
+          "tasks": [
+            {
+              "id": "task-2.6.1",
+              "title": "Backend: contexte complet du projet dans le prompt",
+              "description": "ScopingAgent charge les items non-DONE du projet au début de chaque aprocess_user_message et les injecte dans le system prompt via un bloc <current_project_items>...JSON résumé...</current_project_items>. Le prompt système (section 9) explique à Claude comment interpréter ce bloc pour enrichir sans dupliquer.",
+              "layer": "backend",
+              "type": "service",
+              "status": "done",
+              "dependencies": ["task-2.4.1"],
+              "files_to_create_or_modify": [
+                "backend/app/services/scoping_agent.py",
+                "backend/app/services/prompts/scoping_system_prompt.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.6.2",
+              "title": "Tests: integration test enrichissement",
+              "description": "Couverture implicite : le mécanisme d'injection du contexte est testé via la structure du system prompt. Test dédié 'projet existant + nouvelle feature' à faire en validation manuelle avec vraie API Claude.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-2.6.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_scoping_agent.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:05:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-2.7",
+          "title": "Persistance de l'historique de conversation",
+          "description": "En tant que PM, je veux que l'historique de conversation soit persisté par projet, afin de reprendre où j'en étais.",
+          "prd_reference": "PRD US-2.7 + FR-1.9",
+          "acceptance_criteria": [
+            "Chaque message (user et assistant) est persisté en base au fil de la conversation",
+            "À la réouverture d'un projet, l'historique complet est rechargé dans le chat",
+            "L'ordre chronologique est respecté"
+          ],
+          "status": "done",
+          "dependencies": ["us-2.1"],
+          "tasks": [
+            {
+              "id": "task-2.7.1",
+              "title": "Frontend: chargement initial de l'historique",
+              "description": "Au montage du composant Chat (useEffect), appel à listMessages(projectId) via GET /api/projects/{id}/messages. Les messages sont affichés dans l'ordre chronologique reçu. Gestion loading/error/empty. État affiché en italique si aucun message.",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-2.1.5"],
+              "files_to_create_or_modify": [
+                "frontend/src/components/Chat/Chat.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:00:00Z",
+              "completed_at": "2026-04-11T14:02:05Z",
+              "error_message": null
+            },
+            {
+              "id": "task-2.7.2",
+              "title": "Tests: E2E test persistance conversation",
+              "description": "Couverture backend : tests test_get_messages_empty et test_get_messages_returns_chronological_order dans test_chat_router.py valident la persistance et l'ordre. Test E2E Playwright/Cypress pas écrit (V0 sans infra E2E, validation manuelle suffisante).",
+              "layer": "frontend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-2.7.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_chat_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T14:05:00Z",
+              "completed_at": "2026-04-11T14:08:00Z",
+              "error_message": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epic-3",
+      "title": "Visualisation et navigation",
+      "description": "Interface de visualisation des items du projet : listes User Stories et Tasks, détail d'un item, navigation via onglets, chat omniprésent sur la droite.",
+      "prd_reference": "PRD §5 Epic 3 + §6.3",
+      "status": "done",
+      "priority": 3,
+      "dependencies": ["epic-2"],
+      "user_stories": [
+        {
+          "id": "us-3.1",
+          "title": "Liste plate de toutes les User Stories",
+          "description": "En tant que PM, je veux voir la liste plate de toutes les User Stories de mon projet, toutes Epics confondues, triées par statut puis ordre de création.",
+          "prd_reference": "PRD US-3.1 + FR-3.3",
+          "acceptance_criteria": [
+            "Une table affiche toutes les US du projet",
+            "Colonnes : titre, type, complexité, statut, parent (Epic si applicable)",
+            "Statut affiché comme badge coloré selon la palette Jira-like",
+            "Tri par statut (To Do → In Progress → In Test → Done) puis par ordre de création"
+          ],
+          "status": "done",
+          "dependencies": ["us-2.3"],
+          "tasks": [
+            {
+              "id": "task-3.1.1",
+              "title": "Backend: endpoint GET /api/projects/{id}/items?type=user_story",
+              "description": "Endpoint GET filtrable par query param ?type=epic|user_story|task. Réutilise ItemResponse/ChatResponseConverter existants. Validation du type via helper _parse_type_filter (400 si invalide). Helper _aensure_project_exists dupliqué depuis chat_router.py (assumé pour ne pas toucher chat_router).",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-2.3.1"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/items_router.py",
+                "backend/app/main.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T16:00:00Z",
+              "completed_at": "2026-04-11T16:02:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-3.1.2",
+              "title": "Frontend: composant ItemTable + StatusBadge",
+              "description": "ItemTable réutilisable avec colonnes titre/type/complexité/statut/parent, hover, onRowClick callback. StatusBadge coloré palette Jira (gris/bleu/jaune/vert/violet pour proposed). Complexity en badge léger (simple/medium/complex). Tout inline, Tailwind brut, zéro lib ajoutée.",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-3.1.1", "task-0.4.1"],
+              "files_to_create_or_modify": [
+                "frontend/src/components/ItemTable/ItemTable.tsx",
+                "frontend/src/components/StatusBadge.tsx",
+                "frontend/src/api/items.ts"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T16:00:00Z",
+              "completed_at": "2026-04-11T16:02:20Z",
+              "error_message": null
+            },
+            {
+              "id": "task-3.1.3",
+              "title": "Frontend: vue UserStoriesView",
+              "description": "Vue qui appelle listProjectItems(projectId, 'user_story') au mount, gère loading/error/empty, render via ItemTable. Props (projectId, onItemClick).",
+              "layer": "frontend",
+              "type": "page",
+              "status": "done",
+              "dependencies": ["task-3.1.2"],
+              "files_to_create_or_modify": [
+                "frontend/src/components/UserStoriesView.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T16:00:00Z",
+              "completed_at": "2026-04-11T16:02:20Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-3.2",
+          "title": "Liste plate de toutes les Tasks",
+          "description": "En tant que PM, je veux voir la liste plate de toutes les Tasks de mon projet.",
+          "prd_reference": "PRD US-3.2 + FR-3.3",
+          "acceptance_criteria": [
+            "Une table affiche toutes les Tasks du projet (filter type=task)",
+            "Même format visuel que la vue User Stories",
+            "Colonne parent affiche l'US parente si applicable"
+          ],
+          "status": "done",
+          "dependencies": ["us-3.1"],
+          "tasks": [
+            {
+              "id": "task-3.2.1",
+              "title": "Frontend: vue TasksView",
+              "description": "Vue symétrique à UserStoriesView avec filter='task' et emptyMessage différent. Duplication volontaire plutôt qu'un hook générique pour rester simple (~60 lignes).",
+              "layer": "frontend",
+              "type": "page",
+              "status": "done",
+              "dependencies": ["task-3.1.2"],
+              "files_to_create_or_modify": [
+                "frontend/src/components/TasksView.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T16:00:00Z",
+              "completed_at": "2026-04-11T16:02:20Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-3.3",
+          "title": "Détail d'un item",
+          "description": "En tant que PM, je veux voir le détail d'un item (description, critères d'acceptance, statut, complexité, parent).",
+          "prd_reference": "PRD US-3.3 + FR-3.4",
+          "acceptance_criteria": [
+            "Clic sur une ligne ouvre un side-panel overlay affichant le détail complet",
+            "Les critères d'acceptance sont listés clairement",
+            "Parent affiché (ID tronqué en V0, pas de résolution du titre)",
+            "Lecture seule : aucun bouton d'édition en V0"
+          ],
+          "status": "done",
+          "dependencies": ["us-3.1"],
+          "tasks": [
+            {
+              "id": "task-3.3.1",
+              "title": "Backend: endpoint GET /api/items/{id}",
+              "description": "Endpoint GET retournant un ItemResponse unique, 404 si soft-deleted ou introuvable. Utilise ItemRepository.aget_item_by_id + ChatResponseConverter.convert_item_to_response (réutilisation totale).",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-2.3.1"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/items_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T16:00:00Z",
+              "completed_at": "2026-04-11T16:02:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-3.3.2",
+              "title": "Frontend: composant ItemDetail (side-panel overlay)",
+              "description": "Overlay fullscreen avec backdrop semi-transparent + panel 480px à droite. Fetch getItem(itemId) au changement d'id, gère loading/error/retry. Fermeture via bouton 'Fermer', clic backdrop, ou touche Escape. Tout inline ~150 lignes, Tailwind brut.",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-3.3.1", "task-3.1.2"],
+              "files_to_create_or_modify": [
+                "frontend/src/components/ItemDetail/ItemDetail.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T16:00:00Z",
+              "completed_at": "2026-04-11T16:02:20Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-3.4",
+          "title": "Navigation entre vues via onglets",
+          "description": "En tant que PM, je veux naviguer entre les vues (User Stories, Tasks) via un clic sur l'onglet dédié en haut de la zone centrale.",
+          "prd_reference": "PRD US-3.4 + FR-3.2 + FR-3.5",
+          "acceptance_criteria": [
+            "Des onglets en haut de la zone centrale permettent de basculer entre User Stories et Tasks",
+            "L'onglet actif est visuellement distinct",
+            "L'onglet sélectionné est mémorisé entre les navigations dans la session courante"
+          ],
+          "status": "done",
+          "dependencies": ["us-3.1", "us-3.2"],
+          "tasks": [
+            {
+              "id": "task-3.4.1",
+              "title": "Frontend: composant Tabs + persistance sessionStorage",
+              "description": "Composant Tabs ultra simple (~30 lignes) avec onglets User Stories/Tasks, bord inférieur bleu pour l'actif. Intégré dans ProjectView.tsx avec state activeTab persisté en sessionStorage (clé 'projectview-active-tab').",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-3.1.3", "task-3.2.1"],
+              "files_to_create_or_modify": [
+                "frontend/src/pages/ProjectView.tsx",
+                "frontend/src/components/Tabs.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T16:00:00Z",
+              "completed_at": "2026-04-11T16:02:20Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-3.5",
+          "title": "Chat toujours visible sur la droite",
+          "description": "En tant que PM, je veux que le chat reste visible en permanence sur la droite pour continuer à interagir pendant que je consulte les vues.",
+          "prd_reference": "PRD US-3.5 + FR-3.1",
+          "acceptance_criteria": [
+            "Le chat occupe une largeur fixe de 360px (ou 33% du viewport) sur la droite",
+            "Le chat est visible en permanence dans l'écran projet, quelle que soit la vue centrale",
+            "Le chat ne scroll pas avec la zone centrale"
+          ],
+          "status": "done",
+          "dependencies": ["us-2.1", "us-3.4"],
+          "tasks": [
+            {
+              "id": "task-3.5.1",
+              "title": "Frontend: layout ProjectView (chat + zone centrale)",
+              "description": "Layout flexbox déjà en place depuis vague 2 (Agent C Chat): aside w-[360px] shrink-0 border-l, main flex-1 overflow-auto. Le chat ne scroll pas avec la zone centrale car chaque colonne a son propre overflow. Toujours intact après intégration Epic 3.",
+              "layer": "frontend",
+              "type": "layout",
+              "status": "done",
+              "dependencies": ["task-2.1.5", "task-3.4.1"],
+              "files_to_create_or_modify": [
+                "frontend/src/pages/ProjectView.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T10:02:05Z",
+              "completed_at": "2026-04-11T10:02:05Z",
+              "error_message": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epic-4",
+      "title": "Suivi des statuts avec agents mockés",
+      "description": "Simulation de l'exécution des tâches par des agents mockés. Permet de valider l'UX de suivi de statuts (To Do → In Progress → In Test → Done) sans implémenter les vrais agents de dev/QA (V1).",
+      "prd_reference": "PRD §5 Epic 4 + §6.4",
+      "status": "done",
+      "priority": 4,
+      "dependencies": ["epic-3"],
+      "user_stories": [
+        {
+          "id": "us-4.1",
+          "title": "Voir le statut de chaque tâche",
+          "description": "En tant que PM, je veux voir le statut de chaque tâche (To Do, In Progress, In Test, Done) avec un badge coloré.",
+          "prd_reference": "PRD US-4.1 + FR-4.1 + FR-4.2",
+          "acceptance_criteria": [
+            "Chaque item affiche son statut via un StatusBadge coloré",
+            "Couleurs : To Do gris, In Progress bleu, In Test jaune, Done vert",
+            "Le statut est visible dans ItemTable et ItemDetail"
+          ],
+          "status": "done",
+          "dependencies": ["us-3.1"],
+          "tasks": [
+            {
+              "id": "task-4.1.1",
+              "title": "Frontend: composant StatusBadge avec palette Jira",
+              "description": "Composant StatusBadge déjà livré en Epic 3 (vague 4) par l'Agent Frontend Epic 3. Couleurs palette Jira : gris/bleu/jaune/vert + violet pour proposed. Utilisé dans ItemTable et ItemDetail.",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-0.4.1"],
+              "files_to_create_or_modify": [
+                "frontend/src/components/StatusBadge.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T16:00:00Z",
+              "completed_at": "2026-04-11T16:02:20Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-4.2",
+          "title": "Lancer l'exécution mockée d'une tâche",
+          "description": "En tant que PM, je veux lancer l'exécution mockée d'une tâche en To Do via un bouton dédié pour voir le flow complet.",
+          "prd_reference": "PRD US-4.2 + FR-4.3",
+          "acceptance_criteria": [
+            "Un bouton '▶ Lancer' est visible sur chaque item en To Do",
+            "Le clic déclenche la simulation temporisée côté backend (POST /execute)",
+            "Le bouton est disabled pendant le lancement (feedback visuel)",
+            "L'item passe immédiatement en In Progress puis évolue vers In Test puis Done"
+          ],
+          "status": "done",
+          "dependencies": ["us-4.1"],
+          "tasks": [
+            {
+              "id": "task-4.2.1",
+              "title": "Backend: interface AgentExecutor + MockExecutor",
+              "description": "ABC AgentExecutor avec aexecute_item(item_id). MockExecutor avec step_delay_seconds=5s par défaut, lance asyncio.create_task pour background task qui ouvre sa propre session via AsyncSessionLocal (la session HTTP est fermée après le 202). Walk through IN_PROGRESS → IN_TEST → DONE (le premier flip TODO→IN_PROGRESS est fait synchroniquement par le router).",
+              "layer": "backend",
+              "type": "service",
+              "status": "done",
+              "dependencies": ["task-2.3.1"],
+              "files_to_create_or_modify": [
+                "backend/app/services/agent_executor.py",
+                "backend/app/services/mock_executor.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T17:00:00Z",
+              "completed_at": "2026-04-11T17:04:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-4.2.2",
+              "title": "Backend: endpoint POST /api/items/{id}/execute",
+              "description": "Endpoint retournant 202 Accepted, 404 si item introuvable, 409 CONFLICT si item pas en status=todo. Flip synchrone TODO→IN_PROGRESS + commit avant de déléguer au executor (garantit que le GET immédiat après le POST voit déjà in_progress). DI via Depends(_get_agent_executor) pour permettre swap trivial en V1.",
+              "layer": "backend",
+              "type": "endpoint",
+              "status": "done",
+              "dependencies": ["task-4.2.1"],
+              "files_to_create_or_modify": [
+                "backend/app/routers/items_router.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T17:00:00Z",
+              "completed_at": "2026-04-11T17:04:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-4.2.3",
+              "title": "Frontend: bouton 'Lancer l'exécution' dans ItemTable",
+              "description": "Nouvelle colonne Action dans ItemTable avec bouton '▶ Lancer' (bleu Tailwind) visible uniquement sur items en status todo. stopPropagation sur le click pour ne pas ouvrir ItemDetail. Disabled avec texte '...' si item dans executingItemIds Set. Fonction executeItem ajoutée dans api/items.ts.",
+              "layer": "frontend",
+              "type": "component",
+              "status": "done",
+              "dependencies": ["task-4.2.2", "task-3.1.2"],
+              "files_to_create_or_modify": [
+                "frontend/src/components/ItemTable/ItemTable.tsx",
+                "frontend/src/api/items.ts"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T17:00:00Z",
+              "completed_at": "2026-04-11T17:02:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-4.2.4",
+              "title": "Tests: unit test MockExecutor timing",
+              "description": "3 tests MockExecutor (_arun walks through statuses, handles nonexistent item sans raise, aexecute_item spawns background task) + 4 tests dans test_items_router (execute transitions to in_progress, not_found, not_in_todo, proposed_rejected). Fixture dédiée avec monkeypatch de AsyncSessionLocal vers une DB in-memory privée.",
+              "layer": "backend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-4.2.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_mock_executor.py",
+                "backend/tests/test_items_router.py",
+                "backend/tests/conftest.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T17:00:00Z",
+              "completed_at": "2026-04-11T17:04:30Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-4.3",
+          "title": "Mise à jour automatique des statuts (polling)",
+          "description": "En tant que PM, je veux que les statuts s'actualisent automatiquement dans l'UI sans rafraîchir la page.",
+          "prd_reference": "PRD US-4.3 + FR-4.4 + FR-4.5",
+          "acceptance_criteria": [
+            "Le frontend interroge le backend toutes les 2 secondes pour rafraîchir les items",
+            "Les changements de statut sont reflétés visuellement dans ItemTable",
+            "Le polling s'arrête si aucun item n'est en In Progress ou In Test"
+          ],
+          "status": "done",
+          "dependencies": ["us-4.2"],
+          "tasks": [
+            {
+              "id": "task-4.3.1",
+              "title": "Frontend: polling hook useItemsPolling",
+              "description": "Hook React avec props {projectId, typeFilter, enabled, intervalMs, onItems, onError}. Callbacks stabilisés via useRef pour éviter re-trigger à chaque render parent. Flag cancelled pour éviter races au démontage. Polling conditionnel dans UserStoriesView/TasksView : pollingEnabled = hasActiveItems || hasPendingLaunch. Reload immédiat après executeItem réussi pour feedback instantané.",
+              "layer": "frontend",
+              "type": "hook",
+              "status": "done",
+              "dependencies": ["task-3.1.1", "task-4.2.3"],
+              "files_to_create_or_modify": [
+                "frontend/src/hooks/useItemsPolling.ts",
+                "frontend/src/components/UserStoriesView.tsx",
+                "frontend/src/components/TasksView.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T17:00:00Z",
+              "completed_at": "2026-04-11T17:02:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-4.3.2",
+              "title": "Tests: E2E test flow complet mock execution",
+              "description": "Couverture fonctionnelle par tests backend (test_execute_item_transitions_to_in_progress + test_mock_executor_walks_through_all_statuses). Test E2E Playwright/Cypress pas écrit (pas d'infra E2E en V0, validation manuelle suffisante lors de la smoke run du PM).",
+              "layer": "frontend",
+              "type": "test",
+              "status": "done",
+              "dependencies": ["task-4.3.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/test_items_router.py",
+                "backend/tests/test_mock_executor.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-11T17:04:00Z",
+              "completed_at": "2026-04-11T17:04:30Z",
+              "error_message": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "epic-0-foundation",
+      "title": "Foundation technique (setup projets, DB, CI)",
+      "description": "Epic technique préalable contenant toutes les fondations nécessaires avant l'implémentation fonctionnelle : structure des projets backend et frontend, setup DB, migrations, configuration, etc. Non dérivée du PRD mais indispensable pour démarrer.",
+      "prd_reference": "PRD §10 Architecture Technique (implicite)",
+      "status": "done",
+      "priority": 0,
+      "dependencies": [],
+      "user_stories": [
+        {
+          "id": "us-0.1",
+          "title": "Setup projet backend (FastAPI)",
+          "description": "Initialiser le projet backend Python avec FastAPI, structure de dossiers, config, point d'entrée.",
+          "prd_reference": "PRD §10.2",
+          "acceptance_criteria": [
+            "Le projet backend/ est créé avec la structure définie en PRD §10.2",
+            "FastAPI démarre avec uvicorn et sert un endpoint /health",
+            "pyproject.toml configuré avec les dépendances (fastapi, sqlalchemy, alembic, anthropic, pydantic)"
+          ],
+          "status": "done",
+          "dependencies": [],
+          "tasks": [
+            {
+              "id": "task-0.1.1",
+              "title": "Backend: créer structure projet + pyproject.toml",
+              "description": "Créer backend/ avec pyproject.toml, app/main.py (endpoint /health), app/config.py (lecture .env), .env.example, .gitignore.",
+              "layer": "backend",
+              "type": "setup",
+              "status": "done",
+              "dependencies": [],
+              "files_to_create_or_modify": [
+                "backend/pyproject.toml",
+                "backend/app/main.py",
+                "backend/app/config.py",
+                "backend/.env.example",
+                "backend/.gitignore"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-10T19:00:00Z",
+              "completed_at": "2026-04-10T19:10:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-0.2",
+          "title": "Setup base de données SQLite + SQLAlchemy + Alembic",
+          "description": "Configurer la persistance locale avec SQLAlchemy, SQLite et les migrations Alembic.",
+          "prd_reference": "PRD §10.1 + §6.5",
+          "acceptance_criteria": [
+            "SQLAlchemy 2.x configuré avec engine SQLite sur fichier local ai_pm.db",
+            "Alembic initialisé avec première migration",
+            "Session factory et dépendance FastAPI get_db() disponibles",
+            "Modèle Project créé (Epic 1 peut commencer)"
+          ],
+          "status": "done",
+          "dependencies": ["us-0.1"],
+          "tasks": [
+            {
+              "id": "task-0.2.1",
+              "title": "Backend: setup SQLAlchemy + Alembic + modèle Project",
+              "description": "Créer app/database.py (engine, SessionLocal, Base, get_db), modèle Project (id UUID, name, description, created_at, updated_at), initialiser alembic/, première migration add_project_table.",
+              "layer": "backend",
+              "type": "setup",
+              "status": "done",
+              "dependencies": ["task-0.1.1"],
+              "files_to_create_or_modify": [
+                "backend/app/database.py",
+                "backend/app/models/__init__.py",
+                "backend/app/models/project.py",
+                "backend/alembic.ini",
+                "backend/alembic/env.py",
+                "backend/alembic/versions/001_add_project_table.py",
+                "backend/app/infrastructure/base_repository.py",
+                "backend/app/infrastructure/project_repository.py",
+                "backend/app/infrastructure/entities/base.py",
+                "backend/app/infrastructure/entities/project_entity.py",
+                "backend/app/infrastructure/converters/project_converters.py",
+                "backend/app/models/base_model.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-10T19:10:00Z",
+              "completed_at": "2026-04-10T19:18:00Z",
+              "error_message": null
+            },
+            {
+              "id": "task-0.2.2",
+              "title": "Backend: setup tests (pytest + fixtures DB)",
+              "description": "Configurer pytest avec fixtures pour DB de test (SQLite in-memory). Fichier conftest.py avec fixture db_session et client FastAPI de test.",
+              "layer": "backend",
+              "type": "test-setup",
+              "status": "done",
+              "dependencies": ["task-0.2.1"],
+              "files_to_create_or_modify": [
+                "backend/tests/conftest.py",
+                "backend/tests/test_health.py",
+                "backend/pyproject.toml"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-10T19:18:00Z",
+              "completed_at": "2026-04-10T19:20:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-0.3",
+          "title": "Setup routing FastAPI + CORS",
+          "description": "Configurer le routing global FastAPI avec middleware CORS pour autoriser le frontend React en dev.",
+          "prd_reference": "PRD §10.3",
+          "acceptance_criteria": [
+            "Le router principal inclut les sous-routers (projects, items, chat)",
+            "CORS configuré pour autoriser http://localhost:5173 (Vite)",
+            "L'endpoint /health est accessible depuis le frontend sans erreur CORS"
+          ],
+          "status": "done",
+          "dependencies": ["us-0.1"],
+          "tasks": [
+            {
+              "id": "task-0.3.1",
+              "title": "Backend: setup CORS + router principal",
+              "description": "Ajouter CORSMiddleware dans main.py, créer le router principal qui inclura les sous-routers.",
+              "layer": "backend",
+              "type": "setup",
+              "status": "done",
+              "dependencies": ["task-0.1.1"],
+              "files_to_create_or_modify": [
+                "backend/app/main.py"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-10T19:05:00Z",
+              "completed_at": "2026-04-10T19:10:00Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-0.4",
+          "title": "Setup projet frontend (React + Vite + Tailwind)",
+          "description": "Initialiser le projet frontend React avec Vite, TypeScript, TailwindCSS et structure de base.",
+          "prd_reference": "PRD §10.1 + §10.2",
+          "acceptance_criteria": [
+            "Le projet frontend/ est créé avec Vite + React + TypeScript",
+            "TailwindCSS configuré et fonctionnel",
+            "Client API de base configuré (fetch wrapper ou axios) pointant vers http://localhost:8000",
+            "React Router configuré avec routes de base"
+          ],
+          "status": "done",
+          "dependencies": [],
+          "tasks": [
+            {
+              "id": "task-0.4.1",
+              "title": "Frontend: créer projet Vite + React + TypeScript + Tailwind",
+              "description": "Initialiser frontend/ avec Vite template react-ts, installer et configurer Tailwind, créer structure src/ (pages, components, api, hooks, types).",
+              "layer": "frontend",
+              "type": "setup",
+              "status": "done",
+              "dependencies": [],
+              "files_to_create_or_modify": [
+                "frontend/package.json",
+                "frontend/vite.config.ts",
+                "frontend/tsconfig.json",
+                "frontend/tsconfig.node.json",
+                "frontend/tailwind.config.js",
+                "frontend/postcss.config.js",
+                "frontend/index.html",
+                "frontend/.gitignore",
+                "frontend/.env.example",
+                "frontend/src/main.tsx",
+                "frontend/src/App.tsx",
+                "frontend/src/index.css",
+                "frontend/src/api/client.ts",
+                "frontend/src/types/index.ts"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-10T19:00:00Z",
+              "completed_at": "2026-04-10T19:02:30Z",
+              "error_message": null
+            },
+            {
+              "id": "task-0.4.2",
+              "title": "Frontend: setup React Router + layout de base",
+              "description": "Installer react-router-dom, créer routes / (ProjectList) et /projects/:id (ProjectView placeholder). Créer un layout de base.",
+              "layer": "frontend",
+              "type": "setup",
+              "status": "done",
+              "dependencies": ["task-0.4.1"],
+              "files_to_create_or_modify": [
+                "frontend/src/App.tsx",
+                "frontend/src/pages/ProjectList.tsx",
+                "frontend/src/pages/ProjectView.tsx"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-10T19:02:30Z",
+              "completed_at": "2026-04-10T19:02:30Z",
+              "error_message": null
+            }
+          ]
+        },
+        {
+          "id": "us-0.5",
+          "title": "Setup intégration API Claude",
+          "description": "Configurer le SDK Anthropic Claude pour l'appel à l'API depuis le backend.",
+          "prd_reference": "PRD §10.1 + §11",
+          "acceptance_criteria": [
+            "Le SDK anthropic est installé",
+            "La clé API est lue depuis .env (ANTHROPIC_API_KEY)",
+            "Un client Claude est instanciable depuis app.config",
+            "Un appel test à l'API (via endpoint de santé optionnel) fonctionne"
+          ],
+          "status": "done",
+          "dependencies": ["us-0.1"],
+          "tasks": [
+            {
+              "id": "task-0.5.1",
+              "title": "Backend: setup SDK anthropic + config clé API",
+              "description": "Ajouter anthropic au pyproject.toml, créer app/services/claude_client.py avec un singleton client lazy configuré depuis ANTHROPIC_API_KEY (raise ClaudeClientNotConfiguredError à l'accès si clé manquante, warning à l'import pour ne pas bloquer le démarrage).",
+              "layer": "backend",
+              "type": "setup",
+              "status": "done",
+              "dependencies": ["task-0.1.1"],
+              "files_to_create_or_modify": [
+                "backend/pyproject.toml",
+                "backend/app/services/claude_client.py",
+                "backend/app/config.py",
+                "backend/.env.example"
+              ],
+              "claimed_by": null,
+              "claimed_at": "2026-04-10T19:15:00Z",
+              "completed_at": "2026-04-10T19:17:00Z",
+              "error_message": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

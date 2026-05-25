@@ -811,6 +811,13 @@ margin-left: auto;
 margin-right: auto;
 }
 
+.pricing-grid.pricing-grid--two {
+grid-template-columns: repeat(2, 1fr);
+max-width: 780px;
+margin-left: auto;
+margin-right: auto;
+}
+
 .pricing-card {
 background: var(--color-white);
 border-radius: var(--radius-md);
@@ -1566,6 +1573,10 @@ transform: translateY(0);
     gap: 30px;
 }
 
+.pricing-grid.pricing-grid--two {
+    grid-template-columns: repeat(2, 1fr);
+}
+
 .pricing-card.featured {
     transform: scale(1);
 }
@@ -1669,6 +1680,11 @@ footer {
 .pricing-grid {
     grid-template-columns: 1fr;
     max-width: 500px;
+}
+
+.pricing-grid.pricing-grid--two {
+    grid-template-columns: repeat(2, 1fr);
+    max-width: 780px;
 }
 
 .testimonials-grid {
