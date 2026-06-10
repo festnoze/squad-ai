@@ -3,7 +3,7 @@
 const PRACTITIONER = {
     name: "Yamina Heinrich",
     specialty: "Praticienne en MTC & Aculifting",
-    specialtySubtitle: "Aculifting & Médecine Traditionnelle Chinoise",
+    specialtySubtitle: "Aculifting & Médecine Traditionnelle Chinoise à Montpellier",
     phone: "06 11 36 92 16",
     phoneLink: "+33611369216",
     email: "aculifting.mtc@gmail.com",

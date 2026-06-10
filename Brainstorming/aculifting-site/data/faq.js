@@ -26,6 +26,18 @@ const FAQ = {
         {
             question: "Les résultats durent combien de temps ?",
             answer: "Chaque personne réagit de manière unique. Les effets s'inscrivent dans le temps et la régularité des séances permet de les prolonger."
+        },
+        {
+            question: "L'aculifting est-il une alternative au botox ?",
+            answer: "Oui, l'aculifting est une alternative naturelle au botox et au lifting chirurgical. Contrairement au botox qui utilise des injections de toxine botulique, l'aculifting stimule naturellement la production de collagène et d'élastine grâce à des techniques issues de la Médecine Traditionnelle Chinoise. Aucune injection, aucun produit chimique : le résultat est un visage raffermi et rajeuni de manière douce et progressive."
+        },
+        {
+            question: "Quelle est la différence entre l'aculifting et la Médecine Traditionnelle Chinoise ?",
+            answer: "La Médecine Traditionnelle Chinoise vise l'équilibre énergétique global et le bien-être général. L'aculifting est un soin non invasif centré sur le visage : il cible les muscles faciaux, la circulation sanguine locale et la production de collagène pour un effet rajeunissant et liftant naturel. Les deux approches sont complémentaires et proposées dans mon cabinet à Montpellier."
+        },
+        {
+            question: "Où se situe votre cabinet à Montpellier ?",
+            answer: "Mon cabinet d'aculifting et de Médecine Traditionnelle Chinoise se situe au 622 avenue Xavier de Ricard, dans le quartier Les Aubes à Montpellier (34000). Le stationnement gratuit est facile à proximité du cabinet. Je vous accueille du lundi au vendredi de 9h à 19h, et le samedi sur rendez-vous."
         }
     ]
 };

@@ -121,3 +121,6 @@ skip_empty = true
 branch = true
 source = ["brainstorming"]
 
+[tool.uv.workspace]
+members = ["trading_agents"]
+

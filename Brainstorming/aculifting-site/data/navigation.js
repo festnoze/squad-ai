@@ -7,5 +7,6 @@ const NAVIGATION = [
     { text: "Présentation", href: "#praticienne" },
 { text: "Tarifs", href: "#tarifs" },
     { text: "FAQ", href: "#faq" },
+    { text: "Blog", href: "blog/index.html" },
     { text: "Contact", href: "#contact" }
 ];

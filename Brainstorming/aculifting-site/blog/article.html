@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="light only">
+    <meta name="geo.region" content="FR-34">
+    <meta name="geo.placename" content="Montpellier">
+    <meta name="author" content="Yamina Heinrich">
+    <meta name="robots" content="index, follow">
+
+    <!-- Dynamic meta tags filled by JS -->
+    <title id="pageTitle">Blog - Yamina Heinrich</title>
+    <meta name="description" id="metaDescription" content="">
+    <meta name="keywords" id="metaKeywords" content="">
+    <link rel="canonical" id="canonicalLink" href="">
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="article">
+    <meta property="og:locale" content="fr_FR">
+    <meta property="og:site_name" content="Yamina Heinrich - Aculifting Montpellier">
+    <meta property="og:title" id="ogTitle" content="">
+    <meta property="og:description" id="ogDescription" content="">
+    <meta property="og:url" id="ogUrl" content="">
+    <meta property="og:image" content="https://aculift-mtc.fr/Photo%20YH.jpg">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" id="twitterTitle" content="">
+    <meta name="twitter:description" id="twitterDescription" content="">
+    <meta name="twitter:image" content="https://aculift-mtc.fr/Photo%20YH.jpg">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="../initiales_YH.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@300;600&family=Cormorant+Garamond:wght@300;400;500;600&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+
+    <!-- Blog CSS -->
+    <link rel="stylesheet" href="blog-style.css">
+
+    <!-- Schema.org placeholders -->
+    <script type="application/ld+json" id="schemaArticle">{}</script>
+    <script type="application/ld+json" id="schemaFAQ">{}</script>
+    <script type="application/ld+json" id="schemaBreadcrumb">{}</script>
+
+    <!-- Articles registry -->
+    <script src="data/articles.js"></script>
+</head>
+<body>
+
+    <!-- Top Navigation -->
+    <nav class="blog-nav">
+        <div class="blog-nav-inner">
+            <a href="https://aculift-mtc.fr/" class="blog-nav-brand">
+                <img src="../initiales_YH.png" alt="YH">
+                Yamina Heinrich
+            </a>
+            <div class="blog-nav-links">
+                <a href="https://aculift-mtc.fr/">Site principal</a>
+                <a href="index.html" class="active">Blog</a>
+                <a href="https://aculift-mtc.fr/#contact">Contact</a>
+            </div>
+            <button class="blog-nav-toggle" id="navToggle" aria-label="Ouvrir le menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Sidebar overlay (mobile) -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Layout -->
+    <div class="blog-layout">
+
+        <!-- Sidebar -->
+        <aside class="blog-sidebar" id="blogSidebar">
+            <div class="sidebar-section">
+                <h3>Navigation</h3>
+                <a href="https://aculift-mtc.fr/" class="sidebar-home">
+                    <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                    Site principal
+                </a>
+                <a href="index.html" class="sidebar-blog-link">Tous les articles</a>
+            </div>
+            <div class="sidebar-section">
+                <h3>Articles</h3>
+                <ul class="sidebar-articles" id="sidebarArticles"></ul>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="blog-main">
+            <!-- Breadcrumb -->
+            <div class="breadcrumb" id="breadcrumb">
+                <a href="https://aculift-mtc.fr/">Accueil</a>
+                <span>&rsaquo;</span>
+                <a href="index.html">Blog</a>
+                <span>&rsaquo;</span>
+                <span id="breadcrumbTitle"></span>
+            </div>
+
+            <!-- Article Hero -->
+            <header class="article-hero">
+                <div class="article-meta" id="articleMeta"></div>
+                <h1 id="articleTitle"></h1>
+                <p class="intro-text" id="articleIntro"></p>
+            </header>
+
+            <!-- Article Content (injected) -->
+            <div class="article-content" id="articleContent"></div>
+
+            <!-- Footer -->
+            <footer class="blog-footer">
+                <p>&copy; 2026 Yamina Heinrich &mdash; Praticienne en MTC & Aculifting &mdash; Montpellier</p>
+                <p><a href="https://aculift-mtc.fr/">aculift-mtc.fr</a></p>
+            </footer>
+        </main>
+    </div>
+
+<script>
+(function() {
+    var slug = new URLSearchParams(window.location.search).get('slug');
+    if (!slug) { window.location.href = 'index.html'; return; }
+
+    // Load article data file dynamically
+    var script = document.createElement('script');
+    script.src = 'data/' + slug + '.js';
+    script.onload = function() {
+        if (typeof ARTICLE_DATA === 'undefined') return;
+        renderArticle(slug);
+    };
+    script.onerror = function() {
+        document.getElementById('articleTitle').textContent = 'Article introuvable';
+        document.getElementById('articleContent').innerHTML = '<p>Cet article n\'existe pas. <a href="index.html">Voir tous les articles</a>.</p>';
+    };
+    document.head.appendChild(script);
+
+    function renderArticle(slug) {
+        var data = ARTICLE_DATA;
+        var meta = null;
+
+        // Find article metadata from registry
+        for (var i = 0; i < BLOG_ARTICLES.length; i++) {
+            if (BLOG_ARTICLES[i].slug === slug) { meta = BLOG_ARTICLES[i]; break; }
+        }
+        if (!meta) meta = { title: data.title, description: '', category: '', date: '', readTime: '', keywords: '' };
+
+        // Update page title and meta
+        document.title = data.title + ' | Yamina Heinrich - MTC Montpellier';
+        var url = 'https://aculift-mtc.fr/blog/article.html?slug=' + slug;
+
+        setMeta('metaDescription', 'content', meta.description);
+        setMeta('metaKeywords', 'content', meta.keywords);
+        setAttr('canonicalLink', 'href', url);
+        setMeta('ogTitle', 'content', data.title);
+        setMeta('ogDescription', 'content', meta.description);
+        setMeta('ogUrl', 'content', url);
+        setMeta('twitterTitle', 'content', data.title);
+        setMeta('twitterDescription', 'content', meta.description);
+
+        // Render hero
+        document.getElementById('articleMeta').innerHTML =
+            '<time datetime="' + meta.date + '">' + formatDate(meta.date) + '</time> &middot; ' +
+            meta.category + ' &middot; ' + meta.readTime + ' de lecture';
+        document.getElementById('articleTitle').textContent = data.title;
+        document.getElementById('articleIntro').textContent = data.intro;
+        document.getElementById('breadcrumbTitle').textContent = data.title;
+
+        // Render content
+        var html = data.body;
+
+        // FAQ section
+        if (data.faq && data.faq.length) {
+            html += '<div class="faq-section"><h2>' + (data.faqTitle || 'Questions fréquentes') + '</h2>';
+            data.faq.forEach(function(item) {
+                html += '<div class="faq-item"><h3>' + item.question + '</h3><p>' + item.answer + '</p></div>';
+            });
+            html += '</div>';
+        }
+
+        // CTA
+        if (data.cta) {
+            html += '<div class="cta-section"><h2>' + data.cta.title + '</h2><p>' + data.cta.text + '</p>' +
+                    '<a href="https://aculift-mtc.fr/#contact" class="cta-button">' + (data.cta.button || 'Prendre rendez-vous') + '</a></div>';
+        }
+
+        // Disclaimer
+        if (data.disclaimer) {
+            html += '<div class="disclaimer"><p>' + data.disclaimer + '</p></div>';
+        }
+
+        document.getElementById('articleContent').innerHTML = html;
+
+        // Schema.org - Article
+        document.getElementById('schemaArticle').textContent = JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Article",
+            "headline": data.title,
+            "description": meta.description,
+            "author": { "@type": "Person", "name": "Yamina Heinrich", "url": "https://aculift-mtc.fr/" },
+            "publisher": { "@type": "Organization", "name": "Yamina Heinrich - Aculifting Montpellier", "url": "https://aculift-mtc.fr/" },
+            "datePublished": meta.date,
+            "dateModified": meta.date,
+            "mainEntityOfPage": { "@type": "WebPage", "@id": url },
+            "keywords": meta.keywords,
+            "inLanguage": "fr"
+        });
+
+        // Schema.org - FAQ
+        if (data.faq && data.faq.length) {
+            document.getElementById('schemaFAQ').textContent = JSON.stringify({
+                "@context": "https://schema.org",
+                "@type": "FAQPage",
+                "mainEntity": data.faq.map(function(item) {
+                    return {
+                        "@type": "Question",
+                        "name": item.question,
+                        "acceptedAnswer": { "@type": "Answer", "text": item.answer }
+                    };
+                })
+            });
+        }
+
+        // Schema.org - Breadcrumb
+        document.getElementById('schemaBreadcrumb').textContent = JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+                { "@type": "ListItem", "position": 1, "name": "Accueil", "item": "https://aculift-mtc.fr/" },
+                { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://aculift-mtc.fr/blog/" },
+                { "@type": "ListItem", "position": 3, "name": data.title }
+            ]
+        });
+    }
+
+    // Render sidebar
+    function renderSidebar() {
+        var list = document.getElementById('sidebarArticles');
+        var currentSlug = slug;
+        BLOG_ARTICLES.forEach(function(article) {
+            var li = document.createElement('li');
+            var a = document.createElement('a');
+            a.href = 'article.html?slug=' + article.slug;
+            a.textContent = article.title;
+            if (article.slug === currentSlug) a.classList.add('active');
+            li.appendChild(a);
+            list.appendChild(li);
+        });
+    }
+
+    renderSidebar();
+
+    // Mobile sidebar toggle
+    var toggle = document.getElementById('navToggle');
+    var sidebar = document.getElementById('blogSidebar');
+    var overlay = document.getElementById('sidebarOverlay');
+
+    toggle.addEventListener('click', function() {
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('open');
+    });
+
+    overlay.addEventListener('click', function() {
+        sidebar.classList.remove('open');
+        overlay.classList.remove('open');
+    });
+
+    // Helpers
+    function setMeta(id, attr, value) { var el = document.getElementById(id); if (el) el.setAttribute(attr, value); }
+    function setAttr(id, attr, value) { var el = document.getElementById(id); if (el) el.setAttribute(attr, value); }
+    function formatDate(dateStr) {
+        var months = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
+        var parts = dateStr.split('-');
+        return parseInt(parts[2]) + ' ' + months[parseInt(parts[1])-1] + ' ' + parts[0];
+    }
+})();
+</script>
+
+</body>
+</html>

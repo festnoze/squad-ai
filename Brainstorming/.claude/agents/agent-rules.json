@@ -38,7 +38,32 @@
           "comment ca marche",
           "comprendre le code",
           "cartographier dependances",
-          "tracer le flux"
+          "tracer le flux",
+          "web search",
+          "search the web",
+          "search online",
+          "browse website",
+          "read website",
+          "fetch URL",
+          "open URL",
+          "scrape page",
+          "web research",
+          "look up online",
+          "find online",
+          "check website",
+          "inspect site",
+          "recherche sur le web",
+          "rechercher sur le web",
+          "chercher en ligne",
+          "chercher sur internet",
+          "naviguer sur le site",
+          "lire le site",
+          "ouvrir URL",
+          "consulter le site",
+          "inspecter le site",
+          "recherche en ligne",
+          "trouver en ligne",
+          "verifier le site"
         ],
         "intentPatterns": [
           "(analyze|explore|investigate|research).*?(codebase|code|feature|pattern|implementation)",
@@ -52,7 +77,13 @@
           "(what|which).*?(exist|pattern|implementation).*?for",
           "(qu.est-ce qui|quel).*?(existe|pattern|impl[\u00e9e]mentation).*?pour",
           "map.*?(dependency|architecture|flow|component)",
-          "cartographi.*?(d[\u00e9e]pendance|architecture|flux|composant)"
+          "cartographi.*?(d[\u00e9e]pendance|architecture|flux|composant)",
+          "(search|look up|find|research).*?(web|online|internet|URL|site|website)",
+          "(rechercher|chercher|trouver).*?(web|en ligne|internet|URL|site)",
+          "(browse|read|fetch|open|scrape|inspect|check).*?(website|site|URL|page|web)",
+          "(naviguer|lire|ouvrir|consulter|inspecter|v[\u00e9e]rifier).*?(site|URL|page|web)",
+          "(web|online|internet).*?(search|research|lookup|fetch)",
+          "(web|en ligne|internet).*?(recherche|chercher|consulter)"
         ]
       },
       "delegationCriteria": {
