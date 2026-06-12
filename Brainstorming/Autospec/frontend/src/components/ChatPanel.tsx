@@ -7,7 +7,10 @@ const ROLE_LABEL: Record<string, string> = {
   po: "🏃 PO",
   dev: "💻 Dev",
   analyst: "🔍 Analyste",
+  architect: "🏛️ Architecte",
   qa: "🧪 QA",
+  critic: "🧐 Critique",
+  judge: "⚖️ Juge",
   system: "⚙️ Système",
 };
 
@@ -34,7 +37,9 @@ export function ChatPanel({ chat, phase, onSend }: Props) {
   const placeholder =
     phase === "spec"
       ? "Réponds au PM…"
-      : "Donne ton feedback sur l'itération en cours…";
+      : phase === "build" || phase === "architect"
+        ? "Donne une consigne au dev en cours… (prise en compte aux prochaines tentatives)"
+        : "Donne ton feedback sur l'itération en cours…";
 
   return (
     <div className="panel chat">

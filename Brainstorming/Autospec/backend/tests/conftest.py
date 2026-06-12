@@ -15,7 +15,7 @@ def tmp_workspace(tmp_path, monkeypatch):
 @pytest.fixture
 def green_pytest(monkeypatch):
     async def _arun_pytest(self):
-        return True, "all green"
+        return True, "all green", {}
 
     monkeypatch.setattr(Pipeline, "_arun_pytest", _arun_pytest)
 

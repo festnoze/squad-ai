@@ -39,9 +39,55 @@ L'UI permet de **gérer plusieurs projets** (sélection / suppression), montre l
 board EPIC/US avec l'état de chaque story (todo, dev en cours, rouge, vert, done,
 échec). Chaque **critère d'acceptance est une ligne dépliable** affichant son
 état (**inexistant / rouge / vert** — vert seulement quand tous ses tests sont
-verts) et, au clic, la liste de ses tests d'acceptance et le Gherkin associé. Un
-chat (spécification puis feedback) et un bouton **▶ Lancer le projet** qui
-exécute le `main.py` du code généré complètent l'interface.
+verts) et, au clic, la liste de ses tests d'acceptance et le Gherkin associé. Les
+**user stories sont éditables depuis le board** : on peut **éditer** (titre,
+description, priorité, critères d'acceptance, Gherkin), **ajouter**, **supprimer**
+et **reprioriser** une US directement dans l'UI. Une story peut aussi être
+**relancée** (si échouée), **rejouée** (si terminée) ou **forcée terminée**
+directement depuis sa carte. Un
+chat (spécification puis feedback), des boutons d'**interruption** (**⏸ Pause /
+▶ Reprendre**, **⏹ Stopper**) et un bouton **▶ Lancer le projet** qui exécute le
+`main.py` du code généré complètent l'interface.
+
+## Harnais de raffinement (optionnel)
+
+Un **harnais de raffinement** peut améliorer les artefacts des agents via une
+boucle **maker → critic → judge** : le maker produit (plan PO ou code Dev), un
+agent **critic** (ReAct REFLECT/ACT) propose des améliorations actionnables sans
+réécrire, et un agent **judge** note la qualité de **0 à 100**. La boucle
+s'arrête de façon **déterministe** dès que le **score atteint le seuil**
+(`AUTOSPEC_REFINE_QUALITY_THRESHOLD`, défaut 80) **ou** que le **cap d'allers-
+retours** est atteint (`AUTOSPEC_REFINE_MAX_ROUNDS`, défaut 2), selon ce qui
+survient en premier. Le raffinement du code Dev est protégé par une **garde
+git** : une révision n'est gardée que si `uv run pytest` reste vert (sinon
+rollback). Deux nouveaux rôles de chat apparaissent dans l'UI : **🧐 Critique**
+et **⚖️ Juge**.
+
+**OFF par défaut** (pour économiser des tokens). Activation :
+
+```powershell
+$env:AUTOSPEC_REFINE = "1"          # interrupteur global (requis)
+# $env:AUTOSPEC_REFINE_PO = "1"     # raffiner le plan PO (défaut 1)
+# $env:AUTOSPEC_REFINE_DEV = "1"    # raffiner le code Dev (défaut 1)
+```
+
+## Mode démo (sans Claude)
+
+Pour faire tourner et vérifier tout le stack **sans le CLI Claude ni build de
+venv uv**, lance le backend avec `AUTOSPEC_FAKE_AGENTS=1` : un agent scripté
+déterministe pilote toute la pipeline (PM→PO→QA→Dev). C'est aussi ce qui
+alimente le test e2e Playwright.
+
+```powershell
+# Backend en mode démo
+cd backend
+$env:AUTOSPEC_FAKE_AGENTS = "1"; $env:AUTOSPEC_DEMO_DELAY_S = "0.8"
+uv run uvicorn autospec.api.server:app --port 8100
+
+# Test e2e (build le front + backend démo auto-démarré + navigateur piloté)
+cd frontend
+npm run test:e2e
+```
 
 ## Architecture
 
@@ -85,6 +131,25 @@ cd backend
 uv run pytest
 ```
 
+## CI (GitHub Actions)
+
+Le workflow [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) tourne sur
+chaque `push` et `pull_request` avec 3 jobs sur `ubuntu-latest` :
+
+| Job | Etapes |
+| --- | --- |
+| **backend** | `uv sync --extra dev` → `uv run pytest -q` (dans `backend/`) |
+| **frontend** | Node 20 → `npm ci` → `npm run build` → `npm run test:unit` (Vitest, dans `frontend/`) |
+| **e2e** | uv + Node 20 → `uv sync` (backend, cree le `.venv` requis par Playwright) → `npm ci` → `npx playwright install --with-deps chromium` → `npm run test:e2e` (dans `frontend/`) |
+
+> ⚠️ **Contrainte monorepo** : Autospec vit actuellement dans le monorepo
+> `squad-ai`, dont le `.github` est a la racine. GitHub Actions ne declenche que
+> les workflows en `<repo-root>/.github/workflows/`. Tant qu'Autospec n'est pas
+> extrait dans son propre depot, ce fichier doit etre **deplace a la racine du
+> depot** (en prefixant les chemins par `Brainstorming/Autospec/`) pour etre
+> execute. Le fichier est ecrit pour fonctionner tel quel une fois Autospec a la
+> racine de son propre depot.
+
 ## Configuration (variables d'environnement)
 
 | Variable | Défaut | Rôle |
@@ -96,3 +161,8 @@ uv run pytest
 | `AUTOSPEC_MAX_PARALLEL_DEVS` | `2` | Agents dev en parallèle |
 | `AUTOSPEC_DEV_MAX_ATTEMPTS` | `2` | Tentatives par story |
 | `AUTOSPEC_AGENT_TIMEOUT_S` | `1800` | Timeout d'un appel agent |
+| `AUTOSPEC_REFINE` | `0` | Interrupteur global du harnais de raffinement |
+| `AUTOSPEC_REFINE_PO` | `1` | Raffinement du plan PO (si global ON) |
+| `AUTOSPEC_REFINE_DEV` | `1` | Raffinement du code Dev (si global ON) |
+| `AUTOSPEC_REFINE_MAX_ROUNDS` | `2` | Cap dur d'allers-retours maker↔critic↔judge |
+| `AUTOSPEC_REFINE_QUALITY_THRESHOLD` | `80` | Seuil de score du juge pour s'arrêter |

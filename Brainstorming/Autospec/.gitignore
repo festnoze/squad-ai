@@ -5,3 +5,10 @@ __pycache__/
 node_modules/
 frontend/dist/
 workspace/
+backend/.e2e-workspace/
+backend/.diag-workspace/
+backend/.env
+frontend/test-results/
+frontend/playwright-report/
+frontend/.cache/
+.playwright/

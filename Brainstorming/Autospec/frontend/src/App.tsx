@@ -4,13 +4,19 @@ import {
   createProject,
   deleteProject,
   listProjects,
+  pauseProject,
+  resumeBuild,
+  resumeProject,
   runProject,
   sendChat,
+  stopApp,
   stopProject,
 } from "./api";
+import { ArchitecturePanel } from "./components/ArchitecturePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
 import { Board } from "./components/Board";
 import { ChatPanel } from "./components/ChatPanel";
+import { CodeViewer } from "./components/CodeViewer";
 import { ProjectBar } from "./components/ProjectBar";
 import { ProjectSetup } from "./components/ProjectSetup";
 import { RunPanel } from "./components/RunPanel";
@@ -145,15 +151,24 @@ export default function App() {
               onSend={(m) => guard(() => sendChat(project.id, m))()}
             />
             <BacklogPanel backlog={project.backlog} />
+            <ArchitecturePanel
+              architecture={project.architecture}
+              planQuality={project.plan_quality}
+            />
           </div>
           <div className="col-right">
-            <Board epics={project.epics} stories={project.stories} />
+            <Board epics={project.epics} stories={project.stories} projectId={project.id} />
             <RunPanel
               project={project}
               logs={projectLogs}
               onRun={guard(() => runProject(project.id))}
               onStop={guard(() => stopProject(project.id))}
+              onPause={guard(() => pauseProject(project.id))}
+              onResume={guard(() => resumeProject(project.id))}
+              onStopApp={guard(() => stopApp(project.id))}
+              onResumeBuild={guard(() => resumeBuild(project.id))}
             />
+            <CodeViewer projectId={project.id} />
           </div>
         </main>
       )}

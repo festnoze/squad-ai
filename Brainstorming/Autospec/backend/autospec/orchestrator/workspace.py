@@ -19,6 +19,7 @@ dependencies = []
 dev = [
     "pytest>=8.0",
     "pytest-bdd>=7.0",
+    "pytest-json-report>=1.5",
 ]
 
 [build-system]

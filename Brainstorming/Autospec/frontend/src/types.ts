@@ -2,6 +2,7 @@ export type PipelinePhase =
   | "idle"
   | "spec"
   | "analyze"
+  | "architect"
   | "plan"
   | "build"
   | "done"
@@ -16,7 +17,7 @@ export type StoryStatus =
   | "done"
   | "failed";
 
-export type ChatRole = "user" | "pm" | "po" | "dev" | "analyst" | "qa" | "system";
+export type ChatRole = "user" | "pm" | "po" | "dev" | "analyst" | "architect" | "qa" | "critic" | "judge" | "system";
 
 export type TestState = "nonexistent" | "red" | "green";
 
@@ -67,6 +68,7 @@ export interface UserStory {
   iteration: number;
   attempts: number;
   last_error: string;
+  quality_score: number;
 }
 
 export interface Epic {
@@ -90,8 +92,11 @@ export interface ProjectState {
   feedback: string[];
   iteration: number;
   running: boolean;
+  paused: boolean;
   error: string;
   created_at: number;
+  architecture: string;
+  plan_quality: number;
 }
 
 export interface LogLine {
@@ -103,6 +108,45 @@ export type WsEvent =
   | { type: "state"; project_id: string; state: ProjectState }
   | { type: "log"; project_id: string; source: string; line: string }
   | { type: "deleted"; project_id: string };
+
+/** Body for editing an existing user story (all fields optional). */
+export interface StoryPatch {
+  title?: string;
+  description?: string;
+  gherkin?: string;
+  priority?: number;
+  acceptance_criteria?: { id?: string; text: string }[];
+}
+
+/** Body for creating a new user story under an epic. */
+export interface NewStoryBody {
+  epic_id: string;
+  title: string;
+  description?: string;
+  gherkin?: string;
+  priority?: number;
+  acceptance_criteria?: string[];
+  depends_on?: string[];
+}
+
+/** Listing of generated workspace files (relative POSIX paths, sorted). */
+export interface FileListing {
+  files: string[];
+}
+
+/** Raw content of a generated workspace file. */
+export interface FileContent {
+  path: string;
+  content: string;
+  truncated: boolean;
+}
+
+/** Diff (git show) du commit « story <id> done ». */
+export interface StoryDiff {
+  ok: boolean;
+  available: boolean;
+  diff: string;
+}
 
 /** Derived state of a criterion: green only when all its tests are green. */
 export function criterionState(

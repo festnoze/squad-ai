@@ -6,6 +6,96 @@ import json
 
 from ..models import FeatureHypothesis, HypothesisStatus, ProjectState, UserStory
 
+# ----------------------------------------------- Refinement harness (critic/judge)
+
+def critic_review(kind: str, artifact: str, criteria: str) -> str:
+    return f"""On te soumet {kind} à critiquer dans une boucle de raffinement.
+
+Travaille en mode ReAct (REFLECT puis ACT) :
+1. REFLECT — décompose le travail en sous-aspects et analyse chacun au regard
+   des critères de qualité ci-dessous (raisonnement explicite, étape par étape).
+2. ACT — propose des améliorations CONCRÈTES et actionnables (pas de
+   généralités). Ne réécris pas le travail toi-même.
+
+Critères de qualité :
+{criteria}
+
+Élément à critiquer :
+\"\"\"{artifact}\"\"\"
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{"reflection": "<ton raisonnement décomposé, en français>", "issues": ["problème concret", "..."], "suggestions": ["amélioration actionnable", "..."]}}
+Si l'élément est déjà excellent, renvoie des listes "issues"/"suggestions" vides."""
+
+
+def judge_quality(kind: str, artifact: str, criteria: str) -> str:
+    return f"""Tu es le juge qualité d'une boucle de raffinement. On te soumet {kind}.
+Évalue objectivement sa qualité au regard des critères ci-dessous et donne une
+note ENTIÈRE de 0 à 100 (100 = irréprochable, prêt à livrer). Sois exigeant mais
+juste : la note pilote l'arrêt de la boucle.
+
+Critères de qualité :
+{criteria}
+
+Élément à évaluer :
+\"\"\"{artifact}\"\"\"
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{"score": <entier 0-100>, "verdict": "<une phrase en français>", "reasons": ["..."]}}"""
+
+
+PLAN_CRITERIA = (
+    "- Chaque US suit INVEST (indépendante, négociable, valeur, estimable, "
+    "petite, testable).\n"
+    "- Critères d'acceptance précis, non ambigus et réellement testables.\n"
+    "- Gherkin exécutable et aligné sur les critères.\n"
+    "- Découpage en epics/US cohérent avec la complexité (ni trop gros, ni "
+    "sur-découpé).\n"
+    "- Dépendances et priorités kanban correctes et minimales."
+)
+
+CODE_CRITERIA = (
+    "- Le code respecte les critères d'acceptance et fait passer toute la suite.\n"
+    "- Séparation des responsabilités (SoC), fonctions courtes, nommage clair.\n"
+    "- Pas de duplication (DRY), gestion des cas limites et des erreurs.\n"
+    "- Tests lisibles couvrant les comportements clés, pas seulement le chemin "
+    "nominal."
+)
+
+
+def po_revise(state: ProjectState, package_name: str, previous_json: str, critique: str) -> str:
+    return f"""{po_plan(state, package_name)}
+
+⚠️ BOUCLE DE RAFFINEMENT — une première version du plan a été produite puis
+critiquée. Voici la version précédente (JSON) :
+{previous_json}
+
+Critique et améliorations à intégrer :
+{critique}
+
+Produis une VERSION AMÉLIORÉE du plan qui intègre ces retours, dans le format
+JSON EXACT demandé ci-dessus (mêmes clés)."""
+
+
+def dev_revise(
+    story: UserStory,
+    package_name: str,
+    feature_rel_path: str,
+    critique: str,
+    architecture: str = "",
+    guidance: str = "",
+) -> str:
+    return f"""{dev_story(story, package_name, feature_rel_path, architecture, guidance)}
+
+⚠️ BOUCLE DE RAFFINEMENT — le code de cette story passe déjà au vert, mais un
+critique a relevé des points d'amélioration :
+{critique}
+
+Améliore le code en intégrant ces retours. CONTRAINTE ABSOLUE : toute la suite
+`uv run pytest` doit RESTER verte après tes modifications. Réponds avec le même
+objet JSON que précédemment."""
+
+
 # ---------------------------------------------------------------- PM (spec)
 
 PM_ENVELOPE = """
@@ -117,6 +207,26 @@ Réponds avec EXACTEMENT UN objet JSON :
 {{"type": "brief", "message": "<une phrase de contexte>", "brief": "<brief markdown de la feature>"}}"""
 
 
+# ---------------------------------------------------------- Architect (design)
+
+def architect_design(state: ProjectState, package_name: str) -> str:
+    titles = [s.title for s in state.stories_of_iteration(state.iteration)]
+    stories = "\n".join(f"- {t}" for t in titles) or "(aucune)"
+    return f"""Tu es l'architecte technique d'un pipeline automatisé. Voici le brief produit :
+\"\"\"{state.brief}\"\"\"
+
+Stories planifiées de l'itération courante :
+{stories}
+
+Ta mission : produis un design technique CONCIS pour le package `{package_name}`,
+qui guidera le QA et le développeur. Pas de sur-ingénierie : juste assez pour
+guider l'implémentation (architecture cible en couches/modules, composants clés,
+conventions de nommage, contraintes transverses).
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{"message": "<une phrase, français>", "design": "<markdown court : architecture cible (couches/modules), composants clés, conventions de nommage, contraintes transverses>"}}"""
+
+
 # ---------------------------------------------------------------- PO (plan)
 
 def po_plan(state: ProjectState, package_name: str) -> str:
@@ -173,10 +283,12 @@ ce même JSON (ou des stories existantes listées plus haut)."""
 
 # ---------------------------------------------------------------- QA (test design)
 
-def qa_test_plan(story: UserStory, package_name: str) -> str:
+def qa_test_plan(story: UserStory, package_name: str, architecture: str = "") -> str:
     criteria = "\n".join(f"- [{c.id}] {c.text}" for c in story.acceptance_criteria)
+    arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     return f"""Tu es l'architecte de tests d'un pipeline automatisé BDD/TDD. Le code sera du
 Python dans le package `{package_name}` (projet uv, pytest + pytest-bdd).
+{arch_block}
 
 User story à couvrir : {story.id} — {story.title}
 Description : {story.description}
@@ -230,8 +342,18 @@ def _format_test_plan(story: UserStory) -> str:
     return "\n".join(lines)
 
 
-def dev_story(story: UserStory, package_name: str, feature_rel_path: str) -> str:
+def dev_story(
+    story: UserStory,
+    package_name: str,
+    feature_rel_path: str,
+    architecture: str = "",
+    guidance: str = "",
+) -> str:
     criteria = "\n".join(f"- [{c.id}] {c.text}" for c in story.acceptance_criteria)
+    arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    guidance_block = (
+        f"\nConsignes de l'utilisateur (à respecter en priorité) :\n{guidance}\n" if guidance else ""
+    )
     plan = _format_test_plan(story)
     plan_section = ""
     plan_step = ""
@@ -250,7 +372,7 @@ L'architecte QA a décomposé ce test d'acceptance en tests unitaires outside-in
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant, qui est un projet Python géré par uv (pyproject.toml déjà
 présent, pytest + pytest-bdd installés).
-
+{arch_block}{guidance_block}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
@@ -283,8 +405,12 @@ Quand tu as terminé, réponds avec EXACTEMENT UN objet JSON :
   "status": "green" | "failed",
   "summary": "<ce que tu as fait, en français>",
   "files": ["<fichiers créés/modifiés>"],
-  "test_results": [{{"id": "<id du test du plan QA>", "status": "green" | "red"}}]
+  "test_results": [
+    {{"id": "<id du test du plan QA>", "status": "green" | "red", "nodeids": ["<chemin/fichier.py::nom_test>"]}}
+  ]
 }}
-Dans "test_results", donne l'état final de CHAQUE test du plan QA ci-dessus (id
-exact). Ne réponds "green" (au niveau global) que si `uv run pytest` passe
-intégralement."""
+Dans "test_results", pour CHAQUE test du plan QA (id exact), donne aussi les
+`nodeids` pytest EXACTS que tu as écrits pour ce test (format
+`chemin/fichier.py::nom_de_la_fonction_de_test`, tel que pytest les rapporte) —
+l'orchestrateur s'en sert pour relire l'état réel depuis l'exécution de pytest.
+Ne réponds "green" (au niveau global) que si `uv run pytest` passe intégralement."""

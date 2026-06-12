@@ -14,6 +14,7 @@ class PipelinePhase(str, Enum):
     SPEC = "spec"          # PM is interviewing the user (or self-answering in auto-spec)
     ANALYZE = "analyze"    # Analyst is exploring/prioritizing the next feature hypotheses
     PLAN = "plan"          # PO is breaking the brief into epics / user stories
+    ARCHITECT = "architect"  # Architect designs the technical solution (optional phase)
     BUILD = "build"        # dev agents are implementing stories (BDD/TDD)
     DONE = "done"          # iteration finished, waiting for user (or next auto-spec cycle)
     STOPPED = "stopped"
@@ -35,7 +36,10 @@ class ChatRole(str, Enum):
     PO = "po"
     DEV = "dev"
     ANALYST = "analyst"
+    ARCHITECT = "architect"
     QA = "qa"
+    CRITIC = "critic"
+    JUDGE = "judge"
     SYSTEM = "system"
 
 
@@ -113,6 +117,7 @@ class UserStory(BaseModel):
     iteration: int = 1
     attempts: int = 0
     last_error: str = ""
+    quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
 
     def tests_for_criterion(self, criterion_id: str) -> list[PlannedTest]:
         return [t for t in self.test_plan if criterion_id in t.criteria]
@@ -145,13 +150,17 @@ class ProjectState(BaseModel):
     auto_spec: bool = False
     phase: PipelinePhase = PipelinePhase.IDLE
     brief: str = ""
+    architecture: str = ""  # current technical design (from the optional Architect phase)
+    plan_quality: int = -1  # last refinement score for the PO plan (-1 = not run)
     backlog: list[FeatureHypothesis] = Field(default_factory=list)
     epics: list[Epic] = Field(default_factory=list)
     stories: list[UserStory] = Field(default_factory=list)
     chat: list[ChatMessage] = Field(default_factory=list)
     feedback: list[str] = Field(default_factory=list)
+    build_guidance: list[str] = Field(default_factory=list)  # user directives given during the build
     iteration: int = 1
     running: bool = False  # generated app currently running
+    paused: bool = False   # pipeline paused by the user (gates between steps)
     error: str = ""
     created_at: float = Field(default_factory=time.time)
 

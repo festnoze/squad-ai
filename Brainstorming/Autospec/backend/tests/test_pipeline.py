@@ -1,7 +1,10 @@
+import asyncio
 import json
 
+import pytest
+
 from autospec.agents.runner import FakeRunner
-from autospec.models import ChatRole, PipelinePhase, ProjectState, StoryStatus
+from autospec.models import ChatRole, PipelinePhase, ProjectState, StoryStatus, TestState
 from autospec.orchestrator.pipeline import Pipeline
 
 from .conftest import wait_until
@@ -100,7 +103,7 @@ async def test_feature_files_written(green_pytest, tmp_workspace):
 
 async def test_failed_story_blocks_dependents(monkeypatch, tmp_workspace):
     async def _red_pytest(self):
-        return False, "1 failed"
+        return False, "1 failed", {}
 
     monkeypatch.setattr(Pipeline, "_arun_pytest", _red_pytest)
     # Dev replies green but verification stays red: 2 attempts for US-1
@@ -183,6 +186,116 @@ async def test_kanban_priority_orders_independent_stories(green_pytest):
     assert "US-2" in dev_prompts[0] and "US-1" in dev_prompts[1]
 
 
+async def test_pause_blocks_then_resume_completes(green_pytest):
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN]
+    )
+    # Pause before starting: the plan phase must not run while paused.
+    await pipeline.apause()
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.brief.startswith("# Brief"))
+    assert pipeline.state.paused is True
+    # Still no plan produced because the loop is gated at the checkpoint.
+    await asyncio.sleep(0.05)
+    assert pipeline.state.epics == []
+    assert pipeline.state.phase != PipelinePhase.DONE
+
+    await pipeline.aresume()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    assert pipeline.state.paused is False
+    assert pipeline.state.story("US-1").status == StoryStatus.DONE
+
+
+async def test_stop_unblocks_a_paused_pipeline(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    await pipeline.apause()
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.brief.startswith("# Brief"))
+    await pipeline.astop()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.STOPPED)
+
+
+async def test_po_refinement_invoked_when_enabled(green_pytest, monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "refine_enabled", True)
+    monkeypatch.setattr(settings, "refine_po", True)
+    monkeypatch.setattr(settings, "refine_dev", False)  # no git in this test
+    judge_pass = json.dumps({"score": 92, "verdict": "plan solide"})
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), judge_pass, QA_PLAN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    assert pipeline.state.story("US-1").status == StoryStatus.DONE
+    # The judge passed immediately (92 >= 80): 0 refine rounds, plan kept.
+    assert any(
+        "Plan raffiné en 0 tour(s)" in m.content and "92/100" in m.content
+        for m in pipeline.state.chat
+    )
+
+
+async def test_plan_quality_stored_when_refine_enabled(green_pytest, monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "refine_enabled", True)
+    monkeypatch.setattr(settings, "refine_po", True)
+    monkeypatch.setattr(settings, "refine_dev", False)  # no git in this test
+    judge = json.dumps({"score": 92, "verdict": "ok"})
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), judge, QA_PLAN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    # The refinement score is exposed on the state for the UI.
+    assert pipeline.state.plan_quality == 92
+
+
+async def test_quality_scores_default_minus_one(green_pytest):
+    # Refinement is OFF by default: the quality scores stay at their sentinel -1.
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    assert pipeline.state.plan_quality == -1
+    assert pipeline.state.story("US-1").quality_score == -1
+
+
+async def test_real_pytest_states_map_by_nodeid(monkeypatch):
+    from autospec.models import TestState
+
+    # The orchestrator grounds states on REAL pytest outcomes: UT-1's node
+    # passed, UT-2's node failed. The suite is red, so the suite-green heuristic
+    # does NOT apply — the green/red split comes purely from the real report.
+    async def _mixed_pytest(self):
+        return False, "1 failed", {
+            "tests/unit/a.py::t_ok": "passed",
+            "tests/unit/b.py::t_ko": "failed",
+        }
+
+    monkeypatch.setattr(Pipeline, "_arun_pytest", _mixed_pytest)
+    dev_reply = json.dumps(
+        {
+            "status": "failed",
+            "summary": "partiel",
+            "files": [],
+            "test_results": [
+                {"id": "UT-1", "nodeids": ["tests/unit/a.py::t_ok"]},
+                {"id": "UT-2", "nodeids": ["tests/unit/b.py::t_ko"]},
+            ],
+        }
+    )
+    # QA runs on attempt 1 only; 2 dev attempts then the story fails.
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, dev_reply, dev_reply]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    us1 = pipeline.state.story("US-1")
+    assert us1.status == StoryStatus.FAILED
+    assert us1.test_plan[0].status == TestState.GREEN  # UT-1 node really passed
+    assert us1.test_plan[1].status == TestState.RED    # UT-2 node really failed
+
+
 async def test_qa_failure_is_non_fatal(green_pytest):
     # QA replies garbage: the dev still proceeds from the Gherkin alone.
     pipeline, runner = make_pipeline(
@@ -197,9 +310,204 @@ async def test_qa_failure_is_non_fatal(green_pytest):
     assert "PROCESSUS OBLIGATOIRE" in dev_prompt and "London school" not in dev_prompt
 
 
+async def test_rebuild_failed_story(green_pytest):
+    # 4 replies for the initial build (-> done), 2 more for the rebuild.
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN, QA_PLAN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # Pretend the story actually failed after a first attempt.
+    us1 = pipeline.state.story("US-1")
+    us1.status = StoryStatus.FAILED
+    us1.attempts = 1
+
+    await pipeline.arebuild_story("US-1")
+    await wait_until(
+        lambda: pipeline.state.phase == PipelinePhase.DONE
+        and pipeline.state.story("US-1").status == StoryStatus.DONE
+    )
+    # attempts was reset to 0 then re-incremented once by the successful rebuild.
+    assert pipeline.state.story("US-1").attempts == 1
+
+
+async def test_force_done_story(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    us1 = pipeline.state.story("US-1")
+    us1.status = StoryStatus.FAILED
+
+    await pipeline.aforce_done("US-1")
+    assert us1.status == StoryStatus.DONE
+    assert all(t.status == TestState.GREEN for t in us1.test_plan)
+
+
+async def test_rebuild_rejected_when_pipeline_active(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # Simulate an active pipeline: rebuild must be refused.
+    pipeline.state.phase = PipelinePhase.BUILD
+    with pytest.raises(ValueError):
+        await pipeline.arebuild_story("US-1")
+
+
+async def test_rebuild_unknown_story_raises_keyerror(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    with pytest.raises(KeyError):
+        await pipeline.arebuild_story("US-999")
+
+
+async def test_resume_build_completes_pending_story(green_pytest):
+    # 4 replies for the initial build (-> done), 2 more for the resume.
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN, QA_PLAN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # Simulate a dormant project: the story was reverted to TODO on restart.
+    us1 = pipeline.state.story("US-1")
+    us1.status = StoryStatus.TODO
+    us1.attempts = 0
+
+    await pipeline.aresume_build()
+    await wait_until(
+        lambda: pipeline.state.phase == PipelinePhase.DONE
+        and pipeline.state.story("US-1").status == StoryStatus.DONE
+    )
+
+
+async def test_resume_build_rejected_when_active(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # Simulate an active pipeline: resuming the build must be refused.
+    pipeline.state.phase = PipelinePhase.BUILD
+    with pytest.raises(ValueError):
+        await pipeline.aresume_build()
+
+
+async def test_resume_build_rejected_when_nothing_pending(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # Every story is DONE: there is nothing left to build (no TODO/RED).
+    assert pipeline.state.story("US-1").status == StoryStatus.DONE
+    with pytest.raises(ValueError):
+        await pipeline.aresume_build()
+
+
+async def test_architecture_phase_injects_context(green_pytest, monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "architecture_enabled", True)
+    ARCHITECT = json.dumps({"message": "Design fait.", "design": "## Archi\nservice + repo"})
+    pipeline, runner = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), ARCHITECT, QA_PLAN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # The architect's design is stored on the state and emitted in the chat.
+    assert "service + repo" in pipeline.state.architecture
+    assert any(m.role == ChatRole.ARCHITECT for m in pipeline.state.chat)
+
+    # Both the QA and the Dev prompts carry the architecture context.
+    qa_prompt = next(c["prompt"] for c in runner.calls if "architecte de tests" in c["prompt"])
+    dev_prompt = next(c["prompt"] for c in runner.calls if "PROCESSUS OBLIGATOIRE" in c["prompt"])
+    for prompt in (qa_prompt, dev_prompt):
+        assert "Contexte architecture" in prompt
+        assert "service + repo" in prompt
+
+
+async def test_architecture_off_by_default(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    assert pipeline.state.architecture == ""
+    assert not any(m.role == ChatRole.ARCHITECT for m in pipeline.state.chat)
+
+
 async def test_feedback_outside_spec_is_stored(green_pytest):
     pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
     pipeline.start()
     await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
     await pipeline.asend_user_message("Le bouton est trop petit")
     assert pipeline.state.feedback == ["Le bouton est trop petit"]
+
+
+async def test_chat_during_build_is_guidance():
+    pipeline, _ = make_pipeline([])
+    pipeline.state.phase = PipelinePhase.BUILD
+    await pipeline.asend_user_message("utilise des fixtures pytest")
+    assert "utilise des fixtures pytest" in pipeline.state.build_guidance
+    assert pipeline.state.feedback == []
+
+
+async def test_chat_outside_build_is_feedback():
+    pipeline, _ = make_pipeline([])
+    pipeline.state.phase = PipelinePhase.DONE
+    await pipeline.asend_user_message("le bouton est trop petit")
+    assert pipeline.state.feedback == ["le bouton est trop petit"]
+    assert pipeline.state.build_guidance == []
+
+
+async def test_story_diff_returns_commit():
+    from autospec.models import Epic, UserStory
+    from autospec.orchestrator import workspace
+    from autospec.storage import workspace_dir
+
+    state = ProjectState(id="diff-proj", name="diff", goal="diff demo")
+    pipeline = Pipeline(state, FakeRunner([]))
+    workspace.scaffold(state)
+    state.epics.append(Epic(id="EPIC-1", title="Epic 1"))
+    state.stories.append(UserStory(id="US-1", epic_id="EPIC-1", title="s"))
+
+    (workspace_dir("diff-proj") / "demo.py").write_text("x = 1\n", encoding="utf-8")
+    await pipeline._acommit_story(workspace_dir("diff-proj"), "US-1")
+
+    res = await pipeline.astory_diff("US-1")
+    assert res["available"] is True
+    assert "demo.py" in res["diff"]
+
+
+async def test_story_diff_unavailable_without_commit():
+    from autospec.models import Epic, UserStory
+    from autospec.orchestrator import workspace
+
+    state = ProjectState(id="diff-proj-2", name="diff", goal="diff demo")
+    pipeline = Pipeline(state, FakeRunner([]))
+    workspace.scaffold(state)
+    state.epics.append(Epic(id="EPIC-1", title="Epic 1"))
+    state.stories.append(UserStory(id="US-1", epic_id="EPIC-1", title="s"))
+
+    # No "story US-1 done" commit exists for this workspace.
+    res = await pipeline.astory_diff("US-1")
+    assert res["available"] is False
+    assert res["diff"] == ""
+
+
+async def test_story_diff_unknown_story_raises_keyerror():
+    state = ProjectState(id="diff-proj-3", name="diff", goal="diff demo")
+    pipeline = Pipeline(state, FakeRunner([]))
+    with pytest.raises(KeyError):
+        await pipeline.astory_diff("US-999")
+
+
+def test_dev_prompt_includes_guidance():
+    from autospec.agents import prompts
+    from autospec.models import UserStory
+
+    story = UserStory(id="US-1", epic_id="EPIC-1", title="Story")
+    prompt = prompts.dev_story(story, "pkg", "features/us_1.feature", "", "consigne ABC")
+    assert "Consignes de l'utilisateur" in prompt
+    assert "consigne ABC" in prompt
