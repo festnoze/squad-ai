@@ -172,6 +172,7 @@ class ProjectState(BaseModel):
     usage: Usage = Field(default_factory=Usage)  # accumulated tokens/cost across agent calls
     running: bool = False  # generated app currently running
     paused: bool = False   # pipeline paused by the user (gates between steps)
+    archived: bool = False  # hidden from the default project list (not deleted)
     error: str = ""
     created_at: float = Field(default_factory=time.time)
 

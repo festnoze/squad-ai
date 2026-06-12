@@ -56,7 +56,7 @@ Autospec/
 │       │   └── events.py        # Bus d'événements → WebSocket
 │       └── api/
 │           └── server.py        # REST + WebSocket + service du frontend buildé
-│   └── tests/                   # 80 tests (scheduler, runner, models, pipeline, refine, API, scripted, pytest_report)
+│   └── tests/                   # 82 tests (scheduler, runner, models, pipeline, refine, API, scripted, pytest_report)
 ├── frontend/                    # React + Vite + TypeScript
 │   └── src/
 │       ├── App.tsx
@@ -522,6 +522,8 @@ la pipeline.
 | `POST` | `/api/projects/{id}/resume-build` | **continuer le build** d'un projet dormant : `aresume_build` rejoue la phase build sur les stories `todo`/`red` de l'itération courante en arrière-plan (phase `build` → `done`/`stopped`) ; **409** si la pipeline est déjà active ou s'il n'y a aucune story à construire |
 | `POST` | `/api/projects/{id}/run` | lance le `main.py` du code généré |
 | `POST` | `/api/projects/{id}/stop-app` | **arrête l'application générée** en cours d'exécution (no-op sûr sinon) |
+| `POST` | `/api/projects/{id}/archive` | **archive** le projet (`ProjectState.archived=true`) — le masque par défaut sans le supprimer ; réponse `{ok: true}` ; **404** si inconnu |
+| `POST` | `/api/projects/{id}/unarchive` | **désarchive** le projet (`ProjectState.archived=false`) ; réponse `{ok: true}` ; **404** si inconnu |
 | `PATCH` | `/api/projects/{pid}/stories/{sid}` | **édite une US** (titre, description, Gherkin, priorité, critères d'acceptance — champs optionnels ; réécrit le `.feature` si le Gherkin change) |
 | `POST` | `/api/projects/{pid}/stories` | **ajoute une US** à un epic (id `US-<n>` unique, itération courante, écrit son `.feature`) |
 | `DELETE` | `/api/projects/{pid}/stories/{sid}` | **supprime une US** (la retire des `depends_on` des autres, efface son `.feature`) |
@@ -554,6 +556,13 @@ la pipeline.
 > à un explorateur côté front ; la lecture brute résout le chemin et vérifie
 > qu'il reste sous le workspace (`is_relative_to`) — toute tentative de
 > **path-traversal** renvoie **400**, un fichier absent **404**.
+
+> **Archivage des projets.** `POST .../archive` et `.../unarchive` appellent
+> `Pipeline.aset_archived(True/False)`, qui pose `ProjectState.archived` puis
+> `_sync()` (sauvegarde + diffusion WebSocket `state`). C'est un masquage **non
+> destructif** : `GET /api/projects` renvoie **tous** les projets (archivés
+> inclus, avec le champ `archived` dans le payload) — c'est **le front qui masque
+> les projets archivés par défaut**. Projet inconnu → **404**.
 
 > **Persistance résiliente** : `load_state` migre les anciens formats (ex.
 > `acceptance_criteria` en `list[str]` → objets) et ignore proprement un fichier
@@ -673,7 +682,7 @@ Variables d'environnement (toutes optionnelles) :
 
 ### Tests backend (`backend/tests`)
 
-80 tests, sans aucun appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
+82 tests, sans aucun appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
 
 - **`test_scheduler.py`** — dépendances, détection de cycles, sanitization,
   **ordre kanban**.
@@ -716,7 +725,9 @@ Variables d'environnement (toutes optionnelles) :
   interrompu (phase→`stopped`, story→`todo`, `running`/`paused` réinitialisés), rend
   un projet rechargé pilotable (plus de 404 sur `force-done`), et n'écrase pas un
   projet déjà vivant ; et **arrêt de l'app générée** (`stop-app`) : no-op sûr
-  quand aucune app ne tourne (200 `{"ok": true}`), **404** sur projet inconnu.
+  quand aucune app ne tourne (200 `{"ok": true}`), **404** sur projet inconnu ;
+  et **archivage/désarchivage** (`archive`/`unarchive`) : `archived` passe à
+  `true` puis `false`, **404** sur projet inconnu.
 - **`test_scripted.py`** — le `ScriptedRunner` pilote toute la pipeline en mode
   démo (2 stories livrées, critères structurés).
 

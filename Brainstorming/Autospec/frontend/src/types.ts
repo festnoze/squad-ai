@@ -105,6 +105,7 @@ export interface ProjectState {
   architecture: string;
   plan_quality: number;
   usage: Usage;
+  archived: boolean;
 }
 
 export interface LogLine {

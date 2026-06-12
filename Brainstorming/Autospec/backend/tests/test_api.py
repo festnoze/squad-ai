@@ -103,6 +103,32 @@ async def test_unknown_project_404(green_pytest):
         assert (await client.post("/api/projects/nope/run")).status_code == 404
 
 
+async def test_archive_and_unarchive_project(green_pytest):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = (
+            await client.post("/api/projects", json={"goal": "Une todo-list", "name": "todo"})
+        ).json()["id"]
+
+        async def adone():
+            r = await client.get(f"/api/projects/{project_id}")
+            return r.json()["phase"] == "done"
+
+        await wait_until_async(adone)
+
+        resp = await client.post(f"/api/projects/{project_id}/archive")
+        assert resp.status_code == 200
+        assert (await client.get(f"/api/projects/{project_id}")).json()["archived"] is True
+
+        resp = await client.post(f"/api/projects/{project_id}/unarchive")
+        assert resp.status_code == 200
+        assert (await client.get(f"/api/projects/{project_id}")).json()["archived"] is False
+
+
+async def test_archive_unknown_project_404(green_pytest):
+    async with make_client([]) as client:
+        assert (await client.post("/api/projects/inconnu/archive")).status_code == 404
+
+
 async def _acreate_done_project(client) -> str:
     """Create a project and wait for it to reach the 'done' phase."""
     project_id = (

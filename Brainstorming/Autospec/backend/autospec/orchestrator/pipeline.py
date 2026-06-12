@@ -152,6 +152,11 @@ class Pipeline:
         if not self._resume_event.is_set() and not self._stop_requested:
             await self._resume_event.wait()
 
+    async def aset_archived(self, value: bool) -> None:
+        """Archive or unarchive the project (hide it without deleting it)."""
+        self.state.archived = bool(value)
+        self._sync()
+
     # ------------------------------------------------------------ spec editing
 
     async def aedit_story(

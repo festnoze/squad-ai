@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  archiveProject,
   connectEvents,
   createProject,
   deleteProject,
@@ -11,6 +12,7 @@ import {
   sendChat,
   stopApp,
   stopProject,
+  unarchiveProject,
 } from "./api";
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
@@ -32,6 +34,7 @@ export default function App() {
   const [projects, setProjects] = useState<ProjectState[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [logs, setLogs] = useState<StampedLog[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -39,6 +42,11 @@ export default function App() {
   const project = useMemo(
     () => projects.find((p) => p.id === selectedId) ?? null,
     [projects, selectedId],
+  );
+
+  const visibleProjects = useMemo(
+    () => (showArchived ? projects : projects.filter((p) => !p.archived)),
+    [projects, showArchived],
   );
 
   const upsert = (state: ProjectState) =>
@@ -54,7 +62,8 @@ export default function App() {
     listProjects()
       .then((list) => {
         setProjects(list);
-        if (list.length > 0) setSelectedId(list[0].id);
+        const firstVisible = list.find((p) => !p.archived);
+        if (firstVisible) setSelectedId(firstVisible.id);
         else setShowSetup(true);
       })
       .catch(() => setShowSetup(true));
@@ -109,6 +118,33 @@ export default function App() {
     }
   };
 
+  const handleArchive = async (target: ProjectState) => {
+    try {
+      await archiveProject(target.id);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  const handleUnarchive = async (target: ProjectState) => {
+    try {
+      await unarchiveProject(target.id);
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  // Keep the selection pointing at a visible project. If the selected project
+  // becomes archived (and archived projects are hidden), fall back to the first
+  // visible project, or the home screen when none remain.
+  useEffect(() => {
+    if (selectedId === null) return;
+    if (visibleProjects.some((p) => p.id === selectedId)) return;
+    const next = visibleProjects[0]?.id ?? null;
+    setSelectedId(next);
+    if (next === null) setShowSetup(true);
+  }, [visibleProjects, selectedId]);
+
   const guard = (fn: () => Promise<void>) => () => fn().catch((e) => setError(String(e)));
 
   const projectLogs = useMemo(
@@ -116,7 +152,7 @@ export default function App() {
     [logs, selectedId],
   );
 
-  const showHome = showSetup || (!project && projects.length === 0);
+  const showHome = showSetup || (!project && visibleProjects.length === 0);
 
   return (
     <div className="app">
@@ -125,7 +161,7 @@ export default function App() {
           ⚙️ Autospec <span className="subtitle">PM → PO → QA → Dev, en BDD/TDD (BMAD method)</span>
         </h1>
       </header>
-      {projects.length > 0 && (
+      {(visibleProjects.length > 0 || projects.some((p) => p.archived)) && (
         <ProjectBar
           projects={projects}
           selectedId={showHome ? null : selectedId}
@@ -135,6 +171,10 @@ export default function App() {
           }}
           onNew={() => setShowSetup(true)}
           onDelete={handleDelete}
+          showArchived={showArchived}
+          onToggleArchived={() => setShowArchived((v) => !v)}
+          onArchive={handleArchive}
+          onUnarchive={handleUnarchive}
         />
       )}
       {error && <div className="error-banner">{error}</div>}

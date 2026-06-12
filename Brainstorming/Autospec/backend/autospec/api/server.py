@@ -276,6 +276,18 @@ async def astop_app(project_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/projects/{project_id}/archive")
+async def aarchive_project(project_id: str) -> dict:
+    await _pipeline(project_id).aset_archived(True)
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/unarchive")
+async def aunarchive_project(project_id: str) -> dict:
+    await _pipeline(project_id).aset_archived(False)
+    return {"ok": True}
+
+
 @app.patch("/api/projects/{project_id}/stories/{story_id}")
 async def aedit_story(project_id: str, story_id: str, req: EditStoryRequest) -> dict:
     pipeline = _pipeline(project_id)

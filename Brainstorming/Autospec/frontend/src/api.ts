@@ -64,6 +64,14 @@ export async function deleteProject(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}`, { method: "DELETE" }));
 }
 
+export async function archiveProject(projectId: string): Promise<void> {
+  await json(await fetch(`/api/projects/${projectId}/archive`, { method: "POST" }));
+}
+
+export async function unarchiveProject(projectId: string): Promise<void> {
+  await json(await fetch(`/api/projects/${projectId}/unarchive`, { method: "POST" }));
+}
+
 export async function runProject(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/run`, { method: "POST" }));
 }

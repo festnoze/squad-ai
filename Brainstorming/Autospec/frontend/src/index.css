@@ -542,6 +542,45 @@ button.action-btn.action-done {
   color: var(--red);
 }
 
+.chip-archive {
+  font-size: 11px;
+}
+
+.chip-archive:hover {
+  color: var(--accent);
+}
+
+.project-chip.archived {
+  opacity: 0.55;
+  border-style: dashed;
+}
+
+.project-chip.archived:hover {
+  opacity: 0.8;
+}
+
+.archived-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 99px;
+  padding: 4px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.archived-toggle:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.archived-toggle.active {
+  color: var(--text);
+  border-color: var(--accent);
+  background: #1a2740;
+}
+
 .project-new {
   background: transparent;
   border-style: dashed;
