@@ -44,6 +44,14 @@ if __name__ == "__main__":
     main()
 '''
 
+GITIGNORE_TEMPLATE = """.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+autospec-report-*.json
+.report.json
+"""
+
 
 def package_name(state: ProjectState) -> str:
     slug = re.sub(r"[^a-z0-9_]+", "_", state.name.lower()).strip("_") or "app"
@@ -68,6 +76,7 @@ def scaffold(state: ProjectState) -> Path:
         if not path.exists():
             path.write_text(content, encoding="utf-8")
 
+    _ensure(ws / ".gitignore", GITIGNORE_TEMPLATE)
     _ensure(ws / "pyproject.toml", PYPROJECT_TEMPLATE.format(package=pkg, name=state.name))
     _ensure(ws / pkg / "__init__.py", "")
     _ensure(ws / "tests" / "__init__.py", "")

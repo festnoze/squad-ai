@@ -67,6 +67,11 @@ class Pipeline:
         self._resume_event.set()  # set = running, cleared = paused
         self._task: asyncio.Task | None = None
         self._run_proc: subprocess.Popen | None = None
+        # Serializes the workspace-mutating section of story builds. Parallel dev
+        # workers share one workspace directory, so writing code, running the
+        # whole pytest suite and committing/refining git must not interleave
+        # (else pytest sees half-written trees and git stages the wrong files).
+        self._build_lock = asyncio.Lock()
 
     # ------------------------------------------------------------- events
 
@@ -590,44 +595,48 @@ class Pipeline:
             await self._adesign_tests(story, pkg)
         self._log(f"dev:{story.id}", f"Agent dev assigné à {story.id} — {story.title}")
         try:
-            result = await self._tracked.arun(
-                prompts.dev_story(
-                    story, pkg, workspace.feature_rel_path(story), self.state.architecture,
-                    "\n".join(self.state.build_guidance),
-                ),
-                system_prompt=persona("dev"),
-                cwd=ws,
-            )
-            reply = extract_json(result.text)
-            self._chat(ChatRole.DEV, f"[{story.id}] {reply.get('summary', '(pas de résumé)')}")
-            story.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
-            self._sync()
+            # All workspace mutations (dev write, full-suite pytest, git commit,
+            # code refinement) are serialized: parallel workers share one
+            # workspace dir and must not interleave.
+            async with self._build_lock:
+                result = await self._tracked.arun(
+                    prompts.dev_story(
+                        story, pkg, workspace.feature_rel_path(story), self.state.architecture,
+                        "\n".join(self.state.build_guidance),
+                    ),
+                    system_prompt=persona("dev"),
+                    cwd=ws,
+                )
+                reply = extract_json(result.text)
+                self._chat(ChatRole.DEV, f"[{story.id}] {reply.get('summary', '(pas de résumé)')}")
+                story.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
+                self._sync()
 
-            # Trust but verify: the orchestrator reruns the full test suite
-            # itself and grounds per-test states on the REAL pytest outcomes.
-            ok, output, real = await self._arun_pytest()
-            tail = output[-2000:]
-            self._apply_test_states(story, reply.get("test_results", []), real)
-            if ok:
-                story.status = StoryStatus.DONE
-                # Suite green: any planned test we couldn't map to a real node is
-                # assumed green (the whole suite passed).
-                for test in story.test_plan:
-                    if test.status == TestState.NONEXISTENT:
-                        test.status = TestState.GREEN
-                self._log(f"dev:{story.id}", f"✅ Suite de tests verte — {story.id} terminé.")
-                # Commit the workspace as this story's green state so its diff
-                # can be exposed (git show of the "story <id> done" commit).
-                await self._acommit_story(ws, story.id)
-                if settings.refine_for("dev"):
-                    await self._arefine_code(story, pkg, ws)
-            else:
-                story.last_error = tail
-                self._log(f"dev:{story.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
-                if story.attempts < settings.dev_max_attempts:
-                    story.status = StoryStatus.TODO  # will be rescheduled
+                # Trust but verify: the orchestrator reruns the full test suite
+                # itself and grounds per-test states on the REAL pytest outcomes.
+                ok, output, real = await self._arun_pytest()
+                tail = output[-2000:]
+                self._apply_test_states(story, reply.get("test_results", []), real)
+                if ok:
+                    story.status = StoryStatus.DONE
+                    # Suite green: any planned test we couldn't map to a real
+                    # node is assumed green (the whole suite passed).
+                    for test in story.test_plan:
+                        if test.status == TestState.NONEXISTENT:
+                            test.status = TestState.GREEN
+                    self._log(f"dev:{story.id}", f"✅ Suite de tests verte — {story.id} terminé.")
+                    # Commit the workspace as this story's green state so its diff
+                    # can be exposed (git show of the "story <id> done" commit).
+                    await self._acommit_story(ws, story.id)
+                    if settings.refine_for("dev"):
+                        await self._arefine_code(story, pkg, ws)
                 else:
-                    story.status = StoryStatus.FAILED
+                    story.last_error = tail
+                    self._log(f"dev:{story.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
+                    if story.attempts < settings.dev_max_attempts:
+                        story.status = StoryStatus.TODO  # will be rescheduled
+                    else:
+                        story.status = StoryStatus.FAILED
         except AgentError as exc:
             story.last_error = str(exc)
             story.status = (
@@ -654,6 +663,8 @@ class Pipeline:
             raise ValueError(
                 "la pipeline est active : mets-la en pause ou attends la fin avant de relancer une story"
             )
+        if self._task and not self._task.done():
+            raise ValueError("une tâche est déjà en cours")
         if story.status == StoryStatus.IN_PROGRESS:
             raise ValueError("story déjà en cours")
         story.status = StoryStatus.TODO
@@ -662,6 +673,9 @@ class Pipeline:
         for t in story.test_plan:
             t.status = TestState.NONEXISTENT
         self._stop_requested = False
+        # Set BUILD synchronously BEFORE launching the task so a second
+        # concurrent call is rejected by the phase guard (closes the TOCTOU).
+        self.state.phase = PipelinePhase.BUILD
         self._sync()
         self._task = asyncio.create_task(self._arebuild_one(story))
 
@@ -696,6 +710,8 @@ class Pipeline:
             PipelinePhase.ERROR,
         ):
             raise ValueError("la pipeline est déjà active")
+        if self._task and not self._task.done():
+            raise ValueError("une tâche est déjà en cours")
         to_build = [
             s
             for s in self.state.stories_of_iteration(self.state.iteration)
@@ -704,6 +720,10 @@ class Pipeline:
         if not to_build:
             raise ValueError("aucune story à construire pour cette itération")
         self._stop_requested = False
+        # Set BUILD synchronously BEFORE launching the task so a second
+        # concurrent call is rejected by the phase guard (closes the TOCTOU).
+        self.state.phase = PipelinePhase.BUILD
+        self._sync()
         self._task = asyncio.create_task(self._aresume_build_run())
 
     async def _aresume_build_run(self) -> None:

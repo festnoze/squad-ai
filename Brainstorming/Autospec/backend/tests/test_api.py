@@ -384,3 +384,50 @@ async def test_recover_skips_already_live():
 
     assert "proj-recover" not in ids
     assert len(server.pipelines) == 1
+
+
+async def test_recover_resets_architect_and_green():
+    from autospec import storage
+    from autospec.models import (
+        Epic,
+        PipelinePhase,
+        ProjectState,
+        StoryStatus,
+        UserStory,
+    )
+
+    state = ProjectState(
+        id="proj-arch",
+        name="recover",
+        goal="g",
+        phase=PipelinePhase.ARCHITECT,
+        epics=[Epic(id="EPIC-1", title="e")],
+        stories=[
+            UserStory(id="US-1", epic_id="EPIC-1", title="green", status=StoryStatus.GREEN),
+            UserStory(
+                id="US-2", epic_id="EPIC-1", title="wip", status=StoryStatus.IN_PROGRESS
+            ),
+        ],
+    )
+    storage.save_state(state)
+    server.pipelines.clear()
+
+    server.recover_projects()
+
+    recovered = server.pipelines["proj-arch"].state
+    assert recovered.phase == PipelinePhase.STOPPED
+    assert recovered.story("US-1").status == StoryStatus.TODO
+    assert recovered.story("US-2").status == StoryStatus.TODO
+
+
+async def test_run_rejected_during_build(green_pytest):
+    from autospec.models import PipelinePhase
+
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        # Force the project into the BUILD phase: launching the app while dev
+        # agents write into the same workspace is rejected.
+        server.pipelines[project_id].state.phase = PipelinePhase.BUILD
+        resp = await client.post(f"/api/projects/{project_id}/run")
+        assert resp.status_code == 409

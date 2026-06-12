@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import json
+import logging
+import os
 import shutil
+import tempfile
 from pathlib import Path
 
 from .config import settings
 from .models import ProjectState
+
+logger = logging.getLogger(__name__)
 
 STATE_FILENAME = "autospec-state.json"
 
@@ -37,7 +42,23 @@ def workspace_dir(project_id: str) -> Path:
 def save_state(state: ProjectState) -> None:
     ws = workspace_dir(state.id)
     ws.mkdir(parents=True, exist_ok=True)
-    (ws / STATE_FILENAME).write_text(state.model_dump_json(indent=2), encoding="utf-8")
+    final = ws / STATE_FILENAME
+    # Atomic write: serialize to a temp file in the SAME directory (same volume),
+    # then os.replace() into place. A crash mid-write leaves the temp file behind
+    # but never a half-written state.json.
+    payload = state.model_dump_json(indent=2)
+    fd, tmp_name = tempfile.mkstemp(dir=ws, prefix=STATE_FILENAME + ".", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write(payload)
+        os.replace(tmp_name, final)
+    except BaseException:
+        # Best-effort cleanup of the temp file on any failure.
+        try:
+            os.unlink(tmp_name)
+        except OSError:
+            pass
+        raise
 
 
 def load_state(project_id: str) -> ProjectState | None:
@@ -47,9 +68,10 @@ def load_state(project_id: str) -> ProjectState | None:
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
         return ProjectState.model_validate(_migrate(raw))
-    except Exception:
+    except Exception as exc:
         # A state file from an incompatible/corrupt version must never break the
-        # whole project list — skip it.
+        # whole project list — log it and skip.
+        logger.warning("Failed to load state for project %s: %s", project_id, exc)
         return None
 
 

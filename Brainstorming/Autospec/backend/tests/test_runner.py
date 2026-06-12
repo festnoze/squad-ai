@@ -22,6 +22,16 @@ def test_extract_json_nested_objects():
     assert extract_json(text)["epics"][0]["stories"][0]["id"] == "US-1"
 
 
+def test_extract_json_braces_inside_strings():
+    text = '{"a": "contient } et { dedans", "b": 1}'
+    assert extract_json(text) == {"a": "contient } et { dedans", "b": 1}
+
+
+def test_extract_json_escaped_quote_inside_string():
+    text = '{"g": "a \\"quote\\" and }", "n": 2}'
+    assert extract_json(text) == {"g": 'a "quote" and }', "n": 2}
+
+
 def test_extract_json_missing_raises():
     with pytest.raises(AgentError):
         extract_json("pas de json ici")

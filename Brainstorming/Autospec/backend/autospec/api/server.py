@@ -42,6 +42,7 @@ def _is_excluded_file(name: str) -> bool:
 _INTERRUPTED_PHASES = {
     PipelinePhase.SPEC,
     PipelinePhase.ANALYZE,
+    PipelinePhase.ARCHITECT,
     PipelinePhase.PLAN,
     PipelinePhase.BUILD,
 }
@@ -67,7 +68,7 @@ def recover_projects() -> list[str]:
             state.phase = PipelinePhase.STOPPED
             changed = True
         for story in state.stories:
-            if story.status == StoryStatus.IN_PROGRESS:
+            if story.status in (StoryStatus.IN_PROGRESS, StoryStatus.GREEN):
                 story.status = StoryStatus.TODO
                 changed = True
         if state.running:
@@ -94,7 +95,14 @@ async def _lifespan(app):
 app = FastAPI(title="Autospec", version="0.1.0", lifespan=_lifespan)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:5183",
+        "http://127.0.0.1:5183",
+        "http://localhost:8100",
+        "http://127.0.0.1:8100",
+        "http://localhost:8123",
+        "http://127.0.0.1:8123",
+    ],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -264,7 +272,12 @@ async def aresume_build(project_id: str) -> dict:
 @app.post("/api/projects/{project_id}/run")
 async def arun_app(project_id: str) -> dict:
     pipeline = _pipeline(project_id)
-    if pipeline.state.phase in (PipelinePhase.SPEC, PipelinePhase.PLAN, PipelinePhase.ARCHITECT):
+    if pipeline.state.phase in (
+        PipelinePhase.SPEC,
+        PipelinePhase.PLAN,
+        PipelinePhase.ARCHITECT,
+        PipelinePhase.BUILD,
+    ):
         raise HTTPException(409, "Le projet n'a pas encore de code à lancer.")
     await pipeline.arun_app()
     return {"ok": True}

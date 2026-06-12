@@ -332,6 +332,22 @@ async def test_rebuild_failed_story(green_pytest):
     assert pipeline.state.story("US-1").attempts == 1
 
 
+async def test_rebuild_rejects_concurrent_call(green_pytest):
+    # TOCTOU guard: a second rebuild while one is in flight must be rejected.
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN, QA_PLAN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    pipeline.state.story("US-1").status = StoryStatus.FAILED
+
+    await pipeline.arebuild_story("US-1")  # launches rebuild, sets phase=BUILD synchronously
+    assert pipeline.state.phase == PipelinePhase.BUILD
+    with pytest.raises(ValueError):
+        await pipeline.arebuild_story("US-1")  # rejected while the first is active
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+
 async def test_force_done_story(green_pytest):
     pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
     pipeline.start()

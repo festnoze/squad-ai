@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   archiveProject,
   connectEvents,
@@ -38,6 +38,9 @@ export default function App() {
   const [logs, setLogs] = useState<StampedLog[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // Ids des projets supprimés : empêche un event « state » retardé de
+  // ressusciter un projet déjà supprimé.
+  const deletedIds = useRef<Set<string>>(new Set());
 
   const project = useMemo(
     () => projects.find((p) => p.id === selectedId) ?? null,
@@ -70,18 +73,35 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    return connectEvents((event: WsEvent) => {
-      if (event.type === "state") {
-        upsert(event.state);
-      } else if (event.type === "deleted") {
-        setProjects((prev) => prev.filter((p) => p.id !== event.project_id));
-      } else if (event.type === "log") {
-        setLogs((prev) => [
-          ...prev.slice(-800),
-          { projectId: event.project_id, source: event.source, line: event.line },
-        ]);
-      }
-    });
+    return connectEvents(
+      (event: WsEvent) => {
+        if (event.type === "state") {
+          // Un event « state » retardé ne doit pas ressusciter un projet supprimé.
+          if (deletedIds.current.has(event.state.id)) return;
+          upsert(event.state);
+        } else if (event.type === "deleted") {
+          deletedIds.current.add(event.project_id);
+          setProjects((prev) => prev.filter((p) => p.id !== event.project_id));
+        } else if (event.type === "log") {
+          setLogs((prev) => [
+            ...prev.slice(-800),
+            { projectId: event.project_id, source: event.source, line: event.line },
+          ]);
+        }
+      },
+      () => {
+        // Après une reconnexion, on resynchronise l'état complet : les events
+        // émis pendant la coupure sont sinon perdus définitivement.
+        listProjects()
+          .then((list) => {
+            for (const state of list) {
+              if (deletedIds.current.has(state.id)) continue;
+              upsert(state);
+            }
+          })
+          .catch((e) => setError(String(e)));
+      },
+    );
   }, []);
 
   const handleCreate = async (goal: string, name: string, autoSpec: boolean) => {
@@ -104,6 +124,7 @@ export default function App() {
       return;
     try {
       await deleteProject(target.id);
+      deletedIds.current.add(target.id);
       setProjects((prev) => {
         const remaining = prev.filter((p) => p.id !== target.id);
         if (target.id === selectedId) {

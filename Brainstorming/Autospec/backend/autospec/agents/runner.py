@@ -142,9 +142,21 @@ def extract_json(text: str) -> dict:
     if start == -1:
         raise AgentError(f"No JSON object in agent reply: {text[:200]!r}")
     depth = 0
+    in_string = False
+    escaped = False
     for i in range(start, len(text)):
         ch = text[i]
-        if ch == "{":
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+        if ch == '"':
+            in_string = True
+        elif ch == "{":
             depth += 1
         elif ch == "}":
             depth -= 1

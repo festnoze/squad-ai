@@ -173,14 +173,34 @@ export async function storyDiff(
   return { available: res.available, diff: res.diff };
 }
 
-export function connectEvents(onEvent: (e: WsEvent) => void): () => void {
+export function connectEvents(
+  onEvent: (e: WsEvent) => void,
+  onReconnect?: () => void,
+): () => void {
   let ws: WebSocket | null = null;
   let closed = false;
+  let opened = false;
 
   const open = () => {
     const proto = location.protocol === "https:" ? "wss" : "ws";
     ws = new WebSocket(`${proto}://${location.host}/ws`);
-    ws.onmessage = (msg) => onEvent(JSON.parse(msg.data));
+    ws.onopen = () => {
+      // La toute première ouverture est gérée par l'init initial du composant ;
+      // on ne resynchronise qu'à chaque RE-connexion suivante.
+      if (opened) onReconnect?.();
+      opened = true;
+    };
+    ws.onmessage = (msg) => {
+      let event: WsEvent;
+      try {
+        event = JSON.parse(msg.data) as WsEvent;
+      } catch {
+        // Frame illisible : on l'ignore pour ne pas casser le flux d'événements.
+        console.warn("Frame WebSocket illisible ignorée");
+        return;
+      }
+      onEvent(event);
+    };
     ws.onclose = () => {
       if (!closed) setTimeout(open, 1500);
     };
