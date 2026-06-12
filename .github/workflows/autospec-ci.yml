@@ -1,0 +1,106 @@
+# ---------------------------------------------------------------------------
+# Autospec CI — workflow racine du monorepo `squad-ai`.
+#
+# GitHub Actions ne declenche QUE les workflows situes a `<repo-root>/.github/
+# workflows/`. Le workflow autonome `Brainstorming/Autospec/.github/workflows/
+# ci.yml` (ecrit comme si Autospec etait la racine de son propre depot) n'est
+# donc jamais execute tant qu'Autospec vit dans ce monorepo.
+#
+# Ce fichier reprend EXACTEMENT la logique de ce workflow, mais avec les chemins
+# prefixes par `Brainstorming/Autospec/`, et un filtre `paths:` pour ne se
+# declencher QUE sur les changements d'Autospec. Le workflow autonome reste en
+# place, pret pour une extraction future d'Autospec en depot independant.
+# ---------------------------------------------------------------------------
+
+name: Autospec CI
+
+on:
+  push:
+    paths: ["Brainstorming/Autospec/**"]
+  pull_request:
+    paths: ["Brainstorming/Autospec/**"]
+
+jobs:
+  backend:
+    name: Backend (pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Brainstorming/Autospec/backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Run pytest
+        run: uv run pytest -q
+
+  frontend:
+    name: Frontend (build + vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Brainstorming/Autospec/frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Brainstorming/Autospec/frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Run unit tests (Vitest)
+        run: npm run test:unit
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Brainstorming/Autospec/frontend/package-lock.json
+
+      # The Playwright config starts the backend itself via
+      # backend/.venv/bin/python, so the backend venv must exist on disk.
+      - name: Install backend dependencies (creates .venv)
+        working-directory: Brainstorming/Autospec/backend
+        run: uv sync --extra dev
+
+      - name: Install frontend dependencies
+        working-directory: Brainstorming/Autospec/frontend
+        run: npm ci
+
+      - name: Install Playwright browser
+        working-directory: Brainstorming/Autospec/frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run e2e tests
+        working-directory: Brainstorming/Autospec/frontend
+        run: npm run test:e2e

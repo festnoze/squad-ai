@@ -50,6 +50,8 @@ test("full lifecycle: create, pause/resume, inspect criteria, delete", async ({ 
   // --- Project management: delete the active project via its chip; its board
   // (and stories) must disappear.
   page.once("dialog", (d) => d.accept());
-  await page.locator(".project-chip.active .chip-del").click();
+  // Target the delete button by its title, scoped to the active chip — robust
+  // against other chip buttons (archive…) that share the .chip-del look.
+  await page.locator(".project-chip.active").getByTitle("Supprimer le projet").click();
   await expect(page.getByTestId("story-US-1")).toBeHidden();
 });

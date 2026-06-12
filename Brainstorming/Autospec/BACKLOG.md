@@ -24,13 +24,15 @@ modèle courant.
 | 12 | Vue diff par story (commit git « story done » + `GET .../diff` + overlay diff coloré ; fix suppression workspace git) | tests + e2e |
 | 13 | Réorganisation drag-&-drop des stories sur le board (tri par priorité + poignée → `reorder`) | unit + e2e |
 | 14 | Observabilité tokens/coût (`AgentResult` usage + `_UsageTracker` → `ProjectState.usage` + indicateur 💸) | tests + e2e |
+| 15 | Archivage des projets (`archived` + endpoints archive/unarchive + UI bascule « Archivés ») | tests + e2e |
+| 16 | Workflow CI racine monorepo (filtre paths + chemins préfixés) | YAML valide |
 
 ## ⏳ À faire — découvert en cours de route
 
 | # | Item | V/C | Pourquoi |
 |---|------|-----|----------|
-| 15 | Gestion des projets persistés legacy au boot (archivage/nettoyage) | 2/2 | `recover_projects` recharge tous les vieux états ; offrir un archivage/nettoyage |
-| 16 | Activer le CI dans le monorepo | 1/1 | Le workflow `.github/workflows/ci.yml` n'est pas déclenché tant qu'Autospec est dans `squad-ai` ; le déplacer à la racine du dépôt (chemins préfixés) ou extraire Autospec |
+
+> (vide — backlog courant épuisé)
 
 > Ordre courant : 9 (planifié) puis 10→15 par valeur/complexité, réévalué à chaque
 > itération.

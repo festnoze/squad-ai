@@ -144,11 +144,13 @@ chaque `push` et `pull_request` avec 3 jobs sur `ubuntu-latest` :
 
 > ⚠️ **Contrainte monorepo** : Autospec vit actuellement dans le monorepo
 > `squad-ai`, dont le `.github` est a la racine. GitHub Actions ne declenche que
-> les workflows en `<repo-root>/.github/workflows/`. Tant qu'Autospec n'est pas
-> extrait dans son propre depot, ce fichier doit etre **deplace a la racine du
-> depot** (en prefixant les chemins par `Brainstorming/Autospec/`) pour etre
-> execute. Le fichier est ecrit pour fonctionner tel quel une fois Autospec a la
-> racine de son propre depot.
+> les workflows en `<repo-root>/.github/workflows/`. C'est pourquoi un workflow
+> racine **`squad-ai/.github/workflows/autospec-ci.yml`** (filtre `paths:
+> ["Brainstorming/Autospec/**"]`, chemins prefixes par `Brainstorming/Autospec/`)
+> declenche le CI dans le monorepo, et ne se lance QUE sur les changements
+> d'Autospec. Le fichier `Autospec/.github/workflows/ci.yml` ci-dessus reste en
+> place, ecrit pour fonctionner tel quel et pret pour une extraction future
+> d'Autospec dans son propre depot autonome.
 
 ## Configuration (variables d'environnement)
 
