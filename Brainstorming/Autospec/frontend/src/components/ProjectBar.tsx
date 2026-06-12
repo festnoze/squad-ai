@@ -51,7 +51,7 @@ export function ProjectBar({
           <span className="chip-name">{p.name}</span>
           {p.archived ? (
             <button
-              className="chip-del chip-archive"
+              className="chip-archive"
               title="Désarchiver le projet"
               onClick={(e) => {
                 e.stopPropagation();
@@ -62,7 +62,7 @@ export function ProjectBar({
             </button>
           ) : (
             <button
-              className="chip-del chip-archive"
+              className="chip-archive"
               title="Archiver le projet"
               onClick={(e) => {
                 e.stopPropagation();

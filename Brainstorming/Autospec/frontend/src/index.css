@@ -543,7 +543,13 @@ button.action-btn.action-done {
 }
 
 .chip-archive {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 2px;
   font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .chip-archive:hover {
