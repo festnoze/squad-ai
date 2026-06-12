@@ -90,6 +90,7 @@ export interface ProjectState {
   name: string;
   goal: string;
   auto_spec: boolean;
+  spec_mode: "interview" | "brainstorm";
   phase: PipelinePhase;
   brief: string;
   backlog: FeatureHypothesis[];

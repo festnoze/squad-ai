@@ -103,6 +103,17 @@ async def test_unknown_project_404(green_pytest):
         assert (await client.post("/api/projects/nope/run")).status_code == 404
 
 
+async def test_spec_mode_endpoint(green_pytest):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        rid = (await client.post("/api/projects", json={"goal": "x"})).json()["id"]
+        r = await client.post(f"/api/projects/{rid}/spec-mode", json={"mode": "brainstorm"})
+        assert r.status_code == 200 and r.json()["spec_mode"] == "brainstorm"
+        bad = await client.post(f"/api/projects/{rid}/spec-mode", json={"mode": "bad"})
+        assert bad.status_code == 422
+        nf = await client.post("/api/projects/nope/spec-mode", json={"mode": "interview"})
+        assert nf.status_code == 404
+
+
 async def test_archive_and_unarchive_project(green_pytest):
     async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
         project_id = (

@@ -18,9 +18,11 @@ interface Props {
   chat: ChatMessage[];
   phase: PipelinePhase;
   onSend: (message: string) => void;
+  specMode: "interview" | "brainstorm";
+  onSetSpecMode: (mode: "interview" | "brainstorm") => void;
 }
 
-export function ChatPanel({ chat, phase, onSend }: Props) {
+export function ChatPanel({ chat, phase, onSend, specMode, onSetSpecMode }: Props) {
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +45,35 @@ export function ChatPanel({ chat, phase, onSend }: Props) {
 
   return (
     <div className="panel chat">
-      <h2>Chat — spécification &amp; feedback</h2>
+      <div className="chat-header">
+        <h2>Chat — spécification &amp; feedback</h2>
+        {phase === "spec" && (
+          <div
+            className="spec-mode-switch"
+            role="group"
+            aria-label="Mode de spécification"
+          >
+            <button
+              type="button"
+              className={`spec-mode-btn${specMode === "interview" ? " active" : ""}`}
+              aria-pressed={specMode === "interview"}
+              title="Interview socratique : clarifier le besoin par une série de questions ciblées, dimension par dimension."
+              onClick={() => onSetSpecMode("interview")}
+            >
+              💬 Interview
+            </button>
+            <button
+              type="button"
+              className={`spec-mode-btn${specMode === "brainstorm" ? " active" : ""}`}
+              aria-pressed={specMode === "brainstorm"}
+              title="Brainstorming : le PM/analyste re-questionne lui-même le besoin (divergence puis convergence)."
+              onClick={() => onSetSpecMode("brainstorm")}
+            >
+              🧠 Brainstorming
+            </button>
+          </div>
+        )}
+      </div>
       <div className="chat-messages">
         {chat.map((m, i) => (
           <div key={i} className={`msg msg-${m.role}`}>

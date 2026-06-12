@@ -158,6 +158,7 @@ class ProjectState(BaseModel):
     name: str
     goal: str
     auto_spec: bool = False
+    spec_mode: str = "interview"  # "interview" (Socratic) | "brainstorm" (refine the need)
     phase: PipelinePhase = PipelinePhase.IDLE
     brief: str = ""
     architecture: str = ""  # current technical design (from the optional Architect phase)

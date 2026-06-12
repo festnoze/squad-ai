@@ -168,6 +168,45 @@ button.ghost {
   flex: 1;
 }
 
+.chat-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.spec-mode-switch {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+
+.spec-mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.spec-mode-btn + .spec-mode-btn {
+  border-left: 1px solid var(--border);
+}
+
+.spec-mode-btn:hover {
+  color: var(--text);
+}
+
+.spec-mode-btn.active {
+  background: var(--accent);
+  color: #fff;
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;

@@ -10,6 +10,7 @@ import {
   resumeProject,
   runProject,
   sendChat,
+  setSpecMode,
   stopApp,
   stopProject,
   unarchiveProject,
@@ -210,6 +211,8 @@ export default function App() {
               chat={project.chat}
               phase={project.phase}
               onSend={(m) => guard(() => sendChat(project.id, m))()}
+              specMode={project.spec_mode}
+              onSetSpecMode={(m) => setSpecMode(project.id, m).catch((e) => setError(String(e)))}
             />
             <BacklogPanel backlog={project.backlog} />
             <ArchitecturePanel

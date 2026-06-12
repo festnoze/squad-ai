@@ -43,6 +43,7 @@ function makeProject(overrides: Partial<ProjectState> = {}): ProjectState {
     name: "Projet Alpha",
     goal: "",
     auto_spec: false,
+    spec_mode: "interview",
     phase: "idle" as PipelinePhase,
     brief: "",
     backlog: [],

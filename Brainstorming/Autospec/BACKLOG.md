@@ -42,11 +42,16 @@ modèle courant.
 | Robustesse (med) | `.gitignore` dans le workspace (git n'ingère plus `.venv` ; `clean -fd` ne la détruit plus) ; `extract_json` ignore les accolades dans les chaînes ; `save_state` atomique (temp+rename) + log des chargements échoués |
 | Frontend (high+med) | WS : `JSON.parse` protégé, **resync** (re-fetch) à la reconnexion, anti-résurrection d'un projet supprimé |
 
-### ⏳ Restant (prochaines tranches)
-- **Sécurité (design)** : `bypassPermissions` par défaut + exécution non sandboxée du code généré (`uv run pytest`/`python main.py`) → nécessite un vrai sandbox ; env hérité par les sous-processus (fuite de secrets).
-- **Robustesse (med)** : `adispose` ne tue pas le sous-processus pytest/git en cours (`asyncio.to_thread` non annulable) ; `_force_delete_workspace` n'attrape pas `OSError` ; raffinement (juge illisible = PASS, score défaut = seuil, commit avant jugement, rollback non vérifié).
-- **Frontend (med)** : priorités drag-&-drop clampées à 5 (>5 stories : ordre non distinct).
-- **Couverture** : tests manquants — erreur fatale `_alifecycle`, `_arefine_code`, 409 de `/run` & `/resume-build`, composant App (WS/upsert/suppression), drag-&-drop, endpoints `/chat /pause /resume /diff /rebuild`, recover SPEC/ANALYZE/PLAN, troncature `aread_file`, `RunPanel` conditionnel.
+### ✅ Tranches de remédiation (post-audit, une à la fois)
+- **Tranche 1 — couverture backend** : +12 tests (API : /chat /pause /resume /diff /rebuild, troncature `aread_file`, recover SPEC/ANALYZE/PLAN ; pipeline : erreur fatale `_alifecycle`→ERROR, fallbacks `_apply_test_states`, retry rouge→vert). Suite **102 tests**. Fix du flake de timing (timeout des helpers 5 s → 20 s).
+- **Tranche 2 — couverture frontend** : +13 tests Vitest (**20**) — `RunPanel` (boutons conditionnels, usage-meter) et `App` (WS upsert/deleted + anti-résurrection). Fix : bouton « Lancer » désactivé aussi en phase `build` (cohérent avec la garde backend).
+- **Tranche 3 — sécurité & robustesse backend** : l'app générée (non fiable) tourne avec un **env minimal** (plus de fuite de secrets) ; `_force_delete_workspace` gère les fichiers verrouillés → **409** au lieu de 500.
 
-> Backlog des 16 features : épuisé. Le présent audit a ouvert une nouvelle tranche
-> « sécurité & robustesse » ci-dessus, à traiter en priorité par sévérité.
+### ⏳ Différé (design / infra, faible valeur ou risque élevé)
+- **Sécurité (design)** : `bypassPermissions` + exécution non sandboxée du code généré (`uv run pytest`/`python main.py`) → nécessite un vrai sandbox (gros chantier infra).
+- **Robustesse (marginal)** : `adispose` ne tue pas le sous-processus pytest en vol (`to_thread` non annulable) — impact réduit depuis que la suppression renvoie 409 + retry sur fichier verrouillé.
+- **Raffinement (par design)** : juge illisible = PASS borné par le cap de tours ; score défaut = seuil — choix déterministes assumés.
+- **Frontend (limitation)** : priorité kanban 1-5 → au-delà de 5 stories le drag-&-drop ne distingue pas l'ordre (changer la sémantique de `priority` rippler ait sur PO/UI).
+
+> Backlog des 16 features : épuisé. Remédiation d'audit : 3 tranches actionnables
+> traitées (couverture back/front + durcissement) ; le reste est différé (design/infra).

@@ -127,6 +127,10 @@ class MessageRequest(BaseModel):
     message: str
 
 
+class SpecModeRequest(BaseModel):
+    mode: str
+
+
 class AcceptanceCriterionInput(BaseModel):
     id: str | None = None
     text: str
@@ -252,6 +256,16 @@ async def achat(project_id: str, req: MessageRequest) -> dict:
     pipeline = _pipeline(project_id)
     await pipeline.asend_user_message(req.message)
     return {"ok": True, "phase": pipeline.state.phase}
+
+
+@app.post("/api/projects/{project_id}/spec-mode")
+async def aset_spec_mode(project_id: str, req: SpecModeRequest) -> dict:
+    pipeline = _pipeline(project_id)
+    try:
+        await pipeline.aset_spec_mode(req.mode)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    return {"ok": True, "spec_mode": pipeline.state.spec_mode}
 
 
 @app.post("/api/projects/{project_id}/stop")

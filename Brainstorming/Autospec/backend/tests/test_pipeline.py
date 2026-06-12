@@ -59,6 +59,31 @@ def make_pipeline(replies: list[str], auto_spec: bool = False) -> tuple[Pipeline
     return Pipeline(state, runner), runner
 
 
+async def test_brainstorm_mode_uses_analyst_facilitation(green_pytest):
+    pipeline, runner = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN]
+    )
+    pipeline.state.spec_mode = "brainstorm"
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    # The very first agent call (spec) used the brainstorming prompt, not the
+    # standard Socratic interview.
+    spec_prompt = runner.calls[0]["prompt"]
+    assert "BRAINSTORMING" in spec_prompt
+    assert "DIVERGER" in spec_prompt
+
+
+async def test_set_spec_mode_validation():
+    state = ProjectState(id="proj-test", name="x", goal="g")
+    pipeline = Pipeline(state, FakeRunner([]))
+    await pipeline.aset_spec_mode("brainstorm")
+    assert pipeline.state.spec_mode == "brainstorm"
+    await pipeline.aset_spec_mode("interview")
+    assert pipeline.state.spec_mode == "interview"
+    with pytest.raises(ValueError):
+        await pipeline.aset_spec_mode("nope")
+
+
 async def test_full_pipeline_with_interview(green_pytest):
     pipeline, runner = make_pipeline(
         [PM_QUESTION, PM_BRIEF, po_plan_reply(), QA_PLAN, DEV_GREEN, QA_PLAN, DEV_GREEN]

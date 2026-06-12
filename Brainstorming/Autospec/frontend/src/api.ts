@@ -44,6 +44,19 @@ export async function sendChat(projectId: string, message: string): Promise<void
   );
 }
 
+export async function setSpecMode(
+  projectId: string,
+  mode: "interview" | "brainstorm",
+): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/spec-mode`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    }),
+  );
+}
+
 export async function stopProject(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/stop`, { method: "POST" }));
 }

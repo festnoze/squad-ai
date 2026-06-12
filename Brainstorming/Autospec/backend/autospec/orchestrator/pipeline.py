@@ -178,6 +178,19 @@ class Pipeline:
         self.state.archived = bool(value)
         self._sync()
 
+    async def aset_spec_mode(self, mode: str) -> None:
+        """Switch the spec facilitation: 'interview' (Socratic) or 'brainstorm'
+        (re-question the need). Takes effect on the PM's next turn."""
+        if mode not in ("interview", "brainstorm"):
+            raise ValueError("mode de spécification invalide")
+        self.state.spec_mode = mode
+        self._chat(
+            ChatRole.SYSTEM,
+            "🧠 Mode brainstorming activé (on re-questionne le besoin)."
+            if mode == "brainstorm"
+            else "💬 Mode interview socratique activé.",
+        )
+
     # ------------------------------------------------------------ spec editing
 
     async def aedit_story(
@@ -327,9 +340,15 @@ class Pipeline:
         self.state.phase = PipelinePhase.SPEC
         self._sync()
         while not self._stop_requested:
+            # Brainstorming re-questions the need itself (BMAD analyst persona);
+            # interview is the Socratic spec facilitation (PM persona).
+            if self.state.spec_mode == "brainstorm":
+                prompt, sys_persona = prompts.pm_brainstorm(self.state), persona("analyst")
+            else:
+                prompt, sys_persona = prompts.pm_interview(self.state), persona("pm")
             result = await self._tracked.arun(
-                prompts.pm_interview(self.state),
-                system_prompt=persona("pm"),
+                prompt,
+                system_prompt=sys_persona,
                 session_id=self._pm_session,
             )
             self._pm_session = result.session_id
