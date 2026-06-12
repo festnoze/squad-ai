@@ -121,6 +121,8 @@ class CreateProjectRequest(BaseModel):
     goal: str
     name: str = ""
     auto_spec: bool = False
+    budget_usd: float = 0.0
+    budget_tokens: int = 0
 
 
 class MessageRequest(BaseModel):
@@ -129,6 +131,11 @@ class MessageRequest(BaseModel):
 
 class SpecModeRequest(BaseModel):
     mode: str
+
+
+class BudgetRequest(BaseModel):
+    budget_usd: float | None = None
+    budget_tokens: int | None = None
 
 
 class AcceptanceCriterionInput(BaseModel):
@@ -180,7 +187,14 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
     if not req.goal.strip():
         raise HTTPException(422, "L'objectif du projet est vide.")
     name = req.name.strip() or _slug(req.goal)
-    state = ProjectState(id=new_id(_slug(name)), name=name, goal=req.goal, auto_spec=req.auto_spec)
+    state = ProjectState(
+        id=new_id(_slug(name)),
+        name=name,
+        goal=req.goal,
+        auto_spec=req.auto_spec,
+        budget_usd=max(0.0, req.budget_usd),
+        budget_tokens=max(0, req.budget_tokens),
+    )
     state.chat.append(ChatMessage(role=ChatRole.USER, content=req.goal))
     pipeline = Pipeline(state, _runner)
     pipelines[state.id] = pipeline
@@ -266,6 +280,18 @@ async def aset_spec_mode(project_id: str, req: SpecModeRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     return {"ok": True, "spec_mode": pipeline.state.spec_mode}
+
+
+@app.post("/api/projects/{project_id}/budget")
+async def aset_budget(project_id: str, req: BudgetRequest) -> dict:
+    pipeline = _pipeline(project_id)
+    if req.budget_usd is not None:
+        pipeline.state.budget_usd = max(0.0, req.budget_usd)
+    if req.budget_tokens is not None:
+        pipeline.state.budget_tokens = max(0, req.budget_tokens)
+    pipeline._enforce_budget()  # stop immediately if the new cap is already exceeded
+    pipeline._sync()
+    return {"ok": True, "budget_usd": pipeline.state.budget_usd, "budget_tokens": pipeline.state.budget_tokens}
 
 
 @app.post("/api/projects/{project_id}/stop")

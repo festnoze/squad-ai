@@ -169,9 +169,31 @@ class Pipeline:
         self._chat(ChatRole.SYSTEM, "▶ Reprise de la pipeline.")
 
     async def _checkpoint(self) -> None:
-        """Block here while the pipeline is paused (between phases / stories)."""
+        """Enforce the budget, then block here while the pipeline is paused
+        (called between phases / story batches / auto-spec iterations)."""
+        self._enforce_budget()
         if not self._resume_event.is_set() and not self._stop_requested:
             await self._resume_event.wait()
+
+    def _budget_reached(self) -> bool:
+        u = self.state.usage
+        if self.state.budget_usd and u.cost_usd >= self.state.budget_usd:
+            return True
+        if self.state.budget_tokens and (u.input_tokens + u.output_tokens) >= self.state.budget_tokens:
+            return True
+        return False
+
+    def _enforce_budget(self) -> None:
+        """Request a clean stop when the project's token/cost budget is reached."""
+        if not self._stop_requested and self._budget_reached():
+            self._stop_requested = True
+            self._resume_event.set()  # unblock a paused loop so it can finish
+            u = self.state.usage
+            self._chat(
+                ChatRole.SYSTEM,
+                f"💰 Budget atteint (coût ${u.cost_usd:.4f}, "
+                f"{u.input_tokens + u.output_tokens} tokens) — arrêt propre de la pipeline.",
+            )
 
     async def aset_archived(self, value: bool) -> None:
         """Archive or unarchive the project (hide it without deleting it)."""

@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 interface Props {
-  onCreate: (goal: string, name: string, autoSpec: boolean) => void;
+  onCreate: (goal: string, name: string, autoSpec: boolean, budgetUsd: number) => void;
   busy: boolean;
 }
 
@@ -9,6 +9,7 @@ export function ProjectSetup({ onCreate, busy }: Props) {
   const [goal, setGoal] = useState("");
   const [name, setName] = useState("");
   const [autoSpec, setAutoSpec] = useState(false);
+  const [budget, setBudget] = useState("");
 
   return (
     <div className="panel setup">
@@ -35,10 +36,18 @@ export function ProjectSetup({ onCreate, busy }: Props) {
           itérations en boucle jusqu'à l'arrêt manuel
         </span>
       </label>
+      <input
+        type="number"
+        min={0}
+        step={0.1}
+        placeholder="Budget max ($) — vide = pas de limite"
+        value={budget}
+        onChange={(e) => setBudget(e.target.value)}
+      />
       <button
         className="primary"
         disabled={busy || !goal.trim()}
-        onClick={() => onCreate(goal, name, autoSpec)}
+        onClick={() => onCreate(goal, name, autoSpec, Number(budget) || 0)}
       >
         {autoSpec ? "🔁 Lancer la boucle auto-spec" : "🚀 Démarrer la spécification"}
       </button>

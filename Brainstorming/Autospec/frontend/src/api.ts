@@ -20,12 +20,20 @@ export async function createProject(
   goal: string,
   name: string,
   autoSpec: boolean,
+  budgetUsd?: number,
 ): Promise<{ id: string; state: ProjectState }> {
+  const body: {
+    goal: string;
+    name: string;
+    auto_spec: boolean;
+    budget_usd?: number;
+  } = { goal, name, auto_spec: autoSpec };
+  if (budgetUsd != null && budgetUsd > 0) body.budget_usd = budgetUsd;
   return json(
     await fetch("/api/projects", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goal, name, auto_spec: autoSpec }),
+      body: JSON.stringify(body),
     }),
   );
 }

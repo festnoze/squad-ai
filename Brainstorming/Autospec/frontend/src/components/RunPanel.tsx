@@ -46,6 +46,8 @@ export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onSt
   const agentCalls = project.usage?.agent_calls ?? 0;
   const costUsd = project.usage?.cost_usd ?? 0;
   const totalTokens = (project.usage?.input_tokens ?? 0) + (project.usage?.output_tokens ?? 0);
+  const budgetUsd = project.budget_usd ?? 0;
+  const overBudget = budgetUsd > 0 && costUsd >= budgetUsd;
 
   return (
     <div className="panel run">
@@ -56,8 +58,11 @@ export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onSt
           {project.paused ? " ⏸ en pause" : project.auto_spec && loopActive ? " (boucle auto-spec)" : ""}
         </span>
         {agentCalls > 0 && (
-          <span className="usage-meter">
-            💸 ${costUsd.toFixed(4)} · {formatTokens(totalTokens)} tokens · {agentCalls} appels
+          <span className={`usage-meter${overBudget ? " over-budget" : ""}`}>
+            {budgetUsd > 0
+              ? `💸 $${costUsd.toFixed(4)} / $${budgetUsd.toFixed(2)}`
+              : `💸 $${costUsd.toFixed(4)}`}{" "}
+            · {formatTokens(totalTokens)} tokens · {agentCalls} appels
           </span>
         )}
         <div className="run-buttons">

@@ -58,6 +58,7 @@ function makeProject(overrides: Partial<ProjectState> = {}): ProjectState {
     architecture: "",
     plan_quality: 0,
     usage: { ...NEUTRAL_USAGE },
+    budget_usd: 0,
     archived: false,
     ...overrides,
   };

@@ -106,6 +106,7 @@ export interface ProjectState {
   architecture: string;
   plan_quality: number;
   usage: Usage;
+  budget_usd: number;
   archived: boolean;
 }
 

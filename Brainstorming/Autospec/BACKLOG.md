@@ -5,6 +5,18 @@ itération du loop de développement. Règle de délégation : tâches de comple
 faible/moyenne → subagents Opus ; orchestration/intégration/conception complexe →
 modèle courant.
 
+## 🚀 Extension produit (demandée) — en cours
+
+| # | Feature | V/C | État |
+|---|---------|-----|------|
+| E1 | **Phase spec enrichie** — facilitation socratique par dimensions + mode 🧠 Brainstorming (persona analyste BMAD, divergence→convergence pour re-questionner le besoin) ; endpoint `/spec-mode` + toggle UI | 4/3 | ✅ tests + e2e |
+| E2 | **Analyse d'impact d'un feedback** — quand l'utilisateur donne un feedback / demande un changement, analyser l'état du projet pour décider : METTRE À JOUR une US non implémentée, ou ANALYSER une nouvelle tâche → créer Epic/US | 4/4 | ⏳ à faire |
+| E3 | **Proposition de composants au démarrage** — un agent solutionneur propose les composants (défaut : backend Python+FastAPI, frontend React ; optionnels : DB PostgreSQL, cache Redis…) ; l'utilisateur valide/édite ; `ProjectState.components` | 4/4 | ⏳ à faire |
+| E4 | **Exécuteur de setup** — étape qui crée réellement les composants : dossiers backend/frontend, venv, install des deps, manifests ; install réel derrière un flag (démo-safe) | 4/5 | ⏳ à faire (dépend de E3) |
+| E5 | **Tests d'acceptance UI pilotés par Playwright** — pour les US à dimension **visuelle/UI**, la boucle d'implémentation lance un **navigateur** (Playwright), effectue clics/saisies, capture des screenshots et **assert sur le rendu**, en complément du pytest-bdd backend actuel (qui teste du code Python, pas d'UI/réseau). Les tests d'acceptance UI sont **stockés sous forme rejouable** (comme des tests unitaires, versionnés dans le workspace) pour pouvoir être relancés. Le QA route une US vers ce mode quand elle est UI ; prérequis : composant frontend généré (E3/E4) | 5/5 | ⏳ à faire (dépend de E3/E4) |
+| **I1** | **Budget de tokens/coût par projet + arrêt automatique** — budget max (coût $ ou tokens) défini à la création ; l'orchestrateur vérifie `usage` à chaque point de contrôle et **stoppe proprement** (auto-spec, raffinement, build) quand le budget est atteint, message clair. Base pour activer + ou - de raffinement/architecture « selon le budget ». | 5/2 | 🔜 **prochain (meilleur ratio)** |
+| I2 | **Livraison du produit généré : doc auto + export** — (a) agent **tech-writer** (persona BMAD existante) qui, après le build, produit README + instructions de lancement + résumé d'archi pour le **projet généré** ; (b) export : endpoint zip téléchargeable et/ou `git init` + commit propre du workspace (voire push/PR). Ferme la chaîne « généré → utilisable ». | 4/3 | ⏳ à faire |
+
 ## ✅ Livré
 
 | # | Item | Vérifié |

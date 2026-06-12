@@ -105,11 +105,16 @@ export default function App() {
     );
   }, []);
 
-  const handleCreate = async (goal: string, name: string, autoSpec: boolean) => {
+  const handleCreate = async (
+    goal: string,
+    name: string,
+    autoSpec: boolean,
+    budgetUsd: number,
+  ) => {
     setBusy(true);
     setError("");
     try {
-      const { state } = await createProject(goal, name, autoSpec);
+      const { state } = await createProject(goal, name, autoSpec, budgetUsd);
       upsert(state);
       setSelectedId(state.id);
       setShowSetup(false);

@@ -159,6 +159,8 @@ class ProjectState(BaseModel):
     goal: str
     auto_spec: bool = False
     spec_mode: str = "interview"  # "interview" (Socratic) | "brainstorm" (refine the need)
+    budget_usd: float = 0.0       # cost cap in USD (0 = no limit) — auto-stops when reached
+    budget_tokens: int = 0        # token cap (0 = no limit)
     phase: PipelinePhase = PipelinePhase.IDLE
     brief: str = ""
     architecture: str = ""  # current technical design (from the optional Architect phase)

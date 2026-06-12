@@ -907,6 +907,11 @@ button.action-btn.action-done {
   font-variant-numeric: tabular-nums;
 }
 
+.usage-meter.over-budget {
+  color: var(--red);
+  font-weight: 600;
+}
+
 .phase-build {
   color: var(--accent);
   border-color: var(--accent);

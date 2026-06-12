@@ -59,6 +59,35 @@ def make_pipeline(replies: list[str], auto_spec: bool = False) -> tuple[Pipeline
     return Pipeline(state, runner), runner
 
 
+async def test_budget_stops_auto_spec(green_pytest):
+    # A cost-reporting runner: each agent call costs $0.01. With a tiny budget,
+    # the auto-spec loop must stop cleanly once usage reaches it.
+    class _CostRunner(FakeRunner):
+        async def arun(self, *a, **kw):
+            res = await super().arun(*a, **kw)
+            res.cost_usd = 0.05
+            return res
+
+    analyst_reply = json.dumps(
+        {
+            "message": "Suite.",
+            "hypotheses": [{"id": "FH-1", "title": "X", "rationale": "r", "value": 4, "complexity": 2}],
+            "selected": "FH-1",
+        }
+    )
+    pm_next = json.dumps({"type": "brief", "message": "next", "brief": "# v2"})
+    # Enough replies for several iterations; the budget should cut it short first.
+    replies = [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN] + [
+        analyst_reply, pm_next, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN,
+    ] * 5
+    state = ProjectState(id="proj-test", name="x", goal="g", auto_spec=True, budget_usd=0.10)
+    pipeline = Pipeline(state, _CostRunner(replies))
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.STOPPED)
+    assert pipeline.state.usage.cost_usd >= 0.10
+    assert any("Budget atteint" in m.content for m in pipeline.state.chat)
+
+
 async def test_brainstorm_mode_uses_analyst_facilitation(green_pytest):
     pipeline, runner = make_pipeline(
         [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN]

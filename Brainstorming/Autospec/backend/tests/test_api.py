@@ -103,6 +103,19 @@ async def test_unknown_project_404(green_pytest):
         assert (await client.post("/api/projects/nope/run")).status_code == 404
 
 
+async def test_budget_endpoint_and_creation(green_pytest):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        # Budget set at creation.
+        r = await client.post("/api/projects", json={"goal": "x", "budget_usd": 1.5})
+        assert r.status_code == 200 and r.json()["state"]["budget_usd"] == 1.5
+        rid = r.json()["id"]
+        # Adjust the budget afterwards.
+        b = await client.post(f"/api/projects/{rid}/budget", json={"budget_usd": 2.0, "budget_tokens": 5000})
+        assert b.status_code == 200
+        assert b.json()["budget_usd"] == 2.0 and b.json()["budget_tokens"] == 5000
+        assert (await client.post("/api/projects/nope/budget", json={"budget_usd": 1})).status_code == 404
+
+
 async def test_spec_mode_endpoint(green_pytest):
     async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
         rid = (await client.post("/api/projects", json={"goal": "x"})).json()["id"]
