@@ -35,7 +35,9 @@ export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onSt
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs.length]);
 
-  const canRun = !["spec", "plan", "analyze", "architect", "idle"].includes(project.phase);
+  const canRun = !["spec", "plan", "analyze", "architect", "build", "idle"].includes(
+    project.phase,
+  );
   const loopActive = !["done", "stopped", "error"].includes(project.phase);
   const canResumeBuild =
     ["stopped", "error"].includes(project.phase) &&
