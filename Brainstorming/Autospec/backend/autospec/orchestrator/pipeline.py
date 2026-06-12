@@ -34,6 +34,22 @@ from .events import bus
 
 _REFINE_ROLE_TO_CHAT = {"critic": ChatRole.CRITIC, "judge": ChatRole.JUDGE}
 
+# OS essentials needed to launch a process, WITHOUT inheriting application
+# secrets (API keys, tokens…). Used when running the UNTRUSTED generated app.
+_SAFE_ENV_KEYS = {
+    "PATH", "PATHEXT", "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC",
+    "TEMP", "TMP", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "HOME",
+    "APPDATA", "LOCALAPPDATA", "PROGRAMDATA", "PROGRAMFILES",
+    "PROGRAMFILES(X86)", "NUMBER_OF_PROCESSORS", "OS",
+    "PROCESSOR_ARCHITECTURE", "LANG", "LC_ALL", "USER",
+}
+
+
+def _minimal_env() -> dict[str, str]:
+    """Environment for running the untrusted generated app: OS essentials only,
+    so the agent-written code never inherits the server's secrets."""
+    return {k: v for k, v in os.environ.items() if k.upper() in _SAFE_ENV_KEYS}
+
 
 class _UsageTracker:
     """Wraps a pipeline's runner to accumulate token/cost usage on the project
@@ -935,7 +951,9 @@ class Pipeline:
             self._log("run", "L'application tourne déjà.")
             return
         ws = workspace_dir(self.state.id)
-        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        # The generated app is untrusted agent code — give it OS essentials only,
+        # never the server's full environment (which may hold secrets).
+        env = _minimal_env()
         self.state.running = True
         self._sync()
         self._log("run", "▶ Lancement de l'application générée (uv run python main.py)…")

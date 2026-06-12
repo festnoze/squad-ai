@@ -216,10 +216,17 @@ def _force_delete_workspace(project_id: str) -> bool:
         return False
 
     def _on_error(func, path, _exc) -> None:
-        os.chmod(path, stat.S_IWRITE)
-        func(path)
+        # Best-effort: clear the read-only bit and retry; a still-locked file
+        # (e.g. held by a running app/pytest) is reported by the caller below.
+        try:
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+        except OSError:
+            pass
 
     shutil.rmtree(ws, onerror=_on_error)
+    if ws.exists():
+        raise OSError(f"workspace {project_id} partiellement verrouillé")
     return True
 
 
@@ -228,7 +235,12 @@ async def adelete_project(project_id: str) -> dict:
     pipeline = pipelines.pop(project_id, None)
     if pipeline:
         await pipeline.adispose()
-    existed = _force_delete_workspace(project_id)
+    try:
+        existed = _force_delete_workspace(project_id)
+    except OSError:
+        raise HTTPException(
+            409, "Le workspace est verrouillé (un processus l'utilise) — réessaie dans un instant."
+        )
     if not pipeline and not existed:
         raise HTTPException(404, f"Projet inconnu : {project_id}")
     bus.publish({"type": "deleted", "project_id": project_id})
