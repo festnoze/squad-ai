@@ -1,0 +1,14 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+  - main [ref=e6]:
+    - generic [ref=e7]:
+      - heading "Nouveau projet / feature" [level=2] [ref=e8]
+      - textbox "Nom du projet (optionnel)" [ref=e9]
+      - textbox "Décris la feature ou le projet que tu veux créer…" [ref=e10]
+      - generic [ref=e11] [cursor=pointer]:
+        - checkbox "Auto-spec — le PM décide de tout seul et enchaîne les itérations en boucle jusqu'à l'arrêt manuel" [ref=e12]
+        - generic [ref=e13]:
+          - strong [ref=e14]: Auto-spec
+          - text: — le PM décide de tout seul et enchaîne les itérations en boucle jusqu'à l'arrêt manuel
+      - button "🚀 Démarrer la spécification" [disabled] [ref=e15]

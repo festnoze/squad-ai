@@ -1,0 +1,165 @@
+"""Domain models: project, epics, user stories, chat."""
+
+from __future__ import annotations
+
+import time
+import uuid
+from enum import Enum
+
+from pydantic import BaseModel, Field
+
+
+class PipelinePhase(str, Enum):
+    IDLE = "idle"
+    SPEC = "spec"          # PM is interviewing the user (or self-answering in auto-spec)
+    ANALYZE = "analyze"    # Analyst is exploring/prioritizing the next feature hypotheses
+    PLAN = "plan"          # PO is breaking the brief into epics / user stories
+    BUILD = "build"        # dev agents are implementing stories (BDD/TDD)
+    DONE = "done"          # iteration finished, waiting for user (or next auto-spec cycle)
+    STOPPED = "stopped"
+    ERROR = "error"
+
+
+class StoryStatus(str, Enum):
+    TODO = "todo"
+    IN_PROGRESS = "in_progress"   # dev agent assigned, writing step definitions
+    RED = "red"                   # acceptance tests written and failing, implementing
+    GREEN = "green"               # tests pass, awaiting orchestrator verification
+    DONE = "done"
+    FAILED = "failed"
+
+
+class ChatRole(str, Enum):
+    USER = "user"
+    PM = "pm"
+    PO = "po"
+    DEV = "dev"
+    ANALYST = "analyst"
+    QA = "qa"
+    SYSTEM = "system"
+
+
+class HypothesisStatus(str, Enum):
+    PROPOSED = "proposed"
+    SELECTED = "selected"   # being built in the current iteration
+    DONE = "done"
+    REJECTED = "rejected"
+
+
+class TestState(str, Enum):
+    __test__ = False              # not a pytest test class
+
+    NONEXISTENT = "nonexistent"   # not written yet
+    RED = "red"                   # written and failing
+    GREEN = "green"               # passing
+
+
+def new_id(prefix: str) -> str:
+    return f"{prefix}-{uuid.uuid4().hex[:8]}"
+
+
+class ChatMessage(BaseModel):
+    role: ChatRole
+    content: str
+    ts: float = Field(default_factory=time.time)
+
+
+class FeatureHypothesis(BaseModel):
+    """A candidate next feature proposed and scored by the Analyst agent."""
+
+    id: str
+    title: str
+    rationale: str = ""
+    value: int = 3        # 1 (low) .. 5 (high)
+    complexity: int = 3   # 1 (trivial) .. 5 (hard)
+    status: HypothesisStatus = HypothesisStatus.PROPOSED
+    rank: int = 1         # analyst's priority order, 1 = next to build
+
+    @property
+    def score(self) -> float:
+        return self.value / max(self.complexity, 1)
+
+
+class PlannedTest(BaseModel):
+    """One unit test planned by the QA agent when decomposing the acceptance
+    test outside-in (London style): each layer's test mocks its direct
+    collaborators, written red-first before any implementation."""
+
+    id: str
+    layer: str = ""              # e.g. "api", "facade", "service", "repository", "llm"
+    description: str = ""
+    mocks: list[str] = Field(default_factory=list)   # collaborators to mock
+    file_hint: str = ""          # suggested test file path
+    criteria: list[str] = Field(default_factory=list)   # acceptance-criterion ids covered
+    status: TestState = TestState.NONEXISTENT
+
+
+class AcceptanceCriterion(BaseModel):
+    id: str
+    text: str
+
+
+class UserStory(BaseModel):
+    id: str
+    epic_id: str
+    title: str
+    description: str = ""
+    acceptance_criteria: list[AcceptanceCriterion] = Field(default_factory=list)
+    gherkin: str = ""
+    test_plan: list[PlannedTest] = Field(default_factory=list)
+    depends_on: list[str] = Field(default_factory=list)
+    priority: int = 3     # kanban priority, 1 (haute) .. 5 (basse)
+    status: StoryStatus = StoryStatus.TODO
+    iteration: int = 1
+    attempts: int = 0
+    last_error: str = ""
+
+    def tests_for_criterion(self, criterion_id: str) -> list[PlannedTest]:
+        return [t for t in self.test_plan if criterion_id in t.criteria]
+
+    def criterion_state(self, criterion_id: str) -> TestState:
+        """A criterion is green when all its tests are green (and it has at
+        least one); red if any test is red; otherwise nonexistent. A done story
+        has a fully green suite, so all its criteria are green."""
+        if self.status == StoryStatus.DONE:
+            return TestState.GREEN
+        tests = self.tests_for_criterion(criterion_id)
+        if any(t.status == TestState.RED for t in tests):
+            return TestState.RED
+        if tests and all(t.status == TestState.GREEN for t in tests):
+            return TestState.GREEN
+        return TestState.NONEXISTENT
+
+
+class Epic(BaseModel):
+    id: str
+    title: str
+    description: str = ""
+    iteration: int = 1
+
+
+class ProjectState(BaseModel):
+    id: str
+    name: str
+    goal: str
+    auto_spec: bool = False
+    phase: PipelinePhase = PipelinePhase.IDLE
+    brief: str = ""
+    backlog: list[FeatureHypothesis] = Field(default_factory=list)
+    epics: list[Epic] = Field(default_factory=list)
+    stories: list[UserStory] = Field(default_factory=list)
+    chat: list[ChatMessage] = Field(default_factory=list)
+    feedback: list[str] = Field(default_factory=list)
+    iteration: int = 1
+    running: bool = False  # generated app currently running
+    error: str = ""
+    created_at: float = Field(default_factory=time.time)
+
+    def story(self, story_id: str) -> UserStory:
+        for s in self.stories:
+            if s.id == story_id:
+                return s
+        raise KeyError(story_id)
+
+    def stories_of_iteration(self, iteration: int) -> list[UserStory]:
+        return [s for s in self.stories if s.iteration == iteration]

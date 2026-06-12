@@ -229,11 +229,13 @@ export function LossLandscape({
   w,
   b,
   trajectory,
+  next,
 }: {
   samples: LandscapePoint[]
   w: number
   b: number
   trajectory: { w: number; b: number }[]
+  next?: { w: number; b: number }
 }): JSX.Element {
 
   // Memoised grid depends ONLY on samples (not w/b/trajectory)
@@ -332,6 +334,31 @@ export function LossLandscape({
         strokeWidth={0.8}
         strokeOpacity={0.3}
       />
+
+      {/* ── Gradient step: arrow from current (w,b) to the next chosen (w,b) ── */}
+      {next &&
+        (() => {
+          const nx = round1(wToX(next.w))
+          const ny = round1(bToY(next.b))
+          const dx = nx - cx
+          const dy = ny - cy
+          const len = Math.hypot(dx, dy)
+          if (len < 0.5) return null
+          const ux = dx / len
+          const uy = dy / len
+          const tipL = `${round1(nx - ux * 9 - uy * 5)},${round1(ny - uy * 9 + ux * 5)}`
+          const tipR = `${round1(nx - ux * 9 + uy * 5)},${round1(ny - uy * 9 - ux * 5)}`
+          return (
+            <g>
+              <line x1={cx} y1={cy} x2={round1(nx - ux * 6)} y2={round1(ny - uy * 6)} stroke="#f6c177" strokeWidth={2.4} />
+              <polygon points={`${nx},${ny} ${tipL} ${tipR}`} fill="#f6c177" />
+              <circle cx={nx} cy={ny} r={3} fill="#f6c177" />
+              <text x={round1((cx + nx) / 2 + 7)} y={round1((cy + ny) / 2 - 5)} style={{ fontSize: 10, fill: '#f6c177', fontFamily: 'monospace' }}>
+                pas
+              </text>
+            </g>
+          )
+        })()}
 
       {/* ── Axes & labels ── */}
       <AxisLabels />

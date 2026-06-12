@@ -1,0 +1,23 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - button "＋ Nouveau projet" [ref=e49] [cursor=pointer]
+  - main [ref=e6]:
+    - generic [ref=e51]:
+      - heading "Chat — spécification & feedback" [level=2] [ref=e52]
+      - generic [ref=e54]:
+        - text: Toi
+        - generic [ref=e55]: crée une simple page web qui affiche bonjour
+      - generic [ref=e56]:
+        - textbox "Donne ton feedback sur l'itération en cours…" [ref=e57]
+        - button "Envoyer" [disabled] [ref=e58]
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - heading "Board Epics / User stories" [level=2] [ref=e61]
+        - paragraph [ref=e62]: Le PO n'a pas encore produit de plan.
+      - generic [ref=e64]:
+        - heading "Exécution" [level=2] [ref=e65]
+        - generic [ref=e66]: En attente — itération 1
+        - generic [ref=e67]:
+          - button "▶ Lancer le projet" [disabled] [ref=e68]
+          - button "⏹ Stopper la boucle" [ref=e69] [cursor=pointer]

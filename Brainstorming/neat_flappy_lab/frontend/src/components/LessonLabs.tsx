@@ -317,6 +317,35 @@ function Slider({
   )
 }
 
+function Stepper({
+  label,
+  value,
+  min,
+  max,
+  onChange,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  onChange: (value: number) => void
+}) {
+  return (
+    <div className="stepper">
+      <span>{label}</span>
+      <div className="stepper-controls">
+        <button type="button" disabled={value <= min} onClick={() => onChange(value - 1)}>
+          &minus;
+        </button>
+        <b>{value}</b>
+        <button type="button" disabled={value >= max} onClick={() => onChange(value + 1)}>
+          +
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function ExplanationList({ items }: { items: string[] }) {
   return (
     <div className="explain-list">
@@ -462,6 +491,90 @@ function probeActivations(m: LinModel, x: number): number[] {
   })
 }
 
+// Per-parameter gradient, exactly the quantity each weight is nudged by during a
+// step: next = value - lr * grad. Drives the "Pas" (step mechanics) view.
+function modelGrad(m: LinModel, samples: Point[]): { name: string; value: number; grad: number }[] {
+  const n = samples.length
+  if (m.neurons === 1) {
+    let dw = 0
+    let db = 0
+    for (const p of samples) {
+      const e = m.w * p.x + m.b - p.y
+      dw += 2 * e * p.x
+      db += 2 * e
+    }
+    return [
+      { name: 'w', value: m.w, grad: dw / n },
+      { name: 'b', value: m.b, grad: db / n },
+    ]
+  }
+  const gw1 = new Array<number>(m.neurons).fill(0)
+  const gb1 = new Array<number>(m.neurons).fill(0)
+  const gw2 = new Array<number>(m.neurons).fill(0)
+  let gb2 = 0
+  for (const p of samples) {
+    let y = m.b2
+    const z: number[] = []
+    for (let i = 0; i < m.neurons; i += 1) {
+      const zi = m.w1[i] * p.x + m.b1[i]
+      z.push(zi)
+      if (zi > 0) y += m.w2[i] * zi
+    }
+    const gy = (2 * (y - p.y)) / n
+    gb2 += gy
+    for (let i = 0; i < m.neurons; i += 1) {
+      const h = z[i] > 0 ? z[i] : 0
+      gw2[i] += gy * h
+      const gz = z[i] > 0 ? gy * m.w2[i] : 0
+      gw1[i] += gz * p.x
+      gb1[i] += gz
+    }
+  }
+  const rows: { name: string; value: number; grad: number }[] = []
+  for (let i = 0; i < m.neurons; i += 1) {
+    rows.push({ name: `v${i + 1}`, value: m.w2[i], grad: gw2[i] })
+    rows.push({ name: `w${i + 1}`, value: m.w1[i], grad: gw1[i] })
+    rows.push({ name: `b${i + 1}`, value: m.b1[i], grad: gb1[i] })
+  }
+  rows.push({ name: 'c', value: m.b2, grad: gb2 })
+  return rows
+}
+
+function StepMechanics({ rows, lr }: { rows: { name: string; value: number; grad: number }[]; lr: number }) {
+  const moves = rows.map((r) => lr * r.grad)
+  const maxMove = Math.max(1e-6, ...moves.map((m) => Math.abs(m)))
+  return (
+    <div className="step-mech">
+      <p className="step-mech-intro">
+        Un pas de descente, parametre par parametre : <b>suivante = valeur &minus; lr &middot; gradient</b>. La fleche montre le deplacement
+        choisi (sens oppose au gradient, longueur proportionnelle a lr &middot; gradient).
+      </p>
+      {rows.map((r, idx) => {
+        const move = moves[idx]
+        const next = r.value - move
+        const frac = Math.min(1, Math.abs(move) / maxMove)
+        const dir = next >= r.value ? 1 : -1
+        const curPct = 50
+        const nextPct = 50 + dir * frac * 40
+        return (
+          <div className="step-row" key={r.name}>
+            <b className="step-name">{r.name}</b>
+            <span className="step-calc">
+              {r.value.toFixed(3)} &minus; {lr.toFixed(3)}&middot;<i style={{ color: '#7c9cff' }}>{r.grad.toFixed(3)}</i> = <em>{next.toFixed(3)}</em>
+            </span>
+            <div className="step-track">
+              <span className="step-axis" />
+              <span className="step-move" style={{ left: `${Math.min(curPct, nextPct)}%`, width: `${Math.abs(nextPct - curPct)}%` }} />
+              <span className="step-dot cur" style={{ left: `${curPct}%` }} />
+              <span className="step-dot next" style={{ left: `${nextPct}%` }} />
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function Tok({ c, children }: { c: string; children: ReactNode }) {
   return <b style={{ color: c, fontVariantNumeric: 'tabular-nums' }}>{children}</b>
 }
@@ -473,6 +586,7 @@ interface OverlayData {
   showSquares: boolean
   showArrows: boolean
   showGhostPreds: boolean
+  lossTotalSq: number
   onSelect: (i: number) => void
 }
 
@@ -484,11 +598,14 @@ function LinearOverlay(props: any) {
   const sx = xAxisMap[Object.keys(xAxisMap)[0]]?.scale
   const sy = yAxisMap[Object.keys(yAxisMap)[0]]?.scale
   if (!sx || !sy) return null
-  const { residuals, selected, showResiduals, showSquares, showArrows, showGhostPreds, onSelect } = overlay
+  const { residuals, selected, showResiduals, showSquares, showArrows, showGhostPreds, onSelect, lossTotalSq } = overlay
   const teal = '#4fd1c5'
   const indigo = '#7c9cff'
   const danger = '#f7768e'
   const ok = '#9ece6a'
+  const warn = '#f6c177'
+  const border = '#25304a'
+  const chartW = typeof props.width === 'number' ? props.width : 99999
   return (
     <g>
       {showSquares &&
@@ -543,6 +660,53 @@ function LinearOverlay(props: any) {
       {residuals.map((r) => (
         <circle key={`hit-${r.i}`} cx={sx(r.x)} cy={sy(r.y)} r={11} fill="transparent" style={{ cursor: 'pointer' }} onClick={() => onSelect(r.i)} />
       ))}
+      {selected != null &&
+        residuals[selected] &&
+        ((sIdx: number) => {
+          const r = residuals[sIdx]
+          const px = sx(r.x)
+          const py = sy(r.y)
+          const e = r.yHat - r.y
+          const e2 = e * e
+          const pct = lossTotalSq > 0 ? (e2 / lossTotalSq) * 100 : 0
+          const bw = 178
+          const bh = 132
+          let bx = px + 14
+          let by = py - bh - 10
+          if (by < 4) by = py + 14
+          if (bx + bw > chartW - 4) bx = px - bw - 14
+          if (bx < 4) bx = 4
+          const rows: { k: string; v: string; c: string }[] = [
+            { k: 'x', v: r.x.toFixed(3), c: '#e7edf7' },
+            { k: 'y reel', v: r.y.toFixed(3), c: warn },
+            { k: 'ŷ predit', v: r.yHat.toFixed(3), c: teal },
+            { k: 'e = ŷ − y', v: e.toFixed(3), c: danger },
+            { k: 'e² (aire)', v: e2.toFixed(3), c: '#e7edf7' },
+            { k: 'part de loss', v: `${pct.toFixed(1)} %`, c: danger },
+          ]
+          return (
+            <g>
+              <line x1={px} y1={py} x2={bx < px ? bx + bw : bx} y2={by < py ? by + bh : by} stroke={border} strokeOpacity={0.7} />
+              <rect x={bx} y={by} width={bw} height={bh} rx={8} fill="#1a2333" stroke={border} strokeWidth={1} />
+              <text x={bx + 12} y={by + 21} fill={teal} fontSize={11} fontWeight={700}>
+                point #{r.i}
+              </text>
+              <text x={bx + bw - 12} y={by + 22} fill="#9fb0c8" fontSize={15} textAnchor="end" style={{ cursor: 'pointer' }} onClick={() => onSelect(r.i)}>
+                ×
+              </text>
+              {rows.map((row, idx) => (
+                <g key={row.k}>
+                  <text x={bx + 12} y={by + 44 + idx * 15} fill="#9fb0c8" fontSize={11}>
+                    {row.k}
+                  </text>
+                  <text x={bx + bw - 12} y={by + 44 + idx * 15} fill={row.c} fontSize={11} fontWeight={700} textAnchor="end">
+                    {row.v}
+                  </text>
+                </g>
+              ))}
+            </g>
+          )
+        })(selected)}
     </g>
   )
 }
@@ -652,37 +816,70 @@ const LINEAR_EXPERIMENTS: Experiment[] = [
   },
 ]
 
-const STAGE_DESC = [
-  'Les observations brutes : un nuage de points bruites a expliquer.',
-  'Pour chaque x, la droite propose y_chap = w*x + b.',
-  'On mesure l ecart signe e = y_chap - y a chaque point.',
-  'On resume tous les e au carre en un seul nombre : la MSE.',
-  'Le gradient dit comment bouger w et b pour baisser la loss.',
-  'On fait un pas : w et b glissent dans le sens oppose au gradient.',
+// One explanation card per pipeline stage, shown right under the stepper.
+const STAGE_INFO = [
+  {
+    title: 'Les donnees',
+    text: "On observe des couples (x, y) bruites : les points oranges. L'objectif est de trouver une regle qui predit y a partir de x. Pour l'instant, aucun modele n'existe : juste les faits a expliquer.",
+  },
+  {
+    title: 'La prediction',
+    text: "Avec 1 neurone, le modele propose ŷ = w·x + b : une droite. w regle la pente, b la hauteur. Pour chaque x observe, le petit point teal sur la droite est la valeur predite. Tu peux editer w et b directement dans la formule en bas.",
+  },
+  {
+    title: "L'erreur",
+    text: "Pour chaque point, e = ŷ − y mesure l'ecart vertical entre la prediction et la realite. Elle est signee : rouge quand le modele predit trop haut, verte quand il predit trop bas. Si la droite passait sur le point, e vaudrait 0.",
+  },
+  {
+    title: 'La loss (MSE)',
+    text: "Impossible d'optimiser 28 erreurs a la fois : on les resume en un seul nombre. La MSE est la moyenne des e². Le carre sert deux objectifs : les erreurs + et − ne s'annulent plus, et les gros ecarts pesent beaucoup plus fort. Chaque erreur devient litteralement l'aire d'un carre dessine sur le graphe.",
+  },
+  {
+    title: 'Le gradient',
+    text: "Le gradient repond a la question : si je bouge un peu w ou b, la loss monte ou descend ? Chaque point tire la droite vers lui (fleches indigo), proportionnellement a son erreur — et a sa distance a x = 0 pour la pente : un point eloigne a plus de levier.",
+  },
+  {
+    title: 'La mise a jour',
+    text: "On fait un pas dans le sens oppose au gradient : w ← w − lr·∂w, b ← b − lr·∂b. Le learning rate regle la taille du pas. La ligne verte en pointille montre ou sera le modele apres ce pas. Une iteration d'apprentissage = ce cycle complet, repete des dizaines de fois.",
+  },
 ]
-const ADVANCE_LABEL = ['', '→ Erreurs', '→ Loss', '→ Gradient', '→ Apercu du pas', 'Appliquer le pas ↻']
+// Shown for the prediction stage when more than one neuron is active.
+const PRED_MULTI =
+  "Avec plusieurs neurones, chacun calcule sa propre droite wᵢ·x + bᵢ puis l'active (ReLU annule les valeurs negatives). La sortie additionne ces neurones ponderes par vᵢ, plus un biais c : ŷ = Σ vᵢ·relu(wᵢ·x + bᵢ) + c. En assemblant ces morceaux lineaires, le modele plie la droite en une courbe."
+const ADVANCE_LABEL = ['→ Prediction', '→ Erreurs', '→ Loss', '→ Gradient', '→ Apercu du pas', 'Appliquer le pas ↻']
+const FREE_HINT =
+  "Mode libre : l'apprentissage tourne en continu. Clique un maillon de la chaine ci-dessus pour afficher son explication et sa couche visuelle, ou passe en mode Guide pour derouler les 6 etapes une par une."
+// Dataset complexity follows model capacity: a line for 1 neuron, a curve beyond.
+const ADAPTIVE_CURVE = [0, 0, 0.55, 0.95]
+const SEED = 4
 
 function LinearLab() {
   const [running, setRunning] = useState(false)
   const [lr, setLr] = useState(0.08)
   const [speed, setSpeed] = useState(8)
-  const [seed, setSeed] = useState(4)
   const [noiseScale, setNoiseScale] = useState(0.18)
-  const [curve, setCurve] = useState(0)
-  const [neurons, setNeurons] = useState(1)
+  const [neurons, setNeuronsRaw] = useState(1)
+  // Adaptive dataset shape, unless an experiment forces a specific curvature.
+  const [curveOverride, setCurveOverride] = useState<number | null>(null)
   const [outlier, setOutlier] = useState(false)
   const [mode, setMode] = useState<'free' | 'guided'>('free')
-  const [stage, setStage] = useState(1) // guided: 1..5
+  const [stage, setStage] = useState(0) // guided: 0..5
   const [focus, setFocus] = useState(-1) // free: -1..5
   const [selected, setSelected] = useState<number | null>(null)
-  const [rightView, setRightView] = useState<'loss' | 'landscape'>('loss')
+  const [rightView, setRightView] = useState<'loss' | 'landscape' | 'step'>('loss')
 
+  const curve = curveOverride ?? ADAPTIVE_CURVE[neurons]
   const samples = useMemo(() => {
-    const base = makeSamples(seed, noiseScale, curve)
+    const base = makeSamples(SEED, noiseScale, curve)
     return outlier ? [...base, { x: 1.05, y: 6.1 }] : base
-  }, [noiseScale, seed, curve, outlier])
+  }, [noiseScale, curve, outlier])
 
-  const initialModel = useMemo<LinModel>(() => initModel(neurons, seed, samples), [neurons, seed, samples])
+  const setNeurons = (n: number) => {
+    setCurveOverride(null)
+    setNeuronsRaw(n)
+  }
+
+  const initialModel = useMemo<LinModel>(() => initModel(neurons, SEED, samples), [neurons, samples])
   const [model, setModel] = useState(initialModel)
   const [history, setHistory] = useState<HistoryRow[]>([{ step: 0, loss: initialModel.loss, w: initialModel.w, b: initialModel.b }])
 
@@ -690,7 +887,7 @@ function LinearLab() {
     setRunning(false)
     setModel(initialModel)
     setHistory([{ step: 0, loss: initialModel.loss, w: initialModel.w, b: initialModel.b }])
-    if (mode === 'guided') setStage(1)
+    if (mode === 'guided') setStage(0)
   }
 
   useEffect(reset, [initialModel])
@@ -717,7 +914,7 @@ function LinearLab() {
   const switchMode = (m: 'free' | 'guided') => {
     setRunning(false)
     setMode(m)
-    if (m === 'guided') setStage(1)
+    if (m === 'guided') setStage(0)
     else setFocus(-1)
   }
 
@@ -732,14 +929,14 @@ function LinearLab() {
   }
 
   const onStageClick = (i: number) => {
-    if (guided) setStage(Math.max(1, Math.min(5, i)))
+    if (guided) setStage(Math.max(0, Math.min(5, i)))
     else setFocus(focus === i ? -1 : i)
   }
 
   const applyExperiment = (id: string) => {
     if (id === 'curve') {
-      setNeurons(1)
-      setCurve(0.6)
+      setNeuronsRaw(1)
+      setCurveOverride(0.85)
       switchMode('free')
     } else if (id === 'lr-high') {
       setLr(0.42)
@@ -760,7 +957,8 @@ function LinearLab() {
   const bNext = preview.b
   const paramCount = neurons === 1 ? 2 : neurons * 3 + 1
   const canLandscape = neurons === 1
-  const effectiveView: 'loss' | 'landscape' = canLandscape ? rightView : 'loss'
+  const effectiveView: 'loss' | 'landscape' | 'step' = rightView === 'landscape' && !canLandscape ? 'loss' : rightView
+  const gradRows = useMemo(() => modelGrad(model, samples), [model, samples])
 
   const showGhostPreds = guided ? stage >= 1 : false
   const showResiduals = guided ? stage >= 2 : true
@@ -777,13 +975,22 @@ function LinearLab() {
   const residuals = samples.map((p, i) => ({ x: p.x, y: p.y, yHat: predict(model, p.x), i }))
   const acts = probeActivations(model, 0.6)
 
-  const lines: { name: string; data: Point[]; color: string; dash?: string }[] = [
-    { name: 'depart', data: startLine, color: chart.line2, dash: '5 5' },
-    { name: 'prediction', data: line, color: chart.line },
-  ]
+  // Guided stage 0 shows the bare dataset: no model line at all yet.
+  const lines: { name: string; data: Point[]; color: string; dash?: string }[] = []
+  if (!guided) lines.push({ name: 'depart', data: startLine, color: chart.line2, dash: '5 5' })
+  if (!guided || stage >= 1) lines.push({ name: 'prediction', data: line, color: chart.line })
   if (showNextLine) lines.push({ name: 'prochaine etape', data: nextLine, color: chart.ok, dash: '4 4' })
 
-  const overlay: OverlayData = { residuals, selected, showResiduals, showSquares, showArrows, showGhostPreds, onSelect: setSelected }
+  const overlay: OverlayData = {
+    residuals,
+    selected,
+    showResiduals,
+    showSquares,
+    showArrows,
+    showGhostPreds,
+    lossTotalSq: model.loss * samples.length,
+    onSelect: (i: number) => setSelected((p) => (p === i ? null : i)),
+  }
 
   const sel = selected != null && selected < samples.length ? samples[selected] : null
   const selPred = sel ? predict(model, sel.x) : 0
@@ -800,59 +1007,93 @@ function LinearLab() {
   return (
     <div className="lesson-page">
       <LessonHeader eyebrow="Atelier 01" title="De la droite au reseau">
-        Edite la droite dans la formule et vois son neurone equivalent a droite. Passe
-        de 1 a 3 neurones pour transformer la droite en courbe (somme de morceaux ReLU).
-        Le mode Guide decompose un pas : prediction, erreur, loss, gradient, mise a jour.
+        Un parcours en 6 etapes : donnees, prediction, erreur, loss, gradient, mise a jour.
+        Le mode Guide les deroule une par une, avec une explication a chaque etape. Edite la
+        droite dans la formule, puis monte le nombre de neurones : les donnees s adaptent et
+        la droite devient courbe.
       </LessonHeader>
 
       <div className="linear-layout">
-        {/* Action strip: primary controls always visible at the top. */}
-        <div className="linear-controlstrip">
-          <div className="segmented">
-            <button className={mode === 'free' ? 'active' : ''} onClick={() => switchMode('free')}>
-              Libre
+        {/* Top block: actions row + settings row, always visible. */}
+        <div className="linear-controls">
+          <div className="linear-controlstrip">
+            <div className="segmented">
+              <button className={mode === 'free' ? 'active' : ''} onClick={() => switchMode('free')}>
+                Libre
+              </button>
+              <button className={mode === 'guided' ? 'active' : ''} onClick={() => switchMode('guided')}>
+                Guide
+              </button>
+            </div>
+            {guided ? (
+              <button className="btn primary guided-advance" onClick={advance}>
+                {ADVANCE_LABEL[stage]}
+              </button>
+            ) : (
+              <>
+                <button className="btn primary" disabled={running} onClick={() => setRunning(true)}>
+                  <Icon name="play" />
+                  Play
+                </button>
+                <button className="btn" disabled={!running} onClick={() => setRunning(false)}>
+                  <Icon name="pause" />
+                  Pause
+                </button>
+                <button className="btn" onClick={stepOnce}>
+                  <Icon name="step" />
+                  Step
+                </button>
+              </>
+            )}
+            <button className="btn ghost" onClick={reset}>
+              <Icon name="reset" />
+              Reset
             </button>
-            <button className={mode === 'guided' ? 'active' : ''} onClick={() => switchMode('guided')}>
-              Guide
-            </button>
+            <span className="spacer" />
+            <span className="strip-stat">
+              step <b>{model.step}</b>
+            </span>
+            <span className="strip-stat">
+              loss <b>{model.loss.toFixed(4)}</b>
+            </span>
           </div>
-          {guided ? (
-            <button className="btn primary guided-advance" onClick={advance}>
-              {ADVANCE_LABEL[stage]}
-            </button>
-          ) : (
-            <>
-              <button className="btn primary" disabled={running} onClick={() => setRunning(true)}>
-                <Icon name="play" />
-                Play
+          <div className="linear-settingsrow">
+            <Stepper label="neurones" min={1} max={3} value={neurons} onChange={setNeurons} />
+            <div className="setting-slider">
+              <Slider label="learning rate" min={0.001} max={0.5} step={0.001} value={lr} onChange={setLr} />
+            </div>
+            <div className="setting-slider">
+              <Slider label="bruit donnees" min={0} max={1.2} step={0.02} value={noiseScale} onChange={setNoiseScale} />
+            </div>
+            {!guided && (
+              <div className="setting-slider">
+                <Slider label="vitesse" min={1} max={10} step={1} value={speed} onChange={setSpeed} />
+              </div>
+            )}
+            {outlier && (
+              <button className="btn ghost" onClick={() => setOutlier(false)}>
+                retirer l outlier
               </button>
-              <button className="btn" disabled={!running} onClick={() => setRunning(false)}>
-                <Icon name="pause" />
-                Pause
-              </button>
-              <button className="btn" onClick={stepOnce}>
-                <Icon name="step" />
-                Step
-              </button>
-            </>
-          )}
-          <button className="btn ghost" onClick={reset}>
-            <Icon name="reset" />
-            Reset
-          </button>
-          <span className="spacer" />
-          <span className="strip-stat">
-            neurones <b>{neurons}</b>
-          </span>
-          <span className="strip-stat">
-            step <b>{model.step}</b>
-          </span>
-          <span className="strip-stat">
-            loss <b>{model.loss.toFixed(4)}</b>
-          </span>
+            )}
+          </div>
         </div>
 
         <PipelineBar active={activeStage} reached={guided ? stage : 5} onClick={onStageClick} />
+
+        {/* Contextual explanation for the active stage. */}
+        <div className="stage-info">
+          {activeStage >= 0 ? (
+            <>
+              <span className="stage-info-idx">{activeStage + 1}</span>
+              <div>
+                <b>{STAGE_INFO[activeStage].title}</b>
+                <p>{activeStage === 1 && neurons > 1 ? PRED_MULTI : STAGE_INFO[activeStage].text}</p>
+              </div>
+            </>
+          ) : (
+            <p className="stage-info-hint">{FREE_HINT}</p>
+          )}
+        </div>
 
         <span className="row-label">Le modele &mdash; deux vues equivalentes</span>
         <div className="linear-row">
@@ -886,8 +1127,8 @@ function LinearLab() {
           </section>
         </div>
 
-        <span className="row-label">Dissection d un pas</span>
-        <div className="linear-row dissect">
+        <span className="row-label">Le calcul &mdash; formule et convergence</span>
+        <div className="linear-row">
           <section className="panel">
             <div className="panel-header">
               <span className="panel-title">Formule vivante</span>
@@ -897,40 +1138,60 @@ function LinearLab() {
               <div className={`formula-line${activeStage === 1 ? ' active' : ''}`}>
                 {neurons === 1 ? (
                   <>
-                    <code>
-                      <Tok c={tealC}>y&#770;</Tok> ={' '}
-                      <input
-                        className="tok-input"
-                        type="number"
-                        step={0.05}
-                        value={round(model.w, 3)}
-                        style={{ color: tealC }}
-                        onChange={(e) => {
-                          const v = Number(e.target.value)
-                          if (Number.isFinite(v)) setLine(v, model.b)
-                        }}
-                      />
-                      &middot;x +{' '}
-                      <input
-                        className="tok-input"
-                        type="number"
-                        step={0.05}
-                        value={round(model.b, 3)}
-                        style={{ color: tealC }}
-                        onChange={(e) => {
-                          const v = Number(e.target.value)
-                          if (Number.isFinite(v)) setLine(model.w, v)
-                        }}
-                      />
+                    <code className="formula-inline">
+                      <Tok c={tealC}>y&#770;</Tok> =
+                      <span className="tok-field">
+                        <em>w</em>
+                        <input
+                          className="tok-input"
+                          type="number"
+                          step={0.05}
+                          value={round(model.w, 3)}
+                          style={{ color: tealC }}
+                          onChange={(e) => {
+                            const v = Number(e.target.value)
+                            if (Number.isFinite(v)) setLine(v, model.b)
+                          }}
+                        />
+                      </span>
+                      &middot;x +
+                      <span className="tok-field">
+                        <em>b</em>
+                        <input
+                          className="tok-input"
+                          type="number"
+                          step={0.05}
+                          value={round(model.b, 3)}
+                          style={{ color: tealC }}
+                          onChange={(e) => {
+                            const v = Number(e.target.value)
+                            if (Number.isFinite(v)) setLine(model.w, v)
+                          }}
+                        />
+                      </span>
                     </code>
                     <small>edite w et b : la droite et son neurone bougent ensemble</small>
                   </>
                 ) : (
                   <>
-                    <code>
-                      <Tok c={tealC}>y&#770;</Tok> = &Sigma; <Tok c={tealC}>v&#7522;</Tok>&middot;relu(<Tok c={tealC}>w&#7522;</Tok>&middot;x + <Tok c={tealC}>b&#7522;</Tok>) + c
-                    </code>
-                    <small>{neurons} morceaux lineaires combines en une courbe</small>
+                    <div className="formula-sum">
+                      <Tok c={tealC}>y&#770;</Tok> =
+                      <span className="big-sigma" style={{ fontSize: neurons >= 3 ? 42 : 32 }}>
+                        &Sigma;
+                      </span>
+                      <div className="sum-terms">
+                        {model.w2.map((v, i) => (
+                          <code key={i}>
+                            <Tok c={tealC}>{v.toFixed(2)}</Tok>&middot;relu(<Tok c={tealC}>{model.w1[i].toFixed(2)}</Tok>&middot;x{model.b1[i] >= 0 ? ' + ' : ' − '}
+                            <Tok c={tealC}>{Math.abs(model.b1[i]).toFixed(2)}</Tok>)
+                          </code>
+                        ))}
+                      </div>
+                      <span className="sum-tail">
+                        + <Tok c={tealC}>{model.b2.toFixed(2)}</Tok>
+                      </span>
+                    </div>
+                    <small>{neurons} neurones : une ligne = un morceau lineaire (ReLU)</small>
                   </>
                 )}
                 {sel && (
@@ -997,63 +1258,20 @@ function LinearLab() {
                   </>
                 )}
               </div>
-              {activeStage >= 0 && <p className="formula-desc">{STAGE_DESC[activeStage]}</p>}
             </div>
           </section>
 
-          <section className="panel">
-            <div className="panel-header">
-              <span className="panel-title">Inspecteur de point</span>
-              {sel && (
-                <button className="btn ghost" onClick={() => setSelected(null)}>
-                  deselectionner
-                </button>
-              )}
-            </div>
-            {!sel ? (
-              <div className="inspector-empty">Clique un point du graphe pour dissequer son erreur, son carre et sa part de la loss.</div>
-            ) : (
-              <div className="insp-grid">
-                <div>
-                  <small>x</small>
-                  <b>{sel.x.toFixed(3)}</b>
-                </div>
-                <div>
-                  <small>y reel</small>
-                  <b style={{ color: dataC }}>{sel.y.toFixed(3)}</b>
-                </div>
-                <div>
-                  <small>y&#770; predit</small>
-                  <b style={{ color: tealC }}>{selPred.toFixed(3)}</b>
-                </div>
-                <div>
-                  <small>erreur e</small>
-                  <b style={{ color: errC }}>{selErr.toFixed(3)}</b>
-                </div>
-                <div>
-                  <small>e&sup2; (aire)</small>
-                  <b>{(selErr * selErr).toFixed(3)}</b>
-                </div>
-                <div>
-                  <small>part de la loss</small>
-                  <b style={{ color: errC }}>{(selContrib * 100).toFixed(1)}%</b>
-                </div>
-                <div className="contrib">
-                  <i className="contrib-bar" style={{ width: `${Math.min(100, selContrib * 100)}%` }} />
-                </div>
-              </div>
-            )}
-          </section>
-        </div>
-
-        <span className="row-label">Apprentissage &amp; reglages</span>
-        <div className="linear-row">
           <section className="panel chart-panel short">
             <div className="panel-header">
-              <span className="panel-title">{effectiveView === 'loss' ? 'Loss dans le temps' : 'Paysage de loss (w, b)'}</span>
+              <span className="panel-title">
+                {effectiveView === 'loss' ? 'Loss dans le temps' : effectiveView === 'landscape' ? 'Paysage de loss (w, b)' : 'Mecanique du pas'}
+              </span>
               <div className="segmented">
                 <button className={effectiveView === 'loss' ? 'active' : ''} onClick={() => setRightView('loss')}>
                   Loss
+                </button>
+                <button className={effectiveView === 'step' ? 'active' : ''} onClick={() => setRightView('step')}>
+                  Pas
                 </button>
                 <button
                   className={effectiveView === 'landscape' ? 'active' : ''}
@@ -1068,38 +1286,22 @@ function LinearLab() {
             <div className="panel-body">
               {effectiveView === 'loss' ? (
                 <LossChart data={history} />
+              ) : effectiveView === 'step' ? (
+                <StepMechanics rows={gradRows} lr={lr} />
               ) : (
-                <LossLandscape samples={samples} w={model.w} b={model.b} trajectory={history.map((h) => ({ w: h.w, b: h.b }))} />
-              )}
-            </div>
-          </section>
-
-          <section className="panel">
-            <div className="panel-header">
-              <span className="panel-title">Reglages</span>
-            </div>
-            <div className="lab-controls">
-              <div className="ctrl-sliders">
-                <Slider label="learning rate" min={0.001} max={0.5} step={0.001} value={lr} onChange={setLr} />
-                <Slider label="neurones" min={1} max={3} step={1} value={neurons} onChange={setNeurons} />
-                <Slider label="courbure donnees" min={0} max={1} step={0.05} value={curve} onChange={setCurve} />
-                {!guided && <Slider label="vitesse" min={1} max={10} step={1} value={speed} onChange={setSpeed} />}
-                <Slider label="bruit donnees" min={0} max={1.2} step={0.02} value={noiseScale} onChange={setNoiseScale} />
-                <Slider label="seed" min={1} max={30} step={1} value={seed} onChange={setSeed} />
-              </div>
-              <p className="ctrl-hint">
-                1 neurone = une droite. Monte a 2-3 neurones (ReLU) pour plier la prediction en courbe. Augmente la courbure des donnees pour rendre l interet des neurones visible.
-              </p>
-              {outlier && (
-                <button className="btn ghost" onClick={() => setOutlier(false)}>
-                  retirer l outlier
-                </button>
+                <LossLandscape
+                  samples={samples}
+                  w={model.w}
+                  b={model.b}
+                  trajectory={history.map((h) => ({ w: h.w, b: h.b }))}
+                  next={{ w: preview.w, b: preview.b }}
+                />
               )}
             </div>
           </section>
         </div>
 
-        <span className="row-label">Experiences &mdash; predis puis observe</span>
+        <span className="row-label">Predis puis observe</span>
         <section className="panel">
           <ExperimentCards experiments={LINEAR_EXPERIMENTS} onApply={applyExperiment} />
         </section>
