@@ -12,6 +12,11 @@ interface Props {
   onResumeBuild: () => void;
 }
 
+function formatTokens(n: number): string {
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
+
 const PHASE_LABEL: Record<string, string> = {
   idle: "En attente",
   spec: "📋 Spécification (PM)",
@@ -36,6 +41,10 @@ export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onSt
     ["stopped", "error"].includes(project.phase) &&
     project.stories.some((s) => s.status === "todo" || s.status === "red");
 
+  const agentCalls = project.usage?.agent_calls ?? 0;
+  const costUsd = project.usage?.cost_usd ?? 0;
+  const totalTokens = (project.usage?.input_tokens ?? 0) + (project.usage?.output_tokens ?? 0);
+
   return (
     <div className="panel run">
       <div className="run-header">
@@ -44,6 +53,11 @@ export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onSt
           {PHASE_LABEL[project.phase]} — itération {project.iteration}
           {project.paused ? " ⏸ en pause" : project.auto_spec && loopActive ? " (boucle auto-spec)" : ""}
         </span>
+        {agentCalls > 0 && (
+          <span className="usage-meter">
+            💸 ${costUsd.toFixed(4)} · {formatTokens(totalTokens)} tokens · {agentCalls} appels
+          </span>
+        )}
         <div className="run-buttons">
           <button className="primary" disabled={!canRun || project.running} onClick={onRun}>
             {project.running ? "▶ En cours…" : "▶ Lancer le projet"}

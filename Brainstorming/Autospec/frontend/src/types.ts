@@ -78,6 +78,13 @@ export interface Epic {
   iteration: number;
 }
 
+export interface Usage {
+  cost_usd: number;
+  input_tokens: number;
+  output_tokens: number;
+  agent_calls: number;
+}
+
 export interface ProjectState {
   id: string;
   name: string;
@@ -97,6 +104,7 @@ export interface ProjectState {
   created_at: number;
   architecture: string;
   plan_quality: number;
+  usage: Usage;
 }
 
 export interface LogLine {

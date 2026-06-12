@@ -22,6 +22,10 @@ from ..config import settings
 class AgentResult:
     text: str
     session_id: str | None = None
+    cost_usd: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    duration_ms: int = 0
 
 
 class AgentError(RuntimeError):
@@ -90,9 +94,14 @@ class ClaudeCliRunner:
 
         try:
             payload = json.loads(out)
+            usage = payload.get("usage") or {}
             return AgentResult(
                 text=payload.get("result", ""),
                 session_id=payload.get("session_id"),
+                cost_usd=float(payload.get("total_cost_usd", 0) or 0),
+                input_tokens=int(usage.get("input_tokens", 0) or 0),
+                output_tokens=int(usage.get("output_tokens", 0) or 0),
+                duration_ms=int(payload.get("duration_ms", 0) or 0),
             )
         except json.JSONDecodeError:
             # --output-format json should always give JSON, but degrade gracefully

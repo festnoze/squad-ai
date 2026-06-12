@@ -503,6 +503,40 @@ async def test_story_diff_unknown_story_raises_keyerror():
         await pipeline.astory_diff("US-999")
 
 
+async def test_usage_is_accumulated(green_pytest):
+    class _CostRunner(FakeRunner):
+        async def arun(self, *a, **kw):
+            res = await super().arun(*a, **kw)
+            res.cost_usd = 0.01
+            res.input_tokens = 100
+            res.output_tokens = 50
+            return res
+
+    state = ProjectState(id="proj-test", name="todo", goal="Une todo-list")
+    runner = _CostRunner([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline = Pipeline(state, runner)
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # PM, PO, QA, Dev: four agent calls accumulated on the project state.
+    usage = pipeline.state.usage
+    assert usage.agent_calls == 4
+    assert usage.cost_usd == pytest.approx(0.04)
+    assert usage.input_tokens == 400
+    assert usage.output_tokens == 200
+
+
+async def test_usage_zero_by_default(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # FakeRunner reports no usage, but the call counter still increments.
+    usage = pipeline.state.usage
+    assert usage.cost_usd == 0.0
+    assert usage.agent_calls >= 4
+
+
 def test_dev_prompt_includes_guidance():
     from autospec.agents import prompts
     from autospec.models import UserStory

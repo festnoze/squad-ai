@@ -22,12 +22,12 @@ modèle courant.
 | 10 | Afficher architecture + scores de raffinement dans l'UI (`plan_quality`/`quality_score`, panneau + badges) | tests + e2e |
 | 11 | Action « continuer le build » d'un projet récupéré/dormant (`resume-build` + bouton) | tests + e2e |
 | 12 | Vue diff par story (commit git « story done » + `GET .../diff` + overlay diff coloré ; fix suppression workspace git) | tests + e2e |
+| 13 | Réorganisation drag-&-drop des stories sur le board (tri par priorité + poignée → `reorder`) | unit + e2e |
 
 ## ⏳ À faire — découvert en cours de route
 
 | # | Item | V/C | Pourquoi |
 |---|------|-----|----------|
-| 13 | Réorganisation drag-&-drop du board / backlog | 3/3 | Aujourd'hui repriorisation par champ numérique ; endpoint `reorder` déjà prêt côté backend |
 | 14 | Observabilité tokens/coût + timings par agent | 2/3 | Mesurer le coût par phase/agent, surtout avec raffinement/architecture activés |
 | 15 | Gestion des projets persistés legacy au boot | 2/2 | `recover_projects` recharge tous les vieux états ; offrir un archivage/nettoyage |
 | 16 | Activer le CI dans le monorepo | 1/1 | Le workflow `.github/workflows/ci.yml` n'est pas déclenché tant qu'Autospec est dans `squad-ai` ; le déplacer à la racine du dépôt (chemins préfixés) ou extraire Autospec |

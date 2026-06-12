@@ -56,7 +56,7 @@ Autospec/
 │       │   └── events.py        # Bus d'événements → WebSocket
 │       └── api/
 │           └── server.py        # REST + WebSocket + service du frontend buildé
-│   └── tests/                   # 78 tests (scheduler, runner, models, pipeline, refine, API, scripted, pytest_report)
+│   └── tests/                   # 80 tests (scheduler, runner, models, pipeline, refine, API, scripted, pytest_report)
 ├── frontend/                    # React + Vite + TypeScript
 │   └── src/
 │       ├── App.tsx
@@ -81,7 +81,8 @@ en JSON. Les éléments clés :
 
 | Modèle | Rôle |
 |---|---|
-| `ProjectState` | racine : objectif, phase, brief, **`architecture`** (design technique courant), backlog, epics, stories, chat, feedback, **`build_guidance`** (consignes données pendant le build), **`plan_quality`** (dernier score de raffinement du plan PO, -1 = non exécuté — exposé à l'UI), itération, flags |
+| `ProjectState` | racine : objectif, phase, brief, **`architecture`** (design technique courant), backlog, epics, stories, chat, feedback, **`build_guidance`** (consignes données pendant le build), **`plan_quality`** (dernier score de raffinement du plan PO, -1 = non exécuté — exposé à l'UI), **`usage`** (modèle `Usage` : coût/tokens/nombre d'appels cumulés sur tous les agents — exposé à l'UI), itération, flags |
+| `Usage` | observabilité cumulée d'un projet : `cost_usd`, `input_tokens`, `output_tokens`, `agent_calls` — sommés sur chaque appel agent |
 | `Epic` | regroupement de stories, rattaché à une itération |
 | `UserStory` | description, **`acceptance_criteria`** (objets `AcceptanceCriterion`), **Gherkin**, **`test_plan`** (tests unitaires planifiés par le QA), `depends_on`, **`priority`** (kanban 1-5), statut, tentatives, **`quality_score`** (dernier score de raffinement du code de la story, -1 = non exécuté — exposé à l'UI) ; méthodes `tests_for_criterion` / `criterion_state` |
 | `AcceptanceCriterion` | `{id, text}` — un critère d'acceptance, identifiable et reliable à des tests |
@@ -167,6 +168,19 @@ claude -p --output-format json
   prose ou de fences markdown (parsing par comptage d'accolades) ;
 - un **timeout** (`AUTOSPEC_AGENT_TIMEOUT_S`, 1800 s par défaut) tue le process
   s'il bloque ; toute sortie non-zéro lève `AgentError`.
+
+### 4.6 Observabilité — coût & tokens
+
+`AgentResult` porte, en plus du texte/`session_id`, l'**usage** de l'appel parsé
+du JSON du CLI : `cost_usd` (depuis `total_cost_usd`), `input_tokens` /
+`output_tokens` (depuis `usage`) et `duration_ms` — robuste aux clés manquantes
+(`FakeRunner`/`ScriptedRunner` renvoient un usage à zéro). La pipeline accumule
+ces métriques **par projet** via un wrapper `_UsageTracker` (sa méthode `arun`
+respecte le `Protocol AgentRunner`) qui enveloppe **tous** les appels agent
+(`self._tracked` substitué à `self.runner`, y compris les appels critic/judge/
+revise du raffinement passés à `refine.arefine`). Le total est cumulé dans
+`ProjectState.usage` (modèle `Usage` : `cost_usd`, `input_tokens`,
+`output_tokens`, `agent_calls`), exposé à l'UI dans l'état du projet.
 
 ### 4.3 Ce qui différencie les agents
 
@@ -659,7 +673,7 @@ Variables d'environnement (toutes optionnelles) :
 
 ### Tests backend (`backend/tests`)
 
-78 tests, sans aucun appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
+80 tests, sans aucun appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
 
 - **`test_scheduler.py`** — dépendances, détection de cycles, sanitization,
   **ordre kanban**.
@@ -683,7 +697,9 @@ Variables d'environnement (toutes optionnelles) :
   les stories `todo`/`red` de l'itération ; **409** si pipeline active ou si aucune
   story à construire), **diff git par story** (`astory_diff` : commit `story <id>
   done` retrouvé puis `git show` exposé ; `available=false` sans commit ; `KeyError`
-  si la story est inconnue).
+  si la story est inconnue), **observabilité tokens/coût** (`test_usage_is_accumulated` :
+  `usage.agent_calls`/`cost_usd`/tokens cumulés sur les 4 appels PM/PO/QA/Dev ;
+  `test_usage_zero_by_default` : `cost_usd=0` mais le compteur d'appels incrémente).
 - **`test_pytest_report.py`** — `pytest_report.parse` : parsing nominal du
   json-report, fichier manquant → `{}`, fichier corrompu → `{}`.
 - **`test_refine.py`** — **déterminisme du harnais de raffinement** : désactivé

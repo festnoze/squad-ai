@@ -35,10 +35,31 @@ from .events import bus
 _REFINE_ROLE_TO_CHAT = {"critic": ChatRole.CRITIC, "judge": ChatRole.JUDGE}
 
 
+class _UsageTracker:
+    """Wraps a pipeline's runner to accumulate token/cost usage on the project
+    state. Its `arun` matches the AgentRunner Protocol, so it can be passed to
+    `refine.arefine` to also count critic/judge/revise calls."""
+
+    def __init__(self, pipeline: "Pipeline"):
+        self.pipeline = pipeline
+
+    async def arun(self, prompt, system_prompt, cwd=None, session_id=None):
+        res = await self.pipeline.runner.arun(
+            prompt, system_prompt, cwd=cwd, session_id=session_id
+        )
+        usage = self.pipeline.state.usage
+        usage.cost_usd += res.cost_usd
+        usage.input_tokens += res.input_tokens
+        usage.output_tokens += res.output_tokens
+        usage.agent_calls += 1
+        return res
+
+
 class Pipeline:
     def __init__(self, state: ProjectState, runner: AgentRunner):
         self.state = state
         self.runner = runner
+        self._tracked = _UsageTracker(self)
         self._pm_session: str | None = None
         self._user_messages: asyncio.Queue[str] = asyncio.Queue()
         self._stop_requested = False
@@ -280,7 +301,7 @@ class Pipeline:
         self.state.phase = PipelinePhase.SPEC
         self._sync()
         while not self._stop_requested:
-            result = await self.runner.arun(
+            result = await self._tracked.arun(
                 prompts.pm_interview(self.state),
                 system_prompt=persona("pm"),
                 session_id=self._pm_session,
@@ -307,7 +328,7 @@ class Pipeline:
         self.state.phase = PipelinePhase.PLAN
         self._sync()
         pkg = workspace.package_name(self.state)
-        result = await self.runner.arun(
+        result = await self._tracked.arun(
             prompts.po_plan(self.state, pkg),
             system_prompt=persona("sm"),
         )
@@ -364,7 +385,7 @@ class Pipeline:
         self.state.phase = PipelinePhase.ARCHITECT
         self._sync()
         try:
-            result = await self.runner.arun(
+            result = await self._tracked.arun(
                 prompts.architect_design(self.state, workspace.package_name(self.state)),
                 system_prompt=persona("architect"),
             )
@@ -385,14 +406,14 @@ class Pipeline:
 
     async def _arefine_plan(self, initial_text: str, pkg: str) -> str:
         async def _revise(previous: str, critique: str) -> str:
-            res = await self.runner.arun(
+            res = await self._tracked.arun(
                 prompts.po_revise(self.state, pkg, previous, critique),
                 system_prompt=persona("sm"),
             )
             return res.text
 
         outcome = await refine.arefine(
-            self.runner,
+            self._tracked,
             role="po",
             kind="le plan produit (epics & user stories)",
             criteria=prompts.PLAN_CRITERIA,
@@ -417,7 +438,7 @@ class Pipeline:
             return
 
         async def _revise(previous: str, critique: str) -> str:
-            res = await self.runner.arun(
+            res = await self._tracked.arun(
                 prompts.dev_revise(
                     story, pkg, workspace.feature_rel_path(story), critique,
                     architecture=self.state.architecture,
@@ -440,7 +461,7 @@ class Pipeline:
             await self._agit(ws, "clean", "-fd")
 
         outcome = await refine.arefine(
-            self.runner,
+            self._tracked,
             role="dev",
             kind=f"le code produit pour la story {story.id} (fichiers dans le répertoire courant)",
             criteria=prompts.CODE_CRITERIA,
@@ -564,7 +585,7 @@ class Pipeline:
             await self._adesign_tests(story, pkg)
         self._log(f"dev:{story.id}", f"Agent dev assigné à {story.id} — {story.title}")
         try:
-            result = await self.runner.arun(
+            result = await self._tracked.arun(
                 prompts.dev_story(
                     story, pkg, workspace.feature_rel_path(story), self.state.architecture,
                     "\n".join(self.state.build_guidance),
@@ -713,7 +734,7 @@ class Pipeline:
         failure just means the dev works from the Gherkin alone."""
         self._log(f"qa:{story.id}", f"Architecte QA : décomposition outside-in des tests de {story.id}…")
         try:
-            result = await self.runner.arun(
+            result = await self._tracked.arun(
                 prompts.qa_test_plan(story, pkg, self.state.architecture),
                 system_prompt=persona("qa"),
             )
@@ -826,7 +847,7 @@ class Pipeline:
         selected = await self._aanalyze_phase()
         self.state.phase = PipelinePhase.SPEC
         self._sync()
-        result = await self.runner.arun(
+        result = await self._tracked.arun(
             prompts.pm_brief_for_feature(self.state, selected),
             system_prompt=persona("pm"),
         )
@@ -844,7 +865,7 @@ class Pipeline:
                 hyp.status = HypothesisStatus.DONE
         self._sync()
 
-        result = await self.runner.arun(
+        result = await self._tracked.arun(
             prompts.analyst_explore(self.state),
             system_prompt=persona("analyst"),
         )

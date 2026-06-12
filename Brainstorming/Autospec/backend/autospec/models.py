@@ -143,6 +143,16 @@ class Epic(BaseModel):
     iteration: int = 1
 
 
+class Usage(BaseModel):
+    """Accumulated token/cost observability for a project, summed across every
+    agent call (parsed from the Claude CLI's per-call usage)."""
+
+    cost_usd: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    agent_calls: int = 0
+
+
 class ProjectState(BaseModel):
     id: str
     name: str
@@ -159,6 +169,7 @@ class ProjectState(BaseModel):
     feedback: list[str] = Field(default_factory=list)
     build_guidance: list[str] = Field(default_factory=list)  # user directives given during the build
     iteration: int = 1
+    usage: Usage = Field(default_factory=Usage)  # accumulated tokens/cost across agent calls
     running: bool = False  # generated app currently running
     paused: bool = False   # pipeline paused by the user (gates between steps)
     error: str = ""
