@@ -28,6 +28,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from ..config import SimConfig, StreamMode
 from ..engine.runner import Runner
 from ..engine.snapshots import frame_message, generation_message, genome_message
+from ..lessons.demos import linear_regression_demo, neat_intro_demo, quadratic_network_demo
 from .schema import config_defaults_dict, config_schema_dict, is_structural_change
 
 app = FastAPI(title="neat_flappy_lab")
@@ -55,6 +56,29 @@ def config_schema() -> dict:
 def config_defaults() -> dict:
     """Default config values."""
     return config_defaults_dict()
+
+
+@app.get("/lessons/linear")
+def lesson_linear(steps: int = 80, lr: float = 0.08, seed: int = 4) -> dict:
+    """Trace a tiny linear regression optimized by gradient descent."""
+    return linear_regression_demo(steps=steps, lr=lr, seed=seed)
+
+
+@app.get("/lessons/quadratic")
+def lesson_quadratic(
+    steps: int = 160,
+    lr: float = 0.035,
+    hidden: int = 6,
+    seed: int = 7,
+) -> dict:
+    """Trace a small neural network fitting a quadratic function."""
+    return quadratic_network_demo(steps=steps, lr=lr, hidden=hidden, seed=seed)
+
+
+@app.get("/lessons/neat-intro")
+def lesson_neat_intro(generations: int = 32, seed: int = 11) -> dict:
+    """Return a compact NEAT-style XOR evolution trace."""
+    return neat_intro_demo(generations=generations, seed=seed)
 
 
 class Session:

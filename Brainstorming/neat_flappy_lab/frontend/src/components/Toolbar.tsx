@@ -1,10 +1,11 @@
 import { useLab } from '../store'
 import { MODES } from '../camps'
+import { Icon } from './LessonLabs'
 
 function statusLabel(status: string): string {
-  if (status === 'open') return 'Connecté'
-  if (status === 'connecting') return 'Connexion…'
-  return 'Déconnecté'
+  if (status === 'open') return 'Connecte'
+  if (status === 'connecting') return 'Connexion...'
+  return 'Deconnecte'
 }
 
 export function Toolbar() {
@@ -39,14 +40,18 @@ export function Toolbar() {
       </div>
 
       <span className={`pill ${status}`}>
-        {status === 'connecting' ? <span className="spinner" style={{ width: 10, height: 10 }} /> : <span className="led" />}
+        {status === 'connecting' ? (
+          <span className="spinner" style={{ width: 10, height: 10 }} />
+        ) : (
+          <span className="led" />
+        )}
         {statusLabel(status)}
       </span>
 
       {applying && (
         <span className="pill" title="Application de la configuration">
           <span className="spinner" style={{ width: 10, height: 10 }} />
-          Application…
+          Application...
         </span>
       )}
 
@@ -64,41 +69,33 @@ export function Toolbar() {
         ))}
       </div>
 
-      <button
-        className="btn primary"
-        disabled={!connected || playing}
-        onClick={() => control('play')}
-      >
-        ▶ Play
+      <button className="btn primary" disabled={!connected || playing} onClick={() => control('play')}>
+        <Icon name="play" />
+        Play
       </button>
-      <button
-        className="btn"
-        disabled={!connected || !playing}
-        onClick={() => control('pause')}
-      >
-        ⏸ Pause
+      <button className="btn" disabled={!connected || !playing} onClick={() => control('pause')}>
+        <Icon name="pause" />
+        Pause
       </button>
       <button
         className="btn"
         disabled={!connected}
         onClick={() => control('step')}
-        title="1 génération"
+        title="1 generation"
       >
-        ⤳ Step
+        <Icon name="step" />
+        Step
       </button>
-      <button
-        className="btn"
-        disabled={!connected}
-        onClick={() => control('reset')}
-      >
-        ↺ Reset
+      <button className="btn" disabled={!connected} onClick={() => control('reset')}>
+        <Icon name="reset" />
+        Reset
       </button>
 
       <div className="spacer" />
 
       <div className="stat">
-        <span className="k">Génération</span>
-        <span className="v">{latestGen >= 0 ? latestGen : '—'}</span>
+        <span className="k">Generation</span>
+        <span className="v">{latestGen >= 0 ? latestGen : '-'}</span>
       </div>
       <div className="stat">
         <span className="k">Fitness max</span>
@@ -109,13 +106,14 @@ export function Toolbar() {
         <span className="v">{fitnessMean.toFixed(1)}</span>
       </div>
       <div className="stat">
-        <span className="k">Espèces</span>
+        <span className="k">Especes</span>
         <span className="v">{species}</span>
       </div>
       <div className="stat">
-        <span className="k">Complexité</span>
+        <span className="k">Complexite</span>
         <span className="v">{complexity.toFixed(1)}</span>
       </div>
     </div>
   )
 }
+

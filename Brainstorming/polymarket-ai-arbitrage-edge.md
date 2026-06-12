@@ -1,8 +1,9 @@
 # Gagner un edge sur Polymarket avec des agents IA automatisés (newsfeed + analyse)
 
 > Document de recherche & de raisonnement itératif ("loop thinking").
-> Statut : DRAFT — sections recherche en cours de consolidation (deep-research multi-sources).
-> Date : 2026-06-10
+> Statut : v1.1 — COMPLET. Recherche multi-sources intégrée (§2.1–2.9, dont analyse copy-trading),
+> architecture cible (§3), plan de validation (§4), conclusion (§5).
+> Date : 2026-06-11
 
 ---
 
@@ -156,26 +157,219 @@ financement nécessaire).
 
 ## 2. Recherche vérifiée (multi-sources)
 
-> EN COURS — résultats du harnais deep-research (recherche parallèle,
-> vérification adversariale des claims, citations) à intégrer ici.
+> Résultats consolidés de la recherche parallèle multi-agents (juin 2026).
+> Chaque claim porte un niveau de confiance : HAUTE / MOYENNE / FAIBLE.
 
 ### 2.1 Mécanique Polymarket (CLOB, frais, oracle UMA, neg-risk)
-*(à compléter)*
+
+#### a) Architecture CLOB hybride
+
+- **Matching off-chain, règlement on-chain** : le CLOB de Polymarket est « hybride-décentralisé » — un opérateur centralisé apparie les ordres hors chaîne, puis soumet les trades appariés au contrat **CTF Exchange** sur Polygon, qui vérifie les signatures EIP-712 des deux ordres (prix, taille, allowance) et exécute un swap atomique USDC ↔ tokens d'outcome. Placement/annulation d'ordre sont instantanés et gratuits ; seul le règlement est on-chain. [docs.polymarket.com](https://docs.polymarket.com/trading/overview), [github.com/Polymarket/ctf-exchange](https://github.com/Polymarket/ctf-exchange) — HAUTE.
+- **Tokens d'outcome** : ERC-1155 du Gnosis **Conditional Tokens Framework (CTF)** ; chaque paire YES/NO est adossée à exactement 1 USDC.e (désormais « pUSD ») verrouillé dans le contrat CTF. Le contrat Exchange a été audité par ChainSecurity. [chainstack.com](https://chainstack.com/polymarket-api-for-developers/) — HAUTE.
+- **Primitives split/merge/redeem** : `split` transforme 1 USDC en 1 YES + 1 NO ; `merge` fait l'inverse (YES + NO → 1 USDC, à tout moment) ; `redeem` convertit le token gagnant en 1 USDC après résolution. C'est la base mécanique de tout arbitrage intra-marché. [docs.polymarket.com](https://docs.polymarket.com/developers/CLOB/orders/orders) — HAUTE.
+- **Types d'ordres et microstructure** : ordres limites (GTC/GTD) et ordres « market » (FOK/FAK). Tick sizes par marché : 0,1 / 0,01 / 0,001 / 0,0001 $, avec changement dynamique de tick quand le prix dépasse 0,96 $ ou passe sous 0,04 $ ; un ordre non conforme au tick est rejeté. Taille minimale d'ordre spécifique à chaque marché (exposée via l'API CLOB). — HAUTE.
+- **Gas et relayer** : modèle « gasless » : l'utilisateur signe localement, un **Relayer** (type Gas Station Network) diffuse les transactions via des proxy wallets et paie le gas Polygon (déploiement de wallet, approvals, split/merge/redeem, ordres). Le gas est un coût opérationnel de Polymarket, pas de l'utilisateur. [docs.polymarket.com/trading/gasless](https://docs.polymarket.com/trading/gasless) — HAUTE.
+- Un **CLOB v2** a été déployé fin avril 2026, accompagné d'un programme de récompenses de liquidité de 1 M$. [crypto.news](https://crypto.news/polymarket-rolls-out-clob-v2-with-1m-liquidity-rewards-to-harden-prediction-markets/) — MOYENNE (presse crypto, peu de détails techniques publics).
+
+#### b) Frais (état 2026 — changement majeur)
+
+- Historiquement **0 % de frais de trading** (2020–2025), modèle subventionné pour la croissance. Fin 2025/début 2026, la plateforme internationale a brièvement appliqué un prélèvement de **2 % sur les gains nets** au règlement, selon plusieurs sources secondaires. [kucoin.com](https://www.kucoin.com/blog/polymarket-fees-trading-guide-2026), [marketmath.io](https://marketmath.io/blog/polymarket-fees-explained) — MOYENNE (non confirmé par une page officielle archivée).
+- **Janvier 2026** : premiers taker fees sur les marchés crypto court-terme (5 min/15 min/horaire), avec rebates makers ; extension aux sports le 18 février 2026. [newspoly.net](https://www.newspoly.net/blog/polymarket-fees-guide) — MOYENNE.
+- **Barème actuel (« Fee Structure V2 », effectif fin mars 2026)** : frais **taker uniquement**, formule `fee = C × feeRate × p × (1−p)` (maximum à p = 0,50, tendant vers 0 aux extrêmes). FeeRate par catégorie : crypto 0,07 ; sports 0,03 (frais effectif max ~0,75 % à 50/50) ; finance/politique/mentions/tech 0,04 ; économie/culture/météo 0,05 ; **géopolitique et événements mondiaux : 0 %**. Les makers ne paient rien et reçoivent des rebates quotidiens en USDC (20–25 % des taker fees collectés). Les ordres de vente ne paient pas de taker fee. Pas de frais de dépôt/retrait pUSD. [help.polymarket.com](https://help.polymarket.com/en/articles/13364478-trading-fees), [docs.polymarket.com](https://docs.polymarket.com/polymarket-learn/trading/fees) — HAUTE.
+
+→ **Implication stratégique directe** : le régime de frais 2026 favorise structurellement les stratégies **maker** (0 frais + rebates) et pénalise les stratégies **taker** haute fréquence ; la géopolitique (0 %) est la catégorie la moins chère à trader en taker — exactement la catégorie des « chocs non programmés » identifiée en section 1.
+
+#### c) Résolution par l'oracle UMA
+
+- **Mécanisme optimiste** : n'importe qui peut proposer un résultat en postant un bond de **750 pUSD** ; fenêtre de contestation de **2 h** ; si contesté, contre-bond équivalent, et si une seconde proposition est aussi disputée, escalade vers le **DVM** d'UMA (vote des détenteurs de tokens UMA, ~48 h). Résolution totale : ~2 h sans dispute, 4–6 jours avec. Le proposeur gagnant récupère son bond + la moitié du bond adverse. [docs.polymarket.com/concepts/resolution](https://docs.polymarket.com/concepts/resolution) — HAUTE.
+- **Controverse « Ukraine mineral deal » (mars 2025)** : le marché « Ukraine agrees to mineral deal before April? » a résolu YES alors qu'aucun accord n'était signé ; une whale UMA a voté avec ~5 M de tokens répartis sur 3 comptes (~25 % des votes du round), ~7 M$ payés sur une résolution fausse ; Polymarket a refusé tout remboursement (« not a market failure »). [thedefiant.io](https://thedefiant.io/news/defi/polymarket-s-usd7m-ukraine-mineral-deal-debacle-traced-to-oracle-whale), [coindesk.com](https://www.coindesk.com/markets/2025/03/27/polymarket-uma-communities-lock-horns-after-usd7m-ukraine-bet-resolves) — HAUTE.
+- **Controverse « Zelensky suit » (juillet 2025)** : marché de 160–237 M$ résolu **NO** malgré l'apparition au sommet de l'OTAN décrite comme « costume » par de nombreux médias ; accusations de conflit d'intérêts (vote pondéré par tokens, gros porteurs positionnés NO). [coindesk.com](https://www.coindesk.com/markets/2025/07/07/polymarket-embroiled-in-usd160m-controversy-over-whether-zelensky-wore-a-suit-at-nato), [decrypt.co](https://decrypt.co/329210/polymarket-rules-no-237m-bet-zelenskyys) — HAUTE.
+- En réponse, UMA a déployé un oracle « managé » (**Managed Optimistic Oracle V2**, ~août 2025) réduisant le pouvoir des votes bruts sur les cas litigieux. [orochi.network](https://orochi.network/blog/oracle-manipulation-in-polymarket-2025) — MOYENNE. **Implication pour tout bot : le risque de résolution est non négligeable, même à 99 ¢.**
+
+#### d) Marchés « negative risk » (multi-issues)
+
+- Pour les événements à issues mutuellement exclusives (ex. élection à N candidats), le **NegRiskAdapter** (audité ChainSecurity, avril 2024) relie N marchés binaires : l'opération **convert** brûle 1 NO dans un marché et crédite 1 YES dans chacun des N−1 autres (+ du collatéral le cas échéant) ; détenir les N NO (« complement set ») équivaut à du cash. Cela force la cohérence Σ(YES) ≈ 1 et améliore l'efficacité du capital. [github.com/Polymarket/neg-risk-ctf-adapter](https://github.com/Polymarket/neg-risk-ctf-adapter), [docs.polymarket.com/advanced/neg-risk](https://docs.polymarket.com/advanced/neg-risk) — HAUTE.
+
+#### e) Retour aux États-Unis : deux venues parallèles
+
+- Polymarket a racheté **QCEX** (bourse + chambre de compensation licenciées CFTC) pour **112 M$** le 21 juillet 2025 ; feu vert CFTC en septembre 2025 ; **Amended Order of Designation** le 25 novembre 2025 (accès intermédié brokers/FCM) ; relance US effective début décembre 2025. Volume ~7 Md$/mois en février 2026, ~80 % sports. [prnewswire.com](https://www.prnewswire.com/news-releases/polymarket-acquires-cftc-licensed-exchange-and-clearinghouse-qcex-for-112-million-302509626.html), [coindesk.com](https://www.coindesk.com/policy/2025/09/03/u-s-cftc-gives-go-ahead-for-polymarket-s-new-exchange-qcx) — HAUTE.
+- Il existe donc **deux venues parallèles** : Polymarket US (régulé CFTC, USD, KYC) et Polymarket international (crypto-natif, Polygon, barème V2). Les deux carnets ne sont pas fongibles : **c'est en soi une source potentielle d'écarts de prix.** — HAUTE (existence) / MOYENNE (exploitabilité).
 
 ### 2.2 Classes d'arbitrage documentées
-*(à compléter)*
+
+#### Référence académique principale : « Unravelling the Probabilistic Forest » (arXiv 2508.03474, AFT 2025)
+
+- Étude de Saguillo, Ghafouri, Kiffer & Suarez-Tangil sur les marchés résolus entre **avril 2024 et avril 2025** : 8 659 marchés mono-condition + 1 578 marchés neg-risk (17 218 conditions), ~86 M d'ordres on-chain analysés. Profit d'arbitrage réalisé estimé : **39,6 M$**. [arxiv.org/abs/2508.03474](https://arxiv.org/abs/2508.03474) — HAUTE.
+- Décomposition : mono-condition **~10,6 M$** (achats YES+NO < 1 $ : 5,9 M$ ; ventes YES+NO > 1 $ : 4,7 M$) ; **neg-risk ~29 M$** (achat de tous les YES < 1 $ : 11,1 M$ ; achat de tous les NO < N−1 : 17,3 M$) ; arbitrage **combinatoire : seulement ~95 K$** (4 paires exploitées sur ~13 identifiées). [collective.flashbots.net](https://collective.flashbots.net/t/arbitrage-in-prediction-markets-strategies-impact-and-open-questions/5198) — HAUTE.
+- **Concentration** : le premier arbitragiste a extrait **2,01 M$** en 4 049 transactions ; le top 10 des adresses capte **8,18 M$**. Patterns clairement automatisés chez les top performers. — HAUTE.
+- **Réserve méthodologique** : ces chiffres sont des **bornes supérieures** (hypothèse de détention jusqu'à résolution, pas de coût d'opportunité ni de contrainte de liquidité). — HAUTE.
+
+#### Classe 1 — Arbitrage mono-marché (YES + NO ≠ 1 $)
+
+- Acheter YES et NO quand leur somme < 1 $, puis `merge` ou tenir jusqu'à résolution (symétriquement `split` + vendre quand la somme > 1 $). ~10,6 M$ extraits sur avril 2024–avril 2025 — HAUTE. Les écarts apparaissent surtout lors de chocs d'information (débats, résultats sportifs en direct) quand un côté du book se vide plus vite que l'autre. — MOYENNE.
+
+#### Classe 2 — Arbitrage multi-issues / neg-risk (Σ YES ≠ 1)
+
+- Si la somme des YES de tous les candidats < 1 $, acheter tous les YES garantit 1 $ à la résolution ; si la somme des NO < N−1, acheter tous les NO et utiliser `convert` via le NegRiskAdapter. **La classe la plus lucrative historiquement (~29 M$)**, dopée par l'élection US 2024. — HAUTE.
+
+#### Classe 3 — Arbitrage combinatoire (marchés logiquement liés)
+
+- Exploiter des implications logiques entre marchés distincts (ex. « gagnant de l'élection » vs « marge de victoire ») : 13 paires dépendantes identifiées pendant l'élection 2024, mais **très peu exploitées (~95 K$)** — la détection automatique des dépendances logiques reste le verrou. — HAUTE. **C'est la classe où il reste théoriquement le plus d'inefficiences** (et où un LLM a un avantage : comprendre les liens logiques est sémantique, pas numérique), mais aussi celle où le « risque de modèle » (lien logique imparfait) est le plus élevé. — MOYENNE (interprétation).
+
+#### Classe 4 — Arbitrage cross-platform (Polymarket vs Kalshi vs Betfair)
+
+- Acheter YES sur une plateforme et NO sur l'autre quand YES_A + NO_B < 1 $. Spreads documentés de **1,5–4,5 %** sur événements liquides, divergence > 5 points ~15–20 % du temps selon des trackers commerciaux — FAIBLE (sources promotionnelles). Outils open source : [github.com/ImMike/polymarket-arbitrage](https://github.com/ImMike/polymarket-arbitrage) — MOYENNE.
+- Coûts : taker fees Kalshi (~1,2 % en moyenne, formule 0,07×p×(1−p)) + désormais taker fees Polymarket : spread brut nécessaire ~1,75–2,5 ¢ par contrat. [polycopy.app](https://polycopy.app/polymarket-kalshi-arbitrage) — MOYENNE.
+- **Risque clé : divergence de résolution.** Exemple documenté : marché « Cardi B au Super Bowl » résolu différemment entre Kalshi et Polymarket (critères différents), transformant un arb « sans risque » en perte sur les deux jambes. [defirate.com](https://defirate.com/prediction-markets/how-contracts-settle/) — MOYENNE.
+
+#### Classe 5 — Arbitrage de fin de partie (« endgame », 95–99 ¢)
+
+- Acheter des issues quasi certaines à 0,95–0,99 $ entre l'événement réel et la résolution officielle ; rendements annualisés revendiqués de 15–40 % avec rotation rapide — FAIBLE (estimations praticiennes non auditées). **Ce n'est pas un arbitrage sans risque** : cf. Zelensky suit, où des positions à ~99 ¢ sont allées à 0. — HAUTE (par déduction des cas §2.1c).
+
+#### État de la concurrence en 2026 : fenêtre largement refermée
+
+- Étude UCLA sur les marchés NBA (arXiv 2605.00864, avril 2026) : sur **75 M+ de snapshots de carnet, 173 matchs**, seulement **7 épisodes d'arb mono-marché exécutables** (durée médiane 3,6 s, profit total plafonné à 210 $) ; 290 épisodes combinatoires à ~101 bps médians, mais profondeur exécutable de ~15 shares dans 77 % des cas. Conclusion : « efficience microstructurelle profonde », l'extraction sans risque est confinée à l'**échelle retail** par la faible profondeur des books. [arxiv.org/html/2605.00864v1](https://arxiv.org/html/2605.00864v1) — HAUTE.
+- Cas documenté de **latency arbitrage** : un bot a extrait ~271 500 $ en 30 jours en exploitant le décalage entre prix UI et prix on-chain. [predik.io](https://predik.io/en/blog/bot-trading-polymarket-exploit-latencia-arbitraje-en) — MOYENNE.
+- **Synthèse sceptique** : les classes 1 et 2 sont aujourd'hui dominées par des bots colocalisés (exécution < 100 ms) et les taker fees 2026 rognent les marges résiduelles ; les poches restantes plausibles sont l'**arb combinatoire** (détection sémantique non triviale — rôle pour l'IA), le **cross-platform avec gestion explicite du risque de résolution**, et l'**endgame** — toutes avec un risque non nul et une capacité limitée. — MOYENNE (synthèse).
 
 ### 2.3 Latence news & bots existants
-*(à compléter)*
+
+#### a) Vitesse de repricing documentée
+
+- **Étude académique de référence (Kalshi, NBA)** : *« When Do Markets Fully Process Public Information? »* (arXiv 2606.07811, juin 2026) — 1 438 matchs NBA, ~409 500 observations contrat-minute (avril 2025 → mai 2026). Résultat central : une variation d'1 min de la probabilité « benchmark » ne se traduit que par **~0,64-pour-1** dans le midpoint Kalshi — sous-réaction systématique à l'information publique. [arxiv.org](https://arxiv.org/html/2606.07811) — HAUTE.
+- **Drift prévisible mais non exploitable (en taker)** : le gap de sous-réaction prédit un drift de **+4,6 pts à horizon 5 min** (coefficients 0,38–0,49, significatifs), MAIS les rendements exécutables **après spread bid-ask sont négatifs** : les coûts absorbent l'anomalie. — HAUTE. **Nuance clé pour nous** : l'anomalie n'est pas exploitable en *prenant* le spread, mais elle peut l'être en le *fournissant* (quotes maker asymétriques orientées dans le sens du drift).
+- **Aucune réplication publiée sur Polymarket** : l'extrapolation 0,64-pour-1 à Polymarket reste une hypothèse. — FAIBLE (absence de preuve).
+- **Mouvements violents** : sur breaking news majeure, les prix peuvent bouger de **40–50 points en quelques secondes**, forçant les market makers à des retraits de cotation automatisés. — MOYENNE.
+
+#### b) Bots à réaction rapide et leur infrastructure
+
+- **Bots sportifs** : Polymarket expose un **WebSocket sports officiel** (`wss://sports-api.polymarket.com/ws`) diffusant scores et statuts en temps réel. [docs.polymarket.com](https://docs.polymarket.com/developers/sports-websocket/overview) — HAUTE. Le flux WSS du CLOB (~100 ms) bat largement le polling Gamma (~1 s) ; le CLOB tourne sur **AWS eu-west-2 (Londres)**. [tradingvps.io](https://tradingvps.io/measuring-real-trading-execution-latency-on-polymarket/) — MOYENNE.
+- **Avantage data sportive** : les flux type Sportradar arrivent jusqu'à **~8 s avant le signal TV** ; tennis et NBA sont les plus sensibles à la latence. — MOYENNE. → Confirmer l'itération 3 : sur les événements *programmés*, la course est perdue d'avance sans data feed payant.
+- **Bots macro (CPI/Fed)** : des bots combinent Cleveland Fed Nowcast, FRED, sous-composantes BLS comme signaux. — MOYENNE (architecture plausible, performances non vérifiées).
+- **Bots politiques / Truth Social** : services d'alerte (TrumpBot, SentryDock) revendiquant une notification **<30 s** après un post de Trump. [sentrydock.com](https://www.sentrydock.com/sources/truth-social) — MOYENNE. Cas Reuters : avant l'annonce de cessez-le-feu du 7 avril 2026, **≥50 comptes** ont acheté YES avant le post ; un wallet créé le matin même a gagné ~200 000 $ — mais cela relève de la fuite d'info, pas de la latence. [investing.com/Reuters](https://www.investing.com/news/stock-market-news/some-trades-ahead-of-trump-policy-moves-raise-questions-4606365) — HAUTE.
+
+#### c) Cas documentés de profits « latence »
+
+- **Frappes sur l'Iran (fév. 2026)** : premier ordre placé **71 min avant** que la nouvelle ne devienne publique (+553 000 $) ; cluster de 6 wallets frais, **989 191 $ de profit net combiné**. [npr.org](https://www.npr.org/2026/03/01/nx-s1-5731568/polymarket-trade-iran-supreme-leader-killing), [theblock.co](https://www.theblock.co/post/391650/fresh-accounts-netted-1-million-on-polymarket-hours-before-us-airstrikes-on-iran-bubblemaps) — HAUTE. À noter : la « fenêtre de 71 min » montre surtout que le marché ne reprice PAS tant que l'info reste privée — c'est un argument pour le détecteur de flux informé (§2.7), pas pour la course de vitesse.
+- **Arbitrage de latence oracle (crypto 15 min)** : le flux Chainlink se met à jour en <1 s mais le carnet Polymarket réagirait en ~55 s en moyenne ; backtest revendiquant ~5 000 opportunités/3 semaines, ~60 % win rate. [github.com/JonathanPetersonn/oracle-lag-sniper](https://github.com/JonathanPetersonn/oracle-lag-sniper) — FAIBLE (auto-déclaré). Polymarket a introduit des **frais dynamiques** (jusqu'à ~3,15 % à 50 ¢) sur les marchés crypto court-terme **explicitement pour casser l'arbitrage de latence**. [financemagnates.com](https://www.financemagnates.com/cryptocurrency/polymarket-introduces-dynamic-fees-to-curb-latency-arbitrage-in-short-term-crypto-markets/) — HAUTE. → Les stratégies taker HFT y sont devenues marginales.
+
+#### d) Repricing retardé des marchés corrélés (second ordre)
+
+- **Mécanisme structurel** : les marchés corrélés tradent sur des carnets isolés — les smart contracts ne lient pas nativement les prix de marchés dépendants, d'où des désalignements transitoires récurrents (cf. arb combinatoire §2.2, ~13 paires identifiées dont 4 exploitées). — MOYENNE.
+- C'est la confirmation la plus solide que les marchés de second ordre repricent plus lentement que le marché « principal » touché par la news ; **aucune mesure académique précise du délai de propagation n'a toutefois été publiée** — la quantifier nous-mêmes (données WSS enregistrées) est un prérequis du plan de validation (§4). — FAIBLE sur la quantification.
 
 ### 2.4 Architectures d'agents & outillage open source
-*(à compléter)*
+
+#### a) Stack développeur officielle (état 2026)
+
+- **CLOB API** (`clob.polymarket.com`, REST + WSS) : carnet, placement/annulation, auth par signature de wallet (clés L1/L2). Matching off-chain (quelques ms), règlement on-chain Polygon. [docs.polymarket.com](https://docs.polymarket.com/developers/CLOB/introduction) — HAUTE.
+- **WebSocket CLOB, 4 canaux** : `market` (snapshots de carnet, price changes), `user` (fills, annulations), `sports` (scores live), `RTDS` (temps réel, dont prix crypto Chainlink). — HAUTE.
+- **Gamma API** (`gamma-api.polymarket.com`, lecture sans auth) : métadonnées marchés/événements, ~60 req/min. — HAUTE.
+- **Data API** (`data-api.polymarket.com`, lecture sans auth) : positions, activité et historique des wallets — la base de tous les outils de copy-trading (cf. §2.7). — HAUTE.
+- **SDK Python** : [Polymarket/py-clob-client](https://github.com/Polymarket/py-clob-client) (+ py-clob-client-v2 avec le CLOB v2) gère signature et auth. — HAUTE.
+
+#### b) Frameworks d'agents open source notables
+
+- **[Polymarket/agents](https://github.com/Polymarket/agents)** (officiel, MIT) : framework LangChain — Gamma.py (métadonnées), Polymarket.py (exécution), Chroma.py (RAG sur sources de news), modèles Pydantic, CLI. Complété en 2026 par [Polymarket/agent-skills](https://github.com/Polymarket/agent-skills). — HAUTE sur l'existence ; aucune performance officielle revendiquée.
+- **[valory-xyz/trader](https://github.com/valory-xyz/trader)** (Olas) : agent de prédiction pour Omen et Polymarket, architecture FSM, service on-chain via multisig Safe. Sa déclinaison grand public **Polystrat** aurait exécuté >4 200 trades/mois. [olas.network](https://olas.network/blog/polystrat-or-open-claw-what-s-better-for-trading-polymarket-on-autopilot) — MOYENNE (chiffres promotionnels).
+- **Projets communautaires** : [web3devz/polytrader](https://github.com/web3devz/polytrader) (LangChain + Exa), [itsabhay83/PolyTrade](https://github.com/itsabhay83/PolyTrade) (LangGraph) — HAUTE sur l'existence, FAIBLE sur toute rentabilité revendiquée.
+- **Approche quantitative sans LLM** : [djienne/POLYMARKET_UP_DOWN_DERIBIT_STRATEGY](https://github.com/djienne/POLYMARKET_UP_DOWN_DERIBIT_STRATEGY) — probabilité terminale BTC via surface SSVI calibrée sur options Deribit (Breeden-Litzenberger + Monte Carlo), avec backtester (cf. §2.8d). Même auteur : [djienne/Polymarket-bot](https://github.com/djienne/Polymarket-bot) (bi-stratégie, sizing Kelly). — HAUTE (code public), FAIBLE (pas de track record audité).
+
+#### c) Pipelines de forecasting LLM : structure et résultats
+
+- **Pipeline canonique** (retrieval de news → raisonnement → probabilité calibrée → sizing Kelly → exécution) : formalisé par Halawi et al., *« Approaching Human-Level Forecasting with Language Models »* ([arXiv 2402.18563](https://arxiv.org/abs/2402.18563)) — testé sur 914 questions post-cutoff (dont Polymarket), **Brier 0,179** vs ~0,149 pour la foule humaine — proche mais en dessous. — HAUTE.
+- **Tournois Metaculus AIB** : au Q2 2025, **les Pro Forecasters battent nettement le top-10 des bots** (head-to-head −20,03, p = 0,00001) ; les meilleurs bot-makers étaient des hobbyistes, devant les startups. [metaculus.com](https://www.metaculus.com/aib/2025/q2/) — HAUTE. Conclusion sceptique : **les LLM ne battent pas encore les bons forecasters humains** ; un agent LLM n'a d'edge que face à des marchés peu liquides, lents, ou mal lus (règles de résolution) — ce qui recoupe exactement les verdicts de la section 1.
+- **Cas médiatisé « ilovecircle »** : 2,2 M$ en 60 jours, win rate revendiqué 74 %, scripts Python générés avec Claude — FAIBLE (cas unique, non audité, recyclé par les médias crypto).
+
+#### d) Part des agents IA dans le volume 2026 — à prendre avec précaution
+
+- « >30 % des wallets utilisent des agents IA » (LayerHub) et « 14 des 20 wallets les plus profitables sont des bots » (tweet repris par Finance Magnates) : **non vérifiables indépendamment**. — FAIBLE.
+- Donnée la plus solide : les ~40 M$ d'arbitrage extraits en un an (arXiv 2508.03474, méthodologie on-chain) montrent que l'automatisation domine déjà les classes d'arb mécaniques. — HAUTE.
+
+#### e) Coûts d'infrastructure et position officielle
+
+- **Gas Polygon** : ~0,002 $/tx, <0,01 $/trade ; les ordres CLOB sont signés off-chain (gas seulement sur approvals/redemptions, largement relayé par Polymarket). — HAUTE.
+- **Latence d'ordre** : matching en quelques ms côté serveur ; la latence réseau domine (VPS proche d'eu-west-2 ; retail typique 10–100 ms). — MOYENNE.
+- **Coût LLM par décision** : quelques centimes à quelques dizaines de centimes selon la profondeur du raisonnement (retrieval ~0,005 $/recherche + tokens) ; le framework [Metaculus/forecasting-tools](https://github.com/Metaculus/forecasting-tools) inclut un Monetary Cost Manager. — MOYENNE.
+- **Position officielle** : le trading par API est **explicitement permis et encouragé** (« free and permissionless », repo d'agents officiel, **Builder Program** CLOB v2 avec builder codes et récompenses USDC hebdomadaires). [docs.polymarket.com/builders/overview](https://docs.polymarket.com/builders/overview) — HAUTE. Limites : interdiction ToS pour les juridictions restreintes **y compris via API et agents** — HAUTE ; et frais dynamiques anti-latence sur les marchés crypto courts. En clair : **les bots apporteurs de liquidité sont bienvenus, les snipers de latence sont taxés.**
 
 ### 2.5 Économie réaliste
-*(à compléter)*
+
+#### a) Spreads et profondeur de carnet
+
+- **Structure des carnets** : étude académique (arXiv 2604.24366, avril 2026, 600 marchés, ~30 Md d'événements tick-level) : « prime de spread sur les longshots » (spreads plus larges aux probabilités extrêmes), profondeur quasi uniforme le long du carnet plutôt que concentrée au top-of-book. [arxiv.org](https://arxiv.org/abs/2604.24366) — HAUTE.
+- **Liquide vs long tail** : marchés liquides ~1 ¢ de spread, moyens 3–5 ¢, fins 10 ¢+ ; les marchés >30 jours de durée ont une liquidité moyenne ~450 000 $ contre ~10 000 $ pour les <1 jour. — MOYENNE.
+- **Marchés morts** : sur ~21 850 marchés actifs, ~63 % ont un volume nul sur 24 h ; 156 000 contrats de long tail = 7,5 % du volume total. — MOYENNE. → La « longue traîne » de l'itération 2 est réelle mais sa **capacité est minuscule** : c'est un edge de calibration, pas de volume.
+
+#### b) Volumes 2025–2026
+
+- **Volume mensuel** : pic ~10,5 Md$ en mars 2026 (international), ~9 Md$ en avril, ~7,1 Md$ en mai (2ᵉ baisse consécutive) ; Polymarket US : 1,26 Md$ (avril) → 1,77 Md$ (mai). [cnbc.com](https://www.cnbc.com/2026/06/10/polymarkets-volume-falls-again-in-may.html) — HAUTE.
+- **Concentration thématique** : sports + politique + crypto = 91 % du volume depuis juillet 2024 (Pew Research) ; ~780 000 participants actifs mensuels au pic. [pewresearch.org](https://www.pewresearch.org/short-reads/2026/05/27/trading-volume-on-prediction-markets-has-soared-in-recent-months/) — HAUTE.
+
+#### c) Pile de coûts réelle par trade
+
+- **Frais** (cf. §2.1b pour la formule) : en pratique ~0,75 $/100 parts sur le sport, 1,00 $ politique/finance/tech, 1,25 $ économie/culture/météo, 1,80 $ crypto (à p=0,50) ; géopolitique 0 ; **maker 0**. — HAUTE.
+- **Gas** : quasi nul — un bot réel rapporte 1,19 $ de frais+gas sur 95 830 $ de volume. [kacho.io](https://kacho.io/polymarket-arbitrage-real-numbers) — HAUTE.
+- **Immobilisation du capital** : le collatéral (pUSD depuis le 28 avril 2026) ne porte **pas d'intérêt** par défaut ; exception : « Holding Rewards » à 4 % annualisé sur une liste restreinte de positions long terme. [help.polymarket.com](https://help.polymarket.com/en/articles/13364459-holding-rewards) — HAUTE. Le coût d'opportunité (~4–5 % sans risque ailleurs) reste un vrai coût sur les marchés lointains — ce qui confirme l'arbitrage horizon/edge de l'itération 4.
+- **Slippage** : significatif hors top-marchés ; règlements parfois retardés de plusieurs heures/jours en cas de dispute (capital gelé). — MOYENNE.
+
+#### d) Statistiques de rentabilité — la base rate est brutale
+
+- **~2,4 % des wallets ont gagné >1 000 $** (37 629 / 1 560 857, CrowdIntel) ; analyse on-chain de 2,5 M wallets : 84,1 % perdants, ~8 000 wallets >10 000 $, 840 wallets (0,033 %) >100 000 $. [crowdintel.xyz](https://crowdintel.xyz/blog/only-2-percent-of-polymarket-traders-made-1000), [coindesk.com](https://www.coindesk.com/markets/2026/04/29/a-tiny-group-is-winning-on-polymarket-as-under-1-of-wallets-take-half-the-profits) — HAUTE. (Affine le ~0,51 % cité en §2.8f.)
+- **Concentration extrême** : le top 0,1 % (~1 560 wallets) capte ~71,5 % du ~1 Md$ de profits totaux. [thedefiant.io](https://thedefiant.io/news/research-and-opinion/polymarket-profitability-report-april-2026) — HAUTE.
+- **Top traders** : meilleur PnL all-time ~11,8 M$ ; plusieurs comptes à 3,7–4,4 M$ sur ~12–14 M$ de volume. — MOYENNE (leaderboards publics).
+
+#### e) Économie du market making
+
+- **Liquidity Rewards** : paiement quotidien (minuit UTC) pour ordres limites des deux côtés près du mid, scoring quadratique par minute ; **>5 M$ distribués pour le seul mois d'avril 2026** (sports/esports). [docs.polymarket.com](https://docs.polymarket.com/market-makers/liquidity-rewards) — HAUTE (montant : MOYENNE).
+- **Rebates makers** : 20–25 % des taker fees reversés quotidiennement. — MOYENNE.
+- PnL MM documenté : rare et contradictoire (cf. postmortem tezlee §2.8c : net zéro après adverse selection). — FAIBLE.
+
+#### f) Capital requis et concurrence
+
+- **Étude de cas vérifiable (arb esports, jan–mars 2026)** : +4 973 $ sur 3 858 paris / 95 830 $ de volume avec quelques milliers de $ de capital ; +8 293 $ sur les arbs purs, −3 185 $ sur les jambes non couvertes ; **edge effondré de +2 506 $/mois (fév.) à +390 $ (mars)** après l'arrivée de concurrents et des frais. [kacho.io](https://kacho.io/polymarket-arbitrage-real-numbers) — HAUTE (auto-déclaré mais détaillé). → Le « décay de l'edge » de l'itération 5 est mesuré : division par ~6 en un mois.
+- **Ordres de grandeur par stratégie** : arb scanning ~2–10 k$ ; news trading ~5–20 k$ ; MM avec rewards ~10–50 k$ ; calibration long-tail ~5–20 k$ très fragmentés. — FAIBLE (estimation par recoupement).
+- Le constat qualitatif d'un « terrain de jeu de bots » saturé sur les stratégies mécaniques est largement corroboré. [financemagnates.com](https://www.financemagnates.com/trending/prediction-markets-are-turning-into-a-bot-playground/) — HAUTE.
 
 ### 2.6 Risques & cadre réglementaire 2025–2026
-*(à compléter)*
+
+#### a) Statut juridique — États-Unis
+
+- **Retour US régulé** : rachat QCEX (licences CFTC DCM/DCO, 112 M$, juillet 2025), feu vert CFTC sept. 2025, Amended Order nov. 2025, lancement Polymarket US déc. 2025 (cf. §2.1e). — HAUTE.
+- **Fronde des États sur le sport** : ≥11 États ont envoyé des cease-and-desist ; contre Polymarket : Tennessee, Connecticut (déc. 2025), Illinois (janv. 2026), injonction préliminaire Nevada (janv. 2026), procès de Polymarket contre le Massachusetts (fév. 2026) ; le DOJ a attaqué Connecticut, Arizona et Illinois en avril 2026 pour préemption fédérale. [stateline.org](https://stateline.org/2026/03/06/kalshi-and-polymarket-are-skirting-laws-on-sports-betting-states-say/), [fortune.com](https://fortune.com/2026/04/04/feds-sue-3-states-for-trying-to-bring-kalshi-and-polymarket-under-more-control/) — HAUTE.
+- **Jurisprudence Kalshi divergente** : le 3ᵉ circuit a jugé (avril 2026) que le Commodity Exchange Act préempte le droit du New Jersey, tandis qu'un juge fédéral du Nevada a imposé l'arrêt des contrats sportifs ; résolution Cour suprême plausible. — HAUTE.
+
+#### b) France et UE — point bloquant pour l'auteur de ce document
+
+- **France : Polymarket est illégal et géobloqué.** Après les gains de ~80–85 M$ de Théo sur l'élection US 2024, l'ANJ a ouvert une enquête (nov. 2024) et obtenu un géoblocage IP de tous les utilisateurs français (déc. 2024). [theblock.co](https://www.theblock.co/post/327864/polymarket-blocks-french-users-amid-regulatory-scrutiny-over-80-million-trump-election-bet) — HAUTE.
+- **Position ANJ réaffirmée en février 2026** : publication officielle qualifiant les marchés prédictifs (Polymarket, Kalshi) de **sites illégaux en France**. [anj.fr](https://anj.fr/plateformes-de-marches-de-prediction-des-sites-illegaux-en-france-qui-peuvent-presenter-des-risques) — HAUTE. **Conséquence pratique : opérer un bot depuis la France suppose de contourner un géoblocage, en violation des ToS, sur un service réputé illégal localement.** — HAUTE (analyse).
+- **UE / MiCA** : pas de régime dédié aux event contracts ; appréhension via MiFID II (l'interdiction ESMA des options binaires aux particuliers plane sur la qualification) et MiCA pour le volet crypto (fin du grandfathering CASP juillet 2026 ; le régime d'abus de marché MiCA s'applique aux prediction markets crypto selon l'ESMA). Enforcement national fragmenté : France, Belgique, Pays-Bas, Portugal, Allemagne, Pologne… [nortonrosefulbright.com](https://www.nortonrosefulbright.com/en/knowledge/publications/290d594a/the-eus-approach-to-prediction-markets-and-event-contracts) — MOYENNE.
+
+#### c) ToS, VPN, gel de comptes, surveillance
+
+- L'usage d'un VPN pour contourner le géoblocage viole expressément les ToS (§2.1.4) ; Polymarket bloque depuis 2026 les IP des fournisseurs VPN dans 33 pays restreints, combine analyse comportementale et KYC ciblé, et **peut geler/saisir les fonds** des comptes en infraction — des cas de soldes verrouillés sans recours sont rapportés. [techradar.com](https://www.techradar.com/vpn/vpn-privacy-security/polymarket-blocks-vpns-and-tightens-identity-verification-as-over-30-countries-ban-the-betting-platform) — HAUTE.
+- **Surveillance Chainalysis (30 avril 2026)** : solution de « market integrity » on-chain pour détecter l'insider trading et **partager des preuves avec les régulateurs** — la pseudonymité on-chain ne protège plus. [businesswire.com](https://www.businesswire.com/news/home/20260430726176/en/Polymarket-Selects-Chainalysis-to-Deploy-First-of-Its-Kind-On-Chain-Market-Integrity-Solution) — HAUTE.
+
+#### d) Risque oracle (UMA) — quantifié
+
+- **Attaques avérées** : mars 2025, ~25 % du pouvoir de vote UMA a fait résoudre frauduleusement le marché « minerais ukrainiens » (~7 M$) ; en 2025, >30 M$ de marchés affectés par des résolutions contestées (« proof-of-whales »). — HAUTE.
+- **Concentration structurelle** : enquête WSJ (mai 2026) — sur la plupart des marchés disputés, >50 % des votes UMA viennent des 10 plus gros wallets ; ~60 % des votants UMA actifs liés à des comptes Polymarket ; ~1 dispute sur 5 comporte un votant financièrement intéressé. — MOYENNE (relayé).
+- **Volume de disputes** : >1 150 marchés disputés en 2026 (déjà au-dessus du total 2025) ; dispute notable : « MicroStrategy vend du BTC avant le 31 mai 2026 » (>60 M$) résolue NO à 98,6 % des votes malgré un 8-K mentionnant 32 BTC vendus. [theblock.co](https://www.theblock.co/post/403600/polymarket-upholds-no-outcome-strategy-bitcoin-sale-market) — HAUTE. Réforme MOOV2 : proposeurs whitelistés, −59 % de propositions erronées. — MOYENNE.
+
+#### e) Risque smart contract
+
+- Contrats CTF Exchange audités (ChainSecurity). Mais le 22 mai 2026, ~600–700 k$ drainés via l'**UMA CTF Adapter** — cause : compromission de clé privée d'un wallet opérationnel admin, hors périmètre d'audit ; fonds utilisateurs non touchés. [cryptonews.com](https://cryptonews.com/news/polymarket-520k-smart-contract-exploit-breakdown/) — HAUTE. Leçon : **le périmètre audité ≠ le périmètre déployé.**
+
+#### f) Insider trading — précédent pénal direct pour les bots « copieurs »
+
+- **Avril 2026** : militaire US inculpé pour avoir parié avec du renseignement classifié (opération Maduro) : ~409 881 $ de profit. — HAUTE.
+- **Mai 2026, « AlphaRaccoon »** : Michele Spagnuolo, ingénieur Google, inculpé par le SDNY (fraude CEA, wire fraud, blanchiment — jusqu'à 20 ans) pour ~1,2 M$ de profit via des données internes Google ; première action CFTC pour insider trading sur prediction market. [justice.gov](https://www.justice.gov/usao-sdny/pr/google-employee-charged-insider-trading) — HAUTE.
+- Implication : **suivre algorithmiquement le flux d'initiés** (copy-trading de wallets suspects) n'est pas l'infraction poursuivie à ce jour, mais le couple DOJ/CFTC + Chainalysis montre que le flux est surveillé et que la frontière pénale se précise — un wallet copié peut être gelé, et la position du copieur avec. — MOYENNE (analyse).
+
+#### g) Garde des fonds et fiscalité (résident français, bref)
+
+- **International** : auto-custody (proxy wallet, collatéral pUSD 1:1 USDC) — pas de risque dépositaire classique, mais risque de gel applicatif (compliance) et risque stablecoin/bridge. — HAUTE. **US** : modèle intermédié FCM, comptes ségrégués — inaccessible depuis la France. — HAUTE.
+- **Fiscalité** : pas de régime « prediction markets » ; en pratique régime des actifs numériques (imposition à la cession contre fiat, PFU ~30–31,4 %, crypto-crypto non imposable, **déclaration 3916-bis obligatoire**). Zone grise : requalification possible en gains de jeux (plateforme jugée illégale par l'ANJ) — non documentée ; consulter un fiscaliste. — MOYENNE / FAIBLE (zone grise).
 
 ### 2.7 Détection d'insiders / flux informé (on-chain)
 
@@ -379,11 +573,333 @@ signaux, mais avec des cinétiques différentes.
   rate élevé avec des pertes de queue catastrophiques → le sizing (Kelly
   fractionné) n'est pas un détail, c'est la condition de survie. — MOYENNE.
 
+### 2.9 Analyse de stratégie : copy-trading par scoring de wallets
+
+> Analyse approfondie (demande spécifique) — s'appuie sur les faits des §2.5d et §2.7,
+> les passages non sourcés sont marqués ANALYSE.
+
+#### a) Le fait de départ : une concentration extrême ET observable
+
+Deux propriétés rares coexistent sur Polymarket :
+
+1. **Les profits sont hyper-concentrés** : le top 0,1 % des wallets (~1 560 comptes)
+   capte ~71,5 % du ~1 Md$ de profits totaux ; ~2,4 % des wallets seulement ont
+   gagné >1 000 $ (§2.5d) — HAUTE.
+2. **Tout le flux est public et attribuable** : positions, fills, PnL historique
+   de n'importe quel wallet via la Data API, Goldsky v2 et Dune (§2.7a) — HAUTE.
+
+Sur aucun marché financier classique ces deux propriétés ne coexistent : on sait
+que Renaissance gagne, mais on ne voit pas ses trades. Ici, on voit *tout*.
+D'où la question légitime : pourquoi ne pas simplement copier les meilleurs ?
+
+#### b) Pourquoi le copy-trading naïf ne marche PAS
+
+1. **PnL brut ≠ compétence.** Avec 2,5 M de wallets, le haut du leaderboard
+   contient mécaniquement des chanceux : un wallet qui a parié gros sur un
+   longshot gagnant a un PnL énorme et un skill nul. Pire, la stratégie inverse
+   (vendre des longshots) produit des **win rates de 77 % avant la faillite**
+   (§2.8f) — le win rate et le PnL sont les deux pires métriques de sélection.
+   — ANALYSE (fondée sur §2.8f, HAUTE).
+2. **Le décalage d'exécution mange l'edge.** On copie *après* le fill ; le fill
+   du wallet suivi a déjà déplacé le prix, et les autres copieurs arrivent en
+   même temps que nous. Cinétiques mesurées : Nobel 8 ¢ → 1 $ en quelques heures,
+   Iran 71 min (§2.7b). L'edge copié = edge du wallet − drift depuis son fill −
+   frais taker − slippage. — ANALYSE.
+3. **Le suivi de whales est déjà commoditisé.** PolyGun, PolyCopy, PolyBot,
+   PolyMate… facturent 0,5–1 % pour exactement ça (§2.7d) ; Polysights flagge
+   les insiders EN DIRECT sur X (cas OpenAI, §2.7b). Un signal vendu en bot
+   Telegram à 1 % de frais est un signal dont l'alpha résiduel est partagé entre
+   tous les abonnés. — HAUTE (existence) / ANALYSE (conséquence).
+4. **Les wallets sophistiqués se savent observés.** Théo a opéré sur 11 wallets
+   clusterisés seulement a posteriori (§2.7b) ; la fragmentation, voire les
+   trades-leurres, sont la réponse rationnelle à un écosystème de copieurs.
+   — MOYENNE.
+5. **Copier un insider = risque juridique et de contrepartie.** Depuis
+   Chainalysis (avril 2026) et les inculpations DOJ/CFTC (§2.6f), un wallet
+   flaggé peut voir ses trades annulés/gelés — et la position du copieur
+   construite sur ce signal reste, elle, exposée au retournement. — MOYENNE.
+
+#### c) La version défendable : un moteur de scoring, pas un suiveur
+
+L'edge ne réside pas dans le *suivi* (commoditisé) mais dans le *scoring* —
+séparer statistiquement la compétence de la chance, et la compétence légale de
+l'information privilégiée. C'est un problème de stats + clustering où presque
+personne n'investit sérieusement (les bots Telegram se contentent du PnL brut).
+
+**Principes du scoring (ANALYSE, à valider en §4) :**
+
+1. **Scorer des paires wallet × catégorie, pas des wallets.** Un wallet fort en
+   politique US n'a aucun edge en NBA. C'est le même principe que Mitts & Ofir
+   pour les insiders (§2.7c.4) appliqué aux skilled. Le win rate conditionnel
+   par catégorie est exposé par la Data API / HashDive (§2.7c.6).
+2. **Métrique = excès de rendement à l'entrée, pas PnL.** Pour chaque trade
+   historique du wallet : `edge_réalisé = résultat (0/1) − prix payé`. Moyenné
+   sur N trades *indépendants*, avec t-stat. Un wallet skillé a un edge moyen
+   positif ET significatif ; un chanceux a un gros PnL porté par 1–2 trades.
+3. **Shrinkage bayésien vers zéro.** Prior : ~3,14 % des comptes sont skilled
+   (Gomez-Cram et al., §2.7c.4) → tout score doit être rétréci vers « pas de
+   skill » proportionnellement à la petitesse de l'échantillon. Sans ça, le
+   classement est dominé par les petits échantillons extrêmes.
+4. **Distinguer les deux cinétiques** (déjà identifié en §2.7e) :
+   - **Skilled persistant** (multi-marchés, edge stable) → cible du copy-trading :
+     ses thèses sont lentes (recherche supérieure type Théo), le drift post-fill
+     est faible, la fenêtre de copie est de plusieurs heures ;
+   - **Pattern insider** (wallet frais, one-shot, pré-résolution) → PAS du
+     copy-trading : c'est un déclencheur événementiel à fenêtre de minutes,
+     traité par le module flux informé, avec les risques §2.6f.
+5. **Condition d'« edge restant » à l'entrée.** Ne copier que si
+   `prix_actuel ≤ prix_d'entrée_du_wallet + k × edge_estimé` (k ≈ 0,3–0,5).
+   Si le marché a déjà répricé, le trade est mort — l'erreur classique du
+   copieur est d'acheter le repricing qu'il a lui-même contribué à créer.
+6. **Ensemble plutôt que champion.** Suivre un portefeuille de N wallets scorés
+   (pondérés par score), avec contrôle de corrélation : si 5 wallets suivis
+   prennent la même position, c'est UN pari, pas cinq — plafonner l'exposition
+   par marché, pas par wallet.
+7. **Décroissance et re-scoring continus.** Le score d'un wallet est recalculé
+   à chaque résolution ; un wallet copié massivement perd son edge (ses fills
+   répricent plus vite) — le système doit mesurer l'alpha *réalisé par nous* en
+   le copiant, pas l'alpha du wallet.
+
+**Preuve d'existence partielle** : ~85 % des trades flaggés par Polysights
+seraient profitables (§2.7c.6, Gizmodo) — le flux scoré est une vraie source
+d'alpha ; la question ouverte n'est pas « le signal existe-t-il ? » mais
+« que reste-t-il après le lag de copie et la concurrence des copieurs ? »
+— c'est LA mesure critique de la phase 1 (§4).
+
+#### d) Économie attendue (ordres de grandeur, ANALYSE)
+
+- Edge brut d'un wallet skillé : 3–8 pts par trade (cohérent avec les ~3 % de
+  comptes skilled et leurs PnL, §2.7c.4) ;
+- Coûts de copie : frais taker 0–1 % (catégorie) + spread 1–5 ¢ + drift de
+  copie (inconnu : à mesurer) → l'edge net copié plausible est de **1–3 pts**
+  sur les marchés où le repricing est lent (politique long terme, géopolitique,
+  long tail) et **~0** sur le sport liquide ;
+- Capacité : limitée par la profondeur (long tail ~10 k$ de liquidité, §2.5a)
+  → stratégie de **complément** (10–25 % du capital), pas de cœur ;
+- Avantage structurel : c'est la stratégie la moins gourmande en infrastructure
+  (pas de course de latence, pas de LLM coûteux en continu — un batch de
+  scoring quotidien + un listener de fills suffisent).
+
+#### e) Verdict
+
+Revalorisation par rapport à la synthèse §1 (« complément passif ») : le
+copy-trading naïf est commoditisé et sans edge, mais le **copy-trading par
+scoring de calibration** est l'une des stratégies au meilleur ratio
+edge/complexité du système — à condition que (1) le scoring soit
+statistiquement honnête (shrinkage, paires wallet×catégorie), (2) la règle
+d'edge restant soit respectée, et (3) le pattern insider soit routé vers le
+module événementiel et non copié aveuglément. Elle partage 100 % de son
+infrastructure de données avec le détecteur de flux informé (§2.7) : les deux
+modules sont un seul investissement technique.
+
 ---
 
 ## 3. Architecture cible du système d'agents
-*(à compléter après intégration des sources — pipeline ingestion → analyse →
-pricing → exécution → post-mortem, avec boucles de feedback.)*
+
+### 3.0 Principes de conception (dérivés des sections 1–2)
+
+1. **Maker-first.** Le régime de frais 2026 (taker payant, maker gratuit +
+   rebates + liquidity rewards, §2.1b/§2.5e) impose d'exécuter en ordre limite
+   partout où la fenêtre temporelle le permet.
+2. **Pas de course de milliseconde.** La course est perdue d'avance (§2.3b) et
+   taxée (frais dynamiques anti-latence, §2.3c). Nos fenêtres : la minute
+   (2nd ordre, flux informé) et l'heure/jour (règles, calibration, copy).
+3. **Filtre d'ambiguïté de résolution partout.** >1 150 marchés disputés en
+   2026, des positions à 99 ¢ allées à 0 (§2.1c, §2.6d) → score d'ambiguïté
+   obligatoire, position interdite au-dessus du seuil, quel que soit l'edge.
+4. **Alpha mesuré par stratégie, kill switch par stratégie.** L'edge se
+   divise par 6 en un mois quand la concurrence arrive (§2.5f).
+5. **Le module news est aussi une défense.** Retrait des quotes MM < 1 s sur
+   choc détecté (anti-adverse-selection, itération 4 + §2.8c).
+6. **Conformité d'abord.** Le gate juridique (§2.6b : France = illégal/géobloqué)
+   précède tout déploiement réel — voir §4 phase 0.
+
+### 3.1 Vue d'ensemble
+
+```
+┌─────────────────────────── INGESTION ───────────────────────────┐
+│ WSS CLOB (books, fills)  │ Gamma/Data API  │ Goldsky v2 / Dune  │
+│ News (RSS, X, officiels) │ Sports/RTDS WSS │ On-chain watcher   │
+└──────────────┬───────────────────────────────────────────────────┘
+               ▼
+┌────────────── COMPRÉHENSION (LLM, batch + événementiel) ─────────┐
+│ RuleParser : règle UMA → critères, cas limites, score ambiguïté, │
+│              écart titre/règle                                   │
+│ DependencyGraph : liens logiques entre marchés (1er/2nd ordre)   │
+│ NewsClassifier : programmée/choc, marchés impactés, ambiguïté    │
+└──────────────┬───────────────────────────────────────────────────┘
+               ▼
+┌────────────── PRICING ───────────────────────────────────────────┐
+│ FairValue par marché : ensemble LLM (Brier tracké) + modèles     │
+│   quant par domaine (N(d2) Deribit crypto, ensembles météo, Elo) │
+│ WalletScorer : skill par wallet×catégorie, shrinkage bayésien    │
+│ InsiderDetector : signal composite §2.7e (frais+CEX+taille+niche)│
+└──────────────┬───────────────────────────────────────────────────┘
+               ▼
+┌────────────── DÉCISION & RISQUE ─────────────────────────────────┐
+│ edge_net = |fair − prix| − frais(catégorie, p) − spread/slippage │
+│            − coût_capital(horizon)                               │
+│ Kelly fractionné (≤ 0,25 Kelly) • caps marché/catégorie/stratégie│
+│ Filtres durs : ambiguïté > seuil, liquidité < min, juridiction   │
+└──────────────┬───────────────────────────────────────────────────┘
+               ▼
+┌────────────── EXÉCUTION ─────────────────────────────────────────┐
+│ py-clob-client • maker-first • taker ssi edge_net > seuil_taker  │
+│ CircuitBreaker : annulation de toutes les quotes < 1 s sur choc  │
+└──────────────┬───────────────────────────────────────────────────┘
+               ▼
+┌────────────── MÉTA-BOUCLE ───────────────────────────────────────┐
+│ Post-mortem par trade (edge estimé vs réalisé) • Brier par module│
+│ Suivi du decay par stratégie • allocation de capital • kill      │
+└──────────────────────────────────────────────────────────────────┘
+```
+
+### 3.2 Les sept modules stratégiques
+
+| Module | Fenêtre | Signal | Exécution | Fondement |
+|---|---|---|---|---|
+| **RuleEdge** (écart titre/règle) | heures–jours | RuleParser : le marché price le titre, pas la règle | maker | §1 it.2, §2.1c |
+| **SecondOrder** (chocs non programmés) | 1–30 min | NewsClassifier + DependencyGraph : marché B corrélé pas encore répricé | taker (géopolitique = 0 % de frais) | §1 it.3, §2.3d |
+| **LongTail** (calibration) | jours | FairValue vs prix sur marchés sans suiveurs | maker uniquement | §1 it.2, §2.5a |
+| **InformedFlow** (insiders) | minutes | InsiderDetector (§2.7e) | taker rapide, taille plafonnée, risque §2.6f | §1 it.6, §2.7 |
+| **SmartCopy** (copy scoré) | minutes–heures | fills de wallets à score élevé + règle d'edge restant | maker si possible | §2.9 |
+| **InformedMM** (market making) | continu | quotes autour de FairValue, rewards + rebates | maker, retrait sur CircuitBreaker | §1 it.4, §2.8c |
+| **ArbScanner** (résiduel) | secondes | YES+NO, Σ neg-risk, cross-platform à règles identiques | taker opportuniste | §2.2 |
+
+Notes :
+- **SmartCopy et InformedFlow partagent le même pipeline de données** (Data API
+  + Goldsky + clustering de wallets) — un seul investissement technique, deux
+  cinétiques de signal (§2.9c.4).
+- **ArbScanner n'est pas un centre de profit** (fenêtre refermée, §2.2) : il
+  sert de capteur d'anomalies (un arb qui s'ouvre = un choc en cours) et
+  ramasse l'opportuniste.
+- L'**ordre de construction** suit le ratio edge/complexité : WalletScorer +
+  SmartCopy d'abord (données seules, pas de LLM temps réel), puis RuleEdge
+  (LLM batch), puis LongTail, puis SecondOrder (news temps réel), puis
+  InformedMM (le plus risqué), ArbScanner en tâche de fond.
+
+### 3.3 Choix techniques
+
+- **Python 3.11+, asyncio** (méthodes préfixées `a` selon la convention projet),
+  `py-clob-client` pour l'exécution, WSS natifs pour l'ingestion.
+- **Event bus interne** (queues asyncio) : chaque module est un consommateur
+  indépendant — un module qui crashe ne tue pas les autres ; le CircuitBreaker
+  publie sur un topic prioritaire.
+- **Persistance** : Parquet pour les flux (ticks, books, fills — réutilise le
+  pattern cache du projet trading_agents) ; SQLite/Postgres pour les décisions,
+  scores de wallets, post-mortems.
+- **LLM budgété** : le RuleParser et le FairValue LLM tournent en batch
+  (nouveau marché, nouvelle news, mouvement de prix > seuil), jamais en
+  polling — coût cible < 0,2 $/marché/jour (§2.4e).
+- **Journal de décision obligatoire** : chaque trade logge prix, fair value,
+  edge estimé, frais estimés, module source, raison textuelle → c'est la
+  matière première de la méta-boucle et du post-mortem.
+
+---
 
 ## 4. Plan de validation incrémental
-*(à compléter — paper trading, mesure d'alpha par stratégie, kill switches.)*
+
+### Phase 0 — Gate de conformité (BLOQUANT, avant tout le reste)
+
+La recherche (§2.6b) établit que Polymarket est géobloqué et déclaré illégal en
+France par l'ANJ, que le contournement par VPN viole les ToS et expose au gel
+des fonds (§2.6c). Trois options, à trancher AVANT d'écrire du code d'exécution :
+
+| Option | Légalité | Conséquence |
+|---|---|---|
+| (a) Recherche & paper trading sur données publiques uniquement | OK (lecture de données publiques) | Le projet reste un projet de recherche ; phases 3-4 gelées |
+| (b) Opérer depuis une juridiction autorisée (entité ou résidence) | à valider avec un avocat | Coût/complexité ; fiscalité à structurer (§2.6g) |
+| (c) Porter le système sur une venue accessible légalement | dépend de la venue | L'architecture §3 est portable (l'edge sémantique et le scoring de wallets moins : ils dépendent de la transparence on-chain de Polymarket) |
+
+→ Par défaut, ce projet démarre en **option (a)** : tout le plan ci-dessous
+jusqu'à la phase 2 incluse est réalisable légalement sans compte de trading.
+
+### Phase 1 — Collecte & replay (4–6 semaines, coût ≈ 0)
+
+Objectif : remplacer les « FAIBLE » de la section 2 par nos propres mesures.
+
+1. Enregistrer en continu : books + fills WSS sur ~200 marchés (mix liquide /
+   long tail), news timestampées (RSS + X + flux officiels), flux on-chain
+   (Data API + Goldsky).
+2. Mesurer ce que personne n'a publié :
+   - **délai de propagation 1er → 2nd ordre** (la quantification manquante, §2.3d) ;
+   - réplication du **0,64-pour-1** (sous-réaction) sur Polymarket ;
+   - **drift post-fill des wallets à haut score** = l'edge restant réel du
+     module SmartCopy (la mesure critique de §2.9c).
+3. Backtester : WalletScorer sur l'historique Goldsky/Dune (les résolutions
+   passées donnent la vérité terrain) ; FairValue LLM sur marchés résolus
+   (Brier vs prix de marché à J-7/J-1).
+4. **Critère de sortie** : ≥ 2 modules avec edge net simulé > 0 après frais V2,
+   spread réel observé et slippage modélisé. Sinon : itérer ou arrêter — c'est
+   un résultat aussi.
+
+### Phase 2 — Shadow trading (4–8 semaines, coût ≈ LLM seul)
+
+1. Système complet (§3.1) en temps réel, ordres **simulés** contre le book réel
+   enregistré au moment de la décision (fill simulé conservateur : maker fillé
+   seulement si le prix traverse, taker au pire du spread).
+2. Métriques par module : Brier, calibration (reliability diagram), PnL simulé
+   net, demi-vie de l'edge, taux de faux positifs de l'InsiderDetector.
+3. **Kill par module** : PnL simulé < 0 après coûts sur la fenêtre → retour en
+   phase 1 pour ce module ; les autres continuent.
+
+### Phase 3 — Micro-capital (CONDITIONNEL au gate 0, options b/c)
+
+- 500–2 000 $, tailles minimales, 2–3 modules max (commencer par SmartCopy et
+  RuleEdge : fenêtres lentes, moins sensibles à l'exécution).
+- Mesurer l'écart shadow vs réel : fill rate maker effectif, slippage réel,
+  adverse selection sur nos quotes — **cet écart est le « coût de réalité »**
+  qui invalide ou valide tout le backtest.
+- Circuit breakers actifs dès le premier jour : perte jour > 5 % du capital →
+  arrêt total ; dispute UMA sur une position > 10 % du capital → alerte humaine.
+
+### Phase 4 — Montée en charge
+
+- Allocation de capital par alpha réalisé (méta-boucle), réévaluée chaque
+  semaine ; plafond par stratégie et par marché.
+- Provision de décroissance : hypothèse par défaut = l'edge de chaque module
+  se divise par 2 tous les 2–3 mois (§2.5f) tant que la mesure ne dit pas mieux.
+
+### Métriques permanentes (tous modules, toutes phases)
+
+1. **Brier score** par module et par catégorie, comparé au Brier du prix de
+   marché à l'entrée (battre le marché, pas la météo) ;
+2. **Edge réalisé vs edge estimé** — calibre le modèle d'edge lui-même ;
+3. **Decay** : PnL net par stratégie par mois, avec alerte de tendance ;
+4. **Toxicité de notre propre flux** : ratio fills maker / annulations, drift
+   du prix après nos fills (sommes-nous le pigeon de quelqu'un ?) ;
+5. **Exposition oracle** : capital total sur marchés à score d'ambiguïté moyen,
+   plafonné en dur.
+
+---
+
+## 5. Conclusion — verdict actualisé
+
+La recherche (section 2) confirme l'intuition centrale du loop thinking : **la
+vitesse est un jeu perdu et taxé ; la compréhension et le scoring sont les
+seuls edges accessibles**. Verdicts mis à jour :
+
+| Stratégie | Verdict §1 (a priori) | Verdict final (après recherche) |
+|---|---|---|
+| Arb YES+NO / neg-risk | opportuniste | **Confirmé en pire** : fenêtre refermée (7 épisodes exécutables sur 173 matchs NBA, §2.2) ; capteur d'anomalies, pas un centre de profit |
+| Latence programmée | éviter | **Confirmé** : course perdue + frais dynamiques anti-latence (§2.3c) |
+| Chocs non programmés + 2nd ordre | cœur du système | **Renforcé** : géopolitique à 0 % de frais (§2.1b) ; délai de propagation 2nd ordre jamais quantifié publiquement → à mesurer soi-même (avantage au premier qui mesure) |
+| Lecture des règles de résolution | edge le plus défendable | **Renforcé mais double tranchant** : >1 150 disputes en 2026 — l'ambiguïté est à la fois l'edge (mal pricée) et le risque (résolution whale, §2.6d) |
+| Longue traîne | bon complément | **Tempéré** : réelle mais capacité minuscule (63 % de marchés morts, ~10 k$ de profondeur, §2.5a) |
+| Market making informé | sur marchés moyens | **Confirmé avec preuves** : >5 M$/mois de rewards (§2.5e) mais postmortems d'adverse selection brutaux (§2.8c) ; dernier module à construire |
+| Flux informé / insiders | signal offensif + défensif | **Tempéré** : le signal marche (85 % des flags profitables) mais surveillance Chainalysis + précédents DOJ → signal décroissant, taille plafonnée (§2.6f) |
+| Copy smart wallets | complément passif | **Revalorisé** (§2.9) : naïf = commoditisé et mort ; par scoring de calibration = meilleur ratio edge/complexité du système, premier module à construire |
+
+**Les trois conclusions opérationnelles :**
+
+1. **Le vrai bloquant n'est pas technique, il est juridique** : Polymarket est
+   illégal en France (ANJ, §2.6b). Le projet est viable en mode recherche/shadow
+   (phases 0–2) ; tout déploiement réel exige de résoudre le gate de conformité.
+2. **L'ordre de construction optimal** : WalletScorer + SmartCopy (données
+   seules, edge mesurable vite) → RuleEdge (LLM batch) → LongTail → SecondOrder
+   (news temps réel) → InformedMM → ArbScanner. Chaque module ne passe en
+   production que sur alpha mesuré, jamais sur conviction.
+3. **La rente n'existe pas** : l'étude de cas §2.5f (edge ÷6 en un mois) est le
+   destin par défaut de toute stratégie ici. Le système n'a de valeur que si la
+   méta-boucle (mesure du decay + réallocation + kill) fonctionne — c'est elle,
+   pas une stratégie particulière, le véritable actif.

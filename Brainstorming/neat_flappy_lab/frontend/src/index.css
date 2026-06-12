@@ -359,6 +359,14 @@ h3 {
   padding: 7px 9px;
 }
 
+.btn-icon {
+  width: 15px;
+  height: 15px;
+  flex: 0 0 auto;
+  fill: currentColor;
+  display: block;
+}
+
 /* Inputs */
 .field {
   margin-bottom: 14px;
@@ -625,4 +633,754 @@ input[type='checkbox'] {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+}
+
+/* --------------------------------------------------------- curriculum labs -- */
+
+.curriculum-shell {
+  padding-bottom: 12px;
+}
+
+.curriculum-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.curriculum-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 2px 0 8px;
+}
+
+.curriculum-brand h1 {
+  font-size: 19px;
+  letter-spacing: 0;
+}
+
+.curriculum-brand p {
+  margin: 2px 0 0;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.lesson-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.lesson-tab {
+  width: 100%;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 11px;
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lesson-tab:hover {
+  background: var(--bg-elev-3);
+}
+
+.lesson-tab.active {
+  border-color: var(--accent);
+  background: rgba(79, 209, 197, 0.11);
+}
+
+.lesson-index {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--bg-elev-1);
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.lesson-tab b {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.lesson-tab small {
+  display: block;
+  color: var(--text-faint);
+  line-height: 1.3;
+}
+
+.lesson-page {
+  height: 100vh;
+  overflow: auto;
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.lesson-header {
+  max-width: 920px;
+}
+
+.lesson-eyebrow {
+  display: inline-flex;
+  margin-bottom: 8px;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lesson-header h2 {
+  font-size: 28px;
+  letter-spacing: 0;
+}
+
+.lesson-header p {
+  margin: 8px 0 0;
+  max-width: 760px;
+  color: var(--text-dim);
+}
+
+.lesson-grid {
+  flex: 1;
+  min-height: 640px;
+  display: grid;
+  grid-template-columns: minmax(420px, 1.35fr) minmax(300px, 0.85fr);
+  grid-template-rows: minmax(320px, 1.1fr) minmax(260px, 0.9fr);
+  gap: var(--gap);
+}
+
+.lesson-main {
+  grid-row: span 1;
+}
+
+.lesson-notes .panel-body,
+.lesson-metrics {
+  overflow: auto;
+}
+
+.scrubber {
+  padding: 8px 14px 12px;
+  border-top: 1px solid var(--divider);
+}
+
+.lab-controls {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.lab-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.loss-chart-frame {
+  position: absolute;
+  inset: 0;
+}
+
+.scale-badge {
+  position: absolute;
+  top: 10px;
+  right: 14px;
+  z-index: 2;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-elev-2);
+  color: var(--warn);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.control-row {
+  display: grid;
+  grid-template-columns: 1fr 64px;
+  gap: 6px 10px;
+  align-items: center;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.control-row b {
+  text-align: right;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+.control-row input {
+  grid-column: 1 / -1;
+}
+
+.explain-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+}
+
+.explain-step {
+  display: grid;
+  grid-template-columns: 26px 1fr;
+  gap: 10px;
+  align-items: start;
+}
+
+.explain-step span {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--bg-elev-3);
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.explain-step p {
+  margin: 2px 0 0;
+  color: var(--text-dim);
+}
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.metric-grid div {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  min-width: 0;
+}
+
+.metric-grid small {
+  display: block;
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.metric-grid b {
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.probe-table {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  padding: 14px 14px 2px;
+}
+
+.network-live {
+  padding: 14px 14px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.probe-row {
+  display: grid;
+  grid-template-columns: 62px 70px 1fr;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+}
+
+.probe-row b,
+.probe-row span {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.probe-row div {
+  display: flex;
+  gap: 5px;
+  min-width: 0;
+}
+
+.probe-row i {
+  width: 12px;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--accent);
+  display: inline-block;
+}
+
+.weight-bars {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.weight-row {
+  display: grid;
+  grid-template-columns: 74px 1fr 52px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.weight-row i {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg-elev-3);
+  overflow: hidden;
+}
+
+.weight-row b {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: 999px;
+}
+
+.weight-row em {
+  font-style: normal;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.mini-genome {
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+}
+
+.mini-genome circle {
+  fill: var(--bg-elev-2);
+  stroke-width: 2;
+}
+
+.mini-genome .node-input {
+  stroke: var(--node-input);
+}
+
+.mini-genome .node-hidden {
+  stroke: var(--node-hidden);
+}
+
+.mini-genome .node-output {
+  stroke: var(--node-output);
+}
+
+.mini-genome text {
+  fill: var(--text-dim);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.neat-cloud {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+@media (max-width: 1100px) {
+  .lesson-grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: repeat(4, minmax(260px, auto));
+    min-height: 0;
+  }
+
+  .lesson-page {
+    height: auto;
+    min-height: 100vh;
+  }
+}
+
+/* --------------------------------------------------- linear lab (atelier 01) -- */
+
+.linear-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap);
+}
+
+/* Persistent causal pipeline: predire -> erreur -> loss -> gradient -> update. */
+.pipeline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+}
+
+.pipeline-stage {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-elev-2);
+  color: var(--text-faint);
+  border-radius: 999px;
+  padding: 5px 12px 5px 6px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.pipeline-stage:hover {
+  background: var(--bg-elev-3);
+}
+
+.pipeline-stage.reached {
+  color: var(--text-dim);
+}
+
+.pipeline-stage.active {
+  border-color: var(--accent);
+  background: rgba(79, 209, 197, 0.14);
+  color: var(--text);
+}
+
+.pipeline-idx {
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--bg-elev-1);
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.pipeline-stage.active .pipeline-idx {
+  background: var(--accent);
+  color: #04201d;
+}
+
+.pipeline-arrow {
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+/* Action strip: primary controls pinned at the top, stats pushed right. */
+.linear-controlstrip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 9px 12px;
+}
+
+.linear-controlstrip .spacer {
+  flex: 1;
+}
+
+.strip-stat {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.strip-stat b {
+  color: var(--text);
+  margin-left: 4px;
+}
+
+/* Section dividers that group panels by step of the learning flow. */
+.row-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 2px -4px;
+  color: var(--text-faint);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.row-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--divider);
+}
+
+.linear-row {
+  display: grid;
+  grid-template-columns: minmax(420px, 1.55fr) minmax(300px, 1fr);
+  gap: var(--gap);
+  align-items: start;
+}
+
+.chart-panel {
+  height: 430px;
+}
+
+.net-panel {
+  height: 430px;
+}
+
+.net-panel .panel-body {
+  position: relative;
+  min-height: 0;
+}
+
+/* Inline-editable w / b right inside the living formula. */
+.tok-input {
+  width: 64px;
+  background: var(--bg-elev-1);
+  border: 1px solid var(--panel-border);
+  border-radius: 6px;
+  padding: 1px 6px;
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tok-input:focus {
+  border-color: var(--accent);
+  outline: none;
+}
+
+.ctrl-sliders {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 16px;
+}
+
+.ctrl-hint {
+  color: var(--text-faint);
+  font-size: 11px;
+  margin: 10px 2px 0;
+}
+
+.chart-panel.short {
+  height: 340px;
+}
+
+/* Living formula: tokens are colored to match their on-chart counterparts. */
+.formula-panel {
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.formula-line {
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.formula-line.active {
+  border-color: var(--panel-border);
+  background: var(--bg-elev-2);
+}
+
+.formula-line code {
+  font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+  font-size: 13px;
+  color: var(--text);
+  background: none;
+}
+
+.formula-line small {
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+.formula-desc {
+  margin: 6px 2px 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.inspector-empty {
+  padding: 18px 14px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.insp-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  padding: 14px;
+}
+
+.insp-grid > div {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  min-width: 0;
+}
+
+.insp-grid small {
+  display: block;
+  color: var(--text-faint);
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.insp-grid b {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.insp-grid .contrib {
+  grid-column: 1 / -1;
+  background: var(--bg-elev-3);
+  border: none;
+  padding: 0;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.insp-grid .contrib-bar {
+  display: block;
+  height: 100%;
+  background: var(--danger);
+  border-radius: 999px;
+}
+
+.guided-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.guided-advance {
+  flex: 1;
+  justify-content: center;
+}
+
+/* Predict-before-observe experiment cards. */
+.experiments {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  padding: 14px;
+}
+
+.xp-card {
+  background: var(--bg-elev-2);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.xp-title {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.xp-question {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.xp-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.xp-option {
+  text-align: left;
+  border: 1px solid var(--panel-border);
+  background: var(--bg-elev-1);
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.14s ease, border-color 0.14s ease;
+}
+
+.xp-option:hover {
+  background: var(--bg-elev-3);
+}
+
+.xp-option.chosen {
+  border-color: var(--accent-2);
+}
+
+.xp-option.correct {
+  border-color: var(--ok);
+  background: rgba(158, 206, 106, 0.12);
+}
+
+.xp-option.wrong {
+  border-color: var(--danger);
+  background: rgba(247, 118, 142, 0.12);
+}
+
+.xp-reveal {
+  font-size: 12px;
+  color: var(--text-dim);
+  border-left: 2px solid var(--accent);
+  padding-left: 8px;
+  margin: 2px 0 0;
+}
+
+.xp-apply {
+  align-self: flex-start;
+  border: 1px solid var(--accent-strong);
+  background: var(--accent);
+  color: #04201d;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+@media (max-width: 1100px) {
+  .linear-row {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-panel,
+  .chart-panel.short,
+  .net-panel {
+    height: 360px;
+  }
 }
