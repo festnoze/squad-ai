@@ -295,6 +295,24 @@ button.ghost {
   align-items: center;
 }
 
+.drag-handle {
+  color: var(--muted);
+  cursor: grab;
+  font-size: 13px;
+  line-height: 1;
+  margin-right: 6px;
+  user-select: none;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.story.drag-over {
+  border-color: var(--accent);
+  background: #1a2740;
+}
+
 .story-id {
   font-size: 11px;
   color: var(--muted);

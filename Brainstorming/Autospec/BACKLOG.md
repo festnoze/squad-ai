@@ -21,12 +21,12 @@ modèle courant.
 | 9 | Tests unitaires frontend (Vitest, 7 tests) + CI GitHub Actions (back/front/e2e) | vitest + e2e + YAML valide |
 | 10 | Afficher architecture + scores de raffinement dans l'UI (`plan_quality`/`quality_score`, panneau + badges) | tests + e2e |
 | 11 | Action « continuer le build » d'un projet récupéré/dormant (`resume-build` + bouton) | tests + e2e |
+| 12 | Vue diff par story (commit git « story done » + `GET .../diff` + overlay diff coloré ; fix suppression workspace git) | tests + e2e |
 
 ## ⏳ À faire — découvert en cours de route
 
 | # | Item | V/C | Pourquoi |
 |---|------|-----|----------|
-| 12 | Vue diff par story (git diff du workspace) | 3/3 | La partie « diff » de l'item Visualiseur a été réduite à la lecture de fichiers ; le workspace a déjà un repo git (raffinement) |
 | 13 | Réorganisation drag-&-drop du board / backlog | 3/3 | Aujourd'hui repriorisation par champ numérique ; endpoint `reorder` déjà prêt côté backend |
 | 14 | Observabilité tokens/coût + timings par agent | 2/3 | Mesurer le coût par phase/agent, surtout avec raffinement/architecture activés |
 | 15 | Gestion des projets persistés legacy au boot | 2/2 | `recover_projects` recharge tous les vieux états ; offrir un archivage/nettoyage |

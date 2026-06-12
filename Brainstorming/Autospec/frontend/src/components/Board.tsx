@@ -5,6 +5,7 @@ import {
   editStory,
   forceDoneStory,
   rebuildStory,
+  reorderStories,
   storyDiff,
 } from "../api";
 import {
@@ -321,7 +322,23 @@ function DiffViewer({
   );
 }
 
-function StoryCard({ projectId, story }: { projectId: string; story: UserStory }) {
+function StoryCard({
+  projectId,
+  story,
+  dragOver,
+  onHandleDragStart,
+  onCardDragOver,
+  onCardDragLeave,
+  onCardDrop,
+}: {
+  projectId: string;
+  story: UserStory;
+  dragOver: boolean;
+  onHandleDragStart: (e: React.DragEvent) => void;
+  onCardDragOver: (e: React.DragEvent) => void;
+  onCardDragLeave: (e: React.DragEvent) => void;
+  onCardDrop: (e: React.DragEvent) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -365,8 +382,24 @@ function StoryCard({ projectId, story }: { projectId: string; story: UserStory }
   };
 
   return (
-    <div className={`story status-${story.status}`} data-testid={`story-${story.id}`}>
+    <div
+      className={`story status-${story.status}${dragOver ? " drag-over" : ""}`}
+      data-testid={`story-${story.id}`}
+      onDragOver={onCardDragOver}
+      onDragLeave={onCardDragLeave}
+      onDrop={onCardDrop}
+    >
       <div className="story-head" onClick={() => setOpen(!open)}>
+        <span
+          className="drag-handle"
+          draggable
+          onDragStart={onHandleDragStart}
+          onClick={stop}
+          title="Glisser pour réordonner"
+          aria-label="Poignée de déplacement"
+        >
+          ⠿
+        </span>
         <span className="story-id">{story.id}</span>
         <span className="story-right">
           <span className={`prio prio-${story.priority}`} title="Priorité kanban (1=haute)">
@@ -564,6 +597,82 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
   );
 }
 
+/**
+ * Liste des user stories d'un même epic, triée par priorité (croissante, tri
+ * stable) et réordonnançable par glisser-déposer via la poignée des cartes.
+ */
+function EpicStories({
+  projectId,
+  stories,
+}: {
+  projectId: string;
+  stories: UserStory[];
+}) {
+  // id de la story en cours de drag, et id de la story survolée (cible de drop).
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [overId, setOverId] = useState<string | null>(null);
+
+  // Tri stable par priorité croissante (1=haute). Array.sort est stable en JS,
+  // donc à priorité égale l'ordre de déclaration est conservé.
+  const ordered = [...stories].sort((a, b) => a.priority - b.priority);
+
+  const handleDrop = async (targetId: string) => {
+    const sourceId = draggingId;
+    setDraggingId(null);
+    setOverId(null);
+    if (!sourceId || sourceId === targetId) return;
+    // source et cible sont forcément dans le même epic (ce composant ne rend
+    // que les stories d'un epic), mais on vérifie la présence par sécurité.
+    const ids = ordered.map((s) => s.id);
+    if (!ids.includes(sourceId) || !ids.includes(targetId)) return;
+
+    const without = ids.filter((id) => id !== sourceId);
+    const targetIdx = without.indexOf(targetId);
+    without.splice(targetIdx, 0, sourceId);
+
+    const priorities = without.map((id, i) => ({
+      id,
+      priority: Math.min(i + 1, 5),
+    }));
+    try {
+      await reorderStories(projectId, priorities);
+      // Pas de re-fetch : le backend diffuse le nouvel état par WebSocket.
+    } catch (err) {
+      // Ne pas planter l'UI si l'appel échoue.
+      console.error("Échec du réordonnancement des user stories :", err);
+    }
+  };
+
+  return (
+    <div className="stories">
+      {ordered.map((s) => (
+        <StoryCard
+          key={s.id}
+          projectId={projectId}
+          story={s}
+          dragOver={overId === s.id && draggingId !== null && draggingId !== s.id}
+          onHandleDragStart={(e) => {
+            e.stopPropagation();
+            setDraggingId(s.id);
+            e.dataTransfer.effectAllowed = "move";
+          }}
+          onCardDragOver={(e) => {
+            e.preventDefault();
+            if (draggingId !== null && draggingId !== s.id) setOverId(s.id);
+          }}
+          onCardDragLeave={() => {
+            setOverId((cur) => (cur === s.id ? null : cur));
+          }}
+          onCardDrop={(e) => {
+            e.preventDefault();
+            void handleDrop(s.id);
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
 interface Props {
   epics: Epic[];
   stories: UserStory[];
@@ -590,13 +699,10 @@ export function Board({ epics, stories, projectId }: Props) {
               <span className="epic-iter">itération {epic.iteration}</span>
             </div>
             <div className="epic-title">{epic.title}</div>
-            <div className="stories">
-              {stories
-                .filter((s) => s.epic_id === epic.id)
-                .map((s) => (
-                  <StoryCard key={s.id} projectId={projectId} story={s} />
-                ))}
-            </div>
+            <EpicStories
+              projectId={projectId}
+              stories={stories.filter((s) => s.epic_id === epic.id)}
+            />
             <AddStoryForm projectId={projectId} epicId={epic.id} />
           </div>
         ))}
