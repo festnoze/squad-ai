@@ -4,7 +4,14 @@ import json
 import pytest
 
 from autospec.agents.runner import FakeRunner
-from autospec.models import ChatRole, PipelinePhase, ProjectState, StoryStatus, TestState
+from autospec.models import (
+    ChatRole,
+    PipelinePhase,
+    PlannedTest,
+    ProjectState,
+    StoryStatus,
+    TestState,
+)
 from autospec.orchestrator.pipeline import Pipeline
 
 from .conftest import wait_until
@@ -551,6 +558,83 @@ async def test_usage_zero_by_default(green_pytest):
     usage = pipeline.state.usage
     assert usage.cost_usd == 0.0
     assert usage.agent_calls >= 4
+
+
+async def test_fatal_pipeline_error_sets_error_phase(green_pytest):
+    # The PO stage receives a non-JSON reply: extract_json raises AgentError,
+    # which _alifecycle catches -> phase ERROR + a SYSTEM chat mentioning it.
+    pipeline, _ = make_pipeline([PM_BRIEF, "ceci n'est pas du json"])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.ERROR)
+    assert pipeline.state.error  # non-empty error message stored on the state
+    assert any(
+        m.role == ChatRole.SYSTEM and "Erreur pipeline" in m.content
+        for m in pipeline.state.chat
+    )
+
+
+def test_apply_test_states_fallbacks():
+    # Directly exercise _apply_test_states without a full pipeline run.
+    from autospec.models import UserStory
+
+    story = UserStory(
+        id="US-1",
+        epic_id="EPIC-1",
+        title="s",
+        test_plan=[
+            PlannedTest(id="UT-1"),
+            PlannedTest(id="UT-2"),
+            PlannedTest(id="UT-3"),
+        ],
+    )
+    state = ProjectState(id="apply-proj", name="n", goal="g")
+    pipeline = Pipeline(state, FakeRunner([]))
+
+    real = {
+        "tests/a.py::ok": "passed",
+        "tests/a.py::ko": "failed",
+    }
+    reported = [
+        # nodeids present in the real report: green/red grounded on reality.
+        {"id": "UT-1", "status": "green", "nodeids": ["tests/a.py::ok"]},
+        # status would say green but the REAL node failed -> red wins.
+        {"id": "UT-2", "status": "green", "nodeids": ["tests/a.py::ko"]},
+        # no nodeid in the report, but a declared red status -> fallback red.
+        {"id": "UT-3", "status": "red", "nodeids": ["tests/missing.py::x"]},
+    ]
+    pipeline._apply_test_states(story, reported, real)
+    by_id = {t.id: t for t in story.test_plan}
+    assert by_id["UT-1"].status == TestState.GREEN  # real passed
+    assert by_id["UT-2"].status == TestState.RED     # real failed overrides declared green
+    assert by_id["UT-3"].status == TestState.RED     # declared-status fallback
+
+    # A test with neither matching nodeids nor a status stays nonexistent.
+    story2 = UserStory(id="US-2", epic_id="EPIC-1", title="s", test_plan=[PlannedTest(id="UT-9")])
+    pipeline._apply_test_states(story2, [{"id": "UT-9", "nodeids": []}], real)
+    assert story2.test_plan[0].status == TestState.NONEXISTENT
+
+
+async def test_red_story_is_replanned_then_succeeds(green_pytest, monkeypatch):
+    # The first pytest verification is red, the second is green: the story is
+    # rescheduled (TODO) then completes (DONE) on the second attempt.
+    calls = {"n": 0}
+
+    async def _flaky_pytest(self):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return False, "x", {}
+        return True, "ok", {}
+
+    monkeypatch.setattr(Pipeline, "_arun_pytest", _flaky_pytest)
+    # 1 PM + 1 PO + 1 QA (attempt 1 only) + 2 Dev (one per attempt).
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    us1 = pipeline.state.story("US-1")
+    assert us1.status == StoryStatus.DONE
+    assert us1.attempts == 2  # failed once (retry), succeeded on the second pass
 
 
 def test_dev_prompt_includes_guidance():

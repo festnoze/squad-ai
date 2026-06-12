@@ -27,12 +27,26 @@ modèle courant.
 | 15 | Archivage des projets (`archived` + endpoints archive/unarchive + UI bascule « Archivés ») | tests + e2e |
 | 16 | Workflow CI racine monorepo (filtre paths + chemins préfixés) | YAML valide |
 
-## ⏳ À faire — découvert en cours de route
+## 🔎 Audit multi-agents (workflow `autospec-test-audit`)
 
-| # | Item | V/C | Pourquoi |
-|---|------|-----|----------|
+67 agents en parallèle (8 dimensions + vérification adversariale) → **50 findings confirmés** (9 high, 21 medium, 20 low). Rapport complet : voir l'output du run `ww59ppihi`.
 
-> (vide — backlog courant épuisé)
+### ✅ Corrigés ce tour (high + mediums clés)
+| Catégorie | Fix |
+|---|---|
+| Concurrence (high) | `_build_lock` sérialise la section workspace (écriture dev + pytest + commit + raffinement) — fini les pytest sur arbre mixte et les commits/diff pollués entre workers parallèles |
+| Concurrence (high) | `git reset/clean` du raffinement ne tourne plus en parallèle d'un autre worker (même lock) |
+| Concurrence (high) | TOCTOU `arebuild_story`/`aresume_build` : garde sur `_task` en cours + passage de phase à BUILD **synchrone** avant la tâche |
+| Sécurité (high) | CORS restreint aux origines locales (plus de `*`) |
+| Récupération (high+med) | `recover_projects` gère la phase ARCHITECT + remet les stories GREEN à TODO ; `/run` rejette aussi BUILD |
+| Robustesse (med) | `.gitignore` dans le workspace (git n'ingère plus `.venv` ; `clean -fd` ne la détruit plus) ; `extract_json` ignore les accolades dans les chaînes ; `save_state` atomique (temp+rename) + log des chargements échoués |
+| Frontend (high+med) | WS : `JSON.parse` protégé, **resync** (re-fetch) à la reconnexion, anti-résurrection d'un projet supprimé |
 
-> Ordre courant : 9 (planifié) puis 10→15 par valeur/complexité, réévalué à chaque
-> itération.
+### ⏳ Restant (prochaines tranches)
+- **Sécurité (design)** : `bypassPermissions` par défaut + exécution non sandboxée du code généré (`uv run pytest`/`python main.py`) → nécessite un vrai sandbox ; env hérité par les sous-processus (fuite de secrets).
+- **Robustesse (med)** : `adispose` ne tue pas le sous-processus pytest/git en cours (`asyncio.to_thread` non annulable) ; `_force_delete_workspace` n'attrape pas `OSError` ; raffinement (juge illisible = PASS, score défaut = seuil, commit avant jugement, rollback non vérifié).
+- **Frontend (med)** : priorités drag-&-drop clampées à 5 (>5 stories : ordre non distinct).
+- **Couverture** : tests manquants — erreur fatale `_alifecycle`, `_arefine_code`, 409 de `/run` & `/resume-build`, composant App (WS/upsert/suppression), drag-&-drop, endpoints `/chat /pause /resume /diff /rebuild`, recover SPEC/ANALYZE/PLAN, troncature `aread_file`, `RunPanel` conditionnel.
+
+> Backlog des 16 features : épuisé. Le présent audit a ouvert une nouvelle tranche
+> « sécurité & robustesse » ci-dessus, à traiter en priorité par sévérité.

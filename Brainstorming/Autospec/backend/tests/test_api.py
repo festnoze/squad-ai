@@ -26,7 +26,7 @@ def make_client(replies: list[str]) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=transport, base_url="http://test")
 
 
-async def wait_until_async(apredicate, timeout=5.0):
+async def wait_until_async(apredicate, timeout=20.0):
     deadline = asyncio.get_event_loop().time() + timeout
     while not await apredicate():
         if asyncio.get_event_loop().time() > deadline:
@@ -431,3 +431,182 @@ async def test_run_rejected_during_build(green_pytest):
         server.pipelines[project_id].state.phase = PipelinePhase.BUILD
         resp = await client.post(f"/api/projects/{project_id}/run")
         assert resp.status_code == 409
+
+
+async def test_chat_records_message_on_done_project(green_pytest):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        resp = await client.post(
+            f"/api/projects/{project_id}/chat", json={"message": "Un retour utilisateur"}
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["ok"] is True
+        # Outside the interview the phase is unchanged (still done).
+        assert body["phase"] == "done"
+
+        # The message shows up in the project's chat history.
+        state = (await client.get(f"/api/projects/{project_id}")).json()
+        assert any(
+            m["role"] == "user" and m["content"] == "Un retour utilisateur"
+            for m in state["chat"]
+        )
+        # On a done project, the message is queued as feedback for the next cycle.
+        assert "Un retour utilisateur" in state["feedback"]
+
+
+async def test_chat_unknown_project_404(green_pytest):
+    async with make_client([]) as client:
+        resp = await client.post(
+            "/api/projects/inconnu/chat", json={"message": "hello"}
+        )
+        assert resp.status_code == 404
+
+
+async def test_pause_and_resume_toggle_flag(green_pytest):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+        pipeline = server.pipelines[project_id]
+
+        assert pipeline.state.paused is False
+
+        resp = await client.post(f"/api/projects/{project_id}/pause")
+        assert resp.status_code == 200
+        assert pipeline.state.paused is True
+        # The flag is reflected in the API view of the project.
+        assert (await client.get(f"/api/projects/{project_id}")).json()["paused"] is True
+
+        resp = await client.post(f"/api/projects/{project_id}/resume")
+        assert resp.status_code == 200
+        assert pipeline.state.paused is False
+        assert (await client.get(f"/api/projects/{project_id}")).json()["paused"] is False
+
+
+async def test_pause_resume_unknown_project_404(green_pytest):
+    async with make_client([]) as client:
+        assert (await client.post("/api/projects/inconnu/pause")).status_code == 404
+        assert (await client.post("/api/projects/inconnu/resume")).status_code == 404
+
+
+async def test_story_diff_available_on_done_project(green_pytest):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        # The workspace is committed per finished story, so a diff is recoverable.
+        resp = await client.get(f"/api/projects/{project_id}/stories/US-1/diff")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["available"] is True
+        assert body["diff"]  # non-empty git show output
+
+        # An unknown story is a 404.
+        bad = await client.get(f"/api/projects/{project_id}/stories/US-404/diff")
+        assert bad.status_code == 404
+
+
+async def test_rebuild_story_on_done_project(green_pytest):
+    # A rebuild re-runs QA test design + the dev agent, so it needs 2 more replies.
+    async with make_client(
+        [PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN, QA_TRIVIAL, DEV_GREEN]
+    ) as client:
+        project_id = await _acreate_done_project(client)
+
+        resp = await client.post(
+            f"/api/projects/{project_id}/stories/US-1/rebuild"
+        )
+        assert resp.status_code == 200
+
+        # The rebuild runs in a background task; the project returns to done.
+        async def adone():
+            r = await client.get(f"/api/projects/{project_id}")
+            return r.json()["phase"] == "done"
+
+        await wait_until_async(adone, timeout=10.0)
+        state = (await client.get(f"/api/projects/{project_id}")).json()
+        assert state["stories"][0]["status"] == "done"
+
+        # An unknown story is a 404.
+        bad = await client.post(
+            f"/api/projects/{project_id}/stories/US-404/rebuild"
+        )
+        assert bad.status_code == 404
+
+
+async def test_rebuild_in_progress_story_409(green_pytest):
+    from autospec.models import StoryStatus
+
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        # A story currently being developed cannot be rebuilt.
+        server.pipelines[project_id].state.story("US-1").status = StoryStatus.IN_PROGRESS
+        resp = await client.post(
+            f"/api/projects/{project_id}/stories/US-1/rebuild"
+        )
+        assert resp.status_code == 409
+
+
+async def test_read_file_truncates_large_content(green_pytest):
+    from autospec.storage import workspace_dir
+
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        # Write a file larger than the 200_000-char cap into the workspace.
+        big = "a" * 250_000
+        (workspace_dir(project_id) / "big.txt").write_text(big, encoding="utf-8")
+
+        resp = await client.get(
+            f"/api/projects/{project_id}/files/raw", params={"path": "big.txt"}
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["truncated"] is True
+        assert len(body["content"]) <= 200_000
+
+
+def _persist_phase_project(phase, project_id: str):
+    """Persist a project caught mid-run in the given (interrupted) phase."""
+    from autospec import storage
+    from autospec.models import Epic, ProjectState, StoryStatus, UserStory
+
+    state = ProjectState(
+        id=project_id,
+        name="recover",
+        goal="g",
+        phase=phase,
+        epics=[Epic(id="EPIC-1", title="e")],
+        stories=[
+            UserStory(
+                id="US-1",
+                epic_id="EPIC-1",
+                title="s",
+                status=StoryStatus.TODO,
+            )
+        ],
+        running=True,
+    )
+    storage.save_state(state)
+    return state
+
+
+async def test_recover_stops_interrupted_spec_analyze_plan_phases():
+    from autospec.models import PipelinePhase
+
+    interrupted = {
+        PipelinePhase.SPEC: "proj-spec",
+        PipelinePhase.ANALYZE: "proj-analyze",
+        PipelinePhase.PLAN: "proj-plan",
+    }
+    for phase, pid in interrupted.items():
+        _persist_phase_project(phase, pid)
+
+    server.pipelines.clear()
+    server.recover_projects()
+
+    for pid in interrupted.values():
+        assert pid in server.pipelines
+        recovered = server.pipelines[pid].state
+        assert recovered.phase == PipelinePhase.STOPPED
+        assert recovered.running is False

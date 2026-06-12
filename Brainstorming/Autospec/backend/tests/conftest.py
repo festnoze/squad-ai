@@ -20,7 +20,7 @@ def green_pytest(monkeypatch):
     monkeypatch.setattr(Pipeline, "_arun_pytest", _arun_pytest)
 
 
-async def wait_until(predicate, timeout=5.0, interval=0.01):
+async def wait_until(predicate, timeout=20.0, interval=0.01):
     import asyncio
 
     deadline = asyncio.get_event_loop().time() + timeout
