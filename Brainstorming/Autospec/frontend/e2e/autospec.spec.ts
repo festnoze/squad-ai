@@ -37,6 +37,25 @@ async function createProject(page: Page, name: string, goal: string, budget?: st
 
 test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await page.goto("/");
+  // Accepter tous les dialogues (confirmations de suppression, alerte commit).
+  page.on("dialog", (d) => d.accept());
+
+  // Idempotence : le backend démo conserve son état entre tests (un seul
+  // global-setup sous --repeat-each), donc on repart d'une barre vide.
+  const projectChips = page.locator(".project-chip");
+  await Promise.race([
+    projectChips.first().waitFor({ state: "visible", timeout: 5000 }),
+    page
+      .getByRole("heading", { name: "Nouveau projet / feature" })
+      .waitFor({ state: "visible", timeout: 5000 }),
+  ]).catch(() => {});
+  // Révéler aussi d'éventuels projets archivés avant le nettoyage.
+  const archivedToggle = page.getByRole("button", { name: /📦 Archivés/ });
+  if (await archivedToggle.isVisible().catch(() => false)) await archivedToggle.click();
+  for (let n = await projectChips.count(); n > 0; n = await projectChips.count()) {
+    await projectChips.first().getByTitle("Supprimer le projet").click();
+    await expect(projectChips).toHaveCount(n - 1);
+  }
 
   // === U1 — création (budget I1) ============================================
   await createProject(page, NAME, GOAL, "10");
@@ -145,7 +164,6 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await expect(page.getByText(/README généré/).first()).toBeVisible({ timeout: 30_000 });
 
   // === I2 — commit git du workspace (alerte de confirmation) ================
-  page.once("dialog", (d) => d.accept());
   await page.getByRole("button", { name: /🔀 Commit/ }).click();
 
   // === I2 — export zip (endpoint, via le contexte requête) ==================
@@ -160,9 +178,12 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await expect(page.locator(".provider-select")).toBeVisible();
   await expect(page.locator(".provider-select select")).toBeDisabled();
 
-  // === U1 (multi) — créer un 2e projet : deux chips dans la barre ===========
+  // === U1 (multi) — créer un 2e projet : les deux chips coexistent ==========
   await createProject(page, "Projet secondaire", "Un second produit de démo");
-  await expect(page.locator(".project-chip")).toHaveCount(2);
+  await expect(page.locator(".project-chip", { hasText: NAME })).toHaveCount(1);
+  await expect(
+    page.locator(".project-chip", { hasText: "Projet secondaire" }),
+  ).toHaveCount(1);
 
   // === item 15 — archivage du 1er projet (terminé) ==========================
   await page
@@ -174,8 +195,14 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await page.getByRole("button", { name: /📦 Archivés/ }).click();
   await expect(page.locator(".project-chip", { hasText: NAME })).toHaveCount(1);
 
-  // === nettoyage — suppression des projets ==================================
-  page.on("dialog", (d) => d.accept());
+  // === nettoyage — suppression des deux projets (idempotence des répétitions)
   await page.locator(".project-chip", { hasText: NAME }).getByTitle("Supprimer le projet").click();
   await expect(page.locator(".project-chip", { hasText: NAME })).toHaveCount(0);
+  await page
+    .locator(".project-chip", { hasText: "Projet secondaire" })
+    .getByTitle("Supprimer le projet")
+    .click();
+  await expect(
+    page.locator(".project-chip", { hasText: "Projet secondaire" }),
+  ).toHaveCount(0);
 });
