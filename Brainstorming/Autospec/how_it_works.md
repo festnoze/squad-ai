@@ -120,8 +120,10 @@ a une suite entièrement verte → tous ses critères sont verts.
 
 ## 4. Gestion des LLMs
 
-**Point essentiel : Autospec n'appelle aucune API ni SDK LLM directement. Il
-délègue tout au CLI Claude Code en mode headless**, derrière une abstraction.
+**Point essentiel : Autospec n'appelle aucun SDK LLM directement pour Claude —
+il délègue au CLI Claude Code en mode headless** ; les providers hors
+abonnement (OpenAI, Ollama) passent par **LangChain**, le tout derrière une
+abstraction commune.
 
 ### 4.1 L'abstraction `AgentRunner` (`agents/runner.py`)
 
@@ -132,9 +134,21 @@ class AgentRunner(Protocol):
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None) -> AgentResult: ...
 ```
 
-Trois implémentations :
+Cinq implémentations :
 
 - **`ClaudeCliRunner`** (production) — lance le binaire `claude` en sous-processus.
+- **`OpenAiRunner` / `OllamaRunner`** (`agents/providers.py`, M1) — providers
+  **hors abonnement** via **LangChain** (`langchain-openai` / `langchain-ollama`,
+  imports paresseux). Ces API de chat étant sans état ni outils : (a) la
+  continuité de session est **rejouée en mémoire** par `session_id` ; (b) quand
+  un `cwd` est fourni (agents Dev), un **protocole d'outils JSON borné** est
+  injecté au system prompt — le modèle répond `{"tool": "write_files"|"read_files", ...}`
+  pendant au plus `AUTOSPEC_PROVIDER_TOOL_ROUNDS` tours (chemins confinés au
+  workspace), puis donne sa réponse finale. Coût OpenAI estimé via
+  `AUTOSPEC_OPENAI_PRICE_IN/_OUT` ($/1M tokens) ; Ollama = 0. Sélection par
+  `AUTOSPEC_AGENT_PROVIDER` ou à chaud via `GET/POST /api/provider`
+  (`make_runner()` ; bascule le runner de toutes les pipelines vivantes ;
+  verrouillé en mode démo).
 - **`FakeRunner`** (tests unitaires) — dépile des réponses JSON pré-programmées,
   **sans aucun LLM**. C'est ce qui rend les tests déterministes et instantanés.
 - **`ScriptedRunner`** (mode démo / e2e, `agents/scripted.py`) — reconnaît
@@ -148,7 +162,8 @@ Trois implémentations :
 
 Pour brancher un autre backend (SDK Anthropic, autre provider, mock), il suffit
 d'écrire une classe avec la même méthode `arun` et de l'injecter via
-`server.set_runner(...)`. **C'est le point d'extension propre du projet.**
+`server.set_runner(...)`. **C'est le point d'extension propre du projet** —
+c'est exactement ainsi que `OpenAiRunner`/`OllamaRunner` ont été ajoutés.
 
 ### 4.2 Comment un appel est fait
 
@@ -472,6 +487,57 @@ moins de raffinement / d'architecture **selon le budget**.
 Côté UI : un champ **« Budget max ($) »** dans `ProjectSetup`, et la jauge
 d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
 (`.over-budget`) quand le plafond est atteint.
+
+### 5.9 Composants, impact des feedbacks, livraison & tests UI
+
+- **Composants (E3/E4)** — avec `AUTOSPEC_COMPONENTS=1`, `_apropose_components`
+  (persona `architect`, prompt `components_proposal`) tourne **juste après le
+  brief** (1re itération) et remplit `ProjectState.components` (modèle
+  `Component` : kind backend/frontend/database/cache/other, statut
+  proposed/approved/created/rejected — les obligatoires sont pré-approuvés).
+  L'utilisateur édite via `PUT /api/projects/{id}/components` (panneau 🧱) puis
+  `POST .../components/setup` lance `orchestrator/setup_exec.py` en tâche de
+  fond : scaffolds **idempotents** (`backend/` FastAPI, `frontend/` React+Vite,
+  `docker-compose.yml` pour db/cache) ; `uv sync`/`npm install` réels seulement
+  si `AUTOSPEC_SETUP_INSTALL=1` (démo-safe).
+- **Analyse d'impact d'un feedback (E2)** — un message envoyé quand la pipeline
+  est **dormante** (done/stopped/error) déclenche `_aimpact_analysis` en tâche
+  de fond (prompt `feedback_impact`, persona `analyst`) : `update_story` (US
+  **non implémentée** uniquement — todo/failed ; une US failed amendée repart en
+  todo), `new_stories` (epic + US au format PO, itération courante →
+  développables via « ▶ Continuer le build ») ou `none`. Le feedback reste de
+  toute façon dans `state.feedback` pour l'analyste du cycle suivant.
+- **Livraison (I2)** — persona `tech-writer` : `_adocument_phase` (cwd =
+  workspace) écrit le **README.md du projet généré** ; automatique après chaque
+  build si `AUTOSPEC_TECH_WRITER=1`, sinon à la demande (`POST /document`,
+  tâche de fond). Export : `GET /export` (zip en mémoire, sans
+  `.git`/`.venv`/état interne) et `POST /git-export` (`aexport_git` : repo
+  garanti + `git add -A` + commit propre, renvoie le sha).
+- **Watchdog fenêtre d'usage Claude (M2,
+  `orchestrator/session_monitor.py`)** — actif uniquement pour le provider
+  `claude` (hors démo, `AUTOSPEC_SESSION_MONITOR=1` par défaut). Le
+  `_UsageTracker` intercepte chaque `AgentError` : si le message correspond à
+  une **limite d'usage de session** (« usage limit reached »…), la pipeline
+  s'arrête proprement (comme un stop budget) et `schedule_resume(at)` programme
+  une **reprise automatique** — `at` = epoch embarqué dans l'erreur CLI, sinon
+  fin du **bloc actif ccusage** (`ccusage blocks --json`), sinon
+  `now + AUTOSPEC_RESUME_FALLBACK_MIN`. Le timer est persisté
+  (`ProjectState.resume_at`) et **ré-armé par `recover_projects`** après un
+  redémarrage (un `resume_at` passé tire immédiatement) ; à l'échéance,
+  `aresume_build()` reprend les stories restantes (l'attempt de la story
+  interrompue a été **remboursé**) ; si rien n'est buildable, simple message
+  chat. Annulation : `POST /cancel-resume` / bouton ✕ de la bannière ⏰.
+  Conformité : on **attend** le reset de la fenêtre souscrite (aucun
+  contournement, pas de multiplexage de comptes).
+- **Tests d'acceptance UI (E5)** — le PO marque chaque story d'un drapeau
+  `ui`. Avec `AUTOSPEC_UI_TESTS=1` : le pyproject du workspace ajoute
+  `pytest-playwright`, un marker `ui` et `addopts -m "not ui"` (la suite par
+  défaut les exclut) ; le prompt Dev d'une story UI exige des tests Playwright
+  **rejouables** dans `tests/ui/` (fixture `page`, clics/saisies, screenshots,
+  assertions de rendu, fichiers déclarés dans `ui_test_files` → persistés sur
+  `story.ui_tests`) ; après la suite pytest classique, `_arun_ui_tests`
+  (`uv run pytest -m ui`, exit 5 « rien collecté » = vert) doit passer pour que
+  la story soit DONE — sinon retry/échec comme un rouge normal.
 
 ---
 

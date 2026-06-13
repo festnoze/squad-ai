@@ -124,6 +124,7 @@ export interface ProjectState {
   iteration: number;
   running: boolean;
   paused: boolean;
+  resume_at?: number; // epoch de la reprise auto programmée (0 = aucune) — M2
   error: string;
   created_at: number;
   architecture: string;

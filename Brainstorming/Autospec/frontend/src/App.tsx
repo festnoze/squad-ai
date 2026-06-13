@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   archiveProject,
+  cancelResume,
   connectEvents,
   createProject,
   deleteProject,
@@ -364,6 +365,7 @@ export default function App() {
               onStopApp={guard(() => stopApp(project.id))}
               onResumeBuild={guard(() => resumeBuild(project.id))}
               onDocument={guard(() => documentProject(project.id))}
+              onCancelResume={guard(() => cancelResume(project.id))}
               onExportZip={() => window.open(exportZipUrl(project.id), "_blank")}
               onGitExport={guard(async () => {
                 const { commit } = await gitExportProject(project.id);

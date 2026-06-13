@@ -58,6 +58,53 @@ illimité) réglable à la création (champ **« Budget max ($) »**) ou après 
 **s'arrête automatiquement** (message « 💰 Budget atteint ») et la jauge d'usage
 passe en rouge.
 
+## Providers de modèles (Claude / OpenAI / Ollama)
+
+Les agents tournent par défaut sur **Claude** (CLI Claude Code en headless).
+Deux providers **hors abonnement** sont disponibles via **LangChain** :
+**OpenAI** (clé API) et **Ollama** (modèles locaux). Sélection par
+`AUTOSPEC_AGENT_PROVIDER` ou à chaud via le sélecteur 🤖 du header
+(`GET/POST /api/provider`). Ces providers étant de simples API de chat, les
+agents Dev y manipulent les fichiers du workspace à travers un **protocole
+d'outils JSON borné** (write/read confiné au workspace) — l'orchestrateur
+revérifie de toute façon la suite pytest lui-même.
+
+## Composants, livraison & feedback
+
+- **Composants (E3/E4)** : avec `AUTOSPEC_COMPONENTS=1`, un agent solutionneur
+  propose après le brief les composants du produit (backend FastAPI + frontend
+  React par défaut, PostgreSQL/Redis en optionnel). L'utilisateur les
+  approuve/écarte dans le panneau 🧱, puis « Créer les composants » matérialise
+  dossiers et manifests dans le workspace (`backend/`, `frontend/`,
+  `docker-compose.yml`) ; l'installation réelle des dépendances reste derrière
+  `AUTOSPEC_SETUP_INSTALL=1`.
+- **Livraison (I2)** : le bouton **📘 Doc** fait rédiger par le tech-writer le
+  README du projet généré (présentation, lancement, tests, architecture) ;
+  **⬇ Zip** télécharge le workspace (sans `.git`/`.venv`/état interne) ;
+  **🔀 Commit** fait un commit git propre du workspace. Avec
+  `AUTOSPEC_TECH_WRITER=1`, la doc est régénérée après chaque build.
+- **Analyse d'impact (E2)** : un feedback envoyé quand la pipeline est dormante
+  est analysé automatiquement — soit il **amende une US non implémentée**
+  (todo/échouée, qui repart en todo), soit il **crée un nouvel Epic/US**
+  buildable via « ▶ Continuer le build », soit il est simplement noté.
+- **Tests d'acceptance UI (E5)** : avec `AUTOSPEC_UI_TESTS=1`, les US marquées
+  `ui` par le PO reçoivent en plus des **tests Playwright rejouables**
+  (`tests/ui/`, marker pytest `ui`, screenshots + assertions de rendu) ; la
+  story n'est done que si `uv run pytest -m ui` est vert aussi.
+
+## Fenêtre d'usage Claude : reprise automatique (M2)
+
+Quand les agents tournent sur le **harness Claude** (abonnement), un appel qui
+échoue sur une **limite d'usage de session** déclenche un arrêt propre de la
+pipeline et programme une **reprise automatique** au moment où une session
+fraîche s'ouvre : l'heure de reset est lue dans l'erreur du CLI, sinon via le
+bloc de facturation actif rapporté par **ccusage** (`ccusage blocks --json`),
+sinon un délai de repli. La reprise est **persistée** (`resume_at`) et
+**ré-armée après un redémarrage** du backend ; la tentative de la story
+interrompue n'est pas décomptée. L'UI affiche « ⏰ Reprise auto à HH:MM »
+(annulable). C'est de l'ordonnancement légitime du quota souscrit : le travail
+attend le reset de la fenêtre, rien n'est contourné.
+
 ## Harnais de raffinement (optionnel)
 
 Un **harnais de raffinement** peut améliorer les artefacts des agents via une
@@ -167,7 +214,22 @@ chaque `push` et `pull_request` avec 3 jobs sur `ubuntu-latest` :
 | --- | --- | --- |
 | `AUTOSPEC_BMAD_DIR` | `../_bmad` | Dossier d'installation BMAD |
 | `AUTOSPEC_CLAUDE_CMD` | auto (`claude.cmd`) | Binaire Claude Code |
-| `AUTOSPEC_CLAUDE_MODEL` | (défaut CLI) | Modèle à utiliser |
+| `AUTOSPEC_CLAUDE_MODEL` | (défaut CLI) | Modèle à utiliser (provider claude) |
+| `AUTOSPEC_AGENT_PROVIDER` | `claude` | Provider d'agents : `claude` (harness CLI), `openai`, `ollama` (LangChain) |
+| `AUTOSPEC_OPENAI_API_KEY` | (ou `OPENAI_API_KEY`) | Clé API du provider openai |
+| `AUTOSPEC_OPENAI_MODEL` | `gpt-4o-mini` | Modèle OpenAI |
+| `AUTOSPEC_OPENAI_BASE_URL` | api.openai.com | Endpoint OpenAI-compatible |
+| `AUTOSPEC_OPENAI_PRICE_IN` / `_OUT` | `0` | $/1M tokens pour estimer le coût |
+| `AUTOSPEC_OLLAMA_BASE_URL` | `http://localhost:11434` | Serveur Ollama local |
+| `AUTOSPEC_OLLAMA_MODEL` | `llama3.1` | Modèle Ollama |
+| `AUTOSPEC_PROVIDER_TOOL_ROUNDS` | `8` | Cap de tours du protocole d'outils fichiers (providers LangChain) |
+| `AUTOSPEC_COMPONENTS` | `0` | Phase « composants » (agent solutionneur après le brief) |
+| `AUTOSPEC_SETUP_INSTALL` | `0` | Installe réellement les deps des composants (uv sync / npm install) |
+| `AUTOSPEC_TECH_WRITER` | `0` | Tech-writer auto après chaque build (sinon bouton 📘 Doc) |
+| `AUTOSPEC_UI_TESTS` | `0` | Tests d'acceptance UI Playwright pour les US `ui` |
+| `AUTOSPEC_SESSION_MONITOR` | `1` | Watchdog fenêtre d'usage Claude (M2, provider claude uniquement) |
+| `AUTOSPEC_CCUSAGE_CMD` | `npx --yes ccusage` | Commande ccusage (heure de reset du bloc actif) |
+| `AUTOSPEC_RESUME_FALLBACK_MIN` | `60` | Délai de reprise (min) si l'heure de reset est inconnue |
 | `AUTOSPEC_PERMISSION_MODE` | `bypassPermissions` | Mode permissions des agents |
 | `AUTOSPEC_MAX_PARALLEL_DEVS` | `2` | Agents dev en parallèle |
 | `AUTOSPEC_DEV_MAX_ATTEMPTS` | `2` | Tentatives par story |

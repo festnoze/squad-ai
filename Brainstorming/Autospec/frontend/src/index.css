@@ -912,6 +912,25 @@ button.action-btn.action-done {
   font-weight: 600;
 }
 
+/* M2 : reprise auto programmée (fenêtre d'usage Claude épuisée) */
+.resume-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--amber);
+  border: 1px solid var(--amber);
+  border-radius: 99px;
+  padding: 2px 6px 2px 10px;
+  white-space: nowrap;
+}
+
+.resume-banner .small-btn {
+  padding: 1px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .phase-build {
   color: var(--accent);
   border-color: var(--accent);

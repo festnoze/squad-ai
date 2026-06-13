@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import os
 import subprocess
+import time
 
 from ..agents import prompts
 from ..agents.runner import AgentError, AgentRunner, extract_json
@@ -31,7 +32,7 @@ from ..models import (
     UserStory,
 )
 from ..storage import save_state, workspace_dir
-from . import pytest_report, refine, scheduler, setup_exec, workspace
+from . import pytest_report, refine, scheduler, session_monitor, setup_exec, workspace
 from .events import bus
 
 _REFINE_ROLE_TO_CHAT = {"critic": ChatRole.CRITIC, "judge": ChatRole.JUDGE}
@@ -82,9 +83,16 @@ class _UsageTracker:
         self.pipeline = pipeline
 
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None):
-        res = await self.pipeline.runner.arun(
-            prompt, system_prompt, cwd=cwd, session_id=session_id
-        )
+        try:
+            res = await self.pipeline.runner.arun(
+                prompt, system_prompt, cwd=cwd, session_id=session_id
+            )
+        except AgentError as exc:
+            # Usage-window watchdog (M2): an exhausted Claude session window
+            # triggers a clean stop + scheduled auto-resume, then the error
+            # still propagates to the caller's normal handling.
+            await self.pipeline._aon_agent_error(exc)
+            raise
         usage = self.pipeline.state.usage
         usage.cost_usd += res.cost_usd
         usage.input_tokens += res.input_tokens
@@ -110,6 +118,7 @@ class Pipeline:
         self._impact_task: asyncio.Task | None = None
         self._setup_task: asyncio.Task | None = None
         self._doc_task: asyncio.Task | None = None
+        self._resume_timer: asyncio.Task | None = None  # M2 scheduled auto-resume
         self._run_proc: subprocess.Popen | None = None
         # Strong ref to the app-output streaming task (asyncio keeps only weak
         # refs to tasks: an unreferenced task may be garbage-collected mid-run).
@@ -155,7 +164,13 @@ class Pipeline:
         self._stop_requested = True
         if self._run_proc and self._run_proc.poll() is None:
             self._run_proc.terminate()
-        for task in (self._task, self._impact_task, self._setup_task, self._doc_task):
+        for task in (
+            self._task,
+            self._impact_task,
+            self._setup_task,
+            self._doc_task,
+            self._resume_timer,
+        ):
             if task and not task.done():
                 task.cancel()
                 try:
@@ -357,6 +372,64 @@ class Pipeline:
             if story is not None:
                 story.priority = _clamp_1_5(entry.get("priority"), default=story.priority)
         self._sync()
+
+    # ------------------------------------------- usage-window watchdog (M2)
+
+    async def _aon_agent_error(self, exc: AgentError) -> None:
+        """When the Claude harness reports an exhausted usage window: stop the
+        pipeline cleanly and schedule an automatic resume at the next fresh
+        session window (error epoch → ccusage active block → fallback delay).
+
+        Best-effort watchdog: it must never mask the original AgentError."""
+        try:
+            if not session_monitor.monitor_active():
+                return
+            if not session_monitor.is_usage_limit_error(str(exc)):
+                return
+            if self.state.resume_at and self._resume_timer and not self._resume_timer.done():
+                return  # parallel workers hit the same wall: already scheduled
+            at = await session_monitor.anext_reset(str(exc))
+            self._stop_requested = True
+            self._resume_event.set()  # unblock a paused loop so it can stop
+            self._chat(
+                ChatRole.SYSTEM,
+                "⏳ Fenêtre d'usage Claude épuisée — arrêt propre de la pipeline. "
+                f"Reprise automatique programmée à {time.strftime('%H:%M', time.localtime(at))} "
+                "(nouvelle session disponible).",
+            )
+            self.schedule_resume(at)
+        except Exception:  # noqa: BLE001 — watchdog only
+            pass
+
+    def schedule_resume(self, at: float) -> None:
+        """Arm (or re-arm) the auto-resume timer and persist ``resume_at`` so a
+        backend restart can re-arm it (recover_projects)."""
+        self.state.resume_at = at
+        self._sync()
+        if self._resume_timer and not self._resume_timer.done():
+            self._resume_timer.cancel()
+        self._resume_timer = asyncio.create_task(self._aresume_timer(at))
+
+    async def _aresume_timer(self, at: float) -> None:
+        await asyncio.sleep(max(0.0, at - time.time()))
+        self.state.resume_at = 0.0
+        self._chat(
+            ChatRole.SYSTEM,
+            "⏰ Nouvelle fenêtre d'usage disponible — reprise du travail en cours.",
+        )
+        try:
+            await self.aresume_build()
+        except ValueError as exc:
+            # Nothing buildable (e.g. the window died during the spec phase):
+            # leave the project dormant, the user relaunches manually.
+            self._chat(ChatRole.SYSTEM, f"Reprise automatique impossible : {exc}")
+
+    async def acancel_resume(self) -> None:
+        """Cancel a scheduled auto-resume (user override)."""
+        if self._resume_timer and not self._resume_timer.done():
+            self._resume_timer.cancel()
+        self.state.resume_at = 0.0
+        self._chat(ChatRole.SYSTEM, "⏰ Reprise automatique annulée.")
 
     # ------------------------------------------------------ feedback impact
 
@@ -1024,11 +1097,21 @@ class Pipeline:
                         story.status = StoryStatus.FAILED
         except AgentError as exc:
             story.last_error = str(exc)
-            story.status = (
-                StoryStatus.TODO
-                if story.attempts < settings.dev_max_attempts
-                else StoryStatus.FAILED
-            )
+            if session_monitor.monitor_active() and session_monitor.is_usage_limit_error(
+                str(exc)
+            ):
+                # Usage-window exhaustion is not the story's fault: refund the
+                # attempt and requeue as-is for the scheduled fresh session.
+                # Only with the watchdog active (it stops the build loop) —
+                # otherwise the refund would retry the same wall forever.
+                story.attempts = max(0, story.attempts - 1)
+                story.status = StoryStatus.TODO
+            else:
+                story.status = (
+                    StoryStatus.TODO
+                    if story.attempts < settings.dev_max_attempts
+                    else StoryStatus.FAILED
+                )
             self._log(f"dev:{story.id}", f"Erreur agent : {exc}")
         except Exception:
             # Unexpected failure (pytest runner missing, git crash…): never

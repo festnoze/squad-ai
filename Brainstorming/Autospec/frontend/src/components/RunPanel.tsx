@@ -13,6 +13,7 @@ interface Props {
   onDocument: () => void;
   onExportZip: () => void;
   onGitExport: () => void;
+  onCancelResume: () => void;
 }
 
 function formatTokens(n: number): string {
@@ -44,6 +45,7 @@ export function RunPanel({
   onDocument,
   onExportZip,
   onGitExport,
+  onCancelResume,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -72,6 +74,22 @@ export function RunPanel({
           {PHASE_LABEL[project.phase] ?? project.phase} — itération {project.iteration}
           {project.paused ? " ⏸ en pause" : project.auto_spec && loopActive ? " (boucle auto-spec)" : ""}
         </span>
+        {(project.resume_at ?? 0) > 0 && (
+          <span className="resume-banner" title="Fenêtre d'usage Claude épuisée : le travail reprendra automatiquement">
+            ⏰ Reprise auto à{" "}
+            {new Date((project.resume_at ?? 0) * 1000).toLocaleTimeString("fr-FR", {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+            <button
+              className="small-btn"
+              onClick={onCancelResume}
+              title="Annuler la reprise automatique"
+            >
+              ✕
+            </button>
+          </span>
+        )}
         {agentCalls > 0 && (
           <span className={`usage-meter${overBudget ? " over-budget" : ""}`}>
             {budgetUsd > 0

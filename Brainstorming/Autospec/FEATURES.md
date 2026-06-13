@@ -15,13 +15,16 @@ transforme en **code testé** (BDD puis TDD), de façon itérative et autonome.
 
 ## 1. Pipeline d'agents (cœur)
 
-Tous les agents sont exécutés via le **CLI Claude Code en mode headless**
-(`claude -p --output-format json`), derrière l'abstraction **`AgentRunner`** —
-3 implémentations : `ClaudeCliRunner` (production), `FakeRunner` (tests
-unitaires), `ScriptedRunner` (mode démo). Les personas proviennent de
-l'installation **BMAD** (`_bmad/bmm/agents/`), augmentées d'un override « mode
-programmatique » qui neutralise les menus interactifs et impose **une seule
-réponse JSON**.
+Les agents sont exécutés derrière l'abstraction **`AgentRunner`** —
+5 implémentations : `ClaudeCliRunner` (production, CLI Claude Code headless
+`claude -p --output-format json`), **`OpenAiRunner`** et **`OllamaRunner`**
+(providers hors abonnement via **LangChain** : sessions rejouées en mémoire +
+protocole d'outils JSON borné pour les écritures fichiers, confiné au
+workspace), `FakeRunner` (tests unitaires), `ScriptedRunner` (mode démo).
+Sélection par `AUTOSPEC_AGENT_PROVIDER` ou à chaud via `GET/POST /api/provider`
+(sélecteur 🤖 du header). Les personas proviennent de l'installation **BMAD**
+(`_bmad/bmm/agents/`), augmentées d'un override « mode programmatique » qui
+neutralise les menus interactifs et impose **une seule réponse JSON**.
 
 | Agent | Persona BMAD | Rôle |
 |---|---|---|
@@ -30,7 +33,9 @@ réponse JSON**.
 | **PO** | `sm` | Découpe le brief en **EPICs** et **user stories** : description, critères d'acceptance, **Gherkin**, dépendances (`depends_on`), **priorité kanban** (1-5). |
 | **QA** | `qa` | Décompose le test d'acceptance **outside-in (London school)** en tests unitaires par couche (API → façade → service → repo/LLM), chacun mockant ses collaborateurs directs, rattachés aux critères. |
 | **Dev** | `dev` | Un agent par story, en **BDD puis TDD** avec `pytest-bdd`. |
-| **Analyste** | `analyst` | (Auto-spec) Explore le produit, formule des **hypothèses de features** scorées (valeur/complexité), les priorise, choisit la suivante. |
+| **Analyste** | `analyst` | (Auto-spec) Explore le produit, formule des **hypothèses de features** scorées (valeur/complexité), les priorise, choisit la suivante. Analyse aussi l'**impact des feedbacks** (E2). |
+| **Solutionneur** | `architect` | (E3, `AUTOSPEC_COMPONENTS`) Propose après le brief les **composants** du produit (backend FastAPI, frontend React, infra optionnelle) — validés/édités par l'utilisateur, matérialisés par l'**exécuteur de setup** (E4). |
+| **Tech-writer** | `tech-writer` | (I2) Rédige le **README du projet généré** (présentation, lancement, tests, archi) — auto après build (`AUTOSPEC_TECH_WRITER`) ou bouton 📘. |
 | **Critic / Juge** | (génériques) | Harnais de raffinement (§3). |
 
 **Cycle de vie** : `spec (PM)` → `[architect]` → `plan (PO)` → `build (QA + Dev)`
@@ -244,6 +249,18 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 | `AUTOSPEC_REFINE` / `_PO` / `_DEV` | `0` / `1` / `1` | harnais de raffinement |
 | `AUTOSPEC_REFINE_MAX_ROUNDS` | `2` | cap d'allers-retours |
 | `AUTOSPEC_REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge |
+| `AUTOSPEC_AGENT_PROVIDER` | `claude` | provider d'agents (claude / openai / ollama) |
+| `AUTOSPEC_OPENAI_API_KEY` / `_MODEL` / `_BASE_URL` | — | provider OpenAI (LangChain) |
+| `AUTOSPEC_OPENAI_PRICE_IN` / `_OUT` | `0` | $/1M tokens (estimation de coût) |
+| `AUTOSPEC_OLLAMA_BASE_URL` / `_MODEL` | localhost / `llama3.1` | provider Ollama (LangChain) |
+| `AUTOSPEC_PROVIDER_TOOL_ROUNDS` | `8` | cap du protocole d'outils fichiers |
+| `AUTOSPEC_COMPONENTS` | `0` | phase composants (solutionneur) |
+| `AUTOSPEC_SETUP_INSTALL` | `0` | install réelle des deps composants |
+| `AUTOSPEC_TECH_WRITER` | `0` | tech-writer auto après build |
+| `AUTOSPEC_UI_TESTS` | `0` | tests d'acceptance UI Playwright |
+| `AUTOSPEC_SESSION_MONITOR` | `1` | watchdog fenêtre d'usage Claude (M2) |
+| `AUTOSPEC_CCUSAGE_CMD` | `npx --yes ccusage` | commande ccusage |
+| `AUTOSPEC_RESUME_FALLBACK_MIN` | `60` | repli (min) si reset inconnu |
 
 ---
 
@@ -252,7 +269,16 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 **Projets** : `POST /api/projects`, `GET /api/projects`, `GET|DELETE
 /api/projects/{id}`, `/chat`, `/spec-mode`, `/budget`, `/stop`, `/pause`,
 `/resume`, `/run`, `/stop-app`, `/resume-build`, `/archive`, `/unarchive`,
-`/files`, `/files/raw?path=`.
+`/files`, `/files/raw?path=`, `PUT /components`, `POST /components/setup`,
+`POST /document`, `GET /export` (zip), `POST /git-export`.
+
+**Provider** : `GET|POST /api/provider` (bascule claude/openai/ollama à chaud ;
+verrouillé en mode démo).
+
+**Watchdog M2** : `POST /api/projects/{id}/cancel-resume` (annule la reprise
+auto programmée après épuisement de la fenêtre d'usage Claude — détection sur
+l'erreur CLI, heure de reset via epoch/ccusage/fallback, timer persisté
+`resume_at` ré-armé au restart, bannière ⏰ dans le `RunPanel`).
 
 **Stories** : `PATCH /…/stories/{sid}`, `POST /…/stories`, `DELETE
 /…/stories/{sid}`, `/…/stories/reorder`, `/…/stories/{sid}/rebuild`,
@@ -268,13 +294,18 @@ Gardes : `404` (inconnu), `409` (action interdite : pipeline active, story
 
 ## 8. Qualité, tests & CI
 
-- **Backend — 131 tests pytest** : `test_scheduler`, `test_runner`, `test_models`,
+- **Backend — 178 tests pytest** : `test_scheduler`, `test_runner`, `test_models`,
   `test_pipeline` (interview, dépendances, auto-spec, kanban, plan QA, états
   réels, pause/reprise, rebuild/force-done, resume-build, guidance, architecture,
   usage, diff git…), `test_refine` (déterminisme du harnais), `test_scripted`,
-  `test_pytest_report`, `test_api`.
-- **Frontend — 20 tests Vitest** (4 fichiers) : logique pure `criterionState`,
-  rendu `Board` et panneaux.
+  `test_pytest_report`, `test_api`, `test_providers` (M1 : protocole d'outils,
+  sessions, coût), `test_impact` (E2), `test_components` (E3/E4),
+  `test_delivery` (I2 : tech-writer, zip, git-export), `test_ui_tests` (E5),
+  `test_api_provider`, `test_session_monitor` (M2 : détection limite, parsing
+  epoch/ccusage, stop + reprise auto, ré-armement au restart, annulation).
+- **Frontend — 32 tests Vitest** (6 fichiers) : logique pure `criterionState`,
+  rendu `Board`, `RunPanel`, `ProjectBar` (play/stop/pulse U1),
+  `ComponentsPanel` (E3) et `App`.
 - **e2e — 1 test Playwright** hermétique (backend mode démo servant la SPA
   buildée, same-origin) : création → board peuplé → pause/reprise → critère
   (vert + tests + Gherkin) → suppression.
@@ -304,5 +335,6 @@ Autospec/
 └── workspace/<id>/              # CODE GÉNÉRÉ (projet uv autonome + repo git)
 ```
 
-**État** : 8 features initiales + 16 items de backlog livrés et vérifiés ; les
-3 suites de tests (131 backend, 20 frontend, 1 e2e) sont vertes.
+**État** : 8 features initiales + 16 items de backlog + extension produit
+(E1-E5, I1-I2, M1, M2, U1) livrés et vérifiés ; les 3 suites de tests
+(178 backend, 32 frontend, 1 e2e) sont vertes.

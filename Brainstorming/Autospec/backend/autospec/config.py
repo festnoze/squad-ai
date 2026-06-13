@@ -191,6 +191,19 @@ class Settings:
         default_factory=lambda: _env_bool("AUTOSPEC_SETUP_INSTALL", False)
     )
     npm_cmd: str = field(default_factory=lambda: os.environ.get("AUTOSPEC_NPM_CMD", "npm"))
+    # Claude usage-window watchdog (M2): when the Claude harness reports an
+    # exhausted usage window, schedule an automatic resume when a fresh session
+    # opens. Reset time read from the CLI error, else from ccusage's active
+    # billing block, else now + fallback. Only active for the claude provider.
+    session_monitor_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_SESSION_MONITOR", True)
+    )
+    ccusage_cmd: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_CCUSAGE_CMD", "npx --yes ccusage")
+    )
+    resume_fallback_min: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_RESUME_FALLBACK_MIN", 60.0, minimum=1.0)
+    )
     # Tech-writer phase after each build (README + launch instructions for the
     # GENERATED project). OFF by default; also triggerable via POST /document.
     tech_writer_enabled: bool = field(

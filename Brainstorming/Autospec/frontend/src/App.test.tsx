@@ -33,6 +33,7 @@ vi.mock("./api", () => ({
   updateComponents: vi.fn().mockResolvedValue(undefined),
   setupComponents: vi.fn().mockResolvedValue(undefined),
   documentProject: vi.fn().mockResolvedValue(undefined),
+  cancelResume: vi.fn().mockResolvedValue(undefined),
   gitExportProject: vi.fn().mockResolvedValue({ commit: "abc" }),
   exportZipUrl: (id: string) => `/api/projects/${id}/export`,
 }));

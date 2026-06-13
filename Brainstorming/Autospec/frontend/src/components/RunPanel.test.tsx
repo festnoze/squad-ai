@@ -78,6 +78,7 @@ function renderPanel(project: ProjectState) {
       onDocument={vi.fn()}
       onExportZip={vi.fn()}
       onGitExport={vi.fn()}
+      onCancelResume={vi.fn()}
     />,
   );
 }
@@ -158,5 +159,21 @@ describe("RunPanel", () => {
       makeProject({ usage: { ...NEUTRAL_USAGE, agent_calls: 0 } }),
     );
     expect(container.querySelector(".usage-meter")).toBeNull();
+  });
+
+  it("resume_at > 0 : bannière de reprise auto + bouton annuler (M2)", () => {
+    const { container } = renderPanel(
+      makeProject({ phase: "stopped", resume_at: Date.now() / 1000 + 3600 }),
+    );
+    expect(container.querySelector(".resume-banner")).not.toBeNull();
+    expect(screen.getByText(/Reprise auto à/)).toBeInTheDocument();
+    expect(
+      screen.getByTitle("Annuler la reprise automatique"),
+    ).toBeInTheDocument();
+  });
+
+  it("resume_at absent : pas de bannière de reprise", () => {
+    const { container } = renderPanel(makeProject({ phase: "stopped" }));
+    expect(container.querySelector(".resume-banner")).toBeNull();
   });
 });

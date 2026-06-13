@@ -84,6 +84,13 @@ def recover_projects() -> list[str]:
         pipelines[state.id] = pipeline
         if changed:
             pipeline._sync()
+        if state.resume_at:
+            # Re-arm the M2 auto-resume timer lost with the previous process
+            # (a past resume_at fires immediately: the window already reset).
+            try:
+                pipeline.schedule_resume(state.resume_at)
+            except RuntimeError:
+                pass  # no running event loop (sync context)
         recovered.append(state.id)
     return recovered
 
@@ -398,6 +405,13 @@ async def apause(project_id: str) -> dict:
 @app.post("/api/projects/{project_id}/resume")
 async def aresume(project_id: str) -> dict:
     await _pipeline(project_id).aresume()
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/cancel-resume")
+async def acancel_resume(project_id: str) -> dict:
+    """Cancel the M2 scheduled auto-resume of a project."""
+    await _pipeline(project_id).acancel_resume()
     return {"ok": True}
 
 
