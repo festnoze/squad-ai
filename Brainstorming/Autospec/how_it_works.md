@@ -56,7 +56,7 @@ Autospec/
 │       │   └── events.py        # Bus d'événements → WebSocket
 │       └── api/
 │           └── server.py        # REST + WebSocket + service du frontend buildé
-│   └── tests/                   # 82 tests (scheduler, runner, models, pipeline, refine, API, scripted, pytest_report)
+│   └── tests/                   # 131 tests (scheduler, runner, models, pipeline, refine, API, scripted, pytest_report)
 ├── frontend/                    # React + Vite + TypeScript
 │   └── src/
 │       ├── App.tsx
@@ -81,7 +81,7 @@ en JSON. Les éléments clés :
 
 | Modèle | Rôle |
 |---|---|
-| `ProjectState` | racine : objectif, phase, brief, **`architecture`** (design technique courant), backlog, epics, stories, chat, feedback, **`build_guidance`** (consignes données pendant le build), **`plan_quality`** (dernier score de raffinement du plan PO, -1 = non exécuté — exposé à l'UI), **`usage`** (modèle `Usage` : coût/tokens/nombre d'appels cumulés sur tous les agents — exposé à l'UI), itération, flags |
+| `ProjectState` | racine : objectif, phase, brief, **`spec_mode`** (`"interview"` par défaut ou `"brainstorm"` — pilote la phase spec), **`budget_usd`** (plafond de coût en $, `0` = illimité) et **`budget_tokens`** (plafond de tokens, `0` = illimité), **`architecture`** (design technique courant), backlog, epics, stories, chat, feedback, **`build_guidance`** (consignes données pendant le build), **`plan_quality`** (dernier score de raffinement du plan PO, -1 = non exécuté — exposé à l'UI), **`usage`** (modèle `Usage` : coût/tokens/nombre d'appels cumulés sur tous les agents — exposé à l'UI), itération, flags |
 | `Usage` | observabilité cumulée d'un projet : `cost_usd`, `input_tokens`, `output_tokens`, `agent_calls` — sommés sur chaque appel agent |
 | `Epic` | regroupement de stories, rattaché à une itération |
 | `UserStory` | description, **`acceptance_criteria`** (objets `AcceptanceCriterion`), **Gherkin**, **`test_plan`** (tests unitaires planifiés par le QA), `depends_on`, **`priority`** (kanban 1-5), statut, tentatives, **`quality_score`** (dernier score de raffinement du code de la story, -1 = non exécuté — exposé à l'UI) ; méthodes `tests_for_criterion` / `criterion_state` |
@@ -229,15 +229,36 @@ while not stop_requested:
     await self._anext_feature_phase()   # Analyste + PM (brief suivant)
 ```
 
-### 5.1 Phase SPEC — le PM (`pm`)
+### 5.1 Phase SPEC — interview socratique ou brainstorming
 
-Le PM interviewe l'utilisateur via le chat. À chaque tour il renvoie un JSON :
+La phase spec a **deux modes**, pilotés par `ProjectState.spec_mode`
+(`"interview"` par défaut ou `"brainstorm"`). `_aspec_phase` branche selon ce
+mode : persona **PM** (`pm`) pour l'interview, persona **analyste** (BMAD
+`analyst`, « Mary ») pour le brainstorming. Dans les deux cas, à chaque tour
+l'agent renvoie un JSON :
 - `{"type": "question", "message": "..."}` → la pipeline **attend** la réponse
   utilisateur (`asyncio.Queue`), qui est injectée dans le chat puis relancée ;
 - `{"type": "brief", "brief": "..."}` → le brief est stocké, on passe au PO.
 
+**Mode interview (`pm_interview`).** Le PM mène une **facilitation socratique par
+dimensions** : il questionne dimension par dimension (problème/pourquoi &
+job-to-be-done, personas, périmètre MVP, hors-périmètre, contraintes, données,
+vues/UX, cas limites, critères de succès), **reformule** et **confronte les
+non-dits**, puis produit le brief.
+
+**Mode brainstorming (`pm_brainstorm`).** L'analyste « Mary » **re-questionne le
+besoin lui-même** en deux temps : phase **DIVERGER** (élargir l'espace des
+possibles — angles, analogies, inversion du problème, JTBD alternatifs) puis
+phase **CONVERGER** (choisir/prioriser selon valeur/effort/risque), avant de
+produire le brief.
+
 En **mode auto-spec**, le prompt impose au PM de **ne poser aucune question** et
 de produire le brief immédiatement en décidant lui-même.
+
+Le mode se règle via `POST /api/projects/{id}/spec-mode` (corps `{mode}`,
+méthode `Pipeline.aset_spec_mode`, **422** si le mode est invalide). Côté UI, un
+**toggle 💬 Interview / 🧠 Brainstorming** est affiché dans le `ChatPanel` quand
+la phase est `spec`.
 
 ### 5.2 Phase PLAN — le PO (`sm`)
 
@@ -434,6 +455,24 @@ l'agent BMAD **`architect`** (persona `architect`, fallback « Winston »).
 > se fait via `AUTOSPEC_ARCHITECTURE` (voir §11). Quand la phase est désactivée,
 > `state.architecture` reste vide et aucun appel agent supplémentaire n'est fait.
 
+### 5.8 Budget tokens/coût + arrêt automatique
+
+Un projet peut porter un **plafond de coût et/ou de tokens** : `budget_usd`
+(plafond en $) et `budget_tokens` (plafond de tokens), avec `0` = **illimité**.
+Les deux sont réglables **à la création** (`POST /api/projects` accepte
+`budget_usd`/`budget_tokens`) ou **après coup** via `POST /api/projects/{id}/budget`.
+
+`Pipeline._enforce_budget()` est appelé à **chaque point de contrôle**
+(`_checkpoint` : entre itérations, entre lots de stories du build, et dans la
+boucle auto-spec). Dès que `state.usage` (voir §4.6) atteint le budget, la
+pipeline **s'arrête proprement** (`_stop_requested`, comme un stop manuel) avec
+un message « 💰 Budget atteint ». C'est la base pour, à terme, activer plus ou
+moins de raffinement / d'architecture **selon le budget**.
+
+Côté UI : un champ **« Budget max ($) »** dans `ProjectSetup`, et la jauge
+d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
+(`.over-budget`) quand le plafond est atteint.
+
 ---
 
 ## 6. Ordonnancement : dépendances + kanban (`orchestrator/scheduler.py`)
@@ -511,11 +550,13 @@ la pipeline.
 
 | Méthode | Route | Rôle |
 |---|---|---|
-| `POST` | `/api/projects` | crée un projet (`goal`, `name`, `auto_spec`) et démarre la pipeline |
+| `POST` | `/api/projects` | crée un projet (`goal`, `name`, `auto_spec`, **`budget_usd`**, **`budget_tokens`**) et démarre la pipeline |
 | `GET` | `/api/projects` | liste les projets (vivants + persistés) |
 | `GET` | `/api/projects/{id}` | état complet d'un projet (live ou rechargé du disque) |
 | `DELETE` | `/api/projects/{id}` | **supprime** un projet : stoppe la pipeline (`adispose`) et efface le workspace |
 | `POST` | `/api/projects/{id}/chat` | envoie un message (réponse PM en phase spec, **consigne de build** en phase build/architect, sinon **feedback**) |
+| `POST` | `/api/projects/{id}/spec-mode` | **change le mode de la phase spec** (corps `{mode}` : `interview`/`brainstorm` ; `Pipeline.aset_spec_mode`) ; **422** si mode invalide |
+| `POST` | `/api/projects/{id}/budget` | **règle le budget** (corps `{budget_usd, budget_tokens}`, `0` = illimité ; `Pipeline.aset_budget`) |
 | `POST` | `/api/projects/{id}/stop` | arrête la boucle |
 | `POST` | `/api/projects/{id}/pause` | **met en pause** la pipeline (gate entre étapes) |
 | `POST` | `/api/projects/{id}/resume` | **reprend** la pipeline |
@@ -682,7 +723,7 @@ Variables d'environnement (toutes optionnelles) :
 
 ### Tests backend (`backend/tests`)
 
-82 tests, sans aucun appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
+131 tests, sans aucun appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
 
 - **`test_scheduler.py`** — dépendances, détection de cycles, sanitization,
   **ordre kanban**.
@@ -739,6 +780,16 @@ uv run pytest
 `green_pytest` (conftest) monkeypatche `_arun_pytest` pour simuler une suite
 verte sans lancer de vrais sous-processus.
 
+### Tests frontend (`frontend/src`)
+
+**20 tests Vitest** (4 fichiers) : logique pure (`criterionState`), rendu du
+`Board` et des panneaux.
+
+```powershell
+cd frontend
+npm run test:unit
+```
+
 ### Test e2e Playwright (`frontend/e2e`)
 
 Un test bout-en-bout **hermétique** vérifie le lancement back+front et le
@@ -754,6 +805,31 @@ run (hermétique).
 cd frontend
 npm run test:e2e   # build le front puis lance Playwright (backend démo auto-démarré)
 ```
+
+---
+
+## 12b. Robustesse & sécurité
+
+Une revue de code récente a durci plusieurs points.
+
+**Sécurité.**
+- **Anti path-traversal** dans `storage.workspace_dir` : les ids de projet
+  viennent des URLs et alimentent un `rmtree` ; tout id contenant `..`, un
+  séparateur de chemin ou `:` est **rejeté**.
+- L'**app générée** (code non fiable) est lancée avec un **environnement
+  minimal** : pas de fuite des secrets du process backend.
+- **CORS** restreint aux **origines locales**.
+
+**Robustesse.**
+- `config.py` **tolère les variables d'env malformées** (plus de crash à
+  l'import) : helpers `_env_bool` / `_env_int`, parsing booléen cohérent.
+- Le **runner** gère `result:null`, `is_error`, un payload non-`dict` et le **CLI
+  absent** (→ `AgentError`) ; `extract_json` ne lève **plus jamais**
+  `JSONDecodeError`.
+- Le **scheduler** ne casse que les dépendances **réellement cycliques**.
+- Des **validateurs Pydantic clampent les scores 1-5** : un état legacy ou une
+  sortie LLM hors-bornes ne fait plus échouer le chargement.
+- L'**écriture d'état est atomique** (fichier temporaire + `rename`).
 
 ---
 

@@ -5,9 +5,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from ..config import settings
 from ..models import ProjectState, UserStory
 from ..storage import workspace_dir
 
+# The `ui` marker keeps Playwright acceptance tests out of the default suite
+# (replayed separately with `uv run pytest -m ui`, where the explicit -m wins).
 PYPROJECT_TEMPLATE = """[project]
 name = "{package}"
 version = "0.1.0"
@@ -19,7 +22,7 @@ dependencies = []
 dev = [
     "pytest>=8.0",
     "pytest-bdd>=7.0",
-    "pytest-json-report>=1.5",
+    "pytest-json-report>=1.5",{ui_dep}
 ]
 
 [build-system]
@@ -31,6 +34,8 @@ packages = ["{package}"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "-m \\"not ui\\""
+markers = ["ui: tests d'acceptance UI Playwright (rejoues via `uv run pytest -m ui`)"]
 """
 
 MAIN_TEMPLATE = '''"""Entry point of the generated application. Dev agents extend this."""
@@ -76,11 +81,18 @@ def scaffold(state: ProjectState) -> Path:
         if not path.exists():
             path.write_text(content, encoding="utf-8")
 
+    ui_dep = '\n    "pytest-playwright>=0.5",' if settings.ui_tests_enabled else ""
     _ensure(ws / ".gitignore", GITIGNORE_TEMPLATE)
-    _ensure(ws / "pyproject.toml", PYPROJECT_TEMPLATE.format(package=pkg, name=state.name))
+    _ensure(
+        ws / "pyproject.toml",
+        PYPROJECT_TEMPLATE.format(package=pkg, name=state.name, ui_dep=ui_dep),
+    )
     _ensure(ws / pkg / "__init__.py", "")
     _ensure(ws / "tests" / "__init__.py", "")
     _ensure(ws / "tests" / "steps" / "__init__.py", "")
+    if settings.ui_tests_enabled:
+        (ws / "tests" / "ui").mkdir(parents=True, exist_ok=True)
+        _ensure(ws / "tests" / "ui" / "__init__.py", "")
     _ensure(ws / "main.py", MAIN_TEMPLATE)
     return ws
 

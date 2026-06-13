@@ -50,6 +50,13 @@ class HypothesisStatus(str, Enum):
     REJECTED = "rejected"
 
 
+class ComponentStatus(str, Enum):
+    PROPOSED = "proposed"   # suggested by the solution agent, awaiting the user
+    APPROVED = "approved"   # validated by the user, ready for the setup executor
+    CREATED = "created"     # folders/manifests actually created in the workspace
+    REJECTED = "rejected"   # discarded by the user
+
+
 class TestState(str, Enum):
     __test__ = False              # not a pytest test class
 
@@ -102,6 +109,19 @@ class FeatureHypothesis(BaseModel):
         return self.value / max(self.complexity, 1)
 
 
+class Component(BaseModel):
+    """A technical component of the generated product (backend, frontend,
+    database…), proposed by the solution agent and validated by the user."""
+
+    id: str
+    kind: str = "other"      # backend | frontend | database | cache | other
+    name: str = ""
+    technology: str = ""     # e.g. "Python + FastAPI", "React + Vite", "PostgreSQL"
+    rationale: str = ""
+    optional: bool = False   # optional components default to not-approved
+    status: ComponentStatus = ComponentStatus.PROPOSED
+
+
 class PlannedTest(BaseModel):
     """One unit test planned by the QA agent when decomposing the acceptance
     test outside-in (London style): each layer's test mocks its direct
@@ -136,6 +156,8 @@ class UserStory(BaseModel):
     attempts: int = 0
     last_error: str = ""
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
+    ui: bool = False         # story has a visual/UI dimension (QA routes it to Playwright)
+    ui_tests: list[str] = Field(default_factory=list)  # replayable UI test files (tests/ui/…)
 
     @field_validator("priority")
     @classmethod
@@ -189,6 +211,7 @@ class ProjectState(BaseModel):
     architecture: str = ""  # current technical design (from the optional Architect phase)
     plan_quality: int = -1  # last refinement score for the PO plan (-1 = not run)
     backlog: list[FeatureHypothesis] = Field(default_factory=list)
+    components: list[Component] = Field(default_factory=list)
     epics: list[Epic] = Field(default_factory=list)
     stories: list[UserStory] = Field(default_factory=list)
     chat: list[ChatMessage] = Field(default_factory=list)

@@ -271,6 +271,114 @@ Réponds avec EXACTEMENT UN objet JSON :
 {{"type": "brief", "message": "<une phrase de contexte>", "brief": "<brief markdown de la feature>"}}"""
 
 
+# ------------------------------------------------------ Feedback impact (E2)
+
+def feedback_impact(state: ProjectState, feedback: str) -> str:
+    stories = [
+        {
+            "id": s.id,
+            "epic_id": s.epic_id,
+            "title": s.title,
+            "status": s.status.value,
+            "implemented": s.status.value in ("done", "green"),
+        }
+        for s in state.stories
+    ]
+    epics = [{"id": e.id, "title": e.title} for e in state.epics]
+    return f"""Tu es l'analyste d'impact d'un pipeline automatisé. L'utilisateur vient de
+donner un feedback / une demande de changement sur le produit :
+\"\"\"{feedback}\"\"\"
+
+Objectif initial du produit :
+\"\"\"{state.goal}\"\"\"
+
+Brief de la dernière itération :
+\"\"\"{state.brief}\"\"\"
+
+Epics existants : {json.dumps(epics, ensure_ascii=False)}
+User stories existantes (champ "implemented" = déjà codée) :
+{json.dumps(stories, ensure_ascii=False)}
+
+Ta mission : ANALYSER L'IMPACT de ce feedback et DÉCIDER :
+- "update_story" : le feedback amende une story EXISTANTE et NON IMPLÉMENTÉE
+  (status "todo" ou "failed" uniquement) → fournis "story_id" + "updates"
+  (seuls les champs à changer).
+- "new_stories" : le feedback est une nouvelle tâche (ou touche une story déjà
+  implémentée, qu'on ne réécrit pas) → fournis l'epic (existant via "epic_id",
+  ou nouveau via "epic") et les nouvelles stories au format PO.
+- "none" : le feedback est une simple remarque sans travail à planifier.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<explication de ta décision, en français>",
+  "action": "update_story" | "new_stories" | "none",
+  "story_id": "<si update_story>",
+  "updates": {{"title": "...", "description": "...", "acceptance_criteria": ["..."], "gherkin": "...", "priority": 3}},
+  "epic_id": "<si new_stories et epic existant>",
+  "epic": {{"id": "EPIC-X", "title": "...", "description": "..."}},
+  "stories": [
+    {{"id": "US-X", "title": "...", "description": "En tant que..., je veux..., afin de...",
+      "acceptance_criteria": ["..."], "gherkin": "Feature: ...", "depends_on": [], "priority": 2}}
+  ]
+}}
+N'inclus que les clés utiles à l'action choisie. Pour "updates", n'inclus QUE
+les champs réellement modifiés."""
+
+
+# ------------------------------------------------- Solution agent (components)
+
+def components_proposal(state: ProjectState) -> str:
+    return f"""Tu es l'agent solutionneur d'un pipeline automatisé. Voici le brief produit :
+\"\"\"{state.brief or state.goal}\"\"\"
+
+Ta mission : proposer les COMPOSANTS techniques du produit à générer. Par
+défaut, pars sur : un backend Python + FastAPI et un frontend React + Vite.
+Ajoute en OPTIONNEL (optional=true) les composants d'infrastructure pertinents
+(base de données PostgreSQL, cache Redis…) UNIQUEMENT si le brief les justifie.
+Reste minimal : un produit purement CLI/librairie peut n'avoir qu'un backend.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français justifiant la stack>",
+  "components": [
+    {{"id": "backend", "kind": "backend", "name": "API backend", "technology": "Python + FastAPI", "rationale": "...", "optional": false}},
+    {{"id": "frontend", "kind": "frontend", "name": "Interface web", "technology": "React + Vite", "rationale": "...", "optional": false}},
+    {{"id": "db", "kind": "database", "name": "Base de données", "technology": "PostgreSQL", "rationale": "...", "optional": true}}
+  ]
+}}
+Les "kind" autorisés : backend, frontend, database, cache, other."""
+
+
+# ------------------------------------------------------- Tech-writer (delivery)
+
+def tech_writer(state: ProjectState, package_name: str) -> str:
+    components = [
+        {"kind": c.kind, "name": c.name, "technology": c.technology, "status": c.status.value}
+        for c in state.components
+    ]
+    stories_done = [s.title for s in state.stories if s.status.value == "done"]
+    return f"""Tu es le tech-writer d'un pipeline automatisé. Le répertoire courant contient
+le code GÉNÉRÉ du produit « {state.name} » (package Python `{package_name}`,
+projet uv, lancé via `uv run python main.py`, tests via `uv run pytest`).
+
+Brief produit :
+\"\"\"{state.brief}\"\"\"
+
+Composants du produit : {json.dumps(components, ensure_ascii=False)}
+Fonctionnalités livrées : {json.dumps(stories_done, ensure_ascii=False)}
+Architecture (si définie) :
+\"\"\"{state.architecture or "(non documentée)"}\"\"\"
+
+Ta mission : rédige le README du PROJET GÉNÉRÉ (pas d'Autospec), en t'appuyant
+sur les fichiers du répertoire courant si tu peux les lire. Le README doit
+contenir : présentation du produit, fonctionnalités, instructions d'installation
+ET de lancement (uv), comment exécuter les tests, et un résumé d'architecture
+(modules/couches réels du code).
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{"message": "<une phrase en français>", "readme": "<contenu markdown complet du README.md>"}}"""
+
+
 # ---------------------------------------------------------- Architect (design)
 
 def architect_design(state: ProjectState, package_name: str) -> str:
@@ -318,7 +426,10 @@ stories. Adapte la granularité à la complexité : une petite feature = 1 epic 
   implémentées en parallèle) ;
 - avoir une priorité kanban `priority` (1=haute..5=basse) : pour les stories
   sans dépendance entre elles, c'est cette priorité qui décide l'ordre de
-  passage en développement.
+  passage en développement ;
+- porter un drapeau `ui` (booléen) : true UNIQUEMENT si la story a une vraie
+  dimension visuelle/interface (écran, rendu, interaction navigateur), false
+  pour la logique pure / API / CLI.
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{
@@ -335,7 +446,8 @@ Réponds avec EXACTEMENT UN objet JSON :
           "acceptance_criteria": ["...", "..."],
           "gherkin": "Feature: ...\\n  Scenario: ...\\n    Given ...\\n    When ...\\n    Then ...",
           "depends_on": [],
-          "priority": 1
+          "priority": 1,
+          "ui": false
         }}
       ]
     }}
@@ -405,17 +517,36 @@ def _format_test_plan(story: UserStory) -> str:
     return "\n".join(lines)
 
 
+UI_TEST_BLOCK = """
+TESTS D'ACCEPTANCE UI (story à dimension visuelle) :
+Cette story a une dimension UI. EN PLUS de la suite pytest-bdd, écris un ou
+plusieurs tests d'acceptance UI Playwright REJOUABLES dans `tests/ui/` :
+- fichier `tests/ui/test_{snake}_ui.py`, fonctions marquées `@pytest.mark.ui` ;
+- utilise la fixture `page` de pytest-playwright : navigue vers l'UI générée,
+  effectue les clics/saisies du scénario, capture un screenshot
+  (`page.screenshot(path="tests/ui/screenshots/{snake}.png")`) et ASSERT sur le
+  rendu (`expect(page.locator(...)).to_be_visible()` / contenu textuel) ;
+- si l'app à tester doit tourner, démarre-la dans une fixture (subprocess +
+  attente du port) et arrête-la en teardown ;
+- ces tests sont exclus de la suite par défaut (marker `ui`) et lancés via
+  `uv run pytest -m ui` — ils doivent rester verts ET rejouables.
+Liste ces fichiers dans la clé "ui_test_files" de ta réponse JSON finale.
+"""
+
+
 def dev_story(
     story: UserStory,
     package_name: str,
     feature_rel_path: str,
     architecture: str = "",
     guidance: str = "",
+    ui_tests: bool = False,
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     guidance_block = (
         f"\nConsignes de l'utilisateur (à respecter en priorité) :\n{guidance}\n" if guidance else ""
     )
+    ui_block = UI_TEST_BLOCK.replace("{snake}", _snake(story.id)) if ui_tests else ""
     plan = _format_test_plan(story)
     plan_section = ""
     plan_step = ""
@@ -442,7 +573,7 @@ Critères d'acceptance :
 
 Le test d'acceptance Gherkin est déjà écrit dans `{feature_rel_path}` :
 \"\"\"{story.gherkin}\"\"\"
-{plan_section}
+{plan_section}{ui_block}
 PROCESSUS OBLIGATOIRE (BDD puis TDD, outside-in) :
 1. Écris les step definitions pytest-bdd dans `tests/steps/test_{_snake(story.id)}.py`
    en liant chaque Given/When/Then du fichier feature (utilise

@@ -18,6 +18,8 @@ from ..models import (
     AcceptanceCriterion,
     ChatMessage,
     ChatRole,
+    Component,
+    ComponentStatus,
     Epic,
     FeatureHypothesis,
     HypothesisStatus,
@@ -29,7 +31,7 @@ from ..models import (
     UserStory,
 )
 from ..storage import save_state, workspace_dir
-from . import pytest_report, refine, scheduler, workspace
+from . import pytest_report, refine, scheduler, setup_exec, workspace
 from .events import bus
 
 _REFINE_ROLE_TO_CHAT = {"critic": ChatRole.CRITIC, "judge": ChatRole.JUDGE}
@@ -103,6 +105,11 @@ class Pipeline:
         self._resume_event = asyncio.Event()
         self._resume_event.set()  # set = running, cleared = paused
         self._task: asyncio.Task | None = None
+        # Background side-tasks (feedback impact analysis, component setup):
+        # strong refs, one at a time each.
+        self._impact_task: asyncio.Task | None = None
+        self._setup_task: asyncio.Task | None = None
+        self._doc_task: asyncio.Task | None = None
         self._run_proc: subprocess.Popen | None = None
         # Strong ref to the app-output streaming task (asyncio keeps only weak
         # refs to tasks: an unreferenced task may be garbage-collected mid-run).
@@ -148,12 +155,13 @@ class Pipeline:
         self._stop_requested = True
         if self._run_proc and self._run_proc.poll() is None:
             self._run_proc.terminate()
-        if self._task and not self._task.done():
-            self._task.cancel()
-            try:
-                await self._task
-            except (asyncio.CancelledError, Exception):
-                pass
+        for task in (self._task, self._impact_task, self._setup_task, self._doc_task):
+            if task and not task.done():
+                task.cancel()
+                try:
+                    await task
+                except (asyncio.CancelledError, Exception):
+                    pass
 
     async def asend_user_message(self, text: str) -> None:
         self._chat(ChatRole.USER, text)
@@ -170,6 +178,14 @@ class Pipeline:
             # Outside the interview, user messages are feedback for the next cycle.
             self.state.feedback.append(text)
             self._sync()
+            # Pipeline dormant: analyze the feedback's impact right away (update
+            # an unimplemented story, or plan a new epic/stories).
+            if self.state.phase in (
+                PipelinePhase.DONE,
+                PipelinePhase.STOPPED,
+                PipelinePhase.ERROR,
+            ) and not (self._impact_task and not self._impact_task.done()):
+                self._impact_task = asyncio.create_task(self._aimpact_analysis(text))
 
     async def astop(self) -> None:
         self._stop_requested = True
@@ -342,6 +358,242 @@ class Pipeline:
                 story.priority = _clamp_1_5(entry.get("priority"), default=story.priority)
         self._sync()
 
+    # ------------------------------------------------------ feedback impact
+
+    async def _aimpact_analysis(self, feedback: str) -> None:
+        """Analyze a feedback's impact while the pipeline is dormant: either
+        update an unimplemented story, or create a new epic + stories. Errors
+        are surfaced to the chat, never raised (background task)."""
+        try:
+            result = await self._tracked.arun(
+                prompts.feedback_impact(self.state, feedback),
+                system_prompt=persona("analyst"),
+            )
+            reply = extract_json(result.text)
+        except AgentError as exc:
+            self._chat(ChatRole.SYSTEM, f"Analyse d'impact du feedback impossible : {exc}")
+            return
+        message = reply.get("message", "")
+        action = reply.get("action", "none")
+        if action == "update_story":
+            self._apply_story_update(reply, message)
+        elif action == "new_stories":
+            self._apply_new_stories(reply, message)
+        else:
+            self._chat(ChatRole.ANALYST, f"🔍 Impact : {message or 'aucun changement à planifier.'}")
+
+    def _apply_story_update(self, reply: dict, message: str) -> None:
+        """Apply an impact decision that amends an existing, unimplemented story."""
+        sid = reply.get("story_id") or ""
+        story = next((s for s in self.state.stories if s.id == sid), None)
+        if story is None or story.status not in (StoryStatus.TODO, StoryStatus.FAILED):
+            self._chat(
+                ChatRole.ANALYST,
+                f"🔍 Impact : la story visée ({sid or '?'}) est introuvable ou déjà "
+                "implémentée — feedback conservé pour la prochaine analyse.",
+            )
+            return
+        updates = reply.get("updates") or {}
+        if updates.get("title"):
+            story.title = str(updates["title"])
+        if updates.get("description"):
+            story.description = str(updates["description"])
+        if updates.get("priority") is not None:
+            story.priority = _clamp_1_5(updates.get("priority"), default=story.priority)
+        if isinstance(updates.get("acceptance_criteria"), list):
+            story.acceptance_criteria = [
+                AcceptanceCriterion(id=f"AC-{i}", text=str(text))
+                for i, text in enumerate(updates["acceptance_criteria"], start=1)
+            ]
+        gherkin = updates.get("gherkin")
+        if gherkin and gherkin != story.gherkin:
+            story.gherkin = str(gherkin)
+            workspace.write_feature_files(self.state, [story])
+        # A failed story amended by feedback deserves a fresh run.
+        if story.status == StoryStatus.FAILED:
+            story.status = StoryStatus.TODO
+            story.attempts = 0
+            story.last_error = ""
+        self._chat(ChatRole.ANALYST, f"🔍 Impact : {message}\n✏️ Story {story.id} mise à jour.")
+
+    def _apply_new_stories(self, reply: dict, message: str) -> None:
+        """Apply an impact decision that plans a new epic and/or new stories."""
+        items = reply.get("stories") or []
+        if not items:
+            self._chat(ChatRole.ANALYST, f"🔍 Impact : {message or 'aucune story proposée.'}")
+            return
+        epic_id = reply.get("epic_id") or ""
+        if not any(e.id == epic_id for e in self.state.epics):
+            epic_data = reply.get("epic") or {}
+            taken = {e.id for e in self.state.epics}
+            epic_id = _unique_id(
+                epic_data.get("id") or f"EPIC-{len(taken) + 1}", "EPIC", taken
+            )
+            self.state.epics.append(
+                Epic(
+                    id=epic_id,
+                    title=epic_data.get("title", "Retours utilisateur"),
+                    description=epic_data.get("description", ""),
+                    iteration=self.state.iteration,
+                )
+            )
+        taken_ids = {s.id for s in self.state.stories}
+        new_stories: list[UserStory] = []
+        for story_data in items:
+            story_id = _unique_id(
+                story_data.get("id") or f"US-{len(taken_ids) + 1}", "US", taken_ids
+            )
+            taken_ids.add(story_id)
+            new_stories.append(
+                UserStory(
+                    id=story_id,
+                    epic_id=epic_id,
+                    title=story_data.get("title", "Story"),
+                    description=story_data.get("description", ""),
+                    acceptance_criteria=[
+                        AcceptanceCriterion(id=f"AC-{i}", text=str(text))
+                        for i, text in enumerate(
+                            story_data.get("acceptance_criteria", []), start=1
+                        )
+                    ],
+                    gherkin=story_data.get("gherkin", ""),
+                    depends_on=story_data.get("depends_on", []),
+                    priority=_clamp_1_5(story_data.get("priority", 2)),
+                    ui=bool(story_data.get("ui", False)),
+                    iteration=self.state.iteration,
+                )
+            )
+        scheduler.sanitize_dependencies(self.state.stories + new_stories)
+        self.state.stories.extend(new_stories)
+        workspace.write_feature_files(self.state, new_stories)
+        self._chat(
+            ChatRole.ANALYST,
+            f"🔍 Impact : {message}\n➕ {len(new_stories)} nouvelle(s) story(ies) planifiée(s) "
+            "— « ▶ Continuer le build » pour les développer.",
+        )
+
+    # ------------------------------------------------------ components (E3/E4)
+
+    async def _apropose_components(self) -> None:
+        """Solution agent proposes the product's technical components right
+        after the brief (first iteration only). Mandatory components are
+        pre-approved; optional ones await the user. Non-fatal, env-gated."""
+        if not settings.components_enabled or self.state.components:
+            return
+        try:
+            result = await self._tracked.arun(
+                prompts.components_proposal(self.state),
+                system_prompt=persona("architect"),
+            )
+            reply = extract_json(result.text)
+        except AgentError as exc:
+            self._log("components", f"Solutionneur indisponible ({exc}) — pas de composants.")
+            return
+        components: list[Component] = []
+        for i, data in enumerate(reply.get("components", []), start=1):
+            optional = bool(data.get("optional", False))
+            components.append(
+                Component(
+                    id=str(data.get("id") or f"comp-{i}"),
+                    kind=str(data.get("kind") or "other"),
+                    name=str(data.get("name") or f"Composant {i}"),
+                    technology=str(data.get("technology") or ""),
+                    rationale=str(data.get("rationale") or ""),
+                    optional=optional,
+                    status=ComponentStatus.PROPOSED if optional else ComponentStatus.APPROVED,
+                )
+            )
+        self.state.components = components
+        listing = ", ".join(
+            f"{c.name} ({c.technology}){' [optionnel]' if c.optional else ''}"
+            for c in components
+        )
+        self._chat(
+            ChatRole.ARCHITECT,
+            f"🧱 {reply.get('message', '')}\nComposants proposés : {listing or '(aucun)'}",
+        )
+
+    async def aset_components(self, items: list[dict]) -> list[Component]:
+        """Replace the components list (user validation/edition from the UI)."""
+        self.state.components = setup_exec.components_from_payload(items)
+        self._sync()
+        return self.state.components
+
+    async def asetup_components(self) -> None:
+        """Run the setup executor over the approved components, in background.
+
+        Raises ValueError (-> 409) when a setup is already running or no
+        component is approved."""
+        if self._setup_task and not self._setup_task.done():
+            raise ValueError("un setup de composants est déjà en cours")
+        if not any(
+            c.status in (ComponentStatus.APPROVED, ComponentStatus.CREATED)
+            for c in self.state.components
+        ):
+            raise ValueError("aucun composant approuvé à créer")
+        self._setup_task = asyncio.create_task(self._asetup_run())
+
+    async def _asetup_run(self) -> None:
+        ws = workspace.scaffold(self.state)
+        self._log("setup", "🧱 Création des composants approuvés…")
+        try:
+            for line in await setup_exec.aexecute(self.state, ws):
+                self._log("setup", line)
+        except Exception as exc:  # background task: surface, never crash silently
+            self._chat(ChatRole.SYSTEM, f"Erreur du setup des composants : {exc}")
+        finally:
+            self._sync()
+
+    # ------------------------------------------------------ tech-writer (I2)
+
+    async def adocument(self) -> None:
+        """Tech-writer pass in the background: write the GENERATED project's
+        README (presentation, launch instructions, architecture summary).
+        Raises ValueError (-> 409) while the pipeline is actively building or
+        when a documentation pass is already running."""
+        if self.state.phase in (
+            PipelinePhase.SPEC,
+            PipelinePhase.ANALYZE,
+            PipelinePhase.PLAN,
+            PipelinePhase.ARCHITECT,
+            PipelinePhase.BUILD,
+        ):
+            raise ValueError("la pipeline est active : attends la fin avant de générer la doc")
+        if self._doc_task and not self._doc_task.done():
+            raise ValueError("une génération de doc est déjà en cours")
+        self._doc_task = asyncio.create_task(self._adocument_task())
+
+    async def _adocument_task(self) -> None:
+        try:
+            await self._adocument_phase(force=True)
+        except Exception as exc:  # background task: surface, never crash silently
+            self._chat(ChatRole.SYSTEM, f"Erreur du tech-writer : {exc}")
+
+    async def _adocument_phase(self, force: bool = False) -> None:
+        """Run the tech-writer and persist README.md in the workspace. Env-gated
+        in the pipeline flow (force=True for the explicit endpoint); non-fatal."""
+        if not force and not settings.tech_writer_enabled:
+            return
+        ws = workspace.scaffold(self.state)
+        try:
+            result = await self._tracked.arun(
+                prompts.tech_writer(self.state, workspace.package_name(self.state)),
+                system_prompt=persona("tech-writer"),
+                cwd=ws,
+            )
+            reply = extract_json(result.text)
+        except AgentError as exc:
+            self._chat(ChatRole.SYSTEM, f"Tech-writer indisponible : {exc}")
+            return
+        readme = reply.get("readme", "")
+        if readme:
+            (ws / "README.md").write_text(readme, encoding="utf-8")
+        self._chat(
+            ChatRole.SYSTEM,
+            f"📘 {reply.get('message', 'Documentation générée.')}"
+            + (" README.md écrit dans le workspace." if readme else ""),
+        )
+
     # ------------------------------------------------------------ lifecycle
 
     async def _alifecycle(self) -> None:
@@ -352,6 +604,7 @@ class Pipeline:
                 self.state.phase = PipelinePhase.STOPPED
                 self._sync()
                 return
+            await self._apropose_components()
 
             while not self._stop_requested:
                 await self._checkpoint()
@@ -360,6 +613,7 @@ class Pipeline:
                 await self._aplan_phase()
                 await self._aarchitect_phase()
                 await self._abuild_phase()
+                await self._adocument_phase()
                 if not self.state.auto_spec or self._stop_requested:
                     break
                 await self._anext_feature_phase()
@@ -466,6 +720,7 @@ class Pipeline:
                 # stories; ids of previous-iteration stories pass through.
                 depends_on=[id_map.get(d, d) for d in story_data.get("depends_on", [])],
                 priority=_clamp_1_5(story_data.get("priority", 3)),
+                ui=bool(story_data.get("ui", False)),
                 iteration=self.state.iteration,
             )
             for epic_id, story_id, story_data in planned
@@ -640,6 +895,18 @@ class Pipeline:
         await self._agit(ws, "add", "-A")
         await self._agit(ws, "commit", "-m", f"story {sid} done", "--allow-empty")
 
+    async def aexport_git(self) -> dict:
+        """Clean git delivery of the generated workspace: ensure the repo
+        exists, stage everything and commit. Returns the HEAD commit hash.
+        Raises ValueError (-> 409) when git is unavailable."""
+        ws = workspace_dir(self.state.id)
+        if not await self._agit_ensure_repo(ws):
+            raise ValueError("git indisponible dans le workspace")
+        await self._agit(ws, "add", "-A")
+        await self._agit(ws, "commit", "-m", "autospec: export du projet généré", "--allow-empty")
+        code, out = await self._agit(ws, "rev-parse", "HEAD")
+        return {"commit": out.strip() if code == 0 else ""}
+
     async def astory_diff(self, sid: str) -> dict:
         """Return the git diff committed when a story reached DONE.
 
@@ -712,6 +979,7 @@ class Pipeline:
                     prompts.dev_story(
                         story, pkg, workspace.feature_rel_path(story), self.state.architecture,
                         "\n".join(self.state.build_guidance),
+                        ui_tests=self._ui_mode(story),
                     ),
                     system_prompt=persona("dev"),
                     cwd=ws,
@@ -719,6 +987,7 @@ class Pipeline:
                 reply = extract_json(result.text)
                 self._chat(ChatRole.DEV, f"[{story.id}] {reply.get('summary', '(pas de résumé)')}")
                 story.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
+                story.ui_tests = [str(p) for p in reply.get("ui_test_files") or []]
                 self._sync()
 
                 # Trust but verify: the orchestrator reruns the full test suite
@@ -726,6 +995,13 @@ class Pipeline:
                 ok, output, real = await self._arun_pytest()
                 tail = output[-2000:]
                 self._apply_test_states(story, reply.get("test_results", []), real)
+                if ok and self._ui_mode(story):
+                    # UI-flagged story: the replayable Playwright suite must be
+                    # green too (browser run, screenshots + render assertions).
+                    ok, ui_output = await self._arun_ui_tests()
+                    if not ok:
+                        tail = ui_output[-2000:]
+                        self._log(f"dev:{story.id}", "❌ Tests d'acceptance UI rouges.")
                 if ok:
                     story.status = StoryStatus.DONE
                     # Suite green: any planned test we couldn't map to a real
@@ -942,6 +1218,37 @@ class Pipeline:
                 test.status = TestState.GREEN
             elif item.get("status") == "red":
                 test.status = TestState.RED
+
+    @staticmethod
+    def _ui_mode(story: UserStory) -> bool:
+        """Whether this story goes through the Playwright UI acceptance mode."""
+        return settings.ui_tests_enabled and story.ui
+
+    async def _arun_ui_tests(self) -> tuple[bool, str]:
+        """Run the workspace's replayable Playwright UI suite (`pytest -m ui`).
+
+        Exit code 5 (no test collected) counts as green: a UI story whose dev
+        produced no UI test file simply has nothing to replay yet.
+        """
+        if settings.fake_agents:
+            return True, "mode démo : tests UI court-circuités"
+        ws = workspace_dir(self.state.id)
+        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+
+        def _run() -> tuple[bool, str]:
+            proc = subprocess.run(
+                [settings.uv_cmd, "run", "pytest", "-q", "-m", "ui"],
+                cwd=str(ws),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                env=env,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+            return proc.returncode in (0, 5), proc.stdout
+
+        return await asyncio.to_thread(_run)
 
     async def _arun_pytest(self) -> tuple[bool, str, dict[str, str]]:
         """Run the suite. Returns (suite_green, output, {nodeid: outcome}).

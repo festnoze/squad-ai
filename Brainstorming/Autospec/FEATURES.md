@@ -25,7 +25,7 @@ réponse JSON**.
 
 | Agent | Persona BMAD | Rôle |
 |---|---|---|
-| **PM** | `pm` | Interviewe l'utilisateur dans le chat puis rédige un **brief produit**. Bouton **Auto-spec** : le PM décide seul, sans poser de question. |
+| **PM** | `pm` | Mène la **phase spec** en mode *interview* (facilitation socratique) puis rédige un **brief produit**. Bouton **Auto-spec** : le PM décide seul, sans poser de question. |
 | **Architecte** | `architect` | (Optionnel) Produit un **design technique** injecté dans les prompts QA/Dev. |
 | **PO** | `sm` | Découpe le brief en **EPICs** et **user stories** : description, critères d'acceptance, **Gherkin**, dépendances (`depends_on`), **priorité kanban** (1-5). |
 | **QA** | `qa` | Décompose le test d'acceptance **outside-in (London school)** en tests unitaires par couche (API → façade → service → repo/LLM), chacun mockant ses collaborateurs directs, rattachés aux critères. |
@@ -58,6 +58,48 @@ package, `main.py`) :
 - Stories **indépendantes** développées **en parallèle** (sémaphore
   `AUTOSPEC_MAX_PARALLEL_DEVS`), par ordre de **priorité kanban**.
 - Les stories dont une dépendance échoue sont marquées *failed* avec message.
+
+---
+
+## 1bis. Phase spec : interview socratique + brainstorming
+
+La phase spec a **deux modes**, pilotés par `ProjectState.spec_mode`
+(`"interview"` par défaut, ou `"brainstorm"`). `_aspec_phase` branche selon le
+mode : persona **PM** pour l'interview, persona **analyste** (BMAD `analyst`,
+« Mary ») pour le brainstorming.
+
+- **Interview (`pm_interview`)** — **facilitation socratique par dimensions** : le
+  PM questionne dimension par dimension (problème/pourquoi & job-to-be-done,
+  personas, périmètre MVP, hors-périmètre, contraintes, données, vues/UX, cas
+  limites, critères de succès), **reformule** et **confronte les non-dits**, puis
+  produit le brief.
+- **Brainstorming (`pm_brainstorm`)** — l'analyste « Mary » **re-questionne le
+  besoin lui-même** : phase **DIVERGER** (élargir l'espace des possibles —
+  angles, analogies, inversion du problème, JTBD alternatifs) puis **CONVERGER**
+  (choisir/prioriser selon valeur/effort/risque).
+
+Réglage via `POST /api/projects/{id}/spec-mode` (`{mode}`,
+`Pipeline.aset_spec_mode`, **422** si invalide). UI : **toggle 💬 Interview /
+🧠 Brainstorming** dans le `ChatPanel`, visible en phase `spec`.
+
+---
+
+## 1ter. Budget de coût + arrêt automatique
+
+Un projet porte un **plafond de coût/tokens** : `budget_usd` (en $) et
+`budget_tokens`, avec `0` = **illimité**. Réglables à la création
+(`POST /api/projects` accepte `budget_usd`/`budget_tokens`) ou après coup
+(`POST /api/projects/{id}/budget`).
+
+`Pipeline._enforce_budget()` est appelé à **chaque point de contrôle**
+(`_checkpoint` : entre itérations, entre lots de stories, en boucle auto-spec) :
+dès que `usage` atteint le budget, la pipeline **s'arrête proprement**
+(`_stop_requested`) avec un message « 💰 Budget atteint ». C'est la base pour, à
+terme, doser le raffinement/l'architecture **selon le budget**.
+
+UI : champ **« Budget max ($) »** dans `ProjectSetup` ; la jauge d'usage du
+`RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge (`.over-budget`) au
+plafond.
 
 ---
 
@@ -166,11 +208,25 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 
 - **Persistance résiliente** : `storage` **migre** les anciens formats (ex.
   critères `str` → objets) et **ignore** proprement les fichiers corrompus (la
-  liste ne plante jamais).
+  liste ne plante jamais) ; **écriture d'état atomique** (temp + `rename`).
 - **Observabilité tokens/coût** : `AgentResult` porte cost/tokens/durée parsés du
   JSON du CLI ; un wrapper **`_UsageTracker`** accumule dans `ProjectState.usage`.
 - **Configuration** : chargement **`.env`** (python-dotenv) + variables
-  `AUTOSPEC_*` (fichier `.env.example` documenté).
+  `AUTOSPEC_*` (fichier `.env.example` documenté) ; `config.py` **tolère les
+  variables d'env malformées** (plus de crash à l'import : helpers
+  `_env_bool`/`_env_int`, parsing booléen cohérent).
+
+### Durcissements (sécurité & robustesse)
+
+- **Sécurité** : garde **anti path-traversal** dans `storage.workspace_dir` (les
+  ids viennent des URLs et alimentent `rmtree` ; rejet de `..`, séparateurs,
+  `:`) ; l'**app générée** (non fiable) tourne avec un **env minimal** (pas de
+  fuite de secrets) ; **CORS** restreint aux origines locales.
+- **Robustesse** : le **runner** gère `result:null`, `is_error`, payload
+  non-`dict`, CLI absent (→ `AgentError`) ; `extract_json` ne lève plus jamais
+  `JSONDecodeError` ; le **scheduler** ne casse que les dépendances réellement
+  cycliques ; **validateurs Pydantic** qui **clampent** les scores 1-5 (un état
+  legacy / une sortie LLM hors-bornes ne fait plus échouer le chargement).
 
 ### Principales variables d'environnement
 
@@ -194,8 +250,9 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 ## 7. API (FastAPI + WebSocket)
 
 **Projets** : `POST /api/projects`, `GET /api/projects`, `GET|DELETE
-/api/projects/{id}`, `/chat`, `/stop`, `/pause`, `/resume`, `/run`, `/stop-app`,
-`/resume-build`, `/archive`, `/unarchive`, `/files`, `/files/raw?path=`.
+/api/projects/{id}`, `/chat`, `/spec-mode`, `/budget`, `/stop`, `/pause`,
+`/resume`, `/run`, `/stop-app`, `/resume-build`, `/archive`, `/unarchive`,
+`/files`, `/files/raw?path=`.
 
 **Stories** : `PATCH /…/stories/{sid}`, `POST /…/stories`, `DELETE
 /…/stories/{sid}`, `/…/stories/reorder`, `/…/stories/{sid}/rebuild`,
@@ -211,12 +268,13 @@ Gardes : `404` (inconnu), `409` (action interdite : pipeline active, story
 
 ## 8. Qualité, tests & CI
 
-- **Backend — 82 tests pytest** : `test_scheduler`, `test_runner`, `test_models`,
+- **Backend — 131 tests pytest** : `test_scheduler`, `test_runner`, `test_models`,
   `test_pipeline` (interview, dépendances, auto-spec, kanban, plan QA, états
   réels, pause/reprise, rebuild/force-done, resume-build, guidance, architecture,
   usage, diff git…), `test_refine` (déterminisme du harnais), `test_scripted`,
   `test_pytest_report`, `test_api`.
-- **Frontend — 7 tests Vitest** : logique pure `criterionState`, rendu `Board`.
+- **Frontend — 20 tests Vitest** (4 fichiers) : logique pure `criterionState`,
+  rendu `Board` et panneaux.
 - **e2e — 1 test Playwright** hermétique (backend mode démo servant la SPA
   buildée, same-origin) : création → board peuplé → pause/reprise → critère
   (vert + tests + Gherkin) → suppression.
@@ -247,4 +305,4 @@ Autospec/
 ```
 
 **État** : 8 features initiales + 16 items de backlog livrés et vérifiés ; les
-3 suites de tests (82 backend, 7 frontend, 1 e2e) sont vertes.
+3 suites de tests (131 backend, 20 frontend, 1 e2e) sont vertes.

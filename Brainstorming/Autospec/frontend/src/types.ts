@@ -38,6 +38,26 @@ export interface AcceptanceCriterion {
 
 export type HypothesisStatus = "proposed" | "selected" | "done" | "rejected";
 
+export type ComponentStatus = "proposed" | "approved" | "created" | "rejected";
+
+/** Composant technique du produit généré (backend, frontend, BDD…). */
+export interface ProductComponent {
+  id: string;
+  kind: string; // backend | frontend | database | cache | other
+  name: string;
+  technology: string;
+  rationale: string;
+  optional: boolean;
+  status: ComponentStatus;
+}
+
+/** Provider d'agents (M1) : Claude (harness CLI), OpenAI ou Ollama (LangChain). */
+export interface ProviderInfo {
+  provider: string;
+  model: string;
+  available: string[];
+}
+
 export interface FeatureHypothesis {
   id: string;
   title: string;
@@ -69,6 +89,8 @@ export interface UserStory {
   attempts: number;
   last_error: string;
   quality_score: number;
+  ui?: boolean;
+  ui_tests?: string[];
 }
 
 export interface Epic {
@@ -94,6 +116,7 @@ export interface ProjectState {
   phase: PipelinePhase;
   brief: string;
   backlog: FeatureHypothesis[];
+  components?: ProductComponent[];
   epics: Epic[];
   stories: UserStory[];
   chat: ChatMessage[];

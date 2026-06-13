@@ -75,6 +75,9 @@ function renderPanel(project: ProjectState) {
       onResume={vi.fn()}
       onStopApp={vi.fn()}
       onResumeBuild={vi.fn()}
+      onDocument={vi.fn()}
+      onExportZip={vi.fn()}
+      onGitExport={vi.fn()}
     />,
   );
 }

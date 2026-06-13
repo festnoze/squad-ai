@@ -7,7 +7,10 @@ un projet ou une feature, puis le pipeline enchaîne automatiquement :
 
 1. **PM (BMAD `pm`)** — interviewe l'utilisateur dans le chat pour clarifier le
    besoin, puis rédige un **brief produit**. Avec le bouton **Auto-spec**, le PM
-   ne pose aucune question : il décide de tout lui-même.
+   ne pose aucune question : il décide de tout lui-même. La phase spec a **deux
+   modes** (toggle **💬 Interview / 🧠 Brainstorming** dans le chat) : *Interview*
+   = facilitation socratique du PM dimension par dimension ; *Brainstorming* =
+   l'analyste « Mary » re-questionne le besoin lui-même (DIVERGER puis CONVERGER).
 2. **PO (BMAD `sm`)** — découpe le brief en **EPICs** et **user stories**
    (granularité adaptée à la complexité), chacune avec description, critères
    d'acceptance et **test d'acceptance Gherkin**, plus les **dépendances** entre
@@ -48,6 +51,12 @@ directement depuis sa carte. Un
 chat (spécification puis feedback), des boutons d'**interruption** (**⏸ Pause /
 ▶ Reprendre**, **⏹ Stopper**) et un bouton **▶ Lancer le projet** qui exécute le
 `main.py` du code généré complètent l'interface.
+
+Un projet peut porter un **budget** (plafond de coût en $ et/ou de tokens, `0` =
+illimité) réglable à la création (champ **« Budget max ($) »**) ou après coup :
+à chaque point de contrôle, dès que l'usage atteint le plafond, la pipeline
+**s'arrête automatiquement** (message « 💰 Budget atteint ») et la jauge d'usage
+passe en rouge.
 
 ## Harnais de raffinement (optionnel)
 

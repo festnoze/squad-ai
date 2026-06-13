@@ -3,19 +3,22 @@
 from __future__ import annotations
 
 import asyncio
+import io
 import os
 import re
 import shutil
 import stat
+import zipfile
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from ..agents.runner import AgentRunner, ClaudeCliRunner
+from ..agents.providers import PROVIDERS, make_runner, provider_model
+from ..agents.runner import AgentRunner
 from ..agents.scripted import ScriptedRunner
 from ..config import PROJECT_DIR, settings
 from ..models import ChatMessage, ChatRole, PipelinePhase, ProjectState, StoryStatus, new_id
@@ -108,7 +111,9 @@ app.add_middleware(
 )
 
 pipelines: dict[str, Pipeline] = {}
-_runner: AgentRunner = ScriptedRunner() if settings.fake_agents else ClaudeCliRunner()
+_runner: AgentRunner = (
+    ScriptedRunner() if settings.fake_agents else make_runner(settings.agent_provider)
+)
 
 
 def set_runner(runner: AgentRunner) -> None:
@@ -136,6 +141,25 @@ class SpecModeRequest(BaseModel):
 class BudgetRequest(BaseModel):
     budget_usd: float | None = None
     budget_tokens: int | None = None
+
+
+class ProviderRequest(BaseModel):
+    provider: str
+    model: str | None = None
+
+
+class ComponentInput(BaseModel):
+    id: str | None = None
+    kind: str = "other"
+    name: str | None = None
+    technology: str | None = None
+    rationale: str | None = None
+    optional: bool = False
+    status: str = "proposed"
+
+
+class ComponentsRequest(BaseModel):
+    components: list[ComponentInput]
 
 
 class AcceptanceCriterionInput(BaseModel):
@@ -195,6 +219,48 @@ async def _acall_pipeline(coro, not_found: str):
         raise HTTPException(404, not_found)
     except ValueError as exc:
         raise HTTPException(409, str(exc))
+
+
+@app.get("/api/provider")
+async def aget_provider() -> dict:
+    """Current agent provider/model. In demo mode the scripted backend rules."""
+    if settings.fake_agents:
+        return {"provider": "fake", "model": "scripted", "available": list(PROVIDERS)}
+    return {
+        "provider": settings.agent_provider,
+        "model": provider_model(settings.agent_provider),
+        "available": list(PROVIDERS),
+    }
+
+
+@app.post("/api/provider")
+async def aset_provider(req: ProviderRequest) -> dict:
+    """Switch the agent backend (claude / openai / ollama) and optionally the
+    model, live: new and existing pipelines use it from their next agent call."""
+    if settings.fake_agents:
+        raise HTTPException(409, "Mode démo (AUTOSPEC_FAKE_AGENTS) : provider verrouillé.")
+    provider = req.provider.strip().lower() or "claude"
+    if req.model is not None:
+        model = req.model.strip()
+        if provider == "openai":
+            settings.openai_model = model or settings.openai_model
+        elif provider == "ollama":
+            settings.ollama_model = model or settings.ollama_model
+        else:
+            settings.claude_model = model or None
+    try:
+        runner = make_runner(provider)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    settings.agent_provider = provider
+    set_runner(runner)
+    for pipeline in pipelines.values():
+        pipeline.runner = runner
+    return {
+        "ok": True,
+        "provider": settings.agent_provider,
+        "model": provider_model(settings.agent_provider),
+    }
 
 
 @app.post("/api/projects")
@@ -446,6 +512,76 @@ async def areorder_stories(project_id: str, req: ReorderRequest) -> dict:
     pipeline = _pipeline(project_id)
     await pipeline.areorder_stories([p.model_dump() for p in req.priorities])
     return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
+
+
+@app.put("/api/projects/{project_id}/components")
+async def aset_components(project_id: str, req: ComponentsRequest) -> dict:
+    """Replace the project's components (user validation/edition)."""
+    pipeline = _pipeline(project_id)
+    try:
+        await pipeline.aset_components([c.model_dump() for c in req.components])
+    except ValueError as exc:  # unknown status value
+        raise HTTPException(422, str(exc))
+    return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
+
+
+@app.post("/api/projects/{project_id}/components/setup")
+async def asetup_components(project_id: str) -> dict:
+    """Materialize the approved components in the workspace (background)."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(
+        pipeline.asetup_components(), f"Projet inconnu : {project_id}"
+    )
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/document")
+async def adocument_project(project_id: str) -> dict:
+    """Run the tech-writer over the generated project (background README pass)."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.adocument(), f"Projet inconnu : {project_id}")
+    return {"ok": True}
+
+
+@app.get("/api/projects/{project_id}/export")
+async def aexport_zip(project_id: str) -> Response:
+    """Download the generated workspace as a zip (VCS/venv/state noise excluded)."""
+    pipeline = _pipeline(project_id)
+    ws = workspace_dir(project_id)
+    if not ws.exists():
+        raise HTTPException(404, "Le workspace n'existe pas encore.")
+
+    def _zip() -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for path in ws.rglob("*"):
+                if not path.is_file():
+                    continue
+                rel = path.relative_to(ws)
+                if any(part in _EXCLUDED_DIRS for part in rel.parts[:-1]):
+                    continue
+                if _is_excluded_file(path.name):
+                    continue
+                zf.write(path, rel.as_posix())
+        return buf.getvalue()
+
+    data = await asyncio.to_thread(_zip)
+    filename = re.sub(r"[^a-zA-Z0-9._-]+", "-", pipeline.state.name) or project_id
+    return Response(
+        content=data,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}.zip"'},
+    )
+
+
+@app.post("/api/projects/{project_id}/git-export")
+async def agit_export(project_id: str) -> dict:
+    """Clean git commit of the generated workspace (delivery snapshot)."""
+    pipeline = _pipeline(project_id)
+    result = await _acall_pipeline(
+        pipeline.aexport_git(), f"Projet inconnu : {project_id}"
+    )
+    return {"ok": True, **result}
 
 
 @app.get("/api/projects/{project_id}/files")

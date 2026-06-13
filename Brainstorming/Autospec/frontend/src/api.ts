@@ -2,7 +2,9 @@ import {
   FileContent,
   FileListing,
   NewStoryBody,
+  ProductComponent,
   ProjectState,
+  ProviderInfo,
   StoryDiff,
   StoryPatch,
   WsEvent,
@@ -205,6 +207,59 @@ export async function storyDiff(
     await fetch(`/api/projects/${projectId}/stories/${storyId}/diff`),
   );
   return { available: res.available, diff: res.diff };
+}
+
+export async function getProvider(): Promise<ProviderInfo> {
+  return json(await fetch("/api/provider"));
+}
+
+export async function setProvider(
+  provider: string,
+  model?: string,
+): Promise<ProviderInfo> {
+  return json(
+    await fetch("/api/provider", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(model ? { provider, model } : { provider }),
+    }),
+  );
+}
+
+export async function updateComponents(
+  projectId: string,
+  components: ProductComponent[],
+): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/components`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ components }),
+    }),
+  );
+}
+
+export async function setupComponents(projectId: string): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/components/setup`, { method: "POST" }),
+  );
+}
+
+export async function documentProject(projectId: string): Promise<void> {
+  await json(await fetch(`/api/projects/${projectId}/document`, { method: "POST" }));
+}
+
+export async function gitExportProject(
+  projectId: string,
+): Promise<{ commit: string }> {
+  return json(
+    await fetch(`/api/projects/${projectId}/git-export`, { method: "POST" }),
+  );
+}
+
+/** URL de téléchargement du zip du workspace généré (lien direct). */
+export function exportZipUrl(projectId: string): string {
+  return `/api/projects/${projectId}/export`;
 }
 
 export function connectEvents(

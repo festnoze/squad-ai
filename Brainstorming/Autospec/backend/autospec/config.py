@@ -111,6 +111,45 @@ class Settings:
     claude_model: str | None = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_CLAUDE_MODEL") or None
     )
+    # Agent provider: "claude" (CLI harness), "openai" (API key) or "ollama"
+    # (local models). Switchable at runtime through POST /api/provider.
+    agent_provider: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_AGENT_PROVIDER", "claude").strip().lower()
+    )
+    openai_api_key: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_OPENAI_API_KEY")
+        or os.environ.get("OPENAI_API_KEY", "")
+    )
+    openai_base_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "AUTOSPEC_OPENAI_BASE_URL", "https://api.openai.com/v1"
+        ).rstrip("/")
+    )
+    openai_model: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_OPENAI_MODEL", "gpt-4o-mini")
+    )
+    # USD per 1M tokens, used to estimate cost (the OpenAI API does not return
+    # a price). 0 = don't estimate.
+    openai_price_in: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_OPENAI_PRICE_IN", 0.0, minimum=0.0)
+    )
+    openai_price_out: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_OPENAI_PRICE_OUT", 0.0, minimum=0.0)
+    )
+    ollama_base_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "AUTOSPEC_OLLAMA_BASE_URL", "http://localhost:11434"
+        ).rstrip("/")
+    )
+    ollama_model: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_OLLAMA_MODEL", "llama3.1")
+    )
+    # Cap on the write/read tool-loop rounds of the LangChain providers (OpenAI
+    # / Ollama are plain chat models: file edits go through a bounded JSON
+    # protocol).
+    provider_tool_rounds: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_PROVIDER_TOOL_ROUNDS", 8, minimum=1)
+    )
     permission_mode: str = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_PERMISSION_MODE", "bypassPermissions")
     )
@@ -141,6 +180,26 @@ class Settings:
     # by default, gated exactly like refine_enabled.
     architecture_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_ARCHITECTURE", False)
+    )
+    # Component proposal phase (solution agent right after the brief) and its
+    # setup executor. Real dependency installs stay behind an extra flag so the
+    # default behaviour remains demo-safe (folders + manifests only).
+    components_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_COMPONENTS", False)
+    )
+    setup_install: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_SETUP_INSTALL", False)
+    )
+    npm_cmd: str = field(default_factory=lambda: os.environ.get("AUTOSPEC_NPM_CMD", "npm"))
+    # Tech-writer phase after each build (README + launch instructions for the
+    # GENERATED project). OFF by default; also triggerable via POST /document.
+    tech_writer_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_TECH_WRITER", False)
+    )
+    # Playwright UI acceptance tests for UI-flagged stories. Requires browsers
+    # installed in the workspace venv; OFF by default.
+    ui_tests_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_UI_TESTS", False)
     )
     refine_enabled: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_REFINE", False))
     refine_po: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_REFINE_PO", True))

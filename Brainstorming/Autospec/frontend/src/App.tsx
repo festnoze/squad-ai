@@ -4,27 +4,35 @@ import {
   connectEvents,
   createProject,
   deleteProject,
+  documentProject,
   errorMessage,
+  exportZipUrl,
+  getProvider,
+  gitExportProject,
   listProjects,
   pauseProject,
   resumeBuild,
   resumeProject,
   runProject,
   sendChat,
+  setProvider,
   setSpecMode,
+  setupComponents,
   stopApp,
   stopProject,
   unarchiveProject,
+  updateComponents,
 } from "./api";
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
 import { Board } from "./components/Board";
 import { ChatPanel } from "./components/ChatPanel";
 import { CodeViewer } from "./components/CodeViewer";
+import { ComponentsPanel } from "./components/ComponentsPanel";
 import { ProjectBar } from "./components/ProjectBar";
 import { ProjectSetup } from "./components/ProjectSetup";
 import { RunPanel } from "./components/RunPanel";
-import { ProjectState, WsEvent } from "./types";
+import { ProductComponent, ProjectState, ProviderInfo, WsEvent } from "./types";
 
 interface StampedLog {
   projectId: string;
@@ -40,6 +48,7 @@ export default function App() {
   const [logs, setLogs] = useState<StampedLog[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [provider, setProviderInfo] = useState<ProviderInfo | null>(null);
   // Ids des projets supprimés : empêche un event « state » retardé de
   // ressusciter un projet déjà supprimé.
   const deletedIds = useRef<Set<string>>(new Set());
@@ -68,6 +77,8 @@ export default function App() {
       .then((list) => {
         setProjects(list);
         const firstVisible = list.find((p) => !p.archived);
+        // Accueil intelligent : popup de création seulement si AUCUN projet,
+        // sinon ouverture directe sur la sélection de projet.
         if (firstVisible) setSelectedId(firstVisible.id);
         else setShowSetup(true);
       })
@@ -76,6 +87,10 @@ export default function App() {
         setError(errorMessage(e));
         setShowSetup(true);
       });
+    // Provider d'agents courant (facultatif : l'UI reste utilisable sans).
+    getProvider()
+      .then(setProviderInfo)
+      .catch(() => setProviderInfo(null));
   }, []);
 
   useEffect(() => {
@@ -161,6 +176,36 @@ export default function App() {
     }
   };
 
+  // Play/stop par chip (U1) : ▶ reprend une pipeline en pause ou relance le
+  // build des stories restantes ; ⏹ stoppe la pipeline du projet.
+  const handlePlay = async (target: ProjectState) => {
+    try {
+      if (target.paused) await resumeProject(target.id);
+      else await resumeBuild(target.id);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+
+  const handleStop = async (target: ProjectState) => {
+    try {
+      await stopProject(target.id);
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+
+  const handleProviderChange = async (name: string) => {
+    try {
+      const info = await setProvider(name);
+      setProviderInfo((prev) =>
+        prev ? { ...prev, provider: info.provider, model: info.model } : prev,
+      );
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+
   // Keep the selection pointing at a visible project. If the selected project
   // becomes archived (and archived projects are hidden), fall back to the first
   // visible project, or the home screen when none remain.
@@ -181,7 +226,8 @@ export default function App() {
     [logs, selectedId],
   );
 
-  const showHome = showSetup || (!project && visibleProjects.length === 0);
+  // La popup de création peut être fermée dès qu'il reste un projet à afficher.
+  const canCloseSetup = visibleProjects.length > 0;
 
   return (
     <div className="app">
@@ -189,11 +235,29 @@ export default function App() {
         <h1>
           ⚙️ Autospec <span className="subtitle">PM → PO → QA → Dev, en BDD/TDD (BMAD method)</span>
         </h1>
+        {provider && (
+          <div className="provider-select" title="Provider d'agents (Claude / OpenAI / Ollama)">
+            <span className="provider-label">🤖</span>
+            <select
+              value={provider.provider}
+              disabled={provider.provider === "fake"}
+              onChange={(e) => handleProviderChange(e.target.value)}
+            >
+              {provider.provider === "fake" && <option value="fake">démo</option>}
+              {provider.available.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+            <span className="provider-model">{provider.model}</span>
+          </div>
+        )}
       </header>
       {(visibleProjects.length > 0 || projects.some((p) => p.archived)) && (
         <ProjectBar
           projects={projects}
-          selectedId={showHome ? null : selectedId}
+          selectedId={showSetup ? null : selectedId}
           onSelect={(id) => {
             setSelectedId(id);
             setShowSetup(false);
@@ -204,6 +268,8 @@ export default function App() {
           onToggleArchived={() => setShowArchived((v) => !v)}
           onArchive={handleArchive}
           onUnarchive={handleUnarchive}
+          onPlay={handlePlay}
+          onStop={handleStop}
         />
       )}
       {error && (
@@ -229,9 +295,33 @@ export default function App() {
           </button>
         </div>
       )}
-      {showHome || !project ? (
+      {showSetup && (
+        <div
+          className="modal-backdrop"
+          onClick={() => canCloseSetup && setShowSetup(false)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            {canCloseSetup && (
+              <button
+                className="modal-close"
+                title="Fermer"
+                aria-label="Fermer la création de projet"
+                onClick={() => setShowSetup(false)}
+              >
+                ✕
+              </button>
+            )}
+            <ProjectSetup onCreate={handleCreate} busy={busy} />
+          </div>
+        </div>
+      )}
+      {!project ? (
         <main className="home">
-          <ProjectSetup onCreate={handleCreate} busy={busy} />
+          {!showSetup && (
+            <div className="placeholder">
+              Sélectionne un projet dans la barre ci-dessus, ou crée-en un avec « ＋ Nouveau ».
+            </div>
+          )}
         </main>
       ) : (
         <main className="workspace">
@@ -244,6 +334,13 @@ export default function App() {
               onSend={(m) => guard(() => sendChat(project.id, m))()}
               specMode={project.spec_mode ?? "interview"}
               onSetSpecMode={(m) => guard(() => setSpecMode(project.id, m))()}
+            />
+            <ComponentsPanel
+              components={project.components ?? []}
+              onUpdate={(components: ProductComponent[]) =>
+                guard(() => updateComponents(project.id, components))()
+              }
+              onSetup={guard(() => setupComponents(project.id))}
             />
             <BacklogPanel backlog={project.backlog ?? []} />
             <ArchitecturePanel
@@ -266,6 +363,12 @@ export default function App() {
               onResume={guard(() => resumeProject(project.id))}
               onStopApp={guard(() => stopApp(project.id))}
               onResumeBuild={guard(() => resumeBuild(project.id))}
+              onDocument={guard(() => documentProject(project.id))}
+              onExportZip={() => window.open(exportZipUrl(project.id), "_blank")}
+              onGitExport={guard(async () => {
+                const { commit } = await gitExportProject(project.id);
+                window.alert(`Workspace commité : ${commit.slice(0, 12)}`);
+              })}
             />
             <CodeViewer projectId={project.id} />
           </div>

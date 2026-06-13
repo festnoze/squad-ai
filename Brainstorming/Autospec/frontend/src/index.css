@@ -1206,6 +1206,169 @@ button.action-btn.action-done {
   color: #c6d4f0;
 }
 
+/* ---------- accueil modal (U1) ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  padding: 24px;
+}
+
+.modal {
+  position: relative;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  max-width: 92vw;
+  max-height: 88vh;
+  overflow: auto;
+}
+
+.modal .setup {
+  border: none;
+}
+
+.modal-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  padding: 3px 9px;
+  font-size: 13px;
+  line-height: 1;
+  z-index: 1;
+}
+
+/* ---------- chips multi-projets (U1) ---------- */
+.dot.pulse {
+  animation: chip-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes chip-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgba(79, 140, 255, 0.55);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 4px rgba(79, 140, 255, 0);
+  }
+}
+
+.chip-progress {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: Consolas, monospace;
+}
+
+.chip-play {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  padding: 0 2px;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.chip-play:hover {
+  color: var(--accent);
+}
+
+/* ---------- provider d'agents (M1) ---------- */
+.provider-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.provider-select select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.provider-model {
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- composants du produit (E3/E4) ---------- */
+.components {
+  max-height: 260px;
+}
+
+.component-list {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.component {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.component.status-rejected {
+  opacity: 0.55;
+}
+
+.component-name {
+  flex: 1;
+  min-width: 0;
+}
+
+.component-tech {
+  color: var(--muted);
+}
+
+.component-optional {
+  color: var(--amber);
+  font-size: 11px;
+}
+
+.component-status-approved {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.component-status-created {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.component-status-rejected {
+  color: var(--red);
+}
+
+.setup-btn {
+  margin-top: 8px;
+  font-size: 12px;
+  padding: 6px 10px;
+}
+
 /* Quality score badge on story cards */
 .quality-badge {
   display: inline-flex;

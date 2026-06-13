@@ -108,6 +108,46 @@ _ANALYST = json.dumps(
     }
 )
 
+_IMPACT = json.dumps(
+    {
+        "message": "Feedback analysé : nouvelle story créée (mode démo).",
+        "action": "new_stories",
+        "epic": {"id": "EPIC-FB", "title": "Retours utilisateur", "description": "Changements issus du feedback."},
+        "stories": [
+            {
+                "id": "US-FB-1",
+                "title": "Prendre en compte le feedback",
+                "description": "En tant qu'utilisateur, je veux que mon retour soit intégré afin d'améliorer le produit.",
+                "acceptance_criteria": ["Le feedback est traité."],
+                "gherkin": "Feature: Feedback\n  Scenario: Prise en compte\n    Given un feedback utilisateur\n    When il est analysé\n    Then une story est créée",
+                "depends_on": [],
+                "priority": 1,
+            }
+        ],
+    },
+    ensure_ascii=False,
+)
+
+_COMPONENTS = json.dumps(
+    {
+        "message": "Stack par défaut proposée (mode démo).",
+        "components": [
+            {"id": "backend", "kind": "backend", "name": "API backend", "technology": "Python + FastAPI", "rationale": "logique métier et API", "optional": False},
+            {"id": "frontend", "kind": "frontend", "name": "Interface web", "technology": "React + Vite", "rationale": "interface utilisateur", "optional": False},
+            {"id": "db", "kind": "database", "name": "Base de données", "technology": "PostgreSQL", "rationale": "persistance", "optional": True},
+        ],
+    },
+    ensure_ascii=False,
+)
+
+_TECH_WRITER = json.dumps(
+    {
+        "message": "README généré (mode démo).",
+        "readme": "# Projet généré\n\nApplication de démonstration générée par Autospec.\n\n## Lancement\n\n```\nuv run python main.py\n```\n\n## Tests\n\n```\nuv run pytest\n```\n",
+    },
+    ensure_ascii=False,
+)
+
 _JUDGE = json.dumps(
     {"score": 90, "verdict": "Qualité suffisante (mode démo).", "reasons": ["ok"]},
     ensure_ascii=False,
@@ -147,6 +187,12 @@ class ScriptedRunner:
             return _CRITIC
         if "PROCESSUS OBLIGATOIRE" in prompt:  # dev_story / dev_revise
             return _DEV_GREEN
+        if "analyste d'impact" in prompt:  # feedback_impact
+            return _IMPACT
+        if "agent solutionneur" in prompt:  # components_proposal
+            return _COMPONENTS
+        if "tech-writer d'un pipeline" in prompt:  # tech_writer
+            return _TECH_WRITER
         if "architecte de tests" in prompt:  # qa_test_plan
             match = _QA_STORY_RE.search(prompt)
             return _qa_plan(match.group(1) if match else "US-1")

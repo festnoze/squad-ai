@@ -26,6 +26,15 @@ vi.mock("./api", () => ({
   stopApp: vi.fn().mockResolvedValue(undefined),
   resumeBuild: vi.fn().mockResolvedValue(undefined),
   sendChat: vi.fn().mockResolvedValue(undefined),
+  getProvider: vi
+    .fn()
+    .mockResolvedValue({ provider: "claude", model: "(défaut CLI)", available: ["claude", "openai", "ollama"] }),
+  setProvider: vi.fn().mockResolvedValue({ ok: true, provider: "claude", model: "" }),
+  updateComponents: vi.fn().mockResolvedValue(undefined),
+  setupComponents: vi.fn().mockResolvedValue(undefined),
+  documentProject: vi.fn().mockResolvedValue(undefined),
+  gitExportProject: vi.fn().mockResolvedValue({ commit: "abc" }),
+  exportZipUrl: (id: string) => `/api/projects/${id}/export`,
 }));
 
 // Import APRÈS le vi.mock pour que App consomme la version mockée.

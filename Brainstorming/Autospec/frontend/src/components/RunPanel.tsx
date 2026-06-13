@@ -10,6 +10,9 @@ interface Props {
   onResume: () => void;
   onStopApp: () => void;
   onResumeBuild: () => void;
+  onDocument: () => void;
+  onExportZip: () => void;
+  onGitExport: () => void;
 }
 
 function formatTokens(n: number): string {
@@ -29,7 +32,19 @@ const PHASE_LABEL: Record<string, string> = {
   error: "💥 Erreur",
 };
 
-export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onStopApp, onResumeBuild }: Props) {
+export function RunPanel({
+  project,
+  logs,
+  onRun,
+  onStop,
+  onPause,
+  onResume,
+  onStopApp,
+  onResumeBuild,
+  onDocument,
+  onExportZip,
+  onGitExport,
+}: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -97,6 +112,19 @@ export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onSt
             <button className="danger" disabled={!loopActive} onClick={onStop}>
               ⏹ Stopper
             </button>
+          )}
+          {canRun && (
+            <>
+              <button onClick={onDocument} title="Générer la doc du projet (README via tech-writer)">
+                📘 Doc
+              </button>
+              <button onClick={onExportZip} title="Télécharger le code généré (zip)">
+                ⬇ Zip
+              </button>
+              <button onClick={onGitExport} title="Commit git propre du workspace généré">
+                🔀 Commit
+              </button>
+            </>
           )}
         </div>
       </div>
