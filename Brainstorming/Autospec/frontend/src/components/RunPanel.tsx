@@ -41,7 +41,7 @@ export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onSt
   const loopActive = !["done", "stopped", "error"].includes(project.phase);
   const canResumeBuild =
     ["stopped", "error"].includes(project.phase) &&
-    project.stories.some((s) => s.status === "todo" || s.status === "red");
+    (project.stories ?? []).some((s) => s.status === "todo" || s.status === "red");
 
   const agentCalls = project.usage?.agent_calls ?? 0;
   const costUsd = project.usage?.cost_usd ?? 0;
@@ -54,7 +54,7 @@ export function RunPanel({ project, logs, onRun, onStop, onPause, onResume, onSt
       <div className="run-header">
         <h2>Exécution</h2>
         <span className={`phase phase-${project.phase}`}>
-          {PHASE_LABEL[project.phase]} — itération {project.iteration}
+          {PHASE_LABEL[project.phase] ?? project.phase} — itération {project.iteration}
           {project.paused ? " ⏸ en pause" : project.auto_spec && loopActive ? " (boucle auto-spec)" : ""}
         </span>
         {agentCalls > 0 && (

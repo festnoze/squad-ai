@@ -11,9 +11,22 @@ import {
 async function json<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
     const body = await resp.text();
-    throw new Error(`${resp.status}: ${body}`);
+    // FastAPI renvoie {"detail": "..."} : on extrait le message lisible.
+    let detail = body;
+    try {
+      const parsed = JSON.parse(body) as { detail?: unknown };
+      if (typeof parsed.detail === "string") detail = parsed.detail;
+    } catch {
+      // Corps non-JSON : on garde le texte brut.
+    }
+    throw new Error(`Erreur ${resp.status} : ${detail}`);
   }
   return resp.json();
+}
+
+/** Message lisible d'une erreur inconnue (évite « Error: Error: … »). */
+export function errorMessage(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
 }
 
 export async function createProject(
@@ -201,8 +214,10 @@ export function connectEvents(
   let ws: WebSocket | null = null;
   let closed = false;
   let opened = false;
+  let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
   const open = () => {
+    if (closed) return;
     const proto = location.protocol === "https:" ? "wss" : "ws";
     ws = new WebSocket(`${proto}://${location.host}/ws`);
     ws.onopen = () => {
@@ -223,13 +238,16 @@ export function connectEvents(
       onEvent(event);
     };
     ws.onclose = () => {
-      if (!closed) setTimeout(open, 1500);
+      if (!closed) reconnectTimer = setTimeout(open, 1500);
     };
   };
   open();
 
   return () => {
     closed = true;
+    // Annule une reconnexion en attente : sans cela, un timer déjà programmé
+    // rouvrirait une WebSocket orpheline après le démontage du composant.
+    if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
     ws?.close();
   };
 }

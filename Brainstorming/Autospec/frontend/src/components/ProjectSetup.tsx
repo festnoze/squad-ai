@@ -47,7 +47,7 @@ export function ProjectSetup({ onCreate, busy }: Props) {
       <button
         className="primary"
         disabled={busy || !goal.trim()}
-        onClick={() => onCreate(goal, name, autoSpec, Number(budget) || 0)}
+        onClick={() => onCreate(goal.trim(), name.trim(), autoSpec, Number(budget) || 0)}
       >
         {autoSpec ? "🔁 Lancer la boucle auto-spec" : "🚀 Démarrer la spécification"}
       </button>

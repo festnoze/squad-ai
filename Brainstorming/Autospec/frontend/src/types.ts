@@ -165,7 +165,10 @@ export function criterionState(
   criterion: AcceptanceCriterion,
 ): TestState {
   if (story.status === "done") return "green";
-  const tests = story.test_plan.filter((t) => t.criteria.includes(criterion.id));
+  // `?? []` : robustesse face aux anciens états persistés sans ces champs.
+  const tests = (story.test_plan ?? []).filter((t) =>
+    (t.criteria ?? []).includes(criterion.id),
+  );
   if (tests.some((t) => t.status === "red")) return "red";
   if (tests.length > 0 && tests.every((t) => t.status === "green")) return "green";
   return "nonexistent";

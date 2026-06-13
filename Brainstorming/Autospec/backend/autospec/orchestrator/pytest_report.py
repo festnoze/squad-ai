@@ -19,8 +19,15 @@ def parse(report_path: str | Path) -> dict[str, str]:
         data = json.loads(Path(report_path).read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return {}
+    if not isinstance(data, dict):
+        return {}
+    tests = data.get("tests")
+    if not isinstance(tests, list):
+        return {}
     results: dict[str, str] = {}
-    for test in data.get("tests", []):
+    for test in tests:
+        if not isinstance(test, dict):
+            continue
         node = test.get("nodeid")
         outcome = test.get("outcome")
         if node and outcome:

@@ -691,6 +691,112 @@ async def test_red_story_is_replanned_then_succeeds(green_pytest, monkeypatch):
     assert us1.attempts == 2  # failed once (retry), succeeded on the second pass
 
 
+async def test_plan_deduplicates_story_ids_across_iterations():
+    # Iteration 2: the PO reuses "US-1"/"EPIC-1". The pipeline must keep ids
+    # unique (no state.story() ambiguity, no feature-file overwrite) and remap
+    # the plan's internal depends_on through the renames.
+    from autospec.models import Epic, UserStory
+
+    state = ProjectState(id="proj-test", name="todo", goal="g", brief="# Brief", iteration=2)
+    state.epics.append(Epic(id="EPIC-1", title="Epic 1"))
+    state.stories.append(
+        UserStory(id="US-1", epic_id="EPIC-1", title="old", status=StoryStatus.DONE)
+    )
+    pipeline = Pipeline(state, FakeRunner([po_plan_reply(2)]))
+    await pipeline._aplan_phase()
+
+    ids = [s.id for s in state.stories]
+    assert len(ids) == 3 and len(set(ids)) == 3
+    new1, new2 = state.stories[1], state.stories[2]
+    assert new1.id != "US-1"
+    assert new2.depends_on == [new1.id]  # intra-plan dep follows the rename
+    assert [e.id for e in state.epics] == ["EPIC-1", "EPIC-2"]
+
+
+async def test_analyst_with_only_shipped_hypotheses_raises_clean_error():
+    from autospec.agents.runner import AgentError
+    from autospec.models import FeatureHypothesis, HypothesisStatus
+
+    state = ProjectState(id="proj-test", name="x", goal="g")
+    state.backlog.append(
+        FeatureHypothesis(id="FH-1", title="X", status=HypothesisStatus.DONE)
+    )
+    reply = json.dumps(
+        {"message": "m", "hypotheses": [{"id": "FH-1", "title": "X"}], "selected": "FH-1"}
+    )
+    pipeline = Pipeline(state, FakeRunner([reply]))
+    with pytest.raises(AgentError):
+        await pipeline._aanalyze_phase()
+
+
+async def test_resume_build_picks_up_red_story(green_pytest):
+    # 4 replies for the initial build, 1 dev reply for the resume (QA only runs
+    # on attempt 1).
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    # Simulate a restart that left the story RED mid-attempt: resume-build must
+    # revert it to TODO so the scheduler picks it up again.
+    pipeline.state.story("US-1").status = StoryStatus.RED
+    await pipeline.aresume_build()
+    await wait_until(
+        lambda: pipeline.state.phase == PipelinePhase.DONE
+        and pipeline.state.story("US-1").status == StoryStatus.DONE
+    )
+
+
+async def test_dev_refine_failure_keeps_story_done(green_pytest, monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "refine_enabled", True)
+    monkeypatch.setattr(settings, "refine_po", False)
+    monkeypatch.setattr(settings, "refine_dev", True)
+    judge_low = json.dumps({"score": 10, "verdict": "faible"})
+    critic = json.dumps({"reflection": "r", "issues": ["i"], "suggestions": ["s"]})
+    # After the dev goes green: judge(10) -> critic -> the revise call has NO
+    # queued reply -> AgentError. Refinement is opportunistic: the story must
+    # stay DONE instead of being downgraded to TODO/FAILED.
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN, judge_low, critic]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    us1 = pipeline.state.story("US-1")
+    assert us1.status == StoryStatus.DONE
+    assert us1.attempts == 1
+
+
+async def test_unexpected_build_error_never_leaves_story_in_progress(monkeypatch):
+    # A non-AgentError during verification (e.g. pytest runner missing) must
+    # surface as a pipeline ERROR without persisting a transient story status.
+    async def _boom(self):
+        raise RuntimeError("uv introuvable")
+
+    monkeypatch.setattr(Pipeline, "_arun_pytest", _boom)
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.ERROR)
+    assert pipeline.state.story("US-1").status == StoryStatus.TODO
+
+
+def test_sanitize_keeps_dependencies_unrelated_to_a_cycle():
+    # Cycle-breaking must only clear the deps of the cycle's members, not of
+    # unrelated stories declared earlier.
+    from autospec.models import UserStory
+    from autospec.orchestrator import scheduler
+
+    def mk(sid: str, deps: list[str]) -> UserStory:
+        return UserStory(id=sid, epic_id="EPIC-1", title=sid, depends_on=deps)
+
+    stories = [mk("US-1", ["US-2"]), mk("US-2", []), mk("US-3", ["US-4"]), mk("US-4", ["US-3"])]
+    scheduler.sanitize_dependencies(stories)
+    assert stories[0].depends_on == ["US-2"]  # untouched: not part of the cycle
+    assert scheduler.validate_dependencies(stories) == []
+
+
 def test_dev_prompt_includes_guidance():
     from autospec.agents import prompts
     from autospec.models import UserStory

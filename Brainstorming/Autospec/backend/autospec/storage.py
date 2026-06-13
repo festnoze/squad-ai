@@ -22,9 +22,19 @@ def _migrate(raw: dict) -> dict:
 
     - acceptance_criteria used to be a list[str]; it is now a list of
       {id, text} objects.
+
+    Tolerant on purpose: unexpected shapes are passed through unchanged and
+    left to Pydantic validation (load_state catches and logs the failure).
     """
-    for story in raw.get("stories", []):
-        criteria = story.get("acceptance_criteria", [])
+    stories = raw.get("stories")
+    if not isinstance(stories, list):
+        return raw
+    for story in stories:
+        if not isinstance(story, dict):
+            continue
+        criteria = story.get("acceptance_criteria") or []
+        if not isinstance(criteria, list):
+            continue
         migrated = []
         for i, item in enumerate(criteria, start=1):
             if isinstance(item, str):
@@ -36,6 +46,19 @@ def _migrate(raw: dict) -> dict:
 
 
 def workspace_dir(project_id: str) -> Path:
+    """Resolve a project's workspace folder under the workspace root.
+
+    Rejects ids that would escape the root (empty, '..', path separators,
+    drive letters) — project ids reach here straight from API URLs, and
+    delete_workspace() rmtree's this path.
+    """
+    if (
+        project_id in ("", ".", "..")
+        or "/" in project_id
+        or "\\" in project_id
+        or ":" in project_id
+    ):
+        raise ValueError(f"Invalid project id: {project_id!r}")
     return settings.workspace_root / project_id
 
 
@@ -79,10 +102,14 @@ def delete_workspace(project_id: str) -> bool:
     """Remove a project's workspace (state + generated code). Returns True if it
     existed."""
     ws = workspace_dir(project_id)
+    if not ws.exists():
+        return False
+    shutil.rmtree(ws, ignore_errors=True)
     if ws.exists():
-        shutil.rmtree(ws, ignore_errors=True)
-        return True
-    return False
+        # Typical on Windows when a file is still open (e.g. the generated app
+        # is running). Don't raise: the caller already removed the project.
+        logger.warning("Workspace %s only partially removed (file in use?)", ws)
+    return True
 
 
 def list_states() -> list[ProjectState]:

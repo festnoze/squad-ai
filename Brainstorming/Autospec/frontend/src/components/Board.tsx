@@ -3,6 +3,7 @@ import {
   addStory,
   deleteStory,
   editStory,
+  errorMessage,
   forceDoneStory,
   rebuildStory,
   reorderStories,
@@ -49,7 +50,10 @@ function CriterionRow({
 }) {
   const [open, setOpen] = useState(false);
   const state = criterionState(story, criterion);
-  const tests = story.test_plan.filter((t) => t.criteria.includes(criterion.id));
+  // `?? []` : robustesse face aux anciens états persistés sans ces champs.
+  const tests = (story.test_plan ?? []).filter((t) =>
+    (t.criteria ?? []).includes(criterion.id),
+  );
 
   return (
     <div className={`criterion state-${state}`} data-testid={`criterion-${criterion.id}`}>
@@ -81,7 +85,7 @@ function CriterionRow({
                   </span>
                   <span className="test-layer">{t.layer || "?"}</span>
                   <span className="test-desc">{t.description}</span>
-                  {t.mocks.length > 0 && (
+                  {(t.mocks ?? []).length > 0 && (
                     <span className="test-mocks"> · mocks : {t.mocks.join(", ")}</span>
                   )}
                   <span className={`state-tag state-${t.status}`}>
@@ -125,7 +129,7 @@ function StoryEditor({
     description: story.description,
     priority: story.priority,
     gherkin: story.gherkin,
-    criteria: story.acceptance_criteria.map((c) => ({ id: c.id, text: c.text })),
+    criteria: (story.acceptance_criteria ?? []).map((c) => ({ id: c.id, text: c.text })),
   });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -158,7 +162,7 @@ function StoryEditor({
       });
       onClose();
     } catch (e) {
-      setError(String(e));
+      setError(errorMessage(e));
       setSaving(false);
     }
   };
@@ -283,7 +287,7 @@ function DiffViewer({
         setDiff(res.diff);
       })
       .catch((e) => {
-        if (!cancelled) setError(String(e));
+        if (!cancelled) setError(errorMessage(e));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -348,38 +352,30 @@ function StoryCard({
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!window.confirm(`Supprimer la user story « ${story.title} » ?`)) return;
+    setError("");
     try {
       await deleteStory(projectId, story.id);
     } catch (err) {
-      setError(String(err));
+      setError(errorMessage(err));
     }
   };
 
-  const handleRebuild = async (e: React.MouseEvent) => {
+  // Enveloppe une action API de la carte : erreur affichée + anti double-clic.
+  const action = (fn: () => Promise<void>) => async (e: React.MouseEvent) => {
     e.stopPropagation();
     setError("");
     setBusy(true);
     try {
-      await rebuildStory(projectId, story.id);
+      await fn();
     } catch (err) {
-      setError(String(err));
+      setError(errorMessage(err));
     } finally {
       setBusy(false);
     }
   };
 
-  const handleForceDone = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setError("");
-    setBusy(true);
-    try {
-      await forceDoneStory(projectId, story.id);
-    } catch (err) {
-      setError(String(err));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const handleRebuild = action(() => rebuildStory(projectId, story.id));
+  const handleForceDone = action(() => forceDoneStory(projectId, story.id));
 
   return (
     <div
@@ -405,7 +401,9 @@ function StoryCard({
           <span className={`prio prio-${story.priority}`} title="Priorité kanban (1=haute)">
             P{story.priority}
           </span>
-          <span className={`badge badge-${story.status}`}>{STATUS_LABEL[story.status]}</span>
+          <span className={`badge badge-${story.status}`}>
+            {STATUS_LABEL[story.status] ?? story.status}
+          </span>
           {story.quality_score >= 0 && (
             <span className="quality-badge" title="Qualité du code (raffinement)">
               ⚙ {story.quality_score}/100
@@ -416,7 +414,7 @@ function StoryCard({
       <div className="story-title" onClick={() => setOpen(!open)}>
         {story.title}
       </div>
-      {story.depends_on.length > 0 && (
+      {(story.depends_on ?? []).length > 0 && (
         <div className="story-deps">⛓ dépend de {story.depends_on.join(", ")}</div>
       )}
       {open && (
@@ -483,7 +481,7 @@ function StoryCard({
               </div>
               {error && <div className="edit-error">{error}</div>}
               <p>{story.description}</p>
-              {story.acceptance_criteria.length > 0 && (
+              {(story.acceptance_criteria ?? []).length > 0 && (
                 <>
                   <h4>Critères d'acceptance</h4>
                   <div className="criteria">
@@ -546,7 +544,7 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
       });
       reset();
     } catch (e) {
-      setError(String(e));
+      setError(errorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -611,6 +609,7 @@ function EpicStories({
   // id de la story en cours de drag, et id de la story survolée (cible de drop).
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
+  const [error, setError] = useState("");
 
   // Tri stable par priorité croissante (1=haute). Array.sort est stable en JS,
   // donc à priorité égale l'ordre de déclaration est conservé.
@@ -634,17 +633,19 @@ function EpicStories({
       id,
       priority: Math.min(i + 1, 5),
     }));
+    setError("");
     try {
       await reorderStories(projectId, priorities);
       // Pas de re-fetch : le backend diffuse le nouvel état par WebSocket.
     } catch (err) {
-      // Ne pas planter l'UI si l'appel échoue.
-      console.error("Échec du réordonnancement des user stories :", err);
+      // Erreur affichée à l'utilisateur plutôt que perdue en console.
+      setError(`Échec du réordonnancement : ${errorMessage(err)}`);
     }
   };
 
   return (
     <div className="stories">
+      {error && <div className="edit-error">{error}</div>}
       {ordered.map((s) => (
         <StoryCard
           key={s.id}

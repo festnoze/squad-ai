@@ -1,4 +1,5 @@
-"""Loads the installed BMAD agent personas (PM, PO/Scrum Master, Dev).
+"""Loads the installed BMAD agent personas (PM, PO/Scrum Master, Dev, Analyst,
+Architect, QA, plus the critic/judge of the refinement harness).
 
 The BMAD persona files are menu-driven and expect an interactive session, so we
 append a "programmatic mode" override that keeps the persona's role, identity and
@@ -78,7 +79,11 @@ FALLBACK_PERSONAS = {
 
 @lru_cache(maxsize=None)
 def persona(agent: str) -> str:
-    """Return the system prompt for a BMAD agent ('pm', 'sm' or 'dev')."""
+    """Return the system prompt for a BMAD agent (any FALLBACK_PERSONAS key).
+
+    Prefers the installed BMAD persona file when present, falls back to the
+    built-in persona otherwise; unknown agents default to the dev persona.
+    """
     path = settings.persona_path(agent)
     if path.exists():
         body = path.read_text(encoding="utf-8")

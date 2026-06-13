@@ -182,6 +182,21 @@ def _pipeline(project_id: str) -> Pipeline:
     return pipeline
 
 
+async def _acall_pipeline(coro, not_found: str):
+    """Await a pipeline call, mapping domain errors to HTTP errors.
+
+    ``KeyError`` (unknown story/epic) -> 404 with ``not_found`` as detail;
+    ``ValueError`` (invalid state transition, e.g. story being developed or
+    pipeline already active) -> 409 with the pipeline's own (French) message.
+    """
+    try:
+        return await coro
+    except KeyError:
+        raise HTTPException(404, not_found)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+
+
 @app.post("/api/projects")
 async def acreate_project(req: CreateProjectRequest) -> dict:
     if not req.goal.strip():
@@ -256,6 +271,10 @@ async def adelete_project(project_id: str) -> dict:
     try:
         existed = _force_delete_workspace(project_id)
     except OSError:
+        # The state file survived: re-register the (now dormant) pipeline so
+        # the project stays listed/controllable and the delete can be retried.
+        if pipeline:
+            pipelines[project_id] = pipeline
         raise HTTPException(
             409, "Le workspace est verrouillé (un processus l'utilise) — réessaie dans un instant."
         )
@@ -268,6 +287,10 @@ async def adelete_project(project_id: str) -> dict:
 @app.post("/api/projects/{project_id}/chat")
 async def achat(project_id: str, req: MessageRequest) -> dict:
     pipeline = _pipeline(project_id)
+    # An empty message would unblock the PM interview queue (the same sentinel
+    # astop uses) and waste an agent turn: reject it upfront.
+    if not req.message.strip():
+        raise HTTPException(422, "Le message est vide.")
     await pipeline.asend_user_message(req.message)
     return {"ok": True, "phase": pipeline.state.phase}
 
@@ -314,10 +337,8 @@ async def aresume(project_id: str) -> dict:
 
 @app.post("/api/projects/{project_id}/resume-build")
 async def aresume_build(project_id: str) -> dict:
-    try:
-        await _pipeline(project_id).aresume_build()
-    except ValueError as exc:
-        raise HTTPException(409, str(exc))
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.aresume_build(), f"Projet inconnu : {project_id}")
     return {"ok": True}
 
 
@@ -343,7 +364,12 @@ async def astop_app(project_id: str) -> dict:
 
 @app.post("/api/projects/{project_id}/archive")
 async def aarchive_project(project_id: str) -> dict:
-    await _pipeline(project_id).aset_archived(True)
+    pipeline = _pipeline(project_id)
+    # Archiving hides the project: refuse while agents are actively working on
+    # it (they would keep running — and spending budget — out of sight).
+    if pipeline.state.phase in _INTERRUPTED_PHASES:
+        raise HTTPException(409, "La pipeline est active : arrête-la avant d'archiver le projet.")
+    await pipeline.aset_archived(True)
     return {"ok": True}
 
 
@@ -357,20 +383,21 @@ async def aunarchive_project(project_id: str) -> dict:
 async def aedit_story(project_id: str, story_id: str, req: EditStoryRequest) -> dict:
     pipeline = _pipeline(project_id)
     fields = req.model_dump(exclude_unset=True)
-    try:
-        await pipeline.aedit_story(story_id, **fields)
-    except KeyError:
-        raise HTTPException(404, f"Story inconnue : {story_id}")
-    except ValueError as exc:
-        raise HTTPException(409, str(exc))
+    if fields.get("title") is not None and not fields["title"].strip():
+        raise HTTPException(422, "Le titre de la story est vide.")
+    await _acall_pipeline(
+        pipeline.aedit_story(story_id, **fields), f"Story inconnue : {story_id}"
+    )
     return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
 
 
 @app.post("/api/projects/{project_id}/stories")
 async def aadd_story(project_id: str, req: AddStoryRequest) -> dict:
     pipeline = _pipeline(project_id)
-    try:
-        await pipeline.aadd_story(
+    if not req.title.strip():
+        raise HTTPException(422, "Le titre de la story est vide.")
+    await _acall_pipeline(
+        pipeline.aadd_story(
             epic_id=req.epic_id,
             title=req.title,
             description=req.description or "",
@@ -378,57 +405,39 @@ async def aadd_story(project_id: str, req: AddStoryRequest) -> dict:
             priority=req.priority,
             acceptance_criteria=req.acceptance_criteria,
             depends_on=req.depends_on,
-        )
-    except KeyError:
-        raise HTTPException(404, f"Epic inconnu : {req.epic_id}")
-    except ValueError as exc:
-        raise HTTPException(409, str(exc))
+        ),
+        f"Epic inconnu : {req.epic_id}",
+    )
     return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
 
 
 @app.delete("/api/projects/{project_id}/stories/{story_id}")
 async def adelete_story(project_id: str, story_id: str) -> dict:
     pipeline = _pipeline(project_id)
-    try:
-        await pipeline.adelete_story(story_id)
-    except KeyError:
-        raise HTTPException(404, f"Story inconnue : {story_id}")
-    except ValueError as exc:
-        raise HTTPException(409, str(exc))
+    await _acall_pipeline(pipeline.adelete_story(story_id), f"Story inconnue : {story_id}")
     return {"ok": True}
 
 
 @app.post("/api/projects/{project_id}/stories/{story_id}/rebuild")
 async def arebuild_story(project_id: str, story_id: str) -> dict:
     pipeline = _pipeline(project_id)
-    try:
-        await pipeline.arebuild_story(story_id)
-    except KeyError:
-        raise HTTPException(404, f"Story inconnue : {story_id}")
-    except ValueError as exc:
-        raise HTTPException(409, str(exc))
+    await _acall_pipeline(pipeline.arebuild_story(story_id), f"Story inconnue : {story_id}")
     return {"ok": True}
 
 
 @app.post("/api/projects/{project_id}/stories/{story_id}/force-done")
 async def aforce_done(project_id: str, story_id: str) -> dict:
     pipeline = _pipeline(project_id)
-    try:
-        await pipeline.aforce_done(story_id)
-    except KeyError:
-        raise HTTPException(404, f"Story inconnue : {story_id}")
-    except ValueError as exc:
-        raise HTTPException(409, str(exc))
+    await _acall_pipeline(pipeline.aforce_done(story_id), f"Story inconnue : {story_id}")
     return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
 
 
 @app.get("/api/projects/{project_id}/stories/{story_id}/diff")
 async def astory_diff(project_id: str, story_id: str) -> dict:
     pipeline = _pipeline(project_id)
-    try:
-        result = await pipeline.astory_diff(story_id)
-    except KeyError:
-        raise HTTPException(404, f"Story inconnue : {story_id}")
+    result = await _acall_pipeline(
+        pipeline.astory_diff(story_id), f"Story inconnue : {story_id}"
+    )
     return {"ok": True, **result}
 
 
@@ -495,9 +504,11 @@ async def aws_events(ws: WebSocket) -> None:
         bus.unsubscribe(queue)
 
 
-# Serve the built frontend when available (production mode).
+# Serve the built frontend when available (production mode). Both index.html
+# and assets/ must exist: a partial build must not crash the API at startup
+# (StaticFiles raises on a missing directory).
 _dist = PROJECT_DIR / "frontend" / "dist"
-if _dist.exists():
+if (_dist / "index.html").exists() and (_dist / "assets").is_dir():
     app.mount("/assets", StaticFiles(directory=_dist / "assets"), name="assets")
 
     @app.get("/")

@@ -51,6 +51,26 @@ def _minimal_env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if k.upper() in _SAFE_ENV_KEYS}
 
 
+def _clamp_1_5(value, default: int = 3) -> int:
+    """Coerce a 1..5 score (priority/value/complexity), tolerating garbage
+    from agent replies (non-numeric -> default)."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return default
+    return min(5, max(1, n))
+
+
+def _unique_id(raw: str, prefix: str, taken: set[str]) -> str:
+    """Return ``raw`` if free, else the first unused ``{prefix}-{n}`` id."""
+    if raw not in taken:
+        return raw
+    n = len(taken) + 1
+    while f"{prefix}-{n}" in taken:
+        n += 1
+    return f"{prefix}-{n}"
+
+
 class _UsageTracker:
     """Wraps a pipeline's runner to accumulate token/cost usage on the project
     state. Its `arun` matches the AgentRunner Protocol, so it can be passed to
@@ -68,6 +88,7 @@ class _UsageTracker:
         usage.input_tokens += res.input_tokens
         usage.output_tokens += res.output_tokens
         usage.agent_calls += 1
+        self.pipeline._sync()  # persist + broadcast usage as it accrues
         return res
 
 
@@ -83,6 +104,9 @@ class Pipeline:
         self._resume_event.set()  # set = running, cleared = paused
         self._task: asyncio.Task | None = None
         self._run_proc: subprocess.Popen | None = None
+        # Strong ref to the app-output streaming task (asyncio keeps only weak
+        # refs to tasks: an unreferenced task may be garbage-collected mid-run).
+        self._stream_task: asyncio.Task | None = None
         # Serializes the workspace-mutating section of story builds. Parallel dev
         # workers share one workspace directory, so writing code, running the
         # whole pytest suite and committing/refining git must not interleave
@@ -235,7 +259,7 @@ class Pipeline:
         if description is not None:
             story.description = description
         if priority is not None:
-            story.priority = min(5, max(1, int(priority)))
+            story.priority = _clamp_1_5(priority)
         if acceptance_criteria is not None:
             story.acceptance_criteria = [
                 AcceptanceCriterion(
@@ -268,22 +292,19 @@ class Pipeline:
         if not any(e.id == epic_id for e in self.state.epics):
             raise KeyError(epic_id)
         existing_ids = {s.id for s in self.state.stories}
-        n = len(self.state.stories) + 1
-        while f"US-{n}" in existing_ids:
-            n += 1
         criteria = [
             AcceptanceCriterion(id=f"AC-{i}", text=str(text))
             for i, text in enumerate(acceptance_criteria or [], start=1)
         ]
         story = UserStory(
-            id=f"US-{n}",
+            id=_unique_id(f"US-{len(existing_ids) + 1}", "US", existing_ids),
             epic_id=epic_id,
             title=title,
             description=description,
             acceptance_criteria=criteria,
             gherkin=gherkin,
             depends_on=depends_on or [],
-            priority=min(5, max(1, int(priority))),
+            priority=_clamp_1_5(priority),
             iteration=self.state.iteration,
             status=StoryStatus.TODO,
         )
@@ -318,7 +339,7 @@ class Pipeline:
         for entry in priorities:
             story = by_id.get(entry.get("id"))
             if story is not None:
-                story.priority = min(5, max(1, int(entry["priority"])))
+                story.priority = _clamp_1_5(entry.get("priority"), default=story.priority)
         self._sync()
 
     # ------------------------------------------------------------ lifecycle
@@ -382,11 +403,11 @@ class Pipeline:
                 self.state.brief = reply.get("brief", "")
                 self._sync()
                 return self.state.brief
-            # type == "question": wait for the user's answer.
-            answer = await self._user_messages.get()
+            # type == "question": wait for the user's answer (already appended
+            # to the chat by asend_user_message; the PM rereads it from there).
+            await self._user_messages.get()
             if self._stop_requested:
                 return None
-            # answer was already appended to chat by asend_user_message
         return None
 
     # ------------------------------------------------------------ PLAN (PO)
@@ -401,36 +422,54 @@ class Pipeline:
         )
         plan_text = await self._arefine_plan(result.text, pkg)
         plan = extract_json(plan_text)
-        new_stories: list[UserStory] = []
+        # The PO of a later iteration typically numbers from "US-1"/"EPIC-1"
+        # again: deduplicate against previous iterations (else state.story()
+        # becomes ambiguous and feature files get overwritten), remapping the
+        # plan's internal depends_on through any rename.
+        taken_story_ids = {s.id for s in self.state.stories}
+        taken_epic_ids = {e.id for e in self.state.epics}
+        id_map: dict[str, str] = {}  # PO-chosen story id -> final unique id
+        planned: list[tuple[str, str, dict]] = []  # (epic_id, story_id, story_data)
         for epic_data in plan.get("epics", []):
-            epic = Epic(
-                id=epic_data.get("id", f"EPIC-{len(self.state.epics) + 1}"),
-                title=epic_data.get("title", "Epic"),
-                description=epic_data.get("description", ""),
-                iteration=self.state.iteration,
+            epic_id = _unique_id(
+                epic_data.get("id") or f"EPIC-{len(taken_epic_ids) + 1}",
+                "EPIC",
+                taken_epic_ids,
             )
-            self.state.epics.append(epic)
-            for story_data in epic_data.get("stories", []):
-                story_id = story_data.get(
-                    "id", f"US-{len(self.state.stories) + len(new_stories) + 1}"
+            taken_epic_ids.add(epic_id)
+            self.state.epics.append(
+                Epic(
+                    id=epic_id,
+                    title=epic_data.get("title", "Epic"),
+                    description=epic_data.get("description", ""),
+                    iteration=self.state.iteration,
                 )
-                criteria = [
+            )
+            for story_data in epic_data.get("stories", []):
+                raw_id = story_data.get("id") or f"US-{len(taken_story_ids) + 1}"
+                story_id = _unique_id(raw_id, "US", taken_story_ids)
+                taken_story_ids.add(story_id)
+                id_map.setdefault(raw_id, story_id)
+                planned.append((epic_id, story_id, story_data))
+        new_stories = [
+            UserStory(
+                id=story_id,
+                epic_id=epic_id,
+                title=story_data.get("title", "Story"),
+                description=story_data.get("description", ""),
+                acceptance_criteria=[
                     AcceptanceCriterion(id=f"AC-{i}", text=str(text))
                     for i, text in enumerate(story_data.get("acceptance_criteria", []), start=1)
-                ]
-                new_stories.append(
-                    UserStory(
-                        id=story_id,
-                        epic_id=epic.id,
-                        title=story_data.get("title", "Story"),
-                        description=story_data.get("description", ""),
-                        acceptance_criteria=criteria,
-                        gherkin=story_data.get("gherkin", ""),
-                        depends_on=story_data.get("depends_on", []),
-                        priority=min(5, max(1, int(story_data.get("priority", 3)))),
-                        iteration=self.state.iteration,
-                    )
-                )
+                ],
+                gherkin=story_data.get("gherkin", ""),
+                # Deps use the PO's ids: follow renames for the plan's own
+                # stories; ids of previous-iteration stories pass through.
+                depends_on=[id_map.get(d, d) for d in story_data.get("depends_on", [])],
+                priority=_clamp_1_5(story_data.get("priority", 3)),
+                iteration=self.state.iteration,
+            )
+            for epic_id, story_id, story_data in planned
+        ]
         # Deps may point to already-done stories from previous iterations.
         scheduler.sanitize_dependencies(self.state.stories + new_stories)
         self.state.stories.extend(new_stories)
@@ -527,18 +566,29 @@ class Pipeline:
             await self._agit(ws, "reset", "--hard", "HEAD")
             await self._agit(ws, "clean", "-fd")
 
-        outcome = await refine.arefine(
-            self._tracked,
-            role="dev",
-            kind=f"le code produit pour la story {story.id} (fichiers dans le répertoire courant)",
-            criteria=prompts.CODE_CRITERIA,
-            initial_text=f"Code de la story {story.id} — lis les fichiers du répertoire courant.",
-            revise=_revise,
-            accept=_accept,
-            rollback=_rollback,
-            cwd=ws,
-            emit=self._emit_refine,
-        )
+        try:
+            outcome = await refine.arefine(
+                self._tracked,
+                role="dev",
+                kind=f"le code produit pour la story {story.id} (fichiers dans le répertoire courant)",
+                criteria=prompts.CODE_CRITERIA,
+                initial_text=f"Code de la story {story.id} — lis les fichiers du répertoire courant.",
+                revise=_revise,
+                accept=_accept,
+                rollback=_rollback,
+                cwd=ws,
+                emit=self._emit_refine,
+            )
+        except AgentError as exc:
+            # Refinement is opportunistic: a failure here must never downgrade
+            # a story that already reached green. Restore the snapshot (the
+            # revise agent may have partially rewritten the workspace).
+            await _rollback()
+            self._log(
+                f"dev:{story.id}",
+                f"Raffinement interrompu ({exc}) — retour à l'état vert.",
+            )
+            return
         if outcome.stopped_reason != "disabled":
             story.quality_score = outcome.score
             self._chat(
@@ -614,18 +664,20 @@ class Pipeline:
         self.state.phase = PipelinePhase.BUILD
         self._sync()
         semaphore = asyncio.Semaphore(settings.max_parallel_devs)
-        iteration_stories = self.state.stories_of_iteration(self.state.iteration)
 
         while not self._stop_requested:
             await self._checkpoint()  # honour pause between story batches
             if self._stop_requested:
                 break
+            # Recomputed every batch: the user may add stories mid-build.
+            iteration_stories = self.state.stories_of_iteration(self.state.iteration)
             pending = scheduler.pending_stories(iteration_stories)
             if not pending:
                 break
             ready = scheduler.ready_stories(iteration_stories)
-            in_flight = [s for s in iteration_stories if s.status == StoryStatus.IN_PROGRESS]
-            if not ready and not in_flight:
+            if not ready:
+                if any(s.status == StoryStatus.IN_PROGRESS for s in pending):
+                    break  # defensive: a worker left a story in-flight
                 # Remaining stories depend on failed work: mark them failed.
                 for story in pending:
                     story.status = StoryStatus.FAILED
@@ -702,7 +754,15 @@ class Pipeline:
                 else StoryStatus.FAILED
             )
             self._log(f"dev:{story.id}", f"Erreur agent : {exc}")
-        self._sync()
+        except Exception:
+            # Unexpected failure (pytest runner missing, git crash…): never
+            # persist a transient status; the exception itself surfaces via
+            # the lifecycle task (-> ERROR phase).
+            if story.status in (StoryStatus.IN_PROGRESS, StoryStatus.GREEN, StoryStatus.RED):
+                story.status = StoryStatus.TODO
+            raise
+        finally:
+            self._sync()
 
     # ------------------------------------------------ per-story actions
 
@@ -776,6 +836,10 @@ class Pipeline:
         ]
         if not to_build:
             raise ValueError("aucune story à construire pour cette itération")
+        # The scheduler only picks TODO stories: revert the ones stranded in
+        # RED (e.g. persisted mid-attempt before a restart) so they are rebuilt.
+        for story in to_build:
+            story.status = StoryStatus.TODO
         self._stop_requested = False
         # Set BUILD synchronously BEFORE launching the task so a second
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
@@ -968,11 +1032,13 @@ class Pipeline:
                     id=hyp_id,
                     title=data.get("title", hyp_id),
                     rationale=data.get("rationale", ""),
-                    value=min(5, max(1, int(data.get("value", 3)))),
-                    complexity=min(5, max(1, int(data.get("complexity", 3)))),
+                    value=_clamp_1_5(data.get("value", 3)),
+                    complexity=_clamp_1_5(data.get("complexity", 3)),
                     rank=rank,
                 )
             )
+        if not fresh:
+            raise AgentError("L'analyste n'a proposé que des hypothèses déjà livrées.")
         selected_id = reply.get("selected") or fresh[0].id
         selected = next((h for h in fresh if h.id == selected_id), fresh[0])
         selected.status = HypothesisStatus.SELECTED
@@ -1002,7 +1068,9 @@ class Pipeline:
         # back onto the event loop (asyncio subprocesses are unsupported on the
         # Windows SelectorEventLoop that uvicorn runs).
         loop = asyncio.get_running_loop()
-        asyncio.create_task(asyncio.to_thread(self._stream_run_output, ws, env, loop))
+        self._stream_task = asyncio.create_task(
+            asyncio.to_thread(self._stream_run_output, ws, env, loop)
+        )
 
     def _stream_run_output(self, ws, env, loop: asyncio.AbstractEventLoop) -> None:
         import sys

@@ -29,7 +29,9 @@ export function BacklogPanel({ backlog }: Props) {
             <span className="hyp-scores">
               V{h.value} / C{h.complexity}
             </span>
-            <span className={`badge badge-hyp-${h.status}`}>{STATUS_LABEL[h.status]}</span>
+            <span className={`badge badge-hyp-${h.status}`}>
+              {STATUS_LABEL[h.status] ?? h.status}
+            </span>
           </div>
         ))}
         {shipped.length > 0 && (

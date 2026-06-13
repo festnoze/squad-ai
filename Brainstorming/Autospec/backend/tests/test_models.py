@@ -1,5 +1,6 @@
 from autospec.models import (
     AcceptanceCriterion,
+    FeatureHypothesis,
     PlannedTest,
     StoryStatus,
     TestState,
@@ -55,3 +56,19 @@ def test_criterion_not_green_if_one_missing():
 def test_done_story_is_green_even_without_tests():
     story = make_story([], status=StoryStatus.DONE)
     assert story.criterion_state("AC-1") == TestState.GREEN
+
+
+def test_hypothesis_scores_clamped_to_1_5():
+    h = FeatureHypothesis(id="FH-1", title="t", value=42, complexity=0, rank=-3)
+    assert h.value == 5
+    assert h.complexity == 1
+    assert h.rank == 1
+    assert h.score == 5.0
+
+
+def test_story_priority_clamped_to_1_5():
+    low = make_story([]).model_dump()
+    low["priority"] = 0
+    assert UserStory.model_validate(low).priority == 1
+    low["priority"] = 99
+    assert UserStory.model_validate(low).priority == 5

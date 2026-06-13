@@ -6,7 +6,7 @@ import time
 import uuid
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class PipelinePhase(str, Enum):
@@ -59,7 +59,15 @@ class TestState(str, Enum):
 
 
 def new_id(prefix: str) -> str:
+    """Generate a short unique id like 'us-1a2b3c4d'."""
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
+
+
+def _clamp_1_5(v: int) -> int:
+    """Clamp a 1..5 score so out-of-range agent output or a legacy persisted
+    state never fails Pydantic validation (which would drop the whole project
+    at load time)."""
+    return max(1, min(5, v))
 
 
 class ChatMessage(BaseModel):
@@ -78,6 +86,16 @@ class FeatureHypothesis(BaseModel):
     complexity: int = 3   # 1 (trivial) .. 5 (hard)
     status: HypothesisStatus = HypothesisStatus.PROPOSED
     rank: int = 1         # analyst's priority order, 1 = next to build
+
+    @field_validator("value", "complexity")
+    @classmethod
+    def _clamp_scores(cls, v: int) -> int:
+        return _clamp_1_5(v)
+
+    @field_validator("rank")
+    @classmethod
+    def _rank_at_least_one(cls, v: int) -> int:
+        return max(1, v)
 
     @property
     def score(self) -> float:
@@ -118,6 +136,11 @@ class UserStory(BaseModel):
     attempts: int = 0
     last_error: str = ""
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
+
+    @field_validator("priority")
+    @classmethod
+    def _clamp_priority(cls, v: int) -> int:
+        return _clamp_1_5(v)
 
     def tests_for_criterion(self, criterion_id: str) -> list[PlannedTest]:
         return [t for t in self.test_plan if criterion_id in t.criteria]

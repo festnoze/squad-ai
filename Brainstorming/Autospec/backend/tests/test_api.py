@@ -615,6 +615,72 @@ def _persist_phase_project(phase, project_id: str):
     return state
 
 
+async def test_chat_empty_message_422(green_pytest):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        # A blank message would act as the internal stop sentinel during the
+        # PM interview and waste an agent turn: rejected upfront.
+        resp = await client.post(f"/api/projects/{project_id}/chat", json={"message": "   "})
+        assert resp.status_code == 422
+
+
+async def test_add_or_edit_story_blank_title_422(green_pytest):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        resp = await client.post(
+            f"/api/projects/{project_id}/stories",
+            json={"epic_id": "EPIC-1", "title": "   "},
+        )
+        assert resp.status_code == 422
+
+        resp = await client.patch(
+            f"/api/projects/{project_id}/stories/US-1", json={"title": ""}
+        )
+        assert resp.status_code == 422
+
+
+async def test_archive_active_project_409(green_pytest):
+    from autospec.models import PipelinePhase
+
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        # Archiving while agents are working would hide a project that keeps
+        # spending budget in the background.
+        server.pipelines[project_id].state.phase = PipelinePhase.BUILD
+        assert (await client.post(f"/api/projects/{project_id}/archive")).status_code == 409
+
+        server.pipelines[project_id].state.phase = PipelinePhase.DONE
+        assert (await client.post(f"/api/projects/{project_id}/archive")).status_code == 200
+
+
+async def test_delete_locked_workspace_keeps_project_controllable(green_pytest, monkeypatch):
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        locked = {"value": True}
+        real_delete = server._force_delete_workspace
+
+        def _maybe_locked(pid):
+            if locked["value"]:
+                raise OSError("workspace verrouillé")
+            return real_delete(pid)
+
+        monkeypatch.setattr(server, "_force_delete_workspace", _maybe_locked)
+        resp = await client.delete(f"/api/projects/{project_id}")
+        assert resp.status_code == 409
+        # The pipeline is re-registered: the project is still listed and
+        # controllable, and the delete can be retried once unlocked.
+        assert project_id in server.pipelines
+        assert (await client.get(f"/api/projects/{project_id}")).status_code == 200
+
+        locked["value"] = False
+        assert (await client.delete(f"/api/projects/{project_id}")).status_code == 200
+        assert project_id not in server.pipelines
+
+
 async def test_recover_stops_interrupted_spec_analyze_plan_phases():
     from autospec.models import PipelinePhase
 

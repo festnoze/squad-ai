@@ -4,6 +4,7 @@ import {
   connectEvents,
   createProject,
   deleteProject,
+  errorMessage,
   listProjects,
   pauseProject,
   resumeBuild,
@@ -70,7 +71,11 @@ export default function App() {
         if (firstVisible) setSelectedId(firstVisible.id);
         else setShowSetup(true);
       })
-      .catch(() => setShowSetup(true));
+      .catch((e) => {
+        // Backend injoignable : on affiche l'accueil ET l'erreur (pas silencieux).
+        setError(errorMessage(e));
+        setShowSetup(true);
+      });
   }, []);
 
   useEffect(() => {
@@ -100,7 +105,7 @@ export default function App() {
               upsert(state);
             }
           })
-          .catch((e) => setError(String(e)));
+          .catch((e) => setError(errorMessage(e)));
       },
     );
   }, []);
@@ -119,7 +124,7 @@ export default function App() {
       setSelectedId(state.id);
       setShowSetup(false);
     } catch (e) {
-      setError(String(e));
+      setError(errorMessage(e));
     } finally {
       setBusy(false);
     }
@@ -131,17 +136,12 @@ export default function App() {
     try {
       await deleteProject(target.id);
       deletedIds.current.add(target.id);
-      setProjects((prev) => {
-        const remaining = prev.filter((p) => p.id !== target.id);
-        if (target.id === selectedId) {
-          setSelectedId(remaining[0]?.id ?? null);
-          if (remaining.length === 0) setShowSetup(true);
-        }
-        return remaining;
-      });
+      // Updater pur (pas de setState imbriqué) : l'effet de repli sur la
+      // sélection ci-dessous choisit le prochain projet visible ou l'accueil.
+      setProjects((prev) => prev.filter((p) => p.id !== target.id));
       setLogs((prev) => prev.filter((l) => l.projectId !== target.id));
     } catch (e) {
-      setError(String(e));
+      setError(errorMessage(e));
     }
   };
 
@@ -149,7 +149,7 @@ export default function App() {
     try {
       await archiveProject(target.id);
     } catch (e) {
-      setError(String(e));
+      setError(errorMessage(e));
     }
   };
 
@@ -157,7 +157,7 @@ export default function App() {
     try {
       await unarchiveProject(target.id);
     } catch (e) {
-      setError(String(e));
+      setError(errorMessage(e));
     }
   };
 
@@ -172,7 +172,9 @@ export default function App() {
     if (next === null) setShowSetup(true);
   }, [visibleProjects, selectedId]);
 
-  const guard = (fn: () => Promise<void>) => () => fn().catch((e) => setError(String(e)));
+  // Enveloppe une action API : toute erreur remonte dans le bandeau d'erreur.
+  const guard = (fn: () => Promise<void>) => () =>
+    fn().catch((e) => setError(errorMessage(e)));
 
   const projectLogs = useMemo(
     () => logs.filter((l) => l.projectId === selectedId),
@@ -204,7 +206,29 @@ export default function App() {
           onUnarchive={handleUnarchive}
         />
       )}
-      {error && <div className="error-banner">{error}</div>}
+      {error && (
+        <div
+          className="error-banner"
+          style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}
+        >
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => setError("")}
+            title="Fermer le message d'erreur"
+            aria-label="Fermer le message d'erreur"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "inherit",
+              cursor: "pointer",
+              padding: "0 2px",
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
       {showHome || !project ? (
         <main className="home">
           <ProjectSetup onCreate={handleCreate} busy={busy} />
@@ -212,21 +236,27 @@ export default function App() {
       ) : (
         <main className="workspace">
           <div className="col-left">
+            {/* `?? défaut` : robustesse face aux anciens états persistés
+                auxquels il manque des champs ajoutés depuis. */}
             <ChatPanel
-              chat={project.chat}
+              chat={project.chat ?? []}
               phase={project.phase}
               onSend={(m) => guard(() => sendChat(project.id, m))()}
-              specMode={project.spec_mode}
-              onSetSpecMode={(m) => setSpecMode(project.id, m).catch((e) => setError(String(e)))}
+              specMode={project.spec_mode ?? "interview"}
+              onSetSpecMode={(m) => guard(() => setSpecMode(project.id, m))()}
             />
-            <BacklogPanel backlog={project.backlog} />
+            <BacklogPanel backlog={project.backlog ?? []} />
             <ArchitecturePanel
-              architecture={project.architecture}
-              planQuality={project.plan_quality}
+              architecture={project.architecture ?? ""}
+              planQuality={project.plan_quality ?? -1}
             />
           </div>
           <div className="col-right">
-            <Board epics={project.epics} stories={project.stories} projectId={project.id} />
+            <Board
+              epics={project.epics ?? []}
+              stories={project.stories ?? []}
+              projectId={project.id}
+            />
             <RunPanel
               project={project}
               logs={projectLogs}

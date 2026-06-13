@@ -86,6 +86,9 @@ class ClaudeCliRunner:
             proc = await asyncio.to_thread(_run)
         except subprocess.TimeoutExpired:
             raise AgentError(f"Agent timed out after {settings.agent_timeout_s}s")
+        except OSError as exc:
+            # e.g. claude CLI not installed / not on PATH
+            raise AgentError(f"Could not run claude CLI ({settings.claude_cmd}): {exc}")
 
         out = (proc.stdout or "").strip()
         if proc.returncode != 0:
@@ -94,18 +97,24 @@ class ClaudeCliRunner:
 
         try:
             payload = json.loads(out)
-            usage = payload.get("usage") or {}
-            return AgentResult(
-                text=payload.get("result", ""),
-                session_id=payload.get("session_id"),
-                cost_usd=float(payload.get("total_cost_usd", 0) or 0),
-                input_tokens=int(usage.get("input_tokens", 0) or 0),
-                output_tokens=int(usage.get("output_tokens", 0) or 0),
-                duration_ms=int(payload.get("duration_ms", 0) or 0),
-            )
         except json.JSONDecodeError:
             # --output-format json should always give JSON, but degrade gracefully
             return AgentResult(text=out)
+        if not isinstance(payload, dict):
+            return AgentResult(text=out)
+        if payload.get("is_error"):
+            # Some failures (e.g. error_during_execution) exit 0 but flag the payload.
+            detail = payload.get("result") or payload.get("subtype") or out[:500]
+            raise AgentError(f"claude CLI reported an error: {detail}")
+        usage = payload.get("usage") or {}
+        return AgentResult(
+            text=str(payload.get("result") or ""),
+            session_id=payload.get("session_id"),
+            cost_usd=float(payload.get("total_cost_usd", 0) or 0),
+            input_tokens=int(usage.get("input_tokens", 0) or 0),
+            output_tokens=int(usage.get("output_tokens", 0) or 0),
+            duration_ms=int(payload.get("duration_ms", 0) or 0),
+        )
 
 
 class FakeRunner:
@@ -133,14 +142,11 @@ class FakeRunner:
         return AgentResult(text=self.replies.pop(0), session_id="fake-session")
 
 
-def extract_json(text: str) -> dict:
-    """Extract the first JSON object from an agent reply, tolerating fences/prose."""
-    fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
-    if fenced:
-        text = fenced.group(1)
-    start = text.find("{")
-    if start == -1:
-        raise AgentError(f"No JSON object in agent reply: {text[:200]!r}")
+_FENCED_RE = re.compile(r"```(?:json)?\s*(\{.*?\})\s*```", re.DOTALL)
+
+
+def _balanced_end(text: str, start: int) -> int:
+    """Index of the '}' closing the object opened at `start`, or -1 (string-aware)."""
     depth = 0
     in_string = False
     escaped = False
@@ -161,5 +167,44 @@ def extract_json(text: str) -> dict:
         elif ch == "}":
             depth -= 1
             if depth == 0:
-                return json.loads(text[start : i + 1])
-    raise AgentError(f"Unbalanced JSON in agent reply: {text[:200]!r}")
+                return i
+    return -1
+
+
+def _first_object(text: str) -> dict | None:
+    """Return the first parseable top-level JSON object found in `text`, or None.
+
+    Brace-balanced candidates that fail to parse (e.g. braces inside a code
+    sample) are skipped instead of aborting the whole extraction.
+    """
+    pos = text.find("{")
+    while pos != -1:
+        end = _balanced_end(text, pos)
+        if end != -1:
+            try:
+                obj = json.loads(text[pos : end + 1])
+            except json.JSONDecodeError:
+                obj = None
+            if isinstance(obj, dict):
+                return obj
+        pos = text.find("{", pos + 1)
+    return None
+
+
+def extract_json(text: str) -> dict:
+    """Extract the first JSON object from an agent reply, tolerating fences/prose.
+
+    Fenced ```json blocks are tried first; if none yields a valid object the
+    whole reply is scanned, so JSON preceded by brace-laden prose still parses.
+    Raises AgentError (never JSONDecodeError) when no object can be extracted.
+    """
+    for match in _FENCED_RE.finditer(text):
+        obj = _first_object(match.group(1))
+        if obj is not None:
+            return obj
+    obj = _first_object(text)
+    if obj is not None:
+        return obj
+    if "{" not in text:
+        raise AgentError(f"No JSON object in agent reply: {text[:200]!r}")
+    raise AgentError(f"No parseable JSON object in agent reply: {text[:200]!r}")

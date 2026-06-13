@@ -6,6 +6,28 @@ import json
 
 from ..models import FeatureHypothesis, HypothesisStatus, ProjectState, UserStory
 
+# --------------------------------------------------------------- shared helpers
+
+def _convo(state: ProjectState) -> str:
+    """Render the recent chat history for a PM/analyst prompt."""
+    return "\n".join(f"[{m.role.value}] {m.content}" for m in state.chat[-30:]) or "(aucune)"
+
+
+def _feedback(state: ProjectState) -> str:
+    """Render the recent user feedback as a bullet list."""
+    return "\n".join(f"- {f}" for f in state.feedback[-10:]) or "(aucun)"
+
+
+def _criteria_block(story: UserStory) -> str:
+    """Render acceptance criteria as '- [AC-n] text' lines (ids referenced by QA)."""
+    return "\n".join(f"- [{c.id}] {c.text}" for c in story.acceptance_criteria)
+
+
+def _snake(story_id: str) -> str:
+    """Story id as a python-friendly file fragment ('US-1' -> 'us_1')."""
+    return story_id.lower().replace("-", "_")
+
+
 # ----------------------------------------------- Refinement harness (critic/judge)
 
 def critic_review(kind: str, artifact: str, criteria: str) -> str:
@@ -121,7 +143,6 @@ SPEC_DIMENSIONS = (
 
 
 def pm_interview(state: ProjectState) -> str:
-    convo = "\n".join(f"[{m.role.value}] {m.content}" for m in state.chat[-30:])
     auto = ""
     if state.auto_spec:
         auto = (
@@ -134,7 +155,7 @@ def pm_interview(state: ProjectState) -> str:
 \"\"\"{state.goal}\"\"\"
 
 Conversation jusqu'ici :
-{convo or "(aucune)"}
+{_convo(state)}
 
 Ta mission : faire ÉMERGER une spécification claire en QUESTIONNANT, sans
 présumer à la place de l'utilisateur. Procède dimension par dimension (pose 2-3
@@ -148,7 +169,6 @@ Dès que les dimensions essentielles sont suffisamment claires, produis le brief
 
 
 def pm_brainstorm(state: ProjectState) -> str:
-    convo = "\n".join(f"[{m.role.value}] {m.content}" for m in state.chat[-30:])
     auto = ""
     if state.auto_spec:
         auto = (
@@ -160,7 +180,7 @@ re-questionne LE BESOIN lui-même (pas seulement les détails). Idée initiale :
 \"\"\"{state.goal}\"\"\"
 
 Conversation jusqu'ici :
-{convo or "(aucune)"}
+{_convo(state)}
 
 Méthode en deux temps :
 - DIVERGER : élargis l'espace des possibles — angles différents, analogies,
@@ -179,7 +199,6 @@ qu'une direction est choisie, produis le brief.{auto}
 def analyst_explore(state: ProjectState) -> str:
     delivered = [s.title for s in state.stories if s.status.value == "done"]
     failed = [s.title for s in state.stories if s.status.value == "failed"]
-    feedback = "\n".join(f"- {f}" for f in state.feedback[-10:]) or "(aucun)"
     carried = [
         {"id": h.id, "title": h.title, "rationale": h.rationale,
          "value": h.value, "complexity": h.complexity}
@@ -205,7 +224,7 @@ Hypothèses déjà livrées (NE PAS reproposer) : {json.dumps(shipped, ensure_as
 Backlog d'hypothèses existant (à réévaluer, garder, amender ou rejeter) :
 {json.dumps(carried, ensure_ascii=False)}
 Feedback utilisateur récent (priorité absolue s'il y en a) :
-{feedback}
+{_feedback(state)}
 
 Ta mission :
 1. EXPLORE : formule 3 à 6 hypothèses de prochaines features (nouvelles ou
@@ -230,7 +249,6 @@ la prochaine à développer = celle de "selected")."""
 
 
 def pm_brief_for_feature(state: ProjectState, hypothesis: FeatureHypothesis) -> str:
-    feedback = "\n".join(f"- {f}" for f in state.feedback[-10:]) or "(aucun)"
     return f"""Tu es le PM d'un pipeline automatisé en boucle d'amélioration continue.
 
 Produit existant — objectif initial :
@@ -245,7 +263,7 @@ L'analyste a priorisé le backlog et choisi la prochaine feature à développer 
 - Valeur estimée : {hypothesis.value}/5 — Complexité estimée : {hypothesis.complexity}/5
 
 Feedback utilisateur récent :
-{feedback}
+{_feedback(state)}
 
 Ta mission : rédige le brief produit de CETTE feature (et seulement celle-ci),
 petit et livrable, sans poser de question.
@@ -330,7 +348,6 @@ ce même JSON (ou des stories existantes listées plus haut)."""
 # ---------------------------------------------------------------- QA (test design)
 
 def qa_test_plan(story: UserStory, package_name: str, architecture: str = "") -> str:
-    criteria = "\n".join(f"- [{c.id}] {c.text}" for c in story.acceptance_criteria)
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     return f"""Tu es l'architecte de tests d'un pipeline automatisé BDD/TDD. Le code sera du
 Python dans le package `{package_name}` (projet uv, pytest + pytest-bdd).
@@ -339,7 +356,7 @@ Python dans le package `{package_name}` (projet uv, pytest + pytest-bdd).
 User story à couvrir : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance (chacun avec son id entre crochets) :
-{criteria}
+{_criteria_block(story)}
 
 Test d'acceptance fonctionnel (Gherkin, déjà écrit, NE PAS le modifier) :
 \"\"\"{story.gherkin}\"\"\"
@@ -367,7 +384,7 @@ Réponds avec EXACTEMENT UN objet JSON :
       "layer": "service",
       "description": "le service X appelle le repository Y avec ... et retourne ...",
       "mocks": ["repository Y"],
-      "file_hint": "tests/unit/test_{story.id.lower().replace("-", "_")}_service.py",
+      "file_hint": "tests/unit/test_{_snake(story.id)}_service.py",
       "criteria": ["AC-1"]
     }}
   ]
@@ -395,7 +412,6 @@ def dev_story(
     architecture: str = "",
     guidance: str = "",
 ) -> str:
-    criteria = "\n".join(f"- [{c.id}] {c.text}" for c in story.acceptance_criteria)
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     guidance_block = (
         f"\nConsignes de l'utilisateur (à respecter en priorité) :\n{guidance}\n" if guidance else ""
@@ -422,13 +438,13 @@ présent, pytest + pytest-bdd installés).
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
-{criteria}
+{_criteria_block(story)}
 
 Le test d'acceptance Gherkin est déjà écrit dans `{feature_rel_path}` :
 \"\"\"{story.gherkin}\"\"\"
 {plan_section}
 PROCESSUS OBLIGATOIRE (BDD puis TDD, outside-in) :
-1. Écris les step definitions pytest-bdd dans `tests/steps/test_{story.id.lower().replace("-", "_")}.py`
+1. Écris les step definitions pytest-bdd dans `tests/steps/test_{_snake(story.id)}.py`
    en liant chaque Given/When/Then du fichier feature (utilise
    `from pytest_bdd import scenarios, given, when, then, parsers` et
    `scenarios("../../{feature_rel_path}")`).{plan_step}

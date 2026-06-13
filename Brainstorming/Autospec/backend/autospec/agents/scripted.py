@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 from pathlib import Path
 
 from ..config import settings
@@ -69,7 +70,7 @@ def _qa_plan(story_id: str) -> str:
                     "layer": "service",
                     "description": "le service calcule correctement le résultat",
                     "mocks": [],
-                    "file_hint": f"tests/unit/test_{story_id.lower()}_service.py",
+                    "file_hint": f"tests/unit/test_{story_id.lower().replace('-', '_')}_service.py",
                     "criteria": ["AC-1"],
                 }
             ],
@@ -117,6 +118,9 @@ _CRITIC = json.dumps(
     ensure_ascii=False,
 )
 
+# "User story à couvrir : US-3 — titre" in the QA prompt (prompts.qa_test_plan).
+_QA_STORY_RE = re.compile(r"User story à couvrir : (\S+)")
+
 
 class ScriptedRunner:
     """Returns canned JSON per agent, recognised from the task prompt."""
@@ -135,20 +139,22 @@ class ScriptedRunner:
 
     @staticmethod
     def _reply_for(prompt: str) -> str:
-        if "PROCESSUS OBLIGATOIRE" in prompt:
-            return _DEV_GREEN
-        if "architecte de tests" in prompt:
-            story_id = "US-1" if "US-1" in prompt else "US-2"
-            return _qa_plan(story_id)
-        if "design technique CONCIS" in prompt:
-            return _ARCHITECT
-        if "PO/Scrum Master" in prompt:
-            return _PO_PLAN
-        if "l'analyste" in prompt or "analyste/explorateur" in prompt:
-            return _ANALYST
+        # Judge/critic first: their prompts embed an arbitrary artifact (a plan,
+        # a critique, an agent reply) that could quote other agents' markers.
         if "juge qualité d'une boucle de raffinement" in prompt:
             return _JUDGE
         if "à critiquer dans une boucle de raffinement" in prompt:
             return _CRITIC
-        # default: PM (interview or brief-for-feature) -> produce a brief
+        if "PROCESSUS OBLIGATOIRE" in prompt:  # dev_story / dev_revise
+            return _DEV_GREEN
+        if "architecte de tests" in prompt:  # qa_test_plan
+            match = _QA_STORY_RE.search(prompt)
+            return _qa_plan(match.group(1) if match else "US-1")
+        if "design technique CONCIS" in prompt:  # architect_design
+            return _ARCHITECT
+        if "PO/Scrum Master" in prompt:  # po_plan / po_revise
+            return _PO_PLAN
+        if "analyste/explorateur" in prompt:  # analyst_explore
+            return _ANALYST
+        # default: PM (interview, brainstorm or brief-for-feature) -> a brief
         return _PM_BRIEF

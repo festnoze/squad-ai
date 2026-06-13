@@ -45,15 +45,24 @@ def sanitize_dependencies(stories: list[UserStory]) -> None:
     ids = {s.id for s in stories}
     for story in stories:
         story.depends_on = [d for d in story.depends_on if d in ids and d != story.id]
-    # Break cycles defensively: if validation still finds one, clear deps of
-    # offending stories so the pipeline can never deadlock.
-    while any("cycle" in p for p in validate_dependencies(stories)):
-        for story in stories:
-            if any("cycle" in p for p in validate_dependencies(stories)):
-                if story.depends_on:
-                    story.depends_on = []
-            else:
-                break
+    # Break cycles defensively so the pipeline can never deadlock: clear the
+    # deps of the stories reported inside a cycle (leaving the dependencies of
+    # unrelated stories intact), until validation passes.
+    while True:
+        cycle_ids = {
+            p.rsplit(" ", 1)[-1] for p in validate_dependencies(stories) if "cycle" in p
+        }
+        if not cycle_ids:
+            return
+        offenders = [s for s in stories if s.id in cycle_ids and s.depends_on]
+        if not offenders:
+            # Cannot map the report back to a story (should not happen):
+            # fall back to clearing everything rather than looping forever.
+            for story in stories:
+                story.depends_on = []
+            return
+        for story in offenders:
+            story.depends_on = []
 
 
 def ready_stories(stories: list[UserStory]) -> list[UserStory]:

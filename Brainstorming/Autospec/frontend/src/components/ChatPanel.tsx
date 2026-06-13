@@ -31,8 +31,9 @@ export function ChatPanel({ chat, phase, onSend, specMode, onSetSpecMode }: Prop
   }, [chat.length]);
 
   const send = () => {
-    if (!draft.trim()) return;
-    onSend(draft);
+    const message = draft.trim();
+    if (!message) return;
+    onSend(message);
     setDraft("");
   };
 

@@ -9,6 +9,7 @@ let capturedOnEvent: ((e: WsEvent) => void) | null = null;
 const cleanup = vi.fn();
 
 vi.mock("./api", () => ({
+  errorMessage: (e: unknown) => (e instanceof Error ? e.message : String(e)),
   listProjects: vi.fn().mockResolvedValue([]),
   connectEvents: vi.fn((onEvent: (e: WsEvent) => void) => {
     capturedOnEvent = onEvent;
