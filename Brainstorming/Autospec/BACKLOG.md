@@ -70,6 +70,45 @@ modèle courant.
 - **Raffinement (par design)** : juge illisible = PASS borné par le cap de tours ; score défaut = seuil — choix déterministes assumés.
 - **Frontend (limitation)** : priorité kanban 1-5 → au-delà de 5 stories le drag-&-drop ne distingue pas l'ordre (changer la sémantique de `priority` rippler ait sur PO/UI).
 
+## 💡 Idées d'évolution (proposées, non planifiées)
+
+Issues d'une revue du produit actuel (architecture mature : pipeline complète,
+multi-provider, budget, M2 watchdog, E6/E7, export). Conçues pour réutiliser les
+patterns en place (persona + phase env-gated + `Finding` + `_UsageTracker` +
+endpoint). Priorité par valeur V / complexité C (1-5). **Top 3 : S1, Q1, O1.**
+
+### 🔒 Durcissement & confiance
+| # | Idée | V/C |
+|---|------|-----|
+| S1 | **Phase de revue sécurité & supply-chain** — agent `security-reviewer` après le build (comme E6) : scan du code généré + `pip-audit`/`npm audit` des dépendances → réémission en `Finding` routés vers `feedback_impact`. Réutilise le pattern E6, comble l'angle mort « code untrusted jamais audité ». | 5/3 |
+| Q1 | **Mutation testing** — `mutmut`/`cosmic-ray` après le passage au vert pour vérifier que les tests *contraignent* vraiment le comportement (un agent peut écrire des assertions vacues). Expose un « score de robustesse des tests » par story, à côté du `quality_score`. Durcit la promesse cœur TDD/BDD. | 5/4 |
+| Q2 | **Gate de couverture** — `pytest-cov`, seuil bloquant pour passer `done`, badge couverture par story (calque le pattern UI-tests E5). | 3/2 |
+| R1 | **Vrai sandbox Docker** — le gros différé : exécuter `pytest`/`main.py` en conteneur (env minimal déjà en place) → débloque `setup_install` réel, évaluateur fiable et déploiement. | 4/5 |
+| R2 | **Snapshots d'itération + rollback** — commit par itération (git workspace existe), « revenir à l'itération N » ; flag anti-régression quand une nouvelle story fait passer au rouge un test précédemment vert. | 4/3 |
+
+### 💸 Coût & modèles
+| # | Idée | V/C |
+|---|------|-----|
+| M3 | **Routage modèle par phase** — modèle bon marché pour interview/brainstorm, modèle fort pour Dev/raffinement. `make_runner()` abstrait déjà les providers ; manque une map phase→modèle. Économie directe. | 4/3 |
+| M4 | **Provider Anthropic API direct** (en plus du CLI harness) — usage hors poste dev (cron, cloud) sans dépendre du CLI. | 3/3 |
+| O2 | **Prévision de coût avant lancement** — estimer le coût d'une itération depuis l'historique (E7 collecte déjà tentatives/coût/story) avant de démarrer le build. | 3/3 |
+
+### 🚀 Entrée & sortie (élargir le marché)
+| # | Idée | V/C |
+|---|------|-----|
+| B1 | **Mode brownfield** — pointer Autospec sur un repo existant pour *ajouter* des features au lieu du greenfield. Plus grosse extension de marché (setup/scaffold suppose le greenfield). | 5/5 |
+| D1 | **Déploiement du produit généré** — Dockerfile + CI générés pour le projet créé, puis `docker build`/run (prolonge l'export I2 et le sandbox R1). | 4/4 |
+| I3 | **Import de specs** — ingérer un ticket Jira (MCP Atlassian), un doc ou une image de maquette comme brief initial. | 3/4 |
+
+### 📊 Pilotage de l'usine
+| # | Idée | V/C |
+|---|------|-----|
+| O1 | **Tracing Langfuse de chaque appel agent** — `_UsageTracker.arun` est le seam : un span par appel (persona, phase, story, tokens, coût, score critic/judge). Observabilité réelle de l'usine sans toucher au flux métier. | 4/2 |
+| F1 | **Bibliothèque de leçons inter-projets** — promouvoir les leçons E7 en librairie globale injectée dans tout nouveau projet (l'usine apprend d'un projet à l'autre). | 4/3 |
+| U2 | **Dashboard factory multi-projets** — taux de succès, coût/story, tentatives moyennes, personas les plus coûteuses, agrégés sur tous les projets. | 4/3 |
+| U3 | **Notifications push** — budget atteint, build terminé, `needs input`, reprise programmée (M2). | 3/1 |
+| U4 | **Gates d'approbation granulaires** — valider plan / architecture *avant* le build (HITL ciblé), pas seulement la pause globale. | 3/2 |
+
 > Backlog des 16 features : épuisé. Extension produit (E1→E7 + I1/I2 + M1/M2 + U1) :
 > **épuisée**. Suite backend **193 tests**, **32 tests Vitest**, et un **scénario
 > e2e Playwright exhaustif** (`autospec.spec.ts`) qui exerce TOUTES les features
