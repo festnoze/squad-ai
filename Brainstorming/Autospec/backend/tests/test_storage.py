@@ -66,6 +66,45 @@ def test_delete_workspace_semantics():
     assert storage.delete_workspace(state.id) is False
 
 
+def test_save_state_retries_transient_lock(monkeypatch):
+    """A transient os.replace failure (Windows WinError 5: file briefly locked
+    by AV/indexer/reader) is retried, not propagated."""
+    state = _make_state()
+    real_replace = storage.os.replace
+    calls = {"n": 0}
+
+    def flaky(src, dst):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise PermissionError("WinError 5: access denied")
+        return real_replace(src, dst)
+
+    monkeypatch.setattr(storage.os, "replace", flaky)
+    monkeypatch.setattr(storage.time, "sleep", lambda *_: None)  # no real backoff
+
+    storage.save_state(state)  # must not raise
+    assert calls["n"] == 2  # failed once, retried, succeeded
+    loaded = storage.load_state(state.id)
+    assert loaded is not None and loaded.id == state.id
+    assert list(settings.workspace_root.rglob("*.tmp")) == []  # temp cleaned up
+
+
+def test_save_state_swallows_persistent_lock(monkeypatch):
+    """If the destination stays locked past every retry, persistence is dropped
+    (logged) rather than crashing the whole pipeline."""
+    state = _make_state()
+
+    def always_locked(src, dst):
+        raise PermissionError("WinError 5: access denied")
+
+    monkeypatch.setattr(storage.os, "replace", always_locked)
+    monkeypatch.setattr(storage.time, "sleep", lambda *_: None)
+
+    storage.save_state(state)  # must not raise
+    # No half-written temp file may survive a failed atomic write.
+    assert list(settings.workspace_root.rglob("*.tmp")) == []
+
+
 def test_workspace_dir_rejects_traversal_ids():
     for bad in ("", ".", "..", "a/b", "a\\b", "C:evil"):
         with pytest.raises(ValueError):
