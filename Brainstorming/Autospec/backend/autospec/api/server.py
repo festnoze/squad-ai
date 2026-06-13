@@ -557,6 +557,22 @@ async def adocument_project(project_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/projects/{project_id}/evaluate")
+async def aevaluate_project(project_id: str) -> dict:
+    """Exercise the generated product and feed findings into the impact pipeline (E6)."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.aevaluate(), f"Projet inconnu : {project_id}")
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/retro")
+async def aretro_project(project_id: str) -> dict:
+    """Run the factory retrospective: distil build signals into lessons (E7)."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.aretrospect(), f"Projet inconnu : {project_id}")
+    return {"ok": True}
+
+
 @app.get("/api/projects/{project_id}/export")
 async def aexport_zip(project_id: str) -> Response:
     """Download the generated workspace as a zip (VCS/venv/state noise excluded)."""

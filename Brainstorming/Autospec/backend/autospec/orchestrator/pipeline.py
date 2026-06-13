@@ -23,6 +23,7 @@ from ..models import (
     ComponentStatus,
     Epic,
     FeatureHypothesis,
+    Finding,
     HypothesisStatus,
     PipelinePhase,
     PlannedTest,
@@ -118,6 +119,8 @@ class Pipeline:
         self._impact_task: asyncio.Task | None = None
         self._setup_task: asyncio.Task | None = None
         self._doc_task: asyncio.Task | None = None
+        self._eval_task: asyncio.Task | None = None   # E6 on-demand evaluation
+        self._retro_task: asyncio.Task | None = None  # E7 on-demand retrospective
         self._resume_timer: asyncio.Task | None = None  # M2 scheduled auto-resume
         self._run_proc: subprocess.Popen | None = None
         # Strong ref to the app-output streaming task (asyncio keeps only weak
@@ -169,6 +172,8 @@ class Pipeline:
             self._impact_task,
             self._setup_task,
             self._doc_task,
+            self._eval_task,
+            self._retro_task,
             self._resume_timer,
         ):
             if task and not task.done():
@@ -667,6 +672,193 @@ class Pipeline:
             + (" README.md écrit dans le workspace." if readme else ""),
         )
 
+    # ------------------------------------------------ product evaluator (E6)
+
+    async def aevaluate(self) -> None:
+        """Run the closed-loop evaluator on demand (background): exercise the
+        generated product and feed its findings into the impact pipeline.
+
+        Raises ValueError (-> 409) while the pipeline is actively building or
+        when an evaluation is already running."""
+        if self.state.phase in (
+            PipelinePhase.SPEC,
+            PipelinePhase.ANALYZE,
+            PipelinePhase.PLAN,
+            PipelinePhase.ARCHITECT,
+            PipelinePhase.BUILD,
+        ):
+            raise ValueError("la pipeline est active : attends la fin avant d'évaluer le produit")
+        if self._eval_task and not self._eval_task.done():
+            raise ValueError("une évaluation est déjà en cours")
+        self._eval_task = asyncio.create_task(self._aevaluate_task())
+
+    async def _aevaluate_task(self) -> None:
+        try:
+            await self._aevaluate_phase(force=True)
+        except Exception as exc:  # background task: surface, never crash silently
+            self._chat(ChatRole.SYSTEM, f"Erreur de l'évaluateur : {exc}")
+
+    async def _aexercise_product(self) -> str:
+        """Actually launch the generated app (`main.py`) and capture its output.
+
+        The app is untrusted agent code: it runs with a minimal environment (no
+        server secrets) and a wall-clock cap. A long-running server simply hits
+        the timeout — we keep whatever it printed at startup. Demo mode short-
+        circuits (no real process)."""
+        if settings.fake_agents:
+            return "mode démo : exécution réelle du produit court-circuitée"
+        ws = workspace_dir(self.state.id)
+        env = _minimal_env()
+        timeout = settings.evaluator_run_timeout_s
+        cmd = [settings.uv_cmd, "run", "python", "main.py"]
+
+        def _run() -> str:
+            try:
+                proc = subprocess.run(
+                    cmd, cwd=str(ws),
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    env=env, text=True, encoding="utf-8", errors="replace",
+                    timeout=timeout,
+                )
+                return f"(processus terminé, code {proc.returncode})\n{proc.stdout}"
+            except subprocess.TimeoutExpired as exc:
+                out = exc.output or ""
+                if isinstance(out, bytes):
+                    out = out.decode("utf-8", errors="replace")
+                return (
+                    f"(toujours actif après {timeout:g}s — probablement un service de "
+                    f"longue durée)\n{out}"
+                )
+            except OSError as exc:
+                return f"(lancement impossible : {exc})"
+
+        return await asyncio.to_thread(_run)
+
+    async def _aevaluate_phase(self, force: bool = False) -> None:
+        """Exercise the delivered product and turn the run into structured
+        findings, then feed them into the feedback-impact pipeline (E2) as
+        evidence. Env-gated in the pipeline flow (force=True for the explicit
+        endpoint); non-fatal."""
+        if not force and not settings.evaluator_enabled:
+            return
+        ws = workspace.scaffold(self.state)
+        self._log("evaluator", "🔬 Évaluation du produit livré (exécution réelle)…")
+        run_output = await self._aexercise_product()
+        try:
+            result = await self._tracked.arun(
+                prompts.evaluator_probe(
+                    self.state, workspace.package_name(self.state), run_output
+                ),
+                system_prompt=persona("evaluator"),
+                cwd=ws,
+            )
+            reply = extract_json(result.text)
+        except AgentError as exc:
+            self._chat(ChatRole.SYSTEM, f"Évaluateur indisponible : {exc}")
+            return
+        message = reply.get("message", "")
+        items = reply.get("findings") or []
+        if not items:
+            self._chat(ChatRole.QA, "🔬 " + (message or "Aucun problème détecté à l'exécution."))
+            return
+        taken = {f.id for f in self.state.findings}
+        new_findings: list[Finding] = []
+        for i, data in enumerate(items, start=1):
+            fid = _unique_id(str(data.get("id") or f"FND-{len(taken) + i}"), "FND", taken)
+            taken.add(fid)
+            new_findings.append(
+                Finding(
+                    id=fid,
+                    severity=str(data.get("severity") or "medium"),
+                    kind=str(data.get("kind") or "bug"),
+                    title=str(data.get("title") or "Finding"),
+                    detail=str(data.get("detail") or ""),
+                    iteration=self.state.iteration,
+                )
+            )
+        self.state.findings.extend(new_findings)
+        lines = [f"[{f.severity}/{f.kind}] {f.title} — {f.detail}" for f in new_findings]
+        # Findings are evidence for the next analysis: surface them in the
+        # feedback list (UI) on top of the evaluator's chat message.
+        self.state.feedback.extend(lines)
+        self._chat(
+            ChatRole.QA,
+            f"🔬 {message}\n" + "\n".join(f"• {line}" for line in lines),
+        )
+        self._sync()
+        # Closed loop: route the findings through the impact pipeline so the
+        # analyst amends an unimplemented story, plans new ones, or dismisses —
+        # prioritizing observed evidence over hypotheses.
+        combined = "Findings de l'évaluation du produit livré :\n" + "\n".join(
+            f"- {line}" for line in lines
+        )
+        await self._aimpact_analysis(combined)
+
+    # --------------------------------------------- factory retrospective (E7)
+
+    async def aretrospect(self) -> None:
+        """Run the factory retrospective on demand (background).
+
+        Raises ValueError (-> 409) while the pipeline is actively building or
+        when a retrospective is already running."""
+        if self.state.phase in (
+            PipelinePhase.SPEC,
+            PipelinePhase.ANALYZE,
+            PipelinePhase.PLAN,
+            PipelinePhase.ARCHITECT,
+            PipelinePhase.BUILD,
+        ):
+            raise ValueError("la pipeline est active : attends la fin avant la rétrospective")
+        if self._retro_task and not self._retro_task.done():
+            raise ValueError("une rétrospective est déjà en cours")
+        self._retro_task = asyncio.create_task(self._aretro_task())
+
+    async def _aretro_task(self) -> None:
+        try:
+            await self._aretro_phase(force=True)
+        except Exception as exc:  # background task: surface, never crash silently
+            self._chat(ChatRole.SYSTEM, f"Erreur de la rétrospective : {exc}")
+
+    async def _aretro_phase(self, force: bool = False) -> None:
+        """Mine the just-finished iteration's build signals into durable lessons
+        (persisted on the state, injected into the next QA/Dev prompts) and
+        tuning recommendations (surfaced in the UI). Env-gated in the pipeline
+        flow (force=True for the explicit endpoint); non-fatal."""
+        if not force and not settings.retro_enabled:
+            return
+        try:
+            result = await self._tracked.arun(
+                prompts.retro_review(self.state),
+                system_prompt=persona("retro"),
+            )
+            reply = extract_json(result.text)
+        except AgentError as exc:
+            self._log("retro", f"Rétrospective indisponible ({exc}) — pas de leçon.")
+            return
+        lessons = [str(x).strip() for x in (reply.get("lessons") or []) if str(x).strip()]
+        recommendations = [
+            str(x).strip() for x in (reply.get("recommendations") or []) if str(x).strip()
+        ]
+        # The agent returns the COMPLETE lesson list to keep (it replaces the
+        # previous one), deduplicated and capped to bound prompt growth.
+        deduped: list[str] = []
+        for lesson in lessons:
+            if lesson not in deduped:
+                deduped.append(lesson)
+        self.state.lessons = deduped[: settings.retro_max_lessons]
+        self.state.retro_recommendations = recommendations
+        message = reply.get("message", "")
+        body = ""
+        if self.state.lessons:
+            body += "\n📚 Leçons :\n" + "\n".join(f"• {l}" for l in self.state.lessons)
+        if recommendations:
+            body += "\n🛠 Recommandations :\n" + "\n".join(f"• {r}" for r in recommendations)
+        self._chat(
+            ChatRole.ANALYST,
+            f"🔁 Rétrospective d'usine — {message or 'rien de notable.'}{body}",
+        )
+        self._sync()
+
     # ------------------------------------------------------------ lifecycle
 
     async def _alifecycle(self) -> None:
@@ -687,6 +879,12 @@ class Pipeline:
                 await self._aarchitect_phase()
                 await self._abuild_phase()
                 await self._adocument_phase()
+                # Closed-loop product evaluation (E6): exercise the delivered
+                # iteration and feed findings into the impact pipeline.
+                await self._aevaluate_phase()
+                # Factory retrospective (E7): distil this iteration's signals
+                # into durable lessons before the next one starts.
+                await self._aretro_phase()
                 if not self.state.auto_spec or self._stop_requested:
                     break
                 await self._anext_feature_phase()
@@ -877,6 +1075,7 @@ class Pipeline:
                     story, pkg, workspace.feature_rel_path(story), critique,
                     architecture=self.state.architecture,
                     guidance="\n".join(self.state.build_guidance),
+                    lessons="\n".join(self.state.lessons),
                 ),
                 system_prompt=persona("dev"),
                 cwd=ws,
@@ -1053,6 +1252,7 @@ class Pipeline:
                         story, pkg, workspace.feature_rel_path(story), self.state.architecture,
                         "\n".join(self.state.build_guidance),
                         ui_tests=self._ui_mode(story),
+                        lessons="\n".join(self.state.lessons),
                     ),
                     system_prompt=persona("dev"),
                     cwd=ws,
@@ -1240,7 +1440,10 @@ class Pipeline:
         self._log(f"qa:{story.id}", f"Architecte QA : décomposition outside-in des tests de {story.id}…")
         try:
             result = await self._tracked.arun(
-                prompts.qa_test_plan(story, pkg, self.state.architecture),
+                prompts.qa_test_plan(
+                    story, pkg, self.state.architecture,
+                    lessons="\n".join(self.state.lessons),
+                ),
                 system_prompt=persona("qa"),
             )
             reply = extract_json(result.text)

@@ -15,8 +15,8 @@ const PYTHON =
 export default defineConfig({
   testDir: "./e2e",
   globalSetup: "./e2e/global-setup.ts",
-  timeout: 60_000,
-  expect: { timeout: 12_000 },
+  timeout: 240_000,
+  expect: { timeout: 25_000 },
   fullyParallel: false,
   workers: 1,
   retries: 0,
@@ -31,8 +31,15 @@ export default defineConfig({
     cwd: "../backend",
     env: {
       AUTOSPEC_FAKE_AGENTS: "1",
-      AUTOSPEC_DEMO_DELAY_S: "1.0",
+      AUTOSPEC_DEMO_DELAY_S: "0.6",
       AUTOSPEC_WORKSPACE_ROOT: "./.e2e-workspace",
+      // Exercise every optional pipeline phase in the exhaustive e2e scenario.
+      AUTOSPEC_COMPONENTS: "1", // E3/E4 — component proposal + setup
+      AUTOSPEC_ARCHITECTURE: "1", // item 7 — architecture phase
+      AUTOSPEC_REFINE: "1", // item 0/10 — refinement scores (plan + code)
+      AUTOSPEC_REFINE_MAX_ROUNDS: "1",
+      AUTOSPEC_EVALUATOR: "1", // E6 — closed-loop product evaluator
+      AUTOSPEC_RETRO: "1", // E7 — factory retrospective
     },
     url: `http://127.0.0.1:${BACKEND_PORT}/`,
     reuseExistingServer: false,

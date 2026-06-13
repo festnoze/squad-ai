@@ -5,7 +5,7 @@ itération du loop de développement. Règle de délégation : tâches de comple
 faible/moyenne → subagents Opus ; orchestration/intégration/conception complexe →
 modèle courant.
 
-## 🚀 Extension produit (demandée) — en cours
+## 🚀 Extension produit (demandée) — ✅ livrée
 
 | # | Feature | V/C | État |
 |---|---------|-----|------|
@@ -19,6 +19,8 @@ modèle courant.
 | M1 | **Modèle / provider configurable** — `make_runner()` : **Claude** (harness CLI), **OpenAI** et **Ollama** via **LangChain** (`langchain-openai`/`langchain-ollama`), sessions rejouées en mémoire + protocole d'outils JSON borné (write/read fichiers, confiné au workspace) pour les agents Dev ; coût estimé par prix/1M tokens (OpenAI) ; sélection env `AUTOSPEC_AGENT_PROVIDER` + endpoint `GET/POST /api/provider` (bascule à chaud des pipelines) + sélecteur 🤖 dans le header | 4/3 | ✅ tests |
 | M2 | **Ordonnancement aligné sur la fenêtre d'usage Claude** — watchdog `session_monitor` (provider claude uniquement) : un appel agent qui échoue sur « usage limit reached » déclenche un **arrêt propre** + **reprise auto programmée** quand une session fraîche s'ouvre. Heure de reset : epoch de l'erreur CLI → bloc actif **ccusage** (`ccusage blocks --json`) → fallback `AUTOSPEC_RESUME_FALLBACK_MIN`. Timer persisté (`ProjectState.resume_at`), **ré-armé au restart** (recover_projects) ; l'attempt de la story interrompue est remboursé ; bannière ⏰ + annulation (`POST /cancel-resume`). **Conformité** : ordonnancement légitime du quota souscrit (on attend le reset, aucun contournement ni multiplexage). | 3/3 | ✅ tests |
 | U1 | **Accueil & multi-projets actifs** — (a) la création est une **popup modale** : ouverte d'office si aucun projet (non fermable), sinon accès direct à la sélection (modale fermable via ✕/backdrop, « ＋ Nouveau ») ; (b) chips `ProjectBar` : **dot pulsant** quand des agents travaillent, **▶** (reprendre pause / resume-build) et **⏹** (stopper) par projet, progression `done/total` ; (c) plusieurs pipelines pilotées/surveillées en parallèle depuis la barre | 4/3 | ✅ tests + e2e |
+| E6 | **Évaluateur de produit (boucle fermée)** — après chaque itération livrée (avant la phase `analyze`), un agent `evaluator` (persona QA/analyste) **exerce réellement le produit généré** : lancement via le mécanisme run-app existant, exploration des flux principaux par l'API et/ou Playwright (plomberie E5), et production de **findings structurés** (bugs passés sous pytest, intégrations cassées entre stories, frictions UX, manques). Les findings sont **injectés comme feedback dans la pipeline `feedback_impact` (E2)** — qui sait déjà amender une US, créer Epic/US ou écarter — pour que l'Analyste priorise des **preuves** et plus seulement des hypothèses. Env-gated `AUTOSPEC_EVALUATOR` ; findings visibles dans l'UI (panneau feedback / backlog analyste). Point d'attention : exécution de l'app non fiable (mitigation env minimal en place ; sandbox toujours différé). | 5/4 | ✅ tests |
+| E7 | **Rétrospective d'usine (méta-apprentissage)** — un agent `retro` tourne au `_checkpoint` entre itérations et **consomme les signaux déjà collectés** (usage/coût par story, tentatives Dev, rouge→vert, tours et scores de raffinement, messages d'échec) pour produire : (a) des **leçons par projet** persistées dans `ProjectState.lessons` (survivent au redémarrage, composent d'itération en itération) et **injectées dans les prompts QA/Dev** (comme `build_guidance`, mais générées et durables) ; (b) des **recommandations de réglage** (rounds de raffinement, parallélisme, dépendance chroniquement en échec) remontées dans l'UI. Option : leçons partageables inter-projets. Env-gated `AUTOSPEC_RETRO`. | 4/3 | ✅ tests |
 
 ## ✅ Livré
 
@@ -68,5 +70,8 @@ modèle courant.
 - **Raffinement (par design)** : juge illisible = PASS borné par le cap de tours ; score défaut = seuil — choix déterministes assumés.
 - **Frontend (limitation)** : priorité kanban 1-5 → au-delà de 5 stories le drag-&-drop ne distingue pas l'ordre (changer la sémantique de `priority` rippler ait sur PO/UI).
 
-> Backlog des 16 features : épuisé. Remédiation d'audit : 3 tranches actionnables
-> traitées (couverture back/front + durcissement) ; le reste est différé (design/infra).
+> Backlog des 16 features : épuisé. Extension produit (E1→E7 + I1/I2 + M1/M2 + U1) :
+> **épuisée** — E6 (évaluateur boucle fermée) et E7 (rétrospective d'usine) livrés
+> avec tests (suite backend à 191 tests). Remédiation d'audit : 3 tranches
+> actionnables traitées (couverture back/front + durcissement) ; le reste est
+> différé (design/infra). **Aucune feature en attente.**

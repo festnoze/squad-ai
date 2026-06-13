@@ -148,6 +148,34 @@ _TECH_WRITER = json.dumps(
     ensure_ascii=False,
 )
 
+_EVALUATOR = json.dumps(
+    {
+        "message": "Produit exercé (mode démo) — un souci d'intégration relevé.",
+        "findings": [
+            {
+                "id": "FND-1",
+                "severity": "medium",
+                "kind": "integration",
+                "title": "Addition et soustraction ne se composent pas",
+                "detail": "Le CLI n'enchaîne pas les deux opérations (mode démo).",
+            }
+        ],
+    },
+    ensure_ascii=False,
+)
+
+_RETRO = json.dumps(
+    {
+        "message": "Rétrospective (mode démo).",
+        "lessons": [
+            "Mocker explicitement les collaborateurs directs dans les tests de service.",
+            "Câbler chaque nouvelle opération dans main.py dès la story.",
+        ],
+        "recommendations": ["Conserver le parallélisme à 2 développeurs (mode démo)."],
+    },
+    ensure_ascii=False,
+)
+
 _JUDGE = json.dumps(
     {"score": 90, "verdict": "Qualité suffisante (mode démo).", "reasons": ["ok"]},
     ensure_ascii=False,
@@ -187,6 +215,10 @@ class ScriptedRunner:
             return _CRITIC
         if "PROCESSUS OBLIGATOIRE" in prompt:  # dev_story / dev_revise
             return _DEV_GREEN
+        if "l'évaluateur d'un pipeline" in prompt:  # evaluator_probe (E6)
+            return _EVALUATOR
+        if "agent de rétrospective" in prompt:  # retro_review (E7)
+            return _RETRO
         if "analyste d'impact" in prompt:  # feedback_impact
             return _IMPACT
         if "agent solutionneur" in prompt:  # components_proposal

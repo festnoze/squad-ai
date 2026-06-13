@@ -214,6 +214,29 @@ class Settings:
     ui_tests_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_UI_TESTS", False)
     )
+    # Closed-loop product evaluator (E6): after each delivered iteration (before
+    # the analyze phase) an agent actually exercises the generated product and
+    # turns the run into structured findings, fed into the feedback-impact
+    # pipeline. OFF by default; also triggerable via POST /evaluate.
+    evaluator_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_EVALUATOR", False)
+    )
+    # Wall-clock cap on the untrusted `main.py` run the evaluator observes. A
+    # long-running server simply hits this timeout (we keep its startup output).
+    evaluator_run_timeout_s: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_EVALUATOR_RUN_TIMEOUT_S", 20.0, minimum=1.0)
+    )
+    # Factory retrospective (E7): a meta-learning agent runs between iterations,
+    # mines the collected build signals (attempts, red→green, refine scores,
+    # cost) and produces durable lessons injected into the QA/Dev prompts plus
+    # tuning recommendations. OFF by default; also triggerable via POST /retro.
+    retro_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_RETRO", False)
+    )
+    # Cap on the durable lessons carried across iterations (bounds prompt growth).
+    retro_max_lessons: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_RETRO_MAX_LESSONS", 12, minimum=1)
+    )
     refine_enabled: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_REFINE", False))
     refine_po: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_REFINE_PO", True))
     refine_dev: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_REFINE_DEV", True))

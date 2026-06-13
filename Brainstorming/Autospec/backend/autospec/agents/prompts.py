@@ -106,8 +106,9 @@ def dev_revise(
     critique: str,
     architecture: str = "",
     guidance: str = "",
+    lessons: str = "",
 ) -> str:
-    return f"""{dev_story(story, package_name, feature_rel_path, architecture, guidance)}
+    return f"""{dev_story(story, package_name, feature_rel_path, architecture, guidance, lessons=lessons)}
 
 ⚠️ BOUCLE DE RAFFINEMENT — le code de cette story passe déjà au vert, mais un
 critique a relevé des points d'amélioration :
@@ -325,6 +326,48 @@ N'inclus que les clés utiles à l'action choisie. Pour "updates", n'inclus QUE
 les champs réellement modifiés."""
 
 
+# ------------------------------------------------------ Product evaluator (E6)
+
+def evaluator_probe(state: ProjectState, package_name: str, run_output: str) -> str:
+    delivered = [
+        {"id": s.id, "title": s.title}
+        for s in state.stories
+        if s.status.value == "done"
+    ]
+    return f"""Tu es l'évaluateur d'un pipeline automatisé. Le répertoire courant contient le
+code GÉNÉRÉ du produit « {state.name} » (package Python `{package_name}`, projet
+uv, lancé via `uv run python main.py`, tests via `uv run pytest`).
+
+Brief produit :
+\"\"\"{state.brief}\"\"\"
+
+Fonctionnalités censées être livrées (vertes sous pytest) :
+{json.dumps(delivered, ensure_ascii=False)}
+
+Sortie observée au lancement réel de l'application (`main.py`) :
+\"\"\"{run_output[-4000:]}\"\"\"
+
+Ta mission : EXERCER RÉELLEMENT le produit pour trouver ce que les tests
+unitaires n'attrapent pas. Lis les fichiers du répertoire courant (code, main.py,
+tests) et confronte-les au brief et à la sortie d'exécution ci-dessus. Cherche :
+- des BUGS passés sous pytest (comportement faux, sortie incohérente, crash au
+  lancement réel) ;
+- des INTÉGRATIONS cassées entre stories (deux features qui ne se composent pas) ;
+- des FRICTIONS UX (parcours confus, messages peu clairs) ;
+- des MANQUES par rapport au brief (capacité attendue absente).
+Ne signale QUE des problèmes concrets et étayés par ce que tu observes — pas de
+spéculation. Si le produit semble correct, renvoie une liste "findings" vide.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français résumant ton évaluation>",
+  "findings": [
+    {{"id": "FND-1", "severity": "high|medium|low", "kind": "bug|integration|ux|gap",
+      "title": "<résumé court>", "detail": "<description précise et reproductible>"}}
+  ]
+}}"""
+
+
 # ------------------------------------------------- Solution agent (components)
 
 def components_proposal(state: ProjectState) -> str:
@@ -459,11 +502,18 @@ ce même JSON (ou des stories existantes listées plus haut)."""
 
 # ---------------------------------------------------------------- QA (test design)
 
-def qa_test_plan(story: UserStory, package_name: str, architecture: str = "") -> str:
+def qa_test_plan(
+    story: UserStory, package_name: str, architecture: str = "", lessons: str = ""
+) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    lessons_block = (
+        f"\nLeçons des itérations précédentes (rétrospective d'usine — à appliquer) :\n{lessons}\n"
+        if lessons
+        else ""
+    )
     return f"""Tu es l'architecte de tests d'un pipeline automatisé BDD/TDD. Le code sera du
 Python dans le package `{package_name}` (projet uv, pytest + pytest-bdd).
-{arch_block}
+{arch_block}{lessons_block}
 
 User story à couvrir : {story.id} — {story.title}
 Description : {story.description}
@@ -541,10 +591,16 @@ def dev_story(
     architecture: str = "",
     guidance: str = "",
     ui_tests: bool = False,
+    lessons: str = "",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     guidance_block = (
         f"\nConsignes de l'utilisateur (à respecter en priorité) :\n{guidance}\n" if guidance else ""
+    )
+    lessons_block = (
+        f"\nLeçons des itérations précédentes (rétrospective d'usine — à appliquer) :\n{lessons}\n"
+        if lessons
+        else ""
     )
     ui_block = UI_TEST_BLOCK.replace("{snake}", _snake(story.id)) if ui_tests else ""
     plan = _format_test_plan(story)
@@ -565,7 +621,7 @@ L'architecte QA a décomposé ce test d'acceptance en tests unitaires outside-in
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant, qui est un projet Python géré par uv (pyproject.toml déjà
 présent, pytest + pytest-bdd installés).
-{arch_block}{guidance_block}
+{arch_block}{guidance_block}{lessons_block}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
@@ -607,3 +663,66 @@ Dans "test_results", pour CHAQUE test du plan QA (id exact), donne aussi les
 `chemin/fichier.py::nom_de_la_fonction_de_test`, tel que pytest les rapporte) —
 l'orchestrateur s'en sert pour relire l'état réel depuis l'exécution de pytest.
 Ne réponds "green" (au niveau global) que si `uv run pytest` passe intégralement."""
+
+
+# --------------------------------------------------- Factory retrospective (E7)
+
+def retro_review(state: ProjectState) -> str:
+    """Mine the iteration's build signals into durable lessons + tuning advice."""
+    from ..config import settings
+
+    stories = [
+        {
+            "id": s.id,
+            "title": s.title,
+            "status": s.status.value,
+            "attempts": s.attempts,
+            "quality_score": s.quality_score,
+            "last_error": (s.last_error or "")[-400:],
+        }
+        for s in state.stories_of_iteration(state.iteration)
+    ]
+    u = state.usage
+    signals = {
+        "iteration": state.iteration,
+        "plan_quality": state.plan_quality,
+        "stories": stories,
+        "usage": {
+            "cost_usd": round(u.cost_usd, 4),
+            "tokens": u.input_tokens + u.output_tokens,
+            "agent_calls": u.agent_calls,
+        },
+        "config": {
+            "refine_max_rounds": settings.refine_max_rounds,
+            "refine_quality_threshold": settings.refine_quality_threshold,
+            "max_parallel_devs": settings.max_parallel_devs,
+            "dev_max_attempts": settings.dev_max_attempts,
+        },
+    }
+    previous = "\n".join(f"- {l}" for l in state.lessons) or "(aucune)"
+    return f"""Tu es l'agent de rétrospective d'un pipeline automatisé d'usine logicielle.
+L'itération {state.iteration} vient de se terminer. Voici les SIGNAUX déjà
+collectés pendant le build (ne suppose rien au-delà) :
+{json.dumps(signals, ensure_ascii=False)}
+
+Leçons durables déjà capitalisées sur les itérations précédentes :
+{previous}
+
+Ta mission, à partir de CES SIGNAUX uniquement :
+1. LEÇONS : produis des leçons durables et ACTIONNABLES pour guider le QA et le
+   développeur des prochaines itérations (ex. « mocker explicitement le client X
+   évite les retries rouge→vert observés sur US-N »). Reprends/raffine les leçons
+   précédentes encore pertinentes, écarte celles devenues obsolètes. Reste
+   concis : des consignes, pas un récit.
+2. RECOMMANDATIONS DE RÉGLAGE : repère les signaux problématiques (raffinement
+   trop court/long vu les scores, parallélisme à ajuster, dépendance
+   chroniquement en échec) et propose des réglages concrets.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français>",
+  "lessons": ["<leçon durable actionnable>", "..."],
+  "recommendations": ["<recommandation de réglage>", "..."]
+}}
+Renvoie la liste COMPLÈTE des leçons à conserver (pas seulement les nouvelles) :
+elle remplace la précédente. Listes vides acceptables si rien de notable."""

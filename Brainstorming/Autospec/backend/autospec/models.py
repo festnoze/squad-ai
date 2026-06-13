@@ -188,6 +188,20 @@ class Epic(BaseModel):
     iteration: int = 1
 
 
+class Finding(BaseModel):
+    """A problem the closed-loop evaluator (E6) observed while actually
+    exercising the generated product: a bug that slipped past pytest, a broken
+    integration between stories, a UX friction or a missing capability. Findings
+    are fed into the feedback-impact pipeline as evidence."""
+
+    id: str
+    severity: str = "medium"   # low | medium | high
+    kind: str = "bug"          # bug | integration | ux | gap
+    title: str = ""
+    detail: str = ""
+    iteration: int = 1
+
+
 class Usage(BaseModel):
     """Accumulated token/cost observability for a project, summed across every
     agent call (parsed from the Claude CLI's per-call usage)."""
@@ -216,6 +230,9 @@ class ProjectState(BaseModel):
     stories: list[UserStory] = Field(default_factory=list)
     chat: list[ChatMessage] = Field(default_factory=list)
     feedback: list[str] = Field(default_factory=list)
+    findings: list[Finding] = Field(default_factory=list)  # E6 evaluator observations
+    lessons: list[str] = Field(default_factory=list)  # E7 durable retro lessons (injected into prompts)
+    retro_recommendations: list[str] = Field(default_factory=list)  # E7 tuning advice (UI only)
     build_guidance: list[str] = Field(default_factory=list)  # user directives given during the build
     iteration: int = 1
     usage: Usage = Field(default_factory=Usage)  # accumulated tokens/cost across agent calls

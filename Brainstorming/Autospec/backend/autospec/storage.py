@@ -7,6 +7,7 @@ import logging
 import os
 import shutil
 import tempfile
+import time
 from pathlib import Path
 
 from .config import settings
@@ -62,6 +63,16 @@ def workspace_dir(project_id: str) -> Path:
     return settings.workspace_root / project_id
 
 
+# Windows can briefly refuse os.replace over the destination with WinError 5
+# (Access Denied) when another handle holds it transiently — an antivirus scan
+# of the just-written temp file, a slow concurrent reader, the search indexer.
+# Persistence is best-effort: retry the swap a few times, then log and give up.
+# A missed checkpoint is recovered by the next _sync; crashing the whole
+# pipeline over a transient lock is not acceptable.
+_SAVE_RETRIES = 5
+_SAVE_BACKOFF_S = 0.05
+
+
 def save_state(state: ProjectState) -> None:
     ws = workspace_dir(state.id)
     ws.mkdir(parents=True, exist_ok=True)
@@ -70,18 +81,25 @@ def save_state(state: ProjectState) -> None:
     # then os.replace() into place. A crash mid-write leaves the temp file behind
     # but never a half-written state.json.
     payload = state.model_dump_json(indent=2)
-    fd, tmp_name = tempfile.mkstemp(dir=ws, prefix=STATE_FILENAME + ".", suffix=".tmp")
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            fh.write(payload)
-        os.replace(tmp_name, final)
-    except BaseException:
-        # Best-effort cleanup of the temp file on any failure.
+    last_exc: OSError | None = None
+    for attempt in range(_SAVE_RETRIES):
+        fd, tmp_name = tempfile.mkstemp(dir=ws, prefix=STATE_FILENAME + ".", suffix=".tmp")
         try:
-            os.unlink(tmp_name)
-        except OSError:
-            pass
-        raise
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(payload)
+            os.replace(tmp_name, final)
+            return
+        except OSError as exc:
+            last_exc = exc
+            try:
+                os.unlink(tmp_name)
+            except OSError:
+                pass
+            time.sleep(_SAVE_BACKOFF_S * (attempt + 1))
+    logger.warning(
+        "Could not persist state for project %s after %d retries: %s",
+        state.id, _SAVE_RETRIES, last_exc,
+    )
 
 
 def load_state(project_id: str) -> ProjectState | None:

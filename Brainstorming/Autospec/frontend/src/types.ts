@@ -58,6 +58,16 @@ export interface ProviderInfo {
   available: string[];
 }
 
+/** Observation de l'évaluateur de produit (E6). */
+export interface Finding {
+  id: string;
+  severity: string; // low | medium | high
+  kind: string; // bug | integration | ux | gap
+  title: string;
+  detail: string;
+  iteration: number;
+}
+
 export interface FeatureHypothesis {
   id: string;
   title: string;
@@ -121,6 +131,9 @@ export interface ProjectState {
   stories: UserStory[];
   chat: ChatMessage[];
   feedback: string[];
+  findings?: Finding[]; // E6 evaluator observations
+  lessons?: string[]; // E7 durable retro lessons
+  retro_recommendations?: string[]; // E7 tuning advice
   iteration: number;
   running: boolean;
   paused: boolean;
