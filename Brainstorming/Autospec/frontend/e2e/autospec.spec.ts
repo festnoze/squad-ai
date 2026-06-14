@@ -35,6 +35,19 @@ async function createProject(page: Page, name: string, goal: string, budget?: st
   await page.getByRole("button", { name: /Démarrer la spécification/ }).click();
 }
 
+/**
+ * Drill into an epic (item 17 — the board is a hierarchical drill-down that
+ * shows a single level at a time). Goes back to the root « Épics » level via the
+ * breadcrumb (disabled when already there) then opens the epic card by title.
+ */
+async function openEpic(page: Page, title: string) {
+  const crumb = page.getByRole("button", { name: "Épics" });
+  if (await crumb.isEnabled().catch(() => false)) await crumb.click();
+  const card = page.locator(".epic-card", { hasText: title });
+  await expect(card).toBeVisible({ timeout: 30_000 });
+  await card.click();
+}
+
 test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await page.goto("/");
   // Accepter tous les dialogues (confirmations de suppression, alerte commit).
@@ -75,8 +88,9 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await resumeBtn.click();
   await expect(resumeBtn).toBeHidden();
 
-  // === PM→PO→QA→Dev — le board se peuple ====================================
-  await expect(page.getByText("Cœur applicatif")).toBeVisible();
+  // === PM→PO→QA→Dev — le board se peuple (navigation hiérarchique, item 17) ==
+  // Le board ne montre qu'un niveau à la fois : épics → US d'un epic → détail.
+  await openEpic(page, "Cœur applicatif");
   await expect(page.getByTestId("story-US-1")).toBeVisible();
   await expect(page.getByTestId("story-US-2")).toBeVisible();
 
@@ -97,8 +111,10 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   // Badge qualité du code de la story (raffinement, score démo 90/100).
   await expect(page.getByTestId("story-US-1").getByText(/\/100/)).toBeVisible();
 
-  // === critères d'acceptance + états de test + Gherkin ======================
-  await page.getByTestId("story-US-1").getByText("Additionner deux nombres").click();
+  // === item 17 — détail de US-1 : critères + états de test + Gherkin =========
+  await page.getByTestId("story-US-1").click();
+  const detail = page.locator(".story-detail");
+  await expect(detail).toBeVisible();
   await expect(page.getByText("La somme de 2 et 3 vaut 5.")).toBeVisible();
   await page.getByTestId("criterion-head-AC-1").click();
   await expect(page.getByText("Feature: Addition")).toBeVisible();
@@ -106,26 +122,26 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
     page.getByTestId("criterion-AC-1").getByTestId("criterion-state").first(),
   ).toHaveText("vert");
 
+  // === item 1 — édition d'une story (titre), au niveau détail ================
+  await detail.getByRole("button", { name: /Éditer/ }).click();
+  const titleInput = detail.locator(".story-editor input").first();
+  await titleInput.fill("Additionner deux nombres (édité)");
+  await detail.getByRole("button", { name: "Enregistrer" }).click();
+  await expect(page.getByText("Additionner deux nombres (édité)")).toBeVisible();
+
+  // === item 12 — diff par story (commit « story US-1 done ») ================
+  await detail.getByRole("button", { name: /Diff/ }).click();
+  await expect(page.getByText(/📊 Diff — US-1/)).toBeVisible();
+  await page.locator(".diff-close").click();
+  await expect(page.getByText(/📊 Diff — US-1/)).toBeHidden();
+
   // === E6 — l'évaluateur a exercé le produit (findings dans le chat) ========
   await expect(page.getByText(/🔬/).first()).toBeVisible();
   // === E7 — la rétrospective a produit des leçons ===========================
   await expect(page.getByText(/Rétrospective d'usine/).first()).toBeVisible();
-  // === E6 → E2 — les findings ont alimenté la pipeline d'impact (nouvelle US)
-  await expect(page.getByText("Retours utilisateur")).toBeVisible();
-  await expect(page.getByText("Prendre en compte le feedback").first()).toBeVisible();
-
-  // === item 1 — édition d'une story (titre) =================================
-  await page.getByTestId("story-US-1").getByRole("button", { name: /Éditer/ }).click();
-  const titleInput = page.getByTestId("story-US-1").locator(".story-editor input").first();
-  await titleInput.fill("Additionner deux nombres (édité)");
-  await page.getByTestId("story-US-1").getByRole("button", { name: "Enregistrer" }).click();
-  await expect(page.getByText("Additionner deux nombres (édité)")).toBeVisible();
-
-  // === item 12 — diff par story (commit « story US-1 done ») ================
-  await page.getByTestId("story-US-1").getByRole("button", { name: /Diff/ }).click();
-  await expect(page.getByText(/📊 Diff — US-1/)).toBeVisible();
-  await page.locator(".diff-close").click();
-  await expect(page.getByText(/📊 Diff — US-1/)).toBeHidden();
+  // === E6 → E2 — les findings ont alimenté la pipeline d'impact (nouvel epic)
+  await openEpic(page, "Retours utilisateur");
+  await expect(page.getByText("Prendre en compte le feedback")).toHaveCount(1);
 
   // === item 5 — visualiseur de code du workspace ============================
   await page.getByRole("button", { name: /Code généré/ }).click();
@@ -139,6 +155,8 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await expect(page.getByText("créé").first()).toBeVisible({ timeout: 30_000 });
 
   // === E2 — feedback manuel quand la pipeline est dormante → nouvelle story =
+  // On revient sur l'epic « Retours utilisateur » : son nombre d'US passe de 1 à 2.
+  await openEpic(page, "Retours utilisateur");
   await expect(page.getByText("Prendre en compte le feedback")).toHaveCount(1);
   const chat = page.getByPlaceholder(/Donne ton feedback/);
   await chat.fill("Ajoute une fonction de multiplication.");
