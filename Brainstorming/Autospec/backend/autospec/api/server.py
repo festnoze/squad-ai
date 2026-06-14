@@ -17,7 +17,12 @@ from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from ..agents.providers import PROVIDERS, make_runner, provider_model
+from ..agents.providers import (
+    PROVIDERS,
+    make_runner,
+    provider_model,
+    provider_models,
+)
 from ..agents.runner import AgentRunner
 from ..agents.scripted import ScriptedRunner
 from ..config import PROJECT_DIR, settings

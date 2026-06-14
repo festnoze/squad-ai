@@ -1,12 +1,12 @@
 {
-  "id": "gamma-af6d752c",
-  "name": "Gamma",
-  "goal": "demo Gamma feature",
+  "id": "alpha-d8e21a4e",
+  "name": "Alpha",
+  "goal": "demo Alpha feature",
   "auto_spec": false,
   "spec_mode": "interview",
   "budget_usd": 0.0,
   "budget_tokens": 0,
-  "phase": "done",
+  "phase": "build",
   "brief": "# Brief (démo)\nUne petite application de démonstration générée par Autospec.",
   "brownfield_path": "",
   "architecture": "",
@@ -48,12 +48,12 @@
           "criteria": [
             "AC-1"
           ],
-          "status": "green"
+          "status": "nonexistent"
         }
       ],
       "depends_on": [],
       "priority": 1,
-      "status": "done",
+      "status": "green",
       "iteration": 1,
       "attempts": 1,
       "last_error": "",
@@ -75,26 +75,14 @@
         }
       ],
       "gherkin": "Feature: Soustraction\n  Scenario: Différence simple\n    Given le nombre 5\n    And le nombre 3\n    When je les soustrais\n    Then j'obtiens 2",
-      "test_plan": [
-        {
-          "id": "UT-1",
-          "layer": "service",
-          "description": "le service calcule correctement le résultat",
-          "mocks": [],
-          "file_hint": "tests/unit/test_us_2_service.py",
-          "criteria": [
-            "AC-1"
-          ],
-          "status": "green"
-        }
-      ],
+      "test_plan": [],
       "depends_on": [
         "US-1"
       ],
       "priority": 2,
-      "status": "done",
+      "status": "todo",
       "iteration": 1,
-      "attempts": 1,
+      "attempts": 0,
       "last_error": "",
       "quality_score": -1,
       "mutation_score": -1,
@@ -106,43 +94,28 @@
   "chat": [
     {
       "role": "user",
-      "content": "demo Gamma feature",
-      "ts": 1781459206.7871926
+      "content": "demo Alpha feature",
+      "ts": 1781459224.582701
     },
     {
       "role": "pm",
       "content": "Brief généré (mode démo).",
-      "ts": 1781459207.0013058
+      "ts": 1781459224.8108664
     },
     {
       "role": "po",
       "content": "Plan de l'itération 1 : 1 epic(s), 2 user story(ies).",
-      "ts": 1781459207.2065597
+      "ts": 1781459225.0135925
     },
     {
       "role": "qa",
       "content": "[US-1] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
-      "ts": 1781459207.42266
+      "ts": 1781459225.228366
     },
     {
       "role": "dev",
       "content": "[US-1] Implémentation et tests (mode démo) — suite verte.",
-      "ts": 1781459207.6243598
-    },
-    {
-      "role": "qa",
-      "content": "[US-2] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
-      "ts": 1781459207.9340143
-    },
-    {
-      "role": "dev",
-      "content": "[US-2] Implémentation et tests (mode démo) — suite verte.",
-      "ts": 1781459208.1373534
-    },
-    {
-      "role": "system",
-      "content": "Itération terminée.",
-      "ts": 1781459208.7759213
+      "ts": 1781459225.4438488
     }
   ],
   "feedback": [],
@@ -157,7 +130,7 @@
     "cost_usd": 0.0,
     "input_tokens": 0,
     "output_tokens": 0,
-    "agent_calls": 6
+    "agent_calls": 4
   },
   "running": false,
   "paused": false,
@@ -165,5 +138,5 @@
   "resume_at": 0.0,
   "archived": false,
   "error": "",
-  "created_at": 1781459206.7871842
+  "created_at": 1781459224.5826943
 }

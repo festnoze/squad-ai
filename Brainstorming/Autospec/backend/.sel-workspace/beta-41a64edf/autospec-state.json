@@ -161,4 +161,9 @@
   },
   "running": false,
   "paused": false,
-  "awaitin
+  "awaiting_approval": "",
+  "resume_at": 0.0,
+  "archived": false,
+  "error": "",
+  "created_at": 1781459206.7381766
+}

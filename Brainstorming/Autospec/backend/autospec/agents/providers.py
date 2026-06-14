@@ -260,6 +260,43 @@ class AnthropicRunner(_LangChainRunner):
 
 PROVIDERS = ("claude", "openai", "ollama", "anthropic")
 
+# Suggested models per provider, shown in the UI's second (adaptive) dropdown.
+# These are display/endpoint values passed straight to the backend, so a user
+# can still configure another one via the AUTOSPEC_*_MODEL env vars — the active
+# model is always injected into the list so the selection round-trips correctly.
+MODEL_CHOICES: dict[str, tuple[str, ...]] = {
+    # The Claude Code CLI accepts short aliases.
+    "claude": ("opus", "sonnet", "haiku"),
+    # Anthropic API needs the full model ids.
+    "anthropic": (
+        "claude-opus-4-8",
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5-20251001",
+    ),
+    "openai": (
+        "gpt-4.1",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+        "gpt-5.4-nano",
+        "gpt-5.3-codex",
+        "gpt-4o-mini",
+    ),
+    "ollama": ("llama3.1", "qwen3", "mistral", "deepseek-r1"),
+}
+
+
+def provider_models(provider: str) -> list[str]:
+    """Suggested model choices for a provider, with the active one included.
+
+    The currently configured model is always present (prepended if missing) so
+    the UI dropdown can reflect a non-default model set via env vars."""
+    choices = list(MODEL_CHOICES.get(provider, ()))
+    current = provider_model(provider)
+    # The CLI default placeholder is not a real selectable model id.
+    if current and current != "(défaut CLI)" and current not in choices:
+        choices.insert(0, current)
+    return choices
+
 
 def make_runner(provider: str) -> AgentRunner:
     """Build the agent backend for a provider name (AUTOSPEC_AGENT_PROVIDER)."""
