@@ -85,14 +85,14 @@
           "criteria": [
             "AC-1"
           ],
-          "status": "nonexistent"
+          "status": "green"
         }
       ],
       "depends_on": [
         "US-1"
       ],
       "priority": 2,
-      "status": "green",
+      "status": "done",
       "iteration": 1,
       "attempts": 1,
       "last_error": "",
