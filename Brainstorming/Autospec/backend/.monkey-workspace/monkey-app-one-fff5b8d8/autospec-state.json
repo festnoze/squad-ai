@@ -164,16 +164,16 @@
           "criteria": [
             "AC-1"
           ],
-          "status": "nonexistent"
+          "status": "green"
         }
       ],
       "depends_on": [],
       "priority": 1,
-      "status": "green",
+      "status": "done",
       "iteration": 1,
       "attempts": 1,
       "last_error": "",
-      "quality_score": -1,
+      "quality_score": 90,
       "mutation_score": -1,
       "coverage_score": -1,
       "ui": false,
@@ -191,12 +191,24 @@
         }
       ],
       "gherkin": "Feature: Feedback\n  Scenario: Prise en compte\n    Given un feedback utilisateur\n    When il est analysé\n    Then une story est créée",
-      "test_plan": [],
+      "test_plan": [
+        {
+          "id": "UT-1",
+          "layer": "service",
+          "description": "le service calcule correctement le résultat",
+          "mocks": [],
+          "file_hint": "tests/unit/test_us_4_service.py",
+          "criteria": [
+            "AC-1"
+          ],
+          "status": "nonexistent"
+        }
+      ],
       "depends_on": [],
       "priority": 1,
-      "status": "todo",
+      "status": "green",
       "iteration": 1,
-      "attempts": 0,
+      "attempts": 1,
       "last_error": "",
       "quality_score": -1,
       "mutation_score": -1,
@@ -335,6 +347,26 @@
       "role": "dev",
       "content": "[US-FB-1] Implémentation et tests (mode démo) — suite verte.",
       "ts": 1781455847.2516716
+    },
+    {
+      "role": "judge",
+      "content": "Score qualité 90/100 — Qualité suffisante (mode démo).",
+      "ts": 1781455847.995875
+    },
+    {
+      "role": "system",
+      "content": "[US-FB-1] Code raffiné en 0 tour(s) — qualité 90/100 (arrêt : threshold).",
+      "ts": 1781455847.9960217
+    },
+    {
+      "role": "qa",
+      "content": "[US-4] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
+      "ts": 1781455848.260043
+    },
+    {
+      "role": "dev",
+      "content": "[US-4] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781455848.5249445
     }
   ],
   "feedback": [
@@ -366,7 +398,7 @@
     "cost_usd": 0.0,
     "input_tokens": 0,
     "output_tokens": 0,
-    "agent_calls": 17
+    "agent_calls": 20
   },
   "running": false,
   "paused": false,
