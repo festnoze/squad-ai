@@ -543,6 +543,44 @@ button.action-btn.action-done {
   overflow-x: auto;
 }
 
+/* Sélecteur de projet : repère clair du projet actif, scalable quand il y a
+   beaucoup de projets (la barre de chips déborde sinon). */
+.project-select {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding-right: 10px;
+  margin-right: 2px;
+  border-right: 1px solid var(--border);
+}
+
+.project-select-icon {
+  font-size: 15px;
+}
+
+.project-select select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 280px;
+  cursor: pointer;
+}
+
+.project-select select:hover {
+  border-color: var(--accent);
+}
+
+.project-select select:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
 .project-chip {
   display: flex;
   align-items: center;

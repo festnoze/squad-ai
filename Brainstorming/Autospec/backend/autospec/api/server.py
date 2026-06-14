@@ -760,7 +760,15 @@ async def aws_events(ws: WebSocket) -> None:
         while True:
             event = await queue.get()
             await ws.send_json(event)
-    except (WebSocketDisconnect, RuntimeError):
+    except (WebSocketDisconnect, RuntimeError, ConnectionError, OSError):
+        # Client vanished (tab closed/reloaded, network drop, or a keepalive
+        # ping timeout closing the socket with code 1011). The frontend
+        # auto-reconnects and resyncs, so this is expected — just clean up.
+        pass
+    except Exception:  # noqa: BLE001 — also covers websockets.ConnectionClosed*
+        # The streaming loop only awaits the queue and sends JSON; any other
+        # failure here means the connection is gone or shutting down. Never let
+        # a dead subscriber surface as an unhandled-task traceback.
         pass
     finally:
         bus.unsubscribe(queue)

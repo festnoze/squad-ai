@@ -1,0 +1,142 @@
+{
+  "id": "beta-41a64edf",
+  "name": "Beta",
+  "goal": "demo Beta feature",
+  "auto_spec": false,
+  "spec_mode": "interview",
+  "budget_usd": 0.0,
+  "budget_tokens": 0,
+  "phase": "build",
+  "brief": "# Brief (démo)\nUne petite application de démonstration générée par Autospec.",
+  "brownfield_path": "",
+  "architecture": "",
+  "plan_quality": -1,
+  "backlog": [],
+  "components": [],
+  "epics": [
+    {
+      "id": "EPIC-1",
+      "title": "Cœur applicatif",
+      "description": "Les fonctionnalités de base.",
+      "iteration": 1
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-1",
+      "epic_id": "EPIC-1",
+      "title": "Additionner deux nombres",
+      "description": "En tant qu'utilisateur, je veux additionner deux nombres afin d'obtenir leur somme.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "text": "La somme de 2 et 3 vaut 5."
+        },
+        {
+          "id": "AC-2",
+          "text": "L'addition est commutative."
+        }
+      ],
+      "gherkin": "Feature: Addition\n  Scenario: Somme simple\n    Given le nombre 2\n    And le nombre 3\n    When je les additionne\n    Then j'obtiens 5",
+      "test_plan": [
+        {
+          "id": "UT-1",
+          "layer": "service",
+          "description": "le service calcule correctement le résultat",
+          "mocks": [],
+          "file_hint": "tests/unit/test_us_1_service.py",
+          "criteria": [
+            "AC-1"
+          ],
+          "status": "nonexistent"
+        }
+      ],
+      "depends_on": [],
+      "priority": 1,
+      "status": "green",
+      "iteration": 1,
+      "attempts": 1,
+      "last_error": "",
+      "quality_score": -1,
+      "mutation_score": -1,
+      "coverage_score": -1,
+      "ui": false,
+      "ui_tests": []
+    },
+    {
+      "id": "US-2",
+      "epic_id": "EPIC-1",
+      "title": "Soustraire deux nombres",
+      "description": "En tant qu'utilisateur, je veux soustraire deux nombres afin d'obtenir leur différence.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "text": "La différence de 5 et 3 vaut 2."
+        }
+      ],
+      "gherkin": "Feature: Soustraction\n  Scenario: Différence simple\n    Given le nombre 5\n    And le nombre 3\n    When je les soustrais\n    Then j'obtiens 2",
+      "test_plan": [],
+      "depends_on": [
+        "US-1"
+      ],
+      "priority": 2,
+      "status": "todo",
+      "iteration": 1,
+      "attempts": 0,
+      "last_error": "",
+      "quality_score": -1,
+      "mutation_score": -1,
+      "coverage_score": -1,
+      "ui": false,
+      "ui_tests": []
+    }
+  ],
+  "chat": [
+    {
+      "role": "user",
+      "content": "demo Beta feature",
+      "ts": 1781459206.7381847
+    },
+    {
+      "role": "pm",
+      "content": "Brief généré (mode démo).",
+      "ts": 1781459206.9551575
+    },
+    {
+      "role": "po",
+      "content": "Plan de l'itération 1 : 1 epic(s), 2 user story(ies).",
+      "ts": 1781459207.174043
+    },
+    {
+      "role": "qa",
+      "content": "[US-1] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
+      "ts": 1781459207.3909056
+    },
+    {
+      "role": "dev",
+      "content": "[US-1] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781459207.593877
+    }
+  ],
+  "feedback": [],
+  "findings": [],
+  "lessons": [],
+  "green_tests": [],
+  "regressions": [],
+  "retro_recommendations": [],
+  "build_guidance": [],
+  "iteration": 1,
+  "usage": {
+    "cost_usd": 0.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "agent_calls": 4
+  },
+  "running": false,
+  "paused": false,
+  "awaiting_approval": "",
+  "resume_at": 0.0,
+  "archived": false,
+  "error": "",
+  "created_at": 1781459206.7381766
+}

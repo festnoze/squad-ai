@@ -60,14 +60,15 @@ function makeProject(overrides: Partial<ProjectState> = {}): ProjectState {
 function renderBar(projects: ProjectState[], handlers: Partial<Record<string, any>> = {}) {
   const onPlay = handlers.onPlay ?? vi.fn();
   const onStop = handlers.onStop ?? vi.fn();
+  const onSelect = handlers.onSelect ?? vi.fn();
   render(
     <ProjectBar
       projects={projects}
-      selectedId={null}
-      onSelect={vi.fn()}
+      selectedId={handlers.selectedId ?? null}
+      onSelect={onSelect}
       onNew={vi.fn()}
       onDelete={vi.fn()}
-      showArchived={false}
+      showArchived={handlers.showArchived ?? false}
       onToggleArchived={vi.fn()}
       onArchive={vi.fn()}
       onUnarchive={vi.fn()}
@@ -75,7 +76,7 @@ function renderBar(projects: ProjectState[], handlers: Partial<Record<string, an
       onStop={onStop}
     />,
   );
-  return { onPlay, onStop };
+  return { onPlay, onStop, onSelect };
 }
 
 describe("ProjectBar — surveillance multi-projets (U1)", () => {
@@ -119,5 +120,48 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
     ]);
     expect(document.body.querySelectorAll(".dot.pulse")).toHaveLength(2);
     expect(screen.getAllByTitle("Stopper la pipeline de ce projet")).toHaveLength(2);
+  });
+});
+
+describe("ProjectBar — sélecteur de projet", () => {
+  it("liste tous les projets et reflète le projet courant", () => {
+    renderBar(
+      [
+        makeProject({ id: "p1", name: "Alpha", phase: "build", stories: [makeStory("todo")] }),
+        makeProject({ id: "p2", name: "Beta", phase: "done" }),
+      ],
+      { selectedId: "p2" },
+    );
+    const select = screen.getByLabelText("Sélectionner le projet actif") as HTMLSelectElement;
+    expect(select.value).toBe("p2");
+    expect(screen.getByRole("option", { name: /Alpha/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Beta/ })).toBeInTheDocument();
+  });
+
+  it("changer la sélection appelle onSelect avec l'id choisi", () => {
+    const { onSelect } = renderBar(
+      [
+        makeProject({ id: "p1", name: "Alpha" }),
+        makeProject({ id: "p2", name: "Beta" }),
+      ],
+      { selectedId: "p1" },
+    );
+    fireEvent.change(screen.getByLabelText("Sélectionner le projet actif"), {
+      target: { value: "p2" },
+    });
+    expect(onSelect).toHaveBeenCalledWith("p2");
+  });
+
+  it("inclut le projet courant même s'il est archivé et les archivés masqués", () => {
+    renderBar(
+      [
+        makeProject({ id: "p1", name: "Alpha" }),
+        makeProject({ id: "p2", name: "ArchivedOne", archived: true }),
+      ],
+      { selectedId: "p2", showArchived: false },
+    );
+    const select = screen.getByLabelText("Sélectionner le projet actif") as HTMLSelectElement;
+    expect(select.value).toBe("p2");
+    expect(screen.getByRole("option", { name: /ArchivedOne/ })).toBeInTheDocument();
   });
 });

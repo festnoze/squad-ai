@@ -15,6 +15,19 @@ const PHASE_DOT: Record<string, string> = {
 /** Phases où des agents travaillent : la chip pulse et propose ⏹. */
 const ACTIVE_PHASES = ["spec", "analyze", "plan", "architect", "build"];
 
+/** Pastille de statut (texte) pour les <option> du sélecteur de projet. */
+const PHASE_BADGE: Record<string, string> = {
+  idle: "⚪",
+  spec: "🟠",
+  analyze: "🟣",
+  plan: "🟣",
+  architect: "🟢",
+  build: "🔵",
+  done: "🟢",
+  stopped: "⚪",
+  error: "🔴",
+};
+
 interface Props {
   projects: ProjectState[];
   selectedId: string | null;
@@ -43,6 +56,17 @@ function progress(p: ProjectState): { done: number; total: number } | null {
   };
 }
 
+/** Libellé d'une option du sélecteur : « 🔵 Nom · 2/3 · build ». */
+function optionLabel(p: ProjectState): string {
+  const badge = p.paused ? "⏸" : PHASE_BADGE[p.phase] ?? "⚪";
+  const prog = progress(p);
+  const parts = [`${badge} ${p.name}`];
+  if (prog) parts.push(`${prog.done}/${prog.total}`);
+  parts.push(p.paused ? `${p.phase} (pause)` : p.phase);
+  if (p.archived) parts.push("archivé");
+  return parts.join(" · ");
+}
+
 export function ProjectBar({
   projects,
   selectedId,
@@ -59,8 +83,37 @@ export function ProjectBar({
   const archivedCount = projects.filter((p) => p.archived).length;
   const visible = showArchived ? projects : projects.filter((p) => !p.archived);
 
+  const selected = projects.find((p) => p.id === selectedId) ?? null;
+  // Le projet courant figure toujours dans le sélecteur, même s'il est archivé
+  // et que les archivés sont masqués.
+  const selectable =
+    selected && !visible.some((p) => p.id === selected.id)
+      ? [selected, ...visible]
+      : visible;
+
   return (
     <div className="project-bar">
+      {selectable.length > 0 && (
+        <label className="project-select" title="Sélectionner le projet actif">
+          <span className="project-select-icon" aria-hidden="true">
+            🗂
+          </span>
+          <select
+            aria-label="Sélectionner le projet actif"
+            value={selectedId ?? ""}
+            onChange={(e) => onSelect(e.target.value)}
+          >
+            <option value="" disabled hidden>
+              — Choisir un projet ({selectable.length}) —
+            </option>
+            {selectable.map((p) => (
+              <option key={p.id} value={p.id}>
+                {optionLabel(p)}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {visible.map((p) => {
         const active = ACTIVE_PHASES.includes(p.phase);
         const working = active && !p.paused;
