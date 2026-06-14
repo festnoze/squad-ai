@@ -36,13 +36,19 @@ async function createProject(page: Page, name: string, goal: string, budget?: st
 }
 
 /**
- * Drill into an epic (item 17 — the board is a hierarchical drill-down that
- * shows a single level at a time). Goes back to the root « Épics » level via the
- * breadcrumb (disabled when already there) then opens the epic card by title.
+ * Navigate to the board's root « Épics » level (item 17 — the board is a
+ * hierarchical drill-down showing a single level at a time). The breadcrumb
+ * « Épics » button is disabled when already at that level, so this is a no-op
+ * then.
  */
-async function openEpic(page: Page, title: string) {
+async function gotoEpics(page: Page) {
   const crumb = page.getByRole("button", { name: "Épics" });
   if (await crumb.isEnabled().catch(() => false)) await crumb.click();
+}
+
+/** Drill into an epic by title from anywhere in the board. */
+async function openEpic(page: Page, title: string) {
+  await gotoEpics(page);
   const card = page.locator(".epic-card", { hasText: title });
   await expect(card).toBeVisible({ timeout: 30_000 });
   await card.click();
@@ -140,7 +146,12 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   // === E7 — la rétrospective a produit des leçons ===========================
   await expect(page.getByText(/Rétrospective d'usine/).first()).toBeVisible();
   // === E6 → E2 — les findings ont alimenté la pipeline d'impact (nouvel epic)
-  await openEpic(page, "Retours utilisateur");
+  // Chaque analyse d'impact planifie un epic de feedback (« Retours utilisateur »)
+  // contenant une story buildable ; ici la première, issue de l'évaluateur E6.
+  const fbEpics = page.locator(".epic-card", { hasText: "Retours utilisateur" });
+  await gotoEpics(page);
+  await expect(fbEpics).toHaveCount(1, { timeout: 30_000 });
+  await fbEpics.first().click();
   await expect(page.getByText("Prendre en compte le feedback")).toHaveCount(1);
 
   // === item 5 — visualiseur de code du workspace ============================
@@ -154,16 +165,15 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await page.getByRole("button", { name: /Créer les composants approuvés/ }).click();
   await expect(page.getByText("créé").first()).toBeVisible({ timeout: 30_000 });
 
-  // === E2 — feedback manuel quand la pipeline est dormante → nouvelle story =
-  // On revient sur l'epic « Retours utilisateur » : son nombre d'US passe de 1 à 2.
-  await openEpic(page, "Retours utilisateur");
-  await expect(page.getByText("Prendre en compte le feedback")).toHaveCount(1);
+  // === E2 — feedback manuel quand la pipeline est dormante → nouvel epic =====
+  // Un feedback envoyé pipeline dormante déclenche une 2e analyse d'impact, qui
+  // planifie un second epic de feedback (le board passe à 2 « Retours utilisateur »).
+  await gotoEpics(page);
+  await expect(fbEpics).toHaveCount(1);
   const chat = page.getByPlaceholder(/Donne ton feedback/);
   await chat.fill("Ajoute une fonction de multiplication.");
   await chat.press("Enter");
-  await expect(page.getByText("Prendre en compte le feedback")).toHaveCount(2, {
-    timeout: 30_000,
-  });
+  await expect(fbEpics).toHaveCount(2, { timeout: 30_000 });
 
   // === item 11 — « Continuer le build » via la chip ▶ (construit les US todo)
   // Avant : 2/4 (US-1+US-2 faites, 2 stories de feedback à faire).
