@@ -76,16 +76,16 @@
           "criteria": [
             "AC-1"
           ],
-          "status": "nonexistent"
+          "status": "green"
         }
       ],
       "depends_on": [],
       "priority": 1,
-      "status": "in_progress",
+      "status": "done",
       "iteration": 1,
       "attempts": 1,
       "last_error": "",
-      "quality_score": -1,
+      "quality_score": 90,
       "mutation_score": -1,
       "coverage_score": -1,
       "ui": false,
@@ -108,9 +108,9 @@
         "US-1"
       ],
       "priority": 2,
-      "status": "todo",
+      "status": "in_progress",
       "iteration": 1,
-      "attempts": 0,
+      "attempts": 1,
       "last_error": "",
       "quality_score": -1,
       "mutation_score": -1,
@@ -157,4 +157,44 @@
     },
     {
       "role": "qa",
-      "content": "[US-1] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) 
+      "content": "[US-1] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
+      "ts": 1781455815.56175
+    },
+    {
+      "role": "dev",
+      "content": "[US-1] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781455815.8232946
+    },
+    {
+      "role": "judge",
+      "content": "Score qualité 90/100 — Qualité suffisante (mode démo).",
+      "ts": 1781455816.6131945
+    },
+    {
+      "role": "system",
+      "content": "[US-1] Code raffiné en 0 tour(s) — qualité 90/100 (arrêt : threshold).",
+      "ts": 1781455816.6132915
+    }
+  ],
+  "feedback": [],
+  "findings": [],
+  "lessons": [],
+  "green_tests": [],
+  "regressions": [],
+  "retro_recommendations": [],
+  "build_guidance": [],
+  "iteration": 1,
+  "usage": {
+    "cost_usd": 0.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "agent_calls": 8
+  },
+  "running": false,
+  "paused": false,
+  "awaiting_approval": "",
+  "resume_at": 0.0,
+  "archived": false,
+  "error": "",
+  "created_at": 1781455813.9827533
+}

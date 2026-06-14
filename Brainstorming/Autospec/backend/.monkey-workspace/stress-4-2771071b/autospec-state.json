@@ -47,6 +47,12 @@
       "title": "Cœur applicatif",
       "description": "Les fonctionnalités de base.",
       "iteration": 1
+    },
+    {
+      "id": "EPIC-FB",
+      "title": "Retours utilisateur",
+      "description": "Changements issus du feedback.",
+      "iteration": 1
     }
   ],
   "stories": [
@@ -113,16 +119,41 @@
           "criteria": [
             "AC-1"
           ],
-          "status": "nonexistent"
+          "status": "green"
         }
       ],
       "depends_on": [
         "US-1"
       ],
       "priority": 2,
-      "status": "in_progress",
+      "status": "done",
       "iteration": 1,
       "attempts": 1,
+      "last_error": "",
+      "quality_score": -1,
+      "mutation_score": -1,
+      "coverage_score": -1,
+      "ui": false,
+      "ui_tests": []
+    },
+    {
+      "id": "US-FB-1",
+      "epic_id": "EPIC-FB",
+      "title": "Prendre en compte le feedback",
+      "description": "En tant qu'utilisateur, je veux que mon retour soit intégré afin d'améliorer le produit.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "text": "Le feedback est traité."
+        }
+      ],
+      "gherkin": "Feature: Feedback\n  Scenario: Prise en compte\n    Given un feedback utilisateur\n    When il est analysé\n    Then une story est créée",
+      "test_plan": [],
+      "depends_on": [],
+      "priority": 1,
+      "status": "todo",
+      "iteration": 1,
+      "attempts": 0,
       "last_error": "",
       "quality_score": -1,
       "mutation_score": -1,
@@ -181,10 +212,36 @@
       "role": "qa",
       "content": "[US-2] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
       "ts": 1781455815.454741
+    },
+    {
+      "role": "dev",
+      "content": "[US-2] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781455815.7137513
+    },
+    {
+      "role": "qa",
+      "content": "🔬 Produit exercé (mode démo) — un souci d'intégration relevé.\n• [medium/integration] Addition et soustraction ne se composent pas — Le CLI n'enchaîne pas les deux opérations (mode démo).",
+      "ts": 1781455816.3470564
+    },
+    {
+      "role": "analyst",
+      "content": "🔍 Impact : Feedback analysé : nouvelle story créée (mode démo).\n➕ 1 nouvelle(s) story(ies) planifiée(s) — « ▶ Continuer le build » pour les développer.",
+      "ts": 1781455816.6127667
     }
   ],
-  "feedback": [],
-  "findings": [],
+  "feedback": [
+    "[medium/integration] Addition et soustraction ne se composent pas — Le CLI n'enchaîne pas les deux opérations (mode démo)."
+  ],
+  "findings": [
+    {
+      "id": "FND-1",
+      "severity": "medium",
+      "kind": "integration",
+      "title": "Addition et soustraction ne se composent pas",
+      "detail": "Le CLI n'enchaîne pas les deux opérations (mode démo).",
+      "iteration": 1
+    }
+  ],
   "lessons": [],
   "green_tests": [],
   "regressions": [],
@@ -195,7 +252,7 @@
     "cost_usd": 0.0,
     "input_tokens": 0,
     "output_tokens": 0,
-    "agent_calls": 8
+    "agent_calls": 11
   },
   "running": false,
   "paused": false,
