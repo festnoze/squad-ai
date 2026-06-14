@@ -199,6 +199,7 @@ class ScriptedRunner:
         system_prompt: str,
         cwd: Path | None = None,
         session_id: str | None = None,
+        model: str | None = None,
     ) -> AgentResult:
         if settings.demo_delay_s:
             await asyncio.sleep(settings.demo_delay_s)

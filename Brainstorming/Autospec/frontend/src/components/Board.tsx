@@ -38,8 +38,30 @@ const TEST_STATE_ICON: Record<TestState, string> = {
   green: "●",
 };
 
-/** Stops a click from bubbling up to the card's expand/collapse handler. */
+/** Stops a click from bubbling up to a parent click handler. */
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
+/**
+ * Dérive les dépendances entre epics depuis les `depends_on` des US : l'epic A
+ * « dépend de » l'epic B si une US de A dépend d'une US de B (B ≠ A). Renvoie
+ * une Map epicId -> liste d'epicIds dont il dépend (triée, dédupliquée).
+ */
+function deriveEpicDeps(stories: UserStory[]): Map<string, string[]> {
+  const epicOf = new Map(stories.map((s) => [s.id, s.epic_id]));
+  const acc = new Map<string, Set<string>>();
+  for (const s of stories) {
+    for (const dep of s.depends_on ?? []) {
+      const depEpic = epicOf.get(dep);
+      if (depEpic && depEpic !== s.epic_id) {
+        if (!acc.has(s.epic_id)) acc.set(s.epic_id, new Set());
+        acc.get(s.epic_id)!.add(depEpic);
+      }
+    }
+  }
+  const out = new Map<string, string[]>();
+  for (const [k, v] of acc) out.set(k, [...v].sort());
+  return out;
+}
 
 function CriterionRow({
   story,
@@ -326,66 +348,74 @@ function DiffViewer({
   );
 }
 
-function StoryCard({
-  projectId,
+/** Badges communs (priorité, statut, score qualité) d'une user story. */
+function StoryBadges({ story }: { story: UserStory }) {
+  return (
+    <span className="story-right">
+      <span className={`prio prio-${story.priority}`} title="Priorité kanban (1=haute)">
+        P{story.priority}
+      </span>
+      <span className={`badge badge-${story.status}`}>
+        {STATUS_LABEL[story.status] ?? story.status}
+      </span>
+      {story.quality_score >= 0 && (
+        <span className="quality-badge" title="Qualité du code (raffinement)">
+          ⚙ {story.quality_score}/100
+        </span>
+      )}
+      {(story.mutation_score ?? -1) >= 0 && (
+        <span className="mutation-badge" title="Robustesse des tests (mutation testing)">
+          🧬 {story.mutation_score}/100
+        </span>
+      )}
+      {(story.coverage_score ?? -1) >= 0 && (
+        <span className="coverage-badge" title="Couverture de tests">
+          📊 {story.coverage_score}%
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * Carte compacte cliquable d'une user story (niveau « epic »). Le clic ouvre le
+ * détail (niveau « us ») ; la poignée ⠿ reste dédiée au drag-&-drop de tri.
+ */
+function StoryRow({
   story,
+  onOpen,
   dragOver,
   onHandleDragStart,
   onCardDragOver,
   onCardDragLeave,
   onCardDrop,
 }: {
-  projectId: string;
   story: UserStory;
+  onOpen: () => void;
   dragOver: boolean;
   onHandleDragStart: (e: React.DragEvent) => void;
   onCardDragOver: (e: React.DragEvent) => void;
   onCardDragLeave: (e: React.DragEvent) => void;
   onCardDrop: (e: React.DragEvent) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState(false);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [showDiff, setShowDiff] = useState(false);
-
-  const handleDelete = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (!window.confirm(`Supprimer la user story « ${story.title} » ?`)) return;
-    setError("");
-    try {
-      await deleteStory(projectId, story.id);
-    } catch (err) {
-      setError(errorMessage(err));
-    }
-  };
-
-  // Enveloppe une action API de la carte : erreur affichée + anti double-clic.
-  const action = (fn: () => Promise<void>) => async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setError("");
-    setBusy(true);
-    try {
-      await fn();
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const handleRebuild = action(() => rebuildStory(projectId, story.id));
-  const handleForceDone = action(() => forceDoneStory(projectId, story.id));
-
   return (
     <div
       className={`story status-${story.status}${dragOver ? " drag-over" : ""}`}
       data-testid={`story-${story.id}`}
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
       onDragOver={onCardDragOver}
       onDragLeave={onCardDragLeave}
       onDrop={onCardDrop}
     >
-      <div className="story-head" onClick={() => setOpen(!open)}>
+      <div className="story-head">
         <span
           className="drag-handle"
           draggable
@@ -397,109 +427,139 @@ function StoryCard({
           ⠿
         </span>
         <span className="story-id">{story.id}</span>
-        <span className="story-right">
-          <span className={`prio prio-${story.priority}`} title="Priorité kanban (1=haute)">
-            P{story.priority}
-          </span>
-          <span className={`badge badge-${story.status}`}>
-            {STATUS_LABEL[story.status] ?? story.status}
-          </span>
-          {story.quality_score >= 0 && (
-            <span className="quality-badge" title="Qualité du code (raffinement)">
-              ⚙ {story.quality_score}/100
-            </span>
-          )}
-        </span>
+        <StoryBadges story={story} />
       </div>
-      <div className="story-title" onClick={() => setOpen(!open)}>
-        {story.title}
-      </div>
+      <div className="story-title">{story.title}</div>
       {(story.depends_on ?? []).length > 0 && (
         <div className="story-deps">⛓ dépend de {story.depends_on.join(", ")}</div>
       )}
-      {open && (
-        <div className="story-details">
-          {editing ? (
-            <StoryEditor
-              projectId={projectId}
-              story={story}
-              onClose={() => setEditing(false)}
-            />
-          ) : (
-            <>
-              <div className="story-toolbar" onClick={stop}>
+      <div className="story-open-hint">▸ détails</div>
+    </div>
+  );
+}
+
+/**
+ * Vue détaillée d'une user story (niveau « us ») : description, toolbar
+ * d'actions, critères d'acceptance (tests + Gherkin) et dernière erreur.
+ */
+function StoryDetail({
+  projectId,
+  story,
+  onDeleted,
+}: {
+  projectId: string;
+  story: UserStory;
+  onDeleted: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+
+  const handleDelete = async () => {
+    if (!window.confirm(`Supprimer la user story « ${story.title} » ?`)) return;
+    setError("");
+    try {
+      await deleteStory(projectId, story.id);
+      onDeleted();
+    } catch (err) {
+      setError(errorMessage(err));
+    }
+  };
+
+  // Enveloppe une action API : erreur affichée + anti double-clic.
+  const run = (fn: () => Promise<void>) => async () => {
+    setError("");
+    setBusy(true);
+    try {
+      await fn();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRebuild = run(() => rebuildStory(projectId, story.id));
+  const handleForceDone = run(() => forceDoneStory(projectId, story.id));
+
+  return (
+    <div className="story-detail">
+      <div className="story-detail-head">
+        <span className="story-id">{story.id}</span>
+        <StoryBadges story={story} />
+      </div>
+      <h3 className="story-detail-title">{story.title}</h3>
+      {(story.depends_on ?? []).length > 0 && (
+        <div className="story-deps">⛓ dépend de {story.depends_on.join(", ")}</div>
+      )}
+      {editing ? (
+        <StoryEditor
+          projectId={projectId}
+          story={story}
+          onClose={() => setEditing(false)}
+        />
+      ) : (
+        <>
+          <div className="story-toolbar">
+            <button className="ghost small-btn" onClick={() => setEditing(true)}>
+              ✏️ Éditer
+            </button>
+            <button className="danger small-btn" onClick={handleDelete}>
+              🗑 Supprimer
+            </button>
+            {story.status === "failed" && (
+              <>
                 <button
-                  className="ghost small-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setEditing(true);
-                  }}
+                  className="action-btn small-btn"
+                  disabled={busy}
+                  onClick={handleRebuild}
                 >
-                  ✏️ Éditer
+                  🔄 Relancer
                 </button>
-                <button className="danger small-btn" onClick={handleDelete}>
-                  🗑 Supprimer
+                <button
+                  className="action-btn action-done small-btn"
+                  disabled={busy}
+                  onClick={handleForceDone}
+                >
+                  ✓ Forcer terminé
                 </button>
-                {story.status === "failed" && (
-                  <>
-                    <button
-                      className="action-btn small-btn"
-                      disabled={busy}
-                      onClick={handleRebuild}
-                    >
-                      🔄 Relancer
-                    </button>
-                    <button
-                      className="action-btn action-done small-btn"
-                      disabled={busy}
-                      onClick={handleForceDone}
-                    >
-                      ✓ Forcer terminé
-                    </button>
-                  </>
-                )}
-                {story.status === "done" && (
-                  <button
-                    className="action-btn small-btn"
-                    disabled={busy}
-                    onClick={handleRebuild}
-                  >
-                    🔁 Rejouer
-                  </button>
-                )}
-                {story.status === "done" && (
-                  <button
-                    className="ghost small-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowDiff(true);
-                    }}
-                  >
-                    📊 Diff
-                  </button>
-                )}
+              </>
+            )}
+            {story.status === "done" && (
+              <button
+                className="action-btn small-btn"
+                disabled={busy}
+                onClick={handleRebuild}
+              >
+                🔁 Rejouer
+              </button>
+            )}
+            {story.status === "done" && (
+              <button className="ghost small-btn" onClick={() => setShowDiff(true)}>
+                📊 Diff
+              </button>
+            )}
+          </div>
+          {error && <div className="edit-error">{error}</div>}
+          <p>{story.description}</p>
+          {(story.acceptance_criteria ?? []).length > 0 && (
+            <>
+              <h4>Critères d'acceptance</h4>
+              <div className="criteria">
+                {story.acceptance_criteria.map((c) => (
+                  <CriterionRow key={c.id} story={story} criterion={c} />
+                ))}
               </div>
-              {error && <div className="edit-error">{error}</div>}
-              <p>{story.description}</p>
-              {(story.acceptance_criteria ?? []).length > 0 && (
-                <>
-                  <h4>Critères d'acceptance</h4>
-                  <div className="criteria">
-                    {story.acceptance_criteria.map((c) => (
-                      <CriterionRow key={c.id} story={story} criterion={c} />
-                    ))}
-                  </div>
-                </>
-              )}
-              {story.last_error && (
-                <>
-                  <h4>Dernière erreur</h4>
-                  <pre className="error-output">{story.last_error}</pre>
-                </>
-              )}
             </>
           )}
-        </div>
+          {story.last_error && (
+            <>
+              <h4>Dernière erreur</h4>
+              <pre className="error-output">{story.last_error}</pre>
+            </>
+          )}
+        </>
       )}
       {showDiff && (
         <DiffViewer
@@ -596,23 +656,23 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
 }
 
 /**
- * Liste des user stories d'un même epic, triée par priorité (croissante, tri
- * stable) et réordonnançable par glisser-déposer via la poignée des cartes.
+ * Liste des user stories d'un epic, triée par priorité (croissante, stable) et
+ * réordonnançable par glisser-déposer via la poignée. Un clic ouvre le détail.
  */
 function EpicStories({
   projectId,
   stories,
+  onOpen,
 }: {
   projectId: string;
   stories: UserStory[];
+  onOpen: (storyId: string) => void;
 }) {
-  // id de la story en cours de drag, et id de la story survolée (cible de drop).
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [error, setError] = useState("");
 
-  // Tri stable par priorité croissante (1=haute). Array.sort est stable en JS,
-  // donc à priorité égale l'ordre de déclaration est conservé.
+  // Tri stable par priorité croissante (1=haute) : Array.sort est stable en JS.
   const ordered = [...stories].sort((a, b) => a.priority - b.priority);
 
   const handleDrop = async (targetId: string) => {
@@ -620,8 +680,6 @@ function EpicStories({
     setDraggingId(null);
     setOverId(null);
     if (!sourceId || sourceId === targetId) return;
-    // source et cible sont forcément dans le même epic (ce composant ne rend
-    // que les stories d'un epic), mais on vérifie la présence par sécurité.
     const ids = ordered.map((s) => s.id);
     if (!ids.includes(sourceId) || !ids.includes(targetId)) return;
 
@@ -638,7 +696,6 @@ function EpicStories({
       await reorderStories(projectId, priorities);
       // Pas de re-fetch : le backend diffuse le nouvel état par WebSocket.
     } catch (err) {
-      // Erreur affichée à l'utilisateur plutôt que perdue en console.
       setError(`Échec du réordonnancement : ${errorMessage(err)}`);
     }
   };
@@ -647,10 +704,10 @@ function EpicStories({
     <div className="stories">
       {error && <div className="edit-error">{error}</div>}
       {ordered.map((s) => (
-        <StoryCard
+        <StoryRow
           key={s.id}
-          projectId={projectId}
           story={s}
+          onOpen={() => onOpen(s.id)}
           dragOver={overId === s.id && draggingId !== null && draggingId !== s.id}
           onHandleDragStart={(e) => {
             e.stopPropagation();
@@ -674,6 +731,131 @@ function EpicStories({
   );
 }
 
+/** Fil d'Ariane : Épics / EPIC-x / US-y, chaque ancêtre cliquable. */
+function Breadcrumb({
+  epic,
+  story,
+  onNavEpics,
+  onNavEpic,
+}: {
+  epic: Epic | null;
+  story: UserStory | null;
+  onNavEpics: () => void;
+  onNavEpic: () => void;
+}) {
+  return (
+    <nav className="breadcrumb" aria-label="Fil d'Ariane">
+      <button className="crumb" onClick={onNavEpics} disabled={!epic && !story}>
+        Épics
+      </button>
+      {epic && (
+        <>
+          <span className="crumb-sep">/</span>
+          {story ? (
+            <button className="crumb" onClick={onNavEpic}>
+              {epic.id}
+            </button>
+          ) : (
+            <span className="crumb current">{epic.id}</span>
+          )}
+        </>
+      )}
+      {story && (
+        <>
+          <span className="crumb-sep">/</span>
+          <span className="crumb current">{story.id}</span>
+        </>
+      )}
+    </nav>
+  );
+}
+
+/** Niveau racine : grille de cartes epic avec compteur d'US et deps dérivées. */
+function EpicsView({
+  epics,
+  stories,
+  epicDeps,
+  onOpenEpic,
+}: {
+  epics: Epic[];
+  stories: UserStory[];
+  epicDeps: Map<string, string[]>;
+  onOpenEpic: (epicId: string) => void;
+}) {
+  return (
+    <div className="epic-grid">
+      {epics.map((epic) => {
+        const es = stories.filter((s) => s.epic_id === epic.id);
+        const done = es.filter((s) => s.status === "done").length;
+        const deps = epicDeps.get(epic.id) ?? [];
+        return (
+          <div
+            key={epic.id}
+            className="epic epic-card"
+            role="button"
+            tabIndex={0}
+            onClick={() => onOpenEpic(epic.id)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onOpenEpic(epic.id);
+              }
+            }}
+          >
+            <div className="epic-head">
+              <span className="epic-id">{epic.id}</span>
+              <span className="epic-iter">itération {epic.iteration}</span>
+            </div>
+            <div className="epic-title">{epic.title}</div>
+            {epic.description && <p className="epic-desc">{epic.description}</p>}
+            <div className="epic-card-meta">
+              {es.length} US · {done}/{es.length} terminée(s)
+            </div>
+            {deps.length > 0 && (
+              <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Niveau epic : description + liste des US (drag-&-drop, ajout). */
+function EpicView({
+  projectId,
+  epic,
+  stories,
+  epicDeps,
+  onOpenStory,
+}: {
+  projectId: string;
+  epic: Epic;
+  stories: UserStory[];
+  epicDeps: Map<string, string[]>;
+  onOpenStory: (storyId: string) => void;
+}) {
+  const es = stories.filter((s) => s.epic_id === epic.id);
+  const deps = epicDeps.get(epic.id) ?? [];
+  return (
+    <div className="epic-view">
+      <div className="epic-head">
+        <span className="epic-id">{epic.id}</span>
+        <span className="epic-iter">itération {epic.iteration}</span>
+      </div>
+      <h3 className="epic-view-title">{epic.title}</h3>
+      {epic.description && <p className="epic-view-desc">{epic.description}</p>}
+      {deps.length > 0 && (
+        <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
+      )}
+      <EpicStories projectId={projectId} stories={es} onOpen={onOpenStory} />
+      <AddStoryForm projectId={projectId} epicId={epic.id} />
+    </div>
+  );
+}
+
+type Nav = { level: "epics" | "epic" | "us"; epicId?: string; storyId?: string };
+
 interface Props {
   epics: Epic[];
   stories: UserStory[];
@@ -681,6 +863,8 @@ interface Props {
 }
 
 export function Board({ epics, stories, projectId }: Props) {
+  const [nav, setNav] = useState<Nav>({ level: "epics" });
+
   if (epics.length === 0) {
     return (
       <div className="panel board empty">
@@ -689,25 +873,59 @@ export function Board({ epics, stories, projectId }: Props) {
       </div>
     );
   }
+
+  // Résolution de la navigation contre les props courantes (rafraîchies en live
+  // par WebSocket) : un élément sélectionné qui disparaît fait remonter d'un
+  // niveau plutôt que d'afficher du vide.
+  const epicDeps = deriveEpicDeps(stories);
+  const epic = nav.epicId ? epics.find((e) => e.id === nav.epicId) ?? null : null;
+  const story =
+    nav.level === "us" && epic && nav.storyId
+      ? stories.find((s) => s.id === nav.storyId) ?? null
+      : null;
+  const level: Nav["level"] = !epic
+    ? "epics"
+    : nav.level === "us" && !story
+      ? "epic"
+      : nav.level;
+
   return (
     <div className="panel board">
-      <h2>Board Epics / User stories</h2>
-      <div className="epics">
-        {epics.map((epic) => (
-          <div key={epic.id} className="epic">
-            <div className="epic-head">
-              <span className="epic-id">{epic.id}</span>
-              <span className="epic-iter">itération {epic.iteration}</span>
-            </div>
-            <div className="epic-title">{epic.title}</div>
-            <EpicStories
-              projectId={projectId}
-              stories={stories.filter((s) => s.epic_id === epic.id)}
-            />
-            <AddStoryForm projectId={projectId} epicId={epic.id} />
-          </div>
-        ))}
+      <div className="board-top">
+        <h2>Board Epics / User stories</h2>
+        <Breadcrumb
+          epic={epic}
+          story={story}
+          onNavEpics={() => setNav({ level: "epics" })}
+          onNavEpic={() => epic && setNav({ level: "epic", epicId: epic.id })}
+        />
       </div>
+      {level === "epics" && (
+        <EpicsView
+          epics={epics}
+          stories={stories}
+          epicDeps={epicDeps}
+          onOpenEpic={(epicId) => setNav({ level: "epic", epicId })}
+        />
+      )}
+      {level === "epic" && epic && (
+        <EpicView
+          projectId={projectId}
+          epic={epic}
+          stories={stories}
+          epicDeps={epicDeps}
+          onOpenStory={(storyId) => setNav({ level: "us", epicId: epic.id, storyId })}
+        />
+      )}
+      {level === "us" && epic && story && (
+        <div className="us-view">
+          <StoryDetail
+            projectId={projectId}
+            story={story}
+            onDeleted={() => setNav({ level: "epic", epicId: epic.id })}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -90,10 +90,14 @@ class _LimitOnceRunner(FakeRunner):
         super().__init__(replies)
         self.limit_fired = False
 
-    async def arun(self, prompt, system_prompt, cwd=None, session_id=None):
+    async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
         if "PROCESSUS OBLIGATOIRE" in prompt and not self.limit_fired:
             self.limit_fired = True
-            raise AgentError(f"Claude AI usage limit reached|{int(time.time()) + 1}")
+            # Far-future reset epoch: in production a usage window reopens minutes
+            # or hours later, so the pipeline durably sits in STOPPED until then.
+            # (A near-immediate epoch would collapse STOPPED straight back into
+            # BUILD, racing any observation of the clean stop.)
+            raise AgentError(f"Claude AI usage limit reached|{int(time.time()) + 3600}")
         return await super().arun(prompt, system_prompt, cwd=cwd, session_id=session_id)
 
 
@@ -112,15 +116,21 @@ async def test_usage_limit_stops_then_auto_resumes(monkeypatch, green_pytest):
     pipeline = Pipeline(state, runner)
     pipeline.start()
 
-    # The watchdog schedules the resume and the pipeline stops cleanly.
+    # The watchdog schedules the resume and the pipeline stops cleanly. With a
+    # far reset window the STOPPED state is durable, so observing it is reliable.
     await wait_until(lambda: state.resume_at > 0)
     await wait_until(lambda: state.phase == PipelinePhase.STOPPED)
     story = state.story("US-1")
     assert story.status == StoryStatus.TODO
     assert story.attempts == 0  # the lost attempt was refunded
     assert any("Fenêtre d'usage Claude épuisée" in m.content for m in state.chat)
+    assert pipeline._resume_timer is not None  # auto-resume armed
 
-    # The timer (epoch ~now+1s) fires and resumes the build to completion.
+    # Fire the armed timer now instead of waiting out the reset window (the
+    # wall-clock sleep itself is covered by test_anext_reset): it resumes the
+    # build to completion in a fresh session.
+    pipeline._resume_timer.cancel()
+    await pipeline._aresume_timer(0.0)
     await wait_until(lambda: state.phase == PipelinePhase.DONE)
     assert state.resume_at == 0.0
     assert state.story("US-1").status == StoryStatus.DONE
@@ -135,7 +145,7 @@ async def test_usage_limit_ignored_for_other_providers(monkeypatch, green_pytest
     state = ProjectState(id="proj-m2-off", name="todo", goal="g")
 
     class _AlwaysLimited(FakeRunner):
-        async def arun(self, prompt, system_prompt, cwd=None, session_id=None):
+        async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
             if "PROCESSUS OBLIGATOIRE" in prompt:
                 raise AgentError("usage limit reached|1718226000")
             return await super().arun(prompt, system_prompt, cwd=cwd, session_id=session_id)

@@ -24,6 +24,9 @@ from ..config import PROJECT_DIR, settings
 from ..models import ChatMessage, ChatRole, PipelinePhase, ProjectState, StoryStatus, new_id
 from ..orchestrator.events import bus
 from ..orchestrator.pipeline import Pipeline
+from ..forecast import forecast_iteration_cost
+from ..spec_import import parse_spec_import
+from ..metrics import compute_metrics
 from ..storage import list_states, load_state, workspace_dir
 
 # Directories and files hidden from the workspace file explorer: VCS/build/cache
@@ -51,7 +54,7 @@ _INTERRUPTED_PHASES = {
 }
 
 
-def recover_projects() -> list[str]:
+def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
     """Re-register persisted projects as dormant pipelines after a restart.
 
     Pipelines live in memory, so a backend restart leaves persisted projects
@@ -63,7 +66,7 @@ def recover_projects() -> list[str]:
     recovered state is persisted and broadcast. Returns the re-registered ids.
     """
     recovered: list[str] = []
-    for state in list_states():
+    for state in (list_states() if states is None else states):
         if state.id in pipelines:
             continue
         changed = False
@@ -80,6 +83,9 @@ def recover_projects() -> list[str]:
         if state.paused:
             state.paused = False
             changed = True
+        if state.awaiting_approval:
+            state.awaiting_approval = ""
+            changed = True
         pipeline = Pipeline(state, _runner)
         pipelines[state.id] = pipeline
         if changed:
@@ -95,10 +101,23 @@ def recover_projects() -> list[str]:
     return recovered
 
 
+async def _arecover_projects() -> None:
+    """Background recovery (BUG2): offload the heavy state-file I/O so a blocked
+    startup never leaves the freshly-launched front's WS proxy connect ETIMEDOUT.
+    Uvicorn binds the listening socket BEFORE the lifespan completes, so a
+    synchronous recovery (read every state file + re-persist) starves accept().
+    The list_states() read runs in a thread; the registration runs back on the
+    event loop, so M2 resume timers are armed and `pipelines` is mutated
+    race-free (recover_projects is synchronous — atomic w.r.t. other loop tasks)."""
+    states = await asyncio.to_thread(list_states)
+    recover_projects(states)
+
+
 @asynccontextmanager
 async def _lifespan(app):
-    """Recover persisted projects on startup so they stay controllable."""
-    recover_projects()
+    """Recover persisted projects on startup so they stay controllable — without
+    blocking startup (the file I/O is offloaded; see _arecover_projects)."""
+    app.state.recover_task = asyncio.create_task(_arecover_projects())
     yield
 
 
@@ -135,6 +154,8 @@ class CreateProjectRequest(BaseModel):
     auto_spec: bool = False
     budget_usd: float = 0.0
     budget_tokens: int = 0
+    brief: str = ""  # I3: optional imported spec — seeds the brief, skips the interview
+    brownfield_path: str = ""  # B1: existing repo to extend
 
 
 class MessageRequest(BaseModel):
@@ -143,6 +164,10 @@ class MessageRequest(BaseModel):
 
 class SpecModeRequest(BaseModel):
     mode: str
+
+
+class RollbackRequest(BaseModel):
+    iteration: int
 
 
 class BudgetRequest(BaseModel):
@@ -282,6 +307,8 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
         auto_spec=req.auto_spec,
         budget_usd=max(0.0, req.budget_usd),
         budget_tokens=max(0, req.budget_tokens),
+        brief=parse_spec_import(req.brief),
+        brownfield_path=(req.brownfield_path or "").strip(),
     )
     state.chat.append(ChatMessage(role=ChatRole.USER, content=req.goal))
     pipeline = Pipeline(state, _runner)
@@ -293,9 +320,30 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
 @app.get("/api/projects")
 async def alist_projects() -> list[dict]:
     live = {p.state.id: p.state for p in pipelines.values()}
-    stored = {s.id: s for s in list_states()}
+    stored = {s.id: s for s in await asyncio.to_thread(list_states)}
     stored.update(live)
     return [s.model_dump(mode="json") for s in stored.values()]
+
+
+@app.get("/api/metrics")
+async def ametrics() -> dict:
+    """Factory-wide aggregated metrics across all projects (U2)."""
+    live = {p.state.id: p.state for p in pipelines.values()}
+    stored = {s.id: s for s in await asyncio.to_thread(list_states)}
+    stored.update(live)
+    return compute_metrics(list(stored.values()))
+
+
+@app.get("/api/projects/{project_id}/forecast")
+async def aforecast(project_id: str) -> dict:
+    """Estimate the cost of the project's pending stories (O2), using the
+    cross-project average cost/story as a fallback for fresh projects."""
+    pipeline = _pipeline(project_id)
+    live = {p.state.id: p.state for p in pipelines.values()}
+    stored = {s.id: s for s in await asyncio.to_thread(list_states)}
+    stored.update(live)
+    fallback = compute_metrics(list(stored.values()))["cost_per_story"]
+    return forecast_iteration_cost(pipeline.state, fallback)
 
 
 @app.get("/api/projects/{project_id}")
@@ -405,6 +453,36 @@ async def apause(project_id: str) -> dict:
 @app.post("/api/projects/{project_id}/resume")
 async def aresume(project_id: str) -> dict:
     await _pipeline(project_id).aresume()
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/approve")
+async def aapprove(project_id: str) -> dict:
+    """Approve a pending approval gate so the build proceeds (U4)."""
+    await _pipeline(project_id).aapprove()
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/reject")
+async def areject(project_id: str) -> dict:
+    """Reject a pending approval gate: stop the pipeline (U4)."""
+    await _pipeline(project_id).areject()
+    return {"ok": True}
+
+
+@app.get("/api/projects/{project_id}/iterations")
+async def aiterations(project_id: str) -> dict:
+    """List iteration snapshots available for rollback (R2)."""
+    return {"iterations": await _pipeline(project_id).aiterations()}
+
+
+@app.post("/api/projects/{project_id}/rollback")
+async def arollback(project_id: str, req: RollbackRequest) -> dict:
+    """Roll the workspace back to an iteration snapshot (R2)."""
+    try:
+        await _pipeline(project_id).arollback(req.iteration)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
     return {"ok": True}
 
 
@@ -557,11 +635,29 @@ async def adocument_project(project_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/projects/{project_id}/deploy")
+async def adeploy_project(project_id: str) -> dict:
+    """Generate deployment artifacts (Dockerfile, CI) for the generated product (D1)."""
+    pipeline = _pipeline(project_id)
+    try:
+        return await pipeline.adeploy()
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+
+
 @app.post("/api/projects/{project_id}/evaluate")
 async def aevaluate_project(project_id: str) -> dict:
     """Exercise the generated product and feed findings into the impact pipeline (E6)."""
     pipeline = _pipeline(project_id)
     await _acall_pipeline(pipeline.aevaluate(), f"Projet inconnu : {project_id}")
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/security-review")
+async def asecurity_review_project(project_id: str) -> dict:
+    """Audit the generated code + dependencies and feed findings into the impact pipeline (S1)."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.asecurity_review(), f"Projet inconnu : {project_id}")
     return {"ok": True}
 
 

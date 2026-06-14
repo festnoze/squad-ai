@@ -103,6 +103,16 @@ def _default_workspace_root() -> Path:
     return PROJECT_DIR / "workspace"
 
 
+def _default_phase_models() -> dict:
+    """Per-phase model overrides (M3) from AUTOSPEC_MODEL_<PHASE> env vars."""
+    out = {}
+    for phase in ("spec", "analyze", "plan", "architect", "build", "done"):
+        val = os.environ.get(f"AUTOSPEC_MODEL_{phase.upper()}")
+        if val and val.strip():
+            out[phase] = val.strip()
+    return out
+
+
 @dataclass
 class Settings:
     bmad_dir: Path = field(default_factory=_default_bmad_dir)
@@ -111,6 +121,9 @@ class Settings:
     claude_model: str | None = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_CLAUDE_MODEL") or None
     )
+    # Per-phase model routing (M3): a cheap model for spec/plan, a strong one for
+    # build/refine. Populated from AUTOSPEC_MODEL_<PHASE>; falls back to claude_model.
+    phase_models: dict = field(default_factory=_default_phase_models)
     # Agent provider: "claude" (CLI harness), "openai" (API key) or "ollama"
     # (local models). Switchable at runtime through POST /api/provider.
     agent_provider: str = field(
@@ -143,6 +156,21 @@ class Settings:
     )
     ollama_model: str = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_OLLAMA_MODEL", "llama3.1")
+    )
+    # Anthropic API direct (M4): the Claude models via the API (langchain-anthropic),
+    # independent of the local Claude Code CLI harness.
+    anthropic_api_key: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_ANTHROPIC_API_KEY")
+        or os.environ.get("ANTHROPIC_API_KEY", "")
+    )
+    anthropic_model: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_ANTHROPIC_MODEL", "claude-sonnet-4-6")
+    )
+    anthropic_price_in: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_ANTHROPIC_PRICE_IN", 0.0, minimum=0.0)
+    )
+    anthropic_price_out: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_ANTHROPIC_PRICE_OUT", 0.0, minimum=0.0)
     )
     # Cap on the write/read tool-loop rounds of the LangChain providers (OpenAI
     # / Ollama are plain chat models: file edits go through a bounded JSON
@@ -226,6 +254,66 @@ class Settings:
     evaluator_run_timeout_s: float = field(
         default_factory=lambda: _env_float("AUTOSPEC_EVALUATOR_RUN_TIMEOUT_S", 20.0, minimum=1.0)
     )
+    # Security & supply-chain review (S1): after each build, an agent audits the
+    # generated code and runs pip-audit/npm audit on its dependencies, emitting
+    # security Findings into the feedback-impact pipeline. OFF by default; also
+    # triggerable via POST /security-review.
+    security_review_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_SECURITY_REVIEW", False)
+    )
+    security_audit_timeout_s: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_SECURITY_AUDIT_TIMEOUT_S", 60.0, minimum=1.0)
+    )
+    # Optional Langfuse tracing of every agent call (O1): one generation per call
+    # (phase, project, model, tokens, cost, duration). OFF by default; needs the
+    # `langfuse` package + LANGFUSE_* env vars. Lazily imported, no-op when
+    # unavailable — never affects the pipeline.
+    langfuse_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_LANGFUSE", False)
+    )
+    # Mutation testing (Q1): after a story turns green, mutate the package source
+    # one point at a time and rerun the suite against each mutant to score test
+    # robustness (kill rate). OFF by default (it reruns pytest per mutant).
+    mutation_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_MUTATION", False)
+    )
+    mutation_max_mutants: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_MUTATION_MAX", 30, minimum=1)
+    )
+    # Coverage gate (Q2): run the suite under coverage after a story turns green,
+    # recording the total %% on story.coverage_score (badge). With a gate
+    # threshold > 0, a story below it is rejected (kept red) instead of done.
+    coverage_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_COVERAGE", False)
+    )
+    coverage_gate_threshold: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_COVERAGE_GATE", 0, minimum=0)
+    )
+    # Granular approval gates (U4): when on, the pipeline blocks after planning
+    # (plan + architecture) and waits for explicit human approval before building.
+    approval_gates_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_APPROVAL_GATES", False)
+    )
+    # Untrusted-code sandbox (R1): run the generated app inside a no-network
+    # Docker container. OFF by default; needs Docker + an image carrying the
+    # project toolchain (uv). The image/binary are configurable.
+    sandbox_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_SANDBOX", False)
+    )
+    sandbox_image: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_SANDBOX_IMAGE", "python:3.12-slim")
+    )
+    docker_cmd: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_DOCKER_CMD", "docker")
+    )
+    # Cross-project lesson library (F1): promote E7 lessons to a shared store
+    # injected into every new project's Dev/QA prompts. OFF by default.
+    shared_lessons_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_SHARED_LESSONS", False)
+    )
+    shared_lessons_max: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_SHARED_LESSONS_MAX", 20, minimum=1)
+    )
     # Factory retrospective (E7): a meta-learning agent runs between iterations,
     # mines the collected build signals (attempts, red→green, refine scores,
     # cost) and produces durable lessons injected into the QA/Dev prompts plus
@@ -250,6 +338,11 @@ class Settings:
     def refine_for(self, role: str) -> bool:
         """Is the refinement loop active for this maker role ('po' / 'dev')?"""
         return self.refine_enabled and bool(getattr(self, f"refine_{role}", True))
+
+    def model_for_phase(self, phase: str) -> str | None:
+        """Model to use for a given pipeline phase (M3): the per-phase override
+        if set, else the global claude_model."""
+        return self.phase_models.get(phase) or self.claude_model
 
     def persona_path(self, agent: str) -> Path:
         return self.bmad_dir / "bmm" / "agents" / f"{agent}.md"

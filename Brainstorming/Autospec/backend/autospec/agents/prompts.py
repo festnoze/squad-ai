@@ -368,6 +368,38 @@ Réponds avec EXACTEMENT UN objet JSON :
 }}"""
 
 
+def security_review_probe(state: ProjectState, package_name: str, audit_output: str) -> str:
+    return f"""Tu es l'auditeur sécurité d'un pipeline automatisé. Le répertoire courant
+contient le code GÉNÉRÉ du produit « {state.name} » (package Python `{package_name}`,
+projet uv).
+
+Brief produit :
+\"\"\"{state.brief}\"\"\"
+
+Rapport d'audit des dépendances (pip-audit / npm audit — peut être vide ou indisponible) :
+\"\"\"{audit_output[-4000:]}\"\"\"
+
+Ta mission : AUDITER LA SÉCURITÉ du code généré. Lis les fichiers du répertoire
+courant (code, main.py) et cherche des faiblesses réelles et exploitables :
+- injection (SQL/commande/template), désérialisation non sûre (pickle, yaml.load),
+  `eval`/`exec`/`subprocess(shell=True)` sur entrée non validée ;
+- traversée de chemin, lecture/écriture de fichier non bornée ;
+- secrets en dur (clés, mots de passe, tokens) ;
+- validation d'entrée manquante, auth/authz absente ou contournable ;
+- dépendances vulnérables remontées par le rapport d'audit ci-dessus.
+Ne signale QUE des problèmes concrets et étayés par ce que tu observes — pas de
+spéculation. Si rien de notable, renvoie une liste "findings" vide.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français résumant l'audit>",
+  "findings": [
+    {{"id": "SEC-1", "severity": "high|medium|low", "kind": "security",
+      "title": "<résumé court>", "detail": "<faille précise + localisation + piste de correction>"}}
+  ]
+}}"""
+
+
 # ------------------------------------------------- Solution agent (components)
 
 def components_proposal(state: ProjectState) -> str:

@@ -43,6 +43,7 @@ modèle courant.
 | 14 | Observabilité tokens/coût (`AgentResult` usage + `_UsageTracker` → `ProjectState.usage` + indicateur 💸) | tests + e2e |
 | 15 | Archivage des projets (`archived` + endpoints archive/unarchive + UI bascule « Archivés ») | tests + e2e |
 | 16 | Workflow CI racine monorepo (filtre paths + chemins préfixés) | YAML valide |
+| 17 | Navigation hiérarchique du board (drill-down épics → epic → US + fil d'Ariane, deps d'epic dérivées des US, remplace l'expansion en drop-down) | unit Vitest |
 
 ## 🔎 Audit multi-agents (workflow `autospec-test-audit`)
 
@@ -70,6 +71,14 @@ modèle courant.
 - **Raffinement (par design)** : juge illisible = PASS borné par le cap de tours ; score défaut = seuil — choix déterministes assumés.
 - **Frontend (limitation)** : priorité kanban 1-5 → au-delà de 5 stories le drag-&-drop ne distingue pas l'ordre (changer la sémantique de `priority` rippler ait sur PO/UI).
 
+## 🐛 Bugs à corriger
+
+| # | Bug | V/C |
+|---|-----|-----|
+| BUG1 ✅ | **Encodage Windows de l'app générée (crash + mojibake)** — bug en deux couches symétriques. **(1) Crash `UnicodeEncodeError`** : un `main.py` généré qui `print` un caractère non-ASCII (ex. `→` « → ») plante en code 1 car le `stdout` du Python enfant utilise par défaut **cp1252** (déduit de la locale) sous Windows. **(2) Mojibake** (`systï¿½me`, `franï¿½ais`, `ï¿½uf`) : l'enfant écrit ses accents en cp1252 mais Autospec lit le flux du sous-processus en **utf-8** (`encoding="utf-8", errors="replace"`) → désaccord d'encodage. **Angle mort** : le chemin run-app/évaluateur (E6) ne l'exerce pas (en mode `AUTOSPEC_FAKE_AGENTS`, `_aexercise_product` court-circuite l'exécution réelle ; aucun vrai `main.py` non-ASCII lancé sous Playwright). **Fix** : forcer le mode UTF-8 du Python enfant en ajoutant `PYTHONUTF8=1` et `PYTHONIOENCODING=utf-8` au dict retourné par `_minimal_env()` dans `backend/autospec/orchestrator/pipeline.py` (filtré via `_SAFE_ENV_KEYS`). Résout d'un coup le crash (encode « → » en utf-8) **et** le mojibake (enfant écrit en utf-8, cohérent avec la lecture Autospec). Couvre les deux usages : `_aexercise_product` (E6) **et** `_stream_run_output` (bouton « Lancer le projet »). Défense en profondeur optionnelle : demander au Dev/tech-writer un `sys.stdout.reconfigure(encoding="utf-8")` en tête de `main.py` (mais le fix env est plus sûr, indépendant du code généré). **Non-régression** : ajouter un test qui lance réellement un `main.py` non-ASCII sous Playwright/évaluateur. **✅ CORRIGÉ** : `PYTHONUTF8=1`+`PYTHONIOENCODING=utf-8` dans `_minimal_env`, test `test_generated_app_encoding.py`. | 5/2 |
+
+| BUG2 ✅ | **Vite WS proxy `connect ETIMEDOUT 127.0.0.1:8100` au lancement du front** (×2) — au démarrage, le proxy WS de Vite (`/ws`) ouvre la connexion vers le backend mais celui-ci, **event loop momentanément bloqué par des I/O synchrones** (écritures `save_state` + `time.sleep` de retry pendant un build actif ; `recover_projects`/`list_states` non offloadés au boot), n'`accept()` pas le socket à temps → `ETIMEDOUT` (port en écoute mais accept *starved*, ≠ `ECONNREFUSED`). Même famille que le fix #1 (offload de `list_states` dans `GET /api/projects`, déjà fait) mais sur le **chemin WS / écriture**. **Fix** : finir d'extraire les I/O fichier synchrones de l'event loop — `save_state` via `asyncio.to_thread` ou file d'écriture (supprimer le `time.sleep` bloquant du chemin async), et offloader `recover_projects` au lifespan. Le client WS se reconnecte déjà (auto-resync) donc ça s'auto-répare, mais l'erreur pollue les logs et retarde la 1re synchro. **Non-régression** : test qui martèle `GET /api/projects` + connexion WS pendant des `_sync` répétés sans stall. **✅ CORRIGÉ** : recovery en tâche de fond (`_arecover_projects`, `list_states` offloadé) → uvicorn accepte immédiatement ; 2 tests. | 5/2 |
+
 ## 💡 Idées d'évolution (proposées, non planifiées)
 
 Issues d'une revue du produit actuel (architecture mature : pipeline complète,
@@ -80,34 +89,34 @@ endpoint). Priorité par valeur V / complexité C (1-5). **Top 3 : S1, Q1, O1.**
 ### 🔒 Durcissement & confiance
 | # | Idée | V/C |
 |---|------|-----|
-| S1 | **Phase de revue sécurité & supply-chain** — agent `security-reviewer` après le build (comme E6) : scan du code généré + `pip-audit`/`npm audit` des dépendances → réémission en `Finding` routés vers `feedback_impact`. Réutilise le pattern E6, comble l'angle mort « code untrusted jamais audité ». | 5/3 |
-| Q1 | **Mutation testing** — `mutmut`/`cosmic-ray` après le passage au vert pour vérifier que les tests *contraignent* vraiment le comportement (un agent peut écrire des assertions vacues). Expose un « score de robustesse des tests » par story, à côté du `quality_score`. Durcit la promesse cœur TDD/BDD. | 5/4 |
-| Q2 | **Gate de couverture** — `pytest-cov`, seuil bloquant pour passer `done`, badge couverture par story (calque le pattern UI-tests E5). | 3/2 |
-| R1 | **Vrai sandbox Docker** — le gros différé : exécuter `pytest`/`main.py` en conteneur (env minimal déjà en place) → débloque `setup_install` réel, évaluateur fiable et déploiement. | 4/5 |
-| R2 | **Snapshots d'itération + rollback** — commit par itération (git workspace existe), « revenir à l'itération N » ; flag anti-régression quand une nouvelle story fait passer au rouge un test précédemment vert. | 4/3 |
+| S1 ✅ | **Phase de revue sécurité & supply-chain** — agent `security-reviewer` après le build (comme E6) : scan du code généré + `pip-audit`/`npm audit` des dépendances → réémission en `Finding` routés vers `feedback_impact`. Réutilise le pattern E6, comble l'angle mort « code untrusted jamais audité ». **✅ LIVRÉ** : persona `security-reviewer`, `_asecurity_phase` (audit `pip-audit`/`npm audit` + agent → `Finding` kind=security → pipeline d'impact), endpoint `POST /security-review`, env `AUTOSPEC_SECURITY_REVIEW`, 6 tests. | 5/3 |
+| Q1 ✅ | **Mutation testing** — `mutmut`/`cosmic-ray` après le passage au vert pour vérifier que les tests *contraignent* vraiment le comportement (un agent peut écrire des assertions vacues). Expose un « score de robustesse des tests » par story, à côté du `quality_score`. Durcit la promesse cœur TDD/BDD. **✅ LIVRÉ** : moteur de mutation AST intégré `orchestrator/mutation.py` (sans dépendance externe), `_arun_mutation_test` (score = taux de mutants tués, env `AUTOSPEC_MUTATION`), champ `UserStory.mutation_score`, badge 🧬 dans le board, 7 tests. | 5/4 |
+| Q2 ✅ | **Gate de couverture** — `pytest-cov`, seuil bloquant pour passer `done`, badge couverture par story. **✅ LIVRÉ** : `_arun_coverage` (`pytest --cov`, env `AUTOSPEC_COVERAGE`), champ `UserStory.coverage_score`, gate optionnel `AUTOSPEC_COVERAGE_GATE` (rejette une story sous le seuil), badge 📊, 3 tests. | 3/2 |
+| R1 ✅ | **Vrai sandbox Docker** — le gros différé : exécuter `pytest`/`main.py` en conteneur (env minimal déjà en place) → **✅ LIVRÉ (incrément)** : module `sandbox.py` (`docker_run_cmd` : `docker run --rm --network none -v ws:/app`), config `AUTOSPEC_SANDBOX`/`_IMAGE`/`DOCKER_CMD`, `_maybe_sandbox` wrappe l'exécution non fiable (`_aexercise_product`), 4 tests. (Image avec uv à fournir pour un run réel.) | 4/5 |
+| R2 ✅ | **Snapshots d'itération + rollback** — commit par itération (git workspace existe), « revenir à l'itération N » ; flag anti-régression. **✅ LIVRÉ** : commit `iteration N snapshot` par itération + `arollback`/`aiterations` + endpoints `GET /iterations` `POST /rollback` (bouton ⏪) ; module `regression.py` (`find_regressions`) + `green_tests`/`regressions` sur l'état + bannière UI + notify ; 6 tests. | 4/3 |
 
 ### 💸 Coût & modèles
 | # | Idée | V/C |
 |---|------|-----|
-| M3 | **Routage modèle par phase** — modèle bon marché pour interview/brainstorm, modèle fort pour Dev/raffinement. `make_runner()` abstrait déjà les providers ; manque une map phase→modèle. Économie directe. | 4/3 |
-| M4 | **Provider Anthropic API direct** (en plus du CLI harness) — usage hors poste dev (cron, cloud) sans dépendre du CLI. | 3/3 |
-| O2 | **Prévision de coût avant lancement** — estimer le coût d'une itération depuis l'historique (E7 collecte déjà tentatives/coût/story) avant de démarrer le build. | 3/3 |
+| M3 ✅ | **Routage modèle par phase** — modèle bon marché pour interview/brainstorm, modèle fort pour Dev/raffinement. `make_runner()` abstrait déjà les providers ; manque une map phase→modèle. **✅ LIVRÉ** : param `model` ajouté à tout le Protocol runner (Claude/Fake/Scripted/LangChain), `model_for_phase` (env `AUTOSPEC_MODEL_<PHASE>` → fallback `claude_model`), routage dans `_UsageTracker.arun`, 3 tests. | 4/3 |
+| M4 ✅ | **Provider Anthropic API direct** (en plus du CLI harness) — usage hors poste dev (cron, cloud) sans dépendre du CLI. **✅ LIVRÉ** : `AnthropicRunner` (langchain-anthropic, `_build_model`+`_cost`), ajouté à `PROVIDERS`/`make_runner`/`provider_model` (donc au sélecteur 🤖), config `AUTOSPEC_ANTHROPIC_*`, 4 tests. | 3/3 |
+| O2 ✅ | **Prévision de coût avant lancement** — estimer le coût d'une itération depuis l'historique (E7 collecte déjà tentatives/coût/story) avant de démarrer le build. **✅ LIVRÉ** : module `forecast.py` (`forecast_iteration_cost` : coût/story historique × stories restantes, fallback moyenne inter-projets), endpoint `GET /forecast`, estimation 📈 dans RunPanel, 3 tests. | 3/3 |
 
 ### 🚀 Entrée & sortie (élargir le marché)
 | # | Idée | V/C |
 |---|------|-----|
-| B1 | **Mode brownfield** — pointer Autospec sur un repo existant pour *ajouter* des features au lieu du greenfield. Plus grosse extension de marché (setup/scaffold suppose le greenfield). | 5/5 |
-| D1 | **Déploiement du produit généré** — Dockerfile + CI générés pour le projet créé, puis `docker build`/run (prolonge l'export I2 et le sandbox R1). | 4/4 |
-| I3 | **Import de specs** — ingérer un ticket Jira (MCP Atlassian), un doc ou une image de maquette comme brief initial. | 3/4 |
+| B1 ✅ | **Mode brownfield** — pointer Autospec sur un repo existant pour *ajouter* des features au lieu du greenfield. **✅ LIVRÉ (incrément)** : module `brownfield.py` (`seed_workspace_from` copie le repo existant dans le workspace en excluant .git/.venv/node_modules ; `summarize_repo` produit un résumé d'arbo borné), `_abrownfield_init` au lifecycle injecte le résumé dans `architecture` (donc dans les prompts QA/Dev), champ `brownfield_path` + input UI, 5 tests. | 5/5 |
+| D1 ✅ | **Déploiement du produit généré** — Dockerfile + CI générés pour le projet créé, **✅ LIVRÉ (incrément)** : module `deploy.py` génère Dockerfile + `.dockerignore` + workflow CI GitHub Actions dans le workspace (idempotent), `adeploy` + endpoint `POST /deploy` + bouton 🚀, 4 tests. (Le `docker build`/run effectif reste lié au sandbox R1.) | 4/4 |
+| I3 ✅ | **Import de specs** — ingérer un doc comme brief initial. **✅ LIVRÉ (incrément)** : `spec_import.py` (`parse_spec_import`), champ `brief` à la création qui seed l'état et court-circuite l'interview PM vers le plan (`_aspec_phase`), textarea d'import dans ProjectSetup, 3 tests. (Jira/MCP et image OCR restent hors périmètre.) | 3/4 |
 
 ### 📊 Pilotage de l'usine
 | # | Idée | V/C |
 |---|------|-----|
-| O1 | **Tracing Langfuse de chaque appel agent** — `_UsageTracker.arun` est le seam : un span par appel (persona, phase, story, tokens, coût, score critic/judge). Observabilité réelle de l'usine sans toucher au flux métier. | 4/2 |
-| F1 | **Bibliothèque de leçons inter-projets** — promouvoir les leçons E7 en librairie globale injectée dans tout nouveau projet (l'usine apprend d'un projet à l'autre). | 4/3 |
-| U2 | **Dashboard factory multi-projets** — taux de succès, coût/story, tentatives moyennes, personas les plus coûteuses, agrégés sur tous les projets. | 4/3 |
-| U3 | **Notifications push** — budget atteint, build terminé, `needs input`, reprise programmée (M2). | 3/1 |
-| U4 | **Gates d'approbation granulaires** — valider plan / architecture *avant* le build (HITL ciblé), pas seulement la pause globale. | 3/2 |
+| O1 ✅ | **Tracing Langfuse de chaque appel agent** — `_UsageTracker.arun` est le seam : un span par appel (persona, phase, story, tokens, coût, score critic/judge). Observabilité réelle de l'usine sans toucher au flux métier. **✅ LIVRÉ** : module `observability.py` (env `AUTOSPEC_LANGFUSE`, import paresseux, no-op gracieux), `trace_agent_call` branché dans `_UsageTracker.arun` (phase/projet/modèle/tokens/coût/durée), 3 tests. | 4/2 |
+| F1 ✅ | **Bibliothèque de leçons inter-projets** — promouvoir les leçons E7 en librairie globale injectée dans tout nouveau projet. **✅ LIVRÉ** : module `orchestrator/lessons.py` (store `autospec-lessons.json`, dédup + cap, écriture atomique), alimenté par la rétro E7, `_effective_lessons` (projet + global) injecté aux 3 sites Dev/QA, env `AUTOSPEC_SHARED_LESSONS`, 5 tests. | 4/3 |
+| U2 ✅ | **Dashboard factory multi-projets** — taux de succès, coût/story, tentatives moyennes, agrégés sur tous les projets. **✅ LIVRÉ** : module `metrics.py` (`compute_metrics` : taux de succès, coût/story, tentatives moy., qualité/mutation/couverture moy., findings, régressions), endpoint `GET /api/metrics`, modale 📊 Dashboard, 2 tests. | 4/3 |
+| U3 ✅ | **Notifications push** — budget atteint, build terminé, erreur, reprise programmée (M2). **✅ LIVRÉ** : `_notify` sur le bus + 4 jalons backend ; toasts in-app + `Notification` navigateur (permission demandée au montage) ; 2 tests backend + 1 Vitest. | 3/1 |
+| U4 ✅ | **Gates d'approbation granulaires** — valider plan / architecture *avant* le build (HITL ciblé), pas seulement la pause globale. **✅ LIVRÉ** : `_aapproval_gate` (asyncio.Event) bloque avant le build, `aapprove`/`areject` + endpoints `POST /approve` `/reject`, champ `awaiting_approval`, bannière UI dans RunPanel, env `AUTOSPEC_APPROVAL_GATES`, 4 tests. | 3/2 |
 
 > Backlog des 16 features : épuisé. Extension produit (E1→E7 + I1/I2 + M1/M2 + U1) :
 > **épuisée**. Suite backend **193 tests**, **32 tests Vitest**, et un **scénario

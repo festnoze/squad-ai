@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { Board } from "./Board";
 import { Epic, UserStory } from "../types";
@@ -30,7 +30,7 @@ describe("Board", () => {
     ).toBeInTheDocument();
   });
 
-  it("affiche le titre de la story quand un epic et une story sont fournis", () => {
+  it("navigation hiérarchique : épics → epic → story (drill-down)", () => {
     const epic: Epic = {
       id: "E1",
       title: "Mon epic",
@@ -39,6 +39,18 @@ describe("Board", () => {
     };
     const story = makeStory({ epic_id: "E1", title: "Connexion utilisateur" });
     render(<Board epics={[epic]} stories={[story]} projectId="p1" />);
+
+    // Niveau racine : l'epic est visible, la story ne l'est pas encore.
+    expect(screen.getByText("Mon epic")).toBeInTheDocument();
+    expect(screen.queryByText("Connexion utilisateur")).not.toBeInTheDocument();
+
+    // Clic sur la carte epic → niveau epic : la story apparaît.
+    fireEvent.click(screen.getByText("Mon epic"));
     expect(screen.getByText("Connexion utilisateur")).toBeInTheDocument();
+
+    // Clic sur la story → niveau us : le fil d'Ariane montre l'id de la story.
+    fireEvent.click(screen.getByText("Connexion utilisateur"));
+    const crumbs = screen.getAllByText("S1");
+    expect(crumbs.length).toBeGreaterThan(0);
   });
 });

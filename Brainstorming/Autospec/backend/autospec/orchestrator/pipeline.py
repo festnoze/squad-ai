@@ -7,7 +7,9 @@ asyncio task; the API talks to it through asend_user_message / astop / arun_app.
 from __future__ import annotations
 
 import asyncio
+import json
 import os
+import re
 import subprocess
 import time
 
@@ -15,6 +17,7 @@ from ..agents import prompts
 from ..agents.runner import AgentError, AgentRunner, extract_json
 from ..agents.personas import persona
 from ..config import settings
+from .. import observability
 from ..models import (
     AcceptanceCriterion,
     ChatMessage,
@@ -33,7 +36,12 @@ from ..models import (
     UserStory,
 )
 from ..storage import save_state, workspace_dir
-from . import pytest_report, refine, scheduler, session_monitor, setup_exec, workspace
+from . import mutation, pytest_report, refine, scheduler, session_monitor, setup_exec, workspace
+from . import lessons as lesson_store
+from . import regression
+from . import deploy
+from . import brownfield
+from . import sandbox
 from .events import bus
 
 _REFINE_ROLE_TO_CHAT = {"critic": ChatRole.CRITIC, "judge": ChatRole.JUDGE}
@@ -52,7 +60,17 @@ _SAFE_ENV_KEYS = {
 def _minimal_env() -> dict[str, str]:
     """Environment for running the untrusted generated app: OS essentials only,
     so the agent-written code never inherits the server's secrets."""
-    return {k: v for k, v in os.environ.items() if k.upper() in _SAFE_ENV_KEYS}
+    env = {k: v for k, v in os.environ.items() if k.upper() in _SAFE_ENV_KEYS}
+    # Force the untrusted child's stdio to UTF-8 (BUG1): on Windows the child
+    # Python's stdout defaults to cp1252 (locale-derived), so a generated
+    # main.py that prints non-ASCII (accents, arrows…) either crashes with
+    # UnicodeEncodeError or emits cp1252 bytes we then mis-read as utf-8
+    # (mojibake). Setting these makes the child write utf-8, consistent with our
+    # encoding="utf-8" stream readers. Covers _aexercise_product (E6 evaluator)
+    # and _stream_run_output ("Lancer le projet").
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
+    return env
 
 
 def _clamp_1_5(value, default: int = 3) -> int:
@@ -83,10 +101,11 @@ class _UsageTracker:
     def __init__(self, pipeline: "Pipeline"):
         self.pipeline = pipeline
 
-    async def arun(self, prompt, system_prompt, cwd=None, session_id=None):
+    async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
         try:
+            chosen = model or settings.model_for_phase(self.pipeline.state.phase.value)
             res = await self.pipeline.runner.arun(
-                prompt, system_prompt, cwd=cwd, session_id=session_id
+                prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
         except AgentError as exc:
             # Usage-window watchdog (M2): an exhausted Claude session window
@@ -99,6 +118,25 @@ class _UsageTracker:
         usage.input_tokens += res.input_tokens
         usage.output_tokens += res.output_tokens
         usage.agent_calls += 1
+        # Optional Langfuse trace (O1): one generation per agent call. Best-effort
+        # and env-gated — never affects the pipeline if tracing fails or is off.
+        observability.trace_agent_call(
+            name=f"agent:{self.pipeline.state.phase.value}",
+            model=settings.claude_model or settings.agent_provider,
+            input_text=prompt,
+            output_text=res.text,
+            metadata={
+                "project_id": self.pipeline.state.id,
+                "project": self.pipeline.state.name,
+                "phase": self.pipeline.state.phase.value,
+                "provider": settings.agent_provider,
+                "session_id": res.session_id,
+            },
+            cost_usd=res.cost_usd,
+            input_tokens=res.input_tokens,
+            output_tokens=res.output_tokens,
+            duration_ms=res.duration_ms,
+        )
         self.pipeline._sync()  # persist + broadcast usage as it accrues
         return res
 
@@ -120,6 +158,7 @@ class Pipeline:
         self._setup_task: asyncio.Task | None = None
         self._doc_task: asyncio.Task | None = None
         self._eval_task: asyncio.Task | None = None   # E6 on-demand evaluation
+        self._security_task: asyncio.Task | None = None  # S1 on-demand security review
         self._retro_task: asyncio.Task | None = None  # E7 on-demand retrospective
         self._resume_timer: asyncio.Task | None = None  # M2 scheduled auto-resume
         self._run_proc: subprocess.Popen | None = None
@@ -131,6 +170,9 @@ class Pipeline:
         # whole pytest suite and committing/refining git must not interleave
         # (else pytest sees half-written trees and git stages the wrong files).
         self._build_lock = asyncio.Lock()
+        # U4: cleared while the pipeline waits for human approval before build.
+        self._approval_event = asyncio.Event()
+        self._approval_event.set()
 
     # ------------------------------------------------------------- events
 
@@ -153,6 +195,19 @@ class Pipeline:
         self.state.chat.append(ChatMessage(role=role, content=content))
         self._sync()
 
+    def _notify(self, level: str, title: str, body: str = "") -> None:
+        """Emit a push-notification event (U3): the frontend turns it into a
+        browser notification + an in-app toast. level: info|success|warning|error."""
+        bus.publish(
+            {
+                "type": "notify",
+                "project_id": self.state.id,
+                "level": level,
+                "title": title,
+                "body": body,
+            }
+        )
+
     # ------------------------------------------------------------- control
 
     def start(self) -> None:
@@ -173,6 +228,7 @@ class Pipeline:
             self._setup_task,
             self._doc_task,
             self._eval_task,
+            self._security_task,
             self._retro_task,
             self._resume_timer,
         ):
@@ -228,6 +284,41 @@ class Pipeline:
         self._resume_event.set()
         self._chat(ChatRole.SYSTEM, "▶ Reprise de la pipeline.")
 
+    async def _aapproval_gate(self, stage: str) -> None:
+        """U4: block before the build until a human approves. No-op when gates are
+        disabled or a stop is already requested."""
+        if not settings.approval_gates_enabled or self._stop_requested:
+            return
+        self.state.awaiting_approval = stage
+        self._approval_event.clear()
+        self._notify("info", "Validation requise", f"{self.state.name} : {stage}")
+        self._chat(
+            ChatRole.SYSTEM,
+            f"⏸ Validation requise ({stage}) — approuve pour lancer le build, ou rejette.",
+        )
+        self._sync()
+        await self._approval_event.wait()
+        self.state.awaiting_approval = ""
+        self._sync()
+
+    async def aapprove(self) -> None:
+        """Release a pending approval gate so the build proceeds (U4)."""
+        if not self.state.awaiting_approval:
+            return
+        self.state.awaiting_approval = ""
+        self._approval_event.set()
+        self._chat(ChatRole.SYSTEM, "✅ Étape validée — poursuite du build.")
+
+    async def areject(self) -> None:
+        """Reject a pending approval gate: stop the pipeline cleanly (U4)."""
+        if not self.state.awaiting_approval:
+            return
+        self._stop_requested = True
+        self.state.awaiting_approval = ""
+        self._approval_event.set()
+        self._resume_event.set()
+        self._chat(ChatRole.SYSTEM, "✋ Étape rejetée — arrêt de la pipeline.")
+
     async def _checkpoint(self) -> None:
         """Enforce the budget, then block here while the pipeline is paused
         (called between phases / story batches / auto-spec iterations)."""
@@ -254,6 +345,7 @@ class Pipeline:
                 f"💰 Budget atteint (coût ${u.cost_usd:.4f}, "
                 f"{u.input_tokens + u.output_tokens} tokens) — arrêt propre de la pipeline.",
             )
+            self._notify("warning", "Budget atteint", f"{self.state.name} : ${u.cost_usd:.4f}")
 
     async def aset_archived(self, value: bool) -> None:
         """Archive or unarchive the project (hide it without deleting it)."""
@@ -403,6 +495,11 @@ class Pipeline:
                 "(nouvelle session disponible).",
             )
             self.schedule_resume(at)
+            self._notify(
+                "info",
+                "Reprise programmée",
+                f"{self.state.name} à {time.strftime('%H:%M', time.localtime(at))}",
+            )
         except Exception:  # noqa: BLE001 — watchdog only
             pass
 
@@ -417,6 +514,18 @@ class Pipeline:
 
     async def _aresume_timer(self, at: float) -> None:
         await asyncio.sleep(max(0.0, at - time.time()))
+        # The clean stop runs asynchronously: the interrupted lifecycle task only
+        # unwinds (phase leaves BUILD) at its next checkpoint. Wait for it to land
+        # before resuming, otherwise aresume_build's active-pipeline guard rejects
+        # us. Matters when the reset window is very close to the error (a short
+        # ccusage block, or an epoch only seconds out) — production windows are
+        # usually minutes/hours away so the task is long gone by the time we wake.
+        task = self._task
+        if task is not None and not task.done():
+            try:
+                await task
+            except Exception:  # noqa: BLE001 — the lifecycle task logs its own errors
+                pass
         self.state.resume_at = 0.0
         self._chat(
             ChatRole.SYSTEM,
@@ -552,6 +661,33 @@ class Pipeline:
 
     # ------------------------------------------------------ components (E3/E4)
 
+    async def _abrownfield_init(self) -> None:
+        """B1: seed the workspace from an existing repo and inject a summary of
+        its layout into the architecture context, so the pipeline builds features
+        on top of the existing code. No-op when no brownfield path is set."""
+        if not self.state.brownfield_path:
+            return
+        ws = workspace_dir(self.state.id)
+        path = self.state.brownfield_path
+
+        def _seed():
+            n = brownfield.seed_workspace_from(path, ws)
+            return n, brownfield.summarize_repo(path)
+
+        copied, summary = await asyncio.to_thread(_seed)
+        if summary:
+            prefix = "Contexte brownfield (code existant à étendre) :\n" + summary
+            self.state.architecture = (
+                prefix + "\n\n" + self.state.architecture
+                if self.state.architecture
+                else prefix
+            )
+        self._chat(
+            ChatRole.SYSTEM,
+            f"🧩 Mode brownfield : {copied} fichier(s) existant(s) intégrés au workspace.",
+        )
+        self._sync()
+
     async def _apropose_components(self) -> None:
         """Solution agent proposes the product's technical components right
         after the brief (first iteration only). Mandatory components are
@@ -623,6 +759,26 @@ class Pipeline:
             self._sync()
 
     # ------------------------------------------------------ tech-writer (I2)
+
+    async def adeploy(self) -> dict:
+        """Generate deployment artifacts (Dockerfile, .dockerignore, CI) for the
+        generated product (D1). Idempotent; returns the created files. Raises
+        ValueError (-> 409) while the pipeline is actively building."""
+        if self.state.phase in (
+            PipelinePhase.SPEC, PipelinePhase.ANALYZE, PipelinePhase.PLAN,
+            PipelinePhase.ARCHITECT, PipelinePhase.BUILD,
+        ):
+            raise ValueError(
+                "la pipeline est active : attends la fin avant de générer le déploiement"
+            )
+        ws = workspace.scaffold(self.state)
+        created = await asyncio.to_thread(deploy.write_deploy_artifacts, ws)
+        self._chat(
+            ChatRole.SYSTEM,
+            "🚀 Artefacts de déploiement générés : "
+            + (", ".join(created) if created else "déjà présents."),
+        )
+        return {"created": created}
 
     async def adocument(self) -> None:
         """Tech-writer pass in the background: write the GENERATED project's
@@ -698,6 +854,15 @@ class Pipeline:
         except Exception as exc:  # background task: surface, never crash silently
             self._chat(ChatRole.SYSTEM, f"Erreur de l'évaluateur : {exc}")
 
+    def _maybe_sandbox(self, cmd: list, ws) -> list:
+        """R1: wrap a command to run inside a no-network Docker sandbox when
+        enabled, else return it unchanged."""
+        if not settings.sandbox_enabled:
+            return cmd
+        return sandbox.docker_run_cmd(
+            list(cmd), str(ws), settings.sandbox_image, docker=settings.docker_cmd
+        )
+
     async def _aexercise_product(self) -> str:
         """Actually launch the generated app (`main.py`) and capture its output.
 
@@ -710,7 +875,7 @@ class Pipeline:
         ws = workspace_dir(self.state.id)
         env = _minimal_env()
         timeout = settings.evaluator_run_timeout_s
-        cmd = [settings.uv_cmd, "run", "python", "main.py"]
+        cmd = self._maybe_sandbox([settings.uv_cmd, "run", "python", "main.py"], ws)
 
         def _run() -> str:
             try:
@@ -794,6 +959,121 @@ class Pipeline:
         )
         await self._aimpact_analysis(combined)
 
+    # ----------------------------------------- security & supply-chain (S1)
+
+    async def asecurity_review(self) -> None:
+        """Run the security & supply-chain review on demand (background): audit
+        the generated code + dependencies and feed findings into the impact
+        pipeline.
+
+        Raises ValueError (-> 409) while the pipeline is actively building or
+        when a review is already running."""
+        if self.state.phase in (
+            PipelinePhase.SPEC,
+            PipelinePhase.ANALYZE,
+            PipelinePhase.PLAN,
+            PipelinePhase.ARCHITECT,
+            PipelinePhase.BUILD,
+        ):
+            raise ValueError("la pipeline est active : attends la fin avant la revue sécurité")
+        if self._security_task and not self._security_task.done():
+            raise ValueError("une revue sécurité est déjà en cours")
+        self._security_task = asyncio.create_task(self._asecurity_task())
+
+    async def _asecurity_task(self) -> None:
+        try:
+            await self._asecurity_phase(force=True)
+        except Exception as exc:  # background task: surface, never crash silently
+            self._chat(ChatRole.SYSTEM, f"Erreur de la revue sécurité : {exc}")
+
+    async def _arun_dep_audit(self) -> str:
+        """Best-effort supply-chain audit of the generated workspace: `pip-audit`
+        for the Python project, `npm audit` when a package.json exists. These only
+        read manifests/lockfiles (the untrusted app is never executed) and run
+        with a minimal env + wall-clock cap. Demo mode short-circuits."""
+        if settings.fake_agents:
+            return "mode démo : audit des dépendances court-circuité"
+        ws = workspace_dir(self.state.id)
+        env = _minimal_env()
+        timeout = settings.security_audit_timeout_s
+
+        def _run() -> str:
+            parts: list[str] = []
+            cmds = [("pip-audit", [settings.uv_cmd, "run", "pip-audit"])]
+            if (ws / "package.json").exists():
+                cmds.append(("npm audit", [settings.npm_cmd, "audit"]))
+            for label, cmd in cmds:
+                try:
+                    proc = subprocess.run(
+                        cmd, cwd=str(ws),
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        env=env, text=True, encoding="utf-8", errors="replace",
+                        timeout=timeout,
+                    )
+                    parts.append(f"$ {label} (code {proc.returncode})\n{proc.stdout[-2000:]}")
+                except subprocess.TimeoutExpired:
+                    parts.append(f"$ {label} : timeout après {timeout:g}s")
+                except OSError as exc:
+                    parts.append(f"$ {label} : indisponible ({exc})")
+            return "\n\n".join(parts) or "(aucun audit de dépendances exécuté)"
+
+        return await asyncio.to_thread(_run)
+
+    async def _asecurity_phase(self, force: bool = False) -> None:
+        """Audit the delivered code + dependencies for security weaknesses and
+        turn the review into structured findings, then feed them into the
+        feedback-impact pipeline (E2) as evidence. Env-gated in the pipeline flow
+        (force=True for the explicit endpoint); non-fatal."""
+        if not force and not settings.security_review_enabled:
+            return
+        ws = workspace.scaffold(self.state)
+        self._log("security", "🔒 Revue sécurité & supply-chain du produit livré…")
+        audit_output = await self._arun_dep_audit()
+        try:
+            result = await self._tracked.arun(
+                prompts.security_review_probe(
+                    self.state, workspace.package_name(self.state), audit_output
+                ),
+                system_prompt=persona("security-reviewer"),
+                cwd=ws,
+            )
+            reply = extract_json(result.text)
+        except AgentError as exc:
+            self._chat(ChatRole.SYSTEM, f"Auditeur sécurité indisponible : {exc}")
+            return
+        message = reply.get("message", "")
+        items = reply.get("findings") or []
+        if not items:
+            self._chat(ChatRole.QA, "🔒 " + (message or "Aucune faille de sécurité détectée."))
+            return
+        taken = {f.id for f in self.state.findings}
+        new_findings: list[Finding] = []
+        for i, data in enumerate(items, start=1):
+            fid = _unique_id(str(data.get("id") or f"SEC-{len(taken) + i}"), "SEC", taken)
+            taken.add(fid)
+            new_findings.append(
+                Finding(
+                    id=fid,
+                    severity=str(data.get("severity") or "medium"),
+                    kind=str(data.get("kind") or "security"),
+                    title=str(data.get("title") or "Finding"),
+                    detail=str(data.get("detail") or ""),
+                    iteration=self.state.iteration,
+                )
+            )
+        self.state.findings.extend(new_findings)
+        lines = [f"[{f.severity}/{f.kind}] {f.title} — {f.detail}" for f in new_findings]
+        self.state.feedback.extend(lines)
+        self._chat(
+            ChatRole.QA,
+            f"🔒 {message}\n" + "\n".join(f"• {line}" for line in lines),
+        )
+        self._sync()
+        combined = "Findings de la revue sécurité du produit livré :\n" + "\n".join(
+            f"- {line}" for line in lines
+        )
+        await self._aimpact_analysis(combined)
+
     # --------------------------------------------- factory retrospective (E7)
 
     async def aretrospect(self) -> None:
@@ -846,6 +1126,7 @@ class Pipeline:
             if lesson not in deduped:
                 deduped.append(lesson)
         self.state.lessons = deduped[: settings.retro_max_lessons]
+        lesson_store.add_global_lessons(self.state.lessons)  # F1: shared library
         self.state.retro_recommendations = recommendations
         message = reply.get("message", "")
         body = ""
@@ -864,6 +1145,7 @@ class Pipeline:
     async def _alifecycle(self) -> None:
         try:
             workspace.scaffold(self.state)
+            await self._abrownfield_init()
             brief = await self._aspec_phase()
             if brief is None:  # stopped during interview
                 self.state.phase = PipelinePhase.STOPPED
@@ -877,14 +1159,21 @@ class Pipeline:
                     break
                 await self._aplan_phase()
                 await self._aarchitect_phase()
+                await self._aapproval_gate("plan")
+                if self._stop_requested:
+                    break
                 await self._abuild_phase()
                 await self._adocument_phase()
                 # Closed-loop product evaluation (E6): exercise the delivered
                 # iteration and feed findings into the impact pipeline.
                 await self._aevaluate_phase()
+                # Security & supply-chain review (S1): audit the delivered
+                # code and dependencies, feeding findings into the impact pipeline.
+                await self._asecurity_phase()
                 # Factory retrospective (E7): distil this iteration's signals
                 # into durable lessons before the next one starts.
                 await self._aretro_phase()
+                await self._asnapshot_iteration()
                 if not self.state.auto_spec or self._stop_requested:
                     break
                 await self._anext_feature_phase()
@@ -897,16 +1186,26 @@ class Pipeline:
                 "Itération terminée." if self.state.phase == PipelinePhase.DONE
                 else "Boucle arrêtée par l'utilisateur.",
             )
+            if self.state.phase == PipelinePhase.DONE:
+                self._notify("success", "Itération terminée", self.state.name)
         except Exception as exc:  # surface any pipeline failure to the UI
             self.state.phase = PipelinePhase.ERROR
-            self.state.error = str(exc)
-            self._chat(ChatRole.SYSTEM, f"Erreur pipeline : {exc}")
+            # Some exceptions stringify to "" (e.g. bare TimeoutError); fall back
+            # to repr/type so the UI never shows a detail-less "Erreur pipeline :".
+            detail = str(exc) or repr(exc) or type(exc).__name__
+            self.state.error = detail
+            self._chat(ChatRole.SYSTEM, f"Erreur pipeline : {detail}")
+            self._notify("error", "Erreur pipeline", f"{self.state.name} : {detail}"[:200])
 
     # ------------------------------------------------------------ SPEC (PM)
 
     async def _aspec_phase(self) -> str | None:
         self.state.phase = PipelinePhase.SPEC
         self._sync()
+        if self.state.brief.strip():
+            # I3: an imported / pre-seeded brief skips the PM interview.
+            self._chat(ChatRole.PM, "📥 Brief importé — passage direct à la planification.")
+            return self.state.brief
         while not self._stop_requested:
             # Brainstorming re-questions the need itself (BMAD analyst persona);
             # interview is the Socratic spec facilitation (PM persona).
@@ -1033,6 +1332,16 @@ class Pipeline:
 
     # ----------------------------------------------------- refinement harness
 
+    def _effective_lessons(self) -> list[str]:
+        """This project's lessons (E7) plus the shared cross-project library
+        (F1), deduplicated — the lessons injected into Dev/QA prompts."""
+        combined = list(self.state.lessons)
+        if settings.shared_lessons_enabled:
+            for item in lesson_store.load_global_lessons():
+                if item not in combined:
+                    combined.append(item)
+        return combined
+
     def _emit_refine(self, role: str, message: str) -> None:
         self._chat(_REFINE_ROLE_TO_CHAT.get(role, ChatRole.SYSTEM), message)
 
@@ -1075,7 +1384,7 @@ class Pipeline:
                     story, pkg, workspace.feature_rel_path(story), critique,
                     architecture=self.state.architecture,
                     guidance="\n".join(self.state.build_guidance),
-                    lessons="\n".join(self.state.lessons),
+                    lessons="\n".join(self._effective_lessons()),
                 ),
                 system_prompt=persona("dev"),
                 cwd=ws,
@@ -1123,6 +1432,85 @@ class Pipeline:
                 f"[{story.id}] Code raffiné en {outcome.rounds} tour(s) — "
                 f"qualité {outcome.score}/100 (arrêt : {outcome.stopped_reason}).",
             )
+
+    async def _arun_coverage(self, story: UserStory, pkg: str, ws) -> int:
+        """Coverage gate (Q2): run the suite under coverage and record the total
+        percentage on story.coverage_score. Returns the integer %% (or -1 when
+        unavailable). Best-effort: a coverage-tooling failure returns -1 and never
+        fails the story by itself (the gate decision is made by the caller)."""
+        if not settings.coverage_enabled or settings.fake_agents:
+            return -1
+        report = workspace_dir(self.state.id) / ".autospec-cov.json"
+        env = _minimal_env()
+        cmd = [
+            settings.uv_cmd, "run", "pytest",
+            f"--cov={pkg}", "--cov-report", f"json:{report.name}", "-q",
+        ]
+
+        def _run():
+            try:
+                subprocess.run(
+                    cmd, cwd=str(ws),
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    env=env, text=True, encoding="utf-8", errors="replace",
+                    timeout=settings.agent_timeout_s,
+                )
+            except (OSError, subprocess.TimeoutExpired):
+                return None
+            try:
+                data = json.loads(report.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                return None
+            return (data.get("totals") or {}).get("percent_covered")
+
+        pct = await asyncio.to_thread(_run)
+        if pct is None:
+            return -1
+        story.coverage_score = round(pct)
+        self._sync()
+        return story.coverage_score
+
+    async def _arun_mutation_test(self, story: UserStory, pkg: str, ws) -> None:
+        """Mutation testing (Q1): mutate the package source one point at a time
+        and rerun the suite against each mutant; story.mutation_score = kill rate
+        (%). Env-gated, best-effort (never downgrades a green story). Runs inside
+        the build lock held by the caller, so pytest stays serialized."""
+        if not settings.mutation_enabled or settings.fake_agents:
+            return
+        pkg_dir = ws / pkg
+        if not pkg_dir.is_dir():
+            return
+        sources = [
+            f for f in sorted(pkg_dir.glob("*.py"))
+            if f.name != "__init__.py" and f.read_text(encoding="utf-8").strip()
+        ]
+        cap = settings.mutation_max_mutants
+        total = killed = 0
+        for f in sources:
+            if total >= cap:
+                break
+            original = f.read_text(encoding="utf-8")
+            for _desc, mutant in mutation.generate_mutants(original, max_mutants=cap - total):
+                if total >= cap:
+                    break
+                total += 1
+                f.write_text(mutant, encoding="utf-8")
+                try:
+                    ok, _, _ = await self._arun_pytest()
+                except Exception:  # noqa: BLE001 — runner glitch: count as survived
+                    ok = True
+                finally:
+                    f.write_text(original, encoding="utf-8")  # always restore
+                if not ok:
+                    killed += 1
+        if total:
+            story.mutation_score = round(100 * killed / total)
+            self._chat(
+                ChatRole.SYSTEM,
+                f"[{story.id}] 🧬 Mutation testing : {story.mutation_score}/100 "
+                f"({killed}/{total} mutants tués).",
+            )
+            self._sync()
 
     async def _agit(self, ws, *args: str) -> tuple[int, str]:
         def _run() -> tuple[int, str]:
@@ -1178,6 +1566,52 @@ class Pipeline:
         await self._agit(ws, "commit", "-m", "autospec: export du projet généré", "--allow-empty")
         code, out = await self._agit(ws, "rev-parse", "HEAD")
         return {"commit": out.strip() if code == 0 else ""}
+
+    async def _asnapshot_iteration(self) -> None:
+        """R2: commit the workspace as this iteration's snapshot, for rollback."""
+        ws = workspace_dir(self.state.id)
+        if not await self._agit_ensure_repo(ws):
+            return
+        await self._agit(ws, "add", "-A")
+        await self._agit(
+            ws, "commit", "-m", f"iteration {self.state.iteration} snapshot", "--allow-empty"
+        )
+
+    async def aiterations(self) -> list[int]:
+        """R2: iteration numbers that have a workspace snapshot."""
+        ws = workspace_dir(self.state.id)
+        code, out = await self._agit(ws, "log", "--format=%s")
+        if code != 0:
+            return []
+        found = set()
+        for line in out.splitlines():
+            m = re.match(r"iteration (\d+) snapshot", line.strip())
+            if m:
+                found.add(int(m.group(1)))
+        return sorted(found)
+
+    async def arollback(self, iteration: int) -> None:
+        """R2: hard-reset the workspace to an iteration's snapshot commit. Raises
+        ValueError (-> 409) while the pipeline is active or when the snapshot is
+        missing."""
+        if self.state.phase in (
+            PipelinePhase.SPEC, PipelinePhase.ANALYZE, PipelinePhase.PLAN,
+            PipelinePhase.ARCHITECT, PipelinePhase.BUILD,
+        ):
+            raise ValueError("la pipeline est active : impossible de revenir en arrière")
+        ws = workspace_dir(self.state.id)
+        code, out = await self._agit(
+            ws, "log", "-1", "--format=%H", f"--grep=iteration {iteration} snapshot"
+        )
+        commit = out.strip()
+        if code != 0 or not commit:
+            raise ValueError(f"aucun snapshot pour l'itération {iteration}")
+        await self._agit(ws, "reset", "--hard", commit)
+        await self._agit(ws, "clean", "-fd")
+        self._chat(
+            ChatRole.SYSTEM, f"⏪ Workspace revenu au snapshot de l'itération {iteration}."
+        )
+        self._sync()
 
     async def astory_diff(self, sid: str) -> dict:
         """Return the git diff committed when a story reached DONE.
@@ -1252,7 +1686,7 @@ class Pipeline:
                         story, pkg, workspace.feature_rel_path(story), self.state.architecture,
                         "\n".join(self.state.build_guidance),
                         ui_tests=self._ui_mode(story),
-                        lessons="\n".join(self.state.lessons),
+                        lessons="\n".join(self._effective_lessons()),
                     ),
                     system_prompt=persona("dev"),
                     cwd=ws,
@@ -1268,6 +1702,17 @@ class Pipeline:
                 ok, output, real = await self._arun_pytest()
                 tail = output[-2000:]
                 self._apply_test_states(story, reply.get("test_results", []), real)
+                regs = regression.find_regressions(set(self.state.green_tests), real)
+                if regs:
+                    rmsg = (
+                        f"[{story.id}] {len(regs)} test(s) précédemment verts cassés : "
+                        + ", ".join(regs[:3]) + ("…" if len(regs) > 3 else "")
+                    )
+                    self.state.regressions.append(rmsg)
+                    self._notify("warning", "Régression détectée", rmsg)
+                    self._log(f"dev:{story.id}", "⚠️ " + rmsg)
+                if real:
+                    self.state.green_tests = sorted(n for n, o in real.items() if o == "passed")
                 if ok and self._ui_mode(story):
                     # UI-flagged story: the replayable Playwright suite must be
                     # green too (browser run, screenshots + render assertions).
@@ -1275,6 +1720,15 @@ class Pipeline:
                     if not ok:
                         tail = ui_output[-2000:]
                         self._log(f"dev:{story.id}", "❌ Tests d'acceptance UI rouges.")
+                if ok and settings.coverage_enabled:
+                    cov = await self._arun_coverage(story, pkg, ws)
+                    if settings.coverage_gate_threshold > 0 and 0 <= cov < settings.coverage_gate_threshold:
+                        ok = False
+                        tail = (
+                            f"Couverture insuffisante : {cov}% < seuil "
+                            f"{settings.coverage_gate_threshold}% (gate de couverture)."
+                        )
+                        self._log(f"dev:{story.id}", "❌ " + tail)
                 if ok:
                     story.status = StoryStatus.DONE
                     # Suite green: any planned test we couldn't map to a real
@@ -1288,6 +1742,7 @@ class Pipeline:
                     await self._acommit_story(ws, story.id)
                     if settings.refine_for("dev"):
                         await self._arefine_code(story, pkg, ws)
+                    await self._arun_mutation_test(story, pkg, ws)
                 else:
                     story.last_error = tail
                     self._log(f"dev:{story.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
@@ -1442,7 +1897,7 @@ class Pipeline:
             result = await self._tracked.arun(
                 prompts.qa_test_plan(
                     story, pkg, self.state.architecture,
-                    lessons="\n".join(self.state.lessons),
+                    lessons="\n".join(self._effective_lessons()),
                 ),
                 system_prompt=persona("qa"),
             )

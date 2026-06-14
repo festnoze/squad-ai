@@ -136,6 +136,7 @@ class _LangChainRunner:
         system_prompt: str,
         cwd: Path | None = None,
         session_id: str | None = None,
+        model: str | None = None,
     ) -> AgentResult:
         try:
             from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -227,7 +228,37 @@ class OllamaRunner(_LangChainRunner):
         )
 
 
-PROVIDERS = ("claude", "openai", "ollama")
+class AnthropicRunner(_LangChainRunner):
+    """Anthropic Claude via the API directly (langchain-anthropic), independent
+    of the local Claude Code CLI harness."""
+
+    name = "anthropic"
+
+    def _build_model(self):
+        if not settings.anthropic_api_key:
+            raise AgentError(
+                "Clé API Anthropic absente (AUTOSPEC_ANTHROPIC_API_KEY ou ANTHROPIC_API_KEY)."
+            )
+        try:
+            from langchain_anthropic import ChatAnthropic
+        except ImportError:
+            raise AgentError(
+                "langchain-anthropic n'est pas installé (uv sync) — requis pour le provider anthropic."
+            )
+        return ChatAnthropic(
+            model=settings.anthropic_model,
+            api_key=settings.anthropic_api_key,
+            timeout=settings.agent_timeout_s,
+        )
+
+    def _cost(self, input_tokens: int, output_tokens: int) -> float:
+        return (
+            input_tokens * settings.anthropic_price_in
+            + output_tokens * settings.anthropic_price_out
+        ) / 1_000_000
+
+
+PROVIDERS = ("claude", "openai", "ollama", "anthropic")
 
 
 def make_runner(provider: str) -> AgentRunner:
@@ -237,6 +268,8 @@ def make_runner(provider: str) -> AgentRunner:
         return OpenAiRunner()
     if normalized == "ollama":
         return OllamaRunner()
+    if normalized == "anthropic":
+        return AnthropicRunner()
     if normalized in ("", "claude"):
         return ClaudeCliRunner()
     raise ValueError(f"Provider inconnu : {provider!r} (attendu : {', '.join(PROVIDERS)})")
@@ -248,4 +281,6 @@ def provider_model(provider: str) -> str:
         return settings.openai_model
     if provider == "ollama":
         return settings.ollama_model
+    if provider == "anthropic":
+        return settings.anthropic_model
     return settings.claude_model or "(défaut CLI)"

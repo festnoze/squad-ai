@@ -26,7 +26,7 @@ async def test_get_provider_defaults(monkeypatch):
     async with make_client([]) as client:
         data = (await client.get("/api/provider")).json()
         assert data["provider"] == "claude"
-        assert data["available"] == ["claude", "openai", "ollama"]
+        assert data["available"] == ["claude", "openai", "ollama", "anthropic"]
 
 
 async def test_switch_provider_updates_pipelines(monkeypatch):

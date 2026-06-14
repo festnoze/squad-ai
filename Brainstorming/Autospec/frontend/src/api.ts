@@ -7,6 +7,7 @@ import {
   ProviderInfo,
   StoryDiff,
   StoryPatch,
+  Metrics,
   WsEvent,
 } from "./types";
 
@@ -36,14 +37,20 @@ export async function createProject(
   name: string,
   autoSpec: boolean,
   budgetUsd?: number,
+  brief?: string,
+  brownfieldPath?: string,
 ): Promise<{ id: string; state: ProjectState }> {
   const body: {
     goal: string;
     name: string;
     auto_spec: boolean;
     budget_usd?: number;
+    brief?: string;
+    brownfield_path?: string;
   } = { goal, name, auto_spec: autoSpec };
   if (budgetUsd != null && budgetUsd > 0) body.budget_usd = budgetUsd;
+  if (brief && brief.trim()) body.brief = brief;
+  if (brownfieldPath && brownfieldPath.trim()) body.brownfield_path = brownfieldPath;
   return json(
     await fetch("/api/projects", {
       method: "POST",
@@ -94,6 +101,35 @@ export async function pauseProject(projectId: string): Promise<void> {
 
 export async function resumeProject(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/resume`, { method: "POST" }));
+}
+
+export async function approveProject(projectId: string): Promise<void> {
+  await json(await fetch(`/api/projects/${projectId}/approve`, { method: "POST" }));
+}
+
+export async function rejectProject(projectId: string): Promise<void> {
+  await json(await fetch(`/api/projects/${projectId}/reject`, { method: "POST" }));
+}
+
+export async function getIterations(projectId: string): Promise<number[]> {
+  const r = await json(await fetch(`/api/projects/${projectId}/iterations`));
+  return (r as { iterations: number[] }).iterations;
+}
+
+export async function rollbackProject(projectId: string, iteration: number): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/rollback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ iteration }),
+    }),
+  );
+}
+
+export async function deployProject(projectId: string): Promise<{ created: string[] }> {
+  return json(
+    await fetch(`/api/projects/${projectId}/deploy`, { method: "POST" }),
+  ) as Promise<{ created: string[] }>;
 }
 
 export async function deleteProject(projectId: string): Promise<void> {
@@ -311,4 +347,8 @@ export function connectEvents(
     if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
     ws?.close();
   };
+}
+
+export async function getMetrics(): Promise<Metrics> {
+  return json(await fetch("/api/metrics")) as Promise<Metrics>;
 }

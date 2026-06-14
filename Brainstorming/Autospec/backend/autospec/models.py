@@ -156,6 +156,8 @@ class UserStory(BaseModel):
     attempts: int = 0
     last_error: str = ""
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
+    mutation_score: int = -1  # last mutation-testing robustness score, %% (-1 = not run)
+    coverage_score: int = -1  # last test-coverage percentage (-1 = not run)
     ui: bool = False         # story has a visual/UI dimension (QA routes it to Playwright)
     ui_tests: list[str] = Field(default_factory=list)  # replayable UI test files (tests/ui/…)
 
@@ -222,6 +224,7 @@ class ProjectState(BaseModel):
     budget_tokens: int = 0        # token cap (0 = no limit)
     phase: PipelinePhase = PipelinePhase.IDLE
     brief: str = ""
+    brownfield_path: str = ""  # B1: existing repo to extend ("" = greenfield)
     architecture: str = ""  # current technical design (from the optional Architect phase)
     plan_quality: int = -1  # last refinement score for the PO plan (-1 = not run)
     backlog: list[FeatureHypothesis] = Field(default_factory=list)
@@ -232,12 +235,15 @@ class ProjectState(BaseModel):
     feedback: list[str] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)  # E6 evaluator observations
     lessons: list[str] = Field(default_factory=list)  # E7 durable retro lessons (injected into prompts)
+    green_tests: list[str] = Field(default_factory=list)  # R2: nodeids known green (regression baseline)
+    regressions: list[str] = Field(default_factory=list)  # R2: flagged "was green, now red" events
     retro_recommendations: list[str] = Field(default_factory=list)  # E7 tuning advice (UI only)
     build_guidance: list[str] = Field(default_factory=list)  # user directives given during the build
     iteration: int = 1
     usage: Usage = Field(default_factory=Usage)  # accumulated tokens/cost across agent calls
     running: bool = False  # generated app currently running
     paused: bool = False   # pipeline paused by the user (gates between steps)
+    awaiting_approval: str = ""  # U4: stage awaiting human approval before build ("" = none)
     resume_at: float = 0.0  # epoch of the scheduled auto-resume (0 = none) — M2 watchdog
     archived: bool = False  # hidden from the default project list (not deleted)
     error: str = ""

@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 interface Props {
-  onCreate: (goal: string, name: string, autoSpec: boolean, budgetUsd: number) => void;
+  onCreate: (goal: string, name: string, autoSpec: boolean, budgetUsd: number, brief?: string, brownfieldPath?: string) => void;
   busy: boolean;
 }
 
@@ -10,6 +10,8 @@ export function ProjectSetup({ onCreate, busy }: Props) {
   const [name, setName] = useState("");
   const [autoSpec, setAutoSpec] = useState(false);
   const [budget, setBudget] = useState("");
+  const [brief, setBrief] = useState("");
+  const [brownfield, setBrownfield] = useState("");
 
   return (
     <div className="panel setup">
@@ -36,8 +38,21 @@ export function ProjectSetup({ onCreate, busy }: Props) {
           itérations en boucle jusqu'à l'arrêt manuel
         </span>
       </label>
+      <textarea
+        placeholder="Spec à importer (optionnel) — colle un cahier des charges pour court-circuiter l'interview"
+        rows={4}
+        value={brief}
+        onChange={(e) => setBrief(e.target.value)}
+      />
+      <input
+        aria-label="Chemin d'un repo existant à étendre (mode brownfield, optionnel)"
+        placeholder="Repo existant à étendre (chemin, optionnel — mode brownfield)"
+        value={brownfield}
+        onChange={(e) => setBrownfield(e.target.value)}
+      />
       <input
         type="number"
+        aria-label="Budget maximum en dollars (vide = pas de limite)"
         min={0}
         step={0.1}
         placeholder="Budget max ($) — vide = pas de limite"
@@ -47,7 +62,7 @@ export function ProjectSetup({ onCreate, busy }: Props) {
       <button
         className="primary"
         disabled={busy || !goal.trim()}
-        onClick={() => onCreate(goal.trim(), name.trim(), autoSpec, Number(budget) || 0)}
+        onClick={() => onCreate(goal.trim(), name.trim(), autoSpec, Number(budget) || 0, brief.trim() || undefined, brownfield.trim() || undefined)}
       >
         {autoSpec ? "🔁 Lancer la boucle auto-spec" : "🚀 Démarrer la spécification"}
       </button>

@@ -410,6 +410,28 @@ async def test_recover_skips_already_live():
     assert len(server.pipelines) == 1
 
 
+async def test_recover_accepts_explicit_states():
+    # BUG2: the lifespan offloads list_states() and passes the result in, so
+    # recover_projects must register from an explicit states list too.
+    state = _persist_interrupted_project("proj-recover")
+    server.pipelines.clear()
+
+    ids = server.recover_projects([state])
+
+    assert ids == ["proj-recover"]
+    assert "proj-recover" in server.pipelines
+
+
+async def test_arecover_projects_registers_in_background():
+    # BUG2: the non-blocking background recovery still registers persisted projects.
+    _persist_interrupted_project("proj-recover")
+    server.pipelines.clear()
+
+    await server._arecover_projects()
+
+    assert "proj-recover" in server.pipelines
+
+
 async def test_recover_resets_architect_and_green():
     from autospec import storage
     from autospec.models import (

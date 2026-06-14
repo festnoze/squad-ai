@@ -39,6 +39,7 @@ class AgentRunner(Protocol):
         system_prompt: str,
         cwd: Path | None = None,
         session_id: str | None = None,
+        model: str | None = None,
     ) -> AgentResult: ...
 
 
@@ -51,6 +52,7 @@ class ClaudeCliRunner:
         system_prompt: str,
         cwd: Path | None = None,
         session_id: str | None = None,
+        model: str | None = None,
     ) -> AgentResult:
         args = [
             settings.claude_cmd,
@@ -59,8 +61,9 @@ class ClaudeCliRunner:
             "--permission-mode", settings.permission_mode,
             "--append-system-prompt", system_prompt,
         ]
-        if settings.claude_model:
-            args += ["--model", settings.claude_model]
+        chosen_model = model or settings.claude_model
+        if chosen_model:
+            args += ["--model", chosen_model]
         if session_id:
             args += ["--resume", session_id]
 
@@ -133,9 +136,11 @@ class FakeRunner:
         system_prompt: str,
         cwd: Path | None = None,
         session_id: str | None = None,
+        model: str | None = None,
     ) -> AgentResult:
         self.calls.append(
-            {"prompt": prompt, "system_prompt": system_prompt, "cwd": cwd, "session_id": session_id}
+            {"prompt": prompt, "system_prompt": system_prompt, "cwd": cwd,
+             "session_id": session_id, "model": model}
         )
         if not self.replies:
             raise AgentError("FakeRunner has no queued reply")

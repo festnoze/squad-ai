@@ -14,6 +14,10 @@ interface Props {
   onExportZip: () => void;
   onGitExport: () => void;
   onCancelResume: () => void;
+  onApprove: () => void;
+  onReject: () => void;
+  onRollback: () => void;
+  onDeploy: () => void;
 }
 
 function formatTokens(n: number): string {
@@ -46,6 +50,10 @@ export function RunPanel({
   onExportZip,
   onGitExport,
   onCancelResume,
+  onApprove,
+  onReject,
+  onRollback,
+  onDeploy,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -66,6 +74,14 @@ export function RunPanel({
   const budgetUsd = project.budget_usd ?? 0;
   const overBudget = budgetUsd > 0 && costUsd >= budgetUsd;
 
+  // O2 : estimation du coût restant à partir de l'historique du projet.
+  const doneCount = (project.stories ?? []).filter((s) => s.status === "done").length;
+  const pendingCount = (project.stories ?? []).filter((s) =>
+    ["todo", "red", "in_progress", "green"].includes(s.status),
+  ).length;
+  const forecastUsd =
+    doneCount > 0 && costUsd > 0 ? (costUsd / doneCount) * pendingCount : 0;
+
   return (
     <div className="panel run">
       <div className="run-header">
@@ -74,6 +90,27 @@ export function RunPanel({
           {PHASE_LABEL[project.phase] ?? project.phase} — itération {project.iteration}
           {project.paused ? " ⏸ en pause" : project.auto_spec && loopActive ? " (boucle auto-spec)" : ""}
         </span>
+        {project.phase === "error" && (
+          <span className="run-error" title="Détail de l'erreur de la pipeline">
+            ⚠️ {project.error?.trim() || "Erreur sans détail (voir les logs / le chat)."}
+          </span>
+        )}
+        {(project.regressions?.length ?? 0) > 0 && (
+          <span className="regression-banner" title="Des tests précédemment verts ont été cassés">
+            ⚠️ {project.regressions!.length} régression(s)
+          </span>
+        )}
+        {project.awaiting_approval && (
+          <span className="approval-banner" title="Validation requise avant le build">
+            ⏸ Validation requise ({project.awaiting_approval})
+            <button className="small-btn approve-btn" onClick={onApprove}>
+              ✅ Approuver
+            </button>
+            <button className="small-btn danger" onClick={onReject}>
+              ✋ Rejeter
+            </button>
+          </span>
+        )}
         {(project.resume_at ?? 0) > 0 && (
           <span className="resume-banner" title="Fenêtre d'usage Claude épuisée : le travail reprendra automatiquement">
             ⏰ Reprise auto à{" "}
@@ -96,6 +133,14 @@ export function RunPanel({
               ? `💸 $${costUsd.toFixed(4)} / $${budgetUsd.toFixed(2)}`
               : `💸 $${costUsd.toFixed(4)}`}{" "}
             · {formatTokens(totalTokens)} tokens · {agentCalls} appels
+          </span>
+        )}
+        {pendingCount > 0 && forecastUsd > 0 && (
+          <span
+            className="forecast-meter"
+            title="Estimation du coût restant (historique coût/story du projet)"
+          >
+            📈 ~${forecastUsd.toFixed(2)} / {pendingCount} story(ies)
           </span>
         )}
         <div className="run-buttons">
@@ -141,6 +186,12 @@ export function RunPanel({
               </button>
               <button onClick={onGitExport} title="Commit git propre du workspace généré">
                 🔀 Commit
+              </button>
+              <button onClick={onRollback} title="Revenir à un snapshot d'itération">
+                ⏪ Rollback
+              </button>
+              <button onClick={onDeploy} title="Générer les artefacts de déploiement (Dockerfile, CI)">
+                🚀 Déploiement
               </button>
             </>
           )}

@@ -14,6 +14,11 @@ import {
   pauseProject,
   resumeBuild,
   resumeProject,
+  approveProject,
+  rejectProject,
+  getIterations,
+  rollbackProject,
+  deployProject,
   runProject,
   sendChat,
   setProvider,
@@ -27,6 +32,7 @@ import {
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
 import { Board } from "./components/Board";
+import { Dashboard } from "./components/Dashboard";
 import { ChatPanel } from "./components/ChatPanel";
 import { CodeViewer } from "./components/CodeViewer";
 import { ComponentsPanel } from "./components/ComponentsPanel";
@@ -41,14 +47,24 @@ interface StampedLog {
   line: string;
 }
 
+interface NotifyToast {
+  id: number;
+  level: string;
+  title: string;
+  body: string;
+}
+
 export default function App() {
   const [projects, setProjects] = useState<ProjectState[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [logs, setLogs] = useState<StampedLog[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [toasts, setToasts] = useState<NotifyToast[]>([]);
+  const toastIdRef = useRef(0);
   const [provider, setProviderInfo] = useState<ProviderInfo | null>(null);
   // Ids des projets supprimés : empêche un event « state » retardé de
   // ressusciter un projet déjà supprimé.
@@ -92,6 +108,10 @@ export default function App() {
     getProvider()
       .then(setProviderInfo)
       .catch(() => setProviderInfo(null));
+    // U3 : demande unique de permission des notifications navigateur (best-effort).
+    if (typeof Notification !== "undefined" && Notification.permission === "default") {
+      void Notification.requestPermission();
+    }
   }, []);
 
   useEffect(() => {
@@ -109,6 +129,21 @@ export default function App() {
             ...prev.slice(-800),
             { projectId: event.project_id, source: event.source, line: event.line },
           ]);
+        } else if (event.type === "notify") {
+          const id = ++toastIdRef.current;
+          const toast = { id, level: event.level, title: event.title, body: event.body };
+          setToasts((prev) => [...prev.slice(-4), toast]);
+          if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+            try {
+              new Notification(event.title, { body: event.body });
+            } catch {
+              // notification API indisponible : on garde le toast in-app
+            }
+          }
+          setTimeout(
+            () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+            6000,
+          );
         }
       },
       () => {
@@ -131,11 +166,13 @@ export default function App() {
     name: string,
     autoSpec: boolean,
     budgetUsd: number,
+    brief?: string,
+    brownfieldPath?: string,
   ) => {
     setBusy(true);
     setError("");
     try {
-      const { state } = await createProject(goal, name, autoSpec, budgetUsd);
+      const { state } = await createProject(goal, name, autoSpec, budgetUsd, brief, brownfieldPath);
       upsert(state);
       setSelectedId(state.id);
       setShowSetup(false);
@@ -230,6 +267,26 @@ export default function App() {
   // La popup de création peut être fermée dès qu'il reste un projet à afficher.
   const canCloseSetup = visibleProjects.length > 0;
 
+  const handleRollback = guard(async () => {
+    if (!project) return;
+    const iters = await getIterations(project.id);
+    if (iters.length === 0) {
+      window.alert("Aucun snapshot d'itération disponible.");
+      return;
+    }
+    const input = window.prompt(
+      `Revenir à quelle itération ? (${iters.join(", ")})`,
+      String(iters[iters.length - 1]),
+    );
+    if (input == null) return;
+    const n = Number(input);
+    if (!iters.includes(n)) {
+      window.alert("Itération invalide.");
+      return;
+    }
+    await rollbackProject(project.id, n);
+  });
+
   return (
     <div className="app">
       <header>
@@ -254,6 +311,14 @@ export default function App() {
             <span className="provider-model">{provider.model}</span>
           </div>
         )}
+        <button
+          className="dash-btn"
+          onClick={() => setShowDashboard(true)}
+          title="Dashboard de l'usine"
+          aria-label="Dashboard de l'usine"
+        >
+          📊
+        </button>
       </header>
       {(visibleProjects.length > 0 || projects.some((p) => p.archived)) && (
         <ProjectBar
@@ -296,6 +361,27 @@ export default function App() {
           </button>
         </div>
       )}
+      {toasts.length > 0 && (
+        <div className="toasts" aria-live="polite">
+          {toasts.map((t) => (
+            <div key={t.id} className={`toast toast-${t.level}`}>
+              <div className="toast-text">
+                <div className="toast-title">{t.title}</div>
+                {t.body && <div className="toast-body">{t.body}</div>}
+              </div>
+              <button
+                type="button"
+                className="toast-close"
+                aria-label="Fermer la notification"
+                onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
       {showSetup && (
         <div
           className="modal-backdrop"
@@ -366,6 +452,18 @@ export default function App() {
               onResumeBuild={guard(() => resumeBuild(project.id))}
               onDocument={guard(() => documentProject(project.id))}
               onCancelResume={guard(() => cancelResume(project.id))}
+              onApprove={guard(() => approveProject(project.id))}
+              onReject={guard(() => rejectProject(project.id))}
+              onRollback={handleRollback}
+              onDeploy={guard(async () => {
+                if (!project) return;
+                const { created } = await deployProject(project.id);
+                window.alert(
+                  created.length
+                    ? `Artefacts générés : ${created.join(", ")}`
+                    : "Artefacts de déploiement déjà présents.",
+                );
+              })}
               onExportZip={() => window.open(exportZipUrl(project.id), "_blank")}
               onGitExport={guard(async () => {
                 const { commit } = await gitExportProject(project.id);

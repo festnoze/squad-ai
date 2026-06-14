@@ -151,4 +151,19 @@ describe("App — gestion des évènements WebSocket", () => {
     await Promise.resolve();
     expect(screen.queryByText("Projet Alpha")).not.toBeInTheDocument();
   });
+
+  it("un event 'notify' affiche un toast (U3)", async () => {
+    render(<App />);
+    await waitFor(() => expect(capturedOnEvent).not.toBeNull());
+
+    emit({
+      type: "notify",
+      project_id: "p1",
+      level: "success",
+      title: "Itération terminée",
+      body: "Projet Alpha",
+    });
+
+    expect(await screen.findByText("Itération terminée")).toBeInTheDocument();
+  });
 });

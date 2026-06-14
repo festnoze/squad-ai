@@ -99,6 +99,8 @@ export interface UserStory {
   attempts: number;
   last_error: string;
   quality_score: number;
+  mutation_score?: number;
+  coverage_score?: number;
   ui?: boolean;
   ui_tests?: string[];
 }
@@ -137,6 +139,8 @@ export interface ProjectState {
   iteration: number;
   running: boolean;
   paused: boolean;
+  awaiting_approval?: string;
+  regressions?: string[];
   resume_at?: number; // epoch de la reprise auto programmée (0 = aucune) — M2
   error: string;
   created_at: number;
@@ -155,7 +159,8 @@ export interface LogLine {
 export type WsEvent =
   | { type: "state"; project_id: string; state: ProjectState }
   | { type: "log"; project_id: string; source: string; line: string }
-  | { type: "deleted"; project_id: string };
+  | { type: "deleted"; project_id: string }
+  | { type: "notify"; project_id: string; level: string; title: string; body: string };
 
 /** Body for editing an existing user story (all fields optional). */
 export interface StoryPatch {
@@ -209,4 +214,22 @@ export function criterionState(
   if (tests.some((t) => t.status === "red")) return "red";
   if (tests.length > 0 && tests.every((t) => t.status === "green")) return "green";
   return "nonexistent";
+}
+
+export interface Metrics {
+  projects: number;
+  total_cost_usd: number;
+  total_tokens: number;
+  total_agent_calls: number;
+  total_stories: number;
+  stories_done: number;
+  stories_failed: number;
+  success_rate: number;
+  avg_attempts: number;
+  cost_per_story: number;
+  avg_quality: number | null;
+  avg_mutation: number | null;
+  avg_coverage: number | null;
+  findings: number;
+  regressions: number;
 }
