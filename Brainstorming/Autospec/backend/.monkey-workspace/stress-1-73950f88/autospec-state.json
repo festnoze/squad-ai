@@ -113,18 +113,18 @@
           "criteria": [
             "AC-1"
           ],
-          "status": "nonexistent"
+          "status": "green"
         }
       ],
       "depends_on": [
         "US-1"
       ],
       "priority": 2,
-      "status": "green",
+      "status": "done",
       "iteration": 1,
       "attempts": 1,
       "last_error": "",
-      "quality_score": -1,
+      "quality_score": 90,
       "mutation_score": -1,
       "coverage_score": -1,
       "ui": false,
@@ -196,10 +196,36 @@
       "role": "dev",
       "content": "[US-2] Implémentation et tests (mode démo) — suite verte.",
       "ts": 1781455817.1245277
+    },
+    {
+      "role": "judge",
+      "content": "Score qualité 90/100 — Qualité suffisante (mode démo).",
+      "ts": 1781455817.942279
+    },
+    {
+      "role": "system",
+      "content": "[US-2] Code raffiné en 0 tour(s) — qualité 90/100 (arrêt : threshold).",
+      "ts": 1781455817.9425182
+    },
+    {
+      "role": "qa",
+      "content": "🔬 Produit exercé (mode démo) — un souci d'intégration relevé.\n• [medium/integration] Addition et soustraction ne se composent pas — Le CLI n'enchaîne pas les deux opérations (mode démo).",
+      "ts": 1781455818.202768
     }
   ],
-  "feedback": [],
-  "findings": [],
+  "feedback": [
+    "[medium/integration] Addition et soustraction ne se composent pas — Le CLI n'enchaîne pas les deux opérations (mode démo)."
+  ],
+  "findings": [
+    {
+      "id": "FND-1",
+      "severity": "medium",
+      "kind": "integration",
+      "title": "Addition et soustraction ne se composent pas",
+      "detail": "Le CLI n'enchaîne pas les deux opérations (mode démo).",
+      "iteration": 1
+    }
+  ],
   "lessons": [],
   "green_tests": [],
   "regressions": [],
@@ -210,7 +236,7 @@
     "cost_usd": 0.0,
     "input_tokens": 0,
     "output_tokens": 0,
-    "agent_calls": 10
+    "agent_calls": 12
   },
   "running": false,
   "paused": false,
