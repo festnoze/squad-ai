@@ -1,0 +1,15 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → QA → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - generic "Provider d'agents (Claude / OpenAI / Ollama)" [ref=e6]:
+      - generic [ref=e7]: 🤖
+      - combobox [disabled] [ref=e8]:
+        - option "démo" [selected]
+        - option "claude"
+        - option "openai"
+        - option "ollama"
+        - option "anthropic"
+      - generic [ref=e9]: scripted
+    - button "Dashboard de l'usine" [ref=e10] [cursor=pointer]: 📊
+  - main [ref=e11]:
+    - generic [ref=e12]: Sélectionne un projet dans la barre ci-dessus, ou crée-en un avec « ＋ Nouveau ».

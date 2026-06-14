@@ -157,6 +157,12 @@ export default function App() {
             }
           })
           .catch((e) => setError(errorMessage(e)));
+        // Le provider/modèle est récupéré une seule fois au montage : si le
+        // backend était down à ce moment-là (sélecteur masqué), on le rafraîchit
+        // à la reconnexion pour que le sélecteur réapparaisse sans recharger.
+        getProvider()
+          .then(setProviderInfo)
+          .catch(() => {});
       },
     );
   }, []);
@@ -244,6 +250,19 @@ export default function App() {
     }
   };
 
+  // Second (adaptive) dropdown : change le modèle au sein du provider courant.
+  const handleModelChange = async (model: string) => {
+    if (!provider) return;
+    try {
+      const info = await setProvider(provider.provider, model);
+      setProviderInfo((prev) =>
+        prev ? { ...prev, provider: info.provider, model: info.model } : prev,
+      );
+    } catch (e) {
+      setError(errorMessage(e));
+    }
+  };
+
   // Keep the selection pointing at a visible project. If the selected project
   // becomes archived (and archived projects are hidden), fall back to the first
   // visible project, or the home screen when none remain.
@@ -294,12 +313,13 @@ export default function App() {
           ⚙️ Autospec <span className="subtitle">PM → PO → QA → Dev, en BDD/TDD (BMAD method)</span>
         </h1>
         {provider && (
-          <div className="provider-select" title="Provider d'agents (Claude / OpenAI / Ollama)">
+          <div className="provider-select" title="Provider d'agents (Claude / OpenAI / Ollama / Anthropic)">
             <span className="provider-label">🤖</span>
             <select
               value={provider.provider}
               disabled={provider.provider === "fake"}
               onChange={(e) => handleProviderChange(e.target.value)}
+              title="Provider"
             >
               {provider.provider === "fake" && <option value="fake">démo</option>}
               {provider.available.map((name) => (
@@ -308,7 +328,29 @@ export default function App() {
                 </option>
               ))}
             </select>
-            <span className="provider-model">{provider.model}</span>
+            {provider.provider === "fake" ? (
+              <span className="provider-model">{provider.model}</span>
+            ) : (
+              <select
+                className="provider-model-select"
+                value={provider.model}
+                onChange={(e) => handleModelChange(e.target.value)}
+                title="Modèle"
+              >
+                {/* Le modèle courant peut ne pas figurer dans la liste suggérée
+                    (ex. « (défaut CLI) » ou un modèle fixé par variable d'env) :
+                    on l'ajoute en tête pour que la sélection s'affiche bien. */}
+                {provider.model &&
+                  !(provider.models[provider.provider] ?? []).includes(provider.model) && (
+                    <option value={provider.model}>{provider.model}</option>
+                  )}
+                {(provider.models[provider.provider] ?? []).map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
         )}
         <button

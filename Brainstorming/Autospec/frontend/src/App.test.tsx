@@ -28,7 +28,16 @@ vi.mock("./api", () => ({
   sendChat: vi.fn().mockResolvedValue(undefined),
   getProvider: vi
     .fn()
-    .mockResolvedValue({ provider: "claude", model: "(défaut CLI)", available: ["claude", "openai", "ollama"] }),
+    .mockResolvedValue({
+      provider: "claude",
+      model: "(défaut CLI)",
+      available: ["claude", "openai", "ollama"],
+      models: {
+        claude: ["opus", "sonnet", "haiku"],
+        openai: ["gpt-4.1", "gpt-5.4"],
+        ollama: ["llama3.1"],
+      },
+    }),
   setProvider: vi.fn().mockResolvedValue({ ok: true, provider: "claude", model: "" }),
   updateComponents: vi.fn().mockResolvedValue(undefined),
   setupComponents: vi.fn().mockResolvedValue(undefined),

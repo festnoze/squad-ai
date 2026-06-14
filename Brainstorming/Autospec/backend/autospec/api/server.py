@@ -262,11 +262,18 @@ async def _acall_pipeline(coro, not_found: str):
 async def aget_provider() -> dict:
     """Current agent provider/model. In demo mode the scripted backend rules."""
     if settings.fake_agents:
-        return {"provider": "fake", "model": "scripted", "available": list(PROVIDERS)}
+        return {
+            "provider": "fake",
+            "model": "scripted",
+            "available": list(PROVIDERS),
+            "models": {p: provider_models(p) for p in PROVIDERS},
+        }
     return {
         "provider": settings.agent_provider,
         "model": provider_model(settings.agent_provider),
         "available": list(PROVIDERS),
+        # Per-provider model choices so the UI can drive an adaptive 2nd dropdown.
+        "models": {p: provider_models(p) for p in PROVIDERS},
     }
 
 
@@ -283,6 +290,8 @@ async def aset_provider(req: ProviderRequest) -> dict:
             settings.openai_model = model or settings.openai_model
         elif provider == "ollama":
             settings.ollama_model = model or settings.ollama_model
+        elif provider == "anthropic":
+            settings.anthropic_model = model or settings.anthropic_model
         else:
             settings.claude_model = model or None
     try:

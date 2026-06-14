@@ -1373,6 +1373,18 @@ button.action-btn.action-done {
   white-space: nowrap;
 }
 
+.provider-model-select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 5px 8px;
+  font: inherit;
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  max-width: 200px;
+}
+
 /* ---------- composants du produit (E3/E4) ---------- */
 .components {
   max-height: 260px;

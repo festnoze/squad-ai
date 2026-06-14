@@ -11,6 +11,7 @@ from autospec.agents.providers import (
     _apply_tool,
     make_runner,
     provider_model,
+    provider_models,
 )
 from autospec.agents.runner import AgentError, ClaudeCliRunner
 from autospec.config import settings
@@ -32,6 +33,22 @@ def test_provider_model_reads_settings(monkeypatch):
     assert provider_model("openai") == "gpt-test"
     assert provider_model("ollama") == "llama-test"
     assert provider_model("claude") == "(défaut CLI)"
+
+
+def test_provider_models_lists_choices(monkeypatch):
+    monkeypatch.setattr(settings, "claude_model", None)
+    # Claude default placeholder is not injected as a selectable model.
+    assert provider_models("claude") == ["opus", "sonnet", "haiku"]
+    assert "gpt-4.1" in provider_models("openai")
+
+
+def test_provider_models_includes_current_when_custom(monkeypatch):
+    # A model fixed via env that isn't in the suggested list is prepended so
+    # the UI dropdown can still reflect the active selection.
+    monkeypatch.setattr(settings, "openai_model", "gpt-custom-x")
+    models = provider_models("openai")
+    assert models[0] == "gpt-custom-x"
+    assert "gpt-4.1" in models
 
 
 def test_apply_tool_write_then_read(tmp_path):

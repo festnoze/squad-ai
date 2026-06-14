@@ -27,6 +27,25 @@ async def test_get_provider_defaults(monkeypatch):
         data = (await client.get("/api/provider")).json()
         assert data["provider"] == "claude"
         assert data["available"] == ["claude", "openai", "ollama", "anthropic"]
+        # Adaptive 2nd dropdown: per-provider model choices.
+        assert data["models"]["claude"] == ["opus", "sonnet", "haiku"]
+        assert "gpt-4.1" in data["models"]["openai"]
+
+
+async def test_switch_anthropic_model(monkeypatch):
+    monkeypatch.setattr(settings, "agent_provider", "claude")
+    async with make_client([]) as client:
+        resp = await client.post(
+            "/api/provider",
+            json={"provider": "anthropic", "model": "claude-opus-4-8"},
+        )
+        assert resp.status_code == 200
+        assert resp.json() == {
+            "ok": True,
+            "provider": "anthropic",
+            "model": "claude-opus-4-8",
+        }
+        assert settings.anthropic_model == "claude-opus-4-8"
 
 
 async def test_switch_provider_updates_pipelines(monkeypatch):

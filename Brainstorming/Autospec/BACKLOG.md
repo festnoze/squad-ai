@@ -44,6 +44,7 @@ modèle courant.
 | 15 | Archivage des projets (`archived` + endpoints archive/unarchive + UI bascule « Archivés ») | tests + e2e |
 | 16 | Workflow CI racine monorepo (filtre paths + chemins préfixés) | YAML valide |
 | 17 | Navigation hiérarchique du board (drill-down épics → epic → US + fil d'Ariane, deps d'epic dérivées des US, remplace l'expansion en drop-down) | unit Vitest |
+| 18 | Sélecteur de projet (dropdown 🗂 en tête de `ProjectBar` : option « badge phase + nom + done/total + phase », reflète/commute le projet actif, inclut toujours le projet courant même archivé/masqué ; lisible quand les chips débordent) | unit Vitest + smoke navigateur |
 
 ## 🔎 Audit multi-agents (workflow `autospec-test-audit`)
 

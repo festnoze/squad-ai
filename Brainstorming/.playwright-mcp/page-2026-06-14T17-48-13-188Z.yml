@@ -1,0 +1,95 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → QA → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - generic "Provider d'agents (Claude / OpenAI / Ollama / Anthropic)" [ref=e87]:
+      - generic [ref=e7]: 🤖
+      - combobox "Provider" [disabled] [ref=e88]:
+        - option "démo" [selected]
+        - option "claude"
+        - option "openai"
+        - option "ollama"
+        - option "anthropic"
+      - generic [ref=e9]: scripted
+    - button "Dashboard de l'usine" [ref=e10] [cursor=pointer]: 📊
+  - generic [ref=e13]:
+    - generic "Sélectionner le projet actif" [ref=e14]:
+      - generic [ref=e15]: 🗂
+      - combobox "Sélectionner le projet actif" [ref=e16] [cursor=pointer]:
+        - option "🟢 Alpha · 2/2 · done"
+        - option "🟢 Gamma · 2/2 · done"
+        - option "🟢 Beta · 2/2 · done" [selected]
+    - generic [ref=e17] [cursor=pointer]:
+      - generic "done" [ref=e18]
+      - generic [ref=e19]: Alpha
+      - generic "2 story(ies) terminée(s) sur 2" [ref=e20]: 2/2
+      - button "📦" [ref=e21]
+      - button "✕" [ref=e22]
+    - generic [ref=e23] [cursor=pointer]:
+      - generic "done" [ref=e24]
+      - generic [ref=e25]: Gamma
+      - generic "2 story(ies) terminée(s) sur 2" [ref=e26]: 2/2
+      - button "📦" [ref=e27]
+      - button "✕" [ref=e28]
+    - generic [ref=e29] [cursor=pointer]:
+      - generic "done" [ref=e30]
+      - generic [ref=e31]: Beta
+      - generic "2 story(ies) terminée(s) sur 2" [ref=e32]: 2/2
+      - button "📦" [ref=e33]
+      - button "✕" [ref=e34]
+    - button "＋ Nouveau" [ref=e35] [cursor=pointer]
+  - main [ref=e11]:
+    - generic [ref=e36]:
+      - heading "Chat — spécification & feedback" [level=2] [ref=e38]
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - text: Toi
+          - generic [ref=e41]: demo Beta feature
+        - generic [ref=e42]:
+          - text: 📋 PM
+          - generic [ref=e43]: Brief généré (mode démo).
+        - generic [ref=e44]:
+          - text: 🏃 PO
+          - generic [ref=e45]: "Plan de l'itération 1 : 1 epic(s), 2 user story(ies)."
+        - generic [ref=e46]:
+          - text: 🧪 QA
+          - generic [ref=e47]: "[US-1] Décomposition outside-in (mode démo). Plan outside-in : 1 test(s) unitaire(s) (service)."
+        - generic [ref=e48]:
+          - text: 💻 Dev
+          - generic [ref=e49]: "[US-1] Implémentation et tests (mode démo) — suite verte."
+        - generic [ref=e50]:
+          - text: 🧪 QA
+          - generic [ref=e51]: "[US-2] Décomposition outside-in (mode démo). Plan outside-in : 1 test(s) unitaire(s) (service)."
+        - generic [ref=e52]:
+          - text: 💻 Dev
+          - generic [ref=e53]: "[US-2] Implémentation et tests (mode démo) — suite verte."
+        - generic [ref=e54]:
+          - text: ⚙️ Système
+          - generic [ref=e55]: Itération terminée.
+      - generic [ref=e56]:
+        - textbox "Donne ton feedback sur l'itération en cours…" [ref=e57]
+        - button "Envoyer" [disabled] [ref=e58]
+    - generic [ref=e59]:
+      - generic [ref=e60]:
+        - generic [ref=e61]:
+          - heading "Board Epics / User stories" [level=2] [ref=e62]
+          - navigation "Fil d'Ariane" [ref=e63]:
+            - button "Épics" [disabled] [ref=e64]
+        - button "EPIC-1 itération 1 Cœur applicatif Les fonctionnalités de base. 2 US · 2/2 terminée(s)" [ref=e66] [cursor=pointer]:
+          - generic [ref=e67]:
+            - generic [ref=e68]: EPIC-1
+            - generic [ref=e69]: itération 1
+          - generic [ref=e70]: Cœur applicatif
+          - paragraph [ref=e71]: Les fonctionnalités de base.
+          - generic [ref=e72]: 2 US · 2/2 terminée(s)
+      - generic [ref=e74]:
+        - heading "Exécution" [level=2] [ref=e75]
+        - generic [ref=e76]: ✅ Itération terminée — itération 1
+        - generic [ref=e77]: 💸 $0.0000 · 0 tokens · 6 appels
+        - generic [ref=e78]:
+          - button "▶ Lancer le projet" [ref=e79] [cursor=pointer]
+          - button "📘 Doc" [ref=e80] [cursor=pointer]
+          - button "⬇ Zip" [ref=e81] [cursor=pointer]
+          - button "🔀 Commit" [ref=e82] [cursor=pointer]
+          - button "⏪ Rollback" [ref=e83] [cursor=pointer]
+          - button "🚀 Déploiement" [ref=e84] [cursor=pointer]
+      - button "📁 Code généré" [ref=e86] [cursor=pointer]

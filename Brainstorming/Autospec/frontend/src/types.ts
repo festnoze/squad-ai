@@ -56,6 +56,8 @@ export interface ProviderInfo {
   provider: string;
   model: string;
   available: string[];
+  /** Suggested model choices per provider, driving the adaptive 2nd dropdown. */
+  models: Record<string, string[]>;
 }
 
 /** Observation de l'évaluateur de produit (E6). */
