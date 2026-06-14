@@ -1,0 +1,190 @@
+{
+  "id": "stress-5-3615b286",
+  "name": "Stress 5",
+  "goal": "monkey stress project 5 with several features",
+  "auto_spec": false,
+  "spec_mode": "interview",
+  "budget_usd": 15.0,
+  "budget_tokens": 0,
+  "phase": "build",
+  "brief": "# Brief (démo)\nUne petite application de démonstration générée par Autospec.",
+  "brownfield_path": "",
+  "architecture": "## Architecture\nCouche service + repository (mode démo).",
+  "plan_quality": 90,
+  "backlog": [],
+  "components": [
+    {
+      "id": "backend",
+      "kind": "backend",
+      "name": "API backend",
+      "technology": "Python + FastAPI",
+      "rationale": "logique métier et API",
+      "optional": false,
+      "status": "approved"
+    },
+    {
+      "id": "frontend",
+      "kind": "frontend",
+      "name": "Interface web",
+      "technology": "React + Vite",
+      "rationale": "interface utilisateur",
+      "optional": false,
+      "status": "approved"
+    },
+    {
+      "id": "db",
+      "kind": "database",
+      "name": "Base de données",
+      "technology": "PostgreSQL",
+      "rationale": "persistance",
+      "optional": true,
+      "status": "proposed"
+    }
+  ],
+  "epics": [
+    {
+      "id": "EPIC-1",
+      "title": "Cœur applicatif",
+      "description": "Les fonctionnalités de base.",
+      "iteration": 1
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-1",
+      "epic_id": "EPIC-1",
+      "title": "Additionner deux nombres",
+      "description": "En tant qu'utilisateur, je veux additionner deux nombres afin d'obtenir leur somme.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "text": "La somme de 2 et 3 vaut 5."
+        },
+        {
+          "id": "AC-2",
+          "text": "L'addition est commutative."
+        }
+      ],
+      "gherkin": "Feature: Addition\n  Scenario: Somme simple\n    Given le nombre 2\n    And le nombre 3\n    When je les additionne\n    Then j'obtiens 5",
+      "test_plan": [
+        {
+          "id": "UT-1",
+          "layer": "service",
+          "description": "le service calcule correctement le résultat",
+          "mocks": [],
+          "file_hint": "tests/unit/test_us_1_service.py",
+          "criteria": [
+            "AC-1"
+          ],
+          "status": "green"
+        }
+      ],
+      "depends_on": [],
+      "priority": 1,
+      "status": "done",
+      "iteration": 1,
+      "attempts": 1,
+      "last_error": "",
+      "quality_score": -1,
+      "mutation_score": -1,
+      "coverage_score": -1,
+      "ui": false,
+      "ui_tests": []
+    },
+    {
+      "id": "US-2",
+      "epic_id": "EPIC-1",
+      "title": "Soustraire deux nombres",
+      "description": "En tant qu'utilisateur, je veux soustraire deux nombres afin d'obtenir leur différence.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "text": "La différence de 5 et 3 vaut 2."
+        }
+      ],
+      "gherkin": "Feature: Soustraction\n  Scenario: Différence simple\n    Given le nombre 5\n    And le nombre 3\n    When je les soustrais\n    Then j'obtiens 2",
+      "test_plan": [],
+      "depends_on": [
+        "US-1"
+      ],
+      "priority": 2,
+      "status": "in_progress",
+      "iteration": 1,
+      "attempts": 1,
+      "last_error": "",
+      "quality_score": -1,
+      "mutation_score": -1,
+      "coverage_score": -1,
+      "ui": false,
+      "ui_tests": []
+    }
+  ],
+  "chat": [
+    {
+      "role": "user",
+      "content": "monkey stress project 5 with several features",
+      "ts": 1781455813.0367858
+    },
+    {
+      "role": "pm",
+      "content": "Brief généré (mode démo).",
+      "ts": 1781455813.2934837
+    },
+    {
+      "role": "architect",
+      "content": "🧱 Stack par défaut proposée (mode démo).\nComposants proposés : API backend (Python + FastAPI), Interface web (React + Vite), Base de données (PostgreSQL) [optionnel]",
+      "ts": 1781455813.5455341
+    },
+    {
+      "role": "judge",
+      "content": "Score qualité 90/100 — Qualité suffisante (mode démo).",
+      "ts": 1781455814.0620809
+    },
+    {
+      "role": "system",
+      "content": "Plan raffiné en 0 tour(s) — qualité 90/100 (arrêt : threshold).",
+      "ts": 1781455814.0622046
+    },
+    {
+      "role": "po",
+      "content": "Plan de l'itération 1 : 1 epic(s), 2 user story(ies).",
+      "ts": 1781455814.06439
+    },
+    {
+      "role": "architect",
+      "content": "Design (démo).\n## Architecture\nCouche service + repository (mode démo).",
+      "ts": 1781455814.3185365
+    },
+    {
+      "role": "qa",
+      "content": "[US-1] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
+      "ts": 1781455814.579478
+    },
+    {
+      "role": "dev",
+      "content": "[US-1] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781455814.8432102
+    }
+  ],
+  "feedback": [],
+  "findings": [],
+  "lessons": [],
+  "green_tests": [],
+  "regressions": [],
+  "retro_recommendations": [],
+  "build_guidance": [],
+  "iteration": 1,
+  "usage": {
+    "cost_usd": 0.0,
+    "input_tokens": 0,
+    "output_tokens": 0,
+    "agent_calls": 7
+  },
+  "running": false,
+  "paused": false,
+  "awaiting_approval": "",
+  "resume_at": 0.0,
+  "archived": false,
+  "error": "",
+  "created_at": 1781455813.036779
+}

@@ -1,0 +1,78 @@
+{
+  "id": "stress-1-73950f88",
+  "name": "Stress 1",
+  "goal": "monkey stress project 1 with several features",
+  "auto_spec": false,
+  "spec_mode": "interview",
+  "budget_usd": 15.0,
+  "budget_tokens": 0,
+  "phase": "architect",
+  "brief": "# Brief (démo)\nUne petite application de démonstration générée par Autospec.",
+  "brownfield_path": "",
+  "architecture": "",
+  "plan_quality": 90,
+  "backlog": [],
+  "components": [
+    {
+      "id": "backend",
+      "kind": "backend",
+      "name": "API backend",
+      "technology": "Python + FastAPI",
+      "rationale": "logique métier et API",
+      "optional": false,
+      "status": "approved"
+    },
+    {
+      "id": "frontend",
+      "kind": "frontend",
+      "name": "Interface web",
+      "technology": "React + Vite",
+      "rationale": "interface utilisateur",
+      "optional": false,
+      "status": "approved"
+    },
+    {
+      "id": "db",
+      "kind": "database",
+      "name": "Base de données",
+      "technology": "PostgreSQL",
+      "rationale": "persistance",
+      "optional": true,
+      "status": "proposed"
+    }
+  ],
+  "epics": [
+    {
+      "id": "EPIC-1",
+      "title": "Cœur applicatif",
+      "description": "Les fonctionnalités de base.",
+      "iteration": 1
+    }
+  ],
+  "stories": [
+    {
+      "id": "US-1",
+      "epic_id": "EPIC-1",
+      "title": "Additionner deux nombres",
+      "description": "En tant qu'utilisateur, je veux additionner deux nombres afin d'obtenir leur somme.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "text": "La somme de 2 et 3 vaut 5."
+        },
+        {
+          "id": "AC-2",
+          "text": "L'addition est commutative."
+        }
+      ],
+      "gherkin": "Feature: Addition\n  Scenario: Somme simple\n    Given le nombre 2\n    And le nombre 3\n    When je les additionne\n    Then j'obtiens 5",
+      "test_plan": [],
+      "depends_on": [],
+      "priority": 1,
+      "status": "todo",
+      "iteration": 1,
+      "attempts": 0,
+      "last_error": "",
+      "quality_score": -1,
+      "mutation_score": -1,
+      "coverage_
