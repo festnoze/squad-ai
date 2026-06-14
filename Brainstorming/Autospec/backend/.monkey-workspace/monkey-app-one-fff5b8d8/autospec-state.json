@@ -76,16 +76,16 @@
           "criteria": [
             "AC-1"
           ],
-          "status": "nonexistent"
+          "status": "green"
         }
       ],
       "depends_on": [],
       "priority": 1,
-      "status": "green",
+      "status": "done",
       "iteration": 1,
       "attempts": 1,
       "last_error": "",
-      "quality_score": -1,
+      "quality_score": 90,
       "mutation_score": -1,
       "coverage_score": -1,
       "ui": false,
@@ -103,14 +103,26 @@
         }
       ],
       "gherkin": "Feature: Soustraction\n  Scenario: Différence simple\n    Given le nombre 5\n    And le nombre 3\n    When je les soustrais\n    Then j'obtiens 2",
-      "test_plan": [],
+      "test_plan": [
+        {
+          "id": "UT-1",
+          "layer": "service",
+          "description": "le service calcule correctement le résultat",
+          "mocks": [],
+          "file_hint": "tests/unit/test_us_2_service.py",
+          "criteria": [
+            "AC-1"
+          ],
+          "status": "nonexistent"
+        }
+      ],
       "depends_on": [
         "US-1"
       ],
       "priority": 2,
-      "status": "todo",
+      "status": "green",
       "iteration": 1,
-      "attempts": 0,
+      "attempts": 1,
       "last_error": "",
       "quality_score": -1,
       "mutation_score": -1,
@@ -164,6 +176,26 @@
       "role": "dev",
       "content": "[US-1] Implémentation et tests (mode démo) — suite verte.",
       "ts": 1781455326.3472188
+    },
+    {
+      "role": "judge",
+      "content": "Score qualité 90/100 — Qualité suffisante (mode démo).",
+      "ts": 1781455327.1079245
+    },
+    {
+      "role": "system",
+      "content": "[US-1] Code raffiné en 0 tour(s) — qualité 90/100 (arrêt : threshold).",
+      "ts": 1781455327.1080415
+    },
+    {
+      "role": "qa",
+      "content": "[US-2] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
+      "ts": 1781455327.3718712
+    },
+    {
+      "role": "dev",
+      "content": "[US-2] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781455327.6337044
     }
   ],
   "feedback": [],
@@ -178,7 +210,7 @@
     "cost_usd": 0.0,
     "input_tokens": 0,
     "output_tokens": 0,
-    "agent_calls": 7
+    "agent_calls": 10
   },
   "running": false,
   "paused": false,
