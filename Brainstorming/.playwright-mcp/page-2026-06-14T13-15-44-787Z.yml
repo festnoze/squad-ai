@@ -1,0 +1,64 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → QA → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - generic "Provider d'agents (Claude / OpenAI / Ollama)" [ref=e6]:
+      - generic [ref=e7]: 🤖
+      - combobox [disabled] [ref=e8]:
+        - option "démo" [selected]
+        - option "claude"
+        - option "openai"
+        - option "ollama"
+        - option "anthropic"
+      - generic [ref=e9]: scripted
+    - button "Dashboard de l'usine" [ref=e10] [cursor=pointer]: 📊
+  - generic [ref=e26]:
+    - generic [ref=e27] [cursor=pointer]:
+      - generic "build" [ref=e28]
+      - generic [ref=e29]: chat-eat-a-realtime-chat-app-rep
+      - generic "0 story(ies) terminée(s) sur 2" [ref=e30]: 0/2
+      - button "⏹" [ref=e31]
+      - button "📦" [ref=e32]
+      - button "✕" [ref=e33]
+    - button "＋ Nouveau" [ref=e34] [cursor=pointer]
+  - main [ref=e25]:
+    - generic [ref=e36]:
+      - heading "Chat — spécification & feedback" [level=2] [ref=e38]
+      - generic [ref=e39]:
+        - generic [ref=e40]:
+          - text: Toi
+          - generic [ref=e41]: chat-eat — a realtime chat app, reproduce the ETIMEDOUT
+        - generic [ref=e42]:
+          - text: 📋 PM
+          - generic [ref=e43]: Brief généré (mode démo).
+        - generic [ref=e44]:
+          - text: 🏃 PO
+          - generic [ref=e45]: "Plan de l'itération 1 : 1 epic(s), 2 user story(ies)."
+      - generic [ref=e46]:
+        - textbox "Donne une consigne au dev en cours… (prise en compte aux prochaines tentatives)" [ref=e47]
+        - button "Envoyer" [disabled] [ref=e48]
+    - generic [ref=e49]:
+      - generic [ref=e50]:
+        - generic [ref=e51]:
+          - heading "Board Epics / User stories" [level=2] [ref=e52]
+          - navigation "Fil d'Ariane" [ref=e53]:
+            - button "Épics" [disabled] [ref=e54]
+        - button "EPIC-1 itération 1 Cœur applicatif Les fonctionnalités de base. 2 US · 0/2 terminée(s)" [ref=e56] [cursor=pointer]:
+          - generic [ref=e57]:
+            - generic [ref=e58]: EPIC-1
+            - generic [ref=e59]: itération 1
+          - generic [ref=e60]: Cœur applicatif
+          - paragraph [ref=e61]: Les fonctionnalités de base.
+          - generic [ref=e62]: 2 US · 0/2 terminée(s)
+      - generic [ref=e63]:
+        - generic [ref=e64]:
+          - heading "Exécution" [level=2] [ref=e65]
+          - generic [ref=e66]: 💻 Développement BDD/TDD — itération 1
+          - generic [ref=e67]: 💸 $0.0000 · 0 tokens · 2 appels
+          - generic [ref=e68]:
+            - button "▶ Lancer le projet" [disabled] [ref=e69]
+            - button "⏸ Pause" [ref=e70] [cursor=pointer]
+            - button "⏹ Stopper" [ref=e71] [cursor=pointer]
+        - generic [ref=e73]:
+          - generic [ref=e74]: "[qa:US-1]"
+          - text: "Architecte QA : décomposition outside-in des tests de US-1…"
+      - button "📁 Code généré" [ref=e75] [cursor=pointer]

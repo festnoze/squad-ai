@@ -432,6 +432,55 @@ async def test_arecover_projects_registers_in_background():
     assert "proj-recover" in server.pipelines
 
 
+async def test_sync_does_not_block_the_event_loop(monkeypatch):
+    # BUG2 (write path): _sync() fires on every state change during a build. The
+    # blocking write (save_state_payload — file I/O + a Windows lock-retry sleep)
+    # must run OFF the loop, else uvicorn's accept() is starved and the Vite proxy
+    # reports `ETIMEDOUT 127.0.0.1:8100` on /api/*. Simulate a slow/contended write
+    # and assert the loop stays responsive while it is in flight.
+    import time as _time
+
+    from autospec.models import ProjectState
+    from autospec.orchestrator import pipeline as pipeline_mod
+
+    loop = asyncio.get_running_loop()
+    write_started = asyncio.Event()
+    write_done = asyncio.Event()
+
+    def _slow_write(project_id, payload):
+        loop.call_soon_threadsafe(write_started.set)
+        _time.sleep(0.5)  # a contended/locked disk write
+        loop.call_soon_threadsafe(write_done.set)
+
+    monkeypatch.setattr(pipeline_mod, "save_state_payload", _slow_write)
+
+    pipeline = server.Pipeline(ProjectState(id="proj-sync", name="n", goal="g"), FakeRunner([]))
+
+    t0 = loop.time()
+    pipeline._sync()  # returns immediately — the write is offloaded
+    assert loop.time() - t0 < 0.1
+
+    # The loop advances here while the worker thread is still mid-write.
+    await asyncio.wait_for(write_started.wait(), timeout=1.0)
+    assert not write_done.is_set()
+    await asyncio.wait_for(write_done.wait(), timeout=2.0)
+
+
+def test_sync_writes_inline_without_a_running_loop(tmp_path, monkeypatch):
+    # The offload only applies when a loop is running. Synchronous callers
+    # (recover_projects, scripts, tests) must still see the state on disk at once.
+    from autospec import storage
+    from autospec.config import settings
+    from autospec.models import ProjectState
+
+    monkeypatch.setattr(settings, "workspace_root", tmp_path / "ws")
+    pipeline = server.Pipeline(ProjectState(id="proj-inline", name="n", goal="g"), FakeRunner([]))
+
+    pipeline._sync()  # no running loop -> inline write
+
+    assert storage.load_state("proj-inline") is not None
+
+
 async def test_recover_resets_architect_and_green():
     from autospec import storage
     from autospec.models import (

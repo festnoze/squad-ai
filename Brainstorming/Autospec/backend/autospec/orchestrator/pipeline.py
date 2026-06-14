@@ -35,7 +35,7 @@ from ..models import (
     TestState,
     UserStory,
 )
-from ..storage import save_state, workspace_dir
+from ..storage import save_state_payload, workspace_dir
 from . import mutation, pytest_report, refine, scheduler, session_monitor, setup_exec, workspace
 from . import lessons as lesson_store
 from . import regression
@@ -45,6 +45,15 @@ from . import sandbox
 from .events import bus
 
 _REFINE_ROLE_TO_CHAT = {"critic": ChatRole.CRITIC, "judge": ChatRole.JUDGE}
+
+# State checkpoints are written off the event loop (BUG2): save_state does
+# blocking file I/O plus a retry sleep on Windows lock contention, and _sync()
+# fires on every state change during a build. Running it inline starves
+# uvicorn's accept loop, so the Vite proxy sees ETIMEDOUT on /api/*. A single
+# worker keeps writes FIFO so an older snapshot can never clobber a newer one.
+from concurrent.futures import ThreadPoolExecutor  # noqa: E402
+
+_PERSIST_EXECUTOR = ThreadPoolExecutor(max_workers=1, thread_name_prefix="autospec-persist")
 
 # OS essentials needed to launch a process, WITHOUT inheriting application
 # secrets (API keys, tokens…). Used when running the UNTRUSTED generated app.
@@ -177,7 +186,7 @@ class Pipeline:
     # ------------------------------------------------------------- events
 
     def _sync(self) -> None:
-        save_state(self.state)
+        self._persist()
         bus.publish(
             {
                 "type": "state",
@@ -185,6 +194,24 @@ class Pipeline:
                 "state": self.state.model_dump(mode="json"),
             }
         )
+
+    def _persist(self) -> None:
+        """Persist the state without stalling the event loop (BUG2).
+
+        Serialize on the caller's thread (cheap, and snapshots the state so it
+        can't mutate mid-write), then offload the blocking atomic write +
+        Windows lock-retry sleep to a worker. When no loop is running (sync
+        recovery, tests) the write happens inline so callers see it immediately."""
+        payload = self.state.model_dump_json(indent=2)
+        sid = self.state.id
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            save_state_payload(sid, payload)
+        else:
+            loop.run_in_executor(_PERSIST_EXECUTOR, save_state_payload, sid, payload)
 
     def _log(self, source: str, line: str) -> None:
         bus.publish(

@@ -1,0 +1,28 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → QA → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - generic "Provider d'agents (Claude / OpenAI / Ollama)" [ref=e6]:
+      - generic [ref=e7]: 🤖
+      - combobox [disabled] [ref=e8]:
+        - option "démo" [selected]
+        - option "claude"
+        - option "openai"
+        - option "ollama"
+        - option "anthropic"
+      - generic [ref=e9]: scripted
+    - button "Dashboard de l'usine" [ref=e10] [cursor=pointer]: 📊
+  - generic [ref=e13]:
+    - heading "Nouveau projet / feature" [level=2] [ref=e14]
+    - textbox "Nom du projet (optionnel)" [ref=e15]
+    - textbox "Décris la feature ou le projet que tu veux créer…" [ref=e16]
+    - generic [ref=e17] [cursor=pointer]:
+      - checkbox "Auto-spec — le PM décide de tout seul et enchaîne les itérations en boucle jusqu'à l'arrêt manuel" [ref=e18]
+      - generic [ref=e19]:
+        - strong [ref=e20]: Auto-spec
+        - text: — le PM décide de tout seul et enchaîne les itérations en boucle jusqu'à l'arrêt manuel
+    - textbox "Spec à importer (optionnel) — colle un cahier des charges pour court-circuiter l'interview" [ref=e21]
+    - textbox "Chemin d'un repo existant à étendre (mode brownfield, optionnel)" [ref=e22]:
+      - /placeholder: Repo existant à étendre (chemin, optionnel — mode brownfield)
+    - spinbutton "Budget maximum en dollars (vide = pas de limite)" [ref=e23]
+    - button "🚀 Démarrer la spécification" [disabled] [ref=e24]
+  - main [ref=e25]

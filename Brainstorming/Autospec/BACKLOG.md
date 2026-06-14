@@ -118,12 +118,14 @@ endpoint). Priorité par valeur V / complexité C (1-5). **Top 3 : S1, Q1, O1.**
 | U3 ✅ | **Notifications push** — budget atteint, build terminé, erreur, reprise programmée (M2). **✅ LIVRÉ** : `_notify` sur le bus + 4 jalons backend ; toasts in-app + `Notification` navigateur (permission demandée au montage) ; 2 tests backend + 1 Vitest. | 3/1 |
 | U4 ✅ | **Gates d'approbation granulaires** — valider plan / architecture *avant* le build (HITL ciblé), pas seulement la pause globale. **✅ LIVRÉ** : `_aapproval_gate` (asyncio.Event) bloque avant le build, `aapprove`/`areject` + endpoints `POST /approve` `/reject`, champ `awaiting_approval`, bannière UI dans RunPanel, env `AUTOSPEC_APPROVAL_GATES`, 4 tests. | 3/2 |
 
-> Backlog des 16 features : épuisé. Extension produit (E1→E7 + I1/I2 + M1/M2 + U1) :
-> **épuisée**. Suite backend **193 tests**, **32 tests Vitest**, et un **scénario
-> e2e Playwright exhaustif** (`autospec.spec.ts`) qui exerce TOUTES les features
-> en une passe (composants+setup, budget, architecture+raffinement, board, pause/
-> reprise, évaluateur E6, impact E2, rétrospective E7, continuer-le-build, édition,
-> diff, code-viewer, doc/zip/commit, provider, multi-projets+archivage).
+> Backlog des 16 features : épuisé. Extension produit (E1→E7 + I1/I2 + M1/M2 + U1)
+> **épuisée**. Idées d'évolution (S1, Q1/Q2, R1/R2, M3/M4, O1/O2, B1, D1, I3, F1,
+> U2/U3/U4) **livrées**. Bugs BUG1/BUG2 **corrigés**. Suite backend **261 tests**,
+> **33 tests Vitest**, et un **scénario e2e Playwright exhaustif**
+> (`autospec.spec.ts`) qui exerce TOUTES les features en une passe (composants+
+> setup, budget, architecture+raffinement, board hiérarchique, pause/reprise,
+> évaluateur E6, impact E2, rétrospective E7, continuer-le-build, édition, diff,
+> code-viewer, doc/zip/commit, provider, multi-projets+archivage).
 > Remédiation d'audit : 3 tranches traitées ; reste différé (design/infra).
 > **Aucune feature en attente.**
 >
@@ -132,3 +134,16 @@ endpoint). Priorité par valeur V / complexité C (1-5). **Top 3 : S1, Q1, O1.**
 > — antivirus/indexeur/lecteur concurrent) → désormais **retry + meilleur effort**
 > (un checkpoint manqué est rattrapé au `_sync` suivant, plus de crash). Isolation
 > e2e : `global-setup` efface le bit lecture-seule des objets git avant le wipe.
+>
+> Passe de clôture (vérification finale) :
+> - **M2 — course à la reprise auto corrigée** : `_aresume_timer` attend la fin
+>   propre de la tâche lifecycle (phase quitte BUILD) avant d'appeler
+>   `aresume_build`, sinon une fenêtre de reset très proche (bloc ccusage court /
+>   epoch à quelques secondes) faisait rejeter la reprise par la garde
+>   pipeline-active. Test `test_usage_limit_stops_then_auto_resumes` rendu
+>   déterministe (epoch lointain → STOPPED durable observable, puis reprise
+>   déclenchée explicitement) — fini le flake de timing sous charge.
+> - **e2e aligné sur le board hiérarchique (item 17)** : navigation drill-down
+>   (épics → US d'un epic → détail) via le fil d'Ariane ; l'assertion d'impact E2
+>   compte désormais les **epics** « Retours utilisateur » (1→2), chaque analyse
+>   d'impact planifiant un nouvel epic de feedback.

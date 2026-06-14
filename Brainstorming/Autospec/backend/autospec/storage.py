@@ -74,13 +74,27 @@ _SAVE_BACKOFF_S = 0.05
 
 
 def save_state(state: ProjectState) -> None:
-    ws = workspace_dir(state.id)
+    """Persist a project state synchronously (serialize + atomic write).
+
+    Note: the blocking write + retry sleep below must NOT run on the asyncio
+    event loop (it starves uvicorn's accept loop -> ETIMEDOUT on the Vite proxy).
+    Hot async callers serialize on the loop and offload the write via
+    ``save_state_payload``; see ``Pipeline._sync``."""
+    save_state_payload(state.id, state.model_dump_json(indent=2))
+
+
+def save_state_payload(project_id: str, payload: str) -> None:
+    """Atomically write a pre-serialized state ``payload`` to disk.
+
+    Split out from ``save_state`` so the (loop-bound) JSON serialization and the
+    (blocking, offloadable) file I/O can happen on different threads without the
+    state mutating mid-write."""
+    ws = workspace_dir(project_id)
     ws.mkdir(parents=True, exist_ok=True)
     final = ws / STATE_FILENAME
     # Atomic write: serialize to a temp file in the SAME directory (same volume),
     # then os.replace() into place. A crash mid-write leaves the temp file behind
     # but never a half-written state.json.
-    payload = state.model_dump_json(indent=2)
     last_exc: OSError | None = None
     for attempt in range(_SAVE_RETRIES):
         fd, tmp_name = tempfile.mkstemp(dir=ws, prefix=STATE_FILENAME + ".", suffix=".tmp")
@@ -98,7 +112,7 @@ def save_state(state: ProjectState) -> None:
             time.sleep(_SAVE_BACKOFF_S * (attempt + 1))
     logger.warning(
         "Could not persist state for project %s after %d retries: %s",
-        state.id, _SAVE_RETRIES, last_exc,
+        project_id, _SAVE_RETRIES, last_exc,
     )
 
 
