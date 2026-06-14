@@ -75,12 +75,24 @@
         }
       ],
       "gherkin": "Feature: Soustraction\n  Scenario: Différence simple\n    Given le nombre 5\n    And le nombre 3\n    When je les soustrais\n    Then j'obtiens 2",
-      "test_plan": [],
+      "test_plan": [
+        {
+          "id": "UT-1",
+          "layer": "service",
+          "description": "le service calcule correctement le résultat",
+          "mocks": [],
+          "file_hint": "tests/unit/test_us_2_service.py",
+          "criteria": [
+            "AC-1"
+          ],
+          "status": "nonexistent"
+        }
+      ],
       "depends_on": [
         "US-1"
       ],
       "priority": 2,
-      "status": "in_progress",
+      "status": "green",
       "iteration": 1,
       "attempts": 1,
       "last_error": "",
@@ -116,6 +128,16 @@
       "role": "dev",
       "content": "[US-1] Implémentation et tests (mode démo) — suite verte.",
       "ts": 1781459207.6243598
+    },
+    {
+      "role": "qa",
+      "content": "[US-2] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
+      "ts": 1781459207.9340143
+    },
+    {
+      "role": "dev",
+      "content": "[US-2] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781459208.1373534
     }
   ],
   "feedback": [],
@@ -130,7 +152,7 @@
     "cost_usd": 0.0,
     "input_tokens": 0,
     "output_tokens": 0,
-    "agent_calls": 4
+    "agent_calls": 6
   },
   "running": false,
   "paused": false,
