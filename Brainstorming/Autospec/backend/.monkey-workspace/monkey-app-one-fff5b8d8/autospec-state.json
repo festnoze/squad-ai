@@ -6,7 +6,7 @@
   "spec_mode": "interview",
   "budget_usd": 25.0,
   "budget_tokens": 0,
-  "phase": "done",
+  "phase": "build",
   "brief": "# Brief (démo)\nUne petite application de démonstration générée par Autospec.",
   "brownfield_path": "",
   "architecture": "## Architecture\nCouche service + repository (mode démo).",
@@ -50,6 +50,12 @@
     },
     {
       "id": "EPIC-FB",
+      "title": "Retours utilisateur",
+      "description": "Changements issus du feedback.",
+      "iteration": 1
+    },
+    {
+      "id": "EPIC-3",
       "title": "Retours utilisateur",
       "description": "Changements issus du feedback.",
       "iteration": 1
@@ -139,6 +145,43 @@
     {
       "id": "US-FB-1",
       "epic_id": "EPIC-FB",
+      "title": "Prendre en compte le feedback",
+      "description": "En tant qu'utilisateur, je veux que mon retour soit intégré afin d'améliorer le produit.",
+      "acceptance_criteria": [
+        {
+          "id": "AC-1",
+          "text": "Le feedback est traité."
+        }
+      ],
+      "gherkin": "Feature: Feedback\n  Scenario: Prise en compte\n    Given un feedback utilisateur\n    When il est analysé\n    Then une story est créée",
+      "test_plan": [
+        {
+          "id": "UT-1",
+          "layer": "service",
+          "description": "le service calcule correctement le résultat",
+          "mocks": [],
+          "file_hint": "tests/unit/test_us_fb_1_service.py",
+          "criteria": [
+            "AC-1"
+          ],
+          "status": "nonexistent"
+        }
+      ],
+      "depends_on": [],
+      "priority": 1,
+      "status": "green",
+      "iteration": 1,
+      "attempts": 1,
+      "last_error": "",
+      "quality_score": -1,
+      "mutation_score": -1,
+      "coverage_score": -1,
+      "ui": false,
+      "ui_tests": []
+    },
+    {
+      "id": "US-4",
+      "epic_id": "EPIC-3",
       "title": "Prendre en compte le feedback",
       "description": "En tant qu'utilisateur, je veux que mon retour soit intégré afin d'améliorer le produit.",
       "acceptance_criteria": [
@@ -257,10 +300,46 @@
       "role": "system",
       "content": "Itération terminée.",
       "ts": 1781455329.4577672
+    },
+    {
+      "role": "system",
+      "content": "⏸ Pause demandée : la pipeline s'arrêtera au prochain point de contrôle.",
+      "ts": 1781455846.5823877
+    },
+    {
+      "role": "system",
+      "content": "▶ Reprise de la pipeline.",
+      "ts": 1781455846.6354961
+    },
+    {
+      "role": "user",
+      "content": "add a search feature",
+      "ts": 1781455846.688393
+    },
+    {
+      "role": "system",
+      "content": "▶ Reprise du build de l'itération…",
+      "ts": 1781455846.743308
+    },
+    {
+      "role": "analyst",
+      "content": "🔍 Impact : Feedback analysé : nouvelle story créée (mode démo).\n➕ 1 nouvelle(s) story(ies) planifiée(s) — « ▶ Continuer le build » pour les développer.",
+      "ts": 1781455846.9538324
+    },
+    {
+      "role": "qa",
+      "content": "[US-FB-1] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
+      "ts": 1781455846.9995692
+    },
+    {
+      "role": "dev",
+      "content": "[US-FB-1] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781455847.2516716
     }
   ],
   "feedback": [
-    "[medium/integration] Addition et soustraction ne se composent pas — Le CLI n'enchaîne pas les deux opérations (mode démo)."
+    "[medium/integration] Addition et soustraction ne se composent pas — Le CLI n'enchaîne pas les deux opérations (mode démo).",
+    "add a search feature"
   ],
   "findings": [
     {
@@ -287,7 +366,7 @@
     "cost_usd": 0.0,
     "input_tokens": 0,
     "output_tokens": 0,
-    "agent_calls": 14
+    "agent_calls": 17
   },
   "running": false,
   "paused": false,
