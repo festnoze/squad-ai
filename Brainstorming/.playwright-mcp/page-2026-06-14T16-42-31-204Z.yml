@@ -1,0 +1,191 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → QA → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - generic "Provider d'agents (Claude / OpenAI / Ollama)" [ref=e6]:
+      - generic [ref=e7]: 🤖
+      - combobox [disabled] [ref=e8]:
+        - option "démo" [selected]
+        - option "claude"
+        - option "openai"
+        - option "ollama"
+        - option "anthropic"
+      - generic [ref=e9]: scripted
+    - button "Dashboard de l'usine" [ref=e10] [cursor=pointer]: 📊
+  - generic [ref=e26]:
+    - generic [ref=e27] [cursor=pointer]:
+      - generic "done" [ref=e85]
+      - generic [ref=e29]: Monkey App One
+      - generic "2 story(ies) terminée(s) sur 3" [ref=e86]: 2/3
+      - button "▶" [ref=e87]
+      - button "📦" [ref=e31]
+      - button "✕" [ref=e32]
+    - button "＋ Nouveau" [active] [ref=e33] [cursor=pointer]
+  - generic [ref=e164]:
+    - button "Fermer la création de projet" [ref=e165] [cursor=pointer]: ✕
+    - generic [ref=e166]:
+      - heading "Nouveau projet / feature" [level=2] [ref=e167]
+      - textbox "Nom du projet (optionnel)" [ref=e168]
+      - textbox "Décris la feature ou le projet que tu veux créer…" [ref=e169]
+      - generic [ref=e170] [cursor=pointer]:
+        - checkbox "Auto-spec — le PM décide de tout seul et enchaîne les itérations en boucle jusqu'à l'arrêt manuel" [ref=e171]
+        - generic [ref=e172]:
+          - strong [ref=e173]: Auto-spec
+          - text: — le PM décide de tout seul et enchaîne les itérations en boucle jusqu'à l'arrêt manuel
+      - textbox "Spec à importer (optionnel) — colle un cahier des charges pour court-circuiter l'interview" [ref=e174]
+      - textbox "Chemin d'un repo existant à étendre (mode brownfield, optionnel)" [ref=e175]:
+        - /placeholder: Repo existant à étendre (chemin, optionnel — mode brownfield)
+      - spinbutton "Budget maximum en dollars (vide = pas de limite)" [ref=e176]
+      - button "🚀 Démarrer la spécification" [disabled] [ref=e177]
+  - main [ref=e25]:
+    - generic [ref=e34]:
+      - generic [ref=e35]:
+        - heading "Chat — spécification & feedback" [level=2] [ref=e37]
+        - generic [ref=e38]:
+          - generic [ref=e39]:
+            - text: Toi
+            - generic [ref=e40]: A task manager with realtime notifications and a calculator widget
+          - generic [ref=e41]:
+            - text: 📋 PM
+            - generic [ref=e42]: Brief généré (mode démo).
+          - generic [ref=e43]:
+            - text: 🏛️ Architecte
+            - generic [ref=e44]: "🧱 Stack par défaut proposée (mode démo). Composants proposés : API backend (Python + FastAPI), Interface web (React + Vite), Base de données (PostgreSQL) [optionnel]"
+          - generic [ref=e88]:
+            - text: ⚖️ Juge
+            - generic [ref=e89]: Score qualité 90/100 — Qualité suffisante (mode démo).
+          - generic [ref=e90]:
+            - text: ⚙️ Système
+            - generic [ref=e91]: "Plan raffiné en 0 tour(s) — qualité 90/100 (arrêt : threshold)."
+          - generic [ref=e92]:
+            - text: 🏃 PO
+            - generic [ref=e93]: "Plan de l'itération 1 : 1 epic(s), 2 user story(ies)."
+          - generic [ref=e94]:
+            - text: 🏛️ Architecte
+            - generic [ref=e95]: "Design (démo). ## Architecture Couche service + repository (mode démo)."
+          - generic [ref=e96]:
+            - text: 🧪 QA
+            - generic [ref=e97]: "[US-1] Décomposition outside-in (mode démo). Plan outside-in : 1 test(s) unitaire(s) (service)."
+          - generic [ref=e98]:
+            - text: 💻 Dev
+            - generic [ref=e99]: "[US-1] Implémentation et tests (mode démo) — suite verte."
+          - generic [ref=e100]:
+            - text: ⚖️ Juge
+            - generic [ref=e101]: Score qualité 90/100 — Qualité suffisante (mode démo).
+          - generic [ref=e102]:
+            - text: ⚙️ Système
+            - generic [ref=e103]: "[US-1] Code raffiné en 0 tour(s) — qualité 90/100 (arrêt : threshold)."
+          - generic [ref=e104]:
+            - text: 🧪 QA
+            - generic [ref=e105]: "[US-2] Décomposition outside-in (mode démo). Plan outside-in : 1 test(s) unitaire(s) (service)."
+          - generic [ref=e106]:
+            - text: 💻 Dev
+            - generic [ref=e107]: "[US-2] Implémentation et tests (mode démo) — suite verte."
+          - generic [ref=e108]:
+            - text: ⚖️ Juge
+            - generic [ref=e109]: Score qualité 90/100 — Qualité suffisante (mode démo).
+          - generic [ref=e110]:
+            - text: ⚙️ Système
+            - generic [ref=e111]: "[US-2] Code raffiné en 0 tour(s) — qualité 90/100 (arrêt : threshold)."
+          - generic [ref=e112]:
+            - text: 🧪 QA
+            - generic [ref=e113]: 🔬 Produit exercé (mode démo) — un souci d'intégration relevé. • [medium/integration] Addition et soustraction ne se composent pas — Le CLI n'enchaîne pas les deux opérations (mode démo).
+          - generic [ref=e114]:
+            - text: 🔍 Analyste
+            - generic [ref=e115]: "🔍 Impact : Feedback analysé : nouvelle story créée (mode démo). ➕ 1 nouvelle(s) story(ies) planifiée(s) — « ▶ Continuer le build » pour les développer."
+          - generic [ref=e116]:
+            - text: 🔍 Analyste
+            - generic [ref=e117]: "🔁 Rétrospective d'usine — Rétrospective (mode démo). 📚 Leçons : • Mocker explicitement les collaborateurs directs dans les tests de service. • Câbler chaque nouvelle opération dans main.py dès la story. 🛠 Recommandations : • Conserver le parallélisme à 2 développeurs (mode démo)."
+          - generic [ref=e118]:
+            - text: ⚙️ Système
+            - generic [ref=e119]: Itération terminée.
+        - generic [ref=e45]:
+          - textbox "Donne ton feedback sur l'itération en cours…" [ref=e46]
+          - button "Envoyer" [disabled] [ref=e47]
+      - generic [ref=e48]:
+        - heading "🧱 Composants du produit" [level=2] [ref=e49]
+        - generic [ref=e50]:
+          - generic [ref=e51]:
+            - generic [ref=e52]: ⚙️
+            - generic [ref=e53]:
+              - text: API backend
+              - generic [ref=e54]: — Python + FastAPI
+            - generic [ref=e55]: approuvé
+            - button "✕" [ref=e56] [cursor=pointer]
+          - generic [ref=e57]:
+            - generic [ref=e58]: 🖥️
+            - generic [ref=e59]:
+              - text: Interface web
+              - generic [ref=e60]: — React + Vite
+            - generic [ref=e61]: approuvé
+            - button "✕" [ref=e62] [cursor=pointer]
+          - generic [ref=e63]:
+            - generic [ref=e64]: 🗄️
+            - generic [ref=e65]:
+              - text: Base de données
+              - generic [ref=e66]: — PostgreSQL
+              - text: (optionnel)
+            - generic [ref=e67]: proposé
+            - button "✓" [ref=e68] [cursor=pointer]
+        - button "🧱 Créer les composants approuvés" [ref=e69] [cursor=pointer]
+      - generic [ref=e120]:
+        - heading "Architecture & qualité" [level=2] [ref=e121]
+        - generic [ref=e122]:
+          - text: "Qualité du plan :"
+          - strong [ref=e123]: 90/100
+        - generic [ref=e124]: "## Architecture Couche service + repository (mode démo)."
+    - generic [ref=e70]:
+      - generic [ref=e71]:
+        - generic [ref=e125]:
+          - heading "Board Epics / User stories" [level=2] [ref=e126]
+          - navigation "Fil d'Ariane" [ref=e127]:
+            - button "Épics" [disabled] [ref=e128]
+        - generic [ref=e129]:
+          - button "EPIC-1 itération 1 Cœur applicatif Les fonctionnalités de base. 2 US · 2/2 terminée(s)" [ref=e130] [cursor=pointer]:
+            - generic [ref=e131]:
+              - generic [ref=e132]: EPIC-1
+              - generic [ref=e133]: itération 1
+            - generic [ref=e134]: Cœur applicatif
+            - paragraph [ref=e135]: Les fonctionnalités de base.
+            - generic [ref=e136]: 2 US · 2/2 terminée(s)
+          - button "EPIC-FB itération 1 Retours utilisateur Changements issus du feedback. 1 US · 0/1 terminée(s)" [ref=e137] [cursor=pointer]:
+            - generic [ref=e138]:
+              - generic [ref=e139]: EPIC-FB
+              - generic [ref=e140]: itération 1
+            - generic [ref=e141]: Retours utilisateur
+            - paragraph [ref=e142]: Changements issus du feedback.
+            - generic [ref=e143]: 1 US · 0/1 terminée(s)
+      - generic [ref=e74]:
+        - generic [ref=e75]:
+          - heading "Exécution" [level=2] [ref=e76]
+          - generic [ref=e77]: ✅ Itération terminée — itération 1
+          - generic [ref=e78]: 💸 $0.0000 / $25.00 · 0 tokens · 14 appels
+          - generic [ref=e79]:
+            - button "▶ Lancer le projet" [ref=e80] [cursor=pointer]
+            - button "📘 Doc" [ref=e144] [cursor=pointer]
+            - button "⬇ Zip" [ref=e145] [cursor=pointer]
+            - button "🔀 Commit" [ref=e146] [cursor=pointer]
+            - button "⏪ Rollback" [ref=e147] [cursor=pointer]
+            - button "🚀 Déploiement" [ref=e148] [cursor=pointer]
+        - generic [ref=e83]:
+          - generic [ref=e149]:
+            - generic [ref=e150]: "[qa:US-1]"
+            - text: "Architecte QA : décomposition outside-in des tests de US-1…"
+          - generic [ref=e151]:
+            - generic [ref=e152]: "[dev:US-1]"
+            - text: Agent dev assigné à US-1 — Additionner deux nombres
+          - generic [ref=e153]:
+            - generic [ref=e154]: "[dev:US-1]"
+            - text: ✅ Suite de tests verte — US-1 terminé.
+          - generic [ref=e155]:
+            - generic [ref=e156]: "[qa:US-2]"
+            - text: "Architecte QA : décomposition outside-in des tests de US-2…"
+          - generic [ref=e157]:
+            - generic [ref=e158]: "[dev:US-2]"
+            - text: Agent dev assigné à US-2 — Soustraire deux nombres
+          - generic [ref=e159]:
+            - generic [ref=e160]: "[dev:US-2]"
+            - text: ✅ Suite de tests verte — US-2 terminé.
+          - generic [ref=e161]:
+            - generic [ref=e162]: "[evaluator]"
+            - text: 🔬 Évaluation du produit livré (exécution réelle)…
+      - button "📁 Code généré" [ref=e84] [cursor=pointer]

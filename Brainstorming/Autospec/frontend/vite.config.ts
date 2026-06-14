@@ -1,9 +1,23 @@
 /// <reference types="vitest/config" />
+import http from "node:http";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
 const backendPort = process.env.VITE_BACKEND_PORT ?? "8100";
 const apiTarget = `http://127.0.0.1:${backendPort}`;
+
+// Force a FRESH connection per upstream request: reusing a pooled keep-alive
+// socket that uvicorn already half-closed (idle keep-alive timeout) is the
+// classic Windows-loopback failure mode — the proxy writes to a dead socket and
+// then waits forever (no error, no response), wedging the request. A fresh
+// connection sidesteps the stale socket entirely.
+const noKeepAliveAgent = new http.Agent({ keepAlive: false, maxSockets: 64 });
+
+// Hard backstop so a stuck upstream connection can NEVER hang forever (which
+// otherwise leaves the UI stuck in its "busy" state, e.g. a wedged create
+// modal). Generous enough not to cut off legitimately slow ops (zip export,
+// doc generation). On expiry http-proxy emits an error -> handled below.
+const PROXY_TIMEOUT_MS = 30_000;
 
 // Defense-in-depth for the dev proxy. Talking to a single-threaded uvicorn over
 // Windows loopback intermittently fails to establish a *fresh* connection
@@ -31,6 +45,8 @@ const RETRY_DELAY_MS = 150;
 function retryingProxy(target: string) {
   return {
     target,
+    agent: noKeepAliveAgent,
+    proxyTimeout: PROXY_TIMEOUT_MS,
     configure: (proxy: any, options: any) => {
       const attempts = new WeakMap<object, number>();
       // Vite registers its OWN 'error' handler right after calling configure()

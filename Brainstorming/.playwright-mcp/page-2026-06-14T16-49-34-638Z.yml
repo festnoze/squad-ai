@@ -1,0 +1,84 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → QA → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - generic "Provider d'agents (Claude / OpenAI / Ollama)" [ref=e9]:
+      - generic [ref=e10]: 🤖
+      - combobox [disabled] [ref=e11]:
+        - option "démo" [selected]
+        - option "claude"
+        - option "openai"
+        - option "ollama"
+        - option "anthropic"
+      - generic [ref=e12]: scripted
+    - button "Dashboard de l'usine" [ref=e6] [cursor=pointer]: 📊
+  - generic [ref=e13]:
+    - generic [ref=e144] [cursor=pointer]:
+      - generic "plan" [ref=e145]
+      - generic [ref=e146]: Monkey App Two
+      - button "⏹" [ref=e147]
+      - button "📦" [ref=e148]
+      - button "✕" [ref=e149]
+    - generic [ref=e14] [cursor=pointer]:
+      - generic "done" [ref=e15]
+      - generic [ref=e16]: Monkey App One
+      - generic "2 story(ies) terminée(s) sur 3" [ref=e17]: 2/3
+      - button "▶" [ref=e18]
+      - button "📦" [ref=e19]
+      - button "✕" [ref=e20]
+    - button "＋ Nouveau" [ref=e21] [cursor=pointer]
+  - main [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e22]:
+        - heading "Chat — spécification & feedback" [level=2] [ref=e24]
+        - generic [ref=e25]:
+          - generic [ref=e26]:
+            - text: Toi
+            - generic [ref=e27]: An e-commerce checkout flow with payment integration
+          - generic [ref=e150]:
+            - text: 📋 PM
+            - generic [ref=e151]: Brief généré (mode démo).
+          - generic [ref=e152]:
+            - text: 🏛️ Architecte
+            - generic [ref=e153]: "🧱 Stack par défaut proposée (mode démo). Composants proposés : API backend (Python + FastAPI), Interface web (React + Vite), Base de données (PostgreSQL) [optionnel]"
+        - generic [ref=e64]:
+          - textbox "Donne ton feedback sur l'itération en cours…" [ref=e65]
+          - button "Envoyer" [disabled] [ref=e66]
+      - generic [ref=e154]:
+        - heading "🧱 Composants du produit" [level=2] [ref=e155]
+        - generic [ref=e156]:
+          - generic [ref=e157]:
+            - generic [ref=e158]: ⚙️
+            - generic [ref=e159]:
+              - text: API backend
+              - generic [ref=e160]: — Python + FastAPI
+            - generic [ref=e161]: approuvé
+            - button "✕" [ref=e162] [cursor=pointer]
+          - generic [ref=e163]:
+            - generic [ref=e164]: 🖥️
+            - generic [ref=e165]:
+              - text: Interface web
+              - generic [ref=e166]: — React + Vite
+            - generic [ref=e167]: approuvé
+            - button "✕" [ref=e168] [cursor=pointer]
+          - generic [ref=e169]:
+            - generic [ref=e170]: 🗄️
+            - generic [ref=e171]:
+              - text: Base de données
+              - generic [ref=e172]: — PostgreSQL
+              - text: (optionnel)
+            - generic [ref=e173]: proposé
+            - button "✓" [ref=e174] [cursor=pointer]
+        - button "🧱 Créer les composants approuvés" [ref=e175] [cursor=pointer]
+    - generic [ref=e94]:
+      - generic [ref=e95]:
+        - heading "Board Epics / User stories" [level=2] [ref=e176]
+        - paragraph [ref=e177]: Le PO n'a pas encore produit de plan.
+      - generic [ref=e116]:
+        - heading "Exécution" [level=2] [ref=e117]
+        - generic [ref=e118]: 🏃 Planification (PO) — itération 1
+        - generic [ref=e178]: 💸 $0.0000 · 0 tokens · 3 appels
+        - generic [ref=e120]:
+          - button "▶ Lancer le projet" [disabled] [ref=e121]
+          - button "⏸ Pause" [ref=e179] [cursor=pointer]
+          - button "⏹ Stopper" [ref=e180] [cursor=pointer]
+      - button "📁 Code généré" [ref=e128] [cursor=pointer]

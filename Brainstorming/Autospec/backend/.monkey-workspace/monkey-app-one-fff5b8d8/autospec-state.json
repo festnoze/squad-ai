@@ -6,7 +6,7 @@
   "spec_mode": "interview",
   "budget_usd": 25.0,
   "budget_tokens": 0,
-  "phase": "build",
+  "phase": "done",
   "brief": "# Brief (démo)\nUne petite application de démonstration générée par Autospec.",
   "brownfield_path": "",
   "architecture": "## Architecture\nCouche service + repository (mode démo).",
@@ -252,6 +252,11 @@
       "role": "analyst",
       "content": "🔁 Rétrospective d'usine — Rétrospective (mode démo).\n📚 Leçons :\n• Mocker explicitement les collaborateurs directs dans les tests de service.\n• Câbler chaque nouvelle opération dans main.py dès la story.\n🛠 Recommandations :\n• Conserver le parallélisme à 2 développeurs (mode démo).",
       "ts": 1781455329.1789517
+    },
+    {
+      "role": "system",
+      "content": "Itération terminée.",
+      "ts": 1781455329.4577672
     }
   ],
   "feedback": [
