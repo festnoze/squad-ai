@@ -1,0 +1,72 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → QA → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - generic "Provider d'agents (Claude / OpenAI / Ollama / Anthropic)" [ref=e6]:
+      - generic [ref=e7]: 🤖
+      - combobox "Provider" [disabled] [ref=e8]:
+        - option "démo" [selected]
+        - option "claude"
+        - option "openai"
+        - option "ollama"
+        - option "anthropic"
+      - generic [ref=e9]: scripted
+    - button "Dashboard de l'usine" [ref=e10] [cursor=pointer]: 📊
+  - generic [ref=e11]:
+    - generic "Sélectionner le projet actif" [ref=e12]:
+      - generic [ref=e13]: 🗂
+      - combobox "Sélectionner le projet actif" [ref=e14] [cursor=pointer]:
+        - option "🔵 VizApp · 0/2 · build" [selected]
+    - generic [ref=e15] [cursor=pointer]:
+      - generic "build" [ref=e16]
+      - generic [ref=e17]: VizApp
+      - generic "0 story(ies) terminée(s) sur 2" [ref=e18]: 0/2
+      - button "⏹" [ref=e19]
+      - button "📦" [ref=e20]
+      - button "✕" [ref=e21]
+    - button "＋ Nouveau" [ref=e22] [cursor=pointer]
+  - main [ref=e23]:
+    - generic [ref=e25]:
+      - heading "Chat — spécification & feedback" [level=2] [ref=e27]
+      - generic [ref=e28]:
+        - generic [ref=e29]:
+          - text: Toi
+          - generic [ref=e30]: viz check epic progress
+        - generic [ref=e31]:
+          - text: 📋 PM
+          - generic [ref=e32]: Brief généré (mode démo).
+        - generic [ref=e33]:
+          - text: 🏃 PO
+          - generic [ref=e34]: "Plan de l'itération 1 : 1 epic(s), 2 user story(ies)."
+        - generic [ref=e35]:
+          - text: 🧪 QA
+          - generic [ref=e36]: "[US-1] Décomposition outside-in (mode démo). Plan outside-in : 1 test(s) unitaire(s) (service)."
+      - generic [ref=e37]:
+        - textbox "Donne une consigne au dev en cours… (prise en compte aux prochaines tentatives)" [ref=e38]
+        - button "Envoyer" [disabled] [ref=e39]
+    - generic [ref=e40]:
+      - generic [ref=e41]:
+        - generic [ref=e42]:
+          - heading "Board Epics / User stories" [level=2] [ref=e43]
+          - navigation "Fil d'Ariane" [ref=e44]:
+            - button "Épics" [disabled] [ref=e45]
+        - button "EPIC-1 Développement en cours itération 1 Cœur applicatif Les fonctionnalités de base. 0 0/2 terminée(s) · 1 en cours" [ref=e47] [cursor=pointer]:
+          - generic [ref=e48]:
+            - generic [ref=e49]: EPIC-1
+            - generic [ref=e50]:
+              - generic "Développement en cours" [ref=e51]
+              - generic [ref=e52]: itération 1
+          - generic [ref=e53]: Cœur applicatif
+          - paragraph [ref=e54]: Les fonctionnalités de base.
+          - progressbar "0/2 terminée(s) — 0%" [ref=e55]
+          - generic [ref=e56]:
+            - text: 0/2 terminée(s)
+            - generic [ref=e57]: · 1 en cours
+      - generic [ref=e59]:
+        - heading "Exécution" [level=2] [ref=e60]
+        - generic [ref=e61]: 💻 Développement BDD/TDD — itération 1
+        - generic [ref=e62]: 💸 $0.0000 · 0 tokens · 3 appels
+        - generic [ref=e63]:
+          - button "▶ Lancer le projet" [disabled] [ref=e64]
+          - button "⏸ Pause" [ref=e65] [cursor=pointer]
+          - button "⏹ Stopper" [ref=e66] [cursor=pointer]
+      - button "📁 Code généré" [ref=e68] [cursor=pointer]

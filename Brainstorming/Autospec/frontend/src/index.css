@@ -1542,6 +1542,116 @@ button.action-btn.action-done {
   margin-bottom: 4px;
 }
 
+.epic-meta-working {
+  color: var(--accent);
+}
+
+.epic-meta-failed {
+  color: var(--red);
+}
+
+.epic-head-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---------- avancement d'epic + mise en valeur « dev en cours » ---------- */
+.epic-progress {
+  height: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  overflow: hidden;
+  margin: 8px 0 6px;
+}
+
+.epic-progress-fill {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--accent);
+  transition: width 0.3s ease;
+}
+
+.epic-progress-fill.state-done {
+  background: var(--green);
+}
+
+.epic-progress-fill.state-failed {
+  background: var(--red);
+}
+
+.epic-progress-fill.state-pending {
+  background: var(--muted);
+}
+
+.epic-card.epic-done {
+  border-color: var(--green);
+}
+
+.epic-card.epic-failed {
+  border-color: var(--red);
+}
+
+/* Un epic dont une US est en cours de dev : bordure qui pulse (halo). */
+.epic-card.epic-working,
+.story.status-in_progress {
+  border-color: var(--accent);
+  animation: dev-glow 1.6s ease-in-out infinite;
+}
+
+.epic-view.epic-working .epic-view-title {
+  color: var(--accent);
+}
+
+@keyframes dev-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 140, 255, 0);
+    border-color: var(--accent);
+  }
+  50% {
+    box-shadow: 0 0 11px 1px rgba(79, 140, 255, 0.5);
+    border-color: #84aaff;
+  }
+}
+
+/* Spinner « waiter » réutilisable (epic + story en cours). */
+.spinner {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  display: inline-block;
+  animation: spin 0.7s linear infinite;
+}
+
+.spinner-sm {
+  width: 9px;
+  height: 9px;
+  border-width: 1.5px;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .epic-card.epic-working,
+  .story.status-in_progress {
+    animation: none;
+  }
+  .spinner {
+    animation-duration: 1.4s;
+  }
+}
+
 .epic-view,
 .us-view {
   overflow-y: auto;

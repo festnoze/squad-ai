@@ -53,4 +53,55 @@ describe("Board", () => {
     const crumbs = screen.getAllByText("S1");
     expect(crumbs.length).toBeGreaterThan(0);
   });
+
+  it("carte epic : avancement (barre + compteur) au niveau racine", () => {
+    const epic: Epic = { id: "E1", title: "Cœur", description: "", iteration: 1 };
+    render(
+      <Board
+        epics={[epic]}
+        stories={[
+          makeStory({ id: "S1", status: "done" }),
+          makeStory({ id: "S2", status: "done" }),
+          makeStory({ id: "S3", status: "todo" }),
+        ]}
+        projectId="p1"
+      />,
+    );
+    const card = screen.getByTestId("epic-E1");
+    expect(card).toHaveTextContent("2/3 terminée(s)");
+    expect(card.querySelector('[role="progressbar"]')).toHaveAttribute(
+      "aria-valuenow",
+      "67",
+    );
+    // Aucune US en cours → pas de spinner ni d'état « working ».
+    expect(screen.queryByTestId("epic-spinner")).not.toBeInTheDocument();
+    expect(card.className).not.toMatch(/epic-working/);
+  });
+
+  it("US en cours : epic mis en valeur (spinner + classe working) + compteur", () => {
+    const epic: Epic = { id: "E1", title: "Cœur", description: "", iteration: 1 };
+    render(
+      <Board
+        epics={[epic]}
+        stories={[
+          makeStory({ id: "S1", status: "in_progress" }),
+          makeStory({ id: "S2", status: "todo" }),
+        ]}
+        projectId="p1"
+      />,
+    );
+    const card = screen.getByTestId("epic-E1");
+    expect(card.className).toMatch(/epic-working/);
+    expect(screen.getByTestId("epic-spinner")).toBeInTheDocument();
+    expect(card).toHaveTextContent("1 en cours");
+  });
+
+  it("US en cours : la story porte la classe status-in_progress (halo)", () => {
+    const epic: Epic = { id: "E1", title: "Cœur", description: "", iteration: 1 };
+    const story = makeStory({ id: "S1", status: "in_progress", title: "Dev story" });
+    render(<Board epics={[epic]} stories={[story]} projectId="p1" />);
+    fireEvent.click(screen.getByText("Cœur")); // drill dans l'epic
+    const row = screen.getByTestId("story-S1");
+    expect(row.className).toMatch(/status-in_progress/);
+  });
 });

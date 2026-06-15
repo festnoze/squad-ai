@@ -356,6 +356,9 @@ function StoryBadges({ story }: { story: UserStory }) {
         P{story.priority}
       </span>
       <span className={`badge badge-${story.status}`}>
+        {story.status === "in_progress" && (
+          <span className="spinner spinner-sm" aria-hidden="true" />
+        )}
         {STATUS_LABEL[story.status] ?? story.status}
       </span>
       {story.quality_score >= 0 && (
@@ -770,6 +773,65 @@ function Breadcrumb({
   );
 }
 
+type EpicState = "working" | "failed" | "done" | "pending";
+
+interface EpicProgress {
+  total: number;
+  done: number;
+  inProgress: number;
+  failed: number;
+  pct: number;
+  state: EpicState;
+}
+
+/** Avancement d'un epic : compteurs + état dérivé (priorité au « en cours »). */
+function epicProgress(stories: UserStory[]): EpicProgress {
+  const total = stories.length;
+  const done = stories.filter((s) => s.status === "done").length;
+  const inProgress = stories.filter((s) => s.status === "in_progress").length;
+  const failed = stories.filter((s) => s.status === "failed").length;
+  const pct = total === 0 ? 0 : Math.round((done / total) * 100);
+  const state: EpicState =
+    inProgress > 0
+      ? "working"
+      : failed > 0
+        ? "failed"
+        : total > 0 && done === total
+          ? "done"
+          : "pending";
+  return { total, done, inProgress, failed, pct, state };
+}
+
+/** Barre d'avancement d'un epic + ligne de compteurs (done / en cours / échec). */
+function EpicProgressBar({ prog }: { prog: EpicProgress }) {
+  return (
+    <>
+      <div
+        className="epic-progress"
+        role="progressbar"
+        aria-valuenow={prog.pct}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        title={`${prog.done}/${prog.total} terminée(s) — ${prog.pct}%`}
+      >
+        <div
+          className={`epic-progress-fill state-${prog.state}`}
+          style={{ width: `${prog.pct}%` }}
+        />
+      </div>
+      <div className="epic-card-meta">
+        {prog.done}/{prog.total} terminée(s)
+        {prog.inProgress > 0 && (
+          <span className="epic-meta-working"> · {prog.inProgress} en cours</span>
+        )}
+        {prog.failed > 0 && (
+          <span className="epic-meta-failed"> · {prog.failed} en échec</span>
+        )}
+      </div>
+    </>
+  );
+}
+
 /** Niveau racine : grille de cartes epic avec compteur d'US et deps dérivées. */
 function EpicsView({
   epics,
@@ -786,12 +848,13 @@ function EpicsView({
     <div className="epic-grid">
       {epics.map((epic) => {
         const es = stories.filter((s) => s.epic_id === epic.id);
-        const done = es.filter((s) => s.status === "done").length;
+        const prog = epicProgress(es);
         const deps = epicDeps.get(epic.id) ?? [];
         return (
           <div
             key={epic.id}
-            className="epic epic-card"
+            className={`epic epic-card epic-${prog.state}`}
+            data-testid={`epic-${epic.id}`}
             role="button"
             tabIndex={0}
             onClick={() => onOpenEpic(epic.id)}
@@ -804,13 +867,21 @@ function EpicsView({
           >
             <div className="epic-head">
               <span className="epic-id">{epic.id}</span>
-              <span className="epic-iter">itération {epic.iteration}</span>
+              <span className="epic-head-right">
+                {prog.state === "working" && (
+                  <span
+                    className="spinner"
+                    data-testid="epic-spinner"
+                    title="Développement en cours"
+                    aria-label="Développement en cours"
+                  />
+                )}
+                <span className="epic-iter">itération {epic.iteration}</span>
+              </span>
             </div>
             <div className="epic-title">{epic.title}</div>
             {epic.description && <p className="epic-desc">{epic.description}</p>}
-            <div className="epic-card-meta">
-              {es.length} US · {done}/{es.length} terminée(s)
-            </div>
+            <EpicProgressBar prog={prog} />
             {deps.length > 0 && (
               <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
             )}
@@ -836,15 +907,22 @@ function EpicView({
   onOpenStory: (storyId: string) => void;
 }) {
   const es = stories.filter((s) => s.epic_id === epic.id);
+  const prog = epicProgress(es);
   const deps = epicDeps.get(epic.id) ?? [];
   return (
-    <div className="epic-view">
+    <div className={`epic-view epic-${prog.state}`}>
       <div className="epic-head">
         <span className="epic-id">{epic.id}</span>
         <span className="epic-iter">itération {epic.iteration}</span>
       </div>
-      <h3 className="epic-view-title">{epic.title}</h3>
+      <h3 className="epic-view-title">
+        {prog.state === "working" && (
+          <span className="spinner" title="Développement en cours" aria-label="Développement en cours" />
+        )}
+        {epic.title}
+      </h3>
       {epic.description && <p className="epic-view-desc">{epic.description}</p>}
+      <EpicProgressBar prog={prog} />
       {deps.length > 0 && (
         <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
       )}
