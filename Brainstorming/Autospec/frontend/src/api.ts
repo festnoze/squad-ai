@@ -308,6 +308,21 @@ export async function setProvider(
   );
 }
 
+export async function setLanguage(
+  projectId: string,
+  language: "python" | "go" | "rust",
+): Promise<ProjectState> {
+  // Idempotent (sets a value) -> safe to retry transient proxy failures.
+  const { state } = await json<{ state: ProjectState }>(
+    await fetchIdempotent(`/api/projects/${projectId}/language`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ language }),
+    }),
+  );
+  return state;
+}
+
 export async function updateComponents(
   projectId: string,
   components: ProductComponent[],

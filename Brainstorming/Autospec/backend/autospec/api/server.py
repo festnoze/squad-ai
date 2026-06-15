@@ -199,6 +199,10 @@ class ComponentsRequest(BaseModel):
     components: list[ComponentInput]
 
 
+class LanguageRequest(BaseModel):
+    language: str  # L2: python | go | rust
+
+
 class AcceptanceCriterionInput(BaseModel):
     id: str | None = None
     text: str
@@ -654,6 +658,17 @@ async def aset_components(project_id: str, req: ComponentsRequest) -> dict:
     try:
         await pipeline.aset_components([c.model_dump() for c in req.components])
     except ValueError as exc:  # unknown status value
+        raise HTTPException(422, str(exc))
+    return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
+
+
+@app.put("/api/projects/{project_id}/language")
+async def aset_language(project_id: str, req: LanguageRequest) -> dict:
+    """L2: override the backend language chosen for the generated product."""
+    pipeline = _pipeline(project_id)
+    try:
+        await pipeline.aset_language(req.language)
+    except ValueError as exc:  # unknown language
         raise HTTPException(422, str(exc))
     return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
 

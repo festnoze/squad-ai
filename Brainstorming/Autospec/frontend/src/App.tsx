@@ -23,6 +23,7 @@ import {
   sendChat,
   setProvider,
   setSpecMode,
+  setLanguage,
   setupComponents,
   stopApp,
   stopProject,
@@ -30,6 +31,7 @@ import {
   updateComponents,
 } from "./api";
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
+import { LanguagePanel } from "./components/LanguagePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
 import { Board } from "./components/Board";
 import { Dashboard } from "./components/Dashboard";
@@ -527,6 +529,15 @@ export default function App() {
                 guard(() => updateComponents(project.id, components))()
               }
               onSetup={guard(() => setupComponents(project.id))}
+            />
+            <LanguagePanel
+              language={project.backend_language}
+              complexity={project.language_complexity}
+              criticality={project.language_criticality}
+              rationale={project.language_rationale}
+              onSet={(lang) => {
+                void guard(() => setLanguage(project.id, lang).then(() => undefined))();
+              }}
             />
             <BacklogPanel backlog={project.backlog ?? []} />
             <ArchitecturePanel

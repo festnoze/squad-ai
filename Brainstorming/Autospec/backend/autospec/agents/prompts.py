@@ -402,6 +402,37 @@ Réponds avec EXACTEMENT UN objet JSON :
 
 # ------------------------------------------------- Solution agent (components)
 
+def language_proposal(state: ProjectState) -> str:
+    return f"""Tu es l'architecte d'un pipeline automatisé qui choisit le LANGAGE BACKEND du
+produit à générer. Voici le brief produit :
+\"\"\"{state.brief or state.goal}\"\"\"
+
+Estime DEUX axes, chacun de 1 (faible) à 5 (élevé) :
+- "complexity" : complexité technique du backend (algorithmes, concurrence,
+  temps réel, performance, systèmes…).
+- "criticality" : sensibilité aux erreurs / coût d'une régression (financier,
+  légal, sûreté, données personnelles, santé…).
+
+Dérive le langage backend recommandé :
+- "python" — projet simple / faible criticité (calculatrice, vitrine,
+  prototype, CRUD jetable) : génération la plus fiable, pas de compilation.
+- "go" (défaut) — application professionnelle de complexité/criticité moyenne
+  (SaaS, back-office, API métier) : typage + débit de boucle + déploiement simple.
+- "rust" — complexité technique ÉLEVÉE (≥4) OU criticité ÉLEVÉE (≥4) (bancaire,
+  paiement, santé, systèmes, calcul exigeant) : le compilateur décharge le
+  linter et les tests (exhaustivité, null-safety, erreurs, races).
+
+En cas de doute, choisis "go".
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "language": "python|go|rust",
+  "complexity": <1-5>,
+  "criticality": <1-5>,
+  "rationale": "<une phrase en français justifiant le choix>"
+}}"""
+
+
 def components_proposal(state: ProjectState) -> str:
     return f"""Tu es l'agent solutionneur d'un pipeline automatisé. Voici le brief produit :
 \"\"\"{state.brief or state.goal}\"\"\"
@@ -534,10 +565,28 @@ ce même JSON (ou des stories existantes listées plus haut)."""
 
 # ---------------------------------------------------------------- QA (test design)
 
+def _language_block(backend_language: str) -> str:
+    """L2: surface the chosen backend language to the agents. Python is the
+    implicit default (the toolchain below assumes it); only non-Python targets
+    add an explicit note while the multi-language toolchain (L2g) lands."""
+    if not backend_language or backend_language == "python":
+        return ""
+    return (
+        f"\nLangage backend cible : {backend_language} (choisi selon la "
+        "complexité/criticité du produit ; la chaîne de build/test multi-langage "
+        "est en cours d'intégration).\n"
+    )
+
+
 def qa_test_plan(
-    story: UserStory, package_name: str, architecture: str = "", lessons: str = ""
+    story: UserStory,
+    package_name: str,
+    architecture: str = "",
+    lessons: str = "",
+    backend_language: str = "python",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    lang_block = _language_block(backend_language)
     lessons_block = (
         f"\nLeçons des itérations précédentes (rétrospective d'usine — à appliquer) :\n{lessons}\n"
         if lessons
@@ -545,7 +594,7 @@ def qa_test_plan(
     )
     return f"""Tu es l'architecte de tests d'un pipeline automatisé BDD/TDD. Le code sera du
 Python dans le package `{package_name}` (projet uv, pytest + pytest-bdd).
-{arch_block}{lessons_block}
+{arch_block}{lang_block}{lessons_block}
 
 User story à couvrir : {story.id} — {story.title}
 Description : {story.description}
@@ -624,8 +673,10 @@ def dev_story(
     guidance: str = "",
     ui_tests: bool = False,
     lessons: str = "",
+    backend_language: str = "python",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    lang_block = _language_block(backend_language)
     guidance_block = (
         f"\nConsignes de l'utilisateur (à respecter en priorité) :\n{guidance}\n" if guidance else ""
     )
@@ -653,7 +704,7 @@ L'architecte QA a décomposé ce test d'acceptance en tests unitaires outside-in
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant, qui est un projet Python géré par uv (pyproject.toml déjà
 présent, pytest + pytest-bdd installés).
-{arch_block}{guidance_block}{lessons_block}
+{arch_block}{lang_block}{guidance_block}{lessons_block}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :

@@ -57,6 +57,14 @@ class ComponentStatus(str, Enum):
     REJECTED = "rejected"   # discarded by the user
 
 
+class BackendLanguage(str, Enum):
+    """L2: backend language chosen for the generated product. Python is the safe
+    default (most reliable generation, no compile barrier)."""
+    PYTHON = "python"
+    GO = "go"
+    RUST = "rust"
+
+
 class TestState(str, Enum):
     __test__ = False              # not a pytest test class
 
@@ -227,6 +235,12 @@ class ProjectState(BaseModel):
     brownfield_path: str = ""  # B1: existing repo to extend ("" = greenfield)
     architecture: str = ""  # current technical design (from the optional Architect phase)
     plan_quality: int = -1  # last refinement score for the PO plan (-1 = not run)
+    # L2: recommended/chosen backend language + the two analysis axes (1-5) and
+    # the rationale. Python by default (safe), overridable by the user.
+    backend_language: BackendLanguage = BackendLanguage.PYTHON
+    language_complexity: int = -1   # technical complexity 1-5 (-1 = not analyzed)
+    language_criticality: int = -1  # error-sensitivity 1-5 (-1 = not analyzed)
+    language_rationale: str = ""
     backlog: list[FeatureHypothesis] = Field(default_factory=list)
     components: list[Component] = Field(default_factory=list)
     epics: list[Epic] = Field(default_factory=list)

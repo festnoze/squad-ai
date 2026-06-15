@@ -128,6 +128,16 @@ _IMPACT = json.dumps(
     ensure_ascii=False,
 )
 
+_LANGUAGE = json.dumps(
+    {
+        "language": "go",
+        "complexity": 3,
+        "criticality": 2,
+        "rationale": "Application de complexité moyenne (mode démo) — Go par défaut.",
+    },
+    ensure_ascii=False,
+)
+
 _COMPONENTS = json.dumps(
     {
         "message": "Stack par défaut proposée (mode démo).",
@@ -222,6 +232,8 @@ class ScriptedRunner:
             return _RETRO
         if "analyste d'impact" in prompt:  # feedback_impact
             return _IMPACT
+        if "choisit le LANGAGE BACKEND" in prompt:  # language_proposal (L2)
+            return _LANGUAGE
         if "agent solutionneur" in prompt:  # components_proposal
             return _COMPONENTS
         if "tech-writer d'un pipeline" in prompt:  # tech_writer

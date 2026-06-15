@@ -148,6 +148,10 @@ export interface ProjectState {
   created_at: number;
   architecture: string;
   plan_quality: number;
+  backend_language?: "python" | "go" | "rust";
+  language_complexity?: number;
+  language_criticality?: number;
+  language_rationale?: string;
   usage: Usage;
   budget_usd: number;
   archived: boolean;

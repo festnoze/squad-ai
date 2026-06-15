@@ -20,6 +20,7 @@ from ..config import settings
 from .. import observability
 from ..models import (
     AcceptanceCriterion,
+    BackendLanguage,
     ChatMessage,
     ChatRole,
     Component,
@@ -35,6 +36,7 @@ from ..models import (
     TestState,
     UserStory,
 )
+from ..language_selector import recommend_language
 from ..storage import save_state_payload, workspace_dir
 from . import mutation, pytest_report, refine, scheduler, session_monitor, setup_exec, workspace
 from . import lessons as lesson_store
@@ -715,6 +717,51 @@ class Pipeline:
         )
         self._sync()
 
+    async def _aselect_language(self) -> None:
+        """L2: choose the backend language from the brief/goal. Always sets a
+        value (deterministic heuristic); when AUTOSPEC_LANGUAGE_SELECTOR is on, an
+        agent may refine it. First iteration only, non-fatal."""
+        if self.state.language_complexity >= 0:  # already analyzed
+            return
+        rec = recommend_language(self.state.goal, self.state.brief)
+        if settings.language_selector_enabled:
+            try:
+                result = await self._tracked.arun(
+                    prompts.language_proposal(self.state),
+                    system_prompt=persona("architect"),
+                )
+                reply = extract_json(result.text)
+                lang = str(reply.get("language", "")).strip().lower()
+                if lang in ("python", "go", "rust"):
+                    rec = {
+                        "language": lang,
+                        "complexity": _clamp_1_5(reply.get("complexity"), default=rec["complexity"]),
+                        "criticality": _clamp_1_5(reply.get("criticality"), default=rec["criticality"]),
+                        "rationale": str(reply.get("rationale") or rec["rationale"]),
+                    }
+            except AgentError as exc:
+                self._log("language", f"Sélecteur de langage indisponible ({exc}) — heuristique.")
+        self.state.backend_language = BackendLanguage(rec["language"])
+        self.state.language_complexity = rec["complexity"]
+        self.state.language_criticality = rec["criticality"]
+        self.state.language_rationale = rec["rationale"]
+        self._chat(
+            ChatRole.SYSTEM,
+            f"🧭 Langage backend recommandé : {rec['language']} "
+            f"(complexité {rec['complexity']}/5, criticité {rec['criticality']}/5) — "
+            f"{rec['rationale']}",
+        )
+
+    async def aset_language(self, language: str) -> ProjectState:
+        """L2: user override of the backend language. Raises ValueError (->409)
+        on an unknown language."""
+        try:
+            self.state.backend_language = BackendLanguage(language.strip().lower())
+        except ValueError:
+            raise ValueError(f"langage inconnu : {language!r} (python|go|rust)")
+        self._sync()
+        return self.state
+
     async def _apropose_components(self) -> None:
         """Solution agent proposes the product's technical components right
         after the brief (first iteration only). Mandatory components are
@@ -1178,6 +1225,7 @@ class Pipeline:
                 self.state.phase = PipelinePhase.STOPPED
                 self._sync()
                 return
+            await self._aselect_language()
             await self._apropose_components()
 
             while not self._stop_requested:
@@ -1714,6 +1762,7 @@ class Pipeline:
                         "\n".join(self.state.build_guidance),
                         ui_tests=self._ui_mode(story),
                         lessons="\n".join(self._effective_lessons()),
+                        backend_language=self.state.backend_language.value,
                     ),
                     system_prompt=persona("dev"),
                     cwd=ws,
@@ -1925,6 +1974,7 @@ class Pipeline:
                 prompts.qa_test_plan(
                     story, pkg, self.state.architecture,
                     lessons="\n".join(self._effective_lessons()),
+                    backend_language=self.state.backend_language.value,
                 ),
                 system_prompt=persona("qa"),
             )

@@ -215,6 +215,11 @@ class Settings:
     components_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_COMPONENTS", False)
     )
+    # L2: LLM backend-language selector after the brief (off -> deterministic
+    # heuristic still sets the language; this just lets an agent refine it).
+    language_selector_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_LANGUAGE_SELECTOR", False)
+    )
     setup_install: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_SETUP_INSTALL", False)
     )

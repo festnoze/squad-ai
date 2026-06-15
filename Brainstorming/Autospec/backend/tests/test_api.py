@@ -796,3 +796,16 @@ async def test_long_goal_name_is_truncated():
         ).json()["state"]["name"]
         assert name.endswith("…")
         assert len(name) <= 42
+
+
+async def test_set_language_override():
+    # L2c: override the backend language; unknown -> 422, unknown project -> 404.
+    async with make_client([PM_BRIEF]) as client:
+        pid = (await client.post("/api/projects", json={"goal": "x"})).json()["id"]
+        ok = await client.put(f"/api/projects/{pid}/language", json={"language": "rust"})
+        assert ok.status_code == 200
+        assert ok.json()["state"]["backend_language"] == "rust"
+        bad = await client.put(f"/api/projects/{pid}/language", json={"language": "cobol"})
+        assert bad.status_code == 422
+        nf = await client.put("/api/projects/nope/language", json={"language": "go"})
+        assert nf.status_code == 404
