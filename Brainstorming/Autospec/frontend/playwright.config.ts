@@ -2,8 +2,8 @@ import { defineConfig, devices } from "@playwright/test";
 
 /**
  * E2E config. The FastAPI backend serves the *built* frontend (frontend/dist)
- * itself, so /api and /ws are same-origin — no Vite proxy in the loop (which was
- * flaky for WebSockets under Playwright). Run `npm run build` first (the
+ * itself, so /api and /api/stream (SSE) are same-origin — no Vite proxy in the
+ * loop (which was flaky for streaming under Playwright). Run `npm run build` first (the
  * `test:e2e` script does this). Backend runs in demo mode: scripted agents, no
  * Claude CLI, no uv venv build — fully hermetic.
  */

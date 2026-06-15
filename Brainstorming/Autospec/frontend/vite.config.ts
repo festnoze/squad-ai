@@ -110,13 +110,35 @@ function retryingProxy(target: string) {
   };
 }
 
+// SSE stream (`/api/stream`): a long-lived response that stays idle between
+// events. It must NOT inherit `/api`'s PROXY_TIMEOUT (that would kill the stream
+// mid-flight) and needs no retry — EventSource reconnects natively, and the
+// backend replays missed events via Last-Event-ID. We only swallow connect
+// errors so a backend restart doesn't spam the console; the browser reconnects.
+function streamProxy(target: string) {
+  return {
+    target,
+    agent: keepAliveAgent,
+    // No proxyTimeout: an idle SSE stream between two events must not be cut.
+    configure: (proxy: any) => {
+      setImmediate(() => {
+        proxy.removeAllListeners("error");
+        proxy.on("error", (_err: NodeJS.ErrnoException, _req: any, res: any) => {
+          if (res && typeof res.destroy === "function") res.destroy();
+        });
+      });
+    },
+  };
+}
+
 export default defineConfig({
   plugins: [react()],
   server: {
     port: 5183,
     proxy: {
+      // `/api/stream` first: more specific, must win over the generic `/api`.
+      "/api/stream": streamProxy(apiTarget),
       "/api": retryingProxy(apiTarget),
-      "/ws": { target: `ws://127.0.0.1:${backendPort}`, ws: true },
     },
   },
   test: {

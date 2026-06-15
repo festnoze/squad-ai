@@ -1,9 +1,10 @@
-"""HTTP + WebSocket API exposing the Autospec pipeline to the React frontend."""
+"""HTTP + SSE API exposing the Autospec pipeline to the React frontend."""
 
 from __future__ import annotations
 
 import asyncio
 import io
+import json
 import os
 import re
 import shutil
@@ -11,9 +12,9 @@ import stat
 import zipfile
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
+from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -808,26 +809,71 @@ async def aread_file(project_id: str, path: str) -> dict:
     return {"path": path, "content": content, "truncated": truncated}
 
 
-@app.websocket("/ws")
-async def aws_events(ws: WebSocket) -> None:
-    await ws.accept()
-    queue = bus.subscribe()
+# Seconds between heartbeat comments on an idle SSE stream. Keeps the connection
+# (and any intermediary proxy) alive and lets a vanished client be noticed: the
+# write fails, the generator raises, and the subscriber is cleaned up.
+_SSE_HEARTBEAT_S = 15.0
+# Client-side reconnection backoff (ms) advertised to EventSource via `retry:`.
+_SSE_RETRY_MS = 2000
+
+
+def _sse_frame(seq: int, event: dict) -> str:
+    """One Server-Sent Event: an `id:` (for Last-Event-ID replay) + `data:`."""
+    return f"id: {seq}\ndata: {json.dumps(event)}\n\n"
+
+
+@app.get("/api/stream")
+async def astream(request: Request) -> StreamingResponse:
+    """Server-Sent Events stream of pipeline events (replaces the WebSocket).
+
+    Resilient by design: every event carries a monotonic ``id``. On reconnect
+    the browser resends ``Last-Event-ID`` and the bus replays the missed events
+    from its ring buffer — no events are lost across a transient disconnect.
+    A request without ``Last-Event-ID`` (a fresh page load) starts from the
+    current head: the initial state is fetched separately via ``GET /api/projects``.
+    """
+    raw = request.headers.get("last-event-id")
     try:
-        while True:
-            event = await queue.get()
-            await ws.send_json(event)
-    except (WebSocketDisconnect, RuntimeError, ConnectionError, OSError):
-        # Client vanished (tab closed/reloaded, network drop, or a keepalive
-        # ping timeout closing the socket with code 1011). The frontend
-        # auto-reconnects and resyncs, so this is expected — just clean up.
-        pass
-    except Exception:  # noqa: BLE001 — also covers websockets.ConnectionClosed*
-        # The streaming loop only awaits the queue and sends JSON; any other
-        # failure here means the connection is gone or shutting down. Never let
-        # a dead subscriber surface as an unhandled-task traceback.
-        pass
-    finally:
-        bus.unsubscribe(queue)
+        last_id = int(raw) if raw is not None else bus.latest_seq
+    except ValueError:
+        last_id = bus.latest_seq
+
+    async def gen():
+        # Subscribe BEFORE snapshotting the backlog so no event slips through the
+        # gap between replay and going live; dedup by seq covers any overlap.
+        queue = bus.subscribe()
+        emitted = last_id
+        try:
+            yield f"retry: {_SSE_RETRY_MS}\n\n"
+            for seq, event in bus.replay_since(last_id):
+                if seq > emitted:
+                    emitted = seq
+                    yield _sse_frame(seq, event)
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    seq, event = await asyncio.wait_for(
+                        queue.get(), timeout=_SSE_HEARTBEAT_S
+                    )
+                except asyncio.TimeoutError:
+                    yield ": ping\n\n"  # heartbeat comment (ignored by EventSource)
+                    continue
+                if seq > emitted:
+                    emitted = seq
+                    yield _sse_frame(seq, event)
+        finally:
+            bus.unsubscribe(queue)
+
+    return StreamingResponse(
+        gen(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # disable proxy buffering of the stream
+        },
+    )
 
 
 # Serve the built frontend when available (production mode). Both index.html

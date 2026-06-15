@@ -8,9 +8,11 @@ from autospec.orchestrator.pipeline import Pipeline
 
 
 def _drain(q):
+    # The bus queues carry (seq, event) tuples; tests only care about the event.
     out = []
     while not q.empty():
-        out.append(q.get_nowait())
+        _seq, event = q.get_nowait()
+        out.append(event)
     return out
 
 

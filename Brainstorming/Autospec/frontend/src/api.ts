@@ -359,38 +359,55 @@ export function exportZipUrl(projectId: string): string {
   return `/api/projects/${projectId}/export`;
 }
 
+/**
+ * Flux d'évènements du backend via Server-Sent Events (SSE), en remplacement de
+ * la WebSocket (plus résilient sur le proxy loopback Windows : pas de connexion
+ * bidirectionnelle fragile, reconnexion native d'EventSource, et le serveur
+ * rejoue les events manqués grâce à `Last-Event-ID`).
+ *
+ * Signature inchangée vs l'ancienne WebSocket : `onReconnect` n'est appelé qu'aux
+ * RE-connexions (pas à la première ouverture), comme filet de sécurité si le ring
+ * buffer serveur a évincé des events trop vieux pour être rejoués.
+ */
 export function connectEvents(
   onEvent: (e: WsEvent) => void,
   onReconnect?: () => void,
 ): () => void {
-  let ws: WebSocket | null = null;
+  let es: EventSource | null = null;
   let closed = false;
   let opened = false;
   let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
 
   const open = () => {
     if (closed) return;
-    const proto = location.protocol === "https:" ? "wss" : "ws";
-    ws = new WebSocket(`${proto}://${location.host}/ws`);
-    ws.onopen = () => {
-      // La toute première ouverture est gérée par l'init initial du composant ;
-      // on ne resynchronise qu'à chaque RE-connexion suivante.
+    es = new EventSource("/api/stream");
+    es.onopen = () => {
       if (opened) onReconnect?.();
       opened = true;
     };
-    ws.onmessage = (msg) => {
+    es.onmessage = (msg) => {
       let event: WsEvent;
       try {
         event = JSON.parse(msg.data) as WsEvent;
       } catch {
-        // Frame illisible : on l'ignore pour ne pas casser le flux d'événements.
-        console.warn("Frame WebSocket illisible ignorée");
+        // Évènement illisible : on l'ignore pour ne pas casser le flux.
+        console.warn("Évènement SSE illisible ignoré");
         return;
       }
       onEvent(event);
     };
-    ws.onclose = () => {
-      if (!closed) reconnectTimer = setTimeout(open, 1500);
+    es.onerror = () => {
+      if (closed) return;
+      // readyState CONNECTING : EventSource se reconnecte tout seul (avec le
+      // backoff `retry` envoyé par le serveur) — on ne touche à rien.
+      // readyState CLOSED : le navigateur a abandonné (ex. 502 transitoire du
+      // proxy, type MIME inattendu) et NE se reconnectera pas — on relance
+      // nous-mêmes après un court délai.
+      if (es && es.readyState === EventSource.CLOSED) {
+        es.close();
+        es = null;
+        reconnectTimer = setTimeout(open, 1500);
+      }
     };
   };
   open();
@@ -398,9 +415,9 @@ export function connectEvents(
   return () => {
     closed = true;
     // Annule une reconnexion en attente : sans cela, un timer déjà programmé
-    // rouvrirait une WebSocket orpheline après le démontage du composant.
+    // rouvrirait un EventSource orphelin après le démontage du composant.
     if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
-    ws?.close();
+    es?.close();
   };
 }
 
