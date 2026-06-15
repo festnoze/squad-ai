@@ -45,6 +45,7 @@ modèle courant.
 | 16 | Workflow CI racine monorepo (filtre paths + chemins préfixés) | YAML valide |
 | 17 | Navigation hiérarchique du board (drill-down épics → epic → US + fil d'Ariane, deps d'epic dérivées des US, remplace l'expansion en drop-down) | unit Vitest |
 | 18 | Sélecteur de projet (dropdown 🗂 en tête de `ProjectBar` : option « badge phase + nom + done/total + phase », reflète/commute le projet actif, inclut toujours le projet courant même archivé/masqué ; lisible quand les chips débordent) | unit Vitest + smoke navigateur |
+| 19 | Avancement & mise en valeur des epics sur le board (barre de progression + compteur done/en cours/échec par carte epic, bordure colorée par état ; US `in_progress` → halo `dev-glow` animé + spinner sur la story ET son epic, à la grille et dans l'en-tête du détail ; fallback `prefers-reduced-motion`) | unit Vitest (4) + smoke navigateur (état `working` capturé en live) |
 
 ## 🔎 Audit multi-agents (workflow `autospec-test-audit`)
 
