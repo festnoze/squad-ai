@@ -1,4 +1,5 @@
 import { FeatureHypothesis } from "../types";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 const STATUS_LABEL: Record<string, string> = {
   proposed: "proposée",
@@ -19,8 +20,7 @@ export function BacklogPanel({ backlog }: Props) {
   const shipped = backlog.filter((h) => h.status === "done");
 
   return (
-    <div className="panel backlog">
-      <h2>Backlog de l'analyste (kanban)</h2>
+    <CollapsibleSection title="Backlog de l'analyste (kanban)" className="backlog">
       <div className="hypotheses">
         {active.map((h) => (
           <div key={h.id} className={`hypothesis hyp-${h.status}`} title={h.rationale}>
@@ -40,6 +40,6 @@ export function BacklogPanel({ backlog }: Props) {
           </div>
         )}
       </div>
-    </div>
+    </CollapsibleSection>
   );
 }

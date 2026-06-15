@@ -65,7 +65,27 @@ export default function App() {
   const [error, setError] = useState("");
   const [toasts, setToasts] = useState<NotifyToast[]>([]);
   const toastIdRef = useRef(0);
+  // UI8 : retours d'action in-app (plus de window.alert / prompt natifs).
+  const pushToast = (level: NotifyToast["level"], title: string, body = "") => {
+    const id = ++toastIdRef.current;
+    setToasts((prev) => [...prev.slice(-4), { id, level, title, body }]);
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 6000);
+  };
+  const [rollbackIters, setRollbackIters] = useState<number[] | null>(null);
   const [provider, setProviderInfo] = useState<ProviderInfo | null>(null);
+  // UI10 : provider + modèle regroupés dans un petit popover compact.
+  const [providerMenuOpen, setProviderMenuOpen] = useState(false);
+  const providerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!providerMenuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (providerRef.current && !providerRef.current.contains(e.target as Node)) {
+        setProviderMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [providerMenuOpen]);
   // Ids des projets supprimés : empêche un event « state » retardé de
   // ressusciter un projet déjà supprimé.
   const deletedIds = useRef<Set<string>>(new Set());
@@ -290,21 +310,18 @@ export default function App() {
     if (!project) return;
     const iters = await getIterations(project.id);
     if (iters.length === 0) {
-      window.alert("Aucun snapshot d'itération disponible.");
+      pushToast("warning", "Rollback", "Aucun snapshot d'itération disponible.");
       return;
     }
-    const input = window.prompt(
-      `Revenir à quelle itération ? (${iters.join(", ")})`,
-      String(iters[iters.length - 1]),
-    );
-    if (input == null) return;
-    const n = Number(input);
-    if (!iters.includes(n)) {
-      window.alert("Itération invalide.");
-      return;
-    }
-    await rollbackProject(project.id, n);
+    setRollbackIters(iters); // ouvre la modale de choix (UI8)
   });
+
+  const confirmRollback = async (n: number) => {
+    setRollbackIters(null);
+    if (!project) return;
+    await guard(() => rollbackProject(project.id, n))();
+    pushToast("success", "Rollback", `Revenu à l'itération ${n}.`);
+  };
 
   return (
     <div className="app">
@@ -313,43 +330,59 @@ export default function App() {
           ⚙️ Autospec <span className="subtitle">PM → PO → QA → Dev, en BDD/TDD (BMAD method)</span>
         </h1>
         {provider && (
-          <div className="provider-select" title="Provider d'agents (Claude / OpenAI / Ollama / Anthropic)">
-            <span className="provider-label">🤖</span>
-            <select
-              value={provider.provider}
+          <div className="provider-control" ref={providerRef}>
+            <button
+              type="button"
+              className="provider-trigger"
+              aria-haspopup="menu"
+              aria-expanded={providerMenuOpen}
               disabled={provider.provider === "fake"}
-              onChange={(e) => handleProviderChange(e.target.value)}
-              title="Provider"
+              onClick={() => setProviderMenuOpen((o) => !o)}
+              title="Provider & modèle d'agents (Claude / OpenAI / Ollama / Anthropic)"
             >
-              {provider.provider === "fake" && <option value="fake">démo</option>}
-              {provider.available.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-            {provider.provider === "fake" ? (
-              <span className="provider-model">{provider.model}</span>
-            ) : (
-              <select
-                className="provider-model-select"
-                value={provider.model}
-                onChange={(e) => handleModelChange(e.target.value)}
-                title="Modèle"
-              >
-                {/* Le modèle courant peut ne pas figurer dans la liste suggérée
-                    (ex. « (défaut CLI) » ou un modèle fixé par variable d'env) :
-                    on l'ajoute en tête pour que la sélection s'affiche bien. */}
-                {provider.model &&
-                  !(provider.models[provider.provider] ?? []).includes(provider.model) && (
-                    <option value={provider.model}>{provider.model}</option>
-                  )}
-                {(provider.models[provider.provider] ?? []).map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-              </select>
+              🤖 {provider.provider === "fake" ? "démo" : provider.provider}
+              <span className="provider-trigger-model"> · {provider.model}</span>
+              {provider.provider !== "fake" && (
+                <span className="provider-caret" aria-hidden="true">
+                  ▾
+                </span>
+              )}
+            </button>
+            {providerMenuOpen && provider.provider !== "fake" && (
+              <div className="provider-menu" role="menu">
+                <label className="provider-field">
+                  <span>Provider</span>
+                  <select
+                    value={provider.provider}
+                    onChange={(e) => handleProviderChange(e.target.value)}
+                  >
+                    {provider.available.map((name) => (
+                      <option key={name} value={name}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="provider-field">
+                  <span>Modèle</span>
+                  <select
+                    value={provider.model}
+                    onChange={(e) => handleModelChange(e.target.value)}
+                  >
+                    {/* Le modèle courant peut ne pas figurer dans la liste
+                        suggérée (ex. « (défaut CLI) ») : on l'ajoute en tête. */}
+                    {provider.model &&
+                      !(provider.models[provider.provider] ?? []).includes(provider.model) && (
+                        <option value={provider.model}>{provider.model}</option>
+                      )}
+                    {(provider.models[provider.provider] ?? []).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
             )}
           </div>
         )}
@@ -444,6 +477,30 @@ export default function App() {
           </div>
         </div>
       )}
+      {rollbackIters && (
+        <div className="modal-backdrop" onClick={() => setRollbackIters(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="modal-close"
+              aria-label="Fermer"
+              onClick={() => setRollbackIters(null)}
+            >
+              ✕
+            </button>
+            <h2>⏪ Revenir à une itération</h2>
+            <p className="placeholder">
+              Choisis l'itération de destination (snapshot git du workspace) :
+            </p>
+            <div className="rollback-iters">
+              {rollbackIters.map((n) => (
+                <button key={n} className="ghost" onClick={() => confirmRollback(n)}>
+                  Itération {n}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {!project ? (
         <main className="home">
           {!showSetup && (
@@ -482,6 +539,7 @@ export default function App() {
               epics={project.epics ?? []}
               stories={project.stories ?? []}
               projectId={project.id}
+              phase={project.phase}
             />
             <RunPanel
               project={project}
@@ -500,7 +558,9 @@ export default function App() {
               onDeploy={guard(async () => {
                 if (!project) return;
                 const { created } = await deployProject(project.id);
-                window.alert(
+                pushToast(
+                  "success",
+                  "Déploiement",
                   created.length
                     ? `Artefacts générés : ${created.join(", ")}`
                     : "Artefacts de déploiement déjà présents.",
@@ -509,7 +569,7 @@ export default function App() {
               onExportZip={() => window.open(exportZipUrl(project.id), "_blank")}
               onGitExport={guard(async () => {
                 const { commit } = await gitExportProject(project.id);
-                window.alert(`Workspace commité : ${commit.slice(0, 12)}`);
+                pushToast("success", "Commit", `Workspace commité : ${commit.slice(0, 12)}`);
               })}
             />
             <CodeViewer projectId={project.id} />

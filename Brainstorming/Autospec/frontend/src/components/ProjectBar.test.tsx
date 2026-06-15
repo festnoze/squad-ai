@@ -91,9 +91,11 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
   });
 
   it("projet stoppé avec stories restantes : bouton ▶ qui relance le build", () => {
-    const { onPlay } = renderBar([
-      makeProject({ phase: "stopped", stories: [makeStory("todo")] }),
-    ]);
+    // UI3 : un projet dormant n'est une chip que s'il est sélectionné.
+    const { onPlay } = renderBar(
+      [makeProject({ id: "p1", phase: "stopped", stories: [makeStory("todo")] })],
+      { selectedId: "p1" },
+    );
     fireEvent.click(screen.getByTitle("Reprendre le build des stories restantes"));
     expect(onPlay).toHaveBeenCalledTimes(1);
   });
@@ -106,10 +108,26 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
   });
 
   it("projet terminé sans story restante : ni ▶ ni ⏹, progression visible", () => {
-    renderBar([makeProject({ phase: "done", stories: [makeStory("done")] })]);
+    renderBar([makeProject({ id: "p1", phase: "done", stories: [makeStory("done")] })], {
+      selectedId: "p1",
+    });
     expect(screen.queryByTitle(/Stopper la pipeline/)).toBeNull();
     expect(screen.queryByTitle(/Reprendre/)).toBeNull();
     expect(screen.getByText("1/1")).toBeInTheDocument();
+  });
+
+  it("UI3 : projets inactifs masqués des chips, indiqués « +N dans 🗂 »", () => {
+    renderBar([
+      makeProject({ id: "p1", name: "Actif", phase: "build" }),
+      makeProject({ id: "p2", name: "Fini1", phase: "done" }),
+      makeProject({ id: "p3", name: "Fini2", phase: "stopped" }),
+    ]);
+    // Seule la chip active est rendue ; les 2 inactives sont dans le sélecteur.
+    expect(document.body.querySelectorAll(".project-chip")).toHaveLength(1);
+    expect(screen.getByText("+2 dans 🗂")).toBeInTheDocument();
+    // …mais toutes figurent dans le sélecteur.
+    expect(screen.getByRole("option", { name: /Fini1/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /Fini2/ })).toBeInTheDocument();
   });
 
   it("plusieurs projets actifs en parallèle : chaque chip a son état", () => {

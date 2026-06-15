@@ -47,6 +47,24 @@ modèle courant.
 | 18 | Sélecteur de projet (dropdown 🗂 en tête de `ProjectBar` : option « badge phase + nom + done/total + phase », reflète/commute le projet actif, inclut toujours le projet courant même archivé/masqué ; lisible quand les chips débordent) | unit Vitest + smoke navigateur |
 | 19 | Avancement & mise en valeur des epics sur le board (barre de progression + compteur done/en cours/échec par carte epic, bordure colorée par état ; US `in_progress` → halo `dev-glow` animé + spinner sur la story ET son epic, à la grille et dans l'en-tête du détail ; fallback `prefers-reduced-motion`) | unit Vitest (4) + smoke navigateur (état `working` capturé en live) |
 
+## 🎨 Streamline UI — à faire (revue UX)
+
+Issues d'une revue UX experte de l'app en cours (35 projets réels, board `chat-eat`).
+Priorité par valeur V / complexité C (1-5). À traiter une par une.
+
+| # | Tâche | V/C | État |
+|---|-------|-----|------|
+| UI1 | **Grouper/replier les epics du board par itération** — sections par `iteration` (la plus récente/active dépliée, l'historique replié en résumé une-ligne avec barre de progression agrégée + état) ; auto-déplie le groupe qui passe `working` ; deps inter-itérations toujours visibles ; pas de repli s'il n'y a qu'une itération ; choix d'expansion persisté par projet. Garde le board centré sur la feature active quand l'historique s'accumule. **✅ LIVRÉ** : `EpicsView` groupe par `iteration` (sections repliables, en-tête « Itération N » + barre agrégée + spinner si working), seed sur la plus récente, auto-déplie les itérations `in_progress`, persistance `localStorage` par projet ; `EpicCard` extrait ; 3 tests. | 5/3 | ✅ |
+| UI2 | **Nom de projet lisible par défaut** — dériver un nom signifiant de l'objectif au lieu du slug « todo », dédupliquer (`todo`, `todo-2`). Backend `_slug`/création + fallback. Fini les 12 chips « todo » indistinguables. **✅ LIVRÉ** : `_default_name` (1re clause de l'objectif, capée à 40c + …) + `_unique_name` (dédup « … (2) ») dans `acreate_project` ; 3 tests. | 5/2 | ✅ |
+| UI3 | **Sélecteur de projet primaire + chips secondaires** — le dropdown 🗂 devient le commutateur principal ; les chips se limitent aux projets actifs/en cours (ou masquées au-delà de N) ; tri actif→dormant→terminé ; champ de recherche/filtre dans le sélecteur dès qu'il y a beaucoup de projets. **✅ LIVRÉ** : tri actif→dormant→terminé ; chips limitées aux projets en cours + sélectionné ; reste via 🗂 (« +N dans 🗂 ») ; 1 test. | 4/3 | ✅ |
+| UI4 | **Panneau de logs repliable / auto-dimensionné** — la grosse boîte noire des logs ne réserve plus d'espace tant qu'il n'y a pas de logs (collapse/auto-size), récupère l'espace mort. **✅ LIVRÉ** : RunPanel `run-collapsed` (flex 0 quand vide/replié) + toggle « ▾ Logs (N) » ; le Board récupère l'espace ; 2 tests. | 4/2 | ✅ |
+| UI5 | **Panneaux latéraux conditionnels/repliables** — ne rendre (ou replier en accordéon) Composants/Backlog/Architecture que s'ils ont du contenu, au lieu de 4 panneaux empilés souvent vides. **✅ LIVRÉ** : `CollapsibleSection` réutilisable (caret + repli) appliqué à Composants/Backlog/Architecture (déjà auto-masqués si vides). | 3/3 | ✅ |
+| UI6 | **États vides actionnables** — remplacer « Le PO n'a pas encore produit de plan. » et le chat vide par un appel à l'action (bouton « ▶ Lancer pour générer le plan », aide de démarrage). **✅ LIVRÉ** : board vide contextuel (spinner « plan en cours » en phase planif, consigne sinon) via prop `phase` ; chat vide → message d'amorce ; 2 tests. | 4/2 | ✅ |
+| UI7 | **Regrouper les actions de la RunPanel** — action primaire mise en avant (Lancer/Pause/Reprendre) + menu « ⋯ Livraison/Export » pour Doc/Zip/Commit/Rollback/Déploiement ; masquer les actions post-build tant qu'aucun build n'existe. | 4/3 | ⬜ todo |
+| UI8 | **Remplacer les `prompt`/`alert` natifs** — Rollback (`window.prompt`), Déploiement/Commit (`window.alert`) → modale/toast in-app cohérents avec le reste. **✅ LIVRÉ** : `pushToast` in-app pour Déploiement/Commit/Rollback ; modale de choix d'itération pour le Rollback (plus de `window.prompt`/`alert`). | 3/3 | ✅ |
+| UI9 | **Hiérarchie visuelle** — élévation/espacement entre colonnes, titres de panneaux plus contrastés (moins « muted »), système de couleurs de statut appliqué de façon cohérente (chips, sélecteur, board). **✅ LIVRÉ** : variable `--title` (titres contrastés), élévation des panneaux + barre de titre, gap colonnes 16px. | 3/3 | ✅ |
+| UI10 | **En-tête épuré** — regrouper provider + modèle en un contrôle compact, dégager le titre (le 🤖 flottant + 2 selects encombrent la barre de titre). **✅ LIVRÉ** : pilule compacte « 🤖 provider · modèle ▾ » ouvrant un popover (provider + modèle), dégage la barre de titre. | 2/2 | ✅ |
+
 ## 🔎 Audit multi-agents (workflow `autospec-test-audit`)
 
 67 agents en parallèle (8 dimensions + vérification adversariale) → **50 findings confirmés** (9 high, 21 medium, 20 low). Rapport complet : voir l'output du run `ww59ppihi`.

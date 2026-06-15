@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { RunPanel } from "./RunPanel";
 import { PipelinePhase, ProjectState, StoryStatus, Usage, UserStory } from "../types";
@@ -64,11 +64,14 @@ function makeProject(overrides: Partial<ProjectState> = {}): ProjectState {
   };
 }
 
-function renderPanel(project: ProjectState) {
+function renderPanel(
+  project: ProjectState,
+  logs: { projectId: string; source: string; line: string }[] = [],
+) {
   return render(
     <RunPanel
       project={project}
-      logs={[]}
+      logs={logs}
       onRun={vi.fn()}
       onStop={vi.fn()}
       onPause={vi.fn()}
@@ -79,6 +82,10 @@ function renderPanel(project: ProjectState) {
       onExportZip={vi.fn()}
       onGitExport={vi.fn()}
       onCancelResume={vi.fn()}
+      onApprove={vi.fn()}
+      onReject={vi.fn()}
+      onRollback={vi.fn()}
+      onDeploy={vi.fn()}
     />,
   );
 }
@@ -175,5 +182,38 @@ describe("RunPanel", () => {
   it("resume_at absent : pas de bannière de reprise", () => {
     const { container } = renderPanel(makeProject({ phase: "stopped" }));
     expect(container.querySelector(".resume-banner")).toBeNull();
+  });
+
+  it("UI4 : sans logs, le panneau est replié et n'affiche pas la boîte de logs", () => {
+    const { container } = renderPanel(makeProject());
+    expect(container.querySelector(".run")?.className).toMatch(/run-collapsed/);
+    expect(container.querySelector(".logs")).toBeNull();
+    expect(screen.getByText(/aucun pour l'instant/i)).toBeInTheDocument();
+  });
+
+  it("UI4 : avec des logs, la boîte s'affiche + compteur, panneau non replié", () => {
+    const { container } = renderPanel(makeProject(), [
+      { projectId: "p1", source: "dev:US-1", line: "build ok" },
+    ]);
+    expect(container.querySelector(".run")?.className).not.toMatch(/run-collapsed/);
+    expect(container.querySelector(".logs")).not.toBeNull();
+    expect(screen.getByText("build ok")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Logs \(1\)/ })).toBeInTheDocument();
+  });
+
+  it("UI7 : actions de livraison repliées dans un menu ⋯, déployées au clic", () => {
+    renderPanel(makeProject({ phase: "done" }));
+    // Les actions post-build ne sont pas des boutons inline.
+    expect(screen.queryByRole("button", { name: /Doc \(README\)/ })).not.toBeInTheDocument();
+    const trigger = screen.getByRole("button", { name: /⋯ Livraison/ });
+    fireEvent.click(trigger);
+    expect(screen.getByRole("menuitem", { name: /Doc \(README\)/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Exporter en zip/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Déploiement/ })).toBeInTheDocument();
+  });
+
+  it("UI7 : pas de menu Livraison tant qu'aucun build n'existe (phase build)", () => {
+    renderPanel(makeProject({ phase: "build" }));
+    expect(screen.queryByRole("button", { name: /⋯ Livraison/ })).not.toBeInTheDocument();
   });
 });

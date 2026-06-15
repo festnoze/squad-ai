@@ -236,6 +236,33 @@ def _slug(text: str) -> str:
     return slug or "projet"
 
 
+def _default_name(goal: str) -> str:
+    """A readable project name derived from the goal (UI2): the first clause,
+    capped — not the lowercase URL slug (which produced indistinguishable
+    « todo » chips)."""
+    text = " ".join(goal.split())
+    text = re.split(r"[.\n!?;]", text, maxsplit=1)[0].strip()
+    if len(text) > 40:
+        text = text[:40].rsplit(" ", 1)[0].strip() + "…"
+    return text or "Projet"
+
+
+def _existing_names() -> set[str]:
+    return {p.state.name for p in pipelines.values()}
+
+
+def _unique_name(name: str) -> str:
+    """Disambiguate a project name against existing ones (« Budget » ,
+    « Budget (2) » …) so the bar never shows duplicates (UI2)."""
+    existing = _existing_names()
+    if name not in existing:
+        return name
+    i = 2
+    while f"{name} ({i})" in existing:
+        i += 1
+    return f"{name} ({i})"
+
+
 def _pipeline(project_id: str) -> Pipeline:
     pipeline = pipelines.get(project_id)
     if not pipeline:
@@ -313,7 +340,7 @@ async def aset_provider(req: ProviderRequest) -> dict:
 async def acreate_project(req: CreateProjectRequest) -> dict:
     if not req.goal.strip():
         raise HTTPException(422, "L'objectif du projet est vide.")
-    name = req.name.strip() or _slug(req.goal)
+    name = _unique_name(req.name.strip() or _default_name(req.goal))
     state = ProjectState(
         id=new_id(_slug(name)),
         name=name,

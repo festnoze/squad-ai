@@ -188,11 +188,14 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   });
 
   // === I2 — documentation (tech-writer écrit le README) =====================
-  await page.getByRole("button", { name: /📘 Doc/ }).click();
+  // UI7 : les actions de livraison sont dans le menu « ⋯ Livraison ».
+  await page.getByRole("button", { name: /⋯ Livraison/ }).click();
+  await page.getByRole("menuitem", { name: /📘 Doc/ }).click();
   await expect(page.getByText(/README généré/).first()).toBeVisible({ timeout: 30_000 });
 
-  // === I2 — commit git du workspace (alerte de confirmation) ================
-  await page.getByRole("button", { name: /🔀 Commit/ }).click();
+  // === I2 — commit git du workspace (toast de confirmation, UI8) ============
+  await page.getByRole("button", { name: /⋯ Livraison/ }).click();
+  await page.getByRole("menuitem", { name: /🔀 Commit/ }).click();
 
   // === I2 — export zip (endpoint, via le contexte requête) ==================
   const projects = await (await request.get("/api/projects")).json();
@@ -202,35 +205,36 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   expect(zip.status()).toBe(200);
   expect(zip.headers()["content-type"]).toContain("application/zip");
 
-  // === M1 — sélecteur de provider (verrouillé sur « démo » en mode fake) ====
-  await expect(page.locator(".provider-select")).toBeVisible();
-  await expect(page.locator(".provider-select select")).toBeDisabled();
+  // === M1 — contrôle provider (verrouillé sur « démo » en mode fake, UI10) ===
+  await expect(page.locator(".provider-control .provider-trigger")).toBeVisible();
+  await expect(page.locator(".provider-control .provider-trigger")).toBeDisabled();
 
-  // === U1 (multi) — créer un 2e projet : les deux chips coexistent ==========
+  // === U1 (multi) — créer un 2e projet : les deux figurent dans le sélecteur =
+  // UI3 : un projet dormant/terminé vit dans le sélecteur 🗂, pas en chip.
+  const reName = new RegExp(NAME.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   await createProject(page, "Projet secondaire", "Un second produit de démo");
-  await expect(page.locator(".project-chip", { hasText: NAME })).toHaveCount(1);
-  await expect(
-    page.locator(".project-chip", { hasText: "Projet secondaire" }),
-  ).toHaveCount(1);
+  await expect(page.getByRole("option", { name: reName })).toHaveCount(1);
+  await expect(page.getByRole("option", { name: /Projet secondaire/ })).toHaveCount(1);
 
-  // === item 15 — archivage du 1er projet (terminé) ==========================
+  // === item 15 — archivage du 1er projet (UI3 : sélection → chip → archive) ==
+  const selector = page.getByLabel("Sélectionner le projet actif");
+  await selector.selectOption(proj.id);
   await page
     .locator(".project-chip", { hasText: NAME })
     .getByTitle("Archiver le projet")
     .click();
-  // Masqué par défaut, puis ré-affiché via la bascule « 📦 Archivés ».
-  await expect(page.locator(".project-chip", { hasText: NAME })).toHaveCount(0);
+  // On bascule sur l'autre projet : le 1er (archivé, non sélectionné) disparaît.
+  const after = await (await request.get("/api/projects")).json();
+  const sec = after.find((p: { name: string }) => p.name === "Projet secondaire");
+  await selector.selectOption(sec.id);
+  await expect(page.getByRole("option", { name: reName })).toHaveCount(0);
+  // Ré-affiché via la bascule « 📦 Archivés ».
   await page.getByRole("button", { name: /📦 Archivés/ }).click();
-  await expect(page.locator(".project-chip", { hasText: NAME })).toHaveCount(1);
+  await expect(page.getByRole("option", { name: reName })).toHaveCount(1);
 
-  // === nettoyage — suppression des deux projets (idempotence des répétitions)
-  await page.locator(".project-chip", { hasText: NAME }).getByTitle("Supprimer le projet").click();
-  await expect(page.locator(".project-chip", { hasText: NAME })).toHaveCount(0);
-  await page
-    .locator(".project-chip", { hasText: "Projet secondaire" })
-    .getByTitle("Supprimer le projet")
-    .click();
-  await expect(
-    page.locator(".project-chip", { hasText: "Projet secondaire" }),
-  ).toHaveCount(0);
+  // === nettoyage — suppression via l'API (idempotence des répétitions) ======
+  for (const p of after) {
+    await request.delete(`/api/projects/${p.id}`);
+  }
+  await expect(page.getByRole("option", { name: reName })).toHaveCount(0);
 });

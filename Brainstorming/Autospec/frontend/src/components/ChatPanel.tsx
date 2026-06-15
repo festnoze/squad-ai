@@ -76,12 +76,22 @@ export function ChatPanel({ chat, phase, onSend, specMode, onSetSpecMode }: Prop
         )}
       </div>
       <div className="chat-messages">
-        {chat.map((m, i) => (
-          <div key={i} className={`msg msg-${m.role}`}>
-            <span className="msg-role">{ROLE_LABEL[m.role] ?? m.role}</span>
-            <pre>{m.content}</pre>
+        {chat.length === 0 ? (
+          <div className="chat-empty">
+            <p className="placeholder">
+              {phase === "spec"
+                ? "Le PM va te poser des questions pour cadrer le besoin — réponds ci-dessous."
+                : "Les échanges PM → PO → QA → Dev s'afficheront ici. Tu peux aussi envoyer un feedback à tout moment."}
+            </p>
           </div>
-        ))}
+        ) : (
+          chat.map((m, i) => (
+            <div key={i} className={`msg msg-${m.role}`}>
+              <span className="msg-role">{ROLE_LABEL[m.role] ?? m.role}</span>
+              <pre>{m.content}</pre>
+            </div>
+          ))
+        )}
         <div ref={bottomRef} />
       </div>
       <div className="chat-input">

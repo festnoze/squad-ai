@@ -771,3 +771,28 @@ async def test_recover_stops_interrupted_spec_analyze_plan_phases():
         recovered = server.pipelines[pid].state
         assert recovered.phase == PipelinePhase.STOPPED
         assert recovered.running is False
+
+
+async def test_default_project_name_from_goal_and_dedupe():
+    # UI2: no explicit name -> a readable name derived from the goal (not the
+    # lowercase slug), and duplicate names get disambiguated.
+    async with make_client([PM_BRIEF, PM_BRIEF]) as client:
+        r1 = (
+            await client.post("/api/projects", json={"goal": "Un gestionnaire de tâches"})
+        ).json()
+        assert r1["state"]["name"] == "Un gestionnaire de tâches"
+        r2 = (
+            await client.post("/api/projects", json={"goal": "Un gestionnaire de tâches"})
+        ).json()
+        assert r2["state"]["name"] == "Un gestionnaire de tâches (2)"
+
+
+async def test_long_goal_name_is_truncated():
+    # UI2: a long goal is capped (no 200-char chip).
+    async with make_client([PM_BRIEF]) as client:
+        goal = "Une application complète de gestion de budget personnel avec graphiques et import CSV"
+        name = (
+            await client.post("/api/projects", json={"goal": goal})
+        ).json()["state"]["name"]
+        assert name.endswith("…")
+        assert len(name) <= 42

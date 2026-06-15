@@ -1,3 +1,5 @@
+import { CollapsibleSection } from "./CollapsibleSection";
+
 interface Props {
   architecture: string;
   planQuality: number;
@@ -9,14 +11,13 @@ export function ArchitecturePanel({ architecture, planQuality }: Props) {
   if (!hasArchitecture && !hasPlanQuality) return null;
 
   return (
-    <div className="panel architecture">
-      <h2>Architecture &amp; qualité</h2>
+    <CollapsibleSection title="Architecture & qualité" className="architecture">
       {hasPlanQuality && (
         <div className="plan-quality">
           Qualité du plan : <strong>{planQuality}/100</strong>
         </div>
       )}
       {hasArchitecture && <pre className="architecture-design">{architecture}</pre>}
-    </div>
+    </CollapsibleSection>
   );
 }

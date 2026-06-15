@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { LogLine, ProjectState } from "../types";
 
 interface Props {
@@ -56,9 +56,28 @@ export function RunPanel({
   onDeploy,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  // UI7: post-build delivery/export actions live in an overflow menu so the
+  // primary controls (Lancer/Pause/Stop) stay prominent.
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs.length]);
+    if (!menuOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [menuOpen]);
+  // UI4: the log box only takes space when there are logs to show (and the user
+  // can collapse it). An empty project no longer reserves a big black void.
+  const [logsOpen, setLogsOpen] = useState(true);
+  const hasLogs = logs.length > 0;
+  const logsExpanded = logsOpen && hasLogs;
+  useEffect(() => {
+    if (logsExpanded) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs.length, logsExpanded]);
 
   const canRun = !["spec", "plan", "analyze", "architect", "build", "idle"].includes(
     project.phase,
@@ -83,7 +102,7 @@ export function RunPanel({
     doneCount > 0 && costUsd > 0 ? (costUsd / doneCount) * pendingCount : 0;
 
   return (
-    <div className="panel run">
+    <div className={`panel run${logsExpanded ? "" : " run-collapsed"}`}>
       <div className="run-header">
         <h2>Exécution</h2>
         <span className={`phase phase-${project.phase}`}>
@@ -177,34 +196,61 @@ export function RunPanel({
             </button>
           )}
           {canRun && (
-            <>
-              <button onClick={onDocument} title="Générer la doc du projet (README via tech-writer)">
-                📘 Doc
+            <div className="run-menu-wrap" ref={menuRef}>
+              <button
+                type="button"
+                className="ghost"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((o) => !o)}
+                title="Livraison & export du produit généré"
+              >
+                ⋯ Livraison
               </button>
-              <button onClick={onExportZip} title="Télécharger le code généré (zip)">
-                ⬇ Zip
-              </button>
-              <button onClick={onGitExport} title="Commit git propre du workspace généré">
-                🔀 Commit
-              </button>
-              <button onClick={onRollback} title="Revenir à un snapshot d'itération">
-                ⏪ Rollback
-              </button>
-              <button onClick={onDeploy} title="Générer les artefacts de déploiement (Dockerfile, CI)">
-                🚀 Déploiement
-              </button>
-            </>
+              {menuOpen && (
+                <div className="run-menu" role="menu">
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); onDocument(); }}>
+                    📘 Doc (README)
+                  </button>
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); onExportZip(); }}>
+                    ⬇ Exporter en zip
+                  </button>
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); onGitExport(); }}>
+                    🔀 Commit git
+                  </button>
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); onRollback(); }}>
+                    ⏪ Rollback itération
+                  </button>
+                  <button role="menuitem" onClick={() => { setMenuOpen(false); onDeploy(); }}>
+                    🚀 Déploiement
+                  </button>
+                </div>
+              )}
+            </div>
           )}
         </div>
       </div>
-      <div className="logs">
-        {logs.map((l, i) => (
-          <div key={i} className="log-line">
-            <span className="log-source">[{l.source}]</span> {l.line}
-          </div>
-        ))}
-        <div ref={bottomRef} />
+      <div className="logs-bar">
+        <button
+          type="button"
+          className="logs-toggle"
+          onClick={() => setLogsOpen((o) => !o)}
+          disabled={!hasLogs}
+          title={hasLogs ? "Afficher / masquer les logs" : "Les logs apparaîtront ici pendant l'exécution"}
+        >
+          {hasLogs ? `${logsOpen ? "▾" : "▸"} Logs (${logs.length})` : "Logs — aucun pour l'instant"}
+        </button>
       </div>
+      {logsExpanded && (
+        <div className="logs">
+          {logs.map((l, i) => (
+            <div key={i} className="log-line">
+              <span className="log-source">[{l.source}]</span> {l.line}
+            </div>
+          ))}
+          <div ref={bottomRef} />
+        </div>
+      )}
     </div>
   );
 }

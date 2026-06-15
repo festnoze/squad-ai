@@ -6,6 +6,7 @@
   --border: #2c3342;
   --text: #e6e9f0;
   --muted: #8a93a6;
+  --title: #aeb8cb;
   --accent: #4f8cff;
   --green: #3ecf8e;
   --red: #ff5c6c;
@@ -36,6 +37,9 @@ header {
   padding: 10px 18px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
+  /* UI9 : détache la barre de titre du contenu. */
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  z-index: 2;
 }
 
 header h1 {
@@ -65,7 +69,7 @@ main {
 .workspace {
   display: grid;
   grid-template-columns: 380px 1fr;
-  gap: 14px;
+  gap: 16px;
   height: 100%;
 }
 
@@ -85,6 +89,36 @@ main {
   flex: 1;
 }
 
+/* UI4: when there are no logs (or they're collapsed), the Exécution panel only
+   takes the space it needs so the Board reclaims the rest. */
+.col-right .run.run-collapsed {
+  flex: 0 0 auto;
+}
+
+.logs-bar {
+  margin-top: 10px;
+}
+
+.logs-toggle {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.logs-toggle:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.logs-toggle:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
 .panel {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -94,14 +128,58 @@ main {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  /* UI9 : légère élévation pour détacher les panneaux du fond. */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
 }
 
 .panel h2 {
   margin: 0 0 10px;
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
+  /* UI9 : titres plus contrastés (étaient « muted », noyés). */
+  color: var(--title);
+}
+
+/* UI5 : en-tête de panneau repliable. */
+.panel-header-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0 0 10px;
+  cursor: pointer;
+  color: inherit;
+  text-align: left;
+}
+
+.panel-header-btn h2 {
+  margin: 0;
+}
+
+.panel-header-btn:hover h2 {
+  color: var(--text);
+}
+
+.panel-caret {
   color: var(--muted);
+  font-size: 11px;
+  flex: 0 0 auto;
+}
+
+.panel.panel-collapsed .panel-header-btn {
+  margin-bottom: 0;
+}
+
+.panel-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
 }
 
 /* ---------- setup ---------- */
@@ -291,6 +369,26 @@ button.ghost {
 
 .placeholder {
   color: var(--muted);
+}
+
+/* UI6 : états vides plus parlants (board + chat). */
+.board-empty,
+.chat-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  text-align: center;
+  padding: 24px 16px;
+  flex: 1;
+  min-height: 0;
+}
+
+.board-empty .placeholder,
+.chat-empty .placeholder {
+  max-width: 38ch;
+  line-height: 1.5;
 }
 
 .epic {
@@ -642,6 +740,25 @@ button.action-btn.action-done {
   opacity: 0.8;
 }
 
+.rollback-iters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.rollback-iters button {
+  min-width: 110px;
+}
+
+.chips-hint {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  padding: 0 4px;
+  flex: 0 0 auto;
+}
+
 .archived-toggle {
   background: transparent;
   border: 1px solid var(--border);
@@ -928,6 +1045,41 @@ button.action-btn.action-done {
   margin-left: auto;
   display: flex;
   gap: 8px;
+}
+
+/* UI7 : menu d'actions de livraison/export (overflow). */
+.run-menu-wrap {
+  position: relative;
+}
+
+.run-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.run-menu button {
+  background: transparent;
+  border: none;
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.run-menu button:hover {
+  background: var(--panel-2);
 }
 
 .phase {
@@ -1385,6 +1537,85 @@ button.action-btn.action-done {
   max-width: 200px;
 }
 
+/* UI10 : contrôle provider+modèle compact (pilule + popover). */
+.provider-control {
+  position: relative;
+}
+
+.provider-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  color: var(--text);
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  max-width: 260px;
+}
+
+.provider-trigger:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.provider-trigger:disabled {
+  cursor: default;
+  color: var(--muted);
+}
+
+.provider-trigger-model {
+  font-family: Consolas, monospace;
+  color: var(--muted);
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.provider-caret {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.provider-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 240px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.provider-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.provider-field select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
 /* ---------- composants du produit (E3/E4) ---------- */
 .components {
   max-height: 260px;
@@ -1513,6 +1744,83 @@ button.action-btn.action-done {
   align-content: flex-start;
   overflow-y: auto;
   flex: 1;
+}
+
+/* UI1 : groupes d'itérations repliables sur le board. */
+.epic-iterations {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.epic-iter-group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel-2);
+}
+
+.epic-iter-group.open {
+  padding-bottom: 10px;
+}
+
+.epic-iter-group.epic-working {
+  border-color: var(--accent);
+}
+
+.epic-iter-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  padding: 10px 12px;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.epic-iter-header:hover {
+  color: var(--accent);
+}
+
+.epic-iter-caret {
+  color: var(--muted);
+  width: 12px;
+  flex: 0 0 auto;
+}
+
+.epic-iter-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.epic-iter-summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.epic-progress.mini {
+  width: 90px;
+  height: 6px;
+  margin: 0;
+  flex: 0 0 auto;
+}
+
+.epic-iter-group .epic-grid {
+  padding: 0 12px;
+  overflow: visible;
+  flex: 0 0 auto;
 }
 
 .epic-card {

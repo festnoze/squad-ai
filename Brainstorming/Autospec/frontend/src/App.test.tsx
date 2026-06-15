@@ -100,13 +100,18 @@ afterEach(() => {
 });
 
 describe("App — gestion des évènements WebSocket", () => {
-  it("un event 'state' fait apparaître le projet (nom dans la ProjectBar)", async () => {
+  // UI3 : un projet idle/dormant figure dans le sélecteur 🗂 (option), pas
+  // forcément en chip — on l'y cherche donc par son option.
+  const findProjectOption = (re: RegExp) => screen.findByRole("option", { name: re });
+  const queryProjectOption = (re: RegExp) => screen.queryByRole("option", { name: re });
+
+  it("un event 'state' fait apparaître le projet (dans le sélecteur)", async () => {
     render(<App />);
     await waitFor(() => expect(capturedOnEvent).not.toBeNull());
 
     emit({ type: "state", project_id: "p1", state: makeProject() });
 
-    expect(await screen.findByText("Projet Alpha")).toBeInTheDocument();
+    expect(await findProjectOption(/Projet Alpha/)).toBeInTheDocument();
   });
 
   it("un second 'state' pour le même id met à jour sans dupliquer (upsert)", async () => {
@@ -114,7 +119,7 @@ describe("App — gestion des évènements WebSocket", () => {
     await waitFor(() => expect(capturedOnEvent).not.toBeNull());
 
     emit({ type: "state", project_id: "p1", state: makeProject() });
-    await screen.findByText("Projet Alpha");
+    await findProjectOption(/Projet Alpha/);
 
     emit({
       type: "state",
@@ -122,9 +127,9 @@ describe("App — gestion des évènements WebSocket", () => {
       state: makeProject({ name: "Projet Renommé" }),
     });
 
-    expect(await screen.findByText("Projet Renommé")).toBeInTheDocument();
-    expect(screen.queryByText("Projet Alpha")).not.toBeInTheDocument();
-    expect(screen.queryAllByText("Projet Renommé")).toHaveLength(1);
+    expect(await findProjectOption(/Projet Renommé/)).toBeInTheDocument();
+    expect(queryProjectOption(/Projet Alpha/)).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("option", { name: /Projet Renommé/ })).toHaveLength(1);
   });
 
   it("un event 'deleted' fait disparaître le projet", async () => {
@@ -132,13 +137,11 @@ describe("App — gestion des évènements WebSocket", () => {
     await waitFor(() => expect(capturedOnEvent).not.toBeNull());
 
     emit({ type: "state", project_id: "p1", state: makeProject() });
-    await screen.findByText("Projet Alpha");
+    await findProjectOption(/Projet Alpha/);
 
     emit({ type: "deleted", project_id: "p1" });
 
-    await waitFor(() =>
-      expect(screen.queryByText("Projet Alpha")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(queryProjectOption(/Projet Alpha/)).not.toBeInTheDocument());
   });
 
   it("anti-résurrection : un 'state' retardé après 'deleted' ne ressuscite pas le projet", async () => {
@@ -146,19 +149,17 @@ describe("App — gestion des évènements WebSocket", () => {
     await waitFor(() => expect(capturedOnEvent).not.toBeNull());
 
     emit({ type: "state", project_id: "p1", state: makeProject() });
-    await screen.findByText("Projet Alpha");
+    await findProjectOption(/Projet Alpha/);
 
     emit({ type: "deleted", project_id: "p1" });
-    await waitFor(() =>
-      expect(screen.queryByText("Projet Alpha")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(queryProjectOption(/Projet Alpha/)).not.toBeInTheDocument());
 
     // Event « state » retardé pour le même id : doit être ignoré.
     emit({ type: "state", project_id: "p1", state: makeProject() });
 
     // On laisse le temps à un éventuel re-render fautif de se produire.
     await Promise.resolve();
-    expect(screen.queryByText("Projet Alpha")).not.toBeInTheDocument();
+    expect(queryProjectOption(/Projet Alpha/)).not.toBeInTheDocument();
   });
 
   it("un event 'notify' affiche un toast (U3)", async () => {

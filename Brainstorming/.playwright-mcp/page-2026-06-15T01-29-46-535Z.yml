@@ -1,0 +1,439 @@
+- generic [ref=e3]:
+  - banner [ref=e4]:
+    - heading "⚙️ Autospec PM → PO → QA → Dev, en BDD/TDD (BMAD method)" [level=1] [ref=e5]
+    - generic "Provider d'agents (Claude / OpenAI / Ollama / Anthropic)" [ref=e9]:
+      - generic [ref=e10]: 🤖
+      - combobox "Provider" [ref=e11]:
+        - option "claude" [selected]
+        - option "openai"
+        - option "ollama"
+        - option "anthropic"
+      - combobox "Modèle" [ref=e12]:
+        - option "(défaut CLI)" [selected]
+        - option "opus"
+        - option "sonnet"
+        - option "haiku"
+    - button "Dashboard de l'usine" [ref=e6] [cursor=pointer]: 📊
+  - generic [ref=e13]:
+    - generic "Sélectionner le projet actif" [ref=e14]:
+      - generic [ref=e15]: 🗂
+      - combobox "Sélectionner le projet actif" [ref=e16] [cursor=pointer]:
+        - option "⚪ todo · stopped"
+        - option "🟢 todo · 1/2 · done"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 m · done"
+        - option "⚪ todo · 0/1 · stopped"
+        - option "⚪ calc · idle"
+        - option "⚪ todo · 1/2 · stopped"
+        - option "🟢 todo · 1/2 · done"
+        - option "⚪ todo · 0/1 · stopped"
+        - option "⚪ recover · 0/1 · stopped"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 todo · 1/1 · done"
+        - option "⚪ recover · 1/1 · stopped"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 todo · 1/1 · done"
+        - option "⚪ x · 0/1 · stopped"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 todo · done"
+        - option "⚪ calc · idle"
+        - option "🟢 todo · 1/1 · done"
+        - option "⚪ recover · 0/1 · stopped"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 todo · 1/1 · done"
+        - option "⚪ x · idle"
+        - option "⚪ x · stopped"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 todo · 1/1 · done"
+        - option "🟢 todo · 1/1 · done"
+        - option "⚪ x · idle"
+        - option "⚪ x · stopped"
+        - option "🟢 chat-eat · 10/12 · done" [selected]
+    - generic [ref=e17] [cursor=pointer]:
+      - generic "stopped" [ref=e18]
+      - generic [ref=e19]: todo
+      - button "📦" [ref=e20]
+      - button "✕" [ref=e21]
+    - generic [ref=e22] [cursor=pointer]:
+      - generic "done" [ref=e23]
+      - generic [ref=e24]: todo
+      - generic "1 story(ies) terminée(s) sur 2" [ref=e25]: 1/2
+      - button "▶" [ref=e26]
+      - button "📦" [ref=e27]
+      - button "✕" [ref=e28]
+    - generic [ref=e29] [cursor=pointer]:
+      - generic "done" [ref=e30]
+      - generic [ref=e31]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e32]: 1/1
+      - button "📦" [ref=e33]
+      - button "✕" [ref=e34]
+    - generic [ref=e35] [cursor=pointer]:
+      - generic "done" [ref=e36]
+      - generic [ref=e37]: m
+      - button "📦" [ref=e38]
+      - button "✕" [ref=e39]
+    - generic [ref=e40] [cursor=pointer]:
+      - generic "stopped" [ref=e41]
+      - generic [ref=e42]: todo
+      - generic "0 story(ies) terminée(s) sur 1" [ref=e43]: 0/1
+      - button "▶" [ref=e44]
+      - button "📦" [ref=e45]
+      - button "✕" [ref=e46]
+    - generic [ref=e47] [cursor=pointer]:
+      - generic "idle" [ref=e48]
+      - generic [ref=e49]: calc
+      - button "📦" [ref=e50]
+      - button "✕" [ref=e51]
+    - generic [ref=e52] [cursor=pointer]:
+      - generic "stopped" [ref=e53]
+      - generic [ref=e54]: todo
+      - generic "1 story(ies) terminée(s) sur 2" [ref=e55]: 1/2
+      - button "▶" [ref=e56]
+      - button "📦" [ref=e57]
+      - button "✕" [ref=e58]
+    - generic [ref=e59] [cursor=pointer]:
+      - generic "done" [ref=e60]
+      - generic [ref=e61]: todo
+      - generic "1 story(ies) terminée(s) sur 2" [ref=e62]: 1/2
+      - button "▶" [ref=e63]
+      - button "📦" [ref=e64]
+      - button "✕" [ref=e65]
+    - generic [ref=e66] [cursor=pointer]:
+      - generic "stopped" [ref=e67]
+      - generic [ref=e68]: todo
+      - generic "0 story(ies) terminée(s) sur 1" [ref=e69]: 0/1
+      - button "▶" [ref=e70]
+      - button "📦" [ref=e71]
+      - button "✕" [ref=e72]
+    - generic [ref=e73] [cursor=pointer]:
+      - generic "stopped" [ref=e74]
+      - generic [ref=e75]: recover
+      - generic "0 story(ies) terminée(s) sur 1" [ref=e76]: 0/1
+      - button "▶" [ref=e77]
+      - button "📦" [ref=e78]
+      - button "✕" [ref=e79]
+    - generic [ref=e80] [cursor=pointer]:
+      - generic "done" [ref=e81]
+      - generic [ref=e82]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e83]: 1/1
+      - button "📦" [ref=e84]
+      - button "✕" [ref=e85]
+    - generic [ref=e86] [cursor=pointer]:
+      - generic "done" [ref=e87]
+      - generic [ref=e88]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e89]: 1/1
+      - button "📦" [ref=e90]
+      - button "✕" [ref=e91]
+    - generic [ref=e92] [cursor=pointer]:
+      - generic "stopped" [ref=e93]
+      - generic [ref=e94]: recover
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e95]: 1/1
+      - button "📦" [ref=e96]
+      - button "✕" [ref=e97]
+    - generic [ref=e98] [cursor=pointer]:
+      - generic "done" [ref=e99]
+      - generic [ref=e100]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e101]: 1/1
+      - button "📦" [ref=e102]
+      - button "✕" [ref=e103]
+    - generic [ref=e104] [cursor=pointer]:
+      - generic "done" [ref=e105]
+      - generic [ref=e106]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e107]: 1/1
+      - button "📦" [ref=e108]
+      - button "✕" [ref=e109]
+    - generic [ref=e110] [cursor=pointer]:
+      - generic "stopped" [ref=e111]
+      - generic [ref=e112]: x
+      - generic "0 story(ies) terminée(s) sur 1" [ref=e113]: 0/1
+      - button "▶" [ref=e114]
+      - button "📦" [ref=e115]
+      - button "✕" [ref=e116]
+    - generic [ref=e117] [cursor=pointer]:
+      - generic "done" [ref=e118]
+      - generic [ref=e119]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e120]: 1/1
+      - button "📦" [ref=e121]
+      - button "✕" [ref=e122]
+    - generic [ref=e123] [cursor=pointer]:
+      - generic "done" [ref=e124]
+      - generic [ref=e125]: todo
+      - button "📦" [ref=e126]
+      - button "✕" [ref=e127]
+    - generic [ref=e128] [cursor=pointer]:
+      - generic "idle" [ref=e129]
+      - generic [ref=e130]: calc
+      - button "📦" [ref=e131]
+      - button "✕" [ref=e132]
+    - generic [ref=e133] [cursor=pointer]:
+      - generic "done" [ref=e134]
+      - generic [ref=e135]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e136]: 1/1
+      - button "📦" [ref=e137]
+      - button "✕" [ref=e138]
+    - generic [ref=e139] [cursor=pointer]:
+      - generic "stopped" [ref=e140]
+      - generic [ref=e141]: recover
+      - generic "0 story(ies) terminée(s) sur 1" [ref=e142]: 0/1
+      - button "▶" [ref=e143]
+      - button "📦" [ref=e144]
+      - button "✕" [ref=e145]
+    - generic [ref=e146] [cursor=pointer]:
+      - generic "done" [ref=e147]
+      - generic [ref=e148]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e149]: 1/1
+      - button "📦" [ref=e150]
+      - button "✕" [ref=e151]
+    - generic [ref=e152] [cursor=pointer]:
+      - generic "done" [ref=e153]
+      - generic [ref=e154]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e155]: 1/1
+      - button "📦" [ref=e156]
+      - button "✕" [ref=e157]
+    - generic [ref=e158] [cursor=pointer]:
+      - generic "done" [ref=e159]
+      - generic [ref=e160]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e161]: 1/1
+      - button "📦" [ref=e162]
+      - button "✕" [ref=e163]
+    - generic [ref=e164] [cursor=pointer]:
+      - generic "done" [ref=e165]
+      - generic [ref=e166]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e167]: 1/1
+      - button "📦" [ref=e168]
+      - button "✕" [ref=e169]
+    - generic [ref=e170] [cursor=pointer]:
+      - generic "idle" [ref=e171]
+      - generic [ref=e172]: x
+      - button "📦" [ref=e173]
+      - button "✕" [ref=e174]
+    - generic [ref=e175] [cursor=pointer]:
+      - generic "stopped" [ref=e176]
+      - generic [ref=e177]: x
+      - button "📦" [ref=e178]
+      - button "✕" [ref=e179]
+    - generic [ref=e180] [cursor=pointer]:
+      - generic "done" [ref=e181]
+      - generic [ref=e182]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e183]: 1/1
+      - button "📦" [ref=e184]
+      - button "✕" [ref=e185]
+    - generic [ref=e186] [cursor=pointer]:
+      - generic "done" [ref=e187]
+      - generic [ref=e188]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e189]: 1/1
+      - button "📦" [ref=e190]
+      - button "✕" [ref=e191]
+    - generic [ref=e192] [cursor=pointer]:
+      - generic "done" [ref=e193]
+      - generic [ref=e194]: todo
+      - generic "1 story(ies) terminée(s) sur 1" [ref=e195]: 1/1
+      - button "📦" [ref=e196]
+      - button "✕" [ref=e197]
+    - generic [ref=e198] [cursor=pointer]:
+      - generic "idle" [ref=e199]
+      - generic [ref=e200]: x
+      - button "📦" [ref=e201]
+      - button "✕" [ref=e202]
+    - generic [ref=e203] [cursor=pointer]:
+      - generic "stopped" [ref=e204]
+      - generic [ref=e205]: x
+      - button "📦" [ref=e206]
+      - button "✕" [ref=e207]
+    - generic [ref=e208] [cursor=pointer]:
+      - generic "done" [ref=e209]
+      - generic [ref=e210]: chat-eat
+      - generic "10 story(ies) terminée(s) sur 12" [ref=e211]: 10/12
+      - button "📦" [ref=e212]
+      - button "✕" [ref=e213]
+    - button "＋ Nouveau" [ref=e214] [cursor=pointer]
+    - button "📦 Archivés (2)" [ref=e215] [cursor=pointer]
+  - main [ref=e7]:
+    - generic [ref=e8]:
+      - generic [ref=e216]:
+        - heading "Chat — spécification & feedback" [level=2] [ref=e218]
+        - generic [ref=e219]:
+          - generic [ref=e220]:
+            - text: Toi
+            - generic [ref=e221]: crée un chatbot en français motorisé par le modèle sous-jacent qui donne des conseils de cuisine
+          - generic [ref=e242]:
+            - text: 📋 PM
+            - generic [ref=e243]: "Brief généré en mode auto-spec : un chatbot de conseils culinaires en français, propulsé par le modèle sous-jacent."
+          - generic [ref=e244]:
+            - text: 🏃 PO
+            - generic [ref=e245]: "Plan de l'itération 1 : 2 epic(s), 5 user story(ies)."
+          - generic [ref=e246]:
+            - text: 🧪 QA
+            - generic [ref=e247]: "[US-2] Story triviale : une simple structure de session en mémoire sans collaborateur à mocker ; le Gherkin couvre le bout-en-bout, je l'étaye de 2 tests unitaires de domaine pour verrouiller l'état initial vide (in-memory) et la fidélité rôle/contenu/ordre. Plan outside-in : 2 test(s) unitaire(s) (domain → domain)."
+          - generic [ref=e248]:
+            - text: 🧪 QA
+            - generic [ref=e249]: "[US-1] Story triviale (fonction pure sans collaborateur à mocker) : le Gherkin couvre le bout-en-bout, et deux tests unitaires sur la fonction de persona complètent les critères de contenu et de déterminisme. Plan outside-in : 2 test(s) unitaire(s) (domain → domain)."
+          - generic [ref=e250]:
+            - text: 💻 Dev
+            - generic [ref=e251]: "[US-2] US-2 implémentée en BDD puis TDD outside-in. J'ai écrit les step definitions pytest-bdd liées à features/us_2.feature, puis les tests unitaires du plan QA (UT-1 et UT-2) dans tests/unit/test_us_2_session.py. J'ai vérifié le rouge (4 échecs sur squelette NotImplementedError), puis implémenté chat_eat/session.py : une classe ConversationSession en mémoire seule (dataclass, historique vide à l'instanciation) avec add_user_message / add_assistant_message et messages_for_model() qui restitue les messages role/content dans l'ordre chronologique. main.py expose la fonctionnalité via une démonstration de session. La suite complète passe (4 passed)."
+          - generic [ref=e252]:
+            - text: 🧪 QA
+            - generic [ref=e253]: "[US-3] Décomposition outside-in : la façade chat_eat délègue à un DomainGuardService qui classe la question via un client LLM mocké puis, en cas de hors-sujet, produit un message de recentrage poli et neutre. Plan outside-in : 5 test(s) unitaire(s) (facade → service → service → service → domain)."
+          - generic [ref=e254]:
+            - text: 💻 Dev
+            - generic [ref=e255]: "[US-1] US-1 implémentée en BDD/TDD outside-in. J'ai écrit les step definitions pytest-bdd (tests/steps/test_us_1.py) liant chaque Given/When/Then du feature, puis les tests unitaires UT-1 et UT-2 (tests/unit/test_us_1_persona.py) avec d'abord un squelette levant NotImplementedError pour vérifier le rouge. J'ai ensuite implémenté chat_eat/persona.py avec un prompt système fixe et déterministe cadrant l'assistant comme chef cuisinier bienveillant, imposant le français et des réponses concises et pratiques (AC-1 à AC-5). main.py expose désormais le prompt persona. Toute la suite (10 tests, US-1 + US-2) est verte."
+          - generic [ref=e256]:
+            - text: 💻 Dev
+            - generic [ref=e257]: "[US-3] US-3 implémentée en BDD/TDD outside-in. Step definitions pytest-bdd écrites pour les deux scénarios de features/us_3.feature. Tous les tests unitaires du plan QA écrits puis vérifiés rouges, avant implémentation du package chat_eat/domain_guard.py couche par couche : facade evaluate_question() déléguant à DomainGuardService.evaluate ; DomainGuardService orchestrant un client de classification (DomainClassifier/KeywordDomainClassifier par défaut, stand-in déterministe d'un LLM) et un constructeur de message de recentrage ; verdict DomainVerdict(on_topic, redirect_message) ; build_redirect_message() retournant un message neutre, poli, en français, orienté cuisine et sans réponse à la question hors sujet. main.py mis à jour pour démontrer le garde-fou. Suite complète verte (18 tests), les stories précédentes restent vertes."
+          - generic [ref=e258]:
+            - text: 🧪 QA
+            - generic [ref=e259]: "[US-4] Décomposition outside-in/London : le Gherkin garde le bout-en-bout, puis je teste couche par couche la façade publique (délégation au service), l'assemblage de la requête (prompt système US-1 en tête + historique US-2 incluant le dernier message utilisateur), l'ajout de la réponse à l'historique, et la gestion d'erreur/timeout du client modèle injecté et mocké. Plan outside-in : 5 test(s) unitaire(s) (facade → service → service → service → service)."
+          - generic [ref=e260]:
+            - text: 💻 Dev
+            - generic [ref=e261]: "[US-4] US-4 implémentée en outside-in (London school). J'ai écrit les step definitions pytest-bdd (`tests/steps/test_us_4.py`) couvrant les 2 scénarios du feature, puis tous les tests unitaires du plan QA (UT-1 façade, UT-2 à UT-5 service) en mockant les collaborateurs directs. Après vérification du rouge (7 échecs), j'ai implémenté le module `chat_eat/assistant.py` : la façade `generate_reply(session, model_client)` délègue à `AssistantService(model_client=...).respond(session)` ; le service assemble la requête avec le prompt système chef (persona.system_prompt) en tête suivi de l'historique (session.messages_for_model incluant le dernier message utilisateur), appelle le client modèle injecté, ajoute la réponse via session.add_assistant_message et la retourne ; en cas d'exception/timeout, aucune exception n'est propagée et un message d'erreur clair en français (« momentanément indisponible ») est renvoyé sans modifier l'historique. `main.py` expose la fonctionnalité avec un client modèle stub hors-ligne. Toute la suite est verte (25 passed), stories précédentes incluses."
+          - generic [ref=e262]:
+            - text: 🧪 QA
+            - generic [ref=e263]: "[US-5] Story légère composée de deux helpers de présentation purs (pas de couche service/repository à mocker) : je couvre l'assemblage du streaming et la structuration du fil par des tests unitaires directs sur le package chat_eat, la dimension visuelle AC-5 restant validée côté front Vite. Plan outside-in : 3 test(s) unitaire(s) (domaine → domaine → domaine)."
+          - generic [ref=e264]:
+            - text: 💻 Dev
+            - generic [ref=e265]: "[US-5] Implémentation de US-5 en BDD/TDD outside-in. J'ai écrit les step definitions pytest-bdd (tests/steps/test_us_5.py) liant les deux scénarios du fichier feature, puis les tests unitaires du plan QA (assemblage du flux de streaming et présentation du fil). Après vérification du rouge, j'ai implémenté le minimum : chat_eat/streaming.py avec assemble_stream() qui concatène les fragments dans l'ordre exact sans séparateur parasite, et chat_eat/thread.py avec build_thread() + dataclass ThreadEntry (propriétés is_user/is_assistant) qui structure l'historique de session en liste affichable chronologique distinguant les rôles. main.py expose les deux nouveaux helpers (réassemblage du streaming + affichage du fil). Toute la suite (33 tests, US-1 à US-5) est verte. AC-5 (interface web Vite, dimension visuelle) : aucun frontend n'existe dans ce workspace Python ; les helpers domaine sont prêts à être consommés par une UI et sont validés hors du gate pytest (marqueur 'ui')."
+          - generic [ref=e266]:
+            - text: 🔍 Analyste
+            - generic [ref=e267]: "Je sélectionne le rendu Markdown des réponses car les conseils de cuisine (recettes, étapes, listes d'ingrédients) sont intrinsèquement structurés : c'est le gain de lisibilité le plus fort pour la valeur cœur déjà livrée, à faible complexité et sans risque. Backlog priorisé : FH-1 Rendu Markdown des réponses (listes, étapes numérotées, gras) (V4/C2), FH-2 Actions rapides de suivi sur une réponse (« sans gluten », « pour 6 personnes », « plus court ») (V4/C2), FH-3 Suggestions de démarrage (exemples de questions cliquables) (V3/C1), FH-4 Génération d'une liste de courses copiable à partir d'une recette (V3/C2), FH-5 Persistance locale de la conversation (localStorage) pour survivre au rafraîchissement (V3/C2) ➡ Prochaine feature : FH-1 — Rendu Markdown des réponses (listes, étapes numérotées, gras)"
+          - generic [ref=e268]:
+            - text: 📋 PM
+            - generic [ref=e269]: "[Itération 2] Brief de la feature : afficher les réponses de l'assistant en Markdown rendu (listes, étapes numérotées, gras) côté frontend, en streaming, sans toucher au backend."
+          - generic [ref=e270]:
+            - text: 🏃 PO
+            - generic [ref=e271]: "Plan de l'itération 2 : 1 epic(s), 4 user story(ies)."
+          - generic [ref=e272]:
+            - text: 🧪 QA
+            - generic [ref=e273]: "[US-6] Story triviale : `chat_eat.markdown.render_markdown` est une fonction pure sans collaborateur, donc aucun mock n'est nécessaire ; le Gherkin couvre déjà le bout-en-bout, j'ajoute seulement 2 tests unitaires pour combler les cas non exercés par les scénarios (titre `<h1>` et absence totale de balisage brut `#`/`` ` ``). Plan outside-in : 2 test(s) unitaire(s) (domaine → domaine)."
+          - generic [ref=e274]:
+            - text: 💻 Dev
+            - generic [ref=e275]: "[US-6] Implémentation de US-6 (rendu Markdown vers HTML) en BDD puis TDD outside-in. J'ai d'abord écrit les step definitions pytest-bdd dans tests/steps/test_us_6.py (liées à features/us_6.feature, avec décodage des '\\n' littéraux du feature en vraies sauts de ligne), puis les tests unitaires du plan QA (UT-1 et UT-2) dans tests/unit/test_us_6_markdown.py. Après vérification de l'échec (11 rouges sur un squelette levant NotImplementedError), j'ai implémenté chat_eat/markdown.py : render_markdown gère les titres ATX (# → <h1>, ## → <h2>), le gras **x** → <strong>, l'italique *x* → <em>, le code inline `x` → <code>, les listes à puces (- ) regroupées en <ul>/<li> et les listes numérotées (1. ) en <ol>/<li> dans l'ordre ; le code inline est traité avant le gras, lui-même avant l'italique, pour éviter les confusions de marqueurs. Aucun caractère de balisage brut ne subsiste. Enfin, main.py expose la fonctionnalité via un exemple de recette. Toute la suite (US-1 à US-6) est verte : 44 tests passent."
+          - generic [ref=e276]:
+            - text: 🧪 QA
+            - generic [ref=e277]: "[US-7] Décomposition outside-in d'une story à deux couches : un test de câblage vérifie que la façade render_markdown délègue à sanitize_html (collaborateur mocké), puis quatre tests purs sur la fonction-feuille sanitize_html couvrent chaque comportement d'assainissement (scripts, handlers, javascript:, préservation du formatage). Plan outside-in : 5 test(s) unitaire(s) (facade → domain → domain → domain → domain)."
+          - generic [ref=e278]:
+            - text: 💻 Dev
+            - generic [ref=e279]: "[US-7] US-7 implémentée en BDD/TDD outside-in. J'ai écrit les step definitions pytest-bdd (tests/steps/test_us_7.py) liant les scénarios de features/us_7.feature, puis tous les tests unitaires du plan QA (UT-1 façade avec mock de sanitize_html, UT-2 à UT-5 domaine). Après vérification du rouge initial (8 échecs), j'ai implémenté sanitize_html dans chat_eat/markdown.py via un sanitizer html.parser (stdlib uniquement, aucune dépendance externe) basé sur une liste blanche de balises de formatage : les balises <script>/<style> et leur contenu sont supprimés, les balises non autorisées sont retirées (texte conservé), et les balises autorisées sont ré-émises sans aucun attribut — ce qui neutralise d'office les gestionnaires d'événements (onclick/onerror) et les URLs javascript:. render_markdown applique désormais sanitize_html de bout en bout (AC-6). main.py expose une démonstration US-7. Toute la suite (52 tests, stories précédentes incluses) est verte."
+          - generic [ref=e280]:
+            - text: 🧪 QA
+            - generic [ref=e281]: "[US-8] Story légère (une fonction pure de rendu) : le Gherkin porte la vision bout-en-bout, et je la complète par deux tests unitaires outside-in — un test de délégation à render_markdown (US-7) qui garantit réutilisation de l'assainissement et équivalence avec le rendu complet, puis un test de tolérance paramétré qui vérifie qu'aucun préfixe/balisage incomplet ne lève d'erreur et qu'une chaîne est toujours retournée. Plan outside-in : 2 test(s) unitaire(s) (domaine → domaine)."
+          - generic [ref=e282]:
+            - text: 💻 Dev
+            - generic [ref=e283]: "[US-8] US-8 implémentée en BDD puis TDD outside-in. J'ai écrit les step definitions pytest-bdd (tests/steps/test_us_8.py) liées aux deux scénarios de features/us_8.feature, puis les tests unitaires du plan QA (UT-1 délégation à render_markdown, UT-2 tolérance). Après avoir vérifié le rouge avec un squelette levant NotImplementedError, j'ai implémenté dans chat_eat/markdown.py la fonction render_markdown_stream qui normalise le préfixe partiel (suppression d'un marqueur de liste vide en fin, et d'un marqueur **/*/` non terminé) via _normalize_partial, puis délègue à render_markdown (US-6/US-7) pour le rendu et l'assainissement. La normalisation est neutre sur un texte complet, garantissant l'équivalence avec render_markdown (AC-5). main.py expose une démo de rendu progressif. La suite complète (61 tests) est verte, les stories précédentes restent vertes."
+          - generic [ref=e284]:
+            - text: 🔍 Analyste
+            - generic [ref=e285]: "Je priorise les suggestions de démarrage (FH-3) : complexité triviale, aucun risque, et elles comblent le vide du fil à l'ouverture tout en mettant en valeur le rendu Markdown fraîchement livré — le meilleur retour sur effort immédiat. Backlog priorisé : FH-3 Suggestions de démarrage (exemples de questions cliquables) (V3/C1), FH-2 Actions rapides de suivi sur une réponse (« sans gluten », « pour 6 personnes », « plus court ») (V4/C2), FH-6 Bouton « copier » sur les réponses de l'assistant (V3/C1), FH-4 Génération d'une liste de courses copiable à partir d'une recette (V3/C2), FH-5 Persistance locale de la conversation (localStorage) (V3/C2) ➡ Prochaine feature : FH-3 — Suggestions de démarrage (exemples de questions cliquables)"
+          - generic [ref=e286]:
+            - text: 📋 PM
+            - generic [ref=e287]: "[Itération 3] Brief de la feature : des suggestions de questions cliquables affichées dans le fil vide pour guider le premier usage du chatbot cuisine."
+          - generic [ref=e288]:
+            - text: 🏃 PO
+            - generic [ref=e289]: "Plan de l'itération 3 : 1 epic(s), 3 user story(ies)."
+          - generic [ref=e290]:
+            - text: 🧪 QA
+            - generic [ref=e291]: "[US-10] Story triviale (catalogue de données statique) : le Gherkin assure déjà le bout-en-bout, je n'ajoute que 2 tests unitaires ciblant la structure éditable sans dépendance backend et la couverture d'usages culinaires variés. Plan outside-in : 2 test(s) unitaire(s) (domaine → domaine)."
+          - generic [ref=e292]:
+            - text: Toi
+            - generic [ref=e293]: ajoute un bouton pour créer une nouvelle conversation vide
+          - generic [ref=e294]:
+            - text: ⚙️ Système
+            - generic [ref=e295]: ▶ Reprise du build de l'itération…
+          - generic [ref=e296]:
+            - text: 💻 Dev
+            - generic [ref=e297]: "[US-10] US-10 implémentée et vérifiée en TDD/BDD outside-in. Le catalogue statique chat_eat/suggestions.py expose STARTER_SUGGESTIONS (liste éditable de 4 questions culinaires françaises distinctes couvrant substitution, temps de cuisson, restes et technique) ainsi que l'accesseur starter_suggestions(). Les step definitions pytest-bdd (tests/steps/test_us_10.py) lient le scénario de features/us_10.feature, et les tests unitaires (tests/unit/test_us_10_catalog.py) couvrent UT-1 (liste de 3-4 chaînes non vides, sans réseau ni backend) et UT-2 (distinctes + usages variés par mots-clés). J'ai ajouté l'exposition de la fonctionnalité dans main.py (affichage des suggestions de démarrage). Suite complète : 69 tests passés (les stories précédentes restent vertes)."
+          - generic [ref=e298]:
+            - text: 🧪 QA
+            - generic [ref=e299]: "[US-9] Story moyenne mais centrée sur une seule fonction-aiguillage render_entry : je teste outside-in d'abord le dispatch par rôle (assistant délègue au rendu Markdown+assainissement de US-6/US-7, utilisateur délègue à l'échappement HTML sans interpréter le Markdown), puis la préservation de l'ordre chronologique au niveau du fil ; AC-5 est une intégration visuelle Vite validée côté front et hors périmètre des tests unitaires Python. Plan outside-in : 3 test(s) unitaire(s) (facade → facade → facade)."
+          - generic [ref=e300]:
+            - text: 💻 Dev
+            - generic [ref=e301]: "[US-9] Implémentation de US-9 (politique de rendu par rôle) en outside-in BDD/TDD. J'ai d'abord écrit les step definitions pytest-bdd (tests/steps/test_us_9.py) liant le scénario de features/us_9.feature, puis les 3 tests unitaires du plan QA (tests/unit/test_us_9_render_entry.py) mockant les collaborateurs directs (render_markdown de US-6/US-7 et l'échappement HTML). J'ai vérifié l'échec (rouge) avec des squelettes seuls, puis implémenté chat_eat/rendering.py : render_entry(entry) délègue au pipeline Markdown→HTML assaini pour les entrées assistant et à html.escape pour les entrées utilisateur (le Markdown reste littéral, les caractères HTML sont échappés), et render_thread applique render_entry à chaque entrée en préservant l'ordre chronologique. main.py expose la nouvelle fonctionnalité (US-9). AC-5 (intégration visuelle Vite) n'a pas de composant front dans ce dépôt Python ; la politique est démontrée via main.py. Toute la suite est verte (73 tests), y compris les stories précédentes."
+        - generic [ref=e222]:
+          - textbox "Donne ton feedback sur l'itération en cours…" [ref=e223]
+          - button "Envoyer" [disabled] [ref=e224]
+      - generic [ref=e302]:
+        - heading "Backlog de l'analyste (kanban)" [level=2] [ref=e303]
+        - generic [ref=e304]:
+          - generic "À l'ouverture le fil est vide ; proposer 3-4 questions types (substitution, temps de cuisson, idée avec restes) guide le premier usage, fait découvrir le périmètre et exhibe joliment le rendu Markdown tout juste livré. Coût quasi nul, aucun backend, risque minimal." [ref=e305]:
+            - generic [ref=e306]: "#1"
+            - generic [ref=e307]: Suggestions de démarrage (exemples de questions cliquables)
+            - generic [ref=e308]: V3 / C1
+            - generic [ref=e309]: en cours
+          - generic "Réutilise directement la mémoire de session et le garde-fou déjà livrés ; transforme les relances les plus fréquentes en boutons, réduisant la friction de saisie pendant qu'on cuisine. Forte valeur, complexité contenue." [ref=e310]:
+            - generic [ref=e311]: "#2"
+            - generic [ref=e312]: Actions rapides de suivi sur une réponse (« sans gluten », « pour 6 personnes », « plus court »)
+            - generic [ref=e313]: V4 / C2
+            - generic [ref=e314]: proposée
+          - generic "Une recette mise en forme en Markdown gagne à être copiable d'un clic (vers notes/liste) ; petit ajout frontend qui prolonge la valeur du rendu sans prompt ni backend." [ref=e315]:
+            - generic [ref=e316]: "#3"
+            - generic [ref=e317]: Bouton « copier » sur les réponses de l'assistant
+            - generic [ref=e318]: V3 / C1
+            - generic [ref=e319]: proposée
+          - 'generic "Action utile en aval d''une idée de menu : un bouton qui extrait/copie les ingrédients prolonge la valeur d''une réponse, mais demande un prompt dédié et une logique de parsing plus fragile." [ref=e320]':
+            - generic [ref=e321]: "#4"
+            - generic [ref=e322]: Génération d'une liste de courses copiable à partir d'une recette
+            - generic [ref=e323]: V3 / C2
+            - generic [ref=e324]: proposée
+          - generic "Évite de perdre le fil en cas de refresh accidentel, sans base ni compte ; valeur modérée car la session in-memory suffit déjà à l'usage courant." [ref=e325]:
+            - generic [ref=e326]: "#5"
+            - generic [ref=e327]: Persistance locale de la conversation (localStorage)
+            - generic [ref=e328]: V3 / C2
+            - generic [ref=e329]: proposée
+          - generic [ref=e330]: "✅ Livrées : Rendu Markdown des réponses (listes, étapes numérotées, gras)"
+    - generic [ref=e225]:
+      - generic [ref=e226]:
+        - generic [ref=e331]:
+          - heading "Board Epics / User stories" [level=2] [ref=e332]
+          - navigation "Fil d'Ariane" [ref=e333]:
+            - button "Épics" [disabled] [ref=e334]
+        - generic [ref=e335]:
+          - 'button "EPIC-1 itération 1 Moteur conversationnel culinaire (backend) Logique métier du chatbot : persona système chef francophone, mémoire de la session, garde-fou de domaine, et assemblage/appel du modèle avec gestion d''erreurs. Tout est implémenté en Python pur dans le package chat_eat (testable sans réseau ni interface). 100 4/4 terminée(s)" [ref=e336] [cursor=pointer]':
+            - generic [ref=e337]:
+              - generic [ref=e338]: EPIC-1
+              - generic [ref=e340]: itération 1
+            - generic [ref=e341]: Moteur conversationnel culinaire (backend)
+            - paragraph [ref=e342]: "Logique métier du chatbot : persona système chef francophone, mémoire de la session, garde-fou de domaine, et assemblage/appel du modèle avec gestion d'erreurs. Tout est implémenté en Python pur dans le package chat_eat (testable sans réseau ni interface)."
+            - progressbar "4/4 terminée(s) — 100%" [ref=e343]
+            - generic [ref=e345]: 4/4 terminée(s)
+          - button "EPIC-2 itération 1 Interface de chat (frontend) Interface web légère présentant le fil de conversation et la saisie, avec affichage des réponses en streaming. La logique de présentation testable (assemblage des fragments de streaming, structuration du fil pour l'affichage) est exposée en Python pur dans chat_eat. 100 1/1 terminée(s) ⛓ dépend de EPIC-1" [ref=e346] [cursor=pointer]:
+            - generic [ref=e347]:
+              - generic [ref=e348]: EPIC-2
+              - generic [ref=e350]: itération 1
+            - generic [ref=e351]: Interface de chat (frontend)
+            - paragraph [ref=e352]: Interface web légère présentant le fil de conversation et la saisie, avec affichage des réponses en streaming. La logique de présentation testable (assemblage des fragments de streaming, structuration du fil pour l'affichage) est exposée en Python pur dans chat_eat.
+            - progressbar "1/1 terminée(s) — 100%" [ref=e353]
+            - generic [ref=e355]: 1/1 terminée(s)
+            - generic [ref=e356]: ⛓ dépend de EPIC-1
+          - button "EPIC-3 itération 2 Rendu Markdown sécurisé des réponses de l'assistant Transformer les réponses Markdown brutes du modèle en contenu formaté, assaini et lisible dans le fil de conversation, y compris pendant le streaming, sans toucher au backend ni au format de réponse. La logique de rendu/assainissement est isolée dans le package chat_eat sous forme de fonctions pures testables, que l'interface (Vite) consomme. Les messages utilisateur restent en texte brut échappé. 100 4/4 terminée(s) ⛓ dépend de EPIC-2" [ref=e357] [cursor=pointer]:
+            - generic [ref=e358]:
+              - generic [ref=e359]: EPIC-3
+              - generic [ref=e361]: itération 2
+            - generic [ref=e362]: Rendu Markdown sécurisé des réponses de l'assistant
+            - paragraph [ref=e363]: Transformer les réponses Markdown brutes du modèle en contenu formaté, assaini et lisible dans le fil de conversation, y compris pendant le streaming, sans toucher au backend ni au format de réponse. La logique de rendu/assainissement est isolée dans le package chat_eat sous forme de fonctions pures testables, que l'interface (Vite) consomme. Les messages utilisateur restent en texte brut échappé.
+            - progressbar "4/4 terminée(s) — 100%" [ref=e364]
+            - generic [ref=e366]: 4/4 terminée(s)
+            - generic [ref=e367]: ⛓ dépend de EPIC-2
+          - button "EPIC-4 itération 3 Suggestions de démarrage sur fil vide À l'ouverture sur un fil de conversation vide, proposer 3 à 4 questions types cliquables sous une accroche en français. Un clic envoie la question comme un message utilisateur normal (réutilisation du flux d'envoi existant) et les suggestions disparaissent dès le premier message. La liste est statique et codée en dur ; aucune modification du backend, du prompt ou du format de réponse. 33 1/3 terminée(s) · 2 en échec ⛓ dépend de EPIC-2" [ref=e368] [cursor=pointer]:
+            - generic [ref=e369]:
+              - generic [ref=e370]: EPIC-4
+              - generic [ref=e372]: itération 3
+            - generic [ref=e373]: Suggestions de démarrage sur fil vide
+            - paragraph [ref=e374]: À l'ouverture sur un fil de conversation vide, proposer 3 à 4 questions types cliquables sous une accroche en français. Un clic envoie la question comme un message utilisateur normal (réutilisation du flux d'envoi existant) et les suggestions disparaissent dès le premier message. La liste est statique et codée en dur ; aucune modification du backend, du prompt ou du format de réponse.
+            - progressbar "1/3 terminée(s) — 33%" [ref=e375]
+            - generic [ref=e377]:
+              - text: 1/3 terminée(s)
+              - generic [ref=e378]: · 2 en échec
+            - generic [ref=e379]: ⛓ dépend de EPIC-2
+      - generic [ref=e230]:
+        - heading "Exécution" [level=2] [ref=e231]
+        - generic [ref=e232]: ✅ Itération terminée — itération 3
+        - generic [ref=e380]: 💸 $13.2969 · 317.7k tokens · 28 appels
+        - generic [ref=e233]:
+          - button "▶ Lancer le projet" [ref=e234] [cursor=pointer]
+          - button "⏹ Stopper" [disabled] [ref=e381]
+          - button "📘 Doc" [ref=e235] [cursor=pointer]
+          - button "⬇ Zip" [ref=e236] [cursor=pointer]
+          - button "🔀 Commit" [ref=e237] [cursor=pointer]
+          - button "⏪ Rollback" [ref=e238] [cursor=pointer]
+          - button "🚀 Déploiement" [ref=e239] [cursor=pointer]
+      - button "📁 Code généré" [ref=e241] [cursor=pointer]

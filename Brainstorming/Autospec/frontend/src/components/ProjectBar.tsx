@@ -56,6 +56,14 @@ function progress(p: ProjectState): { done: number; total: number } | null {
   };
 }
 
+/** Ordre d'affichage (UI3) : en cours → en pause → dormant → terminé. */
+function statusRank(p: ProjectState): number {
+  if (ACTIVE_PHASES.includes(p.phase)) return p.paused ? 1 : 0;
+  if (["stopped", "error"].includes(p.phase)) return 2;
+  if (p.phase === "done") return 3;
+  return 4;
+}
+
 /** Libellé d'une option du sélecteur : « 🔵 Nom · 2/3 · build ». */
 function optionLabel(p: ProjectState): string {
   const badge = p.paused ? "⏸" : PHASE_BADGE[p.phase] ?? "⚪";
@@ -84,12 +92,18 @@ export function ProjectBar({
   const visible = showArchived ? projects : projects.filter((p) => !p.archived);
 
   const selected = projects.find((p) => p.id === selectedId) ?? null;
-  // Le projet courant figure toujours dans le sélecteur, même s'il est archivé
-  // et que les archivés sont masqués.
+  const sorted = [...visible].sort((a, b) => statusRank(a) - statusRank(b));
+  // Le sélecteur liste tout (projet courant inclus même archivé/masqué).
   const selectable =
-    selected && !visible.some((p) => p.id === selected.id)
-      ? [selected, ...visible]
-      : visible;
+    selected && !sorted.some((p) => p.id === selected.id)
+      ? [selected, ...sorted]
+      : sorted;
+  // UI3 : les chips se limitent aux projets qui travaillent (ou en pause) + le
+  // projet courant ; le reste se commute via le sélecteur 🗂 (fini l'overflow).
+  const chipProjects = sorted.filter(
+    (p) => ACTIVE_PHASES.includes(p.phase) || p.id === selectedId,
+  );
+  const hiddenFromChips = visible.length - chipProjects.length;
 
   return (
     <div className="project-bar">
@@ -114,7 +128,7 @@ export function ProjectBar({
           </select>
         </label>
       )}
-      {visible.map((p) => {
+      {chipProjects.map((p) => {
         const active = ACTIVE_PHASES.includes(p.phase);
         const working = active && !p.paused;
         const canPlay =
@@ -207,6 +221,14 @@ export function ProjectBar({
           </div>
         );
       })}
+      {hiddenFromChips > 0 && (
+        <span
+          className="chips-hint"
+          title="Projets inactifs — accessibles via le sélecteur 🗂"
+        >
+          +{hiddenFromChips} dans 🗂
+        </span>
+      )}
       <button className="project-new" onClick={onNew}>
         ＋ Nouveau
       </button>

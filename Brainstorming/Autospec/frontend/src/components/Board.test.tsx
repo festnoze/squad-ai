@@ -23,11 +23,19 @@ function makeStory(overrides: Partial<UserStory> = {}): UserStory {
 }
 
 describe("Board", () => {
-  it("affiche l'état vide quand il n'y a pas d'epic", () => {
-    render(<Board epics={[]} stories={[]} projectId="p1" />);
-    expect(
-      screen.getByText("Le PO n'a pas encore produit de plan."),
-    ).toBeInTheDocument();
+  it("affiche un état vide actionnable quand il n'y a pas d'epic", () => {
+    const { container } = render(<Board epics={[]} stories={[]} projectId="p1" />);
+    // Hors phase de planification : consigne claire (UI6), pas de spinner.
+    expect(screen.getByText(/Pas encore de plan/i)).toBeInTheDocument();
+    expect(container.querySelector(".spinner")).toBeNull();
+  });
+
+  it("UI6 : pendant la planification, l'état vide montre un spinner", () => {
+    const { container } = render(
+      <Board epics={[]} stories={[]} projectId="p1" phase="plan" />,
+    );
+    expect(container.querySelector(".spinner")).not.toBeNull();
+    expect(screen.getByText(/génère le plan/i)).toBeInTheDocument();
   });
 
   it("navigation hiérarchique : épics → epic → story (drill-down)", () => {
@@ -103,5 +111,63 @@ describe("Board", () => {
     fireEvent.click(screen.getByText("Cœur")); // drill dans l'epic
     const row = screen.getByTestId("story-S1");
     expect(row.className).toMatch(/status-in_progress/);
+  });
+});
+
+describe("Board — groupement par itération (UI1)", () => {
+  const ep = (id: string, iteration: number): Epic => ({
+    id,
+    title: `Epic ${id}`,
+    description: "",
+    iteration,
+  });
+
+  it("plusieurs itérations → groupées ; historique replié, récente dépliée", () => {
+    render(
+      <Board
+        epics={[ep("E1", 1), ep("E2", 2)]}
+        stories={[
+          makeStory({ id: "S1", epic_id: "E1", status: "done" }),
+          makeStory({ id: "S2", epic_id: "E2", status: "todo" }),
+        ]}
+        projectId="grp1"
+      />,
+    );
+    expect(screen.getByTestId("iter-header-2")).toBeInTheDocument();
+    expect(screen.getByTestId("iter-header-1")).toBeInTheDocument();
+    // itération 2 (récente) dépliée ; itération 1 repliée
+    expect(screen.getByTestId("epic-E2")).toBeInTheDocument();
+    expect(screen.queryByTestId("epic-E1")).not.toBeInTheDocument();
+    // déplier l'historique
+    fireEvent.click(screen.getByTestId("iter-header-1"));
+    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
+  });
+
+  it("une seule itération → pas de regroupement (grille à plat)", () => {
+    render(
+      <Board
+        epics={[ep("E1", 1)]}
+        stories={[makeStory({ epic_id: "E1" })]}
+        projectId="grp2"
+      />,
+    );
+    expect(screen.queryByTestId("iter-header-1")).not.toBeInTheDocument();
+    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
+  });
+
+  it("une itération en cours est dépliée automatiquement", () => {
+    render(
+      <Board
+        epics={[ep("E1", 1), ep("E2", 2)]}
+        stories={[
+          makeStory({ id: "S1", epic_id: "E1", status: "in_progress" }),
+          makeStory({ id: "S2", epic_id: "E2", status: "done" }),
+        ]}
+        projectId="grp3"
+      />,
+    );
+    // itération 1 (en cours) dépliée même si ce n'est pas la plus récente
+    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
+    expect(screen.getByTestId("epic-E2")).toBeInTheDocument();
   });
 });

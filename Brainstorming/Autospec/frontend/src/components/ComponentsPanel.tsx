@@ -1,4 +1,5 @@
 import { ProductComponent } from "../types";
+import { CollapsibleSection } from "./CollapsibleSection";
 
 const KIND_ICON: Record<string, string> = {
   backend: "⚙️",
@@ -46,8 +47,7 @@ export function ComponentsPanel({ components, onUpdate, onSetup }: Props) {
   ).length;
 
   return (
-    <div className="panel components">
-      <h2>🧱 Composants du produit</h2>
+    <CollapsibleSection title="🧱 Composants du produit" className="components">
       <div className="component-list">
         {components.map((c) => (
           <div key={c.id} className={`component status-${c.status}`}>
@@ -80,6 +80,6 @@ export function ComponentsPanel({ components, onUpdate, onSetup }: Props) {
       >
         🧱 Créer les composants approuvés
       </button>
-    </div>
+    </CollapsibleSection>
   );
 }

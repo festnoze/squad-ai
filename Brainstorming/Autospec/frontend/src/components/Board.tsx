@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   addStory,
   deleteStory,
@@ -832,60 +832,165 @@ function EpicProgressBar({ prog }: { prog: EpicProgress }) {
   );
 }
 
-/** Niveau racine : grille de cartes epic avec compteur d'US et deps dérivées. */
+/** Carte epic cliquable (niveau racine) : avancement + halo « working ». */
+function EpicCard({
+  epic,
+  stories,
+  epicDeps,
+  onOpenEpic,
+}: {
+  epic: Epic;
+  stories: UserStory[];
+  epicDeps: Map<string, string[]>;
+  onOpenEpic: (epicId: string) => void;
+}) {
+  const es = stories.filter((s) => s.epic_id === epic.id);
+  const prog = epicProgress(es);
+  const deps = epicDeps.get(epic.id) ?? [];
+  return (
+    <div
+      className={`epic epic-card epic-${prog.state}`}
+      data-testid={`epic-${epic.id}`}
+      role="button"
+      tabIndex={0}
+      onClick={() => onOpenEpic(epic.id)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpenEpic(epic.id);
+        }
+      }}
+    >
+      <div className="epic-head">
+        <span className="epic-id">{epic.id}</span>
+        <span className="epic-head-right">
+          {prog.state === "working" && (
+            <span
+              className="spinner"
+              data-testid="epic-spinner"
+              title="Développement en cours"
+              aria-label="Développement en cours"
+            />
+          )}
+          <span className="epic-iter">itération {epic.iteration}</span>
+        </span>
+      </div>
+      <div className="epic-title">{epic.title}</div>
+      {epic.description && <p className="epic-desc">{epic.description}</p>}
+      <EpicProgressBar prog={prog} />
+      {deps.length > 0 && (
+        <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
+      )}
+    </div>
+  );
+}
+
+/** Résumé une-ligne d'une itération repliée : compteur + barre agrégée. */
+function IterationSummary({ prog, epicCount }: { prog: EpicProgress; epicCount: number }) {
+  return (
+    <span className="epic-iter-summary">
+      <span className="epic-iter-count">
+        {epicCount} épic{epicCount > 1 ? "s" : ""} · {prog.done}/{prog.total}
+      </span>
+      <span className="epic-progress mini" title={`${prog.pct}%`}>
+        <span
+          className={`epic-progress-fill state-${prog.state}`}
+          style={{ width: `${prog.pct}%` }}
+        />
+      </span>
+    </span>
+  );
+}
+
+/**
+ * Niveau racine (UI1) : epics groupés par itération. L'itération active est
+ * dépliée, l'historique se replie en résumé une-ligne (avancement agrégé) ; une
+ * itération qui passe « en cours » se déplie automatiquement (géré par le
+ * parent). Pas de regroupement s'il n'y a qu'une seule itération.
+ */
 function EpicsView({
   epics,
   stories,
   epicDeps,
   onOpenEpic,
+  expanded,
+  onToggleIter,
 }: {
   epics: Epic[];
   stories: UserStory[];
   epicDeps: Map<string, string[]>;
   onOpenEpic: (epicId: string) => void;
+  expanded: Set<number>;
+  onToggleIter: (iter: number) => void;
 }) {
-  return (
-    <div className="epic-grid">
-      {epics.map((epic) => {
-        const es = stories.filter((s) => s.epic_id === epic.id);
-        const prog = epicProgress(es);
-        const deps = epicDeps.get(epic.id) ?? [];
-        return (
-          <div
+  const byIter = new Map<number, Epic[]>();
+  for (const e of epics) {
+    const arr = byIter.get(e.iteration);
+    if (arr) arr.push(e);
+    else byIter.set(e.iteration, [e]);
+  }
+  const iters = [...byIter.keys()].sort((a, b) => b - a); // plus récente d'abord
+
+  if (iters.length <= 1) {
+    return (
+      <div className="epic-grid">
+        {epics.map((epic) => (
+          <EpicCard
             key={epic.id}
-            className={`epic epic-card epic-${prog.state}`}
-            data-testid={`epic-${epic.id}`}
-            role="button"
-            tabIndex={0}
-            onClick={() => onOpenEpic(epic.id)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onOpenEpic(epic.id);
-              }
-            }}
+            epic={epic}
+            stories={stories}
+            epicDeps={epicDeps}
+            onOpenEpic={onOpenEpic}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div className="epic-iterations">
+      {iters.map((iter) => {
+        const iterEpics = byIter.get(iter)!;
+        const iterStories = stories.filter((s) =>
+          iterEpics.some((e) => e.id === s.epic_id),
+        );
+        const prog = epicProgress(iterStories);
+        const open = expanded.has(iter);
+        return (
+          <section
+            key={iter}
+            className={`epic-iter-group epic-${prog.state}${open ? " open" : ""}`}
           >
-            <div className="epic-head">
-              <span className="epic-id">{epic.id}</span>
-              <span className="epic-head-right">
+            <button
+              type="button"
+              className="epic-iter-header"
+              aria-expanded={open}
+              data-testid={`iter-header-${iter}`}
+              onClick={() => onToggleIter(iter)}
+            >
+              <span className="epic-iter-caret">{open ? "▾" : "▸"}</span>
+              <span className="epic-iter-name">
                 {prog.state === "working" && (
-                  <span
-                    className="spinner"
-                    data-testid="epic-spinner"
-                    title="Développement en cours"
-                    aria-label="Développement en cours"
-                  />
+                  <span className="spinner spinner-sm" data-testid="iter-spinner" />
                 )}
-                <span className="epic-iter">itération {epic.iteration}</span>
+                Itération {iter}
               </span>
-            </div>
-            <div className="epic-title">{epic.title}</div>
-            {epic.description && <p className="epic-desc">{epic.description}</p>}
-            <EpicProgressBar prog={prog} />
-            {deps.length > 0 && (
-              <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
+              <IterationSummary prog={prog} epicCount={iterEpics.length} />
+            </button>
+            {open && (
+              <div className="epic-grid">
+                {iterEpics.map((epic) => (
+                  <EpicCard
+                    key={epic.id}
+                    epic={epic}
+                    stories={stories}
+                    epicDeps={epicDeps}
+                    onOpenEpic={onOpenEpic}
+                  />
+                ))}
+              </div>
             )}
-          </div>
+          </section>
         );
       })}
     </div>
@@ -938,16 +1043,102 @@ interface Props {
   epics: Epic[];
   stories: UserStory[];
   projectId: string;
+  phase?: string;
 }
 
-export function Board({ epics, stories, projectId }: Props) {
+const PLANNING_PHASES = ["spec", "analyze", "plan", "architect"];
+
+export function Board({ epics, stories, projectId, phase }: Props) {
   const [nav, setNav] = useState<Nav>({ level: "epics" });
 
+  // UI1 : expansion des groupes d'itérations du board, persistée par projet.
+  const storageKey = `autospec-epics-expanded:${projectId}`;
+  const [expandedIters, setExpandedIters] = useState<Set<number>>(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw) return new Set<number>(JSON.parse(raw));
+    } catch {
+      /* localStorage indisponible : on partira d'un set vide (seedé ci-dessous). */
+    }
+    return new Set<number>();
+  });
+  const seededRef = useRef(false);
+
+  const maxIter = epics.length ? Math.max(...epics.map((e) => e.iteration)) : 0;
+  const workingKey = [
+    ...new Set(
+      epics
+        .filter((e) => stories.some((s) => s.epic_id === e.id && s.status === "in_progress"))
+        .map((e) => e.iteration),
+    ),
+  ]
+    .sort((a, b) => a - b)
+    .join(",");
+
+  // Amorce : déplie l'itération la plus récente la 1re fois (si rien de sauvegardé).
+  useEffect(() => {
+    if (seededRef.current || epics.length === 0) return;
+    seededRef.current = true;
+    setExpandedIters((prev) => (prev.size > 0 ? prev : new Set([maxIter])));
+  }, [epics.length, maxIter]);
+
+  // Auto-déplie toute itération qui passe « en cours ».
+  useEffect(() => {
+    if (!workingKey) return;
+    setExpandedIters((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const it of workingKey.split(",").map(Number)) {
+        if (!next.has(it)) {
+          next.add(it);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [workingKey]);
+
+  // Persiste le choix d'expansion par projet.
+  useEffect(() => {
+    try {
+      localStorage.setItem(storageKey, JSON.stringify([...expandedIters]));
+    } catch {
+      /* best-effort */
+    }
+  }, [storageKey, expandedIters]);
+
+  const toggleIter = (iter: number) =>
+    setExpandedIters((prev) => {
+      const next = new Set(prev);
+      if (next.has(iter)) next.delete(iter);
+      else next.add(iter);
+      return next;
+    });
+
   if (epics.length === 0) {
+    // UI6 : état vide contextuel — un spinner « plan en cours » quand le PM/PO
+    // travaille, sinon une consigne claire (plutôt qu'une phrase morte).
+    const planning = PLANNING_PHASES.includes(phase ?? "");
     return (
       <div className="panel board empty">
         <h2>Board Epics / User stories</h2>
-        <p className="placeholder">Le PO n'a pas encore produit de plan.</p>
+        <div className="board-empty">
+          {planning ? (
+            <>
+              <span className="spinner" aria-hidden="true" />
+              <p className="placeholder">
+                Le PM/PO génère le plan… les épics et user stories apparaîtront ici.
+              </p>
+            </>
+          ) : phase === "build" ? (
+            <p className="placeholder">Construction en cours… le plan va s'afficher.</p>
+          ) : (
+            <p className="placeholder">
+              Pas encore de plan. Lance la spécification depuis le panneau
+              <strong> Exécution</strong> ci-dessous pour générer épics &amp; user stories.
+            </p>
+          )}
+        </div>
       </div>
     );
   }
@@ -984,6 +1175,8 @@ export function Board({ epics, stories, projectId }: Props) {
           stories={stories}
           epicDeps={epicDeps}
           onOpenEpic={(epicId) => setNav({ level: "epic", epicId })}
+          expanded={expandedIters}
+          onToggleIter={toggleIter}
         />
       )}
       {level === "epic" && epic && (
