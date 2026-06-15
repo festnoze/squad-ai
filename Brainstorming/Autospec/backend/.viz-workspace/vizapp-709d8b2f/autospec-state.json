@@ -153,6 +153,16 @@
       "role": "dev",
       "content": "[US-1] Implémentation et tests (mode démo) — suite verte.",
       "ts": 1781486047.005107
+    },
+    {
+      "role": "qa",
+      "content": "[US-1] Décomposition outside-in (mode démo).\nPlan outside-in : 1 test(s) unitaire(s) (service).",
+      "ts": 1781486103.1653302
+    },
+    {
+      "role": "dev",
+      "content": "[US-1] Implémentation et tests (mode démo) — suite verte.",
+      "ts": 1781486104.981834
     }
   ],
   "feedback": [],
@@ -167,7 +177,7 @@
     "cost_usd": 0.0,
     "input_tokens": 0,
     "output_tokens": 0,
-    "agent_calls": 8
+    "agent_calls": 10
   },
   "running": false,
   "paused": false,
