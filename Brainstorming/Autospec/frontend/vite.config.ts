@@ -6,18 +6,22 @@ import react from "@vitejs/plugin-react";
 const backendPort = process.env.VITE_BACKEND_PORT ?? "8100";
 const apiTarget = `http://127.0.0.1:${backendPort}`;
 
-// Force a FRESH connection per upstream request: reusing a pooled keep-alive
-// socket that uvicorn already half-closed (idle keep-alive timeout) is the
-// classic Windows-loopback failure mode — the proxy writes to a dead socket and
-// then waits forever (no error, no response), wedging the request. A fresh
-// connection sidesteps the stale socket entirely.
-const noKeepAliveAgent = new http.Agent({ keepAlive: false, maxSockets: 64 });
+// REUSE upstream connections (keep-alive). Forcing a fresh connection per request
+// maximizes loopback connect attempts, and on Windows each fresh connect has a
+// small chance of ETIMEDOUT/ECONNRESET — so per-request churn turns a rare glitch
+// into a frequent one (the `ECONNRESET on POST /api/provider` / `ws ETIMEDOUT`
+// noise). A pooled socket that the backend closed surfaces a fast reset on reuse
+// (retried below), not a hang, on loopback where FIN/RST is delivered promptly.
+const keepAliveAgent = new http.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 1000,
+  maxSockets: 64,
+});
 
 // Hard backstop so a stuck upstream connection can NEVER hang forever (which
-// otherwise leaves the UI stuck in its "busy" state, e.g. a wedged create
-// modal). Generous enough not to cut off legitimately slow ops (zip export,
-// doc generation). On expiry http-proxy emits an error -> handled below.
-const PROXY_TIMEOUT_MS = 30_000;
+// otherwise leaves the UI stuck in its "busy" state, e.g. a wedged create modal).
+// Bounds the rare half-open stale socket; still generous for slow dev ops.
+const PROXY_TIMEOUT_MS = 12_000;
 
 // Defense-in-depth for the dev proxy. Talking to a single-threaded uvicorn over
 // Windows loopback intermittently fails to establish a *fresh* connection
@@ -45,7 +49,7 @@ const RETRY_DELAY_MS = 150;
 function retryingProxy(target: string) {
   return {
     target,
-    agent: noKeepAliveAgent,
+    agent: keepAliveAgent,
     proxyTimeout: PROXY_TIMEOUT_MS,
     configure: (proxy: any, options: any) => {
       const attempts = new WeakMap<object, number>();

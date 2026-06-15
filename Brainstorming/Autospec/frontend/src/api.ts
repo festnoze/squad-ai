@@ -11,6 +11,43 @@ import {
   WsEvent,
 } from "./types";
 
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * fetch() that retries transient dev-proxy / loopback failures. On Windows the
+ * Vite proxy ↔ uvicorn connection occasionally drops mid-request (ECONNRESET):
+ * for a body-carrying POST that the proxy can't safely retry on its own, it
+ * answers 502, so the call surfaces as an error.
+ *
+ * ONLY use for IDEMPOTENT requests — re-issuing must be harmless (e.g. setting
+ * the active provider/model). Never use for create/append endpoints (project,
+ * chat, story) where a replay could duplicate.
+ */
+async function fetchIdempotent(
+  input: string,
+  init?: RequestInit,
+  retries = 2,
+): Promise<Response> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(input, init);
+      // 502/503/504 = the dev proxy gave up on a dropped upstream connection.
+      if ((res.status === 502 || res.status === 503 || res.status === 504) && attempt < retries) {
+        await delay(150 * (attempt + 1));
+        continue;
+      }
+      return res;
+    } catch (e) {
+      // The fetch itself rejected (network-level failure): retry, then rethrow.
+      lastError = e;
+      if (attempt >= retries) throw e;
+      await delay(150 * (attempt + 1));
+    }
+  }
+  throw lastError;
+}
+
 async function json<T>(resp: Response): Promise<T> {
   if (!resp.ok) {
     const body = await resp.text();
@@ -252,15 +289,18 @@ export async function storyDiff(
 }
 
 export async function getProvider(): Promise<ProviderInfo> {
-  return json(await fetch("/api/provider"));
+  return json(await fetchIdempotent("/api/provider"));
 }
 
 export async function setProvider(
   provider: string,
   model?: string,
 ): Promise<ProviderInfo> {
+  // Idempotent (sets the active provider/model) -> safe to retry on a transient
+  // proxy reset (ECONNRESET -> 502). Fixes the « api proxy error: ECONNRESET on
+  // POST /api/provider » surfaced when switching provider/model.
   return json(
-    await fetch("/api/provider", {
+    await fetchIdempotent("/api/provider", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(model ? { provider, model } : { provider }),
