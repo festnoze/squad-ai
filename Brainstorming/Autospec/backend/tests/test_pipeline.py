@@ -614,6 +614,75 @@ async def test_usage_zero_by_default(green_pytest):
     assert usage.agent_calls >= 4
 
 
+class _FixedCostRunner(FakeRunner):
+    """FakeRunner whose every call reports a fixed cost/token charge so we can
+    assert exact per-iteration accumulation."""
+
+    async def arun(self, *a, **kw):
+        res = await super().arun(*a, **kw)
+        res.cost_usd = 0.01
+        res.input_tokens = 100
+        res.output_tokens = 50
+        return res
+
+
+async def test_iteration_usage_accumulates_for_current_iteration(green_pytest):
+    runner = _FixedCostRunner(["a", "b", "c"])
+    state = ProjectState(id="proj-it", name="todo", goal="Une todo-list")
+    pipeline = Pipeline(state, runner)
+
+    # Three tracked agent calls during the default iteration (1).
+    for _ in range(3):
+        await pipeline._tracked.arun("p", "s")
+
+    n = state.iteration
+    bucket = state.iteration_usage[n]
+    assert bucket.agent_calls == 3
+    assert bucket.cost_usd == pytest.approx(0.03)
+    assert bucket.input_tokens == 300
+    assert bucket.output_tokens == 150
+
+    # With only one iteration, the per-iteration bucket equals the global total.
+    assert bucket.agent_calls == state.usage.agent_calls
+    assert bucket.cost_usd == pytest.approx(state.usage.cost_usd)
+    assert bucket.input_tokens == state.usage.input_tokens
+    assert bucket.output_tokens == state.usage.output_tokens
+
+
+async def test_iteration_usage_splits_across_iterations(green_pytest):
+    runner = _FixedCostRunner(["a", "b", "c", "d", "e"])
+    state = ProjectState(id="proj-split", name="todo", goal="Une todo-list")
+    pipeline = Pipeline(state, runner)
+
+    # Two calls during iteration 1.
+    await pipeline._tracked.arun("p", "s")
+    await pipeline._tracked.arun("p", "s")
+
+    # Bump to a new iteration, then three more calls.
+    state.iteration = 2
+    for _ in range(3):
+        await pipeline._tracked.arun("p", "s")
+
+    b1 = state.iteration_usage[1]
+    b2 = state.iteration_usage[2]
+
+    assert b1.agent_calls == 2
+    assert b1.cost_usd == pytest.approx(0.02)
+    assert b1.input_tokens == 200
+    assert b1.output_tokens == 100
+
+    assert b2.agent_calls == 3
+    assert b2.cost_usd == pytest.approx(0.03)
+    assert b2.input_tokens == 300
+    assert b2.output_tokens == 150
+
+    # The global total is the sum of every iteration bucket.
+    assert state.usage.agent_calls == b1.agent_calls + b2.agent_calls == 5
+    assert state.usage.cost_usd == pytest.approx(b1.cost_usd + b2.cost_usd)
+    assert state.usage.input_tokens == b1.input_tokens + b2.input_tokens == 500
+    assert state.usage.output_tokens == b1.output_tokens + b2.output_tokens == 250
+
+
 async def test_fatal_pipeline_error_sets_error_phase(green_pytest):
     # The PO stage receives a non-JSON reply: extract_json raises AgentError,
     # which _alifecycle catches -> phase ERROR + a SYSTEM chat mentioning it.

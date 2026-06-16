@@ -192,6 +192,9 @@ class Settings:
         default_factory=lambda: _env_int("AUTOSPEC_DEV_MAX_ATTEMPTS", 2, minimum=1)
     )
     uv_cmd: str = field(default_factory=lambda: os.environ.get("AUTOSPEC_UV_CMD", "uv"))
+    # L2g: build/test toolchains for the non-Python backend languages.
+    go_cmd: str = field(default_factory=lambda: os.environ.get("AUTOSPEC_GO_CMD", "go"))
+    cargo_cmd: str = field(default_factory=lambda: os.environ.get("AUTOSPEC_CARGO_CMD", "cargo"))
     # Demo / e2e mode: drive a deterministic scripted agent backend and skip the
     # real `uv run pytest` verification, so the full stack runs without the
     # Claude CLI. demo_delay_s slows scripted agents so UI transitions (and

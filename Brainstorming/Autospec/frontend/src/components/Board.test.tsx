@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { Board } from "./Board";
 import { Epic, UserStory } from "../types";
 
@@ -114,7 +114,7 @@ describe("Board", () => {
   });
 });
 
-describe("Board — groupement par itération (UI1)", () => {
+describe("Board — vision produit à plat + pastille itération", () => {
   const ep = (id: string, iteration: number): Epic => ({
     id,
     title: `Epic ${id}`,
@@ -122,7 +122,7 @@ describe("Board — groupement par itération (UI1)", () => {
     iteration,
   });
 
-  it("plusieurs itérations → groupées ; historique replié, récente dépliée", () => {
+  it("plusieurs itérations → grille à plat (pas de regroupement par itération)", () => {
     render(
       <Board
         epics={[ep("E1", 1), ep("E2", 2)]}
@@ -133,41 +133,39 @@ describe("Board — groupement par itération (UI1)", () => {
         projectId="grp1"
       />,
     );
-    expect(screen.getByTestId("iter-header-2")).toBeInTheDocument();
-    expect(screen.getByTestId("iter-header-1")).toBeInTheDocument();
-    // itération 2 (récente) dépliée ; itération 1 repliée
+    // Tous les epics visibles d'emblée, quelle que soit leur itération.
+    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
     expect(screen.getByTestId("epic-E2")).toBeInTheDocument();
-    expect(screen.queryByTestId("epic-E1")).not.toBeInTheDocument();
-    // déplier l'historique
-    fireEvent.click(screen.getByTestId("iter-header-1"));
-    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
-  });
-
-  it("une seule itération → pas de regroupement (grille à plat)", () => {
-    render(
-      <Board
-        epics={[ep("E1", 1)]}
-        stories={[makeStory({ epic_id: "E1" })]}
-        projectId="grp2"
-      />,
-    );
+    // Plus d'en-têtes d'itération repliables.
     expect(screen.queryByTestId("iter-header-1")).not.toBeInTheDocument();
-    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
+    expect(screen.queryByTestId("iter-header-2")).not.toBeInTheDocument();
   });
 
-  it("une itération en cours est dépliée automatiquement", () => {
+  it("la pastille « it. N » est un lien quand onOpenIteration est fourni", () => {
+    const onOpenIteration = vi.fn();
     render(
       <Board
         epics={[ep("E1", 1), ep("E2", 2)]}
-        stories={[
-          makeStory({ id: "S1", epic_id: "E1", status: "in_progress" }),
-          makeStory({ id: "S2", epic_id: "E2", status: "done" }),
-        ]}
-        projectId="grp3"
+        stories={[makeStory({ id: "S2", epic_id: "E2" })]}
+        projectId="grp2"
+        onOpenIteration={onOpenIteration}
       />,
     );
-    // itération 1 (en cours) dépliée même si ce n'est pas la plus récente
-    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
-    expect(screen.getByTestId("epic-E2")).toBeInTheDocument();
+    fireEvent.click(screen.getByTitle("Voir l'itération 2 dans la chronologie"));
+    expect(onOpenIteration).toHaveBeenCalledWith(2);
+  });
+
+  it("focus externe : navigue directement vers la US ciblée", () => {
+    render(
+      <Board
+        epics={[ep("E1", 1)]}
+        stories={[makeStory({ id: "S1", epic_id: "E1", title: "Story ciblée" })]}
+        projectId="grp3"
+        focus={{ epicId: "E1", storyId: "S1" }}
+      />,
+    );
+    // Le fil d'Ariane montre l'id de la US → on est bien au niveau détail.
+    expect(screen.getAllByText("S1").length).toBeGreaterThan(0);
+    expect(screen.getByText("Story ciblée")).toBeInTheDocument();
   });
 });

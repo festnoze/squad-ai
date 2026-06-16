@@ -34,11 +34,12 @@ from ..models import (
     ProjectState,
     StoryStatus,
     TestState,
+    Usage,
     UserStory,
 )
 from ..language_selector import recommend_language
 from ..storage import save_state_payload, workspace_dir
-from . import mutation, pytest_report, refine, scheduler, session_monitor, setup_exec, workspace
+from . import mutation, refine, scheduler, session_monitor, setup_exec, toolchain, workspace
 from . import lessons as lesson_store
 from . import regression
 from . import deploy
@@ -129,6 +130,15 @@ class _UsageTracker:
         usage.input_tokens += res.input_tokens
         usage.output_tokens += res.output_tokens
         usage.agent_calls += 1
+        # Per-iteration breakdown: mirror the same deltas into this iteration's
+        # bucket (created on first use) so the UI can show cost/tokens per iteration.
+        it_usage = self.pipeline.state.iteration_usage.setdefault(
+            self.pipeline.state.iteration, Usage()
+        )
+        it_usage.cost_usd += res.cost_usd
+        it_usage.input_tokens += res.input_tokens
+        it_usage.output_tokens += res.output_tokens
+        it_usage.agent_calls += 1
         # Optional Langfuse trace (O1): one generation per agent call. Best-effort
         # and env-gated — never affects the pipeline if tracing fails or is off.
         observability.trace_agent_call(
@@ -718,29 +728,32 @@ class Pipeline:
         self._sync()
 
     async def _aselect_language(self) -> None:
-        """L2: choose the backend language from the brief/goal. Always sets a
-        value (deterministic heuristic); when AUTOSPEC_LANGUAGE_SELECTOR is on, an
-        agent may refine it. First iteration only, non-fatal."""
+        """L2: choose the backend language from the brief/goal. Env-gated by
+        AUTOSPEC_LANGUAGE_SELECTOR — OFF keeps Python as the safe default (no
+        analysis, no panel, the existing pytest pipeline unchanged); ON runs the
+        deterministic heuristic and, when the LLM is reachable, an agent that may
+        refine it. First iteration only, non-fatal."""
+        if not settings.language_selector_enabled:
+            return
         if self.state.language_complexity >= 0:  # already analyzed
             return
         rec = recommend_language(self.state.goal, self.state.brief)
-        if settings.language_selector_enabled:
-            try:
-                result = await self._tracked.arun(
-                    prompts.language_proposal(self.state),
-                    system_prompt=persona("architect"),
-                )
-                reply = extract_json(result.text)
-                lang = str(reply.get("language", "")).strip().lower()
-                if lang in ("python", "go", "rust"):
-                    rec = {
-                        "language": lang,
-                        "complexity": _clamp_1_5(reply.get("complexity"), default=rec["complexity"]),
-                        "criticality": _clamp_1_5(reply.get("criticality"), default=rec["criticality"]),
-                        "rationale": str(reply.get("rationale") or rec["rationale"]),
-                    }
-            except AgentError as exc:
-                self._log("language", f"Sélecteur de langage indisponible ({exc}) — heuristique.")
+        try:
+            result = await self._tracked.arun(
+                prompts.language_proposal(self.state),
+                system_prompt=persona("architect"),
+            )
+            reply = extract_json(result.text)
+            lang = str(reply.get("language", "")).strip().lower()
+            if lang in ("python", "go", "rust"):
+                rec = {
+                    "language": lang,
+                    "complexity": _clamp_1_5(reply.get("complexity"), default=rec["complexity"]),
+                    "criticality": _clamp_1_5(reply.get("criticality"), default=rec["criticality"]),
+                    "rationale": str(reply.get("rationale") or rec["rationale"]),
+                }
+        except AgentError as exc:
+            self._log("language", f"Sélecteur de langage indisponible ({exc}) — heuristique.")
         self.state.backend_language = BackendLanguage(rec["language"])
         self.state.language_complexity = rec["complexity"]
         self.state.language_criticality = rec["criticality"]
@@ -949,7 +962,8 @@ class Pipeline:
         ws = workspace_dir(self.state.id)
         env = _minimal_env()
         timeout = settings.evaluator_run_timeout_s
-        cmd = self._maybe_sandbox([settings.uv_cmd, "run", "python", "main.py"], ws)
+        run_cmd = toolchain.run_command(toolchain.normalize(self.state.backend_language.value))
+        cmd = self._maybe_sandbox(run_cmd, ws)
 
         def _run() -> str:
             try:
@@ -1515,6 +1529,8 @@ class Pipeline:
         fails the story by itself (the gate decision is made by the caller)."""
         if not settings.coverage_enabled or settings.fake_agents:
             return -1
+        if toolchain.normalize(self.state.backend_language.value) != "python":
+            return -1  # pytest-cov is Python-only (L2g)
         report = workspace_dir(self.state.id) / ".autospec-cov.json"
         env = _minimal_env()
         cmd = [
@@ -1552,6 +1568,8 @@ class Pipeline:
         the build lock held by the caller, so pytest stays serialized."""
         if not settings.mutation_enabled or settings.fake_agents:
             return
+        if toolchain.normalize(self.state.backend_language.value) != "python":
+            return  # AST mutation engine is Python-only (L2g)
         pkg_dir = ws / pkg
         if not pkg_dir.is_dir():
             return
@@ -2069,29 +2087,35 @@ class Pipeline:
         return await asyncio.to_thread(_run)
 
     async def _arun_pytest(self) -> tuple[bool, str, dict[str, str]]:
-        """Run the suite. Returns (suite_green, output, {nodeid: outcome}).
+        """Run the test suite for the project's backend language (L2g).
 
-        The per-node outcomes come from a real pytest-json-report run, so test
-        states reflect the actual execution rather than the agent's self-report.
+        Returns (suite_green, output, {test_id: outcome}). The command and the
+        result parsing are dispatched by language via ``toolchain`` (Python =
+        pytest-json-report, Go = `go test -json`, Rust = `cargo test`); per-test
+        outcomes reflect the real run, not the agent's self-report. (Name kept
+        for the `green_pytest` test fixture; covers all languages.)
         """
         if settings.fake_agents:
             # Demo / e2e mode: no real code is written, trust the scripted dev.
-            return True, "mode démo : vérification pytest court-circuitée", {}
+            return True, "mode démo : vérification des tests court-circuitée", {}
         # Run in a worker thread via subprocess: asyncio's subprocess support is
         # unavailable on Windows' SelectorEventLoop (used by uvicorn), so we stay
         # off the event loop entirely for child processes.
+        lang = toolchain.normalize(self.state.backend_language.value)
         ws = workspace_dir(self.state.id)
         env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
 
         def _run() -> tuple[bool, str, dict[str, str]]:
             import tempfile
 
-            fd, report_path = tempfile.mkstemp(suffix=".json", prefix="autospec-report-")
-            os.close(fd)
+            report_path = ""
+            if toolchain.needs_report_file(lang):
+                fd, report_path = tempfile.mkstemp(suffix=".json", prefix="autospec-report-")
+                os.close(fd)
             try:
+                cmd = self._maybe_sandbox(toolchain.test_command(lang, report_path), ws)
                 proc = subprocess.run(
-                    [settings.uv_cmd, "run", "pytest", "-q",
-                     "--json-report", f"--json-report-file={report_path}"],
+                    cmd,
                     cwd=str(ws),
                     stdout=subprocess.PIPE,
                     stderr=subprocess.STDOUT,
@@ -2100,13 +2124,14 @@ class Pipeline:
                     encoding="utf-8",
                     errors="replace",
                 )
-                results = pytest_report.parse(report_path)
+                results = toolchain.parse_results(lang, proc.stdout, report_path)
                 return proc.returncode == 0, proc.stdout, results
             finally:
-                try:
-                    os.remove(report_path)
-                except OSError:
-                    pass
+                if report_path:
+                    try:
+                        os.remove(report_path)
+                    except OSError:
+                        pass
 
         return await asyncio.to_thread(_run)
 
@@ -2188,7 +2213,7 @@ class Pipeline:
         env = _minimal_env()
         self.state.running = True
         self._sync()
-        self._log("run", "▶ Lancement de l'application générée (uv run python main.py)…")
+        self._log("run", "▶ Lancement de l'application générée…")
         # Stream the child's output from a worker thread, marshaling each line
         # back onto the event loop (asyncio subprocesses are unsupported on the
         # Windows SelectorEventLoop that uvicorn runs).
@@ -2200,9 +2225,14 @@ class Pipeline:
     def _stream_run_output(self, ws, env, loop: asyncio.AbstractEventLoop) -> None:
         import sys
 
-        # In demo mode run with the current interpreter (hermetic, no uv venv
-        # build); otherwise use `uv run` so the workspace's deps are available.
-        cmd = [sys.executable, "main.py"] if settings.fake_agents else [settings.uv_cmd, "run", "python", "main.py"]
+        # In demo mode a Python project runs with the current interpreter
+        # (hermetic, no uv venv build); otherwise dispatch to the language's run
+        # command (uv run / go run / cargo run) — L2g.
+        lang = toolchain.normalize(self.state.backend_language.value)
+        if settings.fake_agents and lang == "python":
+            cmd = [sys.executable, "main.py"]
+        else:
+            cmd = toolchain.run_command(lang)
         try:
             proc = subprocess.Popen(
                 cmd,

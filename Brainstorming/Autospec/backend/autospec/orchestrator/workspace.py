@@ -1,4 +1,9 @@
-"""Scaffolds the uv-managed Python workspace where dev agents implement stories."""
+"""Scaffolds the workspace where dev agents implement stories.
+
+Python (uv/pytest) is the default; Go (go.mod) and Rust (Cargo) are scaffolded
+per ``state.backend_language`` (L2g) so their native test runners work from the
+first iteration.
+"""
 
 from __future__ import annotations
 
@@ -8,6 +13,7 @@ from pathlib import Path
 from ..config import settings
 from ..models import ProjectState, UserStory
 from ..storage import workspace_dir
+from . import toolchain
 
 # The `ui` marker keeps Playwright acceptance tests out of the default suite
 # (replayed separately with `uv run pytest -m ui`, where the explicit -m wins).
@@ -57,6 +63,42 @@ autospec-report-*.json
 .report.json
 """
 
+# ---- Go (L2g) -------------------------------------------------------------
+GO_MOD_TEMPLATE = """module {package}
+
+go 1.21
+"""
+
+GO_MAIN_TEMPLATE = """package main
+
+import "fmt"
+
+func main() {{
+\tfmt.Println("Projet généré par Autospec — aucune fonctionnalité câblée pour l'instant.")
+}}
+"""
+
+GO_GITIGNORE = """/bin/
+*.exe
+"""
+
+# ---- Rust (L2g) -----------------------------------------------------------
+CARGO_TOML_TEMPLATE = """[package]
+name = "{package}"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+"""
+
+RUST_MAIN_TEMPLATE = """fn main() {{
+    println!("Projet généré par Autospec — aucune fonctionnalité câblée pour l'instant.");
+}}
+"""
+
+RUST_GITIGNORE = """/target/
+"""
+
 
 def package_name(state: ProjectState) -> str:
     slug = re.sub(r"[^a-z0-9_]+", "_", state.name.lower()).strip("_") or "app"
@@ -69,17 +111,34 @@ def feature_rel_path(story: UserStory) -> str:
     return f"features/{story.id.lower().replace('-', '_')}.feature"
 
 
+def _ensure(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if not path.exists():
+        path.write_text(content, encoding="utf-8")
+
+
+def _backend_language(state: ProjectState) -> str:
+    lang = getattr(state, "backend_language", "python")
+    return toolchain.normalize(getattr(lang, "value", lang))
+
+
 def scaffold(state: ProjectState) -> Path:
-    """Create (idempotently) the workspace skeleton for a project."""
+    """Create (idempotently) the workspace skeleton for a project, in the
+    project's backend language (L2g)."""
+    lang = _backend_language(state)
+    if lang == "go":
+        return _scaffold_go(state)
+    if lang == "rust":
+        return _scaffold_rust(state)
+    return _scaffold_python(state)
+
+
+def _scaffold_python(state: ProjectState) -> Path:
     ws = workspace_dir(state.id)
     pkg = package_name(state)
     (ws / pkg).mkdir(parents=True, exist_ok=True)
     (ws / "features").mkdir(exist_ok=True)
     (ws / "tests" / "steps").mkdir(parents=True, exist_ok=True)
-
-    def _ensure(path: Path, content: str) -> None:
-        if not path.exists():
-            path.write_text(content, encoding="utf-8")
 
     ui_dep = '\n    "pytest-playwright>=0.5",' if settings.ui_tests_enabled else ""
     _ensure(ws / ".gitignore", GITIGNORE_TEMPLATE)
@@ -94,6 +153,30 @@ def scaffold(state: ProjectState) -> Path:
         (ws / "tests" / "ui").mkdir(parents=True, exist_ok=True)
         _ensure(ws / "tests" / "ui" / "__init__.py", "")
     _ensure(ws / "main.py", MAIN_TEMPLATE)
+    return ws
+
+
+def _scaffold_go(state: ProjectState) -> Path:
+    """Go module skeleton: `go test ./...` runs green (no test files) from the
+    start, the dev adds `*_test.go` + package code."""
+    ws = workspace_dir(state.id)
+    pkg = package_name(state)
+    (ws / "features").mkdir(parents=True, exist_ok=True)
+    _ensure(ws / ".gitignore", GO_GITIGNORE)
+    _ensure(ws / "go.mod", GO_MOD_TEMPLATE.format(package=pkg))
+    _ensure(ws / "main.go", GO_MAIN_TEMPLATE)
+    return ws
+
+
+def _scaffold_rust(state: ProjectState) -> Path:
+    """Cargo binary crate: `cargo test` runs green (0 tests) from the start, the
+    dev adds modules + `#[cfg(test)]` tests (or files under `tests/`)."""
+    ws = workspace_dir(state.id)
+    pkg = package_name(state)
+    (ws / "features").mkdir(parents=True, exist_ok=True)
+    _ensure(ws / ".gitignore", RUST_GITIGNORE)
+    _ensure(ws / "Cargo.toml", CARGO_TOML_TEMPLATE.format(package=pkg))
+    _ensure(ws / "src" / "main.rs", RUST_MAIN_TEMPLATE)
     return ws
 
 

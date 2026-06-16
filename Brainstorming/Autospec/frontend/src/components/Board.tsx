@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   addStory,
   deleteStory,
@@ -40,6 +40,37 @@ const TEST_STATE_ICON: Record<TestState, string> = {
 
 /** Stops a click from bubbling up to a parent click handler. */
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
+/**
+ * Pastille « itération N ». Cliquable (hyperlien vers la vue Itérations) quand
+ * `onOpen` est fourni — sinon simple libellé. Le clic ne propage pas pour ne pas
+ * déclencher l'ouverture de la carte parente.
+ */
+function IterationBadge({
+  iteration,
+  onOpen,
+  compact,
+}: {
+  iteration: number;
+  onOpen?: (iter: number) => void;
+  compact?: boolean;
+}) {
+  const label = compact ? `it. ${iteration}` : `itération ${iteration}`;
+  if (!onOpen) return <span className="epic-iter">{label}</span>;
+  return (
+    <button
+      type="button"
+      className="epic-iter epic-iter-link"
+      title={`Voir l'itération ${iteration} dans la chronologie`}
+      onClick={(e) => {
+        stop(e);
+        onOpen(iteration);
+      }}
+    >
+      🕒 {label}
+    </button>
+  );
+}
 
 /**
  * Dérive les dépendances entre epics depuis les `depends_on` des US : l'epic A
@@ -449,10 +480,12 @@ function StoryDetail({
   projectId,
   story,
   onDeleted,
+  onOpenIteration,
 }: {
   projectId: string;
   story: UserStory;
   onDeleted: () => void;
+  onOpenIteration?: (iter: number) => void;
 }) {
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
@@ -490,6 +523,7 @@ function StoryDetail({
     <div className="story-detail">
       <div className="story-detail-head">
         <span className="story-id">{story.id}</span>
+        <IterationBadge iteration={story.iteration} onOpen={onOpenIteration} compact />
         <StoryBadges story={story} />
       </div>
       <h3 className="story-detail-title">{story.title}</h3>
@@ -773,9 +807,9 @@ function Breadcrumb({
   );
 }
 
-type EpicState = "working" | "failed" | "done" | "pending";
+export type EpicState = "working" | "failed" | "done" | "pending";
 
-interface EpicProgress {
+export interface EpicProgress {
   total: number;
   done: number;
   inProgress: number;
@@ -784,8 +818,9 @@ interface EpicProgress {
   state: EpicState;
 }
 
-/** Avancement d'un epic : compteurs + état dérivé (priorité au « en cours »). */
-function epicProgress(stories: UserStory[]): EpicProgress {
+/** Avancement d'un ensemble de stories : compteurs + état dérivé (priorité au
+ * « en cours »). Réutilisé par la vue Itérations. */
+export function epicProgress(stories: UserStory[]): EpicProgress {
   const total = stories.length;
   const done = stories.filter((s) => s.status === "done").length;
   const inProgress = stories.filter((s) => s.status === "in_progress").length;
@@ -803,7 +838,7 @@ function epicProgress(stories: UserStory[]): EpicProgress {
 }
 
 /** Barre d'avancement d'un epic + ligne de compteurs (done / en cours / échec). */
-function EpicProgressBar({ prog }: { prog: EpicProgress }) {
+export function EpicProgressBar({ prog }: { prog: EpicProgress }) {
   return (
     <>
       <div
@@ -838,11 +873,13 @@ function EpicCard({
   stories,
   epicDeps,
   onOpenEpic,
+  onOpenIteration,
 }: {
   epic: Epic;
   stories: UserStory[];
   epicDeps: Map<string, string[]>;
   onOpenEpic: (epicId: string) => void;
+  onOpenIteration?: (iter: number) => void;
 }) {
   const es = stories.filter((s) => s.epic_id === epic.id);
   const prog = epicProgress(es);
@@ -872,7 +909,11 @@ function EpicCard({
               aria-label="Développement en cours"
             />
           )}
-          <span className="epic-iter">itération {epic.iteration}</span>
+          <IterationBadge
+            iteration={epic.iteration}
+            onOpen={onOpenIteration}
+            compact
+          />
         </span>
       </div>
       <div className="epic-title">{epic.title}</div>
@@ -885,114 +926,37 @@ function EpicCard({
   );
 }
 
-/** Résumé une-ligne d'une itération repliée : compteur + barre agrégée. */
-function IterationSummary({ prog, epicCount }: { prog: EpicProgress; epicCount: number }) {
-  return (
-    <span className="epic-iter-summary">
-      <span className="epic-iter-count">
-        {epicCount} épic{epicCount > 1 ? "s" : ""} · {prog.done}/{prog.total}
-      </span>
-      <span className="epic-progress mini" title={`${prog.pct}%`}>
-        <span
-          className={`epic-progress-fill state-${prog.state}`}
-          style={{ width: `${prog.pct}%` }}
-        />
-      </span>
-    </span>
-  );
-}
-
 /**
- * Niveau racine (UI1) : epics groupés par itération. L'itération active est
- * dépliée, l'historique se replie en résumé une-ligne (avancement agrégé) ; une
- * itération qui passe « en cours » se déplie automatiquement (géré par le
- * parent). Pas de regroupement s'il n'y a qu'une seule itération.
+ * Niveau racine : vision produit à plat. Tous les epics sont affichés dans une
+ * grille unique, indépendamment de leur itération de build — la dimension
+ * temporelle vit dans la vue « Itérations » dédiée. Chaque carte porte une
+ * pastille « it. N » cliquable qui bascule vers cette chronologie.
  */
 function EpicsView({
   epics,
   stories,
   epicDeps,
   onOpenEpic,
-  expanded,
-  onToggleIter,
+  onOpenIteration,
 }: {
   epics: Epic[];
   stories: UserStory[];
   epicDeps: Map<string, string[]>;
   onOpenEpic: (epicId: string) => void;
-  expanded: Set<number>;
-  onToggleIter: (iter: number) => void;
+  onOpenIteration?: (iter: number) => void;
 }) {
-  const byIter = new Map<number, Epic[]>();
-  for (const e of epics) {
-    const arr = byIter.get(e.iteration);
-    if (arr) arr.push(e);
-    else byIter.set(e.iteration, [e]);
-  }
-  const iters = [...byIter.keys()].sort((a, b) => b - a); // plus récente d'abord
-
-  if (iters.length <= 1) {
-    return (
-      <div className="epic-grid">
-        {epics.map((epic) => (
-          <EpicCard
-            key={epic.id}
-            epic={epic}
-            stories={stories}
-            epicDeps={epicDeps}
-            onOpenEpic={onOpenEpic}
-          />
-        ))}
-      </div>
-    );
-  }
-
   return (
-    <div className="epic-iterations">
-      {iters.map((iter) => {
-        const iterEpics = byIter.get(iter)!;
-        const iterStories = stories.filter((s) =>
-          iterEpics.some((e) => e.id === s.epic_id),
-        );
-        const prog = epicProgress(iterStories);
-        const open = expanded.has(iter);
-        return (
-          <section
-            key={iter}
-            className={`epic-iter-group epic-${prog.state}${open ? " open" : ""}`}
-          >
-            <button
-              type="button"
-              className="epic-iter-header"
-              aria-expanded={open}
-              data-testid={`iter-header-${iter}`}
-              onClick={() => onToggleIter(iter)}
-            >
-              <span className="epic-iter-caret">{open ? "▾" : "▸"}</span>
-              <span className="epic-iter-name">
-                {prog.state === "working" && (
-                  <span className="spinner spinner-sm" data-testid="iter-spinner" />
-                )}
-                Itération {iter}
-              </span>
-              <IterationSummary prog={prog} epicCount={iterEpics.length} />
-            </button>
-            {open && (
-              <div className="epic-grid">
-                {iterEpics.map((epic) => (
-                  <EpicCard
-                    key={epic.id}
-                    epic={epic}
-                    stories={stories}
-                    epicDeps={epicDeps}
-                    onOpenEpic={onOpenEpic}
-                  />
-                ))}
-              </div>
-            )}
-          </section>
-        );
-      })}
+    <div className="epic-grid">
+      {epics.map((epic) => (
+        <EpicCard
+          key={epic.id}
+          epic={epic}
+          stories={stories}
+          epicDeps={epicDeps}
+          onOpenEpic={onOpenEpic}
+          onOpenIteration={onOpenIteration}
+        />
+      ))}
     </div>
   );
 }
@@ -1004,12 +968,14 @@ function EpicView({
   stories,
   epicDeps,
   onOpenStory,
+  onOpenIteration,
 }: {
   projectId: string;
   epic: Epic;
   stories: UserStory[];
   epicDeps: Map<string, string[]>;
   onOpenStory: (storyId: string) => void;
+  onOpenIteration?: (iter: number) => void;
 }) {
   const es = stories.filter((s) => s.epic_id === epic.id);
   const prog = epicProgress(es);
@@ -1018,7 +984,7 @@ function EpicView({
     <div className={`epic-view epic-${prog.state}`}>
       <div className="epic-head">
         <span className="epic-id">{epic.id}</span>
-        <span className="epic-iter">itération {epic.iteration}</span>
+        <IterationBadge iteration={epic.iteration} onOpen={onOpenIteration} />
       </div>
       <h3 className="epic-view-title">
         {prog.state === "working" && (
@@ -1044,76 +1010,38 @@ interface Props {
   stories: UserStory[];
   projectId: string;
   phase?: string;
+  /** Cible de navigation pilotée de l'extérieur (depuis la vue Itérations) :
+   * ouvre l'epic, et la US si fournie. */
+  focus?: { epicId: string; storyId?: string } | null;
+  /** Appelé une fois `focus` appliqué, pour que le parent le remette à null. */
+  onFocusConsumed?: () => void;
+  /** Bascule vers la vue Itérations sur l'itération donnée (pastille « it. N »). */
+  onOpenIteration?: (iter: number) => void;
 }
 
 const PLANNING_PHASES = ["spec", "analyze", "plan", "architect"];
 
-export function Board({ epics, stories, projectId, phase }: Props) {
+export function Board({
+  epics,
+  stories,
+  projectId,
+  phase,
+  focus,
+  onFocusConsumed,
+  onOpenIteration,
+}: Props) {
   const [nav, setNav] = useState<Nav>({ level: "epics" });
 
-  // UI1 : expansion des groupes d'itérations du board, persistée par projet.
-  const storageKey = `autospec-epics-expanded:${projectId}`;
-  const [expandedIters, setExpandedIters] = useState<Set<number>>(() => {
-    try {
-      const raw = localStorage.getItem(storageKey);
-      if (raw) return new Set<number>(JSON.parse(raw));
-    } catch {
-      /* localStorage indisponible : on partira d'un set vide (seedé ci-dessous). */
-    }
-    return new Set<number>();
-  });
-  const seededRef = useRef(false);
-
-  const maxIter = epics.length ? Math.max(...epics.map((e) => e.iteration)) : 0;
-  const workingKey = [
-    ...new Set(
-      epics
-        .filter((e) => stories.some((s) => s.epic_id === e.id && s.status === "in_progress"))
-        .map((e) => e.iteration),
-    ),
-  ]
-    .sort((a, b) => a - b)
-    .join(",");
-
-  // Amorce : déplie l'itération la plus récente la 1re fois (si rien de sauvegardé).
+  // Navigation pilotée depuis l'extérieur (clic sur une US dans la chronologie).
   useEffect(() => {
-    if (seededRef.current || epics.length === 0) return;
-    seededRef.current = true;
-    setExpandedIters((prev) => (prev.size > 0 ? prev : new Set([maxIter])));
-  }, [epics.length, maxIter]);
-
-  // Auto-déplie toute itération qui passe « en cours ».
-  useEffect(() => {
-    if (!workingKey) return;
-    setExpandedIters((prev) => {
-      const next = new Set(prev);
-      let changed = false;
-      for (const it of workingKey.split(",").map(Number)) {
-        if (!next.has(it)) {
-          next.add(it);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [workingKey]);
-
-  // Persiste le choix d'expansion par projet.
-  useEffect(() => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify([...expandedIters]));
-    } catch {
-      /* best-effort */
-    }
-  }, [storageKey, expandedIters]);
-
-  const toggleIter = (iter: number) =>
-    setExpandedIters((prev) => {
-      const next = new Set(prev);
-      if (next.has(iter)) next.delete(iter);
-      else next.add(iter);
-      return next;
-    });
+    if (!focus) return;
+    setNav(
+      focus.storyId
+        ? { level: "us", epicId: focus.epicId, storyId: focus.storyId }
+        : { level: "epic", epicId: focus.epicId },
+    );
+    onFocusConsumed?.();
+  }, [focus, onFocusConsumed]);
 
   if (epics.length === 0) {
     // UI6 : état vide contextuel — un spinner « plan en cours » quand le PM/PO
@@ -1175,8 +1103,7 @@ export function Board({ epics, stories, projectId, phase }: Props) {
           stories={stories}
           epicDeps={epicDeps}
           onOpenEpic={(epicId) => setNav({ level: "epic", epicId })}
-          expanded={expandedIters}
-          onToggleIter={toggleIter}
+          onOpenIteration={onOpenIteration}
         />
       )}
       {level === "epic" && epic && (
@@ -1186,6 +1113,7 @@ export function Board({ epics, stories, projectId, phase }: Props) {
           stories={stories}
           epicDeps={epicDeps}
           onOpenStory={(storyId) => setNav({ level: "us", epicId: epic.id, storyId })}
+          onOpenIteration={onOpenIteration}
         />
       )}
       {level === "us" && epic && story && (
@@ -1194,6 +1122,7 @@ export function Board({ epics, stories, projectId, phase }: Props) {
             projectId={projectId}
             story={story}
             onDeleted={() => setNav({ level: "epic", epicId: epic.id })}
+            onOpenIteration={onOpenIteration}
           />
         </div>
       )}

@@ -16,7 +16,6 @@ import {
   resumeProject,
   approveProject,
   rejectProject,
-  getIterations,
   rollbackProject,
   deployProject,
   runProject,
@@ -33,7 +32,7 @@ import {
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
 import { LanguagePanel } from "./components/LanguagePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
-import { Board } from "./components/Board";
+import { WorkspaceViews } from "./components/WorkspaceViews";
 import { Dashboard } from "./components/Dashboard";
 import { ChatPanel } from "./components/ChatPanel";
 import { CodeViewer } from "./components/CodeViewer";
@@ -73,7 +72,6 @@ export default function App() {
     setToasts((prev) => [...prev.slice(-4), { id, level, title, body }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 6000);
   };
-  const [rollbackIters, setRollbackIters] = useState<number[] | null>(null);
   const [provider, setProviderInfo] = useState<ProviderInfo | null>(null);
   // UI10 : provider + modèle regroupés dans un petit popover compact.
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
@@ -308,19 +306,13 @@ export default function App() {
   // La popup de création peut être fermée dès qu'il reste un projet à afficher.
   const canCloseSetup = visibleProjects.length > 0;
 
-  const handleRollback = guard(async () => {
+  // Rollback déclenché depuis la carte d'une itération (vue Itérations). La
+  // disponibilité d'un snapshot est gérée par WorkspaceViews ; ici on confirme
+  // et on exécute.
+  const handleRollbackTo = async (n: number) => {
     if (!project) return;
-    const iters = await getIterations(project.id);
-    if (iters.length === 0) {
-      pushToast("warning", "Rollback", "Aucun snapshot d'itération disponible.");
+    if (!window.confirm(`Revenir à l'itération ${n} ? Le workspace sera restauré à ce snapshot.`))
       return;
-    }
-    setRollbackIters(iters); // ouvre la modale de choix (UI8)
-  });
-
-  const confirmRollback = async (n: number) => {
-    setRollbackIters(null);
-    if (!project) return;
     await guard(() => rollbackProject(project.id, n))();
     pushToast("success", "Rollback", `Revenu à l'itération ${n}.`);
   };
@@ -479,30 +471,6 @@ export default function App() {
           </div>
         </div>
       )}
-      {rollbackIters && (
-        <div className="modal-backdrop" onClick={() => setRollbackIters(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <button
-              className="modal-close"
-              aria-label="Fermer"
-              onClick={() => setRollbackIters(null)}
-            >
-              ✕
-            </button>
-            <h2>⏪ Revenir à une itération</h2>
-            <p className="placeholder">
-              Choisis l'itération de destination (snapshot git du workspace) :
-            </p>
-            <div className="rollback-iters">
-              {rollbackIters.map((n) => (
-                <button key={n} className="ghost" onClick={() => confirmRollback(n)}>
-                  Itération {n}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
       {!project ? (
         <main className="home">
           {!showSetup && (
@@ -546,11 +514,13 @@ export default function App() {
             />
           </div>
           <div className="col-right">
-            <Board
+            <WorkspaceViews
               epics={project.epics ?? []}
               stories={project.stories ?? []}
               projectId={project.id}
               phase={project.phase}
+              iterationUsage={project.iteration_usage}
+              onRollbackTo={handleRollbackTo}
             />
             <RunPanel
               project={project}
@@ -565,7 +535,6 @@ export default function App() {
               onCancelResume={guard(() => cancelResume(project.id))}
               onApprove={guard(() => approveProject(project.id))}
               onReject={guard(() => rejectProject(project.id))}
-              onRollback={handleRollback}
               onDeploy={guard(async () => {
                 if (!project) return;
                 const { created } = await deployProject(project.id);

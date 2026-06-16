@@ -255,6 +255,10 @@ class ProjectState(BaseModel):
     build_guidance: list[str] = Field(default_factory=list)  # user directives given during the build
     iteration: int = 1
     usage: Usage = Field(default_factory=Usage)  # accumulated tokens/cost across agent calls
+    # Per-iteration usage breakdown (keyed by iteration number). The global
+    # `usage` above stays the project-wide total; this lets the UI show cost/
+    # tokens spent in each build iteration. Old persisted states default to {}.
+    iteration_usage: dict[int, Usage] = Field(default_factory=dict)
     running: bool = False  # generated app currently running
     paused: bool = False   # pipeline paused by the user (gates between steps)
     awaiting_approval: str = ""  # U4: stage awaiting human approval before build ("" = none)

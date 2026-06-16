@@ -84,7 +84,6 @@ function renderPanel(
       onCancelResume={vi.fn()}
       onApprove={vi.fn()}
       onReject={vi.fn()}
-      onRollback={vi.fn()}
       onDeploy={vi.fn()}
     />,
   );

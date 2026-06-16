@@ -153,6 +153,9 @@ export interface ProjectState {
   language_criticality?: number;
   language_rationale?: string;
   usage: Usage;
+  // Per-iteration usage breakdown, keyed by iteration number (as a string in
+  // JSON). The global `usage` above stays the project-wide total.
+  iteration_usage?: Record<string, Usage>;
   budget_usd: number;
   archived: boolean;
 }

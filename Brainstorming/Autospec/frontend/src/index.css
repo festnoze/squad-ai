@@ -1780,81 +1780,209 @@ button.action-btn.action-done {
   flex: 1;
 }
 
-/* UI1 : groupes d'itérations repliables sur le board. */
-.epic-iterations {
+/* Pastille « itération N » (sur les cartes epic / la US). Cliquable = lien vers
+   la chronologie. */
+.epic-iter {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.epic-iter-link {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--accent);
+  padding: 1px 8px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.epic-iter-link:hover {
+  border-color: var(--accent);
+  background: #1a2740;
+}
+
+/* Bascule « Vision produit / Itérations » (haut de la colonne de droite). */
+.view-toggle {
+  display: inline-flex;
+  align-self: flex-start;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+
+.view-toggle button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 13px;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.view-toggle button + button {
+  border-left: 1px solid var(--border);
+}
+
+.view-toggle button:hover {
+  color: var(--text);
+}
+
+.view-toggle button.active {
+  background: var(--accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Vue Itérations : timeline (plus récente en haut). */
+.iter-hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.iter-timeline {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   overflow-y: auto;
   flex: 1;
 }
 
-.epic-iter-group {
+.iter-card {
   border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
   border-radius: 10px;
   background: var(--panel-2);
+  padding: 12px;
 }
 
-.epic-iter-group.open {
-  padding-bottom: 10px;
+.iter-card.epic-working {
+  border-left-color: var(--accent);
+}
+.iter-card.epic-done {
+  border-left-color: var(--green);
+}
+.iter-card.epic-failed {
+  border-left-color: var(--red);
 }
 
-.epic-iter-group.epic-working {
-  border-color: var(--accent);
+.iter-card.focused {
+  box-shadow: 0 0 0 2px var(--accent);
 }
 
-.epic-iter-header {
+.iter-card-head {
   display: flex;
   align-items: center;
-  gap: 10px;
-  width: 100%;
-  background: transparent;
-  border: none;
-  color: var(--text);
-  padding: 10px 12px;
-  cursor: pointer;
-  font: inherit;
-  text-align: left;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
-.epic-iter-header:hover {
-  color: var(--accent);
-}
-
-.epic-iter-caret {
-  color: var(--muted);
-  width: 12px;
-  flex: 0 0 auto;
-}
-
-.epic-iter-name {
+.iter-num {
   display: flex;
   align-items: center;
   gap: 7px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 14px;
 }
 
-.epic-iter-summary {
+.iter-state {
+  font-size: 12px;
+  color: var(--muted);
+}
+.iter-state.state-working {
+  color: var(--accent);
+}
+.iter-state.state-done {
+  color: var(--green);
+}
+.iter-state.state-failed {
+  color: var(--red);
+}
+
+.iter-counts {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.iter-usage {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  font-family: Consolas, monospace;
+}
+
+.iter-card-actions {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.iter-epics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+
+.iter-epic-chip {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.iter-epic-chip:hover {
+  border-color: var(--accent);
+}
+
+.iter-stories {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.iter-story-chip {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-left: auto;
+  gap: 8px;
+  width: 100%;
+  text-align: left;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  padding: 6px 8px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.iter-story-chip:hover {
+  border-color: var(--accent);
+}
+
+.iter-story-id {
+  font-size: 11px;
   color: var(--muted);
-  font-size: 12px;
-}
-
-.epic-progress.mini {
-  width: 90px;
-  height: 6px;
-  margin: 0;
   flex: 0 0 auto;
 }
 
-.epic-iter-group .epic-grid {
-  padding: 0 12px;
-  overflow: visible;
-  flex: 0 0 auto;
+.iter-story-title {
+  font-size: 13px;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .epic-card {

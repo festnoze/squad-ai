@@ -565,6 +565,32 @@ ce même JSON (ou des stories existantes listées plus haut)."""
 
 # ---------------------------------------------------------------- QA (test design)
 
+_LANG_PROFILE = {
+    "python": {
+        "project": "un projet Python géré par uv (pyproject.toml présent, pytest + pytest-bdd installés)",
+        "test_fw": "pytest",
+        "test_cmd": "uv run pytest",
+        "file_hint": "tests/unit/test_{snake}_service.py",
+    },
+    "go": {
+        "project": "un module Go (go.mod présent ; tests via le paquet standard `testing`)",
+        "test_fw": "le paquet standard `testing` (fichiers `*_test.go`, fonctions `func TestXxx(t *testing.T)`)",
+        "test_cmd": "go test ./...",
+        "file_hint": "{snake}_test.go",
+    },
+    "rust": {
+        "project": "une crate Cargo (Cargo.toml présent, binaire `src/main.rs`)",
+        "test_fw": "les tests Rust (`#[cfg(test)] mod tests { ... }` ou fichiers sous `tests/`)",
+        "test_cmd": "cargo test",
+        "file_hint": "tests/{snake}.rs",
+    },
+}
+
+
+def _lang_profile(backend_language: str) -> dict:
+    return _LANG_PROFILE.get((backend_language or "python").lower(), _LANG_PROFILE["python"])
+
+
 def _language_block(backend_language: str) -> str:
     """L2: surface the chosen backend language to the agents. Python is the
     implicit default (the toolchain below assumes it); only non-Python targets
@@ -587,13 +613,14 @@ def qa_test_plan(
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     lang_block = _language_block(backend_language)
+    prof = _lang_profile(backend_language)
     lessons_block = (
         f"\nLeçons des itérations précédentes (rétrospective d'usine — à appliquer) :\n{lessons}\n"
         if lessons
         else ""
     )
-    return f"""Tu es l'architecte de tests d'un pipeline automatisé BDD/TDD. Le code sera du
-Python dans le package `{package_name}` (projet uv, pytest + pytest-bdd).
+    return f"""Tu es l'architecte de tests d'un pipeline automatisé BDD/TDD. Le code cible est
+{prof['project']} ; tests lancés par `{prof['test_cmd']}`.
 {arch_block}{lang_block}{lessons_block}
 
 User story à couvrir : {story.id} — {story.title}
@@ -627,7 +654,7 @@ Réponds avec EXACTEMENT UN objet JSON :
       "layer": "service",
       "description": "le service X appelle le repository Y avec ... et retourne ...",
       "mocks": ["repository Y"],
-      "file_hint": "tests/unit/test_{_snake(story.id)}_service.py",
+      "file_hint": "{prof['file_hint'].format(snake=_snake(story.id))}",
       "criteria": ["AC-1"]
     }}
   ]
@@ -665,6 +692,66 @@ Liste ces fichiers dans la clé "ui_test_files" de ta réponse JSON finale.
 """
 
 
+def _dev_story_native(
+    backend_language: str,
+    story: UserStory,
+    package_name: str,
+    feature_rel_path: str,
+    arch_block: str,
+    guidance_block: str,
+    lessons_block: str,
+    plan: str,
+) -> str:
+    """Dev prompt for Go/Rust (L2g): native test framework, no pytest-bdd. The
+    Gherkin stays the human-readable acceptance spec; tests are written in the
+    language's own framework and run via the toolchain command."""
+    prof = _lang_profile(backend_language)
+    plan_section = (
+        f"\nL'architecte QA a décomposé l'acceptance en tests outside-in "
+        f"(chaque test mocke ses collaborateurs directs) :\n{plan}\n"
+        if plan
+        else ""
+    )
+    return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
+répertoire courant : {prof['project']}.
+{arch_block}{guidance_block}{lessons_block}
+User story à implémenter : {story.id} — {story.title}
+Description : {story.description}
+Critères d'acceptance :
+{_criteria_block(story)}
+
+Spécification d'acceptance (Gherkin, vision fonctionnelle — `{feature_rel_path}`,
+NE PAS la modifier ; elle documente le comportement attendu, tu n'écris PAS de
+step definitions) :
+\"\"\"{story.gherkin}\"\"\"
+{plan_section}
+PROCESSUS OBLIGATOIRE (TDD outside-in, en {backend_language}) :
+1. Écris d'ABORD les tests avec {prof['test_fw']} qui encodent les critères
+   d'acceptance ci-dessus (un test par critère au minimum), et VÉRIFIE qu'ils
+   échouent (`{prof['test_cmd']}` → rouge).
+2. Implémente le minimum nécessaire (modules/paquets idiomatiques) pour faire
+   passer les tests un à un, du comportement externe vers l'interne.
+3. Relance `{prof['test_cmd']}` jusqu'à ce que TOUTE la suite soit verte (les
+   tests des stories précédentes doivent rester verts).
+4. Câble la nouvelle fonctionnalité dans le point d'entrée ({"main.go" if backend_language == "go" else "src/main.rs"}) si pertinent.
+
+CONTRAINTES :
+- Ne modifie JAMAIS les fichiers .feature ni autospec-state.json.
+- Ne touche qu'aux fichiers de ce répertoire ; code idiomatique {backend_language}.
+- Code et identifiants en anglais ; messages utilisateur en français.
+
+Quand tu as terminé, réponds avec EXACTEMENT UN objet JSON :
+{{
+  "status": "green" | "failed",
+  "summary": "<ce que tu as fait, en français>",
+  "files": ["<fichiers créés/modifiés>"],
+  "test_results": [
+    {{"id": "<id du test du plan QA>", "status": "green" | "red", "nodeids": ["<nom du test tel que rapporté par {prof['test_cmd']}>"]}}
+  ]
+}}
+Ne réponds "green" (au niveau global) que si `{prof['test_cmd']}` passe intégralement."""
+
+
 def dev_story(
     story: UserStory,
     package_name: str,
@@ -685,6 +772,11 @@ def dev_story(
         if lessons
         else ""
     )
+    if (backend_language or "python").lower() in ("go", "rust"):
+        return _dev_story_native(
+            backend_language, story, package_name, feature_rel_path,
+            arch_block, guidance_block, lessons_block, _format_test_plan(story),
+        )
     ui_block = UI_TEST_BLOCK.replace("{snake}", _snake(story.id)) if ui_tests else ""
     plan = _format_test_plan(story)
     plan_section = ""

@@ -52,10 +52,21 @@ from autospec.models import BackendLanguage, ProjectState
 from autospec.orchestrator.pipeline import Pipeline
 
 
-async def test_language_phase_uses_heuristic_when_selector_off(monkeypatch):
+async def test_language_phase_noop_when_selector_off(monkeypatch):
+    # Selector OFF -> Python stays the safe default, no analysis (rétro-compat).
     monkeypatch.setattr(settings, "language_selector_enabled", False)
     state = ProjectState(id="lang-off", name="n", goal="Une application bancaire de paiement")
     pipeline = Pipeline(state, FakeRunner([]))
+    await pipeline._aselect_language()
+    assert state.backend_language == BackendLanguage.PYTHON
+    assert state.language_complexity == -1
+
+
+async def test_language_phase_heuristic_when_enabled_no_agent(monkeypatch):
+    # Selector ON but the agent fails -> deterministic heuristic (critical -> rust).
+    monkeypatch.setattr(settings, "language_selector_enabled", True)
+    state = ProjectState(id="lang-heur", name="n", goal="Une application bancaire de paiement")
+    pipeline = Pipeline(state, FakeRunner([]))  # no reply -> AgentError -> heuristic
     await pipeline._aselect_language()
     assert state.backend_language == BackendLanguage.RUST
     assert state.language_criticality >= 4
@@ -84,9 +95,9 @@ async def test_language_phase_falls_back_on_agent_error(monkeypatch):
 
 
 async def test_language_phase_idempotent(monkeypatch):
-    monkeypatch.setattr(settings, "language_selector_enabled", False)
+    monkeypatch.setattr(settings, "language_selector_enabled", True)
     state = ProjectState(id="lang-idem", name="n", goal="Un SaaS de gestion")
-    pipeline = Pipeline(state, FakeRunner([]))
+    pipeline = Pipeline(state, FakeRunner([]))  # agent fails -> heuristic -> go
     await pipeline._aselect_language()
     assert state.backend_language == BackendLanguage.GO
     # Re-run must not re-analyze (already set).
@@ -95,17 +106,30 @@ async def test_language_phase_idempotent(monkeypatch):
     assert state.backend_language == BackendLanguage.RUST
 
 
-def test_prompts_surface_non_python_language():
-    # L2d: the chosen backend language is threaded into the QA/Dev prompts.
+def test_prompts_are_language_specific():
+    # L2d/L2g-4: QA/Dev prompts adapt to the backend language.
     from autospec.agents import prompts
     from autospec.models import UserStory
 
     story = UserStory(id="US-1", epic_id="E1", title="t", description="d", gherkin="Feature: f")
+
+    # Python (default): pytest flow, no native Go/Rust markers.
+    dev_py = prompts.dev_story(story, "pkg", "features/us-1.feature")
+    assert "uv run pytest" in dev_py
+    assert "pytest-bdd" in dev_py
+    assert "go test" not in dev_py and "cargo test" not in dev_py
+
+    # Go: native prompt (go test, testing package, no pytest step defs).
     dev_go = prompts.dev_story(story, "pkg", "features/us-1.feature", backend_language="go")
-    qa_rust = prompts.qa_test_plan(story, "pkg", backend_language="rust")
-    assert "Langage backend cible : go" in dev_go
-    assert "Langage backend cible : rust" in qa_rust
-    # Python (default) keeps the existing prompt unchanged (no extra note).
-    assert "Langage backend cible" not in prompts.dev_story(
-        story, "pkg", "features/us-1.feature"
-    )
+    assert "go test ./..." in dev_go
+    assert "PROCESSUS OBLIGATOIRE" in dev_go  # recognised by the scripted runner
+    assert "pytest" not in dev_go
+
+    # Rust: native prompt (cargo test).
+    dev_rust = prompts.dev_story(story, "pkg", "features/us-1.feature", backend_language="rust")
+    assert "cargo test" in dev_rust
+    assert "pytest" not in dev_rust
+
+    # QA plan surfaces the target test command too.
+    assert "cargo test" in prompts.qa_test_plan(story, "pkg", backend_language="rust")
+    assert "go test" in prompts.qa_test_plan(story, "pkg", backend_language="go")

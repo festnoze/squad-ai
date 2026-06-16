@@ -16,7 +16,6 @@ interface Props {
   onCancelResume: () => void;
   onApprove: () => void;
   onReject: () => void;
-  onRollback: () => void;
   onDeploy: () => void;
 }
 
@@ -52,7 +51,6 @@ export function RunPanel({
   onCancelResume,
   onApprove,
   onReject,
-  onRollback,
   onDeploy,
 }: Props) {
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -217,9 +215,6 @@ export function RunPanel({
                   </button>
                   <button role="menuitem" onClick={() => { setMenuOpen(false); onGitExport(); }}>
                     🔀 Commit git
-                  </button>
-                  <button role="menuitem" onClick={() => { setMenuOpen(false); onRollback(); }}>
-                    ⏪ Rollback itération
                   </button>
                   <button role="menuitem" onClick={() => { setMenuOpen(false); onDeploy(); }}>
                     🚀 Déploiement
