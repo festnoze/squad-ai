@@ -13,6 +13,7 @@ import {
   listProjects,
   pauseProject,
   resumeBuild,
+  retryFailed,
   resumeProject,
   approveProject,
   rejectProject,
@@ -531,6 +532,7 @@ export default function App() {
               onResume={guard(() => resumeProject(project.id))}
               onStopApp={guard(() => stopApp(project.id))}
               onResumeBuild={guard(() => resumeBuild(project.id))}
+              onRetryFailed={guard(() => retryFailed(project.id))}
               onDocument={guard(() => documentProject(project.id))}
               onCancelResume={guard(() => cancelResume(project.id))}
               onApprove={guard(() => approveProject(project.id))}

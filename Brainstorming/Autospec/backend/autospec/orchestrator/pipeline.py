@@ -1955,6 +1955,44 @@ class Pipeline:
         self._sync()
         self._task = asyncio.create_task(self._aresume_build_run())
 
+    async def aretry_failed(self) -> None:
+        """Reset every FAILED story of the current iteration to TODO and rebuild
+        them in one go (« relancer tous les échecs »). Reuses the resume-build
+        run. Raises ValueError (-> 409) if the pipeline is active or there is no
+        failed story to retry."""
+        if self.state.phase not in (
+            PipelinePhase.STOPPED,
+            PipelinePhase.DONE,
+            PipelinePhase.ERROR,
+        ):
+            raise ValueError("la pipeline est déjà active")
+        if self._task and not self._task.done():
+            raise ValueError("une tâche est déjà en cours")
+        failed = [
+            s
+            for s in self.state.stories_of_iteration(self.state.iteration)
+            if s.status == StoryStatus.FAILED
+        ]
+        if not failed:
+            raise ValueError("aucune story en échec à relancer")
+        for story in failed:
+            story.status = StoryStatus.TODO
+            story.attempts = 0
+            story.last_error = ""
+            for t in story.test_plan:
+                t.status = TestState.NONEXISTENT
+        self._stop_requested = False
+        # Phase -> BUILD synchronously before the task (closes the TOCTOU, like
+        # aresume_build); the resume-build run rebuilds the now-TODO stories.
+        self.state.phase = PipelinePhase.BUILD
+        self._sync()
+        self._chat(
+            ChatRole.SYSTEM,
+            f"🔄 Relance de {len(failed)} story(ies) en échec : "
+            f"{', '.join(s.id for s in failed)}.",
+        )
+        self._task = asyncio.create_task(self._aresume_build_run())
+
     async def _aresume_build_run(self) -> None:
         """Background task: re-run the build phase and restore a terminal phase."""
         self._chat(ChatRole.SYSTEM, "▶ Reprise du build de l'itération…")

@@ -67,8 +67,9 @@ function makeProject(overrides: Partial<ProjectState> = {}): ProjectState {
 function renderPanel(
   project: ProjectState,
   logs: { projectId: string; source: string; line: string }[] = [],
+  onRetryFailed: () => void = vi.fn(),
 ) {
-  return render(
+  const utils = render(
     <RunPanel
       project={project}
       logs={logs}
@@ -78,6 +79,7 @@ function renderPanel(
       onResume={vi.fn()}
       onStopApp={vi.fn()}
       onResumeBuild={vi.fn()}
+      onRetryFailed={onRetryFailed}
       onDocument={vi.fn()}
       onExportZip={vi.fn()}
       onGitExport={vi.fn()}
@@ -87,6 +89,7 @@ function renderPanel(
       onDeploy={vi.fn()}
     />,
   );
+  return { ...utils, onRetryFailed };
 }
 
 describe("RunPanel", () => {
@@ -214,5 +217,31 @@ describe("RunPanel", () => {
   it("UI7 : pas de menu Livraison tant qu'aucun build n'existe (phase build)", () => {
     renderPanel(makeProject({ phase: "build" }));
     expect(screen.queryByRole("button", { name: /⋯ Livraison/ })).not.toBeInTheDocument();
+  });
+
+  it("retry-failed : bouton « Relancer les échecs (N) » + clic, quand dormant", () => {
+    const { onRetryFailed } = renderPanel(
+      makeProject({
+        phase: "stopped",
+        stories: [makeStory({ status: "failed" }), makeStory({ id: "S2", status: "done" })],
+      }),
+    );
+    const btn = screen.getByRole("button", { name: /Relancer les échecs \(1\)/ });
+    fireEvent.click(btn);
+    expect(onRetryFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("retry-failed : pas de bouton sans story en échec", () => {
+    renderPanel(makeProject({ phase: "done", stories: [makeStory({ status: "done" })] }));
+    expect(
+      screen.queryByRole("button", { name: /Relancer les échecs/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("retry-failed : pas de bouton si la pipeline est active (build)", () => {
+    renderPanel(makeProject({ phase: "build", stories: [makeStory({ status: "failed" })] }));
+    expect(
+      screen.queryByRole("button", { name: /Relancer les échecs/ }),
+    ).not.toBeInTheDocument();
   });
 });

@@ -546,6 +546,14 @@ async def aresume_build(project_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/projects/{project_id}/retry-failed")
+async def aretry_failed(project_id: str) -> dict:
+    """Reset and rebuild every FAILED story of the current iteration at once."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.aretry_failed(), f"Projet inconnu : {project_id}")
+    return {"ok": True}
+
+
 @app.post("/api/projects/{project_id}/run")
 async def arun_app(project_id: str) -> dict:
     pipeline = _pipeline(project_id)

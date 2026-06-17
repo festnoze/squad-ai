@@ -483,6 +483,45 @@ async def test_resume_build_rejected_when_nothing_pending(green_pytest):
         await pipeline.aresume_build()
 
 
+async def test_retry_failed_resets_and_rebuilds(green_pytest):
+    # 4 replies for the initial build (-> done), 2 more for the retry rebuild.
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN, QA_PLAN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    us1 = pipeline.state.story("US-1")
+    us1.status = StoryStatus.FAILED
+    us1.last_error = "boom"
+
+    await pipeline.aretry_failed()
+    await wait_until(
+        lambda: pipeline.state.phase == PipelinePhase.DONE
+        and pipeline.state.story("US-1").status == StoryStatus.DONE
+    )
+    assert pipeline.state.story("US-1").last_error == ""
+
+
+async def test_retry_failed_rejected_when_no_failure(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    # All stories DONE -> nothing failed to retry.
+    with pytest.raises(ValueError):
+        await pipeline.aretry_failed()
+
+
+async def test_retry_failed_rejected_when_active(green_pytest):
+    pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    pipeline.state.story("US-1").status = StoryStatus.FAILED
+    pipeline.state.phase = PipelinePhase.BUILD  # active -> refused
+    with pytest.raises(ValueError):
+        await pipeline.aretry_failed()
+
+
 async def test_architecture_phase_injects_context(green_pytest, monkeypatch):
     from autospec.config import settings
 

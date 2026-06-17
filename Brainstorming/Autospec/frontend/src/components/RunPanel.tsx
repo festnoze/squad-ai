@@ -10,6 +10,7 @@ interface Props {
   onResume: () => void;
   onStopApp: () => void;
   onResumeBuild: () => void;
+  onRetryFailed: () => void;
   onDocument: () => void;
   onExportZip: () => void;
   onGitExport: () => void;
@@ -45,6 +46,7 @@ export function RunPanel({
   onResume,
   onStopApp,
   onResumeBuild,
+  onRetryFailed,
   onDocument,
   onExportZip,
   onGitExport,
@@ -84,6 +86,11 @@ export function RunPanel({
   const canResumeBuild =
     ["stopped", "error"].includes(project.phase) &&
     (project.stories ?? []).some((s) => s.status === "todo" || s.status === "red");
+  // Bulk « relancer les échecs » : actif quand la pipeline est dormante et qu'au
+  // moins une story est en échec.
+  const failedCount = (project.stories ?? []).filter((s) => s.status === "failed").length;
+  const canRetryFailed =
+    ["done", "stopped", "error"].includes(project.phase) && failedCount > 0;
 
   const agentCalls = project.usage?.agent_calls ?? 0;
   const costUsd = project.usage?.cost_usd ?? 0;
@@ -171,6 +178,15 @@ export function RunPanel({
               title="Reprendre la phase build sur les stories restantes"
             >
               ▶ Continuer le build
+            </button>
+          )}
+          {canRetryFailed && (
+            <button
+              className="action-btn"
+              onClick={onRetryFailed}
+              title="Réinitialiser et relancer toutes les user stories en échec"
+            >
+              🔄 Relancer les échecs ({failedCount})
             </button>
           )}
           {project.running && (

@@ -189,6 +189,10 @@ export async function resumeBuild(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/resume-build`, { method: "POST" }));
 }
 
+export async function retryFailed(projectId: string): Promise<void> {
+  await json(await fetch(`/api/projects/${projectId}/retry-failed`, { method: "POST" }));
+}
+
 export async function cancelResume(projectId: string): Promise<void> {
   await json(
     await fetch(`/api/projects/${projectId}/cancel-resume`, { method: "POST" }),
