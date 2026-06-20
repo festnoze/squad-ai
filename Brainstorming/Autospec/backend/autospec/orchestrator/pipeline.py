@@ -188,6 +188,8 @@ class Pipeline:
         self._retro_task: asyncio.Task | None = None  # E7 on-demand retrospective
         self._resume_timer: asyncio.Task | None = None  # M2 scheduled auto-resume
         self._run_proc: subprocess.Popen | None = None
+        # ST-8: frontend `vite preview` processes launched alongside the backend.
+        self._frontend_procs: list[subprocess.Popen] = []
         # Strong ref to the app-output streaming task (asyncio keeps only weak
         # refs to tasks: an unreferenced task may be garbage-collected mid-run).
         self._stream_task: asyncio.Task | None = None
@@ -269,6 +271,9 @@ class Pipeline:
         self._stop_requested = True
         if self._run_proc and self._run_proc.poll() is None:
             self._run_proc.terminate()
+        for proc in self._frontend_procs:  # ST-8
+            if proc and proc.poll() is None:
+                proc.terminate()
         for task in (
             self._task,
             self._impact_task,
@@ -2037,23 +2042,40 @@ class Pipeline:
         self._sync()
         ws = workspace_dir(self.state.id)
         pkg = workspace.package_name(self.state)
-        if story.attempts == 1:
+        is_frontend = self._is_frontend_story(story)
+        if story.attempts == 1 and not is_frontend:
             await self._adesign_tests(story, pkg)
-        self._log(f"dev:{story.id}", f"Agent dev assigné à {story.id} — {story.title}")
+        label = "dev frontend" if is_frontend else "dev"
+        self._log(f"dev:{story.id}", f"Agent {label} assigné à {story.id} — {story.title}")
         try:
             # All workspace mutations (dev write, full-suite pytest, git commit,
             # code refinement) are serialized: parallel workers share one
             # workspace dir and must not interleave.
             async with self._build_lock:
-                result = await self._tracked.arun(
-                    prompts.dev_story(
+                if is_frontend:
+                    # ST-7: route a frontend-stream story to the React dev agent;
+                    # "green" = Vitest all-pass AND `tsc && vite build` succeeds.
+                    stream = self._story_stream(story)
+                    dev_prompt = prompts.dev_story_frontend(
+                        story, pkg, workspace.feature_rel_path(story),
+                        architecture=self.state.architecture,
+                        guidance="\n".join(self.state.build_guidance),
+                        lessons="\n".join(self._effective_lessons()),
+                        file_root=stream.file_root or "frontend",
+                    )
+                    dev_persona = persona("dev-frontend")
+                else:
+                    dev_prompt = prompts.dev_story(
                         story, pkg, workspace.feature_rel_path(story), self.state.architecture,
                         "\n".join(self.state.build_guidance),
                         ui_tests=self._ui_mode(story),
                         lessons="\n".join(self._effective_lessons()),
                         backend_language=self.state.backend_language.value,
-                    ),
-                    system_prompt=persona("dev"),
+                    )
+                    dev_persona = persona("dev")
+                result = await self._tracked.arun(
+                    dev_prompt,
+                    system_prompt=dev_persona,
                     cwd=ws,
                 )
                 reply = extract_json(result.text)
@@ -2062,9 +2084,13 @@ class Pipeline:
                 story.ui_tests = [str(p) for p in reply.get("ui_test_files") or []]
                 self._sync()
 
-                # Trust but verify: the orchestrator reruns the full test suite
-                # itself and grounds per-test states on the REAL pytest outcomes.
-                ok, output, real = await self._arun_pytest()
+                # Trust but verify: the orchestrator reruns the suite itself and
+                # grounds per-test states on the REAL outcomes (Vitest+build for a
+                # frontend story, pytest/go/cargo otherwise).
+                if is_frontend:
+                    ok, output, real = await self._arun_frontend_tests()
+                else:
+                    ok, output, real = await self._arun_pytest()
                 tail = output[-2000:]
                 self._apply_test_states(story, reply.get("test_results", []), real)
                 regs = regression.find_regressions(set(self.state.green_tests), real)
@@ -2085,7 +2111,7 @@ class Pipeline:
                     if not ok:
                         tail = ui_output[-2000:]
                         self._log(f"dev:{story.id}", "❌ Tests d'acceptance UI rouges.")
-                if ok and settings.coverage_enabled:
+                if ok and settings.coverage_enabled and not is_frontend:
                     cov = await self._arun_coverage(story, pkg, ws)
                     if settings.coverage_gate_threshold > 0 and 0 <= cov < settings.coverage_gate_threshold:
                         ok = False
@@ -2105,9 +2131,13 @@ class Pipeline:
                     # Commit the workspace as this story's green state so its diff
                     # can be exposed (git show of the "story <id> done" commit).
                     await self._acommit_story(ws, story.id)
-                    if settings.refine_for("dev"):
-                        await self._arefine_code(story, pkg, ws)
-                    await self._arun_mutation_test(story, pkg, ws)
+                    # Refinement + mutation testing are Python-suite operations
+                    # (they rerun pytest / mutate the package); skip them for a
+                    # frontend-stream story (ST-7).
+                    if not is_frontend:
+                        if settings.refine_for("dev"):
+                            await self._arefine_code(story, pkg, ws)
+                        await self._arun_mutation_test(story, pkg, ws)
                 else:
                     story.last_error = tail
                     self._log(f"dev:{story.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
@@ -2444,6 +2474,71 @@ class Pipeline:
 
         return await asyncio.to_thread(_run)
 
+    # ------------------------------------------------- Frontend stream (ST-7)
+
+    def _story_stream(self, story: UserStory):
+        """Resolve the Stream a story belongs to (ST-7). ``""`` → primary."""
+        return self.state.stream(getattr(story, "stream", "") or "")
+
+    def _is_frontend_story(self, story: UserStory) -> bool:
+        """Whether this story builds in a frontend stream — only when streams
+        are enabled (flag OFF keeps every story on the backend path)."""
+        if not settings.streams_enabled:
+            return False
+        stream = self._story_stream(story)
+        return stream.kind == StreamKind.FRONTEND or toolchain.is_frontend(stream.language)
+
+    async def _arun_frontend_tests(self) -> tuple[bool, str, dict[str, str]]:
+        """Run the frontend stream's Vitest suite AND the production build
+        (`tsc && vite build`) — "green" requires BOTH (ST-7). Returns
+        (green, output, {test_id: outcome}). Demo / fake-agents mode
+        short-circuits (no real node/vite), exactly like ``_arun_pytest``."""
+        if settings.fake_agents:
+            return True, "mode démo : vérification Vitest + build court-circuitée", {}
+        stream = next(iter(workspace.frontend_streams(self.state)), None)
+        if stream is None:
+            return True, "aucun stream frontend", {}
+        root = workspace.stream_root(self.state, stream)
+        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+
+        def _run() -> tuple[bool, str, dict[str, str]]:
+            import tempfile
+
+            fd, report_path = tempfile.mkstemp(suffix=".json", prefix="autospec-vitest-")
+            os.close(fd)
+            try:
+                test_cmd = self._maybe_sandbox(
+                    toolchain.frontend_test_command(report_path), root
+                )
+                test_proc = subprocess.run(
+                    test_cmd, cwd=str(root),
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    env=env, text=True, encoding="utf-8", errors="replace",
+                )
+                results = toolchain.parse_frontend_results(test_proc.stdout, report_path)
+                tests_ok = test_proc.returncode == 0
+                output = test_proc.stdout
+                if not tests_ok:
+                    return False, output, results
+                # Tests green → the build (tsc && vite build) gates "green" too.
+                build_cmd = self._maybe_sandbox(toolchain.frontend_build_command(), root)
+                build_proc = subprocess.run(
+                    build_cmd, cwd=str(root),
+                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    env=env, text=True, encoding="utf-8", errors="replace",
+                )
+                if build_proc.returncode != 0:
+                    errs = toolchain.parse_build_errors(build_proc.stdout)
+                    return False, output + "\n--- build ---\n" + errs, results
+                return True, output + "\n--- build OK ---", results
+            finally:
+                try:
+                    os.remove(report_path)
+                except OSError:
+                    pass
+
+        return await asyncio.to_thread(_run)
+
     # ------------------------------------------------- AUTO-SPEC next cycle
 
     def _fail_stranded_stories(self, iteration: int) -> int:
@@ -2561,6 +2656,47 @@ class Pipeline:
         self._stream_task = asyncio.create_task(
             asyncio.to_thread(self._stream_run_output, ws, env, loop, run_args)
         )
+        # ST-8: a multi-stream project launches its frontend preview alongside
+        # the backend, with logs tagged per stream. Gated behind streams_enabled;
+        # demo mode never spawns a real vite.
+        if settings.streams_enabled and not settings.fake_agents:
+            self._start_frontend_previews(env, loop)
+
+    def _start_frontend_previews(self, env, loop: asyncio.AbstractEventLoop) -> None:
+        """ST-8: launch `vite preview` for each frontend stream in its own
+        worker thread, tagging logs with `run:<stream-id>`. Best-effort and
+        gated by the caller; a missing build/node surfaces as a run log line."""
+        for stream in workspace.frontend_streams(self.state):
+            root = workspace.stream_root(self.state, stream)
+            source = f"run:{stream.id}"
+            self._log(source, f"▶ Lancement du preview frontend ({stream.id})…")
+            asyncio.create_task(
+                asyncio.to_thread(
+                    self._stream_preview_output, root, env, loop, source
+                )
+            )
+
+    def _stream_preview_output(
+        self, root, env, loop: asyncio.AbstractEventLoop, source: str
+    ) -> None:
+        """Run `vite preview` in ``root`` and stream its output under ``source``
+        (ST-8). Mirrors ``_stream_run_output`` but for a frontend stream."""
+        cmd = toolchain.frontend_run_command()
+        try:
+            proc = subprocess.Popen(
+                cmd, cwd=str(root),
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                env=env, text=True, encoding="utf-8", errors="replace",
+            )
+        except OSError as exc:
+            loop.call_soon_threadsafe(self._log, source, f"■ Échec du lancement : {exc}")
+            return
+        self._frontend_procs.append(proc)
+        assert proc.stdout
+        for line in proc.stdout:
+            loop.call_soon_threadsafe(self._log, source, line.rstrip())
+        code = proc.wait()
+        loop.call_soon_threadsafe(self._log, source, f"■ Preview frontend terminé (code {code}).")
 
     def _stream_run_output(
         self, ws, env, loop: asyncio.AbstractEventLoop, run_args: list[str] | None = None
@@ -2604,8 +2740,16 @@ class Pipeline:
         it exit and calls ``_on_run_finished``, which resets ``running=False``.
         Safe to call when no app is running (logged no-op, never raises).
         """
+        stopped = False
         if self._run_proc is not None and self._run_proc.poll() is None:
             self._run_proc.terminate()
+            stopped = True
+        for proc in self._frontend_procs:  # ST-8: stop the frontend previews too
+            if proc and proc.poll() is None:
+                proc.terminate()
+                stopped = True
+        self._frontend_procs = [p for p in self._frontend_procs if p and p.poll() is None]
+        if stopped:
             self._log("run", "■ Arrêt de l'application demandé.")
         else:
             self._log("run", "Aucune application générée en cours d'exécution.")

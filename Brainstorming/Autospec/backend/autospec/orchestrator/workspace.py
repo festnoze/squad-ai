@@ -11,7 +11,7 @@ import re
 from pathlib import Path
 
 from ..config import settings
-from ..models import ProjectState, UserStory
+from ..models import ProjectState, Stream, StreamKind, UserStory
 from ..storage import workspace_dir
 from . import toolchain
 
@@ -99,6 +99,122 @@ RUST_MAIN_TEMPLATE = """fn main() {{
 RUST_GITIGNORE = """/target/
 """
 
+# ---- Frontend (ST-6): Vite + React + TS + Vitest -------------------------
+# A minimal but real Vite+React+TS skeleton with Vitest wired so `npm run build`
+# (tsc && vite build) and `npm exec -- vitest run` work from the first dev
+# iteration. The dev agent adds components under src/ + *.test.tsx next to them.
+FE_PACKAGE_JSON_TEMPLATE = """{{
+  "name": "{package}-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {{
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  }},
+  "dependencies": {{
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0"
+  }},
+  "devDependencies": {{
+    "@testing-library/jest-dom": "^6.4.0",
+    "@testing-library/react": "^14.2.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "jsdom": "^24.0.0",
+    "typescript": "^5.4.0",
+    "vite": "^5.2.0",
+    "vitest": "^1.4.0"
+  }}
+}}
+"""
+
+FE_TSCONFIG_TEMPLATE = """{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "types": ["vitest/globals", "@testing-library/jest-dom"]
+  },
+  "include": ["src"]
+}
+"""
+
+FE_VITE_CONFIG_TEMPLATE = """import { defineConfig } from "vite";
+import react from "@vitejs/plugin-react";
+
+export default defineConfig({
+  plugins: [react()],
+  test: {
+    globals: true,
+    environment: "jsdom",
+    setupFiles: ["./src/setupTests.ts"],
+  },
+});
+"""
+
+FE_SETUP_TESTS = '''import "@testing-library/jest-dom";
+'''
+
+FE_INDEX_HTML_TEMPLATE = """<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{name}</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+"""
+
+FE_MAIN_TSX = '''import React from "react";
+import ReactDOM from "react-dom/client";
+import App from "./App";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
+);
+'''
+
+FE_APP_TSX = '''export default function App() {
+  return <h1>Projet généré par Autospec — UI à construire.</h1>;
+}
+'''
+
+FE_APP_TEST_TSX = '''import { render, screen } from "@testing-library/react";
+import { describe, it, expect } from "vitest";
+import App from "./App";
+
+describe("App", () => {
+  it("rend le titre par défaut", () => {
+    render(<App />);
+    expect(screen.getByRole("heading")).toBeInTheDocument();
+  });
+});
+'''
+
+FE_GITIGNORE = """node_modules/
+dist/
+*.local
+vitest-report-*.json
+"""
+
 
 def package_name(state: ProjectState) -> str:
     slug = re.sub(r"[^a-z0-9_]+", "_", state.name.lower()).strip("_") or "app"
@@ -124,13 +240,64 @@ def _backend_language(state: ProjectState) -> str:
 
 def scaffold(state: ProjectState) -> Path:
     """Create (idempotently) the workspace skeleton for a project, in the
-    project's backend language (L2g)."""
+    project's backend language (L2g).
+
+    When streams are enabled (ST-6) and a frontend stream is declared, ALSO
+    scaffold its Vite+React+TS+Vitest skeleton under the stream's ``file_root``
+    (e.g. ``frontend/``). The backend skeleton is unchanged, so the flag-off
+    path stays byte-identical."""
     lang = _backend_language(state)
     if lang == "go":
-        return _scaffold_go(state)
-    if lang == "rust":
-        return _scaffold_rust(state)
-    return _scaffold_python(state)
+        ws = _scaffold_go(state)
+    elif lang == "rust":
+        ws = _scaffold_rust(state)
+    else:
+        ws = _scaffold_python(state)
+    if settings.streams_enabled:
+        for stream in frontend_streams(state):
+            scaffold_frontend(state, stream)
+    return ws
+
+
+def frontend_streams(state: ProjectState) -> list[Stream]:
+    """The project's declared frontend streams (ST-6). Empty unless an explicit
+    frontend stream was chosen by the architect."""
+    return [
+        s
+        for s in state.streams
+        if s.kind == StreamKind.FRONTEND or toolchain.is_frontend(s.language)
+    ]
+
+
+def stream_root(state: ProjectState, stream: Stream) -> Path:
+    """The workspace-relative root directory for a stream (ST-6). ``file_root``
+    defaults to ``frontend`` for a frontend stream so the zone stays disjoint
+    from the backend at the repo root."""
+    root = (stream.file_root or "").strip().strip("/\\")
+    if not root and stream.kind == StreamKind.FRONTEND:
+        root = "frontend"
+    ws = workspace_dir(state.id)
+    return ws / root if root else ws
+
+
+def scaffold_frontend(state: ProjectState, stream: Stream) -> Path:
+    """Create (idempotently) a minimal Vite+React+TS project with Vitest under
+    the stream's ``file_root`` (ST-6). ``npm run build`` (tsc && vite build) and
+    ``vitest run`` work from the first dev iteration; the dev agent adds
+    components + ``*.test.tsx`` under ``src/``."""
+    root = stream_root(state, stream)
+    pkg = package_name(state)
+    (root / "src").mkdir(parents=True, exist_ok=True)
+    _ensure(root / ".gitignore", FE_GITIGNORE)
+    _ensure(root / "package.json", FE_PACKAGE_JSON_TEMPLATE.format(package=pkg))
+    _ensure(root / "tsconfig.json", FE_TSCONFIG_TEMPLATE)
+    _ensure(root / "vite.config.ts", FE_VITE_CONFIG_TEMPLATE)
+    _ensure(root / "index.html", FE_INDEX_HTML_TEMPLATE.format(name=state.name))
+    _ensure(root / "src" / "setupTests.ts", FE_SETUP_TESTS)
+    _ensure(root / "src" / "main.tsx", FE_MAIN_TSX)
+    _ensure(root / "src" / "App.tsx", FE_APP_TSX)
+    _ensure(root / "src" / "App.test.tsx", FE_APP_TEST_TSX)
+    return root
 
 
 def _scaffold_python(state: ProjectState) -> Path:

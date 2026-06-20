@@ -89,6 +89,18 @@ _DEV_GREEN = json.dumps(
     }
 )
 
+_DEV_FRONTEND_GREEN = json.dumps(
+    {
+        "status": "green",
+        "summary": "Composant React + tests Vitest (mode démo) — suite verte et build OK.",
+        "files": ["src/Counter.tsx", "src/Counter.test.tsx"],
+        "test_results": [
+            {"id": "UT-1", "status": "green", "nodeids": ["src/Counter.test.tsx::affiche le compteur"]}
+        ],
+    },
+    ensure_ascii=False,
+)
+
 _ARCHITECT = json.dumps(
     {
         "message": "Design (démo).",
@@ -308,6 +320,8 @@ class ScriptedRunner:
             return _JUDGE
         if "à critiquer dans une boucle de raffinement" in prompt:
             return _CRITIC
+        if "PROCESSUS OBLIGATOIRE FRONTEND" in prompt:  # dev_story_frontend (ST-7)
+            return _DEV_FRONTEND_GREEN
         if "PROCESSUS OBLIGATOIRE" in prompt:  # dev_story / dev_revise
             return _DEV_GREEN
         if "l'évaluateur d'un pipeline" in prompt:  # evaluator_probe (E6)
