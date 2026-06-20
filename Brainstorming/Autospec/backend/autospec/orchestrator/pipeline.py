@@ -13,6 +13,7 @@ import re
 import shlex
 import subprocess
 import time
+from pathlib import Path
 
 from ..agents import prompts
 from ..agents.runner import AgentError, AgentRunner, extract_json
@@ -198,6 +199,12 @@ class Pipeline:
         # whole pytest suite and committing/refining git must not interleave
         # (else pytest sees half-written trees and git stages the wrong files).
         self._build_lock = asyncio.Lock()
+        # ST-10: builds run in parallel (each work item in its OWN git worktree),
+        # but merges of those worktree branches back into the shared project repo
+        # MUST be serialized — concurrent `git merge` into the same repo race on
+        # the index/HEAD. The streams path holds this while merging + on a merge
+        # conflict retry. The legacy path never uses it (it keeps _build_lock).
+        self._merge_lock = asyncio.Lock()
         # U4: cleared while the pipeline waits for human approval before build.
         self._approval_event = asyncio.Event()
         self._approval_event.set()
@@ -1747,7 +1754,7 @@ class Pipeline:
             return res.text
 
         async def _accept(_revised: str) -> bool:
-            ok, _, _ = await self._arun_pytest()
+            ok, _, _ = await self._arun_pytest(ws=ws)
             if ok:
                 await self._agit(ws, "add", "-A")
                 await self._agit(ws, "commit", "-m", f"refined {story.id}", "--allow-empty")
@@ -1797,7 +1804,9 @@ class Pipeline:
             return -1
         if toolchain.normalize(self.state.backend_language.value) != "python":
             return -1  # pytest-cov is Python-only (L2g)
-        report = workspace_dir(self.state.id) / ".autospec-cov.json"
+        # The report is written under cwd=ws (via report.name) and read back from
+        # the same dir — ``ws`` may be a per-item worktree on the streams path.
+        report = Path(ws) / ".autospec-cov.json"
         env = _minimal_env()
         cmd = [
             settings.uv_cmd, "run", "pytest",
@@ -1830,8 +1839,10 @@ class Pipeline:
     async def _arun_mutation_test(self, story: UserStory, pkg: str, ws) -> None:
         """Mutation testing (Q1): mutate the package source one point at a time
         and rerun the suite against each mutant; story.mutation_score = kill rate
-        (%). Env-gated, best-effort (never downgrades a green story). Runs inside
-        the build lock held by the caller, so pytest stays serialized."""
+        (%). Env-gated, best-effort (never downgrades a green story). Mutates +
+        reruns pytest in ``ws``: the legacy path serializes it via the build lock
+        (shared workspace), the streams path runs it inside the item's private
+        worktree (no lock needed). Python-only."""
         if not settings.mutation_enabled or settings.fake_agents:
             return
         if toolchain.normalize(self.state.backend_language.value) != "python":
@@ -1855,7 +1866,7 @@ class Pipeline:
                 total += 1
                 f.write_text(mutant, encoding="utf-8")
                 try:
-                    ok, _, _ = await self._arun_pytest()
+                    ok, _, _ = await self._arun_pytest(ws=ws)
                 except Exception:  # noqa: BLE001 — runner glitch: count as survived
                     ok = True
                 finally:
@@ -2003,6 +2014,13 @@ class Pipeline:
     # ------------------------------------------------------------ BUILD (Dev)
 
     async def _abuild_phase(self) -> None:
+        # ST-9: when streams are enabled, build the iteration's work items
+        # (taskless US + tasks) in parallel, each in its OWN git worktree, and
+        # merge them back into the project repo. Flag OFF keeps the legacy path
+        # below byte-identical (the only behaviour the existing suite exercises).
+        if settings.streams_enabled:
+            await self._abuild_phase_streams()
+            return
         self.state.phase = PipelinePhase.BUILD
         self._sync()
         semaphore = asyncio.Semaphore(settings.max_parallel_devs)
@@ -2172,6 +2190,356 @@ class Pipeline:
             raise
         finally:
             self._sync()
+
+    # --------------------------------- ST-9/10/11: parallel worktree build path
+
+    async def _abuild_phase_streams(self) -> None:
+        """ST-9: stream-aware parallel build with per-work-item git worktrees.
+
+        Each batch picks the READY work items (taskless US + tasks whose deps are
+        all merged/DONE) via the work graph, builds them TRULY in parallel — each
+        in its OWN git worktree of the project repo, so they never share a
+        workspace dir and need no ``_build_lock`` — then merges every green item
+        back into the shared repo (serialized by ``_merge_lock``, ST-10). An item
+        is only marked DONE after a successful merge, so the next batch's
+        worktrees branch from the post-merge HEAD (ST-11)."""
+        self.state.phase = PipelinePhase.BUILD
+        self._sync()
+        ws = workspace_dir(self.state.id)
+        await self._agit_ensure_repo(ws)
+        # The worktree base must be a real commit: a freshly-init'd repo has an
+        # unborn HEAD, so `worktree add ... HEAD` would fail. Seed the scaffold.
+        await self._acommit_story(ws, "scaffold")
+        semaphore = asyncio.Semaphore(settings.max_parallel_devs)
+
+        while not self._stop_requested:
+            await self._checkpoint()  # honour pause between batches
+            if self._stop_requested:
+                break
+            # Recomputed every batch: the user may add stories mid-build, and the
+            # previous batch's merges changed which items are now ready (ST-11).
+            iteration_ids = {
+                s.id for s in self.state.stories_of_iteration(self.state.iteration)
+            }
+            graph = work_streams.build_work_graph(self.state)
+            items = [
+                it for it in graph.order
+                if graph.items[it].story_id in iteration_ids
+            ]
+            pending = [
+                graph.items[i] for i in items
+                if graph.items[i].status in (
+                    StoryStatus.TODO, StoryStatus.IN_PROGRESS,
+                    StoryStatus.RED, StoryStatus.GREEN,
+                )
+            ]
+            if not pending:
+                break
+            ready = [
+                graph.items[i] for i in items
+                if work_streams.is_ready(graph.items[i], graph.items)
+            ]
+            if not ready:
+                if any(p.status == StoryStatus.IN_PROGRESS for p in pending):
+                    break  # defensive: a worker left an item in-flight
+                # Remaining items depend on failed work: mark them failed
+                # (mirror the legacy "dependency not satisfied" handling).
+                for item in pending:
+                    blockers = work_streams.blocked_by(item, graph.items)
+                    self._set_item_status(
+                        item, StoryStatus.FAILED,
+                        last_error="Dépendance non satisfaite (work item échoué en amont).",
+                    )
+                    if blockers:
+                        self._log(
+                            f"dev:{item.id}",
+                            f"⛔ {item.id} bloqué par : {', '.join(blockers)}.",
+                        )
+                self._sync()
+                break
+
+            # Write every ready item's acceptance feature file + commit them to
+            # the shared repo ONCE, before the worktrees branch off HEAD — so the
+            # parallel workers never race on the repo index (git's index.lock is
+            # not concurrency-safe). Workers then mutate only their own worktree.
+            subjects = [self._item_subject(it) for it in ready]
+            to_write = [s for s in subjects if s.gherkin.strip()]
+            if to_write:
+                workspace.write_feature_files(self.state, to_write)
+                await self._acommit_story(ws, "features batch")
+
+            async def _aworker(item: work_streams.WorkItem) -> None:
+                async with semaphore:
+                    await self._abuild_work_item(item)
+
+            await asyncio.gather(*(_aworker(it) for it in ready))
+
+        self.state.build_guidance.clear()
+
+    def _item_subject(self, item: "work_streams.WorkItem") -> UserStory:
+        """Resolve a work item to the ``UserStory``-shaped object the build
+        helpers consume. A taskless US is built as-is; a Task is adapted into a
+        lightweight UserStory carrying the task's title/description/criteria/
+        gherkin/stream so ``dev_story``/``dev_story_frontend`` work unchanged
+        (the per-task status is read/written back on the real Task)."""
+        if item.kind == "story":
+            return self.state.story(item.story_id)
+        task = self.state.task(item.id)
+        return UserStory(
+            id=task.id,
+            epic_id=self.state.story(task.story_id).epic_id,
+            title=task.title or task.id,
+            description=task.description,
+            acceptance_criteria=list(task.acceptance_criteria),
+            gherkin=task.gherkin,
+            priority=3,
+            status=task.status,
+            stream=task.stream,
+            attempts=task.attempts,
+            last_error=task.last_error,
+            iteration=self.state.iteration,
+        )
+
+    def _item_target(self, item: "work_streams.WorkItem"):
+        """The persistent model (UserStory or Task) whose status/attempts the
+        scheduler reads — kept in sync with the per-build subject."""
+        if item.kind == "story":
+            return self.state.story(item.story_id)
+        return self.state.task(item.id)
+
+    def _set_item_status(self, item, status, *, last_error=None) -> None:
+        target = self._item_target(item)
+        target.status = status
+        if last_error is not None:
+            target.last_error = last_error
+
+    async def _abuild_work_item(self, item: "work_streams.WorkItem") -> None:
+        """ST-9/10/11: build ONE work item in its own git worktree, then merge.
+
+        Worktree lifecycle (ST-10): add a worktree on a fresh per-item branch off
+        the project repo's current HEAD, run the dev → verify loop there, and on
+        green commit + merge the branch back into the repo (serialized via
+        ``_merge_lock``; one retry then abort+FAILED on conflict). The worktree
+        and branch are always cleaned up in ``finally``."""
+        target = self._item_target(item)
+        subject = self._item_subject(item)
+        target.status = subject.status = StoryStatus.IN_PROGRESS
+        target.attempts = subject.attempts = subject.attempts + 1
+        self._sync()
+
+        ws = workspace_dir(self.state.id)
+        pkg = workspace.package_name(self.state)
+        is_frontend = self._is_frontend_story(subject)
+        # The acceptance feature files were written + committed to the shared
+        # repo by the batch loop before this worker started, so they are already
+        # present at the worktree's HEAD (no per-item commit here — that would
+        # race other workers on the repo index).
+        branch = f"autospec/wi-{item.id.lower().replace('/', '-')}"
+        worktree = None
+        try:
+            worktree = await self._aworktree_add(ws, branch)
+            if worktree is None:
+                raise RuntimeError("git worktree indisponible")
+            if subject.attempts == 1 and not is_frontend:
+                await self._adesign_tests(subject, pkg)
+            label = "dev frontend" if is_frontend else "dev"
+            self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
+
+            ok, tail = await self._arun_item_dev(subject, worktree, pkg, is_frontend)
+
+            if ok:
+                # ST-10/11: commit in the worktree, then merge into the repo. The
+                # item is DONE only after a successful merge (so dependents only
+                # start once this item's code is in the base HEAD).
+                await self._acommit_story(worktree, item.id)
+                merged = await self._amerge_work_item(ws, branch, item.id)
+                if merged:
+                    target.status = subject.status = StoryStatus.DONE
+                    for test in subject.test_plan:
+                        if test.status == TestState.NONEXISTENT:
+                            test.status = TestState.GREEN
+                    if item.kind == "story":
+                        self.state.story(item.story_id).test_plan = subject.test_plan
+                    self._log(f"dev:{item.id}", f"✅ {item.id} vert et mergé.")
+                else:
+                    target.status = subject.status = StoryStatus.FAILED
+                    target.last_error = "conflit de merge inter-stream non résolu"
+            else:
+                target.last_error = tail
+                self._log(f"dev:{item.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
+                target.status = (
+                    StoryStatus.TODO
+                    if subject.attempts < settings.dev_max_attempts
+                    else StoryStatus.FAILED
+                )
+        except AgentError as exc:
+            target.last_error = str(exc)
+            if session_monitor.monitor_active() and session_monitor.is_usage_limit_error(
+                str(exc)
+            ):
+                target.attempts = max(0, target.attempts - 1)
+                target.status = StoryStatus.TODO
+            else:
+                target.status = (
+                    StoryStatus.TODO
+                    if subject.attempts < settings.dev_max_attempts
+                    else StoryStatus.FAILED
+                )
+            self._log(f"dev:{item.id}", f"Erreur agent : {exc}")
+        except Exception:
+            if target.status in (StoryStatus.IN_PROGRESS, StoryStatus.GREEN, StoryStatus.RED):
+                target.status = StoryStatus.TODO
+            raise
+        finally:
+            if worktree is not None:
+                await self._aworktree_remove(ws, worktree, branch)
+            self._sync()
+
+    async def _arun_item_dev(
+        self, subject: UserStory, worktree, pkg: str, is_frontend: bool
+    ) -> tuple[bool, str]:
+        """Run the dev agent for one work item INSIDE its worktree, then verify
+        the real suite there. Returns (green, tail). No ``_build_lock``: the
+        worktree is private to this item, so parallel items never interleave."""
+        if is_frontend:
+            stream = self._story_stream(subject)
+            dev_prompt = prompts.dev_story_frontend(
+                subject, pkg, workspace.feature_rel_path(subject),
+                architecture=self.state.architecture,
+                guidance="\n".join(self.state.build_guidance),
+                lessons="\n".join(self._effective_lessons()),
+                file_root=stream.file_root or "frontend",
+            )
+            dev_persona = persona("dev-frontend")
+        else:
+            dev_prompt = prompts.dev_story(
+                subject, pkg, workspace.feature_rel_path(subject), self.state.architecture,
+                "\n".join(self.state.build_guidance),
+                ui_tests=self._ui_mode(subject),
+                lessons="\n".join(self._effective_lessons()),
+                backend_language=self.state.backend_language.value,
+            )
+            dev_persona = persona("dev")
+        result = await self._tracked.arun(dev_prompt, system_prompt=dev_persona, cwd=worktree)
+        reply = extract_json(result.text)
+        self._chat(ChatRole.DEV, f"[{subject.id}] {reply.get('summary', '(pas de résumé)')}")
+        subject.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
+        subject.ui_tests = [str(p) for p in reply.get("ui_test_files") or []]
+        self._sync()
+
+        if is_frontend:
+            ok, output, real = await self._arun_frontend_tests(ws=worktree)
+        else:
+            ok, output, real = await self._arun_pytest(ws=worktree)
+        tail = output[-2000:]
+        self._apply_test_states(subject, reply.get("test_results", []), real)
+        regs = regression.find_regressions(set(self.state.green_tests), real)
+        if regs:
+            rmsg = (
+                f"[{subject.id}] {len(regs)} test(s) précédemment verts cassés : "
+                + ", ".join(regs[:3]) + ("…" if len(regs) > 3 else "")
+            )
+            self.state.regressions.append(rmsg)
+            self._notify("warning", "Régression détectée", rmsg)
+            self._log(f"dev:{subject.id}", "⚠️ " + rmsg)
+        if real:
+            self.state.green_tests = sorted(n for n, o in real.items() if o == "passed")
+        if ok and self._ui_mode(subject):
+            ok, ui_output = await self._arun_ui_tests()
+            if not ok:
+                tail = ui_output[-2000:]
+                self._log(f"dev:{subject.id}", "❌ Tests d'acceptance UI rouges.")
+        if ok and settings.coverage_enabled and not is_frontend:
+            cov = await self._arun_coverage(subject, pkg, worktree)
+            if settings.coverage_gate_threshold > 0 and 0 <= cov < settings.coverage_gate_threshold:
+                ok = False
+                tail = (
+                    f"Couverture insuffisante : {cov}% < seuil "
+                    f"{settings.coverage_gate_threshold}% (gate de couverture)."
+                )
+                self._log(f"dev:{subject.id}", "❌ " + tail)
+        if ok and not is_frontend:
+            # Refinement + mutation testing run inside the item's worktree (they
+            # rerun pytest / mutate the package) before the merge — Python only.
+            if settings.refine_for("dev"):
+                await self._arefine_code(subject, pkg, worktree)
+            await self._arun_mutation_test(subject, pkg, worktree)
+        return ok, tail
+
+    # ------------------------------------------------ worktree lifecycle (ST-10)
+
+    async def _aworktree_add(self, repo, branch: str):
+        """Add a fresh git worktree on ``branch`` off the repo's HEAD and return
+        its path, or None if git worktree is unavailable. Cleans up any stale
+        branch/worktree of the same name first (a previous attempt).
+
+        Serialized by ``_merge_lock``: ``git worktree add`` mutates the shared
+        repo's ``.git`` metadata (and grabs its index lock), so concurrent adds
+        from parallel workers would race — only the post-add dev/test work runs
+        truly in parallel (in the now-private worktree)."""
+        async with self._merge_lock:
+            # Drop a leftover branch from an earlier attempt so `-b` cannot fail.
+            await self._agit(repo, "branch", "-D", branch)
+            return await self._aworktree_add_locked(repo, branch)
+
+    async def _aworktree_add_locked(self, repo, branch: str):
+        import tempfile
+
+        worktree = Path(tempfile.mkdtemp(prefix="autospec-wt-"))
+        # mkdtemp creates the dir, but `git worktree add` wants to create it.
+        try:
+            worktree.rmdir()
+        except OSError:
+            pass
+        code, out = await self._agit(repo, "worktree", "add", str(worktree), "-b", branch, "HEAD")
+        if code != 0:
+            self._log("streams", f"git worktree add a échoué : {out.strip()[:200]}")
+            return None
+        return worktree
+
+    async def _aworktree_remove(self, repo, worktree, branch: str) -> None:
+        """Always-runs cleanup: remove the worktree and delete its branch.
+        Serialized by ``_merge_lock`` (shared-repo ``.git`` mutation)."""
+        async with self._merge_lock:
+            await self._agit(repo, "worktree", "remove", "--force", str(worktree))
+            await self._agit(repo, "branch", "-D", branch)
+        # Defensive: if `worktree remove` could not delete the dir, drop it.
+        try:
+            if Path(worktree).exists():
+                import shutil
+
+                shutil.rmtree(worktree, ignore_errors=True)
+        except OSError:
+            pass
+
+    async def _amerge_work_item(self, repo, branch: str, wid: str) -> bool:
+        """ST-10: merge a green work item's branch into the project repo's main
+        branch. Merges MUST be serialized (``_merge_lock``) even though builds
+        run in parallel — concurrent merges race on the shared index/HEAD.
+
+        Conflict policy: a `--no-ff` merge that reports a conflict is retried
+        once (still under the lock, so nothing else mutates the repo in between);
+        if it still conflicts, abort cleanly and signal failure to the caller."""
+        async with self._merge_lock:
+            code, out = await self._agit(
+                repo, "merge", "--no-ff", "-m", f"merge work item {wid}", branch
+            )
+            if code == 0:
+                return True
+            # Conflict (or other merge failure): abort, then retry once.
+            await self._agit(repo, "merge", "--abort")
+            self._log(
+                "streams",
+                f"⚠️ Conflit de merge pour {wid} — nouvelle tentative sérialisée.",
+            )
+            code, out = await self._agit(
+                repo, "merge", "--no-ff", "-m", f"merge work item {wid} (retry)", branch
+            )
+            if code == 0:
+                return True
+            await self._agit(repo, "merge", "--abort")
+            self._log("streams", f"⛔ Merge de {wid} impossible (conflit) : {out.strip()[:200]}")
+            return False
 
     # ------------------------------------------------ per-story actions
 
@@ -2425,7 +2793,7 @@ class Pipeline:
 
         return await asyncio.to_thread(_run)
 
-    async def _arun_pytest(self) -> tuple[bool, str, dict[str, str]]:
+    async def _arun_pytest(self, ws=None) -> tuple[bool, str, dict[str, str]]:
         """Run the test suite for the project's backend language (L2g).
 
         Returns (suite_green, output, {test_id: outcome}). The command and the
@@ -2433,6 +2801,9 @@ class Pipeline:
         pytest-json-report, Go = `go test -json`, Rust = `cargo test`); per-test
         outcomes reflect the real run, not the agent's self-report. (Name kept
         for the `green_pytest` test fixture; covers all languages.)
+
+        ``ws`` defaults to the project workspace; the streams build path (ST-9)
+        passes a per-item git worktree so each item's suite runs in isolation.
         """
         if settings.fake_agents:
             # Demo / e2e mode: no real code is written, trust the scripted dev.
@@ -2441,7 +2812,7 @@ class Pipeline:
         # unavailable on Windows' SelectorEventLoop (used by uvicorn), so we stay
         # off the event loop entirely for child processes.
         lang = toolchain.normalize(self.state.backend_language.value)
-        ws = workspace_dir(self.state.id)
+        ws = workspace_dir(self.state.id) if ws is None else ws
         env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
 
         def _run() -> tuple[bool, str, dict[str, str]]:
@@ -2488,17 +2859,25 @@ class Pipeline:
         stream = self._story_stream(story)
         return stream.kind == StreamKind.FRONTEND or toolchain.is_frontend(stream.language)
 
-    async def _arun_frontend_tests(self) -> tuple[bool, str, dict[str, str]]:
+    async def _arun_frontend_tests(self, ws=None) -> tuple[bool, str, dict[str, str]]:
         """Run the frontend stream's Vitest suite AND the production build
         (`tsc && vite build`) — "green" requires BOTH (ST-7). Returns
         (green, output, {test_id: outcome}). Demo / fake-agents mode
-        short-circuits (no real node/vite), exactly like ``_arun_pytest``."""
+        short-circuits (no real node/vite), exactly like ``_arun_pytest``.
+
+        ``ws`` defaults to the project workspace; the streams build path (ST-9)
+        passes a per-item git worktree so the frontend root is resolved relative
+        to that worktree (the item's isolated copy of the project repo)."""
         if settings.fake_agents:
             return True, "mode démo : vérification Vitest + build court-circuitée", {}
         stream = next(iter(workspace.frontend_streams(self.state)), None)
         if stream is None:
             return True, "aucun stream frontend", {}
         root = workspace.stream_root(self.state, stream)
+        if ws is not None:
+            # Re-root the frontend zone onto the worktree copy of the repo.
+            rel = root.relative_to(workspace_dir(self.state.id))
+            root = ws / rel
         env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
 
         def _run() -> tuple[bool, str, dict[str, str]]:

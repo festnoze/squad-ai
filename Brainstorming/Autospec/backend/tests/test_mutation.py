@@ -53,7 +53,7 @@ async def test_mutation_score_all_killed(monkeypatch):
     ws, pkg, pkg_dir = _build_ws(state)
     story = UserStory(id="US-1", epic_id="E1", title="t")
 
-    async def _kill(self):
+    async def _kill(self, ws=None):
         return (False, "boom", {})
 
     monkeypatch.setattr(Pipeline, "_arun_pytest", _kill)
@@ -71,7 +71,7 @@ async def test_mutation_score_all_survived(monkeypatch):
     ws, pkg, _ = _build_ws(state)
     story = UserStory(id="US-1", epic_id="E1", title="t")
 
-    async def _survive(self):
+    async def _survive(self, ws=None):
         return (True, "", {})
 
     monkeypatch.setattr(Pipeline, "_arun_pytest", _survive)
