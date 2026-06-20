@@ -363,6 +363,36 @@ Réponds avec EXACTEMENT UN objet JSON :
 
 # ------------------------------------------------------ Feedback impact (E2)
 
+def _impact_streams_block(state: ProjectState) -> str:
+    """ST-15: the multi-stream extension of the impact analysis. Only injected
+    when streams are on; the marker « ÉVOLUTION MULTI-STREAM » lets the
+    ScriptedRunner branch to its stream-aware reply. Off → "" (byte-identical)."""
+    if not settings.streams_enabled:
+        return ""
+    streams = ", ".join(f"{s.id} ({s.kind.value})" for s in state.effective_streams())
+    catalog = ", ".join(DEFAULT_STREAM_CATALOG.keys())
+    tasks = [
+        {"id": t.id, "stream": t.stream or state.primary_stream_id, "story_id": t.story_id, "title": t.title}
+        for t in state.all_tasks()
+    ]
+    return f"""
+
+ÉVOLUTION MULTI-STREAM (le projet est réparti en streams parallèles).
+Streams actuels : {streams}.
+Catalogue de streams ajoutables (ids) : {catalog}.
+Tâches existantes (pour câbler les dépendances inter-stream) :
+{json.dumps(tasks, ensure_ascii=False)}
+
+Quand le feedback fait GRANDIR le produit vers une nouvelle zone de travail
+(ex. « ajoute une UI web » → stream `frontend`), pour l'action "new_stories" tu PEUX :
+- ajouter "add_streams": ["frontend"] — les streams (ids du catalogue) à créer s'ils manquent ;
+- décomposer chaque nouvelle story en "tasks" (chacune dans UN stream) et RELIER
+  les tâches du nouveau stream aux tâches/US EXISTANTES du back via "depends_on"
+  (utilise les ids listés ci-dessus). Une tâche frontend DOIT dépendre de la
+  tâche/US backend dont elle consomme le contrat.
+Format d'une tâche : {{"id":"T-x","stream":"frontend","title":"...","description":"...","acceptance_criteria":["..."],"gherkin":"...","depends_on":["<id back>"]}}"""
+
+
 def feedback_impact(state: ProjectState, feedback: str) -> str:
     stories = [
         {
@@ -375,6 +405,7 @@ def feedback_impact(state: ProjectState, feedback: str) -> str:
         for s in state.stories
     ]
     epics = [{"id": e.id, "title": e.title} for e in state.epics]
+    streams_block = _impact_streams_block(state)
     return f"""Tu es l'analyste d'impact d'un pipeline automatisé. L'utilisateur vient de
 donner un feedback / une demande de changement sur le produit :
 \"\"\"{feedback}\"\"\"
@@ -412,7 +443,7 @@ Réponds avec EXACTEMENT UN objet JSON :
   ]
 }}
 N'inclus que les clés utiles à l'action choisie. Pour "updates", n'inclus QUE
-les champs réellement modifiés."""
+les champs réellement modifiés.{streams_block}"""
 
 
 # ------------------------------------------------------ Product evaluator (E6)

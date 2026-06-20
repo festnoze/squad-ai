@@ -140,6 +140,41 @@ _IMPACT = json.dumps(
     ensure_ascii=False,
 )
 
+# ST-15: stream-aware impact — a feedback that adds a web UI creates the
+# `frontend` stream and a front task wired (depends_on) to an existing back US.
+_IMPACT_STREAMS = json.dumps(
+    {
+        "message": "Feedback analysé : ajout d'une UI web (nouveau stream frontend).",
+        "action": "new_stories",
+        "add_streams": ["frontend"],
+        "epic": {"id": "EPIC-UI", "title": "Interface web", "description": "UI ajoutée suite au feedback."},
+        "stories": [
+            {
+                "id": "US-UI-1",
+                "title": "Écran web du produit",
+                "description": "En tant qu'utilisateur, je veux une UI web afin d'utiliser le produit dans le navigateur.",
+                "acceptance_criteria": ["L'écran affiche le résultat de l'API."],
+                "gherkin": "Feature: UI web\n  Scenario: Affichage\n    Given l'API back\n    When j'ouvre l'écran\n    Then le résultat s'affiche",
+                "depends_on": [],
+                "priority": 1,
+                "stream": "",
+                "tasks": [
+                    {
+                        "id": "T-UI-1",
+                        "stream": "frontend",
+                        "title": "Composant React principal",
+                        "description": "Écran React qui consomme l'API backend.",
+                        "acceptance_criteria": ["Le composant rend le résultat de l'API."],
+                        "gherkin": "Feature: Composant\n  Scenario: Rendu\n    Given des données\n    When le composant rend\n    Then le résultat est visible",
+                        "depends_on": ["US-1"],
+                    }
+                ],
+            }
+        ],
+    },
+    ensure_ascii=False,
+)
+
 # ST-4: the architect picks a backend + frontend stream (demo).
 _STREAMS = json.dumps(
     {
@@ -329,6 +364,10 @@ class ScriptedRunner:
         if "agent de rétrospective" in prompt:  # retro_review (E7)
             return _RETRO
         if "analyste d'impact" in prompt:  # feedback_impact
+            # ST-15: the stream-aware impact adds this marker → grow the product
+            # with a new frontend stream + a front task wired to the back.
+            if "ÉVOLUTION MULTI-STREAM" in prompt:
+                return _IMPACT_STREAMS
             return _IMPACT
         if "MATURITÉ de l'idée" in prompt:  # assess_idea (B-IDEA)
             return _ASSESS

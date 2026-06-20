@@ -27,6 +27,7 @@ from ..models import (
     ChatRole,
     Component,
     ComponentStatus,
+    DEFAULT_STREAM_CATALOG,
     Epic,
     FeatureHypothesis,
     Finding,
@@ -675,11 +676,26 @@ class Pipeline:
         self._chat(ChatRole.ANALYST, f"🔍 Impact : {message}\n✏️ Story {story.id} mise à jour.")
 
     def _apply_new_stories(self, reply: dict, message: str) -> None:
-        """Apply an impact decision that plans a new epic and/or new stories."""
+        """Apply an impact decision that plans a new epic and/or new stories.
+
+        ST-15: with streams enabled, the analyst may also grow the product into a
+        new work area — ``add_streams`` adds streams (e.g. a web UI → the
+        ``frontend`` stream) and the new stories may carry a ``stream`` and a
+        task decomposition whose ``depends_on`` links the new (front) tasks to
+        existing (back) tasks/US. Flag-off, the parse is byte-identical to before
+        (no streams, no tasks)."""
         items = reply.get("stories") or []
         if not items:
             self._chat(ChatRole.ANALYST, f"🔍 Impact : {message or 'aucune story proposée.'}")
             return
+        streams_on = settings.streams_enabled
+        # ST-15: materialize any newly-needed streams BEFORE tagging tasks.
+        added_streams: list[str] = []
+        if streams_on:
+            for sid in reply.get("add_streams") or []:
+                if self._ensure_stream(str(sid)):
+                    added_streams.append(str(sid))
+
         epic_id = reply.get("epic_id") or ""
         if not any(e.id == epic_id for e in self.state.epics):
             epic_data = reply.get("epic") or {}
@@ -695,13 +711,57 @@ class Pipeline:
                     iteration=self.state.iteration,
                 )
             )
-        taken_ids = {s.id for s in self.state.stories}
-        new_stories: list[UserStory] = []
+
+        # First pass: assign project-wide-unique story + task ids, building rename
+        # maps so depends_on (story↔story and task↔task/US) remap consistently.
+        taken_story_ids = {s.id for s in self.state.stories}
+        taken_task_ids = {t.id for t in self.state.all_tasks()}
+        story_id_map: dict[str, str] = {}
+        task_id_map: dict[str, str] = {}
+        planned: list[tuple[str, dict]] = []
         for story_data in items:
-            story_id = _unique_id(
-                story_data.get("id") or f"US-{len(taken_ids) + 1}", "US", taken_ids
-            )
-            taken_ids.add(story_id)
+            raw_sid = story_data.get("id") or f"US-{len(taken_story_ids) + 1}"
+            story_id = _unique_id(raw_sid, "US", taken_story_ids)
+            taken_story_ids.add(story_id)
+            story_id_map.setdefault(raw_sid, story_id)
+            if streams_on:
+                for task_data in story_data.get("tasks") or []:
+                    raw_tid = str(task_data.get("id") or f"T-{len(taken_task_ids) + 1}")
+                    tid = _unique_id(raw_tid, "T", taken_task_ids)
+                    taken_task_ids.add(tid)
+                    task_id_map.setdefault(raw_tid, tid)
+            planned.append((story_id, story_data))
+
+        # A dep may point at a (renamed) batch task, a (renamed) batch story, or
+        # an existing task/US id — pass the latter through unchanged.
+        def _remap_dep(d: str) -> str:
+            return task_id_map.get(d) or story_id_map.get(d) or d
+
+        def _build_tasks(story_id: str, story_data: dict) -> list[Task]:
+            if not streams_on:
+                return []
+            out: list[Task] = []
+            for task_data in story_data.get("tasks") or []:
+                raw_tid = str(task_data.get("id") or "")
+                out.append(
+                    Task(
+                        id=task_id_map.get(raw_tid, raw_tid),
+                        story_id=story_id,
+                        stream=str(task_data.get("stream") or ""),
+                        title=task_data.get("title", ""),
+                        description=task_data.get("description", ""),
+                        acceptance_criteria=[
+                            AcceptanceCriterion(id=f"AC-{i}", text=str(t))
+                            for i, t in enumerate(task_data.get("acceptance_criteria", []), start=1)
+                        ],
+                        gherkin=task_data.get("gherkin", ""),
+                        depends_on=[_remap_dep(d) for d in task_data.get("depends_on", [])],
+                    )
+                )
+            return out
+
+        new_stories: list[UserStory] = []
+        for story_id, story_data in planned:
             new_stories.append(
                 UserStory(
                     id=story_id,
@@ -715,19 +775,27 @@ class Pipeline:
                         )
                     ],
                     gherkin=story_data.get("gherkin", ""),
-                    depends_on=story_data.get("depends_on", []),
+                    depends_on=[story_id_map.get(d, d) for d in story_data.get("depends_on", [])],
                     priority=_clamp_1_5(story_data.get("priority", 2)),
                     ui=bool(story_data.get("ui", False)),
+                    stream=str(story_data.get("stream") or "") if streams_on else "",
+                    tasks=_build_tasks(story_id, story_data),
                     iteration=self.state.iteration,
                 )
             )
         scheduler.sanitize_dependencies(self.state.stories + new_stories)
         self.state.stories.extend(new_stories)
         workspace.write_feature_files(self.state, new_stories)
+        if streams_on:
+            for w in work_streams.validate(self.state):
+                self._log("streams", f"Graphe de tâches : {w}")
+        n_tasks = sum(len(s.tasks) for s in new_stories)
+        task_note = f", {n_tasks} tâche(s)" if n_tasks else ""
+        extra = f" 🧵 Nouveau(x) stream(s) : {', '.join(added_streams)}." if added_streams else ""
         self._chat(
             ChatRole.ANALYST,
-            f"🔍 Impact : {message}\n➕ {len(new_stories)} nouvelle(s) story(ies) planifiée(s) "
-            "— « ▶ Continuer le build » pour les développer.",
+            f"🔍 Impact : {message}{extra}\n➕ {len(new_stories)} nouvelle(s) story(ies){task_note} "
+            "planifiée(s) — « ▶ Continuer le build » pour les développer.",
         )
 
     # ------------------------------------------------------ components (E3/E4)
@@ -850,6 +918,33 @@ class Pipeline:
         if rationale:
             msg += f" {rationale}"
         self._chat(ChatRole.SYSTEM, msg)
+
+    def _ensure_stream(self, stream_id: str) -> bool:
+        """ST-15: add a stream to the project if absent (from the catalog). Used
+        when a feedback evolves the product into a new work area (e.g. a web UI →
+        the ``frontend`` stream). Returns True when a new stream was added.
+
+        Materializes the implicit backend stream first when ``streams`` is still
+        empty, so the project keeps exactly one primary backend stream."""
+        sid = (stream_id or "").strip()
+        if not sid:
+            return False
+        if not self.state.streams:
+            self.state.streams = [backend_stream_for(self.state.backend_language.value)]
+        if any(s.id == sid for s in self.state.streams):
+            return False
+        spec = DEFAULT_STREAM_CATALOG.get(sid)
+        kind = spec["kind"] if spec else StreamKind.OTHER
+        self.state.streams.append(
+            Stream(
+                id=sid,
+                kind=kind,
+                language=str(spec.get("language", "")) if spec else "",
+                file_root=str(spec.get("file_root", "")) if spec else "",
+                primary=False,
+            )
+        )
+        return True
 
     async def aset_language(self, language: str) -> ProjectState:
         """L2: user override of the backend language. Raises ValueError (->409)

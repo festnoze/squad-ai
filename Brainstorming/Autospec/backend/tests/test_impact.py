@@ -4,6 +4,7 @@ pipeline is dormant either updates an unimplemented story or plans new ones."""
 import json
 
 from autospec.agents.runner import FakeRunner
+from autospec.config import settings
 from autospec.models import (
     AcceptanceCriterion,
     ChatRole,
@@ -129,6 +130,90 @@ async def test_feedback_during_active_phase_skips_impact_analysis():
     await pipeline.asend_user_message("un simple retour")
     assert pipeline._impact_task is None
     assert pipeline.state.feedback == ["un simple retour"]
+
+
+def _ui_feedback_reply() -> str:
+    """An impact reply that grows the product with a frontend stream + a front
+    task depending on an existing backend US (ST-15)."""
+    return json.dumps(
+        {
+            "message": "Ajout d'une UI web.",
+            "action": "new_stories",
+            "add_streams": ["frontend"],
+            "epic": {"id": "EPIC-UI", "title": "Interface web", "description": ""},
+            "stories": [
+                {
+                    "id": "US-UI-1",
+                    "title": "Écran web",
+                    "description": "En tant qu'utilisateur…",
+                    "acceptance_criteria": ["L'écran affiche le résultat."],
+                    "gherkin": "Feature: UI\n  Scenario: s\n    Given a\n    When b\n    Then c",
+                    "depends_on": [],
+                    "priority": 1,
+                    "stream": "",
+                    "tasks": [
+                        {
+                            "id": "T-UI-1",
+                            "stream": "frontend",
+                            "title": "Composant React",
+                            "description": "Écran qui consomme l'API.",
+                            "acceptance_criteria": ["Rend le résultat."],
+                            "gherkin": "Feature: C\n  Scenario: r\n    Given a\n    When b\n    Then c",
+                            "depends_on": ["US-1"],
+                        }
+                    ],
+                }
+            ],
+        },
+        ensure_ascii=False,
+    )
+
+
+async def test_feedback_adds_frontend_stream_and_linked_task(monkeypatch):
+    """ST-15: a 'add a web UI' feedback creates the frontend stream and a front
+    task wired by dependency to an existing backend US."""
+    monkeypatch.setattr(settings, "streams_enabled", True)
+    pipeline = make_done_pipeline([_ui_feedback_reply()])
+    await pipeline.asend_user_message("ajoute une UI web")
+    await wait_until(lambda: any(s.id == "US-UI-1" for s in pipeline.state.stories))
+    # The frontend stream was materialized (alongside the implicit backend).
+    assert {s.id for s in pipeline.state.streams} >= {"backend", "frontend"}
+    assert any(s.kind.value == "frontend" for s in pipeline.state.streams)
+    # The new US carries a frontend task depending on the existing backend US-1.
+    story = pipeline.state.story("US-UI-1")
+    assert len(story.tasks) == 1
+    task = story.tasks[0]
+    assert task.stream == "frontend"
+    assert "US-1" in task.depends_on  # cross-stream dependency on existing back
+    # Work graph is sane (no cycle / dangling dep that matters).
+    assert pipeline.state.task(task.id).id == task.id
+
+
+async def test_feedback_streams_off_ignores_tasks(monkeypatch):
+    """Flag-off: the same reply yields a plain US (no stream, no tasks) — the
+    pre-streams behaviour is preserved byte-for-byte."""
+    monkeypatch.setattr(settings, "streams_enabled", False)
+    pipeline = make_done_pipeline([_ui_feedback_reply()])
+    await pipeline.asend_user_message("ajoute une UI web")
+    await wait_until(lambda: any(s.id == "US-UI-1" for s in pipeline.state.stories))
+    assert pipeline.state.streams == []  # no stream created when off
+    story = pipeline.state.story("US-UI-1")
+    assert story.tasks == [] and story.stream == ""
+
+
+async def test_scripted_runner_supports_streams_impact():
+    """Demo (ST-17): the ScriptedRunner branches to a stream-aware impact reply
+    when the prompt carries the « ÉVOLUTION MULTI-STREAM » marker."""
+    from autospec.agents.scripted import ScriptedRunner
+
+    res = await ScriptedRunner().arun(
+        "Tu es l'analyste d'impact d'un pipeline.\n\nÉVOLUTION MULTI-STREAM (le projet…)",
+        "persona",
+    )
+    reply = json.loads(res.text)
+    assert reply["action"] == "new_stories"
+    assert "frontend" in reply.get("add_streams", [])
+    assert reply["stories"][0]["tasks"][0]["stream"] == "frontend"
 
 
 async def test_failed_story_amended_by_feedback_is_requeued():
