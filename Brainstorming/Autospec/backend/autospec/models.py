@@ -65,6 +65,17 @@ class BackendLanguage(str, Enum):
     RUST = "rust"
 
 
+class StreamKind(str, Enum):
+    """ST-1: a work area's nature. Each stream owns a toolchain + a (presumed
+    disjoint) file zone, which is what lets agents run in parallel across
+    streams. `backend` always exists; the others are selected per project."""
+    BACKEND = "backend"
+    FRONTEND = "frontend"
+    CACHE = "cache"
+    DATABASE = "database"
+    OTHER = "other"
+
+
 class TestState(str, Enum):
     __test__ = False              # not a pytest test class
 
@@ -130,6 +141,38 @@ class Component(BaseModel):
     status: ComponentStatus = ComponentStatus.PROPOSED
 
 
+class Stream(BaseModel):
+    """ST-1: a parallelizable work area with its own toolchain, language and
+    (presumed disjoint) file zone. The `backend` stream is always present; the
+    others (frontend/cache/database) are chosen per project by the architect.
+    An empty ``ProjectState.streams`` means "one implicit backend stream" — the
+    pre-streams behaviour, so legacy/flag-off projects keep working unchanged."""
+
+    id: str                          # short stable id, e.g. "backend", "frontend"
+    kind: StreamKind = StreamKind.BACKEND
+    language: str = ""               # toolchain language: python/go/rust/react/sql…
+    toolchain: str = ""              # explicit toolchain id ("" = derive from language)
+    file_root: str = ""              # workspace-relative root ("" = repo root)
+    primary: bool = False            # the project's default stream (the backend)
+
+
+# ST-1: reference catalog the architect picks from (ST-4). The cache/database
+# toolchains are placeholders until their dedicated tasks land (deferred).
+DEFAULT_STREAM_CATALOG: dict[str, dict] = {
+    "backend": {"kind": StreamKind.BACKEND, "language": "python", "file_root": "", "primary": True},
+    "frontend": {"kind": StreamKind.FRONTEND, "language": "react", "file_root": "frontend"},
+    "cache": {"kind": StreamKind.CACHE, "language": "python", "file_root": "cache"},
+    "database": {"kind": StreamKind.DATABASE, "language": "sql", "file_root": "database"},
+}
+
+
+def backend_stream_for(language: str | BackendLanguage = BackendLanguage.PYTHON) -> Stream:
+    """The implicit/primary backend stream for a project, carrying its backend
+    language. Used as the default when ``ProjectState.streams`` is empty."""
+    lang = language.value if isinstance(language, BackendLanguage) else str(language or "python")
+    return Stream(id="backend", kind=StreamKind.BACKEND, language=lang, primary=True)
+
+
 class PlannedTest(BaseModel):
     """One unit test planned by the QA agent when decomposing the acceptance
     test outside-in (London style): each layer's test mocks its direct
@@ -147,6 +190,27 @@ class PlannedTest(BaseModel):
 class AcceptanceCriterion(BaseModel):
     id: str
     text: str
+
+
+class Task(BaseModel):
+    """ST-2: a unit of work within a SINGLE stream, below a UserStory. A
+    multi-stream feature's US is decomposed into tasks (e.g. a front task + a
+    back task); tasks of different streams run in parallel while ``depends_on``
+    (other Task ids, possibly cross-stream) reflects the functional ordering
+    (e.g. the front task depends on the back task that exposes the API)."""
+
+    id: str
+    story_id: str
+    stream: str = ""          # stream id ("" = the project's primary/backend stream)
+    title: str = ""
+    description: str = ""
+    acceptance_criteria: list[AcceptanceCriterion] = Field(default_factory=list)
+    gherkin: str = ""
+    depends_on: list[str] = Field(default_factory=list)   # other Task ids
+    status: StoryStatus = StoryStatus.TODO
+    attempts: int = 0
+    last_error: str = ""
+    files_hint: list[str] = Field(default_factory=list)   # files/zones it expects to touch
 
 
 class UserStory(BaseModel):
@@ -168,11 +232,32 @@ class UserStory(BaseModel):
     coverage_score: int = -1  # last test-coverage percentage (-1 = not run)
     ui: bool = False         # story has a visual/UI dimension (QA routes it to Playwright)
     ui_tests: list[str] = Field(default_factory=list)  # replayable UI test files (tests/ui/…)
+    # ST-2: stream tagging + optional multi-stream decomposition. ``stream`` ""
+    # means the project's primary/backend stream (so legacy stories are
+    # unchanged). When ``tasks`` is non-empty the US is a container and its
+    # status is DERIVED from its tasks (see ``effective_status``).
+    stream: str = ""
+    tasks: list[Task] = Field(default_factory=list)
 
     @field_validator("priority")
     @classmethod
     def _clamp_priority(cls, v: int) -> int:
         return _clamp_1_5(v)
+
+    def effective_status(self) -> StoryStatus:
+        """The US status. For a taskless US it's the stored ``status``; for a US
+        decomposed into tasks it's DERIVED: all tasks done → DONE; any active
+        (in_progress/red/green) → IN_PROGRESS; any failed → FAILED; else TODO."""
+        if not self.tasks:
+            return self.status
+        states = [t.status for t in self.tasks]
+        if all(s == StoryStatus.DONE for s in states):
+            return StoryStatus.DONE
+        if any(s in (StoryStatus.IN_PROGRESS, StoryStatus.RED, StoryStatus.GREEN) for s in states):
+            return StoryStatus.IN_PROGRESS
+        if any(s == StoryStatus.FAILED for s in states):
+            return StoryStatus.FAILED
+        return StoryStatus.TODO
 
     def tests_for_criterion(self, criterion_id: str) -> list[PlannedTest]:
         return [t for t in self.test_plan if criterion_id in t.criteria]
@@ -246,6 +331,9 @@ class ProjectState(BaseModel):
     idea_rationale: str = ""       # why the idea was judged structured/vague
     brainstorm_techniques: list[str] = Field(default_factory=list)  # BMAD-chosen
     awaiting_brainstorm_decision: bool = False  # UI: offer brainstorming (oui/non)
+    # ST-1: parallelizable work areas chosen by the architect. EMPTY = one
+    # implicit backend stream (legacy / flag-off behaviour, unchanged).
+    streams: list[Stream] = Field(default_factory=list)
     backlog: list[FeatureHypothesis] = Field(default_factory=list)
     components: list[Component] = Field(default_factory=list)
     epics: list[Epic] = Field(default_factory=list)
@@ -280,3 +368,40 @@ class ProjectState(BaseModel):
 
     def stories_of_iteration(self, iteration: int) -> list[UserStory]:
         return [s for s in self.stories if s.iteration == iteration]
+
+    # ------------------------------------------------------------ streams (ST-1)
+
+    @property
+    def primary_stream_id(self) -> str:
+        """The id every empty (``""``) stream reference resolves to — the
+        project's primary/backend stream, or ``"backend"`` when none declared."""
+        for s in self.streams:
+            if s.primary:
+                return s.id
+        for s in self.streams:
+            if s.kind == StreamKind.BACKEND:
+                return s.id
+        return self.streams[0].id if self.streams else "backend"
+
+    def effective_streams(self) -> list[Stream]:
+        """Declared streams, or one implicit backend stream (carrying the
+        project's backend language) when none were chosen yet."""
+        return self.streams or [backend_stream_for(self.backend_language)]
+
+    def stream(self, stream_id: str) -> Stream:
+        """Resolve a stream id (``""`` → primary). Falls back to a synthesized
+        backend stream so callers never crash on a legacy/empty reference."""
+        target = stream_id or self.primary_stream_id
+        for s in self.effective_streams():
+            if s.id == target:
+                return s
+        return backend_stream_for(self.backend_language)
+
+    def all_tasks(self) -> list[Task]:
+        return [t for s in self.stories for t in s.tasks]
+
+    def task(self, task_id: str) -> Task:
+        for t in self.all_tasks():
+            if t.id == task_id:
+                return t
+        raise KeyError(task_id)

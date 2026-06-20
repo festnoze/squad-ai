@@ -151,9 +151,9 @@ Priorité par valeur V / complexité C (1-5). À traiter une par une.
 
 | # | Tâche | Livrable concret | Dép. |
 |---|-------|------------------|------|
-| ST-1 | **Modèle `Stream` + catalogue + `ProjectState.streams`** | `Stream{id, kind, language, toolchain_ref, file_root}` ; catalogue par défaut ; flag `AUTOSPEC_STREAMS` (OFF→backend implicite). `models.py`, `config.py`. | — |
-| ST-2 | **Niveau Tâche + `UserStory.stream`** | Modèle `Task{id, story_id, stream, title, description, acceptance_criteria, gherkin, depends_on:[task_id], status, attempts, last_error, files_hint}` ; `UserStory.stream` (défaut = stream backend primaire) + `UserStory.tasks`. Statut d'US **dérivé** des tâches. Migration des états persistés (US sans stream→`backend`, sans tasks→inchangé). `models.py`. | ST-1 |
-| ST-3 | **Graphe de work items + readiness** | Helper qui énumère les work items (US sans tâches ∪ tâches), calcule la « readiness » (deps `done`+mergées), **détecte les cycles** et valide la cohérence des deps inter-stream. Tests unitaires. `orchestrator/`. | ST-2 |
+| ST-1 ✅ | **Modèle `Stream` + catalogue + `ProjectState.streams`** | `Stream{id, kind, language, toolchain, file_root, primary}` + `StreamKind` + `DEFAULT_STREAM_CATALOG` + `backend_stream_for()` ; `ProjectState.streams` (vide = backend implicite) + `primary_stream_id`/`effective_streams`/`stream()` ; flag `AUTOSPEC_STREAMS` (OFF). `models.py`, `config.py`. | — |
+| ST-2 ✅ | **Niveau Tâche + `UserStory.stream`** | Modèle `Task{id, story_id, stream, title, description, acceptance_criteria, gherkin, depends_on, status, attempts, last_error, files_hint}` ; `UserStory.stream`/`tasks` + `effective_status()` (statut d'US **dérivé** des tâches) ; `ProjectState.all_tasks()`/`task()`. Migration auto via défauts Pydantic (US sans stream→`""`=primary, sans tasks→inchangé). `models.py`. | ST-1 |
+| ST-3 ✅ | **Graphe de work items + readiness** | `orchestrator/streams.py` : `build_work_graph` (US sans tâches ∪ tâches ; deps US→toutes les tâches de l'US dépendante ; tâche hérite des deps de son US), `ready_items`/`is_ready`/`blocked_by`, `detect_cycle` (DFS 3-couleurs), `validate` (deps fantômes + cycle). 15 tests. | ST-2 |
 | ST-4 | **Sélection des streams (architecte)** | Phase architecture : agent qui choisit les streams pertinents du catalogue + langage par stream (≥ `backend`). Prompt + schema JSON + `ScriptedRunner`. `prompts.py`, `pipeline.py`, `scripted.py`. | ST-1 |
 | ST-5 | **Plan multi-stream (PO)** | `po_plan` étendu : US **fonctionnelles** ; par US, soit flag mono-stream, soit **décomposition en tâches** taguées stream avec deps inter-tâches (front→back). Schema `tasks[]`+`stream`+`depends_on`. Dédup/remap d'ids adaptés. Refine du plan compatible. `prompts.py`, `pipeline.py`. | ST-2, ST-4 |
 | ST-6 | **Toolchain frontend (React)** | Scaffold **Vite+React+TS+Vitest** sous le `file_root` du stream ; `test_command` = `vitest run` (reporter JSON), `build` = `tsc && vite build` ; parsing résultats (vert/rouge) + erreurs de build pour le raffinement. Étend `toolchain.py`/`workspace.py` au-delà de Python/Go/Rust. | ST-1 |
@@ -170,7 +170,7 @@ Priorité par valeur V / complexité C (1-5). À traiter une par une.
 | ST-17 | **Tests & démo e2e multi-stream** | Unitaires (graphe/readiness/cycle, décompo tâches, parsing vitest/build, merge/conflit) + démo navigateur multi-stream (back+front en parallèle, dépendance front→back respectée, merge). `tests/`, `e2e`. | ST-1…ST-16 |
 
 ### Lots de livraison conseillés (une tranche à la fois)
-- **Lot 1 — Fondations modèle** : ST-1, ST-2, ST-3 (+ ST-16 garde-flag). Aucun changement de comportement (flag OFF).
+- **Lot 1 — Fondations modèle** : ST-1, ST-2, ST-3 (+ ST-16 garde-flag). Aucun changement de comportement (flag OFF). ✅ **Livré** (modèle `Stream`/`Task`, graphe de work items + readiness/cycle, flag `AUTOSPEC_STREAMS` OFF ; 15 tests ; suite existante verte).
 - **Lot 2 — Planification multi-stream** : ST-4, ST-5. Le plan sait produire streams + tâches.
 - **Lot 3 — Stream frontend** : ST-6, ST-7, ST-8. Un projet peut générer du React vert.
 - **Lot 4 — Moteur parallèle** : ST-9, ST-10, ST-11. Parallélisme réel par worktree + merge.

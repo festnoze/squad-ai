@@ -237,6 +237,13 @@ class Settings:
     brainstorm_auto_rounds: int = field(
         default_factory=lambda: _env_int("AUTOSPEC_BRAINSTORM_ROUNDS", 3, minimum=1)
     )
+    # Multi-stream redesign (ST-1): split work into streams (backend/frontend/
+    # cache/database) with an optional Task level under each US, so independent
+    # streams build in parallel. OFF by default → one implicit backend stream,
+    # no tasks (the pre-streams behaviour is unchanged).
+    streams_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_STREAMS", False)
+    )
     setup_install: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_SETUP_INSTALL", False)
     )
