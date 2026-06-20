@@ -923,6 +923,81 @@ l'orchestrateur s'en sert pour relire l'état réel depuis l'exécution de pytes
 Ne réponds "green" (au niveau global) que si `uv run pytest` passe intégralement."""
 
 
+# ---------------------------------------------------------- Dev frontend (ST-7)
+
+def dev_story_frontend(
+    story: UserStory,
+    package_name: str,
+    feature_rel_path: str,
+    architecture: str = "",
+    guidance: str = "",
+    lessons: str = "",
+    file_root: str = "frontend",
+) -> str:
+    """Dev prompt for the frontend stream (ST-7): a React+TS dev who writes
+    components + Vitest tests in a red→green loop. "Green" = every Vitest test
+    passes AND `tsc && vite build` succeeds. Mirrors ``dev_story`` (same JSON
+    shape) but for the Vite project rooted at ``file_root``.
+
+    The unique substring ``PROCESSUS OBLIGATOIRE FRONTEND`` keys the
+    ScriptedRunner reply (checked before the backend ``PROCESSUS OBLIGATOIRE``)."""
+    arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    guidance_block = (
+        f"\nConsignes de l'utilisateur (à respecter en priorité) :\n{guidance}\n" if guidance else ""
+    )
+    lessons_block = (
+        f"\nLeçons des itérations précédentes (rétrospective d'usine — à appliquer) :\n{lessons}\n"
+        if lessons
+        else ""
+    )
+    return f"""Tu es le développeur FRONTEND d'un pipeline automatisé TDD. Tu travailles dans
+un projet React + TypeScript géré par Vite (dossier `{file_root}/`, package.json
+déjà présent : React, Vitest et Testing Library installés, scripts `build` =
+`tsc && vite build` et `test` = `vitest run`).
+{arch_block}{guidance_block}{lessons_block}
+User story (stream frontend) à implémenter : {story.id} — {story.title}
+Description : {story.description}
+Critères d'acceptance :
+{_criteria_block(story)}
+
+Spécification d'acceptance (Gherkin, vision fonctionnelle — `{feature_rel_path}`,
+NE PAS la modifier ; elle documente le comportement attendu) :
+\"\"\"{story.gherkin}\"\"\"
+
+PROCESSUS OBLIGATOIRE FRONTEND (TDD React, red→green) :
+1. Écris d'ABORD les tests Vitest + Testing Library qui encodent les critères
+   d'acceptance ci-dessus, dans des fichiers `src/**/<Composant>.test.tsx`
+   (`import {{ render, screen }} from "@testing-library/react"`,
+   `import {{ describe, it, expect }} from "vitest"`), et VÉRIFIE qu'ils
+   échouent (`npm exec -- vitest run` → rouge).
+2. Implémente le minimum nécessaire : composants React typés sous `src/`
+   (TypeScript strict — pas de `any`), du comportement externe vers l'interne,
+   pour faire passer les tests un à un.
+3. Relance `npm exec -- vitest run` jusqu'à ce que TOUTE la suite soit verte
+   (les tests des stories précédentes doivent rester verts).
+4. Lance le BUILD de production `npm run build` (`tsc && vite build`) et corrige
+   toute erreur de type/compilation : le « vert » EXIGE des tests verts ET un
+   build qui réussit.
+
+CONTRAINTES :
+- Ne touche qu'aux fichiers du dossier `{file_root}/` ; n'écris PAS dans le
+  backend. Code et identifiants en anglais ; textes utilisateur en français.
+- TypeScript strict, composants fonctionnels + hooks ; pas de dépendance lourde
+  non installée.
+
+Quand tu as terminé, réponds avec EXACTEMENT UN objet JSON :
+{{
+  "status": "green" | "failed",
+  "summary": "<ce que tu as fait, en français>",
+  "files": ["<fichiers créés/modifiés sous {file_root}/>"],
+  "test_results": [
+    {{"id": "<id logique du test>", "status": "green" | "red", "nodeids": ["<fichier.test.tsx::nom du test>"]}}
+  ]
+}}
+Ne réponds "green" (au niveau global) que si `npm exec -- vitest run` ET
+`npm run build` réussissent tous les deux."""
+
+
 # --------------------------------------------------- Factory retrospective (E7)
 
 def retro_review(state: ProjectState) -> str:
