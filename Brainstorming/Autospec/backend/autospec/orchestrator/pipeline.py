@@ -33,14 +33,18 @@ from ..models import (
     PipelinePhase,
     PlannedTest,
     ProjectState,
+    Stream,
+    StreamKind,
     StoryStatus,
+    Task,
     TestState,
     Usage,
     UserStory,
+    backend_stream_for,
 )
 from ..language_selector import recommend_language
 from ..storage import save_state_payload, workspace_dir
-from . import mutation, refine, scheduler, session_monitor, setup_exec, toolchain, workspace
+from . import mutation, refine, scheduler, session_monitor, setup_exec, streams as work_streams, toolchain, workspace
 from . import lessons as lesson_store
 from . import regression
 from . import deploy
@@ -781,6 +785,60 @@ class Pipeline:
             f"{rec['rationale']}",
         )
 
+    async def _aselect_streams(self) -> None:
+        """ST-4: the architect picks the project's work streams from the catalog.
+        Env-gated by AUTOSPEC_STREAMS — OFF is a strict no-op (``state.streams``
+        stays empty → one implicit backend stream, the pre-streams behaviour).
+        Always forces a primary backend stream carrying the backend language;
+        ids are deduplicated. Non-fatal: any agent/parse failure falls back to a
+        lone backend stream. First time only (already-chosen streams are kept)."""
+        if not settings.streams_enabled or self.state.streams:
+            return
+        back_lang = self.state.backend_language.value
+        chosen: list[Stream] = []
+        rationale = ""
+        try:
+            result = await self._tracked.arun(
+                prompts.select_streams(self.state),
+                system_prompt=persona("architect"),
+            )
+            reply = extract_json(result.text)
+            rationale = str(reply.get("rationale") or "")
+            seen: set[str] = set()
+            for data in reply.get("streams", []):
+                sid = str(data.get("id") or "").strip()
+                if not sid or sid in seen:
+                    continue
+                try:
+                    kind = StreamKind(str(data.get("kind") or "other").strip().lower())
+                except ValueError:
+                    kind = StreamKind.OTHER
+                seen.add(sid)
+                chosen.append(
+                    Stream(
+                        id=sid,
+                        kind=kind,
+                        language=str(data.get("language") or "").strip(),
+                        file_root=str(data.get("file_root") or "").strip(),
+                        primary=(kind == StreamKind.BACKEND),
+                    )
+                )
+        except AgentError as exc:
+            self._log("streams", f"Sélecteur de streams indisponible ({exc}) — backend seul.")
+
+        # Always guarantee exactly one primary backend stream carrying the
+        # backend language: drop any agent-declared backend, prepend ours.
+        non_backend = [s for s in chosen if s.kind != StreamKind.BACKEND]
+        for s in non_backend:
+            s.primary = False
+        self.state.streams = [backend_stream_for(back_lang)] + non_backend
+
+        listing = ", ".join(f"{s.id} ({s.kind.value}/{s.language or '—'})" for s in self.state.streams)
+        msg = f"🧵 Streams retenus : {listing}."
+        if rationale:
+            msg += f" {rationale}"
+        self._chat(ChatRole.SYSTEM, msg)
+
     async def aset_language(self, language: str) -> ProjectState:
         """L2: user override of the backend language. Raises ValueError (->409)
         on an unknown language."""
@@ -1255,6 +1313,8 @@ class Pipeline:
                 self._sync()
                 return
             await self._aselect_language()
+            # ST-4: pick the project's work streams (gated; no-op when off).
+            await self._aselect_streams()
             # Scaffold the skeleton ONLY after the backend language is chosen —
             # scaffold() dispatches on it, so doing this earlier (when the
             # language is still the Python default) left a stray Python skeleton
@@ -1495,6 +1555,10 @@ class Pipeline:
         taken_epic_ids = {e.id for e in self.state.epics}
         id_map: dict[str, str] = {}  # PO-chosen story id -> final unique id
         planned: list[tuple[str, str, dict]] = []  # (epic_id, story_id, story_data)
+        # ST-5: task ids must be unique project-wide; their depends_on (task ids)
+        # are remapped through the same rename. Seed with existing project tasks.
+        taken_task_ids = {t.id for t in self.state.all_tasks()}
+        task_id_map: dict[str, str] = {}  # PO-chosen task id -> final unique id
         for epic_data in plan.get("epics", []):
             epic_id = _unique_id(
                 epic_data.get("id") or f"EPIC-{len(taken_epic_ids) + 1}",
@@ -1515,7 +1579,42 @@ class Pipeline:
                 story_id = _unique_id(raw_id, "US", taken_story_ids)
                 taken_story_ids.add(story_id)
                 id_map.setdefault(raw_id, story_id)
+                # First pass: register the unique id of every task so cross-task
+                # depends_on (declared anywhere in the plan) remap consistently.
+                if settings.streams_enabled:
+                    for n, task_data in enumerate(story_data.get("tasks") or [], start=1):
+                        raw_tid = str(task_data.get("id") or f"T-{len(taken_task_ids) + 1}")
+                        tid = _unique_id(raw_tid, "T", taken_task_ids)
+                        taken_task_ids.add(tid)
+                        task_id_map.setdefault(raw_tid, tid)
                 planned.append((epic_id, story_id, story_data))
+
+        def _build_tasks(story_id: str, story_data: dict) -> list[Task]:
+            """ST-5: parse a US's decomposition into Task models, remapping task
+            depends_on through the project-wide rename. Empty unless streams on."""
+            if not settings.streams_enabled:
+                return []
+            out: list[Task] = []
+            for task_data in story_data.get("tasks") or []:
+                raw_tid = str(task_data.get("id") or "")
+                tid = task_id_map.get(raw_tid, raw_tid)
+                out.append(
+                    Task(
+                        id=tid,
+                        story_id=story_id,
+                        stream=str(task_data.get("stream") or ""),
+                        title=task_data.get("title", ""),
+                        description=task_data.get("description", ""),
+                        acceptance_criteria=[
+                            AcceptanceCriterion(id=f"AC-{i}", text=str(text))
+                            for i, text in enumerate(task_data.get("acceptance_criteria", []), start=1)
+                        ],
+                        gherkin=task_data.get("gherkin", ""),
+                        depends_on=[task_id_map.get(d, d) for d in task_data.get("depends_on", [])],
+                    )
+                )
+            return out
+
         new_stories = [
             UserStory(
                 id=story_id,
@@ -1532,6 +1631,10 @@ class Pipeline:
                 depends_on=[id_map.get(d, d) for d in story_data.get("depends_on", [])],
                 priority=_clamp_1_5(story_data.get("priority", 3)),
                 ui=bool(story_data.get("ui", False)),
+                # ST-5: stream tagging + optional task decomposition (gated; "" /
+                # [] when off, so the flag-off parse is byte-identical to today).
+                stream=str(story_data.get("stream") or "") if settings.streams_enabled else "",
+                tasks=_build_tasks(story_id, story_data),
                 iteration=self.state.iteration,
             )
             for epic_id, story_id, story_data in planned
@@ -1540,10 +1643,16 @@ class Pipeline:
         scheduler.sanitize_dependencies(self.state.stories + new_stories)
         self.state.stories.extend(new_stories)
         workspace.write_feature_files(self.state, new_stories)
+        # ST-5: sanity-check the produced work graph (dangling deps / cycle).
+        if settings.streams_enabled:
+            for w in work_streams.validate(self.state):
+                self._log("streams", f"Graphe de tâches : {w}")
+        n_tasks = sum(len(s.tasks) for s in new_stories)
+        task_note = f", {n_tasks} tâche(s)" if n_tasks else ""
         self._chat(
             ChatRole.PO,
             f"Plan de l'itération {self.state.iteration} : "
-            f"{len(plan.get('epics', []))} epic(s), {len(new_stories)} user story(ies).",
+            f"{len(plan.get('epics', []))} epic(s), {len(new_stories)} user story(ies){task_note}.",
         )
 
     # ------------------------------------------------------ ARCHITECT (design)

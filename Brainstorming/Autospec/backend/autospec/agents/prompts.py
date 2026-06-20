@@ -6,7 +6,13 @@ import csv
 import json
 
 from ..config import settings
-from ..models import FeatureHypothesis, HypothesisStatus, ProjectState, UserStory
+from ..models import (
+    DEFAULT_STREAM_CATALOG,
+    FeatureHypothesis,
+    HypothesisStatus,
+    ProjectState,
+    UserStory,
+)
 
 # --------------------------------------------------------------- shared helpers
 
@@ -516,6 +522,44 @@ Réponds avec EXACTEMENT UN objet JSON :
 }}"""
 
 
+def select_streams(state: ProjectState) -> str:
+    """ST-4: the architect chooses the project's work STREAMS from the catalog
+    (each with a language), so independent streams can build in parallel. The
+    primary `backend` stream is always present (carrying the backend language);
+    the agent decides which others (frontend/cache/database) the product needs."""
+    catalog = "\n".join(
+        f"- {sid} : kind={spec['kind'].value}, langage par défaut « {spec['language']} »,"
+        f" zone de fichiers « {spec['file_root'] or '(racine)'} »"
+        for sid, spec in DEFAULT_STREAM_CATALOG.items()
+    )
+    return f"""Tu es l'architecte technique d'un pipeline automatisé qui découpe le travail en
+STREAMS parallélisables (zones de travail disjointes, chacune avec son toolchain
+et son langage). Voici le brief produit :
+\"\"\"{state.brief or state.goal}\"\"\"
+
+Langage backend retenu pour ce projet : {state.backend_language.value}.
+
+Catalogue de streams disponibles (réutilise les `id` EXACTS) :
+{catalog}
+
+Ta mission : choisis les streams pertinents pour CE produit. Règles :
+- Le stream « backend » est OBLIGATOIRE et primaire (porte le langage backend
+  ci-dessus) — inclus-le toujours.
+- Ajoute « frontend » UNIQUEMENT si le produit a une interface web (React+Vite).
+- Ajoute « cache » / « database » UNIQUEMENT si le brief le justifie réellement.
+- Reste minimal : un produit purement CLI/librairie n'a qu'un stream backend.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "streams": [
+    {{"id": "backend", "kind": "backend", "language": "{state.backend_language.value}", "file_root": ""}},
+    {{"id": "frontend", "kind": "frontend", "language": "react", "file_root": "frontend"}}
+  ],
+  "rationale": "<une phrase en français justifiant le découpage>"
+}}
+Les "kind" autorisés : backend, frontend, cache, database, other."""
+
+
 def components_proposal(state: ProjectState) -> str:
     return f"""Tu es l'agent solutionneur d'un pipeline automatisé. Voici le brief produit :
 \"\"\"{state.brief or state.goal}\"\"\"
@@ -590,11 +634,38 @@ Réponds avec EXACTEMENT UN objet JSON :
 
 # ---------------------------------------------------------------- PO (plan)
 
+def _streams_plan_block(state: ProjectState) -> str:
+    """ST-5: the multi-stream extension of the PO plan. Only injected when the
+    streams feature is on; the recognisable marker « DÉCOUPAGE MULTI-STREAM »
+    lets the ScriptedRunner branch to its stream-aware reply. When off this
+    returns "" so the prompt — and its parsing — stay byte-identical to today."""
+    if not settings.streams_enabled:
+        return ""
+    stream_ids = ", ".join(s.id for s in state.effective_streams())
+    return f"""
+
+DÉCOUPAGE MULTI-STREAM (le travail est réparti en streams parallèles).
+Streams disponibles pour ce projet (utilise ces ids) : {stream_ids}.
+Pour CHAQUE user story, choisis l'une des deux formes :
+- MONO-STREAM : ajoute un champ `stream` (id d'un stream ci-dessus) à la story —
+  elle est développée entièrement dans ce stream.
+- MULTI-STREAM : laisse `stream` vide et DÉCOMPOSE la story en `tasks`, chacune
+  dans UN stream, reliées par leurs dépendances (`depends_on` d'ids de tâches).
+  Exemple typique : une tâche backend qui expose l'API + une tâche frontend qui
+  la consomme et qui `depends_on` la tâche backend.
+Chaque tâche : {{"id", "stream", "title", "description", "acceptance_criteria",
+"gherkin", "depends_on": [ids de tâches]}}. Les ids de tâches sont uniques dans
+tout le plan ; une tâche frontend DOIT dépendre de la tâche backend dont elle
+consomme le contrat.
+"""
+
+
 def po_plan(state: ProjectState, package_name: str) -> str:
     existing = [
         {"id": s.id, "title": s.title, "status": s.status.value}
         for s in state.stories
     ]
+    streams_block = _streams_plan_block(state)
     return f"""Tu es le PO/Scrum Master d'un pipeline automatisé. Voici le brief produit :
 \"\"\"{state.brief}\"\"\"
 
@@ -619,7 +690,7 @@ stories. Adapte la granularité à la complexité : une petite feature = 1 epic 
 - porter un drapeau `ui` (booléen) : true UNIQUEMENT si la story a une vraie
   dimension visuelle/interface (écran, rendu, interaction navigateur), false
   pour la logique pure / API / CLI.
-
+{streams_block}
 Réponds avec EXACTEMENT UN objet JSON :
 {{
   "epics": [
@@ -636,7 +707,9 @@ Réponds avec EXACTEMENT UN objet JSON :
           "gherkin": "Feature: ...\\n  Scenario: ...\\n    Given ...\\n    When ...\\n    Then ...",
           "depends_on": [],
           "priority": 1,
-          "ui": false
+          "ui": false,
+          "stream": "",
+          "tasks": []
         }}
       ]
     }}

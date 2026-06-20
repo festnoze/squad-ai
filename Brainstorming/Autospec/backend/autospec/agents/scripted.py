@@ -128,6 +128,75 @@ _IMPACT = json.dumps(
     ensure_ascii=False,
 )
 
+# ST-4: the architect picks a backend + frontend stream (demo).
+_STREAMS = json.dumps(
+    {
+        "streams": [
+            {"id": "backend", "kind": "backend", "language": "python", "file_root": ""},
+            {"id": "frontend", "kind": "frontend", "language": "react", "file_root": "frontend"},
+        ],
+        "rationale": "Backend API + interface web React (mode démo).",
+    },
+    ensure_ascii=False,
+)
+
+# ST-5: the stream-aware PO plan — one US decomposed into a backend task and a
+# frontend task that depends on it (cross-stream dependency).
+_PO_PLAN_STREAMS = json.dumps(
+    {
+        "epics": [
+            {
+                "id": "EPIC-1",
+                "title": "Cœur applicatif",
+                "description": "Fonctionnalités de base, réparties par stream.",
+                "stories": [
+                    {
+                        "id": "US-1",
+                        "title": "Additionner deux nombres (API + UI)",
+                        "description": "En tant qu'utilisateur, je veux additionner deux nombres via une UI web afin d'obtenir leur somme.",
+                        "acceptance_criteria": ["La somme de 2 et 3 vaut 5."],
+                        "gherkin": "Feature: Addition\n  Scenario: Somme simple\n    Given le nombre 2\n    And le nombre 3\n    When je les additionne\n    Then j'obtiens 5",
+                        "depends_on": [],
+                        "priority": 1,
+                        "stream": "",
+                        "tasks": [
+                            {
+                                "id": "T-1",
+                                "stream": "backend",
+                                "title": "Exposer l'addition via l'API",
+                                "description": "Endpoint de calcul de la somme.",
+                                "acceptance_criteria": ["GET /add?a=2&b=3 renvoie 5."],
+                                "gherkin": "Feature: API addition\n  Scenario: Somme\n    Given a=2 et b=3\n    When j'appelle l'API\n    Then la réponse est 5",
+                                "depends_on": [],
+                            },
+                            {
+                                "id": "T-2",
+                                "stream": "frontend",
+                                "title": "Écran d'addition",
+                                "description": "Formulaire React qui appelle l'API et affiche la somme.",
+                                "acceptance_criteria": ["La somme s'affiche à l'écran."],
+                                "gherkin": "Feature: UI addition\n  Scenario: Affichage\n    Given deux champs\n    When je valide\n    Then la somme s'affiche",
+                                "depends_on": ["T-1"],
+                            },
+                        ],
+                    },
+                    {
+                        "id": "US-2",
+                        "title": "Soustraire deux nombres",
+                        "description": "En tant qu'utilisateur, je veux soustraire deux nombres afin d'obtenir leur différence.",
+                        "acceptance_criteria": ["La différence de 5 et 3 vaut 2."],
+                        "gherkin": "Feature: Soustraction\n  Scenario: Différence simple\n    Given le nombre 5\n    And le nombre 3\n    When je les soustrais\n    Then j'obtiens 2",
+                        "depends_on": ["US-1"],
+                        "priority": 2,
+                        "stream": "backend",
+                        "tasks": [],
+                    },
+                ],
+            }
+        ]
+    }
+)
+
 _LANGUAGE = json.dumps(
     {
         "language": "go",
@@ -251,6 +320,8 @@ class ScriptedRunner:
             return _ASSESS
         if "PORTEUR du projet" in prompt:  # brainstorm_auto_answer (B-IDEA)
             return _AUTO_ANSWER
+        if "découpe le travail en\nSTREAMS" in prompt or "STREAMS parallélisables" in prompt:
+            return _STREAMS  # select_streams (ST-4)
         if "choisit le LANGAGE BACKEND" in prompt:  # language_proposal (L2)
             return _LANGUAGE
         if "agent solutionneur" in prompt:  # components_proposal
@@ -263,6 +334,10 @@ class ScriptedRunner:
         if "design technique CONCIS" in prompt:  # architect_design
             return _ARCHITECT
         if "PO/Scrum Master" in prompt:  # po_plan / po_revise
+            # ST-5: the stream-aware plan adds this marker; branch to the
+            # decomposed reply, keeping the flag-off PO reply intact.
+            if "DÉCOUPAGE MULTI-STREAM" in prompt:
+                return _PO_PLAN_STREAMS
             return _PO_PLAN
         if "analyste/explorateur" in prompt:  # analyst_explore
             return _ANALYST
