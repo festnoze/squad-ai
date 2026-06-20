@@ -129,6 +129,11 @@ export interface ProjectState {
   spec_mode: "interview" | "brainstorm";
   phase: PipelinePhase;
   brief: string;
+  // B-IDEA: idea-maturity assessment + brainstorming-assist state.
+  idea_maturity?: "" | "structured" | "vague";
+  idea_rationale?: string;
+  brainstorm_techniques?: string[];
+  awaiting_brainstorm_decision?: boolean;
   backlog: FeatureHypothesis[];
   components?: ProductComponent[];
   epics: Epic[];

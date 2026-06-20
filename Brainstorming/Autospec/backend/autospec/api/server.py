@@ -26,7 +26,7 @@ from ..agents.providers import (
 )
 from ..agents.runner import AgentRunner
 from ..agents.scripted import ScriptedRunner
-from ..config import PROJECT_DIR, settings
+from ..config import PROJECT_DIR, _env_int, settings
 from ..models import ChatMessage, ChatRole, PipelinePhase, ProjectState, StoryStatus, new_id
 from ..orchestrator.events import bus
 from ..orchestrator.pipeline import Pipeline
@@ -172,6 +172,10 @@ class SpecModeRequest(BaseModel):
     mode: str
 
 
+class BrainstormDecisionRequest(BaseModel):
+    accept: bool
+
+
 class RollbackRequest(BaseModel):
     iteration: int
 
@@ -202,6 +206,10 @@ class ComponentsRequest(BaseModel):
 
 class LanguageRequest(BaseModel):
     language: str  # L2: python | go | rust
+
+
+class RunRequest(BaseModel):
+    args: str = ""  # optional CLI args forwarded to the generated app
 
 
 class AcceptanceCriterionInput(BaseModel):
@@ -436,7 +444,10 @@ async def adelete_project(project_id: str) -> dict:
     if pipeline:
         await pipeline.adispose()
     try:
-        existed = _force_delete_workspace(project_id)
+        # rmtree of a git workspace (read-only packs + chmod retries on Windows)
+        # is slow; off the event loop so uvicorn keeps accepting connections
+        # (a blocked loop surfaces as proxy ETIMEDOUT/ECONNRESET in the UI).
+        existed = await asyncio.to_thread(_force_delete_workspace, project_id)
     except OSError:
         # The state file survived: re-register the (now dormant) pipeline so
         # the project stays listed/controllable and the delete can be retried.
@@ -470,6 +481,18 @@ async def aset_spec_mode(project_id: str, req: SpecModeRequest) -> dict:
     except ValueError as exc:
         raise HTTPException(422, str(exc))
     return {"ok": True, "spec_mode": pipeline.state.spec_mode}
+
+
+@app.post("/api/projects/{project_id}/brainstorm-decision")
+async def aresolve_brainstorm(project_id: str, req: BrainstormDecisionRequest) -> dict:
+    """B-IDEA: the user accepts (interactive brainstorming) or declines
+    (autonomous brainstorming) the offer made for a vague idea."""
+    pipeline = _pipeline(project_id)
+    try:
+        await pipeline.aresolve_brainstorm(req.accept)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    return {"ok": True}
 
 
 @app.post("/api/projects/{project_id}/budget")
@@ -555,7 +578,7 @@ async def aretry_failed(project_id: str) -> dict:
 
 
 @app.post("/api/projects/{project_id}/run")
-async def arun_app(project_id: str) -> dict:
+async def arun_app(project_id: str, req: RunRequest | None = None) -> dict:
     pipeline = _pipeline(project_id)
     if pipeline.state.phase in (
         PipelinePhase.SPEC,
@@ -564,7 +587,7 @@ async def arun_app(project_id: str) -> dict:
         PipelinePhase.BUILD,
     ):
         raise HTTPException(409, "Le projet n'a pas encore de code à lancer.")
-    await pipeline.arun_app()
+    await pipeline.arun_app((req.args if req else "").strip())
     return {"ok": True}
 
 
@@ -899,7 +922,20 @@ if (_dist / "index.html").exists() and (_dist / "assets").is_dir():
 def main() -> None:
     import uvicorn
 
-    uvicorn.run("autospec.api.server:app", host="127.0.0.1", port=8100, reload=False)
+    # Keep idle keep-alive connections open far longer than uvicorn's 5s default.
+    # The Vite dev proxy pools connections (keepAlive agent); if uvicorn closes an
+    # idle socket first (e.g. while the user fills the create form), the proxy
+    # reuses the now-dead socket on the next POST and gets an ECONNRESET it won't
+    # retry (a non-idempotent POST) — surfacing as "Erreur 502" on create/chat.
+    # A generous server-side timeout means the client always closes first.
+    keep_alive = _env_int("AUTOSPEC_KEEP_ALIVE_S", 600, minimum=5)
+    uvicorn.run(
+        "autospec.api.server:app",
+        host="127.0.0.1",
+        port=8100,
+        reload=False,
+        timeout_keep_alive=keep_alive,
+    )
 
 
 if __name__ == "__main__":

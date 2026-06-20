@@ -186,6 +186,21 @@ _RETRO = json.dumps(
     ensure_ascii=False,
 )
 
+_ASSESS = json.dumps(
+    {
+        "maturity": "vague",
+        "rationale": "Idée ouverte à explorer avant de spécifier (mode démo).",
+        "techniques": ["What If Scenarios", "First Principles Thinking"],
+    },
+    ensure_ascii=False,
+)
+
+# brainstorm_auto_answer returns PLAIN text (the AI playing the product owner).
+_AUTO_ANSWER = (
+    "Cible : usage personnel, MVP minimal en CLI (mode démo) — priorité à l'ajout "
+    "et au listing des éléments."
+)
+
 _JUDGE = json.dumps(
     {"score": 90, "verdict": "Qualité suffisante (mode démo).", "reasons": ["ok"]},
     ensure_ascii=False,
@@ -232,6 +247,10 @@ class ScriptedRunner:
             return _RETRO
         if "analyste d'impact" in prompt:  # feedback_impact
             return _IMPACT
+        if "MATURITÉ de l'idée" in prompt:  # assess_idea (B-IDEA)
+            return _ASSESS
+        if "PORTEUR du projet" in prompt:  # brainstorm_auto_answer (B-IDEA)
+            return _AUTO_ANSWER
         if "choisit le LANGAGE BACKEND" in prompt:  # language_proposal (L2)
             return _LANGUAGE
         if "agent solutionneur" in prompt:  # components_proposal

@@ -46,14 +46,17 @@ def test_command(language: str, report_path: str) -> list[str]:
     ]
 
 
-def run_command(language: str) -> list[str]:
-    """The subprocess argv to launch the generated app for ``language``."""
+def run_command(language: str, args: list[str] | None = None) -> list[str]:
+    """The subprocess argv to launch the generated app for ``language``, with
+    optional CLI ``args`` forwarded to the app (e.g. a subcommand). Cargo needs
+    a ``--`` separator before program args."""
     lang = normalize(language)
+    extra = list(args or [])
     if lang == "go":
-        return [settings.go_cmd, "run", "."]
+        return [settings.go_cmd, "run", ".", *extra]
     if lang == "rust":
-        return [settings.cargo_cmd, "run", "-q"]
-    return [settings.uv_cmd, "run", "python", "main.py"]
+        return [settings.cargo_cmd, "run", "-q", *(["--", *extra] if extra else [])]
+    return [settings.uv_cmd, "run", "python", "main.py", *extra]
 
 
 def parse_results(language: str, stdout: str, report_path: str) -> dict[str, str]:

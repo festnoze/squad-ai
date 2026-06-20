@@ -241,6 +241,11 @@ class ProjectState(BaseModel):
     language_complexity: int = -1   # technical complexity 1-5 (-1 = not analyzed)
     language_criticality: int = -1  # error-sensitivity 1-5 (-1 = not analyzed)
     language_rationale: str = ""
+    # B-IDEA: idea-maturity assessment + brainstorming-assist state.
+    idea_maturity: str = ""        # "" (not assessed) | "structured" | "vague"
+    idea_rationale: str = ""       # why the idea was judged structured/vague
+    brainstorm_techniques: list[str] = Field(default_factory=list)  # BMAD-chosen
+    awaiting_brainstorm_decision: bool = False  # UI: offer brainstorming (oui/non)
     backlog: list[FeatureHypothesis] = Field(default_factory=list)
     components: list[Component] = Field(default_factory=list)
     epics: list[Epic] = Field(default_factory=list)

@@ -10,6 +10,7 @@ import asyncio
 import json
 import os
 import re
+import shlex
 import subprocess
 import time
 
@@ -194,6 +195,9 @@ class Pipeline:
         # U4: cleared while the pipeline waits for human approval before build.
         self._approval_event = asyncio.Event()
         self._approval_event.set()
+        # B-IDEA: set when the user resolves the brainstorming offer.
+        self._brainstorm_event = asyncio.Event()
+        self._brainstorm_accepted = False
 
     # ------------------------------------------------------------- events
 
@@ -305,6 +309,7 @@ class Pipeline:
     async def astop(self) -> None:
         self._stop_requested = True
         self._resume_event.set()  # unblock a paused pipeline so it can finish
+        self._brainstorm_event.set()  # unblock a pending brainstorming offer
         # Unblock a PM interview waiting for user input.
         await self._user_messages.put("")
         self._chat(ChatRole.SYSTEM, "Arrêt demandé : la boucle se terminera après l'étape en cours.")
@@ -403,6 +408,17 @@ class Pipeline:
             if mode == "brainstorm"
             else "💬 Mode interview socratique activé.",
         )
+
+    async def aresolve_brainstorm(self, accept: bool) -> None:
+        """B-IDEA: resolve the brainstorming offer. ``accept`` → interactive
+        brainstorming (the user answers); ``refuse`` → autonomous brainstorming
+        (the AI plays the product owner). Raises ValueError (-> 409) when no
+        offer is pending."""
+        if not self.state.awaiting_brainstorm_decision:
+            raise ValueError("aucune décision de brainstorming en attente")
+        self._brainstorm_accepted = bool(accept)
+        self.state.awaiting_brainstorm_decision = False
+        self._brainstorm_event.set()
 
     # ------------------------------------------------------------ spec editing
 
@@ -1232,7 +1248,6 @@ class Pipeline:
 
     async def _alifecycle(self) -> None:
         try:
-            workspace.scaffold(self.state)
             await self._abrownfield_init()
             brief = await self._aspec_phase()
             if brief is None:  # stopped during interview
@@ -1240,6 +1255,11 @@ class Pipeline:
                 self._sync()
                 return
             await self._aselect_language()
+            # Scaffold the skeleton ONLY after the backend language is chosen —
+            # scaffold() dispatches on it, so doing this earlier (when the
+            # language is still the Python default) left a stray Python skeleton
+            # (main.py, pyproject.toml, package dir) inside Go/Rust workspaces.
+            workspace.scaffold(self.state)
             await self._apropose_components()
 
             while not self._stop_requested:
@@ -1295,6 +1315,15 @@ class Pipeline:
             # I3: an imported / pre-seeded brief skips the PM interview.
             self._chat(ChatRole.PM, "📥 Brief importé — passage direct à la planification.")
             return self.state.brief
+        if settings.brainstorm_assist_enabled:
+            # B-IDEA: classify the idea; a vague one triggers a brainstorming
+            # (offered, or run autonomously) before the spec loop.
+            outcome = await self._abrainstorm_assist()
+            if outcome == "done":  # a brief was synthesized autonomously
+                return self.state.brief
+            if outcome == "stopped":
+                return None
+            # "interactive" -> fall through to the interview/brainstorm loop
         while not self._stop_requested:
             # Brainstorming re-questions the need itself (BMAD analyst persona);
             # interview is the Socratic spec facilitation (PM persona).
@@ -1322,6 +1351,129 @@ class Pipeline:
             if self._stop_requested:
                 return None
         return None
+
+    async def _abrainstorm_assist(self) -> str:
+        """B-IDEA: assess the idea's maturity; when vague, offer a brainstorming
+        session (or run it autonomously). Returns ``"interactive"`` (continue the
+        normal spec loop), ``"done"`` (a brief was synthesized) or ``"stopped"``.
+        Non-fatal: any agent error falls back to the plain interview."""
+        try:
+            res = await self._tracked.arun(
+                prompts.assess_idea(self.state),
+                system_prompt=persona("analyst"),
+                session_id=self._pm_session,
+            )
+            self._pm_session = res.session_id
+            assess = extract_json(res.text)
+        except AgentError as exc:
+            self._chat(ChatRole.SYSTEM, f"Évaluation de l'idée indisponible : {exc}")
+            return "interactive"
+
+        self.state.idea_maturity = (assess.get("maturity") or "structured").strip().lower()
+        self.state.idea_rationale = assess.get("rationale", "")
+        self.state.brainstorm_techniques = [t for t in (assess.get("techniques") or []) if t][:5]
+
+        if self.state.idea_maturity == "vague":
+            tline = (
+                " Techniques proposées : " + ", ".join(self.state.brainstorm_techniques) + "."
+                if self.state.brainstorm_techniques
+                else ""
+            )
+            self._chat(
+                ChatRole.ANALYST,
+                f"🔎 Idée encore ouverte — {self.state.idea_rationale}{tline}",
+            )
+        else:
+            self._chat(
+                ChatRole.ANALYST,
+                f"🔎 Idée déjà cadrée — {self.state.idea_rationale} On spécifie directement.",
+            )
+        self._sync()
+
+        if self.state.idea_maturity != "vague":
+            return "interactive"
+
+        # Vague idea. Auto-spec runs the brainstorming autonomously without
+        # asking; otherwise we offer the choice and wait for the user.
+        if not self.state.auto_spec:
+            self.state.awaiting_brainstorm_decision = True
+            self._chat(
+                ChatRole.SYSTEM,
+                "💡 Idée à affiner — veux-tu une session de brainstorming ? "
+                "« Oui » : on explore ensemble (je te pose des questions). "
+                "« Non » : je l'affine en autonomie.",
+            )
+            self._sync()
+            self._brainstorm_event.clear()
+            await self._brainstorm_event.wait()
+            self.state.awaiting_brainstorm_decision = False
+            if self._stop_requested:
+                return "stopped"
+            if self._brainstorm_accepted:
+                self.state.spec_mode = "brainstorm"
+                self._chat(
+                    ChatRole.SYSTEM,
+                    "🧠 Brainstorming interactif — affinons l'idée ensemble.",
+                )
+                self._sync()
+                return "interactive"
+
+        brief = await self._aself_brainstorm()
+        return "stopped" if brief is None else "done"
+
+    async def _aself_brainstorm(self) -> str | None:
+        """B-IDEA: autonomous brainstorming. The analyst diverges/converges with
+        the chosen techniques and an AI plays the product owner answering, for a
+        few rounds, then the brief is synthesized. Returns the brief, or None if
+        stopped."""
+        self._chat(
+            ChatRole.ANALYST,
+            "🧠 Brainstorming autonome : j'explore et je réponds à ta place pour affiner l'idée.",
+        )
+        self._sync()
+        rounds = settings.brainstorm_auto_rounds
+        for i in range(rounds):
+            if self._stop_requested:
+                return None
+            res = await self._tracked.arun(
+                prompts.pm_brainstorm(self.state, force_brief=(i == rounds - 1)),
+                system_prompt=persona("analyst"),
+                session_id=self._pm_session,
+            )
+            self._pm_session = res.session_id
+            reply = extract_json(res.text)
+            message = reply.get("message", "")
+            if message:
+                self._chat(ChatRole.ANALYST, message)
+            if reply.get("type") == "brief":
+                self.state.brief = reply.get("brief", "")
+                self._sync()
+                return self.state.brief
+            # The AI answers the analyst's question (plays the product owner).
+            try:
+                ans = await self._tracked.arun(
+                    prompts.brainstorm_auto_answer(self.state, message),
+                    system_prompt=persona("pm"),
+                )
+                answer = ans.text.strip()
+            except AgentError:
+                answer = "(pas de réponse — poursuis avec des hypothèses raisonnables.)"
+            if answer:
+                self._chat(ChatRole.USER, f"🤖 {answer}")
+                self._sync()
+
+        # Safety net: force a brief if the loop ended without one.
+        try:
+            res = await self._tracked.arun(
+                prompts.pm_brainstorm(self.state, force_brief=True),
+                system_prompt=persona("analyst"),
+                session_id=self._pm_session,
+            )
+            self.state.brief = extract_json(res.text).get("brief", "") or self.state.goal
+        except AgentError:
+            self.state.brief = self.state.goal
+        self._sync()
+        return self.state.brief
 
     # ------------------------------------------------------------ PLAN (PO)
 
@@ -1620,14 +1772,24 @@ class Pipeline:
         return await asyncio.to_thread(_run)
 
     async def _agit_ensure_repo(self, ws) -> bool:
-        """Make sure ``ws`` is a git work tree, initializing it (with an Autospec
-        identity) if needed. Returns False only if ``git init`` fails."""
-        code, _ = await self._agit(ws, "rev-parse", "--is-inside-work-tree")
-        if code != 0:
-            if (await self._agit(ws, "init"))[0] != 0:
-                return False
-            await self._agit(ws, "config", "user.email", "autospec@local")
-            await self._agit(ws, "config", "user.name", "Autospec")
+        """Make sure ``ws`` is its OWN git work tree, initializing it (with an
+        Autospec identity) if needed. Returns False only if ``git init`` fails.
+
+        We must check that ``ws`` itself is a repo — NOT merely
+        ``--is-inside-work-tree``, which is also true when the workspace is
+        nested inside an enclosing repository (e.g. when ``workspace_root``
+        lives inside the Autospec checkout). In that case ``git init`` would be
+        skipped and every ``git add -A`` / ``commit`` here would pollute the
+        parent repository with the user's working changes and our scaffold
+        files — committed under the user's global git identity. Anchoring on
+        ``ws/.git`` guarantees an isolated repo (and respects a brownfield repo
+        that already carries its own ``.git``)."""
+        if (ws / ".git").exists():
+            return True
+        if (await self._agit(ws, "init"))[0] != 0:
+            return False
+        await self._agit(ws, "config", "user.email", "autospec@local")
+        await self._agit(ws, "config", "user.name", "Autospec")
         return True
 
     async def _agit_snapshot(self, ws, label: str) -> bool:
@@ -2175,9 +2337,36 @@ class Pipeline:
 
     # ------------------------------------------------- AUTO-SPEC next cycle
 
+    def _fail_stranded_stories(self, iteration: int) -> int:
+        """Mark every story of ``iteration`` left attempted-but-unfinished
+        (todo/red/in_progress with a recorded attempt or error) as FAILED, so
+        advancing to the next iteration never strands an ambiguous « todo with
+        an error » that no action could relaunch. Returns the count."""
+        stranded = [
+            s
+            for s in self.state.stories_of_iteration(iteration)
+            if s.status in (StoryStatus.TODO, StoryStatus.RED, StoryStatus.IN_PROGRESS)
+            and (s.attempts > 0 or s.last_error)
+        ]
+        for s in stranded:
+            s.status = StoryStatus.FAILED
+            if not s.last_error:
+                s.last_error = "Itération clôturée sans finir cette story."
+        return len(stranded)
+
     async def _anext_feature_phase(self) -> None:
         """Analyst explores/prioritizes the backlog and picks the next feature,
         then the PM writes the brief for it."""
+        # Close the finishing iteration cleanly: any attempted-but-unfinished
+        # story becomes FAILED (clear status + relaunchable) instead of a stray
+        # TODO orphaned in a past iteration.
+        n_failed = self._fail_stranded_stories(self.state.iteration)
+        if n_failed:
+            self._chat(
+                ChatRole.SYSTEM,
+                f"⚠️ {n_failed} story(ies) non terminée(s) marquée(s) en échec à la "
+                "clôture de l'itération (relançables via « 🔄 Relancer »).",
+            )
         selected = await self._aanalyze_phase()
         self.state.phase = PipelinePhase.SPEC
         self._sync()
@@ -2241,7 +2430,7 @@ class Pipeline:
 
     # ------------------------------------------------------------ RUN app
 
-    async def arun_app(self) -> None:
+    async def arun_app(self, args: str = "") -> None:
         if self._run_proc and self._run_proc.poll() is None:
             self._log("run", "L'application tourne déjà.")
             return
@@ -2249,28 +2438,35 @@ class Pipeline:
         # The generated app is untrusted agent code — give it OS essentials only,
         # never the server's full environment (which may hold secrets).
         env = _minimal_env()
+        # Optional CLI arguments forwarded to the generated app (e.g. a
+        # subcommand for a CLI app that prints usage when launched bare).
+        run_args = shlex.split(args) if args else []
         self.state.running = True
         self._sync()
-        self._log("run", "▶ Lancement de l'application générée…")
+        hint = f" ({args})" if args else ""
+        self._log("run", f"▶ Lancement de l'application générée{hint}…")
         # Stream the child's output from a worker thread, marshaling each line
         # back onto the event loop (asyncio subprocesses are unsupported on the
         # Windows SelectorEventLoop that uvicorn runs).
         loop = asyncio.get_running_loop()
         self._stream_task = asyncio.create_task(
-            asyncio.to_thread(self._stream_run_output, ws, env, loop)
+            asyncio.to_thread(self._stream_run_output, ws, env, loop, run_args)
         )
 
-    def _stream_run_output(self, ws, env, loop: asyncio.AbstractEventLoop) -> None:
+    def _stream_run_output(
+        self, ws, env, loop: asyncio.AbstractEventLoop, run_args: list[str] | None = None
+    ) -> None:
         import sys
 
         # In demo mode a Python project runs with the current interpreter
         # (hermetic, no uv venv build); otherwise dispatch to the language's run
         # command (uv run / go run / cargo run) — L2g.
         lang = toolchain.normalize(self.state.backend_language.value)
+        run_args = run_args or []
         if settings.fake_agents and lang == "python":
-            cmd = [sys.executable, "main.py"]
+            cmd = [sys.executable, "main.py", *run_args]
         else:
-            cmd = toolchain.run_command(lang)
+            cmd = toolchain.run_command(lang, run_args)
         try:
             proc = subprocess.Popen(
                 cmd,

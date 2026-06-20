@@ -70,3 +70,13 @@ def test_parse_rust_text_output():
         "tests::subtracts": "failed",
         "tests::pending": "skipped",
     }
+
+
+def test_run_command_with_args():
+    # Args are forwarded; cargo needs a `--` separator before program args.
+    assert toolchain.run_command("go", ["auth-screen"]) == ["go", "run", ".", "auth-screen"]
+    assert toolchain.run_command("rust", ["send", "x"]) == [
+        "cargo", "run", "-q", "--", "send", "x",
+    ]
+    assert toolchain.run_command("python", ["inbox"])[-1] == "inbox"
+    assert toolchain.run_command("rust") == ["cargo", "run", "-q"]

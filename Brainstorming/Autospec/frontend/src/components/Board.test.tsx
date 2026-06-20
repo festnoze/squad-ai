@@ -169,3 +169,32 @@ describe("Board — vision produit à plat + pastille itération", () => {
     expect(screen.getByText("Story ciblée")).toBeInTheDocument();
   });
 });
+
+describe("Board — relance d'une story bloquée (US todo en erreur)", () => {
+  const epic: Epic = { id: "E1", title: "Cœur", description: "", iteration: 1 };
+  const stuck = makeStory({
+    id: "US-13",
+    epic_id: "E1",
+    status: "todo",
+    attempts: 1,
+    last_error: "boom",
+    title: "US bloquée",
+  });
+
+  function openDetail(phase: string) {
+    render(<Board epics={[epic]} stories={[stuck]} projectId="p1" phase={phase} />);
+    fireEvent.click(screen.getByText("Cœur")); // épics -> epic
+    fireEvent.click(screen.getByText("US bloquée")); // epic -> détail
+  }
+
+  it("pipeline dormante : une US todo tentée/en erreur est relançable", () => {
+    openDetail("done");
+    expect(screen.getByRole("button", { name: /Relancer/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Forcer terminé/ })).toBeInTheDocument();
+  });
+
+  it("pipeline active : pas de relance par story (le build tourne)", () => {
+    openDetail("build");
+    expect(screen.queryByRole("button", { name: /Relancer/ })).not.toBeInTheDocument();
+  });
+});

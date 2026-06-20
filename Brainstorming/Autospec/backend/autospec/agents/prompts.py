@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import csv
 import json
 
+from ..config import settings
 from ..models import FeatureHypothesis, HypothesisStatus, ProjectState, UserStory
 
 # --------------------------------------------------------------- shared helpers
@@ -169,12 +171,93 @@ Dès que les dimensions essentielles sont suffisamment claires, produis le brief
 {PM_ENVELOPE}"""
 
 
-def pm_brainstorm(state: ProjectState) -> str:
+def _brainstorming_catalog() -> str:
+    """Compact catalog of the BMAD brainstorming techniques (category → names),
+    injected so the analyst picks the most adapted ones for the subject.
+    Resilient: a small built-in fallback if the BMAD CSV is absent."""
+    path = (
+        settings.bmad_dir
+        / "core"
+        / "workflows"
+        / "brainstorming"
+        / "brain-methods.csv"
+    )
+    try:
+        rows = csv.DictReader(path.read_text(encoding="utf-8").splitlines())
+        by_cat: dict[str, list[str]] = {}
+        for r in rows:
+            cat = (r.get("category") or "").strip()
+            name = (r.get("technique_name") or "").strip()
+            if cat and name:
+                by_cat.setdefault(cat, []).append(name)
+        if by_cat:
+            return "\n".join(
+                f"- {cat} : {', '.join(names)}" for cat, names in by_cat.items()
+            )
+    except OSError:
+        pass
+    return (
+        "- creative : What If Scenarios, First Principles Thinking, Reversal Inversion, Analogical Thinking\n"
+        "- deep : Five Whys, Question Storming, Assumption Reversal\n"
+        "- collaborative : Role Playing, Yes And Building"
+    )
+
+
+def assess_idea(state: ProjectState) -> str:
+    """B-IDEA: classify the goal as a structured brief vs a vague idea, and (when
+    vague) let BMAD pick the brainstorming techniques adapted to the subject."""
+    return f"""Tu es Mary, analyste (méthode BMAD). Avant toute spécification, tu évalues la MATURITÉ de l'idée fournie, pour décider s'il faut un brainstorming.
+
+Idée / objectif fourni :
+\"\"\"{state.goal}\"\"\"
+
+Décide :
+- "structured" : l'énoncé est déjà un brief clair (problème précis, périmètre,
+  utilisateurs identifiables) — on peut spécifier directement.
+- "vague" : idée ouverte/floue qui gagnerait à être explorée avant de spécifier.
+
+Si (et seulement si) "vague", choisis 2 à 4 TECHNIQUES de brainstorming les plus
+adaptées AU SUJET, parmi ce catalogue (méthodes BMAD) — réutilise le nom EXACT :
+{_brainstorming_catalog()}
+
+Réponds avec EXACTEMENT un objet JSON :
+{{"maturity": "structured"|"vague", "rationale": "<1-2 phrases>", "techniques": ["<nom exact>", ...]}}
+(techniques = [] quand "structured")"""
+
+
+def brainstorm_auto_answer(state: ProjectState, question: str) -> str:
+    """B-IDEA: the AI plays the product owner, answering the analyst's questions
+    when the brainstorming runs autonomously (user declined / auto-spec)."""
+    return f"""Tu joues le PORTEUR du projet (le client) dans une session de brainstorming.
+L'analyste te pose des questions pour affiner cette idée :
+\"\"\"{state.goal}\"\"\"
+
+Question(s) de l'analyste :
+\"\"\"{question}\"\"\"
+
+Réponds de façon RÉALISTE et DÉCIDÉE, comme un porteur de projet pragmatique :
+fais des choix clairs (évite « ça dépend »), reste concis (2-5 phrases) et oriente
+vers un MVP livrable. Réponds en TEXTE simple (pas de JSON)."""
+
+
+def pm_brainstorm(state: ProjectState, force_brief: bool = False) -> str:
     auto = ""
     if state.auto_spec:
         auto = (
             "\nMODE AUTO-SPEC : ne pose pas de question ; explore brièvement les "
             "options toi-même, choisis la plus pertinente et produis le brief."
+        )
+    techniques = ""
+    if state.brainstorm_techniques:
+        techniques = (
+            "\nApplique en priorité ces techniques de brainstorming, choisies pour "
+            "ce sujet : " + ", ".join(state.brainstorm_techniques) + "."
+        )
+    finalize = ""
+    if force_brief:
+        finalize = (
+            "\nTu as maintenant assez de matière : ne pose PLUS de questions, "
+            'synthétise directement le brief (type "brief").'
         )
     return f"""Tu es Mary, analyste (méthode BMAD), en session de BRAINSTORMING. Ici on
 re-questionne LE BESOIN lui-même (pas seulement les détails). Idée initiale :
@@ -191,7 +274,7 @@ Méthode en deux temps :
 - CONVERGER : aide-le à choisir et prioriser selon valeur / effort / risque.
 Pose des questions ouvertes qui font réfléchir à plusieurs niveaux (vision,
 utilisateur, mécanisme, détail). Reste concis. Quand le besoin est reformulé et
-qu'une direction est choisie, produis le brief.{auto}
+qu'une direction est choisie, produis le brief.{techniques}{auto}{finalize}
 {PM_ENVELOPE}"""
 
 

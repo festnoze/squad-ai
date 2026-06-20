@@ -285,6 +285,52 @@ button.ghost {
   color: #fff;
 }
 
+/* B-IDEA: brainstorming offer for a vague idea. */
+.brainstorm-offer {
+  margin: 8px 0;
+  padding: 10px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--panel-2);
+}
+
+.brainstorm-offer p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.brainstorm-tech {
+  color: var(--muted);
+}
+
+.brainstorm-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.brainstorm-btn {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  background: var(--panel);
+  color: var(--text);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.brainstorm-btn.accept {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.brainstorm-btn:hover {
+  border-color: var(--accent);
+}
+
 .chat-messages {
   flex: 1;
   overflow-y: auto;
@@ -1045,6 +1091,23 @@ button.action-btn.action-done {
   margin-left: auto;
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.run-args {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  padding: 7px 10px;
+  font: inherit;
+  font-size: 12px;
+  width: 170px;
+}
+
+.run-args:focus-visible {
+  outline: none;
+  border-color: var(--accent);
 }
 
 /* UI7 : menu d'actions de livraison/export (overflow). */

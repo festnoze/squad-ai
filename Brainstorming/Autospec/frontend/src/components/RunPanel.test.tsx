@@ -68,12 +68,13 @@ function renderPanel(
   project: ProjectState,
   logs: { projectId: string; source: string; line: string }[] = [],
   onRetryFailed: () => void = vi.fn(),
+  onRun: (args: string) => void = vi.fn(),
 ) {
   const utils = render(
     <RunPanel
       project={project}
       logs={logs}
-      onRun={vi.fn()}
+      onRun={onRun}
       onStop={vi.fn()}
       onPause={vi.fn()}
       onResume={vi.fn()}
@@ -89,7 +90,7 @@ function renderPanel(
       onDeploy={vi.fn()}
     />,
   );
-  return { ...utils, onRetryFailed };
+  return { ...utils, onRetryFailed, onRun };
 }
 
 describe("RunPanel", () => {
@@ -243,5 +244,19 @@ describe("RunPanel", () => {
     expect(
       screen.queryByRole("button", { name: /Relancer les échecs/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("run : les arguments saisis sont transmis à onRun", () => {
+    const onRun = vi.fn();
+    renderPanel(makeProject({ phase: "done" }), [], vi.fn(), onRun);
+    const input = screen.getByPlaceholderText(/arguments/i);
+    fireEvent.change(input, { target: { value: "auth-screen" } });
+    fireEvent.click(screen.getByRole("button", { name: "▶ Lancer le projet" }));
+    expect(onRun).toHaveBeenCalledWith("auth-screen");
+  });
+
+  it("run : pas de champ d'arguments quand on ne peut pas lancer (phase build)", () => {
+    renderPanel(makeProject({ phase: "build" }));
+    expect(screen.queryByPlaceholderText(/arguments/i)).not.toBeInTheDocument();
   });
 });

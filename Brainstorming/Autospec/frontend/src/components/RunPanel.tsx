@@ -4,7 +4,7 @@ import { LogLine, ProjectState } from "../types";
 interface Props {
   project: ProjectState;
   logs: LogLine[];
-  onRun: () => void;
+  onRun: (args: string) => void;
   onStop: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -70,6 +70,9 @@ export function RunPanel({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
+  // Optional CLI args forwarded to the generated app on run (e.g. a subcommand
+  // for a CLI app that just prints usage when launched bare).
+  const [runArgs, setRunArgs] = useState("");
   // UI4: the log box only takes space when there are logs to show (and the user
   // can collapse it). An empty project no longer reserves a big black void.
   const [logsOpen, setLogsOpen] = useState(true);
@@ -168,7 +171,24 @@ export function RunPanel({
           </span>
         )}
         <div className="run-buttons">
-          <button className="primary" disabled={!canRun || project.running} onClick={onRun}>
+          {canRun && !project.running && (
+            <input
+              className="run-args"
+              type="text"
+              value={runArgs}
+              onChange={(e) => setRunArgs(e.target.value)}
+              placeholder="arguments (ex. auth-screen)…"
+              title="Arguments CLI passés à l'application générée (optionnel)"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") onRun(runArgs.trim());
+              }}
+            />
+          )}
+          <button
+            className="primary"
+            disabled={!canRun || project.running}
+            onClick={() => onRun(runArgs.trim())}
+          >
             {project.running ? "▶ En cours…" : "▶ Lancer le projet"}
           </button>
           {canResumeBuild && (

@@ -223,6 +223,20 @@ class Settings:
     language_selector_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_LANGUAGE_SELECTOR", False)
     )
+    # B-IDEA: idea-maturity assessment at creation. When a goal reads as a vague
+    # idea (not a structured brief), Autospec offers a BMAD brainstorming session
+    # to refine it; if the user declines (or auto-spec is on) the brainstorming
+    # runs autonomously with the AI playing the product owner. BMAD picks the
+    # brainstorming techniques adapted to the subject. OFF by default (keeps the
+    # plain Socratic interview); enable with AUTOSPEC_BRAINSTORM_ASSIST.
+    brainstorm_assist_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_BRAINSTORM_ASSIST", False)
+    )
+    # Rounds of autonomous Q&A (analyst asks ↔ AI answers) before the brief is
+    # synthesized, when the brainstorming runs without the user.
+    brainstorm_auto_rounds: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_BRAINSTORM_ROUNDS", 3, minimum=1)
+    )
     setup_install: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_SETUP_INSTALL", False)
     )

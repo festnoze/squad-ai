@@ -124,6 +124,19 @@ export async function setSpecMode(
   );
 }
 
+export async function resolveBrainstorm(
+  projectId: string,
+  accept: boolean,
+): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/brainstorm-decision`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accept }),
+    }),
+  );
+}
+
 export async function stopProject(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/stop`, { method: "POST" }));
 }
@@ -181,8 +194,14 @@ export async function unarchiveProject(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/unarchive`, { method: "POST" }));
 }
 
-export async function runProject(projectId: string): Promise<void> {
-  await json(await fetch(`/api/projects/${projectId}/run`, { method: "POST" }));
+export async function runProject(projectId: string, args = ""): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/run`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ args }),
+    }),
+  );
 }
 
 export async function resumeBuild(projectId: string): Promise<void> {

@@ -512,6 +512,35 @@ async def test_retry_failed_rejected_when_no_failure(green_pytest):
         await pipeline.aretry_failed()
 
 
+def test_fail_stranded_stories_at_iteration_close():
+    # Advancing iterations must not strand an attempted-but-unfinished story as a
+    # stray TODO: those become FAILED (clear + relaunchable). Fresh, never-tried
+    # TODOs and other iterations are left alone.
+    from autospec.models import Epic, ProjectState, UserStory
+
+    state = ProjectState(id="strand", name="n", goal="g", iteration=2)
+    state.epics = [Epic(id="E", title="e", iteration=2)]
+    state.stories = [
+        UserStory(id="US-1", epic_id="E", title="done", iteration=2, status=StoryStatus.DONE),
+        UserStory(id="US-13", epic_id="E", title="orphan", iteration=2,
+                  status=StoryStatus.TODO, attempts=1, last_error="boom"),
+        UserStory(id="US-14", epic_id="E", title="fresh", iteration=2,
+                  status=StoryStatus.TODO, attempts=0),
+        UserStory(id="US-15", epic_id="E", title="red", iteration=2,
+                  status=StoryStatus.RED, attempts=2),
+        UserStory(id="US-99", epic_id="E", title="other-iter", iteration=3,
+                  status=StoryStatus.TODO, attempts=1),
+    ]
+    pipeline = Pipeline(state, FakeRunner([]))
+    n = pipeline._fail_stranded_stories(2)
+    assert n == 2
+    assert state.story("US-13").status == StoryStatus.FAILED
+    assert state.story("US-15").status == StoryStatus.FAILED
+    assert state.story("US-14").status == StoryStatus.TODO  # never attempted -> kept
+    assert state.story("US-1").status == StoryStatus.DONE
+    assert state.story("US-99").status == StoryStatus.TODO  # other iteration untouched
+
+
 async def test_retry_failed_rejected_when_active(green_pytest):
     pipeline, _ = make_pipeline([PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN])
     pipeline.start()
@@ -610,6 +639,120 @@ async def test_story_diff_unavailable_without_commit():
     res = await pipeline.astory_diff("US-1")
     assert res["available"] is False
     assert res["diff"] == ""
+
+
+# --------------------------------------------------------- B-IDEA brainstorm assist
+
+def _assess(maturity: str, techniques=None) -> str:
+    return json.dumps(
+        {"maturity": maturity, "rationale": "r", "techniques": techniques or []}
+    )
+
+
+async def test_brainstorm_assist_structured_goes_straight_to_interview(monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "brainstorm_assist_enabled", True)
+    pipeline, _ = make_pipeline([_assess("structured")])
+    outcome = await pipeline._abrainstorm_assist()
+    assert outcome == "interactive"
+    assert pipeline.state.idea_maturity == "structured"
+    assert pipeline.state.awaiting_brainstorm_decision is False
+
+
+async def test_brainstorm_assist_vague_offers_and_accept_is_interactive(monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "brainstorm_assist_enabled", True)
+    pipeline, _ = make_pipeline([_assess("vague", ["What If Scenarios"])])
+
+    task = asyncio.create_task(pipeline._abrainstorm_assist())
+    await wait_until(lambda: pipeline.state.awaiting_brainstorm_decision)
+    assert pipeline.state.brainstorm_techniques == ["What If Scenarios"]
+    await pipeline.aresolve_brainstorm(True)  # user accepts -> interactive
+    assert await task == "interactive"
+    assert pipeline.state.spec_mode == "brainstorm"
+    assert pipeline.state.awaiting_brainstorm_decision is False
+
+
+async def test_brainstorm_assist_vague_refuse_runs_autonomously(monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "brainstorm_assist_enabled", True)
+    monkeypatch.setattr(settings, "brainstorm_auto_rounds", 2)
+    # assess(vague) -> offer -> refuse -> self-brainstorm: q, AI answer, brief.
+    q = json.dumps({"type": "question", "message": "CLI ou web ?"})
+    pipeline, _ = make_pipeline([_assess("vague"), q, "Réponse IA (porteur).", PM_BRIEF])
+
+    task = asyncio.create_task(pipeline._abrainstorm_assist())
+    await wait_until(lambda: pipeline.state.awaiting_brainstorm_decision)
+    await pipeline.aresolve_brainstorm(False)  # user refuses -> autonomous
+    assert await task == "done"
+    assert pipeline.state.brief.strip()
+    # The AI's simulated answer was recorded in the chat (prefixed 🤖).
+    assert any(m.role == ChatRole.USER and "🤖" in m.content for m in pipeline.state.chat)
+
+
+async def test_brainstorm_assist_auto_spec_skips_the_offer(monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "brainstorm_assist_enabled", True)
+    monkeypatch.setattr(settings, "brainstorm_auto_rounds", 1)
+    pipeline, _ = make_pipeline([_assess("vague"), PM_BRIEF], auto_spec=True)
+    outcome = await pipeline._abrainstorm_assist()
+    assert outcome == "done"
+    assert pipeline.state.awaiting_brainstorm_decision is False  # never offered
+    assert pipeline.state.brief.strip()
+
+
+async def test_brainstorm_assist_disabled_keeps_plain_interview(monkeypatch):
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "brainstorm_assist_enabled", False)
+    # Flag off: _aspec_phase must NOT assess — the first reply is the PM brief.
+    pipeline, _ = make_pipeline([PM_BRIEF])
+    brief = await pipeline._aspec_phase()
+    assert brief and brief.strip()
+    assert pipeline.state.idea_maturity == ""  # never assessed
+
+
+async def test_resolve_brainstorm_without_offer_raises():
+    pipeline, _ = make_pipeline([])
+    with pytest.raises(ValueError):
+        await pipeline.aresolve_brainstorm(True)
+
+
+async def test_workspace_git_is_isolated_from_enclosing_repo(tmp_workspace):
+    """Regression: a workspace nested inside an enclosing git repo must get its
+    OWN repo. ``_agit_ensure_repo`` used ``--is-inside-work-tree`` (also true for
+    nested dirs), so it skipped ``git init`` and every ``git add -A`` / commit
+    leaked the user's working changes into the parent repository."""
+    import subprocess
+
+    from autospec.orchestrator import workspace
+
+    enclosing = tmp_workspace  # tmp_path; workspace_root == tmp_path/workspace
+
+    def _git(*args, cwd):
+        return subprocess.run(
+            ["git", *args], cwd=str(cwd), capture_output=True, text=True
+        )
+
+    _git("init", cwd=enclosing)
+    _git("config", "user.email", "parent@local", cwd=enclosing)
+    _git("config", "user.name", "parent", cwd=enclosing)
+
+    state = ProjectState(id="iso-proj", name="iso", goal="iso")
+    pipeline = Pipeline(state, FakeRunner([]))
+    ws = workspace.scaffold(state)
+    assert ws.is_relative_to(enclosing)  # genuinely nested in the enclosing repo
+
+    assert await pipeline._agit_ensure_repo(ws) is True
+    assert (ws / ".git").exists()  # an ISOLATED repo, not the parent's
+
+    await pipeline._acommit_story(ws, "US-1")
+    # Nothing must have leaked into the enclosing repository.
+    assert _git("log", "--oneline", cwd=enclosing).stdout.strip() == ""
 
 
 async def test_story_diff_unknown_story_raises_keyerror():

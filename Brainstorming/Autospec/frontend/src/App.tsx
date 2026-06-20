@@ -15,6 +15,7 @@ import {
   resumeBuild,
   retryFailed,
   resumeProject,
+  resolveBrainstorm,
   approveProject,
   rejectProject,
   rollbackProject,
@@ -491,6 +492,11 @@ export default function App() {
               onSend={(m) => guard(() => sendChat(project.id, m))()}
               specMode={project.spec_mode ?? "interview"}
               onSetSpecMode={(m) => guard(() => setSpecMode(project.id, m))()}
+              awaitingBrainstorm={project.awaiting_brainstorm_decision ?? false}
+              brainstormTechniques={project.brainstorm_techniques ?? []}
+              onResolveBrainstorm={(accept) =>
+                guard(() => resolveBrainstorm(project.id, accept))()
+              }
             />
             <ComponentsPanel
               components={project.components ?? []}
@@ -526,7 +532,7 @@ export default function App() {
             <RunPanel
               project={project}
               logs={projectLogs}
-              onRun={guard(() => runProject(project.id))}
+              onRun={(args: string) => guard(() => runProject(project.id, args))()}
               onStop={guard(() => stopProject(project.id))}
               onPause={guard(() => pauseProject(project.id))}
               onResume={guard(() => resumeProject(project.id))}

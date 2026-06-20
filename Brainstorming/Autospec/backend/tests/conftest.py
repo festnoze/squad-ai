@@ -1,7 +1,29 @@
 import pytest
 
 from autospec.config import settings
-from autospec.orchestrator.pipeline import Pipeline
+from autospec.orchestrator.pipeline import Pipeline, _PERSIST_EXECUTOR
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _isolate_real_workspace(tmp_path_factory):
+    """Guarantee the real ``Autospec/workspace`` is NEVER written by the suite.
+
+    The per-test ``tmp_workspace`` fixture redirects ``workspace_root`` to a
+    per-test dir, but state persistence runs on a background thread
+    (``_PERSIST_EXECUTOR``) — a pipeline bg task can flush a state write AFTER
+    its test finished, once the per-test ``monkeypatch`` has already reverted
+    ``workspace_root`` to the real value. Pinning the session-wide default to a
+    temp dir means any such late write lands here, not in the developer's real
+    workspace (that's why deterministic-id test projects used to pile up there).
+    """
+    session_root = tmp_path_factory.mktemp("autospec-test-workspace")
+    original = settings.workspace_root
+    settings.workspace_root = session_root
+    yield
+    # Drain any state writes still queued on the shared executor before we
+    # restore the real path, so none escapes to the real workspace at shutdown.
+    _PERSIST_EXECUTOR.shutdown(wait=True)
+    settings.workspace_root = original
 
 
 @pytest.fixture(autouse=True)

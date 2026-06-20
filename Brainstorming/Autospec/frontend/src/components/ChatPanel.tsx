@@ -20,9 +20,22 @@ interface Props {
   onSend: (message: string) => void;
   specMode: "interview" | "brainstorm";
   onSetSpecMode: (mode: "interview" | "brainstorm") => void;
+  // B-IDEA: a vague idea was detected — offer a brainstorming session.
+  awaitingBrainstorm?: boolean;
+  brainstormTechniques?: string[];
+  onResolveBrainstorm?: (accept: boolean) => void;
 }
 
-export function ChatPanel({ chat, phase, onSend, specMode, onSetSpecMode }: Props) {
+export function ChatPanel({
+  chat,
+  phase,
+  onSend,
+  specMode,
+  onSetSpecMode,
+  awaitingBrainstorm = false,
+  brainstormTechniques = [],
+  onResolveBrainstorm,
+}: Props) {
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -94,6 +107,33 @@ export function ChatPanel({ chat, phase, onSend, specMode, onSetSpecMode }: Prop
         )}
         <div ref={bottomRef} />
       </div>
+      {awaitingBrainstorm && onResolveBrainstorm && (
+        <div className="brainstorm-offer" role="group" aria-label="Proposition de brainstorming">
+          <p>
+            💡 Ton idée est encore ouverte. Une session de <strong>brainstorming</strong> pour
+            l'affiner&nbsp;?
+            {brainstormTechniques.length > 0 && (
+              <span className="brainstorm-tech"> Techniques&nbsp;: {brainstormTechniques.join(", ")}.</span>
+            )}
+          </p>
+          <div className="brainstorm-actions">
+            <button
+              type="button"
+              className="brainstorm-btn accept"
+              onClick={() => onResolveBrainstorm(true)}
+            >
+              🧠 Oui, on explore ensemble
+            </button>
+            <button
+              type="button"
+              className="brainstorm-btn refuse"
+              onClick={() => onResolveBrainstorm(false)}
+            >
+              🤖 Non, affine en autonomie
+            </button>
+          </div>
+        </div>
+      )}
       <div className="chat-input">
         <textarea
           rows={2}

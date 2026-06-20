@@ -479,11 +479,13 @@ function StoryRow({
 function StoryDetail({
   projectId,
   story,
+  phase,
   onDeleted,
   onOpenIteration,
 }: {
   projectId: string;
   story: UserStory;
+  phase?: string;
   onDeleted: () => void;
   onOpenIteration?: (iter: number) => void;
 }) {
@@ -519,6 +521,16 @@ function StoryDetail({
   const handleRebuild = run(() => rebuildStory(projectId, story.id));
   const handleForceDone = run(() => forceDoneStory(projectId, story.id));
 
+  // Une story « bloquée » (échec, tests rouges, ou todo déjà tentée/en erreur —
+  // p. ex. orpheline d'une itération passée) est relançable dès que la pipeline
+  // est dormante. Sans ça, une US `todo` avec une erreur n'avait aucun bouton.
+  const dormant = ["done", "stopped", "error"].includes(phase ?? "");
+  const stuck =
+    story.status === "failed" ||
+    story.status === "red" ||
+    (story.status === "todo" && (story.attempts > 0 || !!story.last_error));
+  const canRelaunch = dormant && stuck;
+
   return (
     <div className="story-detail">
       <div className="story-detail-head">
@@ -545,12 +557,13 @@ function StoryDetail({
             <button className="danger small-btn" onClick={handleDelete}>
               🗑 Supprimer
             </button>
-            {story.status === "failed" && (
+            {canRelaunch && (
               <>
                 <button
                   className="action-btn small-btn"
                   disabled={busy}
                   onClick={handleRebuild}
+                  title="Réinitialiser et reconstruire cette user story"
                 >
                   🔄 Relancer
                 </button>
@@ -558,6 +571,7 @@ function StoryDetail({
                   className="action-btn action-done small-btn"
                   disabled={busy}
                   onClick={handleForceDone}
+                  title="Marquer cette user story comme terminée sans la reconstruire"
                 >
                   ✓ Forcer terminé
                 </button>
@@ -1121,6 +1135,7 @@ export function Board({
           <StoryDetail
             projectId={projectId}
             story={story}
+            phase={phase}
             onDeleted={() => setNav({ level: "epic", epicId: epic.id })}
             onOpenIteration={onOpenIteration}
           />
