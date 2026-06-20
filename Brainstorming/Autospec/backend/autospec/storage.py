@@ -92,12 +92,19 @@ def save_state_payload(project_id: str, payload: str) -> None:
     ws = workspace_dir(project_id)
     ws.mkdir(parents=True, exist_ok=True)
     final = ws / STATE_FILENAME
-    # Atomic write: serialize to a temp file in the SAME directory (same volume),
-    # then os.replace() into place. A crash mid-write leaves the temp file behind
-    # but never a half-written state.json.
+    # Atomic write: serialize to a temp file, then os.replace() into place. The
+    # temp lives in a SIBLING ``.tmp/`` dir (same volume as the workspace, so the
+    # replace stays atomic) rather than INSIDE the workspace — otherwise the
+    # transient ``autospec-state.json.*.tmp`` leaks into everything that
+    # enumerates the workspace and races a concurrent write: the /files endpoint
+    # (a name containing the state filename), the zip export (a file that
+    # vanishes mid-walk), the delete rmtree (a momentarily-locked temp). Keeping
+    # it out of the workspace removes that whole class of intermittent failures.
+    tmp_root = settings.workspace_root / ".autospec-tmp"
+    tmp_root.mkdir(parents=True, exist_ok=True)
     last_exc: OSError | None = None
     for attempt in range(_SAVE_RETRIES):
-        fd, tmp_name = tempfile.mkstemp(dir=ws, prefix=STATE_FILENAME + ".", suffix=".tmp")
+        fd, tmp_name = tempfile.mkstemp(dir=tmp_root, prefix=f"{project_id}.", suffix=".tmp")
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(payload)

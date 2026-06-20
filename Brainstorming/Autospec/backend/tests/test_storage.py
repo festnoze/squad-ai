@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -103,6 +104,29 @@ def test_save_state_swallows_persistent_lock(monkeypatch):
     storage.save_state(state)  # must not raise
     # No half-written temp file may survive a failed atomic write.
     assert list(settings.workspace_root.rglob("*.tmp")) == []
+
+
+def test_atomic_write_temp_lives_outside_the_workspace(monkeypatch):
+    """Regression: the atomic-write temp must NOT be created inside the project
+    workspace. A transient ``autospec-state.json.*.tmp`` there leaks into
+    everything that enumerates the workspace (the /files endpoint, the zip
+    export walk, the delete rmtree) and races concurrent writes — flaky failures.
+    It must go to the sibling ``.autospec-tmp`` dir instead."""
+    state = _make_state()
+    seen: list[Path] = []
+    real_mkstemp = storage.tempfile.mkstemp
+
+    def spy(*args, **kwargs):
+        seen.append(Path(kwargs.get("dir")))
+        return real_mkstemp(*args, **kwargs)
+
+    monkeypatch.setattr(storage.tempfile, "mkstemp", spy)
+    storage.save_state(state)
+
+    ws = storage.workspace_dir(state.id)
+    assert seen and all(d.name == ".autospec-tmp" and d != ws for d in seen)
+    # The workspace ends with ONLY the final state file (no *.tmp leaked in).
+    assert [p.name for p in ws.iterdir()] == [storage.STATE_FILENAME]
 
 
 def test_workspace_dir_rejects_traversal_ids():
