@@ -2383,3 +2383,172 @@ button.action-btn.action-done {
   color: var(--muted);
   font-size: 11px;
 }
+
+/* ===== ST-12/13/14 : multi-stream (badges, filtre, tâches) ============== */
+
+/* Badge stream (icône + label, couleur par nature). Calque .quality-badge. */
+.stream-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--text);
+  white-space: nowrap;
+}
+.stream-badge-backend {
+  border-color: #4f8cff;
+  color: #aac6ff;
+}
+.stream-badge-frontend {
+  border-color: #c084fc;
+  color: #e2c7ff;
+}
+.stream-badge-cache {
+  border-color: #f0b429;
+  color: #ffe2a0;
+}
+.stream-badge-database {
+  border-color: #34d399;
+  color: #b6f0d8;
+}
+.stream-badge-other {
+  border-color: var(--border);
+  color: var(--muted);
+}
+
+/* Barre de filtre par stream (n'apparaît qu'en multi-stream). */
+.stream-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+.stream-filter button {
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+.stream-filter button.active {
+  border-color: var(--accent);
+  color: var(--text);
+  background: rgba(79, 140, 255, 0.12);
+}
+
+/* Indicateur « bloquée par X » (ST-14). */
+.blocked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--red);
+  color: #ffb4b4;
+  background: rgba(255, 90, 90, 0.08);
+  white-space: nowrap;
+}
+
+/* Indicateur d'état de merge (ST-14). */
+.merge-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.merge-badge.merge-ok {
+  border-color: var(--green);
+  color: #b6f0c0;
+}
+.merge-badge.merge-conflict {
+  border-color: var(--red);
+  color: #ffb4b4;
+  background: rgba(255, 90, 90, 0.08);
+}
+
+.story-row-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.story-row-hints:empty {
+  display: none;
+}
+
+/* Sous-liste de tâches dépliable sous une US. */
+.task-list {
+  margin-top: 6px;
+  border-top: 1px dashed var(--border);
+  padding-top: 6px;
+}
+.task-list-toggle {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 0 4px;
+}
+.tasks {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.task-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-2);
+  cursor: pointer;
+}
+.task-row:hover {
+  border-color: var(--accent);
+}
+.task-id {
+  font-family: var(--mono, monospace);
+  font-size: 11px;
+  color: var(--muted);
+}
+.task-title {
+  flex: 1;
+  font-size: 13px;
+  min-width: 80px;
+}
+/* Parallélisme : une tâche en cours porte le même halo que les US (dev-glow). */
+.task-row.status-in_progress {
+  border-color: var(--accent);
+  animation: dev-glow 1.6s ease-in-out infinite;
+}
+
+.us-tasks {
+  margin-bottom: 10px;
+}
+.task-criteria {
+  margin: 4px 0;
+  padding-left: 18px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-row.status-in_progress {
+    animation: none;
+  }
+}

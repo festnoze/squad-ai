@@ -2689,6 +2689,98 @@ class Pipeline:
             t.status = TestState.GREEN
         self._sync()
 
+    # --------------------------------------------------------- TASK actions (ST-13)
+
+    async def arebuild_task(self, task_id: str) -> None:
+        """ST-13: reset a single task and rebuild it from scratch in its own git
+        worktree (reusing Lot 4's ``_abuild_work_item``), in the background.
+
+        The per-task equivalent of ``arebuild_story``: same dormant-pipeline guard
+        and TOCTOU phase handling. Raises KeyError if the task is unknown,
+        ValueError (-> 409) if the pipeline is active or the task is in progress."""
+        task = self.state.task(task_id)  # KeyError if absent
+        if self.state.phase not in (
+            PipelinePhase.DONE,
+            PipelinePhase.STOPPED,
+            PipelinePhase.ERROR,
+        ):
+            raise ValueError(
+                "la pipeline est active : mets-la en pause ou attends la fin avant de relancer une tâche"
+            )
+        if self._task and not self._task.done():
+            raise ValueError("une tâche est déjà en cours")
+        if task.status == StoryStatus.IN_PROGRESS:
+            raise ValueError("tâche déjà en cours")
+        task.status = StoryStatus.TODO
+        task.attempts = 0
+        task.last_error = ""
+        self._stop_requested = False
+        # Set BUILD synchronously BEFORE launching the task so a second
+        # concurrent call is rejected by the phase guard (closes the TOCTOU).
+        self.state.phase = PipelinePhase.BUILD
+        self._sync()
+        self._task = asyncio.create_task(self._arebuild_one_task(task_id))
+
+    async def _arebuild_one_task(self, task_id: str) -> None:
+        """Background task: build a single task via the worktree build engine, then
+        restore a terminal phase. Reuses ``_abuild_work_item`` (Lot 4) so the task
+        is built in its own worktree and merged back exactly like a normal batch."""
+        self.state.phase = PipelinePhase.BUILD
+        self._sync()
+        self._log(f"dev:{task_id}", f"Relance de {task_id}…")
+        try:
+            ws = workspace_dir(self.state.id)
+            await self._agit_ensure_repo(ws)
+            # Seed a base commit so the worktree can branch off a real HEAD.
+            await self._acommit_story(ws, "scaffold")
+            # Resolve the task to a WorkItem (RESOLVED deps) via the work graph.
+            graph = work_streams.build_work_graph(self.state)
+            item = graph.items.get(task_id)
+            if item is None:
+                raise KeyError(task_id)
+            # Write the task's acceptance feature file to the shared repo before
+            # the worktree branches off HEAD (mirrors the batch loop).
+            subject = self._item_subject(item)
+            if subject.gherkin.strip():
+                workspace.write_feature_files(self.state, [subject])
+                await self._acommit_story(ws, f"feature {task_id}")
+            await self._abuild_work_item(item)
+        except Exception as exc:  # never leave the pipeline in a broken state
+            self._chat(ChatRole.SYSTEM, f"Erreur lors de la relance de {task_id} : {exc}")
+        finally:
+            self.state.phase = (
+                PipelinePhase.STOPPED if self._stop_requested else PipelinePhase.DONE
+            )
+            self._sync()
+
+    async def aforce_done_task(self, task_id: str) -> None:
+        """ST-13: force a single task to DONE (user override). The per-task
+        equivalent of ``aforce_done``. Raises KeyError if the task is unknown,
+        ValueError (-> 409) if it is currently being developed."""
+        task = self.state.task(task_id)  # KeyError if absent
+        if task.status == StoryStatus.IN_PROGRESS:
+            raise ValueError("tâche en cours")
+        task.status = StoryStatus.DONE
+        task.last_error = ""
+        self._sync()
+
+    async def atask_diff(self, task_id: str) -> dict:
+        """ST-13: the git diff committed when a task reached its green/merged
+        state. A task's green commit is tagged ``story <task_id> done`` (see
+        ``_abuild_work_item`` -> ``_acommit_story(worktree, item.id)``), so the
+        story-diff lookup works unchanged on a task id. Raises KeyError if the
+        task is unknown."""
+        self.state.task(task_id)  # KeyError (-> 404) if absent
+        ws = workspace_dir(self.state.id)
+        code, out = await self._agit(
+            ws, "log", "-1", "--format=%H", f"--grep=story {task_id} done"
+        )
+        commit = out.strip()
+        if code != 0 or not commit:
+            return {"available": False, "diff": ""}
+        _, diff = await self._agit(ws, "show", commit)
+        return {"available": True, "diff": diff[:200_000]}
+
     async def _adesign_tests(self, story: UserStory, pkg: str) -> None:
         """QA agent decomposes the acceptance test outside-in (London style)
         into per-layer unit tests, BEFORE any implementation. Non-fatal: a QA

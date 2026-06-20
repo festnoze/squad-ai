@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { Board } from "./Board";
-import { Epic, UserStory } from "../types";
+import { Epic, Stream, Task, UserStory } from "../types";
 
 function makeStory(overrides: Partial<UserStory> = {}): UserStory {
   return {
@@ -21,6 +21,29 @@ function makeStory(overrides: Partial<UserStory> = {}): UserStory {
     ...overrides,
   };
 }
+
+function makeTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: "T1",
+    story_id: "S1",
+    stream: "",
+    title: "Ma tâche",
+    description: "",
+    acceptance_criteria: [],
+    gherkin: "",
+    depends_on: [],
+    status: "todo",
+    attempts: 0,
+    last_error: "",
+    files_hint: [],
+    ...overrides,
+  };
+}
+
+const STREAMS: Stream[] = [
+  { id: "backend", kind: "backend", language: "python", toolchain: "", file_root: "", primary: true },
+  { id: "frontend", kind: "frontend", language: "react", toolchain: "", file_root: "frontend", primary: false },
+];
 
 describe("Board", () => {
   it("affiche un état vide actionnable quand il n'y a pas d'epic", () => {
@@ -196,5 +219,131 @@ describe("Board — relance d'une story bloquée (US todo en erreur)", () => {
   it("pipeline active : pas de relance par story (le build tourne)", () => {
     openDetail("build");
     expect(screen.queryByRole("button", { name: /Relancer/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Board — multi-stream (ST-12/13/14)", () => {
+  const epic: Epic = { id: "E1", title: "Cœur", description: "", iteration: 1 };
+
+  function drillToEpic(story: UserStory, extra: Partial<Parameters<typeof Board>[0]> = {}) {
+    render(
+      <Board
+        epics={[epic]}
+        stories={[story]}
+        streams={STREAMS}
+        projectId="p1"
+        {...extra}
+      />,
+    );
+    fireEvent.click(screen.getByText("Cœur"));
+  }
+
+  it("ST-12 : badge stream sur une US non-défaut + filtre par stream visible", () => {
+    drillToEpic(makeStory({ id: "S1", stream: "frontend", title: "Front US" }));
+    // Badge stream sur la carte US.
+    expect(screen.getByTestId("stream-badge-frontend")).toBeInTheDocument();
+    // La barre de filtre apparaît (projet multi-stream).
+    expect(screen.getByTestId("stream-filter-backend")).toBeInTheDocument();
+    expect(screen.getByTestId("stream-filter-frontend")).toBeInTheDocument();
+  });
+
+  it("ST-12 : les tâches d'une US sont dépliables avec leur badge stream", () => {
+    const story = makeStory({
+      id: "S1",
+      tasks: [
+        makeTask({ id: "T-back", stream: "backend", title: "API" }),
+        makeTask({ id: "T-front", stream: "frontend", title: "UI" }),
+      ],
+    });
+    drillToEpic(story);
+    // Sous-liste de tâches rendue + badge stream frontend visible sur la tâche.
+    expect(screen.getByTestId("tasks-S1")).toBeInTheDocument();
+    expect(screen.getByTestId("task-T-back")).toBeInTheDocument();
+    expect(screen.getByTestId("task-T-front")).toBeInTheDocument();
+    // Repli/dépli.
+    fireEvent.click(screen.getByTestId("task-toggle-S1"));
+    expect(screen.queryByTestId("tasks-S1")).not.toBeInTheDocument();
+  });
+
+  it("ST-12 : le statut d'une US conteneur est dérivé de ses tâches (in_progress)", () => {
+    const story = makeStory({
+      id: "S1",
+      status: "todo",
+      tasks: [
+        makeTask({ id: "T1", status: "done" }),
+        makeTask({ id: "T2", status: "in_progress" }),
+      ],
+    });
+    drillToEpic(story);
+    const row = screen.getByTestId("story-S1");
+    // Halo « en cours » dérivé bien que le statut stocké soit todo.
+    expect(row.className).toMatch(/status-in_progress/);
+  });
+
+  it("ST-14 : une tâche todo dont la dépendance n'est pas done affiche « bloquée par »", () => {
+    const story = makeStory({
+      id: "S1",
+      tasks: [
+        makeTask({ id: "T-back", status: "in_progress" }),
+        makeTask({ id: "T-front", status: "todo", depends_on: ["T-back"] }),
+      ],
+    });
+    drillToEpic(story);
+    const frontRow = screen.getByTestId("task-T-front");
+    expect(frontRow).toHaveTextContent(/bloquée par T-back/);
+  });
+
+  it("ST-14 : une tâche failed sur conflit de merge affiche l'indice de conflit", () => {
+    const story = makeStory({
+      id: "S1",
+      tasks: [
+        makeTask({
+          id: "T-back",
+          status: "failed",
+          last_error: "conflit de merge inter-stream non résolu",
+        }),
+      ],
+    });
+    drillToEpic(story);
+    const row = screen.getByTestId("task-T-back");
+    expect(row).toHaveTextContent(/conflit de merge/);
+  });
+
+  it("ST-13 : ouvrir une tâche montre son détail + actions par tâche (relance)", () => {
+    const story = makeStory({
+      id: "S1",
+      tasks: [
+        makeTask({
+          id: "T-back",
+          stream: "backend",
+          status: "failed",
+          attempts: 1,
+          last_error: "boom",
+          title: "API en échec",
+        }),
+      ],
+    });
+    drillToEpic(story, { phase: "done" });
+    fireEvent.click(screen.getByText("API en échec"));
+    expect(screen.getByTestId("task-detail-T-back")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Relancer/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Forcer terminé/ })).toBeInTheDocument();
+  });
+
+  it("legacy (aucun stream/tâche) : rendu inchangé, pas de filtre ni badge stream", () => {
+    render(
+      <Board
+        epics={[epic]}
+        stories={[makeStory({ id: "S1", title: "US legacy" })]}
+        projectId="p1"
+      />,
+    );
+    fireEvent.click(screen.getByText("Cœur"));
+    // Aucune barre de filtre, aucune sous-liste de tâches, aucun badge stream.
+    expect(screen.queryByTestId("stream-filter-backend")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tasks-S1")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("stream-badge-frontend")).not.toBeInTheDocument();
+    // La US s'affiche normalement.
+    expect(screen.getByTestId("story-S1")).toBeInTheDocument();
   });
 });

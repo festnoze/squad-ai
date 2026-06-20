@@ -86,6 +86,35 @@ export interface ChatMessage {
   ts: number;
 }
 
+/** ST-1: a work area's nature — drives the stream badge colour + icon. */
+export type StreamKind = "backend" | "frontend" | "cache" | "database" | "other";
+
+/** ST-1: a parallelizable work area with its own toolchain/language/file zone. */
+export interface Stream {
+  id: string;
+  kind: StreamKind;
+  language: string;
+  toolchain: string;
+  file_root: string;
+  primary: boolean;
+}
+
+/** ST-2: a unit of work within a single stream, below a UserStory. */
+export interface Task {
+  id: string;
+  story_id: string;
+  stream: string; // "" = the project's primary/backend stream
+  title: string;
+  description: string;
+  acceptance_criteria: AcceptanceCriterion[];
+  gherkin: string;
+  depends_on: string[]; // other Task ids (possibly cross-stream)
+  status: StoryStatus;
+  attempts: number;
+  last_error: string;
+  files_hint: string[];
+}
+
 export interface UserStory {
   id: string;
   epic_id: string;
@@ -105,6 +134,11 @@ export interface UserStory {
   coverage_score?: number;
   ui?: boolean;
   ui_tests?: string[];
+  // ST-2: stream tagging + optional multi-stream decomposition. "" stream means
+  // the project's primary/backend stream; non-empty `tasks` make the US a
+  // container whose status is derived from its tasks (see `usEffectiveStatus`).
+  stream?: string;
+  tasks?: Task[];
 }
 
 export interface Epic {
@@ -134,6 +168,9 @@ export interface ProjectState {
   idea_rationale?: string;
   brainstorm_techniques?: string[];
   awaiting_brainstorm_decision?: boolean;
+  // ST-1: parallelizable work areas chosen by the architect. Empty/absent = one
+  // implicit backend stream (legacy / flag-off behaviour, unchanged).
+  streams?: Stream[];
   backlog: FeatureHypothesis[];
   components?: ProductComponent[];
   epics: Epic[];
@@ -228,6 +265,60 @@ export function criterionState(
   if (tests.some((t) => t.status === "red")) return "red";
   if (tests.length > 0 && tests.every((t) => t.status === "green")) return "green";
   return "nonexistent";
+}
+
+/**
+ * ST-12: derived status of a user story. A taskless US uses its stored `status`;
+ * a US decomposed into tasks derives it from its tasks — mirrors the backend
+ * `UserStory.effective_status`: all done → done; any active → in_progress; any
+ * failed → failed; else todo.
+ */
+export function usEffectiveStatus(story: UserStory): StoryStatus {
+  const tasks = story.tasks ?? [];
+  if (tasks.length === 0) return story.status;
+  const states = tasks.map((t) => t.status);
+  if (states.every((s) => s === "done")) return "done";
+  if (states.some((s) => s === "in_progress" || s === "red" || s === "green"))
+    return "in_progress";
+  if (states.some((s) => s === "failed")) return "failed";
+  return "todo";
+}
+
+/** Merge-state hint inferred (no new backend field) from status + last_error. */
+export type MergeState = "merged" | "conflict" | "none";
+
+/** ST-14: a `done` item is merged ✓; a `failed` whose error mentions a merge
+ * conflict is a merge-conflict ✗; otherwise no merge hint. */
+export function mergeState(status: StoryStatus, lastError = ""): MergeState {
+  if (status === "done") return "merged";
+  if (status === "failed" && /conflit de merge|merge conflict/i.test(lastError))
+    return "conflict";
+  return "none";
+}
+
+/**
+ * ST-14: the unmet dependency ids holding a `todo` item back — a `depends_on`
+ * target that isn't `done`. Computed in the frontend from the statuses of the
+ * referenced US/tasks. Depending on a US decomposed into tasks means depending
+ * on the whole US (done only when all its tasks are done).
+ */
+export function blockedBy(
+  dependsOn: string[],
+  status: StoryStatus,
+  stories: UserStory[],
+): string[] {
+  if (status !== "todo") return [];
+  const storyById = new Map(stories.map((s) => [s.id, s]));
+  const taskById = new Map<string, Task>();
+  for (const s of stories) for (const t of s.tasks ?? []) taskById.set(t.id, t);
+  const isDone = (id: string): boolean => {
+    const t = taskById.get(id);
+    if (t) return t.status === "done";
+    const s = storyById.get(id);
+    if (s) return usEffectiveStatus(s) === "done";
+    return true; // unknown target: don't treat as a blocker
+  };
+  return (dependsOn ?? []).filter((id) => !isDone(id));
 }
 
 export interface Metrics {

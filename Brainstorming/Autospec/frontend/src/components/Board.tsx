@@ -1,20 +1,30 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   addStory,
   deleteStory,
   editStory,
   errorMessage,
   forceDoneStory,
+  forceDoneTask,
   rebuildStory,
+  rebuildTask,
   reorderStories,
   storyDiff,
+  taskDiff,
 } from "../api";
 import {
   AcceptanceCriterion,
+  blockedBy,
   criterionState,
   Epic,
+  mergeState,
+  Stream,
+  StreamKind,
+  StoryStatus,
+  Task,
   TestState,
   UserStory,
+  usEffectiveStatus,
 } from "../types";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -38,8 +48,78 @@ const TEST_STATE_ICON: Record<TestState, string> = {
   green: "●",
 };
 
+/** ST-12: per-stream-kind presentation (icon + short label). The colour is
+ * driven by CSS via the `stream-badge-<kind>` class. */
+const STREAM_META: Record<StreamKind, { icon: string; label: string }> = {
+  backend: { icon: "⚙", label: "Backend" },
+  frontend: { icon: "🎨", label: "Frontend" },
+  cache: { icon: "⚡", label: "Cache" },
+  database: { icon: "🗄", label: "BDD" },
+  other: { icon: "📦", label: "Autre" },
+};
+
 /** Stops a click from bubbling up to a parent click handler. */
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
+
+/**
+ * ST-12: stream badge (icon + label, colour per kind). Resolves a stream id to
+ * the project's declared stream; falls back to the kind's generic label for an
+ * unknown id. Rendered only by callers that have decided the item carries a
+ * non-default stream — a legacy project (no streams) never shows one.
+ */
+function StreamBadge({ streamId, streams }: { streamId: string; streams: Stream[] }) {
+  const stream = streams.find((s) => s.id === streamId);
+  const kind: StreamKind = stream?.kind ?? "other";
+  const meta = STREAM_META[kind] ?? STREAM_META.other;
+  const label = stream ? `${meta.icon} ${stream.id}` : `${meta.icon} ${meta.label}`;
+  return (
+    <span
+      className={`stream-badge stream-badge-${kind}`}
+      data-testid={`stream-badge-${streamId}`}
+      title={`Stream « ${stream?.id ?? streamId} » (${meta.label})`}
+    >
+      {label}
+    </span>
+  );
+}
+
+/** ST-14: « bloquée par X » badge for a todo item with unmet dependencies. */
+function BlockedBadge({ blockers }: { blockers: string[] }) {
+  if (blockers.length === 0) return null;
+  return (
+    <span
+      className="blocked-badge"
+      data-testid="blocked-badge"
+      title="En attente d'une dépendance non terminée"
+    >
+      ⛔ bloquée par {blockers.join(", ")}
+    </span>
+  );
+}
+
+/** ST-14: merge-state hint — done = merged ✓, failed-on-conflict = ✗. */
+function MergeBadge({ status, lastError }: { status: StoryStatus; lastError?: string }) {
+  const state = mergeState(status, lastError);
+  if (state === "merged") {
+    return (
+      <span className="merge-badge merge-ok" data-testid="merge-badge" title="Code mergé">
+        ✓ mergé
+      </span>
+    );
+  }
+  if (state === "conflict") {
+    return (
+      <span
+        className="merge-badge merge-conflict"
+        data-testid="merge-badge"
+        title="Échec sur conflit de merge inter-stream"
+      >
+        ✗ conflit de merge
+      </span>
+    );
+  }
+  return null;
+}
 
 /**
  * Pastille « itération N ». Cliquable (hyperlien vers la vue Itérations) quand
@@ -315,13 +395,18 @@ function DiffBody({ diff }: { diff: string }) {
   );
 }
 
+/**
+ * Diff overlay reusable for a story OR a task: the caller supplies the label id
+ * and the fetcher (``storyDiff`` / ``taskDiff``), so the per-task Diff action
+ * (ST-13) reuses the exact same UI as the story one.
+ */
 function DiffViewer({
-  projectId,
-  story,
+  label,
+  fetcher,
   onClose,
 }: {
-  projectId: string;
-  story: UserStory;
+  label: string;
+  fetcher: () => Promise<{ available: boolean; diff: string }>;
   onClose: () => void;
 }) {
   const [loading, setLoading] = useState(true);
@@ -333,7 +418,7 @@ function DiffViewer({
     let cancelled = false;
     setLoading(true);
     setError("");
-    storyDiff(projectId, story.id)
+    fetcher()
       .then((res) => {
         if (cancelled) return;
         setAvailable(res.available);
@@ -348,13 +433,14 @@ function DiffViewer({
     return () => {
       cancelled = true;
     };
-  }, [projectId, story.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [label]);
 
   return (
     <div className="diff-overlay" onClick={onClose}>
       <div className="diff-panel" onClick={(e) => e.stopPropagation()}>
         <div className="diff-header">
-          <span className="diff-title">📊 Diff — {story.id}</span>
+          <span className="diff-title">📊 Diff — {label}</span>
           <button
             type="button"
             className="ghost diff-close"
@@ -379,18 +465,21 @@ function DiffViewer({
   );
 }
 
-/** Badges communs (priorité, statut, score qualité) d'une user story. */
+/** Badges communs (priorité, statut, score qualité) d'une user story. Le statut
+ * affiché est l'« effective status » : pour une US conteneur (avec tâches) il est
+ * dérivé de ses tâches, sinon c'est le statut stocké. */
 function StoryBadges({ story }: { story: UserStory }) {
+  const status = usEffectiveStatus(story);
   return (
     <span className="story-right">
       <span className={`prio prio-${story.priority}`} title="Priorité kanban (1=haute)">
         P{story.priority}
       </span>
-      <span className={`badge badge-${story.status}`}>
-        {story.status === "in_progress" && (
+      <span className={`badge badge-${status}`}>
+        {status === "in_progress" && (
           <span className="spinner spinner-sm" aria-hidden="true" />
         )}
-        {STATUS_LABEL[story.status] ?? story.status}
+        {STATUS_LABEL[status] ?? status}
       </span>
       {story.quality_score >= 0 && (
         <span className="quality-badge" title="Qualité du code (raffinement)">
@@ -412,12 +501,67 @@ function StoryBadges({ story }: { story: UserStory }) {
 }
 
 /**
+ * ST-12: a task row inside a US's expandable sub-list. Carries its stream badge,
+ * status (with the shared in-progress spinner for parallelism), blocked-by and
+ * merge hints, and opens the task detail on click.
+ */
+function TaskRow({
+  task,
+  stories,
+  streams,
+  primaryStreamId,
+  onOpen,
+}: {
+  task: Task;
+  stories: UserStory[];
+  streams: Stream[];
+  primaryStreamId: string;
+  onOpen: () => void;
+}) {
+  const blockers = blockedBy(task.depends_on, task.status, stories);
+  const showStream = !!task.stream && task.stream !== primaryStreamId;
+  return (
+    <div
+      className={`task-row status-${task.status}`}
+      data-testid={`task-${task.id}`}
+      role="button"
+      tabIndex={0}
+      onClick={onOpen}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onOpen();
+        }
+      }}
+    >
+      <span className="task-id">{task.id}</span>
+      {showStream && <StreamBadge streamId={task.stream} streams={streams} />}
+      <span className="task-title">{task.title || task.id}</span>
+      <span className={`badge badge-${task.status}`}>
+        {task.status === "in_progress" && (
+          <span className="spinner spinner-sm" aria-hidden="true" />
+        )}
+        {STATUS_LABEL[task.status] ?? task.status}
+      </span>
+      <BlockedBadge blockers={blockers} />
+      <MergeBadge status={task.status} lastError={task.last_error} />
+    </div>
+  );
+}
+
+/**
  * Carte compacte cliquable d'une user story (niveau « epic »). Le clic ouvre le
  * détail (niveau « us ») ; la poignée ⠿ reste dédiée au drag-&-drop de tri.
+ * ST-12 : badge stream (si non-défaut), badges bloquée/merge, et sous-liste de
+ * tâches dépliable quand la US est un conteneur.
  */
 function StoryRow({
   story,
+  stories,
+  streams,
+  primaryStreamId,
   onOpen,
+  onOpenTask,
   dragOver,
   onHandleDragStart,
   onCardDragOver,
@@ -425,16 +569,25 @@ function StoryRow({
   onCardDrop,
 }: {
   story: UserStory;
+  stories: UserStory[];
+  streams: Stream[];
+  primaryStreamId: string;
   onOpen: () => void;
+  onOpenTask: (taskId: string) => void;
   dragOver: boolean;
   onHandleDragStart: (e: React.DragEvent) => void;
   onCardDragOver: (e: React.DragEvent) => void;
   onCardDragLeave: (e: React.DragEvent) => void;
   onCardDrop: (e: React.DragEvent) => void;
 }) {
+  const tasks = story.tasks ?? [];
+  const [expanded, setExpanded] = useState(true);
+  const effStatus = usEffectiveStatus(story);
+  const blockers = blockedBy(story.depends_on, effStatus, stories);
+  const showStream = !!story.stream && story.stream !== primaryStreamId;
   return (
     <div
-      className={`story status-${story.status}${dragOver ? " drag-over" : ""}`}
+      className={`story status-${effStatus}${dragOver ? " drag-over" : ""}`}
       data-testid={`story-${story.id}`}
       role="button"
       tabIndex={0}
@@ -461,11 +614,42 @@ function StoryRow({
           ⠿
         </span>
         <span className="story-id">{story.id}</span>
+        {showStream && <StreamBadge streamId={story.stream!} streams={streams} />}
         <StoryBadges story={story} />
       </div>
       <div className="story-title">{story.title}</div>
       {(story.depends_on ?? []).length > 0 && (
         <div className="story-deps">⛓ dépend de {story.depends_on.join(", ")}</div>
+      )}
+      <div className="story-row-hints">
+        <BlockedBadge blockers={blockers} />
+        <MergeBadge status={effStatus} lastError={story.last_error} />
+      </div>
+      {tasks.length > 0 && (
+        <div className="task-list" onClick={stop}>
+          <button
+            type="button"
+            className="task-list-toggle"
+            data-testid={`task-toggle-${story.id}`}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded ? "▾" : "▸"} {tasks.length} tâche{tasks.length > 1 ? "s" : ""}
+          </button>
+          {expanded && (
+            <div className="tasks" data-testid={`tasks-${story.id}`}>
+              {tasks.map((t) => (
+                <TaskRow
+                  key={t.id}
+                  task={t}
+                  stories={stories}
+                  streams={streams}
+                  primaryStreamId={primaryStreamId}
+                  onOpen={() => onOpenTask(t.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
       )}
       <div className="story-open-hint">▸ détails</div>
     </div>
@@ -614,8 +798,148 @@ function StoryDetail({
       )}
       {showDiff && (
         <DiffViewer
-          projectId={projectId}
-          story={story}
+          label={story.id}
+          fetcher={() => storyDiff(projectId, story.id)}
+          onClose={() => setShowDiff(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * ST-13: detailed view of a single task, mirroring ``StoryDetail`` : stream,
+ * criteria, dependencies (with the blocked-by hint), merge state, last error and
+ * the per-task actions Relancer / Forcer terminé / Diff. The relaunch guard
+ * mirrors the story one (dormant pipeline + a stuck task).
+ */
+function TaskDetail({
+  projectId,
+  task,
+  stories,
+  streams,
+  primaryStreamId,
+  phase,
+}: {
+  projectId: string;
+  task: Task;
+  stories: UserStory[];
+  streams: Stream[];
+  primaryStreamId: string;
+  phase?: string;
+}) {
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
+
+  const run = (fn: () => Promise<void>) => async () => {
+    setError("");
+    setBusy(true);
+    try {
+      await fn();
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleRebuild = run(() => rebuildTask(projectId, task.id));
+  const handleForceDone = run(() => forceDoneTask(projectId, task.id));
+
+  const dormant = ["done", "stopped", "error"].includes(phase ?? "");
+  const stuck =
+    task.status === "failed" ||
+    task.status === "red" ||
+    (task.status === "todo" && (task.attempts > 0 || !!task.last_error));
+  const canRelaunch = dormant && stuck;
+  const blockers = blockedBy(task.depends_on, task.status, stories);
+  const showStream = !!task.stream && task.stream !== primaryStreamId;
+
+  return (
+    <div className="story-detail" data-testid={`task-detail-${task.id}`}>
+      <div className="story-detail-head">
+        <span className="story-id">{task.id}</span>
+        {showStream && <StreamBadge streamId={task.stream} streams={streams} />}
+        <span className={`badge badge-${task.status}`}>
+          {task.status === "in_progress" && (
+            <span className="spinner spinner-sm" aria-hidden="true" />
+          )}
+          {STATUS_LABEL[task.status] ?? task.status}
+        </span>
+        <MergeBadge status={task.status} lastError={task.last_error} />
+      </div>
+      <h3 className="story-detail-title">{task.title || task.id}</h3>
+      {(task.depends_on ?? []).length > 0 && (
+        <div className="story-deps">⛓ dépend de {task.depends_on.join(", ")}</div>
+      )}
+      <div className="story-row-hints">
+        <BlockedBadge blockers={blockers} />
+      </div>
+      <div className="story-toolbar">
+        {canRelaunch && (
+          <>
+            <button
+              className="action-btn small-btn"
+              disabled={busy}
+              onClick={handleRebuild}
+              title="Réinitialiser et reconstruire cette tâche"
+            >
+              🔄 Relancer
+            </button>
+            <button
+              className="action-btn action-done small-btn"
+              disabled={busy}
+              onClick={handleForceDone}
+              title="Marquer cette tâche comme terminée sans la reconstruire"
+            >
+              ✓ Forcer terminé
+            </button>
+          </>
+        )}
+        {task.status === "done" && (
+          <button
+            className="action-btn small-btn"
+            disabled={busy}
+            onClick={handleRebuild}
+          >
+            🔁 Rejouer
+          </button>
+        )}
+        {task.status === "done" && (
+          <button className="ghost small-btn" onClick={() => setShowDiff(true)}>
+            📊 Diff
+          </button>
+        )}
+      </div>
+      {error && <div className="edit-error">{error}</div>}
+      {task.description && <p>{task.description}</p>}
+      {(task.acceptance_criteria ?? []).length > 0 && (
+        <>
+          <h4>Critères d'acceptance</h4>
+          <ul className="task-criteria">
+            {task.acceptance_criteria.map((c) => (
+              <li key={c.id}>{c.text}</li>
+            ))}
+          </ul>
+        </>
+      )}
+      {task.gherkin && (
+        <>
+          <h4>Gherkin</h4>
+          <pre className="gherkin">{task.gherkin}</pre>
+        </>
+      )}
+      {task.last_error && (
+        <>
+          <h4>Dernière erreur</h4>
+          <pre className="error-output">{task.last_error}</pre>
+        </>
+      )}
+      {showDiff && (
+        <DiffViewer
+          label={task.id}
+          fetcher={() => taskDiff(projectId, task.id)}
           onClose={() => setShowDiff(false)}
         />
       )}
@@ -713,11 +1037,20 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
 function EpicStories({
   projectId,
   stories,
+  allStories,
+  streams,
+  primaryStreamId,
   onOpen,
+  onOpenTask,
 }: {
   projectId: string;
   stories: UserStory[];
+  /** Every story (all epics) — needed to resolve cross-stream blocked-by. */
+  allStories: UserStory[];
+  streams: Stream[];
+  primaryStreamId: string;
   onOpen: (storyId: string) => void;
+  onOpenTask: (taskId: string) => void;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
@@ -758,7 +1091,11 @@ function EpicStories({
         <StoryRow
           key={s.id}
           story={s}
+          stories={allStories}
+          streams={streams}
+          primaryStreamId={primaryStreamId}
           onOpen={() => onOpen(s.id)}
+          onOpenTask={onOpenTask}
           dragOver={overId === s.id && draggingId !== null && draggingId !== s.id}
           onHandleDragStart={(e) => {
             e.stopPropagation();
@@ -786,13 +1123,17 @@ function EpicStories({
 function Breadcrumb({
   epic,
   story,
+  taskId,
   onNavEpics,
   onNavEpic,
+  onNavStory,
 }: {
   epic: Epic | null;
   story: UserStory | null;
+  taskId?: string | null;
   onNavEpics: () => void;
   onNavEpic: () => void;
+  onNavStory: () => void;
 }) {
   return (
     <nav className="breadcrumb" aria-label="Fil d'Ariane">
@@ -814,7 +1155,19 @@ function Breadcrumb({
       {story && (
         <>
           <span className="crumb-sep">/</span>
-          <span className="crumb current">{story.id}</span>
+          {taskId ? (
+            <button className="crumb" onClick={onNavStory}>
+              {story.id}
+            </button>
+          ) : (
+            <span className="crumb current">{story.id}</span>
+          )}
+        </>
+      )}
+      {taskId && (
+        <>
+          <span className="crumb-sep">/</span>
+          <span className="crumb current">{taskId}</span>
         </>
       )}
     </nav>
@@ -835,10 +1188,13 @@ export interface EpicProgress {
 /** Avancement d'un ensemble de stories : compteurs + état dérivé (priorité au
  * « en cours »). Réutilisé par la vue Itérations. */
 export function epicProgress(stories: UserStory[]): EpicProgress {
+  // ST-12: count by EFFECTIVE status so a container US (with tasks) contributes
+  // its derived state. Legacy taskless US keep their stored status, unchanged.
   const total = stories.length;
-  const done = stories.filter((s) => s.status === "done").length;
-  const inProgress = stories.filter((s) => s.status === "in_progress").length;
-  const failed = stories.filter((s) => s.status === "failed").length;
+  const eff = stories.map((s) => usEffectiveStatus(s));
+  const done = eff.filter((s) => s === "done").length;
+  const inProgress = eff.filter((s) => s === "in_progress").length;
+  const failed = eff.filter((s) => s === "failed").length;
   const pct = total === 0 ? 0 : Math.round((done / total) * 100);
   const state: EpicState =
     inProgress > 0
@@ -975,24 +1331,50 @@ function EpicsView({
   );
 }
 
-/** Niveau epic : description + liste des US (drag-&-drop, ajout). */
+/**
+ * ST-12: does an item (US or any of its tasks) belong to the given stream id?
+ * Used by the stream filter — a US is kept if itself OR any task matches.
+ */
+function storyTouchesStream(
+  story: UserStory,
+  streamId: string,
+  primaryStreamId: string,
+): boolean {
+  const usStream = story.stream || primaryStreamId;
+  if (usStream === streamId) return true;
+  return (story.tasks ?? []).some((t) => (t.stream || primaryStreamId) === streamId);
+}
+
+/** Niveau epic : description + liste des US (drag-&-drop, ajout). ST-12 : la
+ * liste peut être filtrée par stream. */
 function EpicView({
   projectId,
   epic,
   stories,
+  streams,
+  primaryStreamId,
+  streamFilter,
   epicDeps,
   onOpenStory,
+  onOpenTask,
   onOpenIteration,
 }: {
   projectId: string;
   epic: Epic;
   stories: UserStory[];
+  streams: Stream[];
+  primaryStreamId: string;
+  streamFilter: string; // "" = no filter (all streams)
   epicDeps: Map<string, string[]>;
   onOpenStory: (storyId: string) => void;
+  onOpenTask: (taskId: string) => void;
   onOpenIteration?: (iter: number) => void;
 }) {
-  const es = stories.filter((s) => s.epic_id === epic.id);
-  const prog = epicProgress(es);
+  const all = stories.filter((s) => s.epic_id === epic.id);
+  const es = streamFilter
+    ? all.filter((s) => storyTouchesStream(s, streamFilter, primaryStreamId))
+    : all;
+  const prog = epicProgress(all);
   const deps = epicDeps.get(epic.id) ?? [];
   return (
     <div className={`epic-view epic-${prog.state}`}>
@@ -1011,17 +1393,32 @@ function EpicView({
       {deps.length > 0 && (
         <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
       )}
-      <EpicStories projectId={projectId} stories={es} onOpen={onOpenStory} />
+      <EpicStories
+        projectId={projectId}
+        stories={es}
+        allStories={stories}
+        streams={streams}
+        primaryStreamId={primaryStreamId}
+        onOpen={onOpenStory}
+        onOpenTask={onOpenTask}
+      />
       <AddStoryForm projectId={projectId} epicId={epic.id} />
     </div>
   );
 }
 
-type Nav = { level: "epics" | "epic" | "us"; epicId?: string; storyId?: string };
+type Nav = {
+  level: "epics" | "epic" | "us" | "task";
+  epicId?: string;
+  storyId?: string;
+  taskId?: string;
+};
 
 interface Props {
   epics: Epic[];
   stories: UserStory[];
+  /** ST-12: declared streams (empty/absent = legacy single-stream project). */
+  streams?: Stream[];
   projectId: string;
   phase?: string;
   /** Cible de navigation pilotée de l'extérieur (depuis la vue Itérations) :
@@ -1038,6 +1435,7 @@ const PLANNING_PHASES = ["spec", "analyze", "plan", "architect"];
 export function Board({
   epics,
   stories,
+  streams,
   projectId,
   phase,
   focus,
@@ -1045,6 +1443,19 @@ export function Board({
   onOpenIteration,
 }: Props) {
   const [nav, setNav] = useState<Nav>({ level: "epics" });
+  // ST-12: active stream filter ("" = all streams). Only offered when the
+  // project declares more than one stream (legacy projects never see it).
+  const [streamFilter, setStreamFilter] = useState<string>("");
+
+  const declaredStreams = streams ?? [];
+  const multiStream = declaredStreams.length > 1;
+  const primaryStreamId = useMemo(
+    () => declaredStreams.find((s) => s.primary)?.id
+      ?? declaredStreams.find((s) => s.kind === "backend")?.id
+      ?? declaredStreams[0]?.id
+      ?? "backend",
+    [declaredStreams],
+  );
 
   // Navigation pilotée depuis l'extérieur (clic sur une US dans la chronologie).
   useEffect(() => {
@@ -1091,14 +1502,32 @@ export function Board({
   const epicDeps = deriveEpicDeps(stories);
   const epic = nav.epicId ? epics.find((e) => e.id === nav.epicId) ?? null : null;
   const story =
-    nav.level === "us" && epic && nav.storyId
+    (nav.level === "us" || nav.level === "task") && epic && nav.storyId
       ? stories.find((s) => s.id === nav.storyId) ?? null
+      : null;
+  const task =
+    nav.level === "task" && story && nav.taskId
+      ? (story.tasks ?? []).find((t) => t.id === nav.taskId) ?? null
       : null;
   const level: Nav["level"] = !epic
     ? "epics"
-    : nav.level === "us" && !story
+    : (nav.level === "us" || nav.level === "task") && !story
       ? "epic"
-      : nav.level;
+      : nav.level === "task" && !task
+        ? "us"
+        : nav.level;
+
+  // Resolve a task id to its (epic, story) so we can open its detail from any
+  // level — the task carries its story_id, the story its epic_id.
+  const openTaskById = (taskId: string) => {
+    const owner = stories.find((s) => (s.tasks ?? []).some((t) => t.id === taskId));
+    if (!owner) return;
+    setNav({ level: "task", epicId: owner.epic_id, storyId: owner.id, taskId });
+  };
+  const openTask = (storyId: string, taskId: string) => {
+    const owner = stories.find((s) => s.id === storyId);
+    setNav({ level: "task", epicId: owner?.epic_id, storyId, taskId });
+  };
 
   return (
     <div className="panel board">
@@ -1107,10 +1536,38 @@ export function Board({
         <Breadcrumb
           epic={epic}
           story={story}
+          taskId={level === "task" ? task?.id : null}
           onNavEpics={() => setNav({ level: "epics" })}
           onNavEpic={() => epic && setNav({ level: "epic", epicId: epic.id })}
+          onNavStory={() =>
+            epic && story && setNav({ level: "us", epicId: epic.id, storyId: story.id })
+          }
         />
       </div>
+      {multiStream && (
+        <div className="stream-filter" role="group" aria-label="Filtre par stream">
+          <button
+            type="button"
+            className={streamFilter === "" ? "active" : ""}
+            aria-pressed={streamFilter === ""}
+            onClick={() => setStreamFilter("")}
+          >
+            Tous les streams
+          </button>
+          {declaredStreams.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              data-testid={`stream-filter-${s.id}`}
+              className={streamFilter === s.id ? "active" : ""}
+              aria-pressed={streamFilter === s.id}
+              onClick={() => setStreamFilter((cur) => (cur === s.id ? "" : s.id))}
+            >
+              {(STREAM_META[s.kind] ?? STREAM_META.other).icon} {s.id}
+            </button>
+          ))}
+        </div>
+      )}
       {level === "epics" && (
         <EpicsView
           epics={epics}
@@ -1125,19 +1582,52 @@ export function Board({
           projectId={projectId}
           epic={epic}
           stories={stories}
+          streams={declaredStreams}
+          primaryStreamId={primaryStreamId}
+          streamFilter={streamFilter}
           epicDeps={epicDeps}
           onOpenStory={(storyId) => setNav({ level: "us", epicId: epic.id, storyId })}
+          onOpenTask={openTaskById}
           onOpenIteration={onOpenIteration}
         />
       )}
       {level === "us" && epic && story && (
         <div className="us-view">
+          {(story.tasks ?? []).length > 0 && (
+            <div className="us-tasks" data-testid={`us-tasks-${story.id}`}>
+              <h4>Tâches ({story.tasks!.length})</h4>
+              <div className="tasks">
+                {story.tasks!.map((t) => (
+                  <TaskRow
+                    key={t.id}
+                    task={t}
+                    stories={stories}
+                    streams={declaredStreams}
+                    primaryStreamId={primaryStreamId}
+                    onOpen={() => openTask(story.id, t.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
           <StoryDetail
             projectId={projectId}
             story={story}
             phase={phase}
             onDeleted={() => setNav({ level: "epic", epicId: epic.id })}
             onOpenIteration={onOpenIteration}
+          />
+        </div>
+      )}
+      {level === "task" && epic && story && task && (
+        <div className="us-view">
+          <TaskDetail
+            projectId={projectId}
+            task={task}
+            stories={stories}
+            streams={declaredStreams}
+            primaryStreamId={primaryStreamId}
+            phase={phase}
           />
         </div>
       )}

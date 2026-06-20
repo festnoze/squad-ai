@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getIterations } from "../api";
-import { Epic, Usage, UserStory } from "../types";
+import { Epic, Stream, Usage, UserStory } from "../types";
 import { Board } from "./Board";
 import { IterationsView } from "./IterationsView";
 
@@ -18,6 +18,7 @@ type View = "vision" | "iterations";
 export function WorkspaceViews({
   epics,
   stories,
+  streams,
   projectId,
   phase,
   iterationUsage,
@@ -25,6 +26,8 @@ export function WorkspaceViews({
 }: {
   epics: Epic[];
   stories: UserStory[];
+  /** ST-12: declared streams (empty/absent = legacy single-stream project). */
+  streams?: Stream[];
   projectId: string;
   phase?: string;
   /** Coût/tokens par itération (clé = n° d'itération en string), pour la timeline. */
@@ -116,6 +119,7 @@ export function WorkspaceViews({
         <Board
           epics={epics}
           stories={stories}
+          streams={streams}
           projectId={projectId}
           phase={phase}
           focus={boardFocus}

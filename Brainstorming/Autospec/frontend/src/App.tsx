@@ -524,6 +524,7 @@ export default function App() {
             <WorkspaceViews
               epics={project.epics ?? []}
               stories={project.stories ?? []}
+              streams={project.streams}
               projectId={project.id}
               phase={project.phase}
               iterationUsage={project.iteration_usage}

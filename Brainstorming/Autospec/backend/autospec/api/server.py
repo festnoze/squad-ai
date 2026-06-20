@@ -676,6 +676,32 @@ async def astory_diff(project_id: str, story_id: str) -> dict:
     return {"ok": True, **result}
 
 
+@app.post("/api/projects/{project_id}/tasks/{task_id}/rebuild")
+async def arebuild_task(project_id: str, task_id: str) -> dict:
+    """ST-13: reset and rebuild a single task in its own worktree (background)."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.arebuild_task(task_id), f"Tâche inconnue : {task_id}")
+    return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/tasks/{task_id}/force-done")
+async def aforce_done_task(project_id: str, task_id: str) -> dict:
+    """ST-13: force a single task to DONE (user override)."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.aforce_done_task(task_id), f"Tâche inconnue : {task_id}")
+    return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
+
+
+@app.get("/api/projects/{project_id}/tasks/{task_id}/diff")
+async def atask_diff(project_id: str, task_id: str) -> dict:
+    """ST-13: the git diff of a task's green/merged commit."""
+    pipeline = _pipeline(project_id)
+    result = await _acall_pipeline(
+        pipeline.atask_diff(task_id), f"Tâche inconnue : {task_id}"
+    )
+    return {"ok": True, **result}
+
+
 @app.post("/api/projects/{project_id}/stories/reorder")
 async def areorder_stories(project_id: str, req: ReorderRequest) -> dict:
     pipeline = _pipeline(project_id)

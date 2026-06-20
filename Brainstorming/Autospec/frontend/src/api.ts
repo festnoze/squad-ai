@@ -273,6 +273,38 @@ export async function forceDoneStory(
   );
 }
 
+export async function rebuildTask(
+  projectId: string,
+  taskId: string,
+): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/tasks/${taskId}/rebuild`, {
+      method: "POST",
+    }),
+  );
+}
+
+export async function forceDoneTask(
+  projectId: string,
+  taskId: string,
+): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/tasks/${taskId}/force-done`, {
+      method: "POST",
+    }),
+  );
+}
+
+export async function taskDiff(
+  projectId: string,
+  taskId: string,
+): Promise<{ available: boolean; diff: string }> {
+  const res = await json<StoryDiff>(
+    await fetch(`/api/projects/${projectId}/tasks/${taskId}/diff`),
+  );
+  return { available: res.available, diff: res.diff };
+}
+
 export async function reorderStories(
   projectId: string,
   priorities: { id: string; priority: number }[],
