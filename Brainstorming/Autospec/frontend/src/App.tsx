@@ -139,6 +139,18 @@ export default function App() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [providerMenuOpen]);
+  // P3 — couple the density axis to the responsive one: below 1200px the shell
+  // switches to data-density="compact" (tighter tokens) and reverts above. Pure
+  // attribute toggle; the CSS media query carries the actual deltas.
+  useEffect(() => {
+    const apply = () => {
+      document.body.dataset.density =
+        window.innerWidth < 1200 ? "compact" : "comfortable";
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, []);
   // Ids des projets supprimés : empêche un event « state » retardé de
   // ressusciter un projet déjà supprimé.
   const deletedIds = useRef<Set<string>>(new Set());
@@ -597,6 +609,9 @@ export default function App() {
               iterationUsage={project.iteration_usage}
               onRollbackTo={handleRollbackTo}
               ticks={ticks[project.id]}
+              awaitingApproval={project.awaiting_approval}
+              onApprove={guard(() => approveProject(project.id))}
+              onReject={guard(() => rejectProject(project.id))}
             />
             <RunPanel
               project={project}

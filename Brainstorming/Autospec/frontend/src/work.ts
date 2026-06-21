@@ -99,16 +99,22 @@ export function deriveItemView(
   const kind: "story" | "task" = "epic_id" in item ? "story" : "task";
   const persistedStage = (item.current_stage ?? "queued") as BuildStage;
   const persistedRecovery = item.recovery ?? EMPTY_RECOVERY;
+  // A finished item (done/failed) is authoritative from the PERSISTED state: a
+  // stale heartbeat (the tick loop fires ~every 10s, so a fast build can leave a
+  // queued/in-progress tick lingering) must never flip a completed item back to
+  // "in progress". For non-terminal items the live tick still wins.
+  const terminal = item.status === DONE || item.status === "failed";
+  const useTick = !!tick && !terminal;
   return {
     id: item.id,
     kind,
-    status: (tick?.status as StoryStatus) ?? item.status,
-    stage: (tick?.current_stage as BuildStage) ?? persistedStage,
-    stageStartedAt: tick?.stage_started_at ?? item.stage_started_at ?? 0,
-    persona: tick?.current_persona ?? item.current_persona ?? "",
-    recovery: tick?.recovery ?? persistedRecovery,
+    status: useTick ? ((tick!.status as StoryStatus) ?? item.status) : item.status,
+    stage: useTick ? ((tick!.current_stage as BuildStage) ?? persistedStage) : persistedStage,
+    stageStartedAt: useTick ? (tick!.stage_started_at ?? item.stage_started_at ?? 0) : (item.stage_started_at ?? 0),
+    persona: useTick ? (tick!.current_persona ?? item.current_persona ?? "") : (item.current_persona ?? ""),
+    recovery: useTick ? (tick!.recovery ?? persistedRecovery) : persistedRecovery,
     guidance: item.guidance ?? [],
-    fromTick: !!tick,
+    fromTick: useTick,
   };
 }
 

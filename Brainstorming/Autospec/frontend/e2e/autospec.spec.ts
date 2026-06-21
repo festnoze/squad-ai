@@ -1,4 +1,4 @@
-import { expect, test, Page } from "@playwright/test";
+import { APIRequestContext, expect, test, Page } from "@playwright/test";
 
 /**
  * Exhaustive end-to-end scenario against the real stack in demo mode (scripted
@@ -20,6 +20,26 @@ import { expect, test, Page } from "@playwright/test";
 const GOAL = "Une calculatrice de démonstration exhaustive";
 const NAME = "Calculatrice exhaustive";
 
+/**
+ * GET + parse JSON with a short retry. The demo backend does real git work
+ * (e.g. the commit step blocks the event loop for a beat), so a request fired
+ * right after can transiently fail to connect (ECONNRESET / ETIMEDOUT). Retry a
+ * few times before giving up.
+ */
+async function getJson<T>(request: APIRequestContext, url: string): Promise<T> {
+  let lastErr: unknown;
+  for (let i = 0; i < 6; i++) {
+    try {
+      const res = await request.get(url, { timeout: 10_000 });
+      return (await res.json()) as T;
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 1000));
+    }
+  }
+  throw lastErr;
+}
+
 /** Open the creation modal if a project is already selected. */
 async function ensureCreationForm(page: Page) {
   const newBtn = page.getByRole("button", { name: "＋ Nouveau" });
@@ -33,6 +53,26 @@ async function createProject(page: Page, name: string, goal: string, budget?: st
   await page.getByPlaceholder(/Décris la feature/).fill(goal);
   if (budget) await page.getByPlaceholder(/Budget max/).fill(budget);
   await page.getByRole("button", { name: /Démarrer la spécification/ }).click();
+  await dismissBrainstorm(page);
+}
+
+/**
+ * B-IDEA: when the brainstorming assist is enabled (the demo classifies every
+ * idea as "vague"), the spec phase pauses on a Yes/No offer. Decline it so the PM
+ * refines the idea autonomously and the pipeline flows straight to the spec/build.
+ * No-op when the offer is absent (assist disabled).
+ */
+async function dismissBrainstorm(page: Page) {
+  const refuse = page.getByRole("button", { name: /Non, affine en autonomie/ });
+  // The offer appears a beat after "Démarrer" (the assess-idea agent runs first).
+  // Wait for it; if it never shows (assist disabled), move on.
+  try {
+    await refuse.waitFor({ state: "visible", timeout: 15_000 });
+  } catch {
+    return; // no brainstorm gate (assist off) — nothing to dismiss
+  }
+  await refuse.click();
+  await expect(refuse).toBeHidden();
 }
 
 /**
@@ -198,8 +238,8 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await page.getByRole("menuitem", { name: /🔀 Commit/ }).click();
 
   // === I2 — export zip (endpoint, via le contexte requête) ==================
-  const projects = await (await request.get("/api/projects")).json();
-  const proj = projects.find((p: { name: string }) => p.name === NAME);
+  const projects = await getJson<{ id: string; name: string }[]>(request, "/api/projects");
+  const proj = projects.find((p) => p.name === NAME);
   expect(proj).toBeTruthy();
   const zip = await request.get(`/api/projects/${proj.id}/export`);
   expect(zip.status()).toBe(200);
@@ -224,9 +264,10 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
     .getByTitle("Archiver le projet")
     .click();
   // On bascule sur l'autre projet : le 1er (archivé, non sélectionné) disparaît.
-  const after = await (await request.get("/api/projects")).json();
-  const sec = after.find((p: { name: string }) => p.name === "Projet secondaire");
-  await selector.selectOption(sec.id);
+  const after = await getJson<{ id: string; name: string }[]>(request, "/api/projects");
+  const sec = after.find((p) => p.name === "Projet secondaire");
+  expect(sec).toBeTruthy();
+  await selector.selectOption(sec!.id);
   await expect(page.getByRole("option", { name: reName })).toHaveCount(0);
   // Ré-affiché via la bascule « 📦 Archivés ».
   await page.getByRole("button", { name: /📦 Archivés/ }).click();
