@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clientUuid,
   createProject,
+  discoverModels,
   extendStory,
   getProvider,
   setProvider,
@@ -59,6 +60,20 @@ describe("api — retry des appels idempotents (provider)", () => {
     const fetchMock = mockFetchSequence(proxy502, okProvider);
     await getProvider();
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("discoverModels appelle l'endpoint de découverte et renvoie models+source", async () => {
+    const okDiscovery = {
+      ok: true,
+      status: 200,
+      json: async () => ({ provider: "ollama", models: ["llama3.2:latest"], source: "live" }),
+      text: async () => "",
+    };
+    const fetchMock = mockFetchSequence(okDiscovery);
+    const res = await discoverModels("ollama");
+    expect(res.source).toBe("live");
+    expect(res.models).toContain("llama3.2:latest");
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/providers/ollama/models");
   });
 
   it("createProject (NON idempotent) ne réessaie PAS un 502 — pas de double création", async () => {

@@ -1781,6 +1781,37 @@ button.action-btn.action-done {
   font-size: 13px;
 }
 
+.provider-hint {
+  font-style: normal;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+
+.provider-hint-live {
+  color: var(--green);
+}
+
+.provider-refresh {
+  margin-left: 6px;
+  padding: 0 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  opacity: 0.8;
+}
+
+.provider-refresh:hover {
+  opacity: 1;
+}
+
+.provider-refresh:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
 /* ---------- composants du produit (E3/E4) ---------- */
 .components {
   max-height: 260px;

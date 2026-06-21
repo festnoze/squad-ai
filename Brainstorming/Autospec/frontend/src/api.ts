@@ -359,6 +359,17 @@ export async function getProvider(): Promise<ProviderInfo> {
   return json(await fetchIdempotent("/api/provider"));
 }
 
+/** Live model discovery for a provider: the models actually reachable
+ *  (ollama daemon, OpenAI/codex via the API key). Falls back server-side to the
+ *  static suggestions with source="static". Idempotent GET. */
+export async function discoverModels(
+  provider: string,
+): Promise<{ provider: string; models: string[]; source: "live" | "static" }> {
+  return json(
+    await fetchIdempotent(`/api/providers/${encodeURIComponent(provider)}/models`),
+  );
+}
+
 export async function setProvider(
   provider: string,
   model?: string,

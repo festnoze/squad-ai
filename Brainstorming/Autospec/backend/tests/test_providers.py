@@ -13,17 +13,26 @@ from autospec.agents.providers import (
     provider_model,
     provider_models,
 )
-from autospec.agents.runner import AgentError, ClaudeCliRunner
+from autospec.agents.runner import AgentError, ClaudeCliRunner, CodexCliRunner
 from autospec.config import settings
 
 
 def test_make_runner_mapping():
     assert isinstance(make_runner("claude"), ClaudeCliRunner)
-    assert isinstance(make_runner(""), ClaudeCliRunner)
+    assert isinstance(make_runner("codex"), CodexCliRunner)
+    # Empty/default provider resolves to Codex (the new default, first in the UI).
+    assert isinstance(make_runner(""), CodexCliRunner)
     assert isinstance(make_runner("OpenAI"), OpenAiRunner)
     assert isinstance(make_runner("ollama"), OllamaRunner)
     with pytest.raises(ValueError):
         make_runner("gemini")
+
+
+def test_provider_model_codex(monkeypatch):
+    monkeypatch.setattr(settings, "codex_model", None)
+    assert provider_model("codex") == "(défaut Codex CLI)"
+    monkeypatch.setattr(settings, "codex_model", "gpt-5.3-codex")
+    assert provider_model("codex") == "gpt-5.3-codex"
 
 
 def test_provider_model_reads_settings(monkeypatch):

@@ -120,6 +120,121 @@ class ClaudeCliRunner:
         )
 
 
+def _extract_codex_text(out: str) -> tuple[str, int, int]:
+    """Parse ``codex exec --json`` output into (final_text, in_tokens, out_tokens).
+
+    Codex emits JSONL (one event per line). We don't hard-code the exact event
+    schema (it evolves across versions): we scan every line that parses as a JSON
+    object and keep the LAST human-readable assistant message found under any of
+    the common keys, plus any token-usage counters seen. If nothing parses as
+    JSON (e.g. plain-text mode), the whole output is returned as the text."""
+    last_text = ""
+    in_tok = out_tok = 0
+    saw_json = False
+
+    def _dig_text(obj: dict) -> str:
+        # Common shapes across codex versions: {"msg":{"type":"agent_message","message":...}},
+        # {"item":{"type":"agent_message","text":...}}, {"type":"agent_message","text":...}.
+        for container in (obj, obj.get("msg"), obj.get("item"), obj.get("message")):
+            if not isinstance(container, dict):
+                continue
+            kind = str(container.get("type") or "")
+            if kind and "agent_message" not in kind and "message" not in kind and "assistant" not in kind:
+                continue
+            for key in ("text", "message", "content", "last_agent_message"):
+                val = container.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val
+        return ""
+
+    for line in out.splitlines():
+        line = line.strip()
+        if not line or not line.startswith("{"):
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        saw_json = True
+        text = _dig_text(obj)
+        if text:
+            last_text = text
+        usage = obj.get("usage") or obj.get("token_usage") or {}
+        if isinstance(usage, dict):
+            in_tok = int(usage.get("input_tokens", usage.get("prompt_tokens", in_tok)) or in_tok)
+            out_tok = int(usage.get("output_tokens", usage.get("completion_tokens", out_tok)) or out_tok)
+
+    if not saw_json:
+        return out, 0, 0
+    return (last_text or out), in_tok, out_tok
+
+
+class CodexCliRunner:
+    """Runs one headless OpenAI Codex turn via ``codex exec`` — the OpenAI
+    counterpart of :class:`ClaudeCliRunner`. Codex has no ``--append-system-prompt``
+    flag, so the system prompt is prepended to the user prompt; the combined
+    prompt is fed on stdin. Output is parsed from ``codex exec --json`` JSONL.
+
+    The exact codex flags are env-overridable (``AUTOSPEC_CODEX_CMD``) so the
+    harness can adapt as the CLI evolves."""
+
+    async def arun(
+        self,
+        prompt: str,
+        system_prompt: str,
+        cwd: Path | None = None,
+        session_id: str | None = None,
+        model: str | None = None,
+    ) -> AgentResult:
+        # Codex has no separate system-prompt channel: prepend it to the prompt.
+        combined = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
+        args = [
+            settings.codex_cmd,
+            "exec",
+            "--json",
+            # Headless, non-interactive autonomy — the codex equivalent of
+            # Claude's bypassPermissions (the orchestrator re-verifies anyway).
+            "--dangerously-bypass-approvals-and-sandbox",
+            "--skip-git-repo-check",
+        ]
+        chosen_model = model or settings.codex_model
+        if chosen_model:
+            args += ["--model", chosen_model]
+        # Read the prompt from stdin ('-') rather than argv (Windows argv length
+        # limits would truncate large BMAD prompts).
+        args.append("-")
+
+        def _run() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                args,
+                input=combined,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                cwd=str(cwd) if cwd else None,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=settings.agent_timeout_s,
+            )
+
+        try:
+            proc = await asyncio.to_thread(_run)
+        except subprocess.TimeoutExpired:
+            raise AgentError(f"Agent timed out after {settings.agent_timeout_s}s")
+        except OSError as exc:
+            raise AgentError(f"Could not run codex CLI ({settings.codex_cmd}): {exc}")
+
+        out = (proc.stdout or "").strip()
+        if proc.returncode != 0:
+            err = (proc.stderr or "").strip()
+            raise AgentError(f"codex CLI exited with {proc.returncode}: {err or out}")
+
+        text, in_tok, out_tok = _extract_codex_text(out)
+        return AgentResult(text=text, input_tokens=in_tok, output_tokens=out_tok)
+
+
 class FakeRunner:
     """Deterministic runner for tests: pops queued replies in order."""
 

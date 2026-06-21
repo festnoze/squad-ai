@@ -8,6 +8,7 @@ import {
   documentProject,
   errorMessage,
   exportZipUrl,
+  discoverModels,
   getProvider,
   gitExportProject,
   listProjects,
@@ -128,7 +129,31 @@ export default function App() {
   const [provider, setProviderInfo] = useState<ProviderInfo | null>(null);
   // UI10 : provider + modèle regroupés dans un petit popover compact.
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
+  // Live model discovery per provider (ollama daemon / OpenAI key). Falls back
+  // to the static suggested list (provider.models) when discovery is unavailable.
+  const [discovered, setDiscovered] = useState<
+    Record<string, { models: string[]; source: "live" | "static" }>
+  >({});
+  const [discovering, setDiscovering] = useState(false);
   const providerRef = useRef<HTMLDivElement>(null);
+  const refreshModels = async (name: string) => {
+    setDiscovering(true);
+    try {
+      const res = await discoverModels(name);
+      setDiscovered((prev) => ({ ...prev, [name]: { models: res.models, source: res.source } }));
+    } catch {
+      /* keep the static fallback already in provider.models */
+    } finally {
+      setDiscovering(false);
+    }
+  };
+  // Discover the current provider's real models when the popover opens.
+  useEffect(() => {
+    if (providerMenuOpen && provider && provider.provider !== "fake") {
+      void refreshModels(provider.provider);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [providerMenuOpen, provider?.provider]);
   useEffect(() => {
     if (!providerMenuOpen) return;
     const onDoc = (e: MouseEvent) => {
@@ -439,23 +464,52 @@ export default function App() {
                   </select>
                 </label>
                 <label className="provider-field">
-                  <span>Modèle</span>
-                  <select
-                    value={provider.model}
-                    onChange={(e) => handleModelChange(e.target.value)}
-                  >
-                    {/* Le modèle courant peut ne pas figurer dans la liste
-                        suggérée (ex. « (défaut CLI) ») : on l'ajoute en tête. */}
-                    {provider.model &&
-                      !(provider.models[provider.provider] ?? []).includes(provider.model) && (
-                        <option value={provider.model}>{provider.model}</option>
-                      )}
-                    {(provider.models[provider.provider] ?? []).map((m) => (
-                      <option key={m} value={m}>
-                        {m}
-                      </option>
-                    ))}
-                  </select>
+                  <span>
+                    Modèle
+                    {(() => {
+                      const disc = discovered[provider.provider];
+                      if (discovering) return <em className="provider-hint"> · …</em>;
+                      if (disc?.source === "live")
+                        return <em className="provider-hint provider-hint-live"> · live</em>;
+                      if (disc?.source === "static")
+                        return <em className="provider-hint"> · suggérés</em>;
+                      return null;
+                    })()}
+                    <button
+                      type="button"
+                      className="provider-refresh"
+                      title="Rafraîchir les modèles réellement accessibles"
+                      aria-label="Rafraîchir les modèles"
+                      disabled={discovering}
+                      onClick={() => void refreshModels(provider.provider)}
+                    >
+                      🔄
+                    </button>
+                  </span>
+                  {(() => {
+                    // Real models when discovered, else the static suggestions.
+                    const modelList =
+                      discovered[provider.provider]?.models ??
+                      provider.models[provider.provider] ??
+                      [];
+                    return (
+                      <select
+                        value={provider.model}
+                        onChange={(e) => handleModelChange(e.target.value)}
+                      >
+                        {/* Le modèle courant peut ne pas figurer dans la liste
+                            (ex. « (défaut Codex CLI) ») : on l'ajoute en tête. */}
+                        {provider.model && !modelList.includes(provider.model) && (
+                          <option value={provider.model}>{provider.model}</option>
+                        )}
+                        {modelList.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    );
+                  })()}
                 </label>
               </div>
             )}

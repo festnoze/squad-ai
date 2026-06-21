@@ -18,6 +18,7 @@ from fastapi.responses import FileResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from ..agents.discovery import adiscover_models
 from ..agents.providers import (
     PROVIDERS,
     make_runner,
@@ -346,6 +347,8 @@ async def aset_provider(req: ProviderRequest) -> dict:
             settings.ollama_model = model or settings.ollama_model
         elif provider == "anthropic":
             settings.anthropic_model = model or settings.anthropic_model
+        elif provider == "codex":
+            settings.codex_model = model or None
         else:
             settings.claude_model = model or None
     try:
@@ -361,6 +364,19 @@ async def aset_provider(req: ProviderRequest) -> dict:
         "provider": settings.agent_provider,
         "model": provider_model(settings.agent_provider),
     }
+
+
+@app.get("/api/providers/{provider}/models")
+async def aget_provider_models(provider: str) -> dict:
+    """Live model discovery for a provider: the models actually reachable.
+
+    ``ollama`` queries the Ollama daemon (the API behind ``ollama list``),
+    ``openai``/``codex`` query the OpenAI ``/models`` endpoint with the key.
+    Falls back to the static suggestions (``source: "static"``) on any failure,
+    so the selector keeps working offline."""
+    p = provider.strip().lower()
+    models, source = await adiscover_models(p)
+    return {"provider": p, "models": models, "source": source}
 
 
 @app.post("/api/projects")

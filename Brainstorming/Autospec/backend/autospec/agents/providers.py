@@ -23,7 +23,14 @@ import uuid
 from pathlib import Path
 
 from ..config import settings
-from .runner import AgentError, AgentResult, AgentRunner, ClaudeCliRunner, extract_json
+from .runner import (
+    AgentError,
+    AgentResult,
+    AgentRunner,
+    ClaudeCliRunner,
+    CodexCliRunner,
+    extract_json,
+)
 
 TOOL_PROTOCOL = """
 
@@ -258,13 +265,18 @@ class AnthropicRunner(_LangChainRunner):
         ) / 1_000_000
 
 
-PROVIDERS = ("claude", "openai", "ollama", "anthropic")
+# Codex is first (the default provider): the UI lists it first and selects it by
+# default. claude/openai/ollama/anthropic follow.
+PROVIDERS = ("codex", "claude", "openai", "ollama", "anthropic")
 
 # Suggested models per provider, shown in the UI's second (adaptive) dropdown.
 # These are display/endpoint values passed straight to the backend, so a user
 # can still configure another one via the AUTOSPEC_*_MODEL env vars — the active
 # model is always injected into the list so the selection round-trips correctly.
 MODEL_CHOICES: dict[str, tuple[str, ...]] = {
+    # The Codex CLI runs OpenAI models; these are suggestions (env/live-discovery
+    # can override). Empty model = the codex CLI default.
+    "codex": ("gpt-5.3-codex", "gpt-5.4-codex", "o4-mini"),
     # The Claude Code CLI accepts short aliases.
     "claude": ("opus", "sonnet", "haiku"),
     # Anthropic API needs the full model ids.
@@ -300,15 +312,17 @@ def provider_models(provider: str) -> list[str]:
 
 def make_runner(provider: str) -> AgentRunner:
     """Build the agent backend for a provider name (AUTOSPEC_AGENT_PROVIDER)."""
-    normalized = (provider or "claude").strip().lower()
+    normalized = (provider or "codex").strip().lower()
     if normalized == "openai":
         return OpenAiRunner()
     if normalized == "ollama":
         return OllamaRunner()
     if normalized == "anthropic":
         return AnthropicRunner()
-    if normalized in ("", "claude"):
+    if normalized == "claude":
         return ClaudeCliRunner()
+    if normalized in ("", "codex"):
+        return CodexCliRunner()
     raise ValueError(f"Provider inconnu : {provider!r} (attendu : {', '.join(PROVIDERS)})")
 
 
@@ -320,4 +334,6 @@ def provider_model(provider: str) -> str:
         return settings.ollama_model
     if provider == "anthropic":
         return settings.anthropic_model
+    if provider == "codex":
+        return settings.codex_model or "(défaut Codex CLI)"
     return settings.claude_model or "(défaut CLI)"

@@ -95,6 +95,21 @@ def _resolve_claude_cmd() -> str:
     return "claude"
 
 
+def _resolve_codex_cmd() -> str:
+    """Resolve the OpenAI Codex CLI command (mirror of _resolve_claude_cmd).
+
+    Codex runs headless via ``codex exec`` — the OpenAI counterpart of the Claude
+    Code CLI harness. On Windows the npm shim is codex.cmd."""
+    env = os.environ.get("AUTOSPEC_CODEX_CMD")
+    if env:
+        return env
+    for name in ("codex.cmd", "codex.exe", "codex"):
+        found = shutil.which(name)
+        if found:
+            return found
+    return "codex"
+
+
 def _default_workspace_root() -> Path:
     env = os.environ.get("AUTOSPEC_WORKSPACE_ROOT")
     if env:
@@ -121,13 +136,19 @@ class Settings:
     claude_model: str | None = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_CLAUDE_MODEL") or None
     )
+    # Codex CLI harness: the OpenAI counterpart of the Claude Code CLI, driven
+    # headless via ``codex exec``. Default provider (first in the UI list).
+    codex_cmd: str = field(default_factory=_resolve_codex_cmd)
+    codex_model: str | None = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_CODEX_MODEL") or None
+    )
     # Per-phase model routing (M3): a cheap model for spec/plan, a strong one for
     # build/refine. Populated from AUTOSPEC_MODEL_<PHASE>; falls back to claude_model.
     phase_models: dict = field(default_factory=_default_phase_models)
     # Agent provider: "claude" (CLI harness), "openai" (API key) or "ollama"
     # (local models). Switchable at runtime through POST /api/provider.
     agent_provider: str = field(
-        default_factory=lambda: os.environ.get("AUTOSPEC_AGENT_PROVIDER", "claude").strip().lower()
+        default_factory=lambda: os.environ.get("AUTOSPEC_AGENT_PROVIDER", "codex").strip().lower()
     )
     openai_api_key: str = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_OPENAI_API_KEY")
