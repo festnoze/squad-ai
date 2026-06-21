@@ -2,11 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   blockedBy,
   buildWorkGraph,
+  deriveItemView,
   effectiveStatus,
+  elapsedLabel,
   hasMultiStream,
+  isStageActive,
+  isStageDone,
   mergeState,
+  STAGE_ORDER,
+  stageIndex,
 } from "./work";
-import { Stream, Task, UserStory } from "./types";
+import { Stream, Task, TickItem, UserStory } from "./types";
 
 function task(overrides: Partial<Task> = {}): Task {
   return {
@@ -112,5 +118,97 @@ describe("work — mergeState + hasMultiStream", () => {
     expect(hasMultiStream([], [story({ tasks: [task()] })])).toBe(true);
     expect(hasMultiStream([], [story()])).toBe(false);
     expect(hasMultiStream(undefined, [story()])).toBe(false);
+  });
+});
+
+describe("work — stage tracker helpers", () => {
+  it("STAGE_ORDER : ordre canonique, done en terminal", () => {
+    expect(STAGE_ORDER[0]).toBe("queued");
+    expect(STAGE_ORDER[STAGE_ORDER.length - 1]).toBe("done");
+    expect(STAGE_ORDER).toContain("implementing");
+  });
+
+  it("stageIndex : failed → slot terminal, inconnu → 0", () => {
+    expect(stageIndex("queued")).toBe(0);
+    expect(stageIndex("failed")).toBe(STAGE_ORDER.length - 1);
+    expect(stageIndex("implementing")).toBe(STAGE_ORDER.indexOf("implementing"));
+    expect(stageIndex("")).toBe(0);
+    expect(stageIndex("garbage")).toBe(0);
+  });
+
+  it("isStageDone / isStageActive", () => {
+    // current = implementing
+    expect(isStageDone("analyzing", "implementing")).toBe(true);
+    expect(isStageDone("implementing", "implementing")).toBe(false);
+    expect(isStageDone("verifying", "implementing")).toBe(false);
+    expect(isStageActive("implementing", "implementing")).toBe(true);
+    expect(isStageActive("analyzing", "implementing")).toBe(false);
+    // done : tout done, rien actif
+    expect(isStageDone("verifying", "done")).toBe(true);
+    expect(isStageActive("done", "done")).toBe(false);
+    // failed : aucune cellule done, aucune active
+    expect(isStageDone("analyzing", "failed")).toBe(false);
+    expect(isStageActive("implementing", "failed")).toBe(false);
+  });
+
+  it("elapsedLabel : formats + cas limites", () => {
+    const now = 1_000_000_000_000; // ms
+    const nowS = now / 1000;
+    expect(elapsedLabel(0, now)).toBe("");
+    expect(elapsedLabel(undefined, now)).toBe("");
+    expect(elapsedLabel(nowS - 5, now)).toBe("5s");
+    expect(elapsedLabel(nowS - 90, now)).toBe("1m 30s");
+    expect(elapsedLabel(nowS - 3660, now)).toBe("1h 1m");
+    // horloge décalée (départ dans le futur) → ""
+    expect(elapsedLabel(nowS + 10, now)).toBe("");
+  });
+});
+
+describe("work — deriveItemView", () => {
+  it("sans tick : retombe sur les champs persistés", () => {
+    const s = story({
+      status: "in_progress",
+      current_stage: "implementing",
+      stage_started_at: 123,
+      current_persona: "dev",
+      recovery: { attempt: 1, max_attempts: 3, kind: "refining" },
+    });
+    const v = deriveItemView(s);
+    expect(v.kind).toBe("story");
+    expect(v.fromTick).toBe(false);
+    expect(v.stage).toBe("implementing");
+    expect(v.persona).toBe("dev");
+    expect(v.recovery.kind).toBe("refining");
+    expect(v.stageStartedAt).toBe(123);
+  });
+
+  it("avec tick : le tick gagne pour stage/persona/status, guidance reste de l'état", () => {
+    const s = story({
+      status: "todo",
+      current_stage: "queued",
+      guidance: [{ id: "g1", text: "fix", ts: 1, status: "queued" }],
+    });
+    const tick: TickItem = {
+      id: "US-1",
+      kind: "story",
+      status: "in_progress",
+      current_stage: "verifying",
+      stage_started_at: 999,
+      current_persona: "qa",
+      recovery: { attempt: 2, max_attempts: 3, kind: "retry" },
+    };
+    const v = deriveItemView(s, tick);
+    expect(v.fromTick).toBe(true);
+    expect(v.status).toBe("in_progress");
+    expect(v.stage).toBe("verifying");
+    expect(v.persona).toBe("qa");
+    expect(v.stageStartedAt).toBe(999);
+    expect(v.guidance).toHaveLength(1); // toujours de l'état
+  });
+
+  it("task → kind task", () => {
+    const v = deriveItemView(task({ id: "T1", current_stage: "contracts" }));
+    expect(v.kind).toBe("task");
+    expect(v.stage).toBe("contracts");
   });
 });

@@ -23,6 +23,7 @@ from .. import observability
 from ..models import (
     AcceptanceCriterion,
     BackendLanguage,
+    BuildStage,
     ChatMessage,
     ChatRole,
     Component,
@@ -31,10 +32,12 @@ from ..models import (
     Epic,
     FeatureHypothesis,
     Finding,
+    GuidanceEntry,
     HypothesisStatus,
     PipelinePhase,
     PlannedTest,
     ProjectState,
+    RecoveryState,
     Stream,
     StreamKind,
     StoryStatus,
@@ -43,6 +46,7 @@ from ..models import (
     Usage,
     UserStory,
     backend_stream_for,
+    new_id,
 )
 from ..language_selector import recommend_language
 from ..storage import save_state_payload, workspace_dir
@@ -90,6 +94,54 @@ def _minimal_env() -> dict[str, str]:
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
     return env
+
+
+class _OwnedLock:
+    """B6 (UX): a thin wrapper over ``asyncio.Lock`` that records WHICH work item
+    currently holds it. Additive and drop-in: it supports ``async with`` exactly
+    like a bare lock (existing ``async with self._merge_lock:`` sites keep working
+    with ``owner`` left as ""), and a caller that wants the merge_wait/stall
+    signal acquires it via ``self._merge_lock.ahold(item_id)``. ``owner`` powers
+    the tick's ``stall_reason`` (``merge_lock_held:US-3``) and the per-item
+    ``merge_wait`` ring."""
+
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self.owner: str = ""
+
+    def locked(self) -> bool:
+        return self._lock.locked()
+
+    def ahold(self, owner: str):
+        """Acquire the lock as an async-context-manager, stamping ``owner`` for
+        the duration of the held section (restored on exit)."""
+        return _OwnedLockCtx(self, owner)
+
+    async def __aenter__(self):
+        await self._lock.acquire()
+        return self
+
+    async def __aexit__(self, *exc):
+        self._lock.release()
+        return False
+
+
+class _OwnedLockCtx:
+    """The context object returned by ``_OwnedLock.ahold(owner)``."""
+
+    def __init__(self, lock: "_OwnedLock", owner: str) -> None:
+        self._lock = lock
+        self._owner = owner
+
+    async def __aenter__(self):
+        await self._lock._lock.acquire()
+        self._lock.owner = self._owner
+        return self._lock
+
+    async def __aexit__(self, *exc):
+        self._lock.owner = ""
+        self._lock._lock.release()
+        return False
 
 
 def _clamp_1_5(value, default: int = 3) -> int:
@@ -205,7 +257,12 @@ class Pipeline:
         # MUST be serialized — concurrent `git merge` into the same repo race on
         # the index/HEAD. The streams path holds this while merging + on a merge
         # conflict retry. The legacy path never uses it (it keeps _build_lock).
-        self._merge_lock = asyncio.Lock()
+        # B6 (UX): owner-tracking wrapper so the tick can report who holds it
+        # (``merge_lock_held:US-3``) and stamp the holder's ``merge_wait`` ring.
+        self._merge_lock = _OwnedLock()
+        # B5 (UX): heartbeat tick publisher, started on BUILD entry, cancelled on
+        # stop/dispose. ~10s compact item-status broadcast (never replayed).
+        self._tick_task: asyncio.Task | None = None
         # U4: cleared while the pipeline waits for human approval before build.
         self._approval_event = asyncio.Event()
         self._approval_event.set()
@@ -265,6 +322,136 @@ class Pipeline:
             }
         )
 
+    # ------------------------------------------------------- stage tracking (B1)
+
+    def _set_stage(
+        self, item, stage: BuildStage, persona: str = "", *, sync: bool = True
+    ) -> None:
+        """B1/N4 (UX): stamp the fine-grained build stage + persona on a work item
+        (the persistent UserStory or Task) at a real transition, and broadcast.
+
+        ``item`` is the persistent model (``_item_target``). Passing ``persona=""``
+        clears the persona (e.g. on a terminal stage). All fields default-safe so
+        this never depends on the UX migration having run."""
+        item.current_stage = stage
+        item.stage_started_at = time.time()
+        item.current_persona = persona
+        if sync:
+            self._sync()
+
+    def _set_recovery(
+        self, item, kind: str, attempt: int = 0, max_attempts: int = 0,
+        *, sync: bool = True,
+    ) -> None:
+        """B1 (UX): stamp the auto-repair state on a work item at the refine/
+        regression/mutation/retry call sites. ``kind=""`` clears it."""
+        item.recovery = RecoveryState(
+            attempt=attempt, max_attempts=max_attempts, kind=kind
+        )
+        if sync:
+            self._sync()
+
+    def _apply_guidance(self, target) -> str:
+        """P10 (UX): collect a work item's queued guidance, mark it ``applied``,
+        and return the joined directive text to inject into that item's dev prompt
+        alongside the project-level ``build_guidance``. Returns "" when none."""
+        texts: list[str] = []
+        for entry in target.guidance:
+            if entry.status == "queued":
+                entry.status = "applied"
+            texts.append(entry.text)
+        return "\n".join(t for t in texts if t.strip())
+
+    # ------------------------------------------------------- heartbeat tick (B5)
+
+    def _stall_reason(self) -> str:
+        """B6 (UX): a one-line "why nothing is moving" hint for the tick.
+
+        Priority: a held merge lock (its owner) > awaiting approval > budget
+        pause > everyone at the parallel cap. "" when work is flowing."""
+        if self._merge_lock.locked() and self._merge_lock.owner:
+            return f"merge_lock_held:{self._merge_lock.owner}"
+        if self.state.awaiting_approval:
+            return "awaiting_approval"
+        if self.state.paused:
+            return "budget_paused"
+        return ""
+
+    def _tick_payload(self) -> dict:
+        """B5 (UX): the compact per-item status snapshot broadcast every ~10s
+        during BUILD. Item-level only (the full ``state`` event carries the rest),
+        so the churn stays bounded."""
+        items: list[dict] = []
+        counts = {"running": 0, "queued": 0, "done": 0, "failed": 0, "blocked": 0}
+        graph = work_streams.build_work_graph(self.state)
+        for wid in graph.order:
+            wi = graph.items[wid]
+            target = self.state.story(wi.story_id) if wi.kind == "story" else self.state.task(wi.id)
+            blockers = work_streams.blocked_by(wi, graph.items)
+            items.append({
+                "id": target.id,
+                "kind": wi.kind,
+                "status": target.status.value,
+                "current_stage": target.current_stage.value,
+                "stage_started_at": target.stage_started_at,
+                "current_persona": target.current_persona,
+                "recovery": {
+                    "attempt": target.recovery.attempt,
+                    "max_attempts": target.recovery.max_attempts,
+                    "kind": target.recovery.kind,
+                },
+            })
+            if target.status == StoryStatus.IN_PROGRESS:
+                counts["running"] += 1
+            elif target.status == StoryStatus.DONE:
+                counts["done"] += 1
+            elif target.status == StoryStatus.FAILED:
+                counts["failed"] += 1
+            elif target.status == StoryStatus.TODO and blockers:
+                counts["blocked"] += 1
+            elif target.status == StoryStatus.TODO:
+                counts["queued"] += 1
+            else:  # RED / GREEN are mid-build → running
+                counts["running"] += 1
+        return {
+            "type": "tick",
+            "project_id": self.state.id,
+            "ts": time.time(),
+            "items": items,
+            "counts": counts,
+            "stall_reason": self._stall_reason(),
+        }
+
+    def _publish_tick(self) -> None:
+        """Fan out one tick WITHOUT buffering it for Last-Event-ID replay (a
+        stale heartbeat must never be replayed on reconnect)."""
+        bus.publish_ephemeral(self._tick_payload())
+
+    async def _atick_loop(self) -> None:
+        """B5 (UX): emit a heartbeat tick ~every 10s while phase==BUILD."""
+        try:
+            while self.state.phase == PipelinePhase.BUILD:
+                self._publish_tick()
+                await asyncio.sleep(10.0)
+        except asyncio.CancelledError:
+            pass
+
+    def _start_tick(self) -> None:
+        """Start the heartbeat publisher on BUILD entry (idempotent)."""
+        if self._tick_task and not self._tick_task.done():
+            return
+        try:
+            self._tick_task = asyncio.create_task(self._atick_loop())
+        except RuntimeError:
+            # No running loop (sync test contexts): the tick is a live-only signal.
+            self._tick_task = None
+
+    def _stop_tick(self) -> None:
+        """Cancel the heartbeat publisher on stop/dispose/terminal phase."""
+        if self._tick_task and not self._tick_task.done():
+            self._tick_task.cancel()
+        self._tick_task = None
+
     # ------------------------------------------------------------- control
 
     def start(self) -> None:
@@ -277,6 +464,7 @@ class Pipeline:
         """Hard-stop everything (used when the project is deleted): cancel the
         lifecycle task and terminate the generated app if it runs."""
         self._stop_requested = True
+        self._stop_tick()  # B5: never tick after dispose
         if self._run_proc and self._run_proc.poll() is None:
             self._run_proc.terminate()
         for proc in self._frontend_procs:  # ST-8
@@ -325,6 +513,7 @@ class Pipeline:
 
     async def astop(self) -> None:
         self._stop_requested = True
+        self._stop_tick()  # B5: stop heartbeat on user stop
         self._resume_event.set()  # unblock a paused pipeline so it can finish
         self._brainstorm_event.set()  # unblock a pending brainstorming offer
         # Unblock a PM interview waiting for user input.
@@ -436,6 +625,63 @@ class Pipeline:
         self._brainstorm_accepted = bool(accept)
         self.state.awaiting_brainstorm_decision = False
         self._brainstorm_event.set()
+
+    # ------------------------------------------------ targeted guidance (P10/B4)
+
+    def _guidance_status_for(self, target) -> str:
+        """A directive that arrives after the item is terminal can no longer be
+        injected into a dev run → ``too_late``; otherwise ``queued``."""
+        status = target.status
+        if status in (StoryStatus.DONE, StoryStatus.FAILED):
+            return "too_late"
+        return "queued"
+
+    async def achat_story(self, sid: str, message: str, entry_id: str | None = None) -> GuidanceEntry:
+        """P10/B4: append a targeted directive to a story's ``guidance`` (injected
+        into THAT story's next dev run), echo it to the project chat, and persist.
+
+        Idempotent: a repeated ``entry_id`` returns the existing entry without
+        appending a duplicate. Raises KeyError (-> 404) if the story is unknown."""
+        story = self.state.story(sid)  # KeyError if absent
+        return await self._aappend_guidance(story, f"[{sid}]", message, entry_id)
+
+    async def achat_task(self, tid: str, message: str, entry_id: str | None = None) -> GuidanceEntry:
+        """P10/B4: same as ``achat_story`` for a single task."""
+        task = self.state.task(tid)  # KeyError if absent
+        return await self._aappend_guidance(task, f"[{tid}]", message, entry_id)
+
+    async def _aappend_guidance(
+        self, target, label: str, message: str, entry_id: str | None
+    ) -> GuidanceEntry:
+        if entry_id:
+            for existing in target.guidance:
+                if existing.id == entry_id:
+                    return existing  # idempotent replay
+        entry = GuidanceEntry(
+            id=entry_id or new_id("g"),
+            text=message,
+            status=self._guidance_status_for(target),
+        )
+        target.guidance.append(entry)
+        self._chat(ChatRole.USER, f"{label} {message}")
+        self._sync()
+        return entry
+
+    async def aextend_story(self, sid: str, criteria: list[str]) -> UserStory:
+        """P12/B4: append acceptance criteria to a story still in TODO (so the
+        next build picks them up). Raises KeyError (-> 404) if unknown, ValueError
+        (-> 409) if the story has already started (not TODO)."""
+        story = self.state.story(sid)  # KeyError if absent
+        if story.status != StoryStatus.TODO:
+            raise ValueError("la story a déjà démarré : impossible d'étendre ses critères")
+        start = len(story.acceptance_criteria)
+        for i, text in enumerate(criteria, start=start + 1):
+            if str(text).strip():
+                story.acceptance_criteria.append(
+                    AcceptanceCriterion(id=f"AC-{i}", text=str(text))
+                )
+        self._sync()
+        return story
 
     # ------------------------------------------------------------ spec editing
 
@@ -2118,6 +2364,7 @@ class Pipeline:
             return
         self.state.phase = PipelinePhase.BUILD
         self._sync()
+        self._start_tick()  # B5: heartbeat while building
         semaphore = asyncio.Semaphore(settings.max_parallel_devs)
 
         while not self._stop_requested:
@@ -2146,17 +2393,25 @@ class Pipeline:
 
             await asyncio.gather(*(_aworker(s) for s in ready))
 
+        self._stop_tick()  # B5: build batch loop done
         # Build directives are per-iteration; the next analysis uses `feedback`.
         self.state.build_guidance.clear()
 
     async def _abuild_story(self, story: UserStory) -> None:
         story.status = StoryStatus.IN_PROGRESS
         story.attempts += 1
+        # B1: a retry (attempts > 1) re-entering the build is a recovery state.
+        if story.attempts > 1:
+            self._set_recovery(
+                story, "retry", attempt=story.attempts,
+                max_attempts=settings.dev_max_attempts, sync=False,
+            )
         self._sync()
         ws = workspace_dir(self.state.id)
         pkg = workspace.package_name(self.state)
         is_frontend = self._is_frontend_story(story)
         if story.attempts == 1 and not is_frontend:
+            self._set_stage(story, BuildStage.ANALYZING, "qa")  # N4/B1
             await self._adesign_tests(story, pkg)
         label = "dev frontend" if is_frontend else "dev"
         self._log(f"dev:{story.id}", f"Agent {label} assigné à {story.id} — {story.title}")
@@ -2165,6 +2420,8 @@ class Pipeline:
             # code refinement) are serialized: parallel workers share one
             # workspace dir and must not interleave.
             async with self._build_lock:
+                self._set_stage(story, BuildStage.IMPLEMENTING, "dev")  # N4/B1
+                item_guidance = self._apply_guidance(story)  # P10
                 if is_frontend:
                     # ST-7: route a frontend-stream story to the React dev agent;
                     # "green" = Vitest all-pass AND `tsc && vite build` succeeds.
@@ -2175,6 +2432,7 @@ class Pipeline:
                         guidance="\n".join(self.state.build_guidance),
                         lessons="\n".join(self._effective_lessons()),
                         file_root=stream.file_root or "frontend",
+                        item_guidance=item_guidance,
                     )
                     dev_persona = persona("dev-frontend")
                 else:
@@ -2184,6 +2442,7 @@ class Pipeline:
                         ui_tests=self._ui_mode(story),
                         lessons="\n".join(self._effective_lessons()),
                         backend_language=self.state.backend_language.value,
+                        item_guidance=item_guidance,
                     )
                     dev_persona = persona("dev")
                 result = await self._tracked.arun(
@@ -2195,7 +2454,10 @@ class Pipeline:
                 self._chat(ChatRole.DEV, f"[{story.id}] {reply.get('summary', '(pas de résumé)')}")
                 story.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
                 story.ui_tests = [str(p) for p in reply.get("ui_test_files") or []]
-                self._sync()
+                # B1: dev declared the failing tests (RED) → contracts written.
+                if story.status == StoryStatus.RED:
+                    self._set_stage(story, BuildStage.CONTRACTS, "dev", sync=False)
+                self._set_stage(story, BuildStage.VERIFYING, "qa")  # N4/B1: orchestrator re-runs
 
                 # Trust but verify: the orchestrator reruns the suite itself and
                 # grounds per-test states on the REAL outcomes (Vitest+build for a
@@ -2249,15 +2511,22 @@ class Pipeline:
                     # frontend-stream story (ST-7).
                     if not is_frontend:
                         if settings.refine_for("dev"):
+                            self._set_recovery(story, "refining")  # B1: critic loop
                             await self._arefine_code(story, pkg, ws)
+                        self._set_recovery(story, "mutation_rerun")  # B1
                         await self._arun_mutation_test(story, pkg, ws)
+                        self._set_recovery(story, "", sync=False)  # B1: clear
+                    # B1: terminal stage for the stepper.
+                    self._set_stage(story, BuildStage.DONE, sync=False)
                 else:
                     story.last_error = tail
                     self._log(f"dev:{story.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
                     if story.attempts < settings.dev_max_attempts:
                         story.status = StoryStatus.TODO  # will be rescheduled
+                        self._set_stage(story, BuildStage.QUEUED, sync=False)  # B1: requeue
                     else:
                         story.status = StoryStatus.FAILED
+                        self._set_stage(story, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             story.last_error = str(exc)
             if session_monitor.monitor_active() and session_monitor.is_usage_limit_error(
@@ -2300,6 +2569,7 @@ class Pipeline:
         worktrees branch from the post-merge HEAD (ST-11)."""
         self.state.phase = PipelinePhase.BUILD
         self._sync()
+        self._start_tick()  # B5: heartbeat while building
         ws = workspace_dir(self.state.id)
         await self._agit_ensure_repo(ws)
         # The worktree base must be a real commit: a freshly-init'd repo has an
@@ -2369,6 +2639,7 @@ class Pipeline:
 
             await asyncio.gather(*(_aworker(it) for it in ready))
 
+        self._stop_tick()  # B5: build batch loop done
         self.state.build_guidance.clear()
 
     def _item_subject(self, item: "work_streams.WorkItem") -> UserStory:
@@ -2420,6 +2691,12 @@ class Pipeline:
         subject = self._item_subject(item)
         target.status = subject.status = StoryStatus.IN_PROGRESS
         target.attempts = subject.attempts = subject.attempts + 1
+        # B1: a retry (attempts > 1) re-entering the build is a recovery state.
+        if target.attempts > 1:
+            self._set_recovery(
+                target, "retry", attempt=target.attempts,
+                max_attempts=settings.dev_max_attempts, sync=False,
+            )
         self._sync()
 
         ws = workspace_dir(self.state.id)
@@ -2436,6 +2713,7 @@ class Pipeline:
             if worktree is None:
                 raise RuntimeError("git worktree indisponible")
             if subject.attempts == 1 and not is_frontend:
+                self._set_stage(target, BuildStage.ANALYZING, "qa")  # N4/B1
                 await self._adesign_tests(subject, pkg)
             label = "dev frontend" if is_frontend else "dev"
             self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
@@ -2447,6 +2725,8 @@ class Pipeline:
                 # item is DONE only after a successful merge (so dependents only
                 # start once this item's code is in the base HEAD).
                 await self._acommit_story(worktree, item.id)
+                # B1/B6: green → waiting for the merge lock, then merging.
+                self._set_stage(target, BuildStage.MERGE_WAIT, "")
                 merged = await self._amerge_work_item(ws, branch, item.id)
                 if merged:
                     target.status = subject.status = StoryStatus.DONE
@@ -2455,18 +2735,22 @@ class Pipeline:
                             test.status = TestState.GREEN
                     if item.kind == "story":
                         self.state.story(item.story_id).test_plan = subject.test_plan
+                    self._set_recovery(target, "", sync=False)  # B1: clear
+                    self._set_stage(target, BuildStage.DONE, sync=False)  # B1
                     self._log(f"dev:{item.id}", f"✅ {item.id} vert et mergé.")
                 else:
                     target.status = subject.status = StoryStatus.FAILED
                     target.last_error = "conflit de merge inter-stream non résolu"
+                    self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
             else:
                 target.last_error = tail
                 self._log(f"dev:{item.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
-                target.status = (
-                    StoryStatus.TODO
-                    if subject.attempts < settings.dev_max_attempts
-                    else StoryStatus.FAILED
-                )
+                if subject.attempts < settings.dev_max_attempts:
+                    target.status = StoryStatus.TODO
+                    self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
+                else:
+                    target.status = StoryStatus.FAILED
+                    self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             target.last_error = str(exc)
             if session_monitor.monitor_active() and session_monitor.is_usage_limit_error(
@@ -2490,12 +2774,33 @@ class Pipeline:
                 await self._aworktree_remove(ws, worktree, branch)
             self._sync()
 
+    def _persistent_for(self, subject: UserStory):
+        """Resolve the build subject back to its persistent model (UserStory or
+        Task) so B1 stage/persona/recovery stamps land on the stored item. A
+        taskless US's subject IS the stored story; a task's subject is a transient
+        adapter, so we look the Task up by id (falling back to the subject itself
+        when not found — e.g. a unit-test driving the helper directly)."""
+        try:
+            return self.state.task(subject.id)
+        except KeyError:
+            pass
+        try:
+            return self.state.story(subject.id)
+        except KeyError:
+            return subject
+
     async def _arun_item_dev(
         self, subject: UserStory, worktree, pkg: str, is_frontend: bool
     ) -> tuple[bool, str]:
         """Run the dev agent for one work item INSIDE its worktree, then verify
         the real suite there. Returns (green, tail). No ``_build_lock``: the
-        worktree is private to this item, so parallel items never interleave."""
+        worktree is private to this item, so parallel items never interleave.
+
+        The persistent model (UserStory/Task) is resolved from ``subject`` and
+        stamped with the B1 stage + persona at each real transition."""
+        target = self._persistent_for(subject)
+        self._set_stage(target, BuildStage.IMPLEMENTING, "dev")  # N4/B1
+        item_guidance = self._apply_guidance(target)  # P10
         if is_frontend:
             stream = self._story_stream(subject)
             dev_prompt = prompts.dev_story_frontend(
@@ -2504,6 +2809,7 @@ class Pipeline:
                 guidance="\n".join(self.state.build_guidance),
                 lessons="\n".join(self._effective_lessons()),
                 file_root=stream.file_root or "frontend",
+                item_guidance=item_guidance,
             )
             dev_persona = persona("dev-frontend")
         else:
@@ -2513,6 +2819,7 @@ class Pipeline:
                 ui_tests=self._ui_mode(subject),
                 lessons="\n".join(self._effective_lessons()),
                 backend_language=self.state.backend_language.value,
+                item_guidance=item_guidance,
             )
             dev_persona = persona("dev")
         result = await self._tracked.arun(dev_prompt, system_prompt=dev_persona, cwd=worktree)
@@ -2520,6 +2827,10 @@ class Pipeline:
         self._chat(ChatRole.DEV, f"[{subject.id}] {reply.get('summary', '(pas de résumé)')}")
         subject.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
         subject.ui_tests = [str(p) for p in reply.get("ui_test_files") or []]
+        # B1: dev declared the failing tests (RED) → contracts written.
+        if subject.status == StoryStatus.RED:
+            self._set_stage(target, BuildStage.CONTRACTS, "dev", sync=False)
+        self._set_stage(target, BuildStage.VERIFYING, "qa")  # N4/B1
         self._sync()
 
         if is_frontend:
@@ -2557,8 +2868,11 @@ class Pipeline:
             # Refinement + mutation testing run inside the item's worktree (they
             # rerun pytest / mutate the package) before the merge — Python only.
             if settings.refine_for("dev"):
+                self._set_recovery(target, "refining")  # B1: critic loop
                 await self._arefine_code(subject, pkg, worktree)
+            self._set_recovery(target, "mutation_rerun")  # B1
             await self._arun_mutation_test(subject, pkg, worktree)
+            self._set_recovery(target, "", sync=False)  # B1: clear
         return ok, tail
 
     # ------------------------------------------------ worktree lifecycle (ST-10)
@@ -2615,7 +2929,9 @@ class Pipeline:
         Conflict policy: a `--no-ff` merge that reports a conflict is retried
         once (still under the lock, so nothing else mutates the repo in between);
         if it still conflicts, abort cleanly and signal failure to the caller."""
-        async with self._merge_lock:
+        # B6: hold the merge lock under this item's id so the tick can report
+        # ``merge_lock_held:<wid>`` while others wait.
+        async with self._merge_lock.ahold(wid):
             code, out = await self._agit(
                 repo, "merge", "--no-ff", "-m", f"merge work item {wid}", branch
             )
@@ -2672,12 +2988,14 @@ class Pipeline:
         """Background task: build a single story and restore a terminal phase."""
         self.state.phase = PipelinePhase.BUILD
         self._sync()
+        self._start_tick()  # B5: heartbeat during the rebuild
         self._log(f"dev:{story.id}", f"Relance de {story.id}…")
         try:
             await self._abuild_story(story)
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la relance de {story.id} : {exc}")
         finally:
+            self._stop_tick()  # B5: rebuild done
             self.state.phase = (
                 PipelinePhase.STOPPED if self._stop_requested else PipelinePhase.DONE
             )

@@ -14,6 +14,18 @@ import {
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Client-generated id for idempotent POSTs. The chat endpoints dedupe on
+ * `entry_id`, so a request carrying a stable id can be safely retried through
+ * `fetchIdempotent` without double-injecting guidance. Uses `crypto.randomUUID`
+ * when available, with a non-crypto fallback for older/test environments.
+ */
+export function clientUuid(): string {
+  const c = (globalThis as { crypto?: Crypto }).crypto;
+  if (c && typeof c.randomUUID === "function") return c.randomUUID();
+  return "g-" + Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+/**
  * fetch() that retries transient dev-proxy / loopback failures. On Windows the
  * Vite proxy ↔ uvicorn connection occasionally drops mid-request (ECONNRESET):
  * for a body-carrying POST that the proxy can't safely retry on its own, it
@@ -474,6 +486,66 @@ export function connectEvents(
     if (reconnectTimer !== undefined) clearTimeout(reconnectTimer);
     es?.close();
   };
+}
+
+/**
+ * P10/B4: send a targeted directive to ONE story, injected into that story's next
+ * dev run. A stable client `entry_id` makes the POST idempotent (the backend
+ * dedupes on it), so it routes through `fetchIdempotent` — a retried POST after a
+ * transient proxy reset can't double-inject the guidance. Returns the (possibly
+ * server-assigned) entry id; we echo back the one we sent.
+ */
+export async function storyChat(
+  projectId: string,
+  storyId: string,
+  message: string,
+  entryId?: string,
+): Promise<{ ok: boolean; entry_id: string }> {
+  const entry_id = entryId ?? clientUuid();
+  return json(
+    await fetchIdempotent(`/api/projects/${projectId}/stories/${storyId}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, entry_id }),
+    }),
+  );
+}
+
+/** P10/B4: send a targeted directive to ONE task. Idempotent via `entry_id`. */
+export async function taskChat(
+  projectId: string,
+  taskId: string,
+  message: string,
+  entryId?: string,
+): Promise<{ ok: boolean; entry_id: string }> {
+  const entry_id = entryId ?? clientUuid();
+  return json(
+    await fetchIdempotent(`/api/projects/${projectId}/tasks/${taskId}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message, entry_id }),
+    }),
+  );
+}
+
+/**
+ * Extend a not-yet-built story's acceptance criteria. The backend replaces the
+ * criteria and returns the full updated state. Pure replacement -> idempotent, so
+ * it routes through `fetchIdempotent`. 409 if the story is not `todo`.
+ */
+export async function extendStory(
+  projectId: string,
+  storyId: string,
+  criteria: string[],
+): Promise<ProjectState> {
+  const { state } = await json<{ ok: boolean; state: ProjectState }>(
+    await fetchIdempotent(`/api/projects/${projectId}/stories/${storyId}/extend`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ acceptance_criteria: criteria }),
+    }),
+  );
+  return state;
 }
 
 export async function getMetrics(): Promise<Metrics> {

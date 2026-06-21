@@ -42,12 +42,58 @@ import { ComponentsPanel } from "./components/ComponentsPanel";
 import { ProjectBar } from "./components/ProjectBar";
 import { ProjectSetup } from "./components/ProjectSetup";
 import { RunPanel } from "./components/RunPanel";
-import { ProductComponent, ProjectState, ProviderInfo, WsEvent } from "./types";
+import {
+  GuidanceEntry,
+  ProductComponent,
+  ProjectState,
+  ProjectTicks,
+  ProviderInfo,
+  Task,
+  UserStory,
+  WsEvent,
+} from "./types";
 
 interface StampedLog {
   projectId: string;
   source: string;
   line: string;
+}
+
+/**
+ * B-UX: merge guidance arrays by id so a full `state` event never clobbers an
+ * optimistic local entry that the server hasn't persisted yet. Server status
+ * wins for ids it knows; optimistic-only entries (not yet echoed back) are
+ * preserved. Applied across every story and task of the incoming state.
+ */
+function mergeGuidance(
+  incoming: GuidanceEntry[] | undefined,
+  prev: GuidanceEntry[] | undefined,
+): GuidanceEntry[] | undefined {
+  if (!prev || prev.length === 0) return incoming;
+  const next = [...(incoming ?? [])];
+  const byId = new Map(next.map((g) => [g.id, g]));
+  for (const g of prev) {
+    if (!byId.has(g.id)) next.push(g); // optimistic entry the server hasn't echoed yet
+  }
+  return next;
+}
+
+/** B-UX: produce a copy of `state` whose stories'/tasks' guidance arrays are
+ * merged with the previously held ones (see mergeGuidance). */
+function mergeStateGuidance(state: ProjectState, prev: ProjectState | undefined): ProjectState {
+  if (!prev) return state;
+  const prevStoryById = new Map((prev.stories ?? []).map((s) => [s.id, s]));
+  const prevTaskById = new Map<string, Task>();
+  for (const s of prev.stories ?? []) for (const t of s.tasks ?? []) prevTaskById.set(t.id, t);
+  const stories = (state.stories ?? []).map((s: UserStory) => {
+    const ps = prevStoryById.get(s.id);
+    const tasks = s.tasks?.map((t: Task) => ({
+      ...t,
+      guidance: mergeGuidance(t.guidance, prevTaskById.get(t.id)?.guidance),
+    }));
+    return { ...s, guidance: mergeGuidance(s.guidance, ps?.guidance), ...(tasks ? { tasks } : {}) };
+  });
+  return { ...state, stories };
 }
 
 interface NotifyToast {
@@ -64,6 +110,11 @@ export default function App() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [logs, setLogs] = useState<StampedLog[]>([]);
+  // B-UX: latest heartbeat data keyed by project id. Never overwrites full
+  // project state; refreshes live item-level stage/persona/recovery between
+  // `state` snapshots. Cleared (left stale) is harmless — `state` is the source
+  // of truth for everything rich.
+  const [ticks, setTicks] = useState<Record<string, ProjectTicks>>({});
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [toasts, setToasts] = useState<NotifyToast[]>([]);
@@ -88,6 +139,18 @@ export default function App() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [providerMenuOpen]);
+  // P3 — couple the density axis to the responsive one: below 1200px the shell
+  // switches to data-density="compact" (tighter tokens) and reverts above. Pure
+  // attribute toggle; the CSS media query carries the actual deltas.
+  useEffect(() => {
+    const apply = () => {
+      document.body.dataset.density =
+        window.innerWidth < 1200 ? "compact" : "comfortable";
+    };
+    apply();
+    window.addEventListener("resize", apply);
+    return () => window.removeEventListener("resize", apply);
+  }, []);
   // Ids des projets supprimés : empêche un event « state » retardé de
   // ressusciter un projet déjà supprimé.
   const deletedIds = useRef<Set<string>>(new Set());
@@ -107,7 +170,9 @@ export default function App() {
       const i = prev.findIndex((p) => p.id === state.id);
       if (i === -1) return [state, ...prev];
       const next = [...prev];
-      next[i] = state;
+      // B-UX: merge guidance by id so a full `state` snapshot doesn't clobber an
+      // optimistic local entry the server hasn't echoed back yet.
+      next[i] = mergeStateGuidance(state, prev[i]);
       return next;
     });
 
@@ -151,6 +216,20 @@ export default function App() {
             ...prev.slice(-800),
             { projectId: event.project_id, source: event.source, line: event.line },
           ]);
+        } else if (event.type === "tick") {
+          // B-UX: heartbeat — store latest per-item data; NEVER overwrite the
+          // full project state (titles/criteria/scores live in `state`). A tick
+          // for an already-deleted project is ignored.
+          if (deletedIds.current.has(event.project_id)) return;
+          setTicks((prev) => ({
+            ...prev,
+            [event.project_id]: {
+              ts: event.ts,
+              items: Object.fromEntries(event.items.map((it) => [it.id, it])),
+              counts: event.counts,
+              stallReason: event.stall_reason,
+            },
+          }));
         } else if (event.type === "notify") {
           const id = ++toastIdRef.current;
           const toast = { id, level: event.level, title: event.title, body: event.body };
@@ -529,6 +608,10 @@ export default function App() {
               phase={project.phase}
               iterationUsage={project.iteration_usage}
               onRollbackTo={handleRollbackTo}
+              ticks={ticks[project.id]}
+              awaitingApproval={project.awaiting_approval}
+              onApprove={guard(() => approveProject(project.id))}
+              onReject={guard(() => rejectProject(project.id))}
             />
             <RunPanel
               project={project}

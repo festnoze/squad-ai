@@ -33,6 +33,12 @@ export default defineConfig({
       AUTOSPEC_FAKE_AGENTS: "1",
       AUTOSPEC_DEMO_DELAY_S: "0.6",
       AUTOSPEC_WORKSPACE_ROOT: "./.e2e-workspace",
+      // Hermetic: pin the non-streams build path the specs assert against,
+      // independent of the developer's backend/.env (which may enable streams).
+      // The new Activity view + steppers + targeted chat are validated on this
+      // DEFAULT demo flow (see improve-ux.spec.ts). Do NOT flip this to "1": the
+      // exhaustive autospec.spec.ts depends on the single-stream board shape.
+      AUTOSPEC_STREAMS: "0",
       // Exercise every optional pipeline phase in the exhaustive e2e scenario.
       AUTOSPEC_COMPONENTS: "1", // E3/E4 — component proposal + setup
       AUTOSPEC_ARCHITECTURE: "1", // item 7 — architecture phase

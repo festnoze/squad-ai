@@ -17,6 +17,38 @@ export type StoryStatus =
   | "done"
   | "failed";
 
+/** B1 (UX): the fine-grained stage one work item is in during BUILD. Mirrors the
+ * backend `BuildStage` enum. "merging" exists in the enum but the build currently
+ * stamps merge_wait then done/failed; treat it as a possible transient. */
+export type BuildStage =
+  | "queued"
+  | "analyzing"
+  | "contracts"
+  | "implementing"
+  | "verifying"
+  | "merge_wait"
+  | "merging"
+  | "done"
+  | "failed";
+
+/** B1 (UX): auto-repair state of one work item, surfaced on the stepper. Mirrors
+ * the backend `RecoveryState`. `kind`: "" | "refining" | "critic_restored" |
+ * "regression_rerun" | "mutation_rerun" | "retry". */
+export interface RecoveryState {
+  attempt: number;
+  max_attempts: number;
+  kind: string;
+}
+
+/** P10 (UX): one targeted chat directive aimed at a single work item. Mirrors the
+ * backend `GuidanceEntry`. `status`: "queued" | "applied" | "too_late". */
+export interface GuidanceEntry {
+  id: string;
+  text: string;
+  ts: number;
+  status: string;
+}
+
 export type ChatRole = "user" | "pm" | "po" | "dev" | "analyst" | "architect" | "qa" | "critic" | "judge" | "system";
 
 export type TestState = "nonexistent" | "red" | "green";
@@ -113,6 +145,13 @@ export interface Task {
   attempts: number;
   last_error: string;
   files_hint: string[];
+  // B1 (UX): per-item BUILD-stage telemetry. Defaults are safe for legacy state
+  // persisted before these fields existed ("not started, no recovery/guidance").
+  current_stage?: BuildStage;
+  stage_started_at?: number; // epoch seconds; 0 = never started
+  current_persona?: string; // "qa" | "dev" | "critic" | "" while the stage runs
+  recovery?: RecoveryState;
+  guidance?: GuidanceEntry[];
 }
 
 export interface UserStory {
@@ -139,6 +178,12 @@ export interface UserStory {
   // container whose status is derived from its tasks (see `usEffectiveStatus`).
   stream?: string;
   tasks?: Task[];
+  // B1 (UX): per-item BUILD-stage telemetry (see Task). Optional for legacy state.
+  current_stage?: BuildStage;
+  stage_started_at?: number; // epoch seconds; 0 = never started
+  current_persona?: string; // "qa" | "dev" | "critic" | "" while the stage runs
+  recovery?: RecoveryState;
+  guidance?: GuidanceEntry[];
 }
 
 export interface Epic {
@@ -207,11 +252,58 @@ export interface LogLine {
   line: string;
 }
 
+/** B-UX: one item-level entry inside a heartbeat `tick`. Item-level data ONLY —
+ * the rich data (titles, criteria, test_plan, scores) still comes from `state`. */
+export interface TickItem {
+  id: string;
+  kind: "story" | "task";
+  status: string;
+  current_stage: string; // BuildStage value
+  stage_started_at: number;
+  current_persona: string;
+  recovery: RecoveryState;
+}
+
+/** B-UX: counts buckets in a `tick`. IN_PROGRESS/RED/GREEN -> running; DONE ->
+ * done; FAILED -> failed; TODO with unmet deps -> blocked; TODO otherwise ->
+ * queued. */
+export interface TickCounts {
+  running: number;
+  queued: number;
+  done: number;
+  failed: number;
+  blocked: number;
+}
+
+/** B-UX: why the build can't make progress right now. "" | "merge_lock_held:<id>"
+ * | "awaiting_approval" | "budget_paused". */
+export type StallReason = string;
+
+/** B-UX: the live heartbeat snapshot for ONE project, as stored client-side.
+ * `items` is keyed by work-item id (story or task). `state` stays authoritative
+ * for rich data; this only carries between-snapshot item-level liveness. */
+export interface ProjectTicks {
+  ts: number;
+  items: Record<string, TickItem>;
+  counts: TickCounts;
+  stallReason: StallReason;
+}
+
 export type WsEvent =
   | { type: "state"; project_id: string; state: ProjectState }
   | { type: "log"; project_id: string; source: string; line: string }
   | { type: "deleted"; project_id: string }
-  | { type: "notify"; project_id: string; level: string; title: string; body: string };
+  | { type: "notify"; project_id: string; level: string; title: string; body: string }
+  // B-UX: heartbeat tick — NOT replayed on Last-Event-ID reconnect; arrives
+  // ~every 10s ONLY during phase==BUILD. Item-level only; never overwrites state.
+  | {
+      type: "tick";
+      project_id: string;
+      ts: number;
+      items: TickItem[];
+      counts: TickCounts;
+      stall_reason: StallReason;
+    };
 
 /** Body for editing an existing user story (all fields optional). */
 export interface StoryPatch {

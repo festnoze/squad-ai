@@ -235,6 +235,20 @@ class AddStoryRequest(BaseModel):
     depends_on: list[str] | None = None
 
 
+class ItemChatRequest(BaseModel):
+    """P10/B4: a targeted directive for one work item. ``entry_id`` is an optional
+    client-supplied idempotency key (so a retried POST is not double-appended)."""
+
+    message: str
+    entry_id: str | None = None
+
+
+class ExtendStoryRequest(BaseModel):
+    """P12/B4: extra acceptance criteria appended to a TODO story."""
+
+    acceptance_criteria: list[str]
+
+
 class StoryPriority(BaseModel):
     id: str
     priority: int
@@ -651,6 +665,45 @@ async def adelete_story(project_id: str, story_id: str) -> dict:
     pipeline = _pipeline(project_id)
     await _acall_pipeline(pipeline.adelete_story(story_id), f"Story inconnue : {story_id}")
     return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/stories/{story_id}/chat")
+async def achat_story(project_id: str, story_id: str, req: ItemChatRequest) -> dict:
+    """P10/B4: append a targeted directive to a story's guidance (injected into
+    that story's next dev run). Idempotency-safe via the optional ``entry_id``."""
+    pipeline = _pipeline(project_id)
+    if not req.message.strip():
+        raise HTTPException(422, "Le message est vide.")
+    entry = await _acall_pipeline(
+        pipeline.achat_story(story_id, req.message, req.entry_id),
+        f"Story inconnue : {story_id}",
+    )
+    return {"ok": True, "entry_id": entry.id}
+
+
+@app.post("/api/projects/{project_id}/tasks/{task_id}/chat")
+async def achat_task(project_id: str, task_id: str, req: ItemChatRequest) -> dict:
+    """P10/B4: append a targeted directive to a task's guidance. Idempotency-safe
+    via the optional ``entry_id``."""
+    pipeline = _pipeline(project_id)
+    if not req.message.strip():
+        raise HTTPException(422, "Le message est vide.")
+    entry = await _acall_pipeline(
+        pipeline.achat_task(task_id, req.message, req.entry_id),
+        f"Tâche inconnue : {task_id}",
+    )
+    return {"ok": True, "entry_id": entry.id}
+
+
+@app.post("/api/projects/{project_id}/stories/{story_id}/extend")
+async def aextend_story(project_id: str, story_id: str, req: ExtendStoryRequest) -> dict:
+    """P12/B4: append acceptance criteria to a story still in TODO."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(
+        pipeline.aextend_story(story_id, req.acceptance_criteria),
+        f"Story inconnue : {story_id}",
+    )
+    return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
 
 
 @app.post("/api/projects/{project_id}/stories/{story_id}/rebuild")
