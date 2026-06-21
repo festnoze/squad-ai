@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getIterations } from "../api";
-import { Epic, Stream, Usage, UserStory } from "../types";
+import { Epic, ProjectTicks, Stream, Usage, UserStory } from "../types";
 import { Board } from "./Board";
 import { IterationsView } from "./IterationsView";
 
@@ -23,6 +23,7 @@ export function WorkspaceViews({
   phase,
   iterationUsage,
   onRollbackTo,
+  ticks,
 }: {
   epics: Epic[];
   stories: UserStory[];
@@ -34,7 +35,11 @@ export function WorkspaceViews({
   iterationUsage?: Record<string, Usage>;
   /** Rollback vers une itération (gère confirmation + toast côté App). */
   onRollbackTo?: (iter: number) => void;
+  /** B-UX: live heartbeat for THIS project (item-level stage/persona/recovery +
+   * counts/stall). Optional; absent outside BUILD or before the first tick. */
+  ticks?: ProjectTicks;
 }) {
+  void ticks; // consumed by the B-UX stepper UI (next stage)
   const [view, setView] = useState<View>("vision");
   const [boardFocus, setBoardFocus] = useState<{ epicId: string; storyId?: string } | null>(
     null,

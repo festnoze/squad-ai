@@ -3,9 +3,114 @@
 // multi-stream Board (ST-12/13/14) can derive effective status, readiness
 // ("bloquée par X") and merge state without extra round-trips.
 
-import { Stream, StoryStatus, UserStory } from "./types";
+import {
+  BuildStage,
+  GuidanceEntry,
+  RecoveryState,
+  Stream,
+  StoryStatus,
+  Task,
+  TickItem,
+  UserStory,
+} from "./types";
 
 const DONE: StoryStatus = "done";
+
+// ---------------------------------------------------------------------------
+// B-UX stage tracker helpers (pure, dependency-light, unit-tested in work.test).
+// ---------------------------------------------------------------------------
+
+/** The canonical left→right order of BUILD stages shown in the Stepper. The two
+ *  terminal stages "done"/"failed" share the last slot (a stepper renders the
+ *  reached terminal one). */
+export const STAGE_ORDER: BuildStage[] = [
+  "queued",
+  "analyzing",
+  "contracts",
+  "implementing",
+  "verifying",
+  "merge_wait",
+  "merging",
+  "done",
+];
+
+/** Index of a stage in STAGE_ORDER. "failed" maps to the terminal slot (same as
+ *  "done"); an unknown/empty stage → 0 (queued). */
+export function stageIndex(stage: string): number {
+  if (stage === "failed") return STAGE_ORDER.length - 1;
+  const i = STAGE_ORDER.indexOf(stage as BuildStage);
+  return i < 0 ? 0 : i;
+}
+
+/** A stepper cell is "done" when the item's current stage is strictly past it
+ *  (or the item itself is done). The terminal "done" cell is done only when the
+ *  item actually reached "done". */
+export function isStageDone(cell: BuildStage, current: string): boolean {
+  if (current === "done") return true;
+  if (current === "failed") return false;
+  return stageIndex(current) > stageIndex(cell);
+}
+
+/** A stepper cell is "active" when it is exactly the item's current stage and the
+ *  item is neither done nor failed. */
+export function isStageActive(cell: BuildStage, current: string): boolean {
+  if (current === "done" || current === "failed") return false;
+  return stageIndex(current) === stageIndex(cell) && current === cell;
+}
+
+/** Human elapsed label since `startedAt` (epoch seconds) measured at `now`
+ *  (epoch ms). "" when never started (0/undefined) or clock skew. */
+export function elapsedLabel(startedAt: number | undefined, now: number): string {
+  if (!startedAt || startedAt <= 0) return "";
+  const secs = Math.floor(now / 1000 - startedAt);
+  if (secs < 0) return "";
+  if (secs < 60) return `${secs}s`;
+  const m = Math.floor(secs / 60);
+  if (m < 60) return `${m}m ${secs % 60}s`;
+  const h = Math.floor(m / 60);
+  return `${h}h ${m % 60}m`;
+}
+
+/** A view of one work item combining persisted fields (story/task in `state`)
+ *  with the latest heartbeat `tick`. The tick wins for live BUILD telemetry
+ *  (stage/persona/recovery/status); persisted fields are the fallback. */
+export interface ItemView {
+  id: string;
+  kind: "story" | "task";
+  status: StoryStatus;
+  stage: BuildStage;
+  stageStartedAt: number;
+  persona: string;
+  recovery: RecoveryState;
+  guidance: GuidanceEntry[];
+  /** true when this view's live data came from a tick (vs. persisted only). */
+  fromTick: boolean;
+}
+
+const EMPTY_RECOVERY: RecoveryState = { attempt: 0, max_attempts: 0, kind: "" };
+
+/** Combine a persisted story/task with its optional latest tick into one view.
+ *  Stage/persona/recovery/status prefer the tick; guidance always from persisted
+ *  state (the tick never carries it). */
+export function deriveItemView(
+  item: UserStory | Task,
+  tick?: TickItem,
+): ItemView {
+  const kind: "story" | "task" = "epic_id" in item ? "story" : "task";
+  const persistedStage = (item.current_stage ?? "queued") as BuildStage;
+  const persistedRecovery = item.recovery ?? EMPTY_RECOVERY;
+  return {
+    id: item.id,
+    kind,
+    status: (tick?.status as StoryStatus) ?? item.status,
+    stage: (tick?.current_stage as BuildStage) ?? persistedStage,
+    stageStartedAt: tick?.stage_started_at ?? item.stage_started_at ?? 0,
+    persona: tick?.current_persona ?? item.current_persona ?? "",
+    recovery: tick?.recovery ?? persistedRecovery,
+    guidance: item.guidance ?? [],
+    fromTick: !!tick,
+  };
+}
 
 /** Effective status of a US: stored status for a taskless US, else DERIVED from
  *  its tasks (all done → done ; any active → in_progress ; any failed → failed ;

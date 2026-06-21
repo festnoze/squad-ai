@@ -36,6 +36,21 @@ def _snake(story_id: str) -> str:
     return story_id.lower().replace("-", "_")
 
 
+def _guidance_block(guidance: str, item_guidance: str = "", story_id: str = "") -> str:
+    """P10 (UX): the dev prompt's "user directives" block. Combines the project-
+    level ``build_guidance`` with this item's targeted ``item_guidance`` (from its
+    own chat), the latter labelled so the dev knows it is item-specific."""
+    blocks: list[str] = []
+    if guidance.strip():
+        blocks.append(f"Consignes de l'utilisateur (à respecter en priorité) :\n{guidance}")
+    if item_guidance.strip():
+        label = f"Consignes ciblées pour {story_id}" if story_id else "Consignes ciblées"
+        blocks.append(f"{label} (à respecter en priorité) :\n{item_guidance}")
+    if not blocks:
+        return ""
+    return "\n" + "\n\n".join(blocks) + "\n"
+
+
 # ----------------------------------------------- Refinement harness (critic/judge)
 
 def critic_review(kind: str, artifact: str, criteria: str) -> str:
@@ -948,12 +963,11 @@ def dev_story(
     ui_tests: bool = False,
     lessons: str = "",
     backend_language: str = "python",
+    item_guidance: str = "",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     lang_block = _language_block(backend_language)
-    guidance_block = (
-        f"\nConsignes de l'utilisateur (à respecter en priorité) :\n{guidance}\n" if guidance else ""
-    )
+    guidance_block = _guidance_block(guidance, item_guidance, story.id)
     lessons_block = (
         f"\nLeçons des itérations précédentes (rétrospective d'usine — à appliquer) :\n{lessons}\n"
         if lessons
@@ -1037,6 +1051,7 @@ def dev_story_frontend(
     guidance: str = "",
     lessons: str = "",
     file_root: str = "frontend",
+    item_guidance: str = "",
 ) -> str:
     """Dev prompt for the frontend stream (ST-7): a React+TS dev who writes
     components + Vitest tests in a red→green loop. "Green" = every Vitest test
@@ -1046,9 +1061,7 @@ def dev_story_frontend(
     The unique substring ``PROCESSUS OBLIGATOIRE FRONTEND`` keys the
     ScriptedRunner reply (checked before the backend ``PROCESSUS OBLIGATOIRE``)."""
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
-    guidance_block = (
-        f"\nConsignes de l'utilisateur (à respecter en priorité) :\n{guidance}\n" if guidance else ""
-    )
+    guidance_block = _guidance_block(guidance, item_guidance, story.id)
     lessons_block = (
         f"\nLeçons des itérations précédentes (rétrospective d'usine — à appliquer) :\n{lessons}\n"
         if lessons

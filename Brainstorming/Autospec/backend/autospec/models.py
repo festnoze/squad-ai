@@ -84,6 +84,23 @@ class TestState(str, Enum):
     GREEN = "green"               # passing
 
 
+class BuildStage(str, Enum):
+    """B1 (UX): the fine-grained stage one work item is in during BUILD. Mapped
+    to the real transitions in ``pipeline._abuild_work_item``/``_arun_item_dev``/
+    ``_adesign_tests``. ``QUEUED`` is the safe default so any pre-UX persisted
+    state (which has no ``current_stage``) loads unchanged as "not started"."""
+
+    QUEUED = "queued"            # not started (todo)
+    ANALYZING = "analyzing"      # QA test-plan design (_adesign_tests)
+    CONTRACTS = "contracts"      # dev wrote failing tests (status RED)
+    IMPLEMENTING = "implementing"  # dev writing code toward green
+    VERIFYING = "verifying"      # orchestrator re-runs pytest + coverage/refine/mutation
+    MERGE_WAIT = "merge_wait"    # green, waiting for the merge lock
+    MERGING = "merging"          # git merge into the shared repo
+    DONE = "done"                # terminal: merged
+    FAILED = "failed"            # terminal: gave up
+
+
 def new_id(prefix: str) -> str:
     """Generate a short unique id like 'us-1a2b3c4d'."""
     return f"{prefix}-{uuid.uuid4().hex[:8]}"
@@ -100,6 +117,30 @@ class ChatMessage(BaseModel):
     role: ChatRole
     content: str
     ts: float = Field(default_factory=time.time)
+
+
+class RecoveryState(BaseModel):
+    """B1 (UX): the auto-repair state of one work item — surfaced on the stepper
+    so the operator sees the factory healing itself (refine 2/3, regression
+    rerun…) instead of reading a stalled item as broken. All defaults are safe
+    so legacy persisted state loads as "no recovery in flight"."""
+
+    attempt: int = 0
+    max_attempts: int = 0
+    # "" | "refining" | "critic_restored" | "regression_rerun" | "mutation_rerun" | "retry"
+    kind: str = ""
+
+
+class GuidanceEntry(BaseModel):
+    """P10 (UX): one targeted chat directive aimed at a single work item, injected
+    into THAT item's dev prompt. ``status`` tracks delivery: queued (not yet seen
+    by a dev run), applied (injected into a dev prompt), too_late (the item was
+    already terminal when it arrived)."""
+
+    id: str = Field(default_factory=lambda: new_id("g"))
+    text: str = ""
+    ts: float = Field(default_factory=time.time)
+    status: str = "queued"  # "queued" | "applied" | "too_late"
 
 
 class FeatureHypothesis(BaseModel):
@@ -211,6 +252,14 @@ class Task(BaseModel):
     attempts: int = 0
     last_error: str = ""
     files_hint: list[str] = Field(default_factory=list)   # files/zones it expects to touch
+    # B1/N4/P10 (UX): fine-grained stage tracking for the stepper. All defaults
+    # are safe so a pre-UX persisted Task loads as "queued, no persona, no
+    # recovery, no guidance".
+    current_stage: BuildStage = BuildStage.QUEUED
+    stage_started_at: float = 0.0
+    current_persona: str = ""        # "qa" | "dev" | "critic" | "" while the stage runs
+    recovery: RecoveryState = Field(default_factory=RecoveryState)
+    guidance: list[GuidanceEntry] = Field(default_factory=list)
 
 
 class UserStory(BaseModel):
@@ -238,6 +287,14 @@ class UserStory(BaseModel):
     # status is DERIVED from its tasks (see ``effective_status``).
     stream: str = ""
     tasks: list[Task] = Field(default_factory=list)
+    # B1/N4/P10 (UX): fine-grained stage tracking for the stepper. All defaults
+    # are safe so a pre-UX persisted UserStory loads as "queued, no persona, no
+    # recovery, no guidance".
+    current_stage: BuildStage = BuildStage.QUEUED
+    stage_started_at: float = 0.0
+    current_persona: str = ""        # "qa" | "dev" | "critic" | "" while the stage runs
+    recovery: RecoveryState = Field(default_factory=RecoveryState)
+    guidance: list[GuidanceEntry] = Field(default_factory=list)
 
     @field_validator("priority")
     @classmethod

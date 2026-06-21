@@ -162,6 +162,54 @@ describe("App — gestion des évènements WebSocket", () => {
     expect(queryProjectOption(/Projet Alpha/)).not.toBeInTheDocument();
   });
 
+  it("un event 'tick' n'écrase pas l'état projet (titre conservé)", async () => {
+    render(<App />);
+    await waitFor(() => expect(capturedOnEvent).not.toBeNull());
+
+    emit({ type: "state", project_id: "p1", state: makeProject({ name: "Projet Tick" }) });
+    await findProjectOption(/Projet Tick/);
+
+    // Un tick item-level arrive : il ne doit pas remplacer l'état complet.
+    emit({
+      type: "tick",
+      project_id: "p1",
+      ts: 123,
+      items: [
+        {
+          id: "US-1",
+          kind: "story",
+          status: "in_progress",
+          current_stage: "implementing",
+          stage_started_at: 100,
+          current_persona: "dev",
+          recovery: { attempt: 0, max_attempts: 0, kind: "" },
+        },
+      ],
+      counts: { running: 1, queued: 0, done: 0, failed: 0, blocked: 0 },
+      stall_reason: "",
+    });
+
+    await Promise.resolve();
+    expect(await findProjectOption(/Projet Tick/)).toBeInTheDocument();
+  });
+
+  it("un 'tick' pour un projet inconnu ne crée pas de projet fantôme", async () => {
+    render(<App />);
+    await waitFor(() => expect(capturedOnEvent).not.toBeNull());
+
+    emit({
+      type: "tick",
+      project_id: "ghost",
+      ts: 1,
+      items: [],
+      counts: { running: 0, queued: 0, done: 0, failed: 0, blocked: 0 },
+      stall_reason: "",
+    });
+
+    await Promise.resolve();
+    expect(queryProjectOption(/Projet/)).not.toBeInTheDocument();
+  });
+
   it("un event 'notify' affiche un toast (U3)", async () => {
     render(<App />);
     await waitFor(() => expect(capturedOnEvent).not.toBeNull());
