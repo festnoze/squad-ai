@@ -512,6 +512,87 @@ async def test_retry_failed_rejected_when_no_failure(green_pytest):
         await pipeline.aretry_failed()
 
 
+def _us_for_retry(sid, epic, it, status, deps=None):
+    from autospec.models import AcceptanceCriterion, UserStory
+
+    return UserStory(
+        id=sid, epic_id=epic, title=sid, iteration=it, status=status, depends_on=deps or [],
+        acceptance_criteria=[AcceptanceCriterion(id="AC-1", text="critère")],
+        gherkin="Feature: F\n  Scenario: S\n    Given a\n    When b\n    Then c",
+    )
+
+
+async def test_retry_failed_rebuilds_failure_from_earlier_iteration(green_pytest):
+    """Regression: a done project's failures sit in EARLIER iterations; retry-failed
+    must rebuild them even though the current iteration's stories are all done
+    (the « 409 aucune story en échec » bug), resolving a cross-iteration
+    dependency from the full story pool."""
+    from autospec.models import Epic
+
+    state = ProjectState(id="proj-retry-old", name="n", goal="g", iteration=2)
+    state.epics = [Epic(id="E1", title="e1", iteration=1), Epic(id="E2", title="e2", iteration=2)]
+    state.stories = [
+        _us_for_retry("US-1", "E1", 1, StoryStatus.DONE),                   # dependency, iter 1
+        _us_for_retry("US-2", "E1", 1, StoryStatus.FAILED, deps=["US-1"]),  # FAILED in iter 1
+        _us_for_retry("US-3", "E2", 2, StoryStatus.DONE),                   # current iter, done
+    ]
+    state.story("US-2").last_error = "boom"
+    pipeline = Pipeline(state, FakeRunner([QA_PLAN, DEV_GREEN]))
+    pipeline.state.phase = PipelinePhase.DONE
+
+    await pipeline.aretry_failed()  # must NOT raise (the bug)
+    await wait_until(
+        lambda: state.phase == PipelinePhase.DONE
+        and state.story("US-2").status == StoryStatus.DONE
+    )
+    assert state.story("US-2").last_error == ""
+    assert state.story("US-1").status == StoryStatus.DONE  # dependency untouched
+
+
+async def test_retry_failed_rebuilds_multiple_failures_across_iterations(green_pytest, monkeypatch):
+    """retry-failed rebuilds every failure across ALL iterations in one run."""
+    from autospec.config import settings
+    from autospec.models import Epic
+
+    monkeypatch.setattr(settings, "max_parallel_devs", 1)  # deterministic reply order
+    state = ProjectState(id="proj-retry-many", name="n", goal="g", iteration=3)
+    state.epics = [Epic(id="E", title="e", iteration=1)]
+    state.stories = [
+        _us_for_retry("US-1", "E", 1, StoryStatus.FAILED),
+        _us_for_retry("US-2", "E", 2, StoryStatus.FAILED),
+        _us_for_retry("US-3", "E", 3, StoryStatus.DONE),
+    ]
+    pipeline = Pipeline(state, FakeRunner([QA_PLAN, DEV_GREEN, QA_PLAN, DEV_GREEN]))
+    pipeline.state.phase = PipelinePhase.DONE
+
+    await pipeline.aretry_failed()
+    await wait_until(
+        lambda: state.phase == PipelinePhase.DONE
+        and state.story("US-1").status == StoryStatus.DONE
+        and state.story("US-2").status == StoryStatus.DONE
+    )
+
+
+async def test_resume_build_spans_all_iterations(green_pytest):
+    """resume-build rebuilds a still-to-build story from an earlier iteration too."""
+    from autospec.models import Epic
+
+    state = ProjectState(id="proj-resume-old", name="n", goal="g", iteration=2)
+    state.epics = [Epic(id="E", title="e", iteration=1)]
+    state.stories = [
+        _us_for_retry("US-1", "E", 1, StoryStatus.TODO),   # stranded TODO, iter 1
+        _us_for_retry("US-2", "E", 2, StoryStatus.DONE),   # current iter, done
+    ]
+    pipeline = Pipeline(state, FakeRunner([QA_PLAN, DEV_GREEN]))
+    pipeline.state.phase = PipelinePhase.STOPPED
+
+    await pipeline.aresume_build()  # must NOT raise "aucune story à construire"
+    await wait_until(
+        lambda: state.phase == PipelinePhase.DONE
+        and state.story("US-1").status == StoryStatus.DONE
+    )
+
+
 def test_fail_stranded_stories_at_iteration_close():
     # Advancing iterations must not strand an attempted-but-unfinished story as a
     # stray TODO: those become FAILED (clear + relaunchable). Fresh, never-tried

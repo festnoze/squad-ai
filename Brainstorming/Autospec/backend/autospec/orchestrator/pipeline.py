@@ -2354,13 +2354,19 @@ class Pipeline:
 
     # ------------------------------------------------------------ BUILD (Dev)
 
-    async def _abuild_phase(self) -> None:
+    async def _abuild_phase(self, all_iterations: bool = False) -> None:
         # ST-9: when streams are enabled, build the iteration's work items
         # (taskless US + tasks) in parallel, each in its OWN git worktree, and
         # merge them back into the project repo. Flag OFF keeps the legacy path
         # below byte-identical (the only behaviour the existing suite exercises).
+        #
+        # ``all_iterations`` widens the build pool from the current iteration to
+        # EVERY story (used by retry-failed / resume-build): failures accumulate
+        # across iterations, and dependency readiness needs the DONE stories of
+        # earlier iterations in the pool to resolve (scheduler.ready_stories
+        # derives "done" only from the pool it is given).
         if settings.streams_enabled:
-            await self._abuild_phase_streams()
+            await self._abuild_phase_streams(all_iterations=all_iterations)
             return
         self.state.phase = PipelinePhase.BUILD
         self._sync()
@@ -2372,7 +2378,11 @@ class Pipeline:
             if self._stop_requested:
                 break
             # Recomputed every batch: the user may add stories mid-build.
-            iteration_stories = self.state.stories_of_iteration(self.state.iteration)
+            iteration_stories = (
+                self.state.stories
+                if all_iterations
+                else self.state.stories_of_iteration(self.state.iteration)
+            )
             pending = scheduler.pending_stories(iteration_stories)
             if not pending:
                 break
@@ -2557,7 +2567,7 @@ class Pipeline:
 
     # --------------------------------- ST-9/10/11: parallel worktree build path
 
-    async def _abuild_phase_streams(self) -> None:
+    async def _abuild_phase_streams(self, all_iterations: bool = False) -> None:
         """ST-9: stream-aware parallel build with per-work-item git worktrees.
 
         Each batch picks the READY work items (taskless US + tasks whose deps are
@@ -2584,7 +2594,12 @@ class Pipeline:
             # Recomputed every batch: the user may add stories mid-build, and the
             # previous batch's merges changed which items are now ready (ST-11).
             iteration_ids = {
-                s.id for s in self.state.stories_of_iteration(self.state.iteration)
+                s.id
+                for s in (
+                    self.state.stories
+                    if all_iterations
+                    else self.state.stories_of_iteration(self.state.iteration)
+                )
             }
             graph = work_streams.build_work_graph(self.state)
             items = [
@@ -3019,13 +3034,16 @@ class Pipeline:
             raise ValueError("la pipeline est déjà active")
         if self._task and not self._task.done():
             raise ValueError("une tâche est déjà en cours")
+        # Across ALL iterations: a dormant build can leave still-to-build stories
+        # in any iteration, and the work pool must include earlier-iteration DONE
+        # stories so dependencies resolve.
         to_build = [
             s
-            for s in self.state.stories_of_iteration(self.state.iteration)
+            for s in self.state.stories
             if s.status in (StoryStatus.TODO, StoryStatus.RED)
         ]
         if not to_build:
-            raise ValueError("aucune story à construire pour cette itération")
+            raise ValueError("aucune story à construire")
         # The scheduler only picks TODO stories: revert the ones stranded in
         # RED (e.g. persisted mid-attempt before a restart) so they are rebuilt.
         for story in to_build:
@@ -3035,13 +3053,17 @@ class Pipeline:
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
         self.state.phase = PipelinePhase.BUILD
         self._sync()
-        self._task = asyncio.create_task(self._aresume_build_run())
+        self._task = asyncio.create_task(self._aresume_build_run(all_iterations=True))
 
     async def aretry_failed(self) -> None:
-        """Reset every FAILED story of the current iteration to TODO and rebuild
+        """Reset every FAILED story (across ALL iterations) to TODO and rebuild
         them in one go (« relancer tous les échecs »). Reuses the resume-build
         run. Raises ValueError (-> 409) if the pipeline is active or there is no
-        failed story to retry."""
+        failed story to retry.
+
+        Failures accumulate across iterations (a done project may carry failed
+        stories from iterations 1..N), and the UI's failed count spans them all —
+        so the retry must too, not just the current iteration."""
         if self.state.phase not in (
             PipelinePhase.STOPPED,
             PipelinePhase.DONE,
@@ -3050,11 +3072,9 @@ class Pipeline:
             raise ValueError("la pipeline est déjà active")
         if self._task and not self._task.done():
             raise ValueError("une tâche est déjà en cours")
-        failed = [
-            s
-            for s in self.state.stories_of_iteration(self.state.iteration)
-            if s.status == StoryStatus.FAILED
-        ]
+        # Effective status so a task-decomposed US that is failed via its tasks is
+        # also caught (its stored status may be TODO); reset those tasks too.
+        failed = [s for s in self.state.stories if s.effective_status() == StoryStatus.FAILED]
         if not failed:
             raise ValueError("aucune story en échec à relancer")
         for story in failed:
@@ -3063,6 +3083,11 @@ class Pipeline:
             story.last_error = ""
             for t in story.test_plan:
                 t.status = TestState.NONEXISTENT
+            for task in story.tasks:
+                if task.status == StoryStatus.FAILED:
+                    task.status = StoryStatus.TODO
+                    task.attempts = 0
+                    task.last_error = ""
         self._stop_requested = False
         # Phase -> BUILD synchronously before the task (closes the TOCTOU, like
         # aresume_build); the resume-build run rebuilds the now-TODO stories.
@@ -3073,13 +3098,16 @@ class Pipeline:
             f"🔄 Relance de {len(failed)} story(ies) en échec : "
             f"{', '.join(s.id for s in failed)}.",
         )
-        self._task = asyncio.create_task(self._aresume_build_run())
+        self._task = asyncio.create_task(self._aresume_build_run(all_iterations=True))
 
-    async def _aresume_build_run(self) -> None:
-        """Background task: re-run the build phase and restore a terminal phase."""
-        self._chat(ChatRole.SYSTEM, "▶ Reprise du build de l'itération…")
+    async def _aresume_build_run(self, all_iterations: bool = False) -> None:
+        """Background task: re-run the build phase and restore a terminal phase.
+
+        ``all_iterations`` builds every still-to-build story across all iterations
+        (retry-failed / resume-build), not just the current one."""
+        self._chat(ChatRole.SYSTEM, "▶ Reprise du build…")
         try:
-            await self._abuild_phase()
+            await self._abuild_phase(all_iterations=all_iterations)
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la reprise du build : {exc}")
         finally:
