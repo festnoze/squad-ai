@@ -7,6 +7,8 @@ supabase/
 docs-site/
 processed_data/
 _bmad/
+.mypy_cache/
+.playwright-mcp/
 
 *.egg-info/
 *.save*/
