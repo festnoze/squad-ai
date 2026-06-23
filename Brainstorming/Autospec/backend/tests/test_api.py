@@ -103,6 +103,36 @@ async def test_unknown_project_404(green_pytest):
         assert (await client.post("/api/projects/nope/run")).status_code == 404
 
 
+async def test_interrupt_endpoint_is_idempotent_for_unknown_project(green_pytest):
+    # Switching away from a project no longer live must not 404 — it's treated as
+    # already interrupted, so the UI's fire-and-forget call never errors.
+    async with make_client([]) as client:
+        r = await client.post("/api/projects/gone/interrupt")
+        assert r.status_code == 200 and r.json() == {"ok": True, "killed": 0}
+
+
+async def test_interrupt_stops_a_running_project(green_pytest):
+    # A project whose PM interview is in flight is hard-interrupted: it winds down
+    # to 'stopped' (not 'error'), so switching away leaves a clean state.
+    async with make_client([PM_QUESTION]) as client:
+        project_id = (
+            await client.post("/api/projects", json={"goal": "Une todo-list"})
+        ).json()["id"]
+
+        async def aasked():
+            r = await client.get(f"/api/projects/{project_id}")
+            return any(m["role"] == "pm" for m in r.json()["chat"])
+
+        await wait_until_async(aasked)
+        assert (await client.post(f"/api/projects/{project_id}/interrupt")).status_code == 200
+
+        async def astopped():
+            r = await client.get(f"/api/projects/{project_id}")
+            return r.json()["phase"] == "stopped"
+
+        await wait_until_async(astopped)
+
+
 async def test_budget_endpoint_and_creation(green_pytest):
     async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
         # Budget set at creation.
@@ -332,6 +362,34 @@ async def test_read_unknown_file_404(green_pytest):
 async def test_files_unknown_project_404(green_pytest):
     async with make_client([]) as client:
         assert (await client.get("/api/projects/inconnu/files")).status_code == 404
+
+
+async def test_interactions_sidecar_hidden_from_explorer_and_export(green_pytest):
+    """BUG7: the raw LLM-interaction sidecar (prompts/responses/cost) must not
+    leak into the user file tree NOR the delivered export zip — same hiding as
+    autospec-state.json."""
+    import io
+    import zipfile
+
+    from autospec import storage
+    from autospec.storage import workspace_dir
+
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        # Ensure the sidecar exists on disk (deterministic, not timing-dependent).
+        sidecar = workspace_dir(project_id) / storage.INTERACTIONS_FILENAME
+        sidecar.write_text('{"prompt": "secret prompt", "response": "secret"}\n', encoding="utf-8")
+        assert sidecar.exists()
+
+        files = (await client.get(f"/api/projects/{project_id}/files")).json()["files"]
+        assert storage.INTERACTIONS_FILENAME not in files
+        assert all(storage.INTERACTIONS_FILENAME not in f for f in files)
+
+        resp = await client.get(f"/api/projects/{project_id}/export")
+        assert resp.status_code == 200
+        names = zipfile.ZipFile(io.BytesIO(resp.content)).namelist()
+        assert not any(storage.INTERACTIONS_FILENAME in n for n in names)
 
 
 def _persist_interrupted_project(project_id: str = "proj-recover") -> "ProjectState":

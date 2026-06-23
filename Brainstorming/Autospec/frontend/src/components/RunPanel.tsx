@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { LogLine, ProjectState } from "../types";
+import { effectiveStatus } from "../work";
 
 interface Props {
   project: ProjectState;
@@ -88,10 +89,21 @@ export function RunPanel({
   const loopActive = !["done", "stopped", "error"].includes(project.phase);
   const canResumeBuild =
     ["stopped", "error"].includes(project.phase) &&
-    (project.stories ?? []).some((s) => s.status === "todo" || s.status === "red");
+    (project.stories ?? []).some((s) => {
+      // Statut EFFECTIF : une US multi-stream à moitié construite (effective
+      // todo) doit afficher le bouton même si son status stocké n'est pas
+      // todo/red. effectiveStatus renvoie le status brut pour une US sans tâche.
+      const st = effectiveStatus(s);
+      return st === "todo" || st === "red";
+    });
+  // Statut EFFECTIF par story (cf. canResumeBuild) : une US multi-stream à moitié
+  // construite peut être effective failed/done/in_progress sans que son status
+  // stocké le reflète. On l'aligne sur le backend (aretry_failed agit sur
+  // effective_status). effectiveStatus renvoie le status brut pour une US sans tâche.
+  const effStatuses = (project.stories ?? []).map((s) => effectiveStatus(s));
   // Bulk « relancer les échecs » : actif quand la pipeline est dormante et qu'au
   // moins une story est en échec.
-  const failedCount = (project.stories ?? []).filter((s) => s.status === "failed").length;
+  const failedCount = effStatuses.filter((st) => st === "failed").length;
   const canRetryFailed =
     ["done", "stopped", "error"].includes(project.phase) && failedCount > 0;
 
@@ -102,9 +114,9 @@ export function RunPanel({
   const overBudget = budgetUsd > 0 && costUsd >= budgetUsd;
 
   // O2 : estimation du coût restant à partir de l'historique du projet.
-  const doneCount = (project.stories ?? []).filter((s) => s.status === "done").length;
-  const pendingCount = (project.stories ?? []).filter((s) =>
-    ["todo", "red", "in_progress", "green"].includes(s.status),
+  const doneCount = effStatuses.filter((st) => st === "done").length;
+  const pendingCount = effStatuses.filter((st) =>
+    ["todo", "red", "in_progress", "green"].includes(st),
   ).length;
   const forecastUsd =
     doneCount > 0 && costUsd > 0 ? (costUsd / doneCount) * pendingCount : 0;

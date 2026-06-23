@@ -602,6 +602,12 @@ export function Activity({
   const attentionRows = visibleRows.filter((r) =>
     needsAttention(r.view, r.blockers),
   );
+  // BUG11 : un item épinglé dans « À traiter » ne doit pas aussi apparaître dans
+  // la liste principale — un ActivityRow dupliqué monte un second tiroir de chat /
+  // menu d'actions / poller LlmActivity live pour le même item.
+  const normalRows = attentionRows.length
+    ? visibleRows.filter((r) => !needsAttention(r.view, r.blockers))
+    : visibleRows;
 
   const sendGuidance = (item: WorkItem) => (message: string) =>
     (item.kind === "task"
@@ -743,7 +749,7 @@ export function Activity({
                 Aucun item à afficher. L'activité apparaîtra ici pendant le build.
               </p>
             ) : (
-              visibleRows.map(renderRow)
+              normalRows.map(renderRow)
             )}
           </div>
         </div>

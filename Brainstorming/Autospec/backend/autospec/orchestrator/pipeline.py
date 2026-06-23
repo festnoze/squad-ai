@@ -17,7 +17,13 @@ import time
 from pathlib import Path
 
 from ..agents import prompts
-from ..agents.runner import AgentError, AgentRunner, extract_json
+from ..agents.runner import (
+    AgentError,
+    AgentRunner,
+    ProcessRegistry,
+    active_processes,
+    extract_json,
+)
 from ..agents.personas import FALLBACK_PERSONAS, persona
 from ..config import settings
 from .. import observability
@@ -203,6 +209,10 @@ class _UsageTracker:
         phase = self.pipeline.state.phase.value
         item_id = _BUILD_ITEM.get() or f"phase:{phase}"
         role = _persona_role(system_prompt)
+        # Track this call's CLI child process on the pipeline's registry so a
+        # project switch / shutdown can kill it mid-flight. to_thread copies this
+        # context into the worker thread where the process is actually spawned.
+        active_processes.set(self.pipeline._agent_procs)
         try:
             chosen = model or settings.model_for_phase(phase)
             res = await self.pipeline.runner.arun(
@@ -273,6 +283,10 @@ class Pipeline:
         # ProjectState (prompts/answers are large); in-memory ring + JSONL sidecar.
         # Seed the ring from the sidecar so history survives a backend reload.
         self.interactions = InteractionStore(persist=self._persist_interaction)
+        # Live agent CLI child processes, so an in-flight chat/dev call can be
+        # truly interrupted (project switch / API shutdown), not just left to
+        # finish. Populated per call by _UsageTracker (via the runner contextvar).
+        self._agent_procs = ProcessRegistry()
         try:
             for rec in load_interactions(state.id):
                 self.interactions.add_existing(AgentInteraction.model_validate(rec))
@@ -299,6 +313,10 @@ class Pipeline:
         # Strong ref to the app-output streaming task (asyncio keeps only weak
         # refs to tasks: an unreferenced task may be garbage-collected mid-run).
         self._stream_task: asyncio.Task | None = None
+        # BUG9 : idem pour les previews frontend (ST-8) — chaque task de streaming
+        # frontend doit être gardée en référence forte, sinon le GC peut la collecter
+        # en plein vol.
+        self._frontend_stream_tasks: list[asyncio.Task] = []
         # Serializes the workspace-mutating section of story builds. Parallel dev
         # workers share one workspace directory, so writing code, running the
         # whole pytest suite and committing/refining git must not interleave
@@ -543,11 +561,20 @@ class Pipeline:
         lifecycle task and terminate the generated app if it runs."""
         self._stop_requested = True
         self._stop_tick()  # B5: never tick after dispose
+        # Kill any in-flight agent CLI call (claude/codex) and its sub-tree, so it
+        # never survives the process as an orphan (cost/resource leak).
+        self._agent_procs.terminate_all()
         if self._run_proc and self._run_proc.poll() is None:
             self._run_proc.terminate()
         for proc in self._frontend_procs:  # ST-8
             if proc and proc.poll() is None:
                 proc.terminate()
+        # BUG9 : annule les tasks de streaming frontend encore actives (best-effort,
+        # la teardown ne doit jamais lever).
+        for ftask in self._frontend_stream_tasks:
+            if ftask and not ftask.done():
+                ftask.cancel()
+        self._frontend_stream_tasks.clear()
         for task in (
             self._task,
             self._impact_task,
@@ -564,6 +591,19 @@ class Pipeline:
                     await task
                 except (asyncio.CancelledError, Exception):
                     pass
+        # BUG6 : draine la file de persistance (un seul worker) avant que
+        # l'appelant ne supprime le workspace. Soumettre un no-op et l'attendre
+        # agit comme une barrière : toutes les écritures déjà en file (state /
+        # interactions, qui ouvrent des fichiers DANS le workspace) sont
+        # terminées, donc aucune ne garde un handle ouvert pendant le rmtree
+        # (sinon Windows verrouille -> 409). Best-effort : dispose ne doit
+        # jamais lever (executor déjà fermé, pas de loop en cours…).
+        try:
+            await asyncio.get_running_loop().run_in_executor(
+                _PERSIST_EXECUTOR, lambda: None
+            )
+        except Exception:
+            pass
 
     async def asend_user_message(self, text: str) -> None:
         self._chat(ChatRole.USER, text)
@@ -589,14 +629,61 @@ class Pipeline:
             ) and not (self._impact_task and not self._impact_task.done()):
                 self._impact_task = asyncio.create_task(self._aimpact_analysis(text))
 
-    async def astop(self) -> None:
+    def _signal_stop(self) -> int:
+        """Raise the stop flags + unblock every wait the lifecycle may sit on, and
+        hard-kill any in-flight agent CLI call so the current chat/dev step stops
+        NOW instead of running to completion. Returns the number of killed procs.
+        Synchronous so it can run from shutdown without an await."""
         self._stop_requested = True
-        self._stop_tick()  # B5: stop heartbeat on user stop
-        self._resume_event.set()  # unblock a paused pipeline so it can finish
+        self._stop_tick()  # B5: stop heartbeat
+        self._resume_event.set()  # unblock a paused pipeline
         self._brainstorm_event.set()  # unblock a pending brainstorming offer
-        # Unblock a PM interview waiting for user input.
-        await self._user_messages.put("")
-        self._chat(ChatRole.SYSTEM, "Arrêt demandé : la boucle se terminera après l'étape en cours.")
+        self._approval_event.set()  # unblock a pending approval gate
+        # Unblock a PM interview waiting for user input (non-blocking put).
+        try:
+            self._user_messages.put_nowait("")
+        except asyncio.QueueFull:
+            pass
+        # Kill the in-flight agent CLI(s): the awaiting step then returns at once.
+        return self._agent_procs.terminate_all()
+
+    def _reset_inflight_items(self) -> None:
+        """On a hard stop, revert any work item left in a transient build status
+        (the killed dev/qa call) to TODO and clear its live stage/persona/recovery
+        — so the board shows a clean, relaunchable state, never a frozen
+        « dev en cours »."""
+        transient = (StoryStatus.IN_PROGRESS, StoryStatus.GREEN, StoryStatus.RED)
+        for story in self.state.stories:
+            items = [story, *story.tasks]
+            for item in items:
+                if item.status in transient:
+                    item.status = StoryStatus.TODO
+                    item.current_stage = BuildStage.QUEUED
+                    item.current_persona = ""
+                    item.recovery = RecoveryState()
+
+    async def astop(self) -> None:
+        killed = self._signal_stop()
+        suffix = (
+            f" {killed} appel(s) agent en cours interrompu(s)." if killed else ""
+        )
+        self._chat(
+            ChatRole.SYSTEM,
+            f"Arrêt demandé : interruption des actions en cours.{suffix}",
+        )
+
+    async def ainterrupt(self, reason: str = "") -> int:
+        """Hard-interrupt this project (project switch): kill the in-flight agent
+        CLI call(s), stop the generated app/previews, and let the lifecycle wind
+        down to STOPPED (it reconciles in-flight items). Returns killed count.
+
+        Idempotent and safe when nothing runs. Does NOT await the lifecycle: the
+        UI switch must return immediately; the pipeline finalizes on its own."""
+        killed = self._signal_stop()
+        await self.astop_app()  # also stop a running generated app / previews
+        if reason:
+            self._chat(ChatRole.SYSTEM, reason)
+        return killed
 
     async def apause(self) -> None:
         if self.state.paused:
@@ -750,7 +837,9 @@ class Pipeline:
         next build picks them up). Raises KeyError (-> 404) if unknown, ValueError
         (-> 409) if the story has already started (not TODO)."""
         story = self.state.story(sid)  # KeyError if absent
-        if story.status != StoryStatus.TODO:
+        # BUG8 : une US décomposée en tasks garde un ``status`` stocké à TODO même
+        # une fois entièrement construite — on doit donc tester l'état EFFECTIF.
+        if story.effective_status() != StoryStatus.TODO:
             raise ValueError("la story a déjà démarré : impossible d'étendre ses critères")
         start = len(story.acceptance_criteria)
         for i, text in enumerate(criteria, start=start + 1):
@@ -776,7 +865,9 @@ class Pipeline:
         """Edit an existing story's fields. Raises KeyError if the story is
         unknown, ValueError (-> 409) if it is currently being developed."""
         story = self.state.story(sid)  # KeyError if absent
-        if story.status == StoryStatus.IN_PROGRESS:
+        # BUG8 : une US décomposée en tasks reste à ``status`` TODO pendant que ses
+        # tasks tournent — on teste l'état EFFECTIF pour bloquer l'édition en cours.
+        if story.effective_status() == StoryStatus.IN_PROGRESS:
             raise ValueError("story en cours de développement")
         if title is not None:
             story.title = title
@@ -969,7 +1060,9 @@ class Pipeline:
         """Apply an impact decision that amends an existing, unimplemented story."""
         sid = reply.get("story_id") or ""
         story = next((s for s in self.state.stories if s.id == sid), None)
-        if story is None or story.status not in (StoryStatus.TODO, StoryStatus.FAILED):
+        # BUG8 : une US décomposée et entièrement construite garde ``status`` TODO ;
+        # on teste l'état EFFECTIF pour ne pas amender une story déjà implémentée.
+        if story is None or story.effective_status() not in (StoryStatus.TODO, StoryStatus.FAILED):
             self._chat(
                 ChatRole.ANALYST,
                 f"🔍 Impact : la story visée ({sid or '?'}) est introuvable ou déjà "
@@ -1778,6 +1871,8 @@ class Pipeline:
                     break
                 await self._anext_feature_phase()
 
+            if self._stop_requested:
+                self._reset_inflight_items()
             self.state.phase = (
                 PipelinePhase.STOPPED if self._stop_requested else PipelinePhase.DONE
             )
@@ -1789,13 +1884,21 @@ class Pipeline:
             if self.state.phase == PipelinePhase.DONE:
                 self._notify("success", "Itération terminée", self.state.name)
         except Exception as exc:  # surface any pipeline failure to the UI
-            self.state.phase = PipelinePhase.ERROR
-            # Some exceptions stringify to "" (e.g. bare TimeoutError); fall back
-            # to repr/type so the UI never shows a detail-less "Erreur pipeline :".
-            detail = str(exc) or repr(exc) or type(exc).__name__
-            self.state.error = detail
-            self._chat(ChatRole.SYSTEM, f"Erreur pipeline : {detail}")
-            self._notify("error", "Erreur pipeline", f"{self.state.name} : {detail}"[:200])
+            if self._stop_requested:
+                # A hard interrupt (project switch / shutdown) kills the in-flight
+                # agent CLI, which surfaces here as an AgentError — that's an
+                # interruption, not a failure: end cleanly as STOPPED.
+                self._reset_inflight_items()
+                self.state.phase = PipelinePhase.STOPPED
+                self._chat(ChatRole.SYSTEM, "Boucle interrompue par l'utilisateur.")
+            else:
+                self.state.phase = PipelinePhase.ERROR
+                # Some exceptions stringify to "" (e.g. bare TimeoutError); fall
+                # back to repr/type so the UI never shows a detail-less error.
+                detail = str(exc) or repr(exc) or type(exc).__name__
+                self.state.error = detail
+                self._chat(ChatRole.SYSTEM, f"Erreur pipeline : {detail}")
+                self._notify("error", "Erreur pipeline", f"{self.state.name} : {detail}"[:200])
 
     # ------------------------------------------------------------ SPEC (PM)
 
@@ -2666,76 +2769,130 @@ class Pipeline:
         # The worktree base must be a real commit: a freshly-init'd repo has an
         # unborn HEAD, so `worktree add ... HEAD` would fail. Seed the scaffold.
         await self._acommit_story(ws, "scaffold")
-        semaphore = asyncio.Semaphore(settings.max_parallel_devs)
+        cap = max(1, settings.max_parallel_devs)
+        # Item ids whose acceptance feature file is already committed to the shared
+        # HEAD (so a worktree can branch off it). Committed lazily, once per item.
+        featured: set[str] = set()
+        # Work items currently building, by id — the live set the dynamic
+        # scheduler refills as slots free.
+        running: dict[str, asyncio.Task] = {}
 
-        while not self._stop_requested:
-            await self._checkpoint()  # honour pause between batches
-            if self._stop_requested:
-                break
-            # Recomputed every batch: the user may add stories mid-build, and the
-            # previous batch's merges changed which items are now ready (ST-11).
-            iteration_ids = {
-                s.id
-                for s in (
-                    self.state.stories
-                    if all_iterations
-                    else self.state.stories_of_iteration(self.state.iteration)
-                )
-            }
-            graph = work_streams.build_work_graph(self.state)
-            items = [
-                it for it in graph.order
-                if graph.items[it].story_id in iteration_ids
-            ]
-            pending = [
-                graph.items[i] for i in items
-                if graph.items[i].status in (
-                    StoryStatus.TODO, StoryStatus.IN_PROGRESS,
-                    StoryStatus.RED, StoryStatus.GREEN,
-                )
-            ]
-            if not pending:
-                break
-            ready = [
-                graph.items[i] for i in items
-                if work_streams.is_ready(graph.items[i], graph.items)
-            ]
-            if not ready:
-                if any(p.status == StoryStatus.IN_PROGRESS for p in pending):
-                    break  # defensive: a worker left an item in-flight
-                # Remaining items depend on failed work: mark them failed
-                # (mirror the legacy "dependency not satisfied" handling).
-                for item in pending:
-                    blockers = work_streams.blocked_by(item, graph.items)
-                    self._set_item_status(
-                        item, StoryStatus.FAILED,
-                        last_error="Dépendance non satisfaite (work item échoué en amont).",
+        async def _acommit_feature(item: "work_streams.WorkItem") -> None:
+            """Ensure an item's acceptance feature file is at the shared repo HEAD
+            before its worktree branches off it. Serialized via the merge lock
+            (the shared repo index/HEAD is not concurrency-safe), and done once per
+            item — so a mid-build-added story is handled exactly like the rest."""
+            if item.id in featured:
+                return
+            featured.add(item.id)
+            subject = self._item_subject(item)
+            if subject.gherkin.strip():
+                async with self._merge_lock.ahold(f"feature:{item.id}"):
+                    workspace.write_feature_files(self.state, [subject])
+                    await self._acommit_story(ws, f"feature {item.id}")
+
+        async def _reap_done() -> None:
+            """Remove finished workers (freeing their slots). An unexpected worker
+            failure is surfaced (the lifecycle turns it into ERROR) after the rest
+            are cancelled + drained — matching the old gather()'s propagation."""
+            for wid in [k for k, v in running.items() if v.done()]:
+                finished = running.pop(wid)
+                exc = finished.exception()
+                if exc is not None and not isinstance(exc, asyncio.CancelledError):
+                    for other in running.values():
+                        other.cancel()
+                    await asyncio.gather(*running.values(), return_exceptions=True)
+                    running.clear()
+                    raise exc
+
+        # Dynamic dataflow scheduler (replaces a batch barrier): each work item
+        # starts the instant a slot is free AND all its deps are merged — a freed
+        # slot is refilled immediately with whatever just became ready (e.g. the
+        # items a just-merged dependency unblocked), instead of waiting for the
+        # slowest sibling of a fixed batch. Concurrency is capped at
+        # max_parallel_devs; merges stay serialized by _merge_lock (ST-10), so
+        # dependencies and merges are still finely controlled.
+        try:
+            while not self._stop_requested:
+                await self._checkpoint()  # honour pause/budget before launching more
+                if self._stop_requested:
+                    break
+                await _reap_done()
+
+                # Recomputed each pass: a just-landed merge changes readiness, and
+                # the user may add stories mid-build (ST-11).
+                iteration_ids = {
+                    s.id
+                    for s in (
+                        self.state.stories
+                        if all_iterations
+                        else self.state.stories_of_iteration(self.state.iteration)
                     )
-                    if blockers:
-                        self._log(
-                            f"dev:{item.id}",
-                            f"⛔ {item.id} bloqué par : {', '.join(blockers)}.",
+                }
+                graph = work_streams.build_work_graph(self.state)
+                items = [
+                    graph.items[i] for i in graph.order
+                    if graph.items[i].story_id in iteration_ids
+                ]
+                pending = [
+                    it for it in items
+                    if it.status in (
+                        StoryStatus.TODO, StoryStatus.IN_PROGRESS,
+                        StoryStatus.RED, StoryStatus.GREEN,
+                    )
+                ]
+                if not pending and not running:
+                    break
+
+                # Fill every free slot with a ready item (deps all merged/DONE).
+                for it in items:
+                    if len(running) >= cap:
+                        break
+                    if it.id in running or not work_streams.is_ready(it, graph.items):
+                        continue
+                    await _acommit_feature(it)
+                    running[it.id] = asyncio.create_task(self._abuild_work_item(it))
+
+                if not running:
+                    # Nothing ready and nothing in flight: a defensive in-flight
+                    # remnant, a dependency CYCLE, or everything left depends on
+                    # failed work — mirror the batch loop's terminal handling.
+                    if any(p.status == StoryStatus.IN_PROGRESS for p in pending):
+                        break  # defensive: a worker left an item in-flight
+                    cycle = work_streams.detect_cycle(graph)
+                    cycle_error = (
+                        f"Cycle de dépendances détecté : {' → '.join(cycle)}"
+                        if cycle else None
+                    )
+                    if cycle_error:
+                        self._chat(ChatRole.SYSTEM, f"⛔ {cycle_error}")
+                    for item in pending:
+                        blockers = work_streams.blocked_by(item, graph.items)
+                        self._set_item_status(
+                            item, StoryStatus.FAILED,
+                            last_error=cycle_error
+                            or "Dépendance non satisfaite (work item échoué en amont).",
                         )
-                self._sync()
-                break
+                        if blockers:
+                            self._log(
+                                f"dev:{item.id}",
+                                f"⛔ {item.id} bloqué par : {', '.join(blockers)}.",
+                            )
+                    self._sync()
+                    break
 
-            # Write every ready item's acceptance feature file + commit them to
-            # the shared repo ONCE, before the worktrees branch off HEAD — so the
-            # parallel workers never race on the repo index (git's index.lock is
-            # not concurrency-safe). Workers then mutate only their own worktree.
-            subjects = [self._item_subject(it) for it in ready]
-            to_write = [s for s in subjects if s.gherkin.strip()]
-            if to_write:
-                workspace.write_feature_files(self.state, to_write)
-                await self._acommit_story(ws, "features batch")
+                # Block until the first worker finishes, then loop to refill its
+                # slot with whatever its merge just unblocked.
+                await asyncio.wait(
+                    set(running.values()), return_when=asyncio.FIRST_COMPLETED
+                )
+        finally:
+            # Stop / completion / error: let any still-running worker finish so its
+            # worktree is cleaned up (its finally runs); killed agents return fast.
+            if running:
+                await asyncio.gather(*running.values(), return_exceptions=True)
 
-            async def _aworker(item: work_streams.WorkItem) -> None:
-                async with semaphore:
-                    await self._abuild_work_item(item)
-
-            await asyncio.gather(*(_aworker(it) for it in ready))
-
-        self._stop_tick()  # B5: build batch loop done
+        self._stop_tick()  # B5: build loop done
         self.state.build_guidance.clear()
 
     def _item_subject(self, item: "work_streams.WorkItem") -> UserStory:
@@ -3150,17 +3307,27 @@ class Pipeline:
         # Across ALL iterations: a dormant build can leave still-to-build stories
         # in any iteration, and the work pool must include earlier-iteration DONE
         # stories so dependencies resolve.
+        # Effective status so a task-decomposed US that is half-built via its
+        # tasks (some done, some pending) is also caught — its stored status may
+        # be IN_PROGRESS/DONE even though work remains (the BUG3 « ▶ Continuer le
+        # build » regression).
         to_build = [
             s
             for s in self.state.stories
-            if s.status in (StoryStatus.TODO, StoryStatus.RED)
+            if s.effective_status() in (StoryStatus.TODO, StoryStatus.RED)
         ]
         if not to_build:
             raise ValueError("aucune story à construire")
         # The scheduler only picks TODO stories: revert the ones stranded in
         # RED (e.g. persisted mid-attempt before a restart) so they are rebuilt.
+        # Resume = continuer (pas relancer) : on ne réinitialise QUE les tâches
+        # pendantes (RED) d'une US décomposée, les tâches DONE sont préservées.
         for story in to_build:
             story.status = StoryStatus.TODO
+            for task in story.tasks:
+                if task.status == StoryStatus.RED:
+                    task.status = StoryStatus.TODO
+                    task.last_error = ""
         self._stop_requested = False
         # Set BUILD synchronously BEFORE launching the task so a second
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
@@ -3695,9 +3862,12 @@ class Pipeline:
             root = workspace.stream_root(self.state, stream)
             source = f"run:{stream.id}"
             self._log(source, f"▶ Lancement du preview frontend ({stream.id})…")
-            asyncio.create_task(
-                asyncio.to_thread(
-                    self._stream_preview_output, root, env, loop, source
+            # BUG9 : garder une référence forte (asyncio ne garde que des weak refs).
+            self._frontend_stream_tasks.append(
+                asyncio.create_task(
+                    asyncio.to_thread(
+                        self._stream_preview_output, root, env, loop, source
+                    )
                 )
             )
 
@@ -3774,6 +3944,10 @@ class Pipeline:
                 proc.terminate()
                 stopped = True
         self._frontend_procs = [p for p in self._frontend_procs if p and p.poll() is None]
+        # BUG9 : nettoie les tasks de streaming frontend terminées (best-effort).
+        self._frontend_stream_tasks = [
+            t for t in self._frontend_stream_tasks if t and not t.done()
+        ]
         if stopped:
             self._log("run", "■ Arrêt de l'application demandé.")
         else:

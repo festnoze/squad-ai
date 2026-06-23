@@ -222,6 +222,45 @@ async def test_flag_off_uses_legacy_path(monkeypatch):
     assert state.story("US-1").status == StoryStatus.DONE
 
 
+async def test_dynamic_scheduler_starts_dependent_before_slow_sibling(streams_on, monkeypatch):
+    """Dynamic dataflow: a dependent item starts as soon as its dependency merges,
+    WITHOUT waiting for a slow independent sibling to finish — proof there is no
+    batch barrier. The old batched gather() would deadlock this exact shape (A
+    waits for C, but C couldn't start until A's batch finished)."""
+    # One story, three tasks: A (slow, independent), B (fast, independent),
+    # C (depends on B). cap = max_parallel_devs = 2 (conftest) → A and B start
+    # together; C must slot in the instant B merges, while A is still running.
+    state = _streams_state([
+        _us("US-1", tasks=[
+            _task("T-A", "US-1", stream="backend"),
+            _task("T-B", "US-1", stream="backend"),
+            _task("T-C", "US-1", stream="backend", depends_on=["T-B"]),
+        ])
+    ])
+    pipeline = Pipeline(state, ScriptedRunner())
+
+    started: list[str] = []
+    c_started = asyncio.Event()
+
+    async def _spy(subject, worktree, pkg, is_frontend):
+        started.append(subject.id)
+        if subject.id == "T-C":
+            c_started.set()
+        if subject.id == "T-A":
+            # The slow sibling blocks until the dependent C has started. Under a
+            # batch barrier C can't start while A runs → this would time out.
+            await asyncio.wait_for(c_started.wait(), timeout=20)
+        return True, ""
+
+    monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
+
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+    assert c_started.is_set(), "the dependent item C must have started"
+    assert set(started) == {"T-A", "T-B", "T-C"}
+    assert all(t.status == StoryStatus.DONE for t in state.story("US-1").tasks)
+
+
 async def test_worktree_add_recovers_from_stale_leftover(streams_on):
     """An interrupted build (crash/reload) can leave a worktree still checked out
     on the per-item branch. Re-adding that branch (e.g. a manual « Relancer ») must
@@ -269,3 +308,49 @@ async def test_work_item_built_in_a_worktree_not_the_main_workspace(streams_on, 
 
     assert seen_cwds and all(c != main_ws for c in seen_cwds)
     assert state.story("US-1").status == StoryStatus.DONE
+
+
+# ------------------------------------------------------ (e) BUG10 dep cycle
+
+async def test_dependency_cycle_surfaces_precise_path_in_last_error(streams_on):
+    """BUG10: when nothing is ready because two work items depend on each other
+    (a CYCLE), the failed items' ``last_error`` names the cycle path instead of
+    the generic 'dépendance non satisfaite' upstream-failure message."""
+    back = _task("T-back", "US-1", stream="backend", depends_on=["T-front"])
+    front = _task("T-front", "US-1", stream="frontend", depends_on=["T-back"])
+    state = _streams_state([_us("US-1", tasks=[back, front])])
+    pipeline = Pipeline(state, ScriptedRunner())
+
+    await pipeline._abuild_phase()
+
+    # Both cyclic tasks fail with the cycle-specific message (not the generic one).
+    for tid in ("T-back", "T-front"):
+        task = state.task(tid)
+        assert task.status == StoryStatus.FAILED
+        assert "Cycle" in task.last_error, task.last_error
+        assert "→" in task.last_error
+    # The precise path was surfaced to the chat too.
+    assert any("Cycle de dépendances détecté" in c.content for c in state.chat)
+
+
+# ------------------------------------------------ (f) BUG9 frontend task refs
+
+async def test_frontend_stream_tasks_tracked_and_cleared_by_dispose():
+    """BUG9: frontend preview streaming tasks are kept in a strong-ref list (so
+    asyncio can't GC them mid-run) and that list is cancelled + cleared on
+    dispose."""
+    state = _streams_state([_us("US-1", stream="backend")])
+    pipeline = Pipeline(state, ScriptedRunner())
+    # The attribute exists and starts empty.
+    assert pipeline._frontend_stream_tasks == []
+
+    async def _never():
+        await asyncio.sleep(3600)
+
+    task = asyncio.create_task(_never())
+    pipeline._frontend_stream_tasks.append(task)
+
+    await pipeline.adispose()
+
+    assert pipeline._frontend_stream_tasks == []  # cleared
+    assert task.cancelled() or task.done()  # cancelled by teardown

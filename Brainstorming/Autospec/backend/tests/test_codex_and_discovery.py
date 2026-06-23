@@ -1,7 +1,6 @@
 """Codex CLI provider (mirrors Claude) + live per-provider model discovery."""
 
 import json
-import subprocess
 
 import pytest
 
@@ -37,14 +36,16 @@ def test_extract_codex_text_plain_text_passthrough():
 
 
 def _patch_codex(monkeypatch, *, stdout="", stderr="", returncode=0):
-    def fake_run(args, **kwargs):
+    # The runners spawn via _run_tracked(args, input_text, cwd, timeout) → it
+    # returns (returncode, stdout, stderr); patch that seam.
+    def fake_run(args, input_text, cwd, timeout):
         # Sanity: we drive `codex exec` headless and feed the prompt on stdin.
         assert args[0] == settings.codex_cmd
         assert "exec" in args and args[-1] == "-"
-        assert "system" in (kwargs.get("input") or "")  # system prompt prepended
-        return subprocess.CompletedProcess(args, returncode, stdout=stdout, stderr=stderr)
+        assert "system" in (input_text or "")  # system prompt prepended
+        return returncode, stdout, stderr
 
-    monkeypatch.setattr("autospec.agents.runner.subprocess.run", fake_run)
+    monkeypatch.setattr("autospec.agents.runner._run_tracked", fake_run)
 
 
 async def test_codex_runner_parses_jsonl(monkeypatch):
@@ -57,11 +58,11 @@ async def test_codex_runner_parses_jsonl(monkeypatch):
 async def test_codex_runner_passes_model(monkeypatch):
     captured = {}
 
-    def fake_run(args, **kwargs):
+    def fake_run(args, input_text, cwd, timeout):
         captured["args"] = args
-        return subprocess.CompletedProcess(args, 0, stdout="hello", stderr="")
+        return 0, "hello", ""
 
-    monkeypatch.setattr("autospec.agents.runner.subprocess.run", fake_run)
+    monkeypatch.setattr("autospec.agents.runner._run_tracked", fake_run)
     await CodexCliRunner().arun("p", "s", model="gpt-5.3-codex")
     assert "--model" in captured["args"]
     assert "gpt-5.3-codex" in captured["args"]

@@ -9,6 +9,7 @@ import os
 import re
 import shutil
 import stat
+import time
 import zipfile
 from contextlib import asynccontextmanager
 
@@ -43,6 +44,7 @@ from ..orchestrator.pipeline import Pipeline
 from ..forecast import forecast_iteration_cost
 from ..spec_import import parse_spec_import
 from ..metrics import compute_metrics
+from .. import storage
 from ..storage import list_states, load_interactions, load_state, workspace_dir
 
 # Directories and files hidden from the workspace file explorer: VCS/build/cache
@@ -52,8 +54,15 @@ _MAX_FILE_CHARS = 200_000
 
 
 def _is_excluded_file(name: str) -> bool:
-    """Whether a file is an Autospec artifact that the explorer should hide."""
-    if name == "autospec-state.json" or name.endswith(".pyc"):
+    """Whether a file is an Autospec artifact that the explorer should hide.
+
+    Hides Autospec's own per-workspace sidecars (persisted state + the raw
+    LLM-interaction log, which holds prompts/responses/token-cost) so they leak
+    neither into the user-facing file tree nor the delivered export zip. Uses
+    the ``storage`` filename constants as the single source of truth."""
+    if name in (storage.STATE_FILENAME, storage.INTERACTIONS_FILENAME):
+        return True
+    if name.endswith(".pyc"):
         return True
     if name == ".report.json":
         return True
@@ -159,9 +168,18 @@ async def _arecover_projects() -> None:
 @asynccontextmanager
 async def _lifespan(app):
     """Recover persisted projects on startup so they stay controllable — without
-    blocking startup (the file I/O is offloaded; see _arecover_projects)."""
+    blocking startup (the file I/O is offloaded; see _arecover_projects).
+
+    On shutdown, hard-dispose every live pipeline so no agent CLI (claude/codex)
+    or generated-app subprocess is orphaned — the headless CLIs in particular
+    would otherwise keep running (and spending) after the API exits."""
     app.state.recover_task = asyncio.create_task(_arecover_projects())
     yield
+    for pipeline in list(pipelines.values()):
+        try:
+            await pipeline.adispose()
+        except Exception:  # teardown must never raise — kill what we can, move on
+            pass
 
 
 app = FastAPI(title="Autospec", version="0.1.0", lifespan=_lifespan)
@@ -498,7 +516,15 @@ def _force_delete_workspace(project_id: str) -> bool:
         except OSError:
             pass
 
-    shutil.rmtree(ws, onerror=_on_error)
+    # BUG6 : un handle transitoire (écriture de persistance qui vient de se
+    # terminer, scan antivirus, indexeur…) peut verrouiller brièvement un
+    # fichier du workspace. On retente le rmtree avec backoff — même tolérance
+    # que ``save_state_payload`` — avant de déclarer le workspace verrouillé.
+    for attempt in range(storage._SAVE_RETRIES):
+        shutil.rmtree(ws, onerror=_on_error)
+        if not ws.exists():
+            return True
+        time.sleep(storage._SAVE_BACKOFF_S * (attempt + 1))
     if ws.exists():
         raise OSError(f"workspace {project_id} partiellement verrouillé")
     return True
@@ -577,6 +603,19 @@ async def aset_budget(project_id: str, req: BudgetRequest) -> dict:
 async def astop(project_id: str) -> dict:
     await _pipeline(project_id).astop()
     return {"ok": True}
+
+
+@app.post("/api/projects/{project_id}/interrupt")
+async def ainterrupt(project_id: str) -> dict:
+    """Hard-interrupt a project's in-flight work (chat / dev US): kills the running
+    agent CLI call(s) and the generated app, winding the pipeline down to STOPPED.
+    Called by the UI when switching away from a running project. 404-tolerant: a
+    project no longer live is treated as already interrupted (idempotent)."""
+    pipeline = pipelines.get(project_id)
+    if pipeline is None:
+        return {"ok": True, "killed": 0}
+    killed = await pipeline.ainterrupt()
+    return {"ok": True, "killed": killed}
 
 
 @app.post("/api/projects/{project_id}/pause")

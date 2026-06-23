@@ -80,6 +80,15 @@ describe("Activity", () => {
     expect(within(region).getByTestId("activity-row-US-1")).toBeInTheDocument();
   });
 
+  it("BUG11 : un item épinglé n'est PAS dupliqué dans la liste principale", () => {
+    renderActivity({ stories: [story({ status: "failed" })] });
+    // L'item failed est dans « À traiter » ; il ne doit apparaître qu'une fois au
+    // total (sinon un second ActivityRow monte chat/menu/poller en double).
+    expect(screen.getAllByTestId("activity-row-US-1")).toHaveLength(1);
+    const main = screen.getByTestId("activity-rows");
+    expect(within(main).queryByTestId("activity-row-US-1")).not.toBeInTheDocument();
+  });
+
   it("le tick live est fusionné dans le stepper (étape active depuis le tick)", () => {
     const ticks: ProjectTicks = {
       ts: Math.floor(Date.now() / 1000),

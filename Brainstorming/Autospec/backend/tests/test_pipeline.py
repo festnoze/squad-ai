@@ -59,6 +59,66 @@ def make_pipeline(replies: list[str], auto_spec: bool = False) -> tuple[Pipeline
     return Pipeline(state, runner), runner
 
 
+def test_reset_inflight_items_reverts_stories_and_tasks():
+    """A hard interrupt must turn any item left in a transient build status
+    (story OR task) back into a clean, relaunchable TODO and clear its live
+    stage/persona — never a frozen « dev en cours »."""
+    from autospec.models import BuildStage, Epic, Task, UserStory
+
+    pipeline, _ = make_pipeline([])
+    pipeline.state.epics = [Epic(id="EPIC-1", title="E")]
+    pipeline.state.stories = [
+        UserStory(id="US-1", epic_id="EPIC-1", title="done", status=StoryStatus.DONE),
+        UserStory(
+            id="US-2", epic_id="EPIC-1", title="busy",
+            status=StoryStatus.IN_PROGRESS,
+            current_stage=BuildStage.IMPLEMENTING, current_persona="dev",
+        ),
+        UserStory(
+            id="US-3", epic_id="EPIC-1", title="container", status=StoryStatus.TODO,
+            tasks=[
+                Task(id="T-3a", story_id="US-3", status=StoryStatus.DONE),
+                Task(
+                    id="T-3b", story_id="US-3", status=StoryStatus.IN_PROGRESS,
+                    current_stage=BuildStage.IMPLEMENTING, current_persona="dev",
+                ),
+            ],
+        ),
+    ]
+
+    pipeline._reset_inflight_items()
+
+    assert pipeline.state.story("US-1").status == StoryStatus.DONE  # untouched
+    us2 = pipeline.state.story("US-2")
+    assert us2.status == StoryStatus.TODO
+    assert us2.current_stage == BuildStage.QUEUED and us2.current_persona == ""
+    t3b = pipeline.state.story("US-3").tasks[1]
+    assert t3b.status == StoryStatus.TODO and t3b.current_persona == ""
+    assert pipeline.state.story("US-3").tasks[0].status == StoryStatus.DONE
+
+
+def test_signal_stop_kills_in_flight_agent_process():
+    """astop/ainterrupt go through _signal_stop, which kills the tracked in-flight
+    agent CLI process so the current chat/dev step stops immediately."""
+    import subprocess
+    import sys
+    import time
+
+    pipeline, _ = make_pipeline([])
+    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    pipeline._agent_procs.add(proc)
+
+    killed = pipeline._signal_stop()
+
+    assert killed == 1
+    assert pipeline._stop_requested is True
+    for _ in range(300):  # the kill (taskkill on Windows) is near-immediate
+        if proc.poll() is not None:
+            break
+        time.sleep(0.01)
+    assert proc.poll() is not None, "the in-flight agent process must be killed"
+
+
 async def test_budget_stops_auto_spec(green_pytest):
     # A cost-reporting runner: each agent call costs $0.01. With a tiny budget,
     # the auto-spec loop must stop cleanly once usage reaches it.
@@ -591,6 +651,136 @@ async def test_resume_build_spans_all_iterations(green_pytest):
         lambda: state.phase == PipelinePhase.DONE
         and state.story("US-1").status == StoryStatus.DONE
     )
+
+
+async def test_resume_build_half_done_task_decomposed_story(green_pytest):
+    """BUG3: a task-decomposed US that is HALF-built (one task DONE, one TODO)
+    has effective_status TODO but its STORED status is not todo/red (here DONE).
+    resume-build must still pick it up — without re-running the DONE task."""
+    from autospec.models import AcceptanceCriterion, Epic, Task, UserStory
+
+    state = ProjectState(id="proj-resume-tasks", name="n", goal="g", iteration=1)
+    state.epics = [Epic(id="E", title="e", iteration=1)]
+    us = UserStory(
+        id="US-1", epic_id="E", title="US-1", iteration=1,
+        status=StoryStatus.DONE,  # stored status NOT todo/red (the bug trigger)
+        acceptance_criteria=[AcceptanceCriterion(id="AC-1", text="critère")],
+        gherkin="Feature: F\n  Scenario: S\n    Given a\n    When b\n    Then c",
+        tasks=[
+            Task(id="T-1", story_id="US-1", title="back", status=StoryStatus.DONE,
+                 acceptance_criteria=[AcceptanceCriterion(id="AC-1", text="critère")],
+                 gherkin="Feature: F\n  Scenario: S\n    Given a\n    When b\n    Then c"),
+            Task(id="T-2", story_id="US-1", title="front", status=StoryStatus.TODO,
+                 acceptance_criteria=[AcceptanceCriterion(id="AC-1", text="critère")],
+                 gherkin="Feature: F\n  Scenario: S\n    Given a\n    When b\n    Then c"),
+        ],
+    )
+    state.stories = [us]
+    assert us.effective_status() == StoryStatus.TODO  # half-done -> todo
+    pipeline = Pipeline(state, FakeRunner([QA_PLAN, DEV_GREEN]))
+    pipeline.state.phase = PipelinePhase.STOPPED
+
+    await pipeline.aresume_build()  # must NOT raise "aucune story à construire"
+    # Synchronous post-conditions (set before the background task is launched):
+    # the eligibility now uses effective_status, so the half-done US is selected,
+    # its stored status flipped to TODO (so the scheduler picks it) and its
+    # pending tasks left rebuildable while the DONE task is preserved.
+    assert state.phase == PipelinePhase.BUILD
+    assert state.story("US-1").status == StoryStatus.TODO  # scheduler can pick it
+    assert state.task("T-1").status == StoryStatus.DONE     # done work preserved
+    assert state.task("T-2").status == StoryStatus.TODO     # pending task rebuildable
+
+    # Stop + drain the background build task (the rebuild itself is exercised by
+    # test_streams_build.py; here we only assert the BUG3 eligibility fix).
+    pipeline._stop_requested = True
+    if pipeline._task is not None:
+        await pipeline._task
+
+
+def _decomposed_us(task_statuses, *, story_status=StoryStatus.TODO):
+    """Build a task-decomposed US whose stored ``status`` is TODO but whose tasks
+    carry the given statuses (so ``effective_status`` is DERIVED). Mirrors the
+    BUG3 task fixture above."""
+    from autospec.models import AcceptanceCriterion, Epic, Task, UserStory
+
+    gherkin = "Feature: F\n  Scenario: S\n    Given a\n    When b\n    Then c"
+    ac = [AcceptanceCriterion(id="AC-1", text="critère")]
+    state = ProjectState(id="proj-bug8", name="n", goal="g", iteration=1)
+    state.epics = [Epic(id="E", title="e", iteration=1)]
+    tasks = [
+        Task(id=f"T-{i}", story_id="US-1", title=f"t{i}", status=st,
+             acceptance_criteria=list(ac), gherkin=gherkin)
+        for i, st in enumerate(task_statuses, start=1)
+    ]
+    us = UserStory(
+        id="US-1", epic_id="E", title="US-1", iteration=1,
+        status=story_status, acceptance_criteria=list(ac), gherkin=gherkin,
+        tasks=tasks,
+    )
+    state.stories = [us]
+    return state, us
+
+
+async def test_extend_story_blocked_when_decomposed_us_effectively_done():
+    """BUG8a: a decomposed US with ALL tasks DONE has stored status TODO but
+    effective_status DONE → aextend_story must refuse (would extend a shipped
+    story otherwise)."""
+    state, us = _decomposed_us([StoryStatus.DONE, StoryStatus.DONE])
+    assert us.status == StoryStatus.TODO  # stored status NOT rolled up
+    assert us.effective_status() == StoryStatus.DONE
+    pipeline = Pipeline(state, FakeRunner([]))
+    with pytest.raises(ValueError):
+        await pipeline.aextend_story("US-1", ["trop tard"])
+
+
+async def test_extend_taskless_todo_story_still_works():
+    """BUG8a regression guard: a plain taskless TODO story still extends."""
+    from autospec.models import Epic, UserStory
+
+    state = ProjectState(id="proj-bug8b", name="n", goal="g", iteration=1)
+    state.epics = [Epic(id="E", title="e", iteration=1)]
+    state.stories = [UserStory(id="US-1", epic_id="E", title="t", iteration=1,
+                               status=StoryStatus.TODO)]
+    pipeline = Pipeline(state, FakeRunner([]))
+    story = await pipeline.aextend_story("US-1", ["nouveau critère"])
+    assert any(c.text == "nouveau critère" for c in story.acceptance_criteria)
+
+
+async def test_edit_story_blocked_when_decomposed_task_in_progress():
+    """BUG8b: a decomposed US with a task IN_PROGRESS has stored status TODO but
+    effective_status IN_PROGRESS → aedit_story must refuse."""
+    state, us = _decomposed_us([StoryStatus.IN_PROGRESS, StoryStatus.TODO])
+    assert us.status == StoryStatus.TODO
+    assert us.effective_status() == StoryStatus.IN_PROGRESS
+    pipeline = Pipeline(state, FakeRunner([]))
+    with pytest.raises(ValueError):
+        await pipeline.aedit_story("US-1", title="nouveau titre")
+
+
+async def test_edit_taskless_done_story_still_works(green_pytest):
+    """BUG8b: a taskless DONE story still edits (unchanged legacy behavior)."""
+    from autospec.models import Epic, UserStory
+
+    state = ProjectState(id="proj-bug8c", name="n", goal="g", iteration=1)
+    state.epics = [Epic(id="E", title="e", iteration=1)]
+    state.stories = [UserStory(id="US-1", epic_id="E", title="old", iteration=1,
+                               status=StoryStatus.DONE)]
+    pipeline = Pipeline(state, FakeRunner([]))
+    story = await pipeline.aedit_story("US-1", title="nouveau titre")
+    assert story.title == "nouveau titre"
+
+
+def test_apply_story_update_skips_decomposed_done_us():
+    """BUG8c: a decomposed US with all tasks DONE (stored status TODO, effective
+    DONE) must NOT be amended by a feedback impact — the 'déjà implémentée'
+    branch is taken and the story is left unchanged."""
+    state, us = _decomposed_us([StoryStatus.DONE, StoryStatus.DONE])
+    pipeline = Pipeline(state, FakeRunner([]))
+    reply = {"story_id": "US-1", "updates": {"title": "ne doit pas changer"}}
+    pipeline._apply_story_update(reply, "impact")
+    assert state.story("US-1").title == "US-1"  # unchanged
+    # The "introuvable ou déjà implémentée" branch chatted instead of amending.
+    assert any("déjà" in c.content for c in state.chat if c.role == ChatRole.ANALYST)
 
 
 def test_fail_stranded_stories_at_iteration_close():

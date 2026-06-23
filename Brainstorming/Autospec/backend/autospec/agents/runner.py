@@ -8,14 +8,124 @@ Tests use FakeRunner instead.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
+import os
 import re
 import subprocess
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
 
 from ..config import settings
+
+
+class ProcessRegistry:
+    """Thread-safe set of live agent child processes, so an in-flight CLI call can
+    be interrupted (project switch / API shutdown). Populated from the worker
+    thread that spawns the process; killed from the event-loop thread."""
+
+    def __init__(self) -> None:
+        self._procs: set[subprocess.Popen] = set()
+        self._lock = threading.Lock()
+
+    def add(self, proc: subprocess.Popen) -> None:
+        with self._lock:
+            self._procs.add(proc)
+
+    def discard(self, proc: subprocess.Popen) -> None:
+        with self._lock:
+            self._procs.discard(proc)
+
+    def terminate_all(self) -> int:
+        """Hard-kill every still-running tracked process (whole tree). Returns the
+        number killed. Safe to call repeatedly and from any thread."""
+        with self._lock:
+            procs = [p for p in self._procs if p.poll() is None]
+        for proc in procs:
+            _terminate_tree(proc)
+        return len(procs)
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._procs)
+
+
+# The registry an agent call should register its child process into, set by the
+# pipeline per call (via _UsageTracker). ``asyncio.to_thread`` copies the context
+# into the worker thread, so a value set on the event loop is visible where the
+# process is actually spawned. None = no tracking (tests / FakeRunner).
+active_processes: contextvars.ContextVar[ProcessRegistry | None] = contextvars.ContextVar(
+    "autospec_active_processes", default=None
+)
+
+
+def _terminate_tree(proc: subprocess.Popen) -> None:
+    """Kill a child process AND its descendants. The CLI agents (claude.cmd /
+    codex) spawn sub-processes (node, …); killing only the direct child would
+    orphan them — exactly the leak we must avoid. Windows: ``taskkill /T``;
+    POSIX: kill the process group (the child is a session leader). Best-effort."""
+    if proc.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+            )
+        else:
+            import signal as _signal
+
+            # POSIX-only APIs (resolved dynamically: not present on Windows).
+            killpg = getattr(os, "killpg")
+            getpgid = getattr(os, "getpgid")
+            sigkill = getattr(_signal, "SIGKILL", _signal.SIGTERM)
+            killpg(getpgid(proc.pid), sigkill)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        # Fall back to a plain kill of the direct child.
+        try:
+            proc.kill()
+        except OSError:
+            pass
+
+
+def _run_tracked(
+    args: list[str], input_text: str, cwd: str | None, timeout: float
+) -> tuple[int, str, str]:
+    """Run a child process to completion, tracking it in the context's
+    ProcessRegistry so it can be interrupted, and tree-killing it on timeout.
+    Returns (returncode, stdout, stderr). Runs on a worker thread (blocking)."""
+    kwargs: dict = dict(
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=cwd,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+    )
+    if os.name != "nt":
+        # New session => child is its own process-group leader, so _terminate_tree
+        # can signal the whole group (the CLI + the node/python it spawns).
+        kwargs["start_new_session"] = True
+    proc = subprocess.Popen(args, **kwargs)
+    registry = active_processes.get()
+    if registry is not None:
+        registry.add(proc)
+    try:
+        out, err = proc.communicate(input=input_text, timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _terminate_tree(proc)
+        try:
+            proc.communicate(timeout=5)
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        raise
+    finally:
+        if registry is not None:
+            registry.discard(proc)
+    return proc.returncode, out, err
 
 
 @dataclass
@@ -72,31 +182,23 @@ class ClaudeCliRunner:
         # SelectorEventLoop (the loop uvicorn runs), where
         # create_subprocess_exec raises NotImplementedError. Staying off the
         # event loop for child processes keeps this working on every platform.
-        def _run() -> subprocess.CompletedProcess[str]:
-            return subprocess.run(
-                args,
-                input=prompt,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=str(cwd) if cwd else None,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=settings.agent_timeout_s,
+        def _run() -> tuple[int, str, str]:
+            return _run_tracked(
+                args, prompt, str(cwd) if cwd else None, settings.agent_timeout_s
             )
 
         try:
-            proc = await asyncio.to_thread(_run)
+            returncode, out_raw, err_raw = await asyncio.to_thread(_run)
         except subprocess.TimeoutExpired:
             raise AgentError(f"Agent timed out after {settings.agent_timeout_s}s")
         except OSError as exc:
             # e.g. claude CLI not installed / not on PATH
             raise AgentError(f"Could not run claude CLI ({settings.claude_cmd}): {exc}")
 
-        out = (proc.stdout or "").strip()
-        if proc.returncode != 0:
-            err = (proc.stderr or "").strip()
-            raise AgentError(f"claude CLI exited with {proc.returncode}: {err or out}")
+        out = (out_raw or "").strip()
+        if returncode != 0:
+            err = (err_raw or "").strip()
+            raise AgentError(f"claude CLI exited with {returncode}: {err or out}")
 
         try:
             payload = json.loads(out)
@@ -206,30 +308,22 @@ class CodexCliRunner:
         # limits would truncate large BMAD prompts).
         args.append("-")
 
-        def _run() -> subprocess.CompletedProcess[str]:
-            return subprocess.run(
-                args,
-                input=combined,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                cwd=str(cwd) if cwd else None,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=settings.agent_timeout_s,
+        def _run() -> tuple[int, str, str]:
+            return _run_tracked(
+                args, combined, str(cwd) if cwd else None, settings.agent_timeout_s
             )
 
         try:
-            proc = await asyncio.to_thread(_run)
+            returncode, out_raw, err_raw = await asyncio.to_thread(_run)
         except subprocess.TimeoutExpired:
             raise AgentError(f"Agent timed out after {settings.agent_timeout_s}s")
         except OSError as exc:
             raise AgentError(f"Could not run codex CLI ({settings.codex_cmd}): {exc}")
 
-        out = (proc.stdout or "").strip()
-        if proc.returncode != 0:
-            err = (proc.stderr or "").strip()
-            raise AgentError(f"codex CLI exited with {proc.returncode}: {err or out}")
+        out = (out_raw or "").strip()
+        if returncode != 0:
+            err = (err_raw or "").strip()
+            raise AgentError(f"codex CLI exited with {returncode}: {err or out}")
 
         text, in_tok, out_tok = _extract_codex_text(out)
         return AgentResult(text=text, input_tokens=in_tok, output_tokens=out_tok)

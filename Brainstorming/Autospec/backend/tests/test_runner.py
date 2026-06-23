@@ -1,5 +1,4 @@
 import json
-import subprocess
 
 import pytest
 
@@ -63,10 +62,12 @@ def test_extract_json_invalid_object_raises_agent_error_not_jsondecodeerror():
 
 
 def _patch_cli(monkeypatch, *, stdout="", stderr="", returncode=0):
-    def fake_run(args, **kwargs):
-        return subprocess.CompletedProcess(args, returncode, stdout=stdout, stderr=stderr)
+    # The runners spawn via _run_tracked (Popen-backed, so an in-flight CLI call
+    # can be killed); patch that seam, which returns (returncode, stdout, stderr).
+    def fake_run(args, input_text, cwd, timeout):
+        return returncode, stdout, stderr
 
-    monkeypatch.setattr("autospec.agents.runner.subprocess.run", fake_run)
+    monkeypatch.setattr("autospec.agents.runner._run_tracked", fake_run)
 
 
 async def test_cli_runner_tolerates_missing_usage_and_cost(monkeypatch):
@@ -101,3 +102,48 @@ async def test_cli_runner_non_json_output_degrades_to_raw_text(monkeypatch):
     _patch_cli(monkeypatch, stdout="plain text, not json")
     res = await ClaudeCliRunner().arun("prompt", "system")
     assert res.text == "plain text, not json"
+
+
+# ----------------------------------------- in-flight CLI interruption (kill)
+
+
+def test_process_registry_kills_tracked_in_flight_process():
+    """A long-running child registered (via the active_processes contextvar that
+    _run_tracked reads) can be hard-killed mid-flight — the mechanism behind
+    project-switch / shutdown interruption of agent CLI calls."""
+    import sys
+    import threading
+    import time
+
+    from autospec.agents.runner import (
+        ProcessRegistry,
+        _run_tracked,
+        active_processes,
+    )
+
+    reg = ProcessRegistry()
+    result: dict = {}
+
+    def worker():
+        active_processes.set(reg)  # what _UsageTracker does before a real call
+        result["rc"], _, _ = _run_tracked(
+            [sys.executable, "-c", "import time; time.sleep(30)"], "", None, 60
+        )
+
+    t = threading.Thread(target=worker, daemon=True)
+    t.start()
+
+    # Wait until the child is actually spawned + registered.
+    for _ in range(300):
+        if len(reg) >= 1:
+            break
+        time.sleep(0.01)
+    assert len(reg) == 1, "the in-flight process should be tracked"
+
+    killed = reg.terminate_all()
+    assert killed == 1
+
+    t.join(timeout=15)
+    assert not t.is_alive(), "the blocking run must return once the child is killed"
+    assert result["rc"] != 0, "a killed process never exits cleanly (0)"
+    assert len(reg) == 0, "the registry is emptied once the call returns"

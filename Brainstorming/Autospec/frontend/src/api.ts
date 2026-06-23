@@ -154,6 +154,18 @@ export async function stopProject(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/stop`, { method: "POST" }));
 }
 
+/**
+ * Hard-interrupt a project's in-flight work (chat / dev US) — kills the running
+ * agent CLI call(s) and the generated app, winding the pipeline down to
+ * « stopped ». Called when switching away from a running project. Idempotent
+ * (a project no longer live is treated as already interrupted) → safe to retry.
+ */
+export async function interruptProject(projectId: string): Promise<void> {
+  await json(
+    await fetchIdempotent(`/api/projects/${projectId}/interrupt`, { method: "POST" }),
+  );
+}
+
 export async function stopApp(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/stop-app`, { method: "POST" }));
 }

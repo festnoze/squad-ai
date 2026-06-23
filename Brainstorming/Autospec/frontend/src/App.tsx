@@ -7,6 +7,7 @@ import {
   deleteProject,
   documentProject,
   errorMessage,
+  interruptProject,
   exportZipUrl,
   discoverModels,
   getProvider,
@@ -365,6 +366,24 @@ export default function App() {
     }
   };
 
+  // Phases where agents are actively working (chat/dev) — a project in one of
+  // these (or with the generated app running) has in-flight work to interrupt.
+  const ACTIVE_PHASES = ["spec", "analyze", "plan", "architect", "build"];
+
+  // Switch the selected project. Leaving a RUNNING project hard-interrupts it
+  // (kills the in-flight agent CLI call + the generated app) so its chat/dev work
+  // doesn't keep running — and spending — once we've navigated away. Fire-and-
+  // forget + idempotent: a failure or an already-dormant project is harmless.
+  const switchTo = (id: string | null) => {
+    if (selectedId && selectedId !== id) {
+      const leaving = projects.find((p) => p.id === selectedId);
+      if (leaving && (ACTIVE_PHASES.includes(leaving.phase) || leaving.running)) {
+        void interruptProject(selectedId).catch(() => undefined);
+      }
+    }
+    setSelectedId(id);
+  };
+
   const handleProviderChange = async (name: string) => {
     try {
       const info = await setProvider(name);
@@ -529,7 +548,7 @@ export default function App() {
           projects={projects}
           selectedId={showSetup ? null : selectedId}
           onSelect={(id) => {
-            setSelectedId(id);
+            switchTo(id);
             setShowSetup(false);
           }}
           onNew={() => setShowSetup(true)}

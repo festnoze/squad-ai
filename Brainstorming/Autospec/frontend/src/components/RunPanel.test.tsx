@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import { RunPanel } from "./RunPanel";
-import { PipelinePhase, ProjectState, StoryStatus, Usage, UserStory } from "../types";
+import { PipelinePhase, ProjectState, StoryStatus, Task, Usage, UserStory } from "../types";
 
 // jsdom n'implémente pas Element.scrollIntoView ; RunPanel l'appelle dans un
 // useEffect. On le stub pour éviter une erreur d'environnement (pas un bug prod).
@@ -32,6 +32,24 @@ function makeStory(overrides: Partial<UserStory> = {}): UserStory {
     attempts: 0,
     last_error: "",
     quality_score: 0,
+    ...overrides,
+  };
+}
+
+function makeTask(overrides: Partial<Task> = {}): Task {
+  return {
+    id: "T1",
+    story_id: "S1",
+    stream: "",
+    title: "Ma tâche",
+    description: "",
+    acceptance_criteria: [],
+    gherkin: "",
+    depends_on: [],
+    status: "todo" as StoryStatus,
+    attempts: 0,
+    last_error: "",
+    files_hint: [],
     ...overrides,
   };
 }
@@ -148,6 +166,28 @@ describe("RunPanel", () => {
     ).toBeInTheDocument();
   });
 
+  it("BUG3 : phase 'stopped' avec US multi-stream à moitié faite (tasks [done, todo], status brut 'done') : bouton « Continuer le build » présent", () => {
+    // Statut stocké = 'done' (pas todo/red), mais effective_status = todo car une
+    // tâche reste à faire : le bouton doit s'afficher (gating sur statut effectif).
+    renderPanel(
+      makeProject({
+        phase: "stopped",
+        stories: [
+          makeStory({
+            status: "done",
+            tasks: [
+              makeTask({ id: "T1", status: "done" }),
+              makeTask({ id: "T2", status: "todo" }),
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(
+      screen.getByRole("button", { name: "▶ Continuer le build" }),
+    ).toBeInTheDocument();
+  });
+
   it("phase 'stopped' sans story todo/red : pas de bouton « Continuer le build »", () => {
     renderPanel(
       makeProject({ phase: "stopped", stories: [makeStory({ status: "done" })] }),
@@ -230,6 +270,29 @@ describe("RunPanel", () => {
     const btn = screen.getByRole("button", { name: /Relancer les échecs \(1\)/ });
     fireEvent.click(btn);
     expect(onRetryFailed).toHaveBeenCalledTimes(1);
+  });
+
+  it("BUG5 : retry-failed compte le statut EFFECTIF (US multi-stream tasks [failed, done], status brut 'todo') : « Relancer les échecs (1) »", () => {
+    // Statut stocké = 'todo' mais effective_status = failed (une tâche failed, aucune
+    // active) : le compteur doit s'aligner sur le backend (aretry_failed agit sur
+    // effective_status), comme canResumeBuild.
+    renderPanel(
+      makeProject({
+        phase: "stopped",
+        stories: [
+          makeStory({
+            status: "todo",
+            tasks: [
+              makeTask({ id: "T1", status: "failed" }),
+              makeTask({ id: "T2", status: "done" }),
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(
+      screen.getByRole("button", { name: /Relancer les échecs \(1\)/ }),
+    ).toBeInTheDocument();
   });
 
   it("retry-failed : pas de bouton sans story en échec", () => {

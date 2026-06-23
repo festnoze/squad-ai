@@ -1940,6 +1940,10 @@ button.action-btn.action-done {
   align-content: flex-start;
   overflow-y: auto;
   flex: 1;
+  /* Marge en haut pour que le lift au survol (translateY -1px) et le contour
+     focus (outline-offset 2px) des cartes ne soient pas rognés par le conteneur
+     scrollable — sinon le cadre du haut de la carte disparaît au survol. */
+  padding-top: 4px;
 }
 
 /* Pastille « itération N » (sur les cartes epic / la US). Cliquable = lien vers
@@ -1970,6 +1974,10 @@ button.action-btn.action-done {
 .view-toggle {
   display: inline-flex;
   align-self: flex-start;
+  /* Enfant d'une colonne flex à hauteur bornée : sans ceci le sélecteur est
+     compressé verticalement quand le contenu déborde (seule la bande bleue de
+     l'onglet actif reste visible). */
+  flex-shrink: 0;
   border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;

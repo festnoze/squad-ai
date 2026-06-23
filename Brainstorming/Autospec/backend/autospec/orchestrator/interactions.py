@@ -25,9 +25,13 @@ from ..models import AgentInteraction
 # files; storing them verbatim would bloat the sidecar without adding value.
 MAX_TEXT_CHARS = 16_000
 
-# Recent calls kept in memory per item. A single item rarely exceeds a handful of
-# qa/dev/critic/judge rounds × a few retries; this is generous.
-PER_ITEM_RING = 40
+# Recent calls kept in memory per item. Must be at least as large as the
+# interactions endpoint's max served limit (``min(200, limit)`` in
+# ``api.server.aitem_interactions``) so a LIVE item served from this in-memory
+# ring shows the same depth as the dormant/sidecar path (``storage.load_interactions``,
+# which honors up to that same 200). Otherwise a busy item would truncate while
+# being watched and paradoxically gain history after a backend restart.
+PER_ITEM_RING = 200
 
 
 def _truncate(text: str) -> tuple[str, bool]:

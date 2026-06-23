@@ -4,7 +4,7 @@ end-to-end attribution through a real pipeline build."""
 import json
 
 from autospec.models import AgentInteraction
-from autospec.orchestrator.interactions import MAX_TEXT_CHARS, InteractionStore
+from autospec.orchestrator.interactions import MAX_TEXT_CHARS, PER_ITEM_RING, InteractionStore
 from autospec.orchestrator.pipeline import Pipeline
 from autospec.models import PipelinePhase, ProjectState
 from autospec.agents.runner import FakeRunner
@@ -26,6 +26,19 @@ def test_store_records_and_truncates():
     for _ in range(5):
         store.record(item_id="US-1", phase="build", persona="dev", prompt="p", response="r")
     assert len(store.for_item("US-1")) == 3
+
+
+def test_default_ring_serves_more_than_forty():
+    """BUG4: a LIVE item built with the production default ring (PER_ITEM_RING)
+    must not truncate below the interactions endpoint's 200 max served limit. A
+    busy item with 60 calls should keep all 60 in memory — not collapse to the
+    old hard cap of 40 (which made live history shorter than the sidecar's)."""
+    assert PER_ITEM_RING >= 200
+    store = InteractionStore()  # constructed the way production does (default ring)
+    for i in range(60):
+        store.record(item_id="US-1", phase="build", persona="dev", prompt=str(i), response="")
+    got = store.for_item("US-1")
+    assert len(got) == 60  # > 40: live path no longer truncates below the API limit
 
 
 def test_store_for_item_limit_and_isolation():
