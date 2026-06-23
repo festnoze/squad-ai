@@ -1,4 +1,5 @@
 import {
+  AgentInteraction,
   FileContent,
   FileListing,
   NewStoryBody,
@@ -207,8 +208,12 @@ export async function unarchiveProject(projectId: string): Promise<void> {
 }
 
 export async function runProject(projectId: string, args = ""): Promise<void> {
+  // Safe to retry through the dev proxy: arun_app guards against a double launch
+  // (`if self._run_proc is alive: no-op`), so a replay after a transient
+  // Windows-loopback reset (ECONNRESET/ETIMEDOUT → proxy 502) can't start the app
+  // twice. Without this, that transient surfaces to the user as a hard error.
   await json(
-    await fetch(`/api/projects/${projectId}/run`, {
+    await fetchIdempotent(`/api/projects/${projectId}/run`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ args }),
@@ -561,4 +566,22 @@ export async function extendStory(
 
 export async function getMetrics(): Promise<Metrics> {
   return json(await fetch("/api/metrics")) as Promise<Metrics>;
+}
+
+/**
+ * O2: the recent LLM round-trips (prompt + raw answer + tokens) captured for one
+ * work item (US/task), oldest→newest. Idempotent GET — safe to retry through the
+ * proxy. The id is path-encoded (work-item ids can contain `/`, e.g. task ids).
+ */
+export async function getItemInteractions(
+  projectId: string,
+  itemId: string,
+  limit = 20,
+): Promise<AgentInteraction[]> {
+  const r = await json<{ item_id: string; interactions: AgentInteraction[] }>(
+    await fetchIdempotent(
+      `/api/projects/${projectId}/items/${encodeURIComponent(itemId)}/interactions?limit=${limit}`,
+    ),
+  );
+  return r.interactions;
 }

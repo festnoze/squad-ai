@@ -7,6 +7,7 @@ asyncio task; the API talks to it through asend_user_message / astop / arun_app.
 from __future__ import annotations
 
 import asyncio
+import contextvars
 import json
 import os
 import re
@@ -17,11 +18,12 @@ from pathlib import Path
 
 from ..agents import prompts
 from ..agents.runner import AgentError, AgentRunner, extract_json
-from ..agents.personas import persona
+from ..agents.personas import FALLBACK_PERSONAS, persona
 from ..config import settings
 from .. import observability
 from ..models import (
     AcceptanceCriterion,
+    AgentInteraction,
     BackendLanguage,
     BuildStage,
     ChatMessage,
@@ -49,7 +51,8 @@ from ..models import (
     new_id,
 )
 from ..language_selector import recommend_language
-from ..storage import save_state_payload, workspace_dir
+from ..storage import append_interaction, load_interactions, save_state_payload, workspace_dir
+from .interactions import InteractionStore
 from . import mutation, refine, scheduler, session_monitor, setup_exec, streams as work_streams, toolchain, workspace
 from . import lessons as lesson_store
 from . import regression
@@ -164,6 +167,30 @@ def _unique_id(raw: str, prefix: str, taken: set[str]) -> str:
     return f"{prefix}-{n}"
 
 
+# The work item (user story / task id) the current agent call belongs to. Set by
+# each build worker at its entry; read in ``_UsageTracker.arun`` to attribute the
+# captured interaction. Each build worker runs in its own asyncio Task (which
+# copies the context at creation), so a bare ``set()`` is isolated to that worker
+# — it never leaks to sibling workers or to the parent lifecycle task. Unset (the
+# default) means "not a build call" → attributed to the phase.
+_BUILD_ITEM: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "autospec_build_item", default=None
+)
+
+# Reverse map: the exact system-prompt string ``persona(name)`` returns → the
+# persona name. Lets ``_UsageTracker`` label every call's agent role without
+# touching the ~25 call sites. Built lazily (personas are lru_cached, so the same
+# string object/content comes back each time).
+_PERSONA_BY_PROMPT: dict[str, str] = {}
+
+
+def _persona_role(system_prompt: str) -> str:
+    if not _PERSONA_BY_PROMPT:
+        for name in FALLBACK_PERSONAS:
+            _PERSONA_BY_PROMPT[persona(name)] = name
+    return _PERSONA_BY_PROMPT.get(system_prompt, "")
+
+
 class _UsageTracker:
     """Wraps a pipeline's runner to accumulate token/cost usage on the project
     state. Its `arun` matches the AgentRunner Protocol, so it can be passed to
@@ -173,12 +200,21 @@ class _UsageTracker:
         self.pipeline = pipeline
 
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
+        phase = self.pipeline.state.phase.value
+        item_id = _BUILD_ITEM.get() or f"phase:{phase}"
+        role = _persona_role(system_prompt)
         try:
-            chosen = model or settings.model_for_phase(self.pipeline.state.phase.value)
+            chosen = model or settings.model_for_phase(phase)
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
         except AgentError as exc:
+            # Capture the failed round-trip too — a red/failed item's last call is
+            # exactly what the operator wants to inspect.
+            self.pipeline._record_interaction(
+                item_id=item_id, phase=phase, persona=role, prompt=prompt,
+                response="", ok=False, error=str(exc),
+            )
             # Usage-window watchdog (M2): an exhausted Claude session window
             # triggers a clean stop + scheduled auto-resume, then the error
             # still propagates to the caller's normal handling.
@@ -217,6 +253,13 @@ class _UsageTracker:
             output_tokens=res.output_tokens,
             duration_ms=res.duration_ms,
         )
+        # Capture the round-trip for the live item-activity view (O2).
+        self.pipeline._record_interaction(
+            item_id=item_id, phase=phase, persona=role, prompt=prompt,
+            response=res.text, ok=True,
+            input_tokens=res.input_tokens, output_tokens=res.output_tokens,
+            cost_usd=res.cost_usd, duration_ms=res.duration_ms,
+        )
         self.pipeline._sync()  # persist + broadcast usage as it accrues
         return res
 
@@ -226,6 +269,15 @@ class Pipeline:
         self.state = state
         self.runner = runner
         self._tracked = _UsageTracker(self)
+        # O2: live capture of LLM round-trips per work item. Kept out of
+        # ProjectState (prompts/answers are large); in-memory ring + JSONL sidecar.
+        # Seed the ring from the sidecar so history survives a backend reload.
+        self.interactions = InteractionStore(persist=self._persist_interaction)
+        try:
+            for rec in load_interactions(state.id):
+                self.interactions.add_existing(AgentInteraction.model_validate(rec))
+        except Exception:  # a corrupt sidecar must never block pipeline creation
+            pass
         self._pm_session: str | None = None
         self._user_messages: asyncio.Queue[str] = asyncio.Queue()
         self._stop_requested = False
@@ -308,6 +360,32 @@ class Pipeline:
     def _chat(self, role: ChatRole, content: str) -> None:
         self.state.chat.append(ChatMessage(role=role, content=content))
         self._sync()
+
+    def _record_interaction(self, **kwargs) -> None:
+        """O2: capture one LLM round-trip on the item store (in-memory ring +
+        JSONL sidecar via the store's persist hook). Never raises — capture must
+        not be able to break an agent call. No event is broadcast: the activity
+        panel polls the REST endpoint while open, so we avoid flooding the event
+        replay ring with one event per agent call during a heavy build."""
+        try:
+            self.interactions.record(**kwargs)
+        except Exception:
+            return
+
+    def _persist_interaction(self, interaction: AgentInteraction) -> None:
+        """Append a captured interaction to the JSONL sidecar, offloaded off the
+        event loop (the file write must not stall uvicorn's accept loop — see
+        ``_persist``). Falls back to an inline write when no loop is running."""
+        payload = interaction.model_dump_json()
+        sid = self.state.id
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            loop = None
+        if loop is None:
+            append_interaction(sid, payload)
+        else:
+            loop.run_in_executor(_PERSIST_EXECUTOR, append_interaction, sid, payload)
 
     def _notify(self, level: str, title: str, body: str = "") -> None:
         """Emit a push-notification event (U3): the frontend turns it into a
@@ -2408,6 +2486,9 @@ class Pipeline:
         self.state.build_guidance.clear()
 
     async def _abuild_story(self, story: UserStory) -> None:
+        # O2: attribute every agent call made while building this story to it.
+        # Isolated to this worker's Task context (see _BUILD_ITEM), so no reset.
+        _BUILD_ITEM.set(story.id)
         story.status = StoryStatus.IN_PROGRESS
         story.attempts += 1
         # B1: a retry (attempts > 1) re-entering the build is a recovery state.
@@ -2702,6 +2783,9 @@ class Pipeline:
         green commit + merge the branch back into the repo (serialized via
         ``_merge_lock``; one retry then abort+FAILED on conflict). The worktree
         and branch are always cleaned up in ``finally``."""
+        # O2: attribute every agent call made while building this item to it.
+        # Isolated to this worker's Task context (see _BUILD_ITEM), so no reset.
+        _BUILD_ITEM.set(item.id)
         target = self._item_target(item)
         subject = self._item_subject(item)
         target.status = subject.status = StoryStatus.IN_PROGRESS
@@ -2903,8 +2987,33 @@ class Pipeline:
         truly in parallel (in the now-private worktree)."""
         async with self._merge_lock:
             # Drop a leftover branch from an earlier attempt so `-b` cannot fail.
+            # An interrupted build (crash/reload/cancel — the same kind that
+            # leaves a task stuck IN_PROGRESS) can leave a stale worktree still
+            # holding `branch` checked out; then a plain `branch -D` fails with
+            # "used by worktree" and the fresh `worktree add -b` fails because the
+            # branch still exists. So first unregister/remove any worktree on this
+            # branch, THEN delete the branch.
+            await self._aclear_stale_worktree(repo, branch)
             await self._agit(repo, "branch", "-D", branch)
             return await self._aworktree_add_locked(repo, branch)
+
+    async def _aclear_stale_worktree(self, repo, branch: str) -> None:
+        """Remove any leftover git worktree checked out on ``branch`` (and prune
+        dead admin records), so the branch becomes deletable and re-addable.
+        Best-effort: every git call is tolerated. Caller holds ``_merge_lock``."""
+        # Drop admin records of worktrees whose directory no longer exists.
+        await self._agit(repo, "worktree", "prune")
+        # Force-remove any worktree still registered on this branch (dir present).
+        code, out = await self._agit(repo, "worktree", "list", "--porcelain")
+        if code == 0:
+            path: str | None = None
+            for line in out.splitlines():
+                if line.startswith("worktree "):
+                    path = line[len("worktree ") :].strip()
+                elif line.strip() == f"branch refs/heads/{branch}" and path:
+                    await self._agit(repo, "worktree", "remove", "--force", path)
+                    path = None
+            await self._agit(repo, "worktree", "prune")
 
     async def _aworktree_add_locked(self, repo, branch: str):
         import tempfile
@@ -2915,7 +3024,11 @@ class Pipeline:
             worktree.rmdir()
         except OSError:
             pass
-        code, out = await self._agit(repo, "worktree", "add", str(worktree), "-b", branch, "HEAD")
+        # `-B` (create-or-reset to HEAD) rather than `-b`: if cleanup left the
+        # branch behind (e.g. a Windows file lock blocked the worktree removal),
+        # `-b` would fail "already exists"; `-B` resets it to the same start point
+        # we want anyway, so the add is resilient.
+        code, out = await self._agit(repo, "worktree", "add", str(worktree), "-B", branch, "HEAD")
         if code != 0:
             self._log("streams", f"git worktree add a échoué : {out.strip()[:200]}")
             return None

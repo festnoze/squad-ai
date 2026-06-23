@@ -222,6 +222,34 @@ async def test_flag_off_uses_legacy_path(monkeypatch):
     assert state.story("US-1").status == StoryStatus.DONE
 
 
+async def test_worktree_add_recovers_from_stale_leftover(streams_on):
+    """An interrupted build (crash/reload) can leave a worktree still checked out
+    on the per-item branch. Re-adding that branch (e.g. a manual « Relancer ») must
+    succeed by pruning/removing the orphan first, instead of failing with
+    « git worktree add a échoué … branch already exists / used by worktree »."""
+    state = _streams_state([_us("US-1")], project_id="wt-stale")
+    pipeline = Pipeline(state, ScriptedRunner())
+    ws = workspace_dir(state.id)
+    ws.mkdir(parents=True, exist_ok=True)
+    assert await pipeline._agit_ensure_repo(ws)
+    # A commit so HEAD exists for `worktree add … HEAD`.
+    (ws / "seed.txt").write_text("x", encoding="utf-8")
+    await pipeline._agit(ws, "add", "-A")
+    await pipeline._agit(ws, "commit", "-m", "seed")
+
+    branch = "autospec/wi-stale"
+    first = await pipeline._aworktree_add(ws, branch)
+    assert first is not None
+    # Simulate the interruption: the worktree + branch are left behind (the
+    # cleanup in `finally` never ran). A naive `branch -D` would now fail
+    # ("used by worktree"); the next add must still succeed.
+    second = await pipeline._aworktree_add(ws, branch)
+    assert second is not None, "re-add should recover from the stale worktree"
+    assert second != first
+
+    await pipeline._aworktree_remove(ws, second, branch)
+
+
 async def test_work_item_built_in_a_worktree_not_the_main_workspace(streams_on, monkeypatch):
     # The dev agent for a work item runs with cwd set to a git worktree path,
     # NOT the project workspace dir — proving per-item isolation.

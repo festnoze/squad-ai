@@ -28,13 +28,22 @@ from ..agents.providers import (
 from ..agents.runner import AgentRunner
 from ..agents.scripted import ScriptedRunner
 from ..config import PROJECT_DIR, _env_int, settings
-from ..models import ChatMessage, ChatRole, PipelinePhase, ProjectState, StoryStatus, new_id
+from ..models import (
+    BuildStage,
+    ChatMessage,
+    ChatRole,
+    PipelinePhase,
+    ProjectState,
+    RecoveryState,
+    StoryStatus,
+    new_id,
+)
 from ..orchestrator.events import bus
 from ..orchestrator.pipeline import Pipeline
 from ..forecast import forecast_iteration_cost
 from ..spec_import import parse_spec_import
 from ..metrics import compute_metrics
-from ..storage import list_states, load_state, workspace_dir
+from ..storage import list_states, load_interactions, load_state, workspace_dir
 
 # Directories and files hidden from the workspace file explorer: VCS/build/cache
 # noise plus Autospec's own persisted state and report artifacts.
@@ -61,6 +70,25 @@ _INTERRUPTED_PHASES = {
 }
 
 
+# Build statuses that only exist WHILE a worker is actively on the item. With no
+# worker running (recovery time), an item in one of these is an orphan to reset.
+_TRANSIENT_STATUSES = (StoryStatus.IN_PROGRESS, StoryStatus.GREEN)
+
+
+def _reconcile_orphan(item) -> bool:
+    """Reset a work item (UserStory or Task) left mid-build by an interrupted run.
+
+    Returns True when it changed the item. Reverts a transient status to TODO and
+    clears the live stage/persona/recovery so the UI stops showing it as active."""
+    if item.status not in _TRANSIENT_STATUSES:
+        return False
+    item.status = StoryStatus.TODO
+    item.current_stage = BuildStage.QUEUED
+    item.current_persona = ""
+    item.recovery = RecoveryState()
+    return True
+
+
 def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
     """Re-register persisted projects as dormant pipelines after a restart.
 
@@ -80,10 +108,18 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
         if state.phase in _INTERRUPTED_PHASES:
             state.phase = PipelinePhase.STOPPED
             changed = True
+        # An interrupted build (crash/reload/cancel) can leave a work item in a
+        # transient in-flight status with no worker behind it. Nothing is running
+        # at recovery time, so revert any such orphan to TODO and clear its live
+        # stage/persona/recovery — otherwise the board keeps showing "dev en
+        # cours" forever. Applies to BOTH stories AND their tasks (a US decomposed
+        # into tasks derives its status from them, so a stuck task is enough).
         for story in state.stories:
-            if story.status in (StoryStatus.IN_PROGRESS, StoryStatus.GREEN):
-                story.status = StoryStatus.TODO
+            if _reconcile_orphan(story):
                 changed = True
+            for task in story.tasks:
+                if _reconcile_orphan(task):
+                    changed = True
         if state.running:
             state.running = False
             changed = True
@@ -769,6 +805,24 @@ async def atask_diff(project_id: str, task_id: str) -> dict:
         pipeline.atask_diff(task_id), f"Tâche inconnue : {task_id}"
     )
     return {"ok": True, **result}
+
+
+@app.get("/api/projects/{project_id}/items/{item_id}/interactions")
+async def aitem_interactions(project_id: str, item_id: str, limit: int = 20) -> dict:
+    """O2: the recent LLM round-trips (prompt + answer + tokens) captured for one
+    work item (US/task), oldest→newest. Served from the live pipeline's in-memory
+    ring when the project is active, falling back to the JSONL sidecar so history
+    is still readable for a dormant project (or after a backend reload)."""
+    limit = max(1, min(200, limit))
+    pipeline = pipelines.get(project_id)
+    if pipeline is not None:
+        data = [
+            i.model_dump(mode="json")
+            for i in pipeline.interactions.for_item(item_id, limit)
+        ]
+    else:
+        data = await asyncio.to_thread(load_interactions, project_id, item_id, limit)
+    return {"item_id": item_id, "interactions": data}
 
 
 @app.post("/api/projects/{project_id}/stories/reorder")

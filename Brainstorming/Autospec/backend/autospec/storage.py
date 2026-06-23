@@ -123,6 +123,58 @@ def save_state_payload(project_id: str, payload: str) -> None:
     )
 
 
+INTERACTIONS_FILENAME = "autospec-interactions.jsonl"
+
+# Keep the sidecar bounded: a long build can emit thousands of agent calls. We
+# only ever serve the recent tail per item, so cap how many lines we read back.
+_INTERACTIONS_READ_TAIL = 4000
+
+
+def append_interaction(project_id: str, payload_line: str) -> None:
+    """Append one pre-serialized interaction (a single JSON line) to the project's
+    sidecar. Best-effort and append-only: a failed write just drops that record
+    (the in-memory ring still has it) rather than disturbing the pipeline."""
+    try:
+        ws = workspace_dir(project_id)
+        ws.mkdir(parents=True, exist_ok=True)
+        with open(ws / INTERACTIONS_FILENAME, "a", encoding="utf-8") as fh:
+            fh.write(payload_line.rstrip("\n") + "\n")
+    except OSError as exc:
+        logger.warning("Could not append interaction for project %s: %s", project_id, exc)
+
+
+def load_interactions(
+    project_id: str, item_id: str | None = None, limit: int | None = None
+) -> list[dict]:
+    """Read captured interactions from the sidecar (most recent last).
+
+    Filters by ``item_id`` when given and returns at most ``limit`` (the newest).
+    Tolerant of partial/corrupt lines — they are skipped, not fatal."""
+    path = workspace_dir(project_id) / INTERACTIONS_FILENAME
+    if not path.exists():
+        return []
+    try:
+        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError as exc:
+        logger.warning("Could not read interactions for project %s: %s", project_id, exc)
+        return []
+    out: list[dict] = []
+    for line in lines[-_INTERACTIONS_READ_TAIL:]:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if item_id is not None and rec.get("item_id") != item_id:
+            continue
+        out.append(rec)
+    if limit is not None and limit >= 0:
+        out = out[-limit:]
+    return out
+
+
 def load_state(project_id: str) -> ProjectState | None:
     path = workspace_dir(project_id) / STATE_FILENAME
     if not path.exists():

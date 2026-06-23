@@ -383,6 +383,61 @@ async def test_recover_registers_persisted_projects():
     assert state.paused is False
 
 
+async def test_recover_resets_orphaned_task():
+    """An interrupted build can leave a TASK in_progress with no worker behind it;
+    recovery must revert it (and clear its live stage/persona) so the board stops
+    showing the parent US as 'dev en cours' forever."""
+    from autospec import storage
+    from autospec.models import (
+        BuildStage,
+        Epic,
+        PipelinePhase,
+        ProjectState,
+        StoryStatus,
+        Task,
+        UserStory,
+    )
+
+    state = ProjectState(
+        id="proj-orphan-task",
+        name="orphan",
+        goal="g",
+        phase=PipelinePhase.DONE,  # the run had already moved on
+        epics=[Epic(id="EPIC-1", title="e")],
+        stories=[
+            UserStory(
+                id="US-3",
+                epic_id="EPIC-1",
+                title="s",
+                status=StoryStatus.TODO,
+                tasks=[
+                    Task(id="T-3a", story_id="US-3", status=StoryStatus.DONE),
+                    Task(
+                        id="T-3b",
+                        story_id="US-3",
+                        status=StoryStatus.IN_PROGRESS,
+                        current_stage=BuildStage.IMPLEMENTING,
+                        current_persona="dev",
+                    ),
+                ],
+            )
+        ],
+    )
+    storage.save_state(state)
+    server.pipelines.clear()
+
+    server.recover_projects()
+
+    recovered = server.pipelines["proj-orphan-task"].state
+    t3b = recovered.story("US-3").tasks[1]
+    assert t3b.status == StoryStatus.TODO
+    assert t3b.current_stage == BuildStage.QUEUED
+    assert t3b.current_persona == ""
+    # The completed sibling is untouched, and the US is no longer "in progress".
+    assert recovered.story("US-3").tasks[0].status == StoryStatus.DONE
+    assert recovered.story("US-3").effective_status() != StoryStatus.IN_PROGRESS
+
+
 async def test_recovered_project_is_controllable():
     _persist_interrupted_project("proj-recover")
     server.pipelines.clear()

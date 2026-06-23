@@ -26,6 +26,7 @@ import {
   UserStory,
   usEffectiveStatus,
 } from "../types";
+import { LlmActivity } from "./LlmActivity";
 
 const STATUS_LABEL: Record<string, string> = {
   todo: "À faire",
@@ -35,6 +36,11 @@ const STATUS_LABEL: Record<string, string> = {
   done: "Terminé",
   failed: "Échec",
 };
+
+/** A work item is actively being worked on (so its LLM calls should poll live). */
+function isLiveStatus(status: string): boolean {
+  return status === "in_progress" || status === "red" || status === "green";
+}
 
 const TEST_STATE_LABEL: Record<TestState, string> = {
   nonexistent: "inexistant",
@@ -468,19 +474,44 @@ function DiffViewer({
 /** Badges communs (priorité, statut, score qualité) d'une user story. Le statut
  * affiché est l'« effective status » : pour une US conteneur (avec tâches) il est
  * dérivé de ses tâches, sinon c'est le statut stocké. */
-function StoryBadges({ story }: { story: UserStory }) {
+function StoryBadges({
+  story,
+  onStatusClick,
+}: {
+  story: UserStory;
+  /** When set, the status badge becomes a button (opens the LLM activity view). */
+  onStatusClick?: () => void;
+}) {
   const status = usEffectiveStatus(story);
+  const statusInner = (
+    <>
+      {status === "in_progress" && (
+        <span className="spinner spinner-sm" aria-hidden="true" />
+      )}
+      {STATUS_LABEL[status] ?? status}
+    </>
+  );
   return (
     <span className="story-right">
       <span className={`prio prio-${story.priority}`} title="Priorité kanban (1=haute)">
         P{story.priority}
       </span>
-      <span className={`badge badge-${status}`}>
-        {status === "in_progress" && (
-          <span className="spinner spinner-sm" aria-hidden="true" />
-        )}
-        {STATUS_LABEL[status] ?? status}
-      </span>
+      {onStatusClick ? (
+        <button
+          type="button"
+          className={`badge badge-${status} badge-btn`}
+          title="Voir les appels LLM de cet item"
+          data-testid={`status-badge-${story.id}`}
+          onClick={(e) => {
+            stop(e);
+            onStatusClick();
+          }}
+        >
+          {statusInner} 🧠
+        </button>
+      ) : (
+        <span className={`badge badge-${status}`}>{statusInner}</span>
+      )}
       {story.quality_score >= 0 && (
         <span className="quality-badge" title="Qualité du code (raffinement)">
           ⚙ {story.quality_score}/100
@@ -677,6 +708,7 @@ function StoryDetail({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
+  const [showLlm, setShowLlm] = useState(false);
 
   const handleDelete = async () => {
     if (!window.confirm(`Supprimer la user story « ${story.title} » ?`)) return;
@@ -720,7 +752,7 @@ function StoryDetail({
       <div className="story-detail-head">
         <span className="story-id">{story.id}</span>
         <IterationBadge iteration={story.iteration} onOpen={onOpenIteration} compact />
-        <StoryBadges story={story} />
+        <StoryBadges story={story} onStatusClick={() => setShowLlm((v) => !v)} />
       </div>
       <h3 className="story-detail-title">{story.title}</h3>
       {(story.depends_on ?? []).length > 0 && (
@@ -796,6 +828,13 @@ function StoryDetail({
           )}
         </>
       )}
+      {showLlm && !editing && (
+        <LlmActivity
+          projectId={projectId}
+          itemId={story.id}
+          live={isLiveStatus(usEffectiveStatus(story))}
+        />
+      )}
       {showDiff && (
         <DiffViewer
           label={story.id}
@@ -831,6 +870,7 @@ function TaskDetail({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
+  const [showLlm, setShowLlm] = useState(false);
 
   const run = (fn: () => Promise<void>) => async () => {
     setError("");
@@ -861,12 +901,18 @@ function TaskDetail({
       <div className="story-detail-head">
         <span className="story-id">{task.id}</span>
         {showStream && <StreamBadge streamId={task.stream} streams={streams} />}
-        <span className={`badge badge-${task.status}`}>
+        <button
+          type="button"
+          className={`badge badge-${task.status} badge-btn`}
+          title="Voir les appels LLM de cette tâche"
+          data-testid={`status-badge-${task.id}`}
+          onClick={() => setShowLlm((v) => !v)}
+        >
           {task.status === "in_progress" && (
             <span className="spinner spinner-sm" aria-hidden="true" />
           )}
-          {STATUS_LABEL[task.status] ?? task.status}
-        </span>
+          {STATUS_LABEL[task.status] ?? task.status} 🧠
+        </button>
         <MergeBadge status={task.status} lastError={task.last_error} />
       </div>
       <h3 className="story-detail-title">{task.title || task.id}</h3>
@@ -935,6 +981,13 @@ function TaskDetail({
           <h4>Dernière erreur</h4>
           <pre className="error-output">{task.last_error}</pre>
         </>
+      )}
+      {showLlm && (
+        <LlmActivity
+          projectId={projectId}
+          itemId={task.id}
+          live={isLiveStatus(task.status)}
+        />
       )}
       {showDiff && (
         <DiffViewer

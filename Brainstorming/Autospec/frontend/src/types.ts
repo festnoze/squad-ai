@@ -252,6 +252,27 @@ export interface LogLine {
   line: string;
 }
 
+/** O2: one captured LLM round-trip for a work item — the exact prompt sent and
+ * the raw answer received, plus who/where/how-much. Fetched on demand (never part
+ * of ProjectState, which is broadcast on every change). */
+export interface AgentInteraction {
+  id: string;
+  item_id: string;
+  phase: string;
+  persona: string;
+  prompt: string;
+  response: string;
+  ok: boolean;
+  error: string;
+  input_tokens: number;
+  output_tokens: number;
+  cost_usd: number;
+  duration_ms: number;
+  prompt_truncated: boolean;
+  response_truncated: boolean;
+  ts: number;
+}
+
 /** B-UX: one item-level entry inside a heartbeat `tick`. Item-level data ONLY —
  * the rich data (titles, criteria, test_plan, scores) still comes from `state`. */
 export interface TickItem {

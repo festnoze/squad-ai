@@ -3125,3 +3125,156 @@ button.action-btn.action-done {
     min-width: 0;
   }
 }
+
+/* ------------------------------------------------------------------ O2: LLM activity
+   Integrated (inline, non-popup) view of the prompts/answers exchanged with the
+   model for one work item. Lives in the Activity row drawer and the Board's
+   story/task detail. */
+
+/* The status badge as a clickable affordance (opens the LLM activity). */
+.badge-btn {
+  cursor: pointer;
+  background: transparent;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.badge-btn:hover {
+  border-color: var(--accent);
+}
+
+.llm-activity {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-2);
+  padding: 8px 10px;
+}
+.llm-activity.llm-muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.llm-activity-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.llm-activity-title {
+  font-weight: 600;
+  font-size: 13px;
+}
+.llm-activity-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  padding: 0 7px;
+}
+.llm-live {
+  font-size: 10px;
+  color: var(--green);
+  animation: llm-pulse 1.6s ease-in-out infinite;
+}
+@keyframes llm-pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.llm-call-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.llm-call {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--panel);
+}
+.llm-call-error {
+  border-color: var(--red);
+}
+
+.llm-call-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  background: transparent;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 12px;
+  text-align: left;
+}
+.llm-call-head:hover {
+  background: var(--panel-2);
+}
+.llm-call-caret {
+  color: var(--muted);
+}
+.llm-call-role {
+  font-weight: 600;
+}
+.llm-call-tokens,
+.llm-call-cost,
+.llm-call-dur,
+.llm-call-time {
+  font-size: 11px;
+  color: var(--muted);
+}
+.llm-call-time {
+  margin-left: auto;
+}
+.llm-call-badge-error {
+  font-size: 10px;
+  color: #fff;
+  background: var(--red);
+  border-radius: 99px;
+  padding: 0 6px;
+}
+
+.llm-call-body {
+  padding: 6px 8px 8px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.llm-call-section h6 {
+  margin: 0 0 3px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.llm-trunc {
+  color: var(--red);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.llm-pre {
+  margin: 0;
+  max-height: 320px;
+  overflow: auto;
+  background: #11141b;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #c6d4f0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.llm-pre-error {
+  color: var(--red);
+}

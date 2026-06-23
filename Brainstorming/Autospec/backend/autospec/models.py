@@ -364,6 +364,30 @@ class Usage(BaseModel):
     agent_calls: int = 0
 
 
+class AgentInteraction(BaseModel):
+    """One LLM round-trip captured for live introspection: the exact prompt sent
+    and the raw answer received, plus who/where/how-much. Deliberately NOT part of
+    ``ProjectState`` — prompts/answers are large, and the state is re-serialized +
+    broadcast on every ``_sync``; these are stored apart (in-memory ring + JSONL
+    sidecar) and fetched on demand when the operator opens an item's activity."""
+
+    id: str = Field(default_factory=lambda: new_id("call"))
+    item_id: str = ""        # work-item id (US/task), or "phase:<phase>" otherwise
+    phase: str = ""          # pipeline phase the call ran in
+    persona: str = ""        # agent role (dev/qa/critic/…), reverse-mapped from the system prompt
+    prompt: str = ""
+    response: str = ""
+    ok: bool = True
+    error: str = ""
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+    duration_ms: int = 0
+    prompt_truncated: bool = False
+    response_truncated: bool = False
+    ts: float = Field(default_factory=time.time)
+
+
 class ProjectState(BaseModel):
     id: str
     name: str

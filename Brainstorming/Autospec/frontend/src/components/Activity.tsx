@@ -27,7 +27,13 @@ import {
   ItemView,
   WorkItem,
 } from "../work";
+import { LlmActivity } from "./LlmActivity";
 import { Stepper } from "./Stepper";
+
+/** Is the item actively being worked on (so its LLM calls should poll live)? */
+function isLive(status: string): boolean {
+  return status === "in_progress" || status === "red" || status === "green";
+}
 
 /** P15: persona → icon (forme/icône = persona, canal orthogonal de la couleur). */
 const PERSONA_META: Record<string, { icon: string; label: string }> = {
@@ -388,6 +394,11 @@ function ActivityRow({
               onExtend={(criteria) => extendStory(projectId, story.id, criteria).then(() => undefined)}
             />
           )}
+          <LlmActivity
+            projectId={projectId}
+            itemId={item.id}
+            live={isLive(view.status)}
+          />
         </div>
       )}
       {showDiff && (
