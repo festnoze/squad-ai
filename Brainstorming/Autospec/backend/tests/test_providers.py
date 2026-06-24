@@ -20,8 +20,8 @@ from autospec.config import settings
 def test_make_runner_mapping():
     assert isinstance(make_runner("claude"), ClaudeCliRunner)
     assert isinstance(make_runner("codex"), CodexCliRunner)
-    # Empty/default provider resolves to Codex (the new default, first in the UI).
-    assert isinstance(make_runner(""), CodexCliRunner)
+    # Empty/default provider resolves to Claude (the default, first in the UI).
+    assert isinstance(make_runner(""), ClaudeCliRunner)
     assert isinstance(make_runner("OpenAI"), OpenAiRunner)
     assert isinstance(make_runner("ollama"), OllamaRunner)
     with pytest.raises(ValueError):

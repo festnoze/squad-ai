@@ -137,7 +137,7 @@ class Settings:
         default_factory=lambda: os.environ.get("AUTOSPEC_CLAUDE_MODEL") or None
     )
     # Codex CLI harness: the OpenAI counterpart of the Claude Code CLI, driven
-    # headless via ``codex exec``. Default provider (first in the UI list).
+    # headless via ``codex exec``.
     codex_cmd: str = field(default_factory=_resolve_codex_cmd)
     codex_model: str | None = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_CODEX_MODEL") or None
@@ -148,7 +148,7 @@ class Settings:
     # Agent provider: "claude" (CLI harness), "openai" (API key) or "ollama"
     # (local models). Switchable at runtime through POST /api/provider.
     agent_provider: str = field(
-        default_factory=lambda: os.environ.get("AUTOSPEC_AGENT_PROVIDER", "codex").strip().lower()
+        default_factory=lambda: os.environ.get("AUTOSPEC_AGENT_PROVIDER", "claude").strip().lower()
     )
     openai_api_key: str = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_OPENAI_API_KEY")

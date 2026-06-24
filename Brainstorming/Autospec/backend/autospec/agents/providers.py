@@ -265,9 +265,9 @@ class AnthropicRunner(_LangChainRunner):
         ) / 1_000_000
 
 
-# Codex is first (the default provider): the UI lists it first and selects it by
-# default. claude/openai/ollama/anthropic follow.
-PROVIDERS = ("codex", "claude", "openai", "ollama", "anthropic")
+# Claude is first (the default provider): the UI lists it first and selects it by
+# default. codex/openai/ollama/anthropic follow.
+PROVIDERS = ("claude", "codex", "openai", "ollama", "anthropic")
 
 # Suggested models per provider, shown in the UI's second (adaptive) dropdown.
 # These are display/endpoint values passed straight to the backend, so a user
@@ -312,17 +312,17 @@ def provider_models(provider: str) -> list[str]:
 
 def make_runner(provider: str) -> AgentRunner:
     """Build the agent backend for a provider name (AUTOSPEC_AGENT_PROVIDER)."""
-    normalized = (provider or "codex").strip().lower()
+    normalized = (provider or "claude").strip().lower()
     if normalized == "openai":
         return OpenAiRunner()
     if normalized == "ollama":
         return OllamaRunner()
     if normalized == "anthropic":
         return AnthropicRunner()
-    if normalized == "claude":
-        return ClaudeCliRunner()
-    if normalized in ("", "codex"):
+    if normalized == "codex":
         return CodexCliRunner()
+    if normalized in ("", "claude"):
+        return ClaudeCliRunner()
     raise ValueError(f"Provider inconnu : {provider!r} (attendu : {', '.join(PROVIDERS)})")
 
 

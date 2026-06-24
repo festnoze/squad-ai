@@ -26,8 +26,8 @@ async def test_get_provider_defaults(monkeypatch):
     async with make_client([]) as client:
         data = (await client.get("/api/provider")).json()
         assert data["provider"] == "claude"
-        # Codex is the new default provider: first in the list.
-        assert data["available"] == ["codex", "claude", "openai", "ollama", "anthropic"]
+        # Claude is the default provider: first in the list.
+        assert data["available"] == ["claude", "codex", "openai", "ollama", "anthropic"]
         # Adaptive 2nd dropdown: per-provider model choices.
         assert data["models"]["claude"] == ["opus", "sonnet", "haiku"]
         assert "gpt-4.1" in data["models"]["openai"]
