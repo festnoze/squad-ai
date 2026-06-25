@@ -344,6 +344,20 @@ class Settings:
     approval_gates_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_APPROVAL_GATES", False)
     )
+    # Smoke-run gate: after the suite is green, actually BOOT the delivered app
+    # and require it to start (a web/API app must open its port; a CLI must exit
+    # 0) — a non-runnable build then fails the iteration like a red test. OFF by
+    # default. Catches "the tests pass but the app doesn't run" (e.g. a main.py
+    # that prints launch instructions instead of starting the server).
+    smoke_run: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_SMOKE_RUN", False)
+    )
+    smoke_run_timeout_s: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_SMOKE_RUN_TIMEOUT_S", 60.0, minimum=5.0)
+    )
+    smoke_run_port: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_SMOKE_RUN_PORT", 8000, minimum=1)
+    )
     # Untrusted-code sandbox (R1): run the generated app inside a no-network
     # Docker container. OFF by default; needs Docker + an image carrying the
     # project toolchain (uv). The image/binary are configurable.

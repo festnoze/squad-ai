@@ -1017,8 +1017,13 @@ PROCESSUS OBLIGATOIRE (BDD puis TDD, outside-in) :
    des tests unitaires TDD si tu crées de la logique non couverte.
 {"5" if plan else "4"}. Relance `uv run pytest` jusqu'à ce que TOUTE la suite soit verte (les tests
    des stories précédentes doivent rester verts).
-{"6" if plan else "5"}. Mets à jour `main.py` (point d'entrée CLI du projet) pour exposer la
-   nouvelle fonctionnalité si pertinent.
+{"6" if plan else "5"}. Câble la fonctionnalité dans le POINT D'ENTRÉE EXÉCUTABLE `main.py` :
+   le projet DOIT être lançable tel quel. Pour un CLI, expose la commande. Pour
+   une APP WEB / API (FastAPI, Flask…), `python main.py` DOIT DÉMARRER LE SERVEUR
+   (`if __name__ == "__main__":` → `uvicorn.run(app, host="127.0.0.1", port=8000)`),
+   et la DÉPENDANCE D'EXÉCUTION (ex. `uvicorn`) DOIT être déclarée dans
+   `pyproject.toml` (`dependencies`). Ne te contente JAMAIS d'imprimer des
+   instructions de lancement à la place du démarrage réel.
 
 CONTRAINTES :
 - Ne modifie JAMAIS les fichiers .feature ni autospec-state.json.

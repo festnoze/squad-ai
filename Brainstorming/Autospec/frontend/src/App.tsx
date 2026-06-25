@@ -45,6 +45,7 @@ import { ProjectBar } from "./components/ProjectBar";
 import { ProjectSetup } from "./components/ProjectSetup";
 import { RunPanel } from "./components/RunPanel";
 import { SettingsModal } from "./components/SettingsModal";
+import { Logo } from "./components/Logo";
 import { useI18n } from "./i18n/i18n";
 import {
   GuidanceEntry,
@@ -448,7 +449,7 @@ export default function App() {
     <div className="app">
       <header>
         <h1>
-          ⚙️ Autospec <span className="subtitle">{t("app.subtitle")}</span>
+          <Logo /> Autospec <span className="subtitle">{t("app.subtitle")}</span>
         </h1>
         {provider && (
           <div className="provider-control" ref={providerRef}>

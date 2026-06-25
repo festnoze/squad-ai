@@ -105,6 +105,18 @@ header {
 header h1 {
   font-size: 18px;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Brand mark sized to the title; brackets follow the title color, spark uses
+   the accent token (see Logo.tsx). */
+.app-logo {
+  width: 1.35em;
+  height: 1.35em;
+  flex: none;
+  color: var(--title);
 }
 
 .subtitle {

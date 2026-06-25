@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Les harness des agents de développement</title>
+<title>From Prompting to Agents Harnesses</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
@@ -67,7 +67,7 @@
     backdrop-filter: blur(2px);
   }
 
-  .brand { margin-bottom: 46px; }
+  .brand { margin-bottom: 40px; }
   .brand .kicker {
     font-family: var(--mono); font-size: 11px; letter-spacing: 0.28em;
     text-transform: uppercase; color: var(--accent); margin-bottom: 14px;
@@ -80,19 +80,28 @@
     font-size: 23px; font-weight: 600; line-height: 1.18; letter-spacing: -0.01em;
   }
   .brand h1 em { color: var(--accent); font-style: normal; }
+  .brand h1 .hl  { color: var(--accent); }
+  .brand h1 .hl2 { color: var(--accent-2); }
+  .brand h1 .hl3 { color: var(--accent-3); }
+  .brand h1 .dim { color: var(--muted-2); }
+  .brand > i {
+    display: block; margin-top: 14px;
+    font-size: 13px; line-height: 1.5; color: var(--cream);
+  }
+  .brand > i em { color: var(--accent); font-style: italic; }
 
-  nav { display: flex; flex-direction: column; gap: 9px; margin-top: 4px; }
+  nav { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 
   .nav-item {
     position: relative; overflow: visible;
     display: flex; align-items: center; gap: 16px;
-    padding: 13px 16px; border-radius: 12px;
+    padding: 11px 16px; border-radius: 12px;
     cursor: pointer; color: var(--muted);
     border: 2px solid transparent;
     transition: color .35s ease, border-color .45s ease, font-size .4s cubic-bezier(.22,1,.36,1), box-shadow .45s ease;
     text-align: left; width: 100%; background: none;
     font-family: var(--techno); font-weight: 600;
-    font-size: 21px; letter-spacing: 0.01em; text-transform: uppercase;
+    font-size: 19px; letter-spacing: 0.01em; text-transform: uppercase;
   }
   /* sweeping fill from the left */
   .nav-item::before {
@@ -118,7 +127,7 @@
   .nav-item:hover::before { transform: scaleX(0.4); }
   .nav-item.active {
     color: var(--accent); background: transparent;
-    font-size: 31px;
+    font-size: 27px;
     border-color: var(--accent);
     box-shadow: 0 0 22px rgba(245,184,61,0.30), inset 0 0 16px rgba(245,184,61,0.06);
     animation: navPulse .7s ease;
@@ -136,18 +145,18 @@
   .nav-sub {
     margin-left: 13px; padding-left: 18px;
     border-left: 2px solid var(--line);
-    display: flex; flex-direction: column; gap: 9px;
+    display: flex; flex-direction: column; gap: 8px;
   }
   .nav-group-label {
-    font-family: var(--techno); font-size: 14px; font-weight: 700; letter-spacing: 0.18em;
+    font-family: var(--techno); font-size: 13px; font-weight: 700; letter-spacing: 0.18em;
     text-transform: uppercase; color: var(--muted);
-    margin: 24px 0 12px 16px;
+    margin: 18px 0 10px 16px;
   }
-  .nav-sub .nav-item { padding: 11px 14px; font-size: 18px; }
-  .nav-sub .nav-item.active { font-size: 26px; }
+  .nav-sub .nav-item { padding: 9px 14px; font-size: 17px; }
+  .nav-sub .nav-item.active { font-size: 23px; }
 
   .sidebar-foot {
-    margin-top: auto; padding-top: 26px;
+    margin-top: auto; padding-top: 22px;
     font-family: var(--mono); font-size: 11px; color: var(--muted-2);
     letter-spacing: 0.04em; line-height: 1.7;
   }
@@ -160,22 +169,12 @@
   /* ---------- Stage ---------- */
   .stage { flex: 1; position: relative; overflow: hidden; }
 
-  .progress {
-    position: absolute; top: 0; left: 0; right: 0; height: 2px;
-    background: rgba(255,255,255,0.05); z-index: 5;
-  }
-  .progress > span {
-    display: block; height: 100%; width: 0;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
-    transition: width .5s cubic-bezier(.22,1,.36,1);
-  }
-
   .slides { position: absolute; inset: 0; }
 
   .slide {
     position: absolute; inset: 0;
     display: flex; flex-direction: column; justify-content: flex-start;
-    padding: 7vh 7vw 13vh;
+    padding: 14vh 7vw 7vh;
     opacity: 0; visibility: hidden; transform: translateY(22px);
     transition: opacity .55s ease, transform .55s cubic-bezier(.22,1,.36,1), visibility .55s;
     pointer-events: none;
@@ -204,12 +203,13 @@
     font-size: clamp(42px, 6.2vw, 92px); font-weight: 600;
     line-height: 1.02; letter-spacing: -0.025em; max-width: 16ch;
   }
-  .slide h2 .hl { color: var(--accent); }
+  .slide h2 .hl  { color: var(--accent); }
   .slide h2 .hl2 { color: var(--accent-2); }
+  .slide h2 .hl3 { color: var(--accent-3); }
 
   .lead {
     font-size: clamp(18px, 2vw, 26px); color: var(--muted);
-    line-height: 1.5; max-width: 40ch; margin-top: 28px; font-weight: 400;
+    line-height: 1.5; max-width: 42ch; margin-top: 28px; font-weight: 400;
   }
   .lead strong { color: var(--cream); font-weight: 500; }
 
@@ -222,39 +222,80 @@
     padding: 9px 18px; background: rgba(255,255,255,0.02);
   }
   .tool .dot { color: var(--accent); margin-right: 8px; }
+  .tools .tool:nth-child(3n+2) .dot { color: var(--accent-2); }
+  .tools .tool:nth-child(3n+3) .dot { color: var(--accent-3); }
+  .tools .tool:nth-child(3n+2):hover { border-color: color-mix(in srgb, var(--accent-2) 45%, transparent); }
+  .tools .tool:nth-child(3n+3):hover { border-color: color-mix(in srgb, var(--accent-3) 45%, transparent); }
 
   /* card row */
-  .cards { display: grid; gap: 22px; margin-top: 44px; }
+  .cards { display: grid; gap: 22px; margin-top: 40px; }
   .cards.two { grid-template-columns: repeat(2, 1fr); max-width: 920px; }
   .cards.three { grid-template-columns: repeat(3, 1fr); max-width: 1100px; }
   .cards.four { grid-template-columns: repeat(4, 1fr); max-width: 1320px; gap: 18px; }
   .cards.four .card { padding: 26px 22px; }
   .cards.four .card h3 { font-size: 24px; }
 
-  .card {
-    border: 1px solid var(--line); border-radius: 18px;
-    padding: 30px 28px; background: rgba(255,255,255,0.022);
-    transition: transform .4s cubic-bezier(.22,1,.36,1), border-color .4s, background .4s;
+  /* horizontal flow row: cards linked by arrows (team slide) */
+  .cards-flow {
+    display: flex; align-items: stretch; gap: 12px;
+    margin-top: 40px; max-width: 1320px;
   }
+  .cards-flow .card { flex: 1 1 0; padding: 26px 20px; }
+  .cards-flow .card h3 { font-size: 23px; }
+  .cards-flow .card:nth-of-type(3n+2) { --c: var(--accent-2); }
+  .cards-flow .card:nth-of-type(3n+3) { --c: var(--accent-3); }
+  .flow-arrow {
+    flex: 0 0 auto; align-self: center;
+    font-family: var(--mono); font-size: 26px; line-height: 1;
+    color: var(--muted);
+    display: flex; flex-direction: column; align-items: center; gap: 3px;
+  }
+  /* the last link is a two-way loop between DEV and QA */
+  .flow-arrow--bi { font-size: 23px; }
+  .flow-arrow--bi .fwd { color: var(--accent-3); }
+  .flow-arrow--bi .back { color: var(--accent); }
+
+  .card {
+    --c: var(--accent);
+    position: relative; overflow: hidden;
+    border: 1px solid var(--line); border-radius: 18px;
+    padding: 28px 26px; background: rgba(255,255,255,0.022);
+    transition: transform .4s cubic-bezier(.22,1,.36,1), border-color .4s, background .4s, box-shadow .4s;
+  }
+  /* each card in a row picks the next accent — gold · coral · cyan */
+  .cards .card:nth-child(3n+2) { --c: var(--accent-2); }
+  .cards .card:nth-child(3n+3) { --c: var(--accent-3); }
+  /* thin accent rule along the top, revealed on hover */
+  .card::before {
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: var(--c); transform: scaleX(0); transform-origin: left center;
+    transition: transform .45s cubic-bezier(.22,1,.36,1);
+  }
+  .card:hover::before { transform: scaleX(1); }
   .slide.active .card { animation: rise .6s cubic-bezier(.22,1,.36,1) both; }
   .slide.active .card:nth-child(2) { animation-delay: .08s; }
   .slide.active .card:nth-child(3) { animation-delay: .16s; }
   .slide.active .card:nth-child(4) { animation-delay: .24s; }
   @keyframes rise { from { opacity: 0; transform: translateY(18px); } to { opacity: 1; transform: none; } }
 
-  .card:hover { border-color: rgba(245,184,61,0.4); background: rgba(245,184,61,0.04); transform: translateY(-4px); }
-  .card .idx {
-    font-family: var(--mono); font-size: 13px; color: var(--accent);
-    margin-bottom: 18px; letter-spacing: 0.05em;
+  .card:hover {
+    border-color: color-mix(in srgb, var(--c) 55%, transparent);
+    background: color-mix(in srgb, var(--c) 6%, transparent);
+    transform: translateY(-4px);
+    box-shadow: 0 18px 44px -24px var(--c);
   }
-  .card h3 { font-size: 27px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 12px; }
-  .card p { color: var(--muted); font-size: 16px; line-height: 1.55; }
+  .card .idx {
+    font-family: var(--mono); font-size: 13px; color: var(--c);
+    margin-bottom: 16px; letter-spacing: 0.05em;
+  }
+  .card h3 { font-size: 26px; font-weight: 600; letter-spacing: -0.015em; margin-bottom: 12px; }
+  .card p { color: #C7C3BB; font-size: 16px; line-height: 1.55; }
 
   /* command blocks (slide /loop /goal) */
-  .commands { display: flex; flex-direction: column; gap: 26px; margin-top: 48px; max-width: 1000px; }
+  .commands { display: flex; flex-direction: column; gap: 24px; margin-top: 44px; max-width: 1000px; }
   .command {
     display: flex; align-items: baseline; gap: 28px;
-    padding-bottom: 26px; border-bottom: 1px solid var(--line);
+    padding-bottom: 24px; border-bottom: 1px solid var(--line);
   }
   .command:last-child { border-bottom: none; }
   .command .cmd {
@@ -262,6 +303,8 @@
     font-size: clamp(32px, 4.6vw, 64px); letter-spacing: -0.02em;
     color: var(--accent); flex: 0 0 auto; min-width: 5ch;
   }
+  .commands .command:nth-child(3n+2) .cmd { color: var(--accent-2); }
+  .commands .command:nth-child(3n+3) .cmd { color: var(--accent-3); }
   .command .desc { font-size: clamp(18px, 2vw, 28px); color: var(--cream); line-height: 1.4; font-weight: 400; }
 
   /* example label */
@@ -273,10 +316,54 @@
   .example b { color: var(--cream); font-weight: 500; }
 
   .footnote {
-    margin-top: 40px; font-family: var(--mono); font-size: 13px;
-    color: var(--muted-2); letter-spacing: 0.04em; max-width: 60ch; line-height: 1.7;
+    margin-top: 36px; font-family: var(--mono); font-size: 13px;
+    color: var(--muted); letter-spacing: 0.04em; max-width: 64ch; line-height: 1.7;
   }
   .footnote .accent { color: var(--accent); }
+
+  /* ---------- Proof slide: real metrics + screenshots ---------- */
+  .slide.proof { padding-top: 9vh; }
+  .slide.proof h2 { font-size: clamp(34px, 4.4vw, 60px); }
+
+  .stats { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 24px; max-width: 1320px; }
+  .stat {
+    flex: 1 1 0; min-width: 150px;
+    border: 1px solid var(--line); border-radius: 14px;
+    padding: 16px 18px; background: rgba(255,255,255,0.022);
+  }
+  .stat b {
+    display: block; font-family: var(--mono); font-weight: 600;
+    font-size: clamp(22px, 2.4vw, 32px); letter-spacing: -0.01em; color: var(--c, var(--accent));
+  }
+  .stat span {
+    display: block; margin-top: 6px; font-size: 12.5px; line-height: 1.4; color: var(--muted);
+  }
+  .stats .stat:nth-child(3n+2) { --c: var(--accent-2); }
+  .stats .stat:nth-child(3n+3) { --c: var(--accent-3); }
+
+  .shots { display: flex; gap: 16px; margin-top: 22px; max-width: 1320px; }
+  .shot {
+    flex: 1 1 0; min-width: 0;
+    border: 1px solid var(--line); border-radius: 12px; overflow: hidden;
+    background: var(--ink-2);
+    transition: transform .35s cubic-bezier(.22,1,.36,1), border-color .35s, box-shadow .35s;
+  }
+  .shot img {
+    display: block; width: 100%; height: 34vh;
+    object-fit: contain; object-position: center top; background: var(--ink-2);
+  }
+  .shot figcaption {
+    font-family: var(--mono); font-size: 12px; color: var(--muted);
+    padding: 9px 12px; border-top: 1px solid var(--line); letter-spacing: 0.02em;
+  }
+  .shot figcaption b { color: var(--c, var(--accent)); font-weight: 600; }
+  .shots .shot:nth-child(3n+2) { --c: var(--accent-2); }
+  .shots .shot:nth-child(3n+3) { --c: var(--accent-3); }
+  .shot:hover {
+    transform: translateY(-4px);
+    border-color: color-mix(in srgb, var(--c, var(--accent)) 55%, transparent);
+    box-shadow: 0 18px 44px -24px var(--c, var(--accent));
+  }
 
   /* counter */
   .counter {
@@ -298,9 +385,9 @@
 
   /* ---------- Timeline ---------- */
   .timeline {
-    position: absolute; left: 150px; right: 130px; bottom: 30px; z-index: 6;
+    position: absolute; left: 64px; right: 64px; top: 26px; z-index: 6;
     height: 42px;
-    opacity: 0; transform: translateY(12px);
+    opacity: 0; transform: translateY(-12px);
     transition: opacity .6s ease, transform .6s cubic-bezier(.22,1,.36,1);
     pointer-events: none;
   }
@@ -311,7 +398,7 @@
   }
   .timeline .tl-fill {
     position: absolute; left: 0; top: 0; height: 100%; width: 0;
-    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    background: linear-gradient(90deg, var(--accent), var(--accent-2) 60%, var(--accent-3));
     border-radius: 2px; box-shadow: 0 0 10px rgba(245,184,61,0.35);
     transition: width .5s cubic-bezier(.22,1,.36,1);
   }
@@ -326,11 +413,11 @@
     transition: background .35s ease, border-color .35s ease, transform .35s ease, box-shadow .35s ease;
   }
   .tl-node .tl-date {
-    font-family: var(--mono); font-size: 11px; color: var(--muted-2);
+    font-family: var(--mono); font-size: 11px; color: var(--muted);
     letter-spacing: 0.03em; white-space: nowrap; transition: color .35s ease;
   }
   .tl-node:hover .tl-dot { border-color: var(--accent); }
-  .tl-node:hover .tl-date { color: var(--muted); }
+  .tl-node:hover .tl-date { color: var(--cream); }
   .tl-node.done .tl-dot { border-color: var(--accent); background: rgba(245,184,61,0.30); }
   .tl-node.active .tl-dot {
     background: var(--accent); border-color: var(--accent);
@@ -374,7 +461,7 @@
   .intro h1 .dim { color: var(--muted-2); }
   .intro .sub {
     font-size: clamp(18px, 2.2vw, 30px); color: var(--muted);
-    line-height: 1.45; max-width: 44ch; margin-top: 34px; font-weight: 400;
+    line-height: 1.45; max-width: 52ch; margin-top: 34px; font-weight: 400;
   }
   .intro .sub strong { color: var(--cream); font-weight: 500; }
   .intro .cta {
@@ -384,6 +471,30 @@
   }
   .intro .cta .arrow-i { animation: nudge 1.5s ease-in-out infinite; }
   @keyframes nudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(7px); } }
+
+  /* ---------- Lightbox (zoom screenshots) ---------- */
+  .shot img { cursor: zoom-in; }
+  .lightbox {
+    position: fixed; inset: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: center;
+    padding: 4vh 4vw; background: rgba(5,5,8,0.92);
+    opacity: 0; pointer-events: none; cursor: zoom-out;
+    transition: opacity .3s ease;
+    -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  }
+  .lightbox.open { opacity: 1; pointer-events: auto; }
+  .lightbox img {
+    max-width: 96vw; max-height: 92vh;
+    border: 1px solid var(--line); border-radius: 10px;
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,0.8);
+  }
+  .lightbox .lb-close {
+    position: absolute; top: 20px; right: 26px;
+    font-family: var(--mono); font-size: 26px; color: var(--cream);
+    background: none; border: none; cursor: pointer; line-height: 1;
+    transition: color .2s ease;
+  }
+  .lightbox .lb-close:hover { color: var(--accent); }
 </style>
 </head>
 <body>
@@ -395,7 +506,7 @@
   <h1><span class="dim">From</span> <span class="hl">Prompting</span> <span class="dim">to</span> <span class="hl2">Agents</span> <span class="hl3">Harness</span><span class="dim">es</span></h1>
   <p class="sub" style="max-width: 70ch;">
     L'histoire du codage assisté par IA<br />
-    <strong>Création du harness ultime d'agents de codage spec-driven</strong>
+    <strong>De l'autocomplétion au harness spec-driven que l'on bâtit soi-même.</strong>
   </p>
   <div class="cta">Commencer ... <span class="arrow-i">→</span></div>
 </section>
@@ -405,7 +516,7 @@
   <aside class="sidebar">
     <div class="brand">
       <div class="kicker">Talk · Juin 2026</div>
-      <h1 style="font-size: 30px;">From <em>Prompting</em> to Agents <em>Harness</em>es</h1>
+      <h1><span class="dim">From</span> <span class="hl">Prompting</span> <span class="dim">to</span><br/> <span class="hl2">Agents</span> <span class="hl3">Harness</span><span class="dim">es</span></h1>
       <i>L'histoire du <em>codage assisté</em> par IA</i>
     </div>
 
@@ -419,15 +530,13 @@
 
   <!-- STAGE -->
   <main class="stage">
-    <div class="progress"><span id="progressbar"></span></div>
-
     <div class="slides" id="slides">
 
       <!-- 1 -->
       <section class="slide" data-title="Les Débuts" data-date="nov. '22" data-t="2022.85">
         <div class="ghost">01</div>
         <div class="eyebrow">01 — GPT-3.5 · les débuts</div>
-        <h2>Le <span class="hl">début</span> du code par IA</h2>
+        <h2>Le <span class="hl">début</span> du <span class="hl2">code</span> par <span class="hl3">IA</span></h2>
         <p class="lead">Novembre 2022, <strong>GPT-3.5</strong>&nbsp;; quelques mois plus tard, <strong>GPT-4</strong>. L'IA générative entre dans le quotidien du développeur.</p>
         <div class="cards two">
           <div class="card">
@@ -447,8 +556,8 @@
       <section class="slide" data-title="Agents" data-date="2023" data-t="2023.5">
         <div class="ghost">02</div>
         <div class="eyebrow">02 — Les agents de codage</div>
-        <h2>L'agent prend le <span class="hl">clavier</span></h2>
-        <p class="lead">L'agent s'intègre à l'<strong>IDE</strong> avec <strong>Copilot</strong> et <strong>Cursor</strong>, puis s'émancipe dans le <strong>terminal</strong> avec <strong>Claude Code</strong>, puis et le <strong>cloud</strong> avec <strong>Codex</strong>. <br/>Il propose une approche décomposée en deux temps :</p>
+        <h2>L'<span class="hl3">agent</span> prend le <span class="hl">clavier</span></h2>
+        <p class="lead">L'agent s'intègre à l'<strong>IDE</strong> avec <strong>Copilot</strong> et <strong>Cursor</strong>, puis s'émancipe dans le <strong>terminal</strong> avec <strong>Claude Code</strong>, et jusqu'au <strong>cloud</strong> avec <strong>Codex</strong>.<br/>Il propose une approche décomposée en deux temps&nbsp;:</p>
         <div class="cards two">
           <div class="card">
             <div class="idx">/ étape 1</div>
@@ -464,12 +573,17 @@
       </section>
 
       <!-- 3 -->
-      <section class="slide" data-title="Harness d'agents" data-date="2024" data-t="2024.4">
+      <section class="slide" data-title="Harness d'agents" data-date="2025" data-t="2025.0">
         <div class="ghost">03</div>
         <div class="eyebrow">03 — Plus d'autonomie</div>
-        <h2>Les Harnesses <br/><span class="hl">des agents</span> plus autonomes</h2>
-        <p class="lead">— exemple&nbsp;: <strong>Claude Code</strong>.<br/>L'agent ne fait pas que coder&nbsp;: <br/>Boucle <strong>ReAct</strong> le pousse à <strong>agir, vérifier</strong> et <strong>corriger</strong> —  linter, compilation, tests unitaires et e2e.</p>
+        <h2>Les <span class="hl3">Harnesses</span> <br/><span class="hl2">des agents</span> plus <span class="hl">autonomes</span></h2>
+        <p class="lead">— exemple&nbsp;: <strong>Claude Code</strong>.<br/>L'agent ne fait pas que coder&nbsp;: <br/>une boucle <strong>ReAct</strong> le pousse à <strong>agir, vérifier</strong> et <strong>corriger</strong> — linter, compilation, tests unitaires et e2e.</p>
         <div class="cards four">
+          <div class="card">
+            <div class="idx">↳ outiller</div>
+            <h3>Skills</h3>
+            <p>Des compétences décorrélées des agents, mobilisables à la demande.</p>
+          </div>
           <div class="card">
             <div class="idx">↳ déléguer</div>
             <h3>Sub-agents</h3>
@@ -485,20 +599,15 @@
             <h3>Dynamic workflows</h3>
             <p>Des flux qui s'adaptent en temps réel&nbsp;: fan-out, vérification, synthèse.</p>
           </div>
-          <div class="card">
-            <div class="idx">↳ outiller</div>
-            <h3>Skills</h3>
-            <p>Des compétences décorrélées des agents, mobilisables à la demande.</p>
-          </div>
         </div>
       </section>
 
       <!-- 4 -->
-      <section class="slide" data-title="Spec Driven Development" data-date="2025" data-t="2025.2">
+      <section class="slide" data-title="Spec Driven Development" data-date="2025" data-t="2025.5">
         <div class="ghost">04</div>
         <div class="eyebrow">04 — Le changement de paradigme</div>
-        <h2>Spec Driven <span class="hl">Development</span></h2>
-        <p class="lead">Le grand retour du <strong>cycle en V</strong>&nbsp;: coder et tester de moins en moins, spécifier de plus en plus. On définit un but&nbsp;— <strong>l'agent décide du comment</strong>.</p>
+        <h2><span class="hl">Spec</span> <span class="hl2">Driven</span> <span class="hl3">Development</span></h2>
+        <p class="lead">Le curseur se déplace&nbsp;: <strong>spécifier de plus en plus</strong>, coder et débugguer de moins en moins. On définit un but&nbsp;— <strong>l'agent décide du comment</strong>.</p>
         <div class="tools">
           <span class="tool"><span class="dot">◆</span>BMAD Method</span>
           <span class="tool"><span class="dot">◆</span>SpecKit</span>
@@ -517,11 +626,12 @@
       </section>
 
       <!-- 5 -->
-      <section class="slide" data-title="Révolution OpenClaw" data-date="fin '25" data-t="2025.8">
+      <section class="slide" data-title="Révolution OpenClaw" data-date="2026" data-t="2026.0">
         <div class="ghost">05</div>
         <div class="eyebrow">05 — La révolution OpenClaw</div>
-        <h2>Vers des agents <span class="hl">proactifs et adaptatifs</span></h2>
-        <div class="example"><span>exemples —</span> <b>OpenClaw</b> · <b>Hermes Agent</b></div>
+        <h2>Vers des <span class="hl3">agents</span> <span class="hl">proactifs</span> et <span class="hl2">adaptatifs</span></h2>
+        <p class="lead">Une nouvelle génération de harness qui <strong>choisissent eux-mêmes</strong> les agents à mobiliser et <strong>apprennent de vous</strong> au fil des sessions.</p>
+        <div class="example"><span>harness émergents —</span> <b>OpenClaw</b> · <b>Hermes Agent</b></div>
         <div class="cards two">
           <div class="card">
             <div class="idx">/ orchestration</div>
@@ -536,16 +646,41 @@
         </div>
       </section>
 
-      <!-- 6 -->
-      <section class="slide" data-title="Autospec — La vision" data-date="2026" data-t="2026.2">
+      <!-- 6 — bridge: why build your own -->
+      <section class="slide" data-title="Pourquoi un harness maison" data-date="2026" data-t="2026.15">
         <div class="ghost">06</div>
-        <div class="eyebrow">06 — Créer son propre harness</div>
-        <h2>Projet <span class="hl">Autospec</span></h2>
+        <div class="eyebrow">06 — Le pivot</div>
+        <h2>Pourquoi le <span class="hl">bâtir</span> soi-même&nbsp;?</h2>
+        <p class="lead">Ces harness existent&nbsp;— mais ils sont <strong>génériques</strong>. Un harness maison encode <strong>votre</strong> méthode, <strong>vos</strong> garde-fous, et garde specs et code <strong>chez vous</strong>.</p>
+        <div class="cards three">
+          <div class="card">
+            <div class="idx">/ contrôle</div>
+            <h3>Méthode encodée</h3>
+            <p>Vos process et vos standards de qualité vivent dans la boucle&nbsp;— pas dans des prompts jetables.</p>
+          </div>
+          <div class="card">
+            <div class="idx">/ souveraineté</div>
+            <h3>Données maîtrisées</h3>
+            <p>Specs, code et contexte restent dans votre périmètre&nbsp;— pas de boîte noire externe.</p>
+          </div>
+          <div class="card">
+            <div class="idx">/ coût</div>
+            <h3>Pile choisie</h3>
+            <p>Vous arbitrez modèle, outillage et budget tokens selon vos propres contraintes.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- 7 — Autospec vision -->
+      <section class="slide" data-title="Autospec — La vision" data-group="Autospec" data-date="2026" data-t="2026.3">
+        <div class="ghost">07</div>
+        <div class="eyebrow">07 — Créer son propre harness</div>
+        <h2>Projet <span class="hl">Auto</span><span class="hl3">spec</span></h2>
         <p class="lead">Construire soi-même un harness pour produire du logiciel <strong>à partir de spécifications</strong>. Tout ce qu'on a vu&nbsp;— mais qu'on bâtit nous-mêmes.</p>
         <div class="cards two">
           <div class="card">
             <div class="idx">/ principe</div>
-            <h3>Méthodologie top-bottom</h3>
+            <h3>Méthodologie top-down</h3>
             <p>Injecter une démarche descendante&nbsp;: du besoin vers le code, étape par étape.</p>
           </div>
           <div class="card">
@@ -556,30 +691,92 @@
         </div>
       </section>
 
-      <!-- 7 -->
-      <section class="slide" data-title="Autospec — L'architecture" data-date="juin '26" data-t="2026.45">
-        <div class="ghost">06</div>
-        <div class="eyebrow">06 — Projet AutoSpec · l'équipe</div>
-        <h2>Une <span class="hl">équipe d'agents</span> préconfigurés</h2>
+      <!-- 8 — Autospec architecture / team -->
+      <section class="slide" data-title="Autospec — L'architecture" data-group="Autospec" data-date="juin '26" data-t="2026.45">
+        <div class="ghost">08</div>
+        <div class="eyebrow">08 — Projet AutoSpec · l'équipe</div>
+        <h2>Une <span class="hl2">équipe</span> d'<span class="hl3">agents</span> <span class="hl">préconfigurés</span></h2>
         <p class="lead">Des rôles issus de <strong>BMAD Method</strong>, enchaînés du cadrage jusqu'au code testé.</p>
-        <div class="cards three">
+        <div class="cards-flow">
           <div class="card">
             <div class="idx">PM · Product Manager</div>
             <h3>Définir</h3>
             <p>Rédige le brief et cadre le besoin&nbsp;: le quoi et le pourquoi.</p>
           </div>
+          <span class="flow-arrow">→</span>
           <div class="card">
             <div class="idx">PO · Product Owner</div>
             <h3>Découper</h3>
             <p>Structure et priorise en <b>EPIC</b> &amp; <b>US</b>, écrit les critères et tests d'acceptance.</p>
           </div>
+          <span class="flow-arrow">→</span>
           <div class="card">
             <div class="idx">DEV · Test-Driven</div>
             <h3>Construire</h3>
             <p>Contrats BDD d'abord, puis full <b>TDD</b>&nbsp;: tests → code → exécution, en boucles de rétroaction.</p>
           </div>
+          <span class="flow-arrow flow-arrow--bi"><span class="fwd">→</span><span class="back">←</span></span>
+          <div class="card">
+            <div class="idx">QA · Quality Assurance</div>
+            <h3>Valider</h3>
+            <p>Tests automatisés de bout en bout&nbsp;: scénarios <b>e2e</b> pilotés par <b>Playwright</b>, jusqu'au feu vert.</p>
+          </div>
         </div>
         <p class="footnote"><span class="accent">→</span> L'intelligence organisationnelle vit dans la boucle agentique, pas dans la tête de l'opérateur.</p>
+      </section>
+
+      <!-- 9 — proof / demo -->
+      <section class="slide proof" data-title="Autospec — La preuve" data-group="Autospec" data-date="juin '26" data-t="2026.55">
+        <div class="ghost">09</div>
+        <div class="eyebrow">09 — Autospec en action</div>
+        <h2>De la <span class="hl">spec</span> au <span class="hl3">code testé</span></h2>
+        <div class="stats">
+          <div class="stat"><b>13 / 13 US</b><span>livrées sur 2 itérations · 5 epics</span></div>
+          <div class="stat"><b>≈ 461k tok</b><span>31 appels d'agents</span></div>
+          <div class="stat"><b>≈ $20,7</b><span>coût total des 2 itérations</span></div>
+          <div class="stat"><b>100% vert</b><span>critères d'acceptance · BDD/Gherkin généré</span></div>
+        </div>
+        <div class="shots">
+          <figure class="shot">
+            <img src="assets/autospec-activity.png" alt="Vue Activity d'Autospec : les user stories progressent dans un pipeline en 8 étapes, de Queue à Done." loading="lazy" />
+            <figcaption><b>Activity</b> · pipeline 8 étapes, US Queue → Done</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="assets/autospec-vision.png" alt="Vue Product vision : une user story avec ses critères d'acceptance au vert et le scénario Gherkin généré." loading="lazy" />
+            <figcaption><b>Product vision</b> · critères verts + BDD Gherkin</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="assets/autospec-iterations.png" alt="Vue Iterations : deux itérations livrées avec coût, tokens et appels d'agents." loading="lazy" />
+            <figcaption><b>Iterations</b> · 2 itérations livrées, coût &amp; tokens tracés</figcaption>
+          </figure>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Brief en entrée, US découpées, BDD puis TDD, e2e Playwright&nbsp;: le pipeline mène la spec jusqu'au code testé, coût et tokens tracés à chaque étape.</p>
+      </section>
+
+      <!-- 10 — takeaways / close -->
+      <section class="slide" data-title="À retenir" data-date="→" data-t="2026.65">
+        <div class="ghost">10</div>
+        <div class="eyebrow">10 — À retenir</div>
+        <h2><span class="hl">Spécifier</span>, et laisser <span class="hl3">faire</span></h2>
+        <p class="lead">Du copier-coller au spec-driven, la barre du «&nbsp;comment&nbsp;» monte vers l'agent. Ce qui vous distingue&nbsp;: la <strong>méthode encodée</strong> dans la boucle.</p>
+        <div class="cards three">
+          <div class="card">
+            <div class="idx">/ 01</div>
+            <h3>Une trajectoire</h3>
+            <p>Du chatbot au harness spec-driven, une autonomie croissante en quelques années.</p>
+          </div>
+          <div class="card">
+            <div class="idx">/ 02</div>
+            <h3>La méthode gagne</h3>
+            <p>Le différenciateur n'est plus le code&nbsp;: c'est le process encodé dans l'agent.</p>
+          </div>
+          <div class="card">
+            <div class="idx">/ 03</div>
+            <h3>À vous de jouer</h3>
+            <p>Autospec montre qu'un harness maison est aujourd'hui à portée de main.</p>
+          </div>
+        </div>
+        <p class="footnote"><span class="accent">→</span> Le dépôt est ouvert&nbsp;· construisez le vôtre.</p>
       </section>
 
     </div>
@@ -593,42 +790,55 @@
       <button class="arrow" id="prev" aria-label="Précédent">←</button>
       <button class="arrow" id="next" aria-label="Suivant">→</button>
     </div>
-    <div class="counter"><b id="cur">01</b> / <span id="total">07</span></div>
+    <div class="counter"><b id="cur">01</b> / <span id="total">10</span></div>
   </main>
+</div>
+
+<!-- LIGHTBOX -->
+<div class="lightbox" id="lightbox">
+  <button class="lb-close" id="lbClose" aria-label="Fermer">✕</button>
+  <img id="lbImg" alt="" />
 </div>
 
 <script>
   const slides = Array.from(document.querySelectorAll('.slide'));
   const nav = document.getElementById('nav');
-  const progressbar = document.getElementById('progressbar');
   const curEl = document.getElementById('cur');
   const totalEl = document.getElementById('total');
   const prevBtn = document.getElementById('prev');
   const nextBtn = document.getElementById('next');
 
-  // Build sidebar: items 1-5 standalone, 6-7 grouped under "Software factory"
-  const meta = slides.map((s, i) => ({ i, title: s.dataset.title }));
-  const standalone = meta.slice(0, 5);
-  const grouped = meta.slice(5);
+  // Build sidebar, order-preserving: standalone items + a grouped block (data-group).
+  const meta = slides.map((s, i) => ({ i, title: s.dataset.title, group: s.dataset.group || '' }));
 
-  let html = '';
-  standalone.forEach(m => {
-    html += `<button class="nav-item" data-idx="${m.i}">
-      <span class="num">0${m.i + 1}</span><span class="label">${m.title}</span></button>`;
+  let html = '', inGroup = false, groupCount = 0;
+  meta.forEach(m => {
+    if (m.group && !inGroup) {
+      const n = String(m.i + 1).padStart(2, '0');
+      html += `<div class="nav-group-label">${n} · ${m.group}</div><div class="nav-sub">`;
+      inGroup = true; groupCount = 0;
+    } else if (!m.group && inGroup) {
+      html += `</div>`;
+      inGroup = false;
+    }
+    if (inGroup) {
+      groupCount++;
+      const sub = m.title.split('—').pop().trim();
+      html += `<button class="nav-item" data-idx="${m.i}">
+        <span class="num">.${groupCount}</span><span class="label">${sub}</span></button>`;
+    } else {
+      const n = String(m.i + 1).padStart(2, '0');
+      html += `<button class="nav-item" data-idx="${m.i}">
+        <span class="num">${n}</span><span class="label">${m.title}</span></button>`;
+    }
   });
-  html += `<div class="nav-group-label">06 · Software factory</div><div class="nav-sub">`;
-  grouped.forEach((m, k) => {
-    const sub = m.title.split('—').pop().trim();
-    html += `<button class="nav-item" data-idx="${m.i}">
-      <span class="num">.${k + 1}</span><span class="label">${sub}</span></button>`;
-  });
-  html += `</div>`;
+  if (inGroup) html += `</div>`;
   nav.innerHTML = html;
 
   const navItems = Array.from(nav.querySelectorAll('.nav-item'));
   totalEl.textContent = String(slides.length).padStart(2, '0');
 
-  // Build the bottom timeline — nodes spaced proportionally to their real date.
+  // Build the timeline — nodes spaced proportionally to their real date.
   const timeline = document.getElementById('timeline');
   const tlFill = document.getElementById('tlFill');
   const stamps = slides.map((s, i) => ({
@@ -656,7 +866,6 @@
     current = Math.max(0, Math.min(slides.length - 1, n));
     slides.forEach((s, i) => s.classList.toggle('active', i === current));
     navItems.forEach(it => it.classList.toggle('active', +it.dataset.idx === current));
-    progressbar.style.width = ((current + 1) / slides.length * 100) + '%';
     curEl.textContent = String(current + 1).padStart(2, '0');
     prevBtn.disabled = current === 0;
     nextBtn.disabled = current === slides.length - 1;
@@ -685,14 +894,29 @@
   }
   intro.addEventListener('click', enterDeck);
 
+  // Lightbox: click a screenshot to view it full-size.
+  const lightbox = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lbImg');
+  function openLightbox(src, alt) {
+    lbImg.src = src; lbImg.alt = alt || '';
+    lightbox.classList.add('open');
+  }
+  function closeLightbox() { lightbox.classList.remove('open'); }
+  document.querySelectorAll('.shot img').forEach(img => {
+    img.addEventListener('click', () => openLightbox(img.currentSrc || img.src, img.alt));
+  });
+  lightbox.addEventListener('click', closeLightbox);
+
   document.addEventListener('keydown', e => {
+    // Lightbox open: Escape (or any key) closes it, nothing else navigates.
+    if (lightbox.classList.contains('open')) { e.preventDefault(); closeLightbox(); return; }
     // Any key on the cover enters the deck (and doesn't navigate behind it).
     if (introOpen) { e.preventDefault(); enterDeck(); return; }
     if (e.key === 'ArrowRight' || e.key === 'PageDown' || e.key === ' ') { e.preventDefault(); go(current + 1); }
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); go(current - 1); }
     else if (e.key === 'Home') go(0);
     else if (e.key === 'End') go(slides.length - 1);
-    else if (/^[1-7]$/.test(e.key)) go(+e.key - 1);
+    else if (/^[1-9]$/.test(e.key)) go(+e.key - 1);
   });
 
   go(0);

@@ -1875,6 +1875,9 @@ class Pipeline:
                 if self._stop_requested:
                     break
                 await self._abuild_phase()
+                # Runnability gate: boot the delivered app; a non-runnable build
+                # fails the iteration like a red test (no-op unless AUTOSPEC_SMOKE_RUN).
+                await self._asmoke_phase()
                 await self._adocument_phase()
                 # Closed-loop product evaluation (E6): exercise the delivered
                 # iteration and feed findings into the impact pipeline.
@@ -3712,6 +3715,124 @@ class Pipeline:
             ok=ok, summary=(output or "")[-500:],
         )
         return ok, output, results
+
+    # ------------------------------------------------- Smoke-run gate (runnability)
+
+    async def _asmoke_phase(self) -> None:
+        """Deterministic runnability gate (``AUTOSPEC_SMOKE_RUN``): once the suite
+        is green, actually BOOT the delivered app and require it to start, so a
+        non-runnable build fails the iteration like a red test (raises → the
+        lifecycle ends ERROR). No-op when off / demo mode / nothing delivered.
+
+        Catches the exact gap a passing test suite misses: e.g. a ``main.py`` that
+        only prints launch instructions instead of starting the server."""
+        if not settings.smoke_run or settings.fake_agents:
+            return
+        if not any(s.status == StoryStatus.DONE for s in self.state.stories):
+            return
+        lang = toolchain.normalize(self.state.backend_language.value)
+        ws = workspace_dir(self.state.id)
+        if lang != "python" or not (ws / "main.py").exists() or not (ws / "pyproject.toml").exists():
+            self._log("smoke", f"Smoke run ignoré (langage {lang} non supporté ou pas de main.py).")
+            return
+        self.monitor.phase("smoke")
+        self._log("smoke", "🚀 Smoke run : démarrage de l'application livrée…")
+        ok, detail = await asyncio.to_thread(self._smoke_run_python, ws)
+        self.monitor.event("smoke", ok=ok, detail=detail[:300])
+        if ok:
+            self._log("smoke", f"✅ Smoke run OK — {detail}")
+            self._chat(ChatRole.SYSTEM, f"🚀 Smoke run : l'application démarre ({detail}).")
+            return
+        msg = f"Smoke run échoué : {detail}"
+        self._log("smoke", f"❌ {msg}")
+        self.state.regressions.append(msg)
+        self._notify("error", "Smoke run échoué", msg[:200])
+        # Fail the iteration like a red test — surfaced via the lifecycle handler.
+        raise RuntimeError(msg)
+
+    @staticmethod
+    def _terminate_tree(proc) -> None:
+        """Terminate a launched process and its children (the app may spawn a
+        server child). Windows needs a tree-kill; POSIX gets terminate→kill."""
+        if proc.poll() is not None:
+            return
+        try:
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/PID", str(proc.pid), "/T", "/F"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+                )
+            else:
+                proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        except OSError:
+            pass
+
+    def _smoke_run_python(self, ws: Path) -> tuple[bool, str]:
+        """Boot a Python project's entry point and check it is runnable.
+
+        Web/API app (its pyproject declares a web framework): ``uv run python
+        main.py`` must open a listening TCP port within the timeout. CLI: it must
+        exit 0 within the timeout. Returns (ok, human-readable detail)."""
+        import socket
+
+        text = (ws / "main.py").read_text(encoding="utf-8", errors="replace")
+        pyproject = (ws / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
+        is_web = any(
+            fw in pyproject
+            for fw in ("fastapi", "flask", "starlette", "uvicorn", "aiohttp", "django")
+        )
+        env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        cmd = self._resolve_cmd([settings.uv_cmd, "run", "python", "main.py"])
+        timeout = settings.smoke_run_timeout_s
+
+        if is_web:
+            m = re.search(r"port\s*=\s*(\d{4,5})", text)
+            port = int(m.group(1)) if m else settings.smoke_run_port
+            try:
+                proc = subprocess.Popen(
+                    cmd, cwd=str(ws), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                    env=env, text=True, encoding="utf-8", errors="replace",
+                )
+            except OSError as exc:
+                return False, f"lancement impossible : {exc}"
+            try:
+                deadline = time.monotonic() + timeout
+                while time.monotonic() < deadline:
+                    if proc.poll() is not None:
+                        out = (proc.stdout.read() if proc.stdout else "") or ""
+                        return False, (
+                            f"le process s'est arrêté (code {proc.returncode}) sans écouter "
+                            f"sur 127.0.0.1:{port} — main.py ne démarre pas le serveur ? "
+                            f"{out[-300:].strip()}"
+                        )
+                    with socket.socket() as s:
+                        s.settimeout(1.0)
+                        if s.connect_ex(("127.0.0.1", port)) == 0:
+                            return True, f"serveur à l'écoute sur 127.0.0.1:{port}"
+                    time.sleep(0.5)
+                return False, (
+                    f"aucun serveur à l'écoute sur 127.0.0.1:{port} après {timeout:.0f}s"
+                )
+            finally:
+                self._terminate_tree(proc)
+
+        # CLI: must run to completion with exit code 0.
+        try:
+            proc = subprocess.run(
+                cmd, cwd=str(ws), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                env=env, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return False, f"le CLI n'a pas terminé en {timeout:.0f}s (boucle/serveur bloquant ?)"
+        except OSError as exc:
+            return False, f"lancement impossible : {exc}"
+        if proc.returncode != 0:
+            return False, f"sortie non nulle (code {proc.returncode}) : {(proc.stdout or '')[-300:].strip()}"
+        return True, "CLI exécuté (code 0)"
 
     # ------------------------------------------------- Frontend stream (ST-7)
 
