@@ -27,26 +27,36 @@ import {
   usEffectiveStatus,
 } from "../types";
 import { LlmActivity } from "./LlmActivity";
+import { useI18n } from "../i18n/i18n";
 
-const STATUS_LABEL: Record<string, string> = {
-  todo: "À faire",
-  in_progress: "Dev en cours",
-  red: "Tests rouges",
-  green: "Tests verts",
-  done: "Terminé",
-  failed: "Échec",
-};
+/** Translate a work-item status to its display label. Resolved at render time so
+ * the active language applies. */
+function statusLabel(t: (key: string) => string, status: string): string {
+  const map: Record<string, string> = {
+    todo: t("board.status_todo"),
+    in_progress: t("board.status_in_progress"),
+    red: t("board.status_red"),
+    green: t("board.status_green"),
+    done: t("board.status_done"),
+    failed: t("board.status_failed"),
+  };
+  return map[status] ?? status;
+}
 
 /** A work item is actively being worked on (so its LLM calls should poll live). */
 function isLiveStatus(status: string): boolean {
   return status === "in_progress" || status === "red" || status === "green";
 }
 
-const TEST_STATE_LABEL: Record<TestState, string> = {
-  nonexistent: "inexistant",
-  red: "rouge",
-  green: "vert",
-};
+/** Translate a test state to its short label (resolved at render time). */
+function testStateLabel(t: (key: string) => string, state: TestState): string {
+  const map: Record<TestState, string> = {
+    nonexistent: t("board.testState_nonexistent"),
+    red: t("board.testState_red"),
+    green: t("board.testState_green"),
+  };
+  return map[state];
+}
 
 const TEST_STATE_ICON: Record<TestState, string> = {
   nonexistent: "○",
@@ -54,15 +64,27 @@ const TEST_STATE_ICON: Record<TestState, string> = {
   green: "●",
 };
 
-/** ST-12: per-stream-kind presentation (icon + short label). The colour is
- * driven by CSS via the `stream-badge-<kind>` class. */
-const STREAM_META: Record<StreamKind, { icon: string; label: string }> = {
-  backend: { icon: "⚙", label: "Backend" },
-  frontend: { icon: "🎨", label: "Frontend" },
-  cache: { icon: "⚡", label: "Cache" },
-  database: { icon: "🗄", label: "BDD" },
-  other: { icon: "📦", label: "Autre" },
+/** ST-12: per-stream-kind icon. The colour is driven by CSS via the
+ * `stream-badge-<kind>` class. */
+const STREAM_ICON: Record<StreamKind, string> = {
+  backend: "⚙",
+  frontend: "🎨",
+  cache: "⚡",
+  database: "🗄",
+  other: "📦",
 };
+
+/** ST-12: per-stream-kind short label, resolved at render time. */
+function streamLabel(t: (key: string) => string, kind: StreamKind): string {
+  const map: Record<StreamKind, string> = {
+    backend: t("board.stream_backend"),
+    frontend: t("board.stream_frontend"),
+    cache: t("board.stream_cache"),
+    database: t("board.stream_database"),
+    other: t("board.stream_other"),
+  };
+  return map[kind] ?? map.other;
+}
 
 /** Stops a click from bubbling up to a parent click handler. */
 const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
@@ -74,15 +96,17 @@ const stop = (e: { stopPropagation: () => void }) => e.stopPropagation();
  * non-default stream — a legacy project (no streams) never shows one.
  */
 function StreamBadge({ streamId, streams }: { streamId: string; streams: Stream[] }) {
+  const { t } = useI18n();
   const stream = streams.find((s) => s.id === streamId);
   const kind: StreamKind = stream?.kind ?? "other";
-  const meta = STREAM_META[kind] ?? STREAM_META.other;
-  const label = stream ? `${meta.icon} ${stream.id}` : `${meta.icon} ${meta.label}`;
+  const icon = STREAM_ICON[kind] ?? STREAM_ICON.other;
+  const kindLabel = streamLabel(t, kind);
+  const label = stream ? `${icon} ${stream.id}` : `${icon} ${kindLabel}`;
   return (
     <span
       className={`stream-badge stream-badge-${kind}`}
       data-testid={`stream-badge-${streamId}`}
-      title={`Stream « ${stream?.id ?? streamId} » (${meta.label})`}
+      title={t("board.streamBadge_title", { id: stream?.id ?? streamId, kind: kindLabel })}
     >
       {label}
     </span>
@@ -91,25 +115,31 @@ function StreamBadge({ streamId, streams }: { streamId: string; streams: Stream[
 
 /** ST-14: « bloquée par X » badge for a todo item with unmet dependencies. */
 function BlockedBadge({ blockers }: { blockers: string[] }) {
+  const { t } = useI18n();
   if (blockers.length === 0) return null;
   return (
     <span
       className="blocked-badge"
       data-testid="blocked-badge"
-      title="En attente d'une dépendance non terminée"
+      title={t("board.blocked_title")}
     >
-      ⛔ bloquée par {blockers.join(", ")}
+      ⛔ {t("board.blocked_label", { blockers: blockers.join(", ") })}
     </span>
   );
 }
 
 /** ST-14: merge-state hint — done = merged ✓, failed-on-conflict = ✗. */
 function MergeBadge({ status, lastError }: { status: StoryStatus; lastError?: string }) {
+  const { t } = useI18n();
   const state = mergeState(status, lastError);
   if (state === "merged") {
     return (
-      <span className="merge-badge merge-ok" data-testid="merge-badge" title="Code mergé">
-        ✓ mergé
+      <span
+        className="merge-badge merge-ok"
+        data-testid="merge-badge"
+        title={t("board.merge_ok_title")}
+      >
+        ✓ {t("board.merge_ok_label")}
       </span>
     );
   }
@@ -118,9 +148,9 @@ function MergeBadge({ status, lastError }: { status: StoryStatus; lastError?: st
       <span
         className="merge-badge merge-conflict"
         data-testid="merge-badge"
-        title="Échec sur conflit de merge inter-stream"
+        title={t("board.merge_conflict_title")}
       >
-        ✗ conflit de merge
+        ✗ {t("board.merge_conflict_label")}
       </span>
     );
   }
@@ -141,13 +171,16 @@ function IterationBadge({
   onOpen?: (iter: number) => void;
   compact?: boolean;
 }) {
-  const label = compact ? `it. ${iteration}` : `itération ${iteration}`;
+  const { t } = useI18n();
+  const label = compact
+    ? t("board.iteration_compact", { n: iteration })
+    : t("board.iteration_full", { n: iteration });
   if (!onOpen) return <span className="epic-iter">{label}</span>;
   return (
     <button
       type="button"
       className="epic-iter epic-iter-link"
-      title={`Voir l'itération ${iteration} dans la chronologie`}
+      title={t("board.iteration_title", { n: iteration })}
       onClick={(e) => {
         stop(e);
         onOpen(iteration);
@@ -187,11 +220,12 @@ function CriterionRow({
   story: UserStory;
   criterion: AcceptanceCriterion;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const state = criterionState(story, criterion);
   // `?? []` : robustesse face aux anciens états persistés sans ces champs.
-  const tests = (story.test_plan ?? []).filter((t) =>
-    (t.criteria ?? []).includes(criterion.id),
+  const tests = (story.test_plan ?? []).filter((tst) =>
+    (tst.criteria ?? []).includes(criterion.id),
   );
 
   return (
@@ -204,31 +238,32 @@ function CriterionRow({
         <span className={`state-dot state-${state}`}>{TEST_STATE_ICON[state]}</span>
         <span className="criterion-text">{criterion.text}</span>
         <span className={`state-tag state-${state}`} data-testid="criterion-state">
-          {TEST_STATE_LABEL[state]}
+          {testStateLabel(t, state)}
         </span>
         <span className="criterion-expander">{open ? "▾" : "▸"}</span>
       </div>
       {open && (
         <div className="criterion-body">
-          <h5>Tests d'acceptance ({tests.length})</h5>
+          <h5>{t("board.acceptanceTests_heading", { count: tests.length })}</h5>
           {tests.length === 0 ? (
-            <p className="placeholder small">
-              Aucun test unitaire rattaché — couvert par le test fonctionnel Gherkin ci-dessous.
-            </p>
+            <p className="placeholder small">{t("board.noUnitTest")}</p>
           ) : (
             <ul className="criterion-tests">
-              {tests.map((t) => (
-                <li key={t.id}>
-                  <span className={`state-dot state-${t.status}`}>
-                    {TEST_STATE_ICON[t.status]}
+              {tests.map((tst) => (
+                <li key={tst.id}>
+                  <span className={`state-dot state-${tst.status}`}>
+                    {TEST_STATE_ICON[tst.status]}
                   </span>
-                  <span className="test-layer">{t.layer || "?"}</span>
-                  <span className="test-desc">{t.description}</span>
-                  {(t.mocks ?? []).length > 0 && (
-                    <span className="test-mocks"> · mocks : {t.mocks.join(", ")}</span>
+                  <span className="test-layer">{tst.layer || "?"}</span>
+                  <span className="test-desc">{tst.description}</span>
+                  {(tst.mocks ?? []).length > 0 && (
+                    <span className="test-mocks">
+                      {" · "}
+                      {t("board.testMocks", { mocks: tst.mocks.join(", ") })}
+                    </span>
                   )}
-                  <span className={`state-tag state-${t.status}`}>
-                    {TEST_STATE_LABEL[t.status]}
+                  <span className={`state-tag state-${tst.status}`}>
+                    {testStateLabel(t, tst.status)}
                   </span>
                 </li>
               ))}
@@ -236,7 +271,7 @@ function CriterionRow({
           )}
           {story.gherkin && (
             <>
-              <h5>Gherkin associé</h5>
+              <h5>{t("board.gherkinAssociated")}</h5>
               <pre className="gherkin">{story.gherkin}</pre>
             </>
           )}
@@ -263,6 +298,7 @@ function StoryEditor({
   story: UserStory;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState<EditDraft>({
     title: story.title,
     description: story.description,
@@ -309,14 +345,14 @@ function StoryEditor({
   return (
     <div className="story-editor" onClick={stop}>
       <label className="edit-field">
-        <span>Titre</span>
+        <span>{t("board.field_title")}</span>
         <input
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
         />
       </label>
       <label className="edit-field">
-        <span>Description</span>
+        <span>{t("board.field_description")}</span>
         <textarea
           rows={2}
           value={draft.description}
@@ -324,7 +360,7 @@ function StoryEditor({
         />
       </label>
       <label className="edit-field">
-        <span>Priorité (1=haute)</span>
+        <span>{t("board.field_priority")}</span>
         <input
           type="number"
           min={1}
@@ -336,32 +372,32 @@ function StoryEditor({
         />
       </label>
       <div className="edit-field">
-        <span>Critères d'acceptance</span>
+        <span>{t("board.field_criteria")}</span>
         <div className="edit-criteria">
           {draft.criteria.map((c, i) => (
             <div className="edit-criterion-row" key={c.id ?? `new-${i}`}>
               <input
                 value={c.text}
                 onChange={(e) => setCriterion(i, e.target.value)}
-                placeholder="Critère…"
+                placeholder={t("board.criterion_placeholder")}
               />
               <button
                 type="button"
                 className="danger small-btn"
                 onClick={() => removeCriterion(i)}
-                title="Supprimer ce critère"
+                title={t("board.removeCriterion_title")}
               >
                 ✕
               </button>
             </div>
           ))}
           <button type="button" className="ghost small-btn" onClick={addCriterion}>
-            + critère
+            {t("board.addCriterion")}
           </button>
         </div>
       </div>
       <label className="edit-field">
-        <span>Gherkin</span>
+        <span>{t("board.field_gherkin")}</span>
         <textarea
           rows={4}
           className="mono"
@@ -372,10 +408,10 @@ function StoryEditor({
       {error && <div className="edit-error">{error}</div>}
       <div className="edit-actions">
         <button className="primary" disabled={saving} onClick={save}>
-          Enregistrer
+          {t("common.save")}
         </button>
         <button className="ghost" disabled={saving} onClick={onClose}>
-          Annuler
+          {t("common.cancel")}
         </button>
       </div>
     </div>
@@ -415,6 +451,7 @@ function DiffViewer({
   fetcher: () => Promise<{ available: boolean; diff: string }>;
   onClose: () => void;
 }) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [diff, setDiff] = useState("");
@@ -446,21 +483,21 @@ function DiffViewer({
     <div className="diff-overlay" onClick={onClose}>
       <div className="diff-panel" onClick={(e) => e.stopPropagation()}>
         <div className="diff-header">
-          <span className="diff-title">📊 Diff — {label}</span>
+          <span className="diff-title">📊 {t("board.diff_title", { label })}</span>
           <button
             type="button"
             className="ghost diff-close"
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={t("common.close")}
           >
             ✕
           </button>
         </div>
         <div className="diff-content">
-          {loading && <div className="diff-muted">Chargement…</div>}
+          {loading && <div className="diff-muted">{t("common.loading")}</div>}
           {!loading && error && <div className="diff-error">{error}</div>}
           {!loading && !error && (!available || diff.trim() === "") && (
-            <div className="diff-muted">Aucun diff disponible pour cette story.</div>
+            <div className="diff-muted">{t("board.diff_none")}</div>
           )}
           {!loading && !error && available && diff.trim() !== "" && (
             <DiffBody diff={diff} />
@@ -482,25 +519,26 @@ function StoryBadges({
   /** When set, the status badge becomes a button (opens the LLM activity view). */
   onStatusClick?: () => void;
 }) {
+  const { t } = useI18n();
   const status = usEffectiveStatus(story);
   const statusInner = (
     <>
       {status === "in_progress" && (
         <span className="spinner spinner-sm" aria-hidden="true" />
       )}
-      {STATUS_LABEL[status] ?? status}
+      {statusLabel(t, status)}
     </>
   );
   return (
     <span className="story-right">
-      <span className={`prio prio-${story.priority}`} title="Priorité kanban (1=haute)">
+      <span className={`prio prio-${story.priority}`} title={t("board.prio_title")}>
         P{story.priority}
       </span>
       {onStatusClick ? (
         <button
           type="button"
           className={`badge badge-${status} badge-btn`}
-          title="Voir les appels LLM de cet item"
+          title={t("board.statusBadge_title")}
           data-testid={`status-badge-${story.id}`}
           onClick={(e) => {
             stop(e);
@@ -513,17 +551,17 @@ function StoryBadges({
         <span className={`badge badge-${status}`}>{statusInner}</span>
       )}
       {story.quality_score >= 0 && (
-        <span className="quality-badge" title="Qualité du code (raffinement)">
+        <span className="quality-badge" title={t("board.quality_title")}>
           ⚙ {story.quality_score}/100
         </span>
       )}
       {(story.mutation_score ?? -1) >= 0 && (
-        <span className="mutation-badge" title="Robustesse des tests (mutation testing)">
+        <span className="mutation-badge" title={t("board.mutation_title")}>
           🧬 {story.mutation_score}/100
         </span>
       )}
       {(story.coverage_score ?? -1) >= 0 && (
-        <span className="coverage-badge" title="Couverture de tests">
+        <span className="coverage-badge" title={t("board.coverage_title")}>
           📊 {story.coverage_score}%
         </span>
       )}
@@ -549,6 +587,7 @@ function TaskRow({
   primaryStreamId: string;
   onOpen: () => void;
 }) {
+  const { t } = useI18n();
   const blockers = blockedBy(task.depends_on, task.status, stories);
   const showStream = !!task.stream && task.stream !== primaryStreamId;
   return (
@@ -572,7 +611,7 @@ function TaskRow({
         {task.status === "in_progress" && (
           <span className="spinner spinner-sm" aria-hidden="true" />
         )}
-        {STATUS_LABEL[task.status] ?? task.status}
+        {statusLabel(t, task.status)}
       </span>
       <BlockedBadge blockers={blockers} />
       <MergeBadge status={task.status} lastError={task.last_error} />
@@ -611,6 +650,7 @@ function StoryRow({
   onCardDragLeave: (e: React.DragEvent) => void;
   onCardDrop: (e: React.DragEvent) => void;
 }) {
+  const { t } = useI18n();
   const tasks = story.tasks ?? [];
   const [expanded, setExpanded] = useState(true);
   const effStatus = usEffectiveStatus(story);
@@ -639,8 +679,8 @@ function StoryRow({
           draggable
           onDragStart={onHandleDragStart}
           onClick={stop}
-          title="Glisser pour réordonner"
-          aria-label="Poignée de déplacement"
+          title={t("board.dragHandle_title")}
+          aria-label={t("board.dragHandle_aria")}
         >
           ⠿
         </span>
@@ -650,7 +690,9 @@ function StoryRow({
       </div>
       <div className="story-title">{story.title}</div>
       {(story.depends_on ?? []).length > 0 && (
-        <div className="story-deps">⛓ dépend de {story.depends_on.join(", ")}</div>
+        <div className="story-deps">
+          ⛓ {t("board.dependsOn", { deps: story.depends_on.join(", ") })}
+        </div>
       )}
       <div className="story-row-hints">
         <BlockedBadge blockers={blockers} />
@@ -664,7 +706,10 @@ function StoryRow({
             data-testid={`task-toggle-${story.id}`}
             onClick={() => setExpanded((v) => !v)}
           >
-            {expanded ? "▾" : "▸"} {tasks.length} tâche{tasks.length > 1 ? "s" : ""}
+            {expanded ? "▾" : "▸"}{" "}
+            {tasks.length > 1
+              ? t("board.tasks_count_plural", { count: tasks.length })
+              : t("board.tasks_count", { count: tasks.length })}
           </button>
           {expanded && (
             <div className="tasks" data-testid={`tasks-${story.id}`}>
@@ -682,7 +727,7 @@ function StoryRow({
           )}
         </div>
       )}
-      <div className="story-open-hint">▸ détails</div>
+      <div className="story-open-hint">▸ {t("board.storyOpenHint")}</div>
     </div>
   );
 }
@@ -704,6 +749,7 @@ function StoryDetail({
   onDeleted: () => void;
   onOpenIteration?: (iter: number) => void;
 }) {
+  const { t } = useI18n();
   const [editing, setEditing] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -711,7 +757,7 @@ function StoryDetail({
   const [showLlm, setShowLlm] = useState(false);
 
   const handleDelete = async () => {
-    if (!window.confirm(`Supprimer la user story « ${story.title} » ?`)) return;
+    if (!window.confirm(t("board.confirmDeleteStory", { title: story.title }))) return;
     setError("");
     try {
       await deleteStory(projectId, story.id);
@@ -756,7 +802,9 @@ function StoryDetail({
       </div>
       <h3 className="story-detail-title">{story.title}</h3>
       {(story.depends_on ?? []).length > 0 && (
-        <div className="story-deps">⛓ dépend de {story.depends_on.join(", ")}</div>
+        <div className="story-deps">
+          ⛓ {t("board.dependsOn", { deps: story.depends_on.join(", ") })}
+        </div>
       )}
       {editing ? (
         <StoryEditor
@@ -768,10 +816,10 @@ function StoryDetail({
         <>
           <div className="story-toolbar">
             <button className="ghost small-btn" onClick={() => setEditing(true)}>
-              ✏️ Éditer
+              ✏️ {t("board.action_edit")}
             </button>
             <button className="danger small-btn" onClick={handleDelete}>
-              🗑 Supprimer
+              🗑 {t("board.action_delete")}
             </button>
             {canRelaunch && (
               <>
@@ -779,17 +827,17 @@ function StoryDetail({
                   className="action-btn small-btn"
                   disabled={busy}
                   onClick={handleRebuild}
-                  title="Réinitialiser et reconstruire cette user story"
+                  title={t("board.relaunchStory_title")}
                 >
-                  🔄 Relancer
+                  🔄 {t("board.action_relaunch")}
                 </button>
                 <button
                   className="action-btn action-done small-btn"
                   disabled={busy}
                   onClick={handleForceDone}
-                  title="Marquer cette user story comme terminée sans la reconstruire"
+                  title={t("board.forceDoneStory_title")}
                 >
-                  ✓ Forcer terminé
+                  ✓ {t("board.action_forceDone")}
                 </button>
               </>
             )}
@@ -799,12 +847,12 @@ function StoryDetail({
                 disabled={busy}
                 onClick={handleRebuild}
               >
-                🔁 Rejouer
+                🔁 {t("board.action_replay")}
               </button>
             )}
             {story.status === "done" && (
               <button className="ghost small-btn" onClick={() => setShowDiff(true)}>
-                📊 Diff
+                📊 {t("board.action_diff")}
               </button>
             )}
           </div>
@@ -812,7 +860,7 @@ function StoryDetail({
           <p>{story.description}</p>
           {(story.acceptance_criteria ?? []).length > 0 && (
             <>
-              <h4>Critères d'acceptance</h4>
+              <h4>{t("board.acceptanceCriteria_heading")}</h4>
               <div className="criteria">
                 {story.acceptance_criteria.map((c) => (
                   <CriterionRow key={c.id} story={story} criterion={c} />
@@ -822,7 +870,7 @@ function StoryDetail({
           )}
           {story.last_error && (
             <>
-              <h4>Dernière erreur</h4>
+              <h4>{t("board.lastError_heading")}</h4>
               <pre className="error-output">{story.last_error}</pre>
             </>
           )}
@@ -867,6 +915,7 @@ function TaskDetail({
   primaryStreamId: string;
   phase?: string;
 }) {
+  const { t } = useI18n();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
@@ -904,20 +953,22 @@ function TaskDetail({
         <button
           type="button"
           className={`badge badge-${task.status} badge-btn`}
-          title="Voir les appels LLM de cette tâche"
+          title={t("board.taskStatusBadge_title")}
           data-testid={`status-badge-${task.id}`}
           onClick={() => setShowLlm((v) => !v)}
         >
           {task.status === "in_progress" && (
             <span className="spinner spinner-sm" aria-hidden="true" />
           )}
-          {STATUS_LABEL[task.status] ?? task.status} 🧠
+          {statusLabel(t, task.status)} 🧠
         </button>
         <MergeBadge status={task.status} lastError={task.last_error} />
       </div>
       <h3 className="story-detail-title">{task.title || task.id}</h3>
       {(task.depends_on ?? []).length > 0 && (
-        <div className="story-deps">⛓ dépend de {task.depends_on.join(", ")}</div>
+        <div className="story-deps">
+          ⛓ {t("board.dependsOn", { deps: task.depends_on.join(", ") })}
+        </div>
       )}
       <div className="story-row-hints">
         <BlockedBadge blockers={blockers} />
@@ -929,17 +980,17 @@ function TaskDetail({
               className="action-btn small-btn"
               disabled={busy}
               onClick={handleRebuild}
-              title="Réinitialiser et reconstruire cette tâche"
+              title={t("board.relaunchTask_title")}
             >
-              🔄 Relancer
+              🔄 {t("board.action_relaunch")}
             </button>
             <button
               className="action-btn action-done small-btn"
               disabled={busy}
               onClick={handleForceDone}
-              title="Marquer cette tâche comme terminée sans la reconstruire"
+              title={t("board.forceDoneTask_title")}
             >
-              ✓ Forcer terminé
+              ✓ {t("board.action_forceDone")}
             </button>
           </>
         )}
@@ -949,12 +1000,12 @@ function TaskDetail({
             disabled={busy}
             onClick={handleRebuild}
           >
-            🔁 Rejouer
+            🔁 {t("board.action_replay")}
           </button>
         )}
         {task.status === "done" && (
           <button className="ghost small-btn" onClick={() => setShowDiff(true)}>
-            📊 Diff
+            📊 {t("board.action_diff")}
           </button>
         )}
       </div>
@@ -962,7 +1013,7 @@ function TaskDetail({
       {task.description && <p>{task.description}</p>}
       {(task.acceptance_criteria ?? []).length > 0 && (
         <>
-          <h4>Critères d'acceptance</h4>
+          <h4>{t("board.acceptanceCriteria_heading")}</h4>
           <ul className="task-criteria">
             {task.acceptance_criteria.map((c) => (
               <li key={c.id}>{c.text}</li>
@@ -972,13 +1023,13 @@ function TaskDetail({
       )}
       {task.gherkin && (
         <>
-          <h4>Gherkin</h4>
+          <h4>{t("board.field_gherkin")}</h4>
           <pre className="gherkin">{task.gherkin}</pre>
         </>
       )}
       {task.last_error && (
         <>
-          <h4>Dernière erreur</h4>
+          <h4>{t("board.lastError_heading")}</h4>
           <pre className="error-output">{task.last_error}</pre>
         </>
       )}
@@ -1001,6 +1052,7 @@ function TaskDetail({
 }
 
 function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -1018,7 +1070,7 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
 
   const submit = async () => {
     if (title.trim() === "") {
-      setError("Le titre est requis.");
+      setError(t("board.titleRequired"));
       return;
     }
     setSaving(true);
@@ -1041,7 +1093,7 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
   if (!open) {
     return (
       <button className="ghost add-story-btn" onClick={() => setOpen(true)}>
-        + Ajouter une US
+        {t("board.addStory")}
       </button>
     );
   }
@@ -1049,11 +1101,11 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
   return (
     <div className="add-story-form">
       <label className="edit-field">
-        <span>Titre *</span>
+        <span>{t("board.field_titleRequired")}</span>
         <input value={title} onChange={(e) => setTitle(e.target.value)} />
       </label>
       <label className="edit-field">
-        <span>Description</span>
+        <span>{t("board.field_description")}</span>
         <textarea
           rows={2}
           value={description}
@@ -1061,7 +1113,7 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
         />
       </label>
       <label className="edit-field">
-        <span>Priorité (1=haute)</span>
+        <span>{t("board.field_priority")}</span>
         <input
           type="number"
           min={1}
@@ -1073,10 +1125,10 @@ function AddStoryForm({ projectId, epicId }: { projectId: string; epicId: string
       {error && <div className="edit-error">{error}</div>}
       <div className="edit-actions">
         <button className="primary" disabled={saving} onClick={submit}>
-          Créer
+          {t("board.create")}
         </button>
         <button className="ghost" disabled={saving} onClick={reset}>
-          Annuler
+          {t("common.cancel")}
         </button>
       </div>
     </div>
@@ -1105,6 +1157,7 @@ function EpicStories({
   onOpen: (storyId: string) => void;
   onOpenTask: (taskId: string) => void;
 }) {
+  const { t } = useI18n();
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [overId, setOverId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -1133,7 +1186,7 @@ function EpicStories({
       await reorderStories(projectId, priorities);
       // Pas de re-fetch : le backend diffuse le nouvel état par WebSocket.
     } catch (err) {
-      setError(`Échec du réordonnancement : ${errorMessage(err)}`);
+      setError(t("board.reorderFailed", { error: errorMessage(err) }));
     }
   };
 
@@ -1188,10 +1241,11 @@ function Breadcrumb({
   onNavEpic: () => void;
   onNavStory: () => void;
 }) {
+  const { t } = useI18n();
   return (
-    <nav className="breadcrumb" aria-label="Fil d'Ariane">
+    <nav className="breadcrumb" aria-label={t("board.breadcrumb_aria")}>
       <button className="crumb" onClick={onNavEpics} disabled={!epic && !story}>
-        Épics
+        {t("board.breadcrumb_epics")}
       </button>
       {epic && (
         <>
@@ -1262,6 +1316,7 @@ export function epicProgress(stories: UserStory[]): EpicProgress {
 
 /** Barre d'avancement d'un epic + ligne de compteurs (done / en cours / échec). */
 export function EpicProgressBar({ prog }: { prog: EpicProgress }) {
+  const { t } = useI18n();
   return (
     <>
       <div
@@ -1270,7 +1325,11 @@ export function EpicProgressBar({ prog }: { prog: EpicProgress }) {
         aria-valuenow={prog.pct}
         aria-valuemin={0}
         aria-valuemax={100}
-        title={`${prog.done}/${prog.total} terminée(s) — ${prog.pct}%`}
+        title={t("board.progress_title", {
+          done: prog.done,
+          total: prog.total,
+          pct: prog.pct,
+        })}
       >
         <div
           className={`epic-progress-fill state-${prog.state}`}
@@ -1278,12 +1337,18 @@ export function EpicProgressBar({ prog }: { prog: EpicProgress }) {
         />
       </div>
       <div className="epic-card-meta">
-        {prog.done}/{prog.total} terminée(s)
+        {t("board.progress_done", { done: prog.done, total: prog.total })}
         {prog.inProgress > 0 && (
-          <span className="epic-meta-working"> · {prog.inProgress} en cours</span>
+          <span className="epic-meta-working">
+            {" · "}
+            {t("board.progress_inProgress", { count: prog.inProgress })}
+          </span>
         )}
         {prog.failed > 0 && (
-          <span className="epic-meta-failed"> · {prog.failed} en échec</span>
+          <span className="epic-meta-failed">
+            {" · "}
+            {t("board.progress_failed", { count: prog.failed })}
+          </span>
         )}
       </div>
     </>
@@ -1304,6 +1369,7 @@ function EpicCard({
   onOpenEpic: (epicId: string) => void;
   onOpenIteration?: (iter: number) => void;
 }) {
+  const { t } = useI18n();
   const es = stories.filter((s) => s.epic_id === epic.id);
   const prog = epicProgress(es);
   const deps = epicDeps.get(epic.id) ?? [];
@@ -1328,8 +1394,8 @@ function EpicCard({
             <span
               className="spinner"
               data-testid="epic-spinner"
-              title="Développement en cours"
-              aria-label="Développement en cours"
+              title={t("board.developmentInProgress")}
+              aria-label={t("board.developmentInProgress")}
             />
           )}
           <IterationBadge
@@ -1343,7 +1409,9 @@ function EpicCard({
       {epic.description && <p className="epic-desc">{epic.description}</p>}
       <EpicProgressBar prog={prog} />
       {deps.length > 0 && (
-        <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
+        <div className="story-deps">
+          ⛓ {t("board.dependsOn", { deps: deps.join(", ") })}
+        </div>
       )}
     </div>
   );
@@ -1423,6 +1491,7 @@ function EpicView({
   onOpenTask: (taskId: string) => void;
   onOpenIteration?: (iter: number) => void;
 }) {
+  const { t } = useI18n();
   const all = stories.filter((s) => s.epic_id === epic.id);
   const es = streamFilter
     ? all.filter((s) => storyTouchesStream(s, streamFilter, primaryStreamId))
@@ -1437,14 +1506,20 @@ function EpicView({
       </div>
       <h3 className="epic-view-title">
         {prog.state === "working" && (
-          <span className="spinner" title="Développement en cours" aria-label="Développement en cours" />
+          <span
+            className="spinner"
+            title={t("board.developmentInProgress")}
+            aria-label={t("board.developmentInProgress")}
+          />
         )}
         {epic.title}
       </h3>
       {epic.description && <p className="epic-view-desc">{epic.description}</p>}
       <EpicProgressBar prog={prog} />
       {deps.length > 0 && (
-        <div className="story-deps">⛓ dépend de {deps.join(", ")}</div>
+        <div className="story-deps">
+          ⛓ {t("board.dependsOn", { deps: deps.join(", ") })}
+        </div>
       )}
       <EpicStories
         projectId={projectId}
@@ -1495,6 +1570,7 @@ export function Board({
   onFocusConsumed,
   onOpenIteration,
 }: Props) {
+  const { t } = useI18n();
   const [nav, setNav] = useState<Nav>({ level: "epics" });
   // ST-12: active stream filter ("" = all streams). Only offered when the
   // project declares more than one stream (legacy projects never see it).
@@ -1527,21 +1603,20 @@ export function Board({
     const planning = PLANNING_PHASES.includes(phase ?? "");
     return (
       <div className="panel board empty">
-        <h2>Board Epics / User stories</h2>
+        <h2>{t("board.boardTitle")}</h2>
         <div className="board-empty">
           {planning ? (
             <>
               <span className="spinner" aria-hidden="true" />
-              <p className="placeholder">
-                Le PM/PO génère le plan… les épics et user stories apparaîtront ici.
-              </p>
+              <p className="placeholder">{t("board.empty_planning")}</p>
             </>
           ) : phase === "build" ? (
-            <p className="placeholder">Construction en cours… le plan va s'afficher.</p>
+            <p className="placeholder">{t("board.empty_building")}</p>
           ) : (
             <p className="placeholder">
-              Pas encore de plan. Lance la spécification depuis le panneau
-              <strong> Exécution</strong> ci-dessous pour générer épics &amp; user stories.
+              {t("board.empty_noPlan_before")}
+              <strong>{t("board.empty_noPlan_execution")}</strong>
+              {t("board.empty_noPlan_after")}
             </p>
           )}
         </div>
@@ -1585,7 +1660,7 @@ export function Board({
   return (
     <div className="panel board">
       <div className="board-top">
-        <h2>Board Epics / User stories</h2>
+        <h2>{t("board.boardTitle")}</h2>
         <Breadcrumb
           epic={epic}
           story={story}
@@ -1598,14 +1673,14 @@ export function Board({
         />
       </div>
       {multiStream && (
-        <div className="stream-filter" role="group" aria-label="Filtre par stream">
+        <div className="stream-filter" role="group" aria-label={t("board.streamFilter_aria")}>
           <button
             type="button"
             className={streamFilter === "" ? "active" : ""}
             aria-pressed={streamFilter === ""}
             onClick={() => setStreamFilter("")}
           >
-            Tous les streams
+            {t("board.streamFilter_all")}
           </button>
           {declaredStreams.map((s) => (
             <button
@@ -1616,7 +1691,7 @@ export function Board({
               aria-pressed={streamFilter === s.id}
               onClick={() => setStreamFilter((cur) => (cur === s.id ? "" : s.id))}
             >
-              {(STREAM_META[s.kind] ?? STREAM_META.other).icon} {s.id}
+              {STREAM_ICON[s.kind] ?? STREAM_ICON.other} {s.id}
             </button>
           ))}
         </div>
@@ -1648,7 +1723,7 @@ export function Board({
         <div className="us-view">
           {(story.tasks ?? []).length > 0 && (
             <div className="us-tasks" data-testid={`us-tasks-${story.id}`}>
-              <h4>Tâches ({story.tasks!.length})</h4>
+              <h4>{t("board.tasksHeading", { count: story.tasks!.length })}</h4>
               <div className="tasks">
                 {story.tasks!.map((t) => (
                   <TaskRow

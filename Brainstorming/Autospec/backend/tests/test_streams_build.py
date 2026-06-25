@@ -137,7 +137,11 @@ async def test_frontend_task_starts_only_after_backend_dep_is_merged(streams_on,
 
 # --------------------------------------------------- (c) merge conflict policy
 
-async def test_merge_conflict_marks_item_failed_and_aborts_cleanly(streams_on, monkeypatch):
+async def test_persistent_merge_conflict_fails_after_exhausting_retries(streams_on, monkeypatch):
+    # A conflict that never clears: the item is re-queued and rebuilt on the
+    # updated HEAD each attempt, and only ends FAILED once dev_max_attempts is
+    # exhausted — aborting cleanly on every failed merge.
+    monkeypatch.setattr(settings, "dev_max_attempts", 2)
     state = _streams_state([_us("US-1", stream="backend")])
     pipeline = Pipeline(state, ScriptedRunner())
 
@@ -146,7 +150,6 @@ async def test_merge_conflict_marks_item_failed_and_aborts_cleanly(streams_on, m
 
     async def _agit(ws, *args):
         if args[:1] == ("merge",) and "--abort" not in args:
-            # Simulate a merge conflict on every merge attempt.
             return 1, "CONFLICT (content): merge conflict in app.py"
         if args[:2] == ("merge", "--abort"):
             aborts.append(ws)
@@ -158,9 +161,81 @@ async def test_merge_conflict_marks_item_failed_and_aborts_cleanly(streams_on, m
 
     story = state.story("US-1")
     assert story.status == StoryStatus.FAILED
-    assert story.last_error == "conflit de merge inter-stream non résolu"
-    # Retried once → two failed merges → two aborts (clean abort each time).
-    assert len(aborts) == 2
+    assert story.last_error == "conflit de merge inter-stream"
+    assert story.attempts == 2  # rebuilt once on a fresh worktree before failing
+    # Two build attempts × (one merge + one in-lock retry) = four clean aborts.
+    assert len(aborts) == 4
+
+
+async def test_merge_conflict_requeues_and_resolves_on_rebuild(streams_on, monkeypatch):
+    # The valuable case: a conflict on the first attempt (a sibling touched the
+    # same files) must NOT fail the item — it is re-queued and rebuilt on the
+    # now-updated HEAD, where the merge lands cleanly → DONE.
+    monkeypatch.setattr(settings, "dev_max_attempts", 2)
+    state = _streams_state([_us("US-1", stream="backend")])
+    pipeline = Pipeline(state, ScriptedRunner())
+
+    real_agit = pipeline._agit
+
+    async def _agit(ws, *args):
+        # Conflict only on the first build attempt; clean once rebuilt (attempt 2).
+        if (
+            args[:1] == ("merge",)
+            and "--abort" not in args
+            and state.story("US-1").attempts < 2
+        ):
+            return 1, "CONFLICT (content): merge conflict in app.py"
+        return await real_agit(ws, *args)
+
+    monkeypatch.setattr(pipeline, "_agit", _agit)
+    await pipeline._abuild_phase()
+
+    story = state.story("US-1")
+    assert story.status == StoryStatus.DONE
+    assert story.attempts == 2
+
+
+# ----------------------------------------------- (d) frontend toolchain robustness
+
+def test_resolve_cmd_resolves_npm_shim(monkeypatch):
+    # Windows: a bare "npm" must resolve to its real launchable shim (npm.cmd),
+    # else subprocess raises [WinError 2]. _resolve_cmd uses shutil.which.
+    import autospec.orchestrator.pipeline as plmod
+
+    monkeypatch.setattr(
+        plmod.shutil, "which",
+        lambda name: r"C:\nodejs\npm.cmd" if name == "npm" else None,
+    )
+    assert plmod.Pipeline._resolve_cmd(["npm", "install"]) == [r"C:\nodejs\npm.cmd", "install"]
+    # Unresolvable command is left untouched (caller handles the OSError).
+    assert plmod.Pipeline._resolve_cmd(["nope", "x"]) == ["nope", "x"]
+    assert plmod.Pipeline._resolve_cmd([]) == []
+
+
+async def test_missing_frontend_toolchain_fails_story_not_pipeline(streams_on, monkeypatch):
+    # A missing node/npm must surface as a RED frontend run (the story fails and
+    # is retried/failed), never an unhandled OSError that errors the pipeline.
+    monkeypatch.setattr(settings, "fake_agents", False)  # reach the real subprocess
+    state = _streams_state([_us("US-1", stream="frontend")])
+    pipeline = Pipeline(state, ScriptedRunner())
+    # Don't actually install/junction anything in the test.
+    async def _noop(_root):
+        return None
+    monkeypatch.setattr(pipeline, "_aensure_frontend_node_modules", _noop)
+
+    def _boom(*a, **k):
+        raise OSError(2, "Le fichier spécifié est introuvable")
+    monkeypatch.setattr(plmod_subprocess(), "run", _boom)
+
+    ok, output, results = await pipeline._arun_frontend_tests(ws=workspace_dir(state.id))
+    assert ok is False
+    assert "indisponible" in output
+    assert results == {}
+
+
+def plmod_subprocess():
+    import autospec.orchestrator.pipeline as plmod
+    return plmod.subprocess
 
 
 async def test_merge_is_serialized_by_lock(streams_on, monkeypatch):

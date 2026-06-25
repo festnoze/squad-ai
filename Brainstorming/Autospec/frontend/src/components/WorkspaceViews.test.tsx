@@ -46,7 +46,7 @@ describe("WorkspaceViews", () => {
         projectId="p1"
       />,
     );
-    expect(screen.queryByRole("tab", { name: /Itérations/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: /Iterations/ })).not.toBeInTheDocument();
     expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
   });
 
@@ -61,7 +61,7 @@ describe("WorkspaceViews", () => {
         projectId="p2"
       />,
     );
-    fireEvent.click(screen.getByRole("tab", { name: /Itérations/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Iterations/ }));
     expect(screen.getByTestId("iter-card-2")).toBeInTheDocument();
     expect(screen.getByTestId("iter-card-1")).toBeInTheDocument();
   });
@@ -74,7 +74,7 @@ describe("WorkspaceViews", () => {
         projectId="p3"
       />,
     );
-    fireEvent.click(screen.getByTitle("Voir l'itération 2 dans la chronologie"));
+    fireEvent.click(screen.getByTitle("View iteration 2 in the timeline"));
     const card = screen.getByTestId("iter-card-2");
     expect(card.className).toMatch(/focused/);
   });
@@ -90,8 +90,8 @@ describe("WorkspaceViews", () => {
       />,
     );
     // Aller à la chronologie puis cliquer la US.
-    fireEvent.click(screen.getByRole("tab", { name: /Itérations/ }));
-    fireEvent.click(screen.getByTitle("Ouvrir S2 dans la vision produit"));
+    fireEvent.click(screen.getByRole("tab", { name: /Iterations/ }));
+    fireEvent.click(screen.getByTitle("Open S2 in the product vision"));
     // Retour au Board, navigué sur la US S2.
     expect(screen.getByText("Story ciblée")).toBeInTheDocument();
     expect(screen.getAllByText("S2").length).toBeGreaterThan(0);
@@ -108,11 +108,11 @@ describe("WorkspaceViews", () => {
         }}
       />,
     );
-    fireEvent.click(screen.getByRole("tab", { name: /Itérations/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Iterations/ }));
     const card = screen.getByTestId("iter-card-2");
     expect(card).toHaveTextContent("$0.0500");
     expect(card).toHaveTextContent("1.5k tok");
-    expect(card).toHaveTextContent("3 appels agent");
+    expect(card).toHaveTextContent("3 agent calls");
   });
 
   it("bouton rollback par itération (snapshot dispo) → appelle onRollbackTo", async () => {
@@ -125,10 +125,10 @@ describe("WorkspaceViews", () => {
         onRollbackTo={onRollbackTo}
       />,
     );
-    fireEvent.click(screen.getByRole("tab", { name: /Itérations/ }));
+    fireEvent.click(screen.getByRole("tab", { name: /Iterations/ }));
     // getIterations (mocké → [1,2]) résout de façon asynchrone.
     const btn = await screen.findByTitle(
-      "Restaurer le workspace au snapshot de l'itération 2",
+      "Restore the workspace to the iteration 2 snapshot",
     );
     fireEvent.click(btn);
     await waitFor(() => expect(onRollbackTo).toHaveBeenCalledWith(2));

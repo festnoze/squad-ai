@@ -1,46 +1,55 @@
 import { useCallback, useEffect, useState } from "react";
 import { getItemInteractions } from "../api";
+import { useI18n } from "../i18n/i18n";
 import { AgentInteraction } from "../types";
 
-/** Agent role → icon + human label. Covers the build crew and the planning
- *  personas, so a call captured under "phase:spec" (pm) reads as nicely as a
- *  dev/qa/critic call captured under a story. */
-const ROLE_META: Record<string, { icon: string; label: string }> = {
-  dev: { icon: "👨‍💻", label: "Dev" },
-  "dev-frontend": { icon: "🎨", label: "Dev front" },
-  qa: { icon: "🧪", label: "QA" },
-  critic: { icon: "🔍", label: "Critique" },
-  judge: { icon: "⚖️", label: "Juge" },
-  architect: { icon: "🏛️", label: "Architecte" },
-  analyst: { icon: "📊", label: "Analyste" },
-  pm: { icon: "📋", label: "PM" },
-  sm: { icon: "🗂", label: "PO/SM" },
-  "tech-writer": { icon: "📝", label: "Rédacteur" },
-  evaluator: { icon: "🕵️", label: "Évaluateur" },
-  "security-reviewer": { icon: "🛡️", label: "Sécurité" },
-  retro: { icon: "🔄", label: "Rétro" },
+/** Agent role → icon + label translation key. Covers the build crew and the
+ *  planning personas, so a call captured under "phase:spec" (pm) reads as nicely
+ *  as a dev/qa/critic call captured under a story. */
+const ROLE_META: Record<string, { icon: string; labelKey: string }> = {
+  dev: { icon: "👨‍💻", labelKey: "llmActivity.roleDev" },
+  "dev-frontend": { icon: "🎨", labelKey: "llmActivity.roleDevFrontend" },
+  qa: { icon: "🧪", labelKey: "llmActivity.roleQa" },
+  critic: { icon: "🔍", labelKey: "llmActivity.roleCritic" },
+  judge: { icon: "⚖️", labelKey: "llmActivity.roleJudge" },
+  architect: { icon: "🏛️", labelKey: "llmActivity.roleArchitect" },
+  analyst: { icon: "📊", labelKey: "llmActivity.roleAnalyst" },
+  pm: { icon: "📋", labelKey: "llmActivity.rolePm" },
+  sm: { icon: "🗂", labelKey: "llmActivity.roleSm" },
+  "tech-writer": { icon: "📝", labelKey: "llmActivity.roleTechWriter" },
+  evaluator: { icon: "🕵️", labelKey: "llmActivity.roleEvaluator" },
+  "security-reviewer": { icon: "🛡️", labelKey: "llmActivity.roleSecurityReviewer" },
+  retro: { icon: "🔄", labelKey: "llmActivity.roleRetro" },
 };
 
 /** Poll cadence while the item is live (a build in flight). */
 const POLL_MS = 3000;
 
-function roleMeta(persona: string, phase: string) {
-  return (
-    ROLE_META[persona] ?? {
-      icon: "🤖",
-      label: persona || (phase ? phase.replace(/^phase:/, "") : "agent"),
-    }
-  );
+function roleMeta(
+  persona: string,
+  phase: string,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+) {
+  const known = ROLE_META[persona];
+  if (known) return { icon: known.icon, label: t(known.labelKey) };
+  return {
+    icon: "🤖",
+    label: persona || (phase ? phase.replace(/^phase:/, "") : "agent"),
+  };
 }
 
 /** Short "time ago" for a unix-seconds timestamp. */
-function timeAgo(ts: number, now: number): string {
+function timeAgo(
+  ts: number,
+  now: number,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string {
   const s = Math.max(0, Math.round(now / 1000 - ts));
-  if (s < 60) return `il y a ${s}s`;
+  if (s < 60) return t("llmActivity.timeAgoSeconds", { s });
   const m = Math.round(s / 60);
-  if (m < 60) return `il y a ${m} min`;
+  if (m < 60) return t("llmActivity.timeAgoMinutes", { m });
   const h = Math.round(m / 60);
-  return `il y a ${h} h`;
+  return t("llmActivity.timeAgoHours", { h });
 }
 
 function tokens(it: AgentInteraction): string {
@@ -60,8 +69,9 @@ function InteractionCard({
   now: number;
   defaultOpen: boolean;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(defaultOpen);
-  const meta = roleMeta(it.persona, it.phase);
+  const meta = roleMeta(it.persona, it.phase, t);
   const tok = tokens(it);
   return (
     <div
@@ -79,7 +89,11 @@ function InteractionCard({
         <span className="llm-call-role" title={meta.label}>
           {meta.icon} {meta.label}
         </span>
-        {!it.ok && <span className="llm-call-badge llm-call-badge-error">échec</span>}
+        {!it.ok && (
+          <span className="llm-call-badge llm-call-badge-error">
+            {t("llmActivity.badgeError")}
+          </span>
+        )}
         {tok && <span className="llm-call-tokens">{tok}</span>}
         {it.cost_usd > 0 && (
           <span className="llm-call-cost">${it.cost_usd.toFixed(4)}</span>
@@ -87,29 +101,34 @@ function InteractionCard({
         {it.duration_ms > 0 && (
           <span className="llm-call-dur">{(it.duration_ms / 1000).toFixed(1)}s</span>
         )}
-        <span className="llm-call-time">{timeAgo(it.ts, now)}</span>
+        <span className="llm-call-time">{timeAgo(it.ts, now, t)}</span>
       </button>
       {open && (
         <div className="llm-call-body">
           {!it.ok && it.error && (
             <div className="llm-call-section">
-              <h6>Erreur</h6>
+              <h6>{t("llmActivity.errorHeading")}</h6>
               <pre className="llm-pre llm-pre-error">{it.error}</pre>
             </div>
           )}
           <div className="llm-call-section">
             <h6>
-              Prompt{it.prompt_truncated && <span className="llm-trunc"> (tronqué)</span>}
+              {t("llmActivity.promptHeading")}
+              {it.prompt_truncated && (
+                <span className="llm-trunc">{t("llmActivity.truncated")}</span>
+              )}
             </h6>
-            <pre className="llm-pre">{it.prompt || "(vide)"}</pre>
+            <pre className="llm-pre">{it.prompt || t("llmActivity.empty")}</pre>
           </div>
           {(it.response || it.ok) && (
             <div className="llm-call-section">
               <h6>
-                Réponse
-                {it.response_truncated && <span className="llm-trunc"> (tronqué)</span>}
+                {t("llmActivity.responseHeading")}
+                {it.response_truncated && (
+                  <span className="llm-trunc">{t("llmActivity.truncated")}</span>
+                )}
               </h6>
-              <pre className="llm-pre">{it.response || "(vide)"}</pre>
+              <pre className="llm-pre">{it.response || t("llmActivity.empty")}</pre>
             </div>
           )}
         </div>
@@ -135,6 +154,7 @@ export function LlmActivity({
   live?: boolean;
   limit?: number;
 }) {
+  const { t } = useI18n();
   const [items, setItems] = useState<AgentInteraction[] | null>(null);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
@@ -161,7 +181,7 @@ export function LlmActivity({
   }, [load, live]);
 
   if (items === null) {
-    return <div className="llm-activity llm-muted" data-testid={`llm-activity-${itemId}`}>Chargement…</div>;
+    return <div className="llm-activity llm-muted" data-testid={`llm-activity-${itemId}`}>{t("common.loading")}</div>;
   }
 
   // Newest first: the freshest call is what the operator wants to see. The newest
@@ -173,16 +193,18 @@ export function LlmActivity({
   return (
     <div className="llm-activity" data-testid={`llm-activity-${itemId}`}>
       <div className="llm-activity-head">
-        <span className="llm-activity-title">🧠 Appels LLM</span>
-        {live && <span className="llm-live" title="Mise à jour en direct">● live</span>}
+        <span className="llm-activity-title">{t("llmActivity.title")}</span>
+        {live && (
+          <span className="llm-live" title={t("llmActivity.liveTitle")}>
+            {t("llmActivity.live")}
+          </span>
+        )}
         <span className="llm-activity-count">{items.length}</span>
       </div>
       {error && <div className="edit-error">{error}</div>}
       {ordered.length === 0 ? (
         <p className="placeholder small">
-          {live
-            ? "Aucun appel pour l'instant — ils apparaîtront ici dès que l'agent travaille sur cet item."
-            : "Aucun appel LLM enregistré pour cet item."}
+          {live ? t("llmActivity.emptyLive") : t("llmActivity.emptyHistory")}
         </p>
       ) : (
         <div className="llm-call-list">

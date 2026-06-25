@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useI18n } from "../i18n/i18n";
 
 interface Props {
   onCreate: (goal: string, name: string, autoSpec: boolean, budgetUsd: number, brief?: string, brownfieldPath?: string) => void;
@@ -6,6 +7,7 @@ interface Props {
 }
 
 export function ProjectSetup({ onCreate, busy }: Props) {
+  const { t } = useI18n();
   const [goal, setGoal] = useState("");
   const [name, setName] = useState("");
   const [autoSpec, setAutoSpec] = useState(false);
@@ -15,14 +17,14 @@ export function ProjectSetup({ onCreate, busy }: Props) {
 
   return (
     <div className="panel setup">
-      <h2>Nouveau projet / feature</h2>
+      <h2>{t("projectSetup.title")}</h2>
       <input
-        placeholder="Nom du projet (optionnel)"
+        placeholder={t("projectSetup.namePlaceholder")}
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
       <textarea
-        placeholder="Décris la feature ou le projet que tu veux créer…"
+        placeholder={t("projectSetup.goalPlaceholder")}
         rows={6}
         value={goal}
         onChange={(e) => setGoal(e.target.value)}
@@ -34,28 +36,29 @@ export function ProjectSetup({ onCreate, busy }: Props) {
           onChange={(e) => setAutoSpec(e.target.checked)}
         />
         <span>
-          <strong>Auto-spec</strong> — le PM décide de tout seul et enchaîne les
-          itérations en boucle jusqu'à l'arrêt manuel
+          <strong>{t("projectSetup.autoSpecLabel")}</strong>
+          {" "}
+          {t("projectSetup.autoSpecDescription")}
         </span>
       </label>
       <textarea
-        placeholder="Spec à importer (optionnel) — colle un cahier des charges pour court-circuiter l'interview"
+        placeholder={t("projectSetup.briefPlaceholder")}
         rows={4}
         value={brief}
         onChange={(e) => setBrief(e.target.value)}
       />
       <input
-        aria-label="Chemin d'un repo existant à étendre (mode brownfield, optionnel)"
-        placeholder="Repo existant à étendre (chemin, optionnel — mode brownfield)"
+        aria-label={t("projectSetup.brownfieldAriaLabel")}
+        placeholder={t("projectSetup.brownfieldPlaceholder")}
         value={brownfield}
         onChange={(e) => setBrownfield(e.target.value)}
       />
       <input
         type="number"
-        aria-label="Budget maximum en dollars (vide = pas de limite)"
+        aria-label={t("projectSetup.budgetAriaLabel")}
         min={0}
         step={0.1}
-        placeholder="Budget max ($) — vide = pas de limite"
+        placeholder={t("projectSetup.budgetPlaceholder")}
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
       />
@@ -64,7 +67,7 @@ export function ProjectSetup({ onCreate, busy }: Props) {
         disabled={busy || !goal.trim()}
         onClick={() => onCreate(goal.trim(), name.trim(), autoSpec, Number(budget) || 0, brief.trim() || undefined, brownfield.trim() || undefined)}
       >
-        {autoSpec ? "🔁 Lancer la boucle auto-spec" : "🚀 Démarrer la spécification"}
+        {autoSpec ? t("projectSetup.submitAutoSpec") : t("projectSetup.submitSpec")}
       </button>
     </div>
   );

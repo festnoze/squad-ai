@@ -44,6 +44,8 @@ import { ComponentsPanel } from "./components/ComponentsPanel";
 import { ProjectBar } from "./components/ProjectBar";
 import { ProjectSetup } from "./components/ProjectSetup";
 import { RunPanel } from "./components/RunPanel";
+import { SettingsModal } from "./components/SettingsModal";
+import { useI18n } from "./i18n/i18n";
 import {
   GuidanceEntry,
   ProductComponent,
@@ -106,10 +108,12 @@ interface NotifyToast {
 }
 
 export default function App() {
+  const { t } = useI18n();
   const [projects, setProjects] = useState<ProjectState[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [logs, setLogs] = useState<StampedLog[]>([]);
   // B-UX: latest heartbeat data keyed by project id. Never overwrites full
@@ -317,8 +321,7 @@ export default function App() {
   };
 
   const handleDelete = async (target: ProjectState) => {
-    if (!window.confirm(`Supprimer le projet « ${target.name} » et tout son code généré ?`))
-      return;
+    if (!window.confirm(t("app.confirmDelete", { name: target.name }))) return;
     try {
       await deleteProject(target.id);
       deletedIds.current.add(target.id);
@@ -436,17 +439,16 @@ export default function App() {
   // et on exécute.
   const handleRollbackTo = async (n: number) => {
     if (!project) return;
-    if (!window.confirm(`Revenir à l'itération ${n} ? Le workspace sera restauré à ce snapshot.`))
-      return;
+    if (!window.confirm(t("app.confirmRollback", { n }))) return;
     await guard(() => rollbackProject(project.id, n))();
-    pushToast("success", "Rollback", `Revenu à l'itération ${n}.`);
+    pushToast("success", t("app.rollbackToastTitle"), t("app.rollbackToastBody", { n }));
   };
 
   return (
     <div className="app">
       <header>
         <h1>
-          ⚙️ Autospec <span className="subtitle">PM → PO → QA → Dev, en BDD/TDD (BMAD method)</span>
+          ⚙️ Autospec <span className="subtitle">{t("app.subtitle")}</span>
         </h1>
         {provider && (
           <div className="provider-control" ref={providerRef}>
@@ -457,9 +459,9 @@ export default function App() {
               aria-expanded={providerMenuOpen}
               disabled={provider.provider === "fake"}
               onClick={() => setProviderMenuOpen((o) => !o)}
-              title="Provider & modèle d'agents (Claude / OpenAI / Ollama / Anthropic)"
+              title={t("app.providerTitle")}
             >
-              🤖 {provider.provider === "fake" ? "démo" : provider.provider}
+              🤖 {provider.provider === "fake" ? t("app.providerDemo") : provider.provider}
               <span className="provider-trigger-model"> · {provider.model}</span>
               {provider.provider !== "fake" && (
                 <span className="provider-caret" aria-hidden="true">
@@ -470,7 +472,7 @@ export default function App() {
             {providerMenuOpen && provider.provider !== "fake" && (
               <div className="provider-menu" role="menu">
                 <label className="provider-field">
-                  <span>Provider</span>
+                  <span>{t("app.provider")}</span>
                   <select
                     value={provider.provider}
                     onChange={(e) => handleProviderChange(e.target.value)}
@@ -484,21 +486,26 @@ export default function App() {
                 </label>
                 <label className="provider-field">
                   <span>
-                    Modèle
+                    {t("app.model")}
                     {(() => {
                       const disc = discovered[provider.provider];
                       if (discovering) return <em className="provider-hint"> · …</em>;
                       if (disc?.source === "live")
-                        return <em className="provider-hint provider-hint-live"> · live</em>;
+                        return (
+                          <em className="provider-hint provider-hint-live">
+                            {" "}
+                            · {t("app.modelLive")}
+                          </em>
+                        );
                       if (disc?.source === "static")
-                        return <em className="provider-hint"> · suggérés</em>;
+                        return <em className="provider-hint"> · {t("app.modelSuggested")}</em>;
                       return null;
                     })()}
                     <button
                       type="button"
                       className="provider-refresh"
-                      title="Rafraîchir les modèles réellement accessibles"
-                      aria-label="Rafraîchir les modèles"
+                      title={t("app.refreshModels")}
+                      aria-label={t("app.refreshModelsAria")}
                       disabled={discovering}
                       onClick={() => void refreshModels(provider.provider)}
                     >
@@ -537,10 +544,18 @@ export default function App() {
         <button
           className="dash-btn"
           onClick={() => setShowDashboard(true)}
-          title="Dashboard de l'usine"
-          aria-label="Dashboard de l'usine"
+          title={t("app.dashboard")}
+          aria-label={t("app.dashboard")}
         >
           📊
+        </button>
+        <button
+          className="dash-btn settings-btn"
+          onClick={() => setShowSettings(true)}
+          title={t("app.settings")}
+          aria-label={t("app.settings")}
+        >
+          ⚙️
         </button>
       </header>
       {(visibleProjects.length > 0 || projects.some((p) => p.archived)) && (
@@ -570,8 +585,8 @@ export default function App() {
           <button
             type="button"
             onClick={() => setError("")}
-            title="Fermer le message d'erreur"
-            aria-label="Fermer le message d'erreur"
+            title={t("app.closeError")}
+            aria-label={t("app.closeError")}
             style={{
               background: "transparent",
               border: "none",
@@ -586,17 +601,17 @@ export default function App() {
       )}
       {toasts.length > 0 && (
         <div className="toasts" aria-live="polite">
-          {toasts.map((t) => (
-            <div key={t.id} className={`toast toast-${t.level}`}>
+          {toasts.map((toast) => (
+            <div key={toast.id} className={`toast toast-${toast.level}`}>
               <div className="toast-text">
-                <div className="toast-title">{t.title}</div>
-                {t.body && <div className="toast-body">{t.body}</div>}
+                <div className="toast-title">{toast.title}</div>
+                {toast.body && <div className="toast-body">{toast.body}</div>}
               </div>
               <button
                 type="button"
                 className="toast-close"
-                aria-label="Fermer la notification"
-                onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}
+                aria-label={t("app.closeNotification")}
+                onClick={() => setToasts((prev) => prev.filter((x) => x.id !== toast.id))}
               >
                 ✕
               </button>
@@ -605,6 +620,7 @@ export default function App() {
         </div>
       )}
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSetup && (
         <div
           className="modal-backdrop"
@@ -614,8 +630,8 @@ export default function App() {
             {canCloseSetup && (
               <button
                 className="modal-close"
-                title="Fermer"
-                aria-label="Fermer la création de projet"
+                title={t("common.close")}
+                aria-label={t("app.closeSetup")}
                 onClick={() => setShowSetup(false)}
               >
                 ✕
@@ -628,9 +644,7 @@ export default function App() {
       {!project ? (
         <main className="home">
           {!showSetup && (
-            <div className="placeholder">
-              Sélectionne un projet dans la barre ci-dessus, ou crée-en un avec « ＋ Nouveau ».
-            </div>
+            <div className="placeholder">{t("app.placeholder")}</div>
           )}
         </main>
       ) : (
@@ -705,16 +719,20 @@ export default function App() {
                 const { created } = await deployProject(project.id);
                 pushToast(
                   "success",
-                  "Déploiement",
+                  t("app.deployToastTitle"),
                   created.length
-                    ? `Artefacts générés : ${created.join(", ")}`
-                    : "Artefacts de déploiement déjà présents.",
+                    ? t("app.deployToastArtifacts", { list: created.join(", ") })
+                    : t("app.deployToastNone"),
                 );
               })}
               onExportZip={() => window.open(exportZipUrl(project.id), "_blank")}
               onGitExport={guard(async () => {
                 const { commit } = await gitExportProject(project.id);
-                pushToast("success", "Commit", `Workspace commité : ${commit.slice(0, 12)}`);
+                pushToast(
+                  "success",
+                  t("app.commitToastTitle"),
+                  t("app.commitToastBody", { commit: commit.slice(0, 12) }),
+                );
               })}
             />
             <CodeViewer projectId={project.id} />

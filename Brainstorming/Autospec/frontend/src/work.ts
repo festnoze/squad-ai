@@ -6,6 +6,8 @@
 import {
   BuildStage,
   GuidanceEntry,
+  PipelinePhase,
+  ProjectState,
   RecoveryState,
   Stream,
   StoryStatus,
@@ -130,6 +132,31 @@ export function effectiveStatus(story: UserStory): StoryStatus {
     return "in_progress";
   if (states.some((s) => s === "failed")) return "failed";
   return "todo";
+}
+
+/** Phases where the pipeline is dormant (not actively running) and a paused build
+ *  can be resumed. Mirrors the backend guard in `pipeline.aresume_build`
+ *  (STOPPED/DONE/ERROR) — `done` MUST be here: an auto-spec iteration that ends
+ *  leaves the project in `done` while still carrying unbuilt stories. Keep this
+ *  list as the single source of truth so no caller drifts (the `done` omission
+ *  here was the original "Continuer le build" regression). */
+export const DORMANT_PHASES: PipelinePhase[] = ["done", "stopped", "error"];
+
+/** Whether any story still needs building, by EFFECTIVE status (so a multi-stream
+ *  US half-built via its tasks — raw status not todo/red — still counts). */
+export function hasBuildableStory(stories: UserStory[] | undefined): boolean {
+  return (stories ?? []).some((s) => {
+    const st = effectiveStatus(s);
+    return st === "todo" || st === "red";
+  });
+}
+
+/** Single predicate gating the "Continuer le build" / resume-build affordance,
+ *  shared by RunPanel and ProjectBar so the two never diverge. The backend
+ *  (`aresume_build`) is the real authority and returns 409 if misused — this is
+ *  pure UX gating. */
+export function canResumeBuild(project: ProjectState): boolean {
+  return DORMANT_PHASES.includes(project.phase) && hasBuildableStory(project.stories);
 }
 
 export interface WorkItem {

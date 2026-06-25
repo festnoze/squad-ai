@@ -1,18 +1,20 @@
 import { FeatureHypothesis } from "../types";
 import { CollapsibleSection } from "./CollapsibleSection";
-
-const STATUS_LABEL: Record<string, string> = {
-  proposed: "proposée",
-  selected: "en cours",
-  done: "livrée",
-  rejected: "rejetée",
-};
+import { useI18n } from "../i18n/i18n";
 
 interface Props {
   backlog: FeatureHypothesis[];
 }
 
 export function BacklogPanel({ backlog }: Props) {
+  const { t } = useI18n();
+  const STATUS_LABEL: Record<string, string> = {
+    proposed: t("backlogPanel.statusProposed"),
+    selected: t("backlogPanel.statusSelected"),
+    done: t("backlogPanel.statusDone"),
+    rejected: t("backlogPanel.statusRejected"),
+  };
+
   if (backlog.length === 0) return null;
   const active = backlog
     .filter((h) => h.status !== "done")
@@ -20,7 +22,7 @@ export function BacklogPanel({ backlog }: Props) {
   const shipped = backlog.filter((h) => h.status === "done");
 
   return (
-    <CollapsibleSection title="Backlog de l'analyste (kanban)" className="backlog">
+    <CollapsibleSection title={t("backlogPanel.title")} className="backlog">
       <div className="hypotheses">
         {active.map((h) => (
           <div key={h.id} className={`hypothesis hyp-${h.status}`} title={h.rationale}>
@@ -36,7 +38,7 @@ export function BacklogPanel({ backlog }: Props) {
         ))}
         {shipped.length > 0 && (
           <div className="hyp-shipped">
-            ✅ Livrées : {shipped.map((h) => h.title).join(", ")}
+            ✅ {t("backlogPanel.shipped")} {shipped.map((h) => h.title).join(", ")}
           </div>
         )}
       </div>

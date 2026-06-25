@@ -1,0 +1,49 @@
+{
+  "project": 3,
+  "id": "drv-p3-ebcaf860",
+  "name": "Counter webapp",
+  "provider": "claude",
+  "phase": "done",
+  "error": "",
+  "timed_out": false,
+  "wall_s": 946.4,
+  "backend_language": "python",
+  "streams": [
+    "backend",
+    "frontend"
+  ],
+  "components": [
+    "API backend",
+    "Interface web"
+  ],
+  "stories": [
+    {
+      "id": "US-1",
+      "title": "Persistance d'un compteur unique",
+      "status": "done",
+      "attempts": 1,
+      "stream": "backend"
+    },
+    {
+      "id": "US-2",
+      "title": "Exposer et consommer le compteur (API + écran)",
+      "status": "todo",
+      "attempts": 0,
+      "stream": ""
+    }
+  ],
+  "usage": {
+    "agent_calls": 9,
+    "cost_usd": 4.5715,
+    "input_tokens": 54000,
+    "output_tokens": 49586
+  },
+  "workspace": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p3-ebcaf860",
+  "monitor_log": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p3-ebcaf860\\build-monitor.jsonl",
+  "pytest": {
+    "ran": true,
+    "returncode": 0,
+    "green": true,
+    "tail": "Using CPython 3.14.5 interpreter at: C:\\Program Files\\Python314\\python.exe\nCreating virtual environment at: .venv\n   Building counter-webapp @ file:///C:/Dev/squad-ai/Brainstorming/Autospec/workspace/drv-p3-ebcaf860\n      Built counter-webapp @ file:///C:/Dev/squad-ai/Brainstorming/Autospec/workspace/drv-p3-ebcaf860\nInstalled 17 packages in 169ms\n...............                                                          [100%]\n15 passed in 0.21s\n"
+  }
+}

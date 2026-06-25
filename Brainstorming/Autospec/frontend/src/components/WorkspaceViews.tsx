@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getIterations } from "../api";
 import { Epic, ProjectTicks, Stream, Usage, UserStory } from "../types";
+import { useI18n } from "../i18n/i18n";
 import { Activity } from "./Activity";
 import { Board } from "./Board";
 import { IterationsView } from "./IterationsView";
@@ -48,6 +49,7 @@ export function WorkspaceViews({
   onApprove?: () => void;
   onReject?: () => void;
 }) {
+  const { t } = useI18n();
   // P6/B-UX: Activité is the default lens during BUILD; Board + Iterations stay
   // available. Outside build the historic "vision produit" remains the default.
   const [view, setView] = useState<View>(phase === "build" ? "activity" : "vision");
@@ -100,7 +102,7 @@ export function WorkspaceViews({
 
   return (
     <>
-      <div className="view-toggle" role="tablist" aria-label="Vue du projet">
+      <div className="view-toggle" role="tablist" aria-label={t("workspaceViews.projectView")}>
         <button
           type="button"
           role="tab"
@@ -108,7 +110,7 @@ export function WorkspaceViews({
           className={showActivity ? "active" : ""}
           onClick={() => setView("activity")}
         >
-          ⚡ Activité
+          {t("workspaceViews.activity")}
         </button>
         <button
           type="button"
@@ -117,7 +119,7 @@ export function WorkspaceViews({
           className={!showActivity && !showIterations ? "active" : ""}
           onClick={() => setView("vision")}
         >
-          🗂 Vision produit
+          {t("workspaceViews.productVision")}
         </button>
         {multiIter && (
           <button
@@ -127,7 +129,7 @@ export function WorkspaceViews({
             className={showIterations ? "active" : ""}
             onClick={() => setView("iterations")}
           >
-            🕒 Itérations
+            {t("workspaceViews.iterations")}
           </button>
         )}
       </div>

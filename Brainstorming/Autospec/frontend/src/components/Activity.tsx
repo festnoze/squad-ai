@@ -27,8 +27,11 @@ import {
   ItemView,
   WorkItem,
 } from "../work";
+import { useI18n } from "../i18n/i18n";
 import { LlmActivity } from "./LlmActivity";
 import { Stepper } from "./Stepper";
+
+type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
 /** Is the item actively being worked on (so its LLM calls should poll live)? */
 function isLive(status: string): boolean {
@@ -36,32 +39,34 @@ function isLive(status: string): boolean {
 }
 
 /** P15: persona → icon (forme/icône = persona, canal orthogonal de la couleur). */
-const PERSONA_META: Record<string, { icon: string; label: string }> = {
-  dev: { icon: "👨‍💻", label: "Dev" },
-  qa: { icon: "🧪", label: "QA" },
-  critic: { icon: "🔍", label: "Critique" },
-  judge: { icon: "⚖️", label: "Juge" },
-  architect: { icon: "🏛️", label: "Architecte" },
-  analyst: { icon: "📊", label: "Analyste" },
-  pm: { icon: "📋", label: "PM" },
-  po: { icon: "🗂", label: "PO" },
+const PERSONA_META: Record<string, { icon: string; labelKey: string }> = {
+  dev: { icon: "👨‍💻", labelKey: "activity.personaDev" },
+  qa: { icon: "🧪", labelKey: "activity.personaQa" },
+  critic: { icon: "🔍", labelKey: "activity.personaCritic" },
+  judge: { icon: "⚖️", labelKey: "activity.personaJudge" },
+  architect: { icon: "🏛️", labelKey: "activity.personaArchitect" },
+  analyst: { icon: "📊", labelKey: "activity.personaAnalyst" },
+  pm: { icon: "📋", labelKey: "activity.personaPm" },
+  po: { icon: "🗂", labelKey: "activity.personaPo" },
 };
 
-/** Human label for a guidance delivery status. */
-const GUIDANCE_STATUS_LABEL: Record<string, string> = {
-  queued: "en file",
-  applied: "appliquée",
-  too_late: "trop tard",
+/** Translation key for a guidance delivery status. */
+const GUIDANCE_STATUS_KEY: Record<string, string> = {
+  queued: "activity.guidanceQueued",
+  applied: "activity.guidanceApplied",
+  too_late: "activity.guidanceTooLate",
 };
 
 /** Human label for a stall reason (why the build can't advance right now). */
-function stallLabel(reason: string): string {
+function stallLabel(reason: string, t: TFn): string {
   if (!reason) return "";
   if (reason.startsWith("merge_lock_held:")) {
-    return `Merge en cours (verrou détenu par ${reason.slice("merge_lock_held:".length)})`;
+    return t("activity.stallMergeLock", {
+      holder: reason.slice("merge_lock_held:".length),
+    });
   }
-  if (reason === "awaiting_approval") return "En attente d'une validation";
-  if (reason === "budget_paused") return "Budget atteint — en pause";
+  if (reason === "awaiting_approval") return t("activity.stallAwaitingApproval");
+  if (reason === "budget_paused") return t("activity.stallBudgetPaused");
   return reason;
 }
 
@@ -95,6 +100,7 @@ function ItemChat({
   guidance: GuidanceEntry[];
   onSend: (message: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -118,7 +124,7 @@ function ItemChat({
     <div className="item-chat" data-testid={`item-chat-${view.id}`}>
       <div className="item-chat-guidance" data-testid={`guidance-list-${view.id}`}>
         {guidance.length === 0 ? (
-          <p className="placeholder small">Aucune consigne ciblée pour cet item.</p>
+          <p className="placeholder small">{t("activity.noGuidance")}</p>
         ) : (
           <ul className="guidance-entries">
             {guidance.map((g) => (
@@ -130,7 +136,7 @@ function ItemChat({
               >
                 <span className="guidance-text">{g.text}</span>
                 <span className={`guidance-status guidance-status-${g.status}`}>
-                  {GUIDANCE_STATUS_LABEL[g.status] ?? g.status}
+                  {GUIDANCE_STATUS_KEY[g.status] ? t(GUIDANCE_STATUS_KEY[g.status]) : g.status}
                 </span>
               </li>
             ))}
@@ -141,8 +147,8 @@ function ItemChat({
         <textarea
           rows={2}
           value={text}
-          placeholder={`Consigne ciblée pour ${view.id}…`}
-          aria-label={`Consigne ciblée pour ${view.id}`}
+          placeholder={t("activity.guidancePlaceholder", { id: view.id })}
+          aria-label={t("activity.guidanceAriaLabel", { id: view.id })}
           data-testid={`item-chat-input-${view.id}`}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -159,7 +165,7 @@ function ItemChat({
           data-testid={`item-chat-send-${view.id}`}
           onClick={() => void submit()}
         >
-          Envoyer
+          {t("activity.send")}
         </button>
       </div>
       {error && <div className="edit-error">{error}</div>}
@@ -176,6 +182,7 @@ function ExtendCriteria({
   story: UserStory;
   onExtend: (criteria: string[]) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -209,9 +216,9 @@ function ExtendCriteria({
         className="ghost small-btn"
         data-testid={`extend-${story.id}`}
         onClick={() => setOpen(true)}
-        title="Ajouter des critères d'acceptance avant le build"
+        title={t("activity.extendTitle")}
       >
-        ＋ Étendre les critères
+        {t("activity.extendButton")}
       </button>
     );
   }
@@ -221,8 +228,8 @@ function ExtendCriteria({
       <textarea
         rows={3}
         value={text}
-        placeholder="Un critère par ligne…"
-        aria-label={`Nouveaux critères pour ${story.id}`}
+        placeholder={t("activity.extendPlaceholder")}
+        aria-label={t("activity.extendAriaLabel", { id: story.id })}
         data-testid={`extend-input-${story.id}`}
         onChange={(e) => setText(e.target.value)}
       />
@@ -235,7 +242,7 @@ function ExtendCriteria({
           data-testid={`extend-submit-${story.id}`}
           onClick={() => void submit()}
         >
-          Ajouter
+          {t("common.add")}
         </button>
         <button
           type="button"
@@ -246,7 +253,7 @@ function ExtendCriteria({
             setText("");
           }}
         >
-          Annuler
+          {t("common.cancel")}
         </button>
       </div>
     </div>
@@ -274,6 +281,7 @@ function ActivityRow({
   projectId: string;
   onSendGuidance: (message: string) => Promise<void>;
 }) {
+  const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showDiff, setShowDiff] = useState(false);
@@ -318,7 +326,7 @@ function ActivityRow({
           type="button"
           className="activity-row-toggle"
           aria-expanded={drawerOpen}
-          aria-label={`Détails ${item.id}`}
+          aria-label={t("activity.detailsAriaLabel", { id: item.id })}
           data-testid={`activity-toggle-${item.id}`}
           onClick={() => setDrawerOpen((o) => !o)}
         >
@@ -329,9 +337,9 @@ function ActivityRow({
           <span
             className="activity-persona"
             data-testid={`activity-persona-${item.id}`}
-            title={`Agent en cours : ${persona.label}`}
+            title={t("activity.personaTitle", { label: t(persona.labelKey) })}
           >
-            {persona.icon} {persona.label}
+            {persona.icon} {t(persona.labelKey)}
           </span>
         )}
         <span className="activity-row-title">{item.title}</span>
@@ -342,7 +350,7 @@ function ActivityRow({
             className="ghost small-btn"
             aria-haspopup="menu"
             aria-expanded={menuOpen}
-            aria-label={`Actions ${item.id}`}
+            aria-label={t("activity.actionsAriaLabel", { id: item.id })}
             data-testid={`activity-menu-${item.id}`}
             disabled={busy}
             onClick={() => setMenuOpen((o) => !o)}
@@ -352,10 +360,10 @@ function ActivityRow({
           {menuOpen && (
             <div className="activity-menu" role="menu">
               <button role="menuitem" onClick={handleRetry}>
-                🔄 Relancer
+                {t("activity.menuRetry")}
               </button>
               <button role="menuitem" onClick={handleForce}>
-                ✓ Forcer terminé
+                {t("activity.menuForceDone")}
               </button>
               <button
                 role="menuitem"
@@ -364,7 +372,7 @@ function ActivityRow({
                   setShowDiff(true);
                 }}
               >
-                📊 Diff
+                {t("activity.menuDiff")}
               </button>
               <button
                 role="menuitem"
@@ -373,7 +381,7 @@ function ActivityRow({
                   setDrawerOpen(true);
                 }}
               >
-                💬 Chat
+                {t("activity.menuChat")}
               </button>
             </div>
           )}
@@ -381,7 +389,7 @@ function ActivityRow({
       </div>
       {blockers.length > 0 && (
         <div className="activity-blockers" data-testid={`activity-blockers-${item.id}`}>
-          ⛔ bloqué par {blockers.join(", ")}
+          {t("activity.blockedBy", { blockers: blockers.join(", ") })}
         </div>
       )}
       {actionError && <div className="edit-error">{actionError}</div>}
@@ -409,11 +417,11 @@ function ActivityRow({
         >
           <div className="diff-panel" onClick={(e) => e.stopPropagation()}>
             <div className="diff-header">
-              <span className="diff-title">📊 Diff — {item.id}</span>
+              <span className="diff-title">{t("activity.diffTitle", { id: item.id })}</span>
               <button
                 type="button"
                 className="ghost diff-close"
-                aria-label="Fermer"
+                aria-label={t("common.close")}
                 onClick={() => setShowDiff(false)}
               >
                 ✕
@@ -438,6 +446,7 @@ function DiffContent({
 }: {
   fetcher: () => Promise<{ available: boolean; diff: string }>;
 }) {
+  const { t } = useI18n();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [diff, setDiff] = useState("");
@@ -466,10 +475,10 @@ function DiffContent({
 
   return (
     <div className="diff-content">
-      {loading && <div className="diff-muted">Chargement…</div>}
+      {loading && <div className="diff-muted">{t("common.loading")}</div>}
       {!loading && error && <div className="diff-error">{error}</div>}
       {!loading && !error && (!available || diff.trim() === "") && (
-        <div className="diff-muted">Aucun diff disponible.</div>
+        <div className="diff-muted">{t("activity.noDiff")}</div>
       )}
       {!loading && !error && available && diff.trim() !== "" && (
         <pre className="diff-pre">{diff}</pre>
@@ -522,6 +531,7 @@ export function Activity({
   ticks,
 }: Props) {
   void epics;
+  const { t } = useI18n();
   const [crewFilter, setCrewFilter] = useState<string>("");
   const [crewOpen, setCrewOpen] = useState(true);
   const now = Date.now();
@@ -630,39 +640,39 @@ export function Activity({
   );
 
   return (
-    <section className="panel activity" role="region" aria-label="Activité">
+    <section className="panel activity" role="region" aria-label={t("activity.regionAriaLabel")}>
       <div className="activity-header">
-        <h2>⚡ Activité</h2>
+        <h2>{t("activity.heading")}</h2>
         <div className="activity-counts" data-testid="activity-counts">
-          <span className="count-chip count-running" title="En cours">
-            {counts.running} en cours
+          <span className="count-chip count-running" title={t("activity.countRunningTitle")}>
+            {t("activity.countRunning", { n: counts.running })}
           </span>
-          <span className="count-chip count-queued" title="En file">
-            {counts.queued} en file
+          <span className="count-chip count-queued" title={t("activity.countQueuedTitle")}>
+            {t("activity.countQueued", { n: counts.queued })}
           </span>
-          <span className="count-chip count-done" title="Faits">
-            {counts.done} faits
+          <span className="count-chip count-done" title={t("activity.countDoneTitle")}>
+            {t("activity.countDone", { n: counts.done })}
           </span>
-          <span className="count-chip count-failed" title="En échec">
-            {counts.failed} échecs
+          <span className="count-chip count-failed" title={t("activity.countFailedTitle")}>
+            {t("activity.countFailed", { n: counts.failed })}
           </span>
         </div>
         {attentionCount > 0 && (
           <span
             className="attention-chip"
             data-testid="attention-chip"
-            title="Items en échec ou bloqués nécessitant une intervention"
+            title={t("activity.attentionTitle")}
           >
-            ⚠ {attentionCount} à traiter
+            {t("activity.attentionChip", { n: attentionCount })}
           </span>
         )}
         {stallReason && (
           <span
             className="stall-reason"
             data-testid="stall-reason"
-            title="Pourquoi rien ne progresse actuellement"
+            title={t("activity.stallTitle")}
           >
-            ⏸ {stallLabel(stallReason)}
+            {t("activity.stall", { reason: stallLabel(stallReason, t) })}
           </span>
         )}
       </div>
@@ -674,16 +684,16 @@ export function Activity({
           role="alert"
         >
           <span className="approval-banner-text">
-            ⏸ Validation requise — <strong>{awaitingApproval}</strong>
+            {t("activity.approvalRequired")} <strong>{awaitingApproval}</strong>
           </span>
           {onApprove && (
             <button className="small-btn approve-btn" onClick={onApprove}>
-              ✅ Approuver
+              {t("activity.approve")}
             </button>
           )}
           {onReject && (
             <button className="small-btn danger" onClick={onReject}>
-              ✋ Rejeter
+              {t("activity.reject")}
             </button>
           )}
         </div>
@@ -699,10 +709,10 @@ export function Activity({
               data-testid="crew-rail-toggle"
               onClick={() => setCrewOpen((o) => !o)}
             >
-              {crewOpen ? "▾" : "▸"} Équipe
+              {crewOpen ? "▾" : "▸"} {t("activity.crewToggle")}
             </button>
             {crewOpen && (
-              <div className="crew-rail-list" role="group" aria-label="Filtre par agent">
+              <div className="crew-rail-list" role="group" aria-label={t("activity.crewFilterAriaLabel")}>
                 <button
                   type="button"
                   className={crewFilter === "" ? "active" : ""}
@@ -710,7 +720,7 @@ export function Activity({
                   data-testid="crew-all"
                   onClick={() => setCrewFilter("")}
                 >
-                  Tous
+                  {t("activity.crewAll")}
                 </button>
                 {crew.map(([persona, n]) => (
                   <button
@@ -724,7 +734,7 @@ export function Activity({
                     }
                   >
                     {(PERSONA_META[persona]?.icon ?? "•")}{" "}
-                    {PERSONA_META[persona]?.label ?? persona} ({n})
+                    {PERSONA_META[persona] ? t(PERSONA_META[persona].labelKey) : persona} ({n})
                   </button>
                 ))}
               </div>
@@ -737,17 +747,15 @@ export function Activity({
             <div
               className="activity-attention-region"
               data-testid="attention-region"
-              aria-label="À traiter en priorité"
+              aria-label={t("activity.attentionRegionAriaLabel")}
             >
-              <h3 className="activity-region-title">À traiter</h3>
+              <h3 className="activity-region-title">{t("activity.attentionRegionTitle")}</h3>
               {attentionRows.map(renderRow)}
             </div>
           )}
           <div className="activity-rows" data-testid="activity-rows">
             {visibleRows.length === 0 ? (
-              <p className="placeholder">
-                Aucun item à afficher. L'activité apparaîtra ici pendant le build.
-              </p>
+              <p className="placeholder">{t("activity.empty")}</p>
             ) : (
               normalRows.map(renderRow)
             )}

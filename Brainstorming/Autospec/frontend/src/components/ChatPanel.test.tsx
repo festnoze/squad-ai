@@ -18,7 +18,7 @@ const baseProps = {
 describe("ChatPanel — brainstorming offer (B-IDEA)", () => {
   it("n'affiche pas l'offre de brainstorming par défaut", () => {
     render(<ChatPanel {...baseProps} />);
-    expect(screen.queryByText(/on explore ensemble/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/explore together/)).not.toBeInTheDocument();
   });
 
   it("affiche l'offre + les techniques quand une idée vague est détectée", () => {
@@ -30,7 +30,7 @@ describe("ChatPanel — brainstorming offer (B-IDEA)", () => {
         onResolveBrainstorm={vi.fn()}
       />,
     );
-    expect(screen.getByText(/idée est encore ouverte/i)).toBeInTheDocument();
+    expect(screen.getByText(/idea is still open/i)).toBeInTheDocument();
     expect(screen.getByText(/What If Scenarios, Five Whys/)).toBeInTheDocument();
   });
 
@@ -39,7 +39,7 @@ describe("ChatPanel — brainstorming offer (B-IDEA)", () => {
     render(
       <ChatPanel {...baseProps} awaitingBrainstorm onResolveBrainstorm={onResolveBrainstorm} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Oui, on explore ensemble/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Yes, let's explore together/ }));
     expect(onResolveBrainstorm).toHaveBeenCalledWith(true);
   });
 
@@ -48,7 +48,7 @@ describe("ChatPanel — brainstorming offer (B-IDEA)", () => {
     render(
       <ChatPanel {...baseProps} awaitingBrainstorm onResolveBrainstorm={onResolveBrainstorm} />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Non, affine en autonomie/ }));
+    fireEvent.click(screen.getByRole("button", { name: /No, refine autonomously/ }));
     expect(onResolveBrainstorm).toHaveBeenCalledWith(false);
   });
 });

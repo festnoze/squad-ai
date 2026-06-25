@@ -21,13 +21,13 @@ describe("LanguagePanel (L2)", () => {
     expect(screen.getByText("3/5")).toBeInTheDocument();
     expect(screen.getByText("2/5")).toBeInTheDocument();
     expect(screen.getByText(/Compromis débit/)).toBeInTheDocument();
-    expect((screen.getByLabelText("Langage backend") as HTMLSelectElement).value).toBe("go");
+    expect((screen.getByLabelText("Backend language") as HTMLSelectElement).value).toBe("go");
   });
 
   it("override : choisir un autre langage appelle onSet", () => {
     const onSet = vi.fn();
     render(<LanguagePanel language="python" complexity={1} criticality={1} onSet={onSet} />);
-    fireEvent.change(screen.getByLabelText("Langage backend"), { target: { value: "rust" } });
+    fireEvent.change(screen.getByLabelText("Backend language"), { target: { value: "rust" } });
     expect(onSet).toHaveBeenCalledWith("rust");
   });
 });

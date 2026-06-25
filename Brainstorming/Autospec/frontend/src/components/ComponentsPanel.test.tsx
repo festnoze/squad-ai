@@ -36,9 +36,9 @@ describe("ComponentsPanel (E3/E4)", () => {
       />,
     );
     expect(screen.getByText(/API backend/)).toBeInTheDocument();
-    expect(screen.getByText("approuvé")).toBeInTheDocument();
-    expect(screen.getByText("proposé")).toBeInTheDocument();
-    expect(screen.getByText(/\(optionnel\)/)).toBeInTheDocument();
+    expect(screen.getByText("approved")).toBeInTheDocument();
+    expect(screen.getByText("proposed")).toBeInTheDocument();
+    expect(screen.getByText(/\(optional\)/)).toBeInTheDocument();
   });
 
   it("✓ approuve un composant proposé (onUpdate reçoit la liste à jour)", () => {
@@ -50,7 +50,7 @@ describe("ComponentsPanel (E3/E4)", () => {
         onSetup={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByTitle("Approuver ce composant"));
+    fireEvent.click(screen.getByTitle("Approve this component"));
     expect(onUpdate).toHaveBeenCalledWith([
       expect.objectContaining({ id: "backend", status: "approved" }),
     ]);
@@ -65,7 +65,7 @@ describe("ComponentsPanel (E3/E4)", () => {
       />,
     );
     expect(
-      screen.getByRole("button", { name: /Créer les composants/ }),
+      screen.getByRole("button", { name: /Create approved components/ }),
     ).toBeDisabled();
   });
 
@@ -78,7 +78,7 @@ describe("ComponentsPanel (E3/E4)", () => {
         onSetup={onSetup}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /Créer les composants/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Create approved components/ }));
     expect(onSetup).toHaveBeenCalledTimes(1);
   });
 });

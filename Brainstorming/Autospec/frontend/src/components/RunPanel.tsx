@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { LogLine, ProjectState } from "../types";
-import { effectiveStatus } from "../work";
+import { canResumeBuild, effectiveStatus } from "../work";
+import { useI18n } from "../i18n/i18n";
 
 interface Props {
   project: ProjectState;
@@ -26,18 +27,6 @@ function formatTokens(n: number): string {
   return String(n);
 }
 
-const PHASE_LABEL: Record<string, string> = {
-  idle: "En attente",
-  spec: "📋 Spécification (PM)",
-  analyze: "🔍 Exploration backlog (Analyste)",
-  architect: "🏛️ Architecture (design)",
-  plan: "🏃 Planification (PO)",
-  build: "💻 Développement BDD/TDD",
-  done: "✅ Itération terminée",
-  stopped: "⏹ Arrêté",
-  error: "💥 Erreur",
-};
-
 export function RunPanel({
   project,
   logs,
@@ -56,6 +45,19 @@ export function RunPanel({
   onReject,
   onDeploy,
 }: Props) {
+  const { t } = useI18n();
+  // Phase labels are built inside render so they re-translate on language change.
+  const PHASE_LABEL: Record<string, string> = {
+    idle: t("runPanel.phaseIdle"),
+    spec: t("runPanel.phaseSpec"),
+    analyze: t("runPanel.phaseAnalyze"),
+    architect: t("runPanel.phaseArchitect"),
+    plan: t("runPanel.phasePlan"),
+    build: t("runPanel.phaseBuild"),
+    done: t("runPanel.phaseDone"),
+    stopped: t("runPanel.phaseStopped"),
+    error: t("runPanel.phaseError"),
+  };
   const bottomRef = useRef<HTMLDivElement>(null);
   // UI7: post-build delivery/export actions live in an overflow menu so the
   // primary controls (Lancer/Pause/Stop) stay prominent.
@@ -87,15 +89,10 @@ export function RunPanel({
     project.phase,
   );
   const loopActive = !["done", "stopped", "error"].includes(project.phase);
-  const canResumeBuild =
-    ["stopped", "error"].includes(project.phase) &&
-    (project.stories ?? []).some((s) => {
-      // Statut EFFECTIF : une US multi-stream à moitié construite (effective
-      // todo) doit afficher le bouton même si son status stocké n'est pas
-      // todo/red. effectiveStatus renvoie le status brut pour une US sans tâche.
-      const st = effectiveStatus(s);
-      return st === "todo" || st === "red";
-    });
+  // Phase dormante (done/stopped/error) + au moins une story à construire (statut
+  // EFFECTIF). Logique partagée avec ProjectBar via work.ts pour éviter toute
+  // dérive (l'oubli de `done` ici était le bug « Continuer le build »).
+  const showResumeBuild = canResumeBuild(project);
   // Statut EFFECTIF par story (cf. canResumeBuild) : une US multi-stream à moitié
   // construite peut être effective failed/done/in_progress sans que son status
   // stocké le reflète. On l'aligne sur le backend (aretry_failed agit sur
@@ -124,35 +121,35 @@ export function RunPanel({
   return (
     <div className={`panel run${logsExpanded ? "" : " run-collapsed"}`}>
       <div className="run-header">
-        <h2>Exécution</h2>
+        <h2>{t("runPanel.title")}</h2>
         <span className={`phase phase-${project.phase}`}>
-          {PHASE_LABEL[project.phase] ?? project.phase} — itération {project.iteration}
-          {project.paused ? " ⏸ en pause" : project.auto_spec && loopActive ? " (boucle auto-spec)" : ""}
+          {PHASE_LABEL[project.phase] ?? project.phase} — {t("runPanel.iteration", { n: project.iteration })}
+          {project.paused ? t("runPanel.paused") : project.auto_spec && loopActive ? t("runPanel.autoSpecLoop") : ""}
         </span>
         {project.phase === "error" && (
-          <span className="run-error" title="Détail de l'erreur de la pipeline">
-            ⚠️ {project.error?.trim() || "Erreur sans détail (voir les logs / le chat)."}
+          <span className="run-error" title={t("runPanel.errorTitle")}>
+            ⚠️ {project.error?.trim() || t("runPanel.errorNoDetail")}
           </span>
         )}
         {(project.regressions?.length ?? 0) > 0 && (
-          <span className="regression-banner" title="Des tests précédemment verts ont été cassés">
-            ⚠️ {project.regressions!.length} régression(s)
+          <span className="regression-banner" title={t("runPanel.regressionTitle")}>
+            {t("runPanel.regressionCount", { n: project.regressions!.length })}
           </span>
         )}
         {project.awaiting_approval && (
-          <span className="approval-banner" title="Validation requise avant le build">
-            ⏸ Validation requise ({project.awaiting_approval})
+          <span className="approval-banner" title={t("runPanel.approvalTitle")}>
+            {t("runPanel.approvalRequired", { phase: project.awaiting_approval })}
             <button className="small-btn approve-btn" onClick={onApprove}>
-              ✅ Approuver
+              {t("runPanel.approve")}
             </button>
             <button className="small-btn danger" onClick={onReject}>
-              ✋ Rejeter
+              {t("runPanel.reject")}
             </button>
           </span>
         )}
         {(project.resume_at ?? 0) > 0 && (
-          <span className="resume-banner" title="Fenêtre d'usage Claude épuisée : le travail reprendra automatiquement">
-            ⏰ Reprise auto à{" "}
+          <span className="resume-banner" title={t("runPanel.resumeTitle")}>
+            {t("runPanel.resumeAt")}
             {new Date((project.resume_at ?? 0) * 1000).toLocaleTimeString("fr-FR", {
               hour: "2-digit",
               minute: "2-digit",
@@ -160,7 +157,7 @@ export function RunPanel({
             <button
               className="small-btn"
               onClick={onCancelResume}
-              title="Annuler la reprise automatique"
+              title={t("runPanel.cancelAutoResume")}
             >
               ✕
             </button>
@@ -171,15 +168,15 @@ export function RunPanel({
             {budgetUsd > 0
               ? `💸 $${costUsd.toFixed(4)} / $${budgetUsd.toFixed(2)}`
               : `💸 $${costUsd.toFixed(4)}`}{" "}
-            · {formatTokens(totalTokens)} tokens · {agentCalls} appels
+            · {formatTokens(totalTokens)} {t("runPanel.usageTokens")} · {agentCalls} {t("runPanel.usageCalls")}
           </span>
         )}
         {pendingCount > 0 && forecastUsd > 0 && (
           <span
             className="forecast-meter"
-            title="Estimation du coût restant (historique coût/story du projet)"
+            title={t("runPanel.forecastTitle")}
           >
-            📈 ~${forecastUsd.toFixed(2)} / {pendingCount} story(ies)
+            {t("runPanel.forecast", { cost: forecastUsd.toFixed(2), n: pendingCount })}
           </span>
         )}
         <div className="run-buttons">
@@ -189,8 +186,8 @@ export function RunPanel({
               type="text"
               value={runArgs}
               onChange={(e) => setRunArgs(e.target.value)}
-              placeholder="arguments (ex. auth-screen)…"
-              title="Arguments CLI passés à l'application générée (optionnel)"
+              placeholder={t("runPanel.argsPlaceholder")}
+              title={t("runPanel.argsTitle")}
               onKeyDown={(e) => {
                 if (e.key === "Enter") onRun(runArgs.trim());
               }}
@@ -201,44 +198,44 @@ export function RunPanel({
             disabled={!canRun || project.running}
             onClick={() => onRun(runArgs.trim())}
           >
-            {project.running ? "▶ En cours…" : "▶ Lancer le projet"}
+            {project.running ? t("runPanel.running") : t("runPanel.runProject")}
           </button>
-          {canResumeBuild && (
+          {showResumeBuild && (
             <button
               className="primary"
               onClick={onResumeBuild}
-              title="Reprendre la phase build sur les stories restantes"
+              title={t("runPanel.resumeBuildTitle")}
             >
-              ▶ Continuer le build
+              {t("runPanel.resumeBuild")}
             </button>
           )}
           {canRetryFailed && (
             <button
               className="action-btn"
               onClick={onRetryFailed}
-              title="Réinitialiser et relancer toutes les user stories en échec"
+              title={t("runPanel.retryFailedTitle")}
             >
-              🔄 Relancer les échecs ({failedCount})
+              {t("runPanel.retryFailed", { n: failedCount })}
             </button>
           )}
           {project.running && (
-            <button className="danger" onClick={onStopApp} title="Arrêter l'application générée">
-              ■ Arrêter l'app
+            <button className="danger" onClick={onStopApp} title={t("runPanel.stopAppTitle")}>
+              {t("runPanel.stopApp")}
             </button>
           )}
           {loopActive &&
             (project.paused ? (
-              <button onClick={onResume} title="Reprendre la pipeline">
-                ▶ Reprendre
+              <button onClick={onResume} title={t("runPanel.resumePipelineTitle")}>
+                {t("runPanel.resumePipeline")}
               </button>
             ) : (
-              <button onClick={onPause} title="Mettre la pipeline en pause">
-                ⏸ Pause
+              <button onClick={onPause} title={t("runPanel.pausePipelineTitle")}>
+                {t("runPanel.pausePipeline")}
               </button>
             ))}
           {(loopActive || project.auto_spec) && (
             <button className="danger" disabled={!loopActive} onClick={onStop}>
-              ⏹ Stopper
+              {t("runPanel.stop")}
             </button>
           )}
           {canRun && (
@@ -249,23 +246,23 @@ export function RunPanel({
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
                 onClick={() => setMenuOpen((o) => !o)}
-                title="Livraison & export du produit généré"
+                title={t("runPanel.deliveryTitle")}
               >
-                ⋯ Livraison
+                {t("runPanel.delivery")}
               </button>
               {menuOpen && (
                 <div className="run-menu" role="menu">
                   <button role="menuitem" onClick={() => { setMenuOpen(false); onDocument(); }}>
-                    📘 Doc (README)
+                    {t("runPanel.doc")}
                   </button>
                   <button role="menuitem" onClick={() => { setMenuOpen(false); onExportZip(); }}>
-                    ⬇ Exporter en zip
+                    {t("runPanel.exportZip")}
                   </button>
                   <button role="menuitem" onClick={() => { setMenuOpen(false); onGitExport(); }}>
-                    🔀 Commit git
+                    {t("runPanel.gitCommit")}
                   </button>
                   <button role="menuitem" onClick={() => { setMenuOpen(false); onDeploy(); }}>
-                    🚀 Déploiement
+                    {t("runPanel.deploy")}
                   </button>
                 </div>
               )}
@@ -279,9 +276,9 @@ export function RunPanel({
           className="logs-toggle"
           onClick={() => setLogsOpen((o) => !o)}
           disabled={!hasLogs}
-          title={hasLogs ? "Afficher / masquer les logs" : "Les logs apparaîtront ici pendant l'exécution"}
+          title={hasLogs ? t("runPanel.logsToggleTitle") : t("runPanel.logsEmptyTitle")}
         >
-          {hasLogs ? `${logsOpen ? "▾" : "▸"} Logs (${logs.length})` : "Logs — aucun pour l'instant"}
+          {hasLogs ? `${logsOpen ? "▾" : "▸"} ${t("runPanel.logsCount", { n: logs.length })}` : t("runPanel.logsEmpty")}
         </button>
       </div>
       {logsExpanded && (

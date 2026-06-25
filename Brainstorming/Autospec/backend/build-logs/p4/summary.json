@@ -1,0 +1,50 @@
+{
+  "project": 4,
+  "id": "drv-p4-c6431f2d",
+  "name": "Counter web SSR",
+  "provider": "claude",
+  "phase": "done",
+  "error": "",
+  "timed_out": false,
+  "wall_s": 690.5,
+  "backend_language": "python",
+  "streams": [],
+  "components": [],
+  "stories": [
+    {
+      "id": "US-1",
+      "title": "Persistance du compteur en SQLite",
+      "status": "done",
+      "attempts": 1,
+      "stream": ""
+    },
+    {
+      "id": "US-2",
+      "title": "Rendu HTML de la page compteur",
+      "status": "done",
+      "attempts": 1,
+      "stream": ""
+    },
+    {
+      "id": "US-3",
+      "title": "Routes FastAPI : affichage et incrément avec redirection",
+      "status": "done",
+      "attempts": 1,
+      "stream": ""
+    }
+  ],
+  "usage": {
+    "agent_calls": 7,
+    "cost_usd": 3.3551,
+    "input_tokens": 42586,
+    "output_tokens": 35145
+  },
+  "workspace": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p4-c6431f2d",
+  "monitor_log": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p4-c6431f2d\\build-monitor.jsonl",
+  "pytest": {
+    "ran": true,
+    "returncode": 0,
+    "green": true,
+    "tail": "..........................                                               [100%]\n============================== warnings summary ===============================\ntests/steps/test_us_1.py: 3 warnings\ntests/steps/test_us_2.py: 4 warnings\ntests/steps/test_us_3.py: 7 warnings\n  C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p4-c6431f2d\\.venv\\Lib\\site-packages\\pytest_bdd\\compat.py:28: PytestRemovedIn10Warning: Passing nodeid to _register_fixture is deprecated. Pass node instead for fixture scoping.\n    request._fixturemanager._register_fixture(\n\ntests/steps/test_us_1.py: 3 warnings\ntests/steps/test_us_2.py: 4 warnings\ntests/steps/test_us_3.py: 7 warnings\n  C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p4-c6431f2d\\.venv\\Lib\\site-packages\\_pytest\\fixtures.py:1986: PytestRemovedIn10Warning: Passing baseid to FixtureDef is deprecated. Pass node instead for fixture scoping.\n    fixture_def = FixtureDef(\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n26 passed, 28 warnings in 1.60s\n"
+  }
+}

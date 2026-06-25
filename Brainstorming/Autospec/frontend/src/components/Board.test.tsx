@@ -49,7 +49,7 @@ describe("Board", () => {
   it("affiche un état vide actionnable quand il n'y a pas d'epic", () => {
     const { container } = render(<Board epics={[]} stories={[]} projectId="p1" />);
     // Hors phase de planification : consigne claire (UI6), pas de spinner.
-    expect(screen.getByText(/Pas encore de plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/No plan yet/i)).toBeInTheDocument();
     expect(container.querySelector(".spinner")).toBeNull();
   });
 
@@ -58,7 +58,7 @@ describe("Board", () => {
       <Board epics={[]} stories={[]} projectId="p1" phase="plan" />,
     );
     expect(container.querySelector(".spinner")).not.toBeNull();
-    expect(screen.getByText(/génère le plan/i)).toBeInTheDocument();
+    expect(screen.getByText(/generating the plan/i)).toBeInTheDocument();
   });
 
   it("navigation hiérarchique : épics → epic → story (drill-down)", () => {
@@ -99,7 +99,7 @@ describe("Board", () => {
       />,
     );
     const card = screen.getByTestId("epic-E1");
-    expect(card).toHaveTextContent("2/3 terminée(s)");
+    expect(card).toHaveTextContent("2/3 done");
     expect(card.querySelector('[role="progressbar"]')).toHaveAttribute(
       "aria-valuenow",
       "67",
@@ -124,7 +124,7 @@ describe("Board", () => {
     const card = screen.getByTestId("epic-E1");
     expect(card.className).toMatch(/epic-working/);
     expect(screen.getByTestId("epic-spinner")).toBeInTheDocument();
-    expect(card).toHaveTextContent("1 en cours");
+    expect(card).toHaveTextContent("1 in progress");
   });
 
   it("US en cours : la story porte la classe status-in_progress (halo)", () => {
@@ -174,7 +174,7 @@ describe("Board — vision produit à plat + pastille itération", () => {
         onOpenIteration={onOpenIteration}
       />,
     );
-    fireEvent.click(screen.getByTitle("Voir l'itération 2 dans la chronologie"));
+    fireEvent.click(screen.getByTitle("View iteration 2 in the timeline"));
     expect(onOpenIteration).toHaveBeenCalledWith(2);
   });
 
@@ -212,13 +212,13 @@ describe("Board — relance d'une story bloquée (US todo en erreur)", () => {
 
   it("pipeline dormante : une US todo tentée/en erreur est relançable", () => {
     openDetail("done");
-    expect(screen.getByRole("button", { name: /Relancer/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Forcer terminé/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Relaunch/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Force done/ })).toBeInTheDocument();
   });
 
   it("pipeline active : pas de relance par story (le build tourne)", () => {
     openDetail("build");
-    expect(screen.queryByRole("button", { name: /Relancer/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Relaunch/ })).not.toBeInTheDocument();
   });
 });
 
@@ -290,7 +290,7 @@ describe("Board — multi-stream (ST-12/13/14)", () => {
     });
     drillToEpic(story);
     const frontRow = screen.getByTestId("task-T-front");
-    expect(frontRow).toHaveTextContent(/bloquée par T-back/);
+    expect(frontRow).toHaveTextContent(/blocked by T-back/);
   });
 
   it("ST-14 : une tâche failed sur conflit de merge affiche l'indice de conflit", () => {
@@ -306,7 +306,7 @@ describe("Board — multi-stream (ST-12/13/14)", () => {
     });
     drillToEpic(story);
     const row = screen.getByTestId("task-T-back");
-    expect(row).toHaveTextContent(/conflit de merge/);
+    expect(row).toHaveTextContent(/merge conflict/);
   });
 
   it("ST-13 : ouvrir une tâche montre son détail + actions par tâche (relance)", () => {
@@ -326,8 +326,8 @@ describe("Board — multi-stream (ST-12/13/14)", () => {
     drillToEpic(story, { phase: "done" });
     fireEvent.click(screen.getByText("API en échec"));
     expect(screen.getByTestId("task-detail-T-back")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Relancer/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Forcer terminé/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Relaunch/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Force done/ })).toBeInTheDocument();
   });
 
   it("legacy (aucun stream/tâche) : rendu inchangé, pas de filtre ni badge stream", () => {

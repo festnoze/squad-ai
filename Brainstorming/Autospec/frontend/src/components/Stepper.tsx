@@ -6,28 +6,7 @@ import {
   isStageDone,
   STAGE_ORDER,
 } from "../work";
-
-/** Short label shown under each stepper cell. */
-const STAGE_LABEL: Record<BuildStage, string> = {
-  queued: "File",
-  analyzing: "Analyse",
-  contracts: "Contrats",
-  implementing: "Code",
-  verifying: "Vérif",
-  merge_wait: "Attente merge",
-  merging: "Merge",
-  done: "Fini",
-  failed: "Échec",
-};
-
-/** Human label for an auto-repair recovery kind. */
-const RECOVERY_LABEL: Record<string, string> = {
-  refining: "affinage",
-  critic_restored: "critique restaurée",
-  regression_rerun: "rejeu régression",
-  mutation_rerun: "rejeu mutation",
-  retry: "nouvelle tentative",
-};
+import { useI18n } from "../i18n/i18n";
 
 /** A tick is considered "stale" (greyed-out) once older than this (ms). */
 export const STALE_MS = 25_000;
@@ -54,6 +33,27 @@ export function Stepper({
   /** epoch ms of the heartbeat this view came from (0/undefined = persisted). */
   tickTs?: number;
 }) {
+  const { t } = useI18n();
+  /** Short label shown under each stepper cell. */
+  const STAGE_LABEL: Record<BuildStage, string> = {
+    queued: t("stepper.stageQueued"),
+    analyzing: t("stepper.stageAnalyzing"),
+    contracts: t("stepper.stageContracts"),
+    implementing: t("stepper.stageImplementing"),
+    verifying: t("stepper.stageVerifying"),
+    merge_wait: t("stepper.stageMergeWait"),
+    merging: t("stepper.stageMerging"),
+    done: t("stepper.stageDone"),
+    failed: t("stepper.stageFailed"),
+  };
+  /** Human label for an auto-repair recovery kind. */
+  const RECOVERY_LABEL: Record<string, string> = {
+    refining: t("stepper.recoveryRefining"),
+    critic_restored: t("stepper.recoveryCriticRestored"),
+    regression_rerun: t("stepper.recoveryRegressionRerun"),
+    mutation_rerun: t("stepper.recoveryMutationRerun"),
+    retry: t("stepper.recoveryRetry"),
+  };
   const stale =
     view.fromTick && !!tickTs && now - tickTs > STALE_MS;
   const failed = view.status === "failed" || view.stage === "failed";
@@ -65,7 +65,7 @@ export function Stepper({
     <div
       className={`stepper${stale ? " stepper-stale" : ""}`}
       role="group"
-      aria-label={`Étapes ${view.id}`}
+      aria-label={t("stepper.stepsLabel", { id: view.id })}
       data-testid={`stepper-${view.id}`}
       data-stale={stale ? "true" : "false"}
     >

@@ -1,5 +1,6 @@
 import { ProductComponent } from "../types";
 import { CollapsibleSection } from "./CollapsibleSection";
+import { useI18n } from "../i18n/i18n";
 
 const KIND_ICON: Record<string, string> = {
   backend: "⚙️",
@@ -7,13 +8,6 @@ const KIND_ICON: Record<string, string> = {
   database: "🗄️",
   cache: "⚡",
   other: "📦",
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  proposed: "proposé",
-  approved: "approuvé",
-  created: "créé",
-  rejected: "écarté",
 };
 
 interface Props {
@@ -25,6 +19,13 @@ interface Props {
 /** Composants du produit proposés par l'agent solutionneur : l'utilisateur
  * approuve/écarte chaque composant, puis lance la création réelle (setup). */
 export function ComponentsPanel({ components, onUpdate, onSetup }: Props) {
+  const { t } = useI18n();
+  const STATUS_LABEL: Record<string, string> = {
+    proposed: t("componentsPanel.statusProposed"),
+    approved: t("componentsPanel.statusApproved"),
+    created: t("componentsPanel.statusCreated"),
+    rejected: t("componentsPanel.statusRejected"),
+  };
   if (components.length === 0) return null;
 
   const toggle = (target: ProductComponent) => {
@@ -47,7 +48,7 @@ export function ComponentsPanel({ components, onUpdate, onSetup }: Props) {
   ).length;
 
   return (
-    <CollapsibleSection title="🧱 Composants du produit" className="components">
+    <CollapsibleSection title={t("componentsPanel.title")} className="components">
       <div className="component-list">
         {components.map((c) => (
           <div key={c.id} className={`component status-${c.status}`}>
@@ -55,7 +56,7 @@ export function ComponentsPanel({ components, onUpdate, onSetup }: Props) {
             <span className="component-name">
               {c.name}
               <span className="component-tech"> — {c.technology}</span>
-              {c.optional && <span className="component-optional"> (optionnel)</span>}
+              {c.optional && <span className="component-optional"> {t("componentsPanel.optional")}</span>}
             </span>
             <span className={`state-tag component-status-${c.status}`}>
               {STATUS_LABEL[c.status] ?? c.status}
@@ -63,7 +64,7 @@ export function ComponentsPanel({ components, onUpdate, onSetup }: Props) {
             {c.status !== "created" && (
               <button
                 className="small-btn"
-                title={c.status === "approved" ? "Écarter ce composant" : "Approuver ce composant"}
+                title={c.status === "approved" ? t("componentsPanel.reject") : t("componentsPanel.approve")}
                 onClick={() => toggle(c)}
               >
                 {c.status === "approved" ? "✕" : "✓"}
@@ -76,9 +77,9 @@ export function ComponentsPanel({ components, onUpdate, onSetup }: Props) {
         className="primary setup-btn"
         disabled={approvedCount === 0}
         onClick={onSetup}
-        title="Créer réellement les composants approuvés (dossiers, manifests)"
+        title={t("componentsPanel.setupTitle")}
       >
-        🧱 Créer les composants approuvés
+        {t("componentsPanel.setup")}
       </button>
     </CollapsibleSection>
   );

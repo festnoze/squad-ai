@@ -1,18 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ChatMessage, PipelinePhase } from "../types";
-
-const ROLE_LABEL: Record<string, string> = {
-  user: "Toi",
-  pm: "📋 PM",
-  po: "🏃 PO",
-  dev: "💻 Dev",
-  analyst: "🔍 Analyste",
-  architect: "🏛️ Architecte",
-  qa: "🧪 QA",
-  critic: "🧐 Critique",
-  judge: "⚖️ Juge",
-  system: "⚙️ Système",
-};
+import { useI18n } from "../i18n/i18n";
 
 interface Props {
   chat: ChatMessage[];
@@ -36,8 +24,22 @@ export function ChatPanel({
   brainstormTechniques = [],
   onResolveBrainstorm,
 }: Props) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const ROLE_LABEL: Record<string, string> = {
+    user: t("chatPanel.roleUser"),
+    pm: t("chatPanel.rolePm"),
+    po: t("chatPanel.rolePo"),
+    dev: t("chatPanel.roleDev"),
+    analyst: t("chatPanel.roleAnalyst"),
+    architect: t("chatPanel.roleArchitect"),
+    qa: t("chatPanel.roleQa"),
+    critic: t("chatPanel.roleCritic"),
+    judge: t("chatPanel.roleJudge"),
+    system: t("chatPanel.roleSystem"),
+  };
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -52,38 +54,38 @@ export function ChatPanel({
 
   const placeholder =
     phase === "spec"
-      ? "Réponds au PM…"
+      ? t("chatPanel.placeholderSpec")
       : phase === "build" || phase === "architect"
-        ? "Donne une consigne au dev en cours… (prise en compte aux prochaines tentatives)"
-        : "Donne ton feedback sur l'itération en cours…";
+        ? t("chatPanel.placeholderBuild")
+        : t("chatPanel.placeholderFeedback");
 
   return (
     <div className="panel chat">
       <div className="chat-header">
-        <h2>Chat — spécification &amp; feedback</h2>
+        <h2>{t("chatPanel.heading")}</h2>
         {phase === "spec" && (
           <div
             className="spec-mode-switch"
             role="group"
-            aria-label="Mode de spécification"
+            aria-label={t("chatPanel.specModeGroup")}
           >
             <button
               type="button"
               className={`spec-mode-btn${specMode === "interview" ? " active" : ""}`}
               aria-pressed={specMode === "interview"}
-              title="Interview socratique : clarifier le besoin par une série de questions ciblées, dimension par dimension."
+              title={t("chatPanel.interviewTitle")}
               onClick={() => onSetSpecMode("interview")}
             >
-              💬 Interview
+              {t("chatPanel.interview")}
             </button>
             <button
               type="button"
               className={`spec-mode-btn${specMode === "brainstorm" ? " active" : ""}`}
               aria-pressed={specMode === "brainstorm"}
-              title="Brainstorming : le PM/analyste re-questionne lui-même le besoin (divergence puis convergence)."
+              title={t("chatPanel.brainstormingTitle")}
               onClick={() => onSetSpecMode("brainstorm")}
             >
-              🧠 Brainstorming
+              {t("chatPanel.brainstorming")}
             </button>
           </div>
         )}
@@ -93,8 +95,8 @@ export function ChatPanel({
           <div className="chat-empty">
             <p className="placeholder">
               {phase === "spec"
-                ? "Le PM va te poser des questions pour cadrer le besoin — réponds ci-dessous."
-                : "Les échanges PM → PO → QA → Dev s'afficheront ici. Tu peux aussi envoyer un feedback à tout moment."}
+                ? t("chatPanel.emptySpec")
+                : t("chatPanel.emptyBuild")}
             </p>
           </div>
         ) : (
@@ -108,12 +110,15 @@ export function ChatPanel({
         <div ref={bottomRef} />
       </div>
       {awaitingBrainstorm && onResolveBrainstorm && (
-        <div className="brainstorm-offer" role="group" aria-label="Proposition de brainstorming">
+        <div className="brainstorm-offer" role="group" aria-label={t("chatPanel.brainstormOfferGroup")}>
           <p>
-            💡 Ton idée est encore ouverte. Une session de <strong>brainstorming</strong> pour
-            l'affiner&nbsp;?
+            {t("chatPanel.brainstormOfferLead")}
+            <strong>{t("chatPanel.brainstormOfferWord")}</strong>
+            {t("chatPanel.brainstormOfferTrail")}
             {brainstormTechniques.length > 0 && (
-              <span className="brainstorm-tech"> Techniques&nbsp;: {brainstormTechniques.join(", ")}.</span>
+              <span className="brainstorm-tech">
+                {t("chatPanel.brainstormTechniques", { list: brainstormTechniques.join(", ") })}
+              </span>
             )}
           </p>
           <div className="brainstorm-actions">
@@ -122,14 +127,14 @@ export function ChatPanel({
               className="brainstorm-btn accept"
               onClick={() => onResolveBrainstorm(true)}
             >
-              🧠 Oui, on explore ensemble
+              {t("chatPanel.brainstormAccept")}
             </button>
             <button
               type="button"
               className="brainstorm-btn refuse"
               onClick={() => onResolveBrainstorm(false)}
             >
-              🤖 Non, affine en autonomie
+              {t("chatPanel.brainstormRefuse")}
             </button>
           </div>
         </div>
@@ -148,7 +153,7 @@ export function ChatPanel({
           }}
         />
         <button onClick={send} disabled={!draft.trim()}>
-          Envoyer
+          {t("chatPanel.send")}
         </button>
       </div>
     </div>

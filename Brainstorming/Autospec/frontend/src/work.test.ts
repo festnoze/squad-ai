@@ -2,9 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   blockedBy,
   buildWorkGraph,
+  canResumeBuild,
   deriveItemView,
+  DORMANT_PHASES,
   effectiveStatus,
   elapsedLabel,
+  hasBuildableStory,
   hasMultiStream,
   isStageActive,
   isStageDone,
@@ -12,7 +15,7 @@ import {
   STAGE_ORDER,
   stageIndex,
 } from "./work";
-import { Stream, Task, TickItem, UserStory } from "./types";
+import { PipelinePhase, ProjectState, Stream, Task, TickItem, UserStory } from "./types";
 
 function task(overrides: Partial<Task> = {}): Task {
   return {
@@ -161,6 +164,82 @@ describe("work — stage tracker helpers", () => {
     expect(elapsedLabel(nowS - 3660, now)).toBe("1h 1m");
     // horloge décalée (départ dans le futur) → ""
     expect(elapsedLabel(nowS + 10, now)).toBe("");
+  });
+});
+
+function project(overrides: Partial<ProjectState> = {}): ProjectState {
+  return {
+    id: "p1",
+    name: "Projet",
+    goal: "",
+    auto_spec: false,
+    spec_mode: "interview",
+    phase: "done" as PipelinePhase,
+    brief: "",
+    backlog: [],
+    epics: [],
+    stories: [],
+    chat: [],
+    feedback: [],
+    iteration: 0,
+    running: false,
+    paused: false,
+    error: "",
+    created_at: 0,
+    architecture: "",
+    plan_quality: 0,
+    budget_usd: 0,
+    archived: false,
+    ...overrides,
+  };
+}
+
+describe("work — canResumeBuild (gating partagé RunPanel/ProjectBar)", () => {
+  it("DORMANT_PHASES inclut 'done' (régression snake) en plus de stopped/error", () => {
+    expect(DORMANT_PHASES).toContain("done");
+    expect(DORMANT_PHASES).toContain("stopped");
+    expect(DORMANT_PHASES).toContain("error");
+  });
+
+  it("phase 'done' avec story 'todo' restante → true (le cas snake : 5/9 faites)", () => {
+    expect(
+      canResumeBuild(
+        project({
+          phase: "done",
+          stories: [story({ id: "S1", status: "done" }), story({ id: "S2", status: "todo" })],
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it.each<PipelinePhase>(["stopped", "error"])(
+    "phase dormante '%s' avec story todo → true",
+    (phase) => {
+      expect(
+        canResumeBuild(project({ phase, stories: [story({ status: "todo" })] })),
+      ).toBe(true);
+    },
+  );
+
+  it("phase active (build) même avec story todo → false (pipeline en cours)", () => {
+    expect(
+      canResumeBuild(project({ phase: "build", stories: [story({ status: "todo" })] })),
+    ).toBe(false);
+  });
+
+  it("phase 'done' mais toutes les stories done → false", () => {
+    expect(
+      canResumeBuild(project({ phase: "done", stories: [story({ status: "done" })] })),
+    ).toBe(false);
+  });
+
+  it("statut EFFECTIF : US multi-stream à moitié faite (tasks [done, todo], status brut 'done') → true", () => {
+    const half = story({
+      status: "done",
+      tasks: [task({ id: "T1", status: "done" }), task({ id: "T2", status: "todo" })],
+    });
+    expect(canResumeBuild(project({ phase: "done", stories: [half] }))).toBe(true);
+    expect(hasBuildableStory([half])).toBe(true);
   });
 });
 

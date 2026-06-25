@@ -73,7 +73,7 @@ describe("LlmActivity", () => {
     getItemInteractions.mockResolvedValue([]);
     render(<LlmActivity projectId="p1" itemId="US-9" />);
     await waitFor(() =>
-      expect(screen.getByText(/Aucun appel LLM enregistré/)).toBeInTheDocument(),
+      expect(screen.getByText(/No LLM call recorded/)).toBeInTheDocument(),
     );
   });
 
@@ -82,7 +82,7 @@ describe("LlmActivity", () => {
       call({ id: "call-x", ok: false, error: "timeout", response: "" }),
     ]);
     render(<LlmActivity projectId="p1" itemId="US-1" />);
-    await waitFor(() => expect(screen.getByText("échec")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("failed")).toBeInTheDocument());
     expect(screen.getByText("timeout")).toBeInTheDocument();
   });
 });

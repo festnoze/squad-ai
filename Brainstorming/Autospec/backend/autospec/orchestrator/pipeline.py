@@ -12,6 +12,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -62,6 +63,7 @@ from .interactions import InteractionStore
 from . import mutation, refine, scheduler, session_monitor, setup_exec, streams as work_streams, toolchain, workspace
 from . import lessons as lesson_store
 from . import regression
+from .build_monitor import BuildMonitor
 from . import deploy
 from . import brownfield
 from . import sandbox
@@ -213,6 +215,7 @@ class _UsageTracker:
         # project switch / shutdown can kill it mid-flight. to_thread copies this
         # context into the worker thread where the process is actually spawned.
         active_processes.set(self.pipeline._agent_procs)
+        _t0 = time.monotonic()
         try:
             chosen = model or settings.model_for_phase(phase)
             res = await self.pipeline.runner.arun(
@@ -224,6 +227,11 @@ class _UsageTracker:
             self.pipeline._record_interaction(
                 item_id=item_id, phase=phase, persona=role, prompt=prompt,
                 response="", ok=False, error=str(exc),
+            )
+            self.pipeline.monitor.agent_call(
+                role=role, item_id=item_id,
+                duration_ms=(time.monotonic() - _t0) * 1000,
+                ok=False, error=str(exc),
             )
             # Usage-window watchdog (M2): an exhausted Claude session window
             # triggers a clean stop + scheduled auto-resume, then the error
@@ -270,6 +278,11 @@ class _UsageTracker:
             input_tokens=res.input_tokens, output_tokens=res.output_tokens,
             cost_usd=res.cost_usd, duration_ms=res.duration_ms,
         )
+        self.pipeline.monitor.agent_call(
+            role=role, item_id=item_id,
+            duration_ms=res.duration_ms or (time.monotonic() - _t0) * 1000,
+            ok=True, in_tokens=res.input_tokens, out_tokens=res.output_tokens,
+        )
         self.pipeline._sync()  # persist + broadcast usage as it accrues
         return res
 
@@ -279,6 +292,9 @@ class Pipeline:
         self.state = state
         self.runner = runner
         self._tracked = _UsageTracker(self)
+        # Opt-in build monitor (AUTOSPEC_BUILD_MONITOR): JSONL timeline for
+        # post-mortem failure analysis. No-op when disabled.
+        self.monitor = BuildMonitor(state)
         # O2: live capture of LLM round-trips per work item. Kept out of
         # ProjectState (prompts/answers are large); in-memory ring + JSONL sidecar.
         # Seed the ring from the sidecar so history survives a backend reload.
@@ -330,6 +346,9 @@ class Pipeline:
         # B6 (UX): owner-tracking wrapper so the tick can report who holds it
         # (``merge_lock_held:US-3``) and stamp the holder's ``merge_wait`` ring.
         self._merge_lock = _OwnedLock()
+        # Serialize the one-time `npm install` of the frontend stream so parallel
+        # frontend work items don't each kick off (or race) an install.
+        self._npm_lock = asyncio.Lock()
         # B5 (UX): heartbeat tick publisher, started on BUILD entry, cancelled on
         # stop/dispose. ~10s compact item-status broadcast (never replayed).
         self._tick_task: asyncio.Task | None = None
@@ -1883,6 +1902,10 @@ class Pipeline:
             )
             if self.state.phase == PipelinePhase.DONE:
                 self._notify("success", "Itération terminée", self.state.name)
+            self.monitor.event(
+                "outcome", result=self.state.phase.value,
+                stories=[{"id": s.id, "status": s.status.value} for s in self.state.stories],
+            )
         except Exception as exc:  # surface any pipeline failure to the UI
             if self._stop_requested:
                 # A hard interrupt (project switch / shutdown) kills the in-flight
@@ -1899,6 +1922,11 @@ class Pipeline:
                 self.state.error = detail
                 self._chat(ChatRole.SYSTEM, f"Erreur pipeline : {detail}")
                 self._notify("error", "Erreur pipeline", f"{self.state.name} : {detail}"[:200])
+            self.monitor.event(
+                "outcome", result=self.state.phase.value,
+                error=self.state.error,
+                stories=[{"id": s.id, "status": s.status.value} for s in self.state.stories],
+            )
 
     # ------------------------------------------------------------ SPEC (PM)
 
@@ -2995,9 +3023,25 @@ class Pipeline:
                     self._set_stage(target, BuildStage.DONE, sync=False)  # B1
                     self._log(f"dev:{item.id}", f"✅ {item.id} vert et mergé.")
                 else:
-                    target.status = subject.status = StoryStatus.FAILED
-                    target.last_error = "conflit de merge inter-stream non résolu"
-                    self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
+                    # ST-10/11: a merge conflict means a sibling work item changed
+                    # the SAME files. An immediate same-inputs retry (in
+                    # _amerge_work_item) can never resolve it. Re-queue the item
+                    # like a red build so the next scheduler pass rebuilds it in a
+                    # worktree branched from the now-updated HEAD — which already
+                    # contains the sibling's code — and merges cleanly. Bounded by
+                    # dev_max_attempts; only a persistent conflict ends FAILED.
+                    target.last_error = "conflit de merge inter-stream"
+                    if subject.attempts < settings.dev_max_attempts:
+                        target.status = subject.status = StoryStatus.TODO
+                        self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
+                        self._log(
+                            f"dev:{item.id}",
+                            f"⚠️ Conflit de merge {item.id} — rebuild sur HEAD à jour "
+                            f"(tentative {subject.attempts + 1}/{settings.dev_max_attempts}).",
+                        )
+                    else:
+                        target.status = subject.status = StoryStatus.FAILED
+                        self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
             else:
                 target.last_error = tail
                 self._log(f"dev:{item.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
@@ -3059,6 +3103,12 @@ class Pipeline:
         item_guidance = self._apply_guidance(target)  # P10
         if is_frontend:
             stream = self._story_stream(subject)
+            # The frontend dev agent runs Vitest/`vite build` in its worktree —
+            # ensure `node_modules` is present (shared install + junction) first,
+            # else every frontend item fails with "Cannot find package 'vite'".
+            await self._aensure_frontend_node_modules(
+                Path(worktree) / (stream.file_root or "frontend")
+            )
             dev_prompt = prompts.dev_story_frontend(
                 subject, pkg, workspace.feature_rel_path(subject),
                 architecture=self.state.architecture,
@@ -3656,7 +3706,12 @@ class Pipeline:
                     except OSError:
                         pass
 
-        return await asyncio.to_thread(_run)
+        ok, output, results = await asyncio.to_thread(_run)
+        self.monitor.pytest(
+            item_id=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",
+            ok=ok, summary=(output or "")[-500:],
+        )
+        return ok, output, results
 
     # ------------------------------------------------- Frontend stream (ST-7)
 
@@ -3671,6 +3726,86 @@ class Pipeline:
             return False
         stream = self._story_stream(story)
         return stream.kind == StreamKind.FRONTEND or toolchain.is_frontend(stream.language)
+
+    @staticmethod
+    def _resolve_cmd(cmd: list[str]) -> list[str]:
+        """Resolve a launchable path for ``cmd[0]`` (Windows: ``npm`` → ``npm.cmd``).
+
+        ``subprocess`` without a shell cannot exec a bare ``npm`` on Windows (the
+        on-PATH entry is the ``npm.cmd`` shim), which raises ``[WinError 2]``.
+        ``shutil.which`` honours ``PATHEXT`` and returns the real shim. Left
+        unchanged when nothing resolves (the caller handles the OSError)."""
+        if not cmd:
+            return cmd
+        exe = shutil.which(cmd[0])
+        return [exe, *cmd[1:]] if exe else cmd
+
+    @staticmethod
+    def _link_node_modules(link: Path, target: Path) -> None:
+        """Best-effort: create ``link`` as a directory junction/symlink to
+        ``target`` so a worktree shares the main install. Junctions need no admin
+        rights on Windows (unlike symlinks)."""
+        try:
+            link.parent.mkdir(parents=True, exist_ok=True)
+            if os.name == "nt":
+                subprocess.run(
+                    ["cmd", "/c", "mklink", "/J", str(link), str(target)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+                )
+            else:
+                os.symlink(target, link, target_is_directory=True)
+        except OSError:
+            pass
+
+    async def _aensure_frontend_node_modules(self, root: Path) -> None:
+        """Make ``node_modules`` available in a frontend ``root`` before Vitest /
+        ``vite build`` run.
+
+        The streams build runs frontend items in git worktrees, which never carry
+        ``node_modules`` (gitignored, and ``npm install`` is NOT part of the
+        autonomous lifecycle — only the separate component-setup action installs).
+        Without this, every frontend item fails with ``Cannot find package 'vite'``.
+        Fix: install ONCE in the project's main frontend root, then link it into
+        the worktree via a junction so all worktrees share a single install.
+        Best-effort — any failure is logged and left to surface downstream."""
+        if settings.fake_agents or (root / "node_modules").exists():
+            return
+        stream = next(iter(workspace.frontend_streams(self.state)), None)
+        if stream is None:
+            return
+        main_root = workspace.stream_root(self.state, stream)
+        if not (main_root / "package.json").exists():
+            return
+        async with self._npm_lock:
+            if not (main_root / "node_modules").exists():
+                self._log("streams", "📦 npm install (frontend) — première fois…")
+
+                def _install():
+                    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+                    return subprocess.run(
+                        self._resolve_cmd(
+                            [settings.npm_cmd, "install", "--no-audit", "--no-fund"]
+                        ),
+                        cwd=str(main_root), stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT, env=env, text=True,
+                        encoding="utf-8", errors="replace", timeout=900,
+                    )
+
+                try:
+                    proc = await asyncio.to_thread(_install)
+                    ok = proc.returncode == 0
+                    self._log(
+                        "streams",
+                        f"📦 npm install {'OK' if ok else 'ÉCHEC : ' + proc.stdout[-200:]}",
+                    )
+                except (OSError, subprocess.TimeoutExpired) as exc:
+                    self._log("streams", f"📦 npm install indisponible : {exc}")
+                    return
+        # Link the shared install into the worktree root (when distinct).
+        if root.resolve() != main_root.resolve() and (main_root / "node_modules").exists():
+            await asyncio.to_thread(
+                self._link_node_modules, root / "node_modules", main_root / "node_modules"
+            )
 
     async def _arun_frontend_tests(self, ws=None) -> tuple[bool, str, dict[str, str]]:
         """Run the frontend stream's Vitest suite AND the production build
@@ -3691,6 +3826,9 @@ class Pipeline:
             # Re-root the frontend zone onto the worktree copy of the repo.
             rel = root.relative_to(workspace_dir(self.state.id))
             root = ws / rel
+        # Safety net: the verify step also needs node_modules (idempotent — the
+        # dev step usually installed/linked it already).
+        await self._aensure_frontend_node_modules(root)
         env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
 
         def _run() -> tuple[bool, str, dict[str, str]]:
@@ -3699,26 +3837,36 @@ class Pipeline:
             fd, report_path = tempfile.mkstemp(suffix=".json", prefix="autospec-vitest-")
             os.close(fd)
             try:
-                test_cmd = self._maybe_sandbox(
+                test_cmd = self._resolve_cmd(self._maybe_sandbox(
                     toolchain.frontend_test_command(report_path), root
-                )
-                test_proc = subprocess.run(
-                    test_cmd, cwd=str(root),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    env=env, text=True, encoding="utf-8", errors="replace",
-                )
+                ))
+                try:
+                    test_proc = subprocess.run(
+                        test_cmd, cwd=str(root),
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        env=env, text=True, encoding="utf-8", errors="replace",
+                    )
+                except OSError as exc:
+                    # A missing toolchain (no node/npm) must fail THIS story, not
+                    # crash the whole pipeline with an unhandled OSError.
+                    return False, f"toolchain frontend indisponible : {exc}", {}
                 results = toolchain.parse_frontend_results(test_proc.stdout, report_path)
                 tests_ok = test_proc.returncode == 0
                 output = test_proc.stdout
                 if not tests_ok:
                     return False, output, results
                 # Tests green → the build (tsc && vite build) gates "green" too.
-                build_cmd = self._maybe_sandbox(toolchain.frontend_build_command(), root)
-                build_proc = subprocess.run(
-                    build_cmd, cwd=str(root),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    env=env, text=True, encoding="utf-8", errors="replace",
+                build_cmd = self._resolve_cmd(
+                    self._maybe_sandbox(toolchain.frontend_build_command(), root)
                 )
+                try:
+                    build_proc = subprocess.run(
+                        build_cmd, cwd=str(root),
+                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                        env=env, text=True, encoding="utf-8", errors="replace",
+                    )
+                except OSError as exc:
+                    return False, output + f"\n--- build indisponible : {exc}", results
                 if build_proc.returncode != 0:
                     errs = toolchain.parse_build_errors(build_proc.stdout)
                     return False, output + "\n--- build ---\n" + errs, results
@@ -3729,7 +3877,13 @@ class Pipeline:
                 except OSError:
                     pass
 
-        return await asyncio.to_thread(_run)
+        ok, output, results = await asyncio.to_thread(_run)
+        self.monitor.event(
+            "frontend_verify",
+            item=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",
+            ok=ok, summary=(output or "")[-500:],
+        )
+        return ok, output, results
 
     # ------------------------------------------------- AUTO-SPEC next cycle
 

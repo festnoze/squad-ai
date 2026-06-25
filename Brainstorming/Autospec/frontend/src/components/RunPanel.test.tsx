@@ -114,17 +114,17 @@ function renderPanel(
 describe("RunPanel", () => {
   it("phase 'done' : bouton « Lancer » activé, pas de bouton « Stopper »", () => {
     renderPanel(makeProject({ phase: "done" }));
-    const run = screen.getByRole("button", { name: "▶ Lancer le projet" });
+    const run = screen.getByRole("button", { name: "▶ Run project" });
     expect(run).toBeEnabled();
     expect(
-      screen.queryByRole("button", { name: "⏹ Stopper" }),
+      screen.queryByRole("button", { name: "⏹ Stop" }),
     ).not.toBeInTheDocument();
   });
 
   it("phase 'build' : bouton « Stopper » présent", () => {
     renderPanel(makeProject({ phase: "build" }));
     expect(
-      screen.getByRole("button", { name: "⏹ Stopper" }),
+      screen.getByRole("button", { name: "⏹ Stop" }),
     ).toBeInTheDocument();
   });
 
@@ -133,14 +133,14 @@ describe("RunPanel", () => {
     // PAS exclue, donc le bouton y reste actif : on teste donc « spec ».
     renderPanel(makeProject({ phase: "spec" }));
     expect(
-      screen.getByRole("button", { name: "▶ Lancer le projet" }),
+      screen.getByRole("button", { name: "▶ Run project" }),
     ).toBeDisabled();
   });
 
   it("paused=true (phase build) : bouton « Reprendre » présent, pas « Pause »", () => {
     renderPanel(makeProject({ phase: "build", paused: true }));
     expect(
-      screen.getByRole("button", { name: "▶ Reprendre" }),
+      screen.getByRole("button", { name: "▶ Resume" }),
     ).toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: "⏸ Pause" }),
@@ -150,10 +150,10 @@ describe("RunPanel", () => {
   it("running=true : bouton « Arrêter l'app » présent, libellé primaire « En cours… »", () => {
     renderPanel(makeProject({ phase: "build", running: true }));
     expect(
-      screen.getByRole("button", { name: "■ Arrêter l'app" }),
+      screen.getByRole("button", { name: "■ Stop app" }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "▶ En cours…" }),
+      screen.getByRole("button", { name: "▶ Running…" }),
     ).toBeInTheDocument();
   });
 
@@ -162,7 +162,26 @@ describe("RunPanel", () => {
       makeProject({ phase: "stopped", stories: [makeStory({ status: "todo" })] }),
     );
     expect(
-      screen.getByRole("button", { name: "▶ Continuer le build" }),
+      screen.getByRole("button", { name: "▶ Continue build" }),
+    ).toBeInTheDocument();
+  });
+
+  it("REGRESSION (snake) : phase 'done' avec stories 'todo' restantes : bouton « Continuer le build » présent", () => {
+    // Une itération auto-spec terminée laisse la phase à 'done' tout en gardant
+    // des US non construites. Le bouton doit s'afficher (gating dormant inclut
+    // 'done', cf. backend aresume_build). C'était le bug d'origine : 'done' était
+    // absent de la liste des phases côté RunPanel.
+    renderPanel(
+      makeProject({
+        phase: "done",
+        stories: [
+          makeStory({ id: "S1", status: "done" }),
+          makeStory({ id: "S2", status: "todo" }),
+        ],
+      }),
+    );
+    expect(
+      screen.getByRole("button", { name: "▶ Continue build" }),
     ).toBeInTheDocument();
   });
 
@@ -184,7 +203,7 @@ describe("RunPanel", () => {
       }),
     );
     expect(
-      screen.getByRole("button", { name: "▶ Continuer le build" }),
+      screen.getByRole("button", { name: "▶ Continue build" }),
     ).toBeInTheDocument();
   });
 
@@ -193,7 +212,7 @@ describe("RunPanel", () => {
       makeProject({ phase: "stopped", stories: [makeStory({ status: "done" })] }),
     );
     expect(
-      screen.queryByRole("button", { name: "▶ Continuer le build" }),
+      screen.queryByRole("button", { name: "▶ Continue build" }),
     ).not.toBeInTheDocument();
   });
 
@@ -216,9 +235,9 @@ describe("RunPanel", () => {
       makeProject({ phase: "stopped", resume_at: Date.now() / 1000 + 3600 }),
     );
     expect(container.querySelector(".resume-banner")).not.toBeNull();
-    expect(screen.getByText(/Reprise auto à/)).toBeInTheDocument();
+    expect(screen.getByText(/Auto-resume at/)).toBeInTheDocument();
     expect(
-      screen.getByTitle("Annuler la reprise automatique"),
+      screen.getByTitle("Cancel automatic resume"),
     ).toBeInTheDocument();
   });
 
@@ -231,7 +250,7 @@ describe("RunPanel", () => {
     const { container } = renderPanel(makeProject());
     expect(container.querySelector(".run")?.className).toMatch(/run-collapsed/);
     expect(container.querySelector(".logs")).toBeNull();
-    expect(screen.getByText(/aucun pour l'instant/i)).toBeInTheDocument();
+    expect(screen.getByText(/none yet/i)).toBeInTheDocument();
   });
 
   it("UI4 : avec des logs, la boîte s'affiche + compteur, panneau non replié", () => {
@@ -248,16 +267,16 @@ describe("RunPanel", () => {
     renderPanel(makeProject({ phase: "done" }));
     // Les actions post-build ne sont pas des boutons inline.
     expect(screen.queryByRole("button", { name: /Doc \(README\)/ })).not.toBeInTheDocument();
-    const trigger = screen.getByRole("button", { name: /⋯ Livraison/ });
+    const trigger = screen.getByRole("button", { name: /⋯ Delivery/ });
     fireEvent.click(trigger);
     expect(screen.getByRole("menuitem", { name: /Doc \(README\)/ })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /Exporter en zip/ })).toBeInTheDocument();
-    expect(screen.getByRole("menuitem", { name: /Déploiement/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Export as zip/ })).toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /Deployment/ })).toBeInTheDocument();
   });
 
   it("UI7 : pas de menu Livraison tant qu'aucun build n'existe (phase build)", () => {
     renderPanel(makeProject({ phase: "build" }));
-    expect(screen.queryByRole("button", { name: /⋯ Livraison/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /⋯ Delivery/ })).not.toBeInTheDocument();
   });
 
   it("retry-failed : bouton « Relancer les échecs (N) » + clic, quand dormant", () => {
@@ -267,7 +286,7 @@ describe("RunPanel", () => {
         stories: [makeStory({ status: "failed" }), makeStory({ id: "S2", status: "done" })],
       }),
     );
-    const btn = screen.getByRole("button", { name: /Relancer les échecs \(1\)/ });
+    const btn = screen.getByRole("button", { name: /Retry failures \(1\)/ });
     fireEvent.click(btn);
     expect(onRetryFailed).toHaveBeenCalledTimes(1);
   });
@@ -291,21 +310,21 @@ describe("RunPanel", () => {
       }),
     );
     expect(
-      screen.getByRole("button", { name: /Relancer les échecs \(1\)/ }),
+      screen.getByRole("button", { name: /Retry failures \(1\)/ }),
     ).toBeInTheDocument();
   });
 
   it("retry-failed : pas de bouton sans story en échec", () => {
     renderPanel(makeProject({ phase: "done", stories: [makeStory({ status: "done" })] }));
     expect(
-      screen.queryByRole("button", { name: /Relancer les échecs/ }),
+      screen.queryByRole("button", { name: /Retry failures/ }),
     ).not.toBeInTheDocument();
   });
 
   it("retry-failed : pas de bouton si la pipeline est active (build)", () => {
     renderPanel(makeProject({ phase: "build", stories: [makeStory({ status: "failed" })] }));
     expect(
-      screen.queryByRole("button", { name: /Relancer les échecs/ }),
+      screen.queryByRole("button", { name: /Retry failures/ }),
     ).not.toBeInTheDocument();
   });
 
@@ -314,7 +333,7 @@ describe("RunPanel", () => {
     renderPanel(makeProject({ phase: "done" }), [], vi.fn(), onRun);
     const input = screen.getByPlaceholderText(/arguments/i);
     fireEvent.change(input, { target: { value: "auth-screen" } });
-    fireEvent.click(screen.getByRole("button", { name: "▶ Lancer le projet" }));
+    fireEvent.click(screen.getByRole("button", { name: "▶ Run project" }));
     expect(onRun).toHaveBeenCalledWith("auth-screen");
   });
 

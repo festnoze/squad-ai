@@ -1,4 +1,6 @@
 import { ProjectState } from "../types";
+import { canResumeBuild } from "../work";
+import { useI18n } from "../i18n/i18n";
 
 const PHASE_DOT: Record<string, string> = {
   idle: "#8a93a6",
@@ -42,11 +44,6 @@ interface Props {
   onStop: (project: ProjectState) => void;
 }
 
-/** Une story encore à construire rend le projet « relançable » (resume-build). */
-function hasPendingStories(p: ProjectState): boolean {
-  return (p.stories ?? []).some((s) => s.status === "todo" || s.status === "red");
-}
-
 function progress(p: ProjectState): { done: number; total: number } | null {
   const stories = p.stories ?? [];
   if (stories.length === 0) return null;
@@ -64,17 +61,6 @@ function statusRank(p: ProjectState): number {
   return 4;
 }
 
-/** Libellé d'une option du sélecteur : « 🔵 Nom · 2/3 · build ». */
-function optionLabel(p: ProjectState): string {
-  const badge = p.paused ? "⏸" : PHASE_BADGE[p.phase] ?? "⚪";
-  const prog = progress(p);
-  const parts = [`${badge} ${p.name}`];
-  if (prog) parts.push(`${prog.done}/${prog.total}`);
-  parts.push(p.paused ? `${p.phase} (pause)` : p.phase);
-  if (p.archived) parts.push("archivé");
-  return parts.join(" · ");
-}
-
 export function ProjectBar({
   projects,
   selectedId,
@@ -88,6 +74,19 @@ export function ProjectBar({
   onPlay,
   onStop,
 }: Props) {
+  const { t } = useI18n();
+
+  /** Libellé d'une option du sélecteur : « 🔵 Nom · 2/3 · build ». */
+  const optionLabel = (p: ProjectState): string => {
+    const badge = p.paused ? "⏸" : PHASE_BADGE[p.phase] ?? "⚪";
+    const prog = progress(p);
+    const parts = [`${badge} ${p.name}`];
+    if (prog) parts.push(`${prog.done}/${prog.total}`);
+    parts.push(p.paused ? t("projectBar.phasePaused", { phase: p.phase }) : p.phase);
+    if (p.archived) parts.push(t("projectBar.archived"));
+    return parts.join(" · ");
+  };
+
   const archivedCount = projects.filter((p) => p.archived).length;
   const visible = showArchived ? projects : projects.filter((p) => !p.archived);
 
@@ -108,17 +107,17 @@ export function ProjectBar({
   return (
     <div className="project-bar">
       {selectable.length > 0 && (
-        <label className="project-select" title="Sélectionner le projet actif">
+        <label className="project-select" title={t("projectBar.selectActiveProject")}>
           <span className="project-select-icon" aria-hidden="true">
             🗂
           </span>
           <select
-            aria-label="Sélectionner le projet actif"
+            aria-label={t("projectBar.selectActiveProject")}
             value={selectedId ?? ""}
             onChange={(e) => onSelect(e.target.value)}
           >
             <option value="" disabled hidden>
-              — Choisir un projet ({selectable.length}) —
+              {t("projectBar.chooseProject", { count: selectable.length })}
             </option>
             {selectable.map((p) => (
               <option key={p.id} value={p.id}>
@@ -131,9 +130,9 @@ export function ProjectBar({
       {chipProjects.map((p) => {
         const active = ACTIVE_PHASES.includes(p.phase);
         const working = active && !p.paused;
-        const canPlay =
-          (active && p.paused) ||
-          (["stopped", "error", "done"].includes(p.phase) && hasPendingStories(p));
+        // ▶ = reprendre la pipeline en pause, ou relancer le build des stories
+        // restantes d'un projet dormant (logique partagée via work.ts).
+        const canPlay = (active && p.paused) || canResumeBuild(p);
         const prog = progress(p);
         return (
           <div
@@ -146,13 +145,13 @@ export function ProjectBar({
             <span
               className={`dot ${working ? "pulse" : ""}`}
               style={{ background: PHASE_DOT[p.phase] ?? "#8a93a6" }}
-              title={p.paused ? `${p.phase} (en pause)` : p.phase}
+              title={p.paused ? t("projectBar.phasePausedDot", { phase: p.phase }) : p.phase}
             />
             <span className="chip-name">{p.name}</span>
             {prog && (
               <span
                 className="chip-progress"
-                title={`${prog.done} story(ies) terminée(s) sur ${prog.total}`}
+                title={t("projectBar.progressTitle", { done: prog.done, total: prog.total })}
               >
                 {prog.done}/{prog.total}
               </span>
@@ -160,7 +159,7 @@ export function ProjectBar({
             {working && (
               <button
                 className="chip-play"
-                title="Stopper la pipeline de ce projet"
+                title={t("projectBar.stopPipeline")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStop(p);
@@ -174,8 +173,8 @@ export function ProjectBar({
                 className="chip-play"
                 title={
                   p.paused
-                    ? "Reprendre la pipeline"
-                    : "Reprendre le build des stories restantes"
+                    ? t("projectBar.resumePipeline")
+                    : t("projectBar.resumeBuild")
                 }
                 onClick={(e) => {
                   e.stopPropagation();
@@ -188,7 +187,7 @@ export function ProjectBar({
             {p.archived ? (
               <button
                 className="chip-archive"
-                title="Désarchiver le projet"
+                title={t("projectBar.unarchiveProject")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onUnarchive(p);
@@ -199,7 +198,7 @@ export function ProjectBar({
             ) : (
               <button
                 className="chip-archive"
-                title="Archiver le projet"
+                title={t("projectBar.archiveProject")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onArchive(p);
@@ -210,7 +209,7 @@ export function ProjectBar({
             )}
             <button
               className="chip-del"
-              title="Supprimer le projet"
+              title={t("projectBar.deleteProject")}
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(p);
@@ -224,21 +223,21 @@ export function ProjectBar({
       {hiddenFromChips > 0 && (
         <span
           className="chips-hint"
-          title="Projets inactifs — accessibles via le sélecteur 🗂"
+          title={t("projectBar.inactiveHint")}
         >
-          +{hiddenFromChips} dans 🗂
+          {t("projectBar.hiddenCount", { count: hiddenFromChips })}
         </span>
       )}
       <button className="project-new" onClick={onNew}>
-        ＋ Nouveau
+        {t("projectBar.new")}
       </button>
       {archivedCount > 0 && (
         <button
           className={`archived-toggle ${showArchived ? "active" : ""}`}
           onClick={onToggleArchived}
-          title={showArchived ? "Masquer les projets archivés" : "Afficher les projets archivés"}
+          title={showArchived ? t("projectBar.hideArchived") : t("projectBar.showArchived")}
         >
-          📦 Archivés ({archivedCount})
+          {t("projectBar.archivedToggle", { count: archivedCount })}
         </button>
       )}
     </div>

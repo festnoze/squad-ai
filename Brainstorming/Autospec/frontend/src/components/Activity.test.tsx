@@ -54,7 +54,7 @@ function renderActivity(props: Partial<React.ComponentProps<typeof Activity>> = 
 describe("Activity", () => {
   it("rend la région Activité avec un stepper par item", () => {
     renderActivity();
-    expect(screen.getByRole("region", { name: "Activité" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Activity" })).toBeInTheDocument();
     expect(screen.getByTestId("stepper-US-1")).toBeInTheDocument();
     expect(screen.getByTestId("activity-row-US-1")).toBeInTheDocument();
   });
@@ -67,11 +67,11 @@ describe("Activity", () => {
       stallReason: "merge_lock_held:US-9",
     };
     renderActivity({ ticks });
-    expect(screen.getByTestId("activity-counts")).toHaveTextContent("1 en cours");
-    expect(screen.getByTestId("activity-counts")).toHaveTextContent("3 faits");
+    expect(screen.getByTestId("activity-counts")).toHaveTextContent("1 running");
+    expect(screen.getByTestId("activity-counts")).toHaveTextContent("3 done");
     // failed (1) + blocked (1) = 2 à traiter
     expect(screen.getByTestId("attention-chip")).toHaveTextContent("2");
-    expect(screen.getByTestId("stall-reason")).toHaveTextContent(/Merge en cours/);
+    expect(screen.getByTestId("stall-reason")).toHaveTextContent(/Merge in progress/);
   });
 
   it("région « à traiter » épinglée pour un item failed", () => {
@@ -180,7 +180,7 @@ describe("Activity", () => {
       "data-status",
       "applied",
     );
-    expect(screen.getByTestId("guidance-entry-g2")).toHaveTextContent(/trop tard/);
+    expect(screen.getByTestId("guidance-entry-g2")).toHaveTextContent(/too late/);
   });
 
   it("affordance « étendre les critères » sur un item TODO appelle extendStory", async () => {
@@ -211,7 +211,7 @@ describe("Activity", () => {
     renderActivity({ awaitingApproval: "spec-review", onApprove });
     const banner = screen.getByTestId("approval-banner-activity");
     expect(banner).toHaveTextContent("spec-review");
-    fireEvent.click(within(banner).getByText(/Approuver/));
+    fireEvent.click(within(banner).getByText(/Approve/));
     expect(onApprove).toHaveBeenCalled();
   });
 
@@ -220,7 +220,7 @@ describe("Activity", () => {
     // L'item failed apparaît dans la région à-traiter ET la liste : on cible la
     // première instance du menu.
     fireEvent.click(screen.getAllByTestId("activity-menu-US-1")[0]);
-    fireEvent.click(screen.getAllByRole("menuitem", { name: /Relancer/ })[0]);
+    fireEvent.click(screen.getAllByRole("menuitem", { name: /Restart/ })[0]);
     await waitFor(() => expect(rebuildStory).toHaveBeenCalledWith("p1", "US-1"));
   });
 });

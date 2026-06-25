@@ -1,4 +1,5 @@
 import { CollapsibleSection } from "./CollapsibleSection";
+import { useI18n } from "../i18n/i18n";
 
 interface Props {
   architecture: string;
@@ -6,15 +7,16 @@ interface Props {
 }
 
 export function ArchitecturePanel({ architecture, planQuality }: Props) {
+  const { t } = useI18n();
   const hasArchitecture = architecture.trim() !== "";
   const hasPlanQuality = planQuality >= 0;
   if (!hasArchitecture && !hasPlanQuality) return null;
 
   return (
-    <CollapsibleSection title="Architecture & qualité" className="architecture">
+    <CollapsibleSection title={t("architecturePanel.title")} className="architecture">
       {hasPlanQuality && (
         <div className="plan-quality">
-          Qualité du plan : <strong>{planQuality}/100</strong>
+          {t("architecturePanel.planQuality")} <strong>{planQuality}/100</strong>
         </div>
       )}
       {hasArchitecture && <pre className="architecture-design">{architecture}</pre>}

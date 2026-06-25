@@ -1,4 +1,5 @@
-:root {
+:root,
+:root[data-theme="dark"] {
   color-scheme: dark;
   --bg: #0f1117;
   --panel: #181c25;
@@ -39,6 +40,37 @@
      failed / blocked / needs-attention. Nothing else should pulse. */
   --attention: #ff5c6c;
   --attention-bg: rgba(255, 92, 108, 0.12);
+}
+
+/* Light theme — same token contract, light-optimized values. Toggled via
+   <html data-theme="light"> by the Settings window (see i18n/theme.ts). */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f4f6fb;
+  --panel: #ffffff;
+  --panel-2: #eef1f7;
+  --border: #d3d9e3;
+  --text: #1b2030;
+  --muted: #5b6677;
+  --title: #41506a;
+  --accent: #2f6fe0;
+  --green: #1f9d63;
+  --red: #d83a4b;
+  --amber: #b9781a;
+
+  --stage-queued: #6b7689;
+  --stage-active: #2f6fe0;
+  --stage-done: #1f9d63;
+  --stage-failed: #d83a4b;
+
+  --status-todo: #5b6677;
+  --status-running: #2f6fe0;
+  --status-blocked: #a4631f;
+  --status-done: #1f9d63;
+  --status-failed: #d83a4b;
+
+  --attention: #d83a4b;
+  --attention-bg: rgba(216, 58, 75, 0.1);
 }
 
 * {
@@ -3285,4 +3317,70 @@ button.action-btn.action-done {
 }
 .llm-pre-error {
   color: var(--red);
+}
+
+/* ---------- Settings window (theme + language) ---------- */
+.settings-modal {
+  width: 420px;
+  max-width: 92vw;
+  padding: 18px 18px 20px;
+}
+.settings-modal h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+  color: var(--title);
+}
+.settings-section {
+  margin-bottom: 18px;
+}
+.settings-section:last-child {
+  margin-bottom: 0;
+}
+.settings-section > .settings-section-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.settings-row-label {
+  font-size: 14px;
+  color: var(--text);
+}
+.settings-hint {
+  font-size: 12px;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.settings-segmented {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--panel-2);
+}
+.settings-segmented button {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  padding: 6px 12px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.settings-segmented button:hover {
+  color: var(--text);
+}
+.settings-segmented button[aria-pressed="true"] {
+  background: var(--accent);
+  color: #fff;
 }

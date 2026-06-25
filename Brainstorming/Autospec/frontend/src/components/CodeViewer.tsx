@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import { listFiles, readFile } from "../api";
 import { FileContent } from "../types";
+import { useI18n } from "../i18n/i18n";
 
 interface Props {
   projectId: string;
 }
 
 export function CodeViewer({ projectId }: Props) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [files, setFiles] = useState<string[]>([]);
   const [selected, setSelected] = useState<string | null>(null);
@@ -76,7 +78,7 @@ export function CodeViewer({ projectId }: Props) {
         className="ghost code-viewer-btn"
         onClick={() => setOpen(true)}
       >
-        📁 Code généré
+        📁 {t("codeViewer.generatedCode")}
       </button>
       {open && (
         <div
@@ -88,12 +90,12 @@ export function CodeViewer({ projectId }: Props) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="code-viewer-header">
-              <span className="code-viewer-title">📁 Code généré</span>
+              <span className="code-viewer-title">📁 {t("codeViewer.generatedCode")}</span>
               <button
                 type="button"
                 className="ghost code-viewer-close"
                 onClick={() => setOpen(false)}
-                aria-label="Fermer"
+                aria-label={t("common.close")}
               >
                 ✕
               </button>
@@ -101,13 +103,13 @@ export function CodeViewer({ projectId }: Props) {
             <div className="code-viewer-body">
               <div className="code-viewer-files">
                 {loadingList && (
-                  <div className="code-viewer-muted">Chargement…</div>
+                  <div className="code-viewer-muted">{t("common.loading")}</div>
                 )}
                 {listError && (
                   <div className="code-viewer-error">{listError}</div>
                 )}
                 {!loadingList && !listError && files.length === 0 && (
-                  <div className="code-viewer-muted">Aucun fichier.</div>
+                  <div className="code-viewer-muted">{t("codeViewer.noFiles")}</div>
                 )}
                 {files.map((f) => (
                   <button
@@ -125,7 +127,7 @@ export function CodeViewer({ projectId }: Props) {
               </div>
               <div className="code-viewer-content">
                 {loadingFile && (
-                  <div className="code-viewer-muted">Chargement…</div>
+                  <div className="code-viewer-muted">{t("common.loading")}</div>
                 )}
                 {fileError && (
                   <div className="code-viewer-error">{fileError}</div>
@@ -134,7 +136,7 @@ export function CodeViewer({ projectId }: Props) {
                   <>
                     {file.truncated && (
                       <div className="code-viewer-truncated">
-                        (fichier tronqué)
+                        {t("codeViewer.truncated")}
                       </div>
                     )}
                     <pre className="code-viewer-pre">{file.content}</pre>
@@ -142,7 +144,7 @@ export function CodeViewer({ projectId }: Props) {
                 )}
                 {!loadingFile && !fileError && !file && !selected && (
                   <div className="code-viewer-muted">
-                    Sélectionnez un fichier.
+                    {t("codeViewer.selectFile")}
                   </div>
                 )}
               </div>

@@ -84,7 +84,7 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
     const { onStop, onPlay } = renderBar([makeProject({ phase: "build" })]);
     const { container } = { container: document.body };
     expect(container.querySelector(".dot.pulse")).not.toBeNull();
-    const stop = screen.getByTitle("Stopper la pipeline de ce projet");
+    const stop = screen.getByTitle("Stop this project's pipeline");
     fireEvent.click(stop);
     expect(onStop).toHaveBeenCalledTimes(1);
     expect(onPlay).not.toHaveBeenCalled();
@@ -96,14 +96,14 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
       [makeProject({ id: "p1", phase: "stopped", stories: [makeStory("todo")] })],
       { selectedId: "p1" },
     );
-    fireEvent.click(screen.getByTitle("Reprendre le build des stories restantes"));
+    fireEvent.click(screen.getByTitle("Resume building the remaining stories"));
     expect(onPlay).toHaveBeenCalledTimes(1);
   });
 
   it("projet en pause : ▶ reprend, pas de pulse", () => {
     const { onPlay } = renderBar([makeProject({ phase: "build", paused: true })]);
     expect(document.body.querySelector(".dot.pulse")).toBeNull();
-    fireEvent.click(screen.getByTitle("Reprendre la pipeline"));
+    fireEvent.click(screen.getByTitle("Resume the pipeline"));
     expect(onPlay).toHaveBeenCalledTimes(1);
   });
 
@@ -111,8 +111,8 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
     renderBar([makeProject({ id: "p1", phase: "done", stories: [makeStory("done")] })], {
       selectedId: "p1",
     });
-    expect(screen.queryByTitle(/Stopper la pipeline/)).toBeNull();
-    expect(screen.queryByTitle(/Reprendre/)).toBeNull();
+    expect(screen.queryByTitle(/Stop this project's pipeline/)).toBeNull();
+    expect(screen.queryByTitle(/Resume/)).toBeNull();
     expect(screen.getByText("1/1")).toBeInTheDocument();
   });
 
@@ -124,7 +124,7 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
     ]);
     // Seule la chip active est rendue ; les 2 inactives sont dans le sélecteur.
     expect(document.body.querySelectorAll(".project-chip")).toHaveLength(1);
-    expect(screen.getByText("+2 dans 🗂")).toBeInTheDocument();
+    expect(screen.getByText("+2 in 🗂")).toBeInTheDocument();
     // …mais toutes figurent dans le sélecteur.
     expect(screen.getByRole("option", { name: /Fini1/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Fini2/ })).toBeInTheDocument();
@@ -137,7 +137,7 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
       makeProject({ id: "p3", name: "Gamma", phase: "done" }),
     ]);
     expect(document.body.querySelectorAll(".dot.pulse")).toHaveLength(2);
-    expect(screen.getAllByTitle("Stopper la pipeline de ce projet")).toHaveLength(2);
+    expect(screen.getAllByTitle("Stop this project's pipeline")).toHaveLength(2);
   });
 });
 
@@ -150,7 +150,7 @@ describe("ProjectBar — sélecteur de projet", () => {
       ],
       { selectedId: "p2" },
     );
-    const select = screen.getByLabelText("Sélectionner le projet actif") as HTMLSelectElement;
+    const select = screen.getByLabelText("Select the active project") as HTMLSelectElement;
     expect(select.value).toBe("p2");
     expect(screen.getByRole("option", { name: /Alpha/ })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: /Beta/ })).toBeInTheDocument();
@@ -164,7 +164,7 @@ describe("ProjectBar — sélecteur de projet", () => {
       ],
       { selectedId: "p1" },
     );
-    fireEvent.change(screen.getByLabelText("Sélectionner le projet actif"), {
+    fireEvent.change(screen.getByLabelText("Select the active project"), {
       target: { value: "p2" },
     });
     expect(onSelect).toHaveBeenCalledWith("p2");
@@ -178,7 +178,7 @@ describe("ProjectBar — sélecteur de projet", () => {
       ],
       { selectedId: "p2", showArchived: false },
     );
-    const select = screen.getByLabelText("Sélectionner le projet actif") as HTMLSelectElement;
+    const select = screen.getByLabelText("Select the active project") as HTMLSelectElement;
     expect(select.value).toBe("p2");
     expect(screen.getByRole("option", { name: /ArchivedOne/ })).toBeInTheDocument();
   });

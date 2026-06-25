@@ -1,27 +1,12 @@
 import { useEffect, useRef } from "react";
 import { Epic, Usage, UserStory } from "../types";
+import { useI18n } from "../i18n/i18n";
 import { epicProgress, EpicProgressBar } from "./Board";
 
 function formatTokens(n: number): string {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
 }
-
-const STATUS_LABEL: Record<string, string> = {
-  todo: "À faire",
-  in_progress: "Dev en cours",
-  red: "Tests rouges",
-  green: "Tests verts",
-  done: "Terminé",
-  failed: "Échec",
-};
-
-const STATE_LABEL: Record<string, string> = {
-  working: "● en cours",
-  done: "✓ livrée",
-  failed: "⚠ en échec",
-  pending: "à faire",
-};
 
 /**
  * Vue chronologique : une section par itération de build (plus récente en haut),
@@ -51,6 +36,21 @@ export function IterationsView({
   onOpenEpic: (epicId: string) => void;
   onOpenStory: (epicId: string, storyId: string) => void;
 }) {
+  const { t } = useI18n();
+  const STATUS_LABEL: Record<string, string> = {
+    todo: t("iterationsView.statusTodo"),
+    in_progress: t("iterationsView.statusInProgress"),
+    red: t("iterationsView.statusRed"),
+    green: t("iterationsView.statusGreen"),
+    done: t("iterationsView.statusDone"),
+    failed: t("iterationsView.statusFailed"),
+  };
+  const STATE_LABEL: Record<string, string> = {
+    working: t("iterationsView.stateWorking"),
+    done: t("iterationsView.stateDone"),
+    failed: t("iterationsView.stateFailed"),
+    pending: t("iterationsView.statePending"),
+  };
   const iters = [...new Set(epics.map((e) => e.iteration))].sort((a, b) => b - a);
   const focusRef = useRef<HTMLElement | null>(null);
 
@@ -62,8 +62,8 @@ export function IterationsView({
   return (
     <div className="panel iterations">
       <div className="board-top">
-        <h2>🕒 Itérations</h2>
-        <span className="iter-hint">Chronologie du build — clic sur un élément pour l'ouvrir dans la vision produit</span>
+        <h2>{t("iterationsView.title")}</h2>
+        <span className="iter-hint">{t("iterationsView.hint")}</span>
       </div>
       <div className="iter-timeline">
         {iters.map((n) => {
@@ -85,24 +85,33 @@ export function IterationsView({
                   {prog.state === "working" && (
                     <span className="spinner spinner-sm" aria-hidden="true" />
                   )}
-                  Itération {n}
+                  {t("iterationsView.iteration", { n })}
                 </span>
                 <span className={`iter-state state-${prog.state}`}>
                   {STATE_LABEL[prog.state] ?? prog.state}
                 </span>
                 <span className="iter-counts">
-                  {iterEpics.length} épic{iterEpics.length > 1 ? "s" : ""} · {prog.done}/
-                  {prog.total} US
+                  {t(
+                    iterEpics.length > 1
+                      ? "iterationsView.countsMany"
+                      : "iterationsView.countsOne",
+                    { epics: iterEpics.length, done: prog.done, total: prog.total },
+                  )}
                 </span>
               </header>
 
               <EpicProgressBar prog={prog} />
 
               {usage && (
-                <div className="iter-usage" title="Coût et tokens consommés durant cette itération">
+                <div className="iter-usage" title={t("iterationsView.usageTitle")}>
                   💰 ${usage.cost_usd.toFixed(4)} · 🔢{" "}
                   {formatTokens(usage.input_tokens + usage.output_tokens)} tok ·{" "}
-                  {usage.agent_calls} appel{usage.agent_calls > 1 ? "s" : ""} agent
+                  {t(
+                    usage.agent_calls > 1
+                      ? "iterationsView.usageMany"
+                      : "iterationsView.usageOne",
+                    { calls: usage.agent_calls },
+                  )}
                 </div>
               )}
 
@@ -113,7 +122,7 @@ export function IterationsView({
                       key={e.id}
                       type="button"
                       className="iter-epic-chip"
-                      title={`Ouvrir l'epic ${e.id} dans la vision produit`}
+                      title={t("iterationsView.openEpicTitle", { id: e.id })}
                       onClick={() => onOpenEpic(e.id)}
                     >
                       {e.id} · {e.title}
@@ -129,7 +138,7 @@ export function IterationsView({
                       <button
                         type="button"
                         className={`iter-story-chip status-${s.status}`}
-                        title={`Ouvrir ${s.id} dans la vision produit`}
+                        title={t("iterationsView.openStoryTitle", { id: s.id })}
                         onClick={() => onOpenStory(s.epic_id, s.id)}
                       >
                         <span className="iter-story-id">{s.id}</span>
@@ -142,7 +151,7 @@ export function IterationsView({
                   ))}
                 </ul>
               ) : (
-                <p className="placeholder small">Aucune user story dans cette itération.</p>
+                <p className="placeholder small">{t("iterationsView.noStories")}</p>
               )}
 
               {canRollback && (
@@ -150,10 +159,10 @@ export function IterationsView({
                   <button
                     type="button"
                     className="ghost small-btn"
-                    title={`Restaurer le workspace au snapshot de l'itération ${n}`}
+                    title={t("iterationsView.rollbackTitle", { n })}
                     onClick={() => onRollbackTo!(n)}
                   >
-                    ↩ Revenir à cette itération
+                    {t("iterationsView.rollbackButton")}
                   </button>
                 </div>
               )}

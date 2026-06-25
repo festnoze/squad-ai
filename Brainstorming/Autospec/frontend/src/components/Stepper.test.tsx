@@ -78,7 +78,7 @@ describe("Stepper", () => {
       />,
     );
     expect(screen.getByTestId("recovery-US-1")).toHaveTextContent("2/3");
-    expect(screen.getByTestId("recovery-US-1")).toHaveTextContent(/affinage/i);
+    expect(screen.getByTestId("recovery-US-1")).toHaveTextContent(/refining/i);
   });
 
   it("grise (stale) quand le tick a plus de 25s", () => {

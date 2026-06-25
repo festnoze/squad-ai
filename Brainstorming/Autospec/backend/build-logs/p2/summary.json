@@ -1,0 +1,52 @@
+{
+  "project": 2,
+  "id": "drv-p2-8495b797",
+  "name": "Todo CLI",
+  "provider": "claude",
+  "phase": "done",
+  "error": "",
+  "timed_out": false,
+  "wall_s": 623.3,
+  "backend_language": "python",
+  "streams": [
+    "backend"
+  ],
+  "components": [],
+  "stories": [
+    {
+      "id": "US-1",
+      "title": "Ajouter une tâche",
+      "status": "done",
+      "attempts": 1,
+      "stream": "backend"
+    },
+    {
+      "id": "US-2",
+      "title": "Lister les tâches dans l'ordre d'ajout",
+      "status": "done",
+      "attempts": 2,
+      "stream": "backend"
+    },
+    {
+      "id": "US-3",
+      "title": "Compléter une tâche",
+      "status": "done",
+      "attempts": 1,
+      "stream": "backend"
+    }
+  ],
+  "usage": {
+    "agent_calls": 9,
+    "cost_usd": 3.7023,
+    "input_tokens": 63371,
+    "output_tokens": 45871
+  },
+  "workspace": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p2-8495b797",
+  "monitor_log": "C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p2-8495b797\\build-monitor.jsonl",
+  "pytest": {
+    "ran": true,
+    "returncode": 0,
+    "green": true,
+    "tail": "drv-p2-8495b797\nInstalled 17 packages in 569ms\n.................                                                        [100%]\n============================== warnings summary ===============================\ntests/steps/test_us_1.py::test_ajouter_deux_t�ches_renvoie_des_ids_incr�mentaux\ntests/steps/test_us_2.py::test_lister_respecte_lordre_dajout\ntests/steps/test_us_2.py::test_lister_une_liste_vide\ntests/steps/test_us_3.py::test_compl�ter_une_t�che_existante\ntests/steps/test_us_3.py::test_compl�ter_un_id_inconnu_l�ve_une_erreur\n  C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p2-8495b797\\.venv\\Lib\\site-packages\\pytest_bdd\\compat.py:28: PytestRemovedIn10Warning: Passing nodeid to _register_fixture is deprecated. Pass node instead for fixture scoping.\n    request._fixturemanager._register_fixture(\n\ntests/steps/test_us_1.py::test_ajouter_deux_t�ches_renvoie_des_ids_incr�mentaux\ntests/steps/test_us_2.py::test_lister_respecte_lordre_dajout\ntests/steps/test_us_2.py::test_lister_une_liste_vide\ntests/steps/test_us_3.py::test_compl�ter_une_t�che_existante\ntests/steps/test_us_3.py::test_compl�ter_un_id_inconnu_l�ve_une_erreur\n  C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\drv-p2-8495b797\\.venv\\Lib\\site-packages\\_pytest\\fixtures.py:1986: PytestRemovedIn10Warning: Passing baseid to FixtureDef is deprecated. Pass node instead for fixture scoping.\n    fixture_def = FixtureDef(\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n17 passed, 10 warnings in 0.20s\n"
+  }
+}

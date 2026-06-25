@@ -1,0 +1,12 @@
+{"ts": 1782419318.188, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "spec", "role": "architect", "item": "phase:spec", "duration_ms": 7629, "ok": true, "error": "", "in_tokens": 5582, "out_tokens": 368}
+{"ts": 1782419329.909, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "spec", "role": "architect", "item": "phase:spec", "duration_ms": 9247, "ok": true, "error": "", "in_tokens": 6631, "out_tokens": 474}
+{"ts": 1782419404.158, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 72273, "ok": true, "error": "", "in_tokens": 5584, "out_tokens": 5344}
+{"ts": 1782419440.509, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 33572, "ok": true, "error": "", "in_tokens": 7777, "out_tokens": 2205}
+{"ts": 1782419623.872, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 181975, "ok": true, "error": "", "in_tokens": 5686, "out_tokens": 10268}
+{"ts": 1782419624.784, "kind": "pytest", "project": "drv-p3-ebcaf860", "phase": "build", "item": "US-1", "ok": true, "summary": "..........                                                               [100%]\n10 passed in 0.13s\n"}
+{"ts": 1782419646.773, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "build", "role": "qa", "item": "T-2-API", "duration_ms": 17032, "ok": true, "error": "", "in_tokens": 5582, "out_tokens": 1208}
+{"ts": 1782419789.685, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "build", "role": "dev", "item": "T-2-API", "duration_ms": 141468, "ok": true, "error": "", "in_tokens": 6417, "out_tokens": 7113}
+{"ts": 1782419790.585, "kind": "pytest", "project": "drv-p3-ebcaf860", "phase": "build", "item": "T-2-API", "ok": true, "summary": "...............                                                          [100%]\n15 passed in 0.16s\n"}
+{"ts": 1782419985.546, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "build", "role": "dev-frontend", "item": "T-2-UI", "duration_ms": 179172, "ok": true, "error": "", "in_tokens": 5306, "out_tokens": 9254}
+{"ts": 1782420251.207, "kind": "agent", "project": "drv-p3-ebcaf860", "phase": "build", "role": "dev-frontend", "item": "T-2-UI", "duration_ms": 254175, "ok": true, "error": "", "in_tokens": 5435, "out_tokens": 13352}
+{"ts": 1782420255.043, "kind": "outcome", "project": "drv-p3-ebcaf860", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}, {"id": "US-2", "status": "todo"}]}
