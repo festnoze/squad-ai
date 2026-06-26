@@ -1,0 +1,250 @@
+{
+  "epics": [
+    {
+      "id": "EPIC-1",
+      "title": "Cœur de simulation FPS (package game_3d)",
+      "description": "Logique de jeu pure et déterministe en Python : déplacement/collisions du joueur, ennemis chaser, et résolution de tir hitscan. Aucune dépendance au rendu ni au réseau ; c'est la source de vérité testable du game feel et des règles, consommée ensuite par le client web.",
+      "stories": [
+        {
+          "id": "US-1",
+          "title": "Déplacement et collisions du joueur",
+          "description": "En tant que joueur, je veux me déplacer (avancer/reculer/strafe, sprint, saut) et être bloqué par les murs de l'arène, afin de me mouvoir librement et de façon crédible dans l'espace clos.",
+          "acceptance_criteria": [
+            "Une classe Player expose position (x,y,z), vitesse de marche et de sprint, et un état de saut.",
+            "move(input, dt) intègre la vitesse selon le vecteur d'entrée normalisé et le delta-temps ; le sprint applique un multiplicateur de vitesse documenté.",
+            "Une classe Arena définit des bornes rectangulaires et fournit clamp(position) qui ramène toute position hors limites à l'intérieur.",
+            "Après tout déplacement, la position du joueur reste strictement dans les bornes de l'arène (collisions murs).",
+            "Le saut modifie la composante verticale puis revient au sol via une gravité simple, sans franchir le sol."
+          ],
+          "gherkin": "Feature: Déplacement et collisions du joueur\n  Scenario: Le joueur avance selon sa vitesse\n    Given un joueur à la position (0, 0, 0) dans une arène de 20 par 20\n    When le joueur avance pendant 1 seconde à vitesse normale\n    Then la position du joueur a progressé vers l'avant d'une distance égale à sa vitesse de marche\n\n  Scenario: Le joueur est bloqué par les murs\n    Given un joueur proche du mur nord d'une arène de 20 par 20\n    When le joueur avance vers le mur nord pendant 5 secondes\n    Then la position du joueur reste à l'intérieur des limites de l'arène",
+          "depends_on": [],
+          "priority": 1,
+          "ui": false,
+          "stream": "backend",
+          "tasks": []
+        },
+        {
+          "id": "US-2",
+          "title": "Ennemi chaser (poursuite et contact)",
+          "description": "En tant que système de jeu, je veux des ennemis qui foncent en ligne droite vers le joueur et lui infligent des dégâts au contact, afin de créer une menace simple mais constante sans pathfinding avancé.",
+          "acceptance_criteria": [
+            "Une classe Enemy expose position, points de vie, vitesse et dégâts de contact.",
+            "update(player_position, dt) déplace l'ennemi le long du vecteur normalisé vers le joueur ; la distance au joueur diminue à chaque tick tant qu'il n'est pas au contact.",
+            "Au contact (distance < rayon défini), l'ennemi inflige ses dégâts au joueur une fois par cooldown, sans le traverser.",
+            "Un ennemi dont les PV tombent à 0 ou moins est marqué mort (is_alive == False) et cesse de bouger/attaquer."
+          ],
+          "gherkin": "Feature: Ennemi chaser\n  Scenario: L'ennemi se rapproche du joueur\n    Given un ennemi à la position (10, 0, 0) et un joueur à la position (0, 0, 0)\n    When l'ennemi est mis à jour pendant 1 seconde\n    Then la distance entre l'ennemi et le joueur a diminué\n\n  Scenario: L'ennemi inflige des dégâts au contact\n    Given un ennemi au contact du joueur ayant 100 points de vie\n    When l'ennemi attaque le joueur\n    Then les points de vie du joueur ont diminué des dégâts de contact de l'ennemi",
+          "depends_on": ["US-1"],
+          "priority": 2,
+          "ui": false,
+          "stream": "backend",
+          "tasks": []
+        },
+        {
+          "id": "US-3",
+          "title": "Arme hitscan et résolution des dégâts",
+          "description": "En tant que joueur, je veux tirer instantanément (hitscan) et toucher l'ennemi visé, afin d'obtenir un retour de tir net et satisfaisant sans balistique complexe.",
+          "acceptance_criteria": [
+            "Une classe Weapon expose des dégâts par tir, un cooldown de cadence et un état de munitions/recul léger.",
+            "fire(origin, direction, enemies) effectue un raycast et retourne un résultat indiquant l'ennemi touché (le plus proche sur le rayon) ou None.",
+            "En cas de touche, les PV de l'ennemi ciblé sont réduits des dégâts et le résultat signale un hitmarker (hit == True).",
+            "Le tir respecte le cooldown : deux tirs trop rapprochés ne déclenchent qu'un seul impact.",
+            "Un tir qui ne croise aucun ennemi retourne hit == False et ne modifie aucun PV."
+          ],
+          "gherkin": "Feature: Arme hitscan\n  Scenario: Un tir aligné touche l'ennemi\n    Given une arme hitscan et un ennemi à 100 points de vie aligné dans l'axe de visée\n    When le joueur tire vers l'ennemi\n    Then l'ennemi perd les points de vie correspondant aux dégâts de l'arme\n    And un hitmarker est signalé\n\n  Scenario: Un tir hors-cible ne touche rien\n    Given une arme hitscan et un ennemi en dehors de l'axe de visée\n    When le joueur tire droit devant\n    Then aucun ennemi ne perd de points de vie\n    And aucun hitmarker n'est signalé",
+          "depends_on": ["US-2"],
+          "priority": 2,
+          "ui": false,
+          "stream": "backend",
+          "tasks": []
+        }
+      ]
+    },
+    {
+      "id": "EPIC-2",
+      "title": "Boucle de jeu et progression",
+      "description": "Orchestration de la partie : génération de vagues de difficulté croissante, machine à états (Start/Playing/Game Over/Victory), scoring et rejouabilité. S'appuie sur la simulation cœur pour produire la boucle complète spawn → combat → accalmie → vague suivante → fin.",
+      "stories": [
+        {
+          "id": "US-4",
+          "title": "Système de vagues à difficulté croissante",
+          "description": "En tant que joueur, je veux affronter des vagues successives de plus en plus nombreuses et rapides, afin que la tension monte et que le niveau reste rejouable sans agrandir le décor.",
+          "acceptance_criteria": [
+            "Une classe WaveManager est configurée avec un nombre total de vagues (3 à 5) et une règle d'escalade (nombre d'ennemis et vitesse).",
+            "spawn_wave(index) retourne une liste d'ennemis ; le compte d'ennemis croît strictement avec l'index de vague.",
+            "La vitesse des ennemis d'une vague est supérieure ou égale à celle de la vague précédente.",
+            "Une vague est considérée nettoyée quand tous ses ennemis sont morts ; le manager passe alors à la vague suivante après une accalmie.",
+            "Après la dernière vague nettoyée, le manager signale toutes_les_vagues_terminees == True."
+          ],
+          "gherkin": "Feature: Système de vagues\n  Scenario: La difficulté croît avec les vagues\n    Given un gestionnaire de vagues configuré pour 5 vagues\n    When la vague 1 puis la vague 2 sont générées\n    Then la vague 2 contient plus d'ennemis que la vague 1\n\n  Scenario: Fin des vagues après la dernière nettoyée\n    Given un gestionnaire de vagues configuré pour 3 vagues à la dernière vague\n    When tous les ennemis de la dernière vague sont morts\n    Then le gestionnaire signale que toutes les vagues sont terminées",
+          "depends_on": ["US-2"],
+          "priority": 2,
+          "ui": false,
+          "stream": "backend",
+          "tasks": []
+        },
+        {
+          "id": "US-5",
+          "title": "État de partie, score et rejouer",
+          "description": "En tant que joueur, je veux une partie qui démarre, suit mes PV et mon score, se termine par défaite (PV à 0) ou victoire (dernière vague nettoyée) et que je puisse relancer, afin de boucler une session complète en moins de 5 minutes.",
+          "acceptance_criteria": [
+            "Une énumération GameState définit START, PLAYING, GAME_OVER, VICTORY.",
+            "Une classe Game orchestre joueur, vagues et arme ; tick(dt, input) fait avancer la simulation et met à jour PV et score.",
+            "Le score augmente à chaque ennemi tué selon une valeur définie.",
+            "Quand les PV du joueur atteignent 0, l'état passe à GAME_OVER ; quand toutes les vagues sont nettoyées, l'état passe à VICTORY.",
+            "reset() remet la partie à START avec PV pleins, score à 0 et vague 1, permettant de rejouer."
+          ],
+          "gherkin": "Feature: État de partie et rejouabilité\n  Scenario: Défaite quand les PV tombent à zéro\n    Given une partie en cours avec le joueur à 1 point de vie\n    When le joueur subit des dégâts mortels\n    Then l'état de la partie devient GAME_OVER\n\n  Scenario: Victoire quand toutes les vagues sont nettoyées\n    Given une partie en cours à la dernière vague avec le joueur en vie\n    When le dernier ennemi de la dernière vague est tué\n    Then l'état de la partie devient VICTORY\n    And le score final est supérieur à zéro\n\n  Scenario: Rejouer réinitialise la partie\n    Given une partie terminée en GAME_OVER avec un score positif\n    When la partie est réinitialisée\n    Then l'état revient à START avec des PV pleins, un score à zéro et la vague 1",
+          "depends_on": ["US-3", "US-4"],
+          "priority": 3,
+          "ui": false,
+          "stream": "backend",
+          "tasks": []
+        }
+      ]
+    },
+    {
+      "id": "EPIC-3",
+      "title": "Client web 3D & game feel",
+      "description": "Couche navigateur Three.js/Vite : rendu de l'arène-hangar soignée, contrôleur FPS avec Pointer Lock, feedback de tir (muzzle flash, recul, hitmarker, audio) et HUD/écrans Start/Game Over/Victory. Chaque story est multi-stream : une tâche backend expose un contrat sérialisable et testable de game_3d, consommé par une tâche frontend qui le rend visuellement.",
+      "stories": [
+        {
+          "id": "US-6",
+          "title": "Rendu de l'arène + contrôleur FPS Pointer Lock",
+          "description": "En tant que joueur, je veux voir une arène-hangar soignée et la parcourir à la première personne avec souris verrouillée (Pointer Lock) à 60 fps, afin d'avoir des contrôles réactifs et une présentation de qualité dès les premières secondes.",
+          "acceptance_criteria": [
+            "game_3d expose une vue sérialisable (player_view_state) : position, orientation (yaw/pitch) et dimensions/bornes de l'arène, dérivées de la simulation.",
+            "Le client Three.js charge l'arène (géométrie low-poly, éclairage et matériaux soignés) en moins de 5 s et maintient une boucle de rendu à 60 fps cible.",
+            "Le contrôleur FPS active Pointer Lock au clic, mappe ZQSD/WASD + souris au déplacement et applique les mêmes bornes que l'arène backend.",
+            "Les dimensions d'arène rendues correspondent exactement aux bornes fournies par le contrat backend."
+          ],
+          "gherkin": "Feature: Contrat de vue FPS\n  Scenario: La vue sérialisée expose joueur et arène\n    Given une partie initialisée dans une arène de 20 par 20\n    When l'état de vue du joueur est sérialisé\n    Then il contient la position et l'orientation du joueur ainsi que les bornes de l'arène\n    And les bornes correspondent à la taille de l'arène de la simulation",
+          "depends_on": ["US-1"],
+          "priority": 3,
+          "ui": true,
+          "stream": "",
+          "tasks": [
+            {
+              "id": "T-6B",
+              "stream": "backend",
+              "title": "Exposer player_view_state sérialisable",
+              "description": "Ajouter à game_3d une fonction de sérialisation produisant un dict view-state (position, yaw, pitch, bornes d'arène) à partir du Player et de l'Arena, servant de contrat stable pour le client.",
+              "acceptance_criteria": [
+                "serialize_view_state(game) retourne un dict avec les clés player_position, player_yaw, player_pitch et arena_bounds.",
+                "Les valeurs reflètent l'état courant de la simulation et arena_bounds décrit les limites min/max.",
+                "Le dict est purement composé de types JSON-sérialisables (nombres, listes)."
+              ],
+              "gherkin": "Feature: Sérialisation de la vue\n  Scenario: Les clés du contrat sont présentes et JSON-compatibles\n    Given une partie initialisée\n    When l'état de vue du joueur est sérialisé\n    Then le dictionnaire contient les clés player_position, player_yaw, player_pitch et arena_bounds\n    And toutes les valeurs sont des nombres ou des listes de nombres",
+              "depends_on": []
+            },
+            {
+              "id": "T-6F",
+              "stream": "frontend",
+              "title": "Arène Three.js + contrôleur FPS Pointer Lock",
+              "description": "Implémenter la scène Three.js (hangar low-poly, éclairage/matériaux soignés) et le contrôleur première personne (ZQSD/WASD + souris via Pointer Lock API) qui consomme player_view_state et applique les bornes d'arène fournies par le backend.",
+              "acceptance_criteria": [
+                "Pointer Lock s'active au clic et la souris pilote l'orientation caméra ; Échap relâche le verrou.",
+                "Déplacement ZQSD/WASD + sprint + saut alignés sur la simulation, bornés par arena_bounds.",
+                "Chargement initial de la scène < 5 s et boucle de rendu visant 60 fps stables.",
+                "Les dimensions visuelles de l'arène correspondent aux arena_bounds du contrat backend."
+              ],
+              "gherkin": "Feature: Cohérence des bornes de rendu\n  Scenario: Le rendu respecte les bornes du contrat\n    Given un état de vue sérialisé avec des bornes d'arène données\n    When le client lit les bornes d'arène du contrat\n    Then les bornes utilisées pour le rendu sont identiques à celles fournies par la simulation",
+              "depends_on": ["T-6B"]
+            }
+          ]
+        },
+        {
+          "id": "US-7",
+          "title": "Feedback de tir et de mort ennemie",
+          "description": "En tant que joueur, je veux un retour clair quand je tire et que je touche (muzzle flash, recul léger, hitmarker, son) et quand un ennemi meurt, afin que chaque action procure un game feel percutant.",
+          "acceptance_criteria": [
+            "game_3d émet des événements de tir/impact (ex. {type, hit, target_id, damage}) et de mort ennemie consommables par le client.",
+            "Chaque tir produit un événement ; une touche produit un événement hit avec la cible et les dégâts, un raté un événement sans cible.",
+            "La mort d'un ennemi produit un événement de mort exactement une fois.",
+            "Le client déclenche muzzle flash + recul léger à chaque tir, hitmarker + son d'impact à chaque touche, et animation/feedback de mort à chaque événement de mort."
+          ],
+          "gherkin": "Feature: Événements de feedback de tir\n  Scenario: Une touche émet un événement de hit\n    Given une partie avec une arme hitscan et un ennemi aligné\n    When le joueur tire et touche l'ennemi\n    Then un événement de tir avec hit vrai, l'identifiant de la cible et les dégâts est émis\n\n  Scenario: La mort d'un ennemi est émise une seule fois\n    Given un ennemi avec 1 point de vie restant\n    When le joueur lui inflige des dégâts mortels\n    Then un unique événement de mort est émis pour cet ennemi",
+          "depends_on": ["US-3"],
+          "priority": 4,
+          "ui": true,
+          "stream": "",
+          "tasks": [
+            {
+              "id": "T-7B",
+              "stream": "backend",
+              "title": "Émettre les événements de tir et de mort",
+              "description": "Étendre game_3d pour collecter, à chaque tick, une file d'événements (tir, hit, mort ennemie) avec les données nécessaires au feedback, sans dépendance au rendu.",
+              "acceptance_criteria": [
+                "Un tir ajoute un événement shot avec un drapeau hit ; une touche inclut target_id et damage.",
+                "La mort d'un ennemi ajoute un seul événement death avec l'identifiant de l'ennemi.",
+                "Les événements sont récupérables/vidables par le consommateur (drain) après lecture."
+              ],
+              "gherkin": "Feature: File d'événements de combat\n  Scenario: Tir touchant génère shot et hit\n    Given une partie avec une arme hitscan et un ennemi aligné\n    When le joueur tire vers l'ennemi\n    Then la file d'événements contient un événement de tir marqué comme touche avec dégâts\n\n  Scenario: Mort ennemie génère un seul événement\n    Given un ennemi à 1 point de vie\n    When il reçoit des dégâts mortels\n    Then la file d'événements contient exactement un événement de mort pour cet ennemi",
+              "depends_on": []
+            },
+            {
+              "id": "T-7F",
+              "stream": "frontend",
+              "title": "Rendu du feedback de tir et audio",
+              "description": "Consommer la file d'événements pour déclencher muzzle flash, recul caméra léger, hitmarker visuel, sons de tir/impact/dégâts et feedback de mort ennemie (particules + son).",
+              "acceptance_criteria": [
+                "Muzzle flash + recul léger joués à chaque événement de tir.",
+                "Hitmarker + son d'impact joués à chaque événement hit ; rien en cas de raté.",
+                "Effet et son de mort joués une fois par événement de mort.",
+                "Les effets sont synchronisés avec la file backend (un effet par événement, sans doublon)."
+              ],
+              "gherkin": "Feature: Mapping événement vers feedback\n  Scenario: Un seul effet par événement\n    Given une file d'événements contenant un tir touchant et une mort ennemie\n    When le client consomme la file d'événements\n    Then chaque événement est associé à exactement un effet de feedback sans doublon",
+              "depends_on": ["T-7B"]
+            }
+          ]
+        },
+        {
+          "id": "US-8",
+          "title": "HUD minimal et écrans Start / Game Over / Victory",
+          "description": "En tant que joueur, je veux un HUD lisible (PV, vague, score) et des écrans Start, Game Over et Victory avec un bouton Rejouer et une ambiance sonore, afin de comprendre l'état de la partie et de relancer sans friction.",
+          "acceptance_criteria": [
+            "game_3d expose un snapshot HUD/statut sérialisable : PV joueur, index/total de vague, score, état de partie.",
+            "Le snapshot reflète fidèlement la simulation à chaque tick (PV, vague courante, score, GameState).",
+            "Le client affiche le HUD pendant le jeu et l'écran approprié (Start/Game Over/Victory) selon l'état.",
+            "Le bouton Rejouer appelle la réinitialisation et le snapshot repart à des PV pleins, score 0, vague 1, état START.",
+            "Une ambiance sonore joue en partie et un jingle distinct accompagne Victory vs Game Over."
+          ],
+          "gherkin": "Feature: Snapshot HUD et statut de partie\n  Scenario: Le snapshot reflète l'état de jeu\n    Given une partie en cours à la vague 2 avec un score positif\n    When le snapshot HUD est sérialisé\n    Then il contient les PV du joueur, la vague 2 sur le total, le score et l'état PLAYING\n\n  Scenario: Le snapshot suit l'écran de fin\n    Given une partie terminée en VICTORY\n    When le snapshot HUD est sérialisé\n    Then l'état rapporté est VICTORY\n    And après réinitialisation l'état rapporté est START avec la vague 1 et un score à zéro",
+          "depends_on": ["US-5"],
+          "priority": 4,
+          "ui": true,
+          "stream": "",
+          "tasks": [
+            {
+              "id": "T-8B",
+              "stream": "backend",
+              "title": "Exposer le snapshot HUD/statut",
+              "description": "Ajouter à game_3d une sérialisation du statut de partie (PV, vague courante, total de vagues, score, GameState) en un dict stable consommé par le HUD et les écrans.",
+              "acceptance_criteria": [
+                "serialize_hud(game) retourne un dict avec health, wave_index, wave_total, score et state.",
+                "Les valeurs correspondent à l'état courant de la simulation.",
+                "state est l'une des valeurs de GameState (START/PLAYING/GAME_OVER/VICTORY)."
+              ],
+              "gherkin": "Feature: Sérialisation du HUD\n  Scenario: Le snapshot expose les champs attendus\n    Given une partie en cours à la vague 2 avec un score positif\n    When le snapshot HUD est sérialisé\n    Then le dictionnaire contient health, wave_index, wave_total, score et state\n    And state vaut PLAYING",
+              "depends_on": []
+            },
+            {
+              "id": "T-8F",
+              "stream": "frontend",
+              "title": "HUD, écrans et audio d'ambiance",
+              "description": "Consommer le snapshot pour afficher le HUD (PV, vague, score), router vers les écrans Start/Game Over/Victory selon state, câbler le bouton Rejouer sur reset() et gérer l'ambiance + jingles de fin.",
+              "acceptance_criteria": [
+                "HUD affiché en PLAYING avec PV, vague courante/total et score à jour.",
+                "Écran Start au lancement, Game Over et Victory selon state.",
+                "Rejouer déclenche la réinitialisation et le HUD repart à PV pleins, score 0, vague 1.",
+                "Ambiance sonore en jeu et jingles distincts pour Victory et Game Over."
+              ],
+              "gherkin": "Feature: Routage des écrans selon le statut\n  Scenario: L'écran affiché suit l'état de la partie\n    Given un snapshot HUD dont l'état est VICTORY\n    When le client lit l'état du snapshot\n    Then l'écran sélectionné est l'écran de victoire\n    And après réinitialisation l'état lu est START",
+              "depends_on": ["T-8B"]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

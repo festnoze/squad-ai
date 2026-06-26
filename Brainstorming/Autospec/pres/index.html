@@ -364,6 +364,22 @@
     border-color: color-mix(in srgb, var(--c, var(--accent)) 55%, transparent);
     box-shadow: 0 18px 44px -24px var(--c, var(--accent));
   }
+  /* graceful placeholder shown while the PNG file is missing */
+  .shot .ph {
+    display: none; height: 34vh;
+    flex-direction: column; gap: 12px;
+    align-items: center; justify-content: center; text-align: center;
+    padding: 18px; color: var(--muted);
+    font-family: var(--mono); font-size: 13px; line-height: 1.5;
+    background: repeating-linear-gradient(45deg, rgba(255,255,255,0.022) 0 11px, transparent 11px 22px);
+  }
+  .shot .ph .big { font-size: 30px; opacity: 0.55; }
+  .shot .ph code {
+    color: var(--c, var(--accent)); font-size: 12px;
+    border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px;
+  }
+  .shot.missing img { display: none; }
+  .shot.missing .ph { display: flex; }
 
   /* counter */
   .counter {
@@ -646,29 +662,30 @@
         </div>
       </section>
 
-      <!-- 6 — bridge: why build your own -->
-      <section class="slide" data-title="Pourquoi un harness maison" data-date="2026" data-t="2026.15">
+      <!-- 6 — the future: software factory (introduces Autospec) -->
+      <section class="slide" data-title="Autospec — La software factory" data-group="Autospec" data-date="2026" data-t="2026.15">
         <div class="ghost">06</div>
-        <div class="eyebrow">06 — Le pivot</div>
-        <h2>Pourquoi le <span class="hl">bâtir</span> soi-même&nbsp;?</h2>
-        <p class="lead">Ces harness existent&nbsp;— mais ils sont <strong>génériques</strong>. Un harness maison encode <strong>votre</strong> méthode, <strong>vos</strong> garde-fous, et garde specs et code <strong>chez vous</strong>.</p>
+        <div class="eyebrow">06 — Le futur</div>
+        <h2>La <span class="hl">software</span> <span class="hl3">factory</span></h2>
+        <p class="lead">Et si la chaîne de production logicielle tournait <strong>d'elle-même</strong>&nbsp;? L'humain n'intervient plus que par incursions <strong>limitées</strong>, de <strong>haut niveau</strong> et <strong>adaptatives</strong>. C'est l'initiative <strong>Autospec</strong>.</p>
         <div class="cards three">
           <div class="card">
-            <div class="idx">/ contrôle</div>
-            <h3>Méthode encodée</h3>
-            <p>Vos process et vos standards de qualité vivent dans la boucle&nbsp;— pas dans des prompts jetables.</p>
+            <div class="idx">/ limité</div>
+            <h3>Incursions ciblées</h3>
+            <p>La chaîne avance seule&nbsp;; l'humain n'est sollicité qu'aux points de décision qui comptent vraiment.</p>
           </div>
           <div class="card">
-            <div class="idx">/ souveraineté</div>
-            <h3>Données maîtrisées</h3>
-            <p>Specs, code et contexte restent dans votre périmètre&nbsp;— pas de boîte noire externe.</p>
+            <div class="idx">/ haut niveau</div>
+            <h3>Décider, pas exécuter</h3>
+            <p>On arbitre l'intention et les choix structurants&nbsp;— pas les détails d'implémentation.</p>
           </div>
           <div class="card">
-            <div class="idx">/ coût</div>
-            <h3>Pile choisie</h3>
-            <p>Vous arbitrez modèle, outillage et budget tokens selon vos propres contraintes.</p>
+            <div class="idx">/ adaptatif</div>
+            <h3>Boucle qui s'ajuste</h3>
+            <p>Le niveau et le moment du contrôle humain s'adaptent à la criticité et à la confiance.</p>
           </div>
         </div>
+        <p class="footnote"><span class="accent">→</span> Automatiser la chaîne de production&nbsp;— et garder l'humain là où il crée le plus de valeur.</p>
       </section>
 
       <!-- 7 — Autospec vision -->
@@ -738,16 +755,19 @@
         </div>
         <div class="shots">
           <figure class="shot">
-            <img src="assets/autospec-activity.png" alt="Vue Activity d'Autospec : les user stories progressent dans un pipeline en 8 étapes, de Queue à Done." loading="lazy" />
-            <figcaption><b>Activity</b> · pipeline 8 étapes, US Queue → Done</figcaption>
-          </figure>
-          <figure class="shot">
             <img src="assets/autospec-vision.png" alt="Vue Product vision : une user story avec ses critères d'acceptance au vert et le scénario Gherkin généré." loading="lazy" />
+            <div class="ph"><span class="big">🖼️</span><code>pres/assets/autospec-vision.png</code><span>à déposer ici</span></div>
             <figcaption><b>Product vision</b> · critères verts + BDD Gherkin</figcaption>
           </figure>
           <figure class="shot">
             <img src="assets/autospec-iterations.png" alt="Vue Iterations : deux itérations livrées avec coût, tokens et appels d'agents." loading="lazy" />
+            <div class="ph"><span class="big">🖼️</span><code>pres/assets/autospec-iterations.png</code><span>à déposer ici</span></div>
             <figcaption><b>Iterations</b> · 2 itérations livrées, coût &amp; tokens tracés</figcaption>
+          </figure>
+          <figure class="shot">
+            <img src="assets/autospec-activity.png" alt="Vue Activity d'Autospec : les user stories progressent dans un pipeline en 8 étapes, de Queue à Done." loading="lazy" />
+            <div class="ph"><span class="big">🖼️</span><code>pres/assets/autospec-activity.png</code><span>à déposer ici</span></div>
+            <figcaption><b>Activity</b> · pipeline 8 étapes, US Queue → Done</figcaption>
           </figure>
         </div>
         <p class="footnote"><span class="accent">→</span> Brief en entrée, US découpées, BDD puis TDD, e2e Playwright&nbsp;: le pipeline mène la spec jusqu'au code testé, coût et tokens tracés à chaque étape.</p>
@@ -904,6 +924,10 @@
   function closeLightbox() { lightbox.classList.remove('open'); }
   document.querySelectorAll('.shot img').forEach(img => {
     img.addEventListener('click', () => openLightbox(img.currentSrc || img.src, img.alt));
+    // Show the placeholder frame if the PNG file isn't there yet.
+    const flagMissing = () => img.closest('.shot').classList.add('missing');
+    img.addEventListener('error', flagMissing);
+    if (img.complete && img.naturalWidth === 0) flagMissing();
   });
   lightbox.addEventListener('click', closeLightbox);
 
