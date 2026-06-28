@@ -60,7 +60,7 @@ from ..models import (
 from ..language_selector import recommend_language
 from ..storage import append_interaction, load_interactions, save_state_payload, workspace_dir
 from .interactions import InteractionStore
-from . import mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skills as skill_lib, streams as work_streams, toolchain, workspace
+from . import delivery_state, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import regression
@@ -576,8 +576,7 @@ class Pipeline:
             return
         self._stop_requested = False
         self._delivery_blocked = False
-        self.state.delivery_ready = False
-        self.state.delivery_issues = []
+        delivery_state.reset(self.state)
         self._task = asyncio.create_task(self._alifecycle())
 
     async def adispose(self) -> None:
@@ -1861,8 +1860,7 @@ class Pipeline:
         user-facing acceptance evidence must be present enough to trust.
         """
         if not settings.definition_of_done_enabled:
-            self.state.delivery_ready = True
-            self.state.delivery_issues = []
+            delivery_state.mark_ready(self.state)
             return True
         result = evaluate_definition_of_done(
             self.state,
@@ -1870,8 +1868,7 @@ class Pipeline:
             require_ui_evidence=settings.ui_tests_enabled,
             strict_criteria=settings.definition_of_done_strict_criteria,
         )
-        self.state.delivery_ready = result.ready
-        self.state.delivery_issues = result.messages()
+        delivery_state.apply_definition_result(self.state, result)
         if result.blockers:
             self._delivery_blocked = True
             detail = "\n".join(f"- {i.message}" for i in result.blockers[:8])
@@ -2650,6 +2647,12 @@ class Pipeline:
             # SK-1: seed the workspace's `.claude/skills/` once so the headless
             # claude agent auto-discovers the skill library (best-effort, idempotent).
             await skill_lib.aseed_skills(workspace_dir(self.state.id))
+            skill_check = skill_validation.validate_seeded_skills(workspace_dir(self.state.id))
+            if not skill_check.ok:
+                msg = "Validation des skills échouée : " + "; ".join(skill_check.messages()[:5])
+                delivery_state.append_issue(self.state, msg)
+                self._log("skills", "❌ " + msg)
+                raise RuntimeError(msg)
         if settings.decompose_enabled:
             # SK-2: split eligible backend stories into layered sub-tasks, then
             # let the parallel worktree engine build + aggregate them.
@@ -3414,8 +3417,7 @@ class Pipeline:
             t.status = TestState.NONEXISTENT
         self._stop_requested = False
         self._delivery_blocked = False
-        self.state.delivery_ready = False
-        self.state.delivery_issues = []
+        delivery_state.reset(self.state)
         # Set BUILD synchronously BEFORE launching the task so a second
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
         self.state.phase = PipelinePhase.BUILD
@@ -3487,8 +3489,7 @@ class Pipeline:
                     task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
-        self.state.delivery_ready = False
-        self.state.delivery_issues = []
+        delivery_state.reset(self.state)
         # Set BUILD synchronously BEFORE launching the task so a second
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
         self.state.phase = PipelinePhase.BUILD
@@ -3530,8 +3531,7 @@ class Pipeline:
                     task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
-        self.state.delivery_ready = False
-        self.state.delivery_issues = []
+        delivery_state.reset(self.state)
         # Phase -> BUILD synchronously before the task (closes the TOCTOU, like
         # aresume_build); the resume-build run rebuilds the now-TODO stories.
         self.state.phase = PipelinePhase.BUILD
@@ -3604,8 +3604,7 @@ class Pipeline:
         task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
-        self.state.delivery_ready = False
-        self.state.delivery_issues = []
+        delivery_state.reset(self.state)
         # Set BUILD synchronously BEFORE launching the task so a second
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
         self.state.phase = PipelinePhase.BUILD
@@ -3981,8 +3980,7 @@ class Pipeline:
             return
         msg = f"Runtime acceptance échoué : {result.detail}"
         self._log("runtime", f"❌ {msg}")
-        self.state.delivery_ready = False
-        self.state.delivery_issues = [*self.state.delivery_issues, msg]
+        delivery_state.append_issue(self.state, msg)
         self.state.regressions.append(msg)
         self._notify("error", "Runtime acceptance échoué", msg[:200])
         raise RuntimeError(msg)

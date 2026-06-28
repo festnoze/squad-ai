@@ -136,6 +136,11 @@ export function RunPanel({
             {t("runPanel.regressionCount", { n: project.regressions!.length })}
           </span>
         )}
+        {(project.delivery_issues?.length ?? 0) > 0 && (
+          <span className="run-error" title={project.delivery_issues!.join("\n")}>
+            ⛔ Livraison · {project.delivery_issues!.length}
+          </span>
+        )}
         {project.awaiting_approval && (
           <span className="approval-banner" title={t("runPanel.approvalTitle")}>
             {t("runPanel.approvalRequired", { phase: project.awaiting_approval })}

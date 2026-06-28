@@ -124,6 +124,7 @@ export function deriveItemView(
  *  its tasks (all done → done ; any active → in_progress ; any failed → failed ;
  *  else todo). Mirrors `UserStory.effective_status` on the backend. */
 export function effectiveStatus(story: UserStory): StoryStatus {
+  if (story.effective_status_value) return story.effective_status_value;
   const tasks = story.tasks ?? [];
   if (tasks.length === 0) return story.status;
   const states = tasks.map((t) => t.status);

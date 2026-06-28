@@ -35,9 +35,15 @@ def tmp_workspace(tmp_path, monkeypatch):
     # not change pipeline flow. Pin the flags that add agent calls / phases to
     # their safe defaults; a test exercising one re-enables it via monkeypatch.
     monkeypatch.setattr(settings, "brainstorm_assist_enabled", False)
+    monkeypatch.setattr(settings, "architecture_enabled", False)
+    monkeypatch.setattr(settings, "components_enabled", False)
+    monkeypatch.setattr(settings, "language_selector_enabled", False)
+    monkeypatch.setattr(settings, "approval_gates_enabled", False)
     monkeypatch.setattr(settings, "streams_enabled", False)
     monkeypatch.setattr(settings, "skills_enabled", False)
     monkeypatch.setattr(settings, "decompose_enabled", False)
+    monkeypatch.setattr(settings, "setup_install", False)
+    monkeypatch.setattr(settings, "ui_tests_enabled", False)
     monkeypatch.setattr(settings, "smoke_run", False)
     monkeypatch.setattr(settings, "definition_of_done_enabled", False)
     monkeypatch.setattr(settings, "definition_of_done_strict_criteria", False)

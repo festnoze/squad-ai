@@ -4,7 +4,7 @@
   "skills": {
     "architecture": {
       "type": "domain",
-      "enforcement": "suggest",
+      "enforcement": "required_when_applicable",
       "priority": "critical",
       "description": "3-layer backend architecture (facade -> application -> infrastructure), naming, registration.",
       "promptTriggers": {
@@ -14,7 +14,7 @@
     },
     "db-entity-change": {
       "type": "domain",
-      "enforcement": "suggest",
+      "enforcement": "required_when_applicable",
       "priority": "high",
       "description": "Create/modify a persistence entity + migration (infrastructure).",
       "promptTriggers": {
@@ -24,7 +24,7 @@
     },
     "repo-search-or-create": {
       "type": "domain",
-      "enforcement": "suggest",
+      "enforcement": "required_when_applicable",
       "priority": "high",
       "description": "Reuse-or-create a repository method (data access, DRY).",
       "promptTriggers": {
@@ -34,7 +34,7 @@
     },
     "service-search-or-create": {
       "type": "domain",
-      "enforcement": "suggest",
+      "enforcement": "required_when_applicable",
       "priority": "high",
       "description": "Reuse-or-create a service use-case method (application layer).",
       "promptTriggers": {
@@ -44,7 +44,7 @@
     },
     "endpoint-search-or-create": {
       "type": "domain",
-      "enforcement": "suggest",
+      "enforcement": "required_when_applicable",
       "priority": "high",
       "description": "Reuse-or-create a FastAPI endpoint + request/response models (facade).",
       "promptTriggers": {
@@ -54,7 +54,7 @@
     },
     "error-code-management": {
       "type": "domain",
-      "enforcement": "suggest",
+      "enforcement": "required_when_applicable",
       "priority": "medium",
       "description": "Centralized error codes + exception classes + message catalog.",
       "promptTriggers": {
@@ -64,7 +64,7 @@
     },
     "test-generator": {
       "type": "domain",
-      "enforcement": "suggest",
+      "enforcement": "required_when_applicable",
       "priority": "high",
       "description": "Generate unit/integration/e2e tests by layer following conventions.",
       "promptTriggers": {
@@ -74,7 +74,7 @@
     },
     "bdd-gherkin": {
       "type": "domain",
-      "enforcement": "suggest",
+      "enforcement": "required_when_applicable",
       "priority": "high",
       "description": "Outside-in decomposition of a Gherkin acceptance into per-layer unit tests + pytest-bdd wiring.",
       "promptTriggers": {

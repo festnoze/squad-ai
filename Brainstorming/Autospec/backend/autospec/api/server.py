@@ -23,6 +23,7 @@ from ..agents.discovery import adiscover_models
 from ..agents.providers import (
     PROVIDERS,
     make_runner,
+    provider_capabilities,
     provider_model,
     provider_models,
 )
@@ -378,6 +379,7 @@ async def aget_provider() -> dict:
             "model": "scripted",
             "available": list(PROVIDERS),
             "models": {p: provider_models(p) for p in PROVIDERS},
+            "capabilities": provider_capabilities("fake").__dict__,
         }
     return {
         "provider": settings.agent_provider,
@@ -385,6 +387,7 @@ async def aget_provider() -> dict:
         "available": list(PROVIDERS),
         # Per-provider model choices so the UI can drive an adaptive 2nd dropdown.
         "models": {p: provider_models(p) for p in PROVIDERS},
+        "capabilities": provider_capabilities(settings.agent_provider).__dict__,
     }
 
 
@@ -421,6 +424,7 @@ async def aset_provider(req: ProviderRequest) -> dict:
         "ok": True,
         "provider": settings.agent_provider,
         "model": provider_model(settings.agent_provider),
+        "capabilities": provider_capabilities(settings.agent_provider).__dict__,
     }
 
 

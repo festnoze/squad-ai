@@ -138,6 +138,18 @@ class AgentResult:
     duration_ms: int = 0
 
 
+@dataclass(frozen=True)
+class RunnerCapabilities:
+    """What the orchestrator can safely expect from an agent backend."""
+
+    can_edit_files: bool
+    can_run_shell: bool
+    supports_native_skills: bool
+    reliable_for_build: bool
+    execution_model: str
+    notes: str = ""
+
+
 class AgentError(RuntimeError):
     pass
 

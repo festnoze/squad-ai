@@ -35,6 +35,8 @@ async def test_get_provider_defaults(monkeypatch):
         assert "gpt-4.1" in data["models"]["openai"]
         assert data["models"]["codex"]  # codex has suggested models too
         assert data["models"]["openrouter"]  # OpenRouter has fallback suggestions
+        assert data["capabilities"]["execution_model"] == "cli"
+        assert data["capabilities"]["can_run_shell"] is True
 
 
 async def test_switch_anthropic_model(monkeypatch):
@@ -45,11 +47,12 @@ async def test_switch_anthropic_model(monkeypatch):
             json={"provider": "anthropic", "model": "claude-opus-4-8"},
         )
         assert resp.status_code == 200
-        assert resp.json() == {
-            "ok": True,
-            "provider": "anthropic",
-            "model": "claude-opus-4-8",
-        }
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["provider"] == "anthropic"
+        assert data["model"] == "claude-opus-4-8"
+        assert data["capabilities"]["execution_model"] == "langchain_file_tools"
+        assert data["capabilities"]["can_run_shell"] is False
         assert settings.anthropic_model == "claude-opus-4-8"
 
 
@@ -64,7 +67,11 @@ async def test_switch_provider_updates_pipelines(monkeypatch):
             "/api/provider", json={"provider": "ollama", "model": "qwen3"}
         )
         assert resp.status_code == 200
-        assert resp.json() == {"ok": True, "provider": "ollama", "model": "qwen3"}
+        data = resp.json()
+        assert data["ok"] is True
+        assert data["provider"] == "ollama"
+        assert data["model"] == "qwen3"
+        assert data["capabilities"]["reliable_for_build"] is False
         assert settings.agent_provider == "ollama"
         # Live pipelines now point at the new backend.
         assert isinstance(server.pipelines[project_id].runner, OllamaRunner)

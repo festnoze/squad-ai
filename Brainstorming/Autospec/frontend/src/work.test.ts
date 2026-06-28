@@ -64,6 +64,17 @@ describe("work — effectiveStatus", () => {
   it("US sans tâches : statut stocké", () => {
     expect(effectiveStatus(story({ status: "failed" }))).toBe("failed");
   });
+  it("préférer le statut effectif sérialisé par le backend", () => {
+    expect(
+      effectiveStatus(
+        story({
+          status: "done",
+          effective_status_value: "todo",
+          tasks: [task({ id: "T1", status: "done" }), task({ id: "T2", status: "todo" })],
+        }),
+      ),
+    ).toBe("todo");
+  });
   it("US décomposée : toutes tâches done → done", () => {
     const s = story({
       tasks: [task({ id: "T1", status: "done" }), task({ id: "T2", status: "done" })],

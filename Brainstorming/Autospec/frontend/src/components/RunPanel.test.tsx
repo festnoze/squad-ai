@@ -230,6 +230,11 @@ describe("RunPanel", () => {
     expect(container.querySelector(".usage-meter")).toBeNull();
   });
 
+  it("delivery_issues : affiche une bannière de livraison bloquée", () => {
+    renderPanel(makeProject({ delivery_issues: ["US-2 n'est pas livrée"] }));
+    expect(screen.getByText(/Livraison · 1/)).toBeInTheDocument();
+  });
+
   it("resume_at > 0 : bannière de reprise auto + bouton annuler (M2)", () => {
     const { container } = renderPanel(
       makeProject({ phase: "stopped", resume_at: Date.now() / 1000 + 3600 }),

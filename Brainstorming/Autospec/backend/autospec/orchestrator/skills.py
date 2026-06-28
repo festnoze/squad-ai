@@ -103,13 +103,18 @@ def catalog_block(role: str) -> str:
     if not skills:
         return ""
     lines = [
-        "\nCOMPÉTENCES DISPONIBLES (skills) — réutilise-les quand c'est pertinent.",
+        "\nCOMPÉTENCES DISPONIBLES (skills) — obligatoires quand applicables.",
         "Chaque skill est un mode d'emploi réutilisable : charge-la À LA DEMANDE "
         "(outil Skill, ou lis `.claude/skills/<nom>/SKILL.md`) au lieu de tout "
-        "réinventer. Ne charge que celles utiles à cette story :",
+        "réinventer. Si une story touche un déclencheur listé, applique la skill "
+        "correspondante et mentionne son nom dans ton résumé ou tes fichiers de "
+        "test. Ne charge que celles utiles à cette story :",
     ]
     for s in skills:
-        lines.append(f"- `{s['name']}` — {s['summary']} (utile pour : {s['when']}).")
+        lines.append(
+            f"- `{s['name']}` — {s['summary']} "
+            f"(OBLIGATOIRE si : {s['when']})."
+        )
     return "\n".join(lines) + "\n"
 
 

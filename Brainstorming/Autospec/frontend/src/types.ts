@@ -84,12 +84,22 @@ export interface ProductComponent {
 }
 
 /** Provider d'agents (M1) : Claude (harness CLI), OpenAI ou Ollama (LangChain). */
+export interface RunnerCapabilities {
+  can_edit_files: boolean;
+  can_run_shell: boolean;
+  supports_native_skills: boolean;
+  reliable_for_build: boolean;
+  execution_model: string;
+  notes?: string;
+}
+
 export interface ProviderInfo {
   provider: string;
   model: string;
   available: string[];
   /** Suggested model choices per provider, driving the adaptive 2nd dropdown. */
   models: Record<string, string[]>;
+  capabilities?: RunnerCapabilities;
 }
 
 /** Observation de l'évaluateur de produit (E6). */
@@ -165,6 +175,7 @@ export interface UserStory {
   depends_on: string[];
   priority: number;
   status: StoryStatus;
+  effective_status_value?: StoryStatus;
   iteration: number;
   attempts: number;
   last_error: string;
@@ -205,6 +216,7 @@ export interface ProjectState {
   name: string;
   goal: string;
   auto_spec: boolean;
+  product_profile?: "auto" | "library-fast" | "cli" | "api" | "web-ssr" | "fullstack" | "brownfield";
   spec_mode: "interview" | "brainstorm";
   phase: PipelinePhase;
   brief: string;
@@ -245,6 +257,8 @@ export interface ProjectState {
   iteration_usage?: Record<string, Usage>;
   budget_usd: number;
   archived: boolean;
+  delivery_ready?: boolean;
+  delivery_issues?: string[];
 }
 
 export interface LogLine {
@@ -387,6 +401,7 @@ export function criterionState(
  * failed → failed; else todo.
  */
 export function usEffectiveStatus(story: UserStory): StoryStatus {
+  if (story.effective_status_value) return story.effective_status_value;
   const tasks = story.tasks ?? [];
   if (tasks.length === 0) return story.status;
   const states = tasks.map((t) => t.status);

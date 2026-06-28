@@ -10,7 +10,7 @@ from autospec.agents import prompts, runner as runner_mod
 from autospec.agents.runner import ClaudeCliRunner
 from autospec.config import settings
 from autospec.models import AcceptanceCriterion, ProjectState, UserStory
-from autospec.orchestrator import skills as skill_lib
+from autospec.orchestrator import skill_validation, skills as skill_lib
 from autospec.orchestrator.pipeline import Pipeline
 
 
@@ -39,6 +39,8 @@ def test_skills_for_requires_master_and_role(monkeypatch):
 def test_catalog_block_is_role_scoped():
     qa = skill_lib.catalog_block("qa")
     dev = skill_lib.catalog_block("dev")
+    assert "obligatoires quand applicables" in qa
+    assert "OBLIGATOIRE" in dev
     assert "`bdd-gherkin`" in qa and "`test-generator`" in qa
     assert "`bdd-gherkin`" not in dev                     # qa-only skill
     assert "`db-entity-change`" in dev and "`endpoint-search-or-create`" in dev
@@ -90,6 +92,12 @@ def test_seed_skills_copies_library_and_is_idempotent(tmp_path):
     # rules JSON is valid and lists the same skills.
     rules = json.loads((seeded / "skill-rules.json").read_text(encoding="utf-8"))
     assert set(rules["skills"]) == {s["name"] for s in skill_lib.SKILL_REGISTRY}
+    assert all(
+        rule["enforcement"] == "required_when_applicable"
+        for name, rule in rules["skills"].items()
+        if name != "skill-creator"
+    )
+    assert skill_validation.validate_seeded_skills(ws).ok is True
     # Second run writes nothing (idempotent).
     assert skill_lib.seed_skills(ws) == 0
 
@@ -97,6 +105,25 @@ def test_seed_skills_copies_library_and_is_idempotent(tmp_path):
 def test_seed_skills_missing_source_is_noop(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "skills_dir", tmp_path / "does-not-exist")
     assert skill_lib.seed_skills(tmp_path / "ws") == 0
+
+
+def test_skill_validation_blocks_missing_or_weak_library(tmp_path):
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    missing = skill_validation.validate_seeded_skills(ws)
+    assert missing.ok is False
+    assert any(i.code == "missing_skills_dir" for i in missing.blockers)
+
+    seeded = ws / ".claude" / "skills"
+    (seeded / "architecture").mkdir(parents=True)
+    (seeded / "architecture" / "SKILL.md").write_text("# Architecture", encoding="utf-8")
+    (seeded / "skill-rules.json").write_text(
+        json.dumps({"skills": {"architecture": {"enforcement": "suggest"}}}),
+        encoding="utf-8",
+    )
+    weak = skill_validation.validate_seeded_skills(ws)
+    assert weak.ok is False
+    assert any(i.code == "weak_enforcement" for i in weak.blockers)
 
 
 # ---------------------------------------------------------------- runner --add-dir

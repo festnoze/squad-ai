@@ -89,11 +89,13 @@ export async function createProject(
   budgetUsd?: number,
   brief?: string,
   brownfieldPath?: string,
+  productProfile?: ProjectState["product_profile"],
 ): Promise<{ id: string; state: ProjectState }> {
   const body: {
     goal: string;
     name: string;
     auto_spec: boolean;
+    product_profile?: string;
     budget_usd?: number;
     brief?: string;
     brownfield_path?: string;
@@ -101,6 +103,7 @@ export async function createProject(
   if (budgetUsd != null && budgetUsd > 0) body.budget_usd = budgetUsd;
   if (brief && brief.trim()) body.brief = brief;
   if (brownfieldPath && brownfieldPath.trim()) body.brownfield_path = brownfieldPath;
+  if (productProfile && productProfile !== "auto") body.product_profile = productProfile;
   return json(
     await fetch("/api/projects", {
       method: "POST",

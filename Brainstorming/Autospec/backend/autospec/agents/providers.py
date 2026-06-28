@@ -29,6 +29,7 @@ from .runner import (
     AgentRunner,
     ClaudeCliRunner,
     CodexCliRunner,
+    RunnerCapabilities,
     extract_json,
 )
 
@@ -364,6 +365,60 @@ def provider_models(provider: str) -> list[str]:
     if current and not current.startswith("(défaut") and current not in choices:
         choices.insert(0, current)
     return choices
+
+
+def provider_capabilities(provider: str) -> RunnerCapabilities:
+    """Static capability contract for each provider family.
+
+    The orchestrator can still verify tests for every provider; this tells the
+    UI/operator which backends can inspect/run the workspace themselves versus
+    the bounded LangChain file-tool protocol.
+    """
+    normalized = (provider or "claude").strip().lower()
+    if normalized == "claude":
+        return RunnerCapabilities(
+            can_edit_files=True,
+            can_run_shell=True,
+            supports_native_skills=True,
+            reliable_for_build=True,
+            execution_model="cli",
+            notes="Claude Code CLI: accès workspace + shell, skills natives via .claude/skills.",
+        )
+    if normalized == "codex":
+        return RunnerCapabilities(
+            can_edit_files=True,
+            can_run_shell=True,
+            supports_native_skills=False,
+            reliable_for_build=True,
+            execution_model="cli",
+            notes="Codex CLI: accès workspace + shell; skills injectées via prompt/catalogue.",
+        )
+    if normalized in ("openai", "openrouter", "ollama", "anthropic"):
+        return RunnerCapabilities(
+            can_edit_files=True,
+            can_run_shell=False,
+            supports_native_skills=False,
+            reliable_for_build=False,
+            execution_model="langchain_file_tools",
+            notes="Provider LangChain: lecture/écriture de fichiers seulement; tests et commandes lancés par Autospec.",
+        )
+    if normalized == "fake":
+        return RunnerCapabilities(
+            can_edit_files=False,
+            can_run_shell=False,
+            supports_native_skills=False,
+            reliable_for_build=False,
+            execution_model="scripted",
+            notes="Mode démonstration déterministe.",
+        )
+    return RunnerCapabilities(
+        can_edit_files=False,
+        can_run_shell=False,
+        supports_native_skills=False,
+        reliable_for_build=False,
+        execution_model="unknown",
+        notes=f"Provider inconnu: {provider}",
+    )
 
 
 def make_runner(provider: str) -> AgentRunner:
