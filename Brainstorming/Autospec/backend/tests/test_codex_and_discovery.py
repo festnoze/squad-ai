@@ -107,6 +107,31 @@ async def test_discover_openai_filters_to_chat_models(monkeypatch):
     assert "whisper-1" not in models and "dall-e-3" not in models
 
 
+async def test_discover_openrouter_top_programming(monkeypatch):
+    monkeypatch.setattr(settings, "openrouter_api_key", "sk-or-test")
+    monkeypatch.setattr(settings, "openrouter_base_url", "https://openrouter.ai/api/v1")
+
+    def fake_get(url, headers=None):
+        # The most-popular programming models endpoint, with the key forwarded.
+        assert url.endswith("/models?category=programming")
+        assert headers and headers["Authorization"] == "Bearer sk-or-test"
+        return {"data": [{"id": f"vendor/model-{i}"} for i in range(20)]}
+
+    monkeypatch.setattr(discovery, "_http_get_json", fake_get)
+    models, source = await discovery.adiscover_models("openrouter")
+    assert source == "live"
+    # Capped to the top-N (10), preserving OpenRouter's popularity order.
+    assert len(models) == discovery.OPENROUTER_PROGRAMMING_LIMIT == 10
+    assert models[0] == "vendor/model-0"
+
+
+async def test_discover_openrouter_falls_back_when_empty(monkeypatch):
+    monkeypatch.setattr(discovery, "_http_get_json", lambda url, headers=None: {"data": []})
+    models, source = await discovery.adiscover_models("openrouter")
+    assert source == "static"
+    assert models == list(discovery.provider_models("openrouter"))
+
+
 async def test_discover_falls_back_to_static_on_error(monkeypatch):
     def boom(url, headers=None):
         raise OSError("connection refused")

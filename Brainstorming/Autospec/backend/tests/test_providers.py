@@ -18,14 +18,35 @@ from autospec.config import settings
 
 
 def test_make_runner_mapping():
+    from autospec.agents.providers import OpenRouterRunner
+
     assert isinstance(make_runner("claude"), ClaudeCliRunner)
     assert isinstance(make_runner("codex"), CodexCliRunner)
     # Empty/default provider resolves to Claude (the default, first in the UI).
     assert isinstance(make_runner(""), ClaudeCliRunner)
     assert isinstance(make_runner("OpenAI"), OpenAiRunner)
+    assert isinstance(make_runner("openrouter"), OpenRouterRunner)
     assert isinstance(make_runner("ollama"), OllamaRunner)
     with pytest.raises(ValueError):
         make_runner("gemini")
+
+
+def test_openrouter_provider_model_and_models(monkeypatch):
+    from autospec.agents.providers import OpenRouterRunner
+
+    monkeypatch.setattr(settings, "openrouter_model", "")
+    # The "(défaut …)" placeholder must NOT leak into the selectable list.
+    assert provider_model("openrouter") == "(défaut OpenRouter)"
+    assert "(défaut OpenRouter)" not in provider_models("openrouter")
+    assert "anthropic/claude-sonnet-4" in provider_models("openrouter")  # fallback
+    # A configured model is reflected (and prepended if not already listed).
+    monkeypatch.setattr(settings, "openrouter_model", "vendor/custom-x")
+    assert provider_model("openrouter") == "vendor/custom-x"
+    assert provider_models("openrouter")[0] == "vendor/custom-x"
+    # No key → building the model errors (OpenAI-compatible runner).
+    monkeypatch.setattr(settings, "openrouter_api_key", "")
+    with pytest.raises(AgentError):
+        OpenRouterRunner()._build_model()
 
 
 def test_provider_model_codex(monkeypatch):

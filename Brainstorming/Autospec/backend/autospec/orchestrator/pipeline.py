@@ -60,7 +60,7 @@ from ..models import (
 from ..language_selector import recommend_language
 from ..storage import append_interaction, load_interactions, save_state_payload, workspace_dir
 from .interactions import InteractionStore
-from . import mutation, refine, scheduler, session_monitor, setup_exec, streams as work_streams, toolchain, workspace
+from . import mutation, refine, scheduler, session_monitor, setup_exec, skills as skill_lib, streams as work_streams, toolchain, workspace
 from . import lessons as lesson_store
 from . import regression
 from .build_monitor import BuildMonitor
@@ -2300,6 +2300,7 @@ class Pipeline:
                     architecture=self.state.architecture,
                     guidance="\n".join(self.state.build_guidance),
                     lessons="\n".join(self._effective_lessons()),
+                    available_skills=self._skills_catalog("dev"),
                 ),
                 system_prompt=persona("dev"),
                 cwd=ws,
@@ -2577,7 +2578,15 @@ class Pipeline:
         # across iterations, and dependency readiness needs the DONE stories of
         # earlier iterations in the pool to resolve (scheduler.ready_stories
         # derives "done" only from the pool it is given).
-        if settings.streams_enabled:
+        if settings.skills_enabled:
+            # SK-1: seed the workspace's `.claude/skills/` once so the headless
+            # claude agent auto-discovers the skill library (best-effort, idempotent).
+            await skill_lib.aseed_skills(workspace_dir(self.state.id))
+        if settings.decompose_enabled:
+            # SK-2: split eligible backend stories into layered sub-tasks, then
+            # let the parallel worktree engine build + aggregate them.
+            await self._adecompose_pending(all_iterations=all_iterations)
+        if settings.streams_enabled or settings.decompose_enabled:
             await self._abuild_phase_streams(all_iterations=all_iterations)
             return
         self.state.phase = PipelinePhase.BUILD
@@ -2658,6 +2667,7 @@ class Pipeline:
                         lessons="\n".join(self._effective_lessons()),
                         file_root=stream.file_root or "frontend",
                         item_guidance=item_guidance,
+                        available_skills=self._skills_catalog("dev"),
                     )
                     dev_persona = persona("dev-frontend")
                 else:
@@ -2668,6 +2678,7 @@ class Pipeline:
                         lessons="\n".join(self._effective_lessons()),
                         backend_language=self.state.backend_language.value,
                         item_guidance=item_guidance,
+                        available_skills=self._skills_catalog("dev"),
                     )
                     dev_persona = persona("dev")
                 result = await self._tracked.arun(
@@ -3119,6 +3130,7 @@ class Pipeline:
                 lessons="\n".join(self._effective_lessons()),
                 file_root=stream.file_root or "frontend",
                 item_guidance=item_guidance,
+                available_skills=self._skills_catalog("dev"),
             )
             dev_persona = persona("dev-frontend")
         else:
@@ -3129,6 +3141,7 @@ class Pipeline:
                 lessons="\n".join(self._effective_lessons()),
                 backend_language=self.state.backend_language.value,
                 item_guidance=item_guidance,
+                available_skills=self._skills_catalog("dev"),
             )
             dev_persona = persona("dev")
         result = await self._tracked.arun(dev_prompt, system_prompt=dev_persona, cwd=worktree)
@@ -3555,6 +3568,98 @@ class Pipeline:
         _, diff = await self._agit(ws, "show", commit)
         return {"available": True, "diff": diff[:200_000]}
 
+    def _skills_catalog(self, role: str) -> str:
+        """SK-1: compact "available skills" block for a QA/Dev prompt, or "" when
+        skills are off for that role (so the prompt stays byte-identical)."""
+        return skill_lib.catalog_block(role) if settings.skills_for(role) else ""
+
+    async def _adecompose_pending(self, all_iterations: bool = False) -> None:
+        """SK-2: decompose each not-yet-decomposed backend story of the build
+        pool into layered sub-tasks (best-effort, per story)."""
+        pool = (
+            self.state.stories
+            if all_iterations
+            else self.state.stories_of_iteration(self.state.iteration)
+        )
+        for story in pool:
+            if (
+                story.status in (StoryStatus.TODO, StoryStatus.RED)
+                and not story.tasks
+                and not self._is_frontend_story(story)
+            ):
+                await self._adecompose_story(story)
+
+    async def _adecompose_story(self, story: UserStory) -> None:
+        """Ask the architect to split a backend story into layered sub-tasks
+        (entity → service → endpoint → tests), materialized as the story's Tasks
+        so the parallel worktree engine builds each in a focused subagent (tiny
+        context window) and aggregates them. Non-fatal and conservative: a failure
+        or a trivial (<2 tasks) split leaves the story taskless (built whole)."""
+        pkg = workspace.package_name(self.state)
+        self._log(f"decompose:{story.id}", f"Décomposition de {story.id} en sous-tâches par couche…")
+        try:
+            result = await self._tracked.arun(
+                prompts.decompose_story(
+                    story, pkg, self.state.architecture,
+                    available_skills=self._skills_catalog("dev"),
+                ),
+                system_prompt=persona("architect"),
+            )
+            reply = extract_json(result.text)
+        except AgentError as exc:
+            self._log(
+                f"decompose:{story.id}",
+                f"Décomposition indisponible ({exc}) — story construite en bloc.",
+            )
+            return
+        raw = [t for t in (reply.get("tasks") or []) if isinstance(t, dict)]
+        if len(raw) < 2:
+            self._log(f"decompose:{story.id}", "Story non décomposée (triviale) — construite en bloc.")
+            return
+        # Project-wide-unique task ids; remap the agent's local ids in depends_on.
+        taken = {t.id for t in self.state.all_tasks()} | {s.id for s in self.state.stories}
+        valid_ac = {c.id: c for c in story.acceptance_criteria}
+        id_map: dict[str, str] = {}
+        for i, data in enumerate(raw, start=1):
+            old = str(data.get("id") or f"T-{i}")
+            new = f"{story.id}-T{i}"
+            while new in taken:
+                new += "x"
+            taken.add(new)
+            id_map[old] = new
+        primary = self.state.primary_stream_id
+        tasks: list[Task] = []
+        for i, data in enumerate(raw, start=1):
+            old = str(data.get("id") or f"T-{i}")
+            crit = [valid_ac[c] for c in (data.get("acceptance_criteria") or []) if c in valid_ac]
+            deps = [id_map[d] for d in (data.get("depends_on") or []) if d in id_map]
+            layer = str(data.get("layer") or "")
+            skill = str(data.get("skill") or "")
+            desc = str(data.get("description") or "")
+            tag = " · ".join(
+                p for p in (f"couche {layer}" if layer else "", f"skill `{skill}`" if skill else "") if p
+            )
+            tasks.append(
+                Task(
+                    id=id_map[old],
+                    story_id=story.id,
+                    stream=primary,
+                    title=str(data.get("title") or old),
+                    description=(f"[{tag}] {desc}" if tag else desc),
+                    acceptance_criteria=crit or list(story.acceptance_criteria),
+                    gherkin=str(data.get("gherkin") or story.gherkin),
+                    depends_on=deps,
+                )
+            )
+        story.tasks = tasks
+        chain = " → ".join((t.title or t.id) for t in tasks)
+        self._chat(
+            ChatRole.ARCHITECT,
+            f"[{story.id}] {reply.get('message', 'Décomposition en sous-tâches')}\n"
+            f"{len(tasks)} sous-tâches (subagents parallèles) : {chain}.",
+        )
+        self._sync()
+
     async def _adesign_tests(self, story: UserStory, pkg: str) -> None:
         """QA agent decomposes the acceptance test outside-in (London style)
         into per-layer unit tests, BEFORE any implementation. Non-fatal: a QA
@@ -3566,6 +3671,7 @@ class Pipeline:
                     story, pkg, self.state.architecture,
                     lessons="\n".join(self._effective_lessons()),
                     backend_language=self.state.backend_language.value,
+                    available_skills=self._skills_catalog("qa"),
                 ),
                 system_prompt=persona("qa"),
             )

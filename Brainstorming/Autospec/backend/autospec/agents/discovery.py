@@ -25,7 +25,7 @@ import urllib.error
 import urllib.request
 
 from ..config import settings
-from .providers import provider_models
+from .providers import OPENROUTER_PROGRAMMING_LIMIT, provider_models
 
 # Discovery network calls are short; keep them snappy so the selector stays live.
 _DISCOVERY_TIMEOUT_S = 6
@@ -72,6 +72,24 @@ def _discover_openai_sync() -> list[str]:
     return chat or sorted(i for i in ids if i)
 
 
+def _discover_openrouter_sync() -> list[str]:
+    """The most-popular programming models on OpenRouter, top
+    ``OPENROUTER_PROGRAMMING_LIMIT`` — ``GET {base}/models?category=programming``
+    (the API behind https://openrouter.ai/models?categories=programming&order=most-popular),
+    already returned in popularity order for that category."""
+    headers = {}
+    if settings.openrouter_api_key:
+        headers["Authorization"] = f"Bearer {settings.openrouter_api_key}"
+    data = _http_get_json(
+        f"{settings.openrouter_base_url}/models?category=programming", headers=headers
+    )
+    ids = [str(m.get("id") or "").strip() for m in (data.get("data") or []) if isinstance(m, dict)]
+    top = [i for i in ids if i][:OPENROUTER_PROGRAMMING_LIMIT]
+    if not top:
+        raise RuntimeError("aucun modèle OpenRouter renvoyé")
+    return top
+
+
 async def adiscover_models(provider: str) -> tuple[list[str], str]:
     """Return ``(models, source)`` for a provider. ``source`` is ``"live"`` when
     discovery succeeded, else ``"static"`` (the suggested fallback list).
@@ -84,6 +102,8 @@ async def adiscover_models(provider: str) -> tuple[list[str], str]:
             return (await asyncio.to_thread(_discover_ollama_sync)), "live"
         if p == "openai":
             return (await asyncio.to_thread(_discover_openai_sync)), "live"
+        if p == "openrouter":
+            return (await asyncio.to_thread(_discover_openrouter_sync)), "live"
         if p == "codex":
             # Codex runs OpenAI models — reuse the OpenAI catalogue when a key is
             # configured, else fall back to the static codex suggestions.

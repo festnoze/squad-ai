@@ -397,6 +397,8 @@ async def aset_provider(req: ProviderRequest) -> dict:
         model = req.model.strip()
         if provider == "openai":
             settings.openai_model = model or settings.openai_model
+        elif provider == "openrouter":
+            settings.openrouter_model = model or settings.openrouter_model
         elif provider == "ollama":
             settings.ollama_model = model or settings.ollama_model
         elif provider == "anthropic":

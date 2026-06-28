@@ -1,0 +1,96 @@
+{
+  "version": "1.0",
+  "description": "Skill activation triggers for Autospec-generated apps. Read by the skill-activation hook to surface relevant skills on the fly (EN + FR).",
+  "skills": {
+    "architecture": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "critical",
+      "description": "3-layer backend architecture (facade -> application -> infrastructure), naming, registration.",
+      "promptTriggers": {
+        "keywords": ["architecture", "3-layer", "layer", "couche", "naming", "convention", "register", "facade", "application", "infrastructure", "ou placer", "separation of concerns"],
+        "intentPatterns": ["(which|what|where).*(layer|couche)", "(register|wire|enregistrer|cabler).*(component|composant|router|service|repository)"]
+      }
+    },
+    "db-entity-change": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Create/modify a persistence entity + migration (infrastructure).",
+      "promptTriggers": {
+        "keywords": ["entity", "entite", "add column", "ajouter colonne", "new table", "nouvelle table", "schema", "migration", "add field", "ajouter champ"],
+        "intentPatterns": ["(create|add|modify|alter|creer|ajouter|modifier).*(entity|table|column|field|entite|colonne|champ)"]
+      }
+    },
+    "repo-search-or-create": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Reuse-or-create a repository method (data access, DRY).",
+      "promptTriggers": {
+        "keywords": ["repository", "crud", "data access", "acces donnees", "get", "create", "update", "delete", "query", "persistance"],
+        "intentPatterns": ["(get|create|update|delete|fetch|read|write).*(from|to|in).*(db|database|store|base)"]
+      }
+    },
+    "service-search-or-create": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Reuse-or-create a service use-case method (application layer).",
+      "promptTriggers": {
+        "keywords": ["service", "use-case", "use case", "cas d'usage", "business logic", "logique metier", "orchestration"],
+        "intentPatterns": ["(implement|implementer).*(use.?case|business|metier)"]
+      }
+    },
+    "endpoint-search-or-create": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Reuse-or-create a FastAPI endpoint + request/response models (facade).",
+      "promptTriggers": {
+        "keywords": ["endpoint", "route", "api", "http", "router", "request model", "response model"],
+        "intentPatterns": ["(create|add|expose|creer|ajouter|exposer).*(endpoint|route|api)"]
+      }
+    },
+    "error-code-management": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "medium",
+      "description": "Centralized error codes + exception classes + message catalog.",
+      "promptTriggers": {
+        "keywords": ["error code", "code erreur", "exception", "raise", "lever une erreur", "error message", "message d'erreur"],
+        "intentPatterns": ["(add|new|handle|ajouter|gerer).*(error|exception|erreur)"]
+      }
+    },
+    "test-generator": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Generate unit/integration/e2e tests by layer following conventions.",
+      "promptTriggers": {
+        "keywords": ["test", "tests", "unit test", "integration test", "e2e", "pytest", "fixture", "mock", "couverture", "coverage"],
+        "intentPatterns": ["(generate|write|add|create|generer|ecrire|ajouter).*(test|tests)"]
+      }
+    },
+    "bdd-gherkin": {
+      "type": "domain",
+      "enforcement": "suggest",
+      "priority": "high",
+      "description": "Outside-in decomposition of a Gherkin acceptance into per-layer unit tests + pytest-bdd wiring.",
+      "promptTriggers": {
+        "keywords": ["gherkin", "bdd", "acceptance", "outside-in", "london", "pytest-bdd", "step definitions", "scenario", "given when then", "feature file"],
+        "intentPatterns": ["(decompose|wire|cabler|decomposer).*(gherkin|acceptance|scenario|feature)"]
+      }
+    },
+    "skill-creator": {
+      "type": "meta",
+      "enforcement": "suggest",
+      "priority": "low",
+      "description": "Create a new skill (SKILL.md + references) to extend the factory.",
+      "promptTriggers": {
+        "keywords": ["create skill", "new skill", "nouvelle skill", "creer une skill", "skill triggers", "build skill"],
+        "intentPatterns": ["(create|build|write|creer|construire).*(skill)"]
+      }
+    }
+  }
+}

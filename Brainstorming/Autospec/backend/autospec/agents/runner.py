@@ -174,6 +174,15 @@ class ClaudeCliRunner:
         chosen_model = model or settings.claude_model
         if chosen_model:
             args += ["--model", chosen_model]
+        # SK-1: when skills are on, expose the workspace's seeded skill library so
+        # the CLI's native Skill tool can load `.claude/skills/<name>/SKILL.md` on
+        # demand (progressive disclosure). cwd's `.claude/skills` is auto-found,
+        # but the explicit --add-dir makes the grant unambiguous. No --allowedTools
+        # (it would otherwise RESTRICT the dev agent's file edits).
+        if settings.skills_enabled and cwd is not None:
+            skills_path = Path(cwd) / ".claude" / "skills"
+            if skills_path.exists():
+                args += ["--add-dir", str(skills_path)]
         if session_id:
             args += ["--resume", session_id]
 

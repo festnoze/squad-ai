@@ -109,6 +109,37 @@ _ARCHITECT = json.dumps(
     ensure_ascii=False,
 )
 
+# SK-2: the decomposer splits a backend story into layered sub-tasks (built in
+# parallel worktrees then aggregated). Two tasks, the façade depending on the service.
+_DECOMPOSE = json.dumps(
+    {
+        "message": "Découpage par couche (mode démo).",
+        "tasks": [
+            {
+                "id": "T-1",
+                "layer": "application",
+                "skill": "service-search-or-create",
+                "title": "Service de calcul",
+                "description": "Service qui calcule le résultat.",
+                "acceptance_criteria": ["AC-1"],
+                "gherkin": "Feature: Service\n  Scenario: Calcul\n    Given deux nombres\n    When le service calcule\n    Then le résultat est correct",
+                "depends_on": [],
+            },
+            {
+                "id": "T-2",
+                "layer": "facade",
+                "skill": "endpoint-search-or-create",
+                "title": "Exposition du calcul",
+                "description": "Point d'entrée qui appelle le service.",
+                "acceptance_criteria": ["AC-1"],
+                "gherkin": "Feature: Façade\n  Scenario: Appel\n    Given le service\n    When j'appelle la façade\n    Then le résultat est renvoyé",
+                "depends_on": ["T-1"],
+            },
+        ],
+    },
+    ensure_ascii=False,
+)
+
 _ANALYST = json.dumps(
     {
         "message": "Prochaine feature priorisée : la multiplication (mode démo).",
@@ -384,6 +415,8 @@ class ScriptedRunner:
         if "architecte de tests" in prompt:  # qa_test_plan
             match = _QA_STORY_RE.search(prompt)
             return _qa_plan(match.group(1) if match else "US-1")
+        if "en SOUS-TÂCHES par COUCHE" in prompt:  # decompose_story (SK-2)
+            return _DECOMPOSE
         if "design technique CONCIS" in prompt:  # architect_design
             return _ARCHITECT
         if "PO/Scrum Master" in prompt:  # po_plan / po_revise

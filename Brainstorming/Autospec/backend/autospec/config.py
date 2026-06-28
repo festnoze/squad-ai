@@ -118,6 +118,16 @@ def _default_workspace_root() -> Path:
     return PROJECT_DIR / "workspace"
 
 
+def _default_skills_dir() -> Path:
+    """Source-of-truth bundled skill library (copied into each workspace's
+    ``.claude/skills/`` so the headless claude agent auto-discovers them)."""
+    env = os.environ.get("AUTOSPEC_SKILLS_DIR")
+    if env:
+        p = Path(env)
+        return p if p.is_absolute() else (BACKEND_DIR / p)
+    return BACKEND_DIR / "autospec" / "skills"
+
+
 def _default_phase_models() -> dict:
     """Per-phase model overrides (M3) from AUTOSPEC_MODEL_<PHASE> env vars."""
     out = {}
@@ -193,6 +203,31 @@ class Settings:
     anthropic_price_out: float = field(
         default_factory=lambda: _env_float("AUTOSPEC_ANTHROPIC_PRICE_OUT", 0.0, minimum=0.0)
     )
+    # OpenRouter: an OpenAI-compatible aggregator hub. Reuses the OpenAI runner
+    # path with OpenRouter's base_url + key. The model dropdown is populated live
+    # with the most-popular programming models (GET {base}/models?category=programming).
+    # Reads the bare OPENROUTER_* names too (as the user put them in .env).
+    openrouter_api_key: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_OPENROUTER_API_KEY")
+        or os.environ.get("OPENROUTER_API_KEY")
+        or ""
+    )
+    openrouter_base_url: str = field(
+        default_factory=lambda: (
+            os.environ.get("AUTOSPEC_OPENROUTER_BASE_URL")
+            or os.environ.get("OPENROUTER_BASE_URL")
+            or "https://openrouter.ai/api/v1"
+        ).rstrip("/")
+    )
+    openrouter_model: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_OPENROUTER_MODEL", "")
+    )
+    openrouter_price_in: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_OPENROUTER_PRICE_IN", 0.0, minimum=0.0)
+    )
+    openrouter_price_out: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_OPENROUTER_PRICE_OUT", 0.0, minimum=0.0)
+    )
     # Cap on the write/read tool-loop rounds of the LangChain providers (OpenAI
     # / Ollama are plain chat models: file edits go through a bounded JSON
     # protocol).
@@ -265,6 +300,22 @@ class Settings:
     streams_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_STREAMS", False)
     )
+    # Skills (SK-1): give the QA/Dev agents a library of reusable, progressively-
+    # disclosed capability files (3-layer architecture, per-layer builders, BDD,
+    # test generation) instead of inlining everything in the prompt. The claude
+    # CLI auto-discovers the workspace's seeded `.claude/skills/` (native Skill
+    # tool); every provider also gets a compact skill CATALOG injected into the
+    # prompt. OFF by default; master flag AND per-role flag, like refine.
+    skills_enabled: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_SKILLS", False))
+    skills_qa: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_SKILLS_QA", True))
+    skills_dev: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_SKILLS_DEV", True))
+    skills_dir: Path = field(default_factory=_default_skills_dir)
+    # Decomposition build mode (SK-2): split a non-trivial backend story into
+    # layered sub-tasks (entity → repo → service → endpoint → tests), each built
+    # by a focused subagent (tiny context window) via the parallel worktree
+    # engine, then aggregated. Reuses the streams Task/worktree machinery. OFF by
+    # default; turning it on routes eligible stories through the streams path.
+    decompose_enabled: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_DECOMPOSE", False))
     setup_install: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_SETUP_INSTALL", False)
     )
@@ -402,6 +453,11 @@ class Settings:
     def refine_for(self, role: str) -> bool:
         """Is the refinement loop active for this maker role ('po' / 'dev')?"""
         return self.refine_enabled and bool(getattr(self, f"refine_{role}", True))
+
+    def skills_for(self, role: str) -> bool:
+        """Are skills active for this agent role ('qa' / 'dev')? Master flag AND
+        the per-role flag, mirroring ``refine_for``."""
+        return self.skills_enabled and bool(getattr(self, f"skills_{role}", True))
 
     def model_for_phase(self, phase: str) -> str | None:
         """Model to use for a given pipeline phase (M3): the per-phase override

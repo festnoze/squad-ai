@@ -217,6 +217,59 @@ class OpenAiRunner(_LangChainRunner):
         ) / 1_000_000
 
 
+# How many top programming models OpenRouter's selector shows (live discovery).
+OPENROUTER_PROGRAMMING_LIMIT = 10
+
+# Static fallback shown only when live discovery is unavailable (offline / no key).
+# The real list comes from GET {base}/models?category=programming (most-popular).
+OPENROUTER_FALLBACK_MODELS: tuple[str, ...] = (
+    "anthropic/claude-sonnet-4",
+    "anthropic/claude-opus-4",
+    "openai/gpt-5",
+    "openai/gpt-4.1",
+    "google/gemini-2.5-pro",
+    "deepseek/deepseek-chat",
+    "qwen/qwen3-coder",
+    "x-ai/grok-code-fast-1",
+    "moonshotai/kimi-k2",
+    "z-ai/glm-4.6",
+)
+
+
+class OpenRouterRunner(_LangChainRunner):
+    """OpenRouter (OpenAI-compatible aggregator hub) via langchain-openai.
+
+    Same chat/file-tool loop as OpenAI; only the endpoint, key and model differ.
+    OpenRouter recommends the X-Title / HTTP-Referer headers for attribution."""
+
+    name = "openrouter"
+
+    def _build_model(self):
+        if not settings.openrouter_api_key:
+            raise AgentError(
+                "Clé API OpenRouter absente (AUTOSPEC_OPENROUTER_API_KEY ou OPENROUTER_API_KEY)."
+            )
+        try:
+            from langchain_openai import ChatOpenAI
+        except ImportError:
+            raise AgentError(
+                "langchain-openai n'est pas installé (uv sync) — requis pour le provider openrouter."
+            )
+        return ChatOpenAI(
+            model=settings.openrouter_model or OPENROUTER_FALLBACK_MODELS[0],
+            api_key=settings.openrouter_api_key,
+            base_url=settings.openrouter_base_url,
+            timeout=settings.agent_timeout_s,
+            default_headers={"X-Title": "Autospec", "HTTP-Referer": "https://github.com/autospec"},
+        )
+
+    def _cost(self, input_tokens: int, output_tokens: int) -> float:
+        return (
+            input_tokens * settings.openrouter_price_in
+            + output_tokens * settings.openrouter_price_out
+        ) / 1_000_000
+
+
 class OllamaRunner(_LangChainRunner):
     """Local models through Ollama via langchain-ollama (no key, zero cost)."""
 
@@ -266,8 +319,8 @@ class AnthropicRunner(_LangChainRunner):
 
 
 # Claude is first (the default provider): the UI lists it first and selects it by
-# default. codex/openai/ollama/anthropic follow.
-PROVIDERS = ("claude", "codex", "openai", "ollama", "anthropic")
+# default. codex/openai/openrouter/ollama/anthropic follow.
+PROVIDERS = ("claude", "codex", "openai", "openrouter", "ollama", "anthropic")
 
 # Suggested models per provider, shown in the UI's second (adaptive) dropdown.
 # These are display/endpoint values passed straight to the backend, so a user
@@ -294,6 +347,9 @@ MODEL_CHOICES: dict[str, tuple[str, ...]] = {
         "gpt-4o-mini",
     ),
     "ollama": ("llama3.1", "qwen3", "mistral", "deepseek-r1"),
+    # Fallback only — the live list is the most-popular programming models from
+    # OpenRouter (GET {base}/models?category=programming), fetched on demand.
+    "openrouter": OPENROUTER_FALLBACK_MODELS,
 }
 
 
@@ -304,8 +360,8 @@ def provider_models(provider: str) -> list[str]:
     the UI dropdown can reflect a non-default model set via env vars."""
     choices = list(MODEL_CHOICES.get(provider, ()))
     current = provider_model(provider)
-    # The CLI default placeholder is not a real selectable model id.
-    if current and current != "(défaut CLI)" and current not in choices:
+    # A "(défaut …)" placeholder is not a real selectable model id.
+    if current and not current.startswith("(défaut") and current not in choices:
         choices.insert(0, current)
     return choices
 
@@ -315,6 +371,8 @@ def make_runner(provider: str) -> AgentRunner:
     normalized = (provider or "claude").strip().lower()
     if normalized == "openai":
         return OpenAiRunner()
+    if normalized == "openrouter":
+        return OpenRouterRunner()
     if normalized == "ollama":
         return OllamaRunner()
     if normalized == "anthropic":
@@ -330,6 +388,8 @@ def provider_model(provider: str) -> str:
     """The model currently configured for a provider (display/endpoint)."""
     if provider == "openai":
         return settings.openai_model
+    if provider == "openrouter":
+        return settings.openrouter_model or "(défaut OpenRouter)"
     if provider == "ollama":
         return settings.ollama_model
     if provider == "anthropic":

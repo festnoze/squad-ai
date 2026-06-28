@@ -15,14 +15,19 @@ transforme en **code testé** (BDD puis TDD), de façon itérative et autonome.
 
 ## 1. Pipeline d'agents (cœur)
 
-Les agents sont exécutés derrière l'abstraction **`AgentRunner`** —
-5 implémentations : `ClaudeCliRunner` (production, CLI Claude Code headless
-`claude -p --output-format json`), **`OpenAiRunner`** et **`OllamaRunner`**
-(providers hors abonnement via **LangChain** : sessions rejouées en mémoire +
-protocole d'outils JSON borné pour les écritures fichiers, confiné au
-workspace), `FakeRunner` (tests unitaires), `ScriptedRunner` (mode démo).
-Sélection par `AUTOSPEC_AGENT_PROVIDER` ou à chaud via `GET/POST /api/provider`
-(sélecteur 🤖 du header). Les personas proviennent de l'installation **BMAD**
+Les agents sont exécutés derrière l'abstraction **`AgentRunner`** :
+`ClaudeCliRunner` (production, CLI Claude Code headless
+`claude -p --output-format json`), `CodexCliRunner` (`codex exec`), et les
+providers **hors abonnement** via **LangChain** — **`OpenAiRunner`**,
+**`OpenRouterRunner`** (hub compatible-OpenAI), **`OllamaRunner`**,
+**`AnthropicRunner`** (sessions rejouées en mémoire + protocole d'outils JSON
+borné pour les écritures fichiers, confiné au workspace) — plus `FakeRunner`
+(tests) et `ScriptedRunner` (mode démo). Sélection par `AUTOSPEC_AGENT_PROVIDER`
+ou à chaud via `GET/POST /api/provider` (sélecteur 🤖 du header). Le 2ᵉ menu
+**modèle** est **adaptatif et découvert à la volée** (`GET /api/providers/{p}/models`) :
+Ollama/OpenAI interrogent leur endpoint, **OpenRouter charge les 10 modèles de
+programmation les plus populaires** (`/models?category=programming`), avec repli
+sur une liste statique. Les personas proviennent de l'installation **BMAD**
 (`_bmad/bmm/agents/`), augmentées d'un override « mode programmatique » qui
 neutralise les menus interactifs et impose **une seule réponse JSON**.
 
@@ -114,6 +119,37 @@ Entre PO et build, l'agent **`architect`** produit un design technique concis
 (couches/modules, composants clés, conventions, contraintes transverses), stocké
 dans `ProjectState.architecture` et **injecté dans les prompts QA et Dev**.
 Activable par `AUTOSPEC_ARCHITECTURE`, **OFF par défaut**.
+
+---
+
+## 2bis. Bibliothèque de skills (SK-1)
+
+Les agents **QA / Dev / BDD** s'appuient sur une **bibliothèque de skills**
+réutilisables plutôt que sur des prompts toujours plus gros — meilleure gestion
+de la **fenêtre de contexte** (divulgation progressive). Source :
+`backend/autospec/skills/` — **9 skills** : `architecture` (archi backend en
+**3 couches** façade → application → infrastructure, préfixe async `a`,
+enregistrement des composants), `db-entity-change`,
+`repo`/`service`/`endpoint-search-or-create`, `error-code-management`,
+`test-generator`, `bdd-gherkin`, `skill-creator` — plus `skill-rules.json`
+(déclencheurs FR/EN) et un hook `skill-activation.py`.
+
+**Livraison hybride** (`orchestrator/skills.py`) : (a) **natif** — la bibliothèque
+est **ensemencée** dans `workspace/<id>/.claude/skills/` pour la découverte native
+du CLI Claude (outil Skill) ; (b) **catalogue** — un bloc compact (nom +
+description) est injecté dans les prompts QA/Dev **pour tous les providers**.
+Réglages : `AUTOSPEC_SKILLS` (global, **OFF**) + `AUTOSPEC_SKILLS_QA`/`_DEV`. OFF →
+prompts **strictement inchangés**.
+
+## 2ter. Décomposition en sous-tâches parallèles (SK-2)
+
+`AUTOSPEC_DECOMPOSE` (**OFF par défaut**) découpe une grosse story backend en
+**sous-tâches par couche** (entité → service → endpoint → tests) via l'architecte,
+matérialisées en `Task`. Chaque sous-tâche est construite par un **sous-agent
+focalisé dans son propre worktree git** (contexte minimal = 1 couche + 1 skill)
+**en parallèle**, puis **fusionnée** — réutilise le moteur de worktrees des streams ;
+la fusion + le rollup de statut **agrègent** les sous-résultats. Non-fatal : < 2
+sous-tâches ou erreur → story construite d'un bloc.
 
 ---
 
@@ -249,11 +285,14 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 | `AUTOSPEC_REFINE` / `_PO` / `_DEV` | `0` / `1` / `1` | harnais de raffinement |
 | `AUTOSPEC_REFINE_MAX_ROUNDS` | `2` | cap d'allers-retours |
 | `AUTOSPEC_REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge |
-| `AUTOSPEC_AGENT_PROVIDER` | `claude` | provider d'agents (claude / openai / ollama) |
+| `AUTOSPEC_AGENT_PROVIDER` | `claude` | provider d'agents (claude / codex / openai / openrouter / ollama / anthropic) |
 | `AUTOSPEC_OPENAI_API_KEY` / `_MODEL` / `_BASE_URL` | — | provider OpenAI (LangChain) |
 | `AUTOSPEC_OPENAI_PRICE_IN` / `_OUT` | `0` | $/1M tokens (estimation de coût) |
+| `OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL` | — / `…/api/v1` | provider **OpenRouter** (aussi `AUTOSPEC_OPENROUTER_*`) ; modèles = top-10 programmation chargé dynamiquement |
 | `AUTOSPEC_OLLAMA_BASE_URL` / `_MODEL` | localhost / `llama3.1` | provider Ollama (LangChain) |
 | `AUTOSPEC_PROVIDER_TOOL_ROUNDS` | `8` | cap du protocole d'outils fichiers |
+| `AUTOSPEC_SKILLS` / `_QA` / `_DEV` | `0` / `1` / `1` | bibliothèque de skills QA/Dev (SK-1) |
+| `AUTOSPEC_DECOMPOSE` | `0` | décomposition en sous-tâches parallèles (SK-2) |
 | `AUTOSPEC_COMPONENTS` | `0` | phase composants (solutionneur) |
 | `AUTOSPEC_SETUP_INSTALL` | `0` | install réelle des deps composants |
 | `AUTOSPEC_TECH_WRITER` | `0` | tech-writer auto après build |
@@ -272,8 +311,10 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 `/files`, `/files/raw?path=`, `PUT /components`, `POST /components/setup`,
 `POST /document`, `GET /export` (zip), `POST /git-export`.
 
-**Provider** : `GET|POST /api/provider` (bascule claude/openai/ollama à chaud ;
-verrouillé en mode démo).
+**Provider** : `GET|POST /api/provider` (bascule claude/codex/openai/openrouter/
+ollama/anthropic à chaud ; verrouillé en mode démo) ;
+`GET /api/providers/{provider}/models` (découverte live des modèles — top-10
+programmation pour OpenRouter, repli statique).
 
 **Watchdog M2** : `POST /api/projects/{id}/cancel-resume` (annule la reprise
 auto programmée après épuisement de la fenêtre d'usage Claude — détection sur

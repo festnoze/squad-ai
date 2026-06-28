@@ -36,6 +36,8 @@ def tmp_workspace(tmp_path, monkeypatch):
     # their safe defaults; a test exercising one re-enables it via monkeypatch.
     monkeypatch.setattr(settings, "brainstorm_assist_enabled", False)
     monkeypatch.setattr(settings, "streams_enabled", False)
+    monkeypatch.setattr(settings, "skills_enabled", False)
+    monkeypatch.setattr(settings, "decompose_enabled", False)
     return tmp_path
 
 

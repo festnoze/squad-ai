@@ -130,8 +130,9 @@ def dev_revise(
     architecture: str = "",
     guidance: str = "",
     lessons: str = "",
+    available_skills: str = "",
 ) -> str:
-    return f"""{dev_story(story, package_name, feature_rel_path, architecture, guidance, lessons=lessons)}
+    return f"""{dev_story(story, package_name, feature_rel_path, architecture, guidance, lessons=lessons, available_skills=available_skills)}
 
 ⚠️ BOUCLE DE RAFFINEMENT — le code de cette story passe déjà au vert, mais un
 critique a relevé des points d'amélioration :
@@ -140,6 +141,65 @@ critique a relevé des points d'amélioration :
 Améliore le code en intégrant ces retours. CONTRAINTE ABSOLUE : toute la suite
 `uv run pytest` doit RESTER verte après tes modifications. Réponds avec le même
 objet JSON que précédemment."""
+
+
+# ------------------------------------------------- Decomposition build mode (SK-2)
+
+def decompose_story(
+    story: UserStory,
+    package_name: str,
+    architecture: str = "",
+    available_skills: str = "",
+) -> str:
+    """SK-2: split a backend story into per-LAYER sub-tasks, each built by a
+    focused subagent (tiny context window) in parallel then aggregated. The
+    unique marker ``en SOUS-TÂCHES par COUCHE`` keys the ScriptedRunner reply."""
+    arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    return f"""Tu es l'architecte d'un pipeline automatisé. Tu DÉCOMPOSES une user story
+backend en SOUS-TÂCHES par COUCHE : chacune est confiée à un sous-agent focalisé
+(fenêtre de contexte réduite), les sous-tâches indépendantes sont construites EN
+PARALLÈLE, puis leurs résultats sont agrégés et la suite de tests rejouée.
+{arch_block}{available_skills}
+User story à décomposer : {story.id} — {story.title}
+Description : {story.description}
+Critères d'acceptance (réutilise leurs ids) :
+{_criteria_block(story)}
+
+Acceptance Gherkin (vision de bout en bout, NE PAS la modifier) :
+\"\"\"{story.gherkin}\"\"\"
+
+Découpe en 0 à 5 sous-tâches alignées sur les COUCHES de l'architecture cible, en
+respectant l'ordre des dépendances (du plus interne au plus externe) :
+infrastructure (entité/persistance) → application (service/cas d'usage) → façade
+(endpoint/CLI) → tests d'intégration/bout-en-bout. ADAPTE la granularité : une
+story triviale (une fonction pure) ne se découpe pas → renvoie une liste "tasks"
+VIDE ou à un seul élément.
+- Chaque sous-tâche cible UNE couche et nomme la SKILL à utiliser (champ `skill`,
+  ex. `db-entity-change`, `service-search-or-create`, `endpoint-search-or-create`,
+  `test-generator`).
+- `depends_on` référence les ids des sous-tâches dont elle dépend (couche
+  inférieure). Les sous-tâches sans dépendance mutuelle seront PARALLÉLISÉES.
+- Chaque sous-tâche porte ses propres `acceptance_criteria` (ids, sous-ensemble de
+  ceux de la story) et un mini-Gherkin ciblant sa couche.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase résumant le découpage>",
+  "tasks": [
+    {{
+      "id": "T-1",
+      "layer": "infrastructure",
+      "skill": "db-entity-change",
+      "title": "...",
+      "description": "...",
+      "acceptance_criteria": ["AC-1"],
+      "gherkin": "Feature: ...\\n  Scenario: ...\\n    Given ...\\n    When ...\\n    Then ...",
+      "depends_on": []
+    }}
+  ]
+}}
+Les ids de sous-tâches sont uniques ; `depends_on` ne référence que des ids de ce
+même JSON."""
 
 
 # ---------------------------------------------------------------- PM (spec)
@@ -812,6 +872,7 @@ def qa_test_plan(
     architecture: str = "",
     lessons: str = "",
     backend_language: str = "python",
+    available_skills: str = "",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     lang_block = _language_block(backend_language)
@@ -823,7 +884,7 @@ def qa_test_plan(
     )
     return f"""Tu es l'architecte de tests d'un pipeline automatisé BDD/TDD. Le code cible est
 {prof['project']} ; tests lancés par `{prof['test_cmd']}`.
-{arch_block}{lang_block}{lessons_block}
+{arch_block}{available_skills}{lang_block}{lessons_block}
 
 User story à couvrir : {story.id} — {story.title}
 Description : {story.description}
@@ -903,6 +964,7 @@ def _dev_story_native(
     guidance_block: str,
     lessons_block: str,
     plan: str,
+    skills_block: str = "",
 ) -> str:
     """Dev prompt for Go/Rust (L2g): native test framework, no pytest-bdd. The
     Gherkin stays the human-readable acceptance spec; tests are written in the
@@ -916,7 +978,7 @@ def _dev_story_native(
     )
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant : {prof['project']}.
-{arch_block}{guidance_block}{lessons_block}
+{arch_block}{skills_block}{guidance_block}{lessons_block}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
@@ -964,6 +1026,7 @@ def dev_story(
     lessons: str = "",
     backend_language: str = "python",
     item_guidance: str = "",
+    available_skills: str = "",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     lang_block = _language_block(backend_language)
@@ -977,6 +1040,7 @@ def dev_story(
         return _dev_story_native(
             backend_language, story, package_name, feature_rel_path,
             arch_block, guidance_block, lessons_block, _format_test_plan(story),
+            skills_block=available_skills,
         )
     ui_block = UI_TEST_BLOCK.replace("{snake}", _snake(story.id)) if ui_tests else ""
     plan = _format_test_plan(story)
@@ -997,7 +1061,7 @@ L'architecte QA a décomposé ce test d'acceptance en tests unitaires outside-in
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant, qui est un projet Python géré par uv (pyproject.toml déjà
 présent, pytest + pytest-bdd installés).
-{arch_block}{lang_block}{guidance_block}{lessons_block}
+{arch_block}{lang_block}{available_skills}{guidance_block}{lessons_block}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
@@ -1057,6 +1121,7 @@ def dev_story_frontend(
     lessons: str = "",
     file_root: str = "frontend",
     item_guidance: str = "",
+    available_skills: str = "",
 ) -> str:
     """Dev prompt for the frontend stream (ST-7): a React+TS dev who writes
     components + Vitest tests in a red→green loop. "Green" = every Vitest test
@@ -1076,7 +1141,7 @@ def dev_story_frontend(
 un projet React + TypeScript géré par Vite (dossier `{file_root}/`, package.json
 déjà présent : React, Vitest et Testing Library installés, scripts `build` =
 `tsc && vite build` et `test` = `vitest run`).
-{arch_block}{guidance_block}{lessons_block}
+{arch_block}{available_skills}{guidance_block}{lessons_block}
 User story (stream frontend) à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :

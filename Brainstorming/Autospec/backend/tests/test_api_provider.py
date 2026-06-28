@@ -27,11 +27,14 @@ async def test_get_provider_defaults(monkeypatch):
         data = (await client.get("/api/provider")).json()
         assert data["provider"] == "claude"
         # Claude is the default provider: first in the list.
-        assert data["available"] == ["claude", "codex", "openai", "ollama", "anthropic"]
+        assert data["available"] == [
+            "claude", "codex", "openai", "openrouter", "ollama", "anthropic",
+        ]
         # Adaptive 2nd dropdown: per-provider model choices.
         assert data["models"]["claude"] == ["opus", "sonnet", "haiku"]
         assert "gpt-4.1" in data["models"]["openai"]
         assert data["models"]["codex"]  # codex has suggested models too
+        assert data["models"]["openrouter"]  # OpenRouter has fallback suggestions
 
 
 async def test_switch_anthropic_model(monkeypatch):

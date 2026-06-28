@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Orbiter — Soleil · Terre · Lune · Mars</title>
+  </head>
+  <body>
+    <div id="app">
+      <canvas id="scene"></canvas>
+
+      <div id="hud">
+        <header class="hud-title">
+          <span class="logo">🛰️ Orbiter</span>
+          <span class="sub">Soleil · Terre · Lune · Mars</span>
+        </header>
+
+        <section class="panel" id="frame-panel">
+          <h2>Repère / Navigation</h2>
+          <div class="row" id="frame-buttons"></div>
+          <p class="hint" id="frame-hint"></p>
+        </section>
+
+        <section class="panel" id="time-panel">
+          <h2>Temps</h2>
+          <div class="row">
+            <button id="play">⏸︎ Pause</button>
+            <button id="now">Aujourd'hui</button>
+          </div>
+          <label class="field">
+            Vitesse : <span id="rate-label"></span>
+            <input id="rate" type="range" min="-7" max="7" step="0.25" value="2.5" />
+          </label>
+          <div class="epoch" id="epoch"></div>
+        </section>
+
+        <section class="panel" id="points-panel">
+          <h2>Points remarquables</h2>
+          <div class="checks" id="point-toggles"></div>
+        </section>
+
+        <section class="panel" id="sat-panel">
+          <h2>Satellites artificiels</h2>
+          <div class="row">
+            <select id="sat-preset"></select>
+            <button id="sat-add" class="primary">+ Ajouter</button>
+          </div>
+          <p class="hint">Présélection = orbite calculée autour du corps choisi.</p>
+          <ul id="sat-list"></ul>
+        </section>
+
+        <section class="panel" id="info-panel">
+          <h2>Sélection</h2>
+          <div id="info">Clique un corps / point, ou navigue avec la souris.</div>
+        </section>
+      </div>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

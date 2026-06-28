@@ -122,8 +122,9 @@ a une suite entièrement verte → tous ses critères sont verts.
 
 **Point essentiel : Autospec n'appelle aucun SDK LLM directement pour Claude —
 il délègue au CLI Claude Code en mode headless** ; les providers hors
-abonnement (OpenAI, Ollama) passent par **LangChain**, le tout derrière une
-abstraction commune.
+abonnement (OpenAI, **OpenRouter**, Ollama, Anthropic API) passent par
+**LangChain** et OpenAI Codex par son propre CLI (`codex exec`), le tout
+derrière une abstraction commune.
 
 ### 4.1 L'abstraction `AgentRunner` (`agents/runner.py`)
 
@@ -134,21 +135,35 @@ class AgentRunner(Protocol):
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None) -> AgentResult: ...
 ```
 
-Cinq implémentations :
+Implémentations (`agents/runner.py` + `agents/providers.py`) :
 
 - **`ClaudeCliRunner`** (production) — lance le binaire `claude` en sous-processus.
-- **`OpenAiRunner` / `OllamaRunner`** (`agents/providers.py`, M1) — providers
-  **hors abonnement** via **LangChain** (`langchain-openai` / `langchain-ollama`,
-  imports paresseux). Ces API de chat étant sans état ni outils : (a) la
-  continuité de session est **rejouée en mémoire** par `session_id` ; (b) quand
-  un `cwd` est fourni (agents Dev), un **protocole d'outils JSON borné** est
-  injecté au system prompt — le modèle répond `{"tool": "write_files"|"read_files", ...}`
-  pendant au plus `AUTOSPEC_PROVIDER_TOOL_ROUNDS` tours (chemins confinés au
-  workspace), puis donne sa réponse finale. Coût OpenAI estimé via
-  `AUTOSPEC_OPENAI_PRICE_IN/_OUT` ($/1M tokens) ; Ollama = 0. Sélection par
-  `AUTOSPEC_AGENT_PROVIDER` ou à chaud via `GET/POST /api/provider`
-  (`make_runner()` ; bascule le runner de toutes les pipelines vivantes ;
-  verrouillé en mode démo).
+- **`CodexCliRunner`** — miroir OpenAI : `codex exec --json` en headless (le
+  system prompt est préfixé au prompt, sortie JSONL parsée).
+- **`OpenAiRunner` / `OpenRouterRunner` / `OllamaRunner` / `AnthropicRunner`**
+  (`agents/providers.py`) — providers **hors abonnement** via **LangChain**
+  (`langchain-openai` / `langchain-ollama` / `langchain-anthropic`, imports
+  paresseux). **OpenRouter** est un hub compatible-OpenAI : `OpenRouterRunner`
+  réutilise `ChatOpenAI` avec le `base_url`/clé OpenRouter (clés lues depuis
+  `OPENROUTER_API_KEY`/`OPENROUTER_BASE_URL`). Ces API de chat étant sans état ni
+  outils : (a) la continuité de session est **rejouée en mémoire** par
+  `session_id` ; (b) quand un `cwd` est fourni (agents Dev), un **protocole
+  d'outils JSON borné** est injecté au system prompt — le modèle répond
+  `{"tool": "write_files"|"read_files", ...}` pendant au plus
+  `AUTOSPEC_PROVIDER_TOOL_ROUNDS` tours (chemins confinés au workspace), puis
+  donne sa réponse finale. Coût estimé via `AUTOSPEC_<PROVIDER>_PRICE_IN/_OUT`
+  ($/1M tokens) ; Ollama = 0. Sélection par `AUTOSPEC_AGENT_PROVIDER` ou à chaud
+  via `GET/POST /api/provider` (`make_runner()` ; bascule le runner de toutes les
+  pipelines vivantes ; verrouillé en mode démo).
+- **Découverte de modèles à la volée** (`agents/discovery.py`,
+  `GET /api/providers/{provider}/models`) — au lieu d'une liste statique, le
+  sélecteur affiche les modèles **réellement joignables** : Ollama interroge le
+  démon, OpenAI/Codex le endpoint `/models` avec la clé, et **OpenRouter charge
+  dynamiquement les 10 modèles de programmation les plus populaires**
+  (`GET {base}/models?category=programming` — l'API derrière
+  `openrouter.ai/models?categories=programming&order=most-popular`). Repli sur la
+  liste statique suggérée (`provider_models`) si la découverte échoue (hors-ligne,
+  pas de clé).
 - **`FakeRunner`** (tests unitaires) — dépile des réponses JSON pré-programmées,
   **sans aucun LLM**. C'est ce qui rend les tests déterministes et instantanés.
 - **`ScriptedRunner`** (mode démo / e2e, `agents/scripted.py`) — reconnaît
@@ -346,6 +361,10 @@ parallèle (sémaphore). Pour chaque story (`_abuild_story`) :
    En mode démo (`AUTOSPEC_FAKE_AGENTS`), `_arun_pytest` court-circuite et renvoie
    `(True, ..., {})` (inchangé).
 
+Quand les **skills** sont activées (§5.10), les prompts QA et Dev reçoivent en
+plus un **catalogue compact de compétences** à charger à la demande, et le
+workspace est ensemencé de `.claude/skills/` pour la découverte native.
+
 L'état de chaque **critère** se déduit de ses tests (voir §3) : le board affiche
 chaque critère comme une ligne dépliable (inexistant / rouge / vert).
 
@@ -538,6 +557,49 @@ d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
   `story.ui_tests`) ; après la suite pytest classique, `_arun_ui_tests`
   (`uv run pytest -m ui`, exit 5 « rien collecté » = vert) doit passer pour que
   la story soit DONE — sinon retry/échec comme un rouge normal.
+
+---
+
+### 5.10 Skills — compétences réutilisables pour QA/Dev (SK-1)
+
+Plutôt que de gonfler les prompts, les agents QA/Dev s'appuient sur une
+**bibliothèque de skills** : de petits fichiers `SKILL.md` (frontmatter
+`name` + `description`, plus des `references/`) chargés **à la demande**
+(divulgation progressive → prompt de base plus léger). La source est
+`backend/autospec/skills/` (9 skills : `architecture` [archi backend en
+**3 couches** façade → application → infrastructure, préfixe async `a`,
+enregistrement], `db-entity-change`, `repo`/`service`/`endpoint-search-or-create`,
+`error-code-management`, `test-generator`, `bdd-gherkin`, `skill-creator`) +
+`skill-rules.json` (matrice de déclencheurs FR/EN) + un hook `skill-activation.py`.
+
+**Livraison hybride** (`orchestrator/skills.py`) :
+- **natif** — `seed_skills(ws)` copie la bibliothèque dans
+  `workspace/<id>/.claude/skills/` (idempotent) ; le CLI Claude les découvre
+  alors via son outil Skill natif. Le runner ajoute `--add-dir <ws>/.claude/skills`
+  quand les skills sont actives ;
+- **catalogue** — `catalog_block(role)` injecte un bloc compact
+  (nom + description + « utile pour ») dans les prompts QA/Dev, **pour tous les
+  providers** (OpenAI/Ollama qui n'ont pas d'outil Skill natif en profitent aussi).
+
+Réglages : `AUTOSPEC_SKILLS` (interrupteur global, **OFF**) + `AUTOSPEC_SKILLS_QA`/
+`_DEV` (par rôle) ; `settings.skills_for(role)` = global ET rôle (comme
+`refine_for`). Quand c'est OFF, les prompts sont **strictement inchangés**.
+
+### 5.11 Décomposition en sous-tâches parallèles (SK-2)
+
+Pour mieux gérer la fenêtre de contexte d'une grosse story backend,
+`AUTOSPEC_DECOMPOSE` (**OFF** par défaut) active un **mode décomposition** :
+`_adecompose_story` demande à l'**architecte** (`prompts.decompose_story`) de
+découper la story en **sous-tâches par couche** (entité → service → endpoint →
+tests), mappées aux skills, **matérialisées en `Task`** sur la story (ids uniques,
+`depends_on` remappés). `_abuild_phase` route alors la story via le **moteur de
+worktrees parallèles existant** (`_abuild_phase_streams`, partagé avec les
+streams) : chaque `Task` est construite par un **sous-agent focalisé dans son
+propre worktree git** (contexte minimal = 1 couche + 1 skill), puis **fusionnée**
+— la fusion + le rollup du statut de la story (`effective_status`) **agrègent** les
+sous-résultats. Conservateur et non-fatal : moins de 2 sous-tâches ou une erreur
+agent → la story est construite d'un bloc. En mode démo, `ScriptedRunner` renvoie
+une décomposition cannée (`_DECOMPOSE`).
 
 ---
 
@@ -782,6 +844,12 @@ Variables d'environnement (toutes optionnelles) :
 | `AUTOSPEC_REFINE_DEV` | `1` | raffinement du code Dev (idem) |
 | `AUTOSPEC_REFINE_MAX_ROUNDS` | `2` | cap dur d'allers-retours maker↔critic↔judge |
 | `AUTOSPEC_REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge (0-100) pour s'arrêter |
+| `AUTOSPEC_AGENT_PROVIDER` | `claude` | provider d'agents (claude / codex / openai / openrouter / ollama / anthropic) |
+| `OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL` | — / `…/api/v1` | clé + endpoint du provider **OpenRouter** (aussi `AUTOSPEC_OPENROUTER_*`) |
+| `AUTOSPEC_OPENROUTER_MODEL` | (1er populaire) | modèle OpenRouter (sinon top-10 programmation chargé dynamiquement) |
+| `AUTOSPEC_SKILLS` | `0` | active la **bibliothèque de skills** QA/Dev (§5.10) |
+| `AUTOSPEC_SKILLS_QA` / `_DEV` | `1` / `1` | skills par rôle (effectif si le global est ON) |
+| `AUTOSPEC_DECOMPOSE` | `0` | active la **décomposition en sous-tâches parallèles** (§5.11) |
 
 ---
 
