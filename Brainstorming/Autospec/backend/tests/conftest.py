@@ -38,6 +38,11 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "streams_enabled", False)
     monkeypatch.setattr(settings, "skills_enabled", False)
     monkeypatch.setattr(settings, "decompose_enabled", False)
+    monkeypatch.setattr(settings, "smoke_run", False)
+    monkeypatch.setattr(settings, "definition_of_done_enabled", False)
+    monkeypatch.setattr(settings, "definition_of_done_strict_criteria", False)
+    monkeypatch.setattr(settings, "runtime_acceptance_enabled", False)
+    monkeypatch.setattr(settings, "product_profile", "auto")
     return tmp_path
 
 

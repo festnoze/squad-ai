@@ -6,7 +6,7 @@ import time
 import uuid
 from enum import Enum
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, computed_field, field_validator
 
 
 class PipelinePhase(str, Enum):
@@ -316,6 +316,19 @@ class UserStory(BaseModel):
             return StoryStatus.FAILED
         return StoryStatus.TODO
 
+    @computed_field
+    @property
+    def effective_status_value(self) -> StoryStatus:
+        """Serialized mirror of :meth:`effective_status` for API/UI consumers.
+
+        Keeping the existing method name avoids breaking Python callers, while
+        the computed field gives snapshots a durable, explicit roll-up of
+        task-decomposed stories. The stored ``status`` remains for backward
+        compatibility; this value is the one delivery gates and clients should
+        prefer when deciding whether a story is truly done.
+        """
+        return self.effective_status()
+
     def tests_for_criterion(self, criterion_id: str) -> list[PlannedTest]:
         return [t for t in self.test_plan if criterion_id in t.criteria]
 
@@ -393,6 +406,7 @@ class ProjectState(BaseModel):
     name: str
     goal: str
     auto_spec: bool = False
+    product_profile: str = "auto"  # auto | library-fast | cli | api | web-ssr | fullstack | brownfield
     spec_mode: str = "interview"  # "interview" (Socratic) | "brainstorm" (refine the need)
     budget_usd: float = 0.0       # cost cap in USD (0 = no limit) — auto-stops when reached
     budget_tokens: int = 0        # token cap (0 = no limit)
@@ -438,6 +452,8 @@ class ProjectState(BaseModel):
     awaiting_approval: str = ""  # U4: stage awaiting human approval before build ("" = none)
     resume_at: float = 0.0  # epoch of the scheduled auto-resume (0 = none) — M2 watchdog
     archived: bool = False  # hidden from the default project list (not deleted)
+    delivery_ready: bool = False  # true only when the Definition-of-Done gate passes
+    delivery_issues: list[str] = Field(default_factory=list)  # latest DoD/runtime blockers
     error: str = ""
     created_at: float = Field(default_factory=time.time)
 

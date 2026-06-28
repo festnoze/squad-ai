@@ -160,6 +160,12 @@ class Settings:
     agent_provider: str = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_AGENT_PROVIDER", "claude").strip().lower()
     )
+    # Product generation profile. "auto" keeps existing flag-driven behaviour;
+    # explicit profiles (library-fast/cli/api/web-ssr/fullstack/brownfield)
+    # are applied per project by the pipeline.
+    product_profile: str = field(
+        default_factory=lambda: os.environ.get("AUTOSPEC_PRODUCT_PROFILE", "auto").strip().lower()
+    )
     openai_api_key: str = field(
         default_factory=lambda: os.environ.get("AUTOSPEC_OPENAI_API_KEY")
         or os.environ.get("OPENAI_API_KEY", "")
@@ -319,6 +325,7 @@ class Settings:
     setup_install: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_SETUP_INSTALL", False)
     )
+    node_cmd: str = field(default_factory=lambda: os.environ.get("AUTOSPEC_NODE_CMD", "node"))
     npm_cmd: str = field(default_factory=lambda: os.environ.get("AUTOSPEC_NPM_CMD", "npm"))
     # Claude usage-window watchdog (M2): when the Claude harness reports an
     # exhausted usage window, schedule an automatic resume when a fresh session
@@ -397,11 +404,10 @@ class Settings:
     )
     # Smoke-run gate: after the suite is green, actually BOOT the delivered app
     # and require it to start (a web/API app must open its port; a CLI must exit
-    # 0) — a non-runnable build then fails the iteration like a red test. OFF by
-    # default. Catches "the tests pass but the app doesn't run" (e.g. a main.py
-    # that prints launch instructions instead of starting the server).
+    # 0) — a non-runnable build then fails the iteration like a red test. ON by
+    # default for generated apps; the library-fast profile disables it.
     smoke_run: bool = field(
-        default_factory=lambda: _env_bool("AUTOSPEC_SMOKE_RUN", False)
+        default_factory=lambda: _env_bool("AUTOSPEC_SMOKE_RUN", True)
     )
     smoke_run_timeout_s: float = field(
         default_factory=lambda: _env_float("AUTOSPEC_SMOKE_RUN_TIMEOUT_S", 60.0, minimum=5.0)
@@ -448,6 +454,22 @@ class Settings:
     )
     refine_quality_threshold: int = field(
         default_factory=lambda: _env_int("AUTOSPEC_REFINE_QUALITY_THRESHOLD", 80, minimum=0)
+    )
+    # Delivery gates: the deterministic Definition-of-Done check is ON by
+    # default in production so a green subset of tests cannot mark an incomplete
+    # project as delivered. Strict per-criterion evidence is opt-in because very
+    # small Gherkin-only stories are still valid in the existing pipeline.
+    definition_of_done_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_DEFINITION_OF_DONE", True)
+    )
+    definition_of_done_strict_criteria: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_DOD_STRICT_CRITERIA", False)
+    )
+    runtime_acceptance_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_RUNTIME_ACCEPTANCE", False)
+    )
+    runtime_acceptance_timeout_s: float = field(
+        default_factory=lambda: _env_float("AUTOSPEC_RUNTIME_ACCEPTANCE_TIMEOUT_S", 90.0, minimum=10.0)
     )
 
     def refine_for(self, role: str) -> bool:

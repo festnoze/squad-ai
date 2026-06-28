@@ -103,6 +103,36 @@ async def test_failing_ui_suite_marks_story_red(monkeypatch, green_pytest):
     assert "failed" in story.last_error
 
 
+async def test_ui_story_without_declared_ui_tests_fails(monkeypatch, green_pytest):
+    monkeypatch.setattr(settings, "ui_tests_enabled", True)
+    monkeypatch.setattr(settings, "dev_max_attempts", 1)
+    called = []
+
+    async def _arun_ui_tests(self):
+        called.append(True)
+        return True, "would pass"
+
+    monkeypatch.setattr(Pipeline, "_arun_ui_tests", _arun_ui_tests)
+    dev_green_without_ui_files = json.dumps({
+        "status": "green",
+        "summary": "ok",
+        "files": [],
+        "test_results": [],
+        "ui_test_files": [],
+    })
+    state = ProjectState(id="proj-ui-missing", name="todo", goal="g")
+    pipeline = Pipeline(
+        state,
+        FakeRunner([PM_BRIEF, PO_PLAN_UI, QA_TRIVIAL, dev_green_without_ui_files]),
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    story = pipeline.state.story("US-1")
+    assert story.status == StoryStatus.FAILED
+    assert "Aucun test UI" in story.last_error
+    assert called == []
+
+
 async def test_non_ui_story_skips_ui_suite(monkeypatch, green_pytest):
     monkeypatch.setattr(settings, "ui_tests_enabled", True)
     called = []

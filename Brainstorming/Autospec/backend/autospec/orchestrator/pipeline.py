@@ -60,7 +60,8 @@ from ..models import (
 from ..language_selector import recommend_language
 from ..storage import append_interaction, load_interactions, save_state_payload, workspace_dir
 from .interactions import InteractionStore
-from . import mutation, refine, scheduler, session_monitor, setup_exec, skills as skill_lib, streams as work_streams, toolchain, workspace
+from . import mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skills as skill_lib, streams as work_streams, toolchain, workspace
+from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import regression
 from .build_monitor import BuildMonitor
@@ -311,6 +312,7 @@ class Pipeline:
         self._pm_session: str | None = None
         self._user_messages: asyncio.Queue[str] = asyncio.Queue()
         self._stop_requested = False
+        self._delivery_blocked = False
         self._resume_event = asyncio.Event()
         self._resume_event.set()  # set = running, cleared = paused
         self._task: asyncio.Task | None = None
@@ -573,6 +575,9 @@ class Pipeline:
         if self._task and not self._task.done():
             return
         self._stop_requested = False
+        self._delivery_blocked = False
+        self.state.delivery_ready = False
+        self.state.delivery_issues = []
         self._task = asyncio.create_task(self._alifecycle())
 
     async def adispose(self) -> None:
@@ -1847,8 +1852,61 @@ class Pipeline:
 
     # ------------------------------------------------------------ lifecycle
 
+    def _apply_definition_of_done(self, *, all_iterations: bool = False) -> bool:
+        """Run the deterministic delivery gate and persist its latest verdict.
+
+        The orchestrator already verifies the test suite story by story; this
+        pass answers the delivery-level question before the project can be
+        declared done: every planned story/task must be effectively shipped, and
+        user-facing acceptance evidence must be present enough to trust.
+        """
+        if not settings.definition_of_done_enabled:
+            self.state.delivery_ready = True
+            self.state.delivery_issues = []
+            return True
+        result = evaluate_definition_of_done(
+            self.state,
+            iteration=None if all_iterations else self.state.iteration,
+            require_ui_evidence=settings.ui_tests_enabled,
+            strict_criteria=settings.definition_of_done_strict_criteria,
+        )
+        self.state.delivery_ready = result.ready
+        self.state.delivery_issues = result.messages()
+        if result.blockers:
+            self._delivery_blocked = True
+            detail = "\n".join(f"- {i.message}" for i in result.blockers[:8])
+            more = "" if len(result.blockers) <= 8 else f"\n- … {len(result.blockers) - 8} autre(s)"
+            self.state.error = (
+                "Definition of Done non satisfaite : "
+                + "; ".join(i.message for i in result.blockers[:3])
+            )
+            self._log("delivery", "Definition of Done bloquée.")
+            self._chat(
+                ChatRole.SYSTEM,
+                f"⛔ Definition of Done bloquée : {len(result.blockers)} blocker(s).\n"
+                f"{detail}{more}",
+            )
+            self._notify("error", "Livraison bloquée", result.blockers[0].message[:200])
+            return False
+        if result.warnings:
+            detail = "\n".join(f"- {i.message}" for i in result.warnings[:5])
+            self._log("delivery", "Definition of Done OK avec avertissements.")
+            self._chat(ChatRole.SYSTEM, f"⚠️ Definition of Done OK avec avertissements.\n{detail}")
+        else:
+            self._log("delivery", "Definition of Done OK.")
+        self._sync()
+        return True
+
     async def _alifecycle(self) -> None:
         try:
+            self._delivery_blocked = False
+            applied_profile = profiles.apply_to_settings(self.state)
+            if applied_profile:
+                self._log(
+                    "profile",
+                    f"Profil produit '{self.state.product_profile}' appliqué : "
+                    + ", ".join(f"{k}={v}" for k, v in sorted(applied_profile.items())),
+                )
             await self._abrownfield_init()
             brief = await self._aspec_phase()
             if brief is None:  # stopped during interview
@@ -1878,6 +1936,9 @@ class Pipeline:
                 # Runnability gate: boot the delivered app; a non-runnable build
                 # fails the iteration like a red test (no-op unless AUTOSPEC_SMOKE_RUN).
                 await self._asmoke_phase()
+                await self._aruntime_acceptance_phase()
+                if not self._apply_definition_of_done():
+                    break
                 await self._adocument_phase()
                 # Closed-loop product evaluation (E6): exercise the delivered
                 # iteration and feed findings into the impact pipeline.
@@ -1895,13 +1956,20 @@ class Pipeline:
 
             if self._stop_requested:
                 self._reset_inflight_items()
-            self.state.phase = (
-                PipelinePhase.STOPPED if self._stop_requested else PipelinePhase.DONE
-            )
+            if self._stop_requested:
+                self.state.phase = PipelinePhase.STOPPED
+            elif self._delivery_blocked:
+                self.state.phase = PipelinePhase.ERROR
+            else:
+                self.state.phase = PipelinePhase.DONE
             self._chat(
                 ChatRole.SYSTEM,
                 "Itération terminée." if self.state.phase == PipelinePhase.DONE
-                else "Boucle arrêtée par l'utilisateur.",
+                else (
+                    "Itération non livrable : Definition of Done non satisfaite."
+                    if self._delivery_blocked
+                    else "Boucle arrêtée par l'utilisateur."
+                ),
             )
             if self.state.phase == PipelinePhase.DONE:
                 self._notify("success", "Itération terminée", self.state.name)
@@ -2716,12 +2784,20 @@ class Pipeline:
                 if real:
                     self.state.green_tests = sorted(n for n, o in real.items() if o == "passed")
                 if ok and self._ui_mode(story):
-                    # UI-flagged story: the replayable Playwright suite must be
-                    # green too (browser run, screenshots + render assertions).
-                    ok, ui_output = await self._arun_ui_tests()
-                    if not ok:
-                        tail = ui_output[-2000:]
-                        self._log(f"dev:{story.id}", "❌ Tests d'acceptance UI rouges.")
+                    if not story.ui_tests:
+                        ok = False
+                        tail = (
+                            "Aucun test UI rejouable déclaré pour cette story UI "
+                            "(ui_test_files vide)."
+                        )
+                        self._log(f"dev:{story.id}", f"❌ {tail}")
+                    else:
+                        # UI-flagged story: the replayable Playwright suite must be
+                        # green too (browser run, screenshots + render assertions).
+                        ok, ui_output = await self._arun_ui_tests()
+                        if not ok:
+                            tail = ui_output[-2000:]
+                            self._log(f"dev:{story.id}", "❌ Tests d'acceptance UI rouges.")
                 if ok and settings.coverage_enabled and not is_frontend:
                     cov = await self._arun_coverage(story, pkg, ws)
                     if settings.coverage_gate_threshold > 0 and 0 <= cov < settings.coverage_gate_threshold:
@@ -3173,10 +3249,18 @@ class Pipeline:
         if real:
             self.state.green_tests = sorted(n for n, o in real.items() if o == "passed")
         if ok and self._ui_mode(subject):
-            ok, ui_output = await self._arun_ui_tests()
-            if not ok:
-                tail = ui_output[-2000:]
-                self._log(f"dev:{subject.id}", "❌ Tests d'acceptance UI rouges.")
+            if not subject.ui_tests:
+                ok = False
+                tail = (
+                    "Aucun test UI rejouable déclaré pour cette story UI "
+                    "(ui_test_files vide)."
+                )
+                self._log(f"dev:{subject.id}", f"❌ {tail}")
+            else:
+                ok, ui_output = await self._arun_ui_tests()
+                if not ok:
+                    tail = ui_output[-2000:]
+                    self._log(f"dev:{subject.id}", "❌ Tests d'acceptance UI rouges.")
         if ok and settings.coverage_enabled and not is_frontend:
             cov = await self._arun_coverage(subject, pkg, worktree)
             if settings.coverage_gate_threshold > 0 and 0 <= cov < settings.coverage_gate_threshold:
@@ -3329,6 +3413,9 @@ class Pipeline:
         for t in story.test_plan:
             t.status = TestState.NONEXISTENT
         self._stop_requested = False
+        self._delivery_blocked = False
+        self.state.delivery_ready = False
+        self.state.delivery_issues = []
         # Set BUILD synchronously BEFORE launching the task so a second
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
         self.state.phase = PipelinePhase.BUILD
@@ -3343,13 +3430,17 @@ class Pipeline:
         self._log(f"dev:{story.id}", f"Relance de {story.id}…")
         try:
             await self._abuild_story(story)
+            self._apply_definition_of_done()
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la relance de {story.id} : {exc}")
         finally:
             self._stop_tick()  # B5: rebuild done
-            self.state.phase = (
-                PipelinePhase.STOPPED if self._stop_requested else PipelinePhase.DONE
-            )
+            if self._stop_requested:
+                self.state.phase = PipelinePhase.STOPPED
+            elif self._delivery_blocked:
+                self.state.phase = PipelinePhase.ERROR
+            else:
+                self.state.phase = PipelinePhase.DONE
             self._sync()
 
     async def aresume_build(self) -> None:
@@ -3395,6 +3486,9 @@ class Pipeline:
                     task.status = StoryStatus.TODO
                     task.last_error = ""
         self._stop_requested = False
+        self._delivery_blocked = False
+        self.state.delivery_ready = False
+        self.state.delivery_issues = []
         # Set BUILD synchronously BEFORE launching the task so a second
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
         self.state.phase = PipelinePhase.BUILD
@@ -3435,6 +3529,9 @@ class Pipeline:
                     task.attempts = 0
                     task.last_error = ""
         self._stop_requested = False
+        self._delivery_blocked = False
+        self.state.delivery_ready = False
+        self.state.delivery_issues = []
         # Phase -> BUILD synchronously before the task (closes the TOCTOU, like
         # aresume_build); the resume-build run rebuilds the now-TODO stories.
         self.state.phase = PipelinePhase.BUILD
@@ -3454,12 +3551,16 @@ class Pipeline:
         self._chat(ChatRole.SYSTEM, "▶ Reprise du build…")
         try:
             await self._abuild_phase(all_iterations=all_iterations)
+            self._apply_definition_of_done(all_iterations=all_iterations)
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la reprise du build : {exc}")
         finally:
-            self.state.phase = (
-                PipelinePhase.STOPPED if self._stop_requested else PipelinePhase.DONE
-            )
+            if self._stop_requested:
+                self.state.phase = PipelinePhase.STOPPED
+            elif self._delivery_blocked:
+                self.state.phase = PipelinePhase.ERROR
+            else:
+                self.state.phase = PipelinePhase.DONE
             self._sync()
 
     async def aforce_done(self, sid: str) -> None:
@@ -3502,6 +3603,9 @@ class Pipeline:
         task.attempts = 0
         task.last_error = ""
         self._stop_requested = False
+        self._delivery_blocked = False
+        self.state.delivery_ready = False
+        self.state.delivery_issues = []
         # Set BUILD synchronously BEFORE launching the task so a second
         # concurrent call is rejected by the phase guard (closes the TOCTOU).
         self.state.phase = PipelinePhase.BUILD
@@ -3532,12 +3636,16 @@ class Pipeline:
                 workspace.write_feature_files(self.state, [subject])
                 await self._acommit_story(ws, f"feature {task_id}")
             await self._abuild_work_item(item)
+            self._apply_definition_of_done()
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la relance de {task_id} : {exc}")
         finally:
-            self.state.phase = (
-                PipelinePhase.STOPPED if self._stop_requested else PipelinePhase.DONE
-            )
+            if self._stop_requested:
+                self.state.phase = PipelinePhase.STOPPED
+            elif self._delivery_blocked:
+                self.state.phase = PipelinePhase.ERROR
+            else:
+                self.state.phase = PipelinePhase.DONE
             self._sync()
 
     async def aforce_done_task(self, task_id: str) -> None:
@@ -3742,8 +3850,9 @@ class Pipeline:
     async def _arun_ui_tests(self) -> tuple[bool, str]:
         """Run the workspace's replayable Playwright UI suite (`pytest -m ui`).
 
-        Exit code 5 (no test collected) counts as green: a UI story whose dev
-        produced no UI test file simply has nothing to replay yet.
+        Only exit code 0 is accepted. Pytest exit code 5 (no tests collected)
+        means the UI story did not produce replayable acceptance evidence and
+        must stay red.
         """
         if settings.fake_agents:
             return True, "mode démo : tests UI court-circuités"
@@ -3761,7 +3870,7 @@ class Pipeline:
                 encoding="utf-8",
                 errors="replace",
             )
-            return proc.returncode in (0, 5), proc.stdout
+            return proc.returncode == 0, proc.stdout
 
         return await asyncio.to_thread(_run)
 
@@ -3854,6 +3963,28 @@ class Pipeline:
         self.state.regressions.append(msg)
         self._notify("error", "Smoke run échoué", msg[:200])
         # Fail the iteration like a red test — surfaced via the lifecycle handler.
+        raise RuntimeError(msg)
+
+    async def _aruntime_acceptance_phase(self) -> None:
+        """Optional browser/runtime acceptance gate for web/fullstack products."""
+        result = await runtime_acceptance.arun_runtime_acceptance(
+            self.state, workspace_dir(self.state.id)
+        )
+        if result.skipped:
+            if settings.runtime_acceptance_enabled:
+                self._log("runtime", f"Runtime acceptance ignoré : {result.detail}.")
+            return
+        self.monitor.event("runtime_acceptance", ok=result.ok, detail=result.detail[:300])
+        if result.ok:
+            self._log("runtime", "✅ Runtime acceptance OK.")
+            self._chat(ChatRole.SYSTEM, "🧪 Runtime acceptance : parcours navigateur OK.")
+            return
+        msg = f"Runtime acceptance échoué : {result.detail}"
+        self._log("runtime", f"❌ {msg}")
+        self.state.delivery_ready = False
+        self.state.delivery_issues = [*self.state.delivery_issues, msg]
+        self.state.regressions.append(msg)
+        self._notify("error", "Runtime acceptance échoué", msg[:200])
         raise RuntimeError(msg)
 
     @staticmethod

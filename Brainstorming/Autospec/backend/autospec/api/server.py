@@ -39,6 +39,7 @@ from ..models import (
     StoryStatus,
     new_id,
 )
+from ..orchestrator import profiles
 from ..orchestrator.events import bus
 from ..orchestrator.pipeline import Pipeline
 from ..forecast import forecast_iteration_cost
@@ -213,6 +214,7 @@ class CreateProjectRequest(BaseModel):
     goal: str
     name: str = ""
     auto_spec: bool = False
+    product_profile: str = ""  # auto | library-fast | cli | api | web-ssr | fullstack | brownfield
     budget_usd: float = 0.0
     budget_tokens: int = 0
     brief: str = ""  # I3: optional imported spec — seeds the brief, skips the interview
@@ -440,11 +442,19 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
     if not req.goal.strip():
         raise HTTPException(422, "L'objectif du projet est vide.")
     name = _unique_name(req.name.strip() or _default_name(req.goal))
+    try:
+        product_profile = profiles.normalize_name(
+            req.product_profile or settings.product_profile,
+            brownfield_path=req.brownfield_path or "",
+        )
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
     state = ProjectState(
         id=new_id(_slug(name)),
         name=name,
         goal=req.goal,
         auto_spec=req.auto_spec,
+        product_profile=product_profile,
         budget_usd=max(0.0, req.budget_usd),
         budget_tokens=max(0, req.budget_tokens),
         brief=parse_spec_import(req.brief),
