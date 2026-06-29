@@ -30,6 +30,11 @@ programmation les plus populaires** (`/models?category=programming`), avec repli
 sur une liste statique. Les personas proviennent de l'installation **BMAD**
 (`_bmad/bmm/agents/`), augmentées d'un override « mode programmatique » qui
 neutralise les menus interactifs et impose **une seule réponse JSON**.
+`GET /api/provider` expose aussi les **capacités du runner**
+(`RunnerCapabilities`) : les runners CLI Claude/Codex peuvent modifier les
+fichiers **et lancer le shell** dans le workspace, tandis que les providers
+LangChain utilisent un protocole borné de lecture/écriture de fichiers ; les
+tests, smoke runs et gates restent toujours pilotés par Autospec.
 
 | Agent | Persona BMAD | Rôle |
 |---|---|---|
@@ -113,6 +118,28 @@ plafond.
 
 ---
 
+## 1quater. Profils produit
+
+Autospec peut démarrer un projet avec un **profil produit** explicite
+(`ProjectState.product_profile`, `AUTOSPEC_PRODUCT_PROFILE`, ou champ
+`product_profile` de `POST /api/projects`). Les profils regroupent les flags
+qui vont ensemble plutôt que de demander à l'utilisateur de combiner des
+variables bas niveau :
+
+- `library-fast` : bibliothèque/module rapide, pas de gate runtime.
+- `cli` : produit ligne de commande, tests + smoke CLI.
+- `api` : backend/API, architecture + skills + smoke run.
+- `web-ssr` : app web rendue serveur, smoke + runtime acceptance + UI evidence.
+- `fullstack` : backend + frontend streams, composants, runtime acceptance.
+- `brownfield` : extension d'un repo existant, analyse + gates sans restructurer.
+- `auto` : comportement historique piloté par les flags.
+
+Le module `orchestrator/profiles.py` normalise les alias (`lib`, `web`,
+`full-stack`), rejette les profils inconnus et applique les overrides au début
+du cycle de vie.
+
+---
+
 ## 2. Phase Architecture (optionnelle)
 
 Entre PO et build, l'agent **`architect`** produit un design technique concis
@@ -138,8 +165,13 @@ enregistrement des composants), `db-entity-change`,
 est **ensemencée** dans `workspace/<id>/.claude/skills/` pour la découverte native
 du CLI Claude (outil Skill) ; (b) **catalogue** — un bloc compact (nom +
 description) est injecté dans les prompts QA/Dev **pour tous les providers**.
-Réglages : `AUTOSPEC_SKILLS` (global, **OFF**) + `AUTOSPEC_SKILLS_QA`/`_DEV`. OFF →
-prompts **strictement inchangés**.
+Les skills de domaine sont maintenant **prescriptives** :
+`skill-rules.json` marque leur `enforcement` à `required_when_applicable`, le
+catalogue de prompt dit explicitement qu'elles sont **obligatoires quand
+applicables**, et `orchestrator/skill_validation.py` bloque le build si
+`.claude/skills` est absent, incomplet ou si une règle de domaine est restée en
+simple suggestion. Réglages : `AUTOSPEC_SKILLS` (global, **OFF**) +
+`AUTOSPEC_SKILLS_QA`/`_DEV`. OFF → prompts **strictement inchangés**.
 
 ## 2ter. Décomposition en sous-tâches parallèles (SK-2)
 
@@ -185,6 +217,23 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
   **`pytest-json-report`** et renvoie `(suite_verte, sortie, {nodeid: outcome})`.
   L'état par test (inexistant/rouge/vert) est fondé sur l'**exécution réelle**,
   mappé aux tests planifiés via les **nodeids déclarés** par le Dev.
+- **Definition of Done déterministe** : avant de déclarer une itération livrée,
+  `orchestrator/delivery_gate.py` vérifie que chaque story/tâche est
+  **effectivement** `done`, que les critères ont une preuve Gherkin/test plan,
+  et que les stories UI ont des tests rejouables quand `AUTOSPEC_UI_TESTS=1`.
+  Le verdict est persisté dans `delivery_ready` / `delivery_issues` et affiché
+  dans le `RunPanel`.
+- **Smoke run par défaut** : après une suite verte, Autospec démarre réellement
+  l'app générée (`AUTOSPEC_SMOKE_RUN=1` par défaut) ; une API/web doit ouvrir son
+  port, un CLI doit sortir en code 0. Le profil `library-fast` le désactive.
+- **Runtime acceptance web/fullstack** : `orchestrator/runtime_acceptance.py` +
+  `backend/scripts/runtime_acceptance.js` lancent le backend et/ou le frontend
+  preview, ouvrent un navigateur Playwright, vérifient qu'une page non vide est
+  servie et qu'il n'y a pas d'erreur navigateur bloquante. Activé par
+  `AUTOSPEC_RUNTIME_ACCEPTANCE` ou les profils `web-ssr`/`fullstack`.
+- **Tests UI sans faux vert** : une story `ui=true` doit déclarer au moins un
+  `ui_test_files`; `pytest -m ui` avec **aucun test collecté** ne compte plus
+  comme succès.
 - **Mode démo** (`AUTOSPEC_FAKE_AGENTS=1`) : le `ScriptedRunner` déterministe
   pilote **tout le stack sans CLI Claude ni build de venv uv** ; base du test
   e2e hermétique.
@@ -279,6 +328,7 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 | `AUTOSPEC_MAX_PARALLEL_DEVS` | `2` | agents Dev en parallèle |
 | `AUTOSPEC_DEV_MAX_ATTEMPTS` | `2` | tentatives par story |
 | `AUTOSPEC_WORKSPACE_ROOT` | `./workspace` | racine des workspaces générés |
+| `AUTOSPEC_PRODUCT_PROFILE` | `auto` | profil produit (`library-fast`, `cli`, `api`, `web-ssr`, `fullstack`, `brownfield`) |
 | `AUTOSPEC_FAKE_AGENTS` | `0` | mode démo (agents scriptés) |
 | `AUTOSPEC_DEMO_DELAY_S` | `0` | délai des agents scriptés |
 | `AUTOSPEC_ARCHITECTURE` | `0` | active la phase Architecture |
@@ -297,6 +347,11 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 | `AUTOSPEC_SETUP_INSTALL` | `0` | install réelle des deps composants |
 | `AUTOSPEC_TECH_WRITER` | `0` | tech-writer auto après build |
 | `AUTOSPEC_UI_TESTS` | `0` | tests d'acceptance UI Playwright |
+| `AUTOSPEC_SMOKE_RUN` | `1` | démarre l'app livrée avant `done` |
+| `AUTOSPEC_DEFINITION_OF_DONE` | `1` | gate déterministe de livraison |
+| `AUTOSPEC_DOD_STRICT_CRITERIA` | `0` | rend bloquante l'absence de preuve verte par critère |
+| `AUTOSPEC_RUNTIME_ACCEPTANCE` | `0` | gate navigateur/runtime web/fullstack |
+| `AUTOSPEC_RUNTIME_ACCEPTANCE_TIMEOUT_S` | `90` | timeout du gate runtime |
 | `AUTOSPEC_SESSION_MONITOR` | `1` | watchdog fenêtre d'usage Claude (M2) |
 | `AUTOSPEC_CCUSAGE_CMD` | `npx --yes ccusage` | commande ccusage |
 | `AUTOSPEC_RESUME_FALLBACK_MIN` | `60` | repli (min) si reset inconnu |
@@ -305,14 +360,16 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 
 ## 7. API (FastAPI + WebSocket)
 
-**Projets** : `POST /api/projects`, `GET /api/projects`, `GET|DELETE
+**Projets** : `POST /api/projects` (accepte aussi `product_profile`),
+`GET /api/projects`, `GET|DELETE
 /api/projects/{id}`, `/chat`, `/spec-mode`, `/budget`, `/stop`, `/pause`,
 `/resume`, `/run`, `/stop-app`, `/resume-build`, `/archive`, `/unarchive`,
 `/files`, `/files/raw?path=`, `PUT /components`, `POST /components/setup`,
 `POST /document`, `GET /export` (zip), `POST /git-export`.
 
 **Provider** : `GET|POST /api/provider` (bascule claude/codex/openai/openrouter/
-ollama/anthropic à chaud ; verrouillé en mode démo) ;
+ollama/anthropic à chaud ; verrouillé en mode démo ; renvoie aussi
+`capabilities`) ;
 `GET /api/providers/{provider}/models` (découverte live des modèles — top-10
 programmation pour OpenRouter, repli statique).
 
@@ -335,18 +392,13 @@ Gardes : `404` (inconnu), `409` (action interdite : pipeline active, story
 
 ## 8. Qualité, tests & CI
 
-- **Backend — 178 tests pytest** : `test_scheduler`, `test_runner`, `test_models`,
-  `test_pipeline` (interview, dépendances, auto-spec, kanban, plan QA, états
-  réels, pause/reprise, rebuild/force-done, resume-build, guidance, architecture,
-  usage, diff git…), `test_refine` (déterminisme du harnais), `test_scripted`,
-  `test_pytest_report`, `test_api`, `test_providers` (M1 : protocole d'outils,
-  sessions, coût), `test_impact` (E2), `test_components` (E3/E4),
-  `test_delivery` (I2 : tech-writer, zip, git-export), `test_ui_tests` (E5),
-  `test_api_provider`, `test_session_monitor` (M2 : détection limite, parsing
-  epoch/ccusage, stop + reprise auto, ré-armement au restart, annulation).
-- **Frontend — 32 tests Vitest** (6 fichiers) : logique pure `criterionState`,
-  rendu `Board`, `RunPanel`, `ProjectBar` (play/stop/pulse U1),
-  `ComponentsPanel` (E3) et `App`.
+- **Backend — 458 tests pytest** : scheduler, runner, modèles, pipeline,
+  providers, composants, streams/worktrees, DoD, delivery state, profils produit,
+  runtime acceptance, skills prescriptives, smoke run, sécurité, observabilité,
+  reprise, API et e2e feature factory déterministe.
+- **Frontend — 136 tests Vitest** : logique pure (`criterionState`,
+  `effectiveStatus`), rendu `Board`, `RunPanel`, `ProjectBar`, activité LLM,
+  workspace/code viewer, API client, composants et `App`.
 - **e2e — 1 test Playwright** hermétique (backend mode démo servant la SPA
   buildée, same-origin) : création → board peuplé → pause/reprise → critère
   (vert + tests + Gherkin) → suppression.
@@ -354,6 +406,10 @@ Gardes : `404` (inconnu), `409` (action interdite : pipeline active, story
   + workflow racine monorepo `squad-ai/.github/workflows/autospec-ci.yml` (filtre
   `paths: Brainstorming/Autospec/**`) — 3 jobs : **backend** (pytest),
   **frontend** (build + vitest), **e2e** (Playwright).
+- **Golden Projects** : `.github/workflows/golden-projects.yml` (manuel +
+  nightly) lance une batterie déterministe : feature factory réelle, smoke,
+  runtime acceptance, DoD, profils, skills, streams, frontend toolchain et
+  contrats frontend.
 
 ---
 
@@ -367,15 +423,17 @@ Autospec/
 │       ├── config.py            # Settings + chargement .env
 │       ├── models.py            # ProjectState, Epic, UserStory, PlannedTest, Usage…
 │       ├── storage.py           # persistance JSON + migration
-│       ├── agents/              # personas, prompts, runner (CLI/Fake/Scripted)
+│       ├── agents/              # personas, prompts, runner, providers/capabilities
 │       ├── orchestrator/        # pipeline, scheduler, workspace, refine,
-│       │                        # pytest_report, events (WebSocket)
+│       │                        # delivery_gate/state, profiles, runtime_acceptance,
+│       │                        # skill_validation, pytest_report, events
 │       └── api/server.py        # REST + WS + service SPA
 ├── frontend/src/                # App, api, types, components/ (Board, ProjectBar,
 │                                # RunPanel, ChatPanel, CodeViewer, …), e2e/
 └── workspace/<id>/              # CODE GÉNÉRÉ (projet uv autonome + repo git)
 ```
 
-**État** : 8 features initiales + 16 items de backlog + extension produit
-(E1-E5, I1-I2, M1, M2, U1) livrés et vérifiés ; les 3 suites de tests
-(178 backend, 32 frontend, 1 e2e) sont vertes.
+**État** : pipeline renforcée par des gates de livraison déterministes, profils
+produit, skills validées, runtime acceptance et batterie golden ; les suites
+locales vérifiées sont vertes (**458 backend**, **136 frontend**, golden locale
+**71 tests**).

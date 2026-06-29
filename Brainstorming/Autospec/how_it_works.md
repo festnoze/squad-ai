@@ -48,15 +48,20 @@ Autospec/
 │       ├── agents/
 │       │   ├── personas.py      # Chargement des personas BMAD (system prompts)
 │       │   ├── prompts.py       # Prompts de tâche (PM, PO, Dev, Analyste)
-│       │   └── runner.py        # AgentRunner : ClaudeCliRunner / FakeRunner
+│       │   ├── providers.py     # providers LangChain + capacités exposées
+│       │   └── runner.py        # AgentRunner : Claude/Codex CLI, Fake, Scripted
 │       ├── orchestrator/
 │       │   ├── pipeline.py      # Cycle de vie complet PM→PO→Dev→Analyste
 │       │   ├── scheduler.py     # Dépendances + priorité kanban (fonctions pures)
 │       │   ├── workspace.py     # Scaffolding du projet uv généré
+│       │   ├── delivery_gate.py # Definition of Done déterministe
+│       │   ├── profiles.py      # profils produit (cli/api/web/fullstack/...)
+│       │   ├── runtime_acceptance.py # smoke navigateur/runtime
+│       │   ├── skill_validation.py   # validation des skills prescriptives
 │       │   └── events.py        # Bus d'événements → WebSocket
 │       └── api/
 │           └── server.py        # REST + WebSocket + service du frontend buildé
-│   └── tests/                   # 131 tests (scheduler, runner, models, pipeline, refine, API, scripted, pytest_report)
+│   └── tests/                   # 458 tests (pipeline, gates, providers, runtime, golden...)
 ├── frontend/                    # React + Vite + TypeScript
 │   └── src/
 │       ├── App.tsx
@@ -81,10 +86,10 @@ en JSON. Les éléments clés :
 
 | Modèle | Rôle |
 |---|---|
-| `ProjectState` | racine : objectif, phase, brief, **`spec_mode`** (`"interview"` par défaut ou `"brainstorm"` — pilote la phase spec), **`budget_usd`** (plafond de coût en $, `0` = illimité) et **`budget_tokens`** (plafond de tokens, `0` = illimité), **`architecture`** (design technique courant), backlog, epics, stories, chat, feedback, **`build_guidance`** (consignes données pendant le build), **`plan_quality`** (dernier score de raffinement du plan PO, -1 = non exécuté — exposé à l'UI), **`usage`** (modèle `Usage` : coût/tokens/nombre d'appels cumulés sur tous les agents — exposé à l'UI), itération, flags |
+| `ProjectState` | racine : objectif, phase, brief, **`spec_mode`**, **`product_profile`** (`auto`, `cli`, `api`, `web-ssr`, `fullstack`, `brownfield`, `library-fast`), **`budget_usd`** / **`budget_tokens`**, **`architecture`**, backlog, epics, stories, chat, feedback, **`build_guidance`**, **`plan_quality`**, **`usage`**, verdict de livraison **`delivery_ready`** / **`delivery_issues`**, itération, flags |
 | `Usage` | observabilité cumulée d'un projet : `cost_usd`, `input_tokens`, `output_tokens`, `agent_calls` — sommés sur chaque appel agent |
 | `Epic` | regroupement de stories, rattaché à une itération |
-| `UserStory` | description, **`acceptance_criteria`** (objets `AcceptanceCriterion`), **Gherkin**, **`test_plan`** (tests unitaires planifiés par le QA), `depends_on`, **`priority`** (kanban 1-5), statut, tentatives, **`quality_score`** (dernier score de raffinement du code de la story, -1 = non exécuté — exposé à l'UI) ; méthodes `tests_for_criterion` / `criterion_state` |
+| `UserStory` | description, **`acceptance_criteria`**, **Gherkin**, **`test_plan`**, `depends_on`, **`priority`**, statut, statut effectif agrégé par les tâches, tentatives, drapeaux **`ui`** / **`ui_tests`**, **`quality_score`** ; méthodes `tests_for_criterion` / `criterion_state` |
 | `AcceptanceCriterion` | `{id, text}` — un critère d'acceptance, identifiable et reliable à des tests |
 | `PlannedTest` | un test unitaire planifié par le QA : `layer` (api/façade/service/repository/llm…), description, `mocks`, `file_hint`, **`criteria`** (ids des critères couverts), **`status`** (`TestState`) |
 | `TestState` | état d'un test : `nonexistent` / `red` / `green` |
@@ -135,6 +140,13 @@ class AgentRunner(Protocol):
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None) -> AgentResult: ...
 ```
 
+`GET /api/provider` expose en plus les **capacités du runner**
+(`RunnerCapabilities`) : Claude CLI et Codex CLI peuvent écrire dans le
+workspace et lancer le shell ; les providers LangChain savent lire/écrire des
+fichiers via le protocole borné, mais ne lancent pas de commandes. Les tests,
+smoke runs, gates de livraison et runtime acceptance restent donc toujours
+pilotés par l'orchestrateur Autospec, pas par l'auto-déclaration de l'agent.
+
 Implémentations (`agents/runner.py` + `agents/providers.py`) :
 
 - **`ClaudeCliRunner`** (production) — lance le binaire `claude` en sous-processus.
@@ -176,9 +188,10 @@ Implémentations (`agents/runner.py` + `agents/providers.py`) :
   transitions (et la pause) observables.
 
 Pour brancher un autre backend (SDK Anthropic, autre provider, mock), il suffit
-d'écrire une classe avec la même méthode `arun` et de l'injecter via
-`server.set_runner(...)`. **C'est le point d'extension propre du projet** —
-c'est exactement ainsi que `OpenAiRunner`/`OllamaRunner` ont été ajoutés.
+d'écrire une classe avec la même méthode `arun`, de déclarer ses capacités via
+`provider_capabilities()` et de l'injecter via `server.set_runner(...)`.
+**C'est le point d'extension propre du projet** — c'est exactement ainsi que les
+runners CLI et LangChain cohabitent sans mélanger leurs contrats.
 
 ### 4.2 Comment un appel est fait
 
@@ -371,6 +384,40 @@ chaque critère comme une ligne dépliable (inexistant / rouge / vert).
 Les stories qui dépendaient d'une story `failed` sont marquées `failed` avec un
 message explicite (pas de deadlock, pas d'attente infinie).
 
+### 5.3b Profils produit et gates de livraison
+
+Avant le build, `orchestrator/profiles.py` applique le **profil produit**
+demandé (`ProjectState.product_profile`, `AUTOSPEC_PRODUCT_PROFILE`, ou
+`product_profile` dans `POST /api/projects`). Les profils évitent de composer à
+la main des flags bas niveau :
+
+- `library-fast` : bibliothèque/module rapide, sans smoke runtime.
+- `cli` : produit ligne de commande, tests + smoke CLI.
+- `api` : backend/API, architecture + skills + smoke run.
+- `web-ssr` : web rendu serveur, smoke + runtime acceptance + preuve UI.
+- `fullstack` : backend + frontend, streams, composants, runtime acceptance.
+- `brownfield` : extension d'un repo existant, gates sans restructuration.
+- `auto` : comportement historique piloté par les flags.
+
+Après une suite verte, Autospec ne passe plus directement à `done` :
+
+- **Smoke run par défaut** (`AUTOSPEC_SMOKE_RUN=1`) : l'application générée est
+  réellement démarrée ; une API/web doit ouvrir son port, un CLI doit sortir en
+  code 0. Le profil `library-fast` le désactive.
+- **Runtime acceptance web/fullstack** (`AUTOSPEC_RUNTIME_ACCEPTANCE` ou profils
+  `web-ssr` / `fullstack`) : `orchestrator/runtime_acceptance.py` lance le
+  backend et/ou le frontend preview, puis `backend/scripts/runtime_acceptance.js`
+  ouvre Playwright, vérifie une page non vide et l'absence d'erreurs navigateur
+  bloquantes.
+- **Definition of Done déterministe** (`orchestrator/delivery_gate.py`) :
+  chaque story/tâche doit être effectivement terminée, les critères doivent
+  avoir une preuve Gherkin/test plan, et les stories UI doivent déclarer des
+  tests rejouables si `AUTOSPEC_UI_TESTS=1`. Le résultat est persisté dans
+  `delivery_ready` / `delivery_issues` et rendu dans le `RunPanel`.
+- **Pas de faux vert UI** : une story `ui=true` doit déclarer des
+  `ui_test_files`; un `pytest -m ui` qui ne collecte rien ne valide plus la
+  livraison.
+
 ### 5.4 Phase ANALYZE + brief suivant — l'Analyste (`analyst`) puis le PM
 
 En mode auto-spec, après chaque itération livrée (`_anext_feature_phase`) :
@@ -555,8 +602,9 @@ d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
   **rejouables** dans `tests/ui/` (fixture `page`, clics/saisies, screenshots,
   assertions de rendu, fichiers déclarés dans `ui_test_files` → persistés sur
   `story.ui_tests`) ; après la suite pytest classique, `_arun_ui_tests`
-  (`uv run pytest -m ui`, exit 5 « rien collecté » = vert) doit passer pour que
-  la story soit DONE — sinon retry/échec comme un rouge normal.
+  (`uv run pytest -m ui`) doit passer pour que la story soit DONE. Un exit 5
+  « rien collecté » n'est plus accepté pour une story UI : absence de fichiers
+  déclarés ou de tests collectés = retry/échec comme un rouge normal.
 
 ---
 
@@ -580,6 +628,12 @@ enregistrement], `db-entity-change`, `repo`/`service`/`endpoint-search-or-create
 - **catalogue** — `catalog_block(role)` injecte un bloc compact
   (nom + description + « utile pour ») dans les prompts QA/Dev, **pour tous les
   providers** (OpenAI/Ollama qui n'ont pas d'outil Skill natif en profitent aussi).
+
+Les skills de domaine sont **prescriptives** : `skill-rules.json` utilise
+`required_when_applicable`, le catalogue de prompt dit explicitement qu'elles
+sont obligatoires quand leur déclencheur s'applique, et
+`orchestrator/skill_validation.py` bloque le build si `.claude/skills` est
+absent, incomplet ou si une règle est restée en simple suggestion.
 
 Réglages : `AUTOSPEC_SKILLS` (interrupteur global, **OFF**) + `AUTOSPEC_SKILLS_QA`/
 `_DEV` (par rôle) ; `settings.skills_for(role)` = global ET rôle (comme
@@ -678,7 +732,7 @@ la pipeline.
 
 | Méthode | Route | Rôle |
 |---|---|---|
-| `POST` | `/api/projects` | crée un projet (`goal`, `name`, `auto_spec`, **`budget_usd`**, **`budget_tokens`**) et démarre la pipeline |
+| `POST` | `/api/projects` | crée un projet (`goal`, `name`, `auto_spec`, **`budget_usd`**, **`budget_tokens`**, **`product_profile`**) et démarre la pipeline |
 | `GET` | `/api/projects` | liste les projets (vivants + persistés) |
 | `GET` | `/api/projects/{id}` | état complet d'un projet (live ou rechargé du disque) |
 | `DELETE` | `/api/projects/{id}` | **supprime** un projet : stoppe la pipeline (`adispose`) et efface le workspace |
@@ -702,6 +756,9 @@ la pipeline.
 | `GET` | `/api/projects/{pid}/stories/{sid}/diff` | **diff git d'une story terminée** : `{ok, available, diff}` — chaque story terminée est commitée dans le repo git du workspace (commit `story <id> done`), et le diff est le `git show` de ce commit (tronqué au-delà de 200 000 caractères) ; `available=false` si aucun commit (git absent ou story non terminée) ; **404** si la story est inconnue |
 | `GET` | `/api/projects/{pid}/files` | **arborescence du workspace** : `{files: [...]}` (chemins relatifs POSIX triés ; exclut `.git`/`__pycache__`/`.venv`/`node_modules`/`.pytest_cache`, `autospec-state.json`, `*.pyc`, rapports) |
 | `GET` | `/api/projects/{pid}/files/raw?path=<relpath>` | **contenu d'un fichier** texte : `{path, content, truncated}` (UTF-8 tolérant, tronqué au-delà de 200 000 caractères) |
+| `GET` | `/api/provider` | provider courant, providers disponibles, modèles connus et **`capabilities`** du runner |
+| `POST` | `/api/provider` | bascule de provider à chaud (`{provider, model?}`), verrouillée en mode démo |
+| `GET` | `/api/providers/{provider}/models` | modèles réellement disponibles pour un provider |
 | `WS` | `/ws` | flux temps réel (`state` / `log` / `deleted`) |
 
 > **Édition des specs.** Les quatre routes ci-dessus correspondent aux méthodes
@@ -836,6 +893,7 @@ Variables d'environnement (toutes optionnelles) :
 | `AUTOSPEC_DEV_MAX_ATTEMPTS` | `2` | tentatives par story |
 | `AUTOSPEC_UV_CMD` | `uv` | binaire uv pour le workspace généré |
 | `AUTOSPEC_WORKSPACE_ROOT` | `./workspace` | racine des workspaces générés (isolé en e2e) |
+| `AUTOSPEC_PRODUCT_PROFILE` | `auto` | profil produit (`library-fast`, `cli`, `api`, `web-ssr`, `fullstack`, `brownfield`) |
 | `AUTOSPEC_FAKE_AGENTS` | `0` | mode démo : `ScriptedRunner` + pytest court-circuité |
 | `AUTOSPEC_DEMO_DELAY_S` | `0` | délai des agents scriptés (rend les transitions visibles) |
 | `AUTOSPEC_ARCHITECTURE` | `0` | active la **phase Architecture optionnelle** (design injecté dans QA/Dev, OFF par défaut) |
@@ -850,6 +908,11 @@ Variables d'environnement (toutes optionnelles) :
 | `AUTOSPEC_SKILLS` | `0` | active la **bibliothèque de skills** QA/Dev (§5.10) |
 | `AUTOSPEC_SKILLS_QA` / `_DEV` | `1` / `1` | skills par rôle (effectif si le global est ON) |
 | `AUTOSPEC_DECOMPOSE` | `0` | active la **décomposition en sous-tâches parallèles** (§5.11) |
+| `AUTOSPEC_SMOKE_RUN` | `1` | démarre réellement l'app livrée avant `done` |
+| `AUTOSPEC_DEFINITION_OF_DONE` | `1` | active le gate déterministe de livraison |
+| `AUTOSPEC_DOD_STRICT_CRITERIA` | `0` | rend bloquante l'absence de preuve verte par critère |
+| `AUTOSPEC_RUNTIME_ACCEPTANCE` | `0` | active le gate navigateur/runtime web/fullstack |
+| `AUTOSPEC_RUNTIME_ACCEPTANCE_TIMEOUT_S` | `90` | timeout du gate runtime |
 
 ---
 
@@ -857,54 +920,21 @@ Variables d'environnement (toutes optionnelles) :
 
 ### Tests backend (`backend/tests`)
 
-131 tests, sans aucun appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
+458 tests, sans appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
 
-- **`test_scheduler.py`** — dépendances, détection de cycles, sanitization,
-  **ordre kanban**.
-- **`test_runner.py`** — `extract_json` (prose, fences, objets imbriqués).
-- **`test_models.py`** — **état d'un critère** (`criterion_state`) : inexistant,
-  rouge si un test rouge, vert seulement si tous verts, story `done` ⇒ vert.
-- **`test_pipeline.py`** — pipeline complète avec interview, écriture des
-  `.feature`, blocage des dépendants en cas d'échec, **boucle auto-spec avec
-  analyste**, priorité kanban de bout en bout, **plan de tests QA** (stocké,
-  rattaché aux critères, injecté au Dev, non-fatal en cas d'échec), **états des
-  tests dérivés du vrai rapport pytest** (`test_real_pytest_states_map_by_nodeid` :
-  sous suite rouge, UT-1 dont le nodeid est `passed` devient vert et UT-2 dont le
-  nodeid est `failed` devient rouge — le split vient purement du rapport réel),
-  **pause/reprise** et stop débloquant une pause, feedback, **routage du chat**
-  (un message pendant le `build` devient une consigne `build_guidance` injectée
-  au Dev, hors build c'est du `feedback`) et **injection de la consigne dans le
-  prompt Dev**, **invocation du raffinement PO** quand activé, **exposition des
-  scores de raffinement à l'UI** (`plan_quality` stocké quand le raffinement est
-  actif, `quality_score` des stories ; sentinelle -1 quand le raffinement est OFF),
-  **continuer le build** d'un projet dormant (`aresume_build` rejoue le build sur
-  les stories `todo`/`red` de l'itération ; **409** si pipeline active ou si aucune
-  story à construire), **diff git par story** (`astory_diff` : commit `story <id>
-  done` retrouvé puis `git show` exposé ; `available=false` sans commit ; `KeyError`
-  si la story est inconnue), **observabilité tokens/coût** (`test_usage_is_accumulated` :
-  `usage.agent_calls`/`cost_usd`/tokens cumulés sur les 4 appels PM/PO/QA/Dev ;
-  `test_usage_zero_by_default` : `cost_usd=0` mais le compteur d'appels incrémente).
-- **`test_pytest_report.py`** — `pytest_report.parse` : parsing nominal du
-  json-report, fichier manquant → `{}`, fichier corrompu → `{}`.
-- **`test_refine.py`** — **déterminisme du harnais de raffinement** : désactivé
-  → artefact inchangé ; arrêt immédiat si le juge passe le seuil ; cap dur sur
-  le nombre de tours ; arrêt anticipé au seuil ; **critique vide** ; **révision
-  rejetée + rollback** ; **juge illisible traité comme arrêt**.
-- **`test_api.py`** — création/complétion de projet, **suppression de projet**,
-  arrêt pendant l'interview, validations (goal vide, projet inconnu), et
-  **édition des specs** : édition titre + critères, ajout, suppression, reorder,
-  **404** sur story inconnue, **409** sur story `in_progress` ; et **actions par
-  story** : rebuild d'une story échouée, force-done, **409** si pipeline active,
-  KeyError si story inconnue ; et **reprise après redémarrage** (`recover_projects`) :
-  réenregistre les projets persistés comme pipelines dormantes en récupérant l'état
-  interrompu (phase→`stopped`, story→`todo`, `running`/`paused` réinitialisés), rend
-  un projet rechargé pilotable (plus de 404 sur `force-done`), et n'écrase pas un
-  projet déjà vivant ; et **arrêt de l'app générée** (`stop-app`) : no-op sûr
-  quand aucune app ne tourne (200 `{"ok": true}`), **404** sur projet inconnu ;
-  et **archivage/désarchivage** (`archive`/`unarchive`) : `archived` passe à
-  `true` puis `false`, **404** sur projet inconnu.
-- **`test_scripted.py`** — le `ScriptedRunner` pilote toute la pipeline en mode
-  démo (2 stories livrées, critères structurés).
+- **Pipeline et modèles** : interview, plan PO, dépendances, priorité kanban,
+  QA outside-in, mapping des vrais rapports pytest, pause/reprise, stop,
+  rebuild, force-done, feedback, diff git, usage tokens/coût et récupération au
+  redémarrage.
+- **Gates de livraison** : `delivery_gate`, `delivery_state`, smoke run par
+  défaut, runtime acceptance Playwright, absence de faux vert pour les stories
+  UI, critères/tâches effectifs et verdict `delivery_ready`.
+- **Produit et providers** : profils produit, capacités de runners, découverte
+  de modèles, providers LangChain, Codex/Claude CLI, protocole de fichiers borné
+  et sécurité des chemins.
+- **Factory réelle** : scénarios golden locaux couvrant feature factory,
+  toolchain frontend, streams/worktrees, skills prescriptives, contrats API/UI,
+  sécurité, observabilité et exports.
 
 ```powershell
 cd backend
@@ -916,8 +946,9 @@ verte sans lancer de vrais sous-processus.
 
 ### Tests frontend (`frontend/src`)
 
-**20 tests Vitest** (4 fichiers) : logique pure (`criterionState`), rendu du
-`Board` et des panneaux.
+**136 tests Vitest** : logique pure (`criterionState`, `effectiveStatus`), rendu
+du `Board`, `RunPanel`, `ProjectBar`, activité LLM, workspace/code viewer, API
+client, composants et `App`.
 
 ```powershell
 cd frontend
@@ -939,6 +970,13 @@ run (hermétique).
 cd frontend
 npm run test:e2e   # build le front puis lance Playwright (backend démo auto-démarré)
 ```
+
+### Golden Projects
+
+`.github/workflows/golden-projects.yml` lance une batterie déterministe en manuel
+et nightly : feature factory réelle, smoke run, runtime acceptance, Definition of
+Done, profils produit, skills, streams/worktrees, toolchain frontend et contrats
+frontend. La variante locale vérifiée compte **71 tests**.
 
 ---
 
@@ -971,9 +1009,11 @@ Une revue de code récente a durci plusieurs points.
 
 | Besoin | Où agir |
 |---|---|
-| Changer de backend LLM (SDK Anthropic, autre provider) | nouvelle classe `AgentRunner` + `server.set_runner(...)` |
+| Changer de backend LLM (SDK Anthropic, autre provider) | nouvelle classe `AgentRunner` + capacités dans `provider_capabilities()` + `server.set_runner(...)` |
 | Modifier le comportement d'un agent | persona BMAD dans `_bmad/bmm/agents/` ou prompt dans `agents/prompts.py` |
 | Ajouter une étape au pipeline | nouvelle phase dans `PipelinePhase` + méthode `_a…_phase` dans `pipeline.py` |
+| Ajouter un profil produit | `orchestrator/profiles.py` + champ `product_profile` si nécessaire |
+| Ajouter un gate de livraison | module dédié dans `orchestrator/` + verdict dans `delivery_ready` / `delivery_issues` |
 | Changer la stratégie d'ordonnancement | fonctions pures de `scheduler.py` |
 | Réorganiser le backlog à la main (drag & drop) | non implémenté — actuellement géré via le feedback chat repris par l'analyste |
 | Vérifier individuellement chaque test planifié | implémenté : les outcomes viennent du **vrai rapport pytest** (`pytest-json-report` → `pytest_report.parse`), mappés par les nodeids déclarés par le Dev (`_apply_test_states`, voir §5.3) |
@@ -983,9 +1023,9 @@ Une revue de code récente a durci plusieurs points.
 
 ## 14. Résumé en une phrase
 
-Autospec orchestre de façon **déterministe** une équipe d'**agents BMAD exécutés
-via le CLI Claude Code**, où chaque agent a une responsabilité unique (décider,
-spécifier, planifier, **concevoir les tests outside-in**, coder en BDD/TDD), où
-l'orchestrateur **revérifie lui-même** chaque livraison par les tests, et où une
-**boucle auto-spec** pilotée par un analyste fait progresser le produit en
-continu — le tout visualisé en temps réel dans un board kanban.
+Autospec orchestre de façon **déterministe** une équipe d'**agents BMAD** via
+Claude/Codex CLI ou providers LangChain, où chaque agent a une responsabilité
+unique, où l'orchestrateur **revérifie lui-même** chaque livraison par tests,
+smoke run, runtime acceptance et Definition of Done, et où une **boucle
+auto-spec** pilotée par un analyste fait progresser le produit en continu — le
+tout visualisé en temps réel dans un board kanban.
