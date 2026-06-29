@@ -16,6 +16,7 @@ import {
   pauseProject,
   resumeBuild,
   retryFailed,
+  restartFromScratch,
   resumeProject,
   resolveBrainstorm,
   approveProject,
@@ -445,6 +446,15 @@ export default function App() {
     pushToast("success", t("app.rollbackToastTitle"), t("app.rollbackToastBody", { n }));
   };
 
+  // « Relancer from scratch » : destructif (efface code + epics + stories, garde
+  // le brief), d'où la confirmation explicite avant l'appel API.
+  const handleRestartFromScratch = async () => {
+    if (!project) return;
+    if (!window.confirm(t("app.confirmRestartScratch", { name: project.name }))) return;
+    await guard(() => restartFromScratch(project.id))();
+    pushToast("success", t("app.restartToastTitle"), t("app.restartToastBody"));
+  };
+
   return (
     <div className="app">
       <header>
@@ -711,6 +721,7 @@ export default function App() {
               onStopApp={guard(() => stopApp(project.id))}
               onResumeBuild={guard(() => resumeBuild(project.id))}
               onRetryFailed={guard(() => retryFailed(project.id))}
+              onRestartFromScratch={handleRestartFromScratch}
               onDocument={guard(() => documentProject(project.id))}
               onCancelResume={guard(() => cancelResume(project.id))}
               onApprove={guard(() => approveProject(project.id))}

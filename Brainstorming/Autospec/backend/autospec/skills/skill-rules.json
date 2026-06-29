@@ -82,6 +82,16 @@
         "intentPatterns": ["(decompose|wire|cabler|decomposer).*(gherkin|acceptance|scenario|feature)"]
       }
     },
+    "task-independence": {
+      "type": "domain",
+      "enforcement": "required_when_applicable",
+      "priority": "critical",
+      "description": "Certify which decomposed tasks can build in parallel (file-disjoint) and serialize/merge the rest, before the streams scheduler runs them.",
+      "promptTriggers": {
+        "keywords": ["parallel", "parallele", "independence", "independance", "conflit de merge", "merge conflict", "same file", "meme fichier", "decompose", "decomposer", "scheduling", "ordonnancement", "file_globs", "serialize", "serialiser", "worktree"],
+        "intentPatterns": ["(can|peut|safe).*(parallel|parallele|co-?run)", "(serialize|serialiser|order|ordonner).*(task|tache|work item)", "(independent|independant|disjoint).*(task|tache|file|fichier)"]
+      }
+    },
     "skill-creator": {
       "type": "meta",
       "enforcement": "suggest",

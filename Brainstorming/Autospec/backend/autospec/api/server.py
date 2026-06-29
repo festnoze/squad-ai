@@ -698,6 +698,15 @@ async def aretry_failed(project_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/projects/{project_id}/restart")
+async def arestart_from_scratch(project_id: str) -> dict:
+    """Wipe everything generated (code, epics, stories…) EXCEPT the initial brief,
+    then relaunch PO planning + the global build. 409 if active or no brief."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.arestart_from_scratch(), f"Projet inconnu : {project_id}")
+    return {"ok": True}
+
+
 @app.post("/api/projects/{project_id}/run")
 async def arun_app(project_id: str, req: RunRequest | None = None) -> dict:
     pipeline = _pipeline(project_id)

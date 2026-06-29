@@ -322,6 +322,15 @@ class Settings:
     # engine, then aggregated. Reuses the streams Task/worktree machinery. OFF by
     # default; turning it on routes eligible stories through the streams path.
     decompose_enabled: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_DECOMPOSE", False))
+    # P4: LLM "independence judge" (skill task-independence + persona
+    # independence-judge). When on, before the parallel build it completes each
+    # task's file claims and refines independent/serialize/merge decisions on top
+    # of the deterministic floor (orchestrator/independence.py). OFF by default:
+    # the deterministic floor + prompt-declared file_globs already keep the build
+    # safe; the judge only sharpens parallelism. Non-fatal when it fails.
+    independence_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_INDEPENDENCE", False)
+    )
     setup_install: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_SETUP_INSTALL", False)
     )

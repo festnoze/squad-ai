@@ -55,13 +55,22 @@ if __name__ == "__main__":
     main()
 '''
 
+# Volatile Autospec bookkeeping written into the workspace by the orchestrator
+# (rewritten on every _sync()). It MUST stay out of the generated project's git,
+# otherwise `git add -A` commits drag it into every worktree and parallel work
+# items conflict on it on merge (refactor P0a). Shared across all root gitignores.
+BOOKKEEPING_IGNORE = """autospec-state.json
+autospec-interactions.jsonl
+.autospec/
+"""
+
 GITIGNORE_TEMPLATE = """.venv/
 __pycache__/
 *.pyc
 .pytest_cache/
 autospec-report-*.json
 .report.json
-"""
+""" + BOOKKEEPING_IGNORE
 
 # ---- Go (L2g) -------------------------------------------------------------
 GO_MOD_TEMPLATE = """module {package}
@@ -80,7 +89,7 @@ func main() {{
 
 GO_GITIGNORE = """/bin/
 *.exe
-"""
+""" + BOOKKEEPING_IGNORE
 
 # ---- Rust (L2g) -----------------------------------------------------------
 CARGO_TOML_TEMPLATE = """[package]
@@ -97,7 +106,7 @@ RUST_MAIN_TEMPLATE = """fn main() {{
 """
 
 RUST_GITIGNORE = """/target/
-"""
+""" + BOOKKEEPING_IGNORE
 
 # ---- Frontend (ST-6): Vite + React + TS + Vitest -------------------------
 # A minimal but real Vite+React+TS skeleton with Vitest wired so `npm run build`

@@ -13,6 +13,7 @@ interface Props {
   onStopApp: () => void;
   onResumeBuild: () => void;
   onRetryFailed: () => void;
+  onRestartFromScratch: () => void;
   onDocument: () => void;
   onExportZip: () => void;
   onGitExport: () => void;
@@ -37,6 +38,7 @@ export function RunPanel({
   onStopApp,
   onResumeBuild,
   onRetryFailed,
+  onRestartFromScratch,
   onDocument,
   onExportZip,
   onGitExport,
@@ -104,6 +106,12 @@ export function RunPanel({
   const failedCount = effStatuses.filter((st) => st === "failed").length;
   const canRetryFailed =
     ["done", "stopped", "needs_attention", "error"].includes(project.phase) && failedCount > 0;
+  // « Relancer from scratch » : pipeline dormante + un brief existe. Efface tout
+  // le code/plan (sauf le brief) et relance PO → build. Destructif → confirmation
+  // côté App.
+  const canRestart =
+    ["done", "stopped", "needs_attention", "error"].includes(project.phase) &&
+    !!project.brief?.trim();
 
   const agentCalls = project.usage?.agent_calls ?? 0;
   const costUsd = project.usage?.cost_usd ?? 0;
@@ -222,6 +230,15 @@ export function RunPanel({
               title={t("runPanel.retryFailedTitle")}
             >
               {t("runPanel.retryFailed", { n: failedCount })}
+            </button>
+          )}
+          {canRestart && (
+            <button
+              className="action-btn danger"
+              onClick={onRestartFromScratch}
+              title={t("runPanel.restartScratchTitle")}
+            >
+              {t("runPanel.restartScratch")}
             </button>
           )}
           {project.running && (

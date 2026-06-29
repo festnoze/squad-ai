@@ -87,6 +87,7 @@ function renderPanel(
   logs: { projectId: string; source: string; line: string }[] = [],
   onRetryFailed: () => void = vi.fn(),
   onRun: (args: string) => void = vi.fn(),
+  onRestartFromScratch: () => void = vi.fn(),
 ) {
   const utils = render(
     <RunPanel
@@ -99,6 +100,7 @@ function renderPanel(
       onStopApp={vi.fn()}
       onResumeBuild={vi.fn()}
       onRetryFailed={onRetryFailed}
+      onRestartFromScratch={onRestartFromScratch}
       onDocument={vi.fn()}
       onExportZip={vi.fn()}
       onGitExport={vi.fn()}
@@ -108,7 +110,7 @@ function renderPanel(
       onDeploy={vi.fn()}
     />,
   );
-  return { ...utils, onRetryFailed, onRun };
+  return { ...utils, onRetryFailed, onRun, onRestartFromScratch };
 }
 
 describe("RunPanel", () => {
@@ -323,6 +325,32 @@ describe("RunPanel", () => {
     renderPanel(makeProject({ phase: "done", stories: [makeStory({ status: "done" })] }));
     expect(
       screen.queryByRole("button", { name: /Retry failures/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("restart : bouton « Relancer from scratch » quand dormant + brief, et clic", () => {
+    const { onRestartFromScratch } = renderPanel(
+      makeProject({ phase: "done", brief: "un brief", stories: [makeStory({ status: "done" })] }),
+      [],
+      vi.fn(),
+      vi.fn(),
+    );
+    const btn = screen.getByRole("button", { name: /Restart from scratch/ });
+    fireEvent.click(btn);
+    expect(onRestartFromScratch).toHaveBeenCalledTimes(1);
+  });
+
+  it("restart : pas de bouton sans brief", () => {
+    renderPanel(makeProject({ phase: "done", brief: "", stories: [makeStory({ status: "done" })] }));
+    expect(
+      screen.queryByRole("button", { name: /Restart from scratch/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("restart : pas de bouton si la pipeline est active (build)", () => {
+    renderPanel(makeProject({ phase: "build", brief: "un brief" }));
+    expect(
+      screen.queryByRole("button", { name: /Restart from scratch/ }),
     ).not.toBeInTheDocument();
   });
 

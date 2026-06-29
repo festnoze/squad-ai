@@ -60,9 +60,9 @@ from ..models import (
     new_id,
 )
 from ..language_selector import recommend_language
-from ..storage import append_interaction, load_interactions, save_state_payload, workspace_dir
+from ..storage import append_interaction, force_delete_workspace, load_interactions, save_state_payload, workspace_dir
 from .interactions import InteractionStore
-from . import delivery_state, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
+from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import regression
@@ -361,6 +361,10 @@ class Pipeline:
         # Serialize the one-time `npm install` of the frontend stream so parallel
         # frontend work items don't each kick off (or race) an install.
         self._npm_lock = asyncio.Lock()
+        # P0a: untrack volatile bookkeeping files from the project repo exactly
+        # once per process (idempotent `git rm --cached`); guarded by this flag so
+        # the per-commit `_agit_ensure_repo` hot path stays cheap.
+        self._bookkeeping_ignored = False
         # B5 (UX): heartbeat tick publisher, started on BUILD entry, cancelled on
         # stop/dispose. ~10s compact item-status broadcast (never replayed).
         self._tick_task: asyncio.Task | None = None
@@ -2278,8 +2282,14 @@ class Pipeline:
                         ],
                         gherkin=task_data.get("gherkin", ""),
                         depends_on=[task_id_map.get(d, d) for d in task_data.get("depends_on", [])],
+                        files_hint=[
+                            str(g) for g in (task_data.get("file_globs") or []) if str(g).strip()
+                        ],
                     )
                 )
+            # P4b: serialize file-overlapping tasks of THIS story (the deterministic
+            # floor; trusts but verifies the PO's depends_on).
+            self._enforce_task_independence(out, label=story_id)
             return out
 
         new_stories = [
@@ -2566,12 +2576,44 @@ class Pipeline:
         ``ws/.git`` guarantees an isolated repo (and respects a brownfield repo
         that already carries its own ``.git``)."""
         if (ws / ".git").exists():
+            await self._aignore_bookkeeping(ws)
             return True
         if (await self._agit(ws, "init"))[0] != 0:
             return False
         await self._agit(ws, "config", "user.email", "autospec@local")
         await self._agit(ws, "config", "user.name", "Autospec")
+        await self._aignore_bookkeeping(ws)
         return True
+
+    async def _aignore_bookkeeping(self, ws) -> None:
+        """P0a: keep the volatile Autospec bookkeeping files OUT of the project
+        git, once per process. `git add -A` re-commits already-tracked files even
+        when gitignored, so an existing repo (created before this fix, or a
+        brownfield one) must have them explicitly untracked — otherwise every
+        worktree commit drags `autospec-state.json` / `autospec-interactions.jsonl`
+        along and parallel work items conflict on them at merge time. Idempotent
+        and best-effort; `--ignore-unmatch` makes the rm a no-op when untracked."""
+        if self._bookkeeping_ignored:
+            return
+        self._bookkeeping_ignored = True
+        # Ensure the ignore rules exist even for a brownfield repo with no/partial
+        # .gitignore (the scaffold templates already carry them for greenfield).
+        gitignore = Path(ws) / ".gitignore"
+        try:
+            existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
+            missing = [
+                line for line in ("autospec-state.json", "autospec-interactions.jsonl", ".autospec/")
+                if line not in existing.splitlines()
+            ]
+            if missing:
+                sep = "" if (not existing or existing.endswith("\n")) else "\n"
+                gitignore.write_text(existing + sep + "\n".join(missing) + "\n", encoding="utf-8")
+        except OSError:
+            pass
+        await self._agit(
+            ws, "rm", "--cached", "--ignore-unmatch", "-q", "--",
+            "autospec-state.json", "autospec-interactions.jsonl",
+        )
 
     async def _agit_snapshot(self, ws, label: str) -> bool:
         if not await self._agit_ensure_repo(ws):
@@ -2706,6 +2748,9 @@ class Pipeline:
             # let the parallel worktree engine build + aggregate them.
             await self._adecompose_pending(all_iterations=all_iterations)
         if self._setting("streams_enabled") or self._setting("decompose_enabled"):
+            # P4d: optional LLM judge completes file claims + sharpens
+            # serialization before the parallel scheduler (floor already safe).
+            await self._ajudge_independence()
             await self._abuild_phase_streams(all_iterations=all_iterations)
             return
         self.state.phase = PipelinePhase.BUILD
@@ -2961,18 +3006,25 @@ class Pipeline:
                     await self._acommit_story(ws, f"feature {item.id}")
 
         async def _reap_done() -> None:
-            """Remove finished workers (freeing their slots). An unexpected worker
-            failure is surfaced (the lifecycle turns it into ERROR) after the rest
-            are cancelled + drained — matching the old gather()'s propagation."""
+            """Remove finished workers (freeing their slots). P0b: a single worker
+            that died with an UNEXPECTED exception must NOT tear down the whole
+            build (the old behaviour cancelled every sibling and re-raised, so one
+            transient crash — e.g. ``claude CLI exited with 1073807364`` — stranded
+            an entire project). Instead we isolate the failure: mark that item
+            FAILED (relaunchable) and let the rest keep going. Cancellation still
+            propagates (cooperative stop)."""
             for wid in [k for k, v in running.items() if v.done()]:
                 finished = running.pop(wid)
                 exc = finished.exception()
-                if exc is not None and not isinstance(exc, asyncio.CancelledError):
-                    for other in running.values():
-                        other.cancel()
-                    await asyncio.gather(*running.values(), return_exceptions=True)
-                    running.clear()
-                    raise exc
+                if exc is None or isinstance(exc, asyncio.CancelledError):
+                    continue
+                self._log(
+                    f"dev:{wid}",
+                    f"⛔ Worker {wid} a planté ({type(exc).__name__}: {exc}). "
+                    "Isolé en échec ; le reste du build continue.",
+                )
+                self._fail_item_by_id(wid, f"crash worker : {exc}")
+                self._sync()
 
         # Dynamic dataflow scheduler (replaces a batch barrier): each work item
         # starts the instant a slot is free AND all its deps are merged — a freed
@@ -3014,13 +3066,30 @@ class Pipeline:
                     break
 
                 # Fill every free slot with a ready item (deps all merged/DONE).
+                # P4c: independence safety floor — never co-run two items that
+                # could touch the SAME files. Two same-stream tasks with no proven
+                # file-disjointness (e.g. two frontend tasks both editing App.tsx)
+                # would build in parallel worktrees and conflict on merge, losing
+                # the green work. We hold such an item back until its in-flight
+                # rival merges; the next pass branches it off the updated HEAD.
+                inflight_claims = [
+                    self._item_claim(graph.items[rid])
+                    for rid in running if rid in graph.items
+                ]
                 for it in items:
                     if len(running) >= cap:
                         break
                     if it.id in running or not work_streams.is_ready(it, graph.items):
                         continue
+                    claim = self._item_claim(it)
+                    if any(
+                        independence.declared_overlap(claim, other)
+                        for other in inflight_claims
+                    ):
+                        continue  # would clash on DECLARED files with an in-flight item
                     await _acommit_feature(it)
                     running[it.id] = asyncio.create_task(self._abuild_work_item(it))
+                    inflight_claims.append(claim)
 
                 if not running:
                     # Nothing ready and nothing in flight: a defensive in-flight
@@ -3060,6 +3129,15 @@ class Pipeline:
             # worktree is cleaned up (its finally runs); killed agents return fast.
             if running:
                 await asyncio.gather(*running.values(), return_exceptions=True)
+            # H1: belt-and-suspenders — if the loop was cancelled/stopped while a
+            # worker was mid-flight (or a gather swallowed a cancellation), no item
+            # must be left stuck IN_PROGRESS/GREEN/RED with no worker behind it.
+            # Reset such orphans to TODO so the next resume actually rebuilds them
+            # (the todo_list_2 "stuck forever" symptom can never persist).
+            n_orphans = self._reset_orphan_items()
+            if n_orphans:
+                self._log("build", f"♻️ {n_orphans} item(s) en vol réinitialisé(s) à l'arrêt du build.")
+            self._sync()
 
         self._stop_tick()  # B5: build loop done
         self.state.build_guidance.clear()
@@ -3100,6 +3178,154 @@ class Pipeline:
         target.status = status
         if last_error is not None:
             target.last_error = last_error
+
+    def _enforce_task_independence(self, tasks: list[Task], *, label: str) -> None:
+        """P4b: run the deterministic independence floor over a freshly built task
+        set and INJECT the ``depends_on`` it computes, so file-overlapping tasks
+        are serialized in the work graph (not just at schedule time). Mutates the
+        Task objects in place. Pure + safe: it only ADDS edges, never removes one,
+        and is a no-op when tasks are already disjoint/ordered."""
+        if len(tasks) < 2:
+            return
+        claims = [
+            independence.TaskClaim(
+                id=t.id,
+                stream=t.stream or self.state.primary_stream_id,
+                file_globs=tuple(t.files_hint),
+                depends_on=tuple(t.depends_on),
+            )
+            for t in tasks
+        ]
+        report = independence.analyze(claims)
+        if not report.added_deps and not report.warnings:
+            return
+        by_id = {t.id: t for t in tasks}
+        for tid, extra in report.added_deps.items():
+            task = by_id.get(tid)
+            if task is None:
+                continue
+            for dep in extra:
+                if dep not in task.depends_on:
+                    task.depends_on.append(dep)
+        if report.conflict_pairs:
+            pairs = ", ".join(f"{a}↔{b}" for a, b in report.conflict_pairs[:4])
+            self._log(
+                f"independence:{label}",
+                f"🔗 {len(report.conflict_pairs)} paire(s) de tâches en conflit de "
+                f"fichiers sérialisée(s) ({pairs}…).",
+            )
+        for w in report.warnings:
+            self._log(f"independence:{label}", f"⚠️ {w}")
+
+    async def _ajudge_independence(self) -> None:
+        """P4d: optional LLM independence judge (AUTOSPEC_INDEPENDENCE, OFF). For
+        each story with ≥2 tasks it completes the tasks' file claims and may add
+        serialization edges, THEN re-runs the deterministic floor so the final
+        graph is safe. Non-fatal: any failure leaves the floor-only result (which
+        is already safe). Runs once before the parallel scheduler."""
+        if not settings.independence_enabled:
+            return
+        for story in self.state.stories:
+            tasks = story.tasks
+            if len(tasks) < 2:
+                continue
+            payload = [
+                {
+                    "id": t.id, "stream": t.stream or self.state.primary_stream_id,
+                    "title": t.title, "description": t.description,
+                    "file_globs": list(t.files_hint), "depends_on": list(t.depends_on),
+                }
+                for t in tasks
+            ]
+            try:
+                result = await self._tracked.arun(
+                    prompts.independence_judge(payload),
+                    system_prompt=persona("independence-judge"),
+                )
+                reply = extract_json(result.text)
+            except AgentError as exc:
+                self._log(f"independence:{story.id}", f"Juge indisponible ({exc}) — floor déterministe seul.")
+                continue
+            by_id = {t.id: t for t in tasks}
+            raw_claims = reply.get("claims")
+            claims = raw_claims if isinstance(raw_claims, dict) else {}
+            for tid, globs in claims.items():
+                t = by_id.get(tid)
+                if t is not None and isinstance(globs, list):
+                    completed = [str(g) for g in globs if str(g).strip()]
+                    if completed:
+                        t.files_hint = completed
+            for edge in reply.get("add_dependency") or []:
+                if not isinstance(edge, dict):
+                    continue
+                t = by_id.get(str(edge.get("task")))
+                dep = str(edge.get("depends_on") or "")
+                if t is not None and dep in by_id and dep != t.id and dep not in t.depends_on:
+                    t.depends_on.append(dep)
+            # Re-run the floor with the completed claims (adds any edge the judge missed).
+            self._enforce_task_independence(tasks, label=f"{story.id}/judge")
+        self._sync()
+
+    def _item_claim(self, item: "work_streams.WorkItem") -> "independence.TaskClaim":
+        """P4c: the file-claim used by the independence floor to decide whether an
+        item may co-run with the in-flight ones. A task's claims are its
+        ``files_hint`` (empty ⇒ "the whole stream" ⇒ serialized by default); a
+        taskless story claims its whole stream too (no per-file granularity)."""
+        globs: tuple[str, ...] = ()
+        if item.kind == "task":
+            try:
+                globs = tuple(self.state.task(item.id).files_hint)
+            except KeyError:
+                globs = ()
+        return independence.TaskClaim(
+            id=item.id,
+            stream=item.stream or "",
+            file_globs=globs,
+            depends_on=tuple(item.depends_on),
+        )
+
+    def _find_item_target(self, wid: str):
+        """Resolve a work-item id (task id or story id) to its persistent model,
+        or None if it no longer exists (defensive — the plan may have changed)."""
+        try:
+            return self.state.task(wid)
+        except KeyError:
+            pass
+        try:
+            return self.state.story(wid)
+        except KeyError:
+            return None
+
+    def _fail_item_by_id(self, wid: str, last_error: str) -> None:
+        """P0b: mark a single work item FAILED by id (used when a worker crashes
+        outside the per-item handler). Best-effort — never raises."""
+        target = self._find_item_target(wid)
+        if target is None:
+            return
+        target.status = StoryStatus.FAILED
+        target.last_error = last_error
+        self._set_stage(target, BuildStage.FAILED, sync=False)
+
+    def _reset_orphan_items(self) -> int:
+        """P0c: when no build worker is active, any story/task left mid-flight
+        (IN_PROGRESS / GREEN / RED) is an ORPHAN from a crash or restart — the
+        green/in-progress code lives only in a now-gone worktree. Reset them to
+        TODO so resume/retry actually rebuilds them (the old resume only reset
+        RED tasks, so an IN_PROGRESS orphan was silently skipped forever and the
+        whole project stayed stuck). Returns the number reset."""
+        transient = (StoryStatus.IN_PROGRESS, StoryStatus.GREEN, StoryStatus.RED)
+        n = 0
+        for story in self.state.stories:
+            if story.status in transient:
+                story.status = StoryStatus.TODO
+                n += 1
+            for task in story.tasks:
+                if task.status in transient:
+                    task.status = StoryStatus.TODO
+                    task.last_error = ""
+                    self._set_stage(task, BuildStage.QUEUED, sync=False)
+                    n += 1
+        return n
 
     async def _abuild_work_item(self, item: "work_streams.WorkItem") -> None:
         """ST-9/10/11: build ONE work item in its own git worktree, then merge.
@@ -3206,10 +3432,23 @@ class Pipeline:
                     else StoryStatus.FAILED
                 )
             self._log(f"dev:{item.id}", f"Erreur agent : {exc}")
-        except Exception:
-            if target.status in (StoryStatus.IN_PROGRESS, StoryStatus.GREEN, StoryStatus.RED):
-                target.status = StoryStatus.TODO
-            raise
+        except Exception as exc:  # noqa: BLE001
+            # P0b: an unexpected crash in ONE work item must not bubble up and
+            # kill the whole build phase. Treat it like a red build: retry while
+            # attempts remain, else FAIL this item only. (CancelledError is a
+            # BaseException — it still propagates for cooperative stop.)
+            target.last_error = f"crash worker : {exc}"
+            target.status = (
+                StoryStatus.TODO
+                if subject.attempts < settings.dev_max_attempts
+                else StoryStatus.FAILED
+            )
+            self._set_stage(
+                target,
+                BuildStage.QUEUED if target.status == StoryStatus.TODO else BuildStage.FAILED,
+                sync=False,
+            )
+            self._log(f"dev:{item.id}", f"⛔ Crash worker {item.id} isolé : {exc}")
         finally:
             if worktree is not None:
                 await self._aworktree_remove(ws, worktree, branch)
@@ -3514,6 +3753,14 @@ class Pipeline:
             raise ValueError("la pipeline est déjà active")
         if self._task and not self._task.done():
             raise ValueError("une tâche est déjà en cours")
+        # P0c: no worker is active here (guards above), so any IN_PROGRESS/GREEN/RED
+        # story or task is a crash/restart ORPHAN whose code is gone with its
+        # worktree — reset it to TODO FIRST, otherwise an IN_PROGRESS orphan keeps
+        # its parent US effective_status IN_PROGRESS, the filter below skips it, and
+        # the project stays stuck forever (the exact todo_list_2 symptom).
+        n_orphans = self._reset_orphan_items()
+        if n_orphans:
+            self._log("build", f"♻️ {n_orphans} item(s) orphelin(s) réinitialisé(s) avant reprise.")
         # Across ALL iterations: a dormant build can leave still-to-build stories
         # in any iteration, and the work pool must include earlier-iteration DONE
         # stories so dependencies resolve.
@@ -3565,10 +3812,16 @@ class Pipeline:
             raise ValueError("la pipeline est déjà active")
         if self._task and not self._task.done():
             raise ValueError("une tâche est déjà en cours")
+        # H2: « relancer les échecs » must also unstick crash/restart ORPHANS
+        # (IN_PROGRESS/GREEN/RED with no worker) — otherwise a project stuck on an
+        # orphan (not a clean FAILED) reports "no failure to retry" and is dead.
+        n_orphans = self._reset_orphan_items()
+        if n_orphans:
+            self._log("build", f"♻️ {n_orphans} item(s) orphelin(s) réinitialisé(s) avant relance.")
         # Effective status so a task-decomposed US that is failed via its tasks is
         # also caught (its stored status may be TODO); reset those tasks too.
         failed = [s for s in self.state.stories if s.effective_status() == StoryStatus.FAILED]
-        if not failed:
+        if not failed and not n_orphans:
             raise ValueError("aucune story en échec à relancer")
         for story in failed:
             story.status = StoryStatus.TODO
@@ -3594,6 +3847,85 @@ class Pipeline:
             f"{', '.join(s.id for s in failed)}.",
         )
         self._task = asyncio.create_task(self._aresume_build_run(all_iterations=True))
+
+    async def arestart_from_scratch(self) -> None:
+        """« Relancer from scratch » : efface TOUT le travail dérivé (code généré,
+        epics, user stories, tâches, streams, composants, backlog, leçons, usage…)
+        SAUF le brief initial et l'identité/config du projet, puis relance la
+        pipeline complète. Comme le brief est déjà présent, la phase spec saute
+        l'interview PM (chemin I3) et enchaîne directement la planification PO puis
+        le build global — exactement « ré-analyse PO + dev » demandé.
+
+        Raises ValueError (-> 409) si la pipeline est active ou s'il n'y a aucun
+        brief à partir duquel relancer."""
+        if self.state.phase not in (
+            PipelinePhase.STOPPED,
+            PipelinePhase.DONE,
+            PipelinePhase.NEEDS_ATTENTION,
+            PipelinePhase.ERROR,
+        ):
+            raise ValueError("la pipeline est déjà active")
+        if self._task and not self._task.done():
+            raise ValueError("une tâche est déjà en cours")
+        if not self.state.brief.strip():
+            raise ValueError("aucun brief : lancez d'abord la spec avant de relancer from scratch")
+        # The generated app may still hold file handles in the workspace, which
+        # would block the wipe — stop it first.
+        await self.astop_app()
+        # Wipe the generated workspace (code + git repo), defeating git's
+        # read-only packs. Off the event loop (rmtree + chmod retries are slow).
+        try:
+            await asyncio.to_thread(force_delete_workspace, self.state.id)
+        except OSError as exc:
+            raise ValueError(f"workspace verrouillé (app en cours ?), réessayez : {exc}")
+        # Reset every DERIVED field; keep id/name/goal/config/brief/created_at.
+        s = self.state
+        s.epics = []
+        s.stories = []
+        s.streams = []
+        s.components = []
+        s.backlog = []
+        s.feedback = []
+        s.findings = []
+        s.lessons = []
+        s.green_tests = []
+        s.regressions = []
+        s.retro_recommendations = []
+        s.build_guidance = []
+        s.chat = []
+        s.architecture = ""
+        s.plan_quality = -1
+        s.language_complexity = -1
+        s.language_criticality = -1
+        s.language_rationale = ""
+        s.idea_maturity = ""
+        s.idea_rationale = ""
+        s.brainstorm_techniques = []
+        s.awaiting_brainstorm_decision = False
+        s.iteration = 1
+        s.usage = Usage()
+        s.iteration_usage = {}
+        s.delivery_ready = False
+        s.delivery_issues = []
+        s.resume_at = 0.0
+        s.error = ""
+        s.running = False
+        s.paused = False
+        s.awaiting_approval = ""
+        self._pm_session = None
+        self._stop_requested = False
+        self._delivery_blocked = False
+        delivery_state.reset(s)
+        s.phase = PipelinePhase.SPEC
+        self._sync()  # recreates the wiped workspace dir + persists the reset state
+        self._chat(
+            ChatRole.SYSTEM,
+            "♻️ Projet relancé from scratch : brief conservé, code et plan régénérés "
+            "(planification PO puis build global).",
+        )
+        # Reuse the normal lifecycle: spec sees the brief → skips the interview →
+        # PO plan → architect → build, exactly like a fresh project with a brief.
+        self.start()
 
     async def _aresume_build_run(self, all_iterations: bool = False) -> None:
         """Background task: re-run the build phase and restore a terminal phase.
@@ -3802,6 +4134,7 @@ class Pipeline:
             tag = " · ".join(
                 p for p in (f"couche {layer}" if layer else "", f"skill `{skill}`" if skill else "") if p
             )
+            file_globs = [str(g) for g in (data.get("file_globs") or []) if str(g).strip()]
             tasks.append(
                 Task(
                     id=id_map[old],
@@ -3812,8 +4145,14 @@ class Pipeline:
                     acceptance_criteria=crit or list(story.acceptance_criteria),
                     gherkin=str(data.get("gherkin") or story.gherkin),
                     depends_on=deps,
+                    files_hint=file_globs,
                 )
             )
+        # P4b: deterministic independence floor — serialize any tasks that
+        # overlap on files but have no ordering, so the parallel build can never
+        # lose green work to a merge conflict (the LLM's depends_on are trusted
+        # but verified; missing file claims default to whole-stream = serialized).
+        self._enforce_task_independence(tasks, label=story.id)
         story.tasks = tasks
         chain = " → ".join((t.title or t.id) for t in tasks)
         self._chat(

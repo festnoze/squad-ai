@@ -270,6 +270,18 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 - **▶ Continuer le build** d'un projet dormant (reprend la phase build sur les
   stories `todo`/`red`).
 
+### Relancer un projet *from scratch*
+- Bouton **♻️ Relancer from scratch** (`RunPanel`, visible quand la pipeline est
+  dormante et qu'un **brief** existe) : `Pipeline.arestart_from_scratch()`
+  **efface tout le dérivé** (code généré, epics, user stories, tâches, streams,
+  composants, backlog, leçons, usage…) en **conservant le brief initial** et la
+  config du projet, **purge le workspace** (`storage.force_delete_workspace`,
+  gère les packs git en lecture seule), puis **relance la pipeline** : la phase
+  spec voyant le brief saute l'interview PM et enchaîne **planification PO →
+  build global**. Endpoint `POST /api/projects/{id}/restart` ; **409** si la
+  pipeline est active ou s'il n'y a aucun brief. Action destructive →
+  **confirmation** côté UI.
+
 ### Interruption
 - **⏸ Pause / ▶ Reprendre** (gate coopératif `_checkpoint` entre étapes/lots),
   **⏹ Stopper** (débloque aussi une pause/interview).

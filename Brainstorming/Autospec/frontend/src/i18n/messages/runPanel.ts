@@ -70,6 +70,11 @@ export const runPanel: Namespace = {
     fr: "Réinitialiser et relancer toutes les user stories en échec",
   },
   retryFailed: { en: "🔄 Retry failures ({n})", fr: "🔄 Relancer les échecs ({n})" },
+  restartScratchTitle: {
+    en: "Wipe everything (code, epics, stories) EXCEPT the initial brief, then re-run PO planning and the full build",
+    fr: "Tout effacer (code, epics, stories) SAUF le brief initial, puis relancer la planification PO et le build complet",
+  },
+  restartScratch: { en: "♻️ Restart from scratch", fr: "♻️ Relancer from scratch" },
   stopAppTitle: { en: "Stop the generated application", fr: "Arrêter l'application générée" },
   stopApp: { en: "■ Stop app", fr: "■ Arrêter l'app" },
   resumePipelineTitle: { en: "Resume the pipeline", fr: "Reprendre la pipeline" },

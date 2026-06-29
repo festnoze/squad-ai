@@ -38,6 +38,15 @@ export const app: Namespace = {
   },
   rollbackToastTitle: { en: "Rollback", fr: "Rollback" },
   rollbackToastBody: { en: "Rolled back to iteration {n}.", fr: "Revenu à l'itération {n}." },
+  confirmRestartScratch: {
+    en: "Restart “{name}” from scratch? Everything (code, epics, stories) is deleted EXCEPT the initial brief, then PO planning and the build run again.",
+    fr: "Relancer « {name} » from scratch ? Tout (code, epics, stories) est supprimé SAUF le brief initial, puis la planification PO et le build repartent.",
+  },
+  restartToastTitle: { en: "Restart", fr: "Relance" },
+  restartToastBody: {
+    en: "Project wiped (brief kept) — PO planning then build restarted.",
+    fr: "Projet réinitialisé (brief conservé) — planification PO puis build relancés.",
+  },
   deployToastTitle: { en: "Deployment", fr: "Déploiement" },
   deployToastArtifacts: {
     en: "Generated artifacts: {list}",

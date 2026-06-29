@@ -88,6 +88,16 @@ SKILL_REGISTRY: list[dict] = [
         "summary": "Créer une nouvelle skill (SKILL.md + references) pour étendre l'usine.",
         "when": "un savoir-faire récurrent mérite d'être capitalisé en skill",
     },
+    {
+        # P4: used by the independence-judge agent, NOT injected into qa/dev
+        # catalogs (its own `independence` role keeps their prompts unchanged).
+        "name": "task-independence",
+        "roles": ("independence",),
+        "summary": "Certifier quelles tâches décomposées peuvent se construire en "
+        "parallèle (fichiers disjoints) et sérialiser/fusionner les autres avant "
+        "le scheduler de streams.",
+        "when": "décider si deux tâches d'un même stream peuvent tourner en parallèle",
+    },
 ]
 
 

@@ -181,6 +181,12 @@ VIDE ou à un seul élément.
   inférieure). Les sous-tâches sans dépendance mutuelle seront PARALLÉLISÉES.
 - Chaque sous-tâche porte ses propres `acceptance_criteria` (ids, sous-ensemble de
   ceux de la story) et un mini-Gherkin ciblant sa couche.
+- `file_globs` (OBLIGATOIRE) : la liste des fichiers/zones que cette sous-tâche va
+  créer ou modifier (chemins relatifs au repo, jokers autorisés), ex.
+  `["{package_name}/domain/todo.py", "tests/unit/test_*_service.py"]`. C'est ce qui
+  permet de PARALLÉLISER en sûreté : deux sous-tâches qui revendiquent un MÊME
+  fichier seront sérialisées automatiquement. Vise des zones DISJOINTES par couche ;
+  ne JAMAIS laisser deux sous-tâches réécrire le même fichier sans `depends_on`.
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{
@@ -194,12 +200,50 @@ Réponds avec EXACTEMENT UN objet JSON :
       "description": "...",
       "acceptance_criteria": ["AC-1"],
       "gherkin": "Feature: ...\\n  Scenario: ...\\n    Given ...\\n    When ...\\n    Then ...",
+      "file_globs": ["{package_name}/domain/todo.py"],
       "depends_on": []
     }}
   ]
 }}
 Les ids de sous-tâches sont uniques ; `depends_on` ne référence que des ids de ce
 même JSON."""
+
+
+def independence_judge(tasks: list[dict]) -> str:
+    """P4: ask the independence-judge agent to COMPLETE each task's file claims
+    and flag pairs that must be serialized, so the parallel build never loses
+    green work to a merge conflict. ``tasks`` = [{id,stream,title,description,
+    file_globs,depends_on}]. The deterministic floor enforces the result; the
+    judge only completes/sharpens it (it cannot make the build less safe)."""
+    import json as _json
+
+    listing = _json.dumps(tasks, ensure_ascii=False, indent=2)
+    return f"""Tu juges la SÛRETÉ du parallélisme d'un build automatisé. Des tâches
+vont être construites EN PARALLÈLE, chacune dans son propre worktree git, puis
+fusionnées. Si deux tâches modifient le MÊME fichier, leur fusion entre en conflit
+et le travail est PERDU. Ta mission : pour chaque tâche, COMPLÉTER la liste des
+fichiers qu'elle va créer/modifier (`file_globs`), et signaler les paires qui
+doivent être sérialisées.
+
+Tâches (mêmes ids à réutiliser) :
+{listing}
+
+Règles :
+- Complète `file_globs` pour CHAQUE tâche (chemins relatifs au repo, jokers OK).
+  Une tâche frontend qui crée un composant → `frontend/src/components/X.tsx` ; un
+  endpoint → `<pkg>/api/router.py` ; etc. Ne laisse JAMAIS une liste vide.
+- Deux tâches du même stream avec des fichiers qui se chevauchent et SANS ordre
+  entre elles doivent être sérialisées : propose `add_dependency` (la 2ᵉ dépend de
+  la 1ʳᵉ) OU `merge` si c'est en réalité une seule unité de travail.
+- Par défaut, en cas de doute, sérialise. Le parallélisme est un bonus, la
+  correction prime. Ne propose JAMAIS de retirer une dépendance existante.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "claims": {{ "<task_id>": ["<glob>", "..."] }},
+  "add_dependency": [ {{"task": "<id>", "depends_on": "<id>"}} ],
+  "merge": [ ["<id>", "<id>"] ]
+}}"""
 
 
 # ---------------------------------------------------------------- PM (spec)
@@ -760,9 +804,16 @@ Pour CHAQUE user story, choisis l'une des deux formes :
   Exemple typique : une tâche backend qui expose l'API + une tâche frontend qui
   la consomme et qui `depends_on` la tâche backend.
 Chaque tâche : {{"id", "stream", "title", "description", "acceptance_criteria",
-"gherkin", "depends_on": [ids de tâches]}}. Les ids de tâches sont uniques dans
-tout le plan ; une tâche frontend DOIT dépendre de la tâche backend dont elle
-consomme le contrat.
+"gherkin", "file_globs": [fichiers/zones modifiés], "depends_on": [ids de tâches]}}.
+Les ids de tâches sont uniques dans tout le plan ; une tâche frontend DOIT dépendre
+de la tâche backend dont elle consomme le contrat.
+`file_globs` (OBLIGATOIRE) liste les fichiers que la tâche crée/modifie (chemins
+relatifs, jokers OK). RÈGLE DE PARALLÉLISME : deux tâches du MÊME stream qui
+revendiquent un même fichier seront sérialisées ; vise des zones DISJOINTES (1
+composant/1 fichier par tâche front, 1 couche par tâche back). Ne JAMAIS faire
+réécrire le même fichier (ex. `frontend/src/App.tsx`) par deux tâches parallèles —
+crée des fichiers séparés (un composant par tâche) + une tâche d'intégration qui
+`depends_on` les composants.
 """
 
 

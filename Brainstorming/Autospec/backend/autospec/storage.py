@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import shutil
+import stat
 import tempfile
 import time
 from pathlib import Path
@@ -200,6 +201,37 @@ def delete_workspace(project_id: str) -> bool:
         # Typical on Windows when a file is still open (e.g. the generated app
         # is running). Don't raise: the caller already removed the project.
         logger.warning("Workspace %s only partially removed (file in use?)", ws)
+    return True
+
+
+def force_delete_workspace(project_id: str) -> bool:
+    """Delete a project workspace, defeating git's read-only pack/object files.
+
+    ``delete_workspace`` uses ``ignore_errors=True`` so a committed git repo's
+    read-only ``.git`` files survive on Windows. This variant clears the
+    read-only bit in an ``onerror`` handler and retries (same backoff as
+    ``save_state_payload``), so the workspace is wiped clean — used by the
+    "restart from scratch" flow and the project deletion. Raises OSError if a
+    file stays locked (e.g. the generated app is still running). Returns True if
+    the workspace existed."""
+    ws = workspace_dir(project_id)
+    if not ws.exists():
+        return False
+
+    def _on_error(func, path, _exc) -> None:
+        try:
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+        except OSError:
+            pass
+
+    for attempt in range(_SAVE_RETRIES):
+        shutil.rmtree(ws, onerror=_on_error)
+        if not ws.exists():
+            return True
+        time.sleep(_SAVE_BACKOFF_S * (attempt + 1))
+    if ws.exists():
+        raise OSError(f"workspace {project_id} partiellement verrouillé")
     return True
 
 
