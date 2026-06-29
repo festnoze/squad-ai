@@ -442,7 +442,7 @@ def _impact_streams_block(state: ProjectState) -> str:
     """ST-15: the multi-stream extension of the impact analysis. Only injected
     when streams are on; the marker « ÉVOLUTION MULTI-STREAM » lets the
     ScriptedRunner branch to its stream-aware reply. Off → "" (byte-identical)."""
-    if not settings.streams_enabled:
+    if not (settings.streams_enabled or state.streams):
         return ""
     streams = ", ".join(f"{s.id} ({s.kind.value})" for s in state.effective_streams())
     catalog = ", ".join(DEFAULT_STREAM_CATALOG.keys())
@@ -745,7 +745,7 @@ def _streams_plan_block(state: ProjectState) -> str:
     streams feature is on; the recognisable marker « DÉCOUPAGE MULTI-STREAM »
     lets the ScriptedRunner branch to its stream-aware reply. When off this
     returns "" so the prompt — and its parsing — stay byte-identical to today."""
-    if not settings.streams_enabled:
+    if not (settings.streams_enabled or state.streams):
         return ""
     stream_ids = ", ".join(s.id for s in state.effective_streams())
     return f"""

@@ -60,6 +60,12 @@ active_processes: contextvars.ContextVar[ProcessRegistry | None] = contextvars.C
     "autospec_active_processes", default=None
 )
 
+# Per-agent-call override set by Pipeline so product profiles can enable skills
+# for one project without mutating the process-wide settings singleton.
+active_skills_enabled: contextvars.ContextVar[bool | None] = contextvars.ContextVar(
+    "autospec_active_skills_enabled", default=None
+)
+
 
 def _terminate_tree(proc: subprocess.Popen) -> None:
     """Kill a child process AND its descendants. The CLI agents (claude.cmd /
@@ -191,7 +197,8 @@ class ClaudeCliRunner:
         # demand (progressive disclosure). cwd's `.claude/skills` is auto-found,
         # but the explicit --add-dir makes the grant unambiguous. No --allowedTools
         # (it would otherwise RESTRICT the dev agent's file edits).
-        if settings.skills_enabled and cwd is not None:
+        skills_enabled = active_skills_enabled.get()
+        if (settings.skills_enabled if skills_enabled is None else skills_enabled) and cwd is not None:
             skills_path = Path(cwd) / ".claude" / "skills"
             if skills_path.exists():
                 args += ["--add-dir", str(skills_path)]

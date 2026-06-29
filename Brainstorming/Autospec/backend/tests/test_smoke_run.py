@@ -6,8 +6,6 @@ runnability check without launching `uv` (the subprocess/socket are faked)."""
 import socket as socketmod
 import subprocess
 
-import pytest
-
 from autospec.agents.scripted import ScriptedRunner
 from autospec.config import settings
 from autospec.models import ProjectState, StoryStatus, UserStory
@@ -75,8 +73,9 @@ async def test_smoke_gate_fails_iteration_when_not_runnable(monkeypatch):
         Pipeline, "_smoke_run_python", lambda self, ws: (False, "n'écoute pas")
     )
 
-    with pytest.raises(RuntimeError, match="Smoke run échoué"):
-        await pipeline._asmoke_phase()
+    assert await pipeline._asmoke_phase() is False
+    assert pipeline._delivery_blocked is True
+    assert any("Smoke run échoué" in issue for issue in state.delivery_issues)
     assert any("Smoke run échoué" in r for r in state.regressions)
 
 

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..config import settings
 from ..models import ProjectState
 
 PROFILE_NAMES = (
@@ -138,17 +137,23 @@ def normalize_name(name: str | None, *, brownfield_path: str = "") -> str:
     return value
 
 
-def apply_to_settings(state: ProjectState) -> dict[str, bool]:
-    """Apply a state's explicit profile to the current process settings.
+def resolve_overrides(state: ProjectState) -> dict[str, bool]:
+    """Resolve a state's explicit profile without mutating process settings.
 
     ``auto`` intentionally leaves the existing flag-driven behaviour untouched.
-    Returns the overrides that were applied, for logging/tests.
+    Returns the per-pipeline overrides to apply at read time.
     """
     profile_name = normalize_name(state.product_profile, brownfield_path=state.brownfield_path)
     state.product_profile = profile_name
     if profile_name == "auto":
         return {}
-    profile = PROFILES[profile_name]
-    for key, value in profile.overrides.items():
-        setattr(settings, key, value)
-    return dict(profile.overrides)
+    return dict(PROFILES[profile_name].overrides)
+
+
+def apply_to_settings(state: ProjectState) -> dict[str, bool]:
+    """Backward-compatible alias for tests/callers.
+
+    Historically this mutated the global ``settings`` singleton. It now returns
+    the same override map for a Pipeline instance to carry locally.
+    """
+    return resolve_overrides(state)

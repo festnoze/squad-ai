@@ -238,7 +238,12 @@ def _backend_language(state: ProjectState) -> str:
     return toolchain.normalize(getattr(lang, "value", lang))
 
 
-def scaffold(state: ProjectState) -> Path:
+def scaffold(
+    state: ProjectState,
+    *,
+    streams_enabled: bool | None = None,
+    ui_tests_enabled: bool | None = None,
+) -> Path:
     """Create (idempotently) the workspace skeleton for a project, in the
     project's backend language (L2g).
 
@@ -252,8 +257,8 @@ def scaffold(state: ProjectState) -> Path:
     elif lang == "rust":
         ws = _scaffold_rust(state)
     else:
-        ws = _scaffold_python(state)
-    if settings.streams_enabled:
+        ws = _scaffold_python(state, ui_tests_enabled=ui_tests_enabled)
+    if settings.streams_enabled if streams_enabled is None else streams_enabled:
         for stream in frontend_streams(state):
             scaffold_frontend(state, stream)
     return ws
@@ -300,14 +305,15 @@ def scaffold_frontend(state: ProjectState, stream: Stream) -> Path:
     return root
 
 
-def _scaffold_python(state: ProjectState) -> Path:
+def _scaffold_python(state: ProjectState, *, ui_tests_enabled: bool | None = None) -> Path:
     ws = workspace_dir(state.id)
     pkg = package_name(state)
     (ws / pkg).mkdir(parents=True, exist_ok=True)
     (ws / "features").mkdir(exist_ok=True)
     (ws / "tests" / "steps").mkdir(parents=True, exist_ok=True)
 
-    ui_dep = '\n    "pytest-playwright>=0.5",' if settings.ui_tests_enabled else ""
+    ui_enabled = settings.ui_tests_enabled if ui_tests_enabled is None else ui_tests_enabled
+    ui_dep = '\n    "pytest-playwright>=0.5",' if ui_enabled else ""
     _ensure(ws / ".gitignore", GITIGNORE_TEMPLATE)
     _ensure(
         ws / "pyproject.toml",
@@ -316,7 +322,7 @@ def _scaffold_python(state: ProjectState) -> Path:
     _ensure(ws / pkg / "__init__.py", "")
     _ensure(ws / "tests" / "__init__.py", "")
     _ensure(ws / "tests" / "steps" / "__init__.py", "")
-    if settings.ui_tests_enabled:
+    if ui_enabled:
         (ws / "tests" / "ui").mkdir(parents=True, exist_ok=True)
         _ensure(ws / "tests" / "ui" / "__init__.py", "")
     _ensure(ws / "main.py", MAIN_TEMPLATE)

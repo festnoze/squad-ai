@@ -56,6 +56,7 @@ export function RunPanel({
     build: t("runPanel.phaseBuild"),
     done: t("runPanel.phaseDone"),
     stopped: t("runPanel.phaseStopped"),
+    needs_attention: t("runPanel.phaseNeedsAttention"),
     error: t("runPanel.phaseError"),
   };
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -88,8 +89,8 @@ export function RunPanel({
   const canRun = !["spec", "plan", "analyze", "architect", "build", "idle"].includes(
     project.phase,
   );
-  const loopActive = !["done", "stopped", "error"].includes(project.phase);
-  // Phase dormante (done/stopped/error) + au moins une story à construire (statut
+  const loopActive = !["done", "stopped", "needs_attention", "error"].includes(project.phase);
+  // Phase dormante (done/stopped/needs_attention/error) + au moins une story à construire (statut
   // EFFECTIF). Logique partagée avec ProjectBar via work.ts pour éviter toute
   // dérive (l'oubli de `done` ici était le bug « Continuer le build »).
   const showResumeBuild = canResumeBuild(project);
@@ -102,7 +103,7 @@ export function RunPanel({
   // moins une story est en échec.
   const failedCount = effStatuses.filter((st) => st === "failed").length;
   const canRetryFailed =
-    ["done", "stopped", "error"].includes(project.phase) && failedCount > 0;
+    ["done", "stopped", "needs_attention", "error"].includes(project.phase) && failedCount > 0;
 
   const agentCalls = project.usage?.agent_calls ?? 0;
   const costUsd = project.usage?.cost_usd ?? 0;

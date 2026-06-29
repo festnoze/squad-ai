@@ -135,8 +135,9 @@ variables bas niveau :
 - `auto` : comportement historique piloté par les flags.
 
 Le module `orchestrator/profiles.py` normalise les alias (`lib`, `web`,
-`full-stack`), rejette les profils inconnus et applique les overrides au début
-du cycle de vie.
+`full-stack`), rejette les profils inconnus et résout des overrides portés par
+chaque `Pipeline` : un projet `fullstack` ne mute plus le singleton global ni les
+projets concurrents.
 
 ---
 
@@ -168,9 +169,9 @@ description) est injecté dans les prompts QA/Dev **pour tous les providers**.
 Les skills de domaine sont maintenant **prescriptives** :
 `skill-rules.json` marque leur `enforcement` à `required_when_applicable`, le
 catalogue de prompt dit explicitement qu'elles sont **obligatoires quand
-applicables**, et `orchestrator/skill_validation.py` bloque le build si
-`.claude/skills` est absent, incomplet ou si une règle de domaine est restée en
-simple suggestion. Réglages : `AUTOSPEC_SKILLS` (global, **OFF**) +
+applicables**, et `orchestrator/skill_validation.py` signale une livraison
+`needs_attention` si `.claude/skills` est absent, incomplet ou si une règle de
+domaine est restée en simple suggestion. Réglages : `AUTOSPEC_SKILLS` (global, **OFF**) +
 `AUTOSPEC_SKILLS_QA`/`_DEV`. OFF → prompts **strictement inchangés**.
 
 ## 2ter. Décomposition en sous-tâches parallèles (SK-2)
@@ -221,8 +222,9 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
   `orchestrator/delivery_gate.py` vérifie que chaque story/tâche est
   **effectivement** `done`, que les critères ont une preuve Gherkin/test plan,
   et que les stories UI ont des tests rejouables quand `AUTOSPEC_UI_TESTS=1`.
-  Le verdict est persisté dans `delivery_ready` / `delivery_issues` et affiché
-  dans le `RunPanel`.
+  Le verdict est persisté dans `delivery_ready` / `delivery_issues`, affiché
+  dans le `RunPanel`, et place la pipeline en `needs_attention` plutôt qu'en
+  `error` quand le produit est incomplet mais l'orchestrateur sain.
 - **Smoke run par défaut** : après une suite verte, Autospec démarre réellement
   l'app générée (`AUTOSPEC_SMOKE_RUN=1` par défaut) ; une API/web doit ouvrir son
   port, un CLI doit sortir en code 0. Le profil `library-fast` le désactive.
@@ -392,7 +394,7 @@ Gardes : `404` (inconnu), `409` (action interdite : pipeline active, story
 
 ## 8. Qualité, tests & CI
 
-- **Backend — 458 tests pytest** : scheduler, runner, modèles, pipeline,
+- **Backend — 463 tests pytest** : scheduler, runner, modèles, pipeline,
   providers, composants, streams/worktrees, DoD, delivery state, profils produit,
   runtime acceptance, skills prescriptives, smoke run, sécurité, observabilité,
   reprise, API et e2e feature factory déterministe.
@@ -435,5 +437,5 @@ Autospec/
 
 **État** : pipeline renforcée par des gates de livraison déterministes, profils
 produit, skills validées, runtime acceptance et batterie golden ; les suites
-locales vérifiées sont vertes (**458 backend**, **136 frontend**, golden locale
+locales vérifiées sont vertes (**463 backend**, **136 frontend**, golden locale
 **71 tests**).

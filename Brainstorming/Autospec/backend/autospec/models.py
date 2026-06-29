@@ -18,6 +18,7 @@ class PipelinePhase(str, Enum):
     BUILD = "build"        # dev agents are implementing stories (BDD/TDD)
     DONE = "done"          # iteration finished, waiting for user (or next auto-spec cycle)
     STOPPED = "stopped"
+    NEEDS_ATTENTION = "needs_attention"  # generated product needs user/agent repair, not an orchestrator crash
     ERROR = "error"
 
 

@@ -16,6 +16,7 @@ export const runPanel: Namespace = {
   phaseBuild: { en: "💻 BDD/TDD development", fr: "💻 Développement BDD/TDD" },
   phaseDone: { en: "✅ Iteration complete", fr: "✅ Itération terminée" },
   phaseStopped: { en: "⏹ Stopped", fr: "⏹ Arrêté" },
+  phaseNeedsAttention: { en: "⛔ Needs attention", fr: "⛔ À reprendre" },
   phaseError: { en: "💥 Error", fr: "💥 Erreur" },
 
   // Error / banners

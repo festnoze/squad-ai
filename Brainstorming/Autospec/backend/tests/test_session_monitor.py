@@ -74,7 +74,7 @@ def test_monitor_active_gating(monkeypatch):
     monkeypatch.setattr(settings, "agent_provider", "claude")
     monkeypatch.setattr(settings, "fake_agents", False)
     assert session_monitor.monitor_active()
-    monkeypatch.setattr(settings, "agent_provider", "ollama")
+    monkeypatch.setattr(settings, "agent_provider", "codex")
     assert not session_monitor.monitor_active()
     monkeypatch.setattr(settings, "agent_provider", "claude")
     monkeypatch.setattr(settings, "fake_agents", True)
@@ -139,7 +139,7 @@ async def test_usage_limit_stops_then_auto_resumes(monkeypatch, green_pytest):
 
 async def test_usage_limit_ignored_for_other_providers(monkeypatch, green_pytest):
     monkeypatch.setattr(settings, "session_monitor_enabled", True)
-    monkeypatch.setattr(settings, "agent_provider", "ollama")
+    monkeypatch.setattr(settings, "agent_provider", "codex")
     monkeypatch.setattr(settings, "fake_agents", False)
     monkeypatch.setattr(settings, "dev_max_attempts", 1)
     state = ProjectState(id="proj-m2-off", name="todo", goal="g")

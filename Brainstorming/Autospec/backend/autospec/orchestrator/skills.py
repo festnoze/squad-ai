@@ -12,7 +12,7 @@ convention in the prompt. Two delivery paths (hybrid):
   prompt for EVERY provider (so OpenAI/Ollama backends, which have no native
   Skill tool, still know what is available and how the generated app is shaped).
 
-OFF by default; gated by ``settings.skills_for(role)``.
+OFF by default; gated by the pipeline's effective profile/settings plus role flag.
 """
 
 from __future__ import annotations

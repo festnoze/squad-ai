@@ -18,11 +18,13 @@ import time
 from pathlib import Path
 
 from ..agents import prompts
+from ..agents.providers import provider_capabilities
 from ..agents.runner import (
     AgentError,
     AgentRunner,
     ProcessRegistry,
     active_processes,
+    active_skills_enabled,
     extract_json,
 )
 from ..agents.personas import FALLBACK_PERSONAS, persona
@@ -193,6 +195,10 @@ _BUILD_ITEM: contextvars.ContextVar[str | None] = contextvars.ContextVar(
 _PERSONA_BY_PROMPT: dict[str, str] = {}
 
 
+class DeliveryBlocked(Exception):
+    """A product gate failed; this is actionable delivery work, not a crash."""
+
+
 def _persona_role(system_prompt: str) -> str:
     if not _PERSONA_BY_PROMPT:
         for name in FALLBACK_PERSONAS:
@@ -216,6 +222,7 @@ class _UsageTracker:
         # project switch / shutdown can kill it mid-flight. to_thread copies this
         # context into the worker thread where the process is actually spawned.
         active_processes.set(self.pipeline._agent_procs)
+        skills_token = active_skills_enabled.set(bool(self.pipeline._setting("skills_enabled")))
         _t0 = time.monotonic()
         try:
             chosen = model or settings.model_for_phase(phase)
@@ -239,6 +246,8 @@ class _UsageTracker:
             # still propagates to the caller's normal handling.
             await self.pipeline._aon_agent_error(exc)
             raise
+        finally:
+            active_skills_enabled.reset(skills_token)
         usage = self.pipeline.state.usage
         usage.cost_usd += res.cost_usd
         usage.input_tokens += res.input_tokens
@@ -293,6 +302,7 @@ class Pipeline:
         self.state = state
         self.runner = runner
         self._tracked = _UsageTracker(self)
+        self._profile_overrides: dict[str, bool] = profiles.resolve_overrides(self.state)
         # Opt-in build monitor (AUTOSPEC_BUILD_MONITOR): JSONL timeline for
         # post-mortem failure analysis. No-op when disabled.
         self.monitor = BuildMonitor(state)
@@ -360,6 +370,18 @@ class Pipeline:
         # B-IDEA: set when the user resolves the brainstorming offer.
         self._brainstorm_event = asyncio.Event()
         self._brainstorm_accepted = False
+
+    def _setting(self, name: str):
+        """Read a setting with this pipeline's product-profile overrides applied."""
+        if name in self._profile_overrides:
+            return self._profile_overrides[name]
+        return getattr(settings, name)
+
+    def _block_delivery(self, message: str, *, source: str = "delivery") -> None:
+        self._delivery_blocked = True
+        self.state.error = ""
+        delivery_state.append_issue(self.state, message)
+        self._log(source, f"❌ {message}")
 
     # ------------------------------------------------------------- events
 
@@ -648,6 +670,7 @@ class Pipeline:
             if self.state.phase in (
                 PipelinePhase.DONE,
                 PipelinePhase.STOPPED,
+                PipelinePhase.NEEDS_ATTENTION,
                 PipelinePhase.ERROR,
             ) and not (self._impact_task and not self._impact_task.done()):
                 self._impact_task = asyncio.create_task(self._aimpact_analysis(text))
@@ -1128,7 +1151,7 @@ class Pipeline:
         if not items:
             self._chat(ChatRole.ANALYST, f"🔍 Impact : {message or 'aucune story proposée.'}")
             return
-        streams_on = settings.streams_enabled
+        streams_on = self._setting("streams_enabled")
         # ST-15: materialize any newly-needed streams BEFORE tagging tasks.
         added_streams: list[str] = []
         if streams_on:
@@ -1312,7 +1335,7 @@ class Pipeline:
         Always forces a primary backend stream carrying the backend language;
         ids are deduplicated. Non-fatal: any agent/parse failure falls back to a
         lone backend stream. First time only (already-chosen streams are kept)."""
-        if not settings.streams_enabled or self.state.streams:
+        if not self._setting("streams_enabled") or self.state.streams:
             return
         back_lang = self.state.backend_language.value
         chosen: list[Stream] = []
@@ -1400,7 +1423,7 @@ class Pipeline:
         """Solution agent proposes the product's technical components right
         after the brief (first iteration only). Mandatory components are
         pre-approved; optional ones await the user. Non-fatal, env-gated."""
-        if not settings.components_enabled or self.state.components:
+        if not self._setting("components_enabled") or self.state.components:
             return
         try:
             result = await self._tracked.arun(
@@ -1859,24 +1882,21 @@ class Pipeline:
         declared done: every planned story/task must be effectively shipped, and
         user-facing acceptance evidence must be present enough to trust.
         """
-        if not settings.definition_of_done_enabled:
+        if not self._setting("definition_of_done_enabled"):
             delivery_state.mark_ready(self.state)
             return True
         result = evaluate_definition_of_done(
             self.state,
             iteration=None if all_iterations else self.state.iteration,
-            require_ui_evidence=settings.ui_tests_enabled,
-            strict_criteria=settings.definition_of_done_strict_criteria,
+            require_ui_evidence=self._setting("ui_tests_enabled"),
+            strict_criteria=self._setting("definition_of_done_strict_criteria"),
         )
         delivery_state.apply_definition_result(self.state, result)
         if result.blockers:
             self._delivery_blocked = True
             detail = "\n".join(f"- {i.message}" for i in result.blockers[:8])
             more = "" if len(result.blockers) <= 8 else f"\n- … {len(result.blockers) - 8} autre(s)"
-            self.state.error = (
-                "Definition of Done non satisfaite : "
-                + "; ".join(i.message for i in result.blockers[:3])
-            )
+            self.state.error = ""
             self._log("delivery", "Definition of Done bloquée.")
             self._chat(
                 ChatRole.SYSTEM,
@@ -1897,7 +1917,8 @@ class Pipeline:
     async def _alifecycle(self) -> None:
         try:
             self._delivery_blocked = False
-            applied_profile = profiles.apply_to_settings(self.state)
+            self._profile_overrides = profiles.resolve_overrides(self.state)
+            applied_profile = self._profile_overrides
             if applied_profile:
                 self._log(
                     "profile",
@@ -1917,7 +1938,11 @@ class Pipeline:
             # scaffold() dispatches on it, so doing this earlier (when the
             # language is still the Python default) left a stray Python skeleton
             # (main.py, pyproject.toml, package dir) inside Go/Rust workspaces.
-            workspace.scaffold(self.state)
+            workspace.scaffold(
+                self.state,
+                streams_enabled=self._setting("streams_enabled"),
+                ui_tests_enabled=self._setting("ui_tests_enabled"),
+            )
             await self._apropose_components()
 
             while not self._stop_requested:
@@ -1930,10 +1955,14 @@ class Pipeline:
                 if self._stop_requested:
                     break
                 await self._abuild_phase()
+                if self._delivery_blocked:
+                    break
                 # Runnability gate: boot the delivered app; a non-runnable build
                 # fails the iteration like a red test (no-op unless AUTOSPEC_SMOKE_RUN).
-                await self._asmoke_phase()
-                await self._aruntime_acceptance_phase()
+                if not await self._asmoke_phase():
+                    break
+                if not await self._aruntime_acceptance_phase():
+                    break
                 if not self._apply_definition_of_done():
                     break
                 await self._adocument_phase()
@@ -1956,20 +1985,28 @@ class Pipeline:
             if self._stop_requested:
                 self.state.phase = PipelinePhase.STOPPED
             elif self._delivery_blocked:
-                self.state.phase = PipelinePhase.ERROR
+                self.state.phase = PipelinePhase.NEEDS_ATTENTION
             else:
                 self.state.phase = PipelinePhase.DONE
             self._chat(
                 ChatRole.SYSTEM,
                 "Itération terminée." if self.state.phase == PipelinePhase.DONE
                 else (
-                    "Itération non livrable : Definition of Done non satisfaite."
+                    "Itération à reprendre : livraison non validée."
                     if self._delivery_blocked
                     else "Boucle arrêtée par l'utilisateur."
                 ),
             )
             if self.state.phase == PipelinePhase.DONE:
                 self._notify("success", "Itération terminée", self.state.name)
+            self.monitor.event(
+                "outcome", result=self.state.phase.value,
+                stories=[{"id": s.id, "status": s.status.value} for s in self.state.stories],
+            )
+        except DeliveryBlocked:
+            self.state.phase = PipelinePhase.NEEDS_ATTENTION
+            self.state.error = ""
+            self._chat(ChatRole.SYSTEM, "Itération à reprendre : livraison non validée.")
             self.monitor.event(
                 "outcome", result=self.state.phase.value,
                 stories=[{"id": s.id, "status": s.status.value} for s in self.state.stories],
@@ -2211,7 +2248,7 @@ class Pipeline:
                 id_map.setdefault(raw_id, story_id)
                 # First pass: register the unique id of every task so cross-task
                 # depends_on (declared anywhere in the plan) remap consistently.
-                if settings.streams_enabled:
+                if self._setting("streams_enabled"):
                     for n, task_data in enumerate(story_data.get("tasks") or [], start=1):
                         raw_tid = str(task_data.get("id") or f"T-{len(taken_task_ids) + 1}")
                         tid = _unique_id(raw_tid, "T", taken_task_ids)
@@ -2222,7 +2259,7 @@ class Pipeline:
         def _build_tasks(story_id: str, story_data: dict) -> list[Task]:
             """ST-5: parse a US's decomposition into Task models, remapping task
             depends_on through the project-wide rename. Empty unless streams on."""
-            if not settings.streams_enabled:
+            if not self._setting("streams_enabled"):
                 return []
             out: list[Task] = []
             for task_data in story_data.get("tasks") or []:
@@ -2263,7 +2300,7 @@ class Pipeline:
                 ui=bool(story_data.get("ui", False)),
                 # ST-5: stream tagging + optional task decomposition (gated; "" /
                 # [] when off, so the flag-off parse is byte-identical to today).
-                stream=str(story_data.get("stream") or "") if settings.streams_enabled else "",
+                stream=str(story_data.get("stream") or "") if self._setting("streams_enabled") else "",
                 tasks=_build_tasks(story_id, story_data),
                 iteration=self.state.iteration,
             )
@@ -2274,7 +2311,7 @@ class Pipeline:
         self.state.stories.extend(new_stories)
         workspace.write_feature_files(self.state, new_stories)
         # ST-5: sanity-check the produced work graph (dangling deps / cycle).
-        if settings.streams_enabled:
+        if self._setting("streams_enabled"):
             for w in work_streams.validate(self.state):
                 self._log("streams", f"Graphe de tâches : {w}")
         n_tasks = sum(len(s.tasks) for s in new_stories)
@@ -2291,7 +2328,7 @@ class Pipeline:
         """Optional Architect phase: produce a concise technical design injected
         into the QA and Dev prompts. OFF by default; a design failure is
         non-fatal (the build proceeds without an architecture context)."""
-        if not settings.architecture_enabled:
+        if not self._setting("architecture_enabled"):
             return
         self.state.phase = PipelinePhase.ARCHITECT
         self._sync()
@@ -2643,21 +2680,32 @@ class Pipeline:
         # across iterations, and dependency readiness needs the DONE stories of
         # earlier iterations in the pool to resolve (scheduler.ready_stories
         # derives "done" only from the pool it is given).
-        if settings.skills_enabled:
+        caps = provider_capabilities(settings.agent_provider)
+        if not settings.fake_agents and not caps.reliable_for_build:
+            msg = (
+                f"Provider '{settings.agent_provider}' non fiable pour le build : "
+                f"{caps.notes}"
+            )
+            self._block_delivery(msg, source="provider")
+            self._chat(ChatRole.SYSTEM, f"⛔ {msg}")
+            self._notify("error", "Provider inadapté au build", msg[:200])
+            return
+        if self._setting("skills_enabled"):
             # SK-1: seed the workspace's `.claude/skills/` once so the headless
             # claude agent auto-discovers the skill library (best-effort, idempotent).
             await skill_lib.aseed_skills(workspace_dir(self.state.id))
             skill_check = skill_validation.validate_seeded_skills(workspace_dir(self.state.id))
             if not skill_check.ok:
                 msg = "Validation des skills échouée : " + "; ".join(skill_check.messages()[:5])
-                delivery_state.append_issue(self.state, msg)
-                self._log("skills", "❌ " + msg)
-                raise RuntimeError(msg)
-        if settings.decompose_enabled:
+                self._block_delivery(msg, source="skills")
+                self._chat(ChatRole.SYSTEM, f"⛔ {msg}")
+                self._notify("error", "Validation des skills échouée", msg[:200])
+                return
+        if self._setting("decompose_enabled"):
             # SK-2: split eligible backend stories into layered sub-tasks, then
             # let the parallel worktree engine build + aggregate them.
             await self._adecompose_pending(all_iterations=all_iterations)
-        if settings.streams_enabled or settings.decompose_enabled:
+        if self._setting("streams_enabled") or self._setting("decompose_enabled"):
             await self._abuild_phase_streams(all_iterations=all_iterations)
             return
         self.state.phase = PipelinePhase.BUILD
@@ -3401,6 +3449,7 @@ class Pipeline:
         if self.state.phase not in (
             PipelinePhase.DONE,
             PipelinePhase.STOPPED,
+            PipelinePhase.NEEDS_ATTENTION,
             PipelinePhase.ERROR,
         ):
             raise ValueError(
@@ -3432,7 +3481,8 @@ class Pipeline:
         self._log(f"dev:{story.id}", f"Relance de {story.id}…")
         try:
             await self._abuild_story(story)
-            self._apply_definition_of_done()
+            if not self._delivery_blocked:
+                self._apply_definition_of_done()
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la relance de {story.id} : {exc}")
         finally:
@@ -3440,7 +3490,7 @@ class Pipeline:
             if self._stop_requested:
                 self.state.phase = PipelinePhase.STOPPED
             elif self._delivery_blocked:
-                self.state.phase = PipelinePhase.ERROR
+                self.state.phase = PipelinePhase.NEEDS_ATTENTION
             else:
                 self.state.phase = PipelinePhase.DONE
             self._sync()
@@ -3458,6 +3508,7 @@ class Pipeline:
         if self.state.phase not in (
             PipelinePhase.STOPPED,
             PipelinePhase.DONE,
+            PipelinePhase.NEEDS_ATTENTION,
             PipelinePhase.ERROR,
         ):
             raise ValueError("la pipeline est déjà active")
@@ -3508,6 +3559,7 @@ class Pipeline:
         if self.state.phase not in (
             PipelinePhase.STOPPED,
             PipelinePhase.DONE,
+            PipelinePhase.NEEDS_ATTENTION,
             PipelinePhase.ERROR,
         ):
             raise ValueError("la pipeline est déjà active")
@@ -3551,14 +3603,15 @@ class Pipeline:
         self._chat(ChatRole.SYSTEM, "▶ Reprise du build…")
         try:
             await self._abuild_phase(all_iterations=all_iterations)
-            self._apply_definition_of_done(all_iterations=all_iterations)
+            if not self._delivery_blocked:
+                self._apply_definition_of_done(all_iterations=all_iterations)
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la reprise du build : {exc}")
         finally:
             if self._stop_requested:
                 self.state.phase = PipelinePhase.STOPPED
             elif self._delivery_blocked:
-                self.state.phase = PipelinePhase.ERROR
+                self.state.phase = PipelinePhase.NEEDS_ATTENTION
             else:
                 self.state.phase = PipelinePhase.DONE
             self._sync()
@@ -3590,6 +3643,7 @@ class Pipeline:
         if self.state.phase not in (
             PipelinePhase.DONE,
             PipelinePhase.STOPPED,
+            PipelinePhase.NEEDS_ATTENTION,
             PipelinePhase.ERROR,
         ):
             raise ValueError(
@@ -3635,14 +3689,15 @@ class Pipeline:
                 workspace.write_feature_files(self.state, [subject])
                 await self._acommit_story(ws, f"feature {task_id}")
             await self._abuild_work_item(item)
-            self._apply_definition_of_done()
+            if not self._delivery_blocked:
+                self._apply_definition_of_done()
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la relance de {task_id} : {exc}")
         finally:
             if self._stop_requested:
                 self.state.phase = PipelinePhase.STOPPED
             elif self._delivery_blocked:
-                self.state.phase = PipelinePhase.ERROR
+                self.state.phase = PipelinePhase.NEEDS_ATTENTION
             else:
                 self.state.phase = PipelinePhase.DONE
             self._sync()
@@ -3678,7 +3733,8 @@ class Pipeline:
     def _skills_catalog(self, role: str) -> str:
         """SK-1: compact "available skills" block for a QA/Dev prompt, or "" when
         skills are off for that role (so the prompt stays byte-identical)."""
-        return skill_lib.catalog_block(role) if settings.skills_for(role) else ""
+        role_enabled = bool(getattr(settings, f"skills_{role}", True))
+        return skill_lib.catalog_block(role) if self._setting("skills_enabled") and role_enabled else ""
 
     async def _adecompose_pending(self, all_iterations: bool = False) -> None:
         """SK-2: decompose each not-yet-decomposed backend story of the build
@@ -3841,10 +3897,9 @@ class Pipeline:
             elif item.get("status") == "red":
                 test.status = TestState.RED
 
-    @staticmethod
-    def _ui_mode(story: UserStory) -> bool:
+    def _ui_mode(self, story: UserStory) -> bool:
         """Whether this story goes through the Playwright UI acceptance mode."""
-        return settings.ui_tests_enabled and story.ui
+        return self._setting("ui_tests_enabled") and story.ui
 
     async def _arun_ui_tests(self) -> tuple[bool, str]:
         """Run the workspace's replayable Playwright UI suite (`pytest -m ui`).
@@ -3932,23 +3987,23 @@ class Pipeline:
 
     # ------------------------------------------------- Smoke-run gate (runnability)
 
-    async def _asmoke_phase(self) -> None:
+    async def _asmoke_phase(self) -> bool:
         """Deterministic runnability gate (``AUTOSPEC_SMOKE_RUN``): once the suite
         is green, actually BOOT the delivered app and require it to start, so a
-        non-runnable build fails the iteration like a red test (raises → the
-        lifecycle ends ERROR). No-op when off / demo mode / nothing delivered.
+        non-runnable build pauses the iteration in needs_attention. No-op when
+        off / demo mode / nothing delivered.
 
         Catches the exact gap a passing test suite misses: e.g. a ``main.py`` that
         only prints launch instructions instead of starting the server."""
-        if not settings.smoke_run or settings.fake_agents:
-            return
+        if not self._setting("smoke_run") or settings.fake_agents:
+            return True
         if not any(s.status == StoryStatus.DONE for s in self.state.stories):
-            return
+            return True
         lang = toolchain.normalize(self.state.backend_language.value)
         ws = workspace_dir(self.state.id)
         if lang != "python" or not (ws / "main.py").exists() or not (ws / "pyproject.toml").exists():
             self._log("smoke", f"Smoke run ignoré (langage {lang} non supporté ou pas de main.py).")
-            return
+            return True
         self.monitor.phase("smoke")
         self._log("smoke", "🚀 Smoke run : démarrage de l'application livrée…")
         ok, detail = await asyncio.to_thread(self._smoke_run_python, ws)
@@ -3956,34 +4011,35 @@ class Pipeline:
         if ok:
             self._log("smoke", f"✅ Smoke run OK — {detail}")
             self._chat(ChatRole.SYSTEM, f"🚀 Smoke run : l'application démarre ({detail}).")
-            return
+            return True
         msg = f"Smoke run échoué : {detail}"
-        self._log("smoke", f"❌ {msg}")
+        self._block_delivery(msg, source="smoke")
         self.state.regressions.append(msg)
         self._notify("error", "Smoke run échoué", msg[:200])
-        # Fail the iteration like a red test — surfaced via the lifecycle handler.
-        raise RuntimeError(msg)
+        return False
 
-    async def _aruntime_acceptance_phase(self) -> None:
+    async def _aruntime_acceptance_phase(self) -> bool:
         """Optional browser/runtime acceptance gate for web/fullstack products."""
         result = await runtime_acceptance.arun_runtime_acceptance(
-            self.state, workspace_dir(self.state.id)
+            self.state,
+            workspace_dir(self.state.id),
+            enabled=self._setting("runtime_acceptance_enabled"),
+            timeout_s=settings.runtime_acceptance_timeout_s,
         )
         if result.skipped:
-            if settings.runtime_acceptance_enabled:
+            if self._setting("runtime_acceptance_enabled"):
                 self._log("runtime", f"Runtime acceptance ignoré : {result.detail}.")
-            return
+            return True
         self.monitor.event("runtime_acceptance", ok=result.ok, detail=result.detail[:300])
         if result.ok:
             self._log("runtime", "✅ Runtime acceptance OK.")
             self._chat(ChatRole.SYSTEM, "🧪 Runtime acceptance : parcours navigateur OK.")
-            return
+            return True
         msg = f"Runtime acceptance échoué : {result.detail}"
-        self._log("runtime", f"❌ {msg}")
-        delivery_state.append_issue(self.state, msg)
+        self._block_delivery(msg, source="runtime")
         self.state.regressions.append(msg)
         self._notify("error", "Runtime acceptance échoué", msg[:200])
-        raise RuntimeError(msg)
+        return False
 
     @staticmethod
     def _terminate_tree(proc) -> None:
@@ -4078,7 +4134,7 @@ class Pipeline:
     def _is_frontend_story(self, story: UserStory) -> bool:
         """Whether this story builds in a frontend stream — only when streams
         are enabled (flag OFF keeps every story on the backend path)."""
-        if not settings.streams_enabled:
+        if not self._setting("streams_enabled"):
             return False
         stream = self._story_stream(story)
         return stream.kind == StreamKind.FRONTEND or toolchain.is_frontend(stream.language)
@@ -4361,7 +4417,7 @@ class Pipeline:
         # ST-8: a multi-stream project launches its frontend preview alongside
         # the backend, with logs tagged per stream. Gated behind streams_enabled;
         # demo mode never spawns a real vite.
-        if settings.streams_enabled and not settings.fake_agents:
+        if self._setting("streams_enabled") and not settings.fake_agents:
             self._start_frontend_previews(env, loop)
 
     def _start_frontend_previews(self, env, loop: asyncio.AbstractEventLoop) -> None:

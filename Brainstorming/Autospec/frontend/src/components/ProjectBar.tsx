@@ -11,6 +11,7 @@ const PHASE_DOT: Record<string, string> = {
   build: "#4f8cff",
   done: "#3ecf8e",
   stopped: "#8a93a6",
+  needs_attention: "#ffb454",
   error: "#ff5c6c",
 };
 
@@ -27,6 +28,7 @@ const PHASE_BADGE: Record<string, string> = {
   build: "🔵",
   done: "🟢",
   stopped: "⚪",
+  needs_attention: "🟠",
   error: "🔴",
 };
 
@@ -56,7 +58,7 @@ function progress(p: ProjectState): { done: number; total: number } | null {
 /** Ordre d'affichage (UI3) : en cours → en pause → dormant → terminé. */
 function statusRank(p: ProjectState): number {
   if (ACTIVE_PHASES.includes(p.phase)) return p.paused ? 1 : 0;
-  if (["stopped", "error"].includes(p.phase)) return 2;
+  if (["stopped", "needs_attention", "error"].includes(p.phase)) return 2;
   if (p.phase === "done") return 3;
   return 4;
 }

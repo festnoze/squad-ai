@@ -39,8 +39,8 @@ def _backend_web_candidate(ws: Path) -> bool:
     return any(token in haystack for token in ("fastapi", "uvicorn", "flask", "starlette"))
 
 
-def should_run(state: ProjectState, ws: Path) -> tuple[bool, str]:
-    if not settings.runtime_acceptance_enabled:
+def should_run(state: ProjectState, ws: Path, *, enabled: bool | None = None) -> tuple[bool, str]:
+    if not (settings.runtime_acceptance_enabled if enabled is None else enabled):
         return False, "runtime acceptance désactivé"
     if settings.fake_agents:
         return False, "mode démo"
@@ -51,8 +51,14 @@ def should_run(state: ProjectState, ws: Path) -> tuple[bool, str]:
     return True, ""
 
 
-async def arun_runtime_acceptance(state: ProjectState, ws: Path) -> RuntimeAcceptanceResult:
-    runnable, reason = should_run(state, ws)
+async def arun_runtime_acceptance(
+    state: ProjectState,
+    ws: Path,
+    *,
+    enabled: bool | None = None,
+    timeout_s: float | None = None,
+) -> RuntimeAcceptanceResult:
+    runnable, reason = should_run(state, ws, enabled=enabled)
     if not runnable:
         return RuntimeAcceptanceResult(ok=True, detail=reason, skipped=True)
 
@@ -64,6 +70,7 @@ async def arun_runtime_acceptance(state: ProjectState, ws: Path) -> RuntimeAccep
     backend_web = _backend_web_candidate(ws)
     node_path = PROJECT_DIR / "frontend" / "node_modules"
     env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    timeout = settings.runtime_acceptance_timeout_s if timeout_s is None else timeout_s
     if node_path.exists():
         existing = env.get("NODE_PATH", "")
         env["NODE_PATH"] = str(node_path) if not existing else str(node_path) + os.pathsep + existing
@@ -74,7 +81,7 @@ async def arun_runtime_acceptance(state: ProjectState, ws: Path) -> RuntimeAccep
                 settings.node_cmd,
                 str(script),
                 str(ws),
-                str(int(settings.runtime_acceptance_timeout_s * 1000)),
+                str(int(timeout * 1000)),
                 str(frontend or ""),
                 "1" if backend_web else "0",
             ],
@@ -85,7 +92,7 @@ async def arun_runtime_acceptance(state: ProjectState, ws: Path) -> RuntimeAccep
             text=True,
             encoding="utf-8",
             errors="replace",
-            timeout=settings.runtime_acceptance_timeout_s + 15,
+            timeout=timeout + 15,
         )
 
     try:

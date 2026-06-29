@@ -126,6 +126,30 @@ def test_skill_validation_blocks_missing_or_weak_library(tmp_path):
     assert any(i.code == "weak_enforcement" for i in weak.blockers)
 
 
+async def test_skill_validation_failure_marks_delivery_issue_not_pipeline_crash(monkeypatch):
+    monkeypatch.setattr(settings, "skills_enabled", True)
+
+    async def _seed(_ws):
+        return 0
+
+    def _invalid(_ws):
+        issue = skill_validation.SkillValidationIssue(
+            "missing_rule", "Règle d'activation manquante."
+        )
+        return skill_validation.SkillValidationResult(ok=False, issues=(issue,))
+
+    monkeypatch.setattr(skill_lib, "aseed_skills", _seed)
+    monkeypatch.setattr(skill_validation, "validate_seeded_skills", _invalid)
+    state = ProjectState(id="skill-block", name="n", goal="g")
+    pipeline = Pipeline(state, runner_mod.FakeRunner([]))
+
+    await pipeline._abuild_phase()
+
+    assert pipeline._delivery_blocked is True
+    assert state.error == ""
+    assert any("Validation des skills échouée" in issue for issue in state.delivery_issues)
+
+
 # ---------------------------------------------------------------- runner --add-dir
 
 @pytest.mark.asyncio

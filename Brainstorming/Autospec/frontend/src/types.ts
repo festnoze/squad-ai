@@ -7,6 +7,7 @@ export type PipelinePhase =
   | "build"
   | "done"
   | "stopped"
+  | "needs_attention"
   | "error";
 
 export type StoryStatus =

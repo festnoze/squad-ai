@@ -8,6 +8,8 @@ from autospec.agents.providers import OllamaRunner
 from autospec.agents.runner import FakeRunner
 from autospec.api import server
 from autospec.config import settings
+from autospec.models import ProjectState, StoryStatus, UserStory
+from autospec.orchestrator.pipeline import Pipeline
 from autospec.storage import workspace_dir
 
 PM_QUESTION = json.dumps({"type": "question", "message": "CLI ou web ?"})
@@ -93,6 +95,26 @@ async def test_provider_locked_in_demo_mode(monkeypatch):
         assert (
             await client.post("/api/provider", json={"provider": "claude"})
         ).status_code == 409
+
+
+async def test_unreliable_provider_blocks_build_before_dev(monkeypatch):
+    monkeypatch.setattr(settings, "agent_provider", "ollama")
+    monkeypatch.setattr(settings, "fake_agents", False)
+    state = ProjectState(
+        id="provider-block",
+        name="n",
+        goal="g",
+        stories=[UserStory(id="US-1", epic_id="E1", title="Build me", status=StoryStatus.TODO)],
+    )
+    runner = FakeRunner([])
+    pipeline = Pipeline(state, runner)
+
+    await pipeline._abuild_phase()
+
+    assert pipeline._delivery_blocked is True
+    assert state.delivery_ready is False
+    assert any("Provider 'ollama' non fiable" in issue for issue in state.delivery_issues)
+    assert runner.calls == []
 
 
 async def test_components_endpoints(monkeypatch):

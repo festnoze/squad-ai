@@ -61,7 +61,7 @@ Autospec/
 │       │   └── events.py        # Bus d'événements → WebSocket
 │       └── api/
 │           └── server.py        # REST + WebSocket + service du frontend buildé
-│   └── tests/                   # 458 tests (pipeline, gates, providers, runtime, golden...)
+│   └── tests/                   # 463 tests (pipeline, gates, providers, runtime, golden...)
 ├── frontend/                    # React + Vite + TypeScript
 │   └── src/
 │       ├── App.tsx
@@ -103,7 +103,7 @@ en JSON. Les éléments clés :
 idle → spec → plan → build → done
               ▲                 │
               └── analyze ◀──────┘   (uniquement en mode auto-spec)
-        (+ stopped / error à tout moment)
+        (+ stopped / needs_attention / error à tout moment)
 ```
 
 **Statut d'une story** (`StoryStatus`) :
@@ -386,7 +386,7 @@ message explicite (pas de deadlock, pas d'attente infinie).
 
 ### 5.3b Profils produit et gates de livraison
 
-Avant le build, `orchestrator/profiles.py` applique le **profil produit**
+Avant le build, `orchestrator/profiles.py` résout le **profil produit**
 demandé (`ProjectState.product_profile`, `AUTOSPEC_PRODUCT_PROFILE`, ou
 `product_profile` dans `POST /api/projects`). Les profils évitent de composer à
 la main des flags bas niveau :
@@ -398,6 +398,11 @@ la main des flags bas niveau :
 - `fullstack` : backend + frontend, streams, composants, runtime acceptance.
 - `brownfield` : extension d'un repo existant, gates sans restructuration.
 - `auto` : comportement historique piloté par les flags.
+
+Les overrides restent **locaux à la `Pipeline`** : ils ne mutent plus le
+singleton `settings`, donc un projet `fullstack` ne contamine pas le projet
+suivant en `auto` et deux builds concurrents peuvent garder des profils
+différents.
 
 Après une suite verte, Autospec ne passe plus directement à `done` :
 
@@ -414,6 +419,9 @@ Après une suite verte, Autospec ne passe plus directement à `done` :
   avoir une preuve Gherkin/test plan, et les stories UI doivent déclarer des
   tests rejouables si `AUTOSPEC_UI_TESTS=1`. Le résultat est persisté dans
   `delivery_ready` / `delivery_issues` et rendu dans le `RunPanel`.
+- **Phase `needs_attention`** : DoD, smoke, runtime acceptance et validation
+  skills signalent une livraison à reprendre sans passer par `error`. `error`
+  reste réservé aux crashs/bugs de pipeline.
 - **Pas de faux vert UI** : une story `ui=true` doit déclarer des
   `ui_test_files`; un `pytest -m ui` qui ne collecte rien ne valide plus la
   livraison.
@@ -567,7 +575,7 @@ d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
   `docker-compose.yml` pour db/cache) ; `uv sync`/`npm install` réels seulement
   si `AUTOSPEC_SETUP_INSTALL=1` (démo-safe).
 - **Analyse d'impact d'un feedback (E2)** — un message envoyé quand la pipeline
-  est **dormante** (done/stopped/error) déclenche `_aimpact_analysis` en tâche
+  est **dormante** (done/stopped/needs_attention/error) déclenche `_aimpact_analysis` en tâche
   de fond (prompt `feedback_impact`, persona `analyst`) : `update_story` (US
   **non implémentée** uniquement — todo/failed ; une US failed amendée repart en
   todo), `new_stories` (epic + US au format PO, itération courante →
@@ -632,12 +640,14 @@ enregistrement], `db-entity-change`, `repo`/`service`/`endpoint-search-or-create
 Les skills de domaine sont **prescriptives** : `skill-rules.json` utilise
 `required_when_applicable`, le catalogue de prompt dit explicitement qu'elles
 sont obligatoires quand leur déclencheur s'applique, et
-`orchestrator/skill_validation.py` bloque le build si `.claude/skills` est
-absent, incomplet ou si une règle est restée en simple suggestion.
+`orchestrator/skill_validation.py` met la livraison en `needs_attention` si
+`.claude/skills` est absent, incomplet ou si une règle est restée en simple
+suggestion.
 
 Réglages : `AUTOSPEC_SKILLS` (interrupteur global, **OFF**) + `AUTOSPEC_SKILLS_QA`/
-`_DEV` (par rôle) ; `settings.skills_for(role)` = global ET rôle (comme
-`refine_for`). Quand c'est OFF, les prompts sont **strictement inchangés**.
+`_DEV` (par rôle). Quand c'est OFF, les prompts sont **strictement inchangés**.
+Quand un profil active les skills localement, le catalogue et l'accès natif
+Claude (`--add-dir`) suivent le réglage effectif de cette pipeline.
 
 ### 5.11 Décomposition en sous-tâches parallèles (SK-2)
 
@@ -772,7 +782,7 @@ la pipeline.
 > aux méthodes `Pipeline.arebuild_story` et `Pipeline.aforce_done`.
 > `arebuild_story` (tâche de fond `_arebuild_one`) sert à **Relancer** une story
 > échouée ou à **Rejouer** une story terminée : elle renvoie **409** si la
-> pipeline est active (phase ≠ `done`/`stopped`/`error`) ou si la story est
+> pipeline est active (phase ≠ `done`/`stopped`/`needs_attention`/`error`) ou si la story est
 > `in_progress`, et **404** si la story est inconnue. `aforce_done` force la story
 > à `done` et passe tous ses tests planifiés à `green` (réponse incluant `state`),
 > renvoyant **409** si la story est `in_progress`.
@@ -920,7 +930,7 @@ Variables d'environnement (toutes optionnelles) :
 
 ### Tests backend (`backend/tests`)
 
-458 tests, sans appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
+463 tests, sans appel LLM réel (grâce à `FakeRunner` / `ScriptedRunner`) :
 
 - **Pipeline et modèles** : interview, plan PO, dépendances, priorité kanban,
   QA outside-in, mapping des vrais rapports pytest, pause/reprise, stop,

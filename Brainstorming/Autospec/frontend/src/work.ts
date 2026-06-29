@@ -141,7 +141,7 @@ export function effectiveStatus(story: UserStory): StoryStatus {
  *  leaves the project in `done` while still carrying unbuilt stories. Keep this
  *  list as the single source of truth so no caller drifts (the `done` omission
  *  here was the original "Continuer le build" regression). */
-export const DORMANT_PHASES: PipelinePhase[] = ["done", "stopped", "error"];
+export const DORMANT_PHASES: PipelinePhase[] = ["done", "stopped", "needs_attention", "error"];
 
 /** Whether any story still needs building, by EFFECTIVE status (so a multi-stream
  *  US half-built via its tasks — raw status not todo/red — still counts). */
