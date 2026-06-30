@@ -469,6 +469,15 @@ class Settings:
     refine_enabled: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_REFINE", False))
     refine_po: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_REFINE_PO", True))
     refine_dev: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_REFINE_DEV", True))
+    # Plan review (critic→judge→revise on the PO's epics/US/tasks): a dedicated
+    # toggle so the plan can be reviewed/right-sized WITHOUT enabling the more
+    # expensive code refinement. Independent of the master `AUTOSPEC_REFINE`.
+    # Reviews the breakdown, task complexity and "is each unit small enough for
+    # ONE agent session" — proactively, before the build (complement to the
+    # reactive split-on-failure). OFF by default.
+    review_plan_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_REVIEW_PLAN", False)
+    )
     refine_max_rounds: int = field(
         default_factory=lambda: _env_int("AUTOSPEC_REFINE_MAX_ROUNDS", 2, minimum=0)
     )
@@ -493,7 +502,13 @@ class Settings:
     )
 
     def refine_for(self, role: str) -> bool:
-        """Is the refinement loop active for this maker role ('po' / 'dev')?"""
+        """Is the refinement loop active for this maker role ('po' / 'dev')?
+
+        The PO plan review has a dedicated switch (`AUTOSPEC_REVIEW_PLAN`) that
+        turns it on independently of the master `AUTOSPEC_REFINE`, so an operator
+        can right-size the breakdown without paying for code refinement."""
+        if role == "po" and self.review_plan_enabled:
+            return True
         return self.refine_enabled and bool(getattr(self, f"refine_{role}", True))
 
     def skills_for(self, role: str) -> bool:

@@ -35,6 +35,7 @@ import {
   updateComponents,
 } from "./api";
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
+import { PlanReviewPanel } from "./components/PlanReviewPanel";
 import { LanguagePanel } from "./components/LanguagePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
 import { WorkspaceViews } from "./components/WorkspaceViews";
@@ -695,6 +696,11 @@ export default function App() {
             <ArchitecturePanel
               architecture={project.architecture ?? ""}
               planQuality={project.plan_quality ?? -1}
+            />
+            <PlanReviewPanel
+              planQuality={project.plan_quality ?? -1}
+              issues={project.plan_review_issues ?? []}
+              suggestions={project.plan_review_suggestions ?? []}
             />
           </div>
           <div className="col-right">

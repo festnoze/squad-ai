@@ -351,7 +351,7 @@ async def test_po_refinement_invoked_when_enabled(green_pytest, monkeypatch):
     assert pipeline.state.story("US-1").status == StoryStatus.DONE
     # The judge passed immediately (92 >= 80): 0 refine rounds, plan kept.
     assert any(
-        "Plan raffiné en 0 tour(s)" in m.content and "92/100" in m.content
+        "Revue du plan en 0 tour(s)" in m.content and "92/100" in m.content
         for m in pipeline.state.chat
     )
 
@@ -379,6 +379,34 @@ async def test_quality_scores_default_minus_one(green_pytest):
     await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
     assert pipeline.state.plan_quality == -1
     assert pipeline.state.story("US-1").quality_score == -1
+
+
+async def test_plan_review_issues_persisted_for_panel(green_pytest, monkeypatch):
+    # AUTOSPEC_REVIEW_PLAN (dedicated toggle, no master refine) → the critic's
+    # flagged issues + suggestions land on the state for the « Revue du plan » panel.
+    from autospec.config import settings
+
+    monkeypatch.setattr(settings, "review_plan_enabled", True)
+    monkeypatch.setattr(settings, "refine_enabled", False)
+    monkeypatch.setattr(settings, "refine_dev", False)
+    monkeypatch.setattr(settings, "refine_max_rounds", 1)
+    judge_low = json.dumps({"score": 70, "verdict": "à améliorer"})
+    critic = json.dumps(
+        {"reflection": "r", "issues": ["US-1 trop grosse pour une session"],
+         "suggestions": ["découper US-1 en 2"]}
+    )
+    judge_high = json.dumps({"score": 88, "verdict": "ok"})
+    pipeline, _ = make_pipeline([
+        PM_BRIEF,
+        po_plan_reply(1, with_dep=False),          # initial plan
+        judge_low, critic, po_plan_reply(1, with_dep=False), judge_high,  # one review round
+        QA_PLAN, DEV_GREEN,
+    ])
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+    assert pipeline.state.plan_quality == 88
+    assert any("trop grosse" in i for i in pipeline.state.plan_review_issues)
+    assert any("découper" in s for s in pipeline.state.plan_review_suggestions)
 
 
 async def test_real_pytest_states_map_by_nodeid(monkeypatch):

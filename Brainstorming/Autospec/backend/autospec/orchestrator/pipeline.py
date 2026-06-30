@@ -2389,10 +2389,13 @@ class Pipeline:
         )
         if outcome.stopped_reason != "disabled":
             self.state.plan_quality = outcome.score
+            self.state.plan_review_issues = list(outcome.issues)
+            self.state.plan_review_suggestions = list(outcome.suggestions)
+            n = len(outcome.issues)
             self._chat(
                 ChatRole.SYSTEM,
-                f"Plan raffiné en {outcome.rounds} tour(s) — qualité {outcome.score}/100 "
-                f"(arrêt : {outcome.stopped_reason}).",
+                f"Revue du plan en {outcome.rounds} tour(s) — qualité {outcome.score}/100, "
+                f"{n} point(s) signalé(s) (arrêt : {outcome.stopped_reason}).",
             )
         return outcome.text
 

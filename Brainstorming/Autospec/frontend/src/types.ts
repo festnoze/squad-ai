@@ -248,6 +248,8 @@ export interface ProjectState {
   created_at: number;
   architecture: string;
   plan_quality: number;
+  plan_review_issues?: string[];
+  plan_review_suggestions?: string[];
   backend_language?: "python" | "go" | "rust";
   language_complexity?: number;
   language_criticality?: number;

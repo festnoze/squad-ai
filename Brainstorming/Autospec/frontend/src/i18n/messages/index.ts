@@ -15,6 +15,7 @@ import { componentsPanel } from "./componentsPanel";
 import { languagePanel } from "./languagePanel";
 import { backlogPanel } from "./backlogPanel";
 import { architecturePanel } from "./architecturePanel";
+import { planReviewPanel } from "./planReviewPanel";
 import { dashboard } from "./dashboard";
 import { workspaceViews } from "./workspaceViews";
 import { iterationsView } from "./iterationsView";
@@ -40,6 +41,7 @@ const namespaces: Record<string, Namespace> = {
   languagePanel,
   backlogPanel,
   architecturePanel,
+  planReviewPanel,
   dashboard,
   workspaceViews,
   iterationsView,

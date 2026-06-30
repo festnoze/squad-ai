@@ -202,13 +202,22 @@ est atteint (`AUTOSPEC_REFINE_MAX_ROUNDS`, déf. 2) — selon ce qui survient en
 premier. Arrêts additionnels : critique vide (`critic_empty`), révision rejetée
 (`rejected`), juge illisible (traité comme arrêt).
 
-- **PO** : raffinement du plan (critères INVEST/Gherkin/découpage).
+- **PO / revue de plan** : un **agent de revue** (critic ReAct → juge → révision)
+  critique le plan **avant le build** sur des critères enrichis — INVEST, Gherkin,
+  et surtout le **découpage & la complexité** : chaque US/tâche doit tenir dans
+  **une seule session d'agent de codage** (sinon il signale l'unité trop grosse et
+  propose un re-découpage), détection du sur-découpage, cohérence Epic→US→tâche,
+  dépendances minimales et parallélisables. Le maker `po_revise` applique les
+  suggestions → le plan est **right-sizé** en amont (complément proactif du
+  split-on-failure réactif). **Toggle dédié `AUTOSPEC_REVIEW_PLAN`** : active la
+  revue du plan **indépendamment** du master `AUTOSPEC_REFINE` (donc sans payer le
+  raffinement du code), avec les mêmes `MAX_ROUNDS`/`THRESHOLD`.
 - **Dev** : raffinement du code protégé par une **garde git** — une révision
   n'est gardée que si `uv run pytest` reste vert (sinon `git reset --hard` +
   `git clean -fd`).
 
-**OFF par défaut** (`AUTOSPEC_REFINE`, `_PO`, `_DEV`). Rôles de chat **🧐 Critic**
-et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
+**OFF par défaut** (`AUTOSPEC_REFINE`, `_PO`, `_DEV`, `REVIEW_PLAN`). Rôles de chat
+**🧐 Critic** et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 
 ---
 
@@ -325,6 +334,10 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
   verts) affichant la liste des tests + le Gherkin.
 - **Backlog de l'analyste** (rang, valeur/complexité, statut).
 - **Architecture & qualité** (design technique courant + score du plan).
+- **Revue du plan 🧐** (`PlanReviewPanel`, quand `AUTOSPEC_REVIEW_PLAN`) : score
+  `plan_quality`/100 coloré + **problèmes signalés** et **améliorations proposées**
+  par l'agent critic sur le découpage/complexité (`plan_review_issues` /
+  `plan_review_suggestions`).
 - **Indicateur d'usage 💸** (coût $ / tokens / nombre d'appels agents).
 - **Explorateur de code 📁** (arborescence + contenu du workspace, **anti
   path-traversal**).

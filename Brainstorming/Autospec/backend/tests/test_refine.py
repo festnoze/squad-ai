@@ -51,6 +51,31 @@ async def test_disabled_returns_initial_untouched(monkeypatch):
     assert calls["revise"] == 0
 
 
+def test_review_plan_toggle_gates_po_independently(monkeypatch):
+    # AUTOSPEC_REVIEW_PLAN turns the PO plan review ON without the master refine,
+    # and does NOT enable the (more expensive) code refinement.
+    monkeypatch.setattr(settings, "refine_enabled", False)
+    monkeypatch.setattr(settings, "review_plan_enabled", True)
+    assert settings.refine_for("po") is True
+    assert settings.refine_for("dev") is False
+
+
+async def test_review_plan_runs_loop_without_master_refine(monkeypatch):
+    monkeypatch.setattr(settings, "refine_enabled", False)
+    monkeypatch.setattr(settings, "review_plan_enabled", True)
+    monkeypatch.setattr(settings, "refine_quality_threshold", 80)
+    outcome, _ = await run(FakeRunner([judge(90)]))   # judge consulted first
+    assert outcome.stopped_reason != "disabled"
+    assert outcome.score == 90
+
+
+def test_plan_criteria_targets_decoupage_and_complexity():
+    from autospec.agents import prompts
+
+    c = prompts.PLAN_CRITERIA.lower()
+    assert "complexité" in c and "session" in c and "découpage" in c
+
+
 async def test_stops_immediately_when_judge_passes(refine_on):
     outcome, calls = await run(FakeRunner([judge(90)]))
     assert outcome.stopped_reason == "threshold"

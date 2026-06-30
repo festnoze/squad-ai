@@ -1632,6 +1632,56 @@ button.action-btn.action-done {
   color: #c6d4f0;
 }
 
+/* ---------- Revue du plan (AUTOSPEC_REVIEW_PLAN) ---------- */
+.plan-review-score {
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.plan-review-score strong {
+  font-size: 14px;
+}
+.plan-review-score-good strong {
+  color: var(--green);
+}
+.plan-review-score-mid strong {
+  color: #e0b341;
+}
+.plan-review-score-low strong {
+  color: var(--red, #e06c6c);
+}
+.plan-review-block {
+  margin-top: 8px;
+}
+.plan-review-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  margin-bottom: 4px;
+}
+.plan-review-list {
+  margin: 0;
+  padding-left: 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.plan-review-list li {
+  font-size: 12px;
+  line-height: 1.45;
+  color: #c6d4f0;
+}
+.plan-review-issues li {
+  color: #e6b8b8;
+}
+.plan-review-clean {
+  font-size: 12px;
+  color: var(--green);
+}
+
 /* ---------- accueil modal (U1) ---------- */
 .modal-backdrop {
   position: fixed;

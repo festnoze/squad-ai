@@ -42,6 +42,8 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "streams_enabled", False)
     monkeypatch.setattr(settings, "skills_enabled", False)
     monkeypatch.setattr(settings, "decompose_enabled", False)
+    monkeypatch.setattr(settings, "review_plan_enabled", False)
+    monkeypatch.setattr(settings, "split_on_failure_enabled", False)
     monkeypatch.setattr(settings, "setup_install", False)
     monkeypatch.setattr(settings, "ui_tests_enabled", False)
     monkeypatch.setattr(settings, "smoke_run", False)
@@ -49,7 +51,18 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "definition_of_done_strict_criteria", False)
     monkeypatch.setattr(settings, "runtime_acceptance_enabled", False)
     monkeypatch.setattr(settings, "product_profile", "auto")
-    return tmp_path
+    yield tmp_path
+    # Drain the shared persist executor BEFORE this test's `workspace_root`
+    # monkeypatch is reverted: `_persist` resolves the target path lazily on the
+    # executor thread, so a state write still queued from THIS test would
+    # otherwise flush into the NEXT test's workspace (a stray project that broke,
+    # e.g., test_delete_project's "list is empty" assertion). The executor has a
+    # single FIFO worker, so awaiting a trailing no-op guarantees every prior
+    # save has completed — landing in this test's (still-current) temp dir.
+    try:
+        _PERSIST_EXECUTOR.submit(lambda: None).result(timeout=10)
+    except Exception:  # noqa: BLE001 — teardown must never fail the test
+        pass
 
 
 @pytest.fixture

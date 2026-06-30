@@ -94,9 +94,18 @@ PLAN_CRITERIA = (
     "petite, testable).\n"
     "- Critères d'acceptance précis, non ambigus et réellement testables.\n"
     "- Gherkin exécutable et aligné sur les critères.\n"
-    "- Découpage en epics/US cohérent avec la complexité (ni trop gros, ni "
-    "sur-découpé).\n"
-    "- Dépendances et priorités kanban correctes et minimales."
+    "- DÉCOUPAGE & COMPLEXITÉ — chaque US/tâche doit tenir dans UNE session d'un "
+    "agent de codage : une seule responsabilité claire, un périmètre étroit. "
+    "Signale toute unité TROP GROSSE (plusieurs responsabilités, plusieurs "
+    "couches/écrans dans une même unité, critères d'acceptance trop nombreux, "
+    "Gherkin couvrant plusieurs scénarios indépendants) et propose un re-découpage "
+    "en sous-US/tâches plus fines.\n"
+    "- Inversement, signale le SUR-DÉCOUPAGE (unités triviales qui gagneraient à "
+    "être fusionnées) : ni trop gros, ni trop fragmenté.\n"
+    "- Cohérence de la hiérarchie Epic → US → tâche : pas d'US « fourre-tout », "
+    "regroupement thématique sensé.\n"
+    "- Dépendances (`depends_on`) et priorités kanban correctes, minimales et "
+    "sans cycle ; l'ordre permet un maximum de parallélisme."
 )
 
 CODE_CRITERIA = (
