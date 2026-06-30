@@ -209,6 +209,75 @@ Les ids de sous-tâches sont uniques ; `depends_on` ne référence que des ids d
 même JSON."""
 
 
+def decompose_finer(
+    subject: UserStory,
+    package_name: str,
+    reason: str = "",
+    *,
+    is_frontend: bool = False,
+    architecture: str = "",
+    available_skills: str = "",
+) -> str:
+    """Adaptive split-on-failure: a unit (US or task) the dev agent could NOT make
+    green after its attempts is re-analyzed and split into SMALLER sub-tasks with
+    FINER tests — the unit was likely too big for one agent session. The unique
+    marker ``DÉCOUPAGE PLUS FIN (échec)`` keys the ScriptedRunner reply."""
+    arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    kind = "frontend (React + Vite + TypeScript)" if is_frontend else "backend"
+    front_rule = (
+        "Découpe par COMPOSANT/fichier : un composant React par sous-tâche "
+        "(`frontend/src/components/Xxx.tsx`), plus une sous-tâche d'INTÉGRATION qui "
+        "assemble les composants et `depends_on` eux. Évite que deux sous-tâches "
+        "réécrivent `App.tsx`."
+        if is_frontend else
+        "Découpe par COUCHE et par RESPONSABILITÉ : entité/persistance → "
+        "service/cas d'usage → endpoint/façade → tests. Une responsabilité par "
+        "sous-tâche."
+    )
+    return f"""Tu es l'architecte d'un pipeline automatisé. La tâche {kind} ci-dessous a
+ÉCHOUÉ : l'agent de codage n'a pas réussi à la rendre verte en plusieurs tentatives.
+C'est généralement le signe d'une unité TROP GROSSE pour une seule session d'agent.
+Tu vas la **DÉCOUPER PLUS FINEMENT** en sous-tâches plus petites, chacune avec des
+TESTS PLUS GRANULAIRES, pour qu'un sous-agent focalisé puisse traiter chacune.
+{arch_block}{available_skills}
+Unité en échec : {subject.id} — {subject.title}
+Description : {subject.description}
+Critères d'acceptance (réutilise leurs ids) :
+{_criteria_block(subject)}
+
+Acceptance Gherkin (vision de bout en bout, NE PAS la modifier) :
+\"\"\"{subject.gherkin}\"\"\"
+
+Dernière erreur observée (pour cibler le découpage) :
+\"\"\"{(reason or 'non disponible')[:1500]}\"\"\"
+
+Règles de découpage :
+- {front_rule}
+- Vise **2 à 6 sous-tâches PLUS PETITES** que l'unité d'origine. Si elle est
+  vraiment indivisible, renvoie une liste `tasks` VIDE (elle restera en échec).
+- Chaque sous-tâche : un périmètre étroit, des `acceptance_criteria` (sous-ensemble
+  des ids ci-dessus) et un mini-Gherkin **fin** ciblant UN comportement testable.
+- `file_globs` (OBLIGATOIRE) : fichiers/zones DISJOINTS entre sous-tâches.
+- `depends_on` : ids de sous-tâches de ce JSON (couche inférieure / composant requis).
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase : pourquoi/comment tu découpes plus fin>",
+  "tasks": [
+    {{
+      "id": "T-1",
+      "title": "...",
+      "description": "...",
+      "acceptance_criteria": ["AC-1"],
+      "gherkin": "Feature: ...\\n  Scenario: ...\\n    Given ...\\n    When ...\\n    Then ...",
+      "file_globs": ["{package_name}/domain/xxx.py"],
+      "depends_on": []
+    }}
+  ]
+}}
+DÉCOUPAGE PLUS FIN (échec). Les ids sont uniques ; `depends_on` ne référence que des ids de ce JSON."""
+
+
 def independence_judge(tasks: list[dict]) -> str:
     """P4: ask the independence-judge agent to COMPLETE each task's file claims
     and flag pairs that must be serialized, so the parallel build never loses

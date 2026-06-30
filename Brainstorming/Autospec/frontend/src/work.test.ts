@@ -252,6 +252,15 @@ describe("work — canResumeBuild (gating partagé RunPanel/ProjectBar)", () => 
     expect(canResumeBuild(project({ phase: "done", stories: [half] }))).toBe(true);
     expect(hasBuildableStory([half])).toBe(true);
   });
+
+  it.each<"in_progress" | "green">(["in_progress", "green"])(
+    "orphelin dormant (story '%s' sans worker) → true (le backend le reset à la reprise)",
+    (status) => {
+      expect(
+        canResumeBuild(project({ phase: "stopped", stories: [story({ status })] })),
+      ).toBe(true);
+    },
+  );
 });
 
 describe("work — deriveItemView", () => {

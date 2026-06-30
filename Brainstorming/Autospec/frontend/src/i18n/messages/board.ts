@@ -107,6 +107,11 @@ export const board: Namespace = {
     fr: "Marquer cette user story comme terminée sans la reconstruire",
   },
   action_replay: { en: "Replay", fr: "Rejouer" },
+  action_split: { en: "Split finer", fr: "Découper plus fin" },
+  splitItem_title: {
+    en: "Re-analyze this failed unit and split it into finer sub-tasks (too big for one agent session), then resume the build",
+    fr: "Ré-analyser cette unité en échec et la découper en sous-tâches plus fines (trop grosse pour une session d'agent), puis reprendre le build",
+  },
   action_diff: { en: "Diff", fr: "Diff" },
   acceptanceCriteria_heading: { en: "Acceptance criteria", fr: "Critères d'acceptance" },
   lastError_heading: { en: "Last error", fr: "Dernière erreur" },

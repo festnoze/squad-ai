@@ -108,3 +108,9 @@ class InteractionStore:
 
     def has_item(self, item_id: str) -> bool:
         return bool(self._by_item.get(item_id))
+
+    def clear(self) -> None:
+        """Drop every recorded interaction (used by « restart from scratch » so
+        old items' activity can't resurface from this live in-memory store while
+        the backend keeps running)."""
+        self._by_item.clear()

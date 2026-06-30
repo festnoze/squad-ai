@@ -322,6 +322,17 @@ class Settings:
     # engine, then aggregated. Reuses the streams Task/worktree machinery. OFF by
     # default; turning it on routes eligible stories through the streams path.
     decompose_enabled: bool = field(default_factory=lambda: _env_bool("AUTOSPEC_DECOMPOSE", False))
+    # Adaptive split-on-failure: when a story/task can't be made green after its
+    # dev attempts are exhausted, re-analyze it and split it into FINER sub-tasks
+    # (smaller scope + finer tests) instead of failing — counters the "unit too
+    # big for one agent session" problem. ON by default (it's pure recovery);
+    # bounded by split_max_depth so it can never recurse forever.
+    split_on_failure_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_SPLIT_ON_FAILURE", True)
+    )
+    split_max_depth: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_SPLIT_MAX_DEPTH", 1, minimum=0)
+    )
     # P4: LLM "independence judge" (skill task-independence + persona
     # independence-judge). When on, before the parallel build it completes each
     # task's file claims and refines independent/serialize/merge decisions on top

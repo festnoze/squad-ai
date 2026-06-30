@@ -613,11 +613,9 @@ class Pipeline:
         # Kill any in-flight agent CLI call (claude/codex) and its sub-tree, so it
         # never survives the process as an orphan (cost/resource leak).
         self._agent_procs.terminate_all()
-        if self._run_proc and self._run_proc.poll() is None:
-            self._run_proc.terminate()
+        self._kill_tree(self._run_proc)  # tree-kill so node/esbuild orphans die too
         for proc in self._frontend_procs:  # ST-8
-            if proc and proc.poll() is None:
-                proc.terminate()
+            self._kill_tree(proc)
         # BUG9 : annule les tasks de streaming frontend encore actives (best-effort,
         # la teardown ne doit jamais lever).
         for ftask in self._frontend_stream_tasks:
@@ -2751,6 +2749,10 @@ class Pipeline:
             # P4d: optional LLM judge completes file claims + sharpens
             # serialization before the parallel scheduler (floor already safe).
             await self._ajudge_independence()
+            # P1: global declared-overlap floor across ALL stories/streams (catches
+            # shared repo-root files the per-story/per-stream view misses), after
+            # the judge so it benefits from any completed claims.
+            self._enforce_global_independence()
             await self._abuild_phase_streams(all_iterations=all_iterations)
             return
         self.state.phase = PipelinePhase.BUILD
@@ -3217,6 +3219,173 @@ class Pipeline:
         for w in report.warnings:
             self._log(f"independence:{label}", f"⚠️ {w}")
 
+    def _enforce_global_independence(self) -> None:
+        """P1: a GLOBAL deterministic pass over EVERY pending task (across all
+        stories AND streams) that serializes tasks whose DECLARED file globs
+        overlap — e.g. two stories both editing ``pyproject.toml``, or a backend
+        and a frontend task both touching a repo-root ``README.md`` (which the
+        per-stream/per-story floor would miss). Only DECLARED overlaps create
+        edges, so it never over-serializes undeclared work nor deadlocks."""
+        tasks = [t for s in self.state.stories for t in s.tasks]
+        if len(tasks) < 2:
+            return
+        claims = [
+            independence.TaskClaim(
+                id=t.id,
+                stream=t.stream or self.state.primary_stream_id,
+                file_globs=tuple(t.files_hint),
+                depends_on=tuple(t.depends_on),
+            )
+            for t in tasks
+        ]
+        edges = independence.declared_serialization(claims)
+        if not edges:
+            return
+        by_id = {t.id: t for t in tasks}
+        n = 0
+        for tid, extra in edges.items():
+            task = by_id.get(tid)
+            if task is None:
+                continue
+            for dep in extra:
+                if dep not in task.depends_on:
+                    task.depends_on.append(dep)
+                    n += 1
+        if n:
+            self._log(
+                "independence",
+                f"🔗 {n} arête(s) globale(s) de sérialisation (fichiers déclarés "
+                "partagés inter-stories/streams).",
+            )
+
+    # ---------------------------------------- adaptive split-on-failure (P6)
+
+    def _build_finer_tasks(
+        self, subject: UserStory, raw: list[dict], *, story_id: str, stream: str, base_depth: int
+    ) -> list[Task]:
+        """Materialize the architect's finer-split reply into Task models: project-
+        wide-unique ids, intra-split ``depends_on`` remapped, criteria restricted to
+        the parent's ids, file claims carried, ``split_depth = base_depth + 1`` (so
+        recursion is bounded)."""
+        taken = {t.id for t in self.state.all_tasks()} | {s.id for s in self.state.stories}
+        valid_ac = {c.id: c for c in subject.acceptance_criteria}
+        id_map: dict[str, str] = {}
+        for i, data in enumerate(raw, start=1):
+            old = str(data.get("id") or f"S-{i}")
+            new = f"{subject.id}-S{i}"
+            while new in taken:
+                new += "x"
+            taken.add(new)
+            id_map[old] = new
+        out: list[Task] = []
+        for i, data in enumerate(raw, start=1):
+            old = str(data.get("id") or f"S-{i}")
+            crit = [valid_ac[c] for c in (data.get("acceptance_criteria") or []) if c in valid_ac]
+            deps = [id_map[d] for d in (data.get("depends_on") or []) if d in id_map]
+            globs = [str(g) for g in (data.get("file_globs") or []) if str(g).strip()]
+            out.append(
+                Task(
+                    id=id_map[old],
+                    story_id=story_id,
+                    stream=stream,
+                    title=str(data.get("title") or old),
+                    description=str(data.get("description") or ""),
+                    acceptance_criteria=crit or list(subject.acceptance_criteria),
+                    gherkin=str(data.get("gherkin") or subject.gherkin),
+                    depends_on=deps,
+                    files_hint=globs,
+                    split_depth=base_depth + 1,
+                )
+            )
+        return out
+
+    async def _amaybe_split_on_failure(self, item, subject: UserStory, target, *, force: bool = False) -> bool:
+        """P6 — adaptive split-on-failure (the « unit too big for one agent session »
+        counter). A story/task that exhausted its dev attempts is re-analyzed by the
+        architect and split into FINER sub-tasks (smaller scope + finer tests)
+        instead of just failing. Returns True if it split (caller must NOT mark it
+        FAILED — the new sub-tasks will build); False to fall through to FAILED.
+        Bounded by ``split_max_depth`` (bypassed when ``force`` — a manual user
+        action); non-fatal (any error → False)."""
+        if not force and not settings.split_on_failure_enabled:
+            return False
+        if not force and getattr(target, "split_depth", 0) >= settings.split_max_depth:
+            self._log(f"split:{item.id}", "Profondeur de découpage max atteinte — échec maintenu.")
+            return False
+        is_frontend = self._is_frontend_story(subject)
+        pkg = workspace.package_name(self.state)
+        try:
+            result = await self._tracked.arun(
+                prompts.decompose_finer(
+                    subject, pkg, reason=getattr(target, "last_error", "") or "",
+                    is_frontend=is_frontend, architecture=self.state.architecture,
+                    available_skills=self._skills_catalog("dev"),
+                ),
+                system_prompt=persona("architect"),
+            )
+            reply = extract_json(result.text)
+        except AgentError as exc:
+            self._log(f"split:{item.id}", f"Re-décomposition indisponible ({exc}) — échec maintenu.")
+            return False
+        raw = [t for t in (reply.get("tasks") or []) if isinstance(t, dict)]
+        if len(raw) < 2:
+            self._log(f"split:{item.id}", "Unité jugée indivisible — échec maintenu.")
+            return False
+        if item.kind == "story":
+            return self._split_story(self.state.story(item.story_id), raw)
+        return self._split_task(item.id, raw)
+
+    def _split_story(self, story: UserStory, raw: list[dict]) -> bool:
+        """Re-decompose a taskless FAILED story into finer sub-tasks (it becomes a
+        container; its status then derives from the new tasks)."""
+        stream = story.stream or self.state.primary_stream_id
+        new_tasks = self._build_finer_tasks(
+            story, raw, story_id=story.id, stream=stream, base_depth=story.split_depth
+        )
+        self._enforce_task_independence(new_tasks, label=f"{story.id}/split")
+        story.tasks = new_tasks
+        story.split_depth += 1
+        story.status = StoryStatus.TODO
+        story.last_error = ""
+        self._set_stage(story, BuildStage.QUEUED, sync=False)
+        title_list = ", ".join(t.title or t.id for t in new_tasks)
+        self._log(f"split:{story.id}", f"🪓 {story.id} re-découpée en {len(new_tasks)} sous-tâches plus fines après échec.")
+        self._chat(ChatRole.ARCHITECT, f"[{story.id}] Re-découpage plus fin après échec → {title_list}.")
+        return True
+
+    def _split_task(self, task_id: str, raw: list[dict]) -> bool:
+        """Replace a FAILED task with finer sub-tasks in its parent story, rewiring
+        dependencies so nothing builds out of order: the sub-tasks inherit the
+        failed task's upstream deps, and every downstream task that depended on it
+        now waits for ALL the sub-tasks."""
+        story = next((s for s in self.state.stories if any(t.id == task_id for t in s.tasks)), None)
+        if story is None:
+            return False
+        failed = next(t for t in story.tasks if t.id == task_id)
+        stream = failed.stream or self.state.primary_stream_id
+        new_tasks = self._build_finer_tasks(
+            failed, raw, story_id=story.id, stream=stream, base_depth=failed.split_depth
+        )
+        new_ids = [t.id for t in new_tasks]
+        # Sub-tasks inherit the failed task's UPSTREAM dependencies.
+        for nt in new_tasks:
+            for dep in failed.depends_on:
+                if dep not in nt.depends_on:
+                    nt.depends_on.append(dep)
+        # Downstream tasks that depended on the failed task now wait for ALL sub-tasks.
+        for t in self.state.all_tasks():
+            if task_id in t.depends_on:
+                t.depends_on = [d for d in t.depends_on if d != task_id] + [
+                    nid for nid in new_ids if nid not in t.depends_on
+                ]
+        idx = story.tasks.index(failed)
+        story.tasks[idx : idx + 1] = new_tasks
+        self._enforce_task_independence(story.tasks, label=f"{task_id}/split")
+        title_list = ", ".join(t.title or t.id for t in new_tasks)
+        self._log(f"split:{task_id}", f"🪓 Tâche {task_id} re-découpée en {len(new_tasks)} sous-tâches plus fines après échec.")
+        self._chat(ChatRole.ARCHITECT, f"[{task_id}] Re-découpage plus fin après échec → {title_list}.")
+        return True
+
     async def _ajudge_independence(self) -> None:
         """P4d: optional LLM independence judge (AUTOSPEC_INDEPENDENCE, OFF). For
         each story with ≥2 tasks it completes the tasks' file claims and may add
@@ -3378,7 +3547,7 @@ class Pipeline:
                 await self._acommit_story(worktree, item.id)
                 # B1/B6: green → waiting for the merge lock, then merging.
                 self._set_stage(target, BuildStage.MERGE_WAIT, "")
-                merged = await self._amerge_work_item(ws, branch, item.id)
+                merged = await self._amerge_work_item(ws, branch, item.id, worktree)
                 if merged:
                     target.status = subject.status = StoryStatus.DONE
                     for test in subject.test_plan:
@@ -3415,6 +3584,11 @@ class Pipeline:
                 if subject.attempts < settings.dev_max_attempts:
                     target.status = StoryStatus.TODO
                     self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
+                # P6: attempts exhausted → try an adaptive FINER split before failing
+                # (the unit was likely too big for one agent session). If it splits,
+                # the new sub-tasks build on the next scheduler pass.
+                elif await self._amaybe_split_on_failure(item, subject, target):
+                    pass
                 else:
                     target.status = StoryStatus.FAILED
                     self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
@@ -3646,14 +3820,18 @@ class Pipeline:
         except OSError:
             pass
 
-    async def _amerge_work_item(self, repo, branch: str, wid: str) -> bool:
+    async def _amerge_work_item(self, repo, branch: str, wid: str, worktree=None) -> bool:
         """ST-10: merge a green work item's branch into the project repo's main
         branch. Merges MUST be serialized (``_merge_lock``) even though builds
         run in parallel — concurrent merges race on the shared index/HEAD.
 
-        Conflict policy: a `--no-ff` merge that reports a conflict is retried
-        once (still under the lock, so nothing else mutates the repo in between);
-        if it still conflicts, abort cleanly and signal failure to the caller."""
+        Conflict policy (P2 — never lose green work): a ``--no-ff`` merge that
+        conflicts means main moved ahead (a sibling merged a change to the same
+        area). Rather than throwing the green branch away and regenerating it, we
+        **rebase the branch onto the updated HEAD inside its worktree** then merge
+        again — preserving the green work whenever the real edits don't truly
+        conflict. Only a genuine line-level conflict (rebase fails) falls through
+        to failure, where the caller re-queues for a fresh rebuild."""
         # B6: hold the merge lock under this item's id so the tick can report
         # ``merge_lock_held:<wid>`` while others wait.
         async with self._merge_lock.ahold(wid):
@@ -3662,18 +3840,30 @@ class Pipeline:
             )
             if code == 0:
                 return True
-            # Conflict (or other merge failure): abort, then retry once.
             await self._agit(repo, "merge", "--abort")
-            self._log(
-                "streams",
-                f"⚠️ Conflit de merge pour {wid} — nouvelle tentative sérialisée.",
-            )
-            code, out = await self._agit(
-                repo, "merge", "--no-ff", "-m", f"merge work item {wid} (retry)", branch
-            )
-            if code == 0:
-                return True
-            await self._agit(repo, "merge", "--abort")
+            # P2: preserve the green branch — rebase it onto the now-updated HEAD
+            # (which holds the sibling's commits), then merge the rebased branch.
+            if worktree is not None:
+                _, head = await self._agit(repo, "rev-parse", "HEAD")
+                head = head.strip()
+                rb, _ = await self._agit(worktree, "rebase", head)
+                if rb == 0:
+                    code, out = await self._agit(
+                        repo, "merge", "--no-ff", "-m", f"merge work item {wid} (rebased)", branch
+                    )
+                    if code == 0:
+                        self._log(
+                            "streams",
+                            f"✅ {wid} préservé : rebase sur HEAD à jour puis merge.",
+                        )
+                        return True
+                    await self._agit(repo, "merge", "--abort")
+                else:
+                    await self._agit(worktree, "rebase", "--abort")
+                    self._log(
+                        "streams",
+                        f"⚠️ Rebase de {wid} en conflit réel (mêmes lignes) — régénération nécessaire.",
+                    )
             self._log("streams", f"⛔ Merge de {wid} impossible (conflit) : {out.strip()[:200]}")
             return False
 
@@ -3870,14 +4060,21 @@ class Pipeline:
         if not self.state.brief.strip():
             raise ValueError("aucun brief : lancez d'abord la spec avant de relancer from scratch")
         # The generated app may still hold file handles in the workspace, which
-        # would block the wipe — stop it first.
+        # would block the wipe — stop its whole process tree first (node/esbuild
+        # children keep node_modules open), then let the OS release the handles.
         await self.astop_app()
-        # Wipe the generated workspace (code + git repo), defeating git's
-        # read-only packs. Off the event loop (rmtree + chmod retries are slow).
-        try:
-            await asyncio.to_thread(force_delete_workspace, self.state.id)
-        except OSError as exc:
-            raise ValueError(f"workspace verrouillé (app en cours ?), réessayez : {exc}")
+        await asyncio.sleep(0.3)  # grace: Windows frees handles shortly after taskkill
+        # Wipe the generated workspace (code + git repo), defeating git's read-only
+        # packs. Best-effort: a cache dir (node_modules/.venv) briefly held by a
+        # just-killed process must NOT block the restart — the source + .git get
+        # removed and any harmless cache remnant is tolerated (re-used/regenerated).
+        fully = await asyncio.to_thread(force_delete_workspace, self.state.id, best_effort=True)
+        if not fully:
+            self._log(
+                "build",
+                "⚠️ Workspace partiellement verrouillé (cache node_modules/.venv ?) — "
+                "réinitialisation poursuivie ; le cache résiduel est inoffensif.",
+            )
         # Reset every DERIVED field; keep id/name/goal/config/brief/created_at.
         s = self.state
         s.epics = []
@@ -3915,6 +4112,10 @@ class Pipeline:
         self._pm_session = None
         self._stop_requested = False
         self._delivery_blocked = False
+        # P2: the interactions endpoint serves this LIVE in-memory store first, so
+        # without clearing it the old items' activity would resurface after a
+        # restart until the backend restarts.
+        self.interactions.clear()
         delivery_state.reset(s)
         s.phase = PipelinePhase.SPEC
         self._sync()  # recreates the wiped workspace dir + persists the reset state
@@ -4044,6 +4245,39 @@ class Pipeline:
         task.status = StoryStatus.DONE
         task.last_error = ""
         self._sync()
+
+    async def asplit_item(self, item_id: str) -> None:
+        """P6 — manual « découper plus finement » on a FAILED story or task: re-
+        decompose it into finer sub-tasks (forced — bypasses the auto flag/depth),
+        then resume the build so they get built. Raises ValueError(→409) if the
+        pipeline is active or the item is not eligible (must be effectively
+        FAILED), KeyError(→404) if unknown."""
+        if self.state.phase not in (
+            PipelinePhase.STOPPED,
+            PipelinePhase.DONE,
+            PipelinePhase.NEEDS_ATTENTION,
+            PipelinePhase.ERROR,
+        ):
+            raise ValueError("la pipeline est déjà active")
+        if self._task and not self._task.done():
+            raise ValueError("une tâche est déjà en cours")
+        graph = work_streams.build_work_graph(self.state)
+        item = graph.items.get(item_id)
+        if item is None:
+            raise KeyError(item_id)
+        target = self._item_target(item)
+        if target.status != StoryStatus.FAILED:
+            raise ValueError("seule une unité en échec peut être re-découpée")
+        subject = self._item_subject(item)
+        split = await self._amaybe_split_on_failure(item, subject, target, force=True)
+        if not split:
+            raise ValueError("unité jugée indivisible : aucun découpage plus fin possible")
+        self._stop_requested = False
+        self._delivery_blocked = False
+        delivery_state.reset(self.state)
+        self.state.phase = PipelinePhase.BUILD
+        self._sync()
+        self._task = asyncio.create_task(self._aresume_build_run(all_iterations=True))
 
     async def atask_diff(self, task_id: str) -> dict:
         """ST-13: the git diff committed when a task reached its green/merged
@@ -4492,11 +4726,27 @@ class Pipeline:
         return [exe, *cmd[1:]] if exe else cmd
 
     @staticmethod
-    def _link_node_modules(link: Path, target: Path) -> None:
-        """Best-effort: create ``link`` as a directory junction/symlink to
-        ``target`` so a worktree shares the main install. Junctions need no admin
-        rights on Windows (unlike symlinks)."""
+    def _node_modules_usable(root: Path) -> bool:
+        """``node_modules`` is present AND actually resolvable — not just an empty
+        or broken-junction directory. We probe ``.bin`` (the executables dir npm
+        always creates) or the ``vite`` package the frontend depends on, so a
+        silently-failed junction is detected instead of trusted."""
+        nm = root / "node_modules"
         try:
+            return nm.exists() and ((nm / ".bin").exists() or (nm / "vite").exists())
+        except OSError:
+            return False
+
+    @classmethod
+    def _link_node_modules(cls, link: Path, target: Path) -> bool:
+        """Create ``link`` as a directory junction/symlink to ``target`` so a
+        worktree shares the main install (junctions need no admin rights on
+        Windows). Returns True ONLY if the link now resolves to a usable install
+        — ``mklink /J`` can silently fail (different volume, policy, antivirus),
+        so we never trust it blind."""
+        try:
+            if link.exists():
+                return cls._node_modules_usable(link.parent)
             link.parent.mkdir(parents=True, exist_ok=True)
             if os.name == "nt":
                 subprocess.run(
@@ -4506,20 +4756,49 @@ class Pipeline:
             else:
                 os.symlink(target, link, target_is_directory=True)
         except OSError:
-            pass
+            return False
+        return cls._node_modules_usable(link.parent)
+
+    async def _anpm_install_in(self, root: Path, *, use_ci: bool) -> bool:
+        """Run a real ``npm ci``/``npm install`` in ``root`` (blocking → thread).
+        ``ci`` (reproducible, lockfile-driven) when a ``package-lock.json`` is
+        present, else ``install``. Returns True on success; non-fatal."""
+        ci = use_ci and (root / "package-lock.json").exists()
+        args = [settings.npm_cmd, "ci" if ci else "install", "--no-audit", "--no-fund"]
+
+        def _run():
+            env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+            return subprocess.run(
+                self._resolve_cmd(args), cwd=str(root), stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT, env=env, text=True,
+                encoding="utf-8", errors="replace", timeout=900,
+            )
+
+        try:
+            proc = await asyncio.to_thread(_run)
+            ok = proc.returncode == 0 and self._node_modules_usable(root)
+            self._log(
+                "streams",
+                f"📦 npm {'ci' if ci else 'install'} ({root.name}) "
+                f"{'OK' if ok else 'ÉCHEC : ' + (proc.stdout or '')[-200:]}",
+            )
+            return ok
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            self._log("streams", f"📦 npm install indisponible ({root.name}) : {exc}")
+            return False
 
     async def _aensure_frontend_node_modules(self, root: Path) -> None:
-        """Make ``node_modules`` available in a frontend ``root`` before Vitest /
-        ``vite build`` run.
+        """Make a USABLE ``node_modules`` available in a frontend ``root`` before
+        Vitest / ``vite build`` run.
 
         The streams build runs frontend items in git worktrees, which never carry
-        ``node_modules`` (gitignored, and ``npm install`` is NOT part of the
-        autonomous lifecycle — only the separate component-setup action installs).
-        Without this, every frontend item fails with ``Cannot find package 'vite'``.
-        Fix: install ONCE in the project's main frontend root, then link it into
-        the worktree via a junction so all worktrees share a single install.
-        Best-effort — any failure is logged and left to surface downstream."""
-        if settings.fake_agents or (root / "node_modules").exists():
+        ``node_modules`` (gitignored). Without this, every frontend item fails with
+        ``Cannot find package 'vite'``. Strategy (P3): (1) install ONCE in the main
+        frontend root; (2) share it into the worktree via a junction — fast, single
+        install; (3) **fallback to a real ``npm ci`` in the worktree** when the
+        junction silently fails or doesn't resolve (the recurring Windows trap),
+        so correctness never depends on the junction succeeding."""
+        if settings.fake_agents or self._node_modules_usable(root):
             return
         stream = next(iter(workspace.frontend_streams(self.state)), None)
         if stream is None:
@@ -4527,36 +4806,28 @@ class Pipeline:
         main_root = workspace.stream_root(self.state, stream)
         if not (main_root / "package.json").exists():
             return
+        # 1) Install once in the main frontend root (shared, serialized).
         async with self._npm_lock:
-            if not (main_root / "node_modules").exists():
+            if not self._node_modules_usable(main_root):
                 self._log("streams", "📦 npm install (frontend) — première fois…")
-
-                def _install():
-                    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
-                    return subprocess.run(
-                        self._resolve_cmd(
-                            [settings.npm_cmd, "install", "--no-audit", "--no-fund"]
-                        ),
-                        cwd=str(main_root), stdout=subprocess.PIPE,
-                        stderr=subprocess.STDOUT, env=env, text=True,
-                        encoding="utf-8", errors="replace", timeout=900,
-                    )
-
-                try:
-                    proc = await asyncio.to_thread(_install)
-                    ok = proc.returncode == 0
-                    self._log(
-                        "streams",
-                        f"📦 npm install {'OK' if ok else 'ÉCHEC : ' + proc.stdout[-200:]}",
-                    )
-                except (OSError, subprocess.TimeoutExpired) as exc:
-                    self._log("streams", f"📦 npm install indisponible : {exc}")
-                    return
-        # Link the shared install into the worktree root (when distinct).
-        if root.resolve() != main_root.resolve() and (main_root / "node_modules").exists():
-            await asyncio.to_thread(
+                await self._anpm_install_in(main_root, use_ci=False)
+        # 2) Building IN the main root → the install is already there.
+        if root.resolve() == main_root.resolve():
+            return
+        # 3) Share the install via a junction; only trust it if it resolves.
+        if self._node_modules_usable(main_root):
+            linked = await asyncio.to_thread(
                 self._link_node_modules, root / "node_modules", main_root / "node_modules"
             )
+            if linked:
+                return
+        # 4) Junction failed/unusable → real install in the worktree (the Windows
+        #    `mklink /J` trap). Slower per item, but the build actually resolves.
+        self._log(
+            "streams",
+            f"📦 jonction node_modules indisponible — install réel dans le worktree {root.name}…",
+        )
+        await self._anpm_install_in(root, use_ci=True)
 
     async def _arun_frontend_tests(self, ws=None) -> tuple[bool, str, dict[str, str]]:
         """Run the frontend stream's Vitest suite AND the production build
@@ -4833,20 +5104,42 @@ class Pipeline:
         code = proc.wait()
         loop.call_soon_threadsafe(self._on_run_finished, code, "")
 
+    @staticmethod
+    def _kill_tree(proc) -> bool:
+        """Kill a child process AND its whole tree. ``proc.terminate()`` only
+        signals the immediate child on Windows, leaving the real workers alive
+        (``uvicorn``→python, ``npm``→``node``→``vite``, and the long-lived
+        ``esbuild.exe`` service) — those orphans keep ``frontend/node_modules``
+        and the workspace files OPEN, which is exactly what makes a later wipe
+        (restart / delete) fail with « partiellement verrouillé ». ``taskkill
+        /T`` (Windows) / ``terminate`` (POSIX) takes the children down too.
+        Best-effort; returns True if a live process was signalled."""
+        if proc is None or proc.poll() is not None:
+            return False
+        try:
+            if os.name == "nt":
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
+                )
+            else:
+                proc.terminate()
+        except OSError:
+            pass
+        return True
+
     async def astop_app(self) -> None:
         """Stop the running generated app, if any.
 
-        Terminates the child subprocess; the streaming worker thread then sees
-        it exit and calls ``_on_run_finished``, which resets ``running=False``.
+        Terminates the child subprocess TREE; the streaming worker thread then
+        sees it exit and calls ``_on_run_finished``, which resets ``running=False``.
         Safe to call when no app is running (logged no-op, never raises).
         """
         stopped = False
-        if self._run_proc is not None and self._run_proc.poll() is None:
-            self._run_proc.terminate()
+        if self._kill_tree(self._run_proc):
             stopped = True
         for proc in self._frontend_procs:  # ST-8: stop the frontend previews too
-            if proc and proc.poll() is None:
-                proc.terminate()
+            if self._kill_tree(proc):
                 stopped = True
         self._frontend_procs = [p for p in self._frontend_procs if p and p.poll() is None]
         # BUG9 : nettoie les tasks de streaming frontend terminées (best-effort).

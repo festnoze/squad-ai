@@ -140,6 +140,33 @@ _DECOMPOSE = json.dumps(
     ensure_ascii=False,
 )
 
+_DECOMPOSE_FINER = json.dumps(
+    {
+        "message": "Découpage plus fin après échec (mode démo).",
+        "tasks": [
+            {
+                "id": "F-1",
+                "title": "Sous-partie A (plus fine)",
+                "description": "Première moitié, isolée pour un test granulaire.",
+                "acceptance_criteria": ["AC-1"],
+                "gherkin": "Feature: A\n  Scenario: A\n    Given x\n    When a\n    Then a_ok",
+                "file_globs": ["pkg/part_a.py"],
+                "depends_on": [],
+            },
+            {
+                "id": "F-2",
+                "title": "Sous-partie B (plus fine)",
+                "description": "Seconde moitié, dépend de A.",
+                "acceptance_criteria": ["AC-1"],
+                "gherkin": "Feature: B\n  Scenario: B\n    Given a_ok\n    When b\n    Then b_ok",
+                "file_globs": ["pkg/part_b.py"],
+                "depends_on": ["F-1"],
+            },
+        ],
+    },
+    ensure_ascii=False,
+)
+
 _ANALYST = json.dumps(
     {
         "message": "Prochaine feature priorisée : la multiplication (mode démo).",
@@ -415,6 +442,8 @@ class ScriptedRunner:
         if "architecte de tests" in prompt:  # qa_test_plan
             match = _QA_STORY_RE.search(prompt)
             return _qa_plan(match.group(1) if match else "US-1")
+        if "DÉCOUPAGE PLUS FIN (échec)" in prompt:  # decompose_finer (split-on-failure)
+            return _DECOMPOSE_FINER
         if "en SOUS-TÂCHES par COUCHE" in prompt:  # decompose_story (SK-2)
             return _DECOMPOSE
         if "design technique CONCIS" in prompt:  # architect_design

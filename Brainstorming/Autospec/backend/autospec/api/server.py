@@ -853,6 +853,16 @@ async def arebuild_task(project_id: str, task_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/projects/{project_id}/items/{item_id}/split")
+async def asplit_item(project_id: str, item_id: str) -> dict:
+    """P6: re-decompose a FAILED story or task into finer sub-tasks and resume the
+    build (counters the « unit too big for one agent session » problem). 409 if
+    active or not eligible, 404 if unknown."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.asplit_item(item_id), f"Élément inconnu : {item_id}")
+    return {"ok": True}
+
+
 @app.post("/api/projects/{project_id}/tasks/{task_id}/force-done")
 async def aforce_done_task(project_id: str, task_id: str) -> dict:
     """ST-13: force a single task to DONE (user override)."""

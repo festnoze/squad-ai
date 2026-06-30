@@ -73,12 +73,29 @@ def test_analyze_empty_globs_serialized_and_warned():
     assert len(report.warnings) == 2  # both lack file claims
 
 
-def test_cross_stream_same_path_not_serialized():
+def test_cross_stream_same_real_file_is_serialized():
+    # P1 fix: two tasks of DIFFERENT streams that both DECLARE the same repo-root
+    # file (README.md, .gitignore, main.py…) DO conflict on merge — the stream is
+    # not a safe disjointer for declared paths.
     tasks = [
-        _claim("be", "backend", ("shared.py",)),
-        _claim("fe", "frontend", ("shared.py",)),
+        _claim("be", "backend", ("README.md",)),
+        _claim("fe", "frontend", ("README.md",)),
+    ]
+    assert ("be", "fe") in independence.analyze(tasks).conflict_pairs
+
+
+def test_cross_stream_disjoint_paths_stay_parallel():
+    # Different streams touching their OWN file_roots remain independent.
+    tasks = [
+        _claim("be", "backend", ("backend/api/router.py",)),
+        _claim("fe", "frontend", ("frontend/src/App.tsx",)),
     ]
     assert independence.analyze(tasks).conflict_pairs == []
+
+
+def test_cross_stream_empty_claims_presumed_disjoint():
+    # Unspecified claims only span their own stream's file_root → backend ‖ frontend.
+    assert not independence.claims_overlap(_claim("be", "backend"), _claim("fe", "frontend"))
 
 
 def test_declared_overlap_ignores_undeclared():
@@ -89,6 +106,24 @@ def test_declared_overlap_ignores_undeclared():
     assert not independence.declared_overlap(a, b)
     c = _claim("C", "backend", ("x.py",))
     assert independence.declared_overlap(b, c)
+    # Cross-stream declared overlap is caught too (shared root file).
+    assert independence.declared_overlap(
+        _claim("x", "backend", ("README.md",)), _claim("y", "frontend", ("README.md",))
+    )
+
+
+def test_declared_serialization_global_cross_story():
+    # Two tasks of DIFFERENT stories both declaring pyproject.toml must be ordered.
+    tasks = [
+        _claim("T-A", "backend", ("pyproject.toml", "pkg/a.py")),
+        _claim("T-B", "backend", ("pyproject.toml", "pkg/b.py")),
+    ]
+    edges = independence.declared_serialization(tasks)
+    assert edges.get("T-B") == ("T-A",)
+    # Disjoint declared tasks get no edge.
+    assert independence.declared_serialization(
+        [_claim("T-A", "backend", ("pkg/a.py",)), _claim("T-B", "backend", ("pkg/b.py",))]
+    ) == {}
 
 
 # --------------------------------------------------------------- pipeline wiring
@@ -124,6 +159,17 @@ def _task(tid, story_id, *, stream="", globs=(), deps=(), status=StoryStatus.TOD
 def streams_on(monkeypatch):
     monkeypatch.setattr(settings, "streams_enabled", True)
     monkeypatch.setattr(settings, "fake_agents", True)
+
+
+def test_global_pass_serializes_cross_story_shared_file(streams_on):
+    state = _streams_state([
+        _us("US-1", tasks=[_task("T-1", "US-1", stream="backend", globs=("pyproject.toml", "pkg/a.py"))]),
+        _us("US-2", tasks=[_task("T-2", "US-2", stream="backend", globs=("pyproject.toml", "pkg/b.py"))]),
+    ])
+    pipeline = Pipeline(state, ScriptedRunner())
+    pipeline._enforce_global_independence()
+    # The later-declared task (T-2) now waits for T-1 — no cross-story merge clash.
+    assert "T-1" in state.task("T-2").depends_on
 
 
 def test_enforce_independence_injects_depends_on(streams_on):

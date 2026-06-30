@@ -98,14 +98,19 @@ classe parallélisable certifiée disjointe de tous les items en vol (`running`)
 - `_amerge_work_item` : sur conflit, **ne pas** retry à l'identique — **rebaser** le worktree sur HEAD à jour puis re-merger ; échec persistant → requeue avec `depends_on` ajouté vers l'item qui a gagné le fichier. *(C5)*
 - **Acceptance** : 2 tâches frontend qui touchent `App.tsx` ne tournent jamais en parallèle ; le 2ᵉ part du HEAD contenant le 1er.
 
-### P2 — Ne jamais perdre le green
-- Avant suppression du worktree : si l'item est vert mais non mergé (conflit), **conserver la branche** (`autospec/wi-…`) et requeue ; ne supprimer le worktree qu'après merge réussi ou abandon explicite. *(C3)*
-- **Acceptance** : aucun commit « … done » sans merge correspondant ; le code dev vert finit dans `App.tsx`.
+### P2 — Ne jamais perdre le green ✅ (livré 2026-06-30)
+- `_amerge_work_item` reçoit le **worktree** et, sur conflit, **rebase la branche verte sur le HEAD à jour** (qui contient le commit du sibling) **dans son worktree** puis re-merge → le travail vert est préservé chaque fois que les éditions ne se chevauchent pas vraiment. *(C3)*
+- Sur conflit réel (mêmes lignes), le **`rebase --abort` restaure la branche verte intacte** (jamais perdue côté branche) et l'item est requeue pour un rebuild depuis le HEAD à jour ; le repo et le worktree restent **propres** (pas d'état `MERGE_HEAD`/rebasing résiduel).
+- Tests `test_merge_preserve.py` : merge sans conflit → vert livré ; conflit réel → `False` + repo propre + **branche verte préservée**.
+- **Acceptance** : aucun green silencieusement écrasé ; sur conflit l'état git reste cohérent et la branche conserve le travail.
 
-### P3 — Fiabiliser le frontend en worktree
-- Garantir `node_modules` **avant** toute vérif : si la jonction échoue, **`npm ci` réel** dans le worktree (ou copie), et **échouer la tâche proprement** si le toolchain manque (déjà l'intention, à durcir). *(C7)*
-- Sérialiser le **premier** `npm install` (déjà `_npm_lock`) et vérifier sa réussite avant de lancer les vérifs frontend.
-- **Acceptance** : `vitest`/`tsc` jamais « introuvables » en worktree.
+### P3 — Fiabiliser le frontend en worktree ✅ (livré 2026-06-30)
+- **`_node_modules_usable(root)`** : sonde `.bin`/`vite` au lieu de la simple existence du dossier → détecte une jonction silencieusement cassée ou un dossier vide.
+- **`_link_node_modules` renvoie un booléen** : True **uniquement** si la jonction résout vers un install utilisable (plus de confiance aveugle dans `mklink /J`). *(C7)*
+- **Fallback réel** : si la jonction échoue/ne résout pas, **`npm ci`** (ou `install`) réel dans le worktree (`_anpm_install_in`) → la vérif `vitest`/`tsc` résout toujours.
+- Le retour anticipé teste désormais l'**utilisabilité** (pas l'existence), donc un worktree avec un `node_modules` partiel est ré-installé.
+- Tests `test_frontend_node_modules.py` (utilisabilité, jonction qui rapporte sa résolution, fallback quand la jonction échoue, jonction OK → pas de réinstall).
+- **Acceptance** : `vitest`/`tsc` ne sont plus jamais « introuvables » en worktree.
 
 ### P4 — Sous-système d'indépendance (la demande centrale) ⭐
 - **Modèle** : remplir `Task.files_hint` (renommer conceptuellement en `file_globs`), via le décomposeur. *(C10)*
@@ -115,9 +120,30 @@ classe parallélisable certifiée disjointe de tous les items en vol (`running`)
 - **Scheduler** : consomme la **partition certifiée** ; parallélise les classes disjointes, sérialise le reste.
 - **Acceptance** : sur un projet fullstack à plusieurs composants, seules les tâches à fichiers disjoints tournent en parallèle ; restauration de la perf parallèle **sans** régression de conflit.
 
-### P5 — DoD incrémentale + profils
+### P6 — Re-décomposition adaptative sur échec ⭐ (« US trop grosse pour une session »)
+Quand une story/tâche **n'arrive pas à passer au vert** après ses tentatives de dev,
+au lieu de la marquer FAILED, l'**architecte la ré-analyse et la découpe plus finement**
+en sous-tâches plus petites, avec des **tests plus granulaires** — qui se construisent
+ensuite chacune dans leur sous-agent focalisé. Contre directement le problème de l'unité
+trop volumineuse pour une seule fenêtre de contexte d'agent.
+- Automatique : hook dans la branche « rouge épuisé » du worker (`_amaybe_split_on_failure`),
+  **borné** par `split_depth`/`AUTOSPEC_SPLIT_MAX_DEPTH` (pas de récursion infinie), ON par
+  défaut (`AUTOSPEC_SPLIT_ON_FAILURE`).
+- Manuel : bouton **✂️ Découper plus fin** sur une story/tâche en échec
+  (`POST …/items/{id}/split`), force le découpage puis reprend le build.
+- Réécriture des dépendances : une tâche découpée est remplacée par ses sous-tâches, les
+  dépendants attendent désormais **toutes** les sous-tâches ; le floor d'indépendance
+  s'applique aux nouvelles tâches.
+
+### P5 — DoD incrémentale + profils  ⏸️ (différé — non indispensable)
 - **Progrès partiel** : livrer les stories vertes même si d'autres échouent ; un projet n'est « échoué » que si **0** story livrée. *(C9)*
-- **Profils** : `auto` ne doit pas activer streams pour un produit clairement simple ; aligner `profiles.py` (api/cli par défaut, fullstack explicite). Réintroduire streams **uniquement** via profil `fullstack` une fois P1-P4 verts.
+- **Profils** : `auto` ne doit pas activer streams pour un produit clairement simple ; aligner `profiles.py` (api/cli par défaut, fullstack explicite).
+- **Pourquoi différé** : les stories vertes sont déjà **construites et commitées** ; P5 ne change que la *sémantique de « done »* (livraison partielle), pas la correction ni la récupération. Avec **P6** (auto-split sur échec) + retry + **P2** (préservation du green), les échecs sont déjà adressés. À reprendre seulement si le besoin produit de « livrer partiellement » se confirme.
+
+---
+
+## Clôture du plan (2026-06-30)
+**P0, P1, P2, P3, P4, P6 livrés et testés** (491+ tests backend verts, 141 vitest, tsc clean). Le chemin parallèle streams+worktree est désormais **sûr** (indépendance prouvée, conflits sérialisés), **auto-récupérant** (orphelins reset, worker non-fatal, split-on-failure) et **sans perte de travail** (green préservé, repo propre, bookkeeping hors git). **P5 différé** (optionnel). Reste hors-plan : alignement des profils `auto`/`fullstack` si souhaité.
 
 ---
 
@@ -167,3 +193,11 @@ classe parallélisable certifiée disjointe de tous les items en vol (`running`)
 **Tests :** `tests/test_independence.py` (11) — analyseur pur, reproduction todo_list_2, garde-fou scheduler (jamais de co-run sur fichiers déclarés communs, les deux finissent DONE), reset orphelins, crash worker isolé, commit sans bookkeeping.
 
 > Note config : `AUTOSPEC_STREAMS=1` est **laissé activé** dans `backend/.env` — le chemin parallèle est désormais sécurisé par P4, donc le désactiver (hotfix P0 d'origine) n'est plus nécessaire. À basculer à 0 seulement pour un débogage ponctuel.
+
+### 7bis. Suite à revue de code (P1/P2 corrigés)
+
+- **P1#1 — conflits cross-stream sur un même fichier réel.** `claims_overlap`/`declared_overlap` comparent désormais les **chemins réels** quand les deux tâches ont des `file_globs` **déclarés** (stream-agnostique) : deux streams qui déclarent `README.md`/`.gitignore`/`main.py` à la racine **conflictent** et sont sérialisés. Le stream ne sert de disjoncteur que pour les claims **vides** (« tout le file_root »). Le test qui encodait la mauvaise hypothèse est inversé (`test_cross_stream_same_real_file_is_serialized`).
+- **P1#2 — floor seulement intra-story.** Nouveau **pass global** `independence.declared_serialization` + `Pipeline._enforce_global_independence()` (appelé dans `_abuild_phase` après le juge) : injecte des `depends_on` pour **toute** paire de tâches (toutes stories/streams) aux globs **déclarés** chevauchants (ex. deux stories éditant `pyproject.toml`). Ne touche pas aux claims vides → pas de sur-sérialisation ni deadlock ; le résiduel (agent qui oublie `file_globs`) reste couvert par le re-queue de merge.
+- **P2#1 — restart ne vidait pas les interactions live.** `InteractionStore.clear()` ajouté + appelé dans `arestart_from_scratch` (l'endpoint sert d'abord ce store mémoire → l'activité d'anciens items ne réapparaît plus après un restart sans redémarrage backend).
+- **P2#2 — UI « Continuer le build » masqué pour un orphelin dormant.** `hasBuildableStory` (work.ts) inclut désormais `in_progress`/`green` (évalué uniquement en phase dormante via `canResumeBuild`, où ce sont des orphelins que le backend reset à la reprise).
+- Tests : +5 backend (cross-stream réel sérialisé, disjoints parallèles, pass global cross-story, clear interactions), +1 frontend (orphelin dormant resumable). Backend 482 / vitest 141.

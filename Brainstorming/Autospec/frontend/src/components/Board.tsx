@@ -9,6 +9,7 @@ import {
   rebuildStory,
   rebuildTask,
   reorderStories,
+  splitItem,
   storyDiff,
   taskDiff,
 } from "../api";
@@ -782,6 +783,7 @@ function StoryDetail({
 
   const handleRebuild = run(() => rebuildStory(projectId, story.id));
   const handleForceDone = run(() => forceDoneStory(projectId, story.id));
+  const handleSplit = run(() => splitItem(projectId, story.id));
 
   // Une story « bloquée » (échec, tests rouges, ou todo déjà tentée/en erreur —
   // p. ex. orpheline d'une itération passée) est relançable dès que la pipeline
@@ -792,6 +794,9 @@ function StoryDetail({
     story.status === "red" ||
     (story.status === "todo" && (story.attempts > 0 || !!story.last_error));
   const canRelaunch = dormant && stuck;
+  // P6 : découper plus finement une story EN ÉCHEC (le backend exige le statut
+  // failed) quand la pipeline est dormante.
+  const canSplit = dormant && story.status === "failed";
 
   return (
     <div className="story-detail">
@@ -839,6 +844,16 @@ function StoryDetail({
                 >
                   ✓ {t("board.action_forceDone")}
                 </button>
+                {canSplit && (
+                  <button
+                    className="action-btn small-btn"
+                    disabled={busy}
+                    onClick={handleSplit}
+                    title={t("board.splitItem_title")}
+                  >
+                    ✂️ {t("board.action_split")}
+                  </button>
+                )}
               </>
             )}
             {story.status === "done" && (
@@ -935,6 +950,7 @@ function TaskDetail({
 
   const handleRebuild = run(() => rebuildTask(projectId, task.id));
   const handleForceDone = run(() => forceDoneTask(projectId, task.id));
+  const handleSplit = run(() => splitItem(projectId, task.id));
 
   const dormant = ["done", "stopped", "error"].includes(phase ?? "");
   const stuck =
@@ -942,6 +958,7 @@ function TaskDetail({
     task.status === "red" ||
     (task.status === "todo" && (task.attempts > 0 || !!task.last_error));
   const canRelaunch = dormant && stuck;
+  const canSplit = dormant && task.status === "failed";  // P6: re-decompose a failed task
   const blockers = blockedBy(task.depends_on, task.status, stories);
   const showStream = !!task.stream && task.stream !== primaryStreamId;
 
@@ -992,6 +1009,16 @@ function TaskDetail({
             >
               ✓ {t("board.action_forceDone")}
             </button>
+            {canSplit && (
+              <button
+                className="action-btn small-btn"
+                disabled={busy}
+                onClick={handleSplit}
+                title={t("board.splitItem_title")}
+              >
+                ✂️ {t("board.action_split")}
+              </button>
+            )}
           </>
         )}
         {task.status === "done" && (

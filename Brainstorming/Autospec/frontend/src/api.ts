@@ -248,6 +248,12 @@ export async function restartFromScratch(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/restart`, { method: "POST" }));
 }
 
+export async function splitItem(projectId: string, itemId: string): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/items/${itemId}/split`, { method: "POST" }),
+  );
+}
+
 export async function cancelResume(projectId: string): Promise<void> {
   await json(
     await fetch(`/api/projects/${projectId}/cancel-resume`, { method: "POST" }),

@@ -144,11 +144,15 @@ export function effectiveStatus(story: UserStory): StoryStatus {
 export const DORMANT_PHASES: PipelinePhase[] = ["done", "stopped", "needs_attention", "error"];
 
 /** Whether any story still needs building, by EFFECTIVE status (so a multi-stream
- *  US half-built via its tasks — raw status not todo/red — still counts). */
+ *  US half-built via its tasks — raw status not todo/red — still counts). Only
+ *  ever evaluated in a DORMANT phase (via `canResumeBuild`), where an
+ *  `in_progress`/`green` story/task is a crash-or-restart ORPHAN with no worker
+ *  behind it — the backend resets those to TODO on resume (`_reset_orphan_items`),
+ *  so the UI must still offer « Continuer le build » for them. */
 export function hasBuildableStory(stories: UserStory[] | undefined): boolean {
   return (stories ?? []).some((s) => {
     const st = effectiveStatus(s);
-    return st === "todo" || st === "red";
+    return st === "todo" || st === "red" || st === "in_progress" || st === "green";
   });
 }
 

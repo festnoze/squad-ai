@@ -204,16 +204,22 @@ def delete_workspace(project_id: str) -> bool:
     return True
 
 
-def force_delete_workspace(project_id: str) -> bool:
+def force_delete_workspace(project_id: str, *, best_effort: bool = False) -> bool:
     """Delete a project workspace, defeating git's read-only pack/object files.
 
     ``delete_workspace`` uses ``ignore_errors=True`` so a committed git repo's
     read-only ``.git`` files survive on Windows. This variant clears the
     read-only bit in an ``onerror`` handler and retries (same backoff as
     ``save_state_payload``), so the workspace is wiped clean — used by the
-    "restart from scratch" flow and the project deletion. Raises OSError if a
-    file stays locked (e.g. the generated app is still running). Returns True if
-    the workspace existed."""
+    "restart from scratch" flow and the project deletion.
+
+    Returns True if the workspace is fully gone. With ``best_effort`` it NEVER
+    raises: deletable files (source, ``.git``) are removed and any remnant left
+    by a still-open handle — typically a cache dir like ``node_modules``/``.venv``
+    held briefly by a killed node/esbuild process — is tolerated (the caller can
+    proceed; a leftover cache is harmless). Without it, a remaining lock raises
+    OSError (the strict path used by project deletion, which re-registers on
+    failure so the delete can be retried)."""
     ws = workspace_dir(project_id)
     if not ws.exists():
         return False
@@ -230,9 +236,9 @@ def force_delete_workspace(project_id: str) -> bool:
         if not ws.exists():
             return True
         time.sleep(_SAVE_BACKOFF_S * (attempt + 1))
-    if ws.exists():
+    if ws.exists() and not best_effort:
         raise OSError(f"workspace {project_id} partiellement verrouillé")
-    return True
+    return not ws.exists()
 
 
 def list_states() -> list[ProjectState]:

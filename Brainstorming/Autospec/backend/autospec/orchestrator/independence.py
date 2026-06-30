@@ -34,6 +34,7 @@ __all__ = [
     "globs_overlap",
     "claims_overlap",
     "declared_overlap",
+    "declared_serialization",
     "analyze",
 ]
 
@@ -109,29 +110,60 @@ def globs_overlap(g1: str, g2: str) -> bool:
 
 
 def claims_overlap(t1: TaskClaim, t2: TaskClaim) -> bool:
-    """Two tasks overlap when they share a stream and any of their globs could
-    hit a common file. No declared globs ⇒ "claims the whole stream" ⇒ overlaps
-    every sibling of that stream."""
+    """Whether two tasks could touch a common file.
+
+    DECLARED on both sides → compare the REAL repo-relative paths, *stream-
+    agnostic*: two tasks of DIFFERENT streams that both touch a shared root file
+    (``README.md``, ``.gitignore``, ``main.py``, ``docker-compose.yml``…) DO
+    conflict on merge — the stream is not a safe disjointer for declared paths.
+
+    At least one side UNSPECIFIED ("the whole stream") → only the stream tells us
+    anything: different streams live in disjoint ``file_root``s (presumed
+    disjoint), the same stream is presumed to overlap (conservative)."""
     if t1.id == t2.id:
         return False
+    if t1.file_globs and t2.file_globs:
+        return any(globs_overlap(a, b) for a in t1.file_globs for b in t2.file_globs)
     if (t1.stream or "") != (t2.stream or ""):
-        return False  # different streams live in disjoint file_roots
-    if not t1.file_globs or not t2.file_globs:
-        return True
-    return any(globs_overlap(a, b) for a in t1.file_globs for b in t2.file_globs)
+        return False  # an unspecified claim only spans its own stream's file_root
+    return True
 
 
 def declared_overlap(t1: TaskClaim, t2: TaskClaim) -> bool:
     """Stricter than :func:`claims_overlap`: True only when BOTH tasks have
-    DECLARED (non-empty) file globs that overlap. Used by the live scheduler
-    guard as a pure backstop — it must never serialize on merely-undeclared
-    claims (that is the floor's job via injected ``depends_on``; doing it at
-    schedule time without that ordering could deadlock same-stream siblings)."""
-    if t1.id == t2.id or (t1.stream or "") != (t2.stream or ""):
+    DECLARED (non-empty) file globs that overlap on their REAL paths (stream-
+    agnostic — a cross-stream shared root file still conflicts). Used by the live
+    scheduler guard as a pure backstop — it must never serialize on merely-
+    undeclared claims (that is the floor's job via injected ``depends_on``; doing
+    it at schedule time without that ordering could deadlock same-stream
+    siblings)."""
+    if t1.id == t2.id:
         return False
     if not t1.file_globs or not t2.file_globs:
         return False
     return any(globs_overlap(a, b) for a in t1.file_globs for b in t2.file_globs)
+
+
+def declared_serialization(tasks: list[TaskClaim]) -> dict[str, tuple[str, ...]]:
+    """P1: a GLOBAL deterministic pass — the ``depends_on`` edges to inject so
+    every pair of tasks whose DECLARED globs overlap (across stories AND streams)
+    is serialized, unless already ordered. Unlike :func:`analyze`, it leaves
+    UNDECLARED claims untouched (no whole-stream serialization), so it never
+    over-serializes or deadlocks: it only closes the gap where two *different*
+    stories/streams both declare a shared real file (e.g. ``pyproject.toml`` or
+    a repo-root ``README.md``). Stable: the later-declared task waits."""
+    deps: dict[str, set[str]] = {t.id: set(t.depends_on) for t in tasks}
+    index = {t.id: i for i, t in enumerate(tasks)}
+    added: dict[str, set[str]] = {}
+    for i in range(len(tasks)):
+        for j in range(i + 1, len(tasks)):
+            a, b = tasks[i], tasks[j]
+            if not declared_overlap(a, b) or _ordered(a.id, b.id, deps):
+                continue
+            later, earlier = (a.id, b.id) if index[a.id] > index[b.id] else (b.id, a.id)
+            deps[later].add(earlier)
+            added.setdefault(later, set()).add(earlier)
+    return {k: tuple(sorted(v)) for k, v in added.items()}
 
 
 def _ordered(a: str, b: str, deps: dict[str, set[str]]) -> bool:

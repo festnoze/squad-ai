@@ -253,6 +253,7 @@ class Task(BaseModel):
     attempts: int = 0
     last_error: str = ""
     files_hint: list[str] = Field(default_factory=list)   # files/zones it expects to touch
+    split_depth: int = 0  # how many adaptive failure-splits produced/refined this task (bounds recursion)
     # B1/N4/P10 (UX): fine-grained stage tracking for the stepper. All defaults
     # are safe so a pre-UX persisted Task loads as "queued, no persona, no
     # recovery, no guidance".
@@ -277,6 +278,7 @@ class UserStory(BaseModel):
     iteration: int = 1
     attempts: int = 0
     last_error: str = ""
+    split_depth: int = 0  # adaptive failure-splits applied to this story (bounds re-decomposition)
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
     mutation_score: int = -1  # last mutation-testing robustness score, %% (-1 = not run)
     coverage_score: int = -1  # last test-coverage percentage (-1 = not run)

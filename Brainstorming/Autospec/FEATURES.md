@@ -270,6 +270,32 @@ et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 - **▶ Continuer le build** d'un projet dormant (reprend la phase build sur les
   stories `todo`/`red`).
 
+### Préservation du travail vert sur conflit de merge
+- En build parallèle, si un work item est **vert mais que son merge entre en
+  conflit** (un sibling a modifié la même zone), `_amerge_work_item` **rebase la
+  branche verte sur le HEAD à jour dans son worktree** puis re-merge → le travail
+  est préservé quand les éditions ne se chevauchent pas vraiment. Sur conflit réel,
+  `rebase --abort` **restaure la branche verte intacte** et l'item est requeue pour
+  un rebuild depuis le HEAD à jour ; le repo reste propre (jamais d'état
+  `MERGE_HEAD`/rebasing résiduel). Combiné à la sérialisation par fichiers (P1/P4),
+  les conflits sont rares et le green n'est jamais silencieusement perdu.
+
+### Re-décomposition adaptative sur échec
+- Quand une **US ou une tâche n'arrive pas à passer au vert** après ses tentatives
+  de dev, plutôt que de la marquer en échec, l'agent **architecte la ré-analyse et
+  la découpe en sous-tâches plus petites** (`prompts.decompose_finer`), avec des
+  **tests plus granulaires** — chacune construite par un sous-agent focalisé. Cible
+  le problème de l'**unité trop grosse pour une seule session d'agent**.
+- **Automatique** (`_amaybe_split_on_failure`, hook dans la branche « rouge épuisé »
+  du worker) : ON par défaut (`AUTOSPEC_SPLIT_ON_FAILURE`), **borné** par
+  `split_depth` / `AUTOSPEC_SPLIT_MAX_DEPTH` (jamais de récursion infinie).
+- **Manuel** : bouton **✂️ Découper plus fin** sur une story/tâche en échec
+  (`POST /api/projects/{id}/items/{item_id}/split`) → force la re-décomposition puis
+  reprend le build. **409** si la pipeline est active ou l'unité indivisible.
+- **Réécriture des dépendances** : la tâche découpée est remplacée par ses
+  sous-tâches ; ses dépendants attendent désormais **toutes** les sous-tâches ; le
+  floor d'indépendance (P4) s'applique aux nouvelles tâches.
+
 ### Relancer un projet *from scratch*
 - Bouton **♻️ Relancer from scratch** (`RunPanel`, visible quand la pipeline est
   dormante et qu'un **brief** existe) : `Pipeline.arestart_from_scratch()`

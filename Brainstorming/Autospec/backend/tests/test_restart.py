@@ -60,6 +60,40 @@ async def test_restart_keeps_brief_clears_everything_and_wipes_workspace(monkeyp
     assert launched["started"] is True                   # pipeline relaunched
 
 
+async def test_restart_clears_live_interactions(monkeypatch):
+    state = _seeded_state(project_id="restart-interactions")
+    pipeline = Pipeline(state, ScriptedRunner())
+    pipeline.interactions.record(
+        item_id="US-1", phase="build", persona="dev", prompt="p", response="r", ok=True,
+    )
+    assert pipeline.interactions.has_item("US-1")
+    monkeypatch.setattr(pipeline, "start", lambda: None)
+
+    await pipeline.arestart_from_scratch()
+
+    # The live in-memory store (served first by the interactions endpoint) must be
+    # empty so old items' activity can't resurface after the restart.
+    assert not pipeline.interactions.has_item("US-1")
+
+
+async def test_restart_tolerates_partial_lock(monkeypatch):
+    """A cache dir (node_modules/.venv) briefly held by a just-killed node/esbuild
+    process must NOT 409 the restart — it proceeds and relaunches."""
+    import autospec.orchestrator.pipeline as pipeline_mod
+
+    state = _seeded_state(project_id="restart-locked")
+    pipeline = Pipeline(state, ScriptedRunner())
+    # Simulate force_delete leaving a locked remnant (returns False = not fully gone).
+    monkeypatch.setattr(pipeline_mod, "force_delete_workspace", lambda pid, *, best_effort: False)
+    started = {"v": False}
+    monkeypatch.setattr(pipeline, "start", lambda: started.__setitem__("v", True))
+
+    await pipeline.arestart_from_scratch()        # must not raise
+
+    assert started["v"] is True
+    assert state.brief == "BRIEF: build a todo list."
+
+
 async def test_restart_rejected_without_brief():
     state = _seeded_state()
     state.brief = ""
