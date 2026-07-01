@@ -186,6 +186,54 @@ sous-tâches ou erreur → story construite d'un bloc.
 
 ---
 
+## 2quater. Pipeline PO multi-étapes (RFC po-pipeline-v2)
+
+`AUTOSPEC_PO_PIPELINE` (**off par défaut** | `on`) remplace le PO mono-passe (et
+sa revue judge-first `_arefine_plan`) par un **workflow agentique multi-étapes**
+(`orchestrator/plan_pipeline.py`) :
+
+- **S1 Structure + Complexité** (persona `po-structure`) : squelette (epics,
+  stories, tâches, `depends_on`, priorités) + **jugement de complexité par
+  feuille** (`complexity` trivial/standard/complex, `rationale`,
+  `estimated_files`). Validation **déterministe** à chaque tour (schéma pydantic,
+  DAG acyclique, deps non orphelines, budget fichiers `AUTOSPEC_TASK_FILE_BUDGET`,
+  `complex` sans découpe = refus, globs confrontés à l'arbre réel dès l'itération 2,
+  heuristiques fourre-tout) + **1 retry d'auto-réparation** ; puis UN critic
+  structure en boucle **critic-d'abord** (`arefine_critic_first`, pas de judge
+  d'ouverture ; un critic en échec est distingué d'un critic satisfait).
+- **Gating post-S1 déterministe** : `< AUTOSPEC_PO_PIPELINE_MIN_LEAVES` (défaut 4)
+  feuilles mesurées → **S2+S3 fusionnés en une passe par story** ; sinon pipeline
+  complet. (Le mode `auto` à heuristique de longueur de brief est abandonné.)
+- **S2 Spec** (persona `po-spec`, fan-out **par story**, parallèle) : description
+  + critères taxonomisés `{id, text, kind ∈ happy|error|edge|nonfunctional}` +
+  mini-specs des tâches + **verdict `resize`**. Validation déterministe (intégrité
+  référentielle vs squelette, couverture minimale happy+error) + 1 auto-repair.
+  **Barrière resize** (1 tour borné) : `split` appliqué via le **cerveau de
+  découpe commun** (`SIZING_RULES` partagé avec `decompose_finer`, mode proactif),
+  `merge` si 2 stories triviales adjacentes le demandent ; les nœuds resized
+  repassent une fois en S2. Puis **UN critic transversal** (chevauchements,
+  contradictions, trous, story d'intégration manquante) → **re-make ciblé** des
+  seuls nœuds flaggés.
+- **S3 Gherkin** (persona `po-gherkin`, fan-out par story) : single-shot +
+  validation déterministe (parse Feature/Scenario, **alignement 1-pour-1
+  scénario ↔ critère via tags `@AC-x`**, steps UI/réseau interdits pour les
+  stories non-`ui`) + 1 auto-repair ; **critic LLM réservé aux stories
+  `complex`**. `AUTOSPEC_PO_PIPELINE_GHERKIN=0` coupe S3.
+- **Dégradation explicite** : S2 en échec → 1 tentative mono-passe sur ce seul
+  nœud, sinon squelette conservé marqué `spec_incomplete` ; S3 en échec →
+  **gherkin mécanique dérivé des critères** (jamais vide). Toute dégradation est
+  loggée + comptée ; un échec S1 retombe sur le PO mono-passe legacy.
+- **Boucle d'évolution mesurée (§6)** : compteurs par itération dans
+  `ProjectState.calibration` (splits réactifs, tâches hors budget fichiers au
+  runtime, dégradations d'étapes) ; chaque split réactif émet une **leçon de
+  dimensionnement** (`sizing_lessons`) **injectée dans S1 à l'itération
+  suivante** — l'échec d'aujourd'hui dimensionne le plan de demain.
+
+Mode démo : le `ScriptedRunner` répond à S1/S2 (avec un cas `resize:split` pour
+les ids contenant `SPLIT`)/S3/critic transversal sans LLM.
+
+---
+
 ## 3. Harnais de raffinement (maker → critic → judge)
 
 Boucle générique (`orchestrator/refine.py`, `arefine()`) pour améliorer un
@@ -513,6 +561,6 @@ Autospec/
 ```
 
 **État** : pipeline renforcée par des gates de livraison déterministes, profils
-produit, skills validées, runtime acceptance et batterie golden ; les suites
-locales vérifiées sont vertes (**463 backend**, **136 frontend**, golden locale
-**71 tests**).
+produit, skills validées, runtime acceptance, batterie golden et pipeline PO
+multi-étapes (RFC po-pipeline-v2) ; les suites locales vérifiées sont vertes
+(**533 backend**, **136 frontend**, golden locale **71 tests**).

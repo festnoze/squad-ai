@@ -43,6 +43,7 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "skills_enabled", False)
     monkeypatch.setattr(settings, "decompose_enabled", False)
     monkeypatch.setattr(settings, "review_plan_enabled", False)
+    monkeypatch.setattr(settings, "po_pipeline", "off")
     monkeypatch.setattr(settings, "split_on_failure_enabled", False)
     monkeypatch.setattr(settings, "setup_install", False)
     monkeypatch.setattr(settings, "ui_tests_enabled", False)

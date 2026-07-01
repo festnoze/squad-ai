@@ -385,6 +385,127 @@ _CRITIC = json.dumps(
     ensure_ascii=False,
 )
 
+# --------------------------------------------- PO pipeline (RFC po-pipeline-v2)
+
+# S1: the skeleton — structure + a complexity judgment per leaf, NO specs.
+_PO_STRUCTURE = json.dumps(
+    {
+        "epics": [
+            {
+                "id": "EPIC-1",
+                "title": "Cœur applicatif",
+                "description": "Les fonctionnalités de base (squelette, mode démo).",
+                "stories": [
+                    {
+                        "id": "US-1",
+                        "title": "Additionner deux nombres",
+                        "depends_on": [],
+                        "priority": 1,
+                        "ui": False,
+                        "stream": "",
+                        "complexity": "standard",
+                        "rationale": "Une opération simple mais avec validation d'entrée.",
+                        "estimated_files": 2,
+                        "file_globs": [],
+                        "area": "domaine/calcul",
+                        "tasks": [],
+                    },
+                    {
+                        "id": "US-2",
+                        "title": "Soustraire deux nombres",
+                        "depends_on": ["US-1"],
+                        "priority": 2,
+                        "ui": False,
+                        "stream": "",
+                        "complexity": "trivial",
+                        "rationale": "Symétrique de l'addition, structure déjà en place.",
+                        "estimated_files": 1,
+                        "file_globs": [],
+                        "area": "domaine/calcul",
+                        "tasks": [],
+                    },
+                ],
+            }
+        ]
+    },
+    ensure_ascii=False,
+)
+
+# S2: the story id is echoed from the skeleton JSON embedded in the prompt.
+_SPEC_STORY_ID_RE = re.compile(r'"id":\s*"([^"]+)"')
+_SPEC_TASK_ID_RE = re.compile(r'\{"id":\s*"([^"]+)",\s*"title"')
+# S3: criteria are listed as "- [AC-1] (happy) …" lines in the gherkin prompt.
+_GHERKIN_AC_RE = re.compile(r"- \[(AC-[\w.]+)\]")
+_GHERKIN_STORY_RE = re.compile(r"Story : (\S+)")
+
+
+def _scripted_gherkin(ac_ids: list[str]) -> str:
+    lines = ["Feature: Calcul (mode démo)"]
+    for ac in ac_ids or ["AC-1"]:
+        lines += [
+            f"  @{ac}",
+            f"  Scenario: Vérification du critère {ac}",
+            "    Given deux nombres valides",
+            "    When je lance le calcul",
+            "    Then le résultat attendu est renvoyé",
+        ]
+    return "\n".join(lines)
+
+
+def _po_spec_reply(prompt: str) -> str:
+    """S2 canned spec: minimal happy+error coverage, mini-specs for every task
+    listed in the prompt, resize ok — except a story whose id contains
+    « SPLIT », which asks for a split (the RFC's scripted resize case)."""
+    ids = _SPEC_STORY_ID_RE.findall(prompt)
+    story_id = ids[0] if ids else "US-1"
+    # Task ids live in the « Ses tâches » listing only — the story's own
+    # skeleton JSON also matches the {"id": …, "title"} shape, so scope the scan.
+    tasks_at = prompt.find("Ses tâches")
+    task_ids = _SPEC_TASK_ID_RE.findall(prompt[tasks_at:]) if tasks_at >= 0 else []
+    criteria = [
+        {"id": "AC-1", "text": "Le calcul nominal renvoie le résultat attendu.", "kind": "happy"},
+        {"id": "AC-2", "text": "Une entrée invalide est rejetée avec une erreur claire.", "kind": "error"},
+    ]
+    verdict = {"verdict": "ok", "proposal": ""}
+    if "SPLIT" in story_id.upper():
+        verdict = {
+            "verdict": "split",
+            "proposal": "La story couvre deux responsabilités : le calcul et sa persistance.",
+        }
+    return json.dumps(
+        {
+            "id": story_id,
+            "description": "En tant qu'utilisateur, je veux effectuer le calcul afin d'obtenir le résultat.",
+            "acceptance_criteria": criteria,
+            "tasks": [
+                {
+                    "id": tid,
+                    "description": f"Mini-spec de la tâche {tid} (mode démo).",
+                    "acceptance_criteria": [
+                        {"id": "AC-1", "text": f"Le contrat de {tid} est respecté.", "kind": "happy"}
+                    ],
+                }
+                for tid in task_ids
+            ],
+            "resize": verdict,
+            "gherkin": _scripted_gherkin([c["id"] for c in criteria]),
+        },
+        ensure_ascii=False,
+    )
+
+
+def _po_gherkin_reply(prompt: str) -> str:
+    ids = _GHERKIN_STORY_RE.findall(prompt)
+    ac_ids = _GHERKIN_AC_RE.findall(prompt)
+    return json.dumps(
+        {"id": ids[0] if ids else "US-1", "gherkin": _scripted_gherkin(ac_ids)},
+        ensure_ascii=False,
+    )
+
+
+_PO_CROSS_REVIEW = json.dumps({"issues": [], "flagged": []}, ensure_ascii=False)
+
+
 # "User story à couvrir : US-3 — titre" in the QA prompt (prompts.qa_test_plan).
 _QA_STORY_RE = re.compile(r"User story à couvrir : (\S+)")
 
@@ -444,10 +565,22 @@ class ScriptedRunner:
             return _qa_plan(match.group(1) if match else "US-1")
         if "DÉCOUPAGE PLUS FIN (échec)" in prompt:  # decompose_finer (split-on-failure)
             return _DECOMPOSE_FINER
+        if "DÉCOUPAGE PLUS FIN (resize)" in prompt:  # decompose_finer proactive (S2 resize)
+            return _DECOMPOSE_FINER
         if "en SOUS-TÂCHES par COUCHE" in prompt:  # decompose_story (SK-2)
             return _DECOMPOSE
         if "design technique CONCIS" in prompt:  # architect_design
             return _ARCHITECT
+        # PO pipeline (v2) stage prompts also open with "PO/Scrum Master":
+        # their unique markers MUST be matched before the mono-pass po_plan.
+        if "SQUELETTE du plan" in prompt:  # po_structure (S1)
+            return _PO_STRUCTURE
+        if "SPÉCIFIE la story" in prompt:  # po_spec_story (S2)
+            return _po_spec_reply(prompt)
+        if "GHERKIN d'acceptance" in prompt:  # po_gherkin (S3)
+            return _po_gherkin_reply(prompt)
+        if "revue\nTRANSVERSALE" in prompt or "revue TRANSVERSALE" in prompt:  # po_cross_review
+            return _PO_CROSS_REVIEW
         if "PO/Scrum Master" in prompt:  # po_plan / po_revise
             # ST-5: the stream-aware plan adds this marker; branch to the
             # decomposed reply, keeping the flag-off PO reply intact.
