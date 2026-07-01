@@ -226,11 +226,13 @@ def decompose_finer(
     is_frontend: bool = False,
     architecture: str = "",
     available_skills: str = "",
+    proactive: bool = False,
 ) -> str:
-    """Adaptive split-on-failure: a unit (US or task) the dev agent could NOT make
-    green after its attempts is re-analyzed and split into SMALLER sub-tasks with
-    FINER tests — the unit was likely too big for one agent session. The unique
-    marker ``DÉCOUPAGE PLUS FIN (échec)`` keys the ScriptedRunner reply."""
+    """Adaptive split: a unit (US or task) either FAILED its dev attempts
+    (reactive, default) or was judged too big at SPEC time by the S2 resize
+    verdict (``proactive=True``) — same splitting brain (§5) for both paths.
+    The unique markers ``DÉCOUPAGE PLUS FIN (échec)`` / ``(resize)`` key the
+    ScriptedRunner reply."""
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     kind = "frontend (React + Vite + TypeScript)" if is_frontend else "backend"
     front_rule = (
@@ -243,13 +245,24 @@ def decompose_finer(
         "service/cas d'usage → endpoint/façade → tests. Une responsabilité par "
         "sous-tâche."
     )
-    return f"""Tu es l'architecte d'un pipeline automatisé. La tâche {kind} ci-dessous a
+    if proactive:
+        intro = f"""Tu es l'architecte d'un pipeline automatisé. La story {kind} ci-dessous a été
+jugée TROP GROSSE au moment de la SPÉCIFICATION (verdict de re-dimensionnement du
+rédacteur de la spec) — AVANT tout code. Tu vas la **DÉCOUPER PLUS FINEMENT** en
+sous-tâches plus petites pour qu'un sous-agent focalisé puisse traiter chacune."""
+        reason_label = "Constat du rédacteur de la spec (pour cibler le découpage)"
+        marker = "DÉCOUPAGE PLUS FIN (resize)."
+    else:
+        intro = f"""Tu es l'architecte d'un pipeline automatisé. La tâche {kind} ci-dessous a
 ÉCHOUÉ : l'agent de codage n'a pas réussi à la rendre verte en plusieurs tentatives.
 C'est généralement le signe d'une unité TROP GROSSE pour une seule session d'agent.
 Tu vas la **DÉCOUPER PLUS FINEMENT** en sous-tâches plus petites, chacune avec des
-TESTS PLUS GRANULAIRES, pour qu'un sous-agent focalisé puisse traiter chacune.
+TESTS PLUS GRANULAIRES, pour qu'un sous-agent focalisé puisse traiter chacune."""
+        reason_label = "Dernière erreur observée (pour cibler le découpage)"
+        marker = "DÉCOUPAGE PLUS FIN (échec)."
+    return f"""{intro}
 {arch_block}{available_skills}
-Unité en échec : {subject.id} — {subject.title}
+Unité à découper : {subject.id} — {subject.title}
 Description : {subject.description}
 Critères d'acceptance (réutilise leurs ids) :
 {_criteria_block(subject)}
@@ -257,8 +270,10 @@ Critères d'acceptance (réutilise leurs ids) :
 Acceptance Gherkin (vision de bout en bout, NE PAS la modifier) :
 \"\"\"{subject.gherkin}\"\"\"
 
-Dernière erreur observée (pour cibler le découpage) :
+{reason_label} :
 \"\"\"{(reason or 'non disponible')[:1500]}\"\"\"
+
+{sizing_rules()}
 
 Règles de découpage :
 - {front_rule}
@@ -284,7 +299,7 @@ Réponds avec EXACTEMENT UN objet JSON :
     }}
   ]
 }}
-DÉCOUPAGE PLUS FIN (échec). Les ids sont uniques ; `depends_on` ne référence que des ids de ce JSON."""
+{marker} Les ids sont uniques ; `depends_on` ne référence que des ids de ce JSON."""
 
 
 def independence_judge(tasks: list[dict]) -> str:
@@ -952,6 +967,335 @@ Réponds avec EXACTEMENT UN objet JSON :
 }}
 Les ids doivent être uniques et les depends_on référencer des ids de stories de
 ce même JSON (ou des stories existantes listées plus haut)."""
+
+
+# ------------------------------------------- PO pipeline (RFC po-pipeline-v2)
+
+def sizing_rules() -> str:
+    """§5 — the ONE shared "découpe" brain: the granularity rules consumed by
+    S1 (`po_structure`), its critic (`structure_criteria`), the S2 cross critic
+    and the reactive `decompose_finer`, so the system's notion of "right-sized"
+    never forks between proactive and reactive paths."""
+    budget = settings.task_file_budget
+    return f"""RÈGLES DE DÉCOUPE (communes à tout le pipeline) :
+- BUDGET FICHIERS : une feuille (tâche, ou story sans tâches) doit tenir dans UNE
+  session d'un agent de codage → au plus {budget} fichiers créés/modifiés
+  (`estimated_files` ≤ {budget}). Au-delà, DÉCOUPER.
+- UNE RESPONSABILITÉ par feuille : un titre qui enchaîne plusieurs verbes/objets
+  (« gérer X et Y et Z ») est un fourre-tout → découper.
+- EXTRACTION TECHNIQUE : un pan purement technique (socle, migration, refacto)
+  au sein d'une story fonctionnelle devient une tâche technique DÉDIÉE plutôt que
+  de gonfler la story.
+- ZONES DISJOINTES : deux unités parallèles ne revendiquent JAMAIS le même
+  fichier ; sinon les relier par `depends_on` ou les fusionner.
+- NI TROP GROS NI TROP FIN : fusionner les unités triviales adjacentes qui ne
+  justifient pas chacune une session d'agent."""
+
+
+def structure_criteria() -> str:
+    """Quality criteria for the S1 structure critic (critic-first loop)."""
+    return f"""- Chaque user story suit INVEST (indépendante, négociable, valeur, estimable,
+  petite, testable) ; les titres portent UNE intention claire.
+- La hiérarchie Epic → US → tâche est cohérente : pas d'US « fourre-tout »,
+  regroupement thématique sensé.
+- `complexity` et `estimated_files` sont des JUGEMENTS crédibles : le rationale
+  justifie la note ; une feuille `complex` doit être découpée en tâches.
+- Dépendances (`depends_on`) minimales, sans cycle ; l'ordre permet un maximum
+  de parallélisme ; priorités kanban sensées.
+{sizing_rules()}"""
+
+
+CROSS_SPEC_CRITERIA = (
+    "- CHEVAUCHEMENTS : deux stories/tâches qui couvrent le même comportement ou "
+    "revendiquent la même zone de code.\n"
+    "- CONTRADICTIONS : conventions divergentes entre specs (formats d'erreurs, "
+    "nommage, unités, langues des messages).\n"
+    "- TROUS DE COMPLÉTUDE : un comportement du brief couvert par aucune story ; "
+    "une story d'INTÉGRATION manquante entre deux features qui doivent se composer.\n"
+    "- SUR-DIMENSIONNEMENT découvert en rédigeant : une story dont les critères "
+    "révèlent une unité trop grosse (recommander l'extraction en tâches/story "
+    "technique dédiée)."
+)
+
+
+def _sizing_lessons_block(state: ProjectState) -> str:
+    """§6 — sizing lessons from past reactive splits, injected into S1 so the
+    PO recalibrates on real failures (empty until the loop has fed)."""
+    lessons = state.sizing_lessons[-6:]
+    if not lessons:
+        return ""
+    joined = "\n".join(f"- {l}" for l in lessons)
+    return f"""
+LEÇONS DE DIMENSIONNEMENT (échecs réels des itérations passées — à intégrer) :
+{joined}
+"""
+
+
+def _structure_streams_block(state: ProjectState) -> str:
+    """Stream ids available to the skeleton, when the streams feature is on."""
+    if not (settings.streams_enabled or state.streams):
+        return ""
+    stream_ids = ", ".join(s.id for s in state.effective_streams())
+    return (
+        f"\nStreams disponibles (champ `stream` des stories/tâches) : {stream_ids}. "
+        "Une story multi-stream se découpe en tâches, chacune dans UN stream ; une "
+        "tâche frontend dépend de la tâche backend dont elle consomme le contrat.\n"
+    )
+
+
+def po_structure(state: ProjectState, package_name: str, repo_files: list[str] | None = None) -> str:
+    """S1 maker: the plan SKELETON + a complexity judgment per leaf. No
+    descriptions/AC/gherkin here — S2 writes the specs, per story, in parallel.
+    The unique marker « SQUELETTE du plan » keys the ScriptedRunner reply."""
+    existing = [
+        {"id": s.id, "title": s.title, "status": s.status.value}
+        for s in state.stories
+    ]
+    if repo_files:
+        listing = "\n".join(repo_files[:200])
+        globs_rule = f"""- `file_globs` (OBLIGATOIRE — le repo existe déjà) : les fichiers/zones que la
+  feuille va créer ou modifier (chemins relatifs, jokers autorisés). Voici
+  l'arbre réel du repo (vérifie tes globs contre lui, pas de `**` racine) :
+\"\"\"{listing}\"\"\""""
+    else:
+        globs_rule = (
+            "- `area` : la zone indicative de la feuille (ex. « domaine/persistance », "
+            "« api », « ui/écran principal ») — le repo n'existe pas encore, ne "
+            "fabrique PAS de `file_globs` fictifs."
+        )
+    return f"""Tu es le PO/Scrum Master d'un pipeline automatisé multi-étapes. ÉTAPE 1 :
+tu produis le SQUELETTE du plan — la structure et un jugement de complexité —
+SANS rédiger les descriptions, critères d'acceptance ni Gherkin (une étape
+ultérieure spécifiera chaque story en parallèle).
+
+Brief produit :
+\"\"\"{state.brief}\"\"\"
+
+Stories déjà existantes dans le projet (itérations précédentes) :
+{json.dumps(existing, ensure_ascii=False)}
+{_sizing_lessons_block(state)}{_structure_streams_block(state)}
+{sizing_rules()}
+
+Ta mission : découpe ce brief en 1 à 3 EPICs contenant chacun 1 à 5 user
+stories (titres seulement). Pour CHAQUE FEUILLE (tâche, ou story sans tâches),
+produis un JUGEMENT DE COMPLEXITÉ — pas un constat :
+- `complexity` ∈ "trivial" | "standard" | "complex" ;
+- `rationale` : UNE phrase justifiant la note ;
+- `estimated_files` : le nombre ENTIER de fichiers que la feuille va toucher ;
+{globs_rule}
+- une story `complex` DOIT être découpée en tâches plus petites ;
+- `depends_on` (ids de ce JSON ou de stories existantes), `priority` (1=haute..
+  5=basse), `ui` (booléen : vraie dimension visuelle uniquement).
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "epics": [
+    {{
+      "id": "EPIC-1",
+      "title": "...",
+      "description": "<une phrase>",
+      "stories": [
+        {{
+          "id": "US-1",
+          "title": "...",
+          "depends_on": [],
+          "priority": 1,
+          "ui": false,
+          "stream": "",
+          "complexity": "standard",
+          "rationale": "<une phrase>",
+          "estimated_files": 3,
+          "file_globs": [],
+          "area": "domaine",
+          "tasks": []
+        }}
+      ]
+    }}
+  ]
+}}
+Une story découpée en `tasks` porte la complexité sur SES TÂCHES (mêmes champs
+`complexity`/`rationale`/`estimated_files`/`file_globs`|`area`, plus `id`,
+`title`, `stream`, `depends_on` d'ids de tâches). Les ids sont uniques ; les
+`depends_on` ne référencent que des ids de ce JSON ou de stories existantes."""
+
+
+def po_spec_story(
+    state: ProjectState,
+    skeleton_story: dict,
+    package_name: str,
+    *,
+    merged: bool = False,
+    remake_reason: str = "",
+) -> str:
+    """S2 maker — fan-out unit = the STORY with its tasks: one pass writes the
+    story's description + taxonomised acceptance criteria AND its tasks'
+    mini-specs (coherence US↔tasks by construction), plus a `resize` verdict
+    (the writer who discovers the story is too big SAYS it instead of stuffing
+    12 criteria). ``merged`` (small-project mode) folds S3 in: the same pass
+    also writes the Gherkin, and the resize barrier is skipped.
+    The unique marker « SPÉCIFIE la story » keys the ScriptedRunner reply."""
+    tasks = skeleton_story.get("tasks") or []
+    tasks_block = ""
+    if tasks:
+        listing = json.dumps(
+            [
+                {"id": t.get("id"), "title": t.get("title"), "stream": t.get("stream", "")}
+                for t in tasks
+            ],
+            ensure_ascii=False,
+        )
+        tasks_block = f"""
+Ses tâches (écris la mini-spec de CHACUNE — description + critères) :
+{listing}
+"""
+    resize_block = "" if merged else """
+- "resize" : ton VERDICT de dimensionnement découvert en rédigeant —
+  {{"verdict": "ok" | "split" | "merge", "proposal": "<si split/merge : une phrase
+  décrivant le re-découpage/la fusion proposé(e)>"}}. Si tu dois empiler plus de
+  8 critères, la story est TROP GROSSE : dis-le (verdict "split") au lieu de
+  bourrer les critères.
+"""
+    gherkin_field = ""
+    gherkin_rule = ""
+    if merged:
+        gherkin_field = """
+  "gherkin": "Feature: ...\\n  @AC-1\\n  Scenario: ...\\n    Given ...\\n    When ...\\n    Then ...",
+"""
+        gherkin_rule = f"""
+- "gherkin" : le test d'acceptance Gherkin de la story (langue française,
+  mots-clés anglais Feature/Scenario/Given/When/Then), exécutable avec
+  pytest-bdd contre du code Python du package `{package_name}` (PAS d'interface
+  graphique ni de réseau) ; UN scénario par critère, chacun tagué `@AC-x` (l'id
+  EXACT du critère qu'il vérifie).
+"""
+    remake_block = ""
+    if remake_reason:
+        remake_block = f"""
+⚠️ RE-SPÉCIFICATION CIBLÉE — la revue transversale a signalé ce problème sur
+cette story (corrige-le dans ta nouvelle spec) :
+{remake_reason}
+"""
+    return f"""Tu es le PO/Scrum Master d'un pipeline automatisé multi-étapes. ÉTAPE 2 : tu
+SPÉCIFIE la story ci-dessous (et uniquement elle) à partir du squelette validé.
+
+Brief produit :
+\"\"\"{state.brief}\"\"\"
+
+Story à spécifier (squelette) :
+{json.dumps({k: v for k, v in skeleton_story.items() if k != "tasks"}, ensure_ascii=False)}
+{tasks_block}{remake_block}
+Ta mission — produis pour CETTE story :
+- "description" : « En tant que..., je veux..., afin de... » ;
+- "acceptance_criteria" : 2 à 8 critères PRÉCIS et testables, chacun
+  {{"id": "AC-n", "text": "...", "kind": "happy" | "error" | "edge" | "nonfunctional"}} ;
+  la couverture MINIMALE exige au moins un critère "happy" ET un "error" ;
+- pour chaque tâche listée : {{"id": "<id EXACT>", "description": "...",
+  "acceptance_criteria": [mêmes champs id/text/kind, ids uniques dans la tâche]}} ;
+{resize_block}{gherkin_rule}
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "id": "{skeleton_story.get("id", "")}",
+  "description": "En tant que..., je veux..., afin de...",
+  "acceptance_criteria": [
+    {{"id": "AC-1", "text": "...", "kind": "happy"}},
+    {{"id": "AC-2", "text": "...", "kind": "error"}}
+  ],{gherkin_field}
+  "tasks": [],
+  "resize": {{"verdict": "ok", "proposal": ""}}
+}}
+Les ids de critères sont uniques dans la story ; les ids de tâches sont EXACTEMENT
+ceux du squelette (n'en invente pas, n'en supprime pas)."""
+
+
+def po_gherkin(story_spec: dict, package_name: str, *, ui: bool = False) -> str:
+    """S3 maker — single-shot per functional story: the Gherkin acceptance test,
+    one scenario per AC, tagged `@AC-x` for the deterministic 1-for-1 alignment
+    check. The unique marker « GHERKIN d'acceptance » keys the ScriptedRunner."""
+    criteria = "\n".join(
+        f"- [{c.get('id')}] ({c.get('kind', '')}) {c.get('text')}"
+        for c in story_spec.get("acceptance_criteria", [])
+    )
+    ui_rule = (
+        "- Story UI : les scénarios PEUVENT décrire des interactions d'interface."
+        if ui
+        else "- Story SANS dimension UI : AUCUN step d'interface (« je clique », "
+        "« je vois à l'écran ») ni de réseau (URL http) — teste des fonctions/"
+        "classes Python."
+    )
+    return f"""Tu es le PO/Scrum Master d'un pipeline automatisé multi-étapes. ÉTAPE 3 : tu
+écris le GHERKIN d'acceptance de la story ci-dessous (et uniquement elle).
+
+Story : {story_spec.get("id")} — {story_spec.get("title", "")}
+Description : {story_spec.get("description", "")}
+Critères d'acceptance (chacun avec son id) :
+{criteria}
+
+Règles STRICTES :
+- Langue française, mots-clés Gherkin anglais (Feature/Scenario/Given/When/Then),
+  exécutable avec pytest-bdd contre du code Python du package `{package_name}`.
+- EXACTEMENT un scénario par critère d'acceptance, dans l'ordre, chacun précédé
+  du tag `@AC-x` (l'id EXACT du critère qu'il vérifie) sur sa propre ligne.
+{ui_rule}
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "id": "{story_spec.get("id", "")}",
+  "gherkin": "Feature: ...\\n  @AC-1\\n  Scenario: ...\\n    Given ...\\n    When ...\\n    Then ...\\n  @AC-2\\n  Scenario: ..."
+}}"""
+
+
+def po_cross_review(specs: list[dict]) -> str:
+    """The ONE transversal S2 critic: sees ALL the specs (compact) and hunts
+    EXCLUSIVELY for inter-node defects — the ones a per-node critic is
+    structurally blind to. Output: flagged node ids + reason → targeted
+    re-make. The marker « revue TRANSVERSALE » keys the ScriptedRunner."""
+    return f"""Tu es le critique d'un pipeline automatisé multi-étapes. Tu fais LA revue
+TRANSVERSALE des spécifications ci-dessous : ton unique mission est de trouver
+les défauts INTER-STORIES (une revue par story a déjà eu lieu — ne re-critique
+pas le style d'une story isolée).
+
+Ce que tu cherches (exclusivement) :
+{CROSS_SPEC_CRITERIA}
+
+{sizing_rules()}
+
+Spécifications de l'itération (compactes) :
+{json.dumps(specs, ensure_ascii=False, indent=1)}
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "issues": ["<défaut inter-stories concret>", "..."],
+  "flagged": [
+    {{"id": "<id de story à re-spécifier>", "reason": "<le problème précis à corriger>"}}
+  ]
+}}
+Ne flagge que les stories dont la spec doit VRAIMENT être refaite (liste vide si
+tout est cohérent). "issues" liste les constats ; "flagged" les actions."""
+
+
+def repair_reply(original_prompt: str, previous_reply: str, error: str) -> str:
+    """1-retry auto-repair: re-prompt the SAME task with the deterministic
+    validation error — the cheapest fix for the main failure mode of a
+    multi-stage JSON pipeline (drifting ids, orphan ACs, malformed JSON)."""
+    return f"""{original_prompt}
+
+⚠️ AUTO-RÉPARATION — ta réponse précédente a été REJETÉE par la validation
+déterministe du pipeline. Ta réponse précédente :
+\"\"\"{previous_reply[:4000]}\"\"\"
+
+Erreur(s) de validation à corriger :
+{error}
+
+Renvoie une réponse COMPLÈTE corrigée, au format JSON EXACT demandé ci-dessus."""
+
+
+GHERKIN_CRITERIA = (
+    "- Exécutabilité pytest-bdd RÉELLE : steps implémentables contre des "
+    "fonctions/classes Python, pas de magie implicite.\n"
+    "- Pertinence : chaque scénario vérifie substantiellement son critère "
+    "d'acceptance (pas un simple écho du titre).\n"
+    "- Un scénario par critère, tag @AC-x aligné, Given/When/Then bien formés."
+)
 
 
 # ---------------------------------------------------------------- QA (test design)

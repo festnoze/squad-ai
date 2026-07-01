@@ -232,6 +232,9 @@ class PlannedTest(BaseModel):
 class AcceptanceCriterion(BaseModel):
     id: str
     text: str
+    # PO pipeline (S2): criterion taxonomy — "happy" | "error" | "edge" |
+    # "nonfunctional". "" = legacy criterion (mono-pass PO), untouched.
+    kind: str = ""
 
 
 class Task(BaseModel):
@@ -254,6 +257,11 @@ class Task(BaseModel):
     last_error: str = ""
     files_hint: list[str] = Field(default_factory=list)   # files/zones it expects to touch
     split_depth: int = 0  # how many adaptive failure-splits produced/refined this task (bounds recursion)
+    # PO pipeline (S1): complexity is a first-order JUDGMENT produced at plan
+    # time ("trivial" | "standard" | "complex", "" = legacy/not estimated) and
+    # the estimated number of files the task will touch (0 = not estimated).
+    complexity: str = ""
+    estimated_files: int = 0
     # B1/N4/P10 (UX): fine-grained stage tracking for the stepper. All defaults
     # are safe so a pre-UX persisted Task loads as "queued, no persona, no
     # recovery, no guidance".
@@ -284,6 +292,13 @@ class UserStory(BaseModel):
     coverage_score: int = -1  # last test-coverage percentage (-1 = not run)
     ui: bool = False         # story has a visual/UI dimension (QA routes it to Playwright)
     ui_tests: list[str] = Field(default_factory=list)  # replayable UI test files (tests/ui/…)
+    # PO pipeline (S1/S2): estimated complexity of the story ("trivial" |
+    # "standard" | "complex", "" = legacy), estimated files for a taskless
+    # (leaf) story, and the S2 degradation marker — a story whose spec pass
+    # failed keeps its skeleton and is flagged so the operator sees it.
+    complexity: str = ""
+    estimated_files: int = 0
+    spec_incomplete: bool = False
     # ST-2: stream tagging + optional multi-stream decomposition. ``stream`` ""
     # means the project's primary/backend stream (so legacy stories are
     # unchanged). When ``tasks`` is non-empty the US is a container and its
@@ -354,6 +369,18 @@ class Epic(BaseModel):
     title: str
     description: str = ""
     iteration: int = 1
+
+
+class PlanCalibration(BaseModel):
+    """PO pipeline (§6 — measured evolution loop): per-plan downstream signals
+    that tell whether the PO sized the work correctly. Persisted per iteration
+    in ``ProjectState.calibration``; every reactive split also emits a sizing
+    lesson (``ProjectState.sizing_lessons``) injected into the next S1 prompt,
+    closing the loop: today's failure calibrates tomorrow's plan."""
+
+    reactive_splits: int = 0     # split-on-failure events (unit was too big)
+    over_budget_tasks: int = 0   # items whose dev touched more files than the budget
+    degradations: int = 0        # pipeline stages that fell back (S2/S3 failures)
 
 
 class Finding(BaseModel):
@@ -444,6 +471,11 @@ class ProjectState(BaseModel):
     feedback: list[str] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)  # E6 evaluator observations
     lessons: list[str] = Field(default_factory=list)  # E7 durable retro lessons (injected into prompts)
+    # PO pipeline (§6): per-iteration calibration counters + structured sizing
+    # lessons emitted by reactive splits, injected into the next S1 prompt.
+    # Old persisted states default to {} / [] (loop simply not yet fed).
+    calibration: dict[int, PlanCalibration] = Field(default_factory=dict)
+    sizing_lessons: list[str] = Field(default_factory=list)
     green_tests: list[str] = Field(default_factory=list)  # R2: nodeids known green (regression baseline)
     regressions: list[str] = Field(default_factory=list)  # R2: flagged "was green, now red" events
     retro_recommendations: list[str] = Field(default_factory=list)  # E7 tuning advice (UI only)
@@ -472,6 +504,14 @@ class ProjectState(BaseModel):
 
     def stories_of_iteration(self, iteration: int) -> list[UserStory]:
         return [s for s in self.stories if s.iteration == iteration]
+
+    def calibration_for(self, iteration: int | None = None) -> PlanCalibration:
+        """The (created-on-demand) calibration counters of an iteration —
+        default: the current one. Mutating the returned object persists."""
+        key = self.iteration if iteration is None else iteration
+        if key not in self.calibration:
+            self.calibration[key] = PlanCalibration()
+        return self.calibration[key]
 
     # ------------------------------------------------------------ streams (ST-1)
 

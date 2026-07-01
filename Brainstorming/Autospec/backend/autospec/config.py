@@ -478,6 +478,28 @@ class Settings:
     review_plan_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_REVIEW_PLAN", False)
     )
+    # PO pipeline (RFC po-pipeline-v2): the multi-stage PO — S1 structure +
+    # complexity, S2 per-story specs (resize barrier + cross critic), S3 gherkin.
+    # "off" (default) keeps the legacy mono-pass PO byte-identical; "on" runs
+    # S1 always, then a deterministic post-S1 decision on the measured skeleton
+    # size: < min_leaves → S2+S3 merged into one pass per story, else the full
+    # pipeline. No brief-length "auto" mode (a poor proxy, dropped in v2).
+    po_pipeline: str = field(
+        default_factory=lambda: (
+            os.environ.get("AUTOSPEC_PO_PIPELINE", "off").strip().lower()
+        )
+    )
+    po_pipeline_min_leaves: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_PO_PIPELINE_MIN_LEAVES", 4, minimum=1)
+    )
+    po_pipeline_gherkin: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_PO_PIPELINE_GHERKIN", True)
+    )
+    # Sizing budget (shared "découpe" brain): max files ONE leaf (task / task-
+    # less story) may claim to stay buildable in a single agent session.
+    task_file_budget: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_TASK_FILE_BUDGET", 6, minimum=1)
+    )
     refine_max_rounds: int = field(
         default_factory=lambda: _env_int("AUTOSPEC_REFINE_MAX_ROUNDS", 2, minimum=0)
     )
@@ -500,6 +522,12 @@ class Settings:
     runtime_acceptance_timeout_s: float = field(
         default_factory=lambda: _env_float("AUTOSPEC_RUNTIME_ACCEPTANCE_TIMEOUT_S", 90.0, minimum=10.0)
     )
+
+    def po_pipeline_on(self) -> bool:
+        """Is the multi-stage PO pipeline active? Anything but the explicit
+        "on" (including a malformed value) is OFF — the legacy mono-pass PO
+        must stay the safe default."""
+        return self.po_pipeline == "on"
 
     def refine_for(self, role: str) -> bool:
         """Is the refinement loop active for this maker role ('po' / 'dev')?

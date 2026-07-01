@@ -65,6 +65,7 @@ from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
+from . import plan_pipeline
 from . import regression
 from .build_monitor import BuildMonitor
 from . import deploy
@@ -166,6 +167,25 @@ def _clamp_1_5(value, default: int = 3) -> int:
     except (TypeError, ValueError):
         return default
     return min(5, max(1, n))
+
+
+def _acceptance_list(raw) -> list[AcceptanceCriterion]:
+    """Parse a plan's acceptance criteria. Legacy plans carry plain strings
+    (ids generated AC-1..n); the PO pipeline carries dicts {id, text, kind} —
+    their ids are PRESERVED because the S3 gherkin scenarios tag them."""
+    out: list[AcceptanceCriterion] = []
+    for i, entry in enumerate(raw or [], start=1):
+        if isinstance(entry, dict):
+            out.append(
+                AcceptanceCriterion(
+                    id=str(entry.get("id") or f"AC-{i}"),
+                    text=str(entry.get("text") or ""),
+                    kind=str(entry.get("kind") or ""),
+                )
+            )
+        else:
+            out.append(AcceptanceCriterion(id=f"AC-{i}", text=str(entry)))
+    return out
 
 
 def _unique_id(raw: str, prefix: str, taken: set[str]) -> str:
@@ -2210,12 +2230,41 @@ class Pipeline:
         self.state.phase = PipelinePhase.PLAN
         self._sync()
         pkg = workspace.package_name(self.state)
-        result = await self._tracked.arun(
-            prompts.po_plan(self.state, pkg),
-            system_prompt=persona("sm"),
-        )
-        plan_text = await self._arefine_plan(result.text, pkg)
-        plan = extract_json(plan_text)
+        plan: dict = {}
+        # PO pipeline (RFC po-pipeline-v2): the multi-stage PO replaces the
+        # mono-pass maker AND its judge-first review (_arefine_plan). Any
+        # skeleton-stage failure falls back to the legacy path — a stage
+        # exception never abandons the plan.
+        pipeline_used = False
+        if self._setting("po_pipeline") == "on":
+            try:
+                plan, report = await plan_pipeline.arun_po_pipeline(
+                    self._tracked,
+                    self.state,
+                    pkg,
+                    workspace_root=workspace_dir(self.state.id),
+                    log=self._log,
+                )
+                pipeline_used = True
+                self.state.calibration_for().degradations += len(report.degradations)
+                if report.cross_issues:
+                    # Surface the transversal review in the UI « Revue du plan » panel.
+                    self.state.plan_review_issues = list(report.cross_issues)
+                self._chat(
+                    ChatRole.PO,
+                    f"Pipeline PO ({report.mode}) : {report.leaves} feuille(s), "
+                    f"{len(report.resizes)} resize, {len(report.flagged)} re-spéc ciblée(s), "
+                    f"{len(report.degradations)} dégradation(s).",
+                )
+            except plan_pipeline.PlanPipelineError as exc:
+                self._log("po-pipeline", f"Pipeline PO en échec ({exc}) — repli sur le PO mono-passe.")
+        if not pipeline_used:
+            result = await self._tracked.arun(
+                prompts.po_plan(self.state, pkg),
+                system_prompt=persona("sm"),
+            )
+            plan_text = await self._arefine_plan(result.text, pkg)
+            plan = extract_json(plan_text)
         # The PO of a later iteration typically numbers from "US-1"/"EPIC-1"
         # again: deduplicate against previous iterations (else state.story()
         # becomes ambiguous and feature files get overwritten), remapping the
@@ -2228,6 +2277,10 @@ class Pipeline:
         # are remapped through the same rename. Seed with existing project tasks.
         taken_task_ids = {t.id for t in self.state.all_tasks()}
         task_id_map: dict[str, str] = {}  # PO-chosen task id -> final unique id
+        # The PO pipeline decomposes stories into tasks regardless of the
+        # streams flag (S1 owns the granularity); the legacy path keeps the
+        # streams gate so the flag-off parse stays byte-identical.
+        parse_tasks = pipeline_used or self._setting("streams_enabled")
         for epic_data in plan.get("epics", []):
             epic_id = _unique_id(
                 epic_data.get("id") or f"EPIC-{len(taken_epic_ids) + 1}",
@@ -2250,7 +2303,7 @@ class Pipeline:
                 id_map.setdefault(raw_id, story_id)
                 # First pass: register the unique id of every task so cross-task
                 # depends_on (declared anywhere in the plan) remap consistently.
-                if self._setting("streams_enabled"):
+                if parse_tasks:
                     for n, task_data in enumerate(story_data.get("tasks") or [], start=1):
                         raw_tid = str(task_data.get("id") or f"T-{len(taken_task_ids) + 1}")
                         tid = _unique_id(raw_tid, "T", taken_task_ids)
@@ -2260,8 +2313,9 @@ class Pipeline:
 
         def _build_tasks(story_id: str, story_data: dict) -> list[Task]:
             """ST-5: parse a US's decomposition into Task models, remapping task
-            depends_on through the project-wide rename. Empty unless streams on."""
-            if not self._setting("streams_enabled"):
+            depends_on through the project-wide rename. Empty unless streams on
+            (or the plan came from the PO pipeline, whose S1 owns granularity)."""
+            if not parse_tasks:
                 return []
             out: list[Task] = []
             for task_data in story_data.get("tasks") or []:
@@ -2274,15 +2328,16 @@ class Pipeline:
                         stream=str(task_data.get("stream") or ""),
                         title=task_data.get("title", ""),
                         description=task_data.get("description", ""),
-                        acceptance_criteria=[
-                            AcceptanceCriterion(id=f"AC-{i}", text=str(text))
-                            for i, text in enumerate(task_data.get("acceptance_criteria", []), start=1)
-                        ],
+                        acceptance_criteria=_acceptance_list(
+                            task_data.get("acceptance_criteria", [])
+                        ),
                         gherkin=task_data.get("gherkin", ""),
                         depends_on=[task_id_map.get(d, d) for d in task_data.get("depends_on", [])],
                         files_hint=[
                             str(g) for g in (task_data.get("file_globs") or []) if str(g).strip()
                         ],
+                        complexity=str(task_data.get("complexity") or ""),
+                        estimated_files=int(task_data.get("estimated_files") or 0),
                     )
                 )
             # P4b: serialize file-overlapping tasks of THIS story (the deterministic
@@ -2296,10 +2351,9 @@ class Pipeline:
                 epic_id=epic_id,
                 title=story_data.get("title", "Story"),
                 description=story_data.get("description", ""),
-                acceptance_criteria=[
-                    AcceptanceCriterion(id=f"AC-{i}", text=str(text))
-                    for i, text in enumerate(story_data.get("acceptance_criteria", []), start=1)
-                ],
+                acceptance_criteria=_acceptance_list(
+                    story_data.get("acceptance_criteria", [])
+                ),
                 gherkin=story_data.get("gherkin", ""),
                 # Deps use the PO's ids: follow renames for the plan's own
                 # stories; ids of previous-iteration stories pass through.
@@ -2308,8 +2362,13 @@ class Pipeline:
                 ui=bool(story_data.get("ui", False)),
                 # ST-5: stream tagging + optional task decomposition (gated; "" /
                 # [] when off, so the flag-off parse is byte-identical to today).
-                stream=str(story_data.get("stream") or "") if self._setting("streams_enabled") else "",
+                stream=str(story_data.get("stream") or "") if parse_tasks else "",
                 tasks=_build_tasks(story_id, story_data),
+                # PO pipeline: first-order complexity + S2 degradation marker
+                # ("" / 0 / False on the legacy path — fields simply absent).
+                complexity=str(story_data.get("complexity") or ""),
+                estimated_files=int(story_data.get("estimated_files") or 0),
+                spec_incomplete=bool(story_data.get("spec_incomplete", False)),
                 iteration=self.state.iteration,
             )
             for epic_id, story_id, story_data in planned
@@ -2857,6 +2916,7 @@ class Pipeline:
                 )
                 reply = extract_json(result.text)
                 self._chat(ChatRole.DEV, f"[{story.id}] {reply.get('summary', '(pas de résumé)')}")
+                self._observe_file_budget(story, reply)
                 story.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
                 story.ui_tests = [str(p) for p in reply.get("ui_test_files") or []]
                 # B1: dev declared the failing tests (RED) → contracts written.
@@ -3335,8 +3395,45 @@ class Pipeline:
             self._log(f"split:{item.id}", "Unité jugée indivisible — échec maintenu.")
             return False
         if item.kind == "story":
-            return self._split_story(self.state.story(item.story_id), raw)
-        return self._split_task(item.id, raw)
+            split_ok = self._split_story(self.state.story(item.story_id), raw)
+        else:
+            split_ok = self._split_task(item.id, raw)
+        if split_ok:
+            self._record_split_calibration(subject, target, n=len(raw))
+        return split_ok
+
+    def _observe_file_budget(self, subject: UserStory, reply: dict) -> None:
+        """§6: confront the dev's DECLARED touched files with the sizing budget.
+        An over-budget unit at runtime means the plan sized it too big — a
+        calibration signal counted on the story's iteration."""
+        files = [str(f) for f in reply.get("files") or []]
+        budget = self._setting("task_file_budget")
+        if len(files) > budget:
+            self.state.calibration_for(
+                getattr(subject, "iteration", None)
+            ).over_budget_tasks += 1
+            self._log(
+                f"dev:{subject.id}",
+                f"📏 {len(files)} fichiers touchés > budget {budget} — signal de calibration (§6).",
+            )
+
+    def _record_split_calibration(self, subject: UserStory, target, n: int) -> None:
+        """§6 (PO évolutif, mesuré) : every reactive split is a CALIBRATION
+        signal — counted per iteration and distilled into a structured sizing
+        lesson injected into the next S1 prompt, so today's failure sizes
+        tomorrow's plan."""
+        self.state.calibration_for().reactive_splits += 1
+        stream = getattr(target, "stream", "") or self.state.primary_stream_id
+        zone = ", ".join(list(getattr(target, "files_hint", []))[:3]) or stream
+        attempts = getattr(target, "attempts", 0)
+        lesson = (
+            f"Itération {self.state.iteration} : « {subject.title or subject.id} » "
+            f"(zone {zone}) était sous-dimensionnée — re-découpée en {n} sous-tâches "
+            f"après {attempts} tentative(s). Découper plus fin ce type de tâche dès le plan."
+        )
+        if lesson not in self.state.sizing_lessons:
+            self.state.sizing_lessons.append(lesson)
+        self.state.sizing_lessons = self.state.sizing_lessons[-12:]
 
     def _split_story(self, story: UserStory, raw: list[dict]) -> bool:
         """Re-decompose a taskless FAILED story into finer sub-tasks (it becomes a
@@ -3690,6 +3787,7 @@ class Pipeline:
         result = await self._tracked.arun(dev_prompt, system_prompt=dev_persona, cwd=worktree)
         reply = extract_json(result.text)
         self._chat(ChatRole.DEV, f"[{subject.id}] {reply.get('summary', '(pas de résumé)')}")
+        self._observe_file_budget(subject, reply)
         subject.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
         subject.ui_tests = [str(p) for p in reply.get("ui_test_files") or []]
         # B1: dev declared the failing tests (RED) → contracts written.
