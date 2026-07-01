@@ -5,8 +5,9 @@ import { useI18n } from "../i18n/i18n";
 import { Activity } from "./Activity";
 import { Board } from "./Board";
 import { IterationsView } from "./IterationsView";
+import { DepGraphPanel } from "./DepGraphPanel";
 
-type View = "vision" | "iterations" | "activity";
+type View = "vision" | "iterations" | "activity" | "graph";
 
 /**
  * Conteneur des deux lentilles sur le même produit :
@@ -71,6 +72,16 @@ export function WorkspaceViews({
   // but that's no longer true, fall back to vision.
   const showIterations = view === "iterations" && multiIter;
   const showActivity = view === "activity";
+  // The dependency-graph tab is useful once there's actual structure (tasks or
+  // declared dependencies); a flat list of independent US has nothing to show.
+  const hasGraph = useMemo(
+    () =>
+      (stories ?? []).some(
+        (s) => (s.tasks ?? []).length > 0 || (s.depends_on ?? []).length > 0,
+      ),
+    [stories],
+  );
+  const showGraph = view === "graph" && hasGraph;
 
   useEffect(() => {
     if (!onRollbackTo) return; // rollback désactivé : pas la peine de fetch
@@ -99,6 +110,11 @@ export function WorkspaceViews({
     setBoardFocus({ epicId });
     setView("vision");
   };
+  // Graph node → open its container story/TS on the board (find its epic first).
+  const openWorkItemStory = (storyId: string) => {
+    const s = stories.find((x) => x.id === storyId);
+    if (s) openStory(s.epic_id, s.id);
+  };
 
   return (
     <>
@@ -115,12 +131,23 @@ export function WorkspaceViews({
         <button
           type="button"
           role="tab"
-          aria-selected={!showActivity && !showIterations}
-          className={!showActivity && !showIterations ? "active" : ""}
+          aria-selected={!showActivity && !showIterations && !showGraph}
+          className={!showActivity && !showIterations && !showGraph ? "active" : ""}
           onClick={() => setView("vision")}
         >
           {t("workspaceViews.productVision")}
         </button>
+        {hasGraph && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={showGraph}
+            className={showGraph ? "active" : ""}
+            onClick={() => setView("graph")}
+          >
+            {t("workspaceViews.graph")}
+          </button>
+        )}
         {multiIter && (
           <button
             type="button"
@@ -133,7 +160,13 @@ export function WorkspaceViews({
           </button>
         )}
       </div>
-      {showActivity ? (
+      {showGraph ? (
+        <DepGraphPanel
+          stories={stories}
+          streams={streams}
+          onOpenItem={openWorkItemStory}
+        />
+      ) : showActivity ? (
         <Activity
           epics={epics}
           stories={stories}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   blockedBy,
   buildWorkGraph,
+  computeGraphLayout,
   canResumeBuild,
   deriveItemView,
   DORMANT_PHASES,
@@ -309,5 +310,40 @@ describe("work — deriveItemView", () => {
     const v = deriveItemView(task({ id: "T1", current_stage: "contracts" }));
     expect(v.kind).toBe("task");
     expect(v.stage).toBe("contracts");
+  });
+});
+
+describe("work — computeGraphLayout (vue graphe DAG)", () => {
+  it("couches topologiques + chemin critique + parallélisme max", () => {
+    const us1 = story({
+      id: "US-1",
+      tasks: [
+        task({ id: "A", story_id: "US-1" }),
+        task({ id: "B", story_id: "US-1", depends_on: ["A"] }),
+        task({ id: "C", story_id: "US-1", depends_on: ["B"] }),
+      ],
+    });
+    const us2 = story({ id: "US-2" }); // taskless, indépendante
+    const items = buildWorkGraph([us1, us2], STREAMS);
+    const layout = computeGraphLayout(items);
+    expect(layout.layer.get("A")).toBe(0);
+    expect(layout.layer.get("B")).toBe(1);
+    expect(layout.layer.get("C")).toBe(2);
+    expect(layout.maxLayer).toBe(2);
+    expect(layout.critical).toEqual(new Set(["A", "B", "C"]));
+    expect(layout.maxParallel).toBe(2); // A + US-2 sur la couche 0
+  });
+
+  it("buildWorkGraph résout les tâches d'une TS-enfant (parent_id)", () => {
+    const us1 = story({ id: "US-1", tasks: [task({ id: "T-2", story_id: "US-1" })] });
+    const us2 = story({ id: "US-2", depends_on: ["US-1"] });
+    const ts = story({
+      id: "TS-x",
+      parent_id: "US-1",
+      tasks: [task({ id: "F1", story_id: "TS-x" }), task({ id: "F2", story_id: "TS-x" })],
+    });
+    const items = buildWorkGraph([us1, us2, ts], STREAMS);
+    const deps = items.get("US-2")!.dependsOn;
+    expect(new Set(deps)).toEqual(new Set(["T-2", "F1", "F2"]));
   });
 });

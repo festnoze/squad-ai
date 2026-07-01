@@ -85,6 +85,26 @@ describe("Board", () => {
     expect(crumbs.length).toBeGreaterThan(0);
   });
 
+  it("Technical Story : badge 🔧 + contrat + lignée affichés (RFC technical-stories)", () => {
+    const epic: Epic = { id: "E1", title: "Mon epic", description: "", iteration: 1 };
+    const ts = makeStory({
+      id: "TS-T1",
+      epic_id: "E1",
+      title: "TS · couche repository",
+      technical: true,
+      contract: "Le repository expose aget_x/acreate_x testés.",
+      parent_id: "US-1",
+    });
+    render(<Board epics={[epic]} stories={[ts]} projectId="p1" />);
+    fireEvent.click(screen.getByText("Mon epic"));
+    // Le badge technique apparaît dès la liste des stories de l'epic.
+    expect(screen.getAllByText(/Technical|Technique/).length).toBeGreaterThan(0);
+    // Drill-down → le contrat technique + la lignée sont visibles.
+    fireEvent.click(screen.getByText("TS · couche repository"));
+    expect(screen.getByText(/aget_x\/acreate_x/)).toBeInTheDocument();
+    expect(screen.getByText(/US-1/)).toBeInTheDocument();
+  });
+
   it("carte epic : avancement (barre + compteur) au niveau racine", () => {
     const epic: Epic = { id: "E1", title: "Cœur", description: "", iteration: 1 };
     render(

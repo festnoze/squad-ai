@@ -72,6 +72,25 @@ def build_work_graph(state: ProjectState) -> WorkGraph:
     primary = state.primary_stream_id
     stories_by_id = {s.id: s for s in state.stories}
     task_ids = {t.id for s in state.stories for t in s.tasks}
+    # RFC technical-stories: a Technical Story extracted from a container points
+    # back via ``parent_id``. Depending on that container therefore also means
+    # depending on its child TS' tasks (recursively) — otherwise a dependent could
+    # start before the work moved into the TS is done.
+    children_by_parent: dict[str, list] = {}
+    for s in state.stories:
+        if s.parent_id:
+            children_by_parent.setdefault(s.parent_id, []).append(s)
+
+    def leaf_task_ids(sid: str, _seen: set[str] | None = None) -> list[str]:
+        _seen = _seen if _seen is not None else set()
+        if sid in _seen:
+            return []
+        _seen.add(sid)
+        story = stories_by_id.get(sid)
+        ids = [t.id for t in story.tasks] if story else []
+        for child in children_by_parent.get(sid, ()):
+            ids.extend(leaf_task_ids(child.id, _seen))
+        return ids
 
     graph = WorkGraph()
 
@@ -84,9 +103,9 @@ def build_work_graph(state: ProjectState) -> WorkGraph:
             if dep in task_ids:
                 targets = [dep]
             elif dep in stories_by_id:
-                depended = stories_by_id[dep]
-                # Depending on a decomposed US == depending on ALL its tasks.
-                targets = [t.id for t in depended.tasks] or [dep]
+                # Depending on a decomposed US == depending on ALL its tasks AND
+                # the tasks of any Technical Story extracted from it (recursive).
+                targets = leaf_task_ids(dep) or [dep]
             else:
                 graph.warnings.append(f"{ctx} : dépendance inconnue « {dep} » ignorée")
                 continue

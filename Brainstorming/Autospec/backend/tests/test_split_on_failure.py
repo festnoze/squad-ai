@@ -70,7 +70,9 @@ def test_split_story_creates_finer_tasks(streams_on):
     assert story.tasks[1].depends_on == [story.tasks[0].id]
 
 
-def test_split_task_rewires_dependents(streams_on):
+def test_split_task_extracts_technical_story_when_container_has_others(streams_on):
+    # RFC technical-stories: US-1 keeps T-2, so the failed T-1 is EXTRACTED into a
+    # named Technical Story (not flattened into US-1's tasks).
     state = _streams_state([
         _us("US-1", tasks=[
             _task("T-1", "US-1", stream="backend"),
@@ -83,15 +85,71 @@ def test_split_task_rewires_dependents(streams_on):
         {"id": "b", "title": "B", "file_globs": ["b.py"], "depends_on": ["a"]},
     ]
     assert pipeline._split_task("T-1", raw) is True
-    story = state.story("US-1")
-    ids = [t.id for t in story.tasks]
-    assert "T-1" not in ids                       # the failed task was replaced
-    new_ids = [i for i in ids if i != "T-2"]
-    assert len(new_ids) == 2
-    # T-2 (depended on T-1) now waits for ALL the new sub-tasks, not the gone id.
+    # T-1 left US-1; US-1 keeps T-2 only.
+    assert [t.id for t in state.story("US-1").tasks] == ["T-2"]
+    # A Technical Story was created with the finer sub-tasks.
+    ts = next(s for s in state.stories if s.technical)
+    assert ts.parent_id == "US-1"
+    assert ts.contract  # technical contract carried over
+    assert len(ts.tasks) == 2
+    # T-2 (depended on T-1) now depends on the TS (resolved to its tasks by the graph).
     t2 = state.task("T-2")
     assert "T-1" not in t2.depends_on
-    assert set(new_ids).issubset(set(t2.depends_on))
+    assert ts.id in t2.depends_on
+
+
+def test_split_task_in_place_when_only_task(streams_on):
+    # The failed task is the container's ONLY one → in-place sibling split, no TS.
+    state = _streams_state([_us("US-1", tasks=[_task("T-1", "US-1", stream="backend")])])
+    pipeline = Pipeline(state, ScriptedRunner())
+    raw = [
+        {"id": "a", "title": "A", "file_globs": ["a.py"]},
+        {"id": "b", "title": "B", "file_globs": ["b.py"], "depends_on": ["a"]},
+    ]
+    assert pipeline._split_task("T-1", raw) is True
+    assert not any(s.technical for s in state.stories)   # no TS created
+    ids = [t.id for t in state.story("US-1").tasks]
+    assert "T-1" not in ids and len(ids) == 2
+
+
+def _ts(sid, parent_id, tasks):
+    s = _us(sid, tasks=tasks)
+    s.technical = True
+    s.parent_id = parent_id
+    return s
+
+
+def test_work_graph_resolves_child_ts_tasks(streams_on):
+    from autospec.orchestrator import streams as work_streams
+
+    state = _streams_state([
+        _us("US-1", tasks=[_task("T-2", "US-1", stream="backend")]),
+        _us("US-2", stream="backend"),
+        _ts("TS-x", "US-1", [_task("F1", "TS-x", stream="backend"), _task("F2", "TS-x", stream="backend")]),
+    ])
+    state.story("US-2").depends_on = ["US-1"]
+    graph = work_streams.build_work_graph(state)
+    # Depending on US-1 = depending on its task T-2 AND its child TS' tasks F1/F2.
+    assert set(graph.items["US-2"].depends_on) >= {"T-2", "F1", "F2"}
+
+
+def test_recursion_ts_task_splits_into_deeper_ts(streams_on):
+    state = _streams_state([
+        _us("US-1", tasks=[_task("T-keep", "US-1", stream="backend")]),
+        _ts("TS-1", "US-1", [
+            _task("F1", "TS-1", stream="backend"),
+            _task("F2", "TS-1", stream="backend"),
+        ]),
+    ])
+    pipeline = Pipeline(state, ScriptedRunner())
+    raw = [
+        {"id": "x", "title": "X", "file_globs": ["x.py"]},
+        {"id": "y", "title": "Y", "file_globs": ["y.py"]},
+    ]
+    assert pipeline._split_task("F1", raw) is True
+    assert [t.id for t in state.story("TS-1").tasks] == ["F2"]   # TS-1 keeps F2
+    deeper = [s for s in state.stories if s.technical and s.parent_id == "TS-1"]
+    assert len(deeper) == 1 and len(deeper[0].tasks) == 2        # nested TS (depth+1)
 
 
 # --------------------------------------------------------------- build integration

@@ -195,6 +195,27 @@ export function buildWorkGraph(
   const taskIds = new Set(
     stories.flatMap((s) => (s.tasks ?? []).map((t) => t.id)),
   );
+  // RFC technical-stories: a Technical Story extracted from a container points
+  // back via `parent_id`. Depending on that container also means depending on
+  // its child TS' tasks (recursive) — mirror of the backend `leaf_task_ids`.
+  const childrenByParent = new Map<string, UserStory[]>();
+  for (const s of stories) {
+    if (s.parent_id) {
+      const arr = childrenByParent.get(s.parent_id) ?? [];
+      arr.push(s);
+      childrenByParent.set(s.parent_id, arr);
+    }
+  }
+  const leafTaskIds = (sid: string, seen = new Set<string>()): string[] => {
+    if (seen.has(sid)) return [];
+    seen.add(sid);
+    const s = storyById.get(sid);
+    const ids = s ? (s.tasks ?? []).map((t) => t.id) : [];
+    for (const child of childrenByParent.get(sid) ?? []) {
+      ids.push(...leafTaskIds(child.id, seen));
+    }
+    return ids;
+  };
   const items = new Map<string, WorkItem>();
 
   const resolve = (depIds: string[], owner: string): string[] => {
@@ -205,9 +226,8 @@ export function buildWorkGraph(
       let targets: string[];
       if (taskIds.has(dep)) targets = [dep];
       else if (storyById.has(dep)) {
-        const ds = storyById.get(dep)!;
-        const dts = ds.tasks ?? [];
-        targets = dts.length ? dts.map((t) => t.id) : [dep];
+        const leaves = leafTaskIds(dep);
+        targets = leaves.length ? leaves : [dep];
       } else continue; // unknown dep: dropped (as the backend does)
       for (const t of targets) {
         if (t !== owner && !seen.has(t)) {
@@ -319,4 +339,61 @@ const STREAM_ICON: Record<string, string> = {
 /** Small emoji for a stream kind (badge prefix). */
 export function streamIcon(kind: string): string {
   return STREAM_ICON[kind] ?? STREAM_ICON.other;
+}
+
+/** Layered layout of the work-item DAG for the dependency-graph view: each node
+ *  is placed in a column = its longest path from a source (so an item never sits
+ *  left of a dependency), the critical path (the longest chain) is flagged, and
+ *  the widest column tells how many items can build in parallel at once. */
+export interface GraphLayout {
+  layer: Map<string, number>; // node id → column index
+  maxLayer: number;
+  critical: Set<string>; // ids on one longest (critical) path
+  maxParallel: number; // widest layer = peak parallelism
+}
+
+export function computeGraphLayout(items: Map<string, WorkItem>): GraphLayout {
+  const ids = [...items.keys()];
+  const depsOf = (id: string) =>
+    (items.get(id)?.dependsOn ?? []).filter((d) => items.has(d));
+  const layer = new Map<string, number>();
+  const visiting = new Set<string>();
+  const longest = (id: string): number => {
+    const cached = layer.get(id);
+    if (cached !== undefined) return cached;
+    if (visiting.has(id)) return 0; // defensive: a cycle never recurses forever
+    visiting.add(id);
+    let m = 0;
+    for (const d of depsOf(id)) m = Math.max(m, longest(d) + 1);
+    visiting.delete(id);
+    layer.set(id, m);
+    return m;
+  };
+  ids.forEach(longest);
+
+  const maxLayer = ids.length ? Math.max(...ids.map((i) => layer.get(i) ?? 0)) : 0;
+
+  // Critical path: from the deepest node, walk to the deepest dependency each step.
+  const critical = new Set<string>();
+  if (ids.length) {
+    let cur: string | undefined = ids.reduce((a, b) =>
+      (layer.get(b) ?? 0) > (layer.get(a) ?? 0) ? b : a,
+    );
+    while (cur) {
+      critical.add(cur);
+      const deps = depsOf(cur);
+      cur = deps.length
+        ? deps.reduce((a, b) => ((layer.get(b) ?? 0) > (layer.get(a) ?? 0) ? b : a))
+        : undefined;
+    }
+  }
+
+  const perLayer = new Map<number, number>();
+  for (const i of ids) {
+    const l = layer.get(i) ?? 0;
+    perLayer.set(l, (perLayer.get(l) ?? 0) + 1);
+  }
+  const maxParallel = perLayer.size ? Math.max(...perLayer.values()) : 0;
+
+  return { layer, maxLayer, critical, maxParallel };
 }

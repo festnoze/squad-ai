@@ -5,4 +5,5 @@ export const workspaceViews: Namespace = {
   activity: { en: "⚡ Activity", fr: "⚡ Activité" },
   productVision: { en: "🗂 Product vision", fr: "🗂 Vision produit" },
   iterations: { en: "🕒 Iterations", fr: "🕒 Itérations" },
+  graph: { en: "🔗 Graph", fr: "🔗 Graphe" },
 };

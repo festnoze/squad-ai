@@ -512,6 +512,18 @@ function DiffViewer({
 /** Badges communs (priorité, statut, score qualité) d'une user story. Le statut
  * affiché est l'« effective status » : pour une US conteneur (avec tâches) il est
  * dérivé de ses tâches, sinon c'est le statut stocké. */
+/** RFC technical-stories: a 🔧 marker on a Technical Story card so it reads as a
+ *  technical container (vs a functional US) at the same board level. */
+function TechnicalBadge({ story }: { story: UserStory }) {
+  const { t } = useI18n();
+  if (!story.technical) return null;
+  return (
+    <span className="badge-technical" title={t("board.technicalStory_title")}>
+      🔧 {t("board.technicalStory")}
+    </span>
+  );
+}
+
 function StoryBadges({
   story,
   onStatusClick,
@@ -686,6 +698,7 @@ function StoryRow({
           ⠿
         </span>
         <span className="story-id">{story.id}</span>
+        <TechnicalBadge story={story} />
         {showStream && <StreamBadge streamId={story.stream!} streams={streams} />}
         <StoryBadges story={story} />
       </div>
@@ -802,10 +815,22 @@ function StoryDetail({
     <div className="story-detail">
       <div className="story-detail-head">
         <span className="story-id">{story.id}</span>
+        <TechnicalBadge story={story} />
         <IterationBadge iteration={story.iteration} onOpen={onOpenIteration} compact />
         <StoryBadges story={story} onStatusClick={() => setShowLlm((v) => !v)} />
       </div>
       <h3 className="story-detail-title">{story.title}</h3>
+      {story.technical && story.parent_id && (
+        <div className="story-ts-lineage">
+          🔧 {t("board.technicalStory_from", { parent: story.parent_id })}
+        </div>
+      )}
+      {story.technical && story.contract && (
+        <div className="story-ts-contract">
+          <div className="story-ts-contract-heading">{t("board.technicalContract")}</div>
+          <pre className="gherkin">{story.contract}</pre>
+        </div>
+      )}
       {(story.depends_on ?? []).length > 0 && (
         <div className="story-deps">
           ⛓ {t("board.dependsOn", { deps: story.depends_on.join(", ") })}
