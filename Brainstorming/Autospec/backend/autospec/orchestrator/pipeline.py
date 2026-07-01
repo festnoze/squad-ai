@@ -3600,27 +3600,51 @@ class Pipeline:
         # race other workers on the repo index).
         branch = f"autospec/wi-{item.id.lower().replace('/', '-')}"
         worktree = None
+        keep_branch = False
         try:
-            worktree = await self._aworktree_add(ws, branch)
+            # P2b: a previous attempt may have left a PRESERVED green branch —
+            # merge-conflict requeue (keep_branch below), or a hard crash whose
+            # ``finally`` never ran (GREEN orphan). Resume it rebased onto the
+            # updated HEAD instead of regenerating the code from scratch.
+            resumed = await self._aresume_green_branch(ws, branch)
+            worktree = resumed if resumed is not None else await self._aworktree_add(ws, branch)
             if worktree is None:
                 raise RuntimeError("git worktree indisponible")
             if subject.attempts == 1 and not is_frontend:
                 self._set_stage(target, BuildStage.ANALYZING, "qa")  # N4/B1
                 await self._adesign_tests(subject, pkg)
             label = "dev frontend" if is_frontend else "dev"
-            self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
 
-            ok, tail = await self._arun_item_dev(subject, worktree, pkg, is_frontend)
+            ok, tail = False, ""
+            if resumed is not None:
+                # Re-verify the preserved work on the rebased branch: still
+                # green → merge below with NO dev run at all.
+                ok, tail = await self._averify_resumed(subject, worktree, is_frontend)
+                self._log(
+                    f"dev:{item.id}",
+                    f"♻️ {item.id} : branche verte préservée revalidée sur HEAD à jour — merge sans rebuild."
+                    if ok
+                    else f"♻️ {item.id} : travail préservé rouge après rebase — l'agent {label} reprend depuis ce code.",
+                )
+            if not ok:
+                if resumed is None:
+                    self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
+                ok, tail = await self._arun_item_dev(subject, worktree, pkg, is_frontend)
 
             if ok:
                 # ST-10/11: commit in the worktree, then merge into the repo. The
                 # item is DONE only after a successful merge (so dependents only
                 # start once this item's code is in the base HEAD).
                 await self._acommit_story(worktree, item.id)
+                # P2b: from here the branch holds committed GREEN work — keep it
+                # on cleanup (requeue, stop, manual retry) so the next pass can
+                # resume it; dropped again once merged or split.
+                keep_branch = True
                 # B1/B6: green → waiting for the merge lock, then merging.
                 self._set_stage(target, BuildStage.MERGE_WAIT, "")
                 merged = await self._amerge_work_item(ws, branch, item.id, worktree)
                 if merged:
+                    keep_branch = False  # P2b: merged into HEAD — branch is useless now
                     target.status = subject.status = StoryStatus.DONE
                     for test in subject.test_plan:
                         if test.status == TestState.NONEXISTENT:
@@ -3633,21 +3657,29 @@ class Pipeline:
                 else:
                     # ST-10/11: a merge conflict means a sibling work item changed
                     # the SAME files. An immediate same-inputs retry (in
-                    # _amerge_work_item) can never resolve it. Re-queue the item
-                    # like a red build so the next scheduler pass rebuilds it in a
-                    # worktree branched from the now-updated HEAD — which already
-                    # contains the sibling's code — and merges cleanly. Bounded by
-                    # dev_max_attempts; only a persistent conflict ends FAILED.
+                    # _amerge_work_item) can never resolve it. Re-queue the item:
+                    # the green branch is PRESERVED (keep_branch) so the next
+                    # scheduler pass resumes it — rebase on the now-updated HEAD,
+                    # re-verify, merge — instead of regenerating the code. Bounded
+                    # by dev_max_attempts; a persistent conflict tries a finer
+                    # split (disjoint file zones) before ending FAILED.
                     target.last_error = "conflit de merge inter-stream"
                     if subject.attempts < settings.dev_max_attempts:
                         target.status = subject.status = StoryStatus.TODO
                         self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
                         self._log(
                             f"dev:{item.id}",
-                            f"⚠️ Conflit de merge {item.id} — rebuild sur HEAD à jour "
-                            f"(tentative {subject.attempts + 1}/{settings.dev_max_attempts}).",
+                            f"⚠️ Conflit de merge {item.id} — branche verte conservée, reprise "
+                            f"sur HEAD à jour (tentative {subject.attempts + 1}/{settings.dev_max_attempts}).",
                         )
+                    # A PERSISTENT conflict is a sizing smell: the unit claims file
+                    # zones that keep colliding with its siblings. Try the adaptive
+                    # finer split (smaller, disjoint sub-tasks) before failing.
+                    elif await self._amaybe_split_on_failure(item, subject, target):
+                        keep_branch = False  # the unit was replaced by finer sub-tasks
                     else:
+                        # Terminal FAILED: keep the branch — a manual retry
+                        # (aretry_failed) can still resume the green work.
                         target.status = subject.status = StoryStatus.FAILED
                         self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
             else:
@@ -3697,7 +3729,7 @@ class Pipeline:
             self._log(f"dev:{item.id}", f"⛔ Crash worker {item.id} isolé : {exc}")
         finally:
             if worktree is not None:
-                await self._aworktree_remove(ws, worktree, branch)
+                await self._aworktree_remove(ws, worktree, branch, keep_branch=keep_branch)
             self._sync()
 
     def _persistent_for(self, subject: UserStory):
@@ -3877,12 +3909,18 @@ class Pipeline:
             return None
         return worktree
 
-    async def _aworktree_remove(self, repo, worktree, branch: str) -> None:
+    async def _aworktree_remove(self, repo, worktree, branch: str, *, keep_branch: bool = False) -> None:
         """Always-runs cleanup: remove the worktree and delete its branch.
-        Serialized by ``_merge_lock`` (shared-repo ``.git`` mutation)."""
+        Serialized by ``_merge_lock`` (shared-repo ``.git`` mutation).
+
+        P2b: with ``keep_branch`` the branch ref survives (only the worktree
+        directory goes) — used when the branch holds committed GREEN work that
+        could not merge yet, so a later pass can resume it instead of
+        regenerating the code."""
         async with self._merge_lock:
             await self._agit(repo, "worktree", "remove", "--force", str(worktree))
-            await self._agit(repo, "branch", "-D", branch)
+            if not keep_branch:
+                await self._agit(repo, "branch", "-D", branch)
         # Defensive: if `worktree remove` could not delete the dir, drop it.
         try:
             if Path(worktree).exists():
@@ -3891,6 +3929,74 @@ class Pipeline:
                 shutil.rmtree(worktree, ignore_errors=True)
         except OSError:
             pass
+
+    async def _aresume_green_branch(self, repo, branch: str):
+        """P2b — resume a PRESERVED green branch from an earlier attempt.
+
+        A merge-conflict requeue (``keep_branch``) or a hard crash (the worker's
+        ``finally`` never ran) can leave ``branch`` behind with the item's green
+        commits. Check it out in a fresh worktree and rebase it onto the repo's
+        current HEAD, so the caller can re-verify and merge WITHOUT regenerating
+        the code. Returns the worktree path, or None when there is nothing
+        usable to resume — any stale branch is dropped so the caller falls back
+        to a normal fresh build."""
+        async with self._merge_lock:
+            code, _ = await self._agit(
+                repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"
+            )
+            if code != 0:
+                return None
+            code, out = await self._agit(repo, "rev-list", "--count", f"HEAD..{branch}")
+            if code != 0 or not out.strip().isdigit() or int(out.strip()) == 0:
+                # The branch carries nothing beyond HEAD (crash before commit,
+                # or already merged): useless — drop it and build fresh.
+                await self._aclear_stale_worktree(repo, branch)
+                await self._agit(repo, "branch", "-D", branch)
+                return None
+            # A crashed worker may still hold the branch checked out in a dead
+            # worktree — clear it or `worktree add` fails "already checked out".
+            await self._aclear_stale_worktree(repo, branch)
+            import tempfile
+
+            worktree = Path(tempfile.mkdtemp(prefix="autospec-wt-"))
+            try:
+                worktree.rmdir()
+            except OSError:
+                pass
+            code, out = await self._agit(repo, "worktree", "add", str(worktree), branch)
+            if code != 0:
+                self._log("streams", f"Reprise de {branch} impossible : {out.strip()[:200]}")
+                return None
+            _, head = await self._agit(repo, "rev-parse", "HEAD")
+        rb, _ = await self._agit(worktree, "rebase", head.strip())
+        if rb != 0:
+            # Genuine line-level conflict with what landed meanwhile: the old
+            # work cannot be replayed — clean up fully and regenerate.
+            await self._agit(worktree, "rebase", "--abort")
+            await self._aworktree_remove(repo, worktree, branch)
+            self._log("streams", f"♻️ Branche préservée {branch} en conflit réel — régénération.")
+            return None
+        self._log("streams", f"♻️ Branche verte préservée {branch} reprise (rebasée sur HEAD).")
+        return worktree
+
+    async def _averify_resumed(self, subject: UserStory, worktree, is_frontend: bool) -> tuple[bool, str]:
+        """P2b: re-run the real suite on a resumed (rebased) green branch — no
+        dev agent involved. Green means the preserved work is still valid on the
+        updated HEAD and can merge as-is; red hands the worktree to the dev,
+        which then starts from the preserved code instead of an empty slate."""
+        target = self._persistent_for(subject)
+        self._set_stage(target, BuildStage.VERIFYING, "qa")  # B1
+        if is_frontend:
+            stream = self._story_stream(subject)
+            await self._aensure_frontend_node_modules(
+                Path(worktree) / (stream.file_root or "frontend")
+            )
+            ok, output, _ = await self._arun_frontend_tests(ws=worktree)
+        else:
+            ok, output, _ = await self._arun_pytest(ws=worktree)
+        if ok:
+            subject.status = StoryStatus.GREEN
+        return ok, output[-2000:]
 
     async def _amerge_work_item(self, repo, branch: str, wid: str, worktree=None) -> bool:
         """ST-10: merge a green work item's branch into the project repo's main

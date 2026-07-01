@@ -330,8 +330,11 @@ class Settings:
     split_on_failure_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_SPLIT_ON_FAILURE", True)
     )
+    # Depth 2 (not 1) so a task extracted into a Technical Story can itself be
+    # re-split once — the "arbitrary depth via TS chains" of RFC technical-stories
+    # is otherwise cut off at the first level.
     split_max_depth: int = field(
-        default_factory=lambda: _env_int("AUTOSPEC_SPLIT_MAX_DEPTH", 1, minimum=0)
+        default_factory=lambda: _env_int("AUTOSPEC_SPLIT_MAX_DEPTH", 2, minimum=0)
     )
     # RFC technical-stories: target max files per LEAF task, so each stays small
     # enough for one average-LLM session (≤ N files) → massive parallelism + high

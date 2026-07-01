@@ -198,3 +198,61 @@ async def test_manual_split_rejects_non_failed(streams_on):
     pipeline = Pipeline(state, ScriptedRunner())
     with pytest.raises(ValueError):
         await pipeline.asplit_item("US-1")
+
+
+async def test_exhausted_merge_conflict_tries_finer_split(streams_on, monkeypatch):
+    """A green item whose merge conflicts PERSISTENTLY (attempts exhausted) is a
+    sizing smell — its file zones keep colliding with siblings. The finer split
+    must be attempted before declaring it FAILED (not only on red tests)."""
+    monkeypatch.setattr(settings, "dev_max_attempts", 1)
+    state = _streams_state([_us("US-1", stream="backend")])
+    pipeline = Pipeline(state, ScriptedRunner())
+    split_calls = []
+
+    async def _green(subject, worktree, pkg, is_frontend):
+        return True, ""
+
+    async def _no_merge(repo, branch, wid, worktree=None):
+        return False
+
+    async def _spy_split(item, subject, target, *, force=False):
+        split_calls.append(target.last_error)
+        return False  # judged indivisible → falls through to FAILED
+
+    monkeypatch.setattr(pipeline, "_arun_item_dev", _green)
+    monkeypatch.setattr(pipeline, "_amerge_work_item", _no_merge)
+    monkeypatch.setattr(pipeline, "_amaybe_split_on_failure", _spy_split)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+    assert split_calls == ["conflit de merge inter-stream"]
+    assert state.story("US-1").status == StoryStatus.FAILED
+
+
+async def test_merge_conflict_requeue_resumes_preserved_branch(streams_on, monkeypatch):
+    """P2b: after a merge conflict, the green branch is preserved; the next pass
+    RESUMES it (rebase + re-verify + merge) — the dev agent runs exactly once."""
+    monkeypatch.setattr(settings, "dev_max_attempts", 2)
+    state = _streams_state([_us("US-1", stream="backend")])
+    pipeline = Pipeline(state, ScriptedRunner())
+    dev_runs, merges = [], []
+
+    async def _dev(subject, worktree, pkg, is_frontend):
+        dev_runs.append(subject.id)
+        return True, ""
+
+    async def _merge(repo, branch, wid, worktree=None):
+        merges.append(wid)
+        return len(merges) > 1  # first merge conflicts, second lands
+
+    async def _verify(subject, worktree, is_frontend):
+        subject.status = StoryStatus.GREEN
+        return True, ""
+
+    monkeypatch.setattr(pipeline, "_arun_item_dev", _dev)
+    monkeypatch.setattr(pipeline, "_amerge_work_item", _merge)
+    monkeypatch.setattr(pipeline, "_averify_resumed", _verify)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+    assert state.story("US-1").status == StoryStatus.DONE
+    assert len(merges) == 2
+    assert dev_runs == ["US-1"]  # the second pass resumed the branch: no re-dev
