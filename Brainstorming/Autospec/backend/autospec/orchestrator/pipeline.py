@@ -2311,6 +2311,11 @@ class Pipeline:
                 stream=str(story_data.get("stream") or "") if self._setting("streams_enabled") else "",
                 tasks=_build_tasks(story_id, story_data),
                 iteration=self.state.iteration,
+                # RFC technical-stories: the PO/critic may emit a Technical Story
+                # (a non-functional container of tasks) up-front, not only via the
+                # reactive split. Gated on streams (a TS without tasks is pointless).
+                technical=bool(story_data.get("technical", False)) and self._setting("streams_enabled"),
+                contract=str(story_data.get("contract") or "") if self._setting("streams_enabled") else "",
             )
             for epic_id, story_id, story_data in planned
         ]
@@ -3357,10 +3362,12 @@ class Pipeline:
         return True
 
     def _split_task(self, task_id: str, raw: list[dict]) -> bool:
-        """Replace a FAILED task with finer sub-tasks in its parent story, rewiring
-        dependencies so nothing builds out of order: the sub-tasks inherit the
-        failed task's upstream deps, and every downstream task that depended on it
-        now waits for ALL the sub-tasks."""
+        """Re-decompose a FAILED task into finer sub-tasks. RFC technical-stories:
+        when the parent container keeps ≥1 other task, the sub-tasks are EXTRACTED
+        into a new **Technical Story** (a named, board-level, dependable container);
+        when the failed task is the container's only one, fall back to an in-place
+        sibling split (no empty container). Either way dependencies are rewired so
+        nothing builds out of order."""
         story = next((s for s in self.state.stories if any(t.id == task_id for t in s.tasks)), None)
         if story is None:
             return False
@@ -3370,12 +3377,48 @@ class Pipeline:
             failed, raw, story_id=story.id, stream=stream, base_depth=failed.split_depth
         )
         new_ids = [t.id for t in new_tasks]
-        # Sub-tasks inherit the failed task's UPSTREAM dependencies.
+        other_tasks = [t for t in story.tasks if t.id != failed.id]
+
+        if other_tasks:
+            # EXTRACT into a Technical Story (the container keeps its other tasks).
+            ts = self._make_technical_story(story, failed, new_tasks)
+            # The TS's tasks live under the TS now (their story_id is rebound).
+            for nt in new_tasks:
+                nt.story_id = ts.id
+            # Whatever depended on the failed task now depends on the TS (the graph
+            # resolves « depend on a story = its tasks »), and the failed task leaves
+            # the container. The TS carries the upstream deps at the story level.
+            for t in self.state.all_tasks():
+                if task_id in t.depends_on:
+                    t.depends_on = [d for d in t.depends_on if d != task_id]
+                    if ts.id not in t.depends_on:
+                        t.depends_on.append(ts.id)
+            for s in self.state.stories:
+                if task_id in s.depends_on:
+                    s.depends_on = [d for d in s.depends_on if d != task_id]
+                    if ts.id not in s.depends_on:
+                        s.depends_on.append(ts.id)
+            story.tasks = other_tasks
+            self.state.stories.append(ts)
+            self._enforce_task_independence(ts.tasks, label=f"{ts.id}/split")
+            title_list = ", ".join(t.title or t.id for t in new_tasks)
+            self._log(
+                f"split:{task_id}",
+                f"🔧 Tâche {task_id} extraite en Technical Story {ts.id} "
+                f"({len(new_tasks)} sous-tâches plus fines).",
+            )
+            self._chat(
+                ChatRole.ARCHITECT,
+                f"[{task_id}] Trop grosse → Technical Story {ts.id} : {title_list}.",
+            )
+            return True
+
+        # FALLBACK — the failed task is the container's ONLY one: in-place sibling
+        # split (no empty container, no extra TS node).
         for nt in new_tasks:
             for dep in failed.depends_on:
                 if dep not in nt.depends_on:
                     nt.depends_on.append(dep)
-        # Downstream tasks that depended on the failed task now wait for ALL sub-tasks.
         for t in self.state.all_tasks():
             if task_id in t.depends_on:
                 t.depends_on = [d for d in t.depends_on if d != task_id] + [
@@ -3388,6 +3431,32 @@ class Pipeline:
         self._log(f"split:{task_id}", f"🪓 Tâche {task_id} re-découpée en {len(new_tasks)} sous-tâches plus fines après échec.")
         self._chat(ChatRole.ARCHITECT, f"[{task_id}] Re-découpage plus fin après échec → {title_list}.")
         return True
+
+    def _make_technical_story(self, parent: UserStory, failed: Task, tasks: list[Task]) -> UserStory:
+        """RFC technical-stories: build the TS that absorbs a too-big task's finer
+        sub-tasks — a non-functional container (``technical=True``, no functional
+        Gherkin, a technical ``contract``) tied to its origin via ``parent_id``,
+        carrying the failed task's upstream deps at the story level (inherited by
+        its tasks). Its id is unique project-wide."""
+        taken = {s.id for s in self.state.stories} | {t.id for t in self.state.all_tasks()}
+        tid = f"TS-{failed.id}"
+        while tid in taken:
+            tid += "x"
+        contract = failed.description or failed.gherkin or failed.title or failed.id
+        return UserStory(
+            id=tid,
+            epic_id=parent.epic_id,
+            title=f"TS · {failed.title or failed.id}",
+            technical=True,
+            contract=contract,
+            parent_id=parent.id,
+            gherkin="",
+            stream=failed.stream or parent.stream,
+            tasks=tasks,
+            depends_on=list(failed.depends_on),
+            split_depth=failed.split_depth + 1,
+            iteration=parent.iteration,
+        )
 
     async def _ajudge_independence(self) -> None:
         """P4d: optional LLM independence judge (AUTOSPEC_INDEPENDENCE, OFF). For

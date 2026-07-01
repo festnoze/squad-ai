@@ -190,6 +190,12 @@ export interface UserStory {
   // container whose status is derived from its tasks (see `usEffectiveStatus`).
   stream?: string;
   tasks?: Task[];
+  // Technical Story (RFC technical-stories): a non-functional container extracted
+  // from a too-big task. `technical` flips the kind, `contract` replaces the
+  // functional Gherkin, `parent_id` is the US/TS it was extracted from.
+  technical?: boolean;
+  contract?: string;
+  parent_id?: string;
   // B1 (UX): per-item BUILD-stage telemetry (see Task). Optional for legacy state.
   current_stage?: BuildStage;
   stage_started_at?: number; // epoch seconds; 0 = never started

@@ -18,6 +18,7 @@ import { architecturePanel } from "./architecturePanel";
 import { planReviewPanel } from "./planReviewPanel";
 import { dashboard } from "./dashboard";
 import { workspaceViews } from "./workspaceViews";
+import { depGraph } from "./depGraph";
 import { iterationsView } from "./iterationsView";
 import { stepper } from "./stepper";
 import { codeViewer } from "./codeViewer";
@@ -44,6 +45,7 @@ const namespaces: Record<string, Namespace> = {
   planReviewPanel,
   dashboard,
   workspaceViews,
+  depGraph,
   iterationsView,
   stepper,
   codeViewer,

@@ -104,6 +104,12 @@ PLAN_CRITERIA = (
     "être fusionnées) : ni trop gros, ni trop fragmenté.\n"
     "- Cohérence de la hiérarchie Epic → US → tâche : pas d'US « fourre-tout », "
     "regroupement thématique sensé.\n"
+    "- TECHNICAL STORIES — le travail TECHNIQUE/transverse ou les pièces COMPLEXES "
+    "(socle, couche de données, migration, moteur/algorithme, refactor habilitant) "
+    "devraient être des **Technical Stories** (`technical:true` + `contract`, sans "
+    "Gherkin fonctionnel) groupant des tâches fines, et NON noyés dans une US "
+    "fonctionnelle ou une tâche géante. Signale toute unité trop grosse (> ~3 "
+    "fichiers / multi-responsabilités) à extraire en TS, et toute TS mal posée.\n"
     "- Dépendances (`depends_on`) et priorités kanban correctes, minimales et "
     "sans cycle ; l'ordre permet un maximum de parallélisme."
 )
@@ -266,6 +272,9 @@ Règles de découpage :
   vraiment indivisible, renvoie une liste `tasks` VIDE (elle restera en échec).
 - Chaque sous-tâche : un périmètre étroit, des `acceptance_criteria` (sous-ensemble
   des ids ci-dessus) et un mini-Gherkin **fin** ciblant UN comportement testable.
+- BUDGET : chaque sous-tâche doit toucher **≤ {settings.task_file_budget} fichiers**
+  (taille « une session d'agent moyen »). Si une sous-tâche en exige davantage,
+  découpe-la encore.
 - `file_globs` (OBLIGATOIRE) : fichiers/zones DISJOINTS entre sous-tâches.
 - `depends_on` : ids de sous-tâches de ce JSON (couche inférieure / composant requis).
 
@@ -892,6 +901,22 @@ composant/1 fichier par tâche front, 1 couche par tâche back). Ne JAMAIS faire
 réécrire le même fichier (ex. `frontend/src/App.tsx`) par deux tâches parallèles —
 crée des fichiers séparés (un composant par tâche) + une tâche d'intégration qui
 `depends_on` les composants.
+
+TECHNICAL STORIES (TS) — découpage fin du travail technique/complexe.
+Pour un travail TECHNIQUE transverse ou une pièce COMPLEXE qui n'est pas une vraie
+user story fonctionnelle (socle/scaffolding, couche de données partagée, migration,
+client d'API, moteur/algorithme, refactor habilitant…), crée une **Technical Story**
+plutôt que de la noyer dans une US ou une tâche géante :
+- une story marquée `"technical": true`, avec un **`contract`** (ce qu'elle garantit
+  techniquement) à la place du Gherkin fonctionnel (`gherkin` vide, `ui` false) ;
+- elle GROUPE plusieurs `tasks` fines, chacune **≤ {settings.task_file_budget}
+  fichiers** (taille « une session d'agent moyen ») et à zones disjointes →
+  parallélisme massif ;
+- les US/tâches qui en ont besoin la déclarent dans leur `depends_on` (par son id).
+Utilise une TS dès qu'une unité dépasserait ~{settings.task_file_budget} fichiers ou
+cumule plusieurs responsabilités : préfère **plusieurs petites feuilles** en TS.
+Champs TS : {{"id", "technical": true, "contract": "...", "depends_on": [...],
+"tasks": [...]}} (pas de `gherkin`/`acceptance_criteria` fonctionnels requis).
 """
 
 

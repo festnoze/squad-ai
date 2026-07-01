@@ -290,6 +290,15 @@ class UserStory(BaseModel):
     # status is DERIVED from its tasks (see ``effective_status``).
     stream: str = ""
     tasks: list[Task] = Field(default_factory=list)
+    # Technical Story (TS, RFC technical-stories): a non-functional CONTAINER born
+    # from splitting a too-big task into finer sub-tasks. ``technical`` flips the
+    # node kind (no functional Gherkin → a technical ``contract``); ``parent_id`` is
+    # the container (US/TS) it was extracted from (board lineage + work-graph
+    # resolution « depend on parent = also its child TS tasks »). All default so a
+    # legacy story loads as a normal functional US.
+    technical: bool = False
+    contract: str = ""
+    parent_id: str = ""
     # B1/N4/P10 (UX): fine-grained stage tracking for the stepper. All defaults
     # are safe so a pre-UX persisted UserStory loads as "queued, no persona, no
     # recovery, no guidance".
