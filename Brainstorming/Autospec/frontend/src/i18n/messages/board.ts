@@ -108,6 +108,13 @@ export const board: Namespace = {
   },
   action_replay: { en: "Replay", fr: "Rejouer" },
   action_split: { en: "Split finer", fr: "Découper plus fin" },
+  technicalStory: { en: "Technical", fr: "Technique" },
+  technicalStory_title: {
+    en: "Technical Story: a non-functional container of finer sub-tasks (extracted from a too-big task)",
+    fr: "Technical Story : conteneur non-fonctionnel de sous-tâches plus fines (extraite d'une tâche trop grosse)",
+  },
+  technicalStory_from: { en: "Extracted from {parent}", fr: "Extraite de {parent}" },
+  technicalContract: { en: "Technical contract", fr: "Contrat technique" },
   splitItem_title: {
     en: "Re-analyze this failed unit and split it into finer sub-tasks (too big for one agent session), then resume the build",
     fr: "Ré-analyser cette unité en échec et la découper en sous-tâches plus fines (trop grosse pour une session d'agent), puis reprendre le build",

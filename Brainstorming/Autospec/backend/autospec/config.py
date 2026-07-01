@@ -333,6 +333,13 @@ class Settings:
     split_max_depth: int = field(
         default_factory=lambda: _env_int("AUTOSPEC_SPLIT_MAX_DEPTH", 1, minimum=0)
     )
+    # RFC technical-stories: target max files per LEAF task, so each stays small
+    # enough for one average-LLM session (≤ N files) → massive parallelism + high
+    # per-task success. Indicative (communicated to the architect when splitting),
+    # not a hard runtime reject.
+    task_file_budget: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_TASK_FILE_BUDGET", 3, minimum=1)
+    )
     # P4: LLM "independence judge" (skill task-independence + persona
     # independence-judge). When on, before the parallel build it completes each
     # task's file claims and refines independent/serialize/merge decisions on top

@@ -349,8 +349,26 @@ premier. Arrêts additionnels : critique vide (`critic_empty`), révision rejet�
 - **Manuel** : bouton **✂️ Découper plus fin** sur une story/tâche en échec
   (`POST /api/projects/{id}/items/{item_id}/split`) → force la re-décomposition puis
   reprend le build. **409** si la pipeline est active ou l'unité indivisible.
+- **TS proactives (PO + critique)** : au-delà du split réactif, le **PO peut émettre
+  des Technical Stories directement dans le plan** (`technical:true` + `contract`,
+  groupant des tâches fines ≤ `TASK_FILE_BUDGET` fichiers, dépendables par les US) —
+  pour le travail technique/transverse ou les pièces complexes. Le **critic de la
+  revue de plan** (`AUTOSPEC_REVIEW_PLAN`) **recommande** d'extraire en TS les unités
+  trop grosses/multi-responsabilités, et `po_revise` **applique** ces suggestions.
+  Création **proactive** (plan) **et** réactive (échec) — même structure de TS.
+- **Technical Story (TS)** *(réactif)* : quand le conteneur de la tâche **garde ≥1
+  autre tâche**, les sous-tâches sont **extraites dans une Technical Story** —
+  un conteneur **non-fonctionnel** (pas de Gherkin, un **contrat technique**),
+  affiché **au niveau des US** (badge 🔧), traçable via `parent_id`, et qui sert de
+  **dépendance** aux cartes qui en ont besoin. Récursif : une tâche d'une TS qui
+  échoue peut être extraite dans une TS plus profonde (profondeur arbitraire portée
+  par le DAG, bornée par `split_depth`). Si la tâche échouée est la **seule** du
+  conteneur → découpage **in-place** (pas de conteneur vide). Budget de finesse :
+  `AUTOSPEC_TASK_FILE_BUDGET` (déf. 3) — chaque sous-tâche vise **≤ 3 fichiers**
+  (taille « une session d'agent moyen ») → parallélisme massif. Le work-graph
+  résout « dépendre d'un conteneur = ses tâches **+** les tâches de ses TS-enfants ».
 - **Réécriture des dépendances** : la tâche découpée est remplacée par ses
-  sous-tâches ; ses dépendants attendent désormais **toutes** les sous-tâches ; le
+  sous-tâches (ou la TS) ; ses dépendants attendent désormais **tout** le groupe ; le
   floor d'indépendance (P4) s'applique aux nouvelles tâches.
 
 ### Relancer un projet *from scratch*
@@ -382,6 +400,14 @@ premier. Arrêts additionnels : critique vide (`critic_empty`), révision rejet�
   verts) affichant la liste des tests + le Gherkin.
 - **Backlog de l'analyste** (rang, valeur/complexité, statut).
 - **Architecture & qualité** (design technique courant + score du plan).
+- **Graphe de dépendances 🔗** (`DepGraphPanel`, onglet « Graphe » de `WorkspaceViews`,
+  visible dès qu'il y a des tâches/dépendances) : rend le **DAG des work items**
+  (US/TS/tâches) en **couches topologiques** (chaque colonne = une vague d'items
+  parallélisables), arêtes `depends_on` fléchées, coloration par statut
+  (done/in_progress/red/failed/**bloqué**/prêt), **chemin critique** surligné, et un
+  résumé « N éléments · M vagues · jusqu'à K en parallèle · chemin critique L ».
+  Clic sur un nœud → ouvre sa story/TS. Rend visibles l'indépendance (P4), les TS et
+  l'AND-join. Le `buildWorkGraph` front résout aussi les **TS-enfants** (`parent_id`).
 - **Revue du plan 🧐** (`PlanReviewPanel`, quand `AUTOSPEC_REVIEW_PLAN`) : score
   `plan_quality`/100 coloré + **problèmes signalés** et **améliorations proposées**
   par l'agent critic sur le découpage/complexité (`plan_review_issues` /

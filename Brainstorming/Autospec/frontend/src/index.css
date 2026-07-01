@@ -1632,6 +1632,91 @@ button.action-btn.action-done {
   color: #c6d4f0;
 }
 
+/* ---------- Dependency graph (DAG view) ---------- */
+.dag-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dag-summary {
+  font-size: 12px;
+  color: var(--muted);
+}
+.dag-scroll {
+  overflow: auto;
+  max-height: 560px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0e1117;
+}
+.dag-svg {
+  display: block;
+}
+.dag-edge {
+  stroke: #3a4055;
+  stroke-width: 1.5;
+}
+.dag-edge-crit {
+  stroke: #e0b341;
+  stroke-width: 2.5;
+}
+.dag-node {
+  cursor: pointer;
+}
+.dag-node rect {
+  stroke: var(--border);
+  stroke-width: 1;
+  fill: #1a1f2b;
+}
+.dag-node:hover rect {
+  filter: brightness(1.25);
+}
+.dag-node-crit rect {
+  stroke: #e0b341;
+  stroke-width: 2;
+}
+.dag-node-id {
+  fill: #e6ecf7;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: Consolas, monospace;
+}
+.dag-node-title {
+  fill: var(--muted);
+  font-size: 10px;
+}
+.dag-node-done rect { fill: #16321f; stroke: var(--green); }
+.dag-node-in_progress rect { fill: #16233a; stroke: #4a8fe0; }
+.dag-node-failed rect { fill: #3a1a1a; stroke: #e06c6c; }
+.dag-node-red rect { fill: #3a2a16; stroke: #e0a341; }
+.dag-node-blocked rect { fill: #2a2316; stroke: #8a7a4a; }
+.dag-node-ready rect { fill: #1a1f2b; stroke: #5a6680; }
+
+/* ---------- Technical Story (RFC technical-stories) ---------- */
+.badge-technical {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: #2a2140;
+  color: #c9b8f0;
+  border: 1px solid #4a3d72;
+}
+.story-ts-lineage {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+.story-ts-contract-heading {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c9b8f0;
+  margin: 6px 0 4px;
+}
+
 /* ---------- Revue du plan (AUTOSPEC_REVIEW_PLAN) ---------- */
 .plan-review-score {
   font-size: 13px;
