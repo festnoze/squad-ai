@@ -396,6 +396,11 @@ class PlanCalibration(BaseModel):
     reactive_splits: int = 0     # split-on-failure events (unit was too big)
     over_budget_tasks: int = 0   # items whose dev touched more files than the budget
     degradations: int = 0        # pipeline stages that fell back (S2/S3 failures)
+    # §8 — orchestration health, separated from sizing signals above:
+    merge_requeues: int = 0      # merge conflicts that re-queued an item
+    p2b_resumes: int = 0         # preserved green branches merged WITHOUT a dev rebuild
+    orphan_resets: int = 0       # mid-flight items reset to TODO after a crash/restart
+    infra_retries: int = 0       # transient provider/CLI failures (never a sizing signal)
 
 
 class Finding(BaseModel):

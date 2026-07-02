@@ -3032,6 +3032,7 @@ class Pipeline:
                 # budget infra séparé consommé — cf. le chemin work-item.
                 story.attempts = max(0, story.attempts - 1)
                 story.infra_attempts += 1
+                self.state.calibration_for().infra_retries += 1  # §8
                 story.status = (
                     StoryStatus.TODO
                     if story.infra_attempts <= settings.infra_max_retries
@@ -3678,6 +3679,8 @@ class Pipeline:
                     task.last_error = ""
                     self._set_stage(task, BuildStage.QUEUED, sync=False)
                     n += 1
+        if n:
+            self.state.calibration_for().orphan_resets += n  # §8
         return n
 
     async def _abuild_work_item(self, item: "work_streams.WorkItem") -> None:
@@ -3728,6 +3731,7 @@ class Pipeline:
             label = "dev frontend" if is_frontend else "dev"
 
             ok, tail = False, ""
+            dev_ran = False
             if resumed is not None:
                 # Re-verify the preserved work on the rebased branch: still
                 # green → merge below with NO dev run at all.
@@ -3741,6 +3745,7 @@ class Pipeline:
             if not ok:
                 if resumed is None:
                     self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
+                dev_ran = True
                 ok, tail = await self._arun_item_dev(subject, worktree, pkg, is_frontend)
 
             if ok:
@@ -3748,6 +3753,11 @@ class Pipeline:
                 # item is DONE only after a successful merge (so dependents only
                 # start once this item's code is in the base HEAD).
                 await self._acommit_story(worktree, item.id)
+                if dev_ran:
+                    # §8: measure the dev's REAL footprint (files in its commit)
+                    # against the leaf budget — the ground truth the plan-time
+                    # estimate (file_globs/estimated_files) must be judged by.
+                    await self._arecord_footprint(item, worktree)
                 # P2b: from here the branch holds committed GREEN work — keep it
                 # on cleanup (requeue, stop, manual retry) so the next pass can
                 # resume it; dropped again once merged or split.
@@ -3757,6 +3767,9 @@ class Pipeline:
                 merged = await self._amerge_work_item(ws, branch, item.id, worktree)
                 if merged:
                     keep_branch = False  # P2b: merged into HEAD — branch is useless now
+                    if not dev_ran:
+                        # §8: a preserved branch shipped without any dev rebuild.
+                        self.state.calibration_for().p2b_resumes += 1
                     target.status = subject.status = StoryStatus.DONE
                     for test in subject.test_plan:
                         if test.status == TestState.NONEXISTENT:
@@ -3776,6 +3789,7 @@ class Pipeline:
                     # by dev_max_attempts; a persistent conflict tries a finer
                     # split (disjoint file zones) before ending FAILED.
                     target.last_error = "conflit de merge inter-stream"
+                    self.state.calibration_for().merge_requeues += 1  # §8
                     if subject.attempts < settings.dev_max_attempts:
                         target.status = subject.status = StoryStatus.TODO
                         self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
@@ -3823,6 +3837,7 @@ class Pipeline:
                 # seule (ni polluer la calibration de dimensionnement).
                 target.attempts = subject.attempts = max(0, subject.attempts - 1)
                 target.infra_attempts += 1
+                self.state.calibration_for().infra_retries += 1  # §8
                 if target.infra_attempts <= settings.infra_max_retries:
                     target.status = subject.status = StoryStatus.TODO
                     self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
@@ -4055,6 +4070,23 @@ class Pipeline:
                 shutil.rmtree(worktree, ignore_errors=True)
         except OSError:
             pass
+
+    async def _arecord_footprint(self, item: "work_streams.WorkItem", worktree) -> None:
+        """§8 — ground the sizing calibration on the dev's REAL footprint: count
+        the files of the item's green commit and flag it over-budget when it
+        exceeds ``task_file_budget``. The plan promised small disjoint leaves;
+        this is the measurement that promise is judged by. Best-effort."""
+        code, out = await self._agit(worktree, "show", "--name-only", "--format=", "HEAD")
+        if code != 0:
+            return
+        files = [line for line in out.splitlines() if line.strip()]
+        if len(files) > settings.task_file_budget:
+            self.state.calibration_for().over_budget_tasks += 1
+            self._log(
+                f"dev:{item.id}",
+                f"📏 {item.id} a touché {len(files)} fichiers (budget "
+                f"{settings.task_file_budget}) — compté hors budget (calibration).",
+            )
 
     async def _aresume_green_branch(self, repo, branch: str):
         """P2b — resume a PRESERVED green branch from an earlier attempt.
