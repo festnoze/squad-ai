@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { PipelinePhase, ProjectState, Usage, WsEvent } from "./types";
 
@@ -223,5 +223,30 @@ describe("App — gestion des évènements WebSocket", () => {
     });
 
     expect(await screen.findByText("Itération terminée")).toBeInTheDocument();
+  });
+});
+
+describe("App — popup de création au démarrage", () => {
+  it("la popup s'ouvre sans projet mais reste FERMABLE (pas de création forcée)", async () => {
+    // listProjects (mock) renvoie [] → accueil sans projet : la popup s'ouvre.
+    render(<App />);
+    const close = await screen.findByRole("button", {
+      name: /Close project creation/,
+    });
+
+    fireEvent.click(close);
+
+    // Popup fermée : le formulaire disparaît, l'accueil explique comment la
+    // rouvrir, et le bouton « ＋ New » de la barre reste disponible.
+    expect(
+      screen.queryByRole("button", { name: /Close project creation/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/create one with/)).toBeInTheDocument();
+
+    // Ré-ouverture à la demande depuis la barre de projets.
+    fireEvent.click(screen.getByRole("button", { name: /New/ }));
+    expect(
+      await screen.findByRole("button", { name: /Close project creation/ }),
+    ).toBeInTheDocument();
   });
 });
