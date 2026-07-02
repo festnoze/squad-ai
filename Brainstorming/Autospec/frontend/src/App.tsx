@@ -701,6 +701,7 @@ export default function App() {
               planQuality={project.plan_quality ?? -1}
               issues={project.plan_review_issues ?? []}
               suggestions={project.plan_review_suggestions ?? []}
+              calibration={project.calibration?.[String(project.iteration ?? 1)]}
             />
           </div>
           <div className="col-right">

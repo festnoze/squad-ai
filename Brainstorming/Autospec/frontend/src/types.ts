@@ -67,7 +67,12 @@ export interface PlannedTest {
 export interface AcceptanceCriterion {
   id: string;
   text: string;
+  /** Pipeline PO (S2) : taxonomie du critère — happy | edge | error | boundary ("" = legacy). */
+  kind?: string;
 }
+
+/** Pipeline PO (S1) : jugement de complexité produit au plan ("" = legacy). */
+export type Complexity = "" | "trivial" | "standard" | "complex";
 
 export type HypothesisStatus = "proposed" | "selected" | "done" | "rejected";
 
@@ -154,8 +159,12 @@ export interface Task {
   depends_on: string[]; // other Task ids (possibly cross-stream)
   status: StoryStatus;
   attempts: number;
+  infra_attempts?: number;
   last_error: string;
   files_hint: string[];
+  // Pipeline PO (S1) : complexité estimée + nombre de fichiers estimé (0 = non estimé).
+  complexity?: Complexity;
+  estimated_files?: number;
   // B1 (UX): per-item BUILD-stage telemetry. Defaults are safe for legacy state
   // persisted before these fields existed ("not started, no recovery/guidance").
   current_stage?: BuildStage;
@@ -196,6 +205,11 @@ export interface UserStory {
   technical?: boolean;
   contract?: string;
   parent_id?: string;
+  // Pipeline PO (S1/S2) : complexité estimée, fichiers estimés (story feuille),
+  // marqueur de dégradation S2 (spec incomplète, squelette conservé).
+  complexity?: Complexity;
+  estimated_files?: number;
+  spec_incomplete?: boolean;
   // B1 (UX): per-item BUILD-stage telemetry (see Task). Optional for legacy state.
   current_stage?: BuildStage;
   stage_started_at?: number; // epoch seconds; 0 = never started
@@ -268,6 +282,22 @@ export interface ProjectState {
   archived: boolean;
   delivery_ready?: boolean;
   delivery_issues?: string[];
+  /** P5 : le gate est passé mais des stories FAILED ont été contournées. */
+  delivery_partial?: boolean;
+  /** §8 : compteurs de calibration par itération (clé = n° d'itération en JSON). */
+  calibration?: Record<string, PlanCalibration>;
+}
+
+/** §8 — signaux aval par plan : le PO a-t-il bien dimensionné, et la machinerie
+ * de récupération est-elle un filet rare ou une béquille permanente ? */
+export interface PlanCalibration {
+  reactive_splits: number;
+  over_budget_tasks: number;
+  degradations: number;
+  merge_requeues: number;
+  p2b_resumes: number;
+  orphan_resets: number;
+  infra_retries: number;
 }
 
 export interface LogLine {

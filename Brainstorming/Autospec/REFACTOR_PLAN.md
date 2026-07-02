@@ -167,7 +167,7 @@ trop volumineuse pour une seule fenêtre de contexte d'agent.
   une **US** sans tâches), repli sur le découpage **in-place** en sous-tâches sœurs
   — jamais de conteneur vide. Le floor d'indépendance s'applique aux nouvelles tâches.
 
-### P5 — DoD incrémentale + profils  ⏸️ (différé — non indispensable)
+### P5 — DoD incrémentale ✅ (livraison partielle livrée 2026-07-02 ; profils hors-plan)
 - **Progrès partiel** : livrer les stories vertes même si d'autres échouent ; un projet n'est « échoué » que si **0** story livrée. *(C9)*
 - **Profils** : `auto` ne doit pas activer streams pour un produit clairement simple ; aligner `profiles.py` (api/cli par défaut, fullstack explicite).
 - **Pourquoi différé** : les stories vertes sont déjà **construites et commitées** ; P5 ne change que la *sémantique de « done »* (livraison partielle), pas la correction ni la récupération. Avec **P6** (auto-split sur échec) + retry + **P2** (préservation du green), les échecs sont déjà adressés. À reprendre seulement si le besoin produit de « livrer partiellement » se confirme.
@@ -251,7 +251,7 @@ n'existent pas : leur couverture vit dans les fichiers ci-dessous.)*
 
 ---
 
-## 8. Observabilité & calibration (à instrumenter) 📊
+## 8. Observabilité & calibration ✅ (instrumenté 2026-07-02) 📊
 
 La clôture s'appuie sur des **tests** (correction) ; rien ne mesure encore
 l'**efficacité en run réel**. Compteurs à persister **par build** dans
@@ -270,6 +270,16 @@ Double usage : (a) prouver que P4/P6/P2b sont des filets rarement sollicités et
 des béquilles permanentes ; (b) alimenter les **sizing lessons** du pipeline PO
 (P8/RFC v2) — l'échec d'aujourd'hui dimensionne le plan de demain. Sans ces
 métriques, impossible de savoir si le proactif (P8) réduit réellement le réactif.
+
+**Livré (2026-07-02)** : `PlanCalibration` étendu (`merge_requeues`,
+`p2b_resumes`, `orphan_resets`, `infra_retries`) et **tous les compteurs ont un
+producteur** — dont `over_budget_tasks` mesuré sur l'empreinte réelle du commit
+vert (`_arecord_footprint`). Livraison partielle (P5, `AUTOSPEC_PARTIAL_DELIVERY`)
+et budget infra séparé (`AUTOSPEC_INFRA_MAX_RETRIES`) livrés. L'éval A/B du RFC
+v2 §6 est exécutable : `scripts/eval_po_pipeline.py` (scripted gratuit,
+`AUTOSPEC_EVAL_PROVIDER=claude` pour la mesure réelle). L'UI expose le tout :
+badge complexité S1, taxonomie des critères S2, marqueur spec incomplète,
+bannière « Livraison partielle », bloc calibration dans « Revue du plan ».
 
 ---
 
