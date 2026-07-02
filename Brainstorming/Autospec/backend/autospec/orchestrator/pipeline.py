@@ -1157,6 +1157,7 @@ class Pipeline:
         if story.status == StoryStatus.FAILED:
             story.status = StoryStatus.TODO
             story.attempts = 0
+            story.infra_attempts = 0
             story.last_error = ""
         self._chat(ChatRole.ANALYST, f"🔍 Impact : {message}\n✏️ Story {story.id} mise à jour.")
 
@@ -1912,6 +1913,7 @@ class Pipeline:
             iteration=None if all_iterations else self.state.iteration,
             require_ui_evidence=self._setting("ui_tests_enabled"),
             strict_criteria=self._setting("definition_of_done_strict_criteria"),
+            partial=self._setting("partial_delivery_enabled"),
         )
         delivery_state.apply_definition_result(self.state, result)
         if result.blockers:
@@ -1927,7 +1929,16 @@ class Pipeline:
             )
             self._notify("error", "Livraison bloquée", result.blockers[0].message[:200])
             return False
-        if result.warnings:
+        if result.partial:
+            detail = "\n".join(f"- {i.message}" for i in result.warnings[:6])
+            self._log("delivery", "Livraison PARTIELLE acceptée.")
+            self._chat(
+                ChatRole.SYSTEM,
+                f"📦 Livraison partielle : le projet livre ses stories vertes, "
+                f"les échecs restent visibles et relançables.\n{detail}",
+            )
+            self._notify("warning", "Livraison partielle", result.warnings[0].message[:200])
+        elif result.warnings:
             detail = "\n".join(f"- {i.message}" for i in result.warnings[:5])
             self._log("delivery", "Definition of Done OK avec avertissements.")
             self._chat(ChatRole.SYSTEM, f"⚠️ Definition of Done OK avec avertissements.\n{detail}")
@@ -3017,9 +3028,13 @@ class Pipeline:
                 story.attempts = max(0, story.attempts - 1)
                 story.status = StoryStatus.TODO
             else:
+                # Panne d'infra (pas un échec dev) : tentative dev remboursée,
+                # budget infra séparé consommé — cf. le chemin work-item.
+                story.attempts = max(0, story.attempts - 1)
+                story.infra_attempts += 1
                 story.status = (
                     StoryStatus.TODO
-                    if story.attempts < settings.dev_max_attempts
+                    if story.infra_attempts <= settings.infra_max_retries
                     else StoryStatus.FAILED
                 )
             self._log(f"dev:{story.id}", f"Erreur agent : {exc}")
@@ -3801,11 +3816,24 @@ class Pipeline:
                 target.attempts = max(0, target.attempts - 1)
                 target.status = StoryStatus.TODO
             else:
-                target.status = (
-                    StoryStatus.TODO
-                    if subject.attempts < settings.dev_max_attempts
-                    else StoryStatus.FAILED
-                )
+                # Infra/provider failure (CLI killed, transport error…) : ce
+                # n'est PAS un échec du dev — on rembourse la tentative dev et
+                # on consomme le budget infra séparé, pour qu'une panne
+                # transitoire ne puisse jamais faire FAILED un item à elle
+                # seule (ni polluer la calibration de dimensionnement).
+                target.attempts = subject.attempts = max(0, subject.attempts - 1)
+                target.infra_attempts += 1
+                if target.infra_attempts <= settings.infra_max_retries:
+                    target.status = subject.status = StoryStatus.TODO
+                    self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
+                    self._log(
+                        f"dev:{item.id}",
+                        f"⚡ Panne d'infra sur {item.id} — tentative dev remboursée, "
+                        f"retry infra {target.infra_attempts}/{settings.infra_max_retries}.",
+                    )
+                else:
+                    target.status = subject.status = StoryStatus.FAILED
+                    self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
             self._log(f"dev:{item.id}", f"Erreur agent : {exc}")
         except Exception as exc:  # noqa: BLE001
             # P0b: an unexpected crash in ONE work item must not bubble up and
@@ -4166,6 +4194,7 @@ class Pipeline:
             raise ValueError("story déjà en cours")
         story.status = StoryStatus.TODO
         story.attempts = 0
+        story.infra_attempts = 0
         story.last_error = ""
         for t in story.test_plan:
             t.status = TestState.NONEXISTENT
@@ -4292,6 +4321,7 @@ class Pipeline:
         for story in failed:
             story.status = StoryStatus.TODO
             story.attempts = 0
+            story.infra_attempts = 0
             story.last_error = ""
             for t in story.test_plan:
                 t.status = TestState.NONEXISTENT
@@ -4299,6 +4329,7 @@ class Pipeline:
                 if task.status == StoryStatus.FAILED:
                     task.status = StoryStatus.TODO
                     task.attempts = 0
+                    task.infra_attempts = 0
                     task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
@@ -4464,6 +4495,7 @@ class Pipeline:
             raise ValueError("tâche déjà en cours")
         task.status = StoryStatus.TODO
         task.attempts = 0
+        task.infra_attempts = 0
         task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
