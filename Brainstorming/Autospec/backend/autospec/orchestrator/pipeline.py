@@ -1157,6 +1157,7 @@ class Pipeline:
         if story.status == StoryStatus.FAILED:
             story.status = StoryStatus.TODO
             story.attempts = 0
+            story.infra_attempts = 0
             story.last_error = ""
         self._chat(ChatRole.ANALYST, f"🔍 Impact : {message}\n✏️ Story {story.id} mise à jour.")
 
@@ -1912,6 +1913,7 @@ class Pipeline:
             iteration=None if all_iterations else self.state.iteration,
             require_ui_evidence=self._setting("ui_tests_enabled"),
             strict_criteria=self._setting("definition_of_done_strict_criteria"),
+            partial=self._setting("partial_delivery_enabled"),
         )
         delivery_state.apply_definition_result(self.state, result)
         if result.blockers:
@@ -1927,7 +1929,16 @@ class Pipeline:
             )
             self._notify("error", "Livraison bloquée", result.blockers[0].message[:200])
             return False
-        if result.warnings:
+        if result.partial:
+            detail = "\n".join(f"- {i.message}" for i in result.warnings[:6])
+            self._log("delivery", "Livraison PARTIELLE acceptée.")
+            self._chat(
+                ChatRole.SYSTEM,
+                f"📦 Livraison partielle : le projet livre ses stories vertes, "
+                f"les échecs restent visibles et relançables.\n{detail}",
+            )
+            self._notify("warning", "Livraison partielle", result.warnings[0].message[:200])
+        elif result.warnings:
             detail = "\n".join(f"- {i.message}" for i in result.warnings[:5])
             self._log("delivery", "Definition of Done OK avec avertissements.")
             self._chat(ChatRole.SYSTEM, f"⚠️ Definition of Done OK avec avertissements.\n{detail}")
@@ -3017,9 +3028,14 @@ class Pipeline:
                 story.attempts = max(0, story.attempts - 1)
                 story.status = StoryStatus.TODO
             else:
+                # Panne d'infra (pas un échec dev) : tentative dev remboursée,
+                # budget infra séparé consommé — cf. le chemin work-item.
+                story.attempts = max(0, story.attempts - 1)
+                story.infra_attempts += 1
+                self.state.calibration_for().infra_retries += 1  # §8
                 story.status = (
                     StoryStatus.TODO
-                    if story.attempts < settings.dev_max_attempts
+                    if story.infra_attempts <= settings.infra_max_retries
                     else StoryStatus.FAILED
                 )
             self._log(f"dev:{story.id}", f"Erreur agent : {exc}")
@@ -3663,6 +3679,8 @@ class Pipeline:
                     task.last_error = ""
                     self._set_stage(task, BuildStage.QUEUED, sync=False)
                     n += 1
+        if n:
+            self.state.calibration_for().orphan_resets += n  # §8
         return n
 
     async def _abuild_work_item(self, item: "work_streams.WorkItem") -> None:
@@ -3713,6 +3731,7 @@ class Pipeline:
             label = "dev frontend" if is_frontend else "dev"
 
             ok, tail = False, ""
+            dev_ran = False
             if resumed is not None:
                 # Re-verify the preserved work on the rebased branch: still
                 # green → merge below with NO dev run at all.
@@ -3726,6 +3745,7 @@ class Pipeline:
             if not ok:
                 if resumed is None:
                     self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
+                dev_ran = True
                 ok, tail = await self._arun_item_dev(subject, worktree, pkg, is_frontend)
 
             if ok:
@@ -3733,6 +3753,11 @@ class Pipeline:
                 # item is DONE only after a successful merge (so dependents only
                 # start once this item's code is in the base HEAD).
                 await self._acommit_story(worktree, item.id)
+                if dev_ran:
+                    # §8: measure the dev's REAL footprint (files in its commit)
+                    # against the leaf budget — the ground truth the plan-time
+                    # estimate (file_globs/estimated_files) must be judged by.
+                    await self._arecord_footprint(item, worktree)
                 # P2b: from here the branch holds committed GREEN work — keep it
                 # on cleanup (requeue, stop, manual retry) so the next pass can
                 # resume it; dropped again once merged or split.
@@ -3742,6 +3767,9 @@ class Pipeline:
                 merged = await self._amerge_work_item(ws, branch, item.id, worktree)
                 if merged:
                     keep_branch = False  # P2b: merged into HEAD — branch is useless now
+                    if not dev_ran:
+                        # §8: a preserved branch shipped without any dev rebuild.
+                        self.state.calibration_for().p2b_resumes += 1
                     target.status = subject.status = StoryStatus.DONE
                     for test in subject.test_plan:
                         if test.status == TestState.NONEXISTENT:
@@ -3761,6 +3789,7 @@ class Pipeline:
                     # by dev_max_attempts; a persistent conflict tries a finer
                     # split (disjoint file zones) before ending FAILED.
                     target.last_error = "conflit de merge inter-stream"
+                    self.state.calibration_for().merge_requeues += 1  # §8
                     if subject.attempts < settings.dev_max_attempts:
                         target.status = subject.status = StoryStatus.TODO
                         self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
@@ -3801,11 +3830,25 @@ class Pipeline:
                 target.attempts = max(0, target.attempts - 1)
                 target.status = StoryStatus.TODO
             else:
-                target.status = (
-                    StoryStatus.TODO
-                    if subject.attempts < settings.dev_max_attempts
-                    else StoryStatus.FAILED
-                )
+                # Infra/provider failure (CLI killed, transport error…) : ce
+                # n'est PAS un échec du dev — on rembourse la tentative dev et
+                # on consomme le budget infra séparé, pour qu'une panne
+                # transitoire ne puisse jamais faire FAILED un item à elle
+                # seule (ni polluer la calibration de dimensionnement).
+                target.attempts = subject.attempts = max(0, subject.attempts - 1)
+                target.infra_attempts += 1
+                self.state.calibration_for().infra_retries += 1  # §8
+                if target.infra_attempts <= settings.infra_max_retries:
+                    target.status = subject.status = StoryStatus.TODO
+                    self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
+                    self._log(
+                        f"dev:{item.id}",
+                        f"⚡ Panne d'infra sur {item.id} — tentative dev remboursée, "
+                        f"retry infra {target.infra_attempts}/{settings.infra_max_retries}.",
+                    )
+                else:
+                    target.status = subject.status = StoryStatus.FAILED
+                    self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
             self._log(f"dev:{item.id}", f"Erreur agent : {exc}")
         except Exception as exc:  # noqa: BLE001
             # P0b: an unexpected crash in ONE work item must not bubble up and
@@ -4028,6 +4071,23 @@ class Pipeline:
         except OSError:
             pass
 
+    async def _arecord_footprint(self, item: "work_streams.WorkItem", worktree) -> None:
+        """§8 — ground the sizing calibration on the dev's REAL footprint: count
+        the files of the item's green commit and flag it over-budget when it
+        exceeds ``task_file_budget``. The plan promised small disjoint leaves;
+        this is the measurement that promise is judged by. Best-effort."""
+        code, out = await self._agit(worktree, "show", "--name-only", "--format=", "HEAD")
+        if code != 0:
+            return
+        files = [line for line in out.splitlines() if line.strip()]
+        if len(files) > settings.task_file_budget:
+            self.state.calibration_for().over_budget_tasks += 1
+            self._log(
+                f"dev:{item.id}",
+                f"📏 {item.id} a touché {len(files)} fichiers (budget "
+                f"{settings.task_file_budget}) — compté hors budget (calibration).",
+            )
+
     async def _aresume_green_branch(self, repo, branch: str):
         """P2b — resume a PRESERVED green branch from an earlier attempt.
 
@@ -4166,6 +4226,7 @@ class Pipeline:
             raise ValueError("story déjà en cours")
         story.status = StoryStatus.TODO
         story.attempts = 0
+        story.infra_attempts = 0
         story.last_error = ""
         for t in story.test_plan:
             t.status = TestState.NONEXISTENT
@@ -4292,6 +4353,7 @@ class Pipeline:
         for story in failed:
             story.status = StoryStatus.TODO
             story.attempts = 0
+            story.infra_attempts = 0
             story.last_error = ""
             for t in story.test_plan:
                 t.status = TestState.NONEXISTENT
@@ -4299,6 +4361,7 @@ class Pipeline:
                 if task.status == StoryStatus.FAILED:
                     task.status = StoryStatus.TODO
                     task.attempts = 0
+                    task.infra_attempts = 0
                     task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
@@ -4464,6 +4527,7 @@ class Pipeline:
             raise ValueError("tâche déjà en cours")
         task.status = StoryStatus.TODO
         task.attempts = 0
+        task.infra_attempts = 0
         task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False

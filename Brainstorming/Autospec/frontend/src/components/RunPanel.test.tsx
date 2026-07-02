@@ -237,6 +237,17 @@ describe("RunPanel", () => {
     expect(screen.getByText(/Livraison · 1/)).toBeInTheDocument();
   });
 
+  it("delivery_partial : bannière 📦 (avertissement) au lieu de ⛔", () => {
+    renderPanel(
+      makeProject({
+        delivery_partial: true,
+        delivery_issues: ["Livraison partielle : 2/3", "US-2 livrée SANS cette story"],
+      }),
+    );
+    expect(screen.getByTestId("partial-delivery").textContent).toContain("2");
+    expect(screen.queryByText(/⛔ Livraison/)).not.toBeInTheDocument();
+  });
+
   it("resume_at > 0 : bannière de reprise auto + bouton annuler (M2)", () => {
     const { container } = renderPanel(
       makeProject({ phase: "stopped", resume_at: Date.now() / 1000 + 3600 }),

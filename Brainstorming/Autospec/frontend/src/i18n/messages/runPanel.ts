@@ -102,4 +102,9 @@ export const runPanel: Namespace = {
   },
   logsCount: { en: "Logs ({n})", fr: "Logs ({n})" },
   logsEmpty: { en: "Logs — none yet", fr: "Logs — aucun pour l'instant" },
+  partialDelivery: { en: "Partial delivery", fr: "Livraison partielle" },
+  partialDelivery_title: {
+    en: "The project shipped its green stories; the failed ones stay visible and retryable.",
+    fr: "Le projet livre ses stories vertes ; les échecs restent visibles et relançables.",
+  },
 };

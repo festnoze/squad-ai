@@ -530,6 +530,22 @@ class Settings:
     definition_of_done_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_DEFINITION_OF_DONE", True)
     )
+    # P5 — partial delivery (principle « progrès partiel = succès partiel »):
+    # when ≥1 story is DONE, stories that FAILED downgrade from blockers to
+    # warnings — the project ships what is green instead of appearing entirely
+    # failed (C9). Unfinished items (todo/in-progress) still block, and a
+    # delivery with ZERO done story stays blocked. The failed stories remain
+    # visible (FAILED + delivery warnings) and retryable.
+    partial_delivery_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_PARTIAL_DELIVERY", True)
+    )
+    # Infra vs dev attempts: a transient provider/CLI failure (AgentError that
+    # is not a usage-limit) is NOT a dev failure — it refunds the dev attempt
+    # and consumes this separate budget instead, so infra flakiness alone can
+    # never FAIL an item (nor pollute the sizing calibration).
+    infra_max_retries: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_INFRA_MAX_RETRIES", 3, minimum=0)
+    )
     definition_of_done_strict_criteria: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_DOD_STRICT_CRITERIA", False)
     )

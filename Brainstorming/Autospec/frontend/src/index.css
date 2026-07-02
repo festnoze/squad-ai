@@ -3535,3 +3535,69 @@ button.action-btn.action-done {
   background: var(--accent);
   color: #fff;
 }
+
+/* ---- Pipeline PO (S1/S2) : badge complexité + taxonomie des critères ---- */
+.badge-complexity {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.badge-complexity.cx-trivial {
+  background: #12261a;
+  color: #7fd49a;
+  border-color: #2c5e3f;
+}
+.badge-complexity.cx-standard {
+  background: #1e2433;
+  color: #9db8e8;
+  border-color: #3a4a6b;
+}
+.badge-complexity.cx-complex {
+  background: #2b1a14;
+  color: #e8a87f;
+  border-color: #6b452c;
+}
+
+.criterion-kind {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.criterion-kind.kind-happy { background: #12261a; color: #7fd49a; }
+.criterion-kind.kind-edge { background: #2b2414; color: #e0c06c; }
+.criterion-kind.kind-error { background: #2b1416; color: #e06c75; }
+.criterion-kind.kind-boundary { background: #1e2433; color: #9db8e8; }
+
+/* S2 dégradée : la story a gardé son squelette, la spec est incomplète. */
+.story-spec-incomplete {
+  margin: 4px 0;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #2b2414;
+  border: 1px solid #6b5a2c;
+  color: #e0c06c;
+  font-size: 12px;
+}
+
+/* P5 : livraison partielle — chip d'avertissement (pas une erreur). */
+.partial-banner {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #2b2414;
+  border: 1px solid #e0c06c;
+  color: #e0c06c;
+  font-size: 12px;
+  font-weight: 600;
+}

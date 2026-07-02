@@ -26,6 +26,8 @@ class DeliveryIssue:
 class DefinitionOfDoneResult:
     ready: bool
     issues: tuple[DeliveryIssue, ...]
+    # P5 — the gate passed but some stories FAILED and were shipped around.
+    partial: bool = False
 
     @property
     def blockers(self) -> tuple[DeliveryIssue, ...]:
@@ -52,12 +54,19 @@ def evaluate_definition_of_done(
     iteration: int | None = None,
     require_ui_evidence: bool = False,
     strict_criteria: bool = False,
+    partial: bool = False,
 ) -> DefinitionOfDoneResult:
     """Evaluate the deterministic delivery gate for one iteration.
 
     ``strict_criteria`` upgrades missing per-criterion test evidence to blockers.
     With it off, trivial Gherkin-only stories can still pass while the operator
     sees warnings in ``state.delivery_issues``.
+
+    ``partial`` (P5 — « progrès partiel = succès partiel ») : when ≥1 story is
+    effectively DONE, stories/tasks that FAILED downgrade from blockers to
+    warnings — the project ships what is green instead of appearing entirely
+    failed. Unfinished items (todo/in-progress) still block regardless — they
+    mean the orchestration didn't run to completion, not that it failed.
     """
     stories = (
         state.stories
@@ -74,15 +83,26 @@ def evaluate_definition_of_done(
         )
         return DefinitionOfDoneResult(ready=False, issues=tuple(issues))
 
+    done_count = sum(1 for s in stories if s.effective_status() == StoryStatus.DONE)
+    # Failures only ship-around when there is something green to ship.
+    allow_partial = partial and done_count > 0
+    partial_applied = False
+
     for story in stories:
         effective = story.effective_status()
         if effective != StoryStatus.DONE:
+            downgrade = allow_partial and effective == StoryStatus.FAILED
+            partial_applied = partial_applied or downgrade
             issues.append(
                 DeliveryIssue(
-                    code="story_not_done",
+                    code="story_failed_partial" if downgrade else "story_not_done",
                     item_id=story.id,
+                    severity="warning" if downgrade else "blocker",
                     message=(
-                        f"{story.id} n'est pas livrée : statut effectif "
+                        f"{story.id} livrée SANS cette story (échec conservé, "
+                        "relançable)."
+                        if downgrade
+                        else f"{story.id} n'est pas livrée : statut effectif "
                         f"{effective.value}."
                     ),
                 )
@@ -90,12 +110,18 @@ def evaluate_definition_of_done(
 
         for task in story.tasks:
             if task.status != StoryStatus.DONE:
+                downgrade = allow_partial and task.status == StoryStatus.FAILED
+                partial_applied = partial_applied or downgrade
                 issues.append(
                     DeliveryIssue(
-                        code="task_not_done",
+                        code="task_failed_partial" if downgrade else "task_not_done",
                         item_id=task.id,
+                        severity="warning" if downgrade else "blocker",
                         message=(
-                            f"{task.id} ({story.id}) n'est pas livrée : "
+                            f"{task.id} ({story.id}) livrée sans cette tâche "
+                            "(échec conservé, relançable)."
+                            if downgrade
+                            else f"{task.id} ({story.id}) n'est pas livrée : "
                             f"statut {task.status.value}."
                         ),
                     )
@@ -150,4 +176,19 @@ def evaluate_definition_of_done(
             )
 
     blockers = [i for i in issues if i.severity == "blocker"]
-    return DefinitionOfDoneResult(ready=not blockers, issues=tuple(issues))
+    is_partial = partial_applied and not blockers
+    if is_partial:
+        issues.insert(
+            0,
+            DeliveryIssue(
+                code="partial_delivery",
+                severity="warning",
+                message=(
+                    f"Livraison partielle : {done_count}/{len(stories)} "
+                    "story(ies) livrée(s), le reste en échec (relançable)."
+                ),
+            ),
+        )
+    return DefinitionOfDoneResult(
+        ready=not blockers, issues=tuple(issues), partial=is_partial
+    )
