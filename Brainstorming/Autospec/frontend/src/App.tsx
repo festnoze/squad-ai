@@ -434,9 +434,6 @@ export default function App() {
     [logs, selectedId],
   );
 
-  // La popup de création peut être fermée dès qu'il reste un projet à afficher.
-  const canCloseSetup = visibleProjects.length > 0;
-
   // Rollback déclenché depuis la carte d'une itération (vue Itérations). La
   // disponibilité d'un snapshot est gérée par WorkspaceViews ; ici on confirme
   // et on exécute.
@@ -636,19 +633,19 @@ export default function App() {
       {showSetup && (
         <div
           className="modal-backdrop"
-          onClick={() => canCloseSetup && setShowSetup(false)}
+          onClick={() => setShowSetup(false)}
         >
           <div className="modal" onClick={(e) => e.stopPropagation()}>
-            {canCloseSetup && (
-              <button
-                className="modal-close"
-                title={t("common.close")}
-                aria-label={t("app.closeSetup")}
-                onClick={() => setShowSetup(false)}
-              >
-                ✕
-              </button>
-            )}
+            {/* Toujours fermable — même sans projet (démarrage) : l'accueil
+                explique comment rouvrir via « ＋ Nouveau ». */}
+            <button
+              className="modal-close"
+              title={t("common.close")}
+              aria-label={t("app.closeSetup")}
+              onClick={() => setShowSetup(false)}
+            >
+              ✕
+            </button>
             <ProjectSetup onCreate={handleCreate} busy={busy} />
           </div>
         </div>
@@ -656,7 +653,15 @@ export default function App() {
       {!project ? (
         <main className="home">
           {!showSetup && (
-            <div className="placeholder">{t("app.placeholder")}</div>
+            <div className="placeholder">
+              {t("app.placeholder")}
+              {/* Sans projet, la ProjectBar (et son « ＋ Nouveau ») n'est pas
+                  rendue : ce bouton garantit que fermer la popup de création
+                  n'est jamais un cul-de-sac. */}
+              <button className="primary" onClick={() => setShowSetup(true)}>
+                {t("projectBar.new")}
+              </button>
+            </div>
           )}
         </main>
       ) : (
