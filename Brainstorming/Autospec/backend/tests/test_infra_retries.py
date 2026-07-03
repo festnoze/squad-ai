@@ -10,7 +10,8 @@ import pytest
 from autospec.agents.runner import AgentError
 from autospec.agents.scripted import ScriptedRunner
 from autospec.config import settings
-from autospec.models import Epic, ProjectState, StoryStatus, Stream, StreamKind, UserStory
+from autospec.models import Epic, PipelinePhase, ProjectState, StoryStatus, Stream, StreamKind, UserStory
+from autospec.orchestrator import session_monitor
 from autospec.orchestrator.pipeline import Pipeline
 
 
@@ -88,3 +89,39 @@ async def test_infra_budget_exhausted_fails_without_split(streams_setup, monkeyp
     assert story.attempts == 0        # every dev attempt was refunded
     assert split_calls == []          # infra failure never triggers a split
     assert "provider unreachable" in story.last_error
+
+
+def test_claude_session_limit_messages_are_usage_limit_errors():
+    samples = [
+        "You've hit your session limit · resets 2:40am (Europe/Paris)",
+        '{"status":429,"message":"rate limited"}',
+        "SessionEnd hook failed after Claude usage limit",
+    ]
+
+    assert all(session_monitor.is_usage_limit_error(text) for text in samples)
+
+
+async def test_claude_session_limit_stops_retryable_without_split(streams_setup, monkeypatch):
+    monkeypatch.setattr(settings, "dev_max_attempts", 1)
+    monkeypatch.setattr(settings, "infra_max_retries", 1)
+    state = _state([_us("US-1")], project_id="claude-limit")
+    pipeline = Pipeline(state, ScriptedRunner())
+    split_calls = []
+
+    async def _session_limited(subject, worktree, pkg, is_frontend):
+        raise AgentError("You've hit your session limit · resets 2:40am (Europe/Paris)")
+
+    async def _spy_split(item, subject, target, *, force=False):
+        split_calls.append(item.id)
+        return False
+
+    monkeypatch.setattr(pipeline, "_arun_item_dev", _session_limited)
+    monkeypatch.setattr(pipeline, "_amaybe_split_on_failure", _spy_split)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+    story = state.story("US-1")
+    assert story.status == StoryStatus.TODO
+    assert story.attempts == 0
+    assert story.infra_attempts == 0
+    assert split_calls == []
+    assert state.phase == PipelinePhase.NEEDS_ATTENTION

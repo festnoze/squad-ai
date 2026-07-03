@@ -30,6 +30,9 @@ __all__ = [
     "WorkGraph",
     "build_work_graph",
     "detect_cycle",
+    "cycle_nodes",
+    "transitive_dependents",
+    "dependency_targets",
     "ready_items",
     "is_ready",
     "blocked_by",
@@ -64,6 +67,50 @@ class WorkGraph:
             yield self.items[wid]
 
 
+def _children_by_parent(state: ProjectState) -> dict[str, list]:
+    children: dict[str, list] = {}
+    for story in state.stories:
+        if story.parent_id:
+            children.setdefault(story.parent_id, []).append(story)
+    return children
+
+
+def _leaf_task_ids(
+    sid: str,
+    stories_by_id: dict[str, object],
+    children_by_parent: dict[str, list],
+    _seen: set[str] | None = None,
+) -> list[str]:
+    _seen = _seen if _seen is not None else set()
+    if sid in _seen:
+        return []
+    _seen.add(sid)
+    story = stories_by_id.get(sid)
+    ids = [t.id for t in getattr(story, "tasks", [])] if story else []
+    for child in children_by_parent.get(sid, ()):
+        ids.extend(_leaf_task_ids(child.id, stories_by_id, children_by_parent, _seen))
+    return ids
+
+
+def dependency_targets(dep_id: str, owner: str, state: ProjectState) -> tuple[str, ...]:
+    """Resolve one declared dependency to concrete work-item ids.
+
+    Story dependencies expand to the story's leaf tasks, including tasks from
+    nested Technical Stories. Unknown ids and self-dependencies resolve to empty.
+    """
+    if dep_id == owner:
+        return ()
+    stories_by_id = {s.id: s for s in state.stories}
+    task_ids = {t.id for s in state.stories for t in s.tasks}
+    if dep_id in task_ids:
+        return (dep_id,)
+    if dep_id not in stories_by_id:
+        return ()
+    children = _children_by_parent(state)
+    targets = _leaf_task_ids(dep_id, stories_by_id, children) or [dep_id]
+    return tuple(t for t in targets if t != owner)
+
+
 def build_work_graph(state: ProjectState) -> WorkGraph:
     """Build the work-item graph for ``state`` (all stories, every iteration).
 
@@ -76,21 +123,7 @@ def build_work_graph(state: ProjectState) -> WorkGraph:
     # back via ``parent_id``. Depending on that container therefore also means
     # depending on its child TS' tasks (recursively) — otherwise a dependent could
     # start before the work moved into the TS is done.
-    children_by_parent: dict[str, list] = {}
-    for s in state.stories:
-        if s.parent_id:
-            children_by_parent.setdefault(s.parent_id, []).append(s)
-
-    def leaf_task_ids(sid: str, _seen: set[str] | None = None) -> list[str]:
-        _seen = _seen if _seen is not None else set()
-        if sid in _seen:
-            return []
-        _seen.add(sid)
-        story = stories_by_id.get(sid)
-        ids = [t.id for t in story.tasks] if story else []
-        for child in children_by_parent.get(sid, ()):
-            ids.extend(leaf_task_ids(child.id, _seen))
-        return ids
+    children_by_parent = _children_by_parent(state)
 
     graph = WorkGraph()
 
@@ -105,7 +138,7 @@ def build_work_graph(state: ProjectState) -> WorkGraph:
             elif dep in stories_by_id:
                 # Depending on a decomposed US == depending on ALL its tasks AND
                 # the tasks of any Technical Story extracted from it (recursive).
-                targets = leaf_task_ids(dep) or [dep]
+                targets = _leaf_task_ids(dep, stories_by_id, children_by_parent) or [dep]
             else:
                 graph.warnings.append(f"{ctx} : dépendance inconnue « {dep} » ignorée")
                 continue
@@ -180,6 +213,32 @@ def detect_cycle(graph: WorkGraph) -> list[str] | None:
             if found:
                 return found
     return None
+
+
+def cycle_nodes(graph: WorkGraph) -> set[str]:
+    """Return the exact work-item ids in a detected dependency cycle."""
+    cycle = detect_cycle(graph)
+    if not cycle:
+        return set()
+    return set(cycle[:-1] if len(cycle) > 1 and cycle[0] == cycle[-1] else cycle)
+
+
+def transitive_dependents(graph: WorkGraph, roots: set[str]) -> set[str]:
+    """Return every item that depends, directly or indirectly, on ``roots``."""
+    reverse: dict[str, list[str]] = {}
+    for item in graph:
+        for dep in item.depends_on:
+            reverse.setdefault(dep, []).append(item.id)
+    out: set[str] = set()
+    stack = list(roots)
+    while stack:
+        root = stack.pop()
+        for dependent in reverse.get(root, ()):
+            if dependent in out or dependent in roots:
+                continue
+            out.add(dependent)
+            stack.append(dependent)
+    return out
 
 
 def is_ready(

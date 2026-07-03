@@ -537,7 +537,7 @@ class Settings:
     # delivery with ZERO done story stays blocked. The failed stories remain
     # visible (FAILED + delivery warnings) and retryable.
     partial_delivery_enabled: bool = field(
-        default_factory=lambda: _env_bool("AUTOSPEC_PARTIAL_DELIVERY", True)
+        default_factory=lambda: _env_bool("AUTOSPEC_PARTIAL_DELIVERY", False)
     )
     # Infra vs dev attempts: a transient provider/CLI failure (AgentError that
     # is not a usage-limit) is NOT a dev failure — it refunds the dev attempt

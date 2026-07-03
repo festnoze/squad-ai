@@ -33,7 +33,8 @@ logger = logging.getLogger(__name__)
 
 # Messages the Claude CLI emits when the subscription usage window is exhausted.
 _LIMIT_RE = re.compile(
-    r"usage limit reached|reached your usage limit|limit reached\|\d|5-hour limit",
+    r"usage limit reached|reached your usage limit|you've hit your session limit|"
+    r"session limit|limit reached\|\d|5-hour limit|sessionend hook|status[\"']?\s*:\s*429|\b429\b",
     re.IGNORECASE,
 )
 

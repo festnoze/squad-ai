@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import copy
 import json
 import os
 import re
@@ -3018,15 +3019,14 @@ class Pipeline:
                         self._set_stage(story, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             story.last_error = str(exc)
-            if session_monitor.monitor_active() and session_monitor.is_usage_limit_error(
-                str(exc)
-            ):
+            if settings.agent_provider == "claude" and session_monitor.is_usage_limit_error(str(exc)):
                 # Usage-window exhaustion is not the story's fault: refund the
                 # attempt and requeue as-is for the scheduled fresh session.
-                # Only with the watchdog active (it stops the build loop) —
-                # otherwise the refund would retry the same wall forever.
                 story.attempts = max(0, story.attempts - 1)
                 story.status = StoryStatus.TODO
+                if not session_monitor.monitor_active():
+                    self.state.phase = PipelinePhase.NEEDS_ATTENTION
+                    self._stop_requested = True
             else:
                 # Panne d'infra (pas un échec dev) : tentative dev remboursée,
                 # budget infra séparé consommé — cf. le chemin work-item.
@@ -3180,10 +3180,12 @@ class Pipeline:
                 if not running:
                     # Nothing ready and nothing in flight: a defensive in-flight
                     # remnant, a dependency CYCLE, or everything left depends on
-                    # failed work — mirror the batch loop's terminal handling.
+                    # failed work. Keep failures targeted: a local cycle or one
+                    # failed upstream item must not contaminate the full backlog.
                     if any(p.status == StoryStatus.IN_PROGRESS for p in pending):
                         break  # defensive: a worker left an item in-flight
                     cycle = work_streams.detect_cycle(graph)
+                    cycle_ids = work_streams.cycle_nodes(graph)
                     cycle_error = (
                         f"Cycle de dépendances détecté : {' → '.join(cycle)}"
                         if cycle else None
@@ -3192,11 +3194,17 @@ class Pipeline:
                         self._chat(ChatRole.SYSTEM, f"⛔ {cycle_error}")
                     for item in pending:
                         blockers = work_streams.blocked_by(item, graph.items)
-                        self._set_item_status(
-                            item, StoryStatus.FAILED,
-                            last_error=cycle_error
-                            or "Dépendance non satisfaite (work item échoué en amont).",
-                        )
+                        if item.id in cycle_ids:
+                            self._set_item_status(
+                                item, StoryStatus.FAILED,
+                                last_error=cycle_error,
+                            )
+                        else:
+                            target = self._item_target(item)
+                            target.last_error = (
+                                cycle_error
+                                or "Dépendance non satisfaite (work item échoué en amont)."
+                            )
                         if blockers:
                             self._log(
                                 f"dev:{item.id}",
@@ -3485,16 +3493,18 @@ class Pipeline:
         if story is None:
             return False
         failed = next(t for t in story.tasks if t.id == task_id)
+        stories_snapshot = copy.deepcopy(self.state.stories)
         stream = failed.stream or self.state.primary_stream_id
         new_tasks = self._build_finer_tasks(
             failed, raw, story_id=story.id, stream=stream, base_depth=failed.split_depth
         )
         new_ids = [t.id for t in new_tasks]
         other_tasks = [t for t in story.tasks if t.id != failed.id]
+        safe_failed_deps = self._safe_split_depends(story, failed)
 
         if other_tasks:
             # EXTRACT into a Technical Story (the container keeps its other tasks).
-            ts = self._make_technical_story(story, failed, new_tasks)
+            ts = self._make_technical_story(story, failed, new_tasks, depends_on=safe_failed_deps)
             # The TS's tasks live under the TS now (their story_id is rebound).
             for nt in new_tasks:
                 nt.story_id = ts.id
@@ -3514,6 +3524,8 @@ class Pipeline:
             story.tasks = other_tasks
             self.state.stories.append(ts)
             self._enforce_task_independence(ts.tasks, label=f"{ts.id}/split")
+            if self._restore_split_snapshot_if_cycle(stories_snapshot, label=f"{task_id}/split"):
+                return False
             title_list = ", ".join(t.title or t.id for t in new_tasks)
             self._log(
                 f"split:{task_id}",
@@ -3529,7 +3541,7 @@ class Pipeline:
         # FALLBACK — the failed task is the container's ONLY one: in-place sibling
         # split (no empty container, no extra TS node).
         for nt in new_tasks:
-            for dep in failed.depends_on:
+            for dep in safe_failed_deps:
                 if dep not in nt.depends_on:
                     nt.depends_on.append(dep)
         for t in self.state.all_tasks():
@@ -3540,12 +3552,76 @@ class Pipeline:
         idx = story.tasks.index(failed)
         story.tasks[idx : idx + 1] = new_tasks
         self._enforce_task_independence(story.tasks, label=f"{task_id}/split")
+        if self._restore_split_snapshot_if_cycle(stories_snapshot, label=f"{task_id}/split"):
+            return False
         title_list = ", ".join(t.title or t.id for t in new_tasks)
         self._log(f"split:{task_id}", f"🪓 Tâche {task_id} re-découpée en {len(new_tasks)} sous-tâches plus fines après échec.")
         self._chat(ChatRole.ARCHITECT, f"[{task_id}] Re-découpage plus fin après échec → {title_list}.")
         return True
 
-    def _make_technical_story(self, parent: UserStory, failed: Task, tasks: list[Task]) -> UserStory:
+    def _safe_split_depends(self, parent: UserStory, failed: Task) -> list[str]:
+        """Keep only upstream deps that cannot point back into the split subtree."""
+        graph = work_streams.build_work_graph(self.state)
+        downstream = work_streams.transitive_dependents(graph, {failed.id})
+        children: dict[str, list[UserStory]] = {}
+        by_id = {s.id: s for s in self.state.stories}
+        for story in self.state.stories:
+            if story.parent_id:
+                children.setdefault(story.parent_id, []).append(story)
+
+        unsafe_stories: set[str] = {parent.id}
+        cur = parent
+        while cur.parent_id and cur.parent_id in by_id:
+            unsafe_stories.add(cur.parent_id)
+            cur = by_id[cur.parent_id]
+        stack = [parent.id]
+        while stack:
+            sid = stack.pop()
+            for child in children.get(sid, ()):
+                if child.id not in unsafe_stories:
+                    unsafe_stories.add(child.id)
+                    stack.append(child.id)
+
+        unsafe_items = {failed.id}
+        for story in self.state.stories:
+            if story.id in unsafe_stories:
+                unsafe_items.update(t.id for t in story.tasks)
+
+        safe: list[str] = []
+        for dep in failed.depends_on:
+            targets = set(work_streams.dependency_targets(dep, failed.id, self.state))
+            if (
+                dep in unsafe_stories
+                or dep in unsafe_items
+                or dep in downstream
+                or targets & (unsafe_items | downstream)
+            ):
+                continue
+            if dep not in safe:
+                safe.append(dep)
+        return safe
+
+    def _restore_split_snapshot_if_cycle(self, stories_snapshot: list[UserStory], *, label: str) -> bool:
+        cycle = work_streams.detect_cycle(work_streams.build_work_graph(self.state))
+        if not cycle:
+            return False
+        self.state.stories = stories_snapshot
+        self._log(
+            f"split:{label}",
+            "Split refusé : cycle de dépendances résolu détecté ("
+            + " → ".join(cycle)
+            + ").",
+        )
+        return True
+
+    def _make_technical_story(
+        self,
+        parent: UserStory,
+        failed: Task,
+        tasks: list[Task],
+        *,
+        depends_on: list[str] | None = None,
+    ) -> UserStory:
         """RFC technical-stories: build the TS that absorbs a too-big task's finer
         sub-tasks — a non-functional container (``technical=True``, no functional
         Gherkin, a technical ``contract``) tied to its origin via ``parent_id``,
@@ -3566,7 +3642,7 @@ class Pipeline:
             gherkin="",
             stream=failed.stream or parent.stream,
             tasks=tasks,
-            depends_on=list(failed.depends_on),
+            depends_on=list(depends_on if depends_on is not None else failed.depends_on),
             split_depth=failed.split_depth + 1,
             iteration=parent.iteration,
         )
@@ -3824,11 +3900,13 @@ class Pipeline:
                     self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             target.last_error = str(exc)
-            if session_monitor.monitor_active() and session_monitor.is_usage_limit_error(
-                str(exc)
-            ):
+            if settings.agent_provider == "claude" and session_monitor.is_usage_limit_error(str(exc)):
                 target.attempts = max(0, target.attempts - 1)
-                target.status = StoryStatus.TODO
+                subject.attempts = max(0, subject.attempts - 1)
+                target.status = subject.status = StoryStatus.TODO
+                if not session_monitor.monitor_active():
+                    self.state.phase = PipelinePhase.NEEDS_ATTENTION
+                    self._stop_requested = True
             else:
                 # Infra/provider failure (CLI killed, transport error…) : ce
                 # n'est PAS un échec du dev — on rembourse la tentative dev et

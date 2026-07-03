@@ -152,6 +152,30 @@ def test_recursion_ts_task_splits_into_deeper_ts(streams_on):
     assert len(deeper) == 1 and len(deeper[0].tasks) == 2        # nested TS (depth+1)
 
 
+def test_split_task_rolls_back_when_rewrite_introduces_cycle(streams_on, monkeypatch):
+    state = _streams_state([
+        _us("US-1", tasks=[
+            _task("T-1", "US-1", stream="backend"),
+            _task("T-2", "US-1", stream="backend", deps=["T-1"]),
+        ])
+    ])
+    pipeline = Pipeline(state, ScriptedRunner())
+    raw = [
+        {"id": "a", "title": "A", "file_globs": ["a.py"]},
+        {"id": "b", "title": "B", "file_globs": ["b.py"]},
+    ]
+
+    def _inject_bad_edge(tasks, *, label):
+        tasks[0].depends_on.append("T-2")
+
+    monkeypatch.setattr(pipeline, "_enforce_task_independence", _inject_bad_edge)
+
+    assert pipeline._split_task("T-1", raw) is False
+    assert [s.id for s in state.stories] == ["US-1"]
+    assert [t.id for t in state.story("US-1").tasks] == ["T-1", "T-2"]
+    assert state.task("T-2").depends_on == ["T-1"]
+
+
 # --------------------------------------------------------------- build integration
 
 async def test_auto_split_on_failure_then_subtasks_build_green(streams_on, monkeypatch):
