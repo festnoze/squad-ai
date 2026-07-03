@@ -131,8 +131,33 @@ async def test_frontend_task_starts_only_after_backend_dep_is_merged(streams_on,
     assert start_order == ["T-back", "T-front"]  # strict ordering across batches
     assert state.task("T-back").status == StoryStatus.DONE
     assert state.task("T-front").status == StoryStatus.DONE
-    # When the front task started, the back task was already DONE (merged).
-    assert start_order.index("T-front") > start_order.index("T-back")
+
+
+async def test_cycle_blocks_only_cycle_nodes_without_mass_failing_pending(streams_on):
+    parent = _us(
+        "TS-PARENT",
+        tasks=[
+            _task("T-INTEGRATE", "TS-PARENT", stream="backend", depends_on=["TS-CHILD"]),
+        ],
+    )
+    child = _us(
+        "TS-CHILD",
+        tasks=[
+            _task("T-CHILD-2", "TS-CHILD", stream="backend", depends_on=["T-INTEGRATE"]),
+        ],
+    )
+    child.technical = True
+    child.parent_id = "TS-PARENT"
+    blocked = _us("US-BLOCKED", stream="backend", depends_on=["TS-PARENT"])
+    state = _streams_state([parent, child, blocked], project_id="cycle-no-contam")
+    pipeline = Pipeline(state, ScriptedRunner())
+
+    await pipeline._abuild_phase()
+
+    assert state.task("T-INTEGRATE").status == StoryStatus.FAILED
+    assert state.task("T-CHILD-2").status == StoryStatus.FAILED
+    assert state.story("US-BLOCKED").status == StoryStatus.TODO
+    assert "Cycle de dépendances détecté" in state.story("US-BLOCKED").last_error
 
 
 # --------------------------------------------------- (c) merge conflict policy
@@ -161,7 +186,7 @@ async def test_persistent_merge_conflict_fails_after_exhausting_retries(streams_
 
     story = state.story("US-1")
     assert story.status == StoryStatus.FAILED
-    assert story.last_error == "conflit de merge inter-stream"
+    assert story.last_error.startswith("conflit de merge inter-stream")
     assert story.attempts == 2  # rebuilt once on a fresh worktree before failing
     # Two build attempts × (one merge + one in-lock retry) = four clean aborts.
     assert len(aborts) == 4

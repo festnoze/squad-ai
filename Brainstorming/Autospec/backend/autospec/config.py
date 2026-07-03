@@ -330,8 +330,18 @@ class Settings:
     split_on_failure_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_SPLIT_ON_FAILURE", True)
     )
+    # Depth 2 (not 1) so a task extracted into a Technical Story can itself be
+    # re-split once — the "arbitrary depth via TS chains" of RFC technical-stories
+    # is otherwise cut off at the first level.
     split_max_depth: int = field(
-        default_factory=lambda: _env_int("AUTOSPEC_SPLIT_MAX_DEPTH", 1, minimum=0)
+        default_factory=lambda: _env_int("AUTOSPEC_SPLIT_MAX_DEPTH", 2, minimum=0)
+    )
+    # RFC technical-stories: target max files per LEAF task, so each stays small
+    # enough for one average-LLM session (≤ N files) → massive parallelism + high
+    # per-task success. Indicative (communicated to the architect when splitting),
+    # not a hard runtime reject.
+    task_file_budget: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_TASK_FILE_BUDGET", 3, minimum=1)
     )
     # RFC technical-stories: target max files per LEAF task, so each stays small
     # enough for one average-LLM session (≤ N files) → massive parallelism + high
@@ -519,6 +529,22 @@ class Settings:
     # small Gherkin-only stories are still valid in the existing pipeline.
     definition_of_done_enabled: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_DEFINITION_OF_DONE", True)
+    )
+    # P5 — partial delivery (principle « progrès partiel = succès partiel »):
+    # when ≥1 story is DONE, stories that FAILED downgrade from blockers to
+    # warnings — the project ships what is green instead of appearing entirely
+    # failed (C9). Unfinished items (todo/in-progress) still block, and a
+    # delivery with ZERO done story stays blocked. The failed stories remain
+    # visible (FAILED + delivery warnings) and retryable.
+    partial_delivery_enabled: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_PARTIAL_DELIVERY", False)
+    )
+    # Infra vs dev attempts: a transient provider/CLI failure (AgentError that
+    # is not a usage-limit) is NOT a dev failure — it refunds the dev attempt
+    # and consumes this separate budget instead, so infra flakiness alone can
+    # never FAIL an item (nor pollute the sizing calibration).
+    infra_max_retries: int = field(
+        default_factory=lambda: _env_int("AUTOSPEC_INFRA_MAX_RETRIES", 3, minimum=0)
     )
     definition_of_done_strict_criteria: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_DOD_STRICT_CRITERIA", False)

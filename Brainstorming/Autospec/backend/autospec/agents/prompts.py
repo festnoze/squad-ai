@@ -910,12 +910,15 @@ Chaque tâche : {{"id", "stream", "title", "description", "acceptance_criteria",
 Les ids de tâches sont uniques dans tout le plan ; une tâche frontend DOIT dépendre
 de la tâche backend dont elle consomme le contrat.
 `file_globs` (OBLIGATOIRE) liste les fichiers que la tâche crée/modifie (chemins
-relatifs, jokers OK). RÈGLE DE PARALLÉLISME : deux tâches du MÊME stream qui
+relatifs, jokers OK). RÈGLE DE PARALLÉLISME : deux tâches (même INTER-stream) qui
 revendiquent un même fichier seront sérialisées ; vise des zones DISJOINTES (1
 composant/1 fichier par tâche front, 1 couche par tâche back). Ne JAMAIS faire
-réécrire le même fichier (ex. `frontend/src/App.tsx`) par deux tâches parallèles —
-crée des fichiers séparés (un composant par tâche) + une tâche d'intégration qui
-`depends_on` les composants.
+réécrire le même fichier par deux tâches parallèles — les FICHIERS PARTAGÉS
+(points d'entrée/config : `main.py`, `pyproject.toml`, `package.json`,
+`frontend/src/App.tsx`, `frontend/src/index.css`, `README.md`) sont réservés à
+UNE tâche d'INTÉGRATION par story/stream : les tâches de feature créent leurs
+PROPRES fichiers et exportent ; la tâche d'intégration fait le câblage et
+`depends_on` les features. C'est LA cause n°1 des conflits de merge inter-stream.
 
 TECHNICAL STORIES (TS) — découpage fin du travail technique/complexe.
 Pour un travail TECHNIQUE transverse ou une pièce COMPLEXE qui n'est pas une vraie
@@ -1013,8 +1016,39 @@ def sizing_rules() -> str:
   de gonfler la story.
 - ZONES DISJOINTES : deux unités parallèles ne revendiquent JAMAIS le même
   fichier ; sinon les relier par `depends_on` ou les fusionner.
+- FICHIERS PARTAGÉS (points d'entrée et config : `main.py`, `pyproject.toml`,
+  `package.json`, `frontend/src/App.tsx`, `frontend/src/index.css`, `README.md`) :
+  une SEULE tâche d'INTÉGRATION par story/stream a le droit de les modifier —
+  les tâches de feature créent leurs PROPRES fichiers et exportent ; le câblage
+  dans les fichiers partagés est fait par la tâche d'intégration qui `depends_on`
+  les features. C'est LA cause n°1 des conflits de merge entre unités parallèles.
 - NI TROP GROS NI TROP FIN : fusionner les unités triviales adjacentes qui ne
   justifient pas chacune une session d'agent."""
+
+
+def file_scope_block(file_globs: list[str], *, stream_zone: str = "") -> str:
+    """The dev prompt's FILE SCOPE block for a unit built IN PARALLEL with
+    others: stay inside the declared globs / stream zone, never touch the
+    shared entry-point files unless they are explicitly in scope. This is the
+    prompt-side half of the inter-stream separation (the scheduler guard +
+    independence floor are the deterministic half)."""
+    zone = ", ".join(f"`{g}`" for g in file_globs if str(g).strip())
+    if not zone and stream_zone:
+        zone = f"le dossier `{stream_zone}/`"
+    if not zone:
+        return ""
+    return f"""
+PÉRIMÈTRE FICHIERS — cette unité est construite EN PARALLÈLE d'autres ; deux
+unités qui modifient le même fichier entrent en CONFLIT DE MERGE et le travail
+vert doit être rejoué :
+- Crée/modifie UNIQUEMENT des fichiers dans ce périmètre : {zone}.
+- Fichiers PARTAGÉS (`main.py`, `pyproject.toml`, `package.json`,
+  `frontend/src/App.tsx`, `frontend/src/index.css`, `README.md`…) : n'y touche
+  PAS sauf s'ils figurent EXPLICITEMENT dans ton périmètre — leur câblage
+  appartient à une tâche d'intégration dédiée.
+- S'il te faut du code hors périmètre, crée un NOUVEAU fichier dans ta zone et
+  exporte-le, plutôt que d'éditer le fichier d'une autre unité.
+"""
 
 
 def structure_criteria() -> str:
@@ -1463,6 +1497,7 @@ def _dev_story_native(
     lessons_block: str,
     plan: str,
     skills_block: str = "",
+    file_scope: str = "",
 ) -> str:
     """Dev prompt for Go/Rust (L2g): native test framework, no pytest-bdd. The
     Gherkin stays the human-readable acceptance spec; tests are written in the
@@ -1476,7 +1511,7 @@ def _dev_story_native(
     )
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant : {prof['project']}.
-{arch_block}{skills_block}{guidance_block}{lessons_block}
+{arch_block}{skills_block}{guidance_block}{lessons_block}{file_scope}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
@@ -1525,6 +1560,7 @@ def dev_story(
     backend_language: str = "python",
     item_guidance: str = "",
     available_skills: str = "",
+    file_scope: str = "",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     lang_block = _language_block(backend_language)
@@ -1539,6 +1575,7 @@ def dev_story(
             backend_language, story, package_name, feature_rel_path,
             arch_block, guidance_block, lessons_block, _format_test_plan(story),
             skills_block=available_skills,
+            file_scope=file_scope,
         )
     ui_block = UI_TEST_BLOCK.replace("{snake}", _snake(story.id)) if ui_tests else ""
     plan = _format_test_plan(story)
@@ -1559,7 +1596,7 @@ L'architecte QA a décomposé ce test d'acceptance en tests unitaires outside-in
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant, qui est un projet Python géré par uv (pyproject.toml déjà
 présent, pytest + pytest-bdd installés).
-{arch_block}{lang_block}{available_skills}{guidance_block}{lessons_block}
+{arch_block}{lang_block}{available_skills}{guidance_block}{lessons_block}{file_scope}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
@@ -1620,6 +1657,7 @@ def dev_story_frontend(
     file_root: str = "frontend",
     item_guidance: str = "",
     available_skills: str = "",
+    file_scope: str = "",
 ) -> str:
     """Dev prompt for the frontend stream (ST-7): a React+TS dev who writes
     components + Vitest tests in a red→green loop. "Green" = every Vitest test
@@ -1639,7 +1677,7 @@ def dev_story_frontend(
 un projet React + TypeScript géré par Vite (dossier `{file_root}/`, package.json
 déjà présent : React, Vitest et Testing Library installés, scripts `build` =
 `tsc && vite build` et `test` = `vitest run`).
-{arch_block}{available_skills}{guidance_block}{lessons_block}
+{arch_block}{available_skills}{guidance_block}{lessons_block}{file_scope}
 User story (stream frontend) à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :

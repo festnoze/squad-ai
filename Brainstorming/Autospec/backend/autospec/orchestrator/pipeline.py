@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import copy
 import json
 import os
 import re
@@ -342,6 +343,11 @@ class Pipeline:
         self._pm_session: str | None = None
         self._user_messages: asyncio.Queue[str] = asyncio.Queue()
         self._stop_requested = False
+        # Séparation inter-stream : items re-queués après un CONFLIT DE MERGE.
+        # Le scheduler les re-planifie en mode STRICT (claims_overlap, pas
+        # seulement declared_overlap) tant qu'un rival potentiel est en vol —
+        # un retry ne doit jamais pouvoir re-conflicter avec un item en cours.
+        self._conflict_retry_ids: set[str] = set()
         self._delivery_blocked = False
         self._resume_event = asyncio.Event()
         self._resume_event.set()  # set = running, cleared = paused
@@ -1157,6 +1163,7 @@ class Pipeline:
         if story.status == StoryStatus.FAILED:
             story.status = StoryStatus.TODO
             story.attempts = 0
+            story.infra_attempts = 0
             story.last_error = ""
         self._chat(ChatRole.ANALYST, f"🔍 Impact : {message}\n✏️ Story {story.id} mise à jour.")
 
@@ -1912,6 +1919,7 @@ class Pipeline:
             iteration=None if all_iterations else self.state.iteration,
             require_ui_evidence=self._setting("ui_tests_enabled"),
             strict_criteria=self._setting("definition_of_done_strict_criteria"),
+            partial=self._setting("partial_delivery_enabled"),
         )
         delivery_state.apply_definition_result(self.state, result)
         if result.blockers:
@@ -1927,7 +1935,16 @@ class Pipeline:
             )
             self._notify("error", "Livraison bloquée", result.blockers[0].message[:200])
             return False
-        if result.warnings:
+        if result.partial:
+            detail = "\n".join(f"- {i.message}" for i in result.warnings[:6])
+            self._log("delivery", "Livraison PARTIELLE acceptée.")
+            self._chat(
+                ChatRole.SYSTEM,
+                f"📦 Livraison partielle : le projet livre ses stories vertes, "
+                f"les échecs restent visibles et relançables.\n{detail}",
+            )
+            self._notify("warning", "Livraison partielle", result.warnings[0].message[:200])
+        elif result.warnings:
             detail = "\n".join(f"- {i.message}" for i in result.warnings[:5])
             self._log("delivery", "Definition of Done OK avec avertissements.")
             self._chat(ChatRole.SYSTEM, f"⚠️ Definition of Done OK avec avertissements.\n{detail}")
@@ -3007,19 +3024,23 @@ class Pipeline:
                         self._set_stage(story, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             story.last_error = str(exc)
-            if session_monitor.monitor_active() and session_monitor.is_usage_limit_error(
-                str(exc)
-            ):
+            if settings.agent_provider == "claude" and session_monitor.is_usage_limit_error(str(exc)):
                 # Usage-window exhaustion is not the story's fault: refund the
                 # attempt and requeue as-is for the scheduled fresh session.
-                # Only with the watchdog active (it stops the build loop) —
-                # otherwise the refund would retry the same wall forever.
                 story.attempts = max(0, story.attempts - 1)
                 story.status = StoryStatus.TODO
+                if not session_monitor.monitor_active():
+                    self.state.phase = PipelinePhase.NEEDS_ATTENTION
+                    self._stop_requested = True
             else:
+                # Panne d'infra (pas un échec dev) : tentative dev remboursée,
+                # budget infra séparé consommé — cf. le chemin work-item.
+                story.attempts = max(0, story.attempts - 1)
+                story.infra_attempts += 1
+                self.state.calibration_for().infra_retries += 1  # §8
                 story.status = (
                     StoryStatus.TODO
-                    if story.attempts < settings.dev_max_attempts
+                    if story.infra_attempts <= settings.infra_max_retries
                     else StoryStatus.FAILED
                 )
             self._log(f"dev:{story.id}", f"Erreur agent : {exc}")
@@ -3152,11 +3173,22 @@ class Pipeline:
                     if it.id in running or not work_streams.is_ready(it, graph.items):
                         continue
                     claim = self._item_claim(it)
-                    if any(
-                        independence.declared_overlap(claim, other)
-                        for other in inflight_claims
-                    ):
-                        continue  # would clash on DECLARED files with an in-flight item
+                    # Un retry APRÈS CONFLIT DE MERGE est re-planifié en mode
+                    # STRICT : claims_overlap (un claim non déclaré du même
+                    # stream = rival possible), pas seulement declared_overlap.
+                    # Ses claims viennent d'être recalés sur les fichiers
+                    # RÉELLEMENT touchés (_register_merge_conflict), donc le
+                    # blocage est ciblé ; il attend au pire la fin des items en
+                    # vol — jamais un deadlock (ils se terminent toujours).
+                    strict = it.id in self._conflict_retry_ids
+                    overlap = (
+                        independence.claims_overlap
+                        if strict
+                        else independence.declared_overlap
+                    )
+                    if any(overlap(claim, other) for other in inflight_claims):
+                        continue  # would clash on files with an in-flight item
+                    self._conflict_retry_ids.discard(it.id)
                     await _acommit_feature(it)
                     running[it.id] = asyncio.create_task(self._abuild_work_item(it))
                     inflight_claims.append(claim)
@@ -3164,10 +3196,12 @@ class Pipeline:
                 if not running:
                     # Nothing ready and nothing in flight: a defensive in-flight
                     # remnant, a dependency CYCLE, or everything left depends on
-                    # failed work — mirror the batch loop's terminal handling.
+                    # failed work. Keep failures targeted: a local cycle or one
+                    # failed upstream item must not contaminate the full backlog.
                     if any(p.status == StoryStatus.IN_PROGRESS for p in pending):
                         break  # defensive: a worker left an item in-flight
                     cycle = work_streams.detect_cycle(graph)
+                    cycle_ids = work_streams.cycle_nodes(graph)
                     cycle_error = (
                         f"Cycle de dépendances détecté : {' → '.join(cycle)}"
                         if cycle else None
@@ -3176,11 +3210,17 @@ class Pipeline:
                         self._chat(ChatRole.SYSTEM, f"⛔ {cycle_error}")
                     for item in pending:
                         blockers = work_streams.blocked_by(item, graph.items)
-                        self._set_item_status(
-                            item, StoryStatus.FAILED,
-                            last_error=cycle_error
-                            or "Dépendance non satisfaite (work item échoué en amont).",
-                        )
+                        if item.id in cycle_ids:
+                            self._set_item_status(
+                                item, StoryStatus.FAILED,
+                                last_error=cycle_error,
+                            )
+                        else:
+                            target = self._item_target(item)
+                            target.last_error = (
+                                cycle_error
+                                or "Dépendance non satisfaite (work item échoué en amont)."
+                            )
                         if blockers:
                             self._log(
                                 f"dev:{item.id}",
@@ -3422,6 +3462,44 @@ class Pipeline:
                 f"📏 {len(files)} fichiers touchés > budget {budget} — signal de calibration (§6).",
             )
 
+    def _register_merge_conflict(
+        self,
+        item: "work_streams.WorkItem",
+        target,
+        conflict_files: list[str],
+        touched: list[str],
+    ) -> None:
+        """Separation loop after an inter-stream merge conflict — three effects:
+
+        1. DIAGNOSIS: ``last_error`` names the files that actually clashed
+           (the old opaque « conflit de merge inter-stream » hid the cause).
+        2. RECALIBRATION: the branch's OBSERVED footprint is merged into the
+           item's declared ``files_hint`` — the independence floor and the
+           scheduler guard now reason on reality, not on the plan's promise.
+        3. STRICT RETRY + LESSON (§6): the item is flagged for strict
+           scheduling (no co-run with any possible rival) and a sizing lesson
+           is emitted so the next plan declares disjoint zones or extracts a
+           dedicated integration task."""
+        listing = ", ".join(conflict_files[:5]) or "fichiers non identifiés"
+        target.last_error = f"conflit de merge inter-stream sur : {listing}"
+        observed = [f for f in [*conflict_files, *touched] if f.strip()]
+        hints = list(getattr(target, "files_hint", []))
+        for f in observed:
+            if f not in hints:
+                hints.append(f)
+        if hasattr(target, "files_hint"):
+            target.files_hint = hints
+        self._conflict_retry_ids.add(item.id)
+        lesson = (
+            f"Itération {self.state.iteration} : « {getattr(target, 'title', '') or item.id} » "
+            f"est entrée en conflit de merge avec une unité parallèle sur {listing} — "
+            "déclarer des zones de fichiers DISJOINTES par tâche, ou extraire le câblage "
+            "des fichiers partagés dans une tâche d'intégration dédiée (depends_on les features)."
+        )
+        if lesson not in self.state.sizing_lessons:
+            self.state.sizing_lessons.append(lesson)
+        self.state.sizing_lessons = self.state.sizing_lessons[-12:]
+
     def _record_split_calibration(self, subject: UserStory, target, n: int) -> None:
         """§6 (PO évolutif, mesuré) : every reactive split is a CALIBRATION
         signal — counted per iteration and distilled into a structured sizing
@@ -3469,16 +3547,18 @@ class Pipeline:
         if story is None:
             return False
         failed = next(t for t in story.tasks if t.id == task_id)
+        stories_snapshot = copy.deepcopy(self.state.stories)
         stream = failed.stream or self.state.primary_stream_id
         new_tasks = self._build_finer_tasks(
             failed, raw, story_id=story.id, stream=stream, base_depth=failed.split_depth
         )
         new_ids = [t.id for t in new_tasks]
         other_tasks = [t for t in story.tasks if t.id != failed.id]
+        safe_failed_deps = self._safe_split_depends(story, failed)
 
         if other_tasks:
             # EXTRACT into a Technical Story (the container keeps its other tasks).
-            ts = self._make_technical_story(story, failed, new_tasks)
+            ts = self._make_technical_story(story, failed, new_tasks, depends_on=safe_failed_deps)
             # The TS's tasks live under the TS now (their story_id is rebound).
             for nt in new_tasks:
                 nt.story_id = ts.id
@@ -3498,6 +3578,8 @@ class Pipeline:
             story.tasks = other_tasks
             self.state.stories.append(ts)
             self._enforce_task_independence(ts.tasks, label=f"{ts.id}/split")
+            if self._restore_split_snapshot_if_cycle(stories_snapshot, label=f"{task_id}/split"):
+                return False
             title_list = ", ".join(t.title or t.id for t in new_tasks)
             self._log(
                 f"split:{task_id}",
@@ -3513,7 +3595,7 @@ class Pipeline:
         # FALLBACK — the failed task is the container's ONLY one: in-place sibling
         # split (no empty container, no extra TS node).
         for nt in new_tasks:
-            for dep in failed.depends_on:
+            for dep in safe_failed_deps:
                 if dep not in nt.depends_on:
                     nt.depends_on.append(dep)
         for t in self.state.all_tasks():
@@ -3524,12 +3606,76 @@ class Pipeline:
         idx = story.tasks.index(failed)
         story.tasks[idx : idx + 1] = new_tasks
         self._enforce_task_independence(story.tasks, label=f"{task_id}/split")
+        if self._restore_split_snapshot_if_cycle(stories_snapshot, label=f"{task_id}/split"):
+            return False
         title_list = ", ".join(t.title or t.id for t in new_tasks)
         self._log(f"split:{task_id}", f"🪓 Tâche {task_id} re-découpée en {len(new_tasks)} sous-tâches plus fines après échec.")
         self._chat(ChatRole.ARCHITECT, f"[{task_id}] Re-découpage plus fin après échec → {title_list}.")
         return True
 
-    def _make_technical_story(self, parent: UserStory, failed: Task, tasks: list[Task]) -> UserStory:
+    def _safe_split_depends(self, parent: UserStory, failed: Task) -> list[str]:
+        """Keep only upstream deps that cannot point back into the split subtree."""
+        graph = work_streams.build_work_graph(self.state)
+        downstream = work_streams.transitive_dependents(graph, {failed.id})
+        children: dict[str, list[UserStory]] = {}
+        by_id = {s.id: s for s in self.state.stories}
+        for story in self.state.stories:
+            if story.parent_id:
+                children.setdefault(story.parent_id, []).append(story)
+
+        unsafe_stories: set[str] = {parent.id}
+        cur = parent
+        while cur.parent_id and cur.parent_id in by_id:
+            unsafe_stories.add(cur.parent_id)
+            cur = by_id[cur.parent_id]
+        stack = [parent.id]
+        while stack:
+            sid = stack.pop()
+            for child in children.get(sid, ()):
+                if child.id not in unsafe_stories:
+                    unsafe_stories.add(child.id)
+                    stack.append(child.id)
+
+        unsafe_items = {failed.id}
+        for story in self.state.stories:
+            if story.id in unsafe_stories:
+                unsafe_items.update(t.id for t in story.tasks)
+
+        safe: list[str] = []
+        for dep in failed.depends_on:
+            targets = set(work_streams.dependency_targets(dep, failed.id, self.state))
+            if (
+                dep in unsafe_stories
+                or dep in unsafe_items
+                or dep in downstream
+                or targets & (unsafe_items | downstream)
+            ):
+                continue
+            if dep not in safe:
+                safe.append(dep)
+        return safe
+
+    def _restore_split_snapshot_if_cycle(self, stories_snapshot: list[UserStory], *, label: str) -> bool:
+        cycle = work_streams.detect_cycle(work_streams.build_work_graph(self.state))
+        if not cycle:
+            return False
+        self.state.stories = stories_snapshot
+        self._log(
+            f"split:{label}",
+            "Split refusé : cycle de dépendances résolu détecté ("
+            + " → ".join(cycle)
+            + ").",
+        )
+        return True
+
+    def _make_technical_story(
+        self,
+        parent: UserStory,
+        failed: Task,
+        tasks: list[Task],
+        *,
+        depends_on: list[str] | None = None,
+    ) -> UserStory:
         """RFC technical-stories: build the TS that absorbs a too-big task's finer
         sub-tasks — a non-functional container (``technical=True``, no functional
         Gherkin, a technical ``contract``) tied to its origin via ``parent_id``,
@@ -3550,7 +3696,7 @@ class Pipeline:
             gherkin="",
             stream=failed.stream or parent.stream,
             tasks=tasks,
-            depends_on=list(failed.depends_on),
+            depends_on=list(depends_on if depends_on is not None else failed.depends_on),
             split_depth=failed.split_depth + 1,
             iteration=parent.iteration,
         )
@@ -3663,6 +3809,8 @@ class Pipeline:
                     task.last_error = ""
                     self._set_stage(task, BuildStage.QUEUED, sync=False)
                     n += 1
+        if n:
+            self.state.calibration_for().orphan_resets += n  # §8
         return n
 
     async def _abuild_work_item(self, item: "work_streams.WorkItem") -> None:
@@ -3697,29 +3845,63 @@ class Pipeline:
         # race other workers on the repo index).
         branch = f"autospec/wi-{item.id.lower().replace('/', '-')}"
         worktree = None
+        keep_branch = False
         try:
-            worktree = await self._aworktree_add(ws, branch)
+            # P2b: a previous attempt may have left a PRESERVED green branch —
+            # merge-conflict requeue (keep_branch below), or a hard crash whose
+            # ``finally`` never ran (GREEN orphan). Resume it rebased onto the
+            # updated HEAD instead of regenerating the code from scratch.
+            resumed = await self._aresume_green_branch(ws, branch)
+            worktree = resumed if resumed is not None else await self._aworktree_add(ws, branch)
             if worktree is None:
                 raise RuntimeError("git worktree indisponible")
             if subject.attempts == 1 and not is_frontend:
                 self._set_stage(target, BuildStage.ANALYZING, "qa")  # N4/B1
                 await self._adesign_tests(subject, pkg)
             label = "dev frontend" if is_frontend else "dev"
-            self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
 
-            ok, tail = await self._arun_item_dev(subject, worktree, pkg, is_frontend)
+            ok, tail = False, ""
+            dev_ran = False
+            if resumed is not None:
+                # Re-verify the preserved work on the rebased branch: still
+                # green → merge below with NO dev run at all.
+                ok, tail = await self._averify_resumed(subject, worktree, is_frontend)
+                self._log(
+                    f"dev:{item.id}",
+                    f"♻️ {item.id} : branche verte préservée revalidée sur HEAD à jour — merge sans rebuild."
+                    if ok
+                    else f"♻️ {item.id} : travail préservé rouge après rebase — l'agent {label} reprend depuis ce code.",
+                )
+            if not ok:
+                if resumed is None:
+                    self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
+                dev_ran = True
+                ok, tail = await self._arun_item_dev(subject, worktree, pkg, is_frontend)
 
             if ok:
                 # ST-10/11: commit in the worktree, then merge into the repo. The
                 # item is DONE only after a successful merge (so dependents only
                 # start once this item's code is in the base HEAD).
                 await self._acommit_story(worktree, item.id)
+                if dev_ran:
+                    # §8: measure the dev's REAL footprint (files in its commit)
+                    # against the leaf budget — the ground truth the plan-time
+                    # estimate (file_globs/estimated_files) must be judged by.
+                    await self._arecord_footprint(item, worktree)
+                # P2b: from here the branch holds committed GREEN work — keep it
+                # on cleanup (requeue, stop, manual retry) so the next pass can
+                # resume it; dropped again once merged or split.
+                keep_branch = True
                 # B1/B6: green → waiting for the merge lock, then merging.
                 self._set_stage(target, BuildStage.MERGE_WAIT, "")
                 merged, conflict_files = await self._amerge_work_item(
                     ws, branch, item.id, worktree
                 )
                 if merged:
+                    keep_branch = False  # P2b: merged into HEAD — branch is useless now
+                    if not dev_ran:
+                        # §8: a preserved branch shipped without any dev rebuild.
+                        self.state.calibration_for().p2b_resumes += 1
                     target.status = subject.status = StoryStatus.DONE
                     for test in subject.test_plan:
                         if test.status == TestState.NONEXISTENT:
@@ -3732,14 +3914,17 @@ class Pipeline:
                 else:
                     # ST-10/11: a merge conflict means a sibling work item changed
                     # the SAME files. An immediate same-inputs retry (in
-                    # _amerge_work_item) can never resolve it. Re-queue the item
-                    # like a red build so the next scheduler pass rebuilds it in a
-                    # worktree branched from the now-updated HEAD — which already
-                    # contains the sibling's code — and merges cleanly. Bounded by
-                    # dev_max_attempts; only a persistent conflict ends FAILED.
+                    # _amerge_work_item) can never resolve it. Re-queue the item:
+                    # the green branch is PRESERVED (keep_branch) so the next
+                    # scheduler pass resumes it — rebase on the now-updated HEAD,
+                    # re-verify, merge — instead of regenerating the code. Bounded
+                    # by dev_max_attempts; a persistent conflict tries a finer
+                    # split (disjoint file zones) before ending FAILED.
                     # Separation loop: the branch's REAL touched files recalibrate
-                    # the item's claims, the retry is scheduled strictly, and a
-                    # sizing lesson feeds the next plan (§6).
+                    # the item's declared claims, the retry is scheduled STRICTLY
+                    # (no co-run with a possible rival), and a sizing lesson
+                    # feeds the next plan (§6).
+                    self.state.calibration_for().merge_requeues += 1  # §8
                     touched = await self._abranch_files(ws, branch)
                     self._register_merge_conflict(item, target, conflict_files, touched)
                     if subject.attempts < settings.dev_max_attempts:
@@ -3747,10 +3932,17 @@ class Pipeline:
                         self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
                         self._log(
                             f"dev:{item.id}",
-                            f"⚠️ Conflit de merge {item.id} — rebuild sur HEAD à jour "
-                            f"(tentative {subject.attempts + 1}/{settings.dev_max_attempts}).",
+                            f"⚠️ Conflit de merge {item.id} — branche verte conservée, reprise "
+                            f"sur HEAD à jour (tentative {subject.attempts + 1}/{settings.dev_max_attempts}).",
                         )
+                    # A PERSISTENT conflict is a sizing smell: the unit claims file
+                    # zones that keep colliding with its siblings. Try the adaptive
+                    # finer split (smaller, disjoint sub-tasks) before failing.
+                    elif await self._amaybe_split_on_failure(item, subject, target):
+                        keep_branch = False  # the unit was replaced by finer sub-tasks
                     else:
+                        # Terminal FAILED: keep the branch — a manual retry
+                        # (aretry_failed) can still resume the green work.
                         target.status = subject.status = StoryStatus.FAILED
                         self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
             else:
@@ -3769,17 +3961,33 @@ class Pipeline:
                     self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             target.last_error = str(exc)
-            if session_monitor.monitor_active() and session_monitor.is_usage_limit_error(
-                str(exc)
-            ):
+            if settings.agent_provider == "claude" and session_monitor.is_usage_limit_error(str(exc)):
                 target.attempts = max(0, target.attempts - 1)
-                target.status = StoryStatus.TODO
+                subject.attempts = max(0, subject.attempts - 1)
+                target.status = subject.status = StoryStatus.TODO
+                if not session_monitor.monitor_active():
+                    self.state.phase = PipelinePhase.NEEDS_ATTENTION
+                    self._stop_requested = True
             else:
-                target.status = (
-                    StoryStatus.TODO
-                    if subject.attempts < settings.dev_max_attempts
-                    else StoryStatus.FAILED
-                )
+                # Infra/provider failure (CLI killed, transport error…) : ce
+                # n'est PAS un échec du dev — on rembourse la tentative dev et
+                # on consomme le budget infra séparé, pour qu'une panne
+                # transitoire ne puisse jamais faire FAILED un item à elle
+                # seule (ni polluer la calibration de dimensionnement).
+                target.attempts = subject.attempts = max(0, subject.attempts - 1)
+                target.infra_attempts += 1
+                self.state.calibration_for().infra_retries += 1  # §8
+                if target.infra_attempts <= settings.infra_max_retries:
+                    target.status = subject.status = StoryStatus.TODO
+                    self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
+                    self._log(
+                        f"dev:{item.id}",
+                        f"⚡ Panne d'infra sur {item.id} — tentative dev remboursée, "
+                        f"retry infra {target.infra_attempts}/{settings.infra_max_retries}.",
+                    )
+                else:
+                    target.status = subject.status = StoryStatus.FAILED
+                    self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
             self._log(f"dev:{item.id}", f"Erreur agent : {exc}")
         except Exception as exc:  # noqa: BLE001
             # P0b: an unexpected crash in ONE work item must not bubble up and
@@ -3800,7 +4008,7 @@ class Pipeline:
             self._log(f"dev:{item.id}", f"⛔ Crash worker {item.id} isolé : {exc}")
         finally:
             if worktree is not None:
-                await self._aworktree_remove(ws, worktree, branch)
+                await self._aworktree_remove(ws, worktree, branch, keep_branch=keep_branch)
             self._sync()
 
     def _persistent_for(self, subject: UserStory):
@@ -3830,8 +4038,15 @@ class Pipeline:
         target = self._persistent_for(subject)
         self._set_stage(target, BuildStage.IMPLEMENTING, "dev")  # N4/B1
         item_guidance = self._apply_guidance(target)  # P10
+        # Séparation inter-stream : le dev reçoit son PÉRIMÈTRE FICHIERS (globs
+        # déclarés — recalés sur l'observé après un conflit — sinon la zone de
+        # son stream) pour ne jamais éditer les fichiers d'une unité parallèle.
+        stream = self._story_stream(subject)
+        file_scope = prompts.file_scope_block(
+            list(getattr(target, "files_hint", []) or []),
+            stream_zone=stream.file_root or "",
+        )
         if is_frontend:
-            stream = self._story_stream(subject)
             # The frontend dev agent runs Vitest/`vite build` in its worktree —
             # ensure `node_modules` is present (shared install + junction) first,
             # else every frontend item fails with "Cannot find package 'vite'".
@@ -3846,6 +4061,7 @@ class Pipeline:
                 file_root=stream.file_root or "frontend",
                 item_guidance=item_guidance,
                 available_skills=self._skills_catalog("dev"),
+                file_scope=file_scope,
             )
             dev_persona = persona("dev-frontend")
         else:
@@ -3857,6 +4073,7 @@ class Pipeline:
                 backend_language=self.state.backend_language.value,
                 item_guidance=item_guidance,
                 available_skills=self._skills_catalog("dev"),
+                file_scope=file_scope,
             )
             dev_persona = persona("dev")
         result = await self._tracked.arun(dev_prompt, system_prompt=dev_persona, cwd=worktree)
@@ -3981,12 +4198,18 @@ class Pipeline:
             return None
         return worktree
 
-    async def _aworktree_remove(self, repo, worktree, branch: str) -> None:
+    async def _aworktree_remove(self, repo, worktree, branch: str, *, keep_branch: bool = False) -> None:
         """Always-runs cleanup: remove the worktree and delete its branch.
-        Serialized by ``_merge_lock`` (shared-repo ``.git`` mutation)."""
+        Serialized by ``_merge_lock`` (shared-repo ``.git`` mutation).
+
+        P2b: with ``keep_branch`` the branch ref survives (only the worktree
+        directory goes) — used when the branch holds committed GREEN work that
+        could not merge yet, so a later pass can resume it instead of
+        regenerating the code."""
         async with self._merge_lock:
             await self._agit(repo, "worktree", "remove", "--force", str(worktree))
-            await self._agit(repo, "branch", "-D", branch)
+            if not keep_branch:
+                await self._agit(repo, "branch", "-D", branch)
         # Defensive: if `worktree remove` could not delete the dir, drop it.
         try:
             if Path(worktree).exists():
@@ -4003,6 +4226,101 @@ class Pipeline:
         if code != 0:
             return []
         return [line.strip() for line in out.splitlines() if line.strip()]
+
+    async def _abranch_files(self, repo, branch: str) -> list[str]:
+        """Every file the item's branch REALLY touched since it diverged from
+        HEAD (all its commits, not just the last) — the observed footprint that
+        recalibrates the item's declared file claims after a merge conflict.
+        Best-effort: [] when git fails."""
+        code, out = await self._agit(repo, "diff", "--name-only", f"HEAD...{branch}")
+        if code != 0:
+            return []
+        return [line.strip() for line in out.splitlines() if line.strip()]
+
+    async def _arecord_footprint(self, item: "work_streams.WorkItem", worktree) -> None:
+        """§8 — ground the sizing calibration on the dev's REAL footprint: count
+        the files of the item's green commit and flag it over-budget when it
+        exceeds ``task_file_budget``. The plan promised small disjoint leaves;
+        this is the measurement that promise is judged by. Best-effort."""
+        code, out = await self._agit(worktree, "show", "--name-only", "--format=", "HEAD")
+        if code != 0:
+            return
+        files = [line for line in out.splitlines() if line.strip()]
+        if len(files) > settings.task_file_budget:
+            self.state.calibration_for().over_budget_tasks += 1
+            self._log(
+                f"dev:{item.id}",
+                f"📏 {item.id} a touché {len(files)} fichiers (budget "
+                f"{settings.task_file_budget}) — compté hors budget (calibration).",
+            )
+
+    async def _aresume_green_branch(self, repo, branch: str):
+        """P2b — resume a PRESERVED green branch from an earlier attempt.
+
+        A merge-conflict requeue (``keep_branch``) or a hard crash (the worker's
+        ``finally`` never ran) can leave ``branch`` behind with the item's green
+        commits. Check it out in a fresh worktree and rebase it onto the repo's
+        current HEAD, so the caller can re-verify and merge WITHOUT regenerating
+        the code. Returns the worktree path, or None when there is nothing
+        usable to resume — any stale branch is dropped so the caller falls back
+        to a normal fresh build."""
+        async with self._merge_lock:
+            code, _ = await self._agit(
+                repo, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}"
+            )
+            if code != 0:
+                return None
+            code, out = await self._agit(repo, "rev-list", "--count", f"HEAD..{branch}")
+            if code != 0 or not out.strip().isdigit() or int(out.strip()) == 0:
+                # The branch carries nothing beyond HEAD (crash before commit,
+                # or already merged): useless — drop it and build fresh.
+                await self._aclear_stale_worktree(repo, branch)
+                await self._agit(repo, "branch", "-D", branch)
+                return None
+            # A crashed worker may still hold the branch checked out in a dead
+            # worktree — clear it or `worktree add` fails "already checked out".
+            await self._aclear_stale_worktree(repo, branch)
+            import tempfile
+
+            worktree = Path(tempfile.mkdtemp(prefix="autospec-wt-"))
+            try:
+                worktree.rmdir()
+            except OSError:
+                pass
+            code, out = await self._agit(repo, "worktree", "add", str(worktree), branch)
+            if code != 0:
+                self._log("streams", f"Reprise de {branch} impossible : {out.strip()[:200]}")
+                return None
+            _, head = await self._agit(repo, "rev-parse", "HEAD")
+        rb, _ = await self._agit(worktree, "rebase", head.strip())
+        if rb != 0:
+            # Genuine line-level conflict with what landed meanwhile: the old
+            # work cannot be replayed — clean up fully and regenerate.
+            await self._agit(worktree, "rebase", "--abort")
+            await self._aworktree_remove(repo, worktree, branch)
+            self._log("streams", f"♻️ Branche préservée {branch} en conflit réel — régénération.")
+            return None
+        self._log("streams", f"♻️ Branche verte préservée {branch} reprise (rebasée sur HEAD).")
+        return worktree
+
+    async def _averify_resumed(self, subject: UserStory, worktree, is_frontend: bool) -> tuple[bool, str]:
+        """P2b: re-run the real suite on a resumed (rebased) green branch — no
+        dev agent involved. Green means the preserved work is still valid on the
+        updated HEAD and can merge as-is; red hands the worktree to the dev,
+        which then starts from the preserved code instead of an empty slate."""
+        target = self._persistent_for(subject)
+        self._set_stage(target, BuildStage.VERIFYING, "qa")  # B1
+        if is_frontend:
+            stream = self._story_stream(subject)
+            await self._aensure_frontend_node_modules(
+                Path(worktree) / (stream.file_root or "frontend")
+            )
+            ok, output, _ = await self._arun_frontend_tests(ws=worktree)
+        else:
+            ok, output, _ = await self._arun_pytest(ws=worktree)
+        if ok:
+            subject.status = StoryStatus.GREEN
+        return ok, output[-2000:]
 
     async def _amerge_work_item(
         self, repo, branch: str, wid: str, worktree=None
@@ -4089,6 +4407,7 @@ class Pipeline:
             raise ValueError("story déjà en cours")
         story.status = StoryStatus.TODO
         story.attempts = 0
+        story.infra_attempts = 0
         story.last_error = ""
         for t in story.test_plan:
             t.status = TestState.NONEXISTENT
@@ -4215,6 +4534,7 @@ class Pipeline:
         for story in failed:
             story.status = StoryStatus.TODO
             story.attempts = 0
+            story.infra_attempts = 0
             story.last_error = ""
             for t in story.test_plan:
                 t.status = TestState.NONEXISTENT
@@ -4222,6 +4542,7 @@ class Pipeline:
                 if task.status == StoryStatus.FAILED:
                     task.status = StoryStatus.TODO
                     task.attempts = 0
+                    task.infra_attempts = 0
                     task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
@@ -4387,6 +4708,7 @@ class Pipeline:
             raise ValueError("tâche déjà en cours")
         task.status = StoryStatus.TODO
         task.attempts = 0
+        task.infra_attempts = 0
         task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False

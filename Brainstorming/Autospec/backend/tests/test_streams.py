@@ -159,10 +159,37 @@ def test_cycle_detection():
     st = _state([_us("US-1", tasks=[t1, t2])])
     cycle = wg.detect_cycle(wg.build_work_graph(st))
     assert cycle is not None and set(cycle) >= {"T1", "T2"}
+    assert wg.cycle_nodes(wg.build_work_graph(st)) == {"T1", "T2"}
     assert any("cycle" in w for w in wg.validate(st))
+
+
+def test_nested_technical_story_cycle_is_detected_with_exact_nodes():
+    parent = _us(
+        "TS-PARENT",
+        tasks=[
+            _task("T-INTEGRATE", "TS-PARENT", depends_on=["TS-CHILD"]),
+        ],
+    )
+    child = _us(
+        "TS-CHILD",
+        tasks=[
+            _task("T-CHILD-1", "TS-CHILD"),
+            _task("T-CHILD-2", "TS-CHILD", depends_on=["T-INTEGRATE"]),
+        ],
+    )
+    child.technical = True
+    child.parent_id = "TS-PARENT"
+    blocked = _us("US-BLOCKED", depends_on=["TS-PARENT"])
+    graph = wg.build_work_graph(_state([parent, child, blocked]))
+
+    # Depending on the child TS expands to its leaf tasks, so the integration
+    # task and child task form the same resolved cycle that broke messagerie2.
+    assert wg.cycle_nodes(graph) == {"T-INTEGRATE", "T-CHILD-2"}
+    assert wg.transitive_dependents(graph, wg.cycle_nodes(graph)) == {"US-BLOCKED"}
 
 
 def test_no_cycle_returns_none():
     st = _state([_us("US-1", status=StoryStatus.DONE), _us("US-2", depends_on=["US-1"])])
     assert wg.detect_cycle(wg.build_work_graph(st)) is None
+    assert wg.cycle_nodes(wg.build_work_graph(st)) == set()
     assert wg.validate(st) == []

@@ -337,6 +337,25 @@ premier. Arrêts additionnels : critique vide (`critic_empty`), révision rejet�
   `MERGE_HEAD`/rebasing résiduel). Combiné à la sérialisation par fichiers (P1/P4),
   les conflits sont rares et le green n'est jamais silencieusement perdu.
 
+### Séparation inter-stream : boucle anti-« conflit de merge »
+Quand un conflit survient malgré tout, il alimente une boucle de séparation à
+quatre étages (au lieu de l'erreur opaque « conflit de merge inter-stream ») :
+- **Diagnostic** : `_amerge_work_item` retourne les **fichiers réellement en
+  conflit** (`git diff --diff-filter=U` avant l'abort) — `last_error` les nomme.
+- **Recalage** : le **footprint observé** de la branche (`git diff HEAD...branche`)
+  est fusionné dans les `files_hint` de l'item — le floor d'indépendance et la
+  garde du scheduler raisonnent désormais sur le réel, plus sur le déclaré.
+- **Retry strict** : l'item re-queué est re-planifié en mode **`claims_overlap`**
+  (un claim non déclaré du même stream = rival possible) tant qu'un rival est en
+  vol — un retry ne peut plus re-conflicter avec un item en cours.
+- **Prévention par prompt** : chaque dev parallèle reçoit son **PÉRIMÈTRE
+  FICHIERS** (`prompts.file_scope_block` : globs déclarés, sinon zone du stream) ;
+  le cerveau de découpe commun (`sizing_rules`) et le plan multi-stream réservent
+  les **fichiers partagés** (`main.py`, `pyproject.toml`, `package.json`,
+  `App.tsx`, `index.css`, `README.md`) à **une tâche d'intégration dédiée** qui
+  `depends_on` les features. Chaque conflit émet aussi une **leçon de
+  dimensionnement** (§6) injectée dans le prochain plan S1.
+
 ### Re-décomposition adaptative sur échec
 - Quand une **US ou une tâche n'arrive pas à passer au vert** après ses tentatives
   de dev, plutôt que de la marquer en échec, l'agent **architecte la ré-analyse et

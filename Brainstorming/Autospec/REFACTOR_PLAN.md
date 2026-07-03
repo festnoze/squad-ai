@@ -95,7 +95,7 @@ classe parallélisable certifiée disjointe de tous les items en vol (`running`)
 
 ### P1 — Sérialisation par file_root (corrige la fausse indépendance sans LLM)
 - Scheduler : grouper les items par `stream` effectif ; **au plus un item en vol par `file_root`** tant que l'indépendance n'est pas certifiée. *(C2)*
-- `_amerge_work_item` : sur conflit, **ne pas** retry à l'identique — **rebaser** le worktree sur HEAD à jour puis re-merger ; échec persistant → requeue avec `depends_on` ajouté vers l'item qui a gagné le fichier. *(C5)*
+- `_amerge_work_item` : sur conflit, **ne pas** retry à l'identique — **rebaser** le worktree sur HEAD à jour puis re-merger ; échec persistant → **requeue borné par `dev_max_attempts`** (la branche verte est conservée et **reprise** au passage suivant, cf. P2b ; l'injection de `depends_on` vers l'item gagnant, envisagée initialement, n'a pas été implémentée — le requeue borné + la reprise couvrent le besoin). *(C5)*
 - **Acceptance** : 2 tâches frontend qui touchent `App.tsx` ne tournent jamais en parallèle ; le 2ᵉ part du HEAD contenant le 1er.
 
 ### P2 — Ne jamais perdre le green ✅ (livré 2026-06-30)
@@ -103,6 +103,26 @@ classe parallélisable certifiée disjointe de tous les items en vol (`running`)
 - Sur conflit réel (mêmes lignes), le **`rebase --abort` restaure la branche verte intacte** (jamais perdue côté branche) et l'item est requeue pour un rebuild depuis le HEAD à jour ; le repo et le worktree restent **propres** (pas d'état `MERGE_HEAD`/rebasing résiduel).
 - Tests `test_merge_preserve.py` : merge sans conflit → vert livré ; conflit réel → `False` + repo propre + **branche verte préservée**.
 - **Acceptance** : aucun green silencieusement écrasé ; sur conflit l'état git reste cohérent et la branche conserve le travail.
+
+### P2b — Reprendre le green préservé (au lieu de rebuilder) ✅ (livré 2026-07-02)
+La v1 de P2 préservait la branche verte *pendant* la tentative, mais le cleanup du
+worker (`finally`) **supprimait la branche** : au requeue, le travail vert était
+regénéré de zéro. P2b ferme ce trou :
+- **`keep_branch`** : dès que l'item est vert et commité, sa branche survit au
+  cleanup (requeue de conflit, stop coopératif, FAILED en attente d'un retry
+  manuel) ; elle n'est supprimée qu'une fois **mergée** ou l'unité **re-découpée**.
+- **`_aresume_green_branch`** : au passage suivant (requeue, retry, ou orphelin
+  GREEN d'un crash dur dont le `finally` n'a jamais tourné), la branche préservée
+  est **reprise** — checkout en worktree, **rebase sur le HEAD à jour**, puis
+  **re-vérification réelle** (`_averify_resumed`, suite de tests sans agent dev) :
+  verte → merge direct **sans aucun rebuild** ; rouge → le dev **repart de ce code**
+  (plus de page blanche) ; rebase en conflit réel → branche abandonnée, rebuild
+  propre comme avant.
+- Tests `test_merge_preserve.py` (reprise/rebase/merge, branche vide ou en conflit
+  abandonnée, `keep_branch`) + `test_split_on_failure.py` (requeue de conflit →
+  reprise sans 2ᵉ passage dev).
+- **Acceptance** : un conflit de merge ne coûte plus une régénération complète ;
+  un orphelin GREEN dont la branche a survécu est mergé, pas rebuildé.
 
 ### P3 — Fiabiliser le frontend en worktree ✅ (livré 2026-06-30)
 - **`_node_modules_usable(root)`** : sonde `.bin`/`vite` au lieu de la simple existence du dossier → détecte une jonction silencieusement cassée ou un dossier vide.
@@ -126,35 +146,95 @@ au lieu de la marquer FAILED, l'**architecte la ré-analyse et la découpe plus 
 en sous-tâches plus petites, avec des **tests plus granulaires** — qui se construisent
 ensuite chacune dans leur sous-agent focalisé. Contre directement le problème de l'unité
 trop volumineuse pour une seule fenêtre de contexte d'agent.
-- Automatique : hook dans la branche « rouge épuisé » du worker (`_amaybe_split_on_failure`),
-  **borné** par `split_depth`/`AUTOSPEC_SPLIT_MAX_DEPTH` (pas de récursion infinie), ON par
+- Automatique : hook du worker sur **deux** déclencheurs (`_amaybe_split_on_failure`) :
+  la branche « **rouge épuisé** » (tests jamais verts), **et** le « **conflit de merge
+  persistant** » (item vert dont le merge échoue après toutes ses tentatives — un
+  smell de dimensionnement : ses zones de fichiers percutent sans cesse celles des
+  siblings ; des sous-tâches plus fines et disjointes débloquent). Les erreurs
+  d'**infra** (AgentError, crash CLI) ne déclenchent **jamais** de split — un échec
+  transitoire n'est pas un problème de taille. **Borné** par `split_depth`/
+  `AUTOSPEC_SPLIT_MAX_DEPTH` (défaut **2**, pour qu'une tâche d'une TS extraite
+  puisse elle-même être re-découpée une fois — cf. RFC technical-stories), ON par
   défaut (`AUTOSPEC_SPLIT_ON_FAILURE`).
 - Manuel : bouton **✂️ Découper plus fin** sur une story/tâche en échec
   (`POST …/items/{id}/split`), force le découpage puis reprend le build.
-- Réécriture des dépendances : une tâche découpée est remplacée par ses sous-tâches, les
-  dépendants attendent désormais **toutes** les sous-tâches ; le floor d'indépendance
-  s'applique aux nouvelles tâches.
+- **Forme du découpage** (RFC `RFC-technical-stories.md`, source de vérité) : une
+  **tâche** en échec dont le conteneur garde ≥ 1 autre tâche est **extraite en
+  Technical Story** nommée et adressable (`technical=true`, `contract`, `parent_id`),
+  contenant les sous-tâches plus fines ; les dépendants sont recâblés vers la TS
+  (le work-graph résout « dépendre d'une story = ses tâches + celles de ses TS
+  enfants », récursivement). Quand la tâche était la **seule** du conteneur (ou pour
+  une **US** sans tâches), repli sur le découpage **in-place** en sous-tâches sœurs
+  — jamais de conteneur vide. Le floor d'indépendance s'applique aux nouvelles tâches.
 
-### P5 — DoD incrémentale + profils  ⏸️ (différé — non indispensable)
+### P5 — DoD incrémentale ✅ (livraison partielle livrée 2026-07-02 ; profils hors-plan)
 - **Progrès partiel** : livrer les stories vertes même si d'autres échouent ; un projet n'est « échoué » que si **0** story livrée. *(C9)*
 - **Profils** : `auto` ne doit pas activer streams pour un produit clairement simple ; aligner `profiles.py` (api/cli par défaut, fullstack explicite).
 - **Pourquoi différé** : les stories vertes sont déjà **construites et commitées** ; P5 ne change que la *sémantique de « done »* (livraison partielle), pas la correction ni la récupération. Avec **P6** (auto-split sur échec) + retry + **P2** (préservation du green), les échecs sont déjà adressés. À reprendre seulement si le besoin produit de « livrer partiellement » se confirme.
+- **⚠️ À réévaluer avec P7** : l'argument du report tenait quand les échecs étaient
+  des feuilles. Les **Technical Stories** ajoutent des conteneurs bloquants — une TS
+  FAILED bloque ses dépendants et la perception « projet échoué » (C9) revient. Plus
+  le système découpe fin, plus la livraison partielle redevient le maillon manquant.
+
+### P7 — Technical Stories (proactives + réactives) 🚧 (en cours)
+Spécifié par **`RFC-technical-stories.md`** (source de vérité). Une TS = une
+`UserStory(technical=True)` avec `contract` et `parent_id` — conteneur de travail
+technique affiché au niveau des US, adressable (rebuild/split/diff), résolu par le
+work-graph. Deux moteurs : **réactif** (P6 : extraction au split-on-failure) et
+**proactif** (le PO émet des TS dans le plan ; le critic de `AUTOSPEC_REVIEW_PLAN`
+recommande l'extraction des unités trop grosses, `po_revise` applique).
+- Backend : `technical/contract/parent_id`, promotion dans `_split_task`,
+  résolution récursive `parent_id` dans `build_work_graph` — livrés (tests
+  `test_split_on_failure.py`, `test_technical_story_plan.py`).
+- Frontend : badge 🔧, `contract`, fil d'Ariane `parent_id`, DepGraphPanel — en cours.
+- **Acceptance** : une tâche trop grosse échouée devient une TS visible sur le board ;
+  ses dépendants attendent ses feuilles ; aucun conteneur vide ; profondeur bornée.
+
+### P8 — Pipeline PO proactif (la qualité du plan amont) 📋 (spécifié)
+Spécifié par **`RFC-po-pipeline-v2.md`**. Ce plan-ci a soigné le versant **réactif**
+(orchestration, récupération) ; la prochaine famille d'échecs est la **qualité du
+plan amont** — chaque split-on-failure est par définition une erreur de
+dimensionnement du PO. P8 ferme la boucle : Structure+Complexité estimée (S1) →
+Spec par story avec verdict `resize` (S2) → Gherkin validé déterministiquement (S3),
+un critic transversal par étape, et des **sizing lessons** issues des splits réels
+réinjectées dans S1. Le proactif réduit le réactif — mesurable via §8.
 
 ---
 
-## Clôture du plan (2026-06-30)
-**P0, P1, P2, P3, P4, P6 livrés et testés** (491+ tests backend verts, 141 vitest, tsc clean). Le chemin parallèle streams+worktree est désormais **sûr** (indépendance prouvée, conflits sérialisés), **auto-récupérant** (orphelins reset, worker non-fatal, split-on-failure) et **sans perte de travail** (green préservé, repo propre, bookkeeping hors git). **P5 différé** (optionnel). Reste hors-plan : alignement des profils `auto`/`fullstack` si souhaité.
+## Clôture du plan initial (2026-06-30)
+**P0, P1, P2, P3, P4, P6 livrés et testés** (491+ tests backend verts, 141 vitest, tsc clean). Le chemin parallèle streams+worktree est désormais **sûr** (indépendance prouvée, conflits sérialisés), **auto-récupérant** (orphelins reset, worker non-fatal, split-on-failure) et **sans perte de travail** (green préservé, repo propre, bookkeeping hors git). **P5 différé** (optionnel).
+
+**Réouvert le 2026-07-02** après revue croisée plan/code : **P2b livré** (reprise du
+green préservé), **P6 durci** (split sur conflit persistant, jamais sur erreur
+d'infra, profondeur 2), **P7 en cours** (Technical Stories), **P8 spécifié**
+(pipeline PO), **§8 à instrumenter** (calibration). La clôture de 2026-06-30
+prouvait la *correction* (tests) ; la preuve d'*efficacité en run réel* passe par
+les métriques du §8.
 
 ---
 
-## 5. Tests à ajouter (garde anti-régression)
+## 5. Gardes anti-régression (fichiers réels)
 
-- `test_independence.py` (pur) : overlap de globs → arêtes ; injection de `depends_on` déterministe ; partition correcte ; `file_globs` vide → sérialisé ; idempotence.
-- `test_scheduler_serialization.py` : 2 tâches même `file_root` sans dep → jamais co-running.
-- `test_build_resilience.py` : un worker qui lève → cet item FAILED, les autres continuent (C6).
-- `test_no_lost_green.py` : item vert + conflit de merge → branche conservée, requeue, finit mergé (C3).
-- `test_orphan_recovery.py` : tâche `in_progress` sans worker → `todo` au resume (C8).
-- `test_repo_clean.py` : un commit de story ne contient ni `autospec-state.json` ni `…interactions.jsonl` (C4).
+*(Liste réconciliée le 2026-07-02 — les noms initialement prévus
+(`test_scheduler_serialization.py`, `test_build_resilience.py`,
+`test_no_lost_green.py`, `test_orphan_recovery.py`, `test_repo_clean.py`)
+n'existent pas : leur couverture vit dans les fichiers ci-dessous.)*
+
+- `test_independence.py` : analyseur pur (overlap de globs → arêtes, injection de
+  `depends_on` déterministe, partition, `file_globs` vide → sérialisé), garde-fou
+  scheduler (jamais de co-run sur fichiers déclarés communs), pass global
+  cross-story, crash worker isolé (C6), reset des orphelins (C8), commit sans
+  bookkeeping (C4).
+- `test_merge_preserve.py` : green livré sur merge propre ; conflit réel → repo
+  propre + branche verte préservée (C3) ; **P2b** : `keep_branch`, reprise/rebase/
+  merge de la branche préservée, abandon des branches vides ou en conflit.
+- `test_split_on_failure.py` : P6 — split story/tâche, extraction en TS, récursion
+  bornée, split sur **conflit de merge persistant**, requeue de conflit → reprise
+  **sans second passage dev**, work-graph récursif des TS enfants.
+- `test_technical_story_plan.py` : P7 — TS proactives émises par le PO dans le plan.
+- `test_frontend_node_modules.py` : P3 — utilisabilité de `node_modules`, jonction,
+  fallback `npm ci`.
+- `test_restart.py` : clear des interactions au restart, orphelins relançables.
 
 ---
 
@@ -168,6 +248,38 @@ trop volumineuse pour une seule fenêtre de contexte d'agent.
 
 > Règle d'or : tant que l'indépendance n'est pas **prouvée** (analyseur déterministe **+** juge),
 > on **sérialise**. La perf parallèle revient comme une **optimisation certifiée**, jamais un défaut.
+
+---
+
+## 8. Observabilité & calibration ✅ (instrumenté 2026-07-02) 📊
+
+La clôture s'appuie sur des **tests** (correction) ; rien ne mesure encore
+l'**efficacité en run réel**. Compteurs à persister **par build** dans
+`ProjectState` :
+
+- **splits réactifs** (P6) — chacun est, par définition, une erreur de
+  dimensionnement du plan amont ;
+- **attempts moyens par item** et **requeues de conflit de merge** — santé du
+  découpage en zones disjointes (P4) ;
+- **reprises P2b** (branche préservée mergée sans rebuild) vs **rebuilds** — tokens
+  économisés ;
+- **resets d'orphelins** et **crashs worker isolés** — santé de l'infra, à ne
+  **jamais** compter comme signal de dimensionnement.
+
+Double usage : (a) prouver que P4/P6/P2b sont des filets rarement sollicités et non
+des béquilles permanentes ; (b) alimenter les **sizing lessons** du pipeline PO
+(P8/RFC v2) — l'échec d'aujourd'hui dimensionne le plan de demain. Sans ces
+métriques, impossible de savoir si le proactif (P8) réduit réellement le réactif.
+
+**Livré (2026-07-02)** : `PlanCalibration` étendu (`merge_requeues`,
+`p2b_resumes`, `orphan_resets`, `infra_retries`) et **tous les compteurs ont un
+producteur** — dont `over_budget_tasks` mesuré sur l'empreinte réelle du commit
+vert (`_arecord_footprint`). Livraison partielle (P5, `AUTOSPEC_PARTIAL_DELIVERY`)
+et budget infra séparé (`AUTOSPEC_INFRA_MAX_RETRIES`) livrés. L'éval A/B du RFC
+v2 §6 est exécutable : `scripts/eval_po_pipeline.py` (scripted gratuit,
+`AUTOSPEC_EVAL_PROVIDER=claude` pour la mesure réelle). L'UI expose le tout :
+badge complexité S1, taxonomie des critères S2, marqueur spec incomplète,
+bannière « Livraison partielle », bloc calibration dans « Revue du plan ».
 
 ---
 

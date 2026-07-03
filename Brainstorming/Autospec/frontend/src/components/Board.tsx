@@ -238,6 +238,15 @@ function CriterionRow({
       >
         <span className={`state-dot state-${state}`}>{TEST_STATE_ICON[state]}</span>
         <span className="criterion-text">{criterion.text}</span>
+        {criterion.kind && (
+          <span
+            className={`criterion-kind kind-${criterion.kind}`}
+            title={t("board.criterionKind_title")}
+            data-testid="criterion-kind"
+          >
+            {criterion.kind}
+          </span>
+        )}
         <span className={`state-tag state-${state}`} data-testid="criterion-state">
           {testStateLabel(t, state)}
         </span>
@@ -524,6 +533,27 @@ function TechnicalBadge({ story }: { story: UserStory }) {
   );
 }
 
+/** Pipeline PO (S1) : la complexité estimée au plan — le jugement qui pilote
+ *  l'effort de spec/critique et la politique de découpe. "" = legacy, masqué. */
+function ComplexityBadge({ complexity }: { complexity?: string }) {
+  const { t } = useI18n();
+  const labels: Record<string, string> = {
+    trivial: t("board.complexity_trivial"),
+    standard: t("board.complexity_standard"),
+    complex: t("board.complexity_complex"),
+  };
+  if (!complexity || !labels[complexity]) return null;
+  return (
+    <span
+      className={`badge-complexity cx-${complexity}`}
+      title={t("board.complexity_title")}
+      data-testid="complexity-badge"
+    >
+      ⚖ {labels[complexity]}
+    </span>
+  );
+}
+
 function StoryBadges({
   story,
   onStatusClick,
@@ -699,6 +729,7 @@ function StoryRow({
         </span>
         <span className="story-id">{story.id}</span>
         <TechnicalBadge story={story} />
+        <ComplexityBadge complexity={story.complexity} />
         {showStream && <StreamBadge streamId={story.stream!} streams={streams} />}
         <StoryBadges story={story} />
       </div>
@@ -816,10 +847,16 @@ function StoryDetail({
       <div className="story-detail-head">
         <span className="story-id">{story.id}</span>
         <TechnicalBadge story={story} />
+        <ComplexityBadge complexity={story.complexity} />
         <IterationBadge iteration={story.iteration} onOpen={onOpenIteration} compact />
         <StoryBadges story={story} onStatusClick={() => setShowLlm((v) => !v)} />
       </div>
       <h3 className="story-detail-title">{story.title}</h3>
+      {story.spec_incomplete && (
+        <div className="story-spec-incomplete" data-testid="spec-incomplete">
+          ⚠️ {t("board.specIncomplete")}
+        </div>
+      )}
       {story.technical && story.parent_id && (
         <div className="story-ts-lineage">
           🔧 {t("board.technicalStory_from", { parent: story.parent_id })}

@@ -38,7 +38,8 @@ async def test_merge_succeeds_and_lands_green(tmp_path, monkeypatch):
     (Path(wt) / "feature.txt").write_text("hello", encoding="utf-8")
     await pipeline._acommit_story(wt, "x")
 
-    assert await pipeline._amerge_work_item(ws, "autospec/wi-x", "x", wt) is True
+    merged, conflicts = await pipeline._amerge_work_item(ws, "autospec/wi-x", "x", wt)
+    assert merged is True and conflicts == []
     assert (ws / "feature.txt").exists()              # green landed in main
 
 
@@ -63,8 +64,9 @@ async def test_merge_conflict_returns_false_clean_and_preserves_green(tmp_path, 
     await pipeline._agit(wtB, "add", "-A")
     await pipeline._agit(wtB, "commit", "-m", "B")
 
-    merged = await pipeline._amerge_work_item(ws, "wb", "B", wtB)
+    merged, conflicts = await pipeline._amerge_work_item(ws, "wb", "B", wtB)
     assert merged is False                                  # truly conflicting → not merged
+    assert conflicts == ["F.txt"]                           # the clashing file is NAMED
 
     # The repo is clean: no half-finished merge.
     assert not (ws / ".git" / "MERGE_HEAD").exists()
@@ -74,3 +76,104 @@ async def test_merge_conflict_returns_false_clean_and_preserves_green(tmp_path, 
     assert (ws / "F.txt").read_text(encoding="utf-8") == "A-version\n"
     # Green work is PRESERVED on B's branch (rebase --abort restored it).
     assert (wtB / "F.txt").read_text(encoding="utf-8") == "B-version\n"
+
+
+# ------------------------------------------- P2b: resume a preserved green branch
+
+
+async def test_worktree_remove_keep_branch_preserves_ref(tmp_path, monkeypatch):
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    pipeline = Pipeline(_state("mp-keep"), ScriptedRunner())
+    ws = workspace_dir("mp-keep")
+    await _init_repo(pipeline, ws)
+    wt = await pipeline._aworktree_add(ws, "autospec/wi-k")
+    assert wt is not None
+    (Path(wt) / "k.txt").write_text("k", encoding="utf-8")
+    await pipeline._acommit_story(wt, "k")
+
+    await pipeline._aworktree_remove(ws, wt, "autospec/wi-k", keep_branch=True)
+    code, _ = await pipeline._agit(
+        ws, "rev-parse", "--verify", "--quiet", "refs/heads/autospec/wi-k"
+    )
+    assert code == 0                                   # the ref survived…
+    assert not Path(wt).exists()                       # …but the directory is gone
+
+
+async def test_resume_green_branch_rebases_then_merges(tmp_path, monkeypatch):
+    """The merge-conflict requeue path: green branch preserved, HEAD advanced
+    (sibling, other file) → resume returns a worktree rebased on HEAD, and the
+    merge lands the preserved work WITHOUT any dev rebuild."""
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    pipeline = Pipeline(_state("mp-res"), ScriptedRunner())
+    ws = workspace_dir("mp-res")
+    await _init_repo(pipeline, ws)
+    wt = await pipeline._aworktree_add(ws, "autospec/wi-r")
+    assert wt is not None
+    (Path(wt) / "green.txt").write_text("green", encoding="utf-8")
+    await pipeline._acommit_story(wt, "r")
+    await pipeline._aworktree_remove(ws, wt, "autospec/wi-r", keep_branch=True)
+
+    # A sibling advances HEAD on a DIFFERENT file meanwhile.
+    (ws / "sibling.txt").write_text("s", encoding="utf-8")
+    await pipeline._agit(ws, "add", "-A")
+    await pipeline._agit(ws, "commit", "-m", "sibling")
+
+    resumed = await pipeline._aresume_green_branch(ws, "autospec/wi-r")
+    assert resumed is not None
+    assert (Path(resumed) / "green.txt").exists()      # preserved work is there
+    assert (Path(resumed) / "sibling.txt").exists()    # rebased on the updated HEAD
+
+    merged, _ = await pipeline._amerge_work_item(ws, "autospec/wi-r", "r", resumed)
+    assert merged is True
+    assert (ws / "green.txt").exists()                 # landed without a rebuild
+    await pipeline._aworktree_remove(ws, resumed, "autospec/wi-r")
+
+
+async def test_resume_green_branch_none_when_absent(tmp_path, monkeypatch):
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    pipeline = Pipeline(_state("mp-none"), ScriptedRunner())
+    ws = workspace_dir("mp-none")
+    await _init_repo(pipeline, ws)
+    assert await pipeline._aresume_green_branch(ws, "autospec/wi-nope") is None
+
+
+async def test_resume_green_branch_drops_empty_branch(tmp_path, monkeypatch):
+    """A branch with no commit beyond HEAD (crash before the green commit) is
+    useless: resume drops it so the caller builds fresh."""
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    pipeline = Pipeline(_state("mp-empty"), ScriptedRunner())
+    ws = workspace_dir("mp-empty")
+    await _init_repo(pipeline, ws)
+    await pipeline._agit(ws, "branch", "autospec/wi-e")   # ref at HEAD, nothing ahead
+    assert await pipeline._aresume_green_branch(ws, "autospec/wi-e") is None
+    code, _ = await pipeline._agit(
+        ws, "rev-parse", "--verify", "--quiet", "refs/heads/autospec/wi-e"
+    )
+    assert code != 0                                      # dropped
+
+
+async def test_resume_green_branch_drops_conflicting_branch(tmp_path, monkeypatch):
+    """A genuine line-level conflict with what landed meanwhile cannot be
+    replayed: resume aborts the rebase, drops the branch and returns None —
+    the caller falls back to a fresh rebuild, the repo stays clean."""
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    pipeline = Pipeline(_state("mp-cf"), ScriptedRunner())
+    ws = workspace_dir("mp-cf")
+    await _init_repo(pipeline, ws)
+    wt = await pipeline._aworktree_add(ws, "autospec/wi-c")
+    assert wt is not None
+    (Path(wt) / "F.txt").write_text("branch-version\n", encoding="utf-8")
+    await pipeline._acommit_story(wt, "c")
+    await pipeline._aworktree_remove(ws, wt, "autospec/wi-c", keep_branch=True)
+
+    (ws / "F.txt").write_text("main-version\n", encoding="utf-8")  # same line moved on main
+    await pipeline._agit(ws, "add", "-A")
+    await pipeline._agit(ws, "commit", "-m", "main moved")
+
+    assert await pipeline._aresume_green_branch(ws, "autospec/wi-c") is None
+    code, _ = await pipeline._agit(
+        ws, "rev-parse", "--verify", "--quiet", "refs/heads/autospec/wi-c"
+    )
+    assert code != 0                                      # dropped → fresh rebuild path
+    _, status = await pipeline._agit(ws, "status", "--porcelain")
+    assert status.strip() == ""                           # repo stayed clean

@@ -254,6 +254,9 @@ class Task(BaseModel):
     depends_on: list[str] = Field(default_factory=list)   # other Task ids
     status: StoryStatus = StoryStatus.TODO
     attempts: int = 0
+    # Transient provider/CLI failures (AgentError hors usage-limit) consume THIS
+    # budget, not `attempts`: infra flakiness alone can never FAIL an item.
+    infra_attempts: int = 0
     last_error: str = ""
     files_hint: list[str] = Field(default_factory=list)   # files/zones it expects to touch
     split_depth: int = 0  # how many adaptive failure-splits produced/refined this task (bounds recursion)
@@ -285,6 +288,9 @@ class UserStory(BaseModel):
     status: StoryStatus = StoryStatus.TODO
     iteration: int = 1
     attempts: int = 0
+    # Transient provider/CLI failures (AgentError hors usage-limit) consume THIS
+    # budget, not `attempts`: infra flakiness alone can never FAIL a story.
+    infra_attempts: int = 0
     last_error: str = ""
     split_depth: int = 0  # adaptive failure-splits applied to this story (bounds re-decomposition)
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
@@ -390,6 +396,11 @@ class PlanCalibration(BaseModel):
     reactive_splits: int = 0     # split-on-failure events (unit was too big)
     over_budget_tasks: int = 0   # items whose dev touched more files than the budget
     degradations: int = 0        # pipeline stages that fell back (S2/S3 failures)
+    # §8 — orchestration health, separated from sizing signals above:
+    merge_requeues: int = 0      # merge conflicts that re-queued an item
+    p2b_resumes: int = 0         # preserved green branches merged WITHOUT a dev rebuild
+    orphan_resets: int = 0       # mid-flight items reset to TODO after a crash/restart
+    infra_retries: int = 0       # transient provider/CLI failures (never a sizing signal)
 
 
 class Finding(BaseModel):
@@ -502,6 +513,9 @@ class ProjectState(BaseModel):
     archived: bool = False  # hidden from the default project list (not deleted)
     delivery_ready: bool = False  # true only when the Definition-of-Done gate passes
     delivery_issues: list[str] = Field(default_factory=list)  # latest DoD/runtime blockers
+    # P5 — partial delivery: the gate passed but some stories FAILED and were
+    # shipped around (progress is never all-or-nothing); surfaced in the UI.
+    delivery_partial: bool = False
     error: str = ""
     created_at: float = Field(default_factory=time.time)
 

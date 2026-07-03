@@ -29,4 +29,28 @@ describe("PlanReviewPanel (Revue du plan)", () => {
     expect(score.textContent).toContain("95/100");
     expect(score.className).toContain("plan-review-score-good");
   });
+
+  it("§8 : la calibration aval s'affiche même sans revue LLM", () => {
+    render(
+      <PlanReviewPanel
+        planQuality={-1}
+        issues={[]}
+        suggestions={[]}
+        calibration={{
+          reactive_splits: 2,
+          over_budget_tasks: 1,
+          degradations: 0,
+          merge_requeues: 3,
+          p2b_resumes: 2,
+          orphan_resets: 0,
+          infra_retries: 1,
+        }}
+      />,
+    );
+    const block = screen.getByTestId("plan-calibration");
+    expect(block.textContent).toContain("2");
+    // Seuls les compteurs non nuls sont listés (0 = pas de bruit).
+    expect(block.querySelectorAll("li").length).toBe(5);
+    expect(screen.queryByTestId("plan-review-score")).not.toBeInTheDocument();
+  });
 });

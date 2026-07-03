@@ -185,4 +185,21 @@ export const board: Namespace = {
 
   // US view tasks heading
   tasksHeading: { en: "Tasks ({count})", fr: "Tâches ({count})" },
+
+  // Pipeline PO (S1/S2) : complexité estimée + taxonomie des critères.
+  complexity_title: {
+    en: "Complexity estimated at plan time (PO pipeline S1)",
+    fr: "Complexité estimée au plan (pipeline PO S1)",
+  },
+  complexity_trivial: { en: "trivial", fr: "triviale" },
+  complexity_standard: { en: "standard", fr: "standard" },
+  complexity_complex: { en: "complex", fr: "complexe" },
+  criterionKind_title: {
+    en: "Criterion taxonomy (S2): happy / edge / error / boundary",
+    fr: "Taxonomie du critère (S2) : happy / edge / error / boundary",
+  },
+  specIncomplete: {
+    en: "Incomplete spec — S2 fell back, skeleton kept (mono-pass on retry)",
+    fr: "Spec incomplète — repli S2, squelette conservé (mono-passe au retry)",
+  },
 };

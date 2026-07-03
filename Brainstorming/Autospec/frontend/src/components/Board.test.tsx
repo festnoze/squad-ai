@@ -105,6 +105,29 @@ describe("Board", () => {
     expect(screen.getByText(/US-1/)).toBeInTheDocument();
   });
 
+  it("Pipeline PO : badge complexité, kind des critères et spec incomplète", () => {
+    const epic: Epic = { id: "E1", title: "Mon epic", description: "", iteration: 1 };
+    const story = makeStory({
+      epic_id: "E1",
+      title: "Story complexe",
+      complexity: "complex",
+      spec_incomplete: true,
+      acceptance_criteria: [
+        { id: "AC-1", text: "cas nominal", kind: "happy" },
+        { id: "AC-2", text: "cas d'erreur", kind: "error" },
+      ],
+    });
+    render(<Board epics={[epic]} stories={[story]} projectId="p1" />);
+    fireEvent.click(screen.getByText("Mon epic"));
+    // Le badge complexité apparaît dès la carte de la liste.
+    expect(screen.getAllByTestId("complexity-badge").length).toBeGreaterThan(0);
+    fireEvent.click(screen.getByText("Story complexe"));
+    // Détail : marqueur S2 dégradée + taxonomie des critères.
+    expect(screen.getByTestId("spec-incomplete")).toBeInTheDocument();
+    const kinds = screen.getAllByTestId("criterion-kind");
+    expect(kinds.map((k) => k.textContent)).toEqual(["happy", "error"]);
+  });
+
   it("carte epic : avancement (barre + compteur) au niveau racine", () => {
     const epic: Epic = { id: "E1", title: "Cœur", description: "", iteration: 1 };
     render(
