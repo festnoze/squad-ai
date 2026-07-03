@@ -399,6 +399,7 @@ class PlanCalibration(BaseModel):
     scope_violations: int = 0    # devs whose commit strayed outside their declared file scope
     # §8 — orchestration health, separated from sizing signals above:
     merge_requeues: int = 0      # merge conflicts that re-queued an item
+    canary_reverts: int = 0      # semantic conflicts (green+green=red) reverted post-merge
     p2b_resumes: int = 0         # preserved green branches merged WITHOUT a dev rebuild
     orphan_resets: int = 0       # mid-flight items reset to TODO after a crash/restart
     infra_retries: int = 0       # transient provider/CLI failures (never a sizing signal)

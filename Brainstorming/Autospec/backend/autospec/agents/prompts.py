@@ -919,6 +919,9 @@ réécrire le même fichier par deux tâches parallèles — les FICHIERS PARTAG
 UNE tâche d'INTÉGRATION par story/stream : les tâches de feature créent leurs
 PROPRES fichiers et exportent ; la tâche d'intégration fait le câblage et
 `depends_on` les features. C'est LA cause n°1 des conflits de merge inter-stream.
+MIEUX : le scaffold AUTO-DÉCOUVRE les features (`<pkg>/features/<feature>.py`
+exposant `register()` ; `frontend/src/features/<Feature>.tsx` en export default) —
+une feature câblée par convention n'a besoin d'AUCUNE tâche d'intégration.
 
 TECHNICAL STORIES (TS) — découpage fin du travail technique/complexe.
 Pour un travail TECHNIQUE transverse ou une pièce COMPLEXE qui n'est pas une vraie
@@ -1022,6 +1025,9 @@ def sizing_rules() -> str:
   les tâches de feature créent leurs PROPRES fichiers et exportent ; le câblage
   dans les fichiers partagés est fait par la tâche d'intégration qui `depends_on`
   les features. C'est LA cause n°1 des conflits de merge entre unités parallèles.
+  MIEUX : le scaffold AUTO-DÉCOUVRE `<pkg>/features/<feature>.py` (`register()`)
+  et `frontend/src/features/<Feature>.tsx` (export default) — une feature câblée
+  par convention n'a besoin d'AUCUNE tâche d'intégration.
 - NI TROP GROS NI TROP FIN : fusionner les unités triviales adjacentes qui ne
   justifient pas chacune une session d'agent."""
 
@@ -1046,6 +1052,10 @@ vert doit être rejoué :
   `frontend/src/App.tsx`, `frontend/src/index.css`, `README.md`…) : n'y touche
   PAS sauf s'ils figurent EXPLICITEMENT dans ton périmètre — leur câblage
   appartient à une tâche d'intégration dédiée.
+- CÂBLAGE PAR AUTO-DÉCOUVERTE (convention du scaffold) : dépose ta feature dans
+  `<pkg>/features/<feature>.py` (fonction `register()`) côté backend, ou
+  `frontend/src/features/<Feature>.tsx` (export default) côté frontend — elle
+  est câblée automatiquement, sans éditer `main.py`/`App.tsx`.
 - S'il te faut du code hors périmètre, crée un NOUVEAU fichier dans ta zone et
   exporte-le, plutôt que d'éditer le fichier d'une autre unité.
 """
@@ -1616,10 +1626,14 @@ PROCESSUS OBLIGATOIRE (BDD puis TDD, outside-in) :
    des tests unitaires TDD si tu crées de la logique non couverte.
 {"5" if plan else "4"}. Relance `uv run pytest` jusqu'à ce que TOUTE la suite soit verte (les tests
    des stories précédentes doivent rester verts).
-{"6" if plan else "5"}. Câble la fonctionnalité dans le POINT D'ENTRÉE EXÉCUTABLE `main.py` :
-   le projet DOIT être lançable tel quel. Pour un CLI, expose la commande. Pour
-   une APP WEB / API (FastAPI, Flask…), `python main.py` DOIT DÉMARRER LE SERVEUR
-   (`if __name__ == "__main__":` → `uvicorn.run(app, host="127.0.0.1", port=8000)`),
+{"6" if plan else "5"}. Câble la fonctionnalité — de préférence par AUTO-DÉCOUVERTE : dépose un
+   module `{package_name}/features/<ta_feature>.py` exposant `register()`
+   (main.py les découvre automatiquement) plutôt que d'éditer `main.py`, que
+   des unités parallèles modifieraient en conflit. Le projet DOIT rester
+   lançable tel quel. Pour un CLI, expose la commande. Pour une APP WEB / API
+   (FastAPI, Flask…), `python main.py` DOIT DÉMARRER LE SERVEUR
+   (`if __name__ == "__main__":` → `uvicorn.run(app, host="127.0.0.1", port=8000)`)
+   — SEULE cette évolution du point d'entrée justifie de toucher `main.py` —
    et la DÉPENDANCE D'EXÉCUTION (ex. `uvicorn`) DOIT être déclarée dans
    `pyproject.toml` (`dependencies`). Ne te contente JAMAIS d'imprimer des
    instructions de lancement à la place du démarrage réel.

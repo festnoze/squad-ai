@@ -35,6 +35,7 @@ __all__ = [
     "claims_overlap",
     "declared_overlap",
     "declared_serialization",
+    "zone_mismatches",
     "analyze",
 ]
 
@@ -142,6 +143,37 @@ def declared_overlap(t1: TaskClaim, t2: TaskClaim) -> bool:
     if not t1.file_globs or not t2.file_globs:
         return False
     return any(globs_overlap(a, b) for a in t1.file_globs for b in t2.file_globs)
+
+
+def zone_mismatches(tasks: list[TaskClaim], roots: dict[str, str]) -> list[str]:
+    """Plan-time zone/stream coherence: a task whose declared glob lives OUTSIDE
+    its own stream's ``file_root`` — or, for a root-zoned stream (``""``),
+    INSIDE another stream's root — is a separation bug that will surface later
+    as an inter-stream merge conflict. ``roots`` maps stream id → file_root.
+    Returns human-readable findings (the caller decides error vs warning)."""
+    out: list[str] = []
+    for t in tasks:
+        own_root = (roots.get(t.stream or "", "") or "").strip().strip("/")
+        for g in t.file_globs:
+            prefix = _static_prefix(_norm(g)).rstrip("/")
+            if own_root:
+                if prefix != own_root and not prefix.startswith(own_root + "/"):
+                    out.append(
+                        f"tâche {t.id} (stream {t.stream}) : glob « {g} » hors de "
+                        f"sa zone « {own_root}/ »"
+                    )
+            else:
+                for sid, other_root in roots.items():
+                    other = (other_root or "").strip().strip("/")
+                    if not other or sid == (t.stream or ""):
+                        continue
+                    if prefix == other or prefix.startswith(other + "/"):
+                        out.append(
+                            f"tâche {t.id} (stream {t.stream or 'primaire'}) : glob "
+                            f"« {g} » dans la zone du stream « {sid} »"
+                        )
+                        break
+    return out
 
 
 def declared_serialization(tasks: list[TaskClaim]) -> dict[str, tuple[str, ...]]:

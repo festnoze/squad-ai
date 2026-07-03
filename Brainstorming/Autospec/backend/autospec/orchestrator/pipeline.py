@@ -67,6 +67,7 @@ from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
+from . import manifests
 from . import plan_pipeline
 from . import regression
 from .build_monitor import BuildMonitor
@@ -3375,6 +3376,13 @@ class Pipeline:
             )
             for t in tasks
         ]
+        # Zone/stream coherence (legacy plan path — the PO pipeline refuses
+        # these at S1): a glob outside its stream's zone is a future
+        # inter-stream conflict, surfaced here as an actionable warning.
+        roots = plan_pipeline._stream_roots(self.state)
+        if roots:
+            for w in independence.zone_mismatches(claims, roots):
+                self._log("independence", f"⚠️ {w}")
         edges = independence.declared_serialization(claims)
         if not edges:
             return
@@ -3926,6 +3934,45 @@ class Pipeline:
                 merged, conflict_files = await self._amerge_work_item(
                     ws, branch, item.id, worktree
                 )
+                # Canari : un revert post-merge est un conflit SÉMANTIQUE — il
+                # partage la mécanique de requeue du conflit de merge mais pas
+                # son diagnostic (pas de fichiers en collision à recalibrer).
+                semantic_revert = False
+                if merged:
+                    # Canari post-merge : vert + vert peut faire ROUGE combiné
+                    # (conflit sémantique — deux items compatibles avec HEAD
+                    # mais pas entre eux). La suite est rejouée sur le HEAD
+                    # fraîchement mergé ; rouge → le merge est REVERTÉ (HEAD
+                    # reste toujours vert pour les items suivants) et l'item
+                    # re-queué comme un conflit, branche verte préservée.
+                    canary_ok, canary_tail = await self._apost_merge_canary(
+                        item, is_frontend
+                    )
+                    if not canary_ok and await self._arevert_head_merge(ws, item.id):
+                        merged = False
+                        semantic_revert = True
+                        self.state.calibration_for().canary_reverts += 1  # §8
+                        self._conflict_retry_ids.add(item.id)  # retry strict
+                        target.last_error = (
+                            "conflit sémantique post-merge (suite rouge sur le "
+                            f"HEAD combiné) :\n{canary_tail}"
+                        )
+                        lesson = (
+                            f"Itération {self.state.iteration} : « {getattr(target, 'title', '') or item.id} » "
+                            "était verte isolément mais ROUGE une fois mergée avec ses voisines "
+                            "(conflit sémantique) — expliciter les contrats partagés entre unités "
+                            "parallèles ou prévoir une story d'intégration qui les compose."
+                        )
+                        if lesson not in self.state.sizing_lessons:
+                            self.state.sizing_lessons.append(lesson)
+                        self.state.sizing_lessons = self.state.sizing_lessons[-12:]
+                    elif not canary_ok:
+                        # Revert impossible : on ne peut pas mieux faire que
+                        # livrer l'item en signalant BRUYAMMENT le HEAD rouge.
+                        self._notify(
+                            "warning", "Canari post-merge rouge",
+                            f"{item.id} mergé mais la suite combinée est rouge et le revert a échoué.",
+                        )
                 if merged:
                     keep_branch = False  # P2b: merged into HEAD — branch is useless now
                     if not dev_ran:
@@ -3952,10 +3999,12 @@ class Pipeline:
                     # Separation loop: the branch's REAL touched files recalibrate
                     # the item's declared claims, the retry is scheduled STRICTLY
                     # (no co-run with a possible rival), and a sizing lesson
-                    # feeds the next plan (§6).
-                    self.state.calibration_for().merge_requeues += 1  # §8
-                    touched = await self._abranch_files(ws, branch)
-                    self._register_merge_conflict(item, target, conflict_files, touched)
+                    # feeds the next plan (§6). A semantic revert (canary) took
+                    # its own diagnosis above — only the requeue tail is shared.
+                    if not semantic_revert:
+                        self.state.calibration_for().merge_requeues += 1  # §8
+                        touched = await self._abranch_files(ws, branch)
+                        self._register_merge_conflict(item, target, conflict_files, touched)
                     if subject.attempts < settings.dev_max_attempts:
                         target.status = subject.status = StoryStatus.TODO
                         self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
@@ -4248,6 +4297,46 @@ class Pipeline:
         except OSError:
             pass
 
+    async def _apost_merge_canary(
+        self, item: "work_streams.WorkItem", is_frontend: bool
+    ) -> tuple[bool, str]:
+        """Rejoue la suite du stream de l'item sur le HEAD PARTAGÉ fraîchement
+        mergé (AUTOSPEC_POST_MERGE_CANARY, ON). Deux items verts chacun dans
+        leur worktree peuvent être rouges COMBINÉS — le canari attrape ce
+        conflit sémantique immédiatement, au lieu de le laisser dériver jusqu'au
+        smoke run. HEAD étant maintenu toujours vert (revert sinon), un rouge
+        est attribuable au merge qui vient d'avoir lieu. Retourne (ok, tail)."""
+        if not self._setting("post_merge_canary"):
+            return True, ""
+        if is_frontend:
+            ok, output, _ = await self._arun_frontend_tests()
+        else:
+            ok, output, _ = await self._arun_pytest()
+        if not ok:
+            self._log(
+                f"dev:{item.id}",
+                f"🐤 Canari post-merge ROUGE après le merge de {item.id} — "
+                "conflit sémantique (vert+vert=rouge), revert du merge.",
+            )
+        return ok, output[-1500:]
+
+    async def _arevert_head_merge(self, repo, wid: str) -> bool:
+        """Revert le commit de merge en tête de HEAD (celui de ``wid``), sous le
+        merge lock — l'invariant « HEAD toujours vert » est restauré pour les
+        items suivants. Best-effort : False si git refuse (HEAD reste rouge,
+        signalé bruyamment par l'appelant)."""
+        async with self._merge_lock.ahold(f"revert:{wid}"):
+            code, out = await self._agit(repo, "revert", "-m", "1", "--no-edit", "HEAD")
+            if code != 0:
+                await self._agit(repo, "revert", "--abort")
+                self._log(
+                    "streams",
+                    f"⛔ Revert du merge de {wid} impossible : {out.strip()[:200]}",
+                )
+                return False
+        self._log("streams", f"↩️ Merge de {wid} reverté — HEAD redevient vert.")
+        return True
+
     async def _aconflict_files(self, repo) -> list[str]:
         """The unmerged paths of the in-progress (failed) merge — read BEFORE
         ``merge --abort`` wipes the state. Best-effort: [] when git fails."""
@@ -4255,6 +4344,44 @@ class Pipeline:
         if code != 0:
             return []
         return [line.strip() for line in out.splitlines() if line.strip()]
+
+    async def _aresolve_manifest_conflicts(self, repo, conflict_files: list[str]) -> bool:
+        """Auto-resolve a merge whose ONLY conflicts are dependency MANIFESTS
+        (union of the dependency lists) and their lockfiles (kept at HEAD —
+        regenerated by the toolchain, not line-merged). Runs INSIDE the
+        conflicted merge state, before any abort: each resolved file is staged;
+        True → the caller commits the merge. Conservative: any file it cannot
+        confidently merge → False, nothing staged is trusted, normal conflict
+        handling resumes."""
+        if not manifests.is_manifest_conflict(conflict_files):
+            return False
+        for path in conflict_files:
+            rel = path.strip().replace("\\", "/")
+            name = rel.rsplit("/", 1)[-1]
+            if name in manifests.LOCKFILES:
+                code, _ = await self._agit(repo, "checkout", "--ours", "--", rel)
+                if code != 0:
+                    return False
+            else:
+                ours_code, ours = await self._agit(repo, "show", f":2:{rel}")
+                theirs_code, theirs = await self._agit(repo, "show", f":3:{rel}")
+                if ours_code != 0 or theirs_code != 0:
+                    return False
+                merged = (
+                    manifests.merge_pyproject(ours, theirs)
+                    if name == "pyproject.toml"
+                    else manifests.merge_package_json(ours, theirs)
+                )
+                if merged is None:
+                    return False
+                try:
+                    (Path(repo) / rel).write_text(merged, encoding="utf-8")
+                except OSError:
+                    return False
+            code, _ = await self._agit(repo, "add", "--", rel)
+            if code != 0:
+                return False
+        return True
 
     async def _abranch_files(self, repo, branch: str) -> list[str]:
         """Every file the item's branch REALLY touched since it diverged from
@@ -4482,6 +4609,19 @@ class Pipeline:
             if code == 0:
                 return True, []
             conflict_files = await self._aconflict_files(repo)
+            # Manifest conflicts (pyproject/package.json/lockfiles) are the one
+            # STRUCTURAL collision no zone separation can avoid — two parallel
+            # tasks legitimately adding a dependency each. Union-merge them
+            # deterministically instead of requeuing green work.
+            if await self._aresolve_manifest_conflicts(repo, conflict_files):
+                code, _ = await self._agit(repo, "commit", "--no-edit")
+                if code == 0:
+                    self._log(
+                        "streams",
+                        f"🧩 {wid} : conflit de manifeste auto-résolu (union des "
+                        f"dépendances de {', '.join(conflict_files[:3])}).",
+                    )
+                    return True, []
             await self._agit(repo, "merge", "--abort")
             # P2: preserve the green branch — rebase it onto the now-updated HEAD
             # (which holds the sibling's commits), then merge the rebased branch.

@@ -336,17 +336,10 @@ class Settings:
     split_max_depth: int = field(
         default_factory=lambda: _env_int("AUTOSPEC_SPLIT_MAX_DEPTH", 2, minimum=0)
     )
-    # RFC technical-stories: target max files per LEAF task, so each stays small
-    # enough for one average-LLM session (≤ N files) → massive parallelism + high
-    # per-task success. Indicative (communicated to the architect when splitting),
-    # not a hard runtime reject.
-    task_file_budget: int = field(
-        default_factory=lambda: _env_int("AUTOSPEC_TASK_FILE_BUDGET", 3, minimum=1)
-    )
-    # RFC technical-stories: target max files per LEAF task, so each stays small
-    # enough for one average-LLM session (≤ N files) → massive parallelism + high
-    # per-task success. Indicative (communicated to the architect when splitting),
-    # not a hard runtime reject.
+    # The ONE sizing budget (RFC technical-stories + PO pipeline §5, shared
+    # "découpe" brain): max files a LEAF (task / taskless story) may touch to
+    # stay buildable in one average-LLM session. Indicative for the reactive
+    # architect splits; a hard S1 reject for the PO pipeline's estimated_files.
     task_file_budget: int = field(
         default_factory=lambda: _env_int("AUTOSPEC_TASK_FILE_BUDGET", 3, minimum=1)
     )
@@ -512,10 +505,14 @@ class Settings:
     po_pipeline_gherkin: bool = field(
         default_factory=lambda: _env_bool("AUTOSPEC_PO_PIPELINE_GHERKIN", True)
     )
-    # Sizing budget (shared "découpe" brain): max files ONE leaf (task / task-
-    # less story) may claim to stay buildable in a single agent session.
-    task_file_budget: int = field(
-        default_factory=lambda: _env_int("AUTOSPEC_TASK_FILE_BUDGET", 6, minimum=1)
+    # Canari post-merge : rejoue la vraie suite sur le HEAD partagé juste après
+    # chaque merge d'item parallèle — deux items verts chacun dans leur worktree
+    # peuvent être ROUGES combinés (conflit sémantique). Un HEAD rouge est
+    # immédiatement reverté et l'item re-queué. ON par défaut (l'invariant
+    # « HEAD toujours vert » protège tous les items suivants) ; coupable via
+    # AUTOSPEC_POST_MERGE_CANARY=0 si le coût d'une suite par merge est trop haut.
+    post_merge_canary: bool = field(
+        default_factory=lambda: _env_bool("AUTOSPEC_POST_MERGE_CANARY", True)
     )
     refine_max_rounds: int = field(
         default_factory=lambda: _env_int("AUTOSPEC_REFINE_MAX_ROUNDS", 2, minimum=0)

@@ -33,8 +33,8 @@ from ..agents import prompts
 from ..agents.personas import persona
 from ..agents.runner import AgentError, AgentRunner, extract_json
 from ..config import settings
-from ..models import AcceptanceCriterion, ProjectState, UserStory
-from . import refine
+from ..models import AcceptanceCriterion, ProjectState, StreamKind, UserStory
+from . import independence, refine
 
 LogFn = Callable[[str, str], None]
 
@@ -210,12 +210,13 @@ def validate_skeleton(
     existing_story_ids: set[str] | None = None,
     repo_files: list[str] | None = None,
     budget: int | None = None,
+    stream_roots: dict[str, str] | None = None,
 ) -> tuple[list[str], list[str]]:
     """S1 deterministic gate (blocks acceptance): id/uniqueness + referential
     integrity, acyclic DAG, per-leaf file budget, `complex` leaves must be
-    decomposed, real-repo glob confrontation (iteration ≥ 2), plus catch-all
-    heuristics. Returns ``(errors, warnings)`` — errors block, warnings are
-    injected/logged."""
+    decomposed, real-repo glob confrontation (iteration ≥ 2), zone/stream
+    coherence of the globs (``stream_roots``), plus catch-all heuristics.
+    Returns ``(errors, warnings)`` — errors block, warnings are injected/logged."""
     errors: list[str] = []
     warnings: list[str] = []
     budget = settings.task_file_budget if budget is None else budget
@@ -307,6 +308,22 @@ def validate_skeleton(
                         f"{leaf.id} : le glob « {g} » ne matche aucun fichier du "
                         "repo (fichier nouveau ? vérifie le chemin)"
                     )
+
+    # Zone/stream coherence: a glob outside its stream's file_root (or inside
+    # ANOTHER stream's root for a root-zoned stream) is a future inter-stream
+    # merge conflict — refused at PLAN time, where fixing costs one repair.
+    if stream_roots:
+        claims = []
+        for story, task in skel.leaves():
+            leaf = task if task is not None else story
+            stream_id = (task.stream if task is not None else story.stream) or ""
+            if leaf.file_globs:
+                claims.append(
+                    independence.TaskClaim(
+                        id=leaf.id, stream=stream_id, file_globs=tuple(leaf.file_globs)
+                    )
+                )
+        errors.extend(independence.zone_mismatches(claims, stream_roots))
 
     # Catch-all heuristics (fourre-tout).
     for s in stories:
@@ -452,6 +469,20 @@ def fallback_gherkin(story_id: str, title: str, criteria: list[S2Criterion]) -> 
     return "\n".join(lines)
 
 
+def _stream_roots(state: ProjectState) -> dict[str, str] | None:
+    """Stream id → file_root, for the zone/stream coherence check. ``""``
+    (unspecified stream) resolves to the primary stream's root. None when the
+    project has no declared streams — nothing to check."""
+    if not (settings.streams_enabled or state.streams):
+        return None
+    roots = {
+        s.id: (s.file_root or ("frontend" if s.kind == StreamKind.FRONTEND else ""))
+        for s in state.effective_streams()
+    }
+    roots[""] = roots.get(state.primary_stream_id, "")
+    return roots
+
+
 def repo_file_tree(root: Path, limit: int = 400) -> list[str]:
     """The generated repo's file listing (workspace-relative, posix separators)
     used to confront the S1 file_globs with reality from iteration 2 on."""
@@ -544,10 +575,14 @@ async def _arun_s1(
     critic-first structure review whose every revision is re-validated
     deterministically (a revision that breaks the contract is rejected)."""
     existing_ids = {s.id for s in state.stories}
+    stream_roots = _stream_roots(state)
 
     def _validate(skel: S1Skeleton) -> list[str]:
         errors, warnings = validate_skeleton(
-            skel, existing_story_ids=existing_ids, repo_files=repo_files
+            skel,
+            existing_story_ids=existing_ids,
+            repo_files=repo_files,
+            stream_roots=stream_roots,
         )
         for w in warnings:
             if w not in report.warnings:

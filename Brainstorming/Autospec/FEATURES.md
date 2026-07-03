@@ -358,6 +358,32 @@ quatre étages (au lieu de l'erreur opaque « conflit de merge inter-stream ») 
   `pyproject.toml`), les fichiers sont conservés mais **déclarés** dans
   `files_hint` pour sérialiser les rivaux. Compté en calibration
   (`scope_violations`, §8) + leçon de dimensionnement (§6).
+- **Union des manifestes de dépendances** (`orchestrator/manifests.py`) : deux
+  tâches qui ajoutent chacune une dépendance conflictent structurellement sur
+  `pyproject.toml`/`package.json` — quand TOUS les fichiers en conflit sont des
+  manifestes/lockfiles, le merge est **auto-résolu** (union déterministe des
+  listes de dépendances, pins de HEAD prioritaires ; lockfiles pris côté HEAD et
+  régénérés par l'outillage). Toute divergence au-delà des dépendances → refus,
+  chemin de conflit normal.
+- **Scaffold plugin-style (auto-découverte)** : le squelette généré câble les
+  features **par convention** — `<pkg>/features/<feature>.py` exposant
+  `register()` (découvert par `main.py` via `pkgutil`), et
+  `frontend/src/features/<Feature>.tsx` (export default, rendu par `App.tsx` via
+  `import.meta.glob`). Une feature n'a plus AUCUNE raison d'éditer
+  `main.py`/`App.tsx` : la cause n°1 des collisions disparaît structurellement.
+  Prompts (`sizing_rules`, `file_scope_block`, plan multi-stream, étape de
+  câblage du dev) enseignent la convention.
+- **Canari post-merge** (`AUTOSPEC_POST_MERGE_CANARY`, ON) : vert + vert peut
+  faire ROUGE combiné (conflit sémantique). Après chaque merge, la suite du
+  stream est rejouée sur le HEAD partagé ; rouge → le merge est **reverté**
+  (l'invariant « HEAD toujours vert » protège les items suivants) et l'item
+  re-queué en mode strict avec un `last_error` explicite. Compté
+  (`canary_reverts`, §8) + leçon de dimensionnement (§6).
+- **Cohérence zone/stream au plan** (`independence.zone_mismatches`) : un glob
+  déclaré hors de la zone de son stream (ou dans la zone d'un autre stream) est
+  **refusé dès la validation S1** du pipeline PO (auto-réparé), et signalé en
+  warning sur le chemin legacy — le conflit est tué au moment où le corriger ne
+  coûte qu'une re-passe de plan.
 - **Prévention par prompt** : chaque dev parallèle reçoit son **PÉRIMÈTRE
   FICHIERS** (`prompts.file_scope_block` : globs déclarés, sinon zone du stream) ;
   le cerveau de découpe commun (`sizing_rules`) et le plan multi-stream réservent
