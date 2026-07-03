@@ -2734,6 +2734,13 @@ class Pipeline:
         code, _ = await self._agit(ws, "commit", "-m", f"green {label}", "--allow-empty")
         return code == 0
 
+    async def _acommit_wip(self, worktree, wid: str) -> None:
+        """P2c: commit a RED attempt's partial work in its worktree so the
+        branch can be preserved and RESUMED by the next attempt (targeted
+        repair) instead of regenerating everything from scratch. Best-effort."""
+        await self._agit(worktree, "add", "-A")
+        await self._agit(worktree, "commit", "-m", f"wip {wid} (rouge)", "--allow-empty")
+
     async def _acommit_story(self, ws, sid: str) -> None:
         """Commit the workspace as the green state of a finished story.
 
@@ -2936,6 +2943,9 @@ class Pipeline:
             async with self._build_lock:
                 self._set_stage(story, BuildStage.IMPLEMENTING, "dev")  # N4/B1
                 item_guidance = self._apply_guidance(story)  # P10
+                previous_failure = prompts.previous_failure_block(
+                    story.last_error or "", story.attempts
+                )
                 if is_frontend:
                     # ST-7: route a frontend-stream story to the React dev agent;
                     # "green" = Vitest all-pass AND `tsc && vite build` succeeds.
@@ -2948,6 +2958,7 @@ class Pipeline:
                         file_root=stream.file_root or "frontend",
                         item_guidance=item_guidance,
                         available_skills=self._skills_catalog("dev"),
+                        previous_failure=previous_failure,
                     )
                     dev_persona = persona("dev-frontend")
                 else:
@@ -2959,6 +2970,7 @@ class Pipeline:
                         backend_language=self.state.backend_language.value,
                         item_guidance=item_guidance,
                         available_skills=self._skills_catalog("dev"),
+                        previous_failure=previous_failure,
                     )
                     dev_persona = persona("dev")
                 result = await self._tracked.arun(
@@ -2966,7 +2978,17 @@ class Pipeline:
                     system_prompt=dev_persona,
                     cwd=ws,
                 )
-                reply = extract_json(result.text)
+                try:
+                    reply = extract_json(result.text)
+                except AgentError:
+                    # La réponse JSON n'est qu'informative : la VÉRITÉ est la
+                    # suite rejouée ci-dessous — un dev bien codé mais mal
+                    # formaté ne doit pas perdre son travail (fail inutile).
+                    reply = {}
+                    self._log(
+                        f"dev:{story.id}",
+                        "Réponse dev illisible (JSON) — la suite réelle fait foi.",
+                    )
                 self._chat(ChatRole.DEV, f"[{story.id}] {reply.get('summary', '(pas de résumé)')}")
                 self._observe_file_budget(story, reply)
                 story.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
@@ -4026,6 +4048,12 @@ class Pipeline:
             else:
                 target.last_error = tail
                 self._log(f"dev:{item.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
+                # P2c — reprise incrémentale : le travail ROUGE (partiel) est
+                # committé et sa branche préservée. La prochaine tentative la
+                # REPREND (rebase + le dev répare dans le même worktree, avec
+                # l'erreur précédente en contexte) au lieu de tout régénérer.
+                await self._acommit_wip(worktree, item.id)
+                keep_branch = True
                 if subject.attempts < settings.dev_max_attempts:
                     target.status = StoryStatus.TODO
                     self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
@@ -4033,8 +4061,10 @@ class Pipeline:
                 # (the unit was likely too big for one agent session). If it splits,
                 # the new sub-tasks build on the next scheduler pass.
                 elif await self._amaybe_split_on_failure(item, subject, target):
-                    pass
+                    keep_branch = False  # the unit was replaced by finer sub-tasks
                 else:
+                    # Terminal FAILED: the partial branch stays — a manual retry
+                    # (aretry_failed) resumes the preserved work.
                     target.status = StoryStatus.FAILED
                     self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
@@ -4124,6 +4154,14 @@ class Pipeline:
             list(getattr(target, "files_hint", []) or []),
             stream_zone=stream.file_root or "",
         )
+        # Retry informé : l'échec de la tentative précédente entre dans le
+        # prompt (sinon le retry rejoue la même loterie à l'aveugle).
+        previous_failure = prompts.previous_failure_block(
+            getattr(target, "last_error", "") or "", subject.attempts
+        )
+        # Anti-conflit sémantique proactif : les contrats des dépendances (déjà
+        # mergées dans HEAD) sont pointés au dev — lire avant d'écrire.
+        dependency_contracts = self._dependency_contracts(target)
         if is_frontend:
             # The frontend dev agent runs Vitest/`vite build` in its worktree —
             # ensure `node_modules` is present (shared install + junction) first,
@@ -4140,6 +4178,8 @@ class Pipeline:
                 item_guidance=item_guidance,
                 available_skills=self._skills_catalog("dev"),
                 file_scope=file_scope,
+                previous_failure=previous_failure,
+                dependency_contracts=dependency_contracts,
             )
             dev_persona = persona("dev-frontend")
         else:
@@ -4152,10 +4192,22 @@ class Pipeline:
                 item_guidance=item_guidance,
                 available_skills=self._skills_catalog("dev"),
                 file_scope=file_scope,
+                previous_failure=previous_failure,
+                dependency_contracts=dependency_contracts,
             )
             dev_persona = persona("dev")
         result = await self._tracked.arun(dev_prompt, system_prompt=dev_persona, cwd=worktree)
-        reply = extract_json(result.text)
+        try:
+            reply = extract_json(result.text)
+        except AgentError:
+            # La reponse JSON n'est qu'INFORMATIVE (resume, mapping des tests) :
+            # la verite, c'est la suite executee ci-dessous. Un dev qui a bien
+            # travaille mais repond mal formate ne perd pas son worktree.
+            reply = {}
+            self._log(
+                f"dev:{subject.id}",
+                "Reponse dev illisible (JSON) - la suite reelle fait foi.",
+            )
         self._chat(ChatRole.DEV, f"[{subject.id}] {reply.get('summary', '(pas de résumé)')}")
         self._observe_file_budget(subject, reply)
         subject.status = StoryStatus.GREEN if reply.get("status") == "green" else StoryStatus.RED
@@ -4393,6 +4445,32 @@ class Pipeline:
             return []
         return [line.strip() for line in out.splitlines() if line.strip()]
 
+    def _dependency_contracts(self, target) -> str:
+        """The prompt block naming the CONTRACTS of the item's dependencies
+        (already merged into HEAD when it starts): technical-story ``contract``
+        when present, else description/title, plus their touched files — so the
+        dev READS them before writing instead of redefining them (the root of
+        green+green=red semantic conflicts)."""
+        deps: list[dict] = []
+        for dep_id in list(getattr(target, "depends_on", None) or []):
+            dep = self._find_item_target(dep_id)
+            if dep is None:
+                continue
+            summary = (
+                (getattr(dep, "contract", "") or "").strip()
+                or (getattr(dep, "description", "") or "").strip()
+                or (getattr(dep, "title", "") or "").strip()
+            )
+            deps.append(
+                {
+                    "id": dep_id,
+                    "title": getattr(dep, "title", "") or "",
+                    "summary": summary,
+                    "files": list(getattr(dep, "files_hint", None) or []),
+                }
+            )
+        return prompts.dependency_contracts_block(deps)
+
     def _merge_scope_hints(self, target, files: list[str]) -> None:
         """Fold OBSERVED files into the item's declared claims (``files_hint``)
         so the independence floor and the scheduler guard reason on reality."""
@@ -4514,7 +4592,8 @@ class Pipeline:
             )
 
     async def _aresume_green_branch(self, repo, branch: str):
-        """P2b — resume a PRESERVED green branch from an earlier attempt.
+        """P2b/P2c — resume a PRESERVED branch from an earlier attempt (green
+        work held back by a merge conflict, or a RED attempt's partial work).
 
         A merge-conflict requeue (``keep_branch``) or a hard crash (the worker's
         ``finally`` never ran) can leave ``branch`` behind with the item's green

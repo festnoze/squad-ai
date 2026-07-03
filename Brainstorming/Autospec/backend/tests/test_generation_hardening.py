@@ -19,6 +19,7 @@ from autospec.models import (
 )
 from autospec.orchestrator import independence, manifests
 from autospec.orchestrator import plan_pipeline as pp
+from autospec.orchestrator import streams as work_streams
 from autospec.orchestrator import workspace
 from autospec.orchestrator.pipeline import Pipeline
 from autospec.storage import workspace_dir
@@ -294,6 +295,132 @@ def test_zone_mismatches_flags_globs_outside_their_stream():
     assert "T-1" in text and "hors de «" in text.replace("« ", "« ") or "T-1" in text
     assert "T-3" in text                                # backend qui écrit dans frontend/
     assert "T-2" not in text and "T-4" not in text
+
+
+# ------------------------------- fails inutiles : JSON, retry, rouge, contrats
+
+def _dev_state(pid: str) -> ProjectState:
+    st = _state(pid)
+    st.stories = [
+        UserStory(id="US-1", epic_id="EPIC-1", title="S", stream="backend",
+                  gherkin="Feature: F\n  Scenario: S\n    Given a")
+    ]
+    return st
+
+
+async def test_unparseable_dev_reply_does_not_lose_green_work(tmp_path, monkeypatch):
+    """La réponse JSON du dev n'est qu'informative : si la suite réelle est
+    verte, un JSON illisible ne coûte ni l'attempt ni le worktree."""
+    from autospec.agents.runner import FakeRunner
+
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    state = _dev_state("json-tol")
+    runner = FakeRunner(["voilà c'est fait ! (aucun json)"])
+    pipeline = Pipeline(state, runner)
+
+    async def _green(ws=None):
+        return True, "", {}
+
+    monkeypatch.setattr(pipeline, "_arun_pytest", _green)
+    story = state.story("US-1")
+    story.attempts = 1
+    ok, _ = await pipeline._arun_item_dev(story, tmp_path, "pkg", False)
+
+    assert ok is True                                  # la suite fait foi
+    assert not runner.replies                          # un seul appel dev, pas de retry infra
+
+
+async def test_retry_prompt_carries_the_previous_failure(tmp_path, monkeypatch):
+    from autospec.agents.runner import FakeRunner
+
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    state = _dev_state("retry-ctx")
+    dev_reply = '{"status": "green", "summary": "ok", "files": [], "test_results": []}'
+    runner = FakeRunner([dev_reply, dev_reply])
+    pipeline = Pipeline(state, runner)
+
+    async def _green(ws=None):
+        return True, "", {}
+
+    monkeypatch.setattr(pipeline, "_arun_pytest", _green)
+    story = state.story("US-1")
+
+    story.attempts, story.last_error = 1, ""
+    await pipeline._arun_item_dev(story, tmp_path, "pkg", False)
+    assert "TENTATIVE PRÉCÉDENTE" not in runner.calls[0]["prompt"]
+
+    story.attempts, story.last_error = 2, "AssertionError: boom sur test_x"
+    await pipeline._arun_item_dev(story, tmp_path, "pkg", False)
+    retry_prompt = runner.calls[1]["prompt"]
+    assert "TENTATIVE PRÉCÉDENTE" in retry_prompt
+    assert "boom sur test_x" in retry_prompt
+
+
+async def test_dependent_prompt_names_its_dependencies_contracts(tmp_path, monkeypatch):
+    from autospec.agents.runner import FakeRunner
+    from autospec.models import Task
+
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    state = _state("dep-ctx")
+    t1 = Task(id="T-1", story_id="US-1", stream="backend", title="Exposer l'API",
+              description="Expose GET /add qui renvoie la somme.",
+              files_hint=["pkg/api.py"], status=StoryStatus.DONE)
+    t2 = Task(id="T-2", story_id="US-1", stream="backend", title="Consommer l'API",
+              depends_on=["T-1"])
+    state.stories = [UserStory(id="US-1", epic_id="EPIC-1", title="S", tasks=[t1, t2])]
+    dev_reply = '{"status": "green", "summary": "ok", "files": [], "test_results": []}'
+    runner = FakeRunner([dev_reply])
+    pipeline = Pipeline(state, runner)
+
+    async def _green(ws=None):
+        return True, "", {}
+
+    monkeypatch.setattr(pipeline, "_arun_pytest", _green)
+    # subject synthétisé comme le fait le scheduler
+    item = work_streams.build_work_graph(state).items["T-2"]
+    subject = pipeline._item_subject(item)
+    subject.attempts = 1
+    await pipeline._arun_item_dev(subject, tmp_path, "pkg", False)
+
+    prompt = runner.calls[0]["prompt"]
+    assert "CONTRATS DES DÉPENDANCES" in prompt
+    assert "T-1" in prompt and "Exposer l'API" in prompt
+    assert "pkg/api.py" in prompt
+    assert "GET /add" in prompt
+
+
+async def test_red_attempt_is_preserved_and_resumed_incrementally(tmp_path, monkeypatch):
+    """P2c : une tentative rouge committe son travail partiel ; la tentative
+    suivante REPREND ce worktree (le marqueur de l'essai 1 y est encore) au
+    lieu de repartir de zéro."""
+    from pathlib import Path
+
+    monkeypatch.setattr(settings, "streams_enabled", True)
+    monkeypatch.setattr(settings, "fake_agents", True)
+    monkeypatch.setattr(settings, "dev_max_attempts", 2)
+    monkeypatch.setattr(settings, "split_on_failure_enabled", False)
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    state = _dev_state("red-resume")
+    pipeline = Pipeline(state, ScriptedRunner())
+    seen_marker = []
+
+    async def _dev(subject, worktree, pkg, is_frontend):
+        marker = Path(worktree) / "partial.py"
+        if marker.exists():                      # tentative 2 : travail repris
+            seen_marker.append(True)
+            return True, ""
+        marker.write_text("WIP = 1\n", encoding="utf-8")
+        return False, "AssertionError: presque"
+
+    async def _still_red(subject, worktree, is_frontend):
+        return False, "toujours rouge"           # force le dev sur la reprise
+
+    monkeypatch.setattr(pipeline, "_arun_item_dev", _dev)
+    monkeypatch.setattr(pipeline, "_averify_resumed", _still_red)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=60)
+
+    assert seen_marker == [True]                 # l'essai 2 a VU le travail de l'essai 1
+    assert state.story("US-1").status == StoryStatus.DONE
 
 
 def test_validate_skeleton_refuses_out_of_zone_globs():

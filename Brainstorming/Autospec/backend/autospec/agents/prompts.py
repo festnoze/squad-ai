@@ -1061,6 +1061,48 @@ vert doit être rejoué :
 """
 
 
+def previous_failure_block(last_error: str, attempt: int) -> str:
+    """The retry's REFLEXION block: without it, attempt N replays exactly the
+    same prompt as attempt N-1 and the agent has no memory of why it failed —
+    a blind lottery. The stored ``last_error`` (real pytest/vitest tail, merge
+    diagnosis…) turns the retry into an informed iteration."""
+    if attempt <= 1 or not (last_error or "").strip():
+        return ""
+    return f"""
+⚠️ TENTATIVE PRÉCÉDENTE EN ÉCHEC (tentative {attempt - 1}) — ce travail a déjà
+été tenté et n'est pas passé. Erreur observée :
+\"\"\"{last_error[-1500:]}\"\"\"
+Corrige la CAUSE de cet échec en priorité — ne reproduis pas la même approche à
+l'identique. Si du code de la tentative précédente est déjà présent dans le
+répertoire (travail préservé), RÉPARE-le de façon ciblée plutôt que de tout
+réécrire.
+"""
+
+
+def dependency_contracts_block(deps: list[dict]) -> str:
+    """The dependent's ANTI-semantic-conflict block: its dependencies are
+    already merged into HEAD when it starts, but nothing pointed the dev at
+    them — green+green=red conflicts are born here. ``deps`` entries:
+    {id, title, summary, files}."""
+    if not deps:
+        return ""
+    lines = []
+    for d in deps:
+        files = ", ".join(str(f) for f in (d.get("files") or [])[:4])
+        files_part = f" — fichiers : {files}" if files else ""
+        summary = str(d.get("summary") or "").strip()[:300]
+        lines.append(f"- {d.get('id')} « {d.get('title', '')} » : {summary}{files_part}")
+    joined = "\n".join(lines)
+    return f"""
+CONTRATS DES DÉPENDANCES (déjà mergées dans le repo — ton code s'appuie dessus) :
+{joined}
+Avant d'écrire, LIS les modules correspondants dans le répertoire courant et
+respecte EXACTEMENT leurs signatures et conventions (imports, noms, formats
+d'erreurs, unités). Ne redéfinis JAMAIS ce qu'une dépendance fournit déjà —
+importe-le : deux définitions divergentes rendent la suite combinée rouge.
+"""
+
+
 def structure_criteria() -> str:
     """Quality criteria for the S1 structure critic (critic-first loop)."""
     return f"""- Chaque user story suit INVEST (indépendante, négociable, valeur, estimable,
@@ -1508,6 +1550,8 @@ def _dev_story_native(
     plan: str,
     skills_block: str = "",
     file_scope: str = "",
+    previous_failure: str = "",
+    dependency_contracts: str = "",
 ) -> str:
     """Dev prompt for Go/Rust (L2g): native test framework, no pytest-bdd. The
     Gherkin stays the human-readable acceptance spec; tests are written in the
@@ -1521,7 +1565,7 @@ def _dev_story_native(
     )
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant : {prof['project']}.
-{arch_block}{skills_block}{guidance_block}{lessons_block}{file_scope}
+{arch_block}{skills_block}{guidance_block}{lessons_block}{file_scope}{dependency_contracts}{previous_failure}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
@@ -1571,6 +1615,8 @@ def dev_story(
     item_guidance: str = "",
     available_skills: str = "",
     file_scope: str = "",
+    previous_failure: str = "",
+    dependency_contracts: str = "",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     lang_block = _language_block(backend_language)
@@ -1586,6 +1632,8 @@ def dev_story(
             arch_block, guidance_block, lessons_block, _format_test_plan(story),
             skills_block=available_skills,
             file_scope=file_scope,
+            previous_failure=previous_failure,
+            dependency_contracts=dependency_contracts,
         )
     ui_block = UI_TEST_BLOCK.replace("{snake}", _snake(story.id)) if ui_tests else ""
     plan = _format_test_plan(story)
@@ -1606,7 +1654,7 @@ L'architecte QA a décomposé ce test d'acceptance en tests unitaires outside-in
     return f"""Tu es le développeur d'un pipeline automatisé BDD/TDD. Tu travailles dans le
 répertoire courant, qui est un projet Python géré par uv (pyproject.toml déjà
 présent, pytest + pytest-bdd installés).
-{arch_block}{lang_block}{available_skills}{guidance_block}{lessons_block}{file_scope}
+{arch_block}{lang_block}{available_skills}{guidance_block}{lessons_block}{file_scope}{dependency_contracts}{previous_failure}
 User story à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :
@@ -1672,6 +1720,8 @@ def dev_story_frontend(
     item_guidance: str = "",
     available_skills: str = "",
     file_scope: str = "",
+    previous_failure: str = "",
+    dependency_contracts: str = "",
 ) -> str:
     """Dev prompt for the frontend stream (ST-7): a React+TS dev who writes
     components + Vitest tests in a red→green loop. "Green" = every Vitest test
@@ -1691,7 +1741,7 @@ def dev_story_frontend(
 un projet React + TypeScript géré par Vite (dossier `{file_root}/`, package.json
 déjà présent : React, Vitest et Testing Library installés, scripts `build` =
 `tsc && vite build` et `test` = `vitest run`).
-{arch_block}{available_skills}{guidance_block}{lessons_block}{file_scope}
+{arch_block}{available_skills}{guidance_block}{lessons_block}{file_scope}{dependency_contracts}{previous_failure}
 User story (stream frontend) à implémenter : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance :

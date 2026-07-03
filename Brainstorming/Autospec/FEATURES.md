@@ -392,6 +392,26 @@ quatre étages (au lieu de l'erreur opaque « conflit de merge inter-stream ») 
   `depends_on` les features. Chaque conflit émet aussi une **leçon de
   dimensionnement** (§6) injectée dans le prochain plan S1.
 
+### Moins de fails inutiles : la suite fait foi, retries informés
+- **JSON dev illisible toléré** : la réponse JSON du dev n'est qu'informative —
+  si elle ne se parse pas, la **vraie suite** tranche (worktree ET chemin
+  legacy). Un dev qui a bien codé mais mal formaté sa réponse ne perd plus son
+  travail ni sa tentative.
+- **Reprise incrémentale des tentatives rouges (P2c)** : le travail PARTIEL
+  d'une tentative rouge est committé (`wip <id> (rouge)`) et sa branche
+  préservée ; la tentative suivante la **reprend** (rebase + réparation ciblée
+  dans le même worktree) au lieu de tout régénérer. Un FAILED terminal garde
+  aussi la branche pour la relance manuelle ; un split la libère.
+- **Retry informé** (`prompts.previous_failure_block`) : l'erreur de la
+  tentative précédente (tail pytest/vitest, diagnostic de conflit) est injectée
+  dans le prompt du retry — corriger la cause, réparer le code préservé, ne pas
+  rejouer la même approche à l'aveugle.
+- **Contrats des dépendances** (`prompts.dependency_contracts_block`) : le dev
+  d'un item reçoit les contrats de ses `depends_on` (contract des TS, sinon
+  description + fichiers touchés) avec la consigne de LIRE ces modules et de
+  respecter leurs signatures — le complément proactif du canari post-merge
+  contre les conflits sémantiques.
+
 ### Re-décomposition adaptative sur échec
 - Quand une **US ou une tâche n'arrive pas à passer au vert** après ses tentatives
   de dev, plutôt que de la marquer en échec, l'agent **architecte la ré-analyse et
