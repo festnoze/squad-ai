@@ -396,7 +396,7 @@ async def aset_provider(req: ProviderRequest) -> dict:
     """Switch the agent backend (claude / openai / ollama) and optionally the
     model, live: new and existing pipelines use it from their next agent call."""
     if settings.fake_agents:
-        raise HTTPException(409, "Mode démo (AUTOSPEC_FAKE_AGENTS) : provider verrouillé.")
+        raise HTTPException(409, "Mode démo (FAKE_AGENTS) : provider verrouillé.")
     provider = req.provider.strip().lower() or "claude"
     if req.model is not None:
         model = req.model.strip()
@@ -1151,7 +1151,7 @@ def main() -> None:
     # reuses the now-dead socket on the next POST and gets an ECONNRESET it won't
     # retry (a non-idempotent POST) — surfacing as "Erreur 502" on create/chat.
     # A generous server-side timeout means the client always closes first.
-    keep_alive = _env_int("AUTOSPEC_KEEP_ALIVE_S", 600, minimum=5)
+    keep_alive = _env_int("KEEP_ALIVE_S", 600, minimum=5)
     uvicorn.run(
         "autospec.api.server:app",
         host="127.0.0.1",

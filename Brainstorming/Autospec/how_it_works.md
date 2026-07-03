@@ -162,9 +162,9 @@ Implémentations (`agents/runner.py` + `agents/providers.py`) :
   `session_id` ; (b) quand un `cwd` est fourni (agents Dev), un **protocole
   d'outils JSON borné** est injecté au system prompt — le modèle répond
   `{"tool": "write_files"|"read_files", ...}` pendant au plus
-  `AUTOSPEC_PROVIDER_TOOL_ROUNDS` tours (chemins confinés au workspace), puis
-  donne sa réponse finale. Coût estimé via `AUTOSPEC_<PROVIDER>_PRICE_IN/_OUT`
-  ($/1M tokens) ; Ollama = 0. Sélection par `AUTOSPEC_AGENT_PROVIDER` ou à chaud
+  `PROVIDER_TOOL_ROUNDS` tours (chemins confinés au workspace), puis
+  donne sa réponse finale. Coût estimé via `<PROVIDER>_PRICE_IN/_OUT`
+  ($/1M tokens) ; Ollama = 0. Sélection par `AGENT_PROVIDER` ou à chaud
   via `GET/POST /api/provider` (`make_runner()` ; bascule le runner de toutes les
   pipelines vivantes ; verrouillé en mode démo).
 - **Découverte de modèles à la volée** (`agents/discovery.py`,
@@ -180,11 +180,11 @@ Implémentations (`agents/runner.py` + `agents/providers.py`) :
   **sans aucun LLM**. C'est ce qui rend les tests déterministes et instantanés.
 - **`ScriptedRunner`** (mode démo / e2e, `agents/scripted.py`) — reconnaît
   l'agent appelé d'après le prompt et renvoie un projet canné complet
-  (PM→PO→QA→Dev, voire l'analyste). Activé par `AUTOSPEC_FAKE_AGENTS=1` ; la
+  (PM→PO→QA→Dev, voire l'analyste). Activé par `FAKE_AGENTS=1` ; la
   vérification `uv run pytest` est alors court-circuitée et l'app générée est
   lancée avec l'interpréteur courant — **tout le stack tourne sans le CLI Claude
   ni build de venv uv**, ce qui rend le lancement back+front entièrement
-  vérifiable. `AUTOSPEC_DEMO_DELAY_S` ralentit les agents pour rendre les
+  vérifiable. `DEMO_DELAY_S` ralentit les agents pour rendre les
   transitions (et la pause) observables.
 
 Pour brancher un autre backend (SDK Anthropic, autre provider, mock), il suffit
@@ -201,7 +201,7 @@ runners CLI et LangChain cohabitent sans mélanger leurs contrats.
 claude -p --output-format json
        --permission-mode bypassPermissions
        --append-system-prompt <persona BMAD>
-       [--model <modèle>]        # seulement si AUTOSPEC_CLAUDE_MODEL est défini
+       [--model <modèle>]        # seulement si CLAUDE_MODEL est défini
        [--resume <session_id>]   # pour continuer une conversation
 ```
 
@@ -209,7 +209,7 @@ claude -p --output-format json
 - la sortie est lue en JSON (`{"result": ..., "session_id": ...}`) ;
 - `extract_json()` extrait le premier objet JSON même si l'agent l'entoure de
   prose ou de fences markdown (parsing par comptage d'accolades) ;
-- un **timeout** (`AUTOSPEC_AGENT_TIMEOUT_S`, 1800 s par défaut) tue le process
+- un **timeout** (`AGENT_TIMEOUT_S`, 1800 s par défaut) tue le process
   s'il bloque ; toute sortie non-zéro lève `AgentError`.
 
 ### 4.6 Observabilité — coût & tokens
@@ -250,7 +250,7 @@ appelés en **one-shot** sans état.
 Claude Code déjà installé et connecté sur la machine (compte/abonnement) qui est
 utilisée. Si le CLI n'est pas authentifié, les agents échouent.
 
-> Sous Windows, `AUTOSPEC_CLAUDE_CMD` résout automatiquement `claude.cmd` (et
+> Sous Windows, `CLAUDE_CMD` résout automatiquement `claude.cmd` (et
 > non le `claude` qui est un `.ps1` non exécutable par un subprocess).
 
 ---
@@ -317,7 +317,7 @@ porte description, `acceptance_criteria`, **Gherkin**, `depends_on` et
 ### 5.3 Phase BUILD — QA puis Dev
 
 C'est le cœur BDD/TDD. La boucle d'ordonnancement (voir §6) sélectionne les
-stories **prêtes** et lance jusqu'à `AUTOSPEC_MAX_PARALLEL_DEVS` agents en
+stories **prêtes** et lance jusqu'à `MAX_PARALLEL_DEVS` agents en
 parallèle (sémaphore). Pour chaque story (`_abuild_story`) :
 
 1. statut `in_progress`, `attempts += 1` ;
@@ -367,11 +367,11 @@ parallèle (sémaphore). Pour chaque story (`_abuild_story`) :
 
    Ensuite, au niveau de la story :
    - vert → story `done` (la suite est verte, donc cohérent) ;
-   - rouge → si `attempts < AUTOSPEC_DEV_MAX_ATTEMPTS`, la story repasse `todo`
+   - rouge → si `attempts < DEV_MAX_ATTEMPTS`, la story repasse `todo`
      (re-tentée) ; sinon `failed` avec le tail de sortie pytest dans
      `last_error`. Les états par test, eux, reflètent le rapport réel.
 
-   En mode démo (`AUTOSPEC_FAKE_AGENTS`), `_arun_pytest` court-circuite et renvoie
+   En mode démo (`FAKE_AGENTS`), `_arun_pytest` court-circuite et renvoie
    `(True, ..., {})` (inchangé).
 
 Quand les **skills** sont activées (§5.10), les prompts QA et Dev reçoivent en
@@ -387,7 +387,7 @@ message explicite (pas de deadlock, pas d'attente infinie).
 ### 5.3b Profils produit et gates de livraison
 
 Avant le build, `orchestrator/profiles.py` résout le **profil produit**
-demandé (`ProjectState.product_profile`, `AUTOSPEC_PRODUCT_PROFILE`, ou
+demandé (`ProjectState.product_profile`, `PRODUCT_PROFILE`, ou
 `product_profile` dans `POST /api/projects`). Les profils évitent de composer à
 la main des flags bas niveau :
 
@@ -406,10 +406,10 @@ différents.
 
 Après une suite verte, Autospec ne passe plus directement à `done` :
 
-- **Smoke run par défaut** (`AUTOSPEC_SMOKE_RUN=1`) : l'application générée est
+- **Smoke run par défaut** (`SMOKE_RUN=1`) : l'application générée est
   réellement démarrée ; une API/web doit ouvrir son port, un CLI doit sortir en
   code 0. Le profil `library-fast` le désactive.
-- **Runtime acceptance web/fullstack** (`AUTOSPEC_RUNTIME_ACCEPTANCE` ou profils
+- **Runtime acceptance web/fullstack** (`RUNTIME_ACCEPTANCE` ou profils
   `web-ssr` / `fullstack`) : `orchestrator/runtime_acceptance.py` lance le
   backend et/ou le frontend preview, puis `backend/scripts/runtime_acceptance.js`
   ouvre Playwright, vérifie une page non vide et l'absence d'erreurs navigateur
@@ -417,7 +417,7 @@ Après une suite verte, Autospec ne passe plus directement à `done` :
 - **Definition of Done déterministe** (`orchestrator/delivery_gate.py`) :
   chaque story/tâche doit être effectivement terminée, les critères doivent
   avoir une preuve Gherkin/test plan, et les stories UI doivent déclarer des
-  tests rejouables si `AUTOSPEC_UI_TESTS=1`. Le résultat est persisté dans
+  tests rejouables si `UI_TESTS=1`. Le résultat est persisté dans
   `delivery_ready` / `delivery_issues` et rendu dans le `RunPanel`.
 - **Phase `needs_attention`** : DoD, smoke, runtime acceptance et validation
   skills signalent une livraison à reprendre sans passer par `error`. `error`
@@ -480,10 +480,10 @@ itérative à trois rôles** :
 
 **Arrêt déterministe — le point clé.** La boucle s'arrête dès que, **selon ce
 qui survient en premier** :
-- le **score du juge atteint le seuil** (`AUTOSPEC_REFINE_QUALITY_THRESHOLD`),
+- le **score du juge atteint le seuil** (`REFINE_QUALITY_THRESHOLD`),
   ou
 - le **nombre maximal d'allers-retours est atteint**
-  (`AUTOSPEC_REFINE_MAX_ROUNDS`, cap dur).
+  (`REFINE_MAX_ROUNDS`, cap dur).
 
 Deux autres arrêts déterministes existent : **critique vide** (le critic est
 satisfait → `critic_empty`) et **révision rejetée** par une garde (`rejected`).
@@ -516,7 +516,7 @@ Les rôles de chat `critic` et `judge` (modèle `ChatRole`) sont affichés dans
 l'UI : **🧐 Critique** et **⚖️ Juge**.
 
 > **OFF par défaut** pour économiser des tokens. L'activation se fait via les
-> variables `AUTOSPEC_REFINE*` (voir §11). Le helper `settings.refine_for(role)`
+> variables `REFINE*` (voir §11). Le helper `settings.refine_for(role)`
 > = interrupteur global **ET** flag du rôle. À terme, l'activation se fera selon
 > la complexité du problème ou la qualité résultante ; pour l'instant uniquement
 > via ces variables.
@@ -541,7 +541,7 @@ l'agent BMAD **`architect`** (persona `architect`, fallback « Winston »).
 - Un échec de l'agent est **non-fatal** (log + on continue sans design).
 
 > **OFF par défaut** (même patron que le harnais de raffinement). L'activation
-> se fait via `AUTOSPEC_ARCHITECTURE` (voir §11). Quand la phase est désactivée,
+> se fait via `ARCHITECTURE` (voir §11). Quand la phase est désactivée,
 > `state.architecture` reste vide et aucun appel agent supplémentaire n'est fait.
 
 ### 5.8 Budget tokens/coût + arrêt automatique
@@ -564,7 +564,7 @@ d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
 
 ### 5.9 Composants, impact des feedbacks, livraison & tests UI
 
-- **Composants (E3/E4)** — avec `AUTOSPEC_COMPONENTS=1`, `_apropose_components`
+- **Composants (E3/E4)** — avec `COMPONENTS=1`, `_apropose_components`
   (persona `architect`, prompt `components_proposal`) tourne **juste après le
   brief** (1re itération) et remplit `ProjectState.components` (modèle
   `Component` : kind backend/frontend/database/cache/other, statut
@@ -573,7 +573,7 @@ d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
   `POST .../components/setup` lance `orchestrator/setup_exec.py` en tâche de
   fond : scaffolds **idempotents** (`backend/` FastAPI, `frontend/` React+Vite,
   `docker-compose.yml` pour db/cache) ; `uv sync`/`npm install` réels seulement
-  si `AUTOSPEC_SETUP_INSTALL=1` (démo-safe).
+  si `SETUP_INSTALL=1` (démo-safe).
 - **Analyse d'impact d'un feedback (E2)** — un message envoyé quand la pipeline
   est **dormante** (done/stopped/needs_attention/error) déclenche `_aimpact_analysis` en tâche
   de fond (prompt `feedback_impact`, persona `analyst`) : `update_story` (US
@@ -583,19 +583,19 @@ d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
   toute façon dans `state.feedback` pour l'analyste du cycle suivant.
 - **Livraison (I2)** — persona `tech-writer` : `_adocument_phase` (cwd =
   workspace) écrit le **README.md du projet généré** ; automatique après chaque
-  build si `AUTOSPEC_TECH_WRITER=1`, sinon à la demande (`POST /document`,
+  build si `TECH_WRITER=1`, sinon à la demande (`POST /document`,
   tâche de fond). Export : `GET /export` (zip en mémoire, sans
   `.git`/`.venv`/état interne) et `POST /git-export` (`aexport_git` : repo
   garanti + `git add -A` + commit propre, renvoie le sha).
 - **Watchdog fenêtre d'usage Claude (M2,
   `orchestrator/session_monitor.py`)** — actif uniquement pour le provider
-  `claude` (hors démo, `AUTOSPEC_SESSION_MONITOR=1` par défaut). Le
+  `claude` (hors démo, `SESSION_MONITOR=1` par défaut). Le
   `_UsageTracker` intercepte chaque `AgentError` : si le message correspond à
   une **limite d'usage de session** (« usage limit reached »…), la pipeline
   s'arrête proprement (comme un stop budget) et `schedule_resume(at)` programme
   une **reprise automatique** — `at` = epoch embarqué dans l'erreur CLI, sinon
   fin du **bloc actif ccusage** (`ccusage blocks --json`), sinon
-  `now + AUTOSPEC_RESUME_FALLBACK_MIN`. Le timer est persisté
+  `now + RESUME_FALLBACK_MIN`. Le timer est persisté
   (`ProjectState.resume_at`) et **ré-armé par `recover_projects`** après un
   redémarrage (un `resume_at` passé tire immédiatement) ; à l'échéance,
   `aresume_build()` reprend les stories restantes (l'attempt de la story
@@ -604,7 +604,7 @@ d'usage du `RunPanel` affiche **« 💸 $X / $Y »** et passe en rouge
   Conformité : on **attend** le reset de la fenêtre souscrite (aucun
   contournement, pas de multiplexage de comptes).
 - **Tests d'acceptance UI (E5)** — le PO marque chaque story d'un drapeau
-  `ui`. Avec `AUTOSPEC_UI_TESTS=1` : le pyproject du workspace ajoute
+  `ui`. Avec `UI_TESTS=1` : le pyproject du workspace ajoute
   `pytest-playwright`, un marker `ui` et `addopts -m "not ui"` (la suite par
   défaut les exclut) ; le prompt Dev d'une story UI exige des tests Playwright
   **rejouables** dans `tests/ui/` (fixture `page`, clics/saisies, screenshots,
@@ -644,7 +644,7 @@ sont obligatoires quand leur déclencheur s'applique, et
 `.claude/skills` est absent, incomplet ou si une règle est restée en simple
 suggestion.
 
-Réglages : `AUTOSPEC_SKILLS` (interrupteur global, **OFF**) + `AUTOSPEC_SKILLS_QA`/
+Réglages : `SKILLS` (interrupteur global, **OFF**) + `SKILLS_QA`/
 `_DEV` (par rôle). Quand c'est OFF, les prompts sont **strictement inchangés**.
 Quand un profil active les skills localement, le catalogue et l'accès natif
 Claude (`--add-dir`) suivent le réglage effectif de cette pipeline.
@@ -652,7 +652,7 @@ Claude (`--add-dir`) suivent le réglage effectif de cette pipeline.
 ### 5.11 Décomposition en sous-tâches parallèles (SK-2)
 
 Pour mieux gérer la fenêtre de contexte d'une grosse story backend,
-`AUTOSPEC_DECOMPOSE` (**OFF** par défaut) active un **mode décomposition** :
+`DECOMPOSE` (**OFF** par défaut) active un **mode décomposition** :
 `_adecompose_story` demande à l'**architecte** (`prompts.decompose_story`) de
 découper la story en **sous-tâches par couche** (entité → service → endpoint →
 tests), mappées aux skills, **matérialisées en `Task`** sur la story (ids uniques,
@@ -894,35 +894,35 @@ Variables d'environnement (toutes optionnelles) :
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `AUTOSPEC_BMAD_DIR` | `../_bmad` | dossier d'installation BMAD |
-| `AUTOSPEC_CLAUDE_CMD` | auto (`claude.cmd`/`.exe`) | binaire Claude Code |
-| `AUTOSPEC_CLAUDE_MODEL` | (défaut du CLI) | modèle imposé aux agents |
-| `AUTOSPEC_PERMISSION_MODE` | `bypassPermissions` | mode permissions des agents |
-| `AUTOSPEC_AGENT_TIMEOUT_S` | `1800` | timeout d'un appel agent |
-| `AUTOSPEC_MAX_PARALLEL_DEVS` | `2` | agents Dev en parallèle |
-| `AUTOSPEC_DEV_MAX_ATTEMPTS` | `2` | tentatives par story |
-| `AUTOSPEC_UV_CMD` | `uv` | binaire uv pour le workspace généré |
-| `AUTOSPEC_WORKSPACE_ROOT` | `./workspace` | racine des workspaces générés (isolé en e2e) |
-| `AUTOSPEC_PRODUCT_PROFILE` | `auto` | profil produit (`library-fast`, `cli`, `api`, `web-ssr`, `fullstack`, `brownfield`) |
-| `AUTOSPEC_FAKE_AGENTS` | `0` | mode démo : `ScriptedRunner` + pytest court-circuité |
-| `AUTOSPEC_DEMO_DELAY_S` | `0` | délai des agents scriptés (rend les transitions visibles) |
-| `AUTOSPEC_ARCHITECTURE` | `0` | active la **phase Architecture optionnelle** (design injecté dans QA/Dev, OFF par défaut) |
-| `AUTOSPEC_REFINE` | `0` | interrupteur **global** du harnais de raffinement (OFF par défaut) |
-| `AUTOSPEC_REFINE_PO` | `1` | raffinement du plan PO (effectif seulement si le global est ON) |
-| `AUTOSPEC_REFINE_DEV` | `1` | raffinement du code Dev (idem) |
-| `AUTOSPEC_REFINE_MAX_ROUNDS` | `2` | cap dur d'allers-retours maker↔critic↔judge |
-| `AUTOSPEC_REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge (0-100) pour s'arrêter |
-| `AUTOSPEC_AGENT_PROVIDER` | `claude` | provider d'agents (claude / codex / openai / openrouter / ollama / anthropic) |
-| `OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL` | — / `…/api/v1` | clé + endpoint du provider **OpenRouter** (aussi `AUTOSPEC_OPENROUTER_*`) |
-| `AUTOSPEC_OPENROUTER_MODEL` | (1er populaire) | modèle OpenRouter (sinon top-10 programmation chargé dynamiquement) |
-| `AUTOSPEC_SKILLS` | `0` | active la **bibliothèque de skills** QA/Dev (§5.10) |
-| `AUTOSPEC_SKILLS_QA` / `_DEV` | `1` / `1` | skills par rôle (effectif si le global est ON) |
-| `AUTOSPEC_DECOMPOSE` | `0` | active la **décomposition en sous-tâches parallèles** (§5.11) |
-| `AUTOSPEC_SMOKE_RUN` | `1` | démarre réellement l'app livrée avant `done` |
-| `AUTOSPEC_DEFINITION_OF_DONE` | `1` | active le gate déterministe de livraison |
-| `AUTOSPEC_DOD_STRICT_CRITERIA` | `0` | rend bloquante l'absence de preuve verte par critère |
-| `AUTOSPEC_RUNTIME_ACCEPTANCE` | `0` | active le gate navigateur/runtime web/fullstack |
-| `AUTOSPEC_RUNTIME_ACCEPTANCE_TIMEOUT_S` | `90` | timeout du gate runtime |
+| `BMAD_DIR` | `../_bmad` | dossier d'installation BMAD |
+| `CLAUDE_CMD` | auto (`claude.cmd`/`.exe`) | binaire Claude Code |
+| `CLAUDE_MODEL` | (défaut du CLI) | modèle imposé aux agents |
+| `PERMISSION_MODE` | `bypassPermissions` | mode permissions des agents |
+| `AGENT_TIMEOUT_S` | `1800` | timeout d'un appel agent |
+| `MAX_PARALLEL_DEVS` | `2` | agents Dev en parallèle |
+| `DEV_MAX_ATTEMPTS` | `2` | tentatives par story |
+| `UV_CMD` | `uv` | binaire uv pour le workspace généré |
+| `WORKSPACE_ROOT` | `./workspace` | racine des workspaces générés (isolé en e2e) |
+| `PRODUCT_PROFILE` | `auto` | profil produit (`library-fast`, `cli`, `api`, `web-ssr`, `fullstack`, `brownfield`) |
+| `FAKE_AGENTS` | `0` | mode démo : `ScriptedRunner` + pytest court-circuité |
+| `DEMO_DELAY_S` | `0` | délai des agents scriptés (rend les transitions visibles) |
+| `ARCHITECTURE` | `0` | active la **phase Architecture optionnelle** (design injecté dans QA/Dev, OFF par défaut) |
+| `REFINE` | `0` | interrupteur **global** du harnais de raffinement (OFF par défaut) |
+| `REFINE_PO` | `1` | raffinement du plan PO (effectif seulement si le global est ON) |
+| `REFINE_DEV` | `1` | raffinement du code Dev (idem) |
+| `REFINE_MAX_ROUNDS` | `2` | cap dur d'allers-retours maker↔critic↔judge |
+| `REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge (0-100) pour s'arrêter |
+| `AGENT_PROVIDER` | `claude` | provider d'agents (claude / codex / openai / openrouter / ollama / anthropic) |
+| `OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL` | — / `…/api/v1` | clé + endpoint du provider **OpenRouter** (aussi `OPENROUTER_*`) |
+| `OPENROUTER_MODEL` | (1er populaire) | modèle OpenRouter (sinon top-10 programmation chargé dynamiquement) |
+| `SKILLS` | `0` | active la **bibliothèque de skills** QA/Dev (§5.10) |
+| `SKILLS_QA` / `_DEV` | `1` / `1` | skills par rôle (effectif si le global est ON) |
+| `DECOMPOSE` | `0` | active la **décomposition en sous-tâches parallèles** (§5.11) |
+| `SMOKE_RUN` | `1` | démarre réellement l'app livrée avant `done` |
+| `DEFINITION_OF_DONE` | `1` | active le gate déterministe de livraison |
+| `DOD_STRICT_CRITERIA` | `0` | rend bloquante l'absence de preuve verte par critère |
+| `RUNTIME_ACCEPTANCE` | `0` | active le gate navigateur/runtime web/fullstack |
+| `RUNTIME_ACCEPTANCE_TIMEOUT_S` | `90` | timeout du gate runtime |
 
 ---
 
@@ -969,7 +969,7 @@ npm run test:unit
 
 Un test bout-en-bout **hermétique** vérifie le lancement back+front et le
 parcours complet dans la vraie UI. Il démarre le backend en **mode démo**
-(`AUTOSPEC_FAKE_AGENTS=1`), qui **sert lui-même le frontend buildé** (donc `/api`
+(`FAKE_AGENTS=1`), qui **sert lui-même le frontend buildé** (donc `/api`
 et `/ws` sont same-origin, sans proxy Vite), puis pilote un navigateur :
 création de projet → pipeline qui peuple le board → **pause / reprise** →
 dépliage d'un **critère d'acceptance** (état vert, tests + Gherkin) →
@@ -1027,7 +1027,7 @@ Une revue de code récente a durci plusieurs points.
 | Changer la stratégie d'ordonnancement | fonctions pures de `scheduler.py` |
 | Réorganiser le backlog à la main (drag & drop) | non implémenté — actuellement géré via le feedback chat repris par l'analyste |
 | Vérifier individuellement chaque test planifié | implémenté : les outcomes viennent du **vrai rapport pytest** (`pytest-json-report` → `pytest_report.parse`), mappés par les nodeids déclarés par le Dev (`_apply_test_states`, voir §5.3) |
-| Durcir les permissions des agents | `AUTOSPEC_PERMISSION_MODE` |
+| Durcir les permissions des agents | `PERMISSION_MODE` |
 
 ---
 

@@ -5,11 +5,17 @@
             "name": "Backend (FastAPI)",
             "type": "debugpy",
             "request": "launch",
-            "module": "uvicorn",
-            "args": ["autospec.api.server:app", "--reload", "--port", "8100"],
+            // Run the app's own entrypoint (uvicorn.run reload=False + keep-alive
+            // tuning), NOT `uvicorn --reload`: the reloader spawns the server in a
+            // multiprocessing child, and debugpy's subprocess attach injects its
+            // bootstrap into that child — on stop it raises KeyboardInterrupt from
+            // inside settrace()'s connect sleep (a noisy, harmless traceback).
+            // Single process → breakpoints hit everywhere, clean shutdown.
+            "module": "autospec.api.server",
             "cwd": "${workspaceFolder}/backend",
             "python": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
-            "console": "integratedTerminal"
+            "console": "integratedTerminal",
+            "subProcess": false
         },
         {
             "name": "Frontend (Vite)",

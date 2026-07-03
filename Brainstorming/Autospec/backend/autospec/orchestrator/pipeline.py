@@ -354,7 +354,7 @@ class Pipeline:
         self.runner = runner
         self._tracked = _UsageTracker(self)
         self._profile_overrides: dict[str, bool] = profiles.resolve_overrides(self.state)
-        # Opt-in build monitor (AUTOSPEC_BUILD_MONITOR): JSONL timeline for
+        # Opt-in build monitor (BUILD_MONITOR): JSONL timeline for
         # post-mortem failure analysis. No-op when disabled.
         self.monitor = BuildMonitor(state)
         # O2: live capture of LLM round-trips per work item. Kept out of
@@ -1359,7 +1359,7 @@ class Pipeline:
 
     async def _aselect_language(self) -> None:
         """L2: choose the backend language from the brief/goal. Env-gated by
-        AUTOSPEC_LANGUAGE_SELECTOR — OFF keeps Python as the safe default (no
+        LANGUAGE_SELECTOR — OFF keeps Python as the safe default (no
         analysis, no panel, the existing pytest pipeline unchanged); ON runs the
         deterministic heuristic and, when the LLM is reachable, an agent that may
         refine it. First iteration only, non-fatal."""
@@ -1397,7 +1397,7 @@ class Pipeline:
 
     async def _aselect_streams(self) -> None:
         """ST-4: the architect picks the project's work streams from the catalog.
-        Env-gated by AUTOSPEC_STREAMS — OFF is a strict no-op (``state.streams``
+        Env-gated by STREAMS — OFF is a strict no-op (``state.streams``
         stays empty → one implicit backend stream, the pre-streams behaviour).
         Always forces a primary backend stream carrying the backend language;
         ids are deduplicated. Non-fatal: any agent/parse failure falls back to a
@@ -2035,7 +2035,7 @@ class Pipeline:
                 if self._delivery_blocked:
                     break
                 # Runnability gate: boot the delivered app; a non-runnable build
-                # fails the iteration like a red test (no-op unless AUTOSPEC_SMOKE_RUN).
+                # fails the iteration like a red test (no-op unless SMOKE_RUN).
                 if not await self._asmoke_phase():
                     break
                 if not await self._aruntime_acceptance_phase():
@@ -3763,7 +3763,7 @@ class Pipeline:
         )
 
     async def _ajudge_independence(self) -> None:
-        """P4d: optional LLM independence judge (AUTOSPEC_INDEPENDENCE, OFF). For
+        """P4d: optional LLM independence judge (INDEPENDENCE, OFF). For
         each story with ≥2 tasks it completes the tasks' file claims and may add
         serialization edges, THEN re-runs the deterministic floor so the final
         graph is safe. Non-fatal: any failure leaves the floor-only result (which
@@ -4374,7 +4374,7 @@ class Pipeline:
         self, item: "work_streams.WorkItem", is_frontend: bool
     ) -> tuple[bool, str, str]:
         """Rejoue la suite du stream de l'item sur le HEAD PARTAGÉ fraîchement
-        mergé (AUTOSPEC_POST_MERGE_CANARY, ON). Deux items verts chacun dans
+        mergé (POST_MERGE_CANARY, ON). Deux items verts chacun dans
         leur worktree peuvent être rouges COMBINÉS — le canari attrape ce
         conflit sémantique immédiatement.
 
@@ -5594,7 +5594,7 @@ class Pipeline:
     # ------------------------------------------------- Smoke-run gate (runnability)
 
     async def _asmoke_phase(self) -> bool:
-        """Deterministic runnability gate (``AUTOSPEC_SMOKE_RUN``): once the suite
+        """Deterministic runnability gate (``SMOKE_RUN``): once the suite
         is green, actually BOOT the delivered app and require it to start, so a
         non-runnable build pauses the iteration in needs_attention. No-op when
         off / demo mode / nothing delivered.

@@ -1,7 +1,7 @@
 """Éval A/B du pipeline PO (RFC po-pipeline-v2 §6) — mono-passe vs multi-étapes.
 
 Produit, pour chaque brief de référence, le plan dans les DEUX modes
-(`AUTOSPEC_PO_PIPELINE=off` puis `on`) et compare la FORME des plans :
+(`PO_PIPELINE=off` puis `on`) et compare la FORME des plans :
 granularité des feuilles vs budget, taxonomie des critères (happy/edge/error/
 boundary), présence/alignement du Gherkin, largeur de parallélisme du DAG,
 Technical Stories — plus les compteurs de calibration (dégradations…).
@@ -11,7 +11,7 @@ que si ses plans sont mesurablement mieux dimensionnés.
 
 Usage (depuis backend/, venv actif) :
     uv run python scripts/eval_po_pipeline.py                 # scripted (démo, gratuit)
-    AUTOSPEC_EVAL_PROVIDER=claude uv run python scripts/eval_po_pipeline.py   # agents réels
+    EVAL_PROVIDER=claude uv run python scripts/eval_po_pipeline.py   # agents réels
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ async def _arun_one(brief_slug: str, brief: str, mode: str, provider: str) -> di
 
 
 async def amain() -> None:
-    provider = os.environ.get("AUTOSPEC_EVAL_PROVIDER", "scripted").strip().lower()
+    provider = os.environ.get("EVAL_PROVIDER", "scripted").strip().lower()
     settings.workspace_root = Path(tempfile.mkdtemp(prefix="autospec-eval-"))
     settings.streams_enabled = True
     settings.fake_agents = provider == "scripted"

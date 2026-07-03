@@ -1,6 +1,6 @@
 """Infra vs dev attempts: a transient provider/CLI failure (AgentError that is
 not a usage-limit) refunds the dev attempt and consumes a SEPARATE infra budget
-(`AUTOSPEC_INFRA_MAX_RETRIES`) — infra flakiness alone can never FAIL an item,
+(`INFRA_MAX_RETRIES`) — infra flakiness alone can never FAIL an item,
 never consumes dev attempts, and never triggers the adaptive split."""
 
 import asyncio

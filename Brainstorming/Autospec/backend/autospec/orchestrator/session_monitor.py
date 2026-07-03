@@ -8,7 +8,7 @@ comes from, in order:
 1. the epoch sometimes embedded in the CLI error (``…limit reached|<epoch>``) ;
 2. the active billing block reported by **ccusage** (``ccusage blocks --json``),
    which reads the local Claude Code usage data ;
-3. a fallback delay (``AUTOSPEC_RESUME_FALLBACK_MIN``) — if the window is still
+3. a fallback delay (``RESUME_FALLBACK_MIN``) — if the window is still
    exhausted at resume time, the watchdog simply reschedules.
 
 Compliance note: this is legitimate scheduling of the user's own subscription

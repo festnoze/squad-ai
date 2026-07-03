@@ -307,7 +307,7 @@ class CodexCliRunner:
     flag, so the system prompt is prepended to the user prompt; the combined
     prompt is fed on stdin. Output is parsed from ``codex exec --json`` JSONL.
 
-    The exact codex flags are env-overridable (``AUTOSPEC_CODEX_CMD``) so the
+    The exact codex flags are env-overridable (``CODEX_CMD``) so the
     harness can adapt as the CLI evolves."""
 
     async def arun(

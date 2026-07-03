@@ -382,7 +382,7 @@ async def test_quality_scores_default_minus_one(green_pytest):
 
 
 async def test_plan_review_issues_persisted_for_panel(green_pytest, monkeypatch):
-    # AUTOSPEC_REVIEW_PLAN (dedicated toggle, no master refine) → the critic's
+    # REVIEW_PLAN (dedicated toggle, no master refine) → the critic's
     # flagged issues + suggestions land on the state for the « Revue du plan » panel.
     from autospec.config import settings
 

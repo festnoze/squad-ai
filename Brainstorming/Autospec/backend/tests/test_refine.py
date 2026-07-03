@@ -52,7 +52,7 @@ async def test_disabled_returns_initial_untouched(monkeypatch):
 
 
 def test_review_plan_toggle_gates_po_independently(monkeypatch):
-    # AUTOSPEC_REVIEW_PLAN turns the PO plan review ON without the master refine,
+    # REVIEW_PLAN turns the PO plan review ON without the master refine,
     # and does NOT enable the (more expensive) code refinement.
     monkeypatch.setattr(settings, "refine_enabled", False)
     monkeypatch.setattr(settings, "review_plan_enabled", True)

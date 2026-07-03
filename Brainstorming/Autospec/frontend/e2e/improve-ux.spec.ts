@@ -3,7 +3,7 @@ import { APIRequestContext, expect, Page, test } from "@playwright/test";
 /**
  * Focused E2E for the "improve_UX" MVP: the ⚡ Activité lens (steppers per work
  * item), targeted per-item chat (guidance with a delivery status), and the
- * extend-criteria affordance. Runs on the DEFAULT demo flow (no AUTOSPEC_STREAMS):
+ * extend-criteria affordance. Runs on the DEFAULT demo flow (no STREAMS):
  * steppers derive each story's stage from `current_stage` (→ "done" once the
  * story is done); storyChat/extend work regardless of streams.
  *

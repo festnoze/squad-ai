@@ -131,8 +131,8 @@ BRIEFS: dict[int, dict] = {
 
 
 def _configure(proj: int, run_dir: Path) -> None:
-    os.environ["AUTOSPEC_BUILD_MONITOR"] = "1"
-    os.environ["AUTOSPEC_BUILD_MONITOR_DIR"] = str(run_dir)
+    os.environ["BUILD_MONITOR"] = "1"
+    os.environ["BUILD_MONITOR_DIR"] = str(run_dir)
     from autospec.config import settings
 
     # Force the Claude CLI provider regardless of any .env default (e.g. codex).
@@ -176,7 +176,7 @@ async def _run(proj: int) -> dict:
     state.chat.append(ChatMessage(role=ChatRole.USER, content=spec["goal"]))
     pipeline = Pipeline(state, runner)
 
-    cap_s = float(os.environ.get("AUTOSPEC_DRIVER_CAP_S", "2400"))
+    cap_s = float(os.environ.get("DRIVER_CAP_S", "2400"))
     t0 = time.time()
     timed_out = False
     try:

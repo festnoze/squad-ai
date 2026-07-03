@@ -467,7 +467,7 @@ class ProjectState(BaseModel):
     brownfield_path: str = ""  # B1: existing repo to extend ("" = greenfield)
     architecture: str = ""  # current technical design (from the optional Architect phase)
     plan_quality: int = -1  # last refinement score for the PO plan (-1 = not run)
-    # Plan review (AUTOSPEC_REVIEW_PLAN): the critic's flagged issues + proposed
+    # Plan review (REVIEW_PLAN): the critic's flagged issues + proposed
     # improvements on the PO breakdown, surfaced in the UI « Revue du plan » panel.
     plan_review_issues: list[str] = Field(default_factory=list)
     plan_review_suggestions: list[str] = Field(default_factory=list)

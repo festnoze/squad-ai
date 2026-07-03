@@ -11,7 +11,7 @@
 > **Addendum (2026-06-30)** — les TS sont désormais créées **proactivement** aussi :
 > le **PO** peut émettre des Technical Stories directement dans le plan
 > (`technical:true` + `contract`, groupant des tâches ≤ budget fichiers), et le
-> **critic** de la revue de plan (`AUTOSPEC_REVIEW_PLAN`) recommande l'extraction en
+> **critic** de la revue de plan (`REVIEW_PLAN`) recommande l'extraction en
 > TS des unités trop grosses ; `po_revise` applique. Même structure de TS, deux
 > moteurs (plan **proactif** + échec **réactif**).
 
@@ -60,7 +60,7 @@ physique est rejeté : même puissance, coût bien supérieur.)*
 
 ## 3. Invariante de finesse (le cœur de la valeur)
 
-**Chaque tâche feuille déclare ≤ `AUTOSPEC_TASK_FILE_BUDGET` fichiers** (défaut **3**)
+**Chaque tâche feuille déclare ≤ `TASK_FILE_BUDGET` fichiers** (défaut **3**)
 dans ses `file_globs` (déjà collectés en P4) et un périmètre étroit. Le split produit
 des sous-tâches qui **respectent ce budget** ; une sous-tâche encore au-dessus est
 elle-même re-décomposable (jusqu'à `split_depth` / budget de profondeur).
@@ -75,7 +75,7 @@ Branché sur la branche « rouge-épuisé » déjà existante (`_abuild_work_ite
 remplacement/extension de `_split_task` :
 
 1. **Trigger** : tâche `T` (dans le conteneur `C` = US ou TS) FAILED après ses
-   tentatives **et** `split_depth(T) < AUTOSPEC_SPLIT_MAX_DEPTH`.
+   tentatives **et** `split_depth(T) < SPLIT_MAX_DEPTH`.
 2. **Architecte** (`decompose_finer`, déjà là) : produit 2–6 sous-tâches **≤ budget
    fichiers**, avec `file_globs` disjoints + dépendances internes.
 3. **Promotion en TS** : créer `TS = UserStory(technical=True, parent_id=T.id,
@@ -101,7 +101,7 @@ technique** (déjà produit par `decompose_finer`) au lieu d'un Gherkin fonction
 de QA outside-in fonctionnelle sur une TS.
 
 ### Point délicat #3 — borne
-`split_depth` (budget de profondeur, `AUTOSPEC_SPLIT_MAX_DEPTH`) **plus** le budget
+`split_depth` (budget de profondeur, `SPLIT_MAX_DEPTH`) **plus** le budget
 fichiers bornent la récursion : on arrête de promouvoir des TS quand les feuilles
 tiennent dans le budget ou que la profondeur max est atteinte (sinon FAILED, comme
 aujourd'hui).
@@ -121,7 +121,7 @@ aujourd'hui).
 | Zone | Changement |
 |---|---|
 | `models.py` | `UserStory.technical/contract/parent_id` (défauts ⇒ legacy inchangé) |
-| `config.py` | `AUTOSPEC_TASK_FILE_BUDGET=3` (+ réutilise `SPLIT_MAX_DEPTH`) |
+| `config.py` | `TASK_FILE_BUDGET=3` (+ réutilise `SPLIT_MAX_DEPTH`) |
 | `pipeline.py` | `_split_task` → promotion en TS (au lieu de tâches sœurs) ; `effective_status` généralisé ; le `decompose_finer` impose le budget fichiers |
 | `streams.py` | rien (résolution « dépendre d'une story = ses tâches » déjà là) ; vérifier cycle-safety du recâblage |
 | `prompts.py` | `decompose_finer` : exiger ≤ budget fichiers par sous-tâche |
@@ -151,7 +151,7 @@ identiques**. La feature ne s'active que quand un split se produit.
 
 ## 9. Décisions (tranchées pour l'implémentation)
 
-1. **Budget fichiers** : `AUTOSPEC_TASK_FILE_BUDGET=3`, **indicatif** — communiqué à
+1. **Budget fichiers** : `TASK_FILE_BUDGET=3`, **indicatif** — communiqué à
    l'architecte comme cible (« ≤ 3 fichiers/sous-tâche »), pas un rejet runtime dur
    (trop fragile). Un dépassement est juste loggé.
 2. **Statut conteneur** : **pas** de généralisation de `effective_status` (éviter le

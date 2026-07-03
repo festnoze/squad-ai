@@ -22,7 +22,7 @@ providers **hors abonnement** via **LangChain** — **`OpenAiRunner`**,
 **`OpenRouterRunner`** (hub compatible-OpenAI), **`OllamaRunner`**,
 **`AnthropicRunner`** (sessions rejouées en mémoire + protocole d'outils JSON
 borné pour les écritures fichiers, confiné au workspace) — plus `FakeRunner`
-(tests) et `ScriptedRunner` (mode démo). Sélection par `AUTOSPEC_AGENT_PROVIDER`
+(tests) et `ScriptedRunner` (mode démo). Sélection par `AGENT_PROVIDER`
 ou à chaud via `GET/POST /api/provider` (sélecteur 🤖 du header). Le 2ᵉ menu
 **modèle** est **adaptatif et découvert à la volée** (`GET /api/providers/{p}/models`) :
 Ollama/OpenAI interrogent leur endpoint, **OpenRouter charge les 10 modèles de
@@ -44,8 +44,8 @@ tests, smoke runs et gates restent toujours pilotés par Autospec.
 | **QA** | `qa` | Décompose le test d'acceptance **outside-in (London school)** en tests unitaires par couche (API → façade → service → repo/LLM), chacun mockant ses collaborateurs directs, rattachés aux critères. |
 | **Dev** | `dev` | Un agent par story, en **BDD puis TDD** avec `pytest-bdd`. |
 | **Analyste** | `analyst` | (Auto-spec) Explore le produit, formule des **hypothèses de features** scorées (valeur/complexité), les priorise, choisit la suivante. Analyse aussi l'**impact des feedbacks** (E2). |
-| **Solutionneur** | `architect` | (E3, `AUTOSPEC_COMPONENTS`) Propose après le brief les **composants** du produit (backend FastAPI, frontend React, infra optionnelle) — validés/édités par l'utilisateur, matérialisés par l'**exécuteur de setup** (E4). |
-| **Tech-writer** | `tech-writer` | (I2) Rédige le **README du projet généré** (présentation, lancement, tests, archi) — auto après build (`AUTOSPEC_TECH_WRITER`) ou bouton 📘. |
+| **Solutionneur** | `architect` | (E3, `COMPONENTS`) Propose après le brief les **composants** du produit (backend FastAPI, frontend React, infra optionnelle) — validés/édités par l'utilisateur, matérialisés par l'**exécuteur de setup** (E4). |
+| **Tech-writer** | `tech-writer` | (I2) Rédige le **README du projet généré** (présentation, lancement, tests, archi) — auto après build (`TECH_WRITER`) ou bouton 📘. |
 | **Critic / Juge** | (génériques) | Harnais de raffinement (§3). |
 
 **Cycle de vie** : `spec (PM)` → `[architect]` → `plan (PO)` → `build (QA + Dev)`
@@ -63,7 +63,7 @@ package, `main.py`) :
    plan** (mocks compris) → **vérifie le rouge** → implémente couche par couche
    du haut vers le bas → **suite verte**.
 3. L'orchestrateur **revérifie lui-même** (`uv run pytest`) avant de marquer la
-   story *done* (« trust but verify ») ; sinon retry (`AUTOSPEC_DEV_MAX_ATTEMPTS`)
+   story *done* (« trust but verify ») ; sinon retry (`DEV_MAX_ATTEMPTS`)
    puis échec.
 
 ### Ordonnancement (scheduler)
@@ -71,7 +71,7 @@ package, `main.py`) :
 - Dépendances validées : détection et **cassage défensif des cycles**, purge des
   références inconnues (jamais de deadlock).
 - Stories **indépendantes** développées **en parallèle** (sémaphore
-  `AUTOSPEC_MAX_PARALLEL_DEVS`), par ordre de **priorité kanban**.
+  `MAX_PARALLEL_DEVS`), par ordre de **priorité kanban**.
 - Les stories dont une dépendance échoue sont marquées *failed* avec message.
 
 ---
@@ -121,7 +121,7 @@ plafond.
 ## 1quater. Profils produit
 
 Autospec peut démarrer un projet avec un **profil produit** explicite
-(`ProjectState.product_profile`, `AUTOSPEC_PRODUCT_PROFILE`, ou champ
+(`ProjectState.product_profile`, `PRODUCT_PROFILE`, ou champ
 `product_profile` de `POST /api/projects`). Les profils regroupent les flags
 qui vont ensemble plutôt que de demander à l'utilisateur de combiner des
 variables bas niveau :
@@ -146,7 +146,7 @@ projets concurrents.
 Entre PO et build, l'agent **`architect`** produit un design technique concis
 (couches/modules, composants clés, conventions, contraintes transverses), stocké
 dans `ProjectState.architecture` et **injecté dans les prompts QA et Dev**.
-Activable par `AUTOSPEC_ARCHITECTURE`, **OFF par défaut**.
+Activable par `ARCHITECTURE`, **OFF par défaut**.
 
 ---
 
@@ -171,12 +171,12 @@ Les skills de domaine sont maintenant **prescriptives** :
 catalogue de prompt dit explicitement qu'elles sont **obligatoires quand
 applicables**, et `orchestrator/skill_validation.py` signale une livraison
 `needs_attention` si `.claude/skills` est absent, incomplet ou si une règle de
-domaine est restée en simple suggestion. Réglages : `AUTOSPEC_SKILLS` (global, **OFF**) +
-`AUTOSPEC_SKILLS_QA`/`_DEV`. OFF → prompts **strictement inchangés**.
+domaine est restée en simple suggestion. Réglages : `SKILLS` (global, **OFF**) +
+`SKILLS_QA`/`_DEV`. OFF → prompts **strictement inchangés**.
 
 ## 2ter. Décomposition en sous-tâches parallèles (SK-2)
 
-`AUTOSPEC_DECOMPOSE` (**OFF par défaut**) découpe une grosse story backend en
+`DECOMPOSE` (**OFF par défaut**) découpe une grosse story backend en
 **sous-tâches par couche** (entité → service → endpoint → tests) via l'architecte,
 matérialisées en `Task`. Chaque sous-tâche est construite par un **sous-agent
 focalisé dans son propre worktree git** (contexte minimal = 1 couche + 1 skill)
@@ -188,7 +188,7 @@ sous-tâches ou erreur → story construite d'un bloc.
 
 ## 2quater. Pipeline PO multi-étapes (RFC po-pipeline-v2)
 
-`AUTOSPEC_PO_PIPELINE` (**off par défaut** | `on`) remplace le PO mono-passe (et
+`PO_PIPELINE` (**off par défaut** | `on`) remplace le PO mono-passe (et
 sa revue judge-first `_arefine_plan`) par un **workflow agentique multi-étapes**
 (`orchestrator/plan_pipeline.py`) :
 
@@ -196,12 +196,12 @@ sa revue judge-first `_arefine_plan`) par un **workflow agentique multi-étapes*
   stories, tâches, `depends_on`, priorités) + **jugement de complexité par
   feuille** (`complexity` trivial/standard/complex, `rationale`,
   `estimated_files`). Validation **déterministe** à chaque tour (schéma pydantic,
-  DAG acyclique, deps non orphelines, budget fichiers `AUTOSPEC_TASK_FILE_BUDGET`,
+  DAG acyclique, deps non orphelines, budget fichiers `TASK_FILE_BUDGET`,
   `complex` sans découpe = refus, globs confrontés à l'arbre réel dès l'itération 2,
   heuristiques fourre-tout) + **1 retry d'auto-réparation** ; puis UN critic
   structure en boucle **critic-d'abord** (`arefine_critic_first`, pas de judge
   d'ouverture ; un critic en échec est distingué d'un critic satisfait).
-- **Gating post-S1 déterministe** : `< AUTOSPEC_PO_PIPELINE_MIN_LEAVES` (défaut 4)
+- **Gating post-S1 déterministe** : `< PO_PIPELINE_MIN_LEAVES` (défaut 4)
   feuilles mesurées → **S2+S3 fusionnés en une passe par story** ; sinon pipeline
   complet. (Le mode `auto` à heuristique de longueur de brief est abandonné.)
 - **S2 Spec** (persona `po-spec`, fan-out **par story**, parallèle) : description
@@ -218,7 +218,7 @@ sa revue judge-first `_arefine_plan`) par un **workflow agentique multi-étapes*
   validation déterministe (parse Feature/Scenario, **alignement 1-pour-1
   scénario ↔ critère via tags `@AC-x`**, steps UI/réseau interdits pour les
   stories non-`ui`) + 1 auto-repair ; **critic LLM réservé aux stories
-  `complex`**. `AUTOSPEC_PO_PIPELINE_GHERKIN=0` coupe S3.
+  `complex`**. `PO_PIPELINE_GHERKIN=0` coupe S3.
 - **Dégradation explicite** : S2 en échec → 1 tentative mono-passe sur ce seul
   nœud, sinon squelette conservé marqué `spec_incomplete` ; S3 en échec →
   **gherkin mécanique dérivé des critères** (jamais vide). Toute dégradation est
@@ -245,8 +245,8 @@ artefact :
 - un **juge** note la qualité de **0 à 100**.
 
 **Arrêt déterministe par deux moyens** : le **score atteint le seuil**
-(`AUTOSPEC_REFINE_QUALITY_THRESHOLD`, déf. 80) **ou** le **cap d'allers-retours**
-est atteint (`AUTOSPEC_REFINE_MAX_ROUNDS`, déf. 2) — selon ce qui survient en
+(`REFINE_QUALITY_THRESHOLD`, déf. 80) **ou** le **cap d'allers-retours**
+est atteint (`REFINE_MAX_ROUNDS`, déf. 2) — selon ce qui survient en
 premier. Arrêts additionnels : critique vide (`critic_empty`), révision rejetée
 (`rejected`), juge illisible (traité comme arrêt).
 
@@ -257,14 +257,14 @@ premier. Arrêts additionnels : critique vide (`critic_empty`), révision rejet�
   propose un re-découpage), détection du sur-découpage, cohérence Epic→US→tâche,
   dépendances minimales et parallélisables. Le maker `po_revise` applique les
   suggestions → le plan est **right-sizé** en amont (complément proactif du
-  split-on-failure réactif). **Toggle dédié `AUTOSPEC_REVIEW_PLAN`** : active la
-  revue du plan **indépendamment** du master `AUTOSPEC_REFINE` (donc sans payer le
+  split-on-failure réactif). **Toggle dédié `REVIEW_PLAN`** : active la
+  revue du plan **indépendamment** du master `REFINE` (donc sans payer le
   raffinement du code), avec les mêmes `MAX_ROUNDS`/`THRESHOLD`.
 - **Dev** : raffinement du code protégé par une **garde git** — une révision
   n'est gardée que si `uv run pytest` reste vert (sinon `git reset --hard` +
   `git clean -fd`).
 
-**OFF par défaut** (`AUTOSPEC_REFINE`, `_PO`, `_DEV`, `REVIEW_PLAN`). Rôles de chat
+**OFF par défaut** (`REFINE`, `_PO`, `_DEV`, `REVIEW_PLAN`). Rôles de chat
 **🧐 Critic** et **⚖️ Juge** ; scores exposés à l'UI (`plan_quality`, `quality_score`).
 
 ---
@@ -278,22 +278,22 @@ premier. Arrêts additionnels : critique vide (`critic_empty`), révision rejet�
 - **Definition of Done déterministe** : avant de déclarer une itération livrée,
   `orchestrator/delivery_gate.py` vérifie que chaque story/tâche est
   **effectivement** `done`, que les critères ont une preuve Gherkin/test plan,
-  et que les stories UI ont des tests rejouables quand `AUTOSPEC_UI_TESTS=1`.
+  et que les stories UI ont des tests rejouables quand `UI_TESTS=1`.
   Le verdict est persisté dans `delivery_ready` / `delivery_issues`, affiché
   dans le `RunPanel`, et place la pipeline en `needs_attention` plutôt qu'en
   `error` quand le produit est incomplet mais l'orchestrateur sain.
 - **Smoke run par défaut** : après une suite verte, Autospec démarre réellement
-  l'app générée (`AUTOSPEC_SMOKE_RUN=1` par défaut) ; une API/web doit ouvrir son
+  l'app générée (`SMOKE_RUN=1` par défaut) ; une API/web doit ouvrir son
   port, un CLI doit sortir en code 0. Le profil `library-fast` le désactive.
 - **Runtime acceptance web/fullstack** : `orchestrator/runtime_acceptance.py` +
   `backend/scripts/runtime_acceptance.js` lancent le backend et/ou le frontend
   preview, ouvrent un navigateur Playwright, vérifient qu'une page non vide est
   servie et qu'il n'y a pas d'erreur navigateur bloquante. Activé par
-  `AUTOSPEC_RUNTIME_ACCEPTANCE` ou les profils `web-ssr`/`fullstack`.
+  `RUNTIME_ACCEPTANCE` ou les profils `web-ssr`/`fullstack`.
 - **Tests UI sans faux vert** : une story `ui=true` doit déclarer au moins un
   `ui_test_files`; `pytest -m ui` avec **aucun test collecté** ne compte plus
   comme succès.
-- **Mode démo** (`AUTOSPEC_FAKE_AGENTS=1`) : le `ScriptedRunner` déterministe
+- **Mode démo** (`FAKE_AGENTS=1`) : le `ScriptedRunner` déterministe
   pilote **tout le stack sans CLI Claude ni build de venv uv** ; base du test
   e2e hermétique.
 - **Lancement de l'app générée** : bouton **▶ Lancer le projet** (exécute
@@ -373,7 +373,7 @@ quatre étages (au lieu de l'erreur opaque « conflit de merge inter-stream ») 
   `main.py`/`App.tsx` : la cause n°1 des collisions disparaît structurellement.
   Prompts (`sizing_rules`, `file_scope_block`, plan multi-stream, étape de
   câblage du dev) enseignent la convention.
-- **Canari post-merge** (`AUTOSPEC_POST_MERGE_CANARY`, ON) : vert + vert peut
+- **Canari post-merge** (`POST_MERGE_CANARY`, ON) : vert + vert peut
   faire ROUGE combiné (conflit sémantique). Après chaque merge, la suite du
   stream est rejouée sur le HEAD partagé ; un rouge **SÉMANTIQUE** (des tests
   ont réellement échoué) → le merge est **reverté** (l'invariant « HEAD toujours
@@ -452,7 +452,7 @@ collision au merge.
 
 ### Persistance des logs de build (diagnostic post-mortem)
 Le **build monitor** (`orchestrator/build_monitor.py`) est désormais **ON par
-défaut** (opt-out `AUTOSPEC_BUILD_MONITOR=0`) : chaque run écrit une timeline
+défaut** (opt-out `BUILD_MONITOR=0`) : chaque run écrit une timeline
 JSONL (`workspace/<projet>/build-monitor.jsonl`) — appels d'agents, runs de
 suite (vert/rouge + tail), verdicts du canari (`semantic` / `infra_healed` /
 `infra_persistent`), réparations d'environnement, transitions de phase. Un rouge
@@ -467,8 +467,8 @@ après coup.
   **tests plus granulaires** — chacune construite par un sous-agent focalisé. Cible
   le problème de l'**unité trop grosse pour une seule session d'agent**.
 - **Automatique** (`_amaybe_split_on_failure`, hook dans la branche « rouge épuisé »
-  du worker) : ON par défaut (`AUTOSPEC_SPLIT_ON_FAILURE`), **borné** par
-  `split_depth` / `AUTOSPEC_SPLIT_MAX_DEPTH` (jamais de récursion infinie).
+  du worker) : ON par défaut (`SPLIT_ON_FAILURE`), **borné** par
+  `split_depth` / `SPLIT_MAX_DEPTH` (jamais de récursion infinie).
 - **Manuel** : bouton **✂️ Découper plus fin** sur une story/tâche en échec
   (`POST /api/projects/{id}/items/{item_id}/split`) → force la re-décomposition puis
   reprend le build. **409** si la pipeline est active ou l'unité indivisible.
@@ -476,7 +476,7 @@ après coup.
   des Technical Stories directement dans le plan** (`technical:true` + `contract`,
   groupant des tâches fines ≤ `TASK_FILE_BUDGET` fichiers, dépendables par les US) —
   pour le travail technique/transverse ou les pièces complexes. Le **critic de la
-  revue de plan** (`AUTOSPEC_REVIEW_PLAN`) **recommande** d'extraire en TS les unités
+  revue de plan** (`REVIEW_PLAN`) **recommande** d'extraire en TS les unités
   trop grosses/multi-responsabilités, et `po_revise` **applique** ces suggestions.
   Création **proactive** (plan) **et** réactive (échec) — même structure de TS.
 - **Technical Story (TS)** *(réactif)* : quand le conteneur de la tâche **garde ≥1
@@ -487,7 +487,7 @@ après coup.
   échoue peut être extraite dans une TS plus profonde (profondeur arbitraire portée
   par le DAG, bornée par `split_depth`). Si la tâche échouée est la **seule** du
   conteneur → découpage **in-place** (pas de conteneur vide). Budget de finesse :
-  `AUTOSPEC_TASK_FILE_BUDGET` (déf. 3) — chaque sous-tâche vise **≤ 3 fichiers**
+  `TASK_FILE_BUDGET` (déf. 3) — chaque sous-tâche vise **≤ 3 fichiers**
   (taille « une session d'agent moyen ») → parallélisme massif. Le work-graph
   résout « dépendre d'un conteneur = ses tâches **+** les tâches de ses TS-enfants ».
 - **Réécriture des dépendances** : la tâche découpée est remplacée par ses
@@ -531,7 +531,7 @@ après coup.
   résumé « N éléments · M vagues · jusqu'à K en parallèle · chemin critique L ».
   Clic sur un nœud → ouvre sa story/TS. Rend visibles l'indépendance (P4), les TS et
   l'AND-join. Le `buildWorkGraph` front résout aussi les **TS-enfants** (`parent_id`).
-- **Revue du plan 🧐** (`PlanReviewPanel`, quand `AUTOSPEC_REVIEW_PLAN`) : score
+- **Revue du plan 🧐** (`PlanReviewPanel`, quand `REVIEW_PLAN`) : score
   `plan_quality`/100 coloré + **problèmes signalés** et **améliorations proposées**
   par l'agent critic sur le découpage/complexité (`plan_review_issues` /
   `plan_review_suggestions`).
@@ -552,7 +552,7 @@ après coup.
 - **Observabilité tokens/coût** : `AgentResult` porte cost/tokens/durée parsés du
   JSON du CLI ; un wrapper **`_UsageTracker`** accumule dans `ProjectState.usage`.
 - **Configuration** : chargement **`.env`** (python-dotenv) + variables
-  `AUTOSPEC_*` (fichier `.env.example` documenté) ; `config.py` **tolère les
+  `*` (fichier `.env.example` documenté) ; `config.py` **tolère les
   variables d'env malformées** (plus de crash à l'import : helpers
   `_env_bool`/`_env_int`, parsing booléen cohérent).
 
@@ -572,39 +572,39 @@ après coup.
 
 | Variable | Défaut | Rôle |
 |---|---|---|
-| `AUTOSPEC_CLAUDE_CMD` | auto (`claude.cmd`) | binaire Claude Code |
-| `AUTOSPEC_CLAUDE_MODEL` | (défaut CLI) | modèle imposé aux agents |
-| `AUTOSPEC_PERMISSION_MODE` | `bypassPermissions` | mode permissions des agents |
-| `AUTOSPEC_MAX_PARALLEL_DEVS` | `2` | agents Dev en parallèle |
-| `AUTOSPEC_DEV_MAX_ATTEMPTS` | `2` | tentatives par story |
-| `AUTOSPEC_WORKSPACE_ROOT` | `./workspace` | racine des workspaces générés |
-| `AUTOSPEC_PRODUCT_PROFILE` | `auto` | profil produit (`library-fast`, `cli`, `api`, `web-ssr`, `fullstack`, `brownfield`) |
-| `AUTOSPEC_FAKE_AGENTS` | `0` | mode démo (agents scriptés) |
-| `AUTOSPEC_DEMO_DELAY_S` | `0` | délai des agents scriptés |
-| `AUTOSPEC_ARCHITECTURE` | `0` | active la phase Architecture |
-| `AUTOSPEC_REFINE` / `_PO` / `_DEV` | `0` / `1` / `1` | harnais de raffinement |
-| `AUTOSPEC_REFINE_MAX_ROUNDS` | `2` | cap d'allers-retours |
-| `AUTOSPEC_REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge |
-| `AUTOSPEC_AGENT_PROVIDER` | `claude` | provider d'agents (claude / codex / openai / openrouter / ollama / anthropic) |
-| `AUTOSPEC_OPENAI_API_KEY` / `_MODEL` / `_BASE_URL` | — | provider OpenAI (LangChain) |
-| `AUTOSPEC_OPENAI_PRICE_IN` / `_OUT` | `0` | $/1M tokens (estimation de coût) |
-| `OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL` | — / `…/api/v1` | provider **OpenRouter** (aussi `AUTOSPEC_OPENROUTER_*`) ; modèles = top-10 programmation chargé dynamiquement |
-| `AUTOSPEC_OLLAMA_BASE_URL` / `_MODEL` | localhost / `llama3.1` | provider Ollama (LangChain) |
-| `AUTOSPEC_PROVIDER_TOOL_ROUNDS` | `8` | cap du protocole d'outils fichiers |
-| `AUTOSPEC_SKILLS` / `_QA` / `_DEV` | `0` / `1` / `1` | bibliothèque de skills QA/Dev (SK-1) |
-| `AUTOSPEC_DECOMPOSE` | `0` | décomposition en sous-tâches parallèles (SK-2) |
-| `AUTOSPEC_COMPONENTS` | `0` | phase composants (solutionneur) |
-| `AUTOSPEC_SETUP_INSTALL` | `0` | install réelle des deps composants |
-| `AUTOSPEC_TECH_WRITER` | `0` | tech-writer auto après build |
-| `AUTOSPEC_UI_TESTS` | `0` | tests d'acceptance UI Playwright |
-| `AUTOSPEC_SMOKE_RUN` | `1` | démarre l'app livrée avant `done` |
-| `AUTOSPEC_DEFINITION_OF_DONE` | `1` | gate déterministe de livraison |
-| `AUTOSPEC_DOD_STRICT_CRITERIA` | `0` | rend bloquante l'absence de preuve verte par critère |
-| `AUTOSPEC_RUNTIME_ACCEPTANCE` | `0` | gate navigateur/runtime web/fullstack |
-| `AUTOSPEC_RUNTIME_ACCEPTANCE_TIMEOUT_S` | `90` | timeout du gate runtime |
-| `AUTOSPEC_SESSION_MONITOR` | `1` | watchdog fenêtre d'usage Claude (M2) |
-| `AUTOSPEC_CCUSAGE_CMD` | `npx --yes ccusage` | commande ccusage |
-| `AUTOSPEC_RESUME_FALLBACK_MIN` | `60` | repli (min) si reset inconnu |
+| `CLAUDE_CMD` | auto (`claude.cmd`) | binaire Claude Code |
+| `CLAUDE_MODEL` | (défaut CLI) | modèle imposé aux agents |
+| `PERMISSION_MODE` | `bypassPermissions` | mode permissions des agents |
+| `MAX_PARALLEL_DEVS` | `2` | agents Dev en parallèle |
+| `DEV_MAX_ATTEMPTS` | `2` | tentatives par story |
+| `WORKSPACE_ROOT` | `./workspace` | racine des workspaces générés |
+| `PRODUCT_PROFILE` | `auto` | profil produit (`library-fast`, `cli`, `api`, `web-ssr`, `fullstack`, `brownfield`) |
+| `FAKE_AGENTS` | `0` | mode démo (agents scriptés) |
+| `DEMO_DELAY_S` | `0` | délai des agents scriptés |
+| `ARCHITECTURE` | `0` | active la phase Architecture |
+| `REFINE` / `_PO` / `_DEV` | `0` / `1` / `1` | harnais de raffinement |
+| `REFINE_MAX_ROUNDS` | `2` | cap d'allers-retours |
+| `REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge |
+| `AGENT_PROVIDER` | `claude` | provider d'agents (claude / codex / openai / openrouter / ollama / anthropic) |
+| `OPENAI_API_KEY` / `_MODEL` / `_BASE_URL` | — | provider OpenAI (LangChain) |
+| `OPENAI_PRICE_IN` / `_OUT` | `0` | $/1M tokens (estimation de coût) |
+| `OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL` | — / `…/api/v1` | provider **OpenRouter** (aussi `OPENROUTER_*`) ; modèles = top-10 programmation chargé dynamiquement |
+| `OLLAMA_BASE_URL` / `_MODEL` | localhost / `llama3.1` | provider Ollama (LangChain) |
+| `PROVIDER_TOOL_ROUNDS` | `8` | cap du protocole d'outils fichiers |
+| `SKILLS` / `_QA` / `_DEV` | `0` / `1` / `1` | bibliothèque de skills QA/Dev (SK-1) |
+| `DECOMPOSE` | `0` | décomposition en sous-tâches parallèles (SK-2) |
+| `COMPONENTS` | `0` | phase composants (solutionneur) |
+| `SETUP_INSTALL` | `0` | install réelle des deps composants |
+| `TECH_WRITER` | `0` | tech-writer auto après build |
+| `UI_TESTS` | `0` | tests d'acceptance UI Playwright |
+| `SMOKE_RUN` | `1` | démarre l'app livrée avant `done` |
+| `DEFINITION_OF_DONE` | `1` | gate déterministe de livraison |
+| `DOD_STRICT_CRITERIA` | `0` | rend bloquante l'absence de preuve verte par critère |
+| `RUNTIME_ACCEPTANCE` | `0` | gate navigateur/runtime web/fullstack |
+| `RUNTIME_ACCEPTANCE_TIMEOUT_S` | `90` | timeout du gate runtime |
+| `SESSION_MONITOR` | `1` | watchdog fenêtre d'usage Claude (M2) |
+| `CCUSAGE_CMD` | `npx --yes ccusage` | commande ccusage |
+| `RESUME_FALLBACK_MIN` | `60` | repli (min) si reset inconnu |
 
 ---
 

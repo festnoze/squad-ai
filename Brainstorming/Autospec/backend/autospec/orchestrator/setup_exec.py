@@ -214,7 +214,7 @@ def execute(state: ProjectState, ws: Path) -> list[str]:
     if infra:
         _setup_compose(ws, [c.kind for c in infra], log)
     if not settings.setup_install:
-        log.append("Installation des dépendances ignorée (AUTOSPEC_SETUP_INSTALL=0).")
+        log.append("Installation des dépendances ignorée (SETUP_INSTALL=0).")
     return log
 
 

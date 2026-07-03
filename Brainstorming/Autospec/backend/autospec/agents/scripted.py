@@ -2,7 +2,7 @@
 
 The runner recognises which BMAD agent is being driven from the task prompt and
 returns canned JSON, so the whole pipeline (PM -> PO -> QA -> Dev) runs end to
-end without any LLM. Used when AUTOSPEC_FAKE_AGENTS is set; pytest verification
+end without any LLM. Used when FAKE_AGENTS is set; pytest verification
 is short-circuited separately in the pipeline.
 """
 

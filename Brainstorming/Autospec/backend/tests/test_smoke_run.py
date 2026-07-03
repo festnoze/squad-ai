@@ -1,4 +1,4 @@
-"""Smoke-run gate (AUTOSPEC_SMOKE_RUN): after the suite is green, boot the
+"""Smoke-run gate (SMOKE_RUN): after the suite is green, boot the
 delivered app and require it to actually start — a non-runnable build fails the
 iteration like a red test. These tests cover the gate contract and the
 runnability check without launching `uv` (the subprocess/socket are faked)."""

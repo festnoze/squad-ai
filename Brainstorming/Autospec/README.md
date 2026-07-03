@@ -63,7 +63,7 @@ passe en rouge.
 Les agents tournent par défaut sur **Claude** (CLI Claude Code en headless).
 Deux providers **hors abonnement** sont disponibles via **LangChain** :
 **OpenAI** (clé API) et **Ollama** (modèles locaux). Sélection par
-`AUTOSPEC_AGENT_PROVIDER` ou à chaud via le sélecteur 🤖 du header
+`AGENT_PROVIDER` ou à chaud via le sélecteur 🤖 du header
 (`GET/POST /api/provider`). Ces providers étant de simples API de chat, les
 agents Dev y manipulent les fichiers du workspace à travers un **protocole
 d'outils JSON borné** (write/read confiné au workspace) — l'orchestrateur
@@ -71,23 +71,23 @@ revérifie de toute façon la suite pytest lui-même.
 
 ## Composants, livraison & feedback
 
-- **Composants (E3/E4)** : avec `AUTOSPEC_COMPONENTS=1`, un agent solutionneur
+- **Composants (E3/E4)** : avec `COMPONENTS=1`, un agent solutionneur
   propose après le brief les composants du produit (backend FastAPI + frontend
   React par défaut, PostgreSQL/Redis en optionnel). L'utilisateur les
   approuve/écarte dans le panneau 🧱, puis « Créer les composants » matérialise
   dossiers et manifests dans le workspace (`backend/`, `frontend/`,
   `docker-compose.yml`) ; l'installation réelle des dépendances reste derrière
-  `AUTOSPEC_SETUP_INSTALL=1`.
+  `SETUP_INSTALL=1`.
 - **Livraison (I2)** : le bouton **📘 Doc** fait rédiger par le tech-writer le
   README du projet généré (présentation, lancement, tests, architecture) ;
   **⬇ Zip** télécharge le workspace (sans `.git`/`.venv`/état interne) ;
   **🔀 Commit** fait un commit git propre du workspace. Avec
-  `AUTOSPEC_TECH_WRITER=1`, la doc est régénérée après chaque build.
+  `TECH_WRITER=1`, la doc est régénérée après chaque build.
 - **Analyse d'impact (E2)** : un feedback envoyé quand la pipeline est dormante
   est analysé automatiquement — soit il **amende une US non implémentée**
   (todo/échouée, qui repart en todo), soit il **crée un nouvel Epic/US**
   buildable via « ▶ Continuer le build », soit il est simplement noté.
-- **Tests d'acceptance UI (E5)** : avec `AUTOSPEC_UI_TESTS=1`, les US marquées
+- **Tests d'acceptance UI (E5)** : avec `UI_TESTS=1`, les US marquées
   `ui` par le PO reçoivent en plus des **tests Playwright rejouables**
   (`tests/ui/`, marker pytest `ui`, screenshots + assertions de rendu) ; la
   story n'est done que si `uv run pytest -m ui` est vert aussi.
@@ -112,8 +112,8 @@ boucle **maker → critic → judge** : le maker produit (plan PO ou code Dev), 
 agent **critic** (ReAct REFLECT/ACT) propose des améliorations actionnables sans
 réécrire, et un agent **judge** note la qualité de **0 à 100**. La boucle
 s'arrête de façon **déterministe** dès que le **score atteint le seuil**
-(`AUTOSPEC_REFINE_QUALITY_THRESHOLD`, défaut 80) **ou** que le **cap d'allers-
-retours** est atteint (`AUTOSPEC_REFINE_MAX_ROUNDS`, défaut 2), selon ce qui
+(`REFINE_QUALITY_THRESHOLD`, défaut 80) **ou** que le **cap d'allers-
+retours** est atteint (`REFINE_MAX_ROUNDS`, défaut 2), selon ce qui
 survient en premier. Le raffinement du code Dev est protégé par une **garde
 git** : une révision n'est gardée que si `uv run pytest` reste vert (sinon
 rollback). Deux nouveaux rôles de chat apparaissent dans l'UI : **🧐 Critique**
@@ -122,22 +122,22 @@ et **⚖️ Juge**.
 **OFF par défaut** (pour économiser des tokens). Activation :
 
 ```powershell
-$env:AUTOSPEC_REFINE = "1"          # interrupteur global (requis)
-# $env:AUTOSPEC_REFINE_PO = "1"     # raffiner le plan PO (défaut 1)
-# $env:AUTOSPEC_REFINE_DEV = "1"    # raffiner le code Dev (défaut 1)
+$env:REFINE = "1"          # interrupteur global (requis)
+# $env:REFINE_PO = "1"     # raffiner le plan PO (défaut 1)
+# $env:REFINE_DEV = "1"    # raffiner le code Dev (défaut 1)
 ```
 
 ## Mode démo (sans Claude)
 
 Pour faire tourner et vérifier tout le stack **sans le CLI Claude ni build de
-venv uv**, lance le backend avec `AUTOSPEC_FAKE_AGENTS=1` : un agent scripté
+venv uv**, lance le backend avec `FAKE_AGENTS=1` : un agent scripté
 déterministe pilote toute la pipeline (PM→PO→QA→Dev). C'est aussi ce qui
 alimente le test e2e Playwright.
 
 ```powershell
 # Backend en mode démo
 cd backend
-$env:AUTOSPEC_FAKE_AGENTS = "1"; $env:AUTOSPEC_DEMO_DELAY_S = "0.8"
+$env:FAKE_AGENTS = "1"; $env:DEMO_DELAY_S = "0.8"
 uv run uvicorn autospec.api.server:app --port 8100
 
 # Test e2e (build le front + backend démo auto-démarré + navigateur piloté)
@@ -212,30 +212,30 @@ chaque `push` et `pull_request` avec 3 jobs sur `ubuntu-latest` :
 
 | Variable | Défaut | Rôle |
 | --- | --- | --- |
-| `AUTOSPEC_BMAD_DIR` | `../_bmad` | Dossier d'installation BMAD |
-| `AUTOSPEC_CLAUDE_CMD` | auto (`claude.cmd`) | Binaire Claude Code |
-| `AUTOSPEC_CLAUDE_MODEL` | (défaut CLI) | Modèle à utiliser (provider claude) |
-| `AUTOSPEC_AGENT_PROVIDER` | `claude` | Provider d'agents : `claude` (harness CLI), `openai`, `ollama` (LangChain) |
-| `AUTOSPEC_OPENAI_API_KEY` | (ou `OPENAI_API_KEY`) | Clé API du provider openai |
-| `AUTOSPEC_OPENAI_MODEL` | `gpt-4o-mini` | Modèle OpenAI |
-| `AUTOSPEC_OPENAI_BASE_URL` | api.openai.com | Endpoint OpenAI-compatible |
-| `AUTOSPEC_OPENAI_PRICE_IN` / `_OUT` | `0` | $/1M tokens pour estimer le coût |
-| `AUTOSPEC_OLLAMA_BASE_URL` | `http://localhost:11434` | Serveur Ollama local |
-| `AUTOSPEC_OLLAMA_MODEL` | `llama3.1` | Modèle Ollama |
-| `AUTOSPEC_PROVIDER_TOOL_ROUNDS` | `8` | Cap de tours du protocole d'outils fichiers (providers LangChain) |
-| `AUTOSPEC_COMPONENTS` | `0` | Phase « composants » (agent solutionneur après le brief) |
-| `AUTOSPEC_SETUP_INSTALL` | `0` | Installe réellement les deps des composants (uv sync / npm install) |
-| `AUTOSPEC_TECH_WRITER` | `0` | Tech-writer auto après chaque build (sinon bouton 📘 Doc) |
-| `AUTOSPEC_UI_TESTS` | `0` | Tests d'acceptance UI Playwright pour les US `ui` |
-| `AUTOSPEC_SESSION_MONITOR` | `1` | Watchdog fenêtre d'usage Claude (M2, provider claude uniquement) |
-| `AUTOSPEC_CCUSAGE_CMD` | `npx --yes ccusage` | Commande ccusage (heure de reset du bloc actif) |
-| `AUTOSPEC_RESUME_FALLBACK_MIN` | `60` | Délai de reprise (min) si l'heure de reset est inconnue |
-| `AUTOSPEC_PERMISSION_MODE` | `bypassPermissions` | Mode permissions des agents |
-| `AUTOSPEC_MAX_PARALLEL_DEVS` | `2` | Agents dev en parallèle |
-| `AUTOSPEC_DEV_MAX_ATTEMPTS` | `2` | Tentatives par story |
-| `AUTOSPEC_AGENT_TIMEOUT_S` | `1800` | Timeout d'un appel agent |
-| `AUTOSPEC_REFINE` | `0` | Interrupteur global du harnais de raffinement |
-| `AUTOSPEC_REFINE_PO` | `1` | Raffinement du plan PO (si global ON) |
-| `AUTOSPEC_REFINE_DEV` | `1` | Raffinement du code Dev (si global ON) |
-| `AUTOSPEC_REFINE_MAX_ROUNDS` | `2` | Cap dur d'allers-retours maker↔critic↔judge |
-| `AUTOSPEC_REFINE_QUALITY_THRESHOLD` | `80` | Seuil de score du juge pour s'arrêter |
+| `BMAD_DIR` | `../_bmad` | Dossier d'installation BMAD |
+| `CLAUDE_CMD` | auto (`claude.cmd`) | Binaire Claude Code |
+| `CLAUDE_MODEL` | (défaut CLI) | Modèle à utiliser (provider claude) |
+| `AGENT_PROVIDER` | `claude` | Provider d'agents : `claude` (harness CLI), `openai`, `ollama` (LangChain) |
+| `OPENAI_API_KEY` | (ou `OPENAI_API_KEY`) | Clé API du provider openai |
+| `OPENAI_MODEL` | `gpt-4o-mini` | Modèle OpenAI |
+| `OPENAI_BASE_URL` | api.openai.com | Endpoint OpenAI-compatible |
+| `OPENAI_PRICE_IN` / `_OUT` | `0` | $/1M tokens pour estimer le coût |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Serveur Ollama local |
+| `OLLAMA_MODEL` | `llama3.1` | Modèle Ollama |
+| `PROVIDER_TOOL_ROUNDS` | `8` | Cap de tours du protocole d'outils fichiers (providers LangChain) |
+| `COMPONENTS` | `0` | Phase « composants » (agent solutionneur après le brief) |
+| `SETUP_INSTALL` | `0` | Installe réellement les deps des composants (uv sync / npm install) |
+| `TECH_WRITER` | `0` | Tech-writer auto après chaque build (sinon bouton 📘 Doc) |
+| `UI_TESTS` | `0` | Tests d'acceptance UI Playwright pour les US `ui` |
+| `SESSION_MONITOR` | `1` | Watchdog fenêtre d'usage Claude (M2, provider claude uniquement) |
+| `CCUSAGE_CMD` | `npx --yes ccusage` | Commande ccusage (heure de reset du bloc actif) |
+| `RESUME_FALLBACK_MIN` | `60` | Délai de reprise (min) si l'heure de reset est inconnue |
+| `PERMISSION_MODE` | `bypassPermissions` | Mode permissions des agents |
+| `MAX_PARALLEL_DEVS` | `2` | Agents dev en parallèle |
+| `DEV_MAX_ATTEMPTS` | `2` | Tentatives par story |
+| `AGENT_TIMEOUT_S` | `1800` | Timeout d'un appel agent |
+| `REFINE` | `0` | Interrupteur global du harnais de raffinement |
+| `REFINE_PO` | `1` | Raffinement du plan PO (si global ON) |
+| `REFINE_DEV` | `1` | Raffinement du code Dev (si global ON) |
+| `REFINE_MAX_ROUNDS` | `2` | Cap dur d'allers-retours maker↔critic↔judge |
+| `REFINE_QUALITY_THRESHOLD` | `80` | Seuil de score du juge pour s'arrêter |

@@ -1,0 +1,994 @@
+{"ts": 1783118400.693, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118402.205, "kind": "agent", "project": "canary-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118402.471, "kind": "agent", "project": "json-tol", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118402.481, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118402.483, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118402.498, "kind": "agent", "project": "dep-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118403.018, "kind": "agent", "project": "red-resume", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118404.355, "kind": "agent", "project": "calib-budget", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118405.214, "kind": "agent", "project": "calib-ok", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118406.007, "kind": "agent", "project": "calib-p2b", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118407.06, "kind": "agent", "project": "calib-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118407.336, "kind": "agent", "project": "calib-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118517.467, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118564.57, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118608.286, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118660.444, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118666.281, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118673.744, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118708.677, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118771.903, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118856.761, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118934.279, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118934.608, "kind": "canary", "project": "canary", "phase": "build", "item": "US-1", "verdict": "semantic"}
+{"ts": 1783118936.357, "kind": "agent", "project": "canary-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118936.67, "kind": "agent", "project": "json-tol", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118936.689, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118936.691, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118936.71, "kind": "agent", "project": "dep-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118937.496, "kind": "agent", "project": "red-resume", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118939.449, "kind": "agent", "project": "calib-budget", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118940.482, "kind": "agent", "project": "calib-ok", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118941.49, "kind": "agent", "project": "calib-p2b", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118942.859, "kind": "agent", "project": "calib-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783118943.205, "kind": "agent", "project": "calib-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119080.228, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119080.422, "kind": "canary", "project": "canary", "phase": "build", "item": "US-1", "verdict": "semantic"}
+{"ts": 1783119081.798, "kind": "agent", "project": "canary-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119082.091, "kind": "agent", "project": "json-tol", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119082.103, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119082.105, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119082.125, "kind": "agent", "project": "dep-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119082.787, "kind": "agent", "project": "red-resume", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119083.421, "kind": "env_repair", "project": "guard", "phase": "idle", "scope": "shared", "reason": "invalid_venv"}
+{"ts": 1783119083.915, "kind": "agent", "project": "canary-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119084.092, "kind": "canary", "project": "canary-infra", "phase": "build", "item": "US-1", "verdict": "infra_suspected"}
+{"ts": 1783119084.092, "kind": "canary", "project": "canary-infra", "phase": "build", "item": "US-1", "verdict": "infra_healed"}
+{"ts": 1783119087.818, "kind": "agent", "project": "calib-budget", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119088.575, "kind": "agent", "project": "calib-ok", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119089.332, "kind": "agent", "project": "calib-p2b", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119090.389, "kind": "agent", "project": "calib-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119090.733, "kind": "agent", "project": "calib-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.004, "kind": "agent", "project": "todo-73707b07", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.009, "kind": "agent", "project": "todo-73707b07", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.011, "kind": "agent", "project": "todo-73707b07", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.012, "kind": "agent", "project": "todo-73707b07", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.366, "kind": "outcome", "project": "todo-73707b07", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119103.407, "kind": "agent", "project": "une-todo-list-acf6fa2c", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.464, "kind": "agent", "project": "une-todo-list-b6037a2f", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.469, "kind": "agent", "project": "une-todo-list-b6037a2f", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.471, "kind": "agent", "project": "une-todo-list-b6037a2f", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.472, "kind": "agent", "project": "une-todo-list-b6037a2f", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.801, "kind": "outcome", "project": "une-todo-list-b6037a2f", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119103.84, "kind": "agent", "project": "une-todo-list-bbfa44aa", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.907, "kind": "agent", "project": "x-4158cc96", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.919, "kind": "agent", "project": "x-4158cc96", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.946, "kind": "agent", "project": "x-fe205bcb", "phase": "spec", "role": "analyst", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.959, "kind": "agent", "project": "x-fe205bcb", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.988, "kind": "agent", "project": "todo-929c11dd", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119103.999, "kind": "agent", "project": "todo-929c11dd", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119104.002, "kind": "agent", "project": "todo-929c11dd", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119104.003, "kind": "agent", "project": "todo-929c11dd", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119104.48, "kind": "outcome", "project": "todo-929c11dd", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119104.559, "kind": "agent", "project": "todo-ec55834d", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119104.569, "kind": "agent", "project": "todo-ec55834d", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119104.571, "kind": "agent", "project": "todo-ec55834d", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119104.573, "kind": "agent", "project": "todo-ec55834d", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119104.955, "kind": "outcome", "project": "todo-ec55834d", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119104.992, "kind": "agent", "project": "todo-57bf38ea", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.0, "kind": "agent", "project": "todo-57bf38ea", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.004, "kind": "agent", "project": "todo-57bf38ea", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.006, "kind": "agent", "project": "todo-57bf38ea", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.378, "kind": "outcome", "project": "todo-57bf38ea", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119105.405, "kind": "agent", "project": "todo-477d63f9", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.411, "kind": "agent", "project": "todo-477d63f9", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.412, "kind": "agent", "project": "todo-477d63f9", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.414, "kind": "agent", "project": "todo-477d63f9", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.754, "kind": "outcome", "project": "todo-477d63f9", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119105.779, "kind": "agent", "project": "todo-2b4e46d1", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.787, "kind": "agent", "project": "todo-2b4e46d1", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.79, "kind": "agent", "project": "todo-2b4e46d1", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119105.792, "kind": "agent", "project": "todo-2b4e46d1", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.114, "kind": "outcome", "project": "todo-2b4e46d1", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119106.151, "kind": "agent", "project": "todo-ae864e61", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.158, "kind": "agent", "project": "todo-ae864e61", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.162, "kind": "agent", "project": "todo-ae864e61", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.163, "kind": "agent", "project": "todo-ae864e61", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.482, "kind": "outcome", "project": "todo-ae864e61", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119106.505, "kind": "agent", "project": "todo-7e664881", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.509, "kind": "agent", "project": "todo-7e664881", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.511, "kind": "agent", "project": "todo-7e664881", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.512, "kind": "agent", "project": "todo-7e664881", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.834, "kind": "outcome", "project": "todo-7e664881", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119106.863, "kind": "agent", "project": "todo-9339baed", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.873, "kind": "agent", "project": "todo-9339baed", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.876, "kind": "agent", "project": "todo-9339baed", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119106.886, "kind": "agent", "project": "todo-9339baed", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.256, "kind": "outcome", "project": "todo-9339baed", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119107.298, "kind": "agent", "project": "todo-41231fe9", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.305, "kind": "agent", "project": "todo-41231fe9", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.307, "kind": "agent", "project": "todo-41231fe9", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.309, "kind": "agent", "project": "todo-41231fe9", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.605, "kind": "outcome", "project": "todo-41231fe9", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119107.618, "kind": "agent", "project": "todo-c2c383ee", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.623, "kind": "agent", "project": "todo-c2c383ee", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.625, "kind": "agent", "project": "todo-c2c383ee", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.626, "kind": "agent", "project": "todo-c2c383ee", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.94, "kind": "outcome", "project": "todo-c2c383ee", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119107.961, "kind": "agent", "project": "todo-27fa5270", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.967, "kind": "agent", "project": "todo-27fa5270", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.972, "kind": "agent", "project": "todo-27fa5270", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119107.973, "kind": "agent", "project": "todo-27fa5270", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119108.275, "kind": "outcome", "project": "todo-27fa5270", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119108.284, "kind": "agent", "project": "todo-1a0564a0", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119108.29, "kind": "agent", "project": "todo-1a0564a0", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119108.291, "kind": "agent", "project": "todo-1a0564a0", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119108.293, "kind": "agent", "project": "todo-1a0564a0", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119108.625, "kind": "outcome", "project": "todo-1a0564a0", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119108.662, "kind": "agent", "project": "todo-0b4df41c", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119108.698, "kind": "agent", "project": "todo-0b4df41c", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119108.7, "kind": "agent", "project": "todo-0b4df41c", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119108.701, "kind": "agent", "project": "todo-0b4df41c", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119109.016, "kind": "outcome", "project": "todo-0b4df41c", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119109.62, "kind": "agent", "project": "todo-8e66db93", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119109.625, "kind": "agent", "project": "todo-8e66db93", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119109.627, "kind": "agent", "project": "todo-8e66db93", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119109.628, "kind": "agent", "project": "todo-8e66db93", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119109.955, "kind": "outcome", "project": "todo-8e66db93", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119109.991, "kind": "agent", "project": "todo-4fa6a986", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119109.997, "kind": "agent", "project": "todo-4fa6a986", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119109.999, "kind": "agent", "project": "todo-4fa6a986", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.0, "kind": "agent", "project": "todo-4fa6a986", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.311, "kind": "outcome", "project": "todo-4fa6a986", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119110.342, "kind": "agent", "project": "todo-4fa6a986", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.353, "kind": "agent", "project": "todo-0f4bd9e2", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.36, "kind": "agent", "project": "todo-0f4bd9e2", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 2, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.361, "kind": "agent", "project": "todo-0f4bd9e2", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.362, "kind": "agent", "project": "todo-0f4bd9e2", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.661, "kind": "outcome", "project": "todo-0f4bd9e2", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119110.675, "kind": "agent", "project": "todo-5c10bf85", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.681, "kind": "agent", "project": "todo-5c10bf85", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.682, "kind": "agent", "project": "todo-5c10bf85", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119110.684, "kind": "agent", "project": "todo-5c10bf85", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.019, "kind": "outcome", "project": "todo-5c10bf85", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119111.087, "kind": "agent", "project": "todo-10baea7f", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.092, "kind": "agent", "project": "todo-10baea7f", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.094, "kind": "agent", "project": "todo-10baea7f", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.095, "kind": "agent", "project": "todo-10baea7f", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.44, "kind": "outcome", "project": "todo-10baea7f", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119111.443, "kind": "agent", "project": "todo-10baea7f", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.445, "kind": "agent", "project": "todo-10baea7f", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.557, "kind": "agent", "project": "todo-afc0de3f", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.562, "kind": "agent", "project": "todo-afc0de3f", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.569, "kind": "agent", "project": "todo-afc0de3f", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.57, "kind": "agent", "project": "todo-afc0de3f", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.893, "kind": "outcome", "project": "todo-afc0de3f", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119111.913, "kind": "agent", "project": "todo-b08a581f", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.918, "kind": "agent", "project": "todo-b08a581f", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.921, "kind": "agent", "project": "todo-b08a581f", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119111.929, "kind": "agent", "project": "todo-b08a581f", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119112.268, "kind": "outcome", "project": "todo-b08a581f", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119112.302, "kind": "agent", "project": "todo-f3507197", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119112.308, "kind": "agent", "project": "todo-f3507197", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119112.31, "kind": "agent", "project": "todo-f3507197", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119112.311, "kind": "agent", "project": "todo-f3507197", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119112.629, "kind": "outcome", "project": "todo-f3507197", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119112.659, "kind": "agent", "project": "todo-57b99f06", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119112.665, "kind": "agent", "project": "todo-57b99f06", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119112.668, "kind": "agent", "project": "todo-57b99f06", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119112.669, "kind": "agent", "project": "todo-57b99f06", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.004, "kind": "outcome", "project": "todo-57b99f06", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119113.03, "kind": "agent", "project": "todo-8f9f2675", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.036, "kind": "agent", "project": "todo-8f9f2675", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.038, "kind": "agent", "project": "todo-8f9f2675", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.04, "kind": "agent", "project": "todo-8f9f2675", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.378, "kind": "outcome", "project": "todo-8f9f2675", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119113.401, "kind": "agent", "project": "todo-d166fa96", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.408, "kind": "agent", "project": "todo-d166fa96", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.411, "kind": "agent", "project": "todo-d166fa96", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.412, "kind": "agent", "project": "todo-d166fa96", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.724, "kind": "outcome", "project": "todo-d166fa96", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119113.779, "kind": "agent", "project": "un-gestionnaire-de-t-ches-b5c8a7c5", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.784, "kind": "agent", "project": "un-gestionnaire-de-t-ches-b5c8a7c5", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.785, "kind": "agent", "project": "un-gestionnaire-de-t-ches-2-4ab8ddb6", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.786, "kind": "outcome", "project": "un-gestionnaire-de-t-ches-2-4ab8ddb6", "phase": "error", "result": "error", "error": "FakeRunner has no queued reply", "stories": []}
+{"ts": 1783119113.832, "kind": "agent", "project": "une-application-compl-te-de-gest-fcf8f8bd", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.837, "kind": "agent", "project": "une-application-compl-te-de-gest-fcf8f8bd", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.838, "kind": "outcome", "project": "une-application-compl-te-de-gest-fcf8f8bd", "phase": "error", "result": "error", "error": "FakeRunner has no queued reply", "stories": []}
+{"ts": 1783119113.85, "kind": "agent", "project": "x-22d4d349", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.853, "kind": "agent", "project": "x-22d4d349", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119113.854, "kind": "outcome", "project": "x-22d4d349", "phase": "error", "result": "error", "error": "FakeRunner has no queued reply", "stories": []}
+{"ts": 1783119114.623, "kind": "agent", "project": "une-todo-list-998451ad", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119114.652, "kind": "agent", "project": "p-appr1", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119114.657, "kind": "agent", "project": "p-appr1", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119114.663, "kind": "agent", "project": "p-appr1", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119114.664, "kind": "agent", "project": "p-appr1", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.003, "kind": "outcome", "project": "p-appr1", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119115.019, "kind": "agent", "project": "p-appr2", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.024, "kind": "agent", "project": "p-appr2", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.03, "kind": "outcome", "project": "p-appr2", "phase": "stopped", "result": "stopped", "stories": [{"id": "US-1", "status": "todo"}]}
+{"ts": 1783119115.05, "kind": "agent", "project": "p-appr3", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.055, "kind": "agent", "project": "p-appr3", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.057, "kind": "agent", "project": "p-appr3", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.058, "kind": "agent", "project": "p-appr3", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.441, "kind": "outcome", "project": "p-appr3", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119115.448, "kind": "agent", "project": "todo-85d7c550", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.453, "kind": "agent", "project": "todo-85d7c550", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.464, "kind": "agent", "project": "todo-85d7c550", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.465, "kind": "agent", "project": "todo-85d7c550", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119115.791, "kind": "outcome", "project": "todo-85d7c550", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119116.343, "kind": "agent", "project": "calib-budget", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119117.14, "kind": "agent", "project": "calib-ok", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119117.896, "kind": "agent", "project": "calib-p2b", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119118.977, "kind": "agent", "project": "calib-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.256, "kind": "agent", "project": "calib-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.576, "kind": "agent", "project": "proj-comp", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.582, "kind": "agent", "project": "proj-comp", "phase": "spec", "role": "architect", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.583, "kind": "agent", "project": "proj-comp", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.586, "kind": "agent", "project": "proj-comp", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.588, "kind": "agent", "project": "proj-comp", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.948, "kind": "outcome", "project": "proj-comp", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119119.954, "kind": "agent", "project": "proj-comp", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.959, "kind": "agent", "project": "proj-comp", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.96, "kind": "agent", "project": "proj-comp", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119119.962, "kind": "agent", "project": "proj-comp", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.281, "kind": "outcome", "project": "proj-comp", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119120.364, "kind": "agent", "project": "proj-decomp", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.373, "kind": "agent", "project": "proj-decomp", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.378, "kind": "agent", "project": "proj-decomp", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.383, "kind": "agent", "project": "proj-decomp", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.399, "kind": "agent", "project": "proj-doc", "phase": "done", "role": "tech-writer", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.427, "kind": "agent", "project": "todo-d0473e30", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.433, "kind": "agent", "project": "todo-d0473e30", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.435, "kind": "agent", "project": "todo-d0473e30", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.436, "kind": "agent", "project": "todo-d0473e30", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.758, "kind": "outcome", "project": "todo-d0473e30", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119120.779, "kind": "agent", "project": "todo-d0473e30", "phase": "done", "role": "tech-writer", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.823, "kind": "agent", "project": "une-todo-list-454804d0", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.829, "kind": "agent", "project": "une-todo-list-454804d0", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.831, "kind": "agent", "project": "une-todo-list-454804d0", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119120.832, "kind": "agent", "project": "une-todo-list-454804d0", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119121.158, "kind": "outcome", "project": "une-todo-list-454804d0", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119121.316, "kind": "agent", "project": "dod-lifecycle", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119121.322, "kind": "agent", "project": "dod-lifecycle", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119121.323, "kind": "outcome", "project": "dod-lifecycle", "phase": "needs_attention", "result": "needs_attention", "stories": []}
+{"ts": 1783119121.394, "kind": "agent", "project": "e2e-calc-ok", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119121.399, "kind": "agent", "project": "e2e-calc-ok", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119121.402, "kind": "agent", "project": "e2e-calc-ok", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119121.404, "kind": "agent", "project": "e2e-calc-ok", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119122.974, "kind": "agent", "project": "e2e-calc-ok", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119122.977, "kind": "agent", "project": "e2e-calc-ok", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119124.505, "kind": "outcome", "project": "e2e-calc-ok", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}, {"id": "US-2", "status": "done"}]}
+{"ts": 1783119124.564, "kind": "agent", "project": "e2e-calc-ko", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119124.57, "kind": "agent", "project": "e2e-calc-ko", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119124.572, "kind": "agent", "project": "e2e-calc-ko", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119124.575, "kind": "agent", "project": "e2e-calc-ko", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119126.008, "kind": "agent", "project": "e2e-calc-ko", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.537, "kind": "agent", "project": "proj-eval", "phase": "done", "role": "evaluator", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.538, "kind": "agent", "project": "proj-eval", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.558, "kind": "agent", "project": "proj-eval", "phase": "done", "role": "evaluator", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.566, "kind": "agent", "project": "proj-eval2", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.572, "kind": "agent", "project": "proj-eval2", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.574, "kind": "agent", "project": "proj-eval2", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.575, "kind": "agent", "project": "proj-eval2", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.894, "kind": "outcome", "project": "proj-eval2", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119127.904, "kind": "agent", "project": "todo-059846a1", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.91, "kind": "agent", "project": "todo-059846a1", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.912, "kind": "agent", "project": "todo-059846a1", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119127.913, "kind": "agent", "project": "todo-059846a1", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119128.233, "kind": "outcome", "project": "todo-059846a1", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119128.245, "kind": "agent", "project": "todo-059846a1", "phase": "done", "role": "evaluator", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119128.246, "kind": "agent", "project": "todo-059846a1", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119128.899, "kind": "agent", "project": "proj-fe-build", "phase": "idle", "role": "dev-frontend", "item": "US-F1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119130.667, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119130.902, "kind": "canary", "project": "canary", "phase": "build", "item": "US-1", "verdict": "semantic"}
+{"ts": 1783119132.103, "kind": "agent", "project": "canary-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119132.369, "kind": "agent", "project": "json-tol", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119132.379, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119132.381, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119132.397, "kind": "agent", "project": "dep-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119132.925, "kind": "agent", "project": "red-resume", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119133.594, "kind": "env_repair", "project": "guard", "phase": "idle", "scope": "shared", "reason": "invalid_venv"}
+{"ts": 1783119134.101, "kind": "agent", "project": "canary-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119134.287, "kind": "canary", "project": "canary-infra", "phase": "build", "item": "US-1", "verdict": "infra_suspected"}
+{"ts": 1783119134.287, "kind": "canary", "project": "canary-infra", "phase": "build", "item": "US-1", "verdict": "infra_healed"}
+{"ts": 1783119134.379, "kind": "agent", "project": "proj-impact", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119134.407, "kind": "agent", "project": "proj-impact", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119134.424, "kind": "agent", "project": "proj-impact", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119134.446, "kind": "agent", "project": "proj-impact", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119134.471, "kind": "agent", "project": "proj-impact", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119134.491, "kind": "agent", "project": "proj-impact", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119136.72, "kind": "agent", "project": "indep-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119138.22, "kind": "agent", "project": "infra-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119138.483, "kind": "agent", "project": "infra-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119138.756, "kind": "agent", "project": "infra-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119139.569, "kind": "agent", "project": "infra-fail", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119139.855, "kind": "agent", "project": "infra-fail", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.456, "kind": "agent", "project": "claude-limit", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.545, "kind": "agent", "project": "proj-int", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.553, "kind": "agent", "project": "proj-int", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.555, "kind": "agent", "project": "proj-int", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.557, "kind": "agent", "project": "proj-int", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.883, "kind": "outcome", "project": "proj-int", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119140.895, "kind": "agent", "project": "proj-int-err", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.901, "kind": "agent", "project": "proj-int-err", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.903, "kind": "agent", "project": "proj-int-err", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.904, "kind": "agent", "project": "proj-int-err", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.905, "kind": "agent", "project": "proj-int-err", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.906, "kind": "agent", "project": "proj-int-err", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.907, "kind": "agent", "project": "proj-int-err", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.908, "kind": "agent", "project": "proj-int-err", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.909, "kind": "agent", "project": "proj-int-err", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119140.91, "kind": "agent", "project": "proj-int-err", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119141.133, "kind": "outcome", "project": "proj-int-err", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "failed"}]}
+{"ts": 1783119141.159, "kind": "agent", "project": "lang-heur", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119141.164, "kind": "agent", "project": "lang-agent", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119141.171, "kind": "agent", "project": "lang-fb", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119141.177, "kind": "agent", "project": "lang-idem", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119149.956, "kind": "agent", "project": "p-m3", "phase": "plan", "role": "?", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.048, "kind": "agent", "project": "p-obs", "phase": "plan", "role": "?", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.266, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.271, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.534, "kind": "outcome", "project": "proj-test", "phase": "stopped", "result": "stopped", "stories": [{"id": "US-1", "status": "todo"}]}
+{"ts": 1783119150.549, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "analyst", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.556, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.559, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.56, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.913, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119150.943, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.959, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.967, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.97, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119150.972, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.253, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.255, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.456, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}, {"id": "US-2", "status": "done"}]}
+{"ts": 1783119151.463, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.469, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.471, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.472, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.823, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119151.832, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.839, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.842, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.844, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119151.846, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.11, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "failed"}, {"id": "US-2", "status": "failed"}]}
+{"ts": 1783119152.117, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.124, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.126, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.127, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.487, "kind": "agent", "project": "proj-test", "phase": "analyze", "role": "analyst", "item": "phase:analyze", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.489, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.49, "kind": "outcome", "project": "proj-test", "phase": "stopped", "result": "stopped", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119152.528, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.535, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.538, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.54, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.542, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119152.79, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.006, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}, {"id": "US-2", "status": "done"}]}
+{"ts": 1783119153.013, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.085, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.088, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.089, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.45, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119153.457, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.471, "kind": "outcome", "project": "proj-test", "phase": "stopped", "result": "stopped", "stories": []}
+{"ts": 1783119153.492, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.499, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.5, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "judge", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.502, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.504, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.848, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119153.866, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.872, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.873, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "judge", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.875, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119153.877, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.214, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119154.221, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.229, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.231, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.233, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.637, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119154.645, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.653, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.654, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "judge", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.656, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.66, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.662, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "judge", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.665, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119154.672, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.054, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119155.062, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.071, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.073, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.074, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.077, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.361, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "failed"}]}
+{"ts": 1783119155.376, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.385, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.387, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.388, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.805, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119155.827, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.835, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.837, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119155.839, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.221, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119156.237, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.238, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.353, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.359, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.361, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.362, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.707, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119156.717, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.719, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.832, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.839, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.841, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119156.844, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119157.209, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119157.219, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119157.228, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119157.231, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119157.233, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119157.636, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119157.653, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119157.66, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119157.663, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119157.678, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.029, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119158.036, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.043, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.045, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.046, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.39, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119158.392, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.393, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.52, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.526, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.529, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.53, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.89, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119158.908, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.915, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.917, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119158.921, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.257, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119159.264, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.27, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.272, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.274, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.652, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119159.666, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.667, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.778, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.786, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.79, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119159.793, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119160.154, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119160.171, "kind": "agent", "project": "proj-retry-old", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119160.173, "kind": "agent", "project": "proj-retry-old", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119160.445, "kind": "agent", "project": "proj-retry-many", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119160.447, "kind": "agent", "project": "proj-retry-many", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119160.701, "kind": "agent", "project": "proj-retry-many", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119160.703, "kind": "agent", "project": "proj-retry-many", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119160.815, "kind": "agent", "project": "proj-resume-old", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119160.819, "kind": "agent", "project": "proj-resume-old", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.112, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.118, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.12, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.121, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.473, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119161.489, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.497, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.499, "kind": "agent", "project": "proj-test", "phase": "architect", "role": "architect", "item": "phase:architect", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.5, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.501, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.909, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119161.917, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.924, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.927, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119161.928, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119162.275, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119162.295, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119162.304, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119162.306, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119162.307, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119162.66, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119162.661, "kind": "agent", "project": "proj-test", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119162.692, "kind": "agent", "project": "proj-test", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.097, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.111, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.131, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.156, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.158, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "pm", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.161, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.181, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.183, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.2, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119163.632, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119163.639, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119163.641, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119163.642, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.007, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119164.027, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.033, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.035, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.038, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.408, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119164.459, "kind": "agent", "project": "proj-it", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.46, "kind": "agent", "project": "proj-it", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.462, "kind": "agent", "project": "proj-it", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.471, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.473, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.475, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.476, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.478, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783119164.513, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.521, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.521, "kind": "outcome", "project": "proj-test", "phase": "error", "result": "error", "error": "No JSON object in agent reply: \"ceci n'est pas du json\"", "stories": []}
+{"ts": 1783119164.536, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.543, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.545, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.547, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.55, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.976, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119164.984, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119164.996, "kind": "agent", "project": "proj-test", "phase": "analyze", "role": "analyst", "item": "phase:analyze", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.006, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.013, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.016, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.017, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.357, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119165.368, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.483, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.49, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.492, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.493, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.857, "kind": "agent", "project": "proj-test", "phase": "build", "role": "judge", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.859, "kind": "agent", "project": "proj-test", "phase": "build", "role": "critic", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119165.861, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.052, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119166.073, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.081, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.084, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.085, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.087, "kind": "outcome", "project": "proj-test", "phase": "error", "result": "error", "error": "uv introuvable", "stories": [{"id": "US-1", "status": "todo"}]}
+{"ts": 1783119166.249, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.261, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.263, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.265, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.267, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.268, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-gherkin", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.283, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.285, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.287, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.299, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.301, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.302, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.304, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.323, "kind": "agent", "project": "pp-proj", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.342, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.344, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.345, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.347, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.348, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.349, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119166.35, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.061, "kind": "agent", "project": "proj-retro", "phase": "done", "role": "retro", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.072, "kind": "agent", "project": "proj-retro", "phase": "done", "role": "retro", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.086, "kind": "agent", "project": "proj-retro2", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.093, "kind": "agent", "project": "proj-retro2", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.094, "kind": "agent", "project": "proj-retro2", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.095, "kind": "agent", "project": "proj-retro2", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.442, "kind": "outcome", "project": "proj-retro2", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119168.45, "kind": "agent", "project": "proj-retro3", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.457, "kind": "agent", "project": "proj-retro3", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.459, "kind": "agent", "project": "proj-retro3", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.46, "kind": "agent", "project": "proj-retro3", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.728, "kind": "agent", "project": "proj-retro3", "phase": "build", "role": "retro", "item": "phase:build", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119168.834, "kind": "outcome", "project": "proj-retro3", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119168.862, "kind": "agent", "project": "proj-retro5", "phase": "done", "role": "retro", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.249, "kind": "agent", "project": "demo-1", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.256, "kind": "agent", "project": "demo-1", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.259, "kind": "agent", "project": "demo-1", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.26, "kind": "agent", "project": "demo-1", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.518, "kind": "agent", "project": "demo-1", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.52, "kind": "agent", "project": "demo-1", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.711, "kind": "outcome", "project": "demo-1", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}, {"id": "US-2", "status": "done"}]}
+{"ts": 1783119169.728, "kind": "agent", "project": "proj-sec", "phase": "done", "role": "security-reviewer", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.73, "kind": "agent", "project": "proj-sec", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.746, "kind": "agent", "project": "proj-sec", "phase": "done", "role": "security-reviewer", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.762, "kind": "agent", "project": "proj-sec3", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.768, "kind": "agent", "project": "proj-sec3", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.77, "kind": "agent", "project": "proj-sec3", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119169.771, "kind": "agent", "project": "proj-sec3", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.12, "kind": "outcome", "project": "proj-sec3", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119170.14, "kind": "agent", "project": "todo-473b12c8", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.147, "kind": "agent", "project": "todo-473b12c8", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.149, "kind": "agent", "project": "todo-473b12c8", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.15, "kind": "agent", "project": "todo-473b12c8", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.54, "kind": "outcome", "project": "todo-473b12c8", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119170.554, "kind": "agent", "project": "todo-473b12c8", "phase": "done", "role": "security-reviewer", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.555, "kind": "agent", "project": "todo-473b12c8", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.606, "kind": "agent", "project": "proj-m2", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.614, "kind": "agent", "project": "proj-m2", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.617, "kind": "agent", "project": "proj-m2", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.618, "kind": "agent", "project": "proj-m2", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "Claude AI usage limit reached|1783122770", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.882, "kind": "outcome", "project": "proj-m2", "phase": "stopped", "result": "stopped", "stories": [{"id": "US-1", "status": "todo"}]}
+{"ts": 1783119170.893, "kind": "agent", "project": "proj-m2", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119170.894, "kind": "agent", "project": "proj-m2", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.023, "kind": "agent", "project": "proj-m2-off", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.031, "kind": "agent", "project": "proj-m2-off", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.033, "kind": "agent", "project": "proj-m2-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.034, "kind": "agent", "project": "proj-m2-off", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "usage limit reached|1718226000", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.036, "kind": "agent", "project": "proj-m2-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.037, "kind": "agent", "project": "proj-m2-off", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "usage limit reached|1718226000", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.039, "kind": "agent", "project": "proj-m2-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.04, "kind": "agent", "project": "proj-m2-off", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "usage limit reached|1718226000", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.042, "kind": "agent", "project": "proj-m2-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.043, "kind": "agent", "project": "proj-m2-off", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "usage limit reached|1718226000", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119171.302, "kind": "outcome", "project": "proj-m2-off", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "failed"}]}
+{"ts": 1783119171.5, "kind": "phase", "project": "smoke-ok", "phase": "idle", "name": "smoke"}
+{"ts": 1783119171.502, "kind": "smoke", "project": "smoke-ok", "phase": "idle", "ok": true, "detail": "listening :8000"}
+{"ts": 1783119171.513, "kind": "phase", "project": "smoke-ko", "phase": "idle", "name": "smoke"}
+{"ts": 1783119171.514, "kind": "smoke", "project": "smoke-ko", "phase": "idle", "ok": false, "detail": "n'écoute pas"}
+{"ts": 1783119172.593, "kind": "agent", "project": "p-i3", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119172.596, "kind": "agent", "project": "p-i3", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119172.598, "kind": "agent", "project": "p-i3", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119172.979, "kind": "outcome", "project": "p-i3", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119172.999, "kind": "agent", "project": "imp-f5327e05", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119173.002, "kind": "agent", "project": "imp-f5327e05", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119173.004, "kind": "agent", "project": "imp-f5327e05", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119173.396, "kind": "outcome", "project": "imp-f5327e05", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119173.987, "kind": "agent", "project": "split-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119174.074, "kind": "agent", "project": "split-proj", "phase": "build", "role": "architect", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119174.471, "kind": "agent", "project": "split-proj", "phase": "build", "role": "qa", "item": "US-1-S1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119175.161, "kind": "agent", "project": "split-proj", "phase": "build", "role": "qa", "item": "US-1-S2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119176.111, "kind": "agent", "project": "split-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119176.793, "kind": "agent", "project": "split-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119177.564, "kind": "agent", "project": "split-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119179.141, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119179.143, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119179.371, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev-frontend", "item": "T-front", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119180.428, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119180.643, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119180.645, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119180.646, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119181.687, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "T-back", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119181.689, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "T-back", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119182.293, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev-frontend", "item": "T-front", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119183.42, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119183.421, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119185.096, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119185.097, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119186.048, "kind": "frontend_verify", "project": "wt-proj", "phase": "idle", "item": "phase:idle", "ok": false, "summary": "toolchain frontend indisponible : [Errno 2] Le fichier spécifié est introuvable"}
+{"ts": 1783119186.75, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119186.752, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119186.985, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119186.987, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119187.387, "kind": "agent", "project": "legacy-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119187.389, "kind": "agent", "project": "legacy-proj", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119188.314, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "T-A", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119188.534, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "T-B", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119189.161, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "T-C", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.062, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.064, "kind": "agent", "project": "wt-proj", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.613, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.624, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.638, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.658, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.67, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.68, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119191.684, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119192.28, "kind": "agent", "project": "task-proj", "phase": "build", "role": "qa", "item": "T-back", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119192.282, "kind": "agent", "project": "task-proj", "phase": "build", "role": "dev", "item": "T-back", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119193.202, "kind": "agent", "project": "task-proj", "phase": "build", "role": "qa", "item": "T-back", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119193.203, "kind": "agent", "project": "task-proj", "phase": "build", "role": "dev", "item": "T-back", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119193.568, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119193.579, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119193.656, "kind": "agent", "project": "proj-ui-run", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119193.663, "kind": "agent", "project": "proj-ui-run", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119193.665, "kind": "agent", "project": "proj-ui-run", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119193.667, "kind": "agent", "project": "proj-ui-run", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.018, "kind": "outcome", "project": "proj-ui-run", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119194.034, "kind": "agent", "project": "proj-ui-red", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.042, "kind": "agent", "project": "proj-ui-red", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.045, "kind": "agent", "project": "proj-ui-red", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.047, "kind": "agent", "project": "proj-ui-red", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.325, "kind": "outcome", "project": "proj-ui-red", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "failed"}]}
+{"ts": 1783119194.35, "kind": "agent", "project": "proj-ui-missing", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.362, "kind": "agent", "project": "proj-ui-missing", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.365, "kind": "agent", "project": "proj-ui-missing", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.367, "kind": "agent", "project": "proj-ui-missing", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.684, "kind": "outcome", "project": "proj-ui-missing", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "failed"}]}
+{"ts": 1783119194.703, "kind": "agent", "project": "proj-no-ui-run", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.712, "kind": "agent", "project": "proj-no-ui-run", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.714, "kind": "agent", "project": "proj-no-ui-run", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119194.716, "kind": "agent", "project": "proj-no-ui-run", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119195.141, "kind": "outcome", "project": "proj-no-ui-run", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119195.275, "kind": "agent", "project": "proj-ux", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119195.284, "kind": "agent", "project": "proj-ux", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119195.286, "kind": "agent", "project": "proj-ux", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119195.288, "kind": "agent", "project": "proj-ux", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119195.739, "kind": "outcome", "project": "proj-ux", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783119195.756, "kind": "agent", "project": "proj-ux2", "phase": "idle", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783119195.758, "kind": "agent", "project": "proj-ux2", "phase": "idle", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120621.891, "kind": "agent", "project": "infra-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120622.569, "kind": "agent", "project": "infra-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120623.322, "kind": "agent", "project": "infra-proj", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120625.307, "kind": "agent", "project": "infra-fail", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120625.738, "kind": "agent", "project": "infra-fail", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120626.701, "kind": "agent", "project": "claude-limit", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120626.816, "kind": "phase", "project": "smoke-ok", "phase": "idle", "name": "smoke"}
+{"ts": 1783120626.817, "kind": "smoke", "project": "smoke-ok", "phase": "idle", "ok": true, "detail": "listening :8000"}
+{"ts": 1783120626.826, "kind": "phase", "project": "smoke-ko", "phase": "idle", "name": "smoke"}
+{"ts": 1783120626.827, "kind": "smoke", "project": "smoke-ko", "phase": "idle", "ok": false, "detail": "n'écoute pas"}
+{"ts": 1783120628.271, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120628.281, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120628.665, "kind": "outcome", "project": "proj-test", "phase": "stopped", "result": "stopped", "stories": [{"id": "US-1", "status": "todo"}]}
+{"ts": 1783120628.671, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "analyst", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120628.679, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120628.681, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120628.683, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120629.226, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120629.244, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120629.261, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120629.269, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120629.279, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120629.281, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120629.766, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120629.768, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.076, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}, {"id": "US-2", "status": "done"}]}
+{"ts": 1783120630.088, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.095, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.097, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.099, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.594, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120630.611, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.619, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.622, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.624, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120630.626, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.002, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "failed"}, {"id": "US-2", "status": "failed"}]}
+{"ts": 1783120631.009, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.018, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.021, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.022, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.565, "kind": "agent", "project": "proj-test", "phase": "analyze", "role": "analyst", "item": "phase:analyze", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.566, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.568, "kind": "outcome", "project": "proj-test", "phase": "stopped", "result": "stopped", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120631.584, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.593, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.596, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.597, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120631.6, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120632.127, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120632.597, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}, {"id": "US-2", "status": "done"}]}
+{"ts": 1783120632.609, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120632.682, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120632.687, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120632.689, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.267, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120633.275, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.285, "kind": "outcome", "project": "proj-test", "phase": "stopped", "result": "stopped", "stories": []}
+{"ts": 1783120633.307, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.315, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.316, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "judge", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.319, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.321, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.925, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120633.943, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.953, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.954, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "judge", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.958, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120633.96, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120634.576, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120634.591, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120634.601, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120634.604, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120634.618, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.205, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120635.221, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.229, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.23, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "judge", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.273, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.275, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.324, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "judge", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.328, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.33, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.932, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120635.953, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.965, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.968, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.969, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120635.972, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120636.42, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "failed"}]}
+{"ts": 1783120636.428, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120636.437, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120636.44, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120636.442, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120636.988, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120637.003, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.011, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.014, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.015, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.543, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120637.557, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.559, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.714, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.722, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.725, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120637.726, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120638.299, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120638.301, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120638.304, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120638.71, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120638.723, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120638.735, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120638.752, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120639.955, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120639.974, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120639.991, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120639.997, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120640.0, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120640.863, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120640.878, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120640.892, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120640.897, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120640.901, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120641.795, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120641.809, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120641.823, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120641.828, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120641.832, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120642.667, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120642.67, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120642.675, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120642.945, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120642.961, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120642.966, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120642.969, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120643.926, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120643.943, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120643.958, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120643.961, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120643.964, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120644.723, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120644.746, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120644.76, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120644.764, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120644.767, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120645.553, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120645.556, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120645.559, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120645.763, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120645.776, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120645.78, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120645.782, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120646.4, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120646.418, "kind": "agent", "project": "proj-retry-old", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120646.42, "kind": "agent", "project": "proj-retry-old", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120646.79, "kind": "agent", "project": "proj-retry-many", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120646.793, "kind": "agent", "project": "proj-retry-many", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120647.198, "kind": "agent", "project": "proj-retry-many", "phase": "build", "role": "qa", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120647.2, "kind": "agent", "project": "proj-retry-many", "phase": "build", "role": "dev", "item": "US-2", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120647.348, "kind": "agent", "project": "proj-resume-old", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120647.351, "kind": "agent", "project": "proj-resume-old", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120647.752, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120647.758, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120647.76, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120647.762, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.311, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120648.328, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.338, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.341, "kind": "agent", "project": "proj-test", "phase": "architect", "role": "architect", "item": "phase:architect", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.344, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.345, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.927, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120648.948, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.956, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.959, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120648.961, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120649.588, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120649.609, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120649.618, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120649.62, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120649.622, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.197, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120650.199, "kind": "agent", "project": "proj-test", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.221, "kind": "agent", "project": "proj-test", "phase": "done", "role": "analyst", "item": "phase:done", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.808, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.821, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.838, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.856, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.857, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "pm", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.859, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.876, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.878, "kind": "agent", "project": "proj-test", "phase": "idle", "role": "analyst", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120650.895, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120651.604, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120651.613, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120651.616, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120651.618, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120652.254, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120652.271, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120652.281, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120652.284, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120652.286, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120652.951, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120652.963, "kind": "agent", "project": "proj-it", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120652.965, "kind": "agent", "project": "proj-it", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120652.967, "kind": "agent", "project": "proj-it", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120652.98, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120652.983, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120652.986, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120652.989, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120652.991, "kind": "agent", "project": "proj-split", "phase": "idle", "role": "?", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 100, "out_tokens": 50}
+{"ts": 1783120653.011, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.025, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 1, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.027, "kind": "outcome", "project": "proj-test", "phase": "error", "result": "error", "error": "No JSON object in agent reply: \"ceci n'est pas du json\"", "stories": []}
+{"ts": 1783120653.061, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.073, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.076, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.079, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.082, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.671, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120653.692, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.704, "kind": "agent", "project": "proj-test", "phase": "analyze", "role": "analyst", "item": "phase:analyze", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.714, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.722, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.725, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120653.726, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120654.23, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120654.244, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120654.406, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120654.414, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120654.417, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120654.419, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.086, "kind": "agent", "project": "proj-test", "phase": "build", "role": "judge", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.088, "kind": "agent", "project": "proj-test", "phase": "build", "role": "critic", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.09, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": false, "error": "FakeRunner has no queued reply", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.396, "kind": "outcome", "project": "proj-test", "phase": "done", "result": "done", "stories": [{"id": "US-1", "status": "done"}]}
+{"ts": 1783120655.406, "kind": "agent", "project": "proj-test", "phase": "spec", "role": "pm", "item": "phase:spec", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.417, "kind": "agent", "project": "proj-test", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.421, "kind": "agent", "project": "proj-test", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.423, "kind": "agent", "project": "proj-test", "phase": "build", "role": "dev", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.425, "kind": "outcome", "project": "proj-test", "phase": "error", "result": "error", "error": "uv introuvable", "stories": [{"id": "US-1", "status": "todo"}]}
+{"ts": 1783120655.609, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.627, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.629, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.632, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.634, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.636, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-gherkin", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.655, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.657, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.659, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "sm", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.677, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.679, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.682, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.685, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.715, "kind": "agent", "project": "pp-proj", "phase": "idle", "role": "architect", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.737, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-structure", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.739, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.741, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.743, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.744, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.748, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "po-spec", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120655.75, "kind": "agent", "project": "pp-proj", "phase": "plan", "role": "critic", "item": "phase:plan", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120658.74, "kind": "agent", "project": "canary", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120659.103, "kind": "canary", "project": "canary", "phase": "build", "item": "US-1", "verdict": "semantic"}
+{"ts": 1783120663.849, "kind": "agent", "project": "canary-off", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120664.594, "kind": "agent", "project": "json-tol", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120664.63, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120664.634, "kind": "agent", "project": "retry-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120664.699, "kind": "agent", "project": "dep-ctx", "phase": "idle", "role": "dev", "item": "phase:idle", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120666.184, "kind": "agent", "project": "red-resume", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120668.62, "kind": "env_repair", "project": "guard", "phase": "idle", "scope": "shared", "reason": "invalid_venv"}
+{"ts": 1783120670.394, "kind": "agent", "project": "canary-infra", "phase": "build", "role": "qa", "item": "US-1", "duration_ms": 0, "ok": true, "error": "", "in_tokens": 0, "out_tokens": 0}
+{"ts": 1783120671.404, "kind": "canary", "project": "canary-infra", "phase": "build", "item": "US-1", "verdict": "infra_suspected"}
+{"ts": 1783120671.406, "kind": "canary", "project": "canary-infra", "phase": "build", "item": "US-1", "verdict": "infra_healed"}

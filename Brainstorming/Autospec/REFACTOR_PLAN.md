@@ -14,7 +14,7 @@ Preuve transverse : **le code généré est correct**. Sur `todo_list_2`, `uv ru
 
 | # | Cause racine | Preuve | Emplacement |
 |---|---|---|---|
-| C1 | **`AUTOSPEC_STREAMS=1` global** : tout projet, même trivial, emprunte le chemin parallèle streams+worktrees+merge. | `.env` ; défaut code `False`. | [config.py:306](backend/autospec/config.py#L306), [backend/.env](backend/.env) |
+| C1 | **`STREAMS=1` global** : tout projet, même trivial, emprunte le chemin parallèle streams+worktrees+merge. | `.env` ; défaut code `False`. | [config.py:306](backend/autospec/config.py#L306), [backend/.env](backend/.env) |
 | C2 | **Fausse indépendance** : `T-3-fe` et `T-4-fe` sont dans le **même** `frontend`/`file_root`, éditent tous deux `App.tsx`, mais sont planifiés **parallèles** (aucun `depends_on` entre eux). | Les 2 sont `frontend`, App.tsx reste le scaffold. | [pipeline.py:2923](backend/autospec/orchestrator/pipeline.py#L2923), [streams.py:166](backend/autospec/orchestrator/streams.py#L166) |
 | C3 | **Travail « green » perdu** : le dev répond « tests verts + build OK » mais **aucun `merge work item T-3-fe/T-4-fe`** n'existe ; le worktree (avec le code) est supprimé en `finally`. | `git log` : pas de merge fe ; `App.tsx` = placeholder. | [pipeline.py:3146-3216](backend/autospec/orchestrator/pipeline.py#L3146) |
 | C4 | **Fichiers volatils commités** : `autospec-state.json` / `autospec-interactions.jsonl` sont **tracés** ; `_acommit_story` fait `git add -A`. Réécrits à chaque `_sync()` → conflits/churn de merge garantis. | `git ls-files` les montre ; pas dans `.gitignore`. | [pipeline.py:2591](backend/autospec/orchestrator/pipeline.py#L2591) |
@@ -87,7 +87,7 @@ classe parallélisable certifiée disjointe de tous les items en vol (`running`)
 ## 4. Plan par phases
 
 ### P0 — Hotfix stabilité (jour 0, faible risque, débloque « tous échouent »)
-- **Config** : `AUTOSPEC_STREAMS=0` dans [backend/.env](backend/.env) (retour build série, chemin prouvé vert). *(C1)*
+- **Config** : `STREAMS=0` dans [backend/.env](backend/.env) (retour build série, chemin prouvé vert). *(C1)*
 - **Repo propre** : ajouter `autospec-state.json`, `autospec-interactions.jsonl` au `.gitignore` du workspace **et** remplacer `git add -A` par un add ciblé du code. *(C4)*
 - **Worker non-fatal** : dans `_reap_done`, **logger + marquer l'item FAILED**, ne plus relancer l'exception ni annuler les siblings. *(C6)*
 - **Orphelins** : au `resume_build`/retry, remettre toute tâche `in_progress`/`green`/`red` **sans worker actif** → `todo`. *(C8)*
@@ -153,9 +153,9 @@ trop volumineuse pour une seule fenêtre de contexte d'agent.
   siblings ; des sous-tâches plus fines et disjointes débloquent). Les erreurs
   d'**infra** (AgentError, crash CLI) ne déclenchent **jamais** de split — un échec
   transitoire n'est pas un problème de taille. **Borné** par `split_depth`/
-  `AUTOSPEC_SPLIT_MAX_DEPTH` (défaut **2**, pour qu'une tâche d'une TS extraite
+  `SPLIT_MAX_DEPTH` (défaut **2**, pour qu'une tâche d'une TS extraite
   puisse elle-même être re-découpée une fois — cf. RFC technical-stories), ON par
-  défaut (`AUTOSPEC_SPLIT_ON_FAILURE`).
+  défaut (`SPLIT_ON_FAILURE`).
 - Manuel : bouton **✂️ Découper plus fin** sur une story/tâche en échec
   (`POST …/items/{id}/split`), force le découpage puis reprend le build.
 - **Forme du découpage** (RFC `RFC-technical-stories.md`, source de vérité) : une
@@ -181,7 +181,7 @@ Spécifié par **`RFC-technical-stories.md`** (source de vérité). Une TS = une
 `UserStory(technical=True)` avec `contract` et `parent_id` — conteneur de travail
 technique affiché au niveau des US, adressable (rebuild/split/diff), résolu par le
 work-graph. Deux moteurs : **réactif** (P6 : extraction au split-on-failure) et
-**proactif** (le PO émet des TS dans le plan ; le critic de `AUTOSPEC_REVIEW_PLAN`
+**proactif** (le PO émet des TS dans le plan ; le critic de `REVIEW_PLAN`
 recommande l'extraction des unités trop grosses, `po_revise` applique).
 - Backend : `technical/contract/parent_id`, promotion dans `_split_task`,
   résolution récursive `parent_id` dans `build_work_graph` — livrés (tests
@@ -241,9 +241,9 @@ n'existent pas : leur couverture vit dans les fichiers ci-dessous.)*
 ## 6. Rollout / flags
 
 1. Mergez **P0** seul, vérifiez todo-list verte en série.
-2. **P1-P3** sous un flag `AUTOSPEC_STREAMS_SAFE` (sérialisation par défaut), tests verts.
-3. **P4** : `independence.py` + juge derrière `AUTOSPEC_INDEPENDENCE` (OFF), activez après tests.
-4. Réactivez `AUTOSPEC_STREAMS=1` **uniquement** profil `fullstack`, une fois P1-P4 stables.
+2. **P1-P3** sous un flag `STREAMS_SAFE` (sérialisation par défaut), tests verts.
+3. **P4** : `independence.py` + juge derrière `INDEPENDENCE` (OFF), activez après tests.
+4. Réactivez `STREAMS=1` **uniquement** profil `fullstack`, une fois P1-P4 stables.
 5. **P5** en dernier (change la sémantique de « done »).
 
 > Règle d'or : tant que l'indépendance n'est pas **prouvée** (analyseur déterministe **+** juge),
@@ -274,10 +274,10 @@ métriques, impossible de savoir si le proactif (P8) réduit réellement le réa
 **Livré (2026-07-02)** : `PlanCalibration` étendu (`merge_requeues`,
 `p2b_resumes`, `orphan_resets`, `infra_retries`) et **tous les compteurs ont un
 producteur** — dont `over_budget_tasks` mesuré sur l'empreinte réelle du commit
-vert (`_arecord_footprint`). Livraison partielle (P5, `AUTOSPEC_PARTIAL_DELIVERY`)
-et budget infra séparé (`AUTOSPEC_INFRA_MAX_RETRIES`) livrés. L'éval A/B du RFC
+vert (`_arecord_footprint`). Livraison partielle (P5, `PARTIAL_DELIVERY`)
+et budget infra séparé (`INFRA_MAX_RETRIES`) livrés. L'éval A/B du RFC
 v2 §6 est exécutable : `scripts/eval_po_pipeline.py` (scripted gratuit,
-`AUTOSPEC_EVAL_PROVIDER=claude` pour la mesure réelle). L'UI expose le tout :
+`EVAL_PROVIDER=claude` pour la mesure réelle). L'UI expose le tout :
 badge complexité S1, taxonomie des critères S2, marqueur spec incomplète,
 bannière « Livraison partielle », bloc calibration dans « Revue du plan ».
 
@@ -295,7 +295,7 @@ bannière « Livraison partielle », bloc calibration dans « Revue du plan ».
 - `Task.files_hint` enfin rempli : prompts `decompose_story` + `_streams_plan_block` demandent `file_globs` ; parsing dans `_adecompose_story` et `_build_tasks`.
 - `_enforce_task_independence` injecte les `depends_on` (floor) à la création des tâches.
 - Garde-fou scheduler `_item_claim` + `independence.declared_overlap` : deux items aux fichiers **déclarés** chevauchants ne tournent jamais en parallèle (sans jamais deadlock les claims non déclarés — gérés par le floor).
-- Juge LLM optionnel : persona `independence-judge`, skill `task-independence`, prompt `independence_judge`, méthode `_ajudge_independence`, flag `AUTOSPEC_INDEPENDENCE` (OFF).
+- Juge LLM optionnel : persona `independence-judge`, skill `task-independence`, prompt `independence_judge`, méthode `_ajudge_independence`, flag `INDEPENDENCE` (OFF).
 
 **Durcissement supplémentaire :**
 - H1 — `_reset_orphan_items()` aussi dans le `finally` de `_abuild_phase_streams` (stop/cancel laisse un état propre, relançable).
@@ -304,7 +304,7 @@ bannière « Livraison partielle », bloc calibration dans « Revue du plan ».
 
 **Tests :** `tests/test_independence.py` (11) — analyseur pur, reproduction todo_list_2, garde-fou scheduler (jamais de co-run sur fichiers déclarés communs, les deux finissent DONE), reset orphelins, crash worker isolé, commit sans bookkeeping.
 
-> Note config : `AUTOSPEC_STREAMS=1` est **laissé activé** dans `backend/.env` — le chemin parallèle est désormais sécurisé par P4, donc le désactiver (hotfix P0 d'origine) n'est plus nécessaire. À basculer à 0 seulement pour un débogage ponctuel.
+> Note config : `STREAMS=1` est **laissé activé** dans `backend/.env` — le chemin parallèle est désormais sécurisé par P4, donc le désactiver (hotfix P0 d'origine) n'est plus nécessaire. À basculer à 0 seulement pour un débogage ponctuel.
 
 ### 7bis. Suite à revue de code (P1/P2 corrigés)
 

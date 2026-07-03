@@ -538,9 +538,9 @@ async def test_infra_red_canary_keeps_the_merge_and_does_not_revert(tmp_path, mo
 def test_build_monitor_is_on_by_default_and_opt_out(monkeypatch):
     from autospec.orchestrator import build_monitor
 
-    monkeypatch.delenv("AUTOSPEC_BUILD_MONITOR", raising=False)
+    monkeypatch.delenv("BUILD_MONITOR", raising=False)
     assert build_monitor.enabled() is True          # ON par défaut : diagnostic
-    monkeypatch.setenv("AUTOSPEC_BUILD_MONITOR", "0")
+    monkeypatch.setenv("BUILD_MONITOR", "0")
     assert build_monitor.enabled() is False          # opt-out explicite
-    monkeypatch.setenv("AUTOSPEC_BUILD_MONITOR", "1")
+    monkeypatch.setenv("BUILD_MONITOR", "1")
     assert build_monitor.enabled() is True

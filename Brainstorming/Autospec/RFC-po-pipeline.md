@@ -66,7 +66,7 @@ sont optionnels et ignorés par le parse legacy → compat totale).
 - **Critic** : `SPEC_CRITERIA` — **complétude** (happy ET edge ET error ET boundary),
   testabilité, non-ambiguïté, alignement à la structure. *(Option : panel de critics
   à lentilles diverses pour la complétude — réservé high-value.)*
-- Parallélisé sur les nœuds (sémaphore `AUTOSPEC_MAX_PARALLEL_DEVS`).
+- Parallélisé sur les nœuds (sémaphore `MAX_PARALLEL_DEVS`).
 
 ### S3 — Gherkin (fan-out parallèle par story/TS)
 - **Maker** : persona `po-gherkin`. Entrée = une story + ses critères S2 + langage
@@ -77,7 +77,7 @@ sont optionnels et ignorés par le parse legacy → compat totale).
 
 ## 4. Gating (complexité + env)
 
-`AUTOSPEC_PO_PIPELINE` ∈ `off` (défaut) | `on` | `auto`.
+`PO_PIPELINE` ∈ `off` (défaut) | `on` | `auto`.
 - **off** : comportement actuel (`po_plan` + `_arefine_plan`/REVIEW_PLAN).
 - **on** : toujours le pipeline 3 étapes.
 - **auto** : heuristique de complexité — pipeline si l'un de : brief « long »
@@ -87,8 +87,8 @@ sont optionnels et ignorés par le parse legacy → compat totale).
   décider de S2/S3 selon la taille produite.)*
 
 Quand le pipeline est actif, il **remplace** le whole-plan `_arefine_plan`
-(`AUTOSPEC_REVIEW_PLAN`) : les critics par étape couvrent mieux. Granularité possible :
-`AUTOSPEC_PO_PIPELINE_GHERKIN=0` pour couper l'étape la plus chère.
+(`REVIEW_PLAN`) : les critics par étape couvrent mieux. Granularité possible :
+`PO_PIPELINE_GHERKIN=0` pour couper l'étape la plus chère.
 
 ## 5. Maîtrise cost / latence
 
@@ -109,11 +109,11 @@ Quand le pipeline est actif, il **remplace** le whole-plan `_arefine_plan`
 | `orchestrator/pipeline.py` | `_aplan_pipeline()` (S1→S2→S3, fan-out, merge) ; branché dans `_aplan_phase` derrière le gating ; validation déterministe S1 (réutilise `streams.validate`/`detect_cycle` + budget fichiers) |
 | `orchestrator/refine.py` | rien (réutilisé tel quel ; `accept` callback pour bloquer S1 sur check déterministe) |
 | `models.py` | `AcceptanceCriterion.kind: str = ""` (happy/edge/error/boundary ; optionnel) |
-| `config.py` | `AUTOSPEC_PO_PIPELINE` (+ heuristique) |
+| `config.py` | `PO_PIPELINE` (+ heuristique) |
 | `agents/scripted.py` | réponses scriptées S1/S2/S3 (démo/tests) |
 | Frontend | (optionnel) afficher le `kind` des critères + le score par étape ; non bloquant |
 
-**Compat** : `AUTOSPEC_PO_PIPELINE=off` par défaut ⇒ comportement **byte-identique**.
+**Compat** : `PO_PIPELINE=off` par défaut ⇒ comportement **byte-identique**.
 
 ## 7. Tests
 
@@ -126,7 +126,7 @@ Quand le pipeline est actif, il **remplace** le whole-plan `_arefine_plan`
 
 ## 8. Plan de livraison (phases)
 
-1. **Modèle + config** (`AcceptanceCriterion.kind`, `AUTOSPEC_PO_PIPELINE`) + gating squelette.
+1. **Modèle + config** (`AcceptanceCriterion.kind`, `PO_PIPELINE`) + gating squelette.
 2. **S1 Structure** : prompt + persona + critic + **validation déterministe** + tests.
 3. **S2 Spec** : prompt + persona + critic + fan-out + taxonomie critères + tests.
 4. **S3 Gherkin** : prompt + persona + critic + fan-out + tests.

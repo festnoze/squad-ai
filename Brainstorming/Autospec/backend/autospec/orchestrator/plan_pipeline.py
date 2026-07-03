@@ -1100,7 +1100,7 @@ async def arun_po_pipeline(
             gherkins[sid] = fallback_gherkin(
                 sid, by_id[sid].title, spec.acceptance_criteria
             )
-        log(_LOG_SRC, "S3 coupé (AUTOSPEC_PO_PIPELINE_GHERKIN=0) — gherkin mécanique dérivé des critères.")
+        log(_LOG_SRC, "S3 coupé (PO_PIPELINE_GHERKIN=0) — gherkin mécanique dérivé des critères.")
     else:
         ordered = [sid for sid in by_id if sid in specs]
         texts = await asyncio.gather(

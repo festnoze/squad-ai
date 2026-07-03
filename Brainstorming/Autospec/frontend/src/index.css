@@ -1721,7 +1721,7 @@ button.action-btn.action-done {
   margin: 6px 0 4px;
 }
 
-/* ---------- Revue du plan (AUTOSPEC_REVIEW_PLAN) ---------- */
+/* ---------- Revue du plan (REVIEW_PLAN) ---------- */
 .plan-review-score {
   font-size: 13px;
   color: var(--muted);

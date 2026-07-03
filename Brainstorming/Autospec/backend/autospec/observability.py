@@ -1,6 +1,6 @@
 """Optional Langfuse tracing of agent calls (O1).
 
-Env-gated (``AUTOSPEC_LANGFUSE``) and lazily imported: when langfuse is not
+Env-gated (``LANGFUSE``) and lazily imported: when langfuse is not
 installed or not configured, every entry point is a no-op. Tracing must NEVER
 affect the pipeline, so all langfuse interaction is wrapped — a failure here is
 logged and swallowed, never raised. The client reads LANGFUSE_PUBLIC_KEY /

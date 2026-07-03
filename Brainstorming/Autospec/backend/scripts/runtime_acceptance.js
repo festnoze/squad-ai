@@ -19,8 +19,8 @@ const WS = process.argv[2];
 const TIMEOUT = Number(process.argv[3] || 90000);
 const FRONTEND = process.argv[4] || "";
 const BACKEND_WEB = process.argv[5] === "1";
-const BACKEND_PORT = Number(process.env.AUTOSPEC_RUNTIME_BACKEND_PORT || 8000);
-const FRONTEND_PORT = Number(process.env.AUTOSPEC_RUNTIME_FRONTEND_PORT || 5174);
+const BACKEND_PORT = Number(process.env.RUNTIME_BACKEND_PORT || 8000);
+const FRONTEND_PORT = Number(process.env.RUNTIME_FRONTEND_PORT || 5174);
 
 const procs = [];
 const startedAt = Date.now();

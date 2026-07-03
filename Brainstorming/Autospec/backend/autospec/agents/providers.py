@@ -196,7 +196,7 @@ class OpenAiRunner(_LangChainRunner):
     def _build_model(self):
         if not settings.openai_api_key:
             raise AgentError(
-                "Clé API OpenAI absente (AUTOSPEC_OPENAI_API_KEY ou OPENAI_API_KEY)."
+                "Clé API OpenAI absente (OPENAI_API_KEY)."
             )
         try:
             from langchain_openai import ChatOpenAI
@@ -248,7 +248,7 @@ class OpenRouterRunner(_LangChainRunner):
     def _build_model(self):
         if not settings.openrouter_api_key:
             raise AgentError(
-                "Clé API OpenRouter absente (AUTOSPEC_OPENROUTER_API_KEY ou OPENROUTER_API_KEY)."
+                "Clé API OpenRouter absente (OPENROUTER_API_KEY)."
             )
         try:
             from langchain_openai import ChatOpenAI
@@ -298,7 +298,7 @@ class AnthropicRunner(_LangChainRunner):
     def _build_model(self):
         if not settings.anthropic_api_key:
             raise AgentError(
-                "Clé API Anthropic absente (AUTOSPEC_ANTHROPIC_API_KEY ou ANTHROPIC_API_KEY)."
+                "Clé API Anthropic absente (ANTHROPIC_API_KEY)."
             )
         try:
             from langchain_anthropic import ChatAnthropic
@@ -325,7 +325,7 @@ PROVIDERS = ("claude", "codex", "openai", "openrouter", "ollama", "anthropic")
 
 # Suggested models per provider, shown in the UI's second (adaptive) dropdown.
 # These are display/endpoint values passed straight to the backend, so a user
-# can still configure another one via the AUTOSPEC_*_MODEL env vars — the active
+# can still configure another one via the *_MODEL env vars — the active
 # model is always injected into the list so the selection round-trips correctly.
 MODEL_CHOICES: dict[str, tuple[str, ...]] = {
     # The Codex CLI runs OpenAI models; these are suggestions (env/live-discovery
@@ -422,7 +422,7 @@ def provider_capabilities(provider: str) -> RunnerCapabilities:
 
 
 def make_runner(provider: str) -> AgentRunner:
-    """Build the agent backend for a provider name (AUTOSPEC_AGENT_PROVIDER)."""
+    """Build the agent backend for a provider name (AGENT_PROVIDER)."""
     normalized = (provider or "claude").strip().lower()
     if normalized == "openai":
         return OpenAiRunner()

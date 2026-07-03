@@ -673,7 +673,7 @@ div.modal-backdrop [onClick=onClose]
 **Fichier** : `frontend/src/components/PlanReviewPanel.tsx`
 
 ### Rôle et emplacement
-Panneau « Revue du plan » (étape AUTOSPEC_REVIEW_PLAN) : score qualité du plan PO + problèmes signalés et améliorations proposées par l'agent **critic**. Dernier panneau de `div.col-left`. Masqué tant que la revue n'a pas tourné.
+Panneau « Revue du plan » (étape REVIEW_PLAN) : score qualité du plan PO + problèmes signalés et améliorations proposées par l'agent **critic**. Dernier panneau de `div.col-left`. Masqué tant que la revue n'a pas tourné.
 
 ### Props (interface `Props`)
 | Prop | Type | Oblig. |

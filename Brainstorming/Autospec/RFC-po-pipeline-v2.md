@@ -139,7 +139,7 @@ brief ──▶ S1 Structure+Complexité ──▶ S2 Spec (fan-out par STORY, /
 
 ## 3. Gating simplifié
 
-`AUTOSPEC_PO_PIPELINE ∈ off (défaut) | on`. **Suppression du mode `auto` à
+`PO_PIPELINE ∈ off (défaut) | on`. **Suppression du mode `auto` à
 heuristiques de brief** (longueur en caractères ≈ proxy médiocre) :
 
 - `on` → **S1 tourne toujours** (1-2 appels, c'est le levier principal).
@@ -147,7 +147,7 @@ heuristiques de brief** (longueur en caractères ≈ proxy médiocre) :
   - `< K` feuilles (défaut 4) → S2+S3 **fusionnés en une passe par story**
     (petit projet : 1 appel/story, pas de critic transversal) ;
   - `≥ K` → pipeline complet.
-- `AUTOSPEC_PO_PIPELINE_GHERKIN=0` conservé (couper S3).
+- `PO_PIPELINE_GHERKIN=0` conservé (couper S3).
 - Le pipeline actif remplace `_arefine_plan` (inchangé v1) — mais le critic
   transversal S2 **reprend la responsabilité TS** de l'addendum technical-stories
   (recommander l'extraction en TS des unités trop grosses), qui sinon disparaît
@@ -196,7 +196,7 @@ le critic transversal S2, et `decompose_finer`. Une seule définition de la
 | `orchestrator/plan_pipeline.py` (nouveau) | schémas pydantic des artefacts d'étapes ; validation + auto-repair ; S1→resize→critic transversal→S3 ; merge + dégradation. (Nouveau module : `pipeline.py` fait déjà 5200 lignes.) |
 | `orchestrator/refine.py` | variante critic-d'abord (pas de judge d'ouverture) + distinction « critic en échec » vs « critic satisfait » |
 | `orchestrator/pipeline.py` | branchement dans `_aplan_phase` derrière le gating ; émission des signaux de calibration depuis `_amaybe_split_on_failure` |
-| `config.py` | `AUTOSPEC_PO_PIPELINE` (off/on), `AUTOSPEC_PO_PIPELINE_MIN_LEAVES` (K), `AUTOSPEC_PO_PIPELINE_GHERKIN` |
+| `config.py` | `PO_PIPELINE` (off/on), `PO_PIPELINE_MIN_LEAVES` (K), `PO_PIPELINE_GHERKIN` |
 | `agents/scripted.py` | réponses S1/S2 (avec un cas `resize:split`)/S3 |
 | Frontend | (option) badge complexité + `kind` des critères + compteur de calibration |
 

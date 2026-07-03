@@ -652,7 +652,7 @@ async def test_aplan_phase_s1_failure_falls_back_to_legacy_po(monkeypatch):
 
 
 async def test_scripted_end_to_end_merged_mode(monkeypatch):
-    """AUTOSPEC_FAKE_AGENTS-style e2e: the ScriptedRunner drives S1 + the S1
+    """FAKE_AGENTS-style e2e: the ScriptedRunner drives S1 + the S1
     critic + the merged S2 pass (2 leaves < default K=4) without any LLM."""
     monkeypatch.setattr(settings, "po_pipeline", "on")
     monkeypatch.setattr(settings, "po_pipeline_min_leaves", 4)

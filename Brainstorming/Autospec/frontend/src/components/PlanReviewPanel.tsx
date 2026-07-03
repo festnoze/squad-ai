@@ -20,7 +20,7 @@ const CALIB_KEYS = [
   "infra_retries",
 ] as const;
 
-/** « Revue du plan » (AUTOSPEC_REVIEW_PLAN) : le score qualité du plan PO + les
+/** « Revue du plan » (REVIEW_PLAN) : le score qualité du plan PO + les
  *  problèmes signalés et améliorations proposées par l'agent critic, plus la
  *  calibration aval (§8) — les signaux du build qui jugent le dimensionnement.
  *  Masqué tant que rien n'a tourné (score < 0, aucune issue, aucun signal). */
