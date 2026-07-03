@@ -3716,7 +3716,9 @@ class Pipeline:
                 await self._acommit_story(worktree, item.id)
                 # B1/B6: green → waiting for the merge lock, then merging.
                 self._set_stage(target, BuildStage.MERGE_WAIT, "")
-                merged = await self._amerge_work_item(ws, branch, item.id, worktree)
+                merged, conflict_files = await self._amerge_work_item(
+                    ws, branch, item.id, worktree
+                )
                 if merged:
                     target.status = subject.status = StoryStatus.DONE
                     for test in subject.test_plan:
@@ -3735,7 +3737,11 @@ class Pipeline:
                     # worktree branched from the now-updated HEAD — which already
                     # contains the sibling's code — and merges cleanly. Bounded by
                     # dev_max_attempts; only a persistent conflict ends FAILED.
-                    target.last_error = "conflit de merge inter-stream"
+                    # Separation loop: the branch's REAL touched files recalibrate
+                    # the item's claims, the retry is scheduled strictly, and a
+                    # sizing lesson feeds the next plan (§6).
+                    touched = await self._abranch_files(ws, branch)
+                    self._register_merge_conflict(item, target, conflict_files, touched)
                     if subject.attempts < settings.dev_max_attempts:
                         target.status = subject.status = StoryStatus.TODO
                         self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
@@ -3990,7 +3996,17 @@ class Pipeline:
         except OSError:
             pass
 
-    async def _amerge_work_item(self, repo, branch: str, wid: str, worktree=None) -> bool:
+    async def _aconflict_files(self, repo) -> list[str]:
+        """The unmerged paths of the in-progress (failed) merge — read BEFORE
+        ``merge --abort`` wipes the state. Best-effort: [] when git fails."""
+        code, out = await self._agit(repo, "diff", "--name-only", "--diff-filter=U")
+        if code != 0:
+            return []
+        return [line.strip() for line in out.splitlines() if line.strip()]
+
+    async def _amerge_work_item(
+        self, repo, branch: str, wid: str, worktree=None
+    ) -> tuple[bool, list[str]]:
         """ST-10: merge a green work item's branch into the project repo's main
         branch. Merges MUST be serialized (``_merge_lock``) even though builds
         run in parallel — concurrent merges race on the shared index/HEAD.
@@ -4001,15 +4017,21 @@ class Pipeline:
         **rebase the branch onto the updated HEAD inside its worktree** then merge
         again — preserving the green work whenever the real edits don't truly
         conflict. Only a genuine line-level conflict (rebase fails) falls through
-        to failure, where the caller re-queues for a fresh rebuild."""
+        to failure, where the caller re-queues for a fresh rebuild.
+
+        Returns ``(merged, conflict_files)`` — the files that actually clashed
+        (empty on success), so the caller can diagnose the collision, recalibrate
+        the item's file claims and serialize the retry (inter-stream separation)."""
         # B6: hold the merge lock under this item's id so the tick can report
         # ``merge_lock_held:<wid>`` while others wait.
+        conflict_files: list[str] = []
         async with self._merge_lock.ahold(wid):
             code, out = await self._agit(
                 repo, "merge", "--no-ff", "-m", f"merge work item {wid}", branch
             )
             if code == 0:
-                return True
+                return True, []
+            conflict_files = await self._aconflict_files(repo)
             await self._agit(repo, "merge", "--abort")
             # P2: preserve the green branch — rebase it onto the now-updated HEAD
             # (which holds the sibling's commits), then merge the rebased branch.
@@ -4026,7 +4048,10 @@ class Pipeline:
                             "streams",
                             f"✅ {wid} préservé : rebase sur HEAD à jour puis merge.",
                         )
-                        return True
+                        return True, []
+                    for f in await self._aconflict_files(repo):
+                        if f not in conflict_files:
+                            conflict_files.append(f)
                     await self._agit(repo, "merge", "--abort")
                 else:
                     await self._agit(worktree, "rebase", "--abort")
@@ -4034,8 +4059,12 @@ class Pipeline:
                         "streams",
                         f"⚠️ Rebase de {wid} en conflit réel (mêmes lignes) — régénération nécessaire.",
                     )
-            self._log("streams", f"⛔ Merge de {wid} impossible (conflit) : {out.strip()[:200]}")
-            return False
+            listing = ", ".join(conflict_files[:5]) or "(fichiers non identifiés)"
+            self._log(
+                "streams",
+                f"⛔ Merge de {wid} impossible — conflit sur : {listing}. {out.strip()[:200]}",
+            )
+            return False, conflict_files
 
     # ------------------------------------------------ per-story actions
 
