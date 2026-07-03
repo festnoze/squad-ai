@@ -9,6 +9,7 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import copy
+import fnmatch
 import json
 import os
 import re
@@ -168,6 +169,34 @@ def _clamp_1_5(value, default: int = 3) -> int:
     except (TypeError, ValueError):
         return default
     return min(5, max(1, n))
+
+
+# Files any dev work legitimately produces alongside its scope: per-story test
+# and feature collateral (named after the story, siblings almost never collide).
+_SCOPE_ALLOWED_PREFIXES = ("tests/", "features/")
+
+
+def _file_in_scope(path: str, globs: list[str], zone: str) -> bool:
+    """Is a repo-relative file within a work item's declared scope? In scope:
+    it matches a declared glob (or lives under a directory glob), lives under
+    the item's stream zone, or is test/feature collateral. Everything else —
+    typically a shared entry-point/config file — is a conflict seed."""
+    p = path.strip().replace("\\", "/").lstrip("./")
+    if any(p.startswith(pre) for pre in _SCOPE_ALLOWED_PREFIXES):
+        return True
+    if ".test." in p.rsplit("/", 1)[-1]:
+        return True  # colocated vitest file next to its component
+    if zone and (p == zone or p.startswith(zone.rstrip("/") + "/")):
+        return True
+    for g in globs:
+        g_norm = str(g).strip().replace("\\", "/").lstrip("./")
+        if not g_norm:
+            continue
+        if fnmatch.fnmatch(p, g_norm):
+            return True
+        if g_norm.endswith("/") and p.startswith(g_norm):
+            return True  # a directory-prefix glob covers its whole subtree
+    return False
 
 
 def _acceptance_list(raw) -> list[AcceptanceCriterion]:
@@ -3482,13 +3511,7 @@ class Pipeline:
            dedicated integration task."""
         listing = ", ".join(conflict_files[:5]) or "fichiers non identifiés"
         target.last_error = f"conflit de merge inter-stream sur : {listing}"
-        observed = [f for f in [*conflict_files, *touched] if f.strip()]
-        hints = list(getattr(target, "files_hint", []))
-        for f in observed:
-            if f not in hints:
-                hints.append(f)
-        if hasattr(target, "files_hint"):
-            target.files_hint = hints
+        self._merge_scope_hints(target, [*conflict_files, *touched])
         self._conflict_retry_ids.add(item.id)
         lesson = (
             f"Itération {self.state.iteration} : « {getattr(target, 'title', '') or item.id} » "
@@ -3888,6 +3911,12 @@ class Pipeline:
                     # against the leaf budget — the ground truth the plan-time
                     # estimate (file_globs/estimated_files) must be judged by.
                     await self._arecord_footprint(item, worktree)
+                    # Scope gate (separation loop, proactive half): out-of-scope
+                    # edits are reverted-if-harmless BEFORE the merge, or kept
+                    # but declared — a conflict seed never reaches HEAD unseen.
+                    await self._aenforce_file_scope(
+                        item, subject, target, ws, worktree, branch, is_frontend
+                    )
                 # P2b: from here the branch holds committed GREEN work — keep it
                 # on cleanup (requeue, stop, manual retry) so the next pass can
                 # resume it; dropped again once merged or split.
@@ -4236,6 +4265,109 @@ class Pipeline:
         if code != 0:
             return []
         return [line.strip() for line in out.splitlines() if line.strip()]
+
+    def _merge_scope_hints(self, target, files: list[str]) -> None:
+        """Fold OBSERVED files into the item's declared claims (``files_hint``)
+        so the independence floor and the scheduler guard reason on reality."""
+        if not hasattr(target, "files_hint"):
+            return  # taskless UserStory: no per-file claims to recalibrate
+        hints = list(target.files_hint)
+        for f in files:
+            if f and f not in hints:
+                hints.append(f)
+        target.files_hint = hints
+
+    async def _aenforce_file_scope(
+        self,
+        item: "work_streams.WorkItem",
+        subject: UserStory,
+        target,
+        ws,
+        worktree,
+        branch: str,
+        is_frontend: bool,
+    ) -> None:
+        """Deterministic pre-merge SCOPE GATE (separation loop, proactive half).
+
+        The dev prompt's « PÉRIMÈTRE FICHIERS » is only an instruction; this
+        turns it into a verified contract. The branch's REAL footprint is
+        compared to the item's declared scope (its file globs, else its stream
+        zone). Out-of-scope edits — the raw material of inter-stream merge
+        conflicts — get the « revert if harmless » treatment:
+
+        - revert the strayed files to their base version and re-run the real
+          suite in the worktree: still green → the edits were gratuitous and
+          the conflict seed is removed BEFORE it can collide with a sibling;
+        - suite red → the edits are load-bearing (e.g. a new dependency in
+          ``pyproject.toml``): restore them, but DECLARE them (folded into
+          ``files_hint``) so the scheduler guard serializes any rival.
+
+        Either way the violation is counted (§8) and distilled into a sizing
+        lesson for the next plan. Best-effort: on any git failure the branch is
+        left as-is (the merge-conflict path stays the safety net); no declared
+        scope at all (legacy taskless backend story) → nothing to enforce."""
+        globs = [
+            str(g) for g in (getattr(target, "files_hint", None) or []) if str(g).strip()
+        ]
+        stream = self._story_stream(subject)
+        zone = (stream.file_root or "").strip().strip("/")
+        if not globs and not zone:
+            return
+        observed = await self._abranch_files(ws, branch)
+        out = [f for f in observed if not _file_in_scope(f, globs, zone)]
+        if not out:
+            return
+        listing = ", ".join(out[:5])
+        self.state.calibration_for().scope_violations += 1  # §8
+        self._log(
+            f"dev:{item.id}",
+            f"🚧 {item.id} a modifié {len(out)} fichier(s) HORS de son périmètre "
+            f"({listing}) — tentative de retrait avant merge.",
+        )
+        code, base = await self._agit(ws, "merge-base", "HEAD", branch)
+        _, tip = await self._agit(worktree, "rev-parse", "HEAD")
+        base, tip = base.strip(), tip.strip()
+        if code != 0 or not base or not tip:
+            self._merge_scope_hints(target, out)
+            return
+        for f in out:
+            restored, _ = await self._agit(worktree, "checkout", base, "--", f)
+            if restored != 0:  # the file did not exist at base: a stray NEW file
+                await self._agit(worktree, "rm", "-f", "--ignore-unmatch", "--", f)
+        if is_frontend:
+            ok, _, _ = await self._arun_frontend_tests(ws=worktree)
+        else:
+            ok, _, _ = await self._arun_pytest(ws=worktree)
+        if ok:
+            await self._agit(worktree, "add", "-A")
+            await self._agit(
+                worktree, "commit", "-m",
+                f"scope gate: retire les fichiers hors périmètre de {item.id}",
+            )
+            self._log(
+                f"dev:{item.id}",
+                f"✂️ Hors-périmètre retiré ({listing}) — la suite reste verte, la "
+                "graine de conflit est éliminée avant merge.",
+            )
+            action = "modifications superflues, retirées avant merge"
+        else:
+            await self._agit(worktree, "reset", "--hard", tip)
+            await self._agit(worktree, "clean", "-fd")
+            self._merge_scope_hints(target, out)
+            self._log(
+                f"dev:{item.id}",
+                f"⚠️ Retrait impossible (suite rouge sans {listing}) — fichiers "
+                "conservés mais DÉCLARÉS : les rivaux seront sérialisés.",
+            )
+            action = "modifications porteuses, conservées et déclarées"
+        lesson = (
+            f"Itération {self.state.iteration} : « {getattr(target, 'title', '') or item.id} » "
+            f"a débordé de son périmètre fichiers sur {listing} ({action}) — déclarer des "
+            "file_globs complets dès le plan, ou prévoir une tâche d'intégration dédiée."
+        )
+        if lesson not in self.state.sizing_lessons:
+            self.state.sizing_lessons.append(lesson)
+        self.state.sizing_lessons = self.state.sizing_lessons[-12:]
 
     async def _arecord_footprint(self, item: "work_streams.WorkItem", worktree) -> None:
         """§8 — ground the sizing calibration on the dev's REAL footprint: count

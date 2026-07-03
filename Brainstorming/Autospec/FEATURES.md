@@ -348,6 +348,16 @@ quatre étages (au lieu de l'erreur opaque « conflit de merge inter-stream ») 
 - **Retry strict** : l'item re-queué est re-planifié en mode **`claims_overlap`**
   (un claim non déclaré du même stream = rival possible) tant qu'un rival est en
   vol — un retry ne peut plus re-conflicter avec un item en cours.
+- **Gate de périmètre pré-merge** : le prompt n'est plus le seul garde-fou —
+  avant chaque merge, `_aenforce_file_scope` confronte le footprint réel de la
+  branche au périmètre déclaré (globs, sinon zone du stream ; `tests/`,
+  `features/` et fichiers `.test.` toujours admis). Un débordement est traité en
+  « **revert si inoffensif** » : les fichiers hors périmètre sont ramenés à leur
+  version de base et la suite rejouée — verte, la graine de conflit est éliminée
+  avant d'atteindre HEAD ; rouge (modification porteuse, ex. dépendance dans
+  `pyproject.toml`), les fichiers sont conservés mais **déclarés** dans
+  `files_hint` pour sérialiser les rivaux. Compté en calibration
+  (`scope_violations`, §8) + leçon de dimensionnement (§6).
 - **Prévention par prompt** : chaque dev parallèle reçoit son **PÉRIMÈTRE
   FICHIERS** (`prompts.file_scope_block` : globs déclarés, sinon zone du stream) ;
   le cerveau de découpe commun (`sizing_rules`) et le plan multi-stream réservent

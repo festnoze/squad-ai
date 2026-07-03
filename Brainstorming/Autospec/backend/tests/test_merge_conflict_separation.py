@@ -6,12 +6,15 @@ de dimensionnement injectée dans le prochain plan S1 (§6). Côté prompts, le
 dev reçoit son PÉRIMÈTRE FICHIERS et le cerveau de découpe réserve les
 fichiers partagés à une tâche d'intégration dédiée."""
 
+from pathlib import Path
+
 from autospec.agents import prompts
 from autospec.agents.runner import FakeRunner
-from autospec.models import Epic, ProjectState, StoryStatus, Task, UserStory
+from autospec.models import Epic, ProjectState, StoryStatus, Stream, StreamKind, Task, UserStory
 from autospec.orchestrator import independence
 from autospec.orchestrator import streams as work_streams
-from autospec.orchestrator.pipeline import Pipeline
+from autospec.orchestrator.pipeline import Pipeline, _file_in_scope
+from autospec.storage import workspace_dir
 
 
 def _state() -> ProjectState:
@@ -151,3 +154,145 @@ def test_shared_brain_reserves_shared_files_to_an_integration_task(monkeypatch):
     block = prompts._streams_plan_block(_state())
     assert "FICHIERS PARTAGÉS" in block and "INTÉGRATION" in block
     assert "INTER-stream" in block
+
+
+# ------------------------------------------- gate de périmètre pré-merge
+
+def test_file_in_scope_predicate():
+    globs = ["pkg/domain/*.py", "pkg/api/"]
+    # Globs déclarés (fichier + sous-arbre d'un glob-répertoire).
+    assert _file_in_scope("pkg/domain/todo.py", globs, "")
+    assert _file_in_scope("pkg/api/router.py", globs, "")
+    # Zone du stream.
+    assert _file_in_scope("frontend/src/X.tsx", [], "frontend")
+    # Collatéral légitime de tout dev : tests, features, fichiers .test colocalisés.
+    assert _file_in_scope("tests/steps/test_us_1.py", globs, "")
+    assert _file_in_scope("features/us_1.feature", globs, "")
+    assert _file_in_scope("frontend/src/X.test.tsx", [], "other")
+    # Hors périmètre : fichiers partagés et zones d'autres unités.
+    assert not _file_in_scope("main.py", globs, "")
+    assert not _file_in_scope("pyproject.toml", globs, "")
+    assert not _file_in_scope("frontend/src/App.tsx", globs, "")
+    assert not _file_in_scope("pkg/other/x.py", globs, "")
+
+
+def _scope_state(pid: str) -> ProjectState:
+    st = ProjectState(id=pid, name="scope", goal="g")
+    st.epics.append(Epic(id="EPIC-1", title="E"))
+    st.streams = [
+        Stream(id="backend", kind=StreamKind.BACKEND, language="python", primary=True)
+    ]
+    task = Task(
+        id="T-1", story_id="US-1", stream="backend", title="Tâche A",
+        files_hint=["pkg/a.py"],
+    )
+    st.stories = [UserStory(id="US-1", epic_id="EPIC-1", title="S", tasks=[task])]
+    return st
+
+
+async def _scope_harness(tmp_path, monkeypatch, pid: str):
+    """Un repo réel + une branche d'item qui modifie pkg/a.py (dans le périmètre)
+    ET main.py (hors périmètre). Retourne (pipeline, ws, worktree, task)."""
+    from autospec.agents.scripted import ScriptedRunner
+
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    state = _scope_state(pid)
+    pipeline = Pipeline(state, ScriptedRunner())
+    ws = workspace_dir(pid)
+    ws.mkdir(parents=True, exist_ok=True)
+    assert await pipeline._agit_ensure_repo(ws)
+    (ws / "pkg").mkdir()
+    (ws / "pkg" / "a.py").write_text("base\n", encoding="utf-8")
+    (ws / "main.py").write_text("entry\n", encoding="utf-8")
+    await pipeline._agit(ws, "add", "-A")
+    await pipeline._agit(ws, "commit", "-m", "base")
+    worktree = await pipeline._aworktree_add(ws, "autospec/wi-t-1")
+    assert worktree is not None
+    (Path(worktree) / "pkg" / "a.py").write_text("changed\n", encoding="utf-8")
+    (Path(worktree) / "main.py").write_text("entry + wiring\n", encoding="utf-8")
+    await pipeline._acommit_story(worktree, "T-1")
+    return pipeline, ws, worktree, state.stories[0].tasks[0]
+
+
+async def test_scope_gate_reverts_harmless_out_of_scope_edits(tmp_path, monkeypatch):
+    pipeline, ws, worktree, task = await _scope_harness(tmp_path, monkeypatch, "sg-ok")
+
+    async def _green(ws=None):
+        return True, "", {}
+
+    monkeypatch.setattr(pipeline, "_arun_pytest", _green)
+    item = _task_item("T-1")
+    await pipeline._aenforce_file_scope(
+        item, pipeline.state.stories[0], task, ws, worktree, "autospec/wi-t-1", False
+    )
+
+    # La graine de conflit (main.py) a été RETIRÉE de la branche avant merge…
+    touched = await pipeline._abranch_files(ws, "autospec/wi-t-1")
+    assert "main.py" not in touched and "pkg/a.py" in touched
+    # …et la modification hors périmètre n'atteindra jamais HEAD.
+    assert (Path(worktree) / "main.py").read_text(encoding="utf-8") == "entry\n"
+    assert pipeline.state.calibration_for().scope_violations == 1
+    assert any("débordé de son périmètre" in l for l in pipeline.state.sizing_lessons)
+    assert task.files_hint == ["pkg/a.py"]         # claims inchangés : ils sont vrais
+
+
+async def test_scope_gate_keeps_and_declares_load_bearing_edits(tmp_path, monkeypatch):
+    pipeline, ws, worktree, task = await _scope_harness(tmp_path, monkeypatch, "sg-red")
+
+    async def _red(ws=None):
+        return False, "boom", {}
+
+    monkeypatch.setattr(pipeline, "_arun_pytest", _red)
+    await pipeline._aenforce_file_scope(
+        _task_item("T-1"), pipeline.state.stories[0], task, ws, worktree,
+        "autospec/wi-t-1", False,
+    )
+
+    # Modification porteuse : conservée sur la branche…
+    assert (Path(worktree) / "main.py").read_text(encoding="utf-8") == "entry + wiring\n"
+    touched = await pipeline._abranch_files(ws, "autospec/wi-t-1")
+    assert "main.py" in touched
+    # …mais DÉCLARÉE : la garde du scheduler sérialisera tout rival.
+    assert "main.py" in task.files_hint
+    assert pipeline.state.calibration_for().scope_violations == 1
+
+
+async def test_scope_gate_is_a_noop_without_declared_scope(tmp_path, monkeypatch):
+    pipeline, ws, worktree, task = await _scope_harness(tmp_path, monkeypatch, "sg-off")
+    task.files_hint = []                            # plus de périmètre déclaré
+    calls = []
+
+    async def _spy(ws=None):
+        calls.append(1)
+        return True, "", {}
+
+    monkeypatch.setattr(pipeline, "_arun_pytest", _spy)
+    await pipeline._aenforce_file_scope(
+        _task_item("T-1"), pipeline.state.stories[0], task, ws, worktree,
+        "autospec/wi-t-1", False,
+    )
+
+    assert calls == []                              # pas de suite rejouée
+    assert pipeline.state.calibration_for().scope_violations == 0
+    touched = await pipeline._abranch_files(ws, "autospec/wi-t-1")
+    assert "main.py" in touched                     # branche intacte
+
+
+async def test_scope_gate_ignores_in_scope_work(tmp_path, monkeypatch):
+    pipeline, ws, worktree, task = await _scope_harness(tmp_path, monkeypatch, "sg-in")
+    # On retire la modification hors périmètre : plus rien à signaler.
+    await pipeline._agit(worktree, "checkout", "HEAD~1", "--", "main.py")
+    await pipeline._agit(worktree, "add", "-A")
+    await pipeline._agit(worktree, "commit", "-m", "fix")
+    calls = []
+
+    async def _spy(ws=None):
+        calls.append(1)
+        return True, "", {}
+
+    monkeypatch.setattr(pipeline, "_arun_pytest", _spy)
+    await pipeline._aenforce_file_scope(
+        _task_item("T-1"), pipeline.state.stories[0], task, ws, worktree,
+        "autospec/wi-t-1", False,
+    )
+    assert calls == [] and pipeline.state.calibration_for().scope_violations == 0
