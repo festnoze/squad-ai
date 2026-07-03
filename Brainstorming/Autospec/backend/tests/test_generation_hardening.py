@@ -450,3 +450,97 @@ def test_validate_skeleton_refuses_out_of_zone_globs():
     # Sans streams déclarés : le check est neutre.
     errors, _ = pp.validate_skeleton(skel, stream_roots=None)
     assert not any("zone" in e for e in errors)
+
+
+# ------------------------ infra vs sémantique : ne pas jeter du vert sur un
+# environnement cassé (venv partagée à moitié détruite, outil absent)
+
+def test_venv_validity_detects_the_half_deleted_state(tmp_path):
+    """La venv du bug réel : Lib/ présent mais ni pyvenv.cfg ni python.exe."""
+    # Absente → valide (uv la recrée).
+    assert Pipeline._venv_is_valid(tmp_path) is True
+    # À moitié détruite → invalide.
+    (tmp_path / ".venv" / "Lib").mkdir(parents=True)
+    assert Pipeline._venv_is_valid(tmp_path) is False
+    # Réparée (pyvenv.cfg + interpréteur) → valide.
+    (tmp_path / ".venv" / "pyvenv.cfg").write_text("home = x\n", encoding="utf-8")
+    (tmp_path / ".venv" / "Scripts").mkdir()
+    (tmp_path / ".venv" / "Scripts" / "python.exe").write_text("", encoding="utf-8")
+    assert Pipeline._venv_is_valid(tmp_path) is True
+
+
+def test_guard_purges_a_broken_shared_venv(tmp_path, monkeypatch):
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    pipeline = Pipeline(_state("guard"), ScriptedRunner())
+    ws = workspace_dir("guard")
+    (ws / ".venv" / "Lib").mkdir(parents=True)          # invalide
+    assert pipeline._guard_shared_venv(ws) is True       # purge effectuée
+    assert not (ws / ".venv").exists()                   # uv la reconstruira
+    # Deuxième passe : plus rien à purger.
+    assert pipeline._guard_shared_venv(ws) is False
+
+
+def test_infra_classifier_separates_env_breakage_from_real_reds():
+    P = Pipeline
+    # Aucun test collecté + signature d'outil → infra.
+    assert P._looks_like_infra_failure("No module named pytest", {}) is True
+    assert P._looks_like_infra_failure("error: failed to spawn `python`", {}) is True
+    # Des tests ont réellement échoué → PAS infra (vrai conflit sémantique).
+    assert P._looks_like_infra_failure("1 failed", {"UT-1": "failed"}) is False
+    # Rouge sans signature d'outil ni résultat → prudence : traité comme réel.
+    assert P._looks_like_infra_failure("AssertionError: boom", {}) is False
+
+
+async def test_infra_red_canary_keeps_the_merge_and_does_not_revert(tmp_path, monkeypatch):
+    """Le bug messagerie2 : la suite du HEAD combiné est rouge PARCE QUE la venv
+    partagée est cassée (aucun test exécuté), pas à cause d'un conflit de code.
+    Le canari répare l'environnement, rejoue, redevient vert — le merge est
+    CONSERVÉ (pas de revert, pas de requeue), et c'est compté comme infra."""
+    monkeypatch.setattr(settings, "streams_enabled", True)
+    monkeypatch.setattr(settings, "fake_agents", True)
+    monkeypatch.setattr(settings, "post_merge_canary", True)
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    state = _dev_state("canary-infra")
+    pipeline = Pipeline(state, ScriptedRunner())
+    shared_runs = []
+
+    async def _dev(subject, worktree, pkg, is_frontend):
+        from pathlib import Path
+
+        (Path(worktree) / "f.py").write_text("x = 1\n", encoding="utf-8")
+        return True, ""
+
+    async def _pytest(ws=None):
+        if ws is not None:
+            return True, "", {}                    # worktree : toujours vert
+        shared_runs.append(1)
+        # 1er canari : rouge d'INFRA (aucun test, signature venv) ; après la
+        # reconstruction forcée, vert.
+        if len(shared_runs) == 1:
+            return False, "No module named pytest", {}
+        return True, "", {}
+
+    monkeypatch.setattr(pipeline, "_arun_item_dev", _dev)
+    monkeypatch.setattr(pipeline, "_arun_pytest", _pytest)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=60)
+
+    story = state.story("US-1")
+    assert story.status == StoryStatus.DONE
+    assert len(shared_runs) == 2                    # rouge d'infra → 1 réparation + 1 rejeu
+    cal = state.calibration_for()
+    assert cal.canary_reverts == 0                  # AUCUN revert : le code était bon
+    assert cal.infra_retries == 1                   # compté comme infra
+    # Le HEAD partagé ne contient PAS de revert.
+    _, log = await pipeline._agit(workspace_dir("canary-infra"), "log", "--oneline")
+    assert "Revert" not in log
+
+
+def test_build_monitor_is_on_by_default_and_opt_out(monkeypatch):
+    from autospec.orchestrator import build_monitor
+
+    monkeypatch.delenv("AUTOSPEC_BUILD_MONITOR", raising=False)
+    assert build_monitor.enabled() is True          # ON par défaut : diagnostic
+    monkeypatch.setenv("AUTOSPEC_BUILD_MONITOR", "0")
+    assert build_monitor.enabled() is False          # opt-out explicite
+    monkeypatch.setenv("AUTOSPEC_BUILD_MONITOR", "1")
+    assert build_monitor.enabled() is True

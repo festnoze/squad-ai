@@ -417,6 +417,14 @@ class Pipeline:
         # Serialize the one-time `npm install` of the frontend stream so parallel
         # frontend work items don't each kick off (or race) an install.
         self._npm_lock = asyncio.Lock()
+        # Serialize every test-suite run that touches the SHARED workspace (the
+        # post-merge canary, the smoke run, any verify with ws=None). Two such
+        # runs racing on the shared `.venv` — each `uv run` may recreate it — can
+        # leave it half-built (no pyvenv.cfg / no python.exe), after which every
+        # subsequent `uv run` fails at launch and a green HEAD reads as red. Runs
+        # in a per-item git WORKTREE are isolated (their own `.venv`) and never
+        # take this lock, so parallel builds keep their concurrency.
+        self._shared_suite_lock = asyncio.Lock()
         # P0a: untrack volatile bookkeeping files from the project repo exactly
         # once per process (idempotent `git rm --cached`); guarded by this flag so
         # the per-commit `_agit_ensure_repo` hot path stays cheap.
@@ -3967,10 +3975,14 @@ class Pipeline:
                     # fraîchement mergé ; rouge → le merge est REVERTÉ (HEAD
                     # reste toujours vert pour les items suivants) et l'item
                     # re-queué comme un conflit, branche verte préservée.
-                    canary_ok, canary_tail = await self._apost_merge_canary(
+                    canary_ok, canary_kind, canary_tail = await self._apost_merge_canary(
                         item, is_frontend
                     )
-                    if not canary_ok and await self._arevert_head_merge(ws, item.id):
+                    # Seul un rouge SÉMANTIQUE (conflit de code réel) justifie un
+                    # revert. Un rouge d'INFRA (venv/outil) ne se répare pas en
+                    # jetant le merge — le canari a déjà tenté la reconstruction,
+                    # on garde le vert et on signale.
+                    if canary_kind == "semantic" and await self._arevert_head_merge(ws, item.id):
                         merged = False
                         semantic_revert = True
                         self.state.calibration_for().canary_reverts += 1  # §8
@@ -3988,12 +4000,21 @@ class Pipeline:
                         if lesson not in self.state.sizing_lessons:
                             self.state.sizing_lessons.append(lesson)
                         self.state.sizing_lessons = self.state.sizing_lessons[-12:]
-                    elif not canary_ok:
+                    elif canary_kind == "semantic":
                         # Revert impossible : on ne peut pas mieux faire que
                         # livrer l'item en signalant BRUYAMMENT le HEAD rouge.
                         self._notify(
                             "warning", "Canari post-merge rouge",
                             f"{item.id} mergé mais la suite combinée est rouge et le revert a échoué.",
+                        )
+                    elif not canary_ok:  # canary_kind == "infra"
+                        # Rouge d'infra persistant : le merge est conservé (le
+                        # code est bon), mais l'environnement partagé est cassé —
+                        # à signaler pour que le prochain run le voie.
+                        self._notify(
+                            "warning", "Canari post-merge : infra rouge",
+                            f"{item.id} mergé mais l'outillage partagé est indisponible "
+                            "(venv/toolchain), pas un conflit de code.",
                         )
                 if merged:
                     keep_branch = False  # P2b: merged into HEAD — branch is useless now
@@ -4351,26 +4372,70 @@ class Pipeline:
 
     async def _apost_merge_canary(
         self, item: "work_streams.WorkItem", is_frontend: bool
-    ) -> tuple[bool, str]:
+    ) -> tuple[bool, str, str]:
         """Rejoue la suite du stream de l'item sur le HEAD PARTAGÉ fraîchement
         mergé (AUTOSPEC_POST_MERGE_CANARY, ON). Deux items verts chacun dans
         leur worktree peuvent être rouges COMBINÉS — le canari attrape ce
-        conflit sémantique immédiatement, au lieu de le laisser dériver jusqu'au
-        smoke run. HEAD étant maintenu toujours vert (revert sinon), un rouge
-        est attribuable au merge qui vient d'avoir lieu. Retourne (ok, tail)."""
+        conflit sémantique immédiatement.
+
+        Retourne ``(ok, kind, tail)`` où ``kind`` ∈ {``"green"``, ``"semantic"``,
+        ``"infra"``}. La distinction est CAPITALE : un rouge d'INFRA (venv
+        partagée cassée, outil absent) n'est PAS un conflit de code — reverter le
+        merge jetterait du travail vert sans rien réparer. Deux garde-fous :
+
+        1. ``_arun_pytest`` purge d'abord une ``.venv`` invalide et sérialise le
+           run (le rouge d'infra le plus courant s'auto-répare dès le 1er essai) ;
+        2. si le rouge SUBSISTE et ressemble à de l'infra (aucun test collecté +
+           signature d'outil), on force une purge de l'environnement et on rejoue
+           UNE fois. Vert → c'était l'infra (``infra``, pas de revert). Toujours
+           rouge, ou rouge avec des tests réellement en échec → ``semantic`` (le
+           merge est reverté par l'appelant)."""
         if not self._setting("post_merge_canary"):
-            return True, ""
-        if is_frontend:
-            ok, output, _ = await self._arun_frontend_tests()
-        else:
-            ok, output, _ = await self._arun_pytest()
-        if not ok:
+            return True, "green", ""
+        run = self._arun_frontend_tests if is_frontend else self._arun_pytest
+        ok, output, results = await run()
+        if ok:
+            return True, "green", ""
+        # Rouge. Est-ce l'environnement plutôt que le code ?
+        if not is_frontend and self._looks_like_infra_failure(output, results):
             self._log(
                 f"dev:{item.id}",
-                f"🐤 Canari post-merge ROUGE après le merge de {item.id} — "
-                "conflit sémantique (vert+vert=rouge), revert du merge.",
+                f"🐤 Canari ROUGE après {item.id} mais SANS test exécuté — "
+                "suspicion d'infra (venv/outil). Réparation puis nouvel essai.",
             )
-        return ok, output[-1500:]
+            self.monitor.event("canary", item=item.id, verdict="infra_suspected")
+            import shutil
+
+            shutil.rmtree(workspace_dir(self.state.id) / ".venv", ignore_errors=True)
+            ok2, output2, _ = await self._arun_pytest()
+            if ok2:
+                self.state.calibration_for().infra_retries += 1  # §8
+                self._log(
+                    f"dev:{item.id}",
+                    "✅ Canari VERT après reconstruction de l'environnement — "
+                    f"le rouge de {item.id} venait de l'infra, PAS d'un conflit. "
+                    "Merge conservé.",
+                )
+                self.monitor.event("canary", item=item.id, verdict="infra_healed")
+                return True, "infra", output2[-1500:]
+            # Toujours rouge après un environnement neuf : outage profond de
+            # l'outillage. Reverter ne répare rien — on conserve le merge et on
+            # signale bruyamment (kind infra) plutôt que de jeter du vert.
+            self._log(
+                f"dev:{item.id}",
+                f"⛔ Canari toujours ROUGE après reconstruction — outillage "
+                f"indisponible, pas un conflit de code. Merge de {item.id} conservé.",
+            )
+            self.monitor.event("canary", item=item.id, verdict="infra_persistent")
+            return False, "infra", output2[-1500:]
+        # Des tests ont réellement échoué → vrai conflit sémantique.
+        self._log(
+            f"dev:{item.id}",
+            f"🐤 Canari post-merge ROUGE après le merge de {item.id} — "
+            "conflit sémantique (vert+vert=rouge), revert du merge.",
+        )
+        self.monitor.event("canary", item=item.id, verdict="semantic")
+        return False, "semantic", output[-1500:]
 
     async def _arevert_head_merge(self, repo, wid: str) -> bool:
         """Revert le commit de merge en tête de HEAD (celui de ``wid``), sous le
@@ -4520,6 +4585,25 @@ class Pipeline:
             return
         observed = await self._abranch_files(ws, branch)
         out = [f for f in observed if not _file_in_scope(f, globs, zone)]
+        if not out:
+            return
+        # Les MANIFESTES de dépendances (pyproject.toml / package.json + lockfiles)
+        # ne sont JAMAIS strippés : leur retrait est un faux vert STRUCTUREL — la
+        # .venv du worktree a déjà installé la dépendance, donc la suite reste
+        # verte SANS la ligne du manifeste, mais le HEAD combiné, lui, ne peut
+        # plus l'importer (c'est exactement le bug qui a fait tourner en rond une
+        # génération entière). On les DÉCLARE (les rivaux se sérialisent) et
+        # l'auto-fusion des manifestes règle la collision au moment du merge.
+        manifest_out = [f for f in out if manifests.is_manifest_conflict([f])]
+        if manifest_out:
+            out = [f for f in out if f not in manifest_out]
+            self._merge_scope_hints(target, manifest_out)
+            self._log(
+                f"dev:{item.id}",
+                f"📦 Manifeste(s) hors périmètre DÉCLARÉ(s) plutôt que retiré(s) : "
+                f"{', '.join(manifest_out[:5])} — les retirer serait un faux vert "
+                "(dépendance déjà installée dans la venv), l'auto-fusion s'en charge.",
+            )
         if not out:
             return
         listing = ", ".join(out[:5])
@@ -5373,6 +5457,74 @@ class Pipeline:
 
         return await asyncio.to_thread(_run)
 
+    def _is_shared_ws(self, ws) -> bool:
+        """Does ``ws`` designate the project's SHARED workspace (not a per-item
+        git worktree)? Only shared runs contend on the shared ``.venv`` and thus
+        need the venv guard + serialization lock."""
+        if ws is None:
+            return True
+        try:
+            return Path(ws).resolve() == workspace_dir(self.state.id).resolve()
+        except OSError:
+            return False
+
+    @staticmethod
+    def _venv_is_valid(ws) -> bool:
+        """Is ``ws/.venv`` a USABLE virtualenv? Absent is fine (``uv run`` will
+        create one). Present-but-broken — no ``pyvenv.cfg`` or no interpreter,
+        the exact half-deleted state a race between two ``uv run`` recreations
+        leaves behind on Windows — is NOT: uv then refuses both to use it and to
+        recreate it, and every launch fails."""
+        venv = Path(ws) / ".venv"
+        if not venv.exists():
+            return True
+        if not (venv / "pyvenv.cfg").exists():
+            return False
+        return (venv / "Scripts" / "python.exe").exists() or (venv / "bin" / "python").exists()
+
+    def _guard_shared_venv(self, ws) -> bool:
+        """Purge a broken shared ``.venv`` so the next ``uv run`` rebuilds it from
+        scratch. Returns True if it removed one (a repair happened). No-op when
+        the venv is valid or absent. Python only; best-effort (never raises)."""
+        if toolchain.normalize(self.state.backend_language.value) != "python":
+            return False
+        if self._venv_is_valid(ws):
+            return False
+        import shutil
+
+        shutil.rmtree(Path(ws) / ".venv", ignore_errors=True)
+        self._log(
+            "streams",
+            "🩹 .venv partagée invalide (à moitié détruite) — purgée pour "
+            "reconstruction par uv.",
+        )
+        self.monitor.event("env_repair", scope="shared", reason="invalid_venv")
+        return True
+
+    @staticmethod
+    def _looks_like_infra_failure(output: str, results: dict[str, str]) -> bool:
+        """Does a RED run look like a broken environment rather than a real test
+        failure? True only when NO test outcome was parsed (nothing ran) AND the
+        output carries a toolchain/venv signature. Deliberately narrow: a
+        project-level ``ModuleNotFoundError`` (a genuine post-merge semantic
+        conflict) is NOT matched here, so it still reverts."""
+        if results:
+            return False  # tests were collected and ran → a real red
+        low = (output or "").lower()
+        signatures = (
+            "no module named pytest",
+            "no module named 'pytest",
+            "failed to spawn",
+            "unable to create virtualenv",
+            "pyvenv.cfg",
+            "no interpreter found",
+            "does not appear to be a python project",
+            "the system cannot find the file specified",
+            "cannot find the path",
+            "failed to install",
+        )
+        return any(s in low for s in signatures)
+
     async def _arun_pytest(self, ws=None) -> tuple[bool, str, dict[str, str]]:
         """Run the test suite for the project's backend language (L2g).
 
@@ -5394,6 +5546,7 @@ class Pipeline:
         lang = toolchain.normalize(self.state.backend_language.value)
         ws = workspace_dir(self.state.id) if ws is None else ws
         env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        shared = self._is_shared_ws(ws)
 
         def _run() -> tuple[bool, str, dict[str, str]]:
             import tempfile
@@ -5423,7 +5576,15 @@ class Pipeline:
                     except OSError:
                         pass
 
-        ok, output, results = await asyncio.to_thread(_run)
+        # Shared workspace: purge a broken `.venv` first (so `uv run` rebuilds a
+        # valid one) and serialize the whole run so no sibling suite mutates the
+        # shared venv underneath it. Worktree runs are isolated → no lock.
+        if shared:
+            async with self._shared_suite_lock:
+                self._guard_shared_venv(ws)
+                ok, output, results = await asyncio.to_thread(_run)
+        else:
+            ok, output, results = await asyncio.to_thread(_run)
         self.monitor.pytest(
             item_id=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",
             ok=ok, summary=(output or "")[-500:],
@@ -5724,6 +5885,7 @@ class Pipeline:
         # dev step usually installed/linked it already).
         await self._aensure_frontend_node_modules(root)
         env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+        shared = ws is None
 
         def _run() -> tuple[bool, str, dict[str, str]]:
             import tempfile
@@ -5771,7 +5933,13 @@ class Pipeline:
                 except OSError:
                     pass
 
-        ok, output, results = await asyncio.to_thread(_run)
+        # Shared workspace: serialize so no sibling suite races on the shared
+        # frontend tree / node_modules. Worktree runs are isolated → no lock.
+        if shared:
+            async with self._shared_suite_lock:
+                ok, output, results = await asyncio.to_thread(_run)
+        else:
+            ok, output, results = await asyncio.to_thread(_run)
         self.monitor.event(
             "frontend_verify",
             item=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",

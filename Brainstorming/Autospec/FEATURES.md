@@ -375,10 +375,16 @@ quatre étages (au lieu de l'erreur opaque « conflit de merge inter-stream ») 
   câblage du dev) enseignent la convention.
 - **Canari post-merge** (`AUTOSPEC_POST_MERGE_CANARY`, ON) : vert + vert peut
   faire ROUGE combiné (conflit sémantique). Après chaque merge, la suite du
-  stream est rejouée sur le HEAD partagé ; rouge → le merge est **reverté**
-  (l'invariant « HEAD toujours vert » protège les items suivants) et l'item
-  re-queué en mode strict avec un `last_error` explicite. Compté
-  (`canary_reverts`, §8) + leçon de dimensionnement (§6).
+  stream est rejouée sur le HEAD partagé ; un rouge **SÉMANTIQUE** (des tests
+  ont réellement échoué) → le merge est **reverté** (l'invariant « HEAD toujours
+  vert » protège les items suivants) et l'item re-queué en mode strict avec un
+  `last_error` explicite (compté `canary_reverts`, §8 + leçon §6). Un rouge
+  d'**INFRA** (aucun test exécuté + signature d'outil : venv cassée, uv
+  indisponible) n'est **PAS** un conflit de code : le canari **répare
+  l'environnement** (purge de la venv partagée) et **rejoue** ; vert →
+  le merge est **conservé** (jamais reverté, `infra_retries`, §8). Cette
+  distinction évite le piège qui, sur un run réel, a fait reverter **34 merges
+  verts sur 34** à cause d'une venv partagée à moitié détruite.
 - **Cohérence zone/stream au plan** (`independence.zone_mismatches`) : un glob
   déclaré hors de la zone de son stream (ou dans la zone d'un autre stream) est
   **refusé dès la validation S1** du pipeline PO (auto-réparé), et signalé en
@@ -411,6 +417,48 @@ quatre étages (au lieu de l'erreur opaque « conflit de merge inter-stream ») 
   description + fichiers touchés) avec la consigne de LIRE ces modules et de
   respecter leurs signatures — le complément proactif du canari post-merge
   contre les conflits sémantiques.
+
+### Robustesse de l'environnement partagé (anti-fails d'infra)
+Un run réel (« messagerie2 ») a été entièrement perdu non par des bugs de code
+mais par une **venv partagée corrompue** : deux runs de suite concurrents sur le
+workspace partagé ont, sur Windows, laissé le `.venv` à moitié reconstruit (plus
+de `pyvenv.cfg` ni de `python.exe`). Dès lors chaque `uv run` échouait au
+lancement, le canari lisait un HEAD vert comme rouge et **revertait tous les
+merges**. Trois garde-fous :
+- **Garde-venv avant tout run partagé** (`_guard_shared_venv` / `_venv_is_valid`) :
+  avant de lancer la suite sur le workspace partagé, un `.venv` présent mais
+  invalide (sans `pyvenv.cfg` ni interpréteur) est **purgé** pour que `uv run` le
+  reconstruise proprement. Absent = laissé tel quel (uv le crée). Journalisé.
+- **Sérialisation des suites partagées** (`_shared_suite_lock`) : tout run de
+  suite qui touche le workspace **partagé** (canari, smoke, vérif `ws=None`) est
+  sérialisé — plus deux `uv run` qui se courent après sur le même `.venv`. Les
+  runs en **worktree** (isolés, leur propre `.venv`) ne prennent pas le lock et
+  gardent leur parallélisme.
+- **Classifieur infra vs sémantique** (`_looks_like_infra_failure`) : un rouge
+  **sans aucun test collecté** portant une signature d'outil (« No module named
+  pytest », « failed to spawn », `pyvenv.cfg`…) est de l'infra ; un rouge avec
+  des tests réellement en échec est un vrai conflit. Volontairement étroit : un
+  `ModuleNotFoundError` du package projet (vrai conflit post-merge) n'est PAS
+  classé infra et reverte bien.
+
+### Exemption des manifestes au scope gate
+Le scope gate ne **retire jamais** un manifeste de dépendances hors périmètre
+(`pyproject.toml`, `package.json`, lockfiles). Les retirer serait un **faux vert
+structurel** : la venv du worktree a déjà installé la dépendance, donc la suite
+reste verte SANS la ligne du manifeste, mais le HEAD combiné, lui, ne peut plus
+l'importer (exactement l'amorce du run perdu ci-dessus). Ils sont **déclarés**
+(`files_hint`, sérialise les rivaux) et l'**union des manifestes** règle la
+collision au merge.
+
+### Persistance des logs de build (diagnostic post-mortem)
+Le **build monitor** (`orchestrator/build_monitor.py`) est désormais **ON par
+défaut** (opt-out `AUTOSPEC_BUILD_MONITOR=0`) : chaque run écrit une timeline
+JSONL (`workspace/<projet>/build-monitor.jsonl`) — appels d'agents, runs de
+suite (vert/rouge + tail), verdicts du canari (`semantic` / `infra_healed` /
+`infra_persistent`), réparations d'environnement, transitions de phase. Un rouge
+dont l'unique trace était une ligne de log SSE volatile est impossible à
+diagnostiquer une fois le process terminé ; la timeline rend le run relisible
+après coup.
 
 ### Re-décomposition adaptative sur échec
 - Quand une **US ou une tâche n'arrive pas à passer au vert** après ses tentatives

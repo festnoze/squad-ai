@@ -257,6 +257,58 @@ async def test_scope_gate_keeps_and_declares_load_bearing_edits(tmp_path, monkey
     assert pipeline.state.calibration_for().scope_violations == 1
 
 
+async def test_scope_gate_never_strips_dependency_manifests(tmp_path, monkeypatch):
+    """Un manifeste (pyproject.toml) hors périmètre n'est JAMAIS retiré : le
+    retirer serait un faux vert (la dépendance est déjà installée dans la venv du
+    worktree), et le HEAD combiné ne pourrait plus l'importer. Il est DÉCLARÉ
+    (les rivaux se sérialisent) et la suite n'est même pas rejouée."""
+    from autospec.agents.scripted import ScriptedRunner
+
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    state = _scope_state("sg-manifest")
+    pipeline = Pipeline(state, ScriptedRunner())
+    task = state.stories[0].tasks[0]
+    ws = workspace_dir("sg-manifest")
+    ws.mkdir(parents=True, exist_ok=True)
+    assert await pipeline._agit_ensure_repo(ws)
+    (ws / "pkg").mkdir()
+    (ws / "pkg" / "a.py").write_text("base\n", encoding="utf-8")
+    (ws / "pyproject.toml").write_text(
+        '[project]\nname = "app"\ndependencies = []\n', encoding="utf-8"
+    )
+    await pipeline._agit(ws, "add", "-A")
+    await pipeline._agit(ws, "commit", "-m", "base")
+    worktree = await pipeline._aworktree_add(ws, "autospec/wi-t-1")
+    assert worktree is not None
+    (Path(worktree) / "pkg" / "a.py").write_text("changed\n", encoding="utf-8")
+    (Path(worktree) / "pyproject.toml").write_text(
+        '[project]\nname = "app"\ndependencies = [\n    "redis>=5.0",\n]\n',
+        encoding="utf-8",
+    )
+    await pipeline._acommit_story(worktree, "T-1")
+
+    calls = []
+
+    async def _spy(ws=None):
+        calls.append(1)
+        return True, "", {}
+
+    monkeypatch.setattr(pipeline, "_arun_pytest", _spy)
+    await pipeline._aenforce_file_scope(
+        _task_item("T-1"), state.stories[0], task, ws, worktree,
+        "autospec/wi-t-1", False,
+    )
+
+    # Le manifeste est CONSERVÉ tel quel sur la branche (jamais reverté)…
+    assert '"redis>=5.0"' in (Path(worktree) / "pyproject.toml").read_text(encoding="utf-8")
+    # …DÉCLARÉ pour sérialiser les rivaux…
+    assert "pyproject.toml" in task.files_hint
+    # …sans rejouer la suite (le retrait-si-inoffensif ne s'applique pas)…
+    assert calls == []
+    # …et sans compter une violation (c'est un partage structurel, pas une bavure).
+    assert pipeline.state.calibration_for().scope_violations == 0
+
+
 async def test_scope_gate_is_a_noop_without_declared_scope(tmp_path, monkeypatch):
     pipeline, ws, worktree, task = await _scope_harness(tmp_path, monkeypatch, "sg-off")
     task.files_hint = []                            # plus de périmètre déclaré
