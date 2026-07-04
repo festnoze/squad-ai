@@ -43,10 +43,11 @@ _RESET_EPOCH_RE = re.compile(r"\|(\d{9,13})\b")
 
 
 def monitor_active() -> bool:
-    """The watchdog only concerns the real Claude harness (subscription)."""
+    """The watchdog only concerns the real Claude Code CLI harness
+    (subscription usage windows) — not the key-based "claude" API provider."""
     return (
         settings.session_monitor_enabled
-        and settings.agent_provider == "claude"
+        and settings.agent_provider == "claude code"
         and not settings.fake_agents
     )
 

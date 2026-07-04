@@ -131,12 +131,12 @@ BRIEFS: dict[int, dict] = {
 
 
 def _configure(proj: int, run_dir: Path) -> None:
-    os.environ["BUILD_MONITOR"] = "1"
+    # The monitor is always on; this mirrors the run's events into run_dir too.
     os.environ["BUILD_MONITOR_DIR"] = str(run_dir)
     from autospec.config import settings
 
-    # Force the Claude CLI provider regardless of any .env default (e.g. codex).
-    settings.agent_provider = "claude"
+    # Force the Claude Code CLI provider regardless of any .env default (e.g. codex).
+    settings.agent_provider = "claude code"
     settings.fake_agents = False
     # Keep the heavy optional phases off unless this project needs them.
     settings.approval_gates_enabled = False
@@ -165,7 +165,7 @@ async def _run(proj: int) -> dict:
     from autospec.orchestrator.pipeline import Pipeline
     from autospec.storage import workspace_dir
 
-    runner = make_runner("claude")
+    runner = make_runner("claude code")
     state = ProjectState(
         id=new_id(f"drv-p{proj}"),
         name=spec["name"],

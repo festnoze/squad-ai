@@ -99,6 +99,7 @@ def discover() -> list:
 # items conflict on it on merge (refactor P0a). Shared across all root gitignores.
 BOOKKEEPING_IGNORE = """autospec-state.json
 autospec-interactions.jsonl
+build-monitor.jsonl
 .autospec/
 """
 

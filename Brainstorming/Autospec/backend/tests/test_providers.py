@@ -18,11 +18,15 @@ from autospec.config import settings
 
 
 def test_make_runner_mapping():
-    from autospec.agents.providers import OpenRouterRunner
+    from autospec.agents.providers import AnthropicRunner, OpenRouterRunner
 
-    assert isinstance(make_runner("claude"), ClaudeCliRunner)
+    # "claude code" = the CLI harness; "claude" = the Anthropic API direct.
+    assert isinstance(make_runner("claude code"), ClaudeCliRunner)
+    assert isinstance(make_runner("claude"), AnthropicRunner)
+    # "anthropic" survives as a legacy alias of "claude".
+    assert isinstance(make_runner("anthropic"), AnthropicRunner)
     assert isinstance(make_runner("codex"), CodexCliRunner)
-    # Empty/default provider resolves to Claude (the default, first in the UI).
+    # Empty/default provider resolves to Claude Code (the default, first in the UI).
     assert isinstance(make_runner(""), ClaudeCliRunner)
     assert isinstance(make_runner("OpenAI"), OpenAiRunner)
     assert isinstance(make_runner("openrouter"), OpenRouterRunner)
@@ -60,15 +64,20 @@ def test_provider_model_reads_settings(monkeypatch):
     monkeypatch.setattr(settings, "openai_model", "gpt-test")
     monkeypatch.setattr(settings, "ollama_model", "llama-test")
     monkeypatch.setattr(settings, "claude_model", None)
+    monkeypatch.setattr(settings, "anthropic_model", "claude-opus-4-8")
     assert provider_model("openai") == "gpt-test"
     assert provider_model("ollama") == "llama-test"
-    assert provider_model("claude") == "(défaut CLI)"
+    assert provider_model("claude code") == "(défaut CLI)"
+    # "claude" reads the Anthropic API model.
+    assert provider_model("claude") == "claude-opus-4-8"
 
 
 def test_provider_models_lists_choices(monkeypatch):
     monkeypatch.setattr(settings, "claude_model", None)
-    # Claude default placeholder is not injected as a selectable model.
-    assert provider_models("claude") == ["opus", "sonnet", "haiku"]
+    # Claude Code default placeholder is not injected as a selectable model;
+    # Opus 4.8 leads both Claude lists.
+    assert provider_models("claude code")[0] == "claude-opus-4-8"
+    assert provider_models("claude")[0] == "claude-opus-4-8"
     assert "gpt-4.1" in provider_models("openai")
 
 

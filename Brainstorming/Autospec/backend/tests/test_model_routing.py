@@ -8,6 +8,7 @@ from autospec.orchestrator.pipeline import Pipeline
 
 
 def test_model_for_phase_override(monkeypatch):
+    monkeypatch.setattr(cfg, "agent_provider", "claude code")
     monkeypatch.setattr(cfg, "phase_models", {"build": "strong-model"})
     monkeypatch.setattr(cfg, "claude_model", "default-model")
     assert cfg.model_for_phase("build") == "strong-model"
@@ -15,9 +16,20 @@ def test_model_for_phase_override(monkeypatch):
 
 
 def test_model_for_phase_no_override(monkeypatch):
+    monkeypatch.setattr(cfg, "agent_provider", "claude code")
     monkeypatch.setattr(cfg, "phase_models", {})
     monkeypatch.setattr(cfg, "claude_model", None)
     assert cfg.model_for_phase("build") is None
+
+
+def test_model_for_phase_does_not_leak_claude_model_to_other_providers(monkeypatch):
+    # The claude_model fallback is CLI-only: a Claude model id must not be
+    # passed to the codex/openai/... runners (they have their own settings).
+    monkeypatch.setattr(cfg, "agent_provider", "codex")
+    monkeypatch.setattr(cfg, "phase_models", {"build": "strong-model"})
+    monkeypatch.setattr(cfg, "claude_model", "claude-opus-4-8")
+    assert cfg.model_for_phase("build") == "strong-model"  # explicit override wins
+    assert cfg.model_for_phase("spec") is None
 
 
 async def test_tracker_routes_model_by_phase(monkeypatch):

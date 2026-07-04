@@ -9,8 +9,8 @@ static guess:
 - ``openai``  : ``GET {base_url}/models`` with the API key — the models the key
   can actually access (filtered to chat-capable ids).
 - ``codex``   : reuses the OpenAI catalogue (the Codex CLI runs OpenAI models).
-- ``claude`` / ``anthropic`` : static choices (no public list endpoint / the CLI
-  exposes only aliases).
+- ``claude code`` (CLI) / ``claude`` (Anthropic API) : static choices (no public
+  list endpoint / the CLI exposes only aliases).
 
 All network/subprocess work runs in a worker thread (the event loop on Windows is
 a SelectorEventLoop). Callers fall back to the static ``provider_models`` list on

@@ -535,12 +535,20 @@ async def test_infra_red_canary_keeps_the_merge_and_does_not_revert(tmp_path, mo
     assert "Revert" not in log
 
 
-def test_build_monitor_is_on_by_default_and_opt_out(monkeypatch):
-    from autospec.orchestrator import build_monitor
+def test_every_pipeline_log_line_is_persisted_in_the_timeline(tmp_path, monkeypatch):
+    """Le bus SSE est volatile ; chaque ligne `_log` doit AUSSI atterrir dans
+    workspace/<projet>/build-monitor.jsonl (kind=log) pour le post-mortem —
+    c'est le récit (scope gate, merges, reverts…) qui manquait au diagnostic."""
+    import json
 
-    monkeypatch.delenv("BUILD_MONITOR", raising=False)
-    assert build_monitor.enabled() is True          # ON par défaut : diagnostic
-    monkeypatch.setenv("BUILD_MONITOR", "0")
-    assert build_monitor.enabled() is False          # opt-out explicite
-    monkeypatch.setenv("BUILD_MONITOR", "1")
-    assert build_monitor.enabled() is True
+    monkeypatch.setattr("autospec.config.settings.workspace_root", tmp_path)
+    monkeypatch.delenv("BUILD_MONITOR_DIR", raising=False)
+    pipeline = Pipeline(_state("timeline"), ScriptedRunner())
+    pipeline._log("streams", "🚧 T-1 a modifié main.py hors périmètre")
+
+    timeline = workspace_dir("timeline") / "build-monitor.jsonl"
+    assert timeline.exists()
+    events = [json.loads(l) for l in timeline.read_text(encoding="utf-8").splitlines()]
+    logs = [e for e in events if e["kind"] == "log"]
+    assert logs and logs[-1]["source"] == "streams"
+    assert "hors périmètre" in logs[-1]["line"]

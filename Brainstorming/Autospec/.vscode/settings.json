@@ -1,0 +1,14 @@
+{
+    // Don't inject venv activation into new terminals: the Frontend (Vite)
+    // launch already has `npm run dev` running in its terminal, and the
+    // injected Activate.ps1 line reaches npm as input, triggering
+    // "Terminate batch job (Y/N)?" and killing the dev server.
+    // Debug launches don't need it — launch.json sets "python" explicitly.
+    "python.terminal.activateEnvironment": false,
+    "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+    "python.testing.pytestArgs": [
+        "backend"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true
+}

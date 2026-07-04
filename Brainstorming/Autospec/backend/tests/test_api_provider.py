@@ -23,17 +23,20 @@ def make_client(replies: list[str]) -> httpx.AsyncClient:
 
 
 async def test_get_provider_defaults(monkeypatch):
-    monkeypatch.setattr(settings, "agent_provider", "claude")
-    monkeypatch.setattr(settings, "claude_model", None)
+    monkeypatch.setattr(settings, "agent_provider", "claude code")
+    monkeypatch.setattr(settings, "claude_model", "claude-opus-4-8")
     async with make_client([]) as client:
         data = (await client.get("/api/provider")).json()
-        assert data["provider"] == "claude"
-        # Claude is the default provider: first in the list.
+        assert data["provider"] == "claude code"
+        # Claude Code (CLI harness) is the default provider: first in the list;
+        # "claude" is the Anthropic API direct.
         assert data["available"] == [
-            "claude", "codex", "openai", "openrouter", "ollama", "anthropic",
+            "claude code", "claude", "codex", "openai", "openrouter", "ollama",
         ]
-        # Adaptive 2nd dropdown: per-provider model choices.
-        assert data["models"]["claude"] == ["opus", "sonnet", "haiku"]
+        # Adaptive 2nd dropdown: per-provider model choices, Opus 4.8 first.
+        assert data["model"] == "claude-opus-4-8"
+        assert data["models"]["claude code"][0] == "claude-opus-4-8"
+        assert data["models"]["claude"][0] == "claude-opus-4-8"
         assert "gpt-4.1" in data["models"]["openai"]
         assert data["models"]["codex"]  # codex has suggested models too
         assert data["models"]["openrouter"]  # OpenRouter has fallback suggestions
@@ -41,25 +44,26 @@ async def test_get_provider_defaults(monkeypatch):
         assert data["capabilities"]["can_run_shell"] is True
 
 
-async def test_switch_anthropic_model(monkeypatch):
-    monkeypatch.setattr(settings, "agent_provider", "claude")
+async def test_switch_claude_api_model(monkeypatch):
+    monkeypatch.setattr(settings, "agent_provider", "claude code")
     async with make_client([]) as client:
         resp = await client.post(
             "/api/provider",
-            json={"provider": "anthropic", "model": "claude-opus-4-8"},
+            json={"provider": "claude", "model": "claude-sonnet-4-6"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["ok"] is True
-        assert data["provider"] == "anthropic"
-        assert data["model"] == "claude-opus-4-8"
+        # "claude" goes through the Anthropic API (LangChain), not the CLI.
+        assert data["provider"] == "claude"
+        assert data["model"] == "claude-sonnet-4-6"
         assert data["capabilities"]["execution_model"] == "langchain_file_tools"
         assert data["capabilities"]["can_run_shell"] is False
-        assert settings.anthropic_model == "claude-opus-4-8"
+        assert settings.anthropic_model == "claude-sonnet-4-6"
 
 
 async def test_switch_provider_updates_pipelines(monkeypatch):
-    monkeypatch.setattr(settings, "agent_provider", "claude")
+    monkeypatch.setattr(settings, "agent_provider", "claude code")
     monkeypatch.setattr(settings, "ollama_model", "llama3.1")
     async with make_client([PM_QUESTION]) as client:
         project_id = (
@@ -80,7 +84,7 @@ async def test_switch_provider_updates_pipelines(monkeypatch):
 
 
 async def test_switch_provider_rejects_unknown(monkeypatch):
-    monkeypatch.setattr(settings, "agent_provider", "claude")
+    monkeypatch.setattr(settings, "agent_provider", "claude code")
     async with make_client([]) as client:
         assert (
             await client.post("/api/provider", json={"provider": "gemini"})
@@ -93,7 +97,7 @@ async def test_provider_locked_in_demo_mode(monkeypatch):
         data = (await client.get("/api/provider")).json()
         assert data["provider"] == "fake"
         assert (
-            await client.post("/api/provider", json={"provider": "claude"})
+            await client.post("/api/provider", json={"provider": "claude code"})
         ).status_code == 409
 
 

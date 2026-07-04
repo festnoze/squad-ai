@@ -149,11 +149,13 @@ pilotés par l'orchestrateur Autospec, pas par l'auto-déclaration de l'agent.
 
 Implémentations (`agents/runner.py` + `agents/providers.py`) :
 
-- **`ClaudeCliRunner`** (production) — lance le binaire `claude` en sous-processus.
+- **`ClaudeCliRunner`** (production, provider **`claude code`**) — lance le
+  binaire `claude` en sous-processus (abonnement Claude Code).
 - **`CodexCliRunner`** — miroir OpenAI : `codex exec --json` en headless (le
   system prompt est préfixé au prompt, sortie JSONL parsée).
 - **`OpenAiRunner` / `OpenRouterRunner` / `OllamaRunner` / `AnthropicRunner`**
-  (`agents/providers.py`) — providers **hors abonnement** via **LangChain**
+  (`agents/providers.py`, `AnthropicRunner` = provider **`claude`**, l'API
+  Anthropic directe) — providers **hors abonnement** via **LangChain**
   (`langchain-openai` / `langchain-ollama` / `langchain-anthropic`, imports
   paresseux). **OpenRouter** est un hub compatible-OpenAI : `OpenRouterRunner`
   réutilise `ChatOpenAI` avec le `base_url`/clé OpenRouter (clés lues depuis
@@ -912,7 +914,7 @@ Variables d'environnement (toutes optionnelles) :
 | `REFINE_DEV` | `1` | raffinement du code Dev (idem) |
 | `REFINE_MAX_ROUNDS` | `2` | cap dur d'allers-retours maker↔critic↔judge |
 | `REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge (0-100) pour s'arrêter |
-| `AGENT_PROVIDER` | `claude` | provider d'agents (claude / codex / openai / openrouter / ollama / anthropic) |
+| `AGENT_PROVIDER` | `claude code` | provider d'agents (claude code [CLI] / claude [API Anthropic] / codex / openai / openrouter / ollama) |
 | `OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL` | — / `…/api/v1` | clé + endpoint du provider **OpenRouter** (aussi `OPENROUTER_*`) |
 | `OPENROUTER_MODEL` | (1er populaire) | modèle OpenRouter (sinon top-10 programmation chargé dynamiquement) |
 | `SKILLS` | `0` | active la **bibliothèque de skills** QA/Dev (§5.10) |

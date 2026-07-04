@@ -9,6 +9,8 @@
   --muted: #8a93a6;
   --title: #aeb8cb;
   --accent: #4f8cff;
+  /* Fond teinté accent des états sélection/survol (chips, fichiers actifs…). */
+  --accent-bg: #1a2740;
   --green: #3ecf8e;
   --red: #ff5c6c;
   --amber: #ffb454;
@@ -54,6 +56,7 @@
   --muted: #5b6677;
   --title: #41506a;
   --accent: #2f6fe0;
+  --accent-bg: #dce7fb;
   --green: #1f9d63;
   --red: #d83a4b;
   --amber: #b9781a;
@@ -609,7 +612,7 @@ button.ghost {
 
 .story.drag-over {
   border-color: var(--accent);
-  background: #1a2740;
+  background: var(--accent-bg);
 }
 
 .story-id {
@@ -856,7 +859,7 @@ button.action-btn.action-done {
 
 .project-chip.active {
   border-color: var(--accent);
-  background: #1a2740;
+  background: var(--accent-bg);
 }
 
 .project-chip .dot {
@@ -940,7 +943,7 @@ button.action-btn.action-done {
 .archived-toggle.active {
   color: var(--text);
   border-color: var(--accent);
-  background: #1a2740;
+  background: var(--accent-bg);
 }
 
 .project-new {
@@ -1438,7 +1441,7 @@ button.action-btn.action-done {
 }
 
 .code-viewer-file.active {
-  background: #1a2740;
+  background: var(--accent-bg);
   border-color: var(--accent);
   color: var(--accent);
 }
@@ -2150,7 +2153,7 @@ button.action-btn.action-done {
 
 .epic-iter-link:hover {
   border-color: var(--accent);
-  background: #1a2740;
+  background: var(--accent-bg);
 }
 
 /* Bascule « Vision produit / Itérations » (haut de la colonne de droite). */

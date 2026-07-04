@@ -71,12 +71,15 @@ async def test_anext_reset_fallback(monkeypatch):
 
 def test_monitor_active_gating(monkeypatch):
     monkeypatch.setattr(settings, "session_monitor_enabled", True)
-    monkeypatch.setattr(settings, "agent_provider", "claude")
+    monkeypatch.setattr(settings, "agent_provider", "claude code")
     monkeypatch.setattr(settings, "fake_agents", False)
     assert session_monitor.monitor_active()
     monkeypatch.setattr(settings, "agent_provider", "codex")
     assert not session_monitor.monitor_active()
+    # The key-based "claude" API provider has no subscription usage window.
     monkeypatch.setattr(settings, "agent_provider", "claude")
+    assert not session_monitor.monitor_active()
+    monkeypatch.setattr(settings, "agent_provider", "claude code")
     monkeypatch.setattr(settings, "fake_agents", True)
     assert not session_monitor.monitor_active()
 
@@ -103,7 +106,7 @@ class _LimitOnceRunner(FakeRunner):
 
 def _enable_monitor(monkeypatch):
     monkeypatch.setattr(settings, "session_monitor_enabled", True)
-    monkeypatch.setattr(settings, "agent_provider", "claude")
+    monkeypatch.setattr(settings, "agent_provider", "claude code")
     monkeypatch.setattr(settings, "fake_agents", False)
 
 

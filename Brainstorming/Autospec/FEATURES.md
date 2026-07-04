@@ -16,11 +16,12 @@ transforme en **code testé** (BDD puis TDD), de façon itérative et autonome.
 ## 1. Pipeline d'agents (cœur)
 
 Les agents sont exécutés derrière l'abstraction **`AgentRunner`** :
-`ClaudeCliRunner` (production, CLI Claude Code headless
-`claude -p --output-format json`), `CodexCliRunner` (`codex exec`), et les
-providers **hors abonnement** via **LangChain** — **`OpenAiRunner`**,
-**`OpenRouterRunner`** (hub compatible-OpenAI), **`OllamaRunner`**,
-**`AnthropicRunner`** (sessions rejouées en mémoire + protocole d'outils JSON
+`ClaudeCliRunner` (provider **claude code** : CLI Claude Code headless
+`claude -p --output-format json`, abonnement), `CodexCliRunner` (`codex exec`),
+et les providers **hors abonnement** via **LangChain** — **`AnthropicRunner`**
+(provider **claude** : API Anthropic directe), **`OpenAiRunner`**,
+**`OpenRouterRunner`** (hub compatible-OpenAI), **`OllamaRunner`**
+(sessions rejouées en mémoire + protocole d'outils JSON
 borné pour les écritures fichiers, confiné au workspace) — plus `FakeRunner`
 (tests) et `ScriptedRunner` (mode démo). Sélection par `AGENT_PROVIDER`
 ou à chaud via `GET/POST /api/provider` (sélecteur 🤖 du header). Le 2ᵉ menu
@@ -451,14 +452,18 @@ l'importer (exactement l'amorce du run perdu ci-dessus). Ils sont **déclarés**
 collision au merge.
 
 ### Persistance des logs de build (diagnostic post-mortem)
-Le **build monitor** (`orchestrator/build_monitor.py`) est désormais **ON par
-défaut** (opt-out `BUILD_MONITOR=0`) : chaque run écrit une timeline
-JSONL (`workspace/<projet>/build-monitor.jsonl`) — appels d'agents, runs de
-suite (vert/rouge + tail), verdicts du canari (`semantic` / `infra_healed` /
-`infra_persistent`), réparations d'environnement, transitions de phase. Un rouge
-dont l'unique trace était une ligne de log SSE volatile est impossible à
-diagnostiquer une fois le process terminé ; la timeline rend le run relisible
-après coup.
+Le **build monitor** (`orchestrator/build_monitor.py`) est **toujours actif**
+(aucun flag) : chaque run écrit une timeline JSONL
+(`workspace/<projet>/build-monitor.jsonl`) — appels d'agents, runs de suite
+(vert/rouge + tail), verdicts du canari (`semantic` / `infra_healed` /
+`infra_persistent`), réparations d'environnement, transitions de phase, **et
+chaque ligne de log narrative du pipeline** (`_log` : décisions du scope gate,
+merges, reverts, requeues, splits…) en événements `kind=log`. Le bus SSE sur
+lequel ces lignes sont publiées est volatile ; sans ce miroir, le récit
+opérationnel du run meurt avec le process et un échec devient indiagnosticable
+après coup. Optionnel : `BUILD_MONITOR_DIR=<dir>` duplique tous les événements
+dans un `timeline.jsonl` agrégé inter-projets (utilisé par
+`scripts/build_driver.py` pour collecter un dossier par run).
 
 ### Re-décomposition adaptative sur échec
 - Quand une **US ou une tâche n'arrive pas à passer au vert** après ses tentatives
@@ -585,7 +590,7 @@ après coup.
 | `REFINE` / `_PO` / `_DEV` | `0` / `1` / `1` | harnais de raffinement |
 | `REFINE_MAX_ROUNDS` | `2` | cap d'allers-retours |
 | `REFINE_QUALITY_THRESHOLD` | `80` | seuil de score du juge |
-| `AGENT_PROVIDER` | `claude` | provider d'agents (claude / codex / openai / openrouter / ollama / anthropic) |
+| `AGENT_PROVIDER` | `claude code` | provider d'agents (claude code [CLI] / claude [API Anthropic] / codex / openai / openrouter / ollama) |
 | `OPENAI_API_KEY` / `_MODEL` / `_BASE_URL` | — | provider OpenAI (LangChain) |
 | `OPENAI_PRICE_IN` / `_OUT` | `0` | $/1M tokens (estimation de coût) |
 | `OPENROUTER_API_KEY` / `OPENROUTER_BASE_URL` | — / `…/api/v1` | provider **OpenRouter** (aussi `OPENROUTER_*`) ; modèles = top-10 programmation chargé dynamiquement |
@@ -617,9 +622,9 @@ après coup.
 `/files`, `/files/raw?path=`, `PUT /components`, `POST /components/setup`,
 `POST /document`, `GET /export` (zip), `POST /git-export`.
 
-**Provider** : `GET|POST /api/provider` (bascule claude/codex/openai/openrouter/
-ollama/anthropic à chaud ; verrouillé en mode démo ; renvoie aussi
-`capabilities`) ;
+**Provider** : `GET|POST /api/provider` (bascule claude code [CLI]/claude [API
+Anthropic]/codex/openai/openrouter/ollama à chaud ; verrouillé en mode démo ;
+renvoie aussi `capabilities`) ;
 `GET /api/providers/{provider}/models` (découverte live des modèles — top-10
 programmation pour OpenRouter, repli statique).
 

@@ -143,6 +143,11 @@ async def test_discover_falls_back_to_static_on_error(monkeypatch):
 
 
 async def test_discover_claude_is_static(monkeypatch):
+    monkeypatch.setattr(discovery.settings, "claude_model", "claude-opus-4-8")
+    models, source = await discovery.adiscover_models("claude code")
+    assert source == "static"
+    assert models[0] == "claude-opus-4-8"
+    # The Anthropic API provider ("claude") is static too (no list endpoint).
     models, source = await discovery.adiscover_models("claude")
     assert source == "static"
-    assert models == ["opus", "sonnet", "haiku"]
+    assert "claude-opus-4-8" in models

@@ -60,7 +60,8 @@ passe en rouge.
 
 ## Providers de modèles (Claude / OpenAI / Ollama)
 
-Les agents tournent par défaut sur **Claude** (CLI Claude Code en headless).
+Les agents tournent par défaut sur **claude code** (CLI Claude Code en
+headless, abonnement) ; **claude** passe par l'API Anthropic directe (clé).
 Deux providers **hors abonnement** sont disponibles via **LangChain** :
 **OpenAI** (clé API) et **Ollama** (modèles locaux). Sélection par
 `AGENT_PROVIDER` ou à chaud via le sélecteur 🤖 du header
@@ -214,8 +215,8 @@ chaque `push` et `pull_request` avec 3 jobs sur `ubuntu-latest` :
 | --- | --- | --- |
 | `BMAD_DIR` | `../_bmad` | Dossier d'installation BMAD |
 | `CLAUDE_CMD` | auto (`claude.cmd`) | Binaire Claude Code |
-| `CLAUDE_MODEL` | (défaut CLI) | Modèle à utiliser (provider claude) |
-| `AGENT_PROVIDER` | `claude` | Provider d'agents : `claude` (harness CLI), `openai`, `ollama` (LangChain) |
+| `CLAUDE_MODEL` | `claude-opus-4-8` | Modèle à utiliser (provider claude code) |
+| `AGENT_PROVIDER` | `claude code` | Provider d'agents : `claude code` (harness CLI), `claude` (API Anthropic), `openai`, `ollama` (LangChain) |
 | `OPENAI_API_KEY` | (ou `OPENAI_API_KEY`) | Clé API du provider openai |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Modèle OpenAI |
 | `OPENAI_BASE_URL` | api.openai.com | Endpoint OpenAI-compatible |

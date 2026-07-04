@@ -1,15 +1,15 @@
-"""Lightweight build monitor — a JSONL timeline of a pipeline run.
+"""Build monitor — the persisted JSONL timeline of a pipeline run.
 
-ON by default; opt OUT with ``BUILD_MONITOR=0`` (the write is cheap and
-per-project, so the timeline is available whenever a run has to be diagnosed
-after the fact — a red run whose only trace was an SSE log line is impossible to
-debug once the process is gone). Each run appends events to
-``workspace/<project>/build-monitor.jsonl`` and, when
-``BUILD_MONITOR_DIR`` is set, mirrors them into a single cross-project
-``timeline.jsonl`` there too. The goal is to make *what actually happened* during
-a headless build legible after the fact: every agent round-trip (role, item,
-duration, ok/error), every real test run (green/red + tail), phase transitions
-and the final outcome — so the common failure modes can be diagnosed.
+ALWAYS on (the write is cheap and per-project, and the timeline is the primary
+after-the-fact diagnostic — a red run whose only trace was a volatile SSE log
+line is impossible to debug once the process is gone). Each run appends events
+to ``workspace/<project>/build-monitor.jsonl`` and, when ``BUILD_MONITOR_DIR``
+is set (e.g. by ``scripts/build_driver.py`` to collect one dir per run), mirrors
+them into a single cross-project ``timeline.jsonl`` there too. The goal is to
+make *what actually happened* during a headless build legible after the fact:
+every agent round-trip (role, item, duration, ok/error), every real test run
+(green/red + tail), every narrative pipeline log line, phase transitions and the
+final outcome — so the common failure modes can be diagnosed.
 
 This module is intentionally defensive: any I/O error is swallowed so monitoring
 never perturbs a build.
@@ -25,21 +25,13 @@ import time
 from ..storage import workspace_dir
 
 
-def enabled() -> bool:
-    """ON unless explicitly disabled — the timeline is the primary after-the-fact
-    diagnostic, so it defaults on and is opted OUT with 0/false/no/off."""
-    return os.environ.get("BUILD_MONITOR", "").strip().lower() not in (
-        "0", "false", "no", "off",
-    )
-
-
 def _aggregate_path():
     d = os.environ.get("BUILD_MONITOR_DIR", "").strip()
     return (d and os.path.join(d, "timeline.jsonl")) or ""
 
 
 class BuildMonitor:
-    """Per-pipeline writer. Cheap to construct; a no-op while disabled."""
+    """Per-pipeline writer. Cheap to construct; every emit is best-effort."""
 
     _agg_lock = threading.Lock()
 
@@ -59,6 +51,13 @@ class BuildMonitor:
     def pytest(self, item_id, ok, summary=""):
         self._emit("pytest", item=item_id, ok=ok, summary=(summary or "")[:600])
 
+    def log(self, source, line):
+        """Mirror one narrative pipeline log line (``Pipeline._log``) into the
+        timeline. The SSE bus those lines are published on is volatile — without
+        this mirror the run's actual story (scope gate decisions, merges,
+        reverts, requeues, splits) dies with the process."""
+        self._emit("log", source=source or "?", line=(line or "")[:2000])
+
     def phase(self, name):
         self._emit("phase", name=name)
 
@@ -67,8 +66,6 @@ class BuildMonitor:
 
     # -- writer ------------------------------------------------------------
     def _emit(self, kind, **fields):
-        if not enabled():
-            return
         try:
             phase = self._state.phase.value
         except Exception:

@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from ..agents import prompts
-from ..agents.providers import provider_capabilities
+from ..agents.providers import provider_capabilities, provider_model
 from ..agents.runner import (
     AgentError,
     AgentRunner,
@@ -317,7 +317,7 @@ class _UsageTracker:
         # and env-gated — never affects the pipeline if tracing fails or is off.
         observability.trace_agent_call(
             name=f"agent:{self.pipeline.state.phase.value}",
-            model=settings.claude_model or settings.agent_provider,
+            model=provider_model(settings.agent_provider) or settings.agent_provider,
             input_text=prompt,
             output_text=res.text,
             metadata={
@@ -354,8 +354,8 @@ class Pipeline:
         self.runner = runner
         self._tracked = _UsageTracker(self)
         self._profile_overrides: dict[str, bool] = profiles.resolve_overrides(self.state)
-        # Opt-in build monitor (BUILD_MONITOR): JSONL timeline for
-        # post-mortem failure analysis. No-op when disabled.
+        # Build monitor (always on): persisted JSONL timeline for post-mortem
+        # failure analysis — mirrors every _log line, test run and agent call.
         self.monitor = BuildMonitor(state)
         # O2: live capture of LLM round-trips per work item. Kept out of
         # ProjectState (prompts/answers are large); in-memory ring + JSONL sidecar.
@@ -485,6 +485,10 @@ class Pipeline:
         bus.publish(
             {"type": "log", "project_id": self.state.id, "source": source, "line": line}
         )
+        # Le bus SSE est volatile : sans ce miroir, le récit opérationnel du run
+        # (scope gate, merges, reverts, requeues, splits…) meurt avec le process
+        # et un échec devient indiagnosticable après coup.
+        self.monitor.log(source, line)
 
     def _chat(self, role: ChatRole, content: str) -> None:
         self.state.chat.append(ChatMessage(role=role, content=content))
@@ -2722,7 +2726,10 @@ class Pipeline:
         try:
             existing = gitignore.read_text(encoding="utf-8") if gitignore.exists() else ""
             missing = [
-                line for line in ("autospec-state.json", "autospec-interactions.jsonl", ".autospec/")
+                line for line in (
+                    "autospec-state.json", "autospec-interactions.jsonl",
+                    "build-monitor.jsonl", ".autospec/",
+                )
                 if line not in existing.splitlines()
             ]
             if missing:
@@ -2733,6 +2740,7 @@ class Pipeline:
         await self._agit(
             ws, "rm", "--cached", "--ignore-unmatch", "-q", "--",
             "autospec-state.json", "autospec-interactions.jsonl",
+            "build-monitor.jsonl",
         )
 
     async def _agit_snapshot(self, ws, label: str) -> bool:
@@ -3084,7 +3092,7 @@ class Pipeline:
                         self._set_stage(story, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             story.last_error = str(exc)
-            if settings.agent_provider == "claude" and session_monitor.is_usage_limit_error(str(exc)):
+            if settings.agent_provider == "claude code" and session_monitor.is_usage_limit_error(str(exc)):
                 # Usage-window exhaustion is not the story's fault: refund the
                 # attempt and requeue as-is for the scheduled fresh session.
                 story.attempts = max(0, story.attempts - 1)
@@ -4090,7 +4098,7 @@ class Pipeline:
                     self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
         except AgentError as exc:
             target.last_error = str(exc)
-            if settings.agent_provider == "claude" and session_monitor.is_usage_limit_error(str(exc)):
+            if settings.agent_provider == "claude code" and session_monitor.is_usage_limit_error(str(exc)):
                 target.attempts = max(0, target.attempts - 1)
                 subject.attempts = max(0, subject.attempts - 1)
                 target.status = subject.status = StoryStatus.TODO

@@ -24,6 +24,8 @@ _DOCKERIGNORE = """.git
 __pycache__
 *.pyc
 autospec-state.json
+autospec-interactions.jsonl
+build-monitor.jsonl
 .autospec-cov.json
 """
 

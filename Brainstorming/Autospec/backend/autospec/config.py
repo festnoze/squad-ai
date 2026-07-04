@@ -143,8 +143,10 @@ class Settings:
     bmad_dir: Path = field(default_factory=_default_bmad_dir)
     workspace_root: Path = field(default_factory=_default_workspace_root)
     claude_cmd: str = field(default_factory=_resolve_claude_cmd)
+    # Default model of the Claude Code CLI harness ("claude code" provider):
+    # Opus 4.8 unless CLAUDE_MODEL overrides it.
     claude_model: str | None = field(
-        default_factory=lambda: os.environ.get("CLAUDE_MODEL") or None
+        default_factory=lambda: os.environ.get("CLAUDE_MODEL") or "claude-opus-4-8"
     )
     # Codex CLI harness: the OpenAI counterpart of the Claude Code CLI, driven
     # headless via ``codex exec``.
@@ -155,10 +157,11 @@ class Settings:
     # Per-phase model routing (M3): a cheap model for spec/plan, a strong one for
     # build/refine. Populated from MODEL_<PHASE>; falls back to claude_model.
     phase_models: dict = field(default_factory=_default_phase_models)
-    # Agent provider: "claude" (CLI harness), "openai" (API key) or "ollama"
-    # (local models). Switchable at runtime through POST /api/provider.
+    # Agent provider: "claude code" (Claude Code CLI harness, the default),
+    # "claude" (Anthropic API direct), "codex" (OpenAI CLI), "openai",
+    # "openrouter" or "ollama". Switchable at runtime through POST /api/provider.
     agent_provider: str = field(
-        default_factory=lambda: os.environ.get("AGENT_PROVIDER", "claude").strip().lower()
+        default_factory=lambda: os.environ.get("AGENT_PROVIDER", "claude code").strip().lower()
     )
     # Product generation profile. "auto" keeps existing flag-driven behaviour;
     # explicit profiles (library-fast/cli/api/web-ssr/fullstack/brownfield)
@@ -193,13 +196,13 @@ class Settings:
     ollama_model: str = field(
         default_factory=lambda: os.environ.get("OLLAMA_MODEL", "llama3.1")
     )
-    # Anthropic API direct (M4): the Claude models via the API (langchain-anthropic),
-    # independent of the local Claude Code CLI harness.
+    # Anthropic API direct (M4): the "claude" provider — Claude models via the
+    # API (langchain-anthropic), independent of the Claude Code CLI harness.
     anthropic_api_key: str = field(
         default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", "")
     )
     anthropic_model: str = field(
-        default_factory=lambda: os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+        default_factory=lambda: os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
     )
     anthropic_price_in: float = field(
         default_factory=lambda: _env_float("ANTHROPIC_PRICE_IN", 0.0, minimum=0.0)
@@ -570,8 +573,15 @@ class Settings:
 
     def model_for_phase(self, phase: str) -> str | None:
         """Model to use for a given pipeline phase (M3): the per-phase override
-        if set, else the global claude_model."""
-        return self.phase_models.get(phase) or self.claude_model
+        if set, else the global claude_model — but only for the Claude Code CLI
+        harness: the other runners pick their model from their own settings, so
+        a Claude model id must not leak into their calls."""
+        override = self.phase_models.get(phase)
+        if override:
+            return override
+        if self.agent_provider in ("", "claude code"):
+            return self.claude_model
+        return None
 
     def persona_path(self, agent: str) -> Path:
         return self.bmad_dir / "bmm" / "agents" / f"{agent}.md"

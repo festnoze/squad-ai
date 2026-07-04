@@ -319,9 +319,10 @@ class AnthropicRunner(_LangChainRunner):
         ) / 1_000_000
 
 
-# Claude is first (the default provider): the UI lists it first and selects it by
-# default. codex/openai/openrouter/ollama/anthropic follow.
-PROVIDERS = ("claude", "codex", "openai", "openrouter", "ollama", "anthropic")
+# "claude code" is first (the default provider): the Claude Code CLI harness
+# (subscription). "claude" is the Anthropic API (direct, key-based). codex/
+# openai/openrouter/ollama follow.
+PROVIDERS = ("claude code", "claude", "codex", "openai", "openrouter", "ollama")
 
 # Suggested models per provider, shown in the UI's second (adaptive) dropdown.
 # These are display/endpoint values passed straight to the backend, so a user
@@ -331,10 +332,14 @@ MODEL_CHOICES: dict[str, tuple[str, ...]] = {
     # The Codex CLI runs OpenAI models; these are suggestions (env/live-discovery
     # can override). Empty model = the codex CLI default.
     "codex": ("gpt-5.3-codex", "gpt-5.4-codex", "o4-mini"),
-    # The Claude Code CLI accepts short aliases.
-    "claude": ("opus", "sonnet", "haiku"),
-    # Anthropic API needs the full model ids.
-    "anthropic": (
+    # The Claude Code CLI accepts full model ids (and short aliases like "opus").
+    "claude code": (
+        "claude-opus-4-8",
+        "claude-sonnet-4-6",
+        "claude-haiku-4-5-20251001",
+    ),
+    # Anthropic API ("claude") needs the full model ids.
+    "claude": (
         "claude-opus-4-8",
         "claude-sonnet-4-6",
         "claude-haiku-4-5-20251001",
@@ -374,8 +379,8 @@ def provider_capabilities(provider: str) -> RunnerCapabilities:
     UI/operator which backends can inspect/run the workspace themselves versus
     the bounded LangChain file-tool protocol.
     """
-    normalized = (provider or "claude").strip().lower()
-    if normalized == "claude":
+    normalized = (provider or "claude code").strip().lower()
+    if normalized == "claude code":
         return RunnerCapabilities(
             can_edit_files=True,
             can_run_shell=True,
@@ -393,7 +398,7 @@ def provider_capabilities(provider: str) -> RunnerCapabilities:
             execution_model="cli",
             notes="Codex CLI: accès workspace + shell; skills injectées via prompt/catalogue.",
         )
-    if normalized in ("openai", "openrouter", "ollama", "anthropic"):
+    if normalized in ("openai", "openrouter", "ollama", "claude", "anthropic"):
         return RunnerCapabilities(
             can_edit_files=True,
             can_run_shell=False,
@@ -423,18 +428,20 @@ def provider_capabilities(provider: str) -> RunnerCapabilities:
 
 def make_runner(provider: str) -> AgentRunner:
     """Build the agent backend for a provider name (AGENT_PROVIDER)."""
-    normalized = (provider or "claude").strip().lower()
+    normalized = (provider or "claude code").strip().lower()
     if normalized == "openai":
         return OpenAiRunner()
     if normalized == "openrouter":
         return OpenRouterRunner()
     if normalized == "ollama":
         return OllamaRunner()
-    if normalized == "anthropic":
+    # "claude" = the Anthropic API direct ("anthropic" kept as a legacy alias).
+    if normalized in ("claude", "anthropic"):
         return AnthropicRunner()
     if normalized == "codex":
         return CodexCliRunner()
-    if normalized in ("", "claude"):
+    # "claude code" = the Claude Code CLI harness (subscription), the default.
+    if normalized in ("", "claude code"):
         return ClaudeCliRunner()
     raise ValueError(f"Provider inconnu : {provider!r} (attendu : {', '.join(PROVIDERS)})")
 
@@ -447,7 +454,7 @@ def provider_model(provider: str) -> str:
         return settings.openrouter_model or "(défaut OpenRouter)"
     if provider == "ollama":
         return settings.ollama_model
-    if provider == "anthropic":
+    if provider in ("claude", "anthropic"):
         return settings.anthropic_model
     if provider == "codex":
         return settings.codex_model or "(défaut Codex CLI)"

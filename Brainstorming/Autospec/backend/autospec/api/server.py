@@ -393,11 +393,12 @@ async def aget_provider() -> dict:
 
 @app.post("/api/provider")
 async def aset_provider(req: ProviderRequest) -> dict:
-    """Switch the agent backend (claude / openai / ollama) and optionally the
-    model, live: new and existing pipelines use it from their next agent call."""
+    """Switch the agent backend ("claude code" CLI / claude API / codex / openai
+    / ollama…) and optionally the model, live: new and existing pipelines use it
+    from their next agent call."""
     if settings.fake_agents:
         raise HTTPException(409, "Mode démo (FAKE_AGENTS) : provider verrouillé.")
-    provider = req.provider.strip().lower() or "claude"
+    provider = req.provider.strip().lower() or "claude code"
     if req.model is not None:
         model = req.model.strip()
         if provider == "openai":
@@ -406,7 +407,7 @@ async def aset_provider(req: ProviderRequest) -> dict:
             settings.openrouter_model = model or settings.openrouter_model
         elif provider == "ollama":
             settings.ollama_model = model or settings.ollama_model
-        elif provider == "anthropic":
+        elif provider in ("claude", "anthropic"):
             settings.anthropic_model = model or settings.anthropic_model
         elif provider == "codex":
             settings.codex_model = model or None
