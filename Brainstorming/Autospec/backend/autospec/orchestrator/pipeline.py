@@ -2914,10 +2914,18 @@ class Pipeline:
             if not ready:
                 if any(s.status == StoryStatus.IN_PROGRESS for s in pending):
                     break  # defensive: a worker left a story in-flight
-                # Remaining stories depend on failed work: mark them failed.
+                # Remaining stories depend on failed work: mark them failed,
+                # each carrying its ROOT failure (not just "unmet dependency").
+                by_id = {s.id: s for s in iteration_stories}
                 for story in pending:
                     story.status = StoryStatus.FAILED
-                    story.last_error = "Dépendance non satisfaite (story échouée en amont)."
+                    root = scheduler.failed_root(story, by_id)
+                    detail = (root.last_error or "").strip()[:300] if root else ""
+                    story.last_error = (
+                        "Dépendance non satisfaite (story échouée en amont)."
+                        + (f" Cause racine : {root.id}" if root else "")
+                        + (f" — {detail}" if detail else "")
+                    )
                 self._sync()
                 break
 
@@ -3285,9 +3293,25 @@ class Pipeline:
                             )
                         else:
                             target = self._item_target(item)
+                            # Name the transitive FAILED root and its error: the
+                            # direct blocker of a deep item is often itself only
+                            # blocked, and the operator otherwise has to walk the
+                            # chain by hand to find what actually broke.
+                            root = scheduler.failed_root(item, graph.items)
+                            root_err = ""
+                            if root is not None:
+                                root_target = self._item_target(root)
+                                detail = (
+                                    (getattr(root_target, "last_error", "") or "")
+                                    .strip()[:300]
+                                )
+                                root_err = f" Cause racine : {root.id}" + (
+                                    f" — {detail}" if detail else ""
+                                )
                             target.last_error = (
                                 cycle_error
                                 or "Dépendance non satisfaite (work item échoué en amont)."
+                                + root_err
                             )
                         if blockers:
                             self._log(
@@ -4362,10 +4386,24 @@ class Pipeline:
                     path = None
             await self._agit(repo, "worktree", "prune")
 
-    async def _aworktree_add_locked(self, repo, branch: str):
+    @staticmethod
+    def _new_worktree_path() -> Path:
+        """A fresh directory path for a git worktree, NEXT TO the workspaces —
+        never in ``%TEMP%``: Windows exposes the temp dir as an 8.3 SHORT path
+        (``C:\\Users\\E6FB4~1.MIL\\…``) and Vite/Vitest percent-encode the ``~``
+        when mapping file paths to module URLs, so setupFiles fail to load
+        ("Failed to load url …%7E…setupTests.ts" — messagerie2 T5-S1-S1 : même
+        branche, même commande, verte sous un chemin sans ``~``). ``resolve()``
+        normalise tout composant court restant ; même volume que le repo, donc
+        ``git worktree add`` est aussi moins coûteux."""
         import tempfile
 
-        worktree = Path(tempfile.mkdtemp(prefix="autospec-wt-"))
+        wt_root = settings.workspace_root / "_worktrees"
+        wt_root.mkdir(parents=True, exist_ok=True)
+        return Path(tempfile.mkdtemp(prefix="autospec-wt-", dir=str(wt_root))).resolve()
+
+    async def _aworktree_add_locked(self, repo, branch: str):
+        worktree = self._new_worktree_path()
         # mkdtemp creates the dir, but `git worktree add` wants to create it.
         try:
             worktree.rmdir()
@@ -4736,9 +4774,7 @@ class Pipeline:
             # A crashed worker may still hold the branch checked out in a dead
             # worktree — clear it or `worktree add` fails "already checked out".
             await self._aclear_stale_worktree(repo, branch)
-            import tempfile
-
-            worktree = Path(tempfile.mkdtemp(prefix="autospec-wt-"))
+            worktree = self._new_worktree_path()
             try:
                 worktree.rmdir()
             except OSError:

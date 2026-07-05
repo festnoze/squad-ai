@@ -114,43 +114,47 @@ describe("Activity", () => {
     expect(screen.getByTestId("activity-persona-US-1")).toBeInTheDocument();
   });
 
-  it("filtre crew par persona (rail repliable)", () => {
-    const ticks: ProjectTicks = {
-      ts: Math.floor(Date.now() / 1000),
-      items: {
-        "US-1": {
-          id: "US-1",
-          kind: "story",
-          status: "in_progress",
-          current_stage: "implementing",
-          stage_started_at: 0,
-          current_persona: "dev",
-          recovery: { attempt: 0, max_attempts: 0, kind: "" },
-        },
-        "US-2": {
-          id: "US-2",
-          kind: "story",
-          status: "in_progress",
-          current_stage: "verifying",
-          stage_started_at: 0,
-          current_persona: "qa",
-          recovery: { attempt: 0, max_attempts: 0, kind: "" },
-        },
-      },
-      counts: { running: 2, queued: 0, done: 0, failed: 0, blocked: 0 },
-      stallReason: "",
-    };
+  it("les chips de compteurs filtrent les items par statut (toggle + tous)", () => {
     renderActivity({
       stories: [
-        story({ id: "US-1", current_persona: "dev" }),
-        story({ id: "US-2", current_persona: "qa" }),
+        story({ id: "US-1", status: "in_progress" }),
+        story({ id: "US-2", status: "done" }),
+        story({ id: "US-3", status: "todo" }),
       ],
-      ticks,
     });
-    expect(screen.getByTestId("crew-rail")).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("crew-qa"));
+    // « faits » ne montre que l'item done.
+    fireEvent.click(screen.getByTestId("filter-done"));
     expect(screen.queryByTestId("activity-row-US-1")).not.toBeInTheDocument();
     expect(screen.getByTestId("activity-row-US-2")).toBeInTheDocument();
+    expect(screen.queryByTestId("activity-row-US-3")).not.toBeInTheDocument();
+    // Re-clic sur le même chip = retour à « tous ».
+    fireEvent.click(screen.getByTestId("filter-done"));
+    expect(screen.getByTestId("activity-row-US-1")).toBeInTheDocument();
+    // « en cours » ne montre que l'item in_progress.
+    fireEvent.click(screen.getByTestId("filter-running"));
+    expect(screen.getByTestId("activity-row-US-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("activity-row-US-2")).not.toBeInTheDocument();
+    // « en file » ne montre que le todo non bloqué.
+    fireEvent.click(screen.getByTestId("filter-queued"));
+    expect(screen.getByTestId("activity-row-US-3")).toBeInTheDocument();
+    expect(screen.queryByTestId("activity-row-US-1")).not.toBeInTheDocument();
+    // « tous » réinitialise.
+    fireEvent.click(screen.getByTestId("filter-all"));
+    expect(screen.getByTestId("activity-row-US-1")).toBeInTheDocument();
+    expect(screen.getByTestId("activity-row-US-2")).toBeInTheDocument();
+    expect(screen.getByTestId("activity-row-US-3")).toBeInTheDocument();
+  });
+
+  it("le chip « à traiter » filtre sur les items failed/bloqués", () => {
+    renderActivity({
+      stories: [
+        story({ id: "US-1", status: "failed" }),
+        story({ id: "US-2", status: "todo" }),
+      ],
+    });
+    fireEvent.click(screen.getByTestId("attention-chip"));
+    expect(screen.getByTestId("activity-row-US-1")).toBeInTheDocument();
+    expect(screen.queryByTestId("activity-row-US-2")).not.toBeInTheDocument();
   });
 
   it("chat ciblé par item : envoie une consigne via storyChat", async () => {

@@ -632,14 +632,11 @@ Mêmes patterns que le code viewer : `.diff-overlay` (identique à `.code-viewer
 | `.activity` | `flex: 1` |
 | `.activity-header` | flex `gap: 12px`, wrap, `margin-bottom: 10px` ; `h2` → margin 0 |
 | `.activity-counts` | flex `gap: 6px`, wrap |
-| `.count-chip` | pill 11px, padding `2px 9px`, radius 99px, bordure `var(--border)`, muted, nowrap. `.count-running` / `.count-done` / `.count-failed` → texte+bordure `--status-running/done/failed` |
-| `.attention-chip` | pill persistant : 12px bold 700, padding `3px 10px`, radius 99px, texte `#fff`, fond+bordure `var(--attention)`, nowrap, `animation: attention-pulse 1.3s` |
+| `.count-chip` | pill 11px, padding `2px 9px`, radius 99px, bordure `var(--border)`, muted, nowrap. `.count-running` / `.count-done` / `.count-failed` → texte+bordure `--status-running/done/failed`. Rendus en `button` (filtre par statut) : `background: transparent; cursor: pointer` ; `.active` → bold 700 + fond `rgba(127,127,127,0.16)` |
+| `.attention-chip` | pill persistant : 12px bold 700, padding `3px 10px`, radius 99px, texte `#fff`, fond+bordure `var(--attention)`, nowrap, `animation: attention-pulse 1.3s`. Rendu en `button` (filtre failed/bloqués) ; `.active` → `box-shadow: 0 0 0 2px rgba(255,82,82,0.45)` |
 | `.stall-reason` | 12px `var(--amber)`, bordure ambre, radius 99px, padding `2px 10px`, nowrap |
 | `.approval-banner-scene` | (P13) flex `gap: 10px`, `margin: 0 0 12px`, padding `10px 14px`, 13px, wrap ; `.approval-banner-text` → `flex: 1; min-width: 0` |
 | `.activity-body` | flex `gap: 12px; flex: 1; min-height: 0` |
-| `.crew-rail` | rail de filtre : `flex: 0 0 auto`, colonne `gap: 6px`, `min-width: 130px` |
-| `.crew-rail-toggle` | bouton nu muted 12px aligné gauche, padding `2px 0` |
-| `.crew-rail-list` | colonne `gap: 4px` ; `button` → gauche, 12px, padding `4px 8px`, radius 7px, panel-2, muted. `.active` → bordure accent, texte `var(--text)`, fond `rgba(79,140,255,0.12)` |
 | `.activity-rows-wrap` | `flex: 1; min-width: 0; overflow-y: auto`, colonne `gap: 12px` |
 | `.activity-attention-region` | région épinglée « à traiter » : bordure `var(--attention)`, radius 10px, fond `var(--attention-bg)`, padding `8px 10px`, colonne `gap: 8px` |
 | `.activity-region-title` | margin 0, 11px uppercase `0.06em`, `var(--attention)` |
@@ -710,7 +707,7 @@ Mêmes patterns que le code viewer : `.diff-overlay` (identique à `.code-viewer
 | `@media (min-width: 1100px) and (max-width: 1599px)` | `--rail-w: 340px` (2 colonnes, rail resserré) |
 | `@media (max-width: 1199px)` | `--font-sm: 12px; --row-pad: 4px` + `[data-density="compact"] .activity-row-title { font-size: var(--font-sm); }` (densité compacte) |
 | `@media (max-width: 1099px)` | `--rail-w: 1fr; --scene-w: 1fr` et `.workspace { grid-template-columns: 1fr; }` (mono-colonne, rail empilé au-dessus de la scène) |
-| `@media (max-width: 1099px)` (2e bloc, section Activité) | `.activity-body { flex-direction: column; }` et `.crew-rail { flex-direction: row; flex-wrap: wrap; min-width: 0; }` |
+| `@media (max-width: 1099px)` (2e bloc, section Activité) | `.activity-body { flex-direction: column; }` |
 | `@media (prefers-reduced-motion: reduce)` ×3 | (1) coupe `dev-glow` sur `.epic-card.epic-working` et `.story.status-in_progress`, `.spinner` ralenti à 1.4s ; (2) coupe l'animation de `.task-row.status-in_progress` ; (3) coupe `.stepper-failed .stepper-dot` et `.attention-chip` |
 
 ---

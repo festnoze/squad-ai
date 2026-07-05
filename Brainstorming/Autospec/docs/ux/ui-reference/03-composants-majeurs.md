@@ -702,19 +702,20 @@ Diagramme :
 ```
 ┌─ section.panel.activity [region "Activité"] ────────────────────────────┐
 │ ┌ .activity-header ──────────────────────────────────────────────────┐  │
-│ │ h2 "⚡ Activité"  [2 en cours][1 en file][5 faits][1 échecs]        │  │
-│ │ [⚠ 2 à traiter]  [⏸ raison de stall]                               │  │
+│ │ h2 "⚡ Activité"  [8 au total][2 en cours][1 en file][5 faits]      │  │
+│ │ [1 échecs] [⚠ 2 à traiter]  [⏸ raison de stall]                    │  │
+│ │ (chaque chip est un BOUTON de filtre par statut ; re-clic = tous)  │  │
 │ └────────────────────────────────────────────────────────────────────┘  │
 │ [.approval-banner ⏸ Validation requise — <phase>  ✅ Approuver ✋ Rejeter]│
 │ ┌ .activity-body ───────────────────────────────────────────────────┐   │
-│ │ ┌.crew-rail──────┐ ┌.activity-rows-wrap───────────────────────┐   │   │
-│ │ │ ▾ Équipe       │ │ ┌ À traiter (région épinglée) ─────────┐ │   │   │
-│ │ │ [Tous]         │ │ │ ActivityRow (attention)…             │ │   │   │
-│ │ │ [👨‍💻 Dev (2)]  │ │ └──────────────────────────────────────┘ │   │   │
-│ │ │ [🧪 QA (1)]    │ │ .activity-rows                           │   │   │
-│ │ └────────────────┘ │  ▸ US-1 👨‍💻 Dev  titre  [Stepper]  ⋯     │   │   │
-│ │                    │  ▾ US-2 … (tiroir: chat + LLM calls)     │   │   │
-│ │                    └──────────────────────────────────────────┘   │   │
+│ │ ┌.activity-rows-wrap───────────────────────┐                      │   │
+│ │ │ ┌ À traiter (région épinglée) ─────────┐ │                      │   │
+│ │ │ │ ActivityRow (attention)…             │ │                      │   │
+│ │ │ └──────────────────────────────────────┘ │                      │   │
+│ │ │ .activity-rows                           │                      │   │
+│ │ │  ▸ US-1 👨‍💻 Dev  titre  [Stepper]  ⋯     │                      │   │
+│ │ │  ▾ US-2 … (tiroir: chat + LLM calls)     │                      │   │
+│ │ └──────────────────────────────────────────┘                      │   │
 │ └───────────────────────────────────────────────────────────────────┘   │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -735,7 +736,9 @@ Diagramme :
 | `onReject` | `() => void` | non |
 | `ticks` | `ProjectTicks` | non — heartbeat live du projet |
 
-**State** : `crewFilter: string` (`""` = tous), `crewOpen: boolean` (init true).
+**State** : `statusFilter: StatusFilter` (`""` = tous | `running` | `queued` |
+`done` | `failed` | `attention`) — piloté par les chips de compteurs de
+l'en-tête (re-clic sur le chip actif = retour à tous).
 
 **Dérivations (useMemo)** :
 - `now = Date.now()` (à chaque rendu), `tickTs = ticks.ts * 1000` si présent.
@@ -748,10 +751,11 @@ Diagramme :
   (running = in_progress/red/green ; done ; failed ; blocked si blockers ;
   sinon queued).
 - `stallReason = ticks?.stallReason ?? ""` ; `attentionCount = failed + blocked`.
-- `crew` : Map persona→count sur les rows, triée alphabétiquement.
-- `visibleRows` : filtrées par `crewFilter` ; `attentionRows` =
-  `needsAttention` ; `normalRows` = le complément **uniquement si**
-  `attentionRows.length > 0` (BUG11 : pas de ligne dupliquée), sinon toutes.
+- `visibleRows` : filtrées par `statusFilter` (running = in_progress/red/green ;
+  queued = todo non bloqué ; done ; failed ; attention = needsAttention) ;
+  `attentionRows` = `needsAttention` ; `normalRows` = le complément
+  **uniquement si** `attentionRows.length > 0` (BUG11 : pas de ligne
+  dupliquée), sinon toutes.
 - `sendGuidance(item)` : curried → `taskChat`/`storyChat(projectId, id, message)`.
 
 **DOM** :
@@ -759,14 +763,18 @@ Diagramme :
 section.panel.activity [role=region, aria-label=activity.regionAriaLabel « Activité »]
   div.activity-header
     h2 → activity.heading « ⚡ Activité »
-    div.activity-counts [data-testid=activity-counts]
-      span.count-chip.count-running [title « En cours »]  → « {n} en cours » (countRunning)
-      span.count-chip.count-queued  [title « En file »]   → « {n} en file »  (countQueued)
-      span.count-chip.count-done    [title « Faits »]     → « {n} faits »    (countDone)
-      span.count-chip.count-failed  [title « En échec »]  → « {n} échecs »   (countFailed)
-    (si attentionCount>0) span.attention-chip [data-testid=attention-chip,
-      title=activity.attentionTitle « Items en échec ou bloqués nécessitant une intervention »]
-      → activity.attentionChip « ⚠ {n} à traiter »
+    div.activity-counts [data-testid=activity-counts, role=group,
+      aria-label=activity.filterAriaLabel « Filtrer les items par statut »]
+      (chaque chip est un button[aria-pressed][.active] qui FILTRE les rows ;
+       re-clic sur le chip actif = retour à tous)
+      button.count-chip.count-all     [data-testid=filter-all]     → « {n} au total » (countAll)
+      button.count-chip.count-running [data-testid=filter-running] → « {n} en cours » (countRunning)
+      button.count-chip.count-queued  [data-testid=filter-queued]  → « {n} en file »  (countQueued)
+      button.count-chip.count-done    [data-testid=filter-done]    → « {n} faits »    (countDone)
+      button.count-chip.count-failed  [data-testid=filter-failed]  → « {n} échecs »   (countFailed)
+    (si attentionCount>0) button.attention-chip [data-testid=attention-chip,
+      aria-pressed, title=activity.attentionTitle]
+      → activity.attentionChip « ⚠ {n} à traiter » (filtre failed/bloqués)
     (si stallReason) span.stall-reason [data-testid=stall-reason,
       title=activity.stallTitle « Pourquoi rien ne progresse actuellement »]
       → activity.stall « ⏸ {reason} » (reason via stallLabel)
@@ -776,15 +784,6 @@ section.panel.activity [role=region, aria-label=activity.regionAriaLabel « Acti
       (si onApprove) button.small-btn.approve-btn → « ✅ Approuver » (approve)
       (si onReject)  button.small-btn.danger      → « ✋ Rejeter »   (reject)
   div.activity-body
-    (si crew non vide)
-      div.crew-rail [data-testid=crew-rail]
-        button.crew-rail-toggle [aria-expanded, data-testid=crew-rail-toggle]
-          → "▾ "/"▸ " + activity.crewToggle « Équipe »   (clic → toggle crewOpen)
-        (si crewOpen)
-          div.crew-rail-list [role=group, aria-label=activity.crewFilterAriaLabel « Filtre par agent »]
-            button[.active][aria-pressed][data-testid=crew-all] → activity.crewAll « Tous »
-            button×persona [data-testid=crew-<persona>] → "<icône> <label> ({n})"
-              (clic : toggle — re-clic sur le filtre actif le désactive)
     div.activity-rows-wrap
       (si attentionRows non vide)
         div.activity-attention-region [data-testid=attention-region,

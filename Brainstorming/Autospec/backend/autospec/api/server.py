@@ -12,6 +12,7 @@ import stat
 import time
 import zipfile
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -53,6 +54,24 @@ from ..storage import list_states, load_interactions, load_state, workspace_dir
 # noise plus Autospec's own persisted state and report artifacts.
 _EXCLUDED_DIRS = {".git", "__pycache__", ".venv", "node_modules", ".pytest_cache"}
 _MAX_FILE_CHARS = 200_000
+
+
+def _source_stamp() -> str:
+    """Newest mtime across the autospec package sources (ISO local time)."""
+    root = Path(__file__).resolve().parent.parent  # autospec/
+    try:
+        latest = max((p.stat().st_mtime for p in root.rglob("*.py")), default=0.0)
+    except OSError:
+        latest = 0.0
+    return time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(latest))
+
+
+_SERVER_STARTED_AT = time.time()
+# Frozen at import: the sources THIS process actually runs. The server runs
+# with reload=False, so after an on-disk fix the running code silently predates
+# it — the messagerie2 trap where several build rounds replayed the same
+# failure on stale code with no way to see it from the API.
+_LOADED_SOURCE_STAMP = _source_stamp()
 
 
 def _is_excluded_file(name: str) -> bool:
@@ -368,6 +387,19 @@ async def _acall_pipeline(coro, not_found: str):
         raise HTTPException(404, not_found)
     except ValueError as exc:
         raise HTTPException(409, str(exc))
+
+
+@app.get("/api/health")
+async def ahealth() -> dict:
+    """Liveness + staleness beacon: ``source_stamp`` is what this process LOADED,
+    ``source_stamp_now`` what is on disk — different values mean a fix landed
+    that the (reload=False) server does not run yet: restart required."""
+    return {
+        "ok": True,
+        "started_at": _SERVER_STARTED_AT,
+        "source_stamp": _LOADED_SOURCE_STAMP,
+        "source_stamp_now": _source_stamp(),
+    }
 
 
 @app.get("/api/provider")

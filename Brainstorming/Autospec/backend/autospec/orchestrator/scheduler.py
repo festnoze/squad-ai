@@ -84,3 +84,26 @@ def ready_stories(stories: list[UserStory]) -> list[UserStory]:
 def pending_stories(stories: list[UserStory]) -> list[UserStory]:
     active = {StoryStatus.TODO, StoryStatus.IN_PROGRESS, StoryStatus.RED, StoryStatus.GREEN}
     return [s for s in stories if s.status in active]
+
+
+def failed_root(node, by_id: dict):
+    """The first FAILED dependency reachable from ``node`` (BFS, transitive) —
+    the ROOT CAUSE an operator needs when a whole chain gets marked
+    « dépendance non satisfaite » : the direct blocker of a deep item is often
+    itself only blocked, and the real failure sits levels below (messagerie2 :
+    T8 ← T6 ← T5-S1-S1). Duck-typed on ``.depends_on``/``.status`` so it works
+    for stories AND stream work items. None when nothing failed upstream."""
+    seen: set[str] = set()
+    queue = list(getattr(node, "depends_on", ()))
+    while queue:
+        dep_id = queue.pop(0)
+        if dep_id in seen:
+            continue
+        seen.add(dep_id)
+        dep = by_id.get(dep_id)
+        if dep is None:
+            continue
+        if dep.status == StoryStatus.FAILED:
+            return dep
+        queue.extend(getattr(dep, "depends_on", ()))
+    return None

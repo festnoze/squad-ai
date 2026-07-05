@@ -501,20 +501,23 @@ interface Props {
   ticks?: ProjectTicks;
 }
 
+/** Status filter driven by the header count chips ("" = show everything). */
+type StatusFilter = "" | "running" | "queued" | "done" | "failed" | "attention";
+
 /**
  * P6: the canonical build surface. Fed by `buildWorkGraph` + the `ProjectTicks`
- * heartbeat. Header carries running/queued/done/failed counts + a persistent
- * failed/blocked count chip + the stall reason. A pinned "needs attention" region
- * lists failed/blocked items first. Each row is a Stepper for one work item,
- * merging the persisted stage with the live tick. A collapsible crew rail filters
- * rows by `current_persona`.
+ * heartbeat. The header count chips (all/running/queued/done/failed + the
+ * persistent failed/blocked chip) double as FILTER BUTTONS: clicking one shows
+ * only the matching items, clicking it again (or "all") resets. A pinned
+ * "needs attention" region lists failed/blocked items first. Each row is a
+ * Stepper for one work item, merging the persisted stage with the live tick.
  *
  * Accessible names / test ids the e2e stage can target:
  *  - tab (in WorkspaceViews): role="tab" name "⚡ Activité"
  *  - region: role="region", aria-label="Activité"
  *  - approval banner: data-testid="approval-banner-activity"
- *  - failed/blocked chip: data-testid="attention-chip"
- *  - crew rail: data-testid="crew-rail", buttons data-testid={`crew-${persona}`}
+ *  - failed/blocked chip (filter): data-testid="attention-chip"
+ *  - filter chips: data-testid="filter-all|filter-running|filter-queued|filter-done|filter-failed"
  *  - per row: data-testid={`activity-row-${id}`}, the Stepper {`stepper-${id}`}
  *  - per-item chat: input {`item-chat-input-${id}`}, send {`item-chat-send-${id}`}
  *  - guidance entry: {`guidance-entry-${entryId}`}
@@ -532,8 +535,7 @@ export function Activity({
 }: Props) {
   void epics;
   const { t } = useI18n();
-  const [crewFilter, setCrewFilter] = useState<string>("");
-  const [crewOpen, setCrewOpen] = useState(true);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("");
   const now = Date.now();
   const tickTs = ticks?.ts ? ticks.ts * 1000 : undefined;
 
@@ -595,19 +597,26 @@ export function Activity({
   const stallReason = ticks?.stallReason ?? "";
   const attentionCount = counts.failed + counts.blocked;
 
-  // Crew rail: personas currently active across the rows, with their counts.
-  const crew = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of rows) {
-      const p = r.view.persona;
-      if (p) m.set(p, (m.get(p) ?? 0) + 1);
-    }
-    return [...m.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [rows]);
+  // The header chips filter the rows by status (same buckets as the counts).
+  const toggleFilter = (f: StatusFilter) =>
+    setStatusFilter((cur) => (cur === f ? "" : f));
 
-  const visibleRows = crewFilter
-    ? rows.filter((r) => r.view.persona === crewFilter)
-    : rows;
+  const visibleRows = rows.filter((r) => {
+    switch (statusFilter) {
+      case "running":
+        return isLive(r.view.status);
+      case "queued":
+        return r.view.status === "todo" && r.blockers.length === 0;
+      case "done":
+        return r.view.status === "done";
+      case "failed":
+        return r.view.status === "failed";
+      case "attention":
+        return needsAttention(r.view, r.blockers);
+      default:
+        return true;
+    }
+  });
 
   const attentionRows = visibleRows.filter((r) =>
     needsAttention(r.view, r.blockers),
@@ -643,28 +652,74 @@ export function Activity({
     <section className="panel activity" role="region" aria-label={t("activity.regionAriaLabel")}>
       <div className="activity-header">
         <h2>{t("activity.heading")}</h2>
-        <div className="activity-counts" data-testid="activity-counts">
-          <span className="count-chip count-running" title={t("activity.countRunningTitle")}>
+        <div
+          className="activity-counts"
+          data-testid="activity-counts"
+          role="group"
+          aria-label={t("activity.filterAriaLabel")}
+        >
+          <button
+            type="button"
+            className={`count-chip count-all${statusFilter === "" ? " active" : ""}`}
+            aria-pressed={statusFilter === ""}
+            data-testid="filter-all"
+            title={t("activity.countAllTitle")}
+            onClick={() => setStatusFilter("")}
+          >
+            {t("activity.countAll", { n: rows.length })}
+          </button>
+          <button
+            type="button"
+            className={`count-chip count-running${statusFilter === "running" ? " active" : ""}`}
+            aria-pressed={statusFilter === "running"}
+            data-testid="filter-running"
+            title={t("activity.countRunningTitle")}
+            onClick={() => toggleFilter("running")}
+          >
             {t("activity.countRunning", { n: counts.running })}
-          </span>
-          <span className="count-chip count-queued" title={t("activity.countQueuedTitle")}>
+          </button>
+          <button
+            type="button"
+            className={`count-chip count-queued${statusFilter === "queued" ? " active" : ""}`}
+            aria-pressed={statusFilter === "queued"}
+            data-testid="filter-queued"
+            title={t("activity.countQueuedTitle")}
+            onClick={() => toggleFilter("queued")}
+          >
             {t("activity.countQueued", { n: counts.queued })}
-          </span>
-          <span className="count-chip count-done" title={t("activity.countDoneTitle")}>
+          </button>
+          <button
+            type="button"
+            className={`count-chip count-done${statusFilter === "done" ? " active" : ""}`}
+            aria-pressed={statusFilter === "done"}
+            data-testid="filter-done"
+            title={t("activity.countDoneTitle")}
+            onClick={() => toggleFilter("done")}
+          >
             {t("activity.countDone", { n: counts.done })}
-          </span>
-          <span className="count-chip count-failed" title={t("activity.countFailedTitle")}>
+          </button>
+          <button
+            type="button"
+            className={`count-chip count-failed${statusFilter === "failed" ? " active" : ""}`}
+            aria-pressed={statusFilter === "failed"}
+            data-testid="filter-failed"
+            title={t("activity.countFailedTitle")}
+            onClick={() => toggleFilter("failed")}
+          >
             {t("activity.countFailed", { n: counts.failed })}
-          </span>
+          </button>
         </div>
         {attentionCount > 0 && (
-          <span
-            className="attention-chip"
+          <button
+            type="button"
+            className={`attention-chip${statusFilter === "attention" ? " active" : ""}`}
+            aria-pressed={statusFilter === "attention"}
             data-testid="attention-chip"
             title={t("activity.attentionTitle")}
+            onClick={() => toggleFilter("attention")}
           >
             {t("activity.attentionChip", { n: attentionCount })}
-          </span>
+          </button>
         )}
         {stallReason && (
           <span
@@ -700,48 +755,6 @@ export function Activity({
       )}
 
       <div className="activity-body">
-        {crew.length > 0 && (
-          <div className="crew-rail" data-testid="crew-rail">
-            <button
-              type="button"
-              className="crew-rail-toggle"
-              aria-expanded={crewOpen}
-              data-testid="crew-rail-toggle"
-              onClick={() => setCrewOpen((o) => !o)}
-            >
-              {crewOpen ? "▾" : "▸"} {t("activity.crewToggle")}
-            </button>
-            {crewOpen && (
-              <div className="crew-rail-list" role="group" aria-label={t("activity.crewFilterAriaLabel")}>
-                <button
-                  type="button"
-                  className={crewFilter === "" ? "active" : ""}
-                  aria-pressed={crewFilter === ""}
-                  data-testid="crew-all"
-                  onClick={() => setCrewFilter("")}
-                >
-                  {t("activity.crewAll")}
-                </button>
-                {crew.map(([persona, n]) => (
-                  <button
-                    key={persona}
-                    type="button"
-                    className={crewFilter === persona ? "active" : ""}
-                    aria-pressed={crewFilter === persona}
-                    data-testid={`crew-${persona}`}
-                    onClick={() =>
-                      setCrewFilter((cur) => (cur === persona ? "" : persona))
-                    }
-                  >
-                    {(PERSONA_META[persona]?.icon ?? "•")}{" "}
-                    {PERSONA_META[persona] ? t(PERSONA_META[persona].labelKey) : persona} ({n})
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
         <div className="activity-rows-wrap">
           {attentionRows.length > 0 && (
             <div

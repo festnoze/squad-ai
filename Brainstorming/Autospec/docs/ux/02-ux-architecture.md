@@ -153,7 +153,8 @@ bascule par défaut.
    - Tokens design + **shell adaptatif** (grille par tokens + breakpoints + densité).
    - `work.ts` étendu (helpers d'étape) + **composant `Stepper`** + **vue `Activity`**
      ajoutée comme onglet de `WorkspaceViews` (Board conservé), avec en-tête compteurs +
-     chip échecs + région à-traiter + filtre crew.
+     chip échecs + région à-traiter + chips-filtres par statut (tous / en
+     cours / en file / faits / échecs / à traiter).
    - **Chat ciblé par item** + menu d'actions d'item (réutilise endpoints existants + B4).
    - **Bannière d'approbation** améliorée.
    - Gestion du `tick` (types.ts/api.ts/App.tsx).

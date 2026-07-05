@@ -57,18 +57,21 @@ export const activity: Namespace = {
 
   heading: { en: "⚡ Activity", fr: "⚡ Activité" },
   regionAriaLabel: { en: "Activity", fr: "Activité" },
-  countRunningTitle: { en: "Running", fr: "En cours" },
+  filterAriaLabel: { en: "Filter items by status", fr: "Filtrer les items par statut" },
+  countAllTitle: { en: "Show all items", fr: "Afficher tous les items" },
+  countAll: { en: "{n} total", fr: "{n} au total" },
+  countRunningTitle: { en: "Show only running items", fr: "N'afficher que les items en cours" },
   countRunning: { en: "{n} running", fr: "{n} en cours" },
-  countQueuedTitle: { en: "Queued", fr: "En file" },
+  countQueuedTitle: { en: "Show only queued items", fr: "N'afficher que les items en file" },
   countQueued: { en: "{n} queued", fr: "{n} en file" },
-  countDoneTitle: { en: "Done", fr: "Faits" },
+  countDoneTitle: { en: "Show only done items", fr: "N'afficher que les items faits" },
   countDone: { en: "{n} done", fr: "{n} faits" },
-  countFailedTitle: { en: "Failed", fr: "En échec" },
+  countFailedTitle: { en: "Show only failed items", fr: "N'afficher que les items en échec" },
   countFailed: { en: "{n} failed", fr: "{n} échecs" },
 
   attentionTitle: {
-    en: "Failed or blocked items needing attention",
-    fr: "Items en échec ou bloqués nécessitant une intervention",
+    en: "Show only failed or blocked items needing attention",
+    fr: "N'afficher que les items en échec ou bloqués nécessitant une intervention",
   },
   attentionChip: { en: "⚠ {n} to handle", fr: "⚠ {n} à traiter" },
   stallTitle: {
@@ -80,10 +83,6 @@ export const activity: Namespace = {
   approvalRequired: { en: "⏸ Approval required —", fr: "⏸ Validation requise —" },
   approve: { en: "✅ Approve", fr: "✅ Approuver" },
   reject: { en: "✋ Reject", fr: "✋ Rejeter" },
-
-  crewToggle: { en: "Crew", fr: "Équipe" },
-  crewFilterAriaLabel: { en: "Filter by agent", fr: "Filtre par agent" },
-  crewAll: { en: "All", fr: "Tous" },
 
   attentionRegionAriaLabel: { en: "To handle first", fr: "À traiter en priorité" },
   attentionRegionTitle: { en: "To handle", fr: "À traiter" },
