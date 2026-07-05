@@ -42,7 +42,10 @@ def test_frontend_test_command_shape():
     assert cmd[0] == settings.npm_cmd
     assert "vitest" in cmd and "run" in cmd
     assert "--reporter=json" in cmd
-    assert "--outputFile=/tmp/vitest.json" in cmd
+    # The json output goes to the file, scoped so the DEFAULT reporter keeps
+    # printing failures to stdout (a red run must carry actionable output).
+    assert "--reporter=default" in cmd
+    assert "--outputFile.json=/tmp/vitest.json" in cmd
 
 
 def test_frontend_build_and_run_command_shape():
@@ -111,6 +114,30 @@ def test_parse_vitest_from_stdout_when_no_report_file():
 def test_parse_vitest_build_failure_yields_no_tests():
     # A failed `tsc && vite build` prints no JSON report.
     assert toolchain.parse_frontend_results("src/App.tsx(3,5): error TS2322: ...", "") == {}
+
+
+def test_frontend_failure_digest_extracts_failed_tests(tmp_path):
+    """Le mode d'échec T5-S1-S1 : reporter json muet sur stdout — le digest du
+    rapport doit porter le nom du test rouge ET son message d'échec."""
+    report = tmp_path / "v.json"
+    payload = json.loads(_VITEST_FAIL)
+    payload["testResults"][0]["assertionResults"][1]["failureMessages"] = [
+        "AssertionError: expected 2 to be 3",
+    ]
+    # Crash au niveau fichier (import cassé) : message sans assertions.
+    payload["testResults"].append(
+        {"name": "src/broken.test.tsx", "message": "Cannot find module './nope'",
+         "assertionResults": []}
+    )
+    report.write_text(json.dumps(payload), encoding="utf-8")
+    digest = toolchain.frontend_failure_digest(str(report))
+    assert "Counter > increments" in digest
+    assert "expected 2 to be 3" in digest
+    assert "Cannot find module './nope'" in digest
+    # Les tests verts/todo n'y figurent pas.
+    assert "renders" not in digest
+    # Rapport illisible → digest vide (jamais d'exception).
+    assert toolchain.frontend_failure_digest(str(tmp_path / "absent.json")) == ""
 
 
 def test_parse_build_errors_extracts_ts_errors():

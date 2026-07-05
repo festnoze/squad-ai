@@ -105,10 +105,15 @@ def frontend_test_command(report_path: str) -> list[str]:
     """``vitest run`` with the JSON reporter writing to ``report_path`` (ST-6).
 
     ``npm exec`` runs the project-local Vitest binary; ``run`` forces a single
-    non-watch pass. The JSON report is parsed by ``_parse_vitest``."""
+    non-watch pass. The JSON report is parsed by ``_parse_vitest``. The
+    ``default`` reporter is kept ALONGSIDE (``--outputFile.json`` scopes the
+    file to the json reporter): with json alone, a red run's stdout is just
+    "JSON report written to …" — zero signal for the dev retry prompt (the
+    messagerie2 T5-S1-S1 failure mode)."""
     return [
         settings.npm_cmd, "exec", "--", "vitest", "run",
-        "--reporter=json", f"--outputFile={report_path}",
+        "--reporter=default", "--reporter=json",
+        f"--outputFile.json={report_path}",
     ]
 
 
@@ -178,6 +183,34 @@ def _parse_vitest(text: str) -> dict[str, str]:
             node = f"{file_name}::{name}" if file_name else name
             out[node] = mapping.get(assertion.get("status"), "failed")
     return out
+
+
+def frontend_failure_digest(report_path: str, limit: int = 4000) -> str:
+    """Human-readable digest of the FAILED entries of a Vitest JSON report
+    (test names + failure messages, plus file-level crash messages). The json
+    reporter keeps stdout terse, so a red run's output alone may carry no
+    actionable signal — this digest is appended to it by the caller."""
+    try:
+        with open(report_path, encoding="utf-8") as fh:
+            data = json.loads(fh.read() or "{}")
+    except (OSError, json.JSONDecodeError):
+        return ""
+    chunks: list[str] = []
+    for file_res in data.get("testResults") or []:
+        file_name = file_res.get("name") or file_res.get("testFilePath") or ""
+        assertions = file_res.get("assertionResults") or []
+        # File-level failure (import/config crash): no assertions, a message.
+        message = (file_res.get("message") or "").strip()
+        if message and not assertions:
+            chunks.append(f"✗ {file_name}\n{message}")
+        for assertion in assertions:
+            if assertion.get("status") != "failed":
+                continue
+            title_parts = [*(assertion.get("ancestorTitles") or []), assertion.get("title") or ""]
+            name = " > ".join(p for p in title_parts if p) or "test"
+            msgs = "\n".join(str(m) for m in (assertion.get("failureMessages") or []))
+            chunks.append(f"✗ {file_name}::{name}\n{msgs}".strip())
+    return "\n\n".join(chunks)[:limit]
 
 
 def parse_build_errors(stdout: str) -> str:

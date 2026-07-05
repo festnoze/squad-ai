@@ -5,6 +5,7 @@ dans main.py/App.tsx), canari post-merge (vert+vert=rouge → revert + requeue),
 et cohérence zone/stream des globs dès la validation du plan."""
 
 import asyncio
+import os
 import sys
 
 from autospec.agents.scripted import ScriptedRunner
@@ -485,10 +486,82 @@ def test_infra_classifier_separates_env_breakage_from_real_reds():
     # Aucun test collecté + signature d'outil → infra.
     assert P._looks_like_infra_failure("No module named pytest", {}) is True
     assert P._looks_like_infra_failure("error: failed to spawn `python`", {}) is True
+    # La signature exacte de l'outage messagerie2 : uv refuse une .venv à
+    # moitié purgée. DOIT être classée infra, pas conflit sémantique.
+    assert P._looks_like_infra_failure(
+        "error: Project virtual environment directory `C:\\ws\\.venv` cannot "
+        "be used because it is not a valid Python environment (no Python "
+        "executable was found)",
+        {},
+    ) is True
     # Des tests ont réellement échoué → PAS infra (vrai conflit sémantique).
     assert P._looks_like_infra_failure("1 failed", {"UT-1": "failed"}) is False
     # Rouge sans signature d'outil ni résultat → prudence : traité comme réel.
     assert P._looks_like_infra_failure("AssertionError: boom", {}) is False
+
+
+def test_frontend_infra_classifier_separates_node_modules_breakage():
+    P = Pipeline
+    # La signature messagerie2 T5-S1-S1 : vitest meurt au chargement de la
+    # config parce que node_modules est à moitié détruit — infra, pas code.
+    assert P._looks_like_frontend_infra_failure(
+        "failed to load config from vite.config.ts\n"
+        "Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'vite'", {},
+    ) is True
+    assert P._looks_like_frontend_infra_failure(
+        "npm ERR! could not determine executable to run", {},
+    ) is True
+    # Des tests ont tourné → vrai rouge, même avec un mot-clef louche.
+    assert P._looks_like_frontend_infra_failure(
+        "Cannot find package (dans un message de test)", {"UT-1": "failed"},
+    ) is False
+    # Rouge sans signature → prudence : traité comme réel.
+    assert P._looks_like_frontend_infra_failure("2 tests failed", {}) is False
+
+
+def test_unlink_node_modules_junctions_preserves_the_shared_install(tmp_path):
+    """`git worktree remove --force` suit les jonctions sous Windows : détacher
+    node_modules AVANT doit supprimer le LIEN sans toucher la cible partagée."""
+    shared = tmp_path / "main" / "frontend" / "node_modules"
+    shared.mkdir(parents=True)
+    (shared / "vite").mkdir()
+    (shared / "vite" / "package.json").write_text("{}", encoding="utf-8")
+    wt = tmp_path / "wt"
+    (wt / "frontend").mkdir(parents=True)
+    linked = Pipeline._link_node_modules(wt / "frontend" / "node_modules", shared)
+    if not linked:  # pas de droits mklink/symlink sur ce runner → non testable
+        return
+    # Un vrai dossier node_modules (install locale, pas une jonction) survit.
+    (wt / "backend").mkdir()
+    real_nm = wt / "backend" / "node_modules"
+    real_nm.mkdir()
+    (real_nm / "left.txt").write_text("x", encoding="utf-8")
+
+    Pipeline._unlink_node_modules_junctions(wt)
+
+    assert not (wt / "frontend" / "node_modules").exists()  # lien détaché
+    assert (shared / "vite" / "package.json").exists()      # cible INTACTE
+    assert (real_nm / "left.txt").exists()                  # vrai dossier gardé
+
+
+def test_purge_venv_dir_reports_a_locked_survivor(tmp_path):
+    """Windows : un python.exe encore ouvert fait survivre l'arbre à rmtree —
+    la purge doit le DIRE (False) au lieu de laisser uv échouer en silence."""
+    venv = tmp_path / ".venv"
+    venv.mkdir()
+    (venv / "python.exe").write_text("", encoding="utf-8")
+    # Purge normale : tout part, la purge répond True.
+    assert Pipeline._purge_venv_dir(tmp_path) is True
+    assert not venv.exists()
+    # Fichier verrouillé (handle ouvert) : l'arbre survit → False.
+    venv.mkdir()
+    locked = venv / "python.exe"
+    locked.write_text("", encoding="utf-8")
+    with open(locked, "r", encoding="utf-8"):
+        result = Pipeline._purge_venv_dir(tmp_path)
+    if os.name == "nt":  # le verrou d'un handle ouvert n'existe que sur Windows
+        assert result is False
+        assert venv.exists()
 
 
 async def test_infra_red_canary_keeps_the_merge_and_does_not_revert(tmp_path, monkeypatch):

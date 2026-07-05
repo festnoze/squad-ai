@@ -4320,6 +4320,27 @@ class Pipeline:
             await self._agit(repo, "branch", "-D", branch)
             return await self._aworktree_add_locked(repo, branch)
 
+    @staticmethod
+    def _unlink_node_modules_junctions(worktree) -> None:
+        """Detach every ``node_modules`` JUNCTION from a worktree before its
+        directory is deleted. ``git worktree remove --force`` (and any naive
+        recursive delete) follows the junction on Windows and destroys the
+        SHARED frontend install it points to — the messagerie2 churn where the
+        main ``node_modules`` was wiped after every item and a sibling's suite
+        died mid-run on "Cannot find package 'vite'". ``os.rmdir`` on a
+        junction removes only the reparse point, never the target."""
+        root = Path(worktree)
+        if not root.exists():
+            return
+        for pattern in ("node_modules", "*/node_modules", "*/*/node_modules"):
+            for nm in root.glob(pattern):
+                try:
+                    is_junction = getattr(nm, "is_junction", lambda: False)()
+                    if is_junction or nm.is_symlink():
+                        os.rmdir(nm)
+                except OSError:
+                    pass
+
     async def _aclear_stale_worktree(self, repo, branch: str) -> None:
         """Remove any leftover git worktree checked out on ``branch`` (and prune
         dead admin records), so the branch becomes deletable and re-addable.
@@ -4334,6 +4355,9 @@ class Pipeline:
                 if line.startswith("worktree "):
                     path = line[len("worktree ") :].strip()
                 elif line.strip() == f"branch refs/heads/{branch}" and path:
+                    # Detach shared node_modules junctions BEFORE git deletes
+                    # the tree (it would recurse through them).
+                    await asyncio.to_thread(self._unlink_node_modules_junctions, path)
                     await self._agit(repo, "worktree", "remove", "--force", path)
                     path = None
             await self._agit(repo, "worktree", "prune")
@@ -4366,6 +4390,10 @@ class Pipeline:
         could not merge yet, so a later pass can resume it instead of
         regenerating the code."""
         async with self._merge_lock:
+            # Detach shared node_modules junctions BEFORE git deletes the tree:
+            # `git worktree remove --force` recurses through junctions on
+            # Windows and would wipe the shared frontend install.
+            await asyncio.to_thread(self._unlink_node_modules_junctions, worktree)
             await self._agit(repo, "worktree", "remove", "--force", str(worktree))
             if not keep_branch:
                 await self._agit(repo, "branch", "-D", branch)
@@ -4412,9 +4440,7 @@ class Pipeline:
                 "suspicion d'infra (venv/outil). Réparation puis nouvel essai.",
             )
             self.monitor.event("canary", item=item.id, verdict="infra_suspected")
-            import shutil
-
-            shutil.rmtree(workspace_dir(self.state.id) / ".venv", ignore_errors=True)
+            await asyncio.to_thread(self._purge_venv_dir, workspace_dir(self.state.id))
             ok2, output2, _ = await self._arun_pytest()
             if ok2:
                 self.state.calibration_for().infra_retries += 1  # §8
@@ -5490,6 +5516,24 @@ class Pipeline:
             return False
         return (venv / "Scripts" / "python.exe").exists() or (venv / "bin" / "python").exists()
 
+    @staticmethod
+    def _purge_venv_dir(ws) -> bool:
+        """Remove ``ws/.venv`` entirely, retrying on Windows file locks: an open
+        ``python.exe`` makes a single ``rmtree(ignore_errors=True)`` leave a
+        half-deleted tree that uv refuses both to use AND to recreate ("not a
+        valid Python environment"). Returns True when the directory is gone."""
+        import shutil
+        import time as _time
+
+        venv = Path(ws) / ".venv"
+        for attempt in range(3):
+            if attempt:
+                _time.sleep(0.5 * attempt)  # let a dying process release its lock
+            shutil.rmtree(venv, ignore_errors=True)
+            if not venv.exists():
+                return True
+        return not venv.exists()
+
     def _guard_shared_venv(self, ws) -> bool:
         """Purge a broken shared ``.venv`` so the next ``uv run`` rebuilds it from
         scratch. Returns True if it removed one (a repair happened). No-op when
@@ -5498,9 +5542,16 @@ class Pipeline:
             return False
         if self._venv_is_valid(ws):
             return False
-        import shutil
-
-        shutil.rmtree(Path(ws) / ".venv", ignore_errors=True)
+        if not self._purge_venv_dir(ws):
+            # A locked file survived every attempt: the next uv run WILL fail
+            # (infra). Say it loudly instead of letting the red read as code.
+            self._log(
+                "streams",
+                "⛔ .venv partagée invalide et impossible à purger (fichier "
+                "verrouillé) — le prochain run échouera pour cause d'infra.",
+            )
+            self.monitor.event("env_repair", scope="shared", reason="purge_failed")
+            return False
         self._log(
             "streams",
             "🩹 .venv partagée invalide (à moitié détruite) — purgée pour "
@@ -5530,6 +5581,12 @@ class Pipeline:
             "the system cannot find the file specified",
             "cannot find the path",
             "failed to install",
+            # uv refusing a half-deleted .venv (locked python.exe survived a
+            # purge): "Project virtual environment directory ... cannot be used
+            # because it is not a valid Python environment (no Python
+            # executable was found)" — the messagerie2 outage signature.
+            "not a valid python environment",
+            "no python executable",
         )
         return any(s in low for s in signatures)
 
@@ -5833,12 +5890,15 @@ class Pipeline:
         Vitest / ``vite build`` run.
 
         The streams build runs frontend items in git worktrees, which never carry
-        ``node_modules`` (gitignored). Without this, every frontend item fails with
-        ``Cannot find package 'vite'``. Strategy (P3): (1) install ONCE in the main
-        frontend root; (2) share it into the worktree via a junction — fast, single
-        install; (3) **fallback to a real ``npm ci`` in the worktree** when the
-        junction silently fails or doesn't resolve (the recurring Windows trap),
-        so correctness never depends on the junction succeeding."""
+        ``node_modules`` (gitignored). Worktrees get a REAL hermetic install
+        (``npm ci``), NEVER a junction to the main install: through a junction,
+        any npm/rm run inside a worktree (harness fallback or a dev agent
+        repairing its environment — Git-Bash ``rm -rf`` recurses into junctions)
+        destroys the SHARED node_modules, and vitest even bundles
+        ``vite.config.ts`` into the junction TARGET's ``.vite-temp`` — every
+        sibling suite then died mid-run on "Cannot find package 'vite'" (the
+        messagerie2 churn: 6 reinstalls of the shared install in one build).
+        The npm cache keeps the per-worktree install fast (~20-40 s)."""
         if settings.fake_agents or self._node_modules_usable(root):
             return
         stream = next(iter(workspace.frontend_streams(self.state)), None)
@@ -5847,26 +5907,19 @@ class Pipeline:
         main_root = workspace.stream_root(self.state, stream)
         if not (main_root / "package.json").exists():
             return
-        # 1) Install once in the main frontend root (shared, serialized).
-        async with self._npm_lock:
-            if not self._node_modules_usable(main_root):
-                self._log("streams", "📦 npm install (frontend) — première fois…")
-                await self._anpm_install_in(main_root, use_ci=False)
-        # 2) Building IN the main root → the install is already there.
         if root.resolve() == main_root.resolve():
+            # Shared root: install once, serialized (siblings contend on it).
+            async with self._npm_lock:
+                if not self._node_modules_usable(main_root):
+                    self._log("streams", "📦 npm install (frontend) — racine partagée…")
+                    await self._anpm_install_in(main_root, use_ci=False)
             return
-        # 3) Share the install via a junction; only trust it if it resolves.
-        if self._node_modules_usable(main_root):
-            linked = await asyncio.to_thread(
-                self._link_node_modules, root / "node_modules", main_root / "node_modules"
-            )
-            if linked:
-                return
-        # 4) Junction failed/unusable → real install in the worktree (the Windows
-        #    `mklink /J` trap). Slower per item, but the build actually resolves.
+        # Worktree: real install. Detach any junction left by an older build
+        # first — npm must never write through it into the shared install.
+        await asyncio.to_thread(self._unlink_node_modules_junctions, root)
         self._log(
             "streams",
-            f"📦 jonction node_modules indisponible — install réel dans le worktree {root.name}…",
+            f"📦 npm ci (frontend) — install réel (hermétique) dans {root.name}…",
         )
         await self._anpm_install_in(root, use_ci=True)
 
@@ -5918,6 +5971,17 @@ class Pipeline:
                 tests_ok = test_proc.returncode == 0
                 output = test_proc.stdout
                 if not tests_ok:
+                    # The json reporter keeps stdout terse: without this digest a
+                    # red run's tail can be as useless as "JSON report written
+                    # to …" — the dev retry prompt then carries zero signal.
+                    digest = toolchain.frontend_failure_digest(report_path)
+                    if digest:
+                        output += "\n--- échecs Vitest (rapport JSON) ---\n" + digest
+                    elif not results:
+                        output += (
+                            "\n(vitest s'est terminé en erreur SANS test collecté : "
+                            "crash de config/setup, suite vide ou reporter muet)"
+                        )
                     return False, output, results
                 # Tests green → the build (tsc && vite build) gates "green" too.
                 build_cmd = self._resolve_cmd(
@@ -5943,17 +6007,51 @@ class Pipeline:
 
         # Shared workspace: serialize so no sibling suite races on the shared
         # frontend tree / node_modules. Worktree runs are isolated → no lock.
-        if shared:
-            async with self._shared_suite_lock:
-                ok, output, results = await asyncio.to_thread(_run)
-        else:
-            ok, output, results = await asyncio.to_thread(_run)
+        async def _arun_once() -> tuple[bool, str, dict[str, str]]:
+            if shared:
+                async with self._shared_suite_lock:
+                    return await asyncio.to_thread(_run)
+            return await asyncio.to_thread(_run)
+
+        ok, output, results = await _arun_once()
+        if not ok and self._looks_like_frontend_infra_failure(output, results):
+            # Mirror of the shared-venv guard: a red with ZERO test executed and
+            # a module-resolution signature is a broken node_modules, not code.
+            # Reinstall and replay once instead of burning a dev attempt.
+            self._log(
+                "streams",
+                "🩹 Suite frontend rouge SANS test exécuté — node_modules "
+                "suspect, réinstallation puis nouvel essai.",
+            )
+            self.monitor.event("env_repair", scope="frontend", reason="node_modules")
+            async with self._npm_lock:
+                await self._anpm_install_in(root, use_ci=True)
+            ok, output, results = await _arun_once()
         self.monitor.event(
             "frontend_verify",
             item=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",
             ok=ok, summary=(output or "")[-500:],
         )
         return ok, output, results
+
+    @staticmethod
+    def _looks_like_frontend_infra_failure(output: str, results: dict[str, str]) -> bool:
+        """Frontend twin of ``_looks_like_infra_failure``: a red Vitest run with
+        NO test outcome AND a module/toolchain-resolution signature is a broken
+        ``node_modules`` (half-deleted install, dead junction), not a code red."""
+        if results:
+            return False  # tests ran → a real red
+        low = (output or "").lower()
+        signatures = (
+            "cannot find package",
+            "err_module_not_found",
+            "failed to load config",
+            "startup error",
+            "could not determine executable to run",  # npm exec: vitest absent
+            "vitest: not found",
+            "enoent",
+        )
+        return any(s in low for s in signatures)
 
     # ------------------------------------------------- AUTO-SPEC next cycle
 

@@ -162,9 +162,11 @@ export function WorkspaceViews({
       </div>
       {showGraph ? (
         <DepGraphPanel
+          epics={epics}
           stories={stories}
           streams={streams}
           onOpenItem={openWorkItemStory}
+          onOpenEpic={openEpic}
         />
       ) : showActivity ? (
         <Activity

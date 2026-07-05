@@ -1,158 +1,333 @@
-import { useMemo } from "react";
-import { Stream, UserStory } from "../types";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  blockedBy,
-  buildWorkGraph,
-  computeGraphLayout,
-  WorkItem,
-} from "../work";
-import { useI18n } from "../i18n/i18n";
+  Background,
+  BackgroundVariant,
+  Handle,
+  MarkerType,
+  Position,
+  ReactFlow,
+  applyNodeChanges,
+  type Edge,
+  type Node,
+  type NodeChange,
+  type NodeProps,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { Epic, Stream, UserStory } from "../types";
+import { computeDagView, DagViewNode, ITEM_H, ITEM_W } from "../graph";
+import { t, useI18n } from "../i18n/i18n";
 
 interface Props {
+  epics: Epic[];
   stories: UserStory[];
   streams?: Stream[];
-  /** Click a node → open its container story/TS on the board (by story id). */
+  /** Double-click a story/task → open its container story/TS on the board. */
   onOpenItem?: (storyId: string) => void;
+  /** Double-click an epic → open the epic on the board. */
+  onOpenEpic?: (epicId: string) => void;
 }
 
-const COL = 190; // horizontal spacing between layers (columns)
-const ROW = 52; // vertical spacing between nodes of a layer
-const NODE_W = 150;
-const NODE_H = 34;
-const PAD = 16;
+/** Data payload carried by every graph node (spec + interaction callbacks). */
+type DagData = DagViewNode & {
+  onToggle: (id: string) => void;
+  onFocus: (id: string) => void;
+};
 
-/** Visual status of a work item: terminal statuses win; an unstarted item with
- *  unmet deps is "blocked", otherwise "ready". Drives the node colour. */
-function nodeState(item: WorkItem, items: Map<string, WorkItem>): string {
-  const s = item.status;
-  if (s === "done") return "done";
-  if (s === "in_progress") return "in_progress";
-  if (s === "failed") return "failed";
-  if (s === "red") return "red";
-  return blockedBy(item.id, items).length > 0 ? "blocked" : "ready";
+const KIND_ICON: Record<string, string> = {
+  epic: "📦",
+  story: "",
+  ts: "🔧",
+  task: "",
+};
+
+function stop(e: React.MouseEvent) {
+  e.stopPropagation();
 }
 
-/** Dependency-graph view (the work-item DAG): one node per schedulable item
- *  (task / taskless story / TS task), laid out in topological columns so each
- *  column is a wave of items that can build in parallel; the critical path (the
- *  longest dependency chain) is highlighted. Makes the independence / TS / AND-join
- *  structure visible at a glance. */
-export function DepGraphPanel({ stories, streams, onOpenItem }: Props) {
+/** Card node: a leaf (task / taskless US), a collapsed container, or a ghost. */
+function DagItemNode({ data }: NodeProps) {
+  const d = data as unknown as DagData;
+  return (
+    <div
+      className={`dag-item dag-state-${d.state}${d.ghost ? " dag-ghost" : ""}${d.crit ? " dag-crit" : ""} dag-kind-${d.kind}`}
+      data-testid={`dag-node-${d.id}`}
+    >
+      <Handle type="target" position={Position.Left} className="dag-handle" />
+      <div className="dag-item-head">
+        {d.container && !d.ghost && (
+          <button
+            type="button"
+            className="dag-btn nodrag"
+            title={t("depGraph.expand")}
+            data-testid={`dag-toggle-${d.id}`}
+            onClick={(e) => {
+              stop(e);
+              d.onToggle(d.id);
+            }}
+            onDoubleClick={stop}
+          >
+            ▸
+          </button>
+        )}
+        <span className="dag-item-id">
+          {KIND_ICON[d.kind] ? `${KIND_ICON[d.kind]} ` : ""}
+          {d.id}
+        </span>
+        {d.container && <span className="dag-count">{d.childCount}</span>}
+        {d.kind !== "task" && (
+          <button
+            type="button"
+            className="dag-btn nodrag"
+            title={t("depGraph.focus")}
+            data-testid={`dag-focus-${d.id}`}
+            onClick={(e) => {
+              stop(e);
+              d.onFocus(d.id);
+            }}
+            onDoubleClick={stop}
+          >
+            ◎
+          </button>
+        )}
+      </div>
+      <div className="dag-item-title">{d.title}</div>
+      <Handle type="source" position={Position.Right} className="dag-handle" />
+    </div>
+  );
+}
+
+/** Expanded container box (epic or decomposed US/TS) holding its children. */
+function DagGroupNode({ data }: NodeProps) {
+  const d = data as unknown as DagData;
+  return (
+    <div
+      className={`dag-group dag-state-${d.state} dag-kind-${d.kind}`}
+      data-testid={`dag-group-${d.id}`}
+    >
+      <div className="dag-group-head">
+        <button
+          type="button"
+          className="dag-btn nodrag"
+          title={t("depGraph.collapse")}
+          data-testid={`dag-toggle-${d.id}`}
+          onClick={(e) => {
+            stop(e);
+            d.onToggle(d.id);
+          }}
+          onDoubleClick={stop}
+        >
+          ▾
+        </button>
+        <span className="dag-item-id">
+          {KIND_ICON[d.kind] ? `${KIND_ICON[d.kind]} ` : ""}
+          {d.id}
+        </span>
+        <span className="dag-group-title">{d.title}</span>
+        <span className="dag-count">{d.childCount}</span>
+        <button
+          type="button"
+          className="dag-btn nodrag"
+          title={t("depGraph.focus")}
+          data-testid={`dag-focus-${d.id}`}
+          onClick={(e) => {
+            stop(e);
+            d.onFocus(d.id);
+          }}
+          onDoubleClick={stop}
+        >
+          ◎
+        </button>
+      </div>
+    </div>
+  );
+}
+
+const nodeTypes = { dagItem: DagItemNode, dagGroup: DagGroupNode };
+
+/** Dependency-graph tab, hierarchical edition: epics → US/TS → tasks rendered
+ *  with React Flow. Everything is collapsed by default; each level opens in
+ *  place (dagre re-layouts automatically), any epic/US can be focused alone,
+ *  nodes stay draggable (edges follow) and the canvas grows with real
+ *  scrollbars instead of pan/zoom. */
+export function DepGraphPanel({
+  epics,
+  stories,
+  streams,
+  onOpenItem,
+  onOpenEpic,
+}: Props) {
   const { t } = useI18n();
-  const technicalIds = useMemo(
-    () => new Set((stories ?? []).filter((s) => s.technical).map((s) => s.id)),
-    [stories],
+  const [expanded, setExpanded] = useState<ReadonlySet<string>>(new Set());
+  const [focusId, setFocusId] = useState<string | null>(null);
+
+  const view = useMemo(
+    () =>
+      computeDagView(epics ?? [], stories ?? [], streams ?? [], expanded, focusId),
+    [epics, stories, streams, expanded, focusId],
   );
 
-  const { items, layout, positions, width, height } = useMemo(() => {
-    const items = buildWorkGraph(stories ?? [], streams ?? []);
-    const layout = computeGraphLayout(items);
-    // Stack nodes within each layer (column), stable by insertion order.
-    const perLayerCount = new Map<number, number>();
-    const positions = new Map<string, { x: number; y: number }>();
-    for (const id of items.keys()) {
-      const l = layout.layer.get(id) ?? 0;
-      const row = perLayerCount.get(l) ?? 0;
-      perLayerCount.set(l, row + 1);
-      positions.set(id, { x: PAD + l * COL, y: PAD + row * ROW });
+  const toggle = useCallback((id: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+  const focus = useCallback((id: string) => setFocusId(id), []);
+
+  // Layouted specs → React Flow nodes. Recomputed on every structural change
+  // (expand/collapse/focus/data), which resets manual drag offsets — that's the
+  // "auto-adapt" behaviour: the layout always reflects the current level.
+  const layoutNodes = useMemo<Node[]>(
+    () =>
+      view.nodes.map((spec) => ({
+        id: spec.id,
+        type: spec.type === "group" ? "dagGroup" : "dagItem",
+        position: { x: spec.x, y: spec.y },
+        parentId: spec.parentId,
+        extent: spec.parentId ? ("parent" as const) : undefined,
+        style: { width: spec.w, height: spec.h },
+        data: { ...spec, onToggle: toggle, onFocus: focus },
+      })),
+    [view, toggle, focus],
+  );
+
+  const [nodes, setNodes] = useState<Node[]>(layoutNodes);
+  useEffect(() => setNodes(layoutNodes), [layoutNodes]);
+
+  // Free drag for top-level nodes (clamped to ≥0 so nothing escapes the
+  // scrollable canvas); children are constrained to their parent group.
+  const onNodesChange = useCallback((changes: NodeChange[]) => {
+    setNodes((ns) =>
+      applyNodeChanges(changes, ns).map((n) =>
+        n.parentId
+          ? n
+          : {
+              ...n,
+              position: {
+                x: Math.max(0, n.position.x),
+                y: Math.max(0, n.position.y),
+              },
+            },
+      ),
+    );
+  }, []);
+
+  const rfEdges = useMemo<Edge[]>(
+    () =>
+      view.edges.map((e) => ({
+        id: e.id,
+        source: e.source,
+        target: e.target,
+        className: e.crit ? "dag-edge dag-edge-crit" : "dag-edge",
+        markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
+      })),
+    [view],
+  );
+
+  const onNodeDoubleClick = useCallback(
+    (_: React.MouseEvent, node: Node) => {
+      const d = node.data as unknown as DagData;
+      if (d.kind === "epic") onOpenEpic?.(d.id);
+      else onOpenItem?.(d.storyId || d.id);
+    },
+    [onOpenEpic, onOpenItem],
+  );
+
+  // The canvas grows with the layout AND with manual drags, so the wrapper's
+  // native scrollbars always cover the content (zoom/pan are disabled).
+  const canvas = useMemo(() => {
+    let w = view.width;
+    let h = view.height;
+    for (const n of nodes) {
+      if (n.parentId) continue;
+      w = Math.max(w, n.position.x + (Number(n.style?.width) || ITEM_W) + 24);
+      h = Math.max(h, n.position.y + (Number(n.style?.height) || ITEM_H) + 24);
     }
-    const width = PAD * 2 + (layout.maxLayer + 1) * COL;
-    const height = PAD * 2 + Math.max(1, layout.maxParallel) * ROW;
-    return { items, layout, positions, width, height };
-  }, [stories, streams]);
+    return { w, h };
+  }, [nodes, view.width, view.height]);
 
-  if (items.size === 0) return null;
-
-  const nodes = [...items.values()];
-  const edges: { from: string; to: string; crit: boolean }[] = [];
-  for (const it of nodes) {
-    for (const dep of it.dependsOn) {
-      if (!items.has(dep)) continue;
-      edges.push({
-        from: dep,
-        to: it.id,
-        crit: layout.critical.has(dep) && layout.critical.has(it.id),
-      });
-    }
-  }
-
-  const open = (it: WorkItem) => onOpenItem?.(it.storyId);
+  if (view.summary.n === 0) return null;
 
   return (
     <div className="dag-panel">
-      <div className="dag-summary" data-testid="dag-summary">
-        {t("depGraph.summary", {
-          n: items.size,
-          waves: layout.maxLayer + 1,
-          parallel: layout.maxParallel,
-          critical: layout.critical.size,
-        })}
-      </div>
-      <div className="dag-scroll">
-        <svg
-          className="dag-svg"
-          width={width}
-          height={height}
-          viewBox={`0 0 ${width} ${height}`}
-          role="img"
-          aria-label={t("depGraph.title")}
-        >
-          <defs>
-            <marker
-              id="dag-arrow"
-              viewBox="0 0 8 8"
-              refX="7"
-              refY="4"
-              markerWidth="6"
-              markerHeight="6"
-              orient="auto-start-reverse"
+      <div className="dag-toolbar">
+        {view.focusPath.length > 0 && (
+          <>
+            <button
+              type="button"
+              className="dag-tool"
+              data-testid="dag-back"
+              onClick={() => setFocusId(null)}
             >
-              <path d="M0,0 L8,4 L0,8 z" fill="#5a6680" />
-            </marker>
-          </defs>
-          {edges.map((e, i) => {
-            const a = positions.get(e.from)!;
-            const b = positions.get(e.to)!;
-            const x1 = a.x + NODE_W;
-            const y1 = a.y + NODE_H / 2;
-            const x2 = b.x;
-            const y2 = b.y + NODE_H / 2;
-            const midx = (x1 + x2) / 2;
-            return (
-              <path
-                key={`e-${i}`}
-                className={`dag-edge${e.crit ? " dag-edge-crit" : ""}`}
-                d={`M${x1},${y1} C${midx},${y1} ${midx},${y2} ${x2},${y2}`}
-                markerEnd="url(#dag-arrow)"
-                fill="none"
-              />
-            );
-          })}
-          {nodes.map((it) => {
-            const p = positions.get(it.id)!;
-            const st = nodeState(it, items);
-            const isTs = technicalIds.has(it.storyId);
-            const crit = layout.critical.has(it.id);
-            return (
-              <g
-                key={it.id}
-                className={`dag-node dag-node-${st}${crit ? " dag-node-crit" : ""}`}
-                transform={`translate(${p.x},${p.y})`}
-                onClick={() => open(it)}
-                data-testid={`dag-node-${it.id}`}
-              >
-                <rect width={NODE_W} height={NODE_H} rx={6} />
-                <text className="dag-node-id" x={8} y={14}>
-                  {isTs ? "🔧 " : ""}
-                  {it.id}
-                </text>
-                <text className="dag-node-title" x={8} y={27}>
-                  {(it.title || "").slice(0, 22)}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+              ⌂ {t("depGraph.backToProject")}
+            </button>
+            {view.focusPath.map((p, i) => (
+              <span key={p.id} className="dag-crumb-wrap">
+                <span className="dag-crumb-sep">›</span>
+                <button
+                  type="button"
+                  className="dag-crumb"
+                  onClick={() => setFocusId(p.id)}
+                  disabled={i === view.focusPath.length - 1}
+                >
+                  {p.id}
+                </button>
+              </span>
+            ))}
+          </>
+        )}
+        <span className="dag-summary" data-testid="dag-summary">
+          {t("depGraph.summary", view.summary)}
+        </span>
+        <span className="dag-spacer" />
+        <button
+          type="button"
+          className="dag-tool"
+          data-testid="dag-expand-all"
+          onClick={() => setExpanded(new Set(view.containerIds))}
+        >
+          {t("depGraph.expandAll")}
+        </button>
+        <button
+          type="button"
+          className="dag-tool"
+          data-testid="dag-collapse-all"
+          onClick={() => setExpanded(new Set())}
+        >
+          {t("depGraph.collapseAll")}
+        </button>
+      </div>
+      <div className="dag-hint">{t("depGraph.hint")}</div>
+      <div className="dag-scroll" data-testid="dag-scroll">
+        <div
+          className="dag-canvas"
+          style={{ width: canvas.w, height: canvas.h }}
+        >
+          <ReactFlow
+            nodes={nodes}
+            edges={rfEdges}
+            nodeTypes={nodeTypes}
+            onNodesChange={onNodesChange}
+            onNodeDoubleClick={onNodeDoubleClick}
+            minZoom={1}
+            maxZoom={1}
+            defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+            panOnDrag={false}
+            panOnScroll={false}
+            zoomOnScroll={false}
+            zoomOnPinch={false}
+            zoomOnDoubleClick={false}
+            preventScrolling={false}
+            nodesConnectable={false}
+            deleteKeyCode={null}
+            selectNodesOnDrag={false}
+            aria-label={t("depGraph.title")}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={24} size={1} />
+          </ReactFlow>
+        </div>
       </div>
     </div>
   );

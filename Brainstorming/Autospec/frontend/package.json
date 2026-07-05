@@ -11,6 +11,8 @@
     "test:e2e": "npm run build && playwright test"
   },
   "dependencies": {
+    "@dagrejs/dagre": "^3.0.0",
+    "@xyflow/react": "^12.11.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
