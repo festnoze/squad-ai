@@ -90,7 +90,7 @@ export function ChatPanel({
           </div>
         )}
       </div>
-      <div className="chat-messages">
+      <div className="chat-messages" role="log" aria-live="polite">
         {chat.length === 0 ? (
           <div className="chat-empty">
             <p className="placeholder">
@@ -143,6 +143,7 @@ export function ChatPanel({
         <textarea
           rows={2}
           placeholder={placeholder}
+          aria-label={t("chatPanel.inputAria")}
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => {
@@ -156,6 +157,7 @@ export function ChatPanel({
           {t("chatPanel.send")}
         </button>
       </div>
+      <span className="input-hint">{t("chatPanel.sendHint")}</span>
     </div>
   );
 }

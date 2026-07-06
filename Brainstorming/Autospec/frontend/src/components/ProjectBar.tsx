@@ -162,6 +162,7 @@ export function ProjectBar({
               <button
                 className="chip-play"
                 title={t("projectBar.stopPipeline")}
+                aria-label={t("projectBar.stopPipeline")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onStop(p);
@@ -178,6 +179,11 @@ export function ProjectBar({
                     ? t("projectBar.resumePipeline")
                     : t("projectBar.resumeBuild")
                 }
+                aria-label={
+                  p.paused
+                    ? t("projectBar.resumePipeline")
+                    : t("projectBar.resumeBuild")
+                }
                 onClick={(e) => {
                   e.stopPropagation();
                   onPlay(p);
@@ -190,6 +196,7 @@ export function ProjectBar({
               <button
                 className="chip-archive"
                 title={t("projectBar.unarchiveProject")}
+                aria-label={t("projectBar.unarchiveProject")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onUnarchive(p);
@@ -201,6 +208,7 @@ export function ProjectBar({
               <button
                 className="chip-archive"
                 title={t("projectBar.archiveProject")}
+                aria-label={t("projectBar.archiveProject")}
                 onClick={(e) => {
                   e.stopPropagation();
                   onArchive(p);
@@ -212,6 +220,7 @@ export function ProjectBar({
             <button
               className="chip-del"
               title={t("projectBar.deleteProject")}
+              aria-label={t("projectBar.deleteProject")}
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete(p);

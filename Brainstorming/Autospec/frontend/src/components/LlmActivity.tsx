@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getItemInteractions } from "../api";
 import { useI18n } from "../i18n/i18n";
 import { AgentInteraction } from "../types";
@@ -158,14 +158,22 @@ export function LlmActivity({
   const [items, setItems] = useState<AgentInteraction[] | null>(null);
   const [error, setError] = useState("");
   const [now, setNow] = useState(() => Date.now());
+  // Q5 — un échec du PREMIER chargement s'affiche (« historique indisponible »)
+  // au lieu d'un vide trompeur ; les échecs de polling suivants restent muets.
+  const loadedOnce = useRef(false);
+  const [unavailable, setUnavailable] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const data = await getItemInteractions(projectId, itemId, limit);
+      loadedOnce.current = true;
       setItems(data);
+      setUnavailable(false);
       setError("");
-    } catch {
+    } catch (e) {
       // A 404 (no pipeline / no history yet) is not an error worth shouting about.
+      const is404 = e instanceof Error && /^Erreur 404\b/.test(e.message);
+      if (!loadedOnce.current && !is404) setUnavailable(true);
       setItems((cur) => cur ?? []);
     }
   }, [projectId, itemId, limit]);
@@ -204,7 +212,11 @@ export function LlmActivity({
       {error && <div className="edit-error">{error}</div>}
       {ordered.length === 0 ? (
         <p className="placeholder small">
-          {live ? t("llmActivity.emptyLive") : t("llmActivity.emptyHistory")}
+          {unavailable
+            ? t("llmActivity.unavailable")
+            : live
+              ? t("llmActivity.emptyLive")
+              : t("llmActivity.emptyHistory")}
         </p>
       ) : (
         <div className="llm-call-list">

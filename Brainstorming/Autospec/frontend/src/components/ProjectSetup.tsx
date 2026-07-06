@@ -19,11 +19,13 @@ export function ProjectSetup({ onCreate, busy }: Props) {
     <div className="panel setup">
       <h2>{t("projectSetup.title")}</h2>
       <input
+        aria-label={t("projectSetup.nameAriaLabel")}
         placeholder={t("projectSetup.namePlaceholder")}
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
       <textarea
+        aria-label={t("projectSetup.goalAriaLabel")}
         placeholder={t("projectSetup.goalPlaceholder")}
         rows={6}
         value={goal}
@@ -42,6 +44,7 @@ export function ProjectSetup({ onCreate, busy }: Props) {
         </span>
       </label>
       <textarea
+        aria-label={t("projectSetup.briefAriaLabel")}
         placeholder={t("projectSetup.briefPlaceholder")}
         rows={4}
         value={brief}

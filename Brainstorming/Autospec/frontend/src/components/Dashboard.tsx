@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { errorMessage, getMetrics } from "../api";
 import { Metrics } from "../types";
+import { useEscapeToClose } from "../hooks";
 import { useI18n } from "../i18n/i18n";
 
 function Stat({ label, value }: { label: string; value: string | number }) {
@@ -16,6 +17,7 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
   const { t } = useI18n();
   const [metrics, setMetrics] = useState<Metrics | null>(null);
   const [error, setError] = useState("");
+  useEscapeToClose(true, onClose);
 
   useEffect(() => {
     getMetrics()

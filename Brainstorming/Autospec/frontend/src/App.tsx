@@ -35,6 +35,7 @@ import {
   updateComponents,
 } from "./api";
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
+import { ConfirmHost, confirmAction } from "./components/ConfirmDialog";
 import { PlanReviewPanel } from "./components/PlanReviewPanel";
 import { LanguagePanel } from "./components/LanguagePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
@@ -48,6 +49,8 @@ import { ProjectSetup } from "./components/ProjectSetup";
 import { RunPanel } from "./components/RunPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { Logo } from "./components/Logo";
+import { useEscapeToClose } from "./hooks";
+import { subscribeToasts } from "./toast";
 import { useI18n } from "./i18n/i18n";
 import {
   GuidanceEntry,
@@ -134,6 +137,8 @@ export default function App() {
     setToasts((prev) => [...prev.slice(-4), { id, level, title, body }]);
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 6000);
   };
+  // Q5 — connexion SSE coupée : pastille « Reconnexion… » dans le header.
+  const [sseDown, setSseDown] = useState(false);
   const [provider, setProviderInfo] = useState<ProviderInfo | null>(null);
   // UI10 : provider + modèle regroupés dans un petit popover compact.
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
@@ -172,6 +177,15 @@ export default function App() {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [providerMenuOpen]);
+  // Q1 — Escape ferme le popover provider et la modale de création.
+  useEscapeToClose(providerMenuOpen, () => setProviderMenuOpen(false));
+  useEscapeToClose(showSetup, () => setShowSetup(false));
+  // Q0 — toasts émis hors de App (copie, etc.) via le bus module-level.
+  useEffect(
+    () => subscribeToasts((ev) => pushToast(ev.level, ev.title, ev.body)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
   // P3 — couple the density axis to the responsive one: below 1200px the shell
   // switches to data-density="compact" (tighter tokens) and reverts above. Pure
   // attribute toggle; the CSS media query carries the actual deltas.
@@ -298,6 +312,8 @@ export default function App() {
           .then(setProviderInfo)
           .catch(() => {});
       },
+      // Q5 — indicateur de connexion live (pastille « Reconnexion… »).
+      (connected) => setSseDown(!connected),
     );
   }, []);
 
@@ -324,7 +340,13 @@ export default function App() {
   };
 
   const handleDelete = async (target: ProjectState) => {
-    if (!window.confirm(t("app.confirmDelete", { name: target.name }))) return;
+    const ok = await confirmAction({
+      title: t("app.confirmDeleteTitle"),
+      body: t("app.confirmDelete", { name: target.name }),
+      confirmLabel: t("common.delete"),
+      danger: true,
+    });
+    if (!ok) return;
     try {
       await deleteProject(target.id);
       deletedIds.current.add(target.id);
@@ -439,7 +461,11 @@ export default function App() {
   // et on exécute.
   const handleRollbackTo = async (n: number) => {
     if (!project) return;
-    if (!window.confirm(t("app.confirmRollback", { n }))) return;
+    const ok = await confirmAction({
+      title: t("app.confirmRollbackTitle"),
+      body: t("app.confirmRollback", { n }),
+    });
+    if (!ok) return;
     await guard(() => rollbackProject(project.id, n))();
     pushToast("success", t("app.rollbackToastTitle"), t("app.rollbackToastBody", { n }));
   };
@@ -448,7 +474,12 @@ export default function App() {
   // le brief), d'où la confirmation explicite avant l'appel API.
   const handleRestartFromScratch = async () => {
     if (!project) return;
-    if (!window.confirm(t("app.confirmRestartScratch", { name: project.name }))) return;
+    const ok = await confirmAction({
+      title: t("app.confirmRestartTitle"),
+      body: t("app.confirmRestartScratch", { name: project.name }),
+      danger: true,
+    });
+    if (!ok) return;
     await guard(() => restartFromScratch(project.id))();
     pushToast("success", t("app.restartToastTitle"), t("app.restartToastBody"));
   };
@@ -550,6 +581,11 @@ export default function App() {
             )}
           </div>
         )}
+        {sseDown && (
+          <span className="sse-pill" role="status" title={t("app.reconnectingTitle")}>
+            ⟳ {t("app.reconnecting")}
+          </span>
+        )}
         <button
           className="dash-btn"
           onClick={() => setShowDashboard(true)}
@@ -628,6 +664,7 @@ export default function App() {
           ))}
         </div>
       )}
+      <ConfirmHost />
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSetup && (

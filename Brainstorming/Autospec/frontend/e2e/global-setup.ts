@@ -24,5 +24,25 @@ function makeWritable(path: string) {
 export default function globalSetup() {
   const dir = resolve(process.cwd(), "../backend/.e2e-workspace");
   makeWritable(dir);
-  rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  try {
+    rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+  } catch {
+    // La corbeille .autospec-trash (DLL hardlinkées depuis le cache uv, encore
+    // chargées par un processus python externe — backend dev, LSP…) peut être
+    // inamovible : on wipe alors chaque enfant individuellement et on tolère
+    // l'échec des seuls fichiers encore verrouillés. Le backend les re-purge
+    // en best-effort à chaque suppression de projet.
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      try {
+        rmSync(join(dir, entry.name), {
+          recursive: true,
+          force: true,
+          maxRetries: 2,
+          retryDelay: 100,
+        });
+      } catch {
+        /* fichier encore verrouillé (corbeille) — toléré */
+      }
+    }
+  }
 }

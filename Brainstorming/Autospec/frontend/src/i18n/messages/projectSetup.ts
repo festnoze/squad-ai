@@ -6,9 +6,14 @@ export const projectSetup: Namespace = {
     en: "Project name (optional)",
     fr: "Nom du projet (optionnel)",
   },
+  nameAriaLabel: { en: "Project name", fr: "Nom du projet" },
   goalPlaceholder: {
     en: "Describe the feature or project you want to create…",
     fr: "Décris la feature ou le projet que tu veux créer…",
+  },
+  goalAriaLabel: {
+    en: "Feature or project description",
+    fr: "Description de la feature ou du projet",
   },
   autoSpecLabel: { en: "Auto-spec", fr: "Auto-spec" },
   autoSpecDescription: {
@@ -19,6 +24,7 @@ export const projectSetup: Namespace = {
     en: "Spec to import (optional) — paste a set of requirements to skip the interview",
     fr: "Spec à importer (optionnel) — colle un cahier des charges pour court-circuiter l'interview",
   },
+  briefAriaLabel: { en: "Spec to import", fr: "Spec à importer" },
   brownfieldAriaLabel: {
     en: "Path to an existing repo to extend (brownfield mode, optional)",
     fr: "Chemin d'un repo existant à étendre (mode brownfield, optionnel)",

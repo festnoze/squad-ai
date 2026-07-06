@@ -71,4 +71,9 @@ export const chatPanel: Namespace = {
   },
 
   send: { en: "Send", fr: "Envoyer" },
+  sendHint: {
+    en: "Enter to send · Shift+Enter for a new line",
+    fr: "Entrée pour envoyer · Maj+Entrée pour une nouvelle ligne",
+  },
+  inputAria: { en: "Message to the team", fr: "Message à l'équipe" },
 };

@@ -120,6 +120,49 @@ def test_smoke_python_web_process_exits_without_listening_fails(monkeypatch):
     assert ok is False and "ne démarre pas le serveur" in detail
 
 
+def test_expects_web_app_by_profile_and_streams():
+    """La classification web doit venir de l'INTENTION (profil / stream
+    frontend), pas seulement de l'artefact généré (piège messagerie2)."""
+    from autospec.models import Stream, StreamKind
+
+    p = Pipeline(_state_with_done_story("smoke-intent"), ScriptedRunner())
+    p.state.product_profile = "fullstack"
+    assert p._expects_web_app() is True
+    p.state.product_profile = "api"
+    assert p._expects_web_app() is True
+    p.state.product_profile = "cli"
+    assert p._expects_web_app() is False
+    # auto : la présence d'un stream frontend implique un backend web.
+    p.state.product_profile = "auto"
+    assert p._expects_web_app() is False
+    p.state.streams = [
+        Stream(id="frontend", kind=StreamKind.FRONTEND, language="react", file_root="frontend"),
+    ]
+    assert p._expects_web_app() is True
+
+
+def test_smoke_web_expected_by_intent_without_framework_fails(monkeypatch):
+    """messagerie2 : app fullstack SANS framework web dans pyproject → l'ancien
+    gate la classait CLI (exit 0 = succès). Avec l'intention web, main.py qui
+    sort sans écouter doit ÉCHOUER, avec l'indice « framework absent »."""
+    from autospec.models import Stream, StreamKind
+
+    monkeypatch.setattr(settings, "smoke_run_timeout_s", 5.0)
+    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: _FakeProc(alive=False))
+    monkeypatch.setattr(Pipeline, "_terminate_tree", staticmethod(lambda proc: None))
+    state = _state_with_done_story("smoke-intent-web")
+    state.streams = [
+        Stream(id="frontend", kind=StreamKind.FRONTEND, language="react", file_root="frontend"),
+    ]
+    ws = _scaffold(workspace_dir(state.id), web=False)  # pas de framework déclaré
+    pipeline = Pipeline(state, ScriptedRunner())
+
+    ok, detail = pipeline._smoke_run_python(ws)
+    assert ok is False
+    assert "ne démarre pas le serveur" in detail
+    assert "aucun framework web déclaré" in detail
+
+
 def test_smoke_python_cli_exit_zero_passes(monkeypatch):
     completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="done")
     monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed)

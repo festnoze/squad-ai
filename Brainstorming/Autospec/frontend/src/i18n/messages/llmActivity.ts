@@ -35,4 +35,9 @@ export const llmActivity: Namespace = {
     en: "No LLM call recorded for this item.",
     fr: "Aucun appel LLM enregistré pour cet item.",
   },
+  // Q5 — échec du premier chargement (réseau/backend) : pas de vide trompeur.
+  unavailable: {
+    en: "History unavailable (fetch failed).",
+    fr: "Historique indisponible (échec du chargement).",
+  },
 };

@@ -19,4 +19,7 @@ export const common: Namespace = {
   refresh: { en: "Refresh", fr: "Rafraîchir" },
   error: { en: "Error", fr: "Erreur" },
   success: { en: "Success", fr: "Succès" },
+  copy: { en: "Copy", fr: "Copier" },
+  copied: { en: "Copied to clipboard", fr: "Copié dans le presse-papiers" },
+  copyFailed: { en: "Copy failed", fr: "Échec de la copie" },
 };

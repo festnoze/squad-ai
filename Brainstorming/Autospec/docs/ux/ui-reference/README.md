@@ -81,5 +81,6 @@ cd frontend && npm install && npm run dev   # Vite sur http://localhost:5183
 # backend attendu sur :8100 (proxy /api configuré dans vite.config.ts)
 ```
 
-Voir aussi les documents de refonte : [../01-analysis-and-proposals.md](../01-analysis-and-proposals.md)
-et [../02-ux-architecture.md](../02-ux-architecture.md).
+Voir aussi les documents de refonte : [../01-analysis-and-proposals.md](../01-analysis-and-proposals.md),
+[../02-ux-architecture.md](../02-ux-architecture.md)
+et [../03-ux-improvements.md](../03-ux-improvements.md) (quick wins post-MVP + roadmap).

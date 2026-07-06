@@ -50,14 +50,21 @@ async function dismissBrainstorm(page: Page) {
  *  then reload so the bar reflects the clean state. */
 async function clearProjects(page: Page, request: APIRequestContext) {
   const existing = (await (await request.get("/api/projects")).json()) as { id: string }[];
+  // La suppression d'un workspace git sous Windows peut renvoyer un 409
+  // transitoire (« workspace verrouillé ») : on réessaie jusqu'à succès.
   for (const p of existing) {
-    await request.delete(`/api/projects/${p.id}`).catch(() => {});
+    await expect(async () => {
+      const res = await request.delete(`/api/projects/${p.id}`);
+      expect(res.ok() || res.status() === 404).toBeTruthy();
+    }).toPass({ timeout: 30_000 });
   }
   await page.goto("/");
   await expect(page.locator(".project-chip")).toHaveCount(0);
 }
 
 test("improve_UX: Activité stepper + targeted chat + extend", async ({ page, request }) => {
+  // Les assertions de la spec sont en français ; l'app démarre en "en" par défaut.
+  await page.addInitScript(() => localStorage.setItem("autospec.lang", "fr"));
   await page.goto("/");
   page.on("dialog", (d) => d.accept());
 

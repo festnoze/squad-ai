@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   clientUuid,
+  connectEvents,
   createProject,
   discoverModels,
   extendStory,
@@ -139,5 +140,39 @@ describe("api — directives ciblées idempotentes (chat/extend)", () => {
     expect(a).toBeTruthy();
     expect(b).toBeTruthy();
     expect(a).not.toBe(b);
+  });
+});
+
+describe("connectEvents — statut de connexion (Q5)", () => {
+  class FakeEventSource {
+    static CONNECTING = 0;
+    static OPEN = 1;
+    static CLOSED = 2;
+    static last: FakeEventSource | null = null;
+    onopen: (() => void) | null = null;
+    onerror: (() => void) | null = null;
+    onmessage: ((e: { data: string }) => void) | null = null;
+    readyState = 0;
+    constructor(public url: string) {
+      FakeEventSource.last = this;
+    }
+    close() {
+      this.readyState = 2;
+    }
+  }
+
+  it("onStatus(true) à l'ouverture, onStatus(false) sur erreur", () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    const statuses: boolean[] = [];
+    const off = connectEvents(
+      () => {},
+      undefined,
+      (connected) => statuses.push(connected),
+    );
+    FakeEventSource.last!.onopen!();
+    expect(statuses).toEqual([true]);
+    FakeEventSource.last!.onerror!();
+    expect(statuses).toEqual([true, false]);
+    off();
   });
 });

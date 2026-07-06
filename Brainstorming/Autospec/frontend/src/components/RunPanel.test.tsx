@@ -386,3 +386,45 @@ describe("RunPanel", () => {
     expect(screen.queryByPlaceholderText(/arguments/i)).not.toBeInTheDocument();
   });
 });
+
+describe("RunPanel — filtres de logs (Q3)", () => {
+  const LOGS = [
+    { projectId: "p1", source: "dev:US-1", line: "building the thing" },
+    { projectId: "p1", source: "qa:US-1", line: "❌ test failed on step 2" },
+    { projectId: "p1", source: "dev:US-2", line: "another build line" },
+  ];
+
+  it("filtre par texte libre + compteur affiché/total", () => {
+    renderPanel(makeProject({ phase: "done" }), LOGS);
+    fireEvent.change(screen.getByPlaceholderText("Filter logs…"), {
+      target: { value: "another" },
+    });
+    expect(screen.getByText(/another build line/)).toBeInTheDocument();
+    expect(screen.queryByText(/building the thing/)).not.toBeInTheDocument();
+    expect(screen.getByText("1/3 lines")).toBeInTheDocument();
+  });
+
+  it("filtre par source (tag dev:US-n / qa:US-n)", () => {
+    renderPanel(makeProject({ phase: "done" }), LOGS);
+    fireEvent.change(screen.getByLabelText("Filter logs by source"), {
+      target: { value: "qa:US-1" },
+    });
+    expect(screen.getByText(/test failed on step 2/)).toBeInTheDocument();
+    expect(screen.queryByText(/another build line/)).not.toBeInTheDocument();
+  });
+
+  it("« erreurs seulement » (heuristique ❌/⚠️)", () => {
+    renderPanel(makeProject({ phase: "done" }), LOGS);
+    fireEvent.click(screen.getByRole("checkbox", { name: "Errors only" }));
+    expect(screen.getByText(/test failed on step 2/)).toBeInTheDocument();
+    expect(screen.queryByText(/building the thing/)).not.toBeInTheDocument();
+    expect(screen.getByText("1/3 lines")).toBeInTheDocument();
+  });
+
+  it("sans filtre actif : toutes les lignes, pas de compteur", () => {
+    renderPanel(makeProject({ phase: "done" }), LOGS);
+    expect(screen.getByText(/building the thing/)).toBeInTheDocument();
+    expect(screen.getByText(/another build line/)).toBeInTheDocument();
+    expect(screen.queryByText(/\/3 lines/)).not.toBeInTheDocument();
+  });
+});

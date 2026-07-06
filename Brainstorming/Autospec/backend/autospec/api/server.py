@@ -551,20 +551,54 @@ def _force_delete_workspace(project_id: str) -> bool:
     its pack/object files read-only — on Windows ``shutil.rmtree`` then fails to
     remove the ``.git`` directory (leaving the workspace behind). We retry with
     an ``onerror`` handler that clears the read-only bit before re-deleting.
+
+    Deuxième classe de verrous, PERSISTANTS ceux-là : les venvs de projet sont
+    hardlinkés depuis le cache uv, donc une DLL (.pyd) du workspace partage son
+    file-object avec le backend lui-même et tout autre venv de la machine —
+    tant qu'UN processus python l'a chargée, Windows en interdit la suppression
+    (le 409 devenait éternel). La suppression est impossible mais le RENOMMAGE
+    est permis : on déporte ces fichiers dans une corbeille hors du workspace
+    (``.autospec-trash`` au niveau du workspace-root, ignorée par
+    ``list_states``), purgée en best-effort au passage suivant.
     """
     ws = workspace_dir(project_id)
     if not ws.exists():
         return False
 
+    trash = ws.parent / ".autospec-trash"
+
+    def _purge_trash() -> None:
+        # Les fichiers déportés se déverrouillent quand leurs processus
+        # détenteurs se terminent : on retente leur suppression à chaque
+        # passage, sans jamais échouer.
+        if not trash.exists():
+            return
+        for child in trash.iterdir():
+            try:
+                if child.is_dir():
+                    shutil.rmtree(child, onerror=lambda _f, _p, _e: None)
+                else:
+                    os.chmod(child, stat.S_IWRITE)
+                    child.unlink()
+            except OSError:
+                pass
+
     def _on_error(func, path, _exc) -> None:
         # Best-effort: clear the read-only bit and retry; a still-locked file
-        # (e.g. held by a running app/pytest) is reported by the caller below.
+        # (e.g. held by a running app/pytest, or a hardlinked DLL loaded by any
+        # python process) is MOVED to the trash — rename is allowed on a mapped
+        # DLL — so the rmtree can finish.
         try:
             os.chmod(path, stat.S_IWRITE)
             func(path)
         except OSError:
-            pass
+            try:
+                trash.mkdir(exist_ok=True)
+                os.replace(path, trash / f"{time.time_ns():x}-{os.path.basename(path)}")
+            except OSError:
+                pass
 
+    _purge_trash()
     # BUG6 : un handle transitoire (écriture de persistance qui vient de se
     # terminer, scan antivirus, indexeur…) peut verrouiller brièvement un
     # fichier du workspace. On retente le rmtree avec backoff — même tolérance

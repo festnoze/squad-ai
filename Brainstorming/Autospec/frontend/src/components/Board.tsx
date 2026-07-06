@@ -27,6 +27,9 @@ import {
   UserStory,
   usEffectiveStatus,
 } from "../types";
+import { copyText } from "../clipboard";
+import { useEscapeToClose } from "../hooks";
+import { confirmAction } from "./ConfirmDialog";
 import { LlmActivity } from "./LlmActivity";
 import { useI18n } from "../i18n/i18n";
 
@@ -466,6 +469,7 @@ function DiffViewer({
   const [error, setError] = useState("");
   const [diff, setDiff] = useState("");
   const [available, setAvailable] = useState(false);
+  useEscapeToClose(true, onClose);
 
   useEffect(() => {
     let cancelled = false;
@@ -494,6 +498,15 @@ function DiffViewer({
       <div className="diff-panel" onClick={(e) => e.stopPropagation()}>
         <div className="diff-header">
           <span className="diff-title">📊 {t("board.diff_title", { label })}</span>
+          <button
+            type="button"
+            className="ghost small-btn"
+            disabled={loading || !available || diff.trim() === ""}
+            title={t("common.copy")}
+            onClick={() => void copyText(diff)}
+          >
+            📋 {t("common.copy")}
+          </button>
           <button
             type="button"
             className="ghost diff-close"
@@ -802,7 +815,13 @@ function StoryDetail({
   const [showLlm, setShowLlm] = useState(false);
 
   const handleDelete = async () => {
-    if (!window.confirm(t("board.confirmDeleteStory", { title: story.title }))) return;
+    const ok = await confirmAction({
+      title: t("board.confirmDeleteStoryTitle"),
+      body: t("board.confirmDeleteStory", { title: story.title }),
+      confirmLabel: t("common.delete"),
+      danger: true,
+    });
+    if (!ok) return;
     setError("");
     try {
       await deleteStory(projectId, story.id);
@@ -1564,6 +1583,7 @@ function EpicView({
   streams,
   primaryStreamId,
   streamFilter,
+  matchesQuery,
   epicDeps,
   onOpenStory,
   onOpenTask,
@@ -1575,6 +1595,9 @@ function EpicView({
   streams: Stream[];
   primaryStreamId: string;
   streamFilter: string; // "" = no filter (all streams)
+  /** Q4 — prédicat de recherche (composé avec le filtre stream). La barre de
+   * progression reste calculée sur la liste NON filtrée. */
+  matchesQuery?: (s: UserStory) => boolean;
   epicDeps: Map<string, string[]>;
   onOpenStory: (storyId: string) => void;
   onOpenTask: (taskId: string) => void;
@@ -1582,9 +1605,11 @@ function EpicView({
 }) {
   const { t } = useI18n();
   const all = stories.filter((s) => s.epic_id === epic.id);
-  const es = streamFilter
-    ? all.filter((s) => storyTouchesStream(s, streamFilter, primaryStreamId))
-    : all;
+  const es = (
+    streamFilter
+      ? all.filter((s) => storyTouchesStream(s, streamFilter, primaryStreamId))
+      : all
+  ).filter(matchesQuery ?? (() => true));
   const prog = epicProgress(all);
   const deps = epicDeps.get(epic.id) ?? [];
   return (
@@ -1664,6 +1689,15 @@ export function Board({
   // ST-12: active stream filter ("" = all streams). Only offered when the
   // project declares more than one stream (legacy projects never see it).
   const [streamFilter, setStreamFilter] = useState<string>("");
+  // Q4 — recherche plein texte (id / titre / description, insensible aux
+  // diacritiques). Se compose avec le filtre stream ; ne touche pas aux barres
+  // de progression (calculées sur les listes non filtrées).
+  const [query, setQuery] = useState("");
+  const norm = (s: string) =>
+    s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const q = norm(query.trim());
+  const matchesQuery = (s: UserStory) =>
+    q === "" || norm(`${s.id} ${s.title} ${s.description ?? ""}`).includes(q);
 
   const declaredStreams = streams ?? [];
   const multiStream = declaredStreams.length > 1;
@@ -1750,6 +1784,17 @@ export function Board({
     <div className="panel board">
       <div className="board-top">
         <h2>{t("board.boardTitle")}</h2>
+        {(level === "epics" || level === "epic") && (
+          <input
+            className="board-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("board.searchPlaceholder")}
+            aria-label={t("board.searchAria")}
+            data-testid="board-search"
+          />
+        )}
         <Breadcrumb
           epic={epic}
           story={story}
@@ -1785,15 +1830,35 @@ export function Board({
           ))}
         </div>
       )}
-      {level === "epics" && (
-        <EpicsView
-          epics={epics}
-          stories={stories}
-          epicDeps={epicDeps}
-          onOpenEpic={(epicId) => setNav({ level: "epic", epicId })}
-          onOpenIteration={onOpenIteration}
-        />
-      )}
+      {level === "epics" &&
+        (() => {
+          // Q4 — un épic reste visible si son titre matche ou s'il contient au
+          // moins une story qui matche.
+          const visibleEpics =
+            q === ""
+              ? epics
+              : epics.filter(
+                  (e) =>
+                    norm(e.title).includes(q) ||
+                    stories.some((s) => s.epic_id === e.id && matchesQuery(s)),
+                );
+          if (visibleEpics.length === 0) {
+            return (
+              <p className="placeholder" data-testid="board-search-empty">
+                {t("board.searchNoResult", { q: query.trim() })}
+              </p>
+            );
+          }
+          return (
+            <EpicsView
+              epics={visibleEpics}
+              stories={stories}
+              epicDeps={epicDeps}
+              onOpenEpic={(epicId) => setNav({ level: "epic", epicId })}
+              onOpenIteration={onOpenIteration}
+            />
+          );
+        })()}
       {level === "epic" && epic && (
         <EpicView
           projectId={projectId}
@@ -1802,6 +1867,7 @@ export function Board({
           streams={declaredStreams}
           primaryStreamId={primaryStreamId}
           streamFilter={streamFilter}
+          matchesQuery={matchesQuery}
           epicDeps={epicDeps}
           onOpenStory={(storyId) => setNav({ level: "us", epicId: epic.id, storyId })}
           onOpenTask={openTaskById}

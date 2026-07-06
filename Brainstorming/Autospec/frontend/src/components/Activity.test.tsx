@@ -227,4 +227,28 @@ describe("Activity", () => {
     fireEvent.click(screen.getAllByRole("menuitem", { name: /Restart/ })[0]);
     await waitFor(() => expect(rebuildStory).toHaveBeenCalledWith("p1", "US-1"));
   });
+
+  it("Q5 : item failed avec last_error → CTA « Voir l'erreur » ouvre le tiroir avec l'erreur", () => {
+    renderActivity({
+      stories: [story({ status: "failed", last_error: "pytest: 2 tests failed\nAssertionError" })],
+    });
+    const cta = screen.getByTestId("view-error-US-1");
+    expect(cta).toBeInTheDocument();
+    fireEvent.click(cta);
+    const block = screen.getByTestId("last-error-US-1");
+    expect(block).toHaveTextContent("pytest: 2 tests failed");
+  });
+
+  it("Q5 : pas de CTA d'erreur sans last_error ou hors échec", () => {
+    renderActivity({ stories: [story({ status: "done", last_error: "vieille erreur" })] });
+    expect(screen.queryByTestId("view-error-US-1")).not.toBeInTheDocument();
+  });
+
+  it("Q1 : Escape ferme le menu d'actions d'un item", () => {
+    renderActivity();
+    fireEvent.click(screen.getByTestId("activity-menu-US-1"));
+    expect(screen.getAllByRole("menuitem").length).toBeGreaterThan(0);
+    fireEvent.keyDown(document, { key: "Escape" });
+    expect(screen.queryByRole("menuitem")).not.toBeInTheDocument();
+  });
 });

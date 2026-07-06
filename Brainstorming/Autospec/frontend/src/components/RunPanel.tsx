@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { copyText } from "../clipboard";
+import { useEscapeToClose } from "../hooks";
 import { LogLine, ProjectState } from "../types";
 import { canResumeBuild, effectiveStatus } from "../work";
 import { useI18n } from "../i18n/i18n";
@@ -76,6 +78,7 @@ export function RunPanel({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menuOpen]);
+  useEscapeToClose(menuOpen, () => setMenuOpen(false));
   // Optional CLI args forwarded to the generated app on run (e.g. a subcommand
   // for a CLI app that just prints usage when launched bare).
   const [runArgs, setRunArgs] = useState("");
@@ -84,9 +87,31 @@ export function RunPanel({
   const [logsOpen, setLogsOpen] = useState(true);
   const hasLogs = logs.length > 0;
   const logsExpanded = logsOpen && hasLogs;
+  // Q3 — filtres de logs : texte libre, source (tag `dev:US-3` / `qa:…`), et
+  // « erreurs seulement » (heuristique : le backend n'émet pas de niveau).
+  const [logQuery, setLogQuery] = useState("");
+  const [logSource, setLogSource] = useState("");
+  const [errorsOnly, setErrorsOnly] = useState(false);
+  const logFilterActive = logQuery.trim() !== "" || logSource !== "" || errorsOnly;
+  const logSources = useMemo(
+    () => [...new Set(logs.map((l) => l.source))].sort(),
+    [logs],
+  );
+  const shownLogs = useMemo(() => {
+    if (!logFilterActive) return logs;
+    const q = logQuery.trim().toLowerCase();
+    return logs.filter(
+      (l) =>
+        (logSource === "" || l.source === logSource) &&
+        (!errorsOnly || /[❌⚠️]|Erreur|Error/i.test(l.line)) &&
+        (q === "" || l.line.toLowerCase().includes(q) || l.source.toLowerCase().includes(q)),
+    );
+  }, [logs, logFilterActive, logQuery, logSource, errorsOnly]);
   useEffect(() => {
-    if (logsExpanded) bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs.length, logsExpanded]);
+    // Pas d'auto-scroll pendant qu'un filtre est actif (on lit un extrait).
+    if (logsExpanded && !logFilterActive)
+      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [logs.length, logsExpanded, logFilterActive]);
 
   const canRun = !["spec", "plan", "analyze", "architect", "build", "idle"].includes(
     project.phase,
@@ -181,6 +206,7 @@ export function RunPanel({
               className="small-btn"
               onClick={onCancelResume}
               title={t("runPanel.cancelAutoResume")}
+              aria-label={t("runPanel.cancelAutoResume")}
             >
               ✕
             </button>
@@ -312,10 +338,59 @@ export function RunPanel({
         >
           {hasLogs ? `${logsOpen ? "▾" : "▸"} ${t("runPanel.logsCount", { n: logs.length })}` : t("runPanel.logsEmpty")}
         </button>
+        {logsExpanded && (
+          <>
+            <input
+              className="log-search"
+              type="search"
+              value={logQuery}
+              onChange={(e) => setLogQuery(e.target.value)}
+              placeholder={t("runPanel.logSearchPlaceholder")}
+              aria-label={t("runPanel.logSearchAria")}
+            />
+            <select
+              className="log-source-select"
+              value={logSource}
+              onChange={(e) => setLogSource(e.target.value)}
+              aria-label={t("runPanel.logSourceAria")}
+            >
+              <option value="">{t("runPanel.logSourceAll")}</option>
+              {logSources.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <label className="log-errors-only">
+              <input
+                type="checkbox"
+                checked={errorsOnly}
+                onChange={(e) => setErrorsOnly(e.target.checked)}
+              />
+              {t("runPanel.logErrorsOnly")}
+            </label>
+            {logFilterActive && (
+              <span className="log-shown-count">
+                {t("runPanel.logsShown", { shown: shownLogs.length, total: logs.length })}
+              </span>
+            )}
+            <button
+              type="button"
+              className="ghost small-btn"
+              title={t("runPanel.copyLogsTitle")}
+              disabled={shownLogs.length === 0}
+              onClick={() =>
+                void copyText(shownLogs.map((l) => `[${l.source}] ${l.line}`).join("\n"))
+              }
+            >
+              📋 {t("common.copy")}
+            </button>
+          </>
+        )}
       </div>
       {logsExpanded && (
         <div className="logs">
-          {logs.map((l, i) => (
+          {shownLogs.map((l, i) => (
             <div key={i} className="log-line">
               <span className="log-source">[{l.source}]</span> {l.line}
             </div>

@@ -1,3 +1,4 @@
+import { useEscapeToClose } from "../hooks";
 import { LANGS, useI18n } from "../i18n/i18n";
 import { useTheme } from "../i18n/theme";
 
@@ -13,6 +14,7 @@ interface Props {
 export function SettingsModal({ onClose }: Props) {
   const { t, lang, setLang } = useI18n();
   const { theme, setTheme } = useTheme();
+  useEscapeToClose(true, onClose);
 
   return (
     <div className="modal-backdrop" onClick={onClose}>

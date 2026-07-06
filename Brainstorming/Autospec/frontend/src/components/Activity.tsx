@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { copyText } from "../clipboard";
+import { useEscapeToClose } from "../hooks";
 import {
   errorMessage,
   extendStory,
@@ -122,7 +124,12 @@ function ItemChat({
 
   return (
     <div className="item-chat" data-testid={`item-chat-${view.id}`}>
-      <div className="item-chat-guidance" data-testid={`guidance-list-${view.id}`}>
+      <div
+        className="item-chat-guidance"
+        data-testid={`guidance-list-${view.id}`}
+        role="log"
+        aria-live="polite"
+      >
         {guidance.length === 0 ? (
           <p className="placeholder small">{t("activity.noGuidance")}</p>
         ) : (
@@ -168,6 +175,7 @@ function ItemChat({
           {t("activity.send")}
         </button>
       </div>
+      <span className="input-hint">{t("activity.sendHint")}</span>
       {error && <div className="edit-error">{error}</div>}
     </div>
   );
@@ -294,6 +302,10 @@ function ActivityRow({
   const isStory = !isTask;
   const story = isStory ? (source as UserStory | undefined) : undefined;
   const canExtend = isStory && !!story && view.status === "todo";
+  // Q5 — l'erreur persistée d'un item en échec devient visible (CTA + tiroir).
+  const lastError = view.status === "failed" ? source?.last_error?.trim() ?? "" : "";
+  useEscapeToClose(menuOpen, () => setMenuOpen(false));
+  useEscapeToClose(showDiff, () => setShowDiff(false));
 
   const run = (fn: () => Promise<void>) => async () => {
     setActionError("");
@@ -344,6 +356,17 @@ function ActivityRow({
         )}
         <span className="activity-row-title">{item.title}</span>
         <Stepper view={view} now={now} tickTs={tickTs} />
+        {lastError && (
+          <button
+            type="button"
+            className="ghost small-btn activity-view-error"
+            data-testid={`view-error-${item.id}`}
+            title={t("activity.viewErrorTitle")}
+            onClick={() => setDrawerOpen(true)}
+          >
+            ⚠ {t("activity.viewError")}
+          </button>
+        )}
         <div className="activity-row-menu-wrap">
           <button
             type="button"
@@ -395,6 +418,14 @@ function ActivityRow({
       {actionError && <div className="edit-error">{actionError}</div>}
       {drawerOpen && (
         <div className="activity-drawer" data-testid={`activity-drawer-${item.id}`}>
+          {lastError && (
+            <div className="activity-last-error-wrap" data-testid={`last-error-${item.id}`}>
+              <h4 className="activity-last-error-title">⚠ {t("activity.lastErrorHeading")}</h4>
+              <pre className="activity-last-error" title={lastError}>
+                {lastError.length > 2000 ? `${lastError.slice(0, 2000)}…` : lastError}
+              </pre>
+            </div>
+          )}
           <ItemChat view={view} guidance={view.guidance} onSend={onSendGuidance} />
           {canExtend && story && (
             <ExtendCriteria
@@ -481,7 +512,19 @@ function DiffContent({
         <div className="diff-muted">{t("activity.noDiff")}</div>
       )}
       {!loading && !error && available && diff.trim() !== "" && (
-        <pre className="diff-pre">{diff}</pre>
+        <>
+          <div className="diff-actions">
+            <button
+              type="button"
+              className="ghost small-btn"
+              title={t("common.copy")}
+              onClick={() => void copyText(diff)}
+            >
+              📋 {t("common.copy")}
+            </button>
+          </div>
+          <pre className="diff-pre">{diff}</pre>
+        </>
       )}
     </div>
   );

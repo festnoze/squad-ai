@@ -35,6 +35,15 @@ export const activity: Namespace = {
   guidancePlaceholder: { en: "Targeted guidance for {id}…", fr: "Consigne ciblée pour {id}…" },
   guidanceAriaLabel: { en: "Targeted guidance for {id}", fr: "Consigne ciblée pour {id}" },
   send: { en: "Send", fr: "Envoyer" },
+  sendHint: { en: "Ctrl+Enter to send", fr: "Ctrl+Entrée pour envoyer" },
+
+  // Q5 — erreur persistée d'un item en échec
+  viewError: { en: "View error", fr: "Voir l'erreur" },
+  viewErrorTitle: {
+    en: "Show this item's last error",
+    fr: "Afficher la dernière erreur de cet item",
+  },
+  lastErrorHeading: { en: "Last error", fr: "Dernière erreur" },
 
   extendTitle: {
     en: "Add acceptance criteria before the build",

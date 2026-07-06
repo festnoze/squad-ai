@@ -480,6 +480,9 @@ export function exportZipUrl(projectId: string): string {
 export function connectEvents(
   onEvent: (e: WsEvent) => void,
   onReconnect?: () => void,
+  // Q5 — état de la connexion live (true = flux ouvert, false = coupé/en cours
+  // de reconnexion) pour afficher un indicateur « Reconnexion… » dans l'UI.
+  onStatus?: (connected: boolean) => void,
 ): () => void {
   let es: EventSource | null = null;
   let closed = false;
@@ -492,6 +495,7 @@ export function connectEvents(
     es.onopen = () => {
       if (opened) onReconnect?.();
       opened = true;
+      onStatus?.(true);
     };
     es.onmessage = (msg) => {
       let event: WsEvent;
@@ -506,6 +510,7 @@ export function connectEvents(
     };
     es.onerror = () => {
       if (closed) return;
+      onStatus?.(false);
       // readyState CONNECTING : EventSource se reconnecte tout seul (avec le
       // backoff `retry` envoyé par le serveur) — on ne touche à rien.
       // readyState CLOSED : le navigateur a abandonné (ex. 502 transitoire du

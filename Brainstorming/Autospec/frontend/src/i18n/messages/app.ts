@@ -32,16 +32,19 @@ export const app: Namespace = {
     en: "Delete project “{name}” and all its generated code?",
     fr: "Supprimer le projet « {name} » et tout son code généré ?",
   },
+  confirmDeleteTitle: { en: "Delete this project?", fr: "Supprimer ce projet ?" },
   confirmRollback: {
     en: "Roll back to iteration {n}? The workspace will be restored to this snapshot.",
     fr: "Revenir à l'itération {n} ? Le workspace sera restauré à ce snapshot.",
   },
+  confirmRollbackTitle: { en: "Roll back?", fr: "Revenir en arrière ?" },
   rollbackToastTitle: { en: "Rollback", fr: "Rollback" },
   rollbackToastBody: { en: "Rolled back to iteration {n}.", fr: "Revenu à l'itération {n}." },
   confirmRestartScratch: {
     en: "Restart “{name}” from scratch? Everything (code, epics, stories) is deleted EXCEPT the initial brief, then PO planning and the build run again.",
     fr: "Relancer « {name} » from scratch ? Tout (code, epics, stories) est supprimé SAUF le brief initial, puis la planification PO et le build repartent.",
   },
+  confirmRestartTitle: { en: "Restart from scratch?", fr: "Relancer from scratch ?" },
   restartToastTitle: { en: "Restart", fr: "Relance" },
   restartToastBody: {
     en: "Project wiped (brief kept) — PO planning then build restarted.",
@@ -58,4 +61,9 @@ export const app: Namespace = {
   },
   commitToastTitle: { en: "Commit", fr: "Commit" },
   commitToastBody: { en: "Workspace committed: {commit}", fr: "Workspace commité : {commit}" },
+  reconnecting: { en: "Reconnecting…", fr: "Reconnexion…" },
+  reconnectingTitle: {
+    en: "Live connection lost — retrying",
+    fr: "Connexion temps réel perdue — nouvelle tentative",
+  },
 };

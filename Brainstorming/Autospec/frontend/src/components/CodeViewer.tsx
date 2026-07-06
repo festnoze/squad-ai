@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { listFiles, readFile } from "../api";
+import { copyText } from "../clipboard";
 import { FileContent } from "../types";
+import { useEscapeToClose } from "../hooks";
 import { useI18n } from "../i18n/i18n";
 
 interface Props {
@@ -17,6 +19,7 @@ export function CodeViewer({ projectId }: Props) {
   const [fileError, setFileError] = useState("");
   const [loadingList, setLoadingList] = useState(false);
   const [loadingFile, setLoadingFile] = useState(false);
+  useEscapeToClose(open, () => setOpen(false));
 
   // Charge la liste des fichiers à l'ouverture.
   useEffect(() => {
@@ -91,6 +94,15 @@ export function CodeViewer({ projectId }: Props) {
           >
             <div className="code-viewer-header">
               <span className="code-viewer-title">📁 {t("codeViewer.generatedCode")}</span>
+              <button
+                type="button"
+                className="ghost small-btn"
+                disabled={loadingFile || !file}
+                onClick={() => file && void copyText(file.content)}
+                title={t("common.copy")}
+              >
+                📋 {t("common.copy")}
+              </button>
               <button
                 type="button"
                 className="ghost code-viewer-close"

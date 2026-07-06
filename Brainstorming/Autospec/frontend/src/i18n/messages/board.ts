@@ -94,6 +94,17 @@ export const board: Namespace = {
     en: "Delete user story « {title} »?",
     fr: "Supprimer la user story « {title} » ?",
   },
+  confirmDeleteStoryTitle: { en: "Delete this story?", fr: "Supprimer cette story ?" },
+  // Q4 — recherche du board
+  searchPlaceholder: {
+    en: "Search stories (id, title, text)…",
+    fr: "Rechercher une story (id, titre, texte)…",
+  },
+  searchAria: { en: "Search stories", fr: "Rechercher des stories" },
+  searchNoResult: {
+    en: "No story matches « {q} ».",
+    fr: "Aucune story ne correspond à « {q} ».",
+  },
   action_edit: { en: "Edit", fr: "Éditer" },
   action_delete: { en: "Delete", fr: "Supprimer" },
   action_relaunch: { en: "Relaunch", fr: "Relancer" },

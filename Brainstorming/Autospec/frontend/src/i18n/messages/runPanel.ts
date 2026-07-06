@@ -102,6 +102,17 @@ export const runPanel: Namespace = {
   },
   logsCount: { en: "Logs ({n})", fr: "Logs ({n})" },
   logsEmpty: { en: "Logs — none yet", fr: "Logs — aucun pour l'instant" },
+  // Q3 — filtres de logs
+  logSearchPlaceholder: { en: "Filter logs…", fr: "Filtrer les logs…" },
+  logSearchAria: { en: "Filter logs by text", fr: "Filtrer les logs par texte" },
+  logSourceAll: { en: "All sources", fr: "Toutes les sources" },
+  logSourceAria: { en: "Filter logs by source", fr: "Filtrer les logs par source" },
+  logErrorsOnly: { en: "Errors only", fr: "Erreurs seulement" },
+  logsShown: { en: "{shown}/{total} lines", fr: "{shown}/{total} lignes" },
+  copyLogsTitle: {
+    en: "Copy the displayed log lines",
+    fr: "Copier les lignes de logs affichées",
+  },
   partialDelivery: { en: "Partial delivery", fr: "Livraison partielle" },
   partialDelivery_title: {
     en: "The project shipped its green stories; the failed ones stay visible and retryable.",

@@ -390,3 +390,43 @@ describe("Board — multi-stream (ST-12/13/14)", () => {
     expect(screen.getByTestId("story-S1")).toBeInTheDocument();
   });
 });
+
+describe("Board — recherche (Q4)", () => {
+  const EPICS: Epic[] = [
+    { id: "E1", title: "Authentification", description: "", iteration: 1 },
+    { id: "E2", title: "Facturation", description: "", iteration: 1 },
+  ];
+  const STORIES = [
+    makeStory({ id: "S1", epic_id: "E1", title: "Connexion utilisateur" }),
+    makeStory({ id: "S2", epic_id: "E1", title: "Réinitialiser le mot de passe" }),
+    makeStory({ id: "S3", epic_id: "E2", title: "Générer une facture" }),
+  ];
+
+  it("niveau épics : seuls les épics avec une story qui matche restent visibles", () => {
+    render(<Board epics={EPICS} stories={STORIES} projectId="p1" />);
+    fireEvent.change(screen.getByTestId("board-search"), { target: { value: "facture" } });
+    expect(screen.getByText("Facturation")).toBeInTheDocument();
+    expect(screen.queryByText("Authentification")).not.toBeInTheDocument();
+  });
+
+  it("insensible aux diacritiques (« reinitialiser » matche « Réinitialiser »)", () => {
+    render(<Board epics={EPICS} stories={STORIES} projectId="p1" />);
+    fireEvent.change(screen.getByTestId("board-search"), { target: { value: "reinitialiser" } });
+    expect(screen.getByText("Authentification")).toBeInTheDocument();
+    expect(screen.queryByText("Facturation")).not.toBeInTheDocument();
+  });
+
+  it("aucun résultat : placeholder avec écho de la requête", () => {
+    render(<Board epics={EPICS} stories={STORIES} projectId="p1" />);
+    fireEvent.change(screen.getByTestId("board-search"), { target: { value: "zzz-inconnu" } });
+    expect(screen.getByTestId("board-search-empty")).toHaveTextContent("zzz-inconnu");
+  });
+
+  it("niveau epic : la liste des stories est filtrée, la recherche se compose avec le drill-down", () => {
+    render(<Board epics={EPICS} stories={STORIES} projectId="p1" />);
+    fireEvent.click(screen.getByText("Authentification"));
+    fireEvent.change(screen.getByTestId("board-search"), { target: { value: "connexion" } });
+    expect(screen.getByText("Connexion utilisateur")).toBeInTheDocument();
+    expect(screen.queryByText("Réinitialiser le mot de passe")).not.toBeInTheDocument();
+  });
+});

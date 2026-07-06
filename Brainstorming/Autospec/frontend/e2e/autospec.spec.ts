@@ -95,6 +95,8 @@ async function openEpic(page: Page, title: string) {
 }
 
 test("exhaustive: every feature in one scenario", async ({ page, request }) => {
+  // Les assertions de la spec sont en français ; l'app démarre en "en" par défaut.
+  await page.addInitScript(() => localStorage.setItem("autospec.lang", "fr"));
   await page.goto("/");
   // Accepter tous les dialogues (confirmations de suppression, alerte commit).
   page.on("dialog", (d) => d.accept());
@@ -113,6 +115,9 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   if (await archivedToggle.isVisible().catch(() => false)) await archivedToggle.click();
   for (let n = await projectChips.count(); n > 0; n = await projectChips.count()) {
     await projectChips.first().getByTitle("Supprimer le projet").click();
+    // Q2 : la confirmation est désormais un dialogue de marque (plus de
+    // window.confirm natif auto-accepté).
+    await page.getByTestId("confirm-accept").click();
     await expect(projectChips).toHaveCount(n - 1);
   }
 
@@ -153,7 +158,8 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
 
   // === item 7 — phase Architecture + item 10 — scores de raffinement ========
   await expect(page.getByText("Architecture & qualité")).toBeVisible();
-  await expect(page.getByText(/Qualité du plan/)).toBeVisible();
+  // `.first()` : le libellé apparaît dans ArchitecturePanel ET PlanReviewPanel.
+  await expect(page.getByText(/Qualité du plan/).first()).toBeVisible();
   // Badge qualité du code de la story (raffinement, score démo 90/100).
   await expect(page.getByTestId("story-US-1").getByText(/\/100/)).toBeVisible();
 
@@ -274,8 +280,13 @@ test("exhaustive: every feature in one scenario", async ({ page, request }) => {
   await expect(page.getByRole("option", { name: reName })).toHaveCount(1);
 
   // === nettoyage — suppression via l'API (idempotence des répétitions) ======
+  // La suppression d'un workspace git sous Windows peut renvoyer un 409
+  // transitoire (« workspace verrouillé ») : on réessaie jusqu'à succès.
   for (const p of after) {
-    await request.delete(`/api/projects/${p.id}`);
+    await expect(async () => {
+      const res = await request.delete(`/api/projects/${p.id}`);
+      expect(res.ok() || res.status() === 404).toBeTruthy();
+    }).toPass({ timeout: 30_000 });
   }
   await expect(page.getByRole("option", { name: reName })).toHaveCount(0);
 });

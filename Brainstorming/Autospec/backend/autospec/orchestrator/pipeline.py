@@ -5769,19 +5769,42 @@ class Pipeline:
         except OSError:
             pass
 
+    def _expects_web_app(self) -> bool:
+        """Should the delivered product LISTEN on a port, by INTENT (product
+        profile / streams) rather than by artifact? The messagerie2 trap: a
+        fullstack app whose dev stories never added a web framework was
+        classified CLI by its own pyproject — exit 0 = smoke PASS — and shipped
+        as a green library + a frontend calling an API that exists nowhere.
+        The gate must judge the artifact against the intent, not against the
+        artifact it is validating."""
+        profile = (self.state.product_profile or "").strip().lower()
+        if profile in ("api", "web-ssr", "fullstack"):
+            return True
+        if profile in ("cli", "library-fast"):
+            return False
+        # auto / brownfield: a frontend stream implies a backend serving it.
+        return bool(list(workspace.frontend_streams(self.state)))
+
     def _smoke_run_python(self, ws: Path) -> tuple[bool, str]:
         """Boot a Python project's entry point and check it is runnable.
 
-        Web/API app (its pyproject declares a web framework): ``uv run python
-        main.py`` must open a listening TCP port within the timeout. CLI: it must
+        Web/API app (its pyproject declares a web framework, OR the project
+        INTENT is web — profile/frontend stream): ``uv run python main.py``
+        must open a listening TCP port within the timeout. CLI: it must
         exit 0 within the timeout. Returns (ok, human-readable detail)."""
         import socket
 
         text = (ws / "main.py").read_text(encoding="utf-8", errors="replace")
         pyproject = (ws / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
-        is_web = any(
+        has_framework = any(
             fw in pyproject
             for fw in ("fastapi", "flask", "starlette", "uvicorn", "aiohttp", "django")
+        )
+        is_web = has_framework or self._expects_web_app()
+        no_fw_hint = (
+            "" if has_framework
+            else " (aucun framework web déclaré dans pyproject.toml — l'API n'a "
+            "probablement jamais été câblée)"
         )
         env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
         cmd = self._resolve_cmd([settings.uv_cmd, "run", "python", "main.py"])
@@ -5804,8 +5827,8 @@ class Pipeline:
                         out = (proc.stdout.read() if proc.stdout else "") or ""
                         return False, (
                             f"le process s'est arrêté (code {proc.returncode}) sans écouter "
-                            f"sur 127.0.0.1:{port} — main.py ne démarre pas le serveur ? "
-                            f"{out[-300:].strip()}"
+                            f"sur 127.0.0.1:{port} — main.py ne démarre pas le serveur ?"
+                            f"{no_fw_hint} {out[-300:].strip()}"
                         )
                     with socket.socket() as s:
                         s.settimeout(1.0)
@@ -5813,7 +5836,8 @@ class Pipeline:
                             return True, f"serveur à l'écoute sur 127.0.0.1:{port}"
                     time.sleep(0.5)
                 return False, (
-                    f"aucun serveur à l'écoute sur 127.0.0.1:{port} après {timeout:.0f}s"
+                    f"aucun serveur à l'écoute sur 127.0.0.1:{port} après "
+                    f"{timeout:.0f}s{no_fw_hint}"
                 )
             finally:
                 self._terminate_tree(proc)

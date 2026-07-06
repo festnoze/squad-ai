@@ -212,6 +212,46 @@ main {
 
 .logs-bar {
   margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Q3 — filtres de logs (texte / source / erreurs seulement). */
+.log-search,
+.log-source-select {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+.log-search {
+  width: 180px;
+}
+
+.log-source-select {
+  max-width: 170px;
+}
+
+.log-errors-only {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.log-shown-count {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .logs-toggle {
@@ -354,6 +394,23 @@ button.danger {
 
 button.ghost {
   background: transparent;
+}
+
+/* Q1 — anneau de focus global (clavier uniquement) : complète les 3 règles
+   :focus-visible locales existantes sans les remplacer. */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[role="tab"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Q1 — indice discret sous un champ de saisie (raccourci d'envoi). */
+.input-hint {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 /* ---------- chat ---------- */
@@ -1990,6 +2047,70 @@ button.action-btn.action-done {
   z-index: 1;
 }
 
+/* Q2 — dialogue de confirmation de marque (remplace window.confirm). Couleurs
+   danger statiques : aucun pulse, le canal --attention reste réservé. */
+.confirm-dialog {
+  width: 420px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.confirm-dialog h2 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--title);
+}
+
+.confirm-body {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+  white-space: pre-wrap;
+}
+
+.confirm-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Q5 — dernière erreur d'un item en échec (tiroir Activité). Couleurs statiques :
+   pas de pulse, le canal --attention reste réservé aux pastilles d'état. */
+.activity-last-error-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.activity-last-error-title {
+  margin: 0;
+  font-size: 12px;
+  color: var(--red);
+}
+
+.activity-last-error {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--red);
+  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--text);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 180px;
+  overflow: auto;
+}
+
+/* Q7 — rangée d'actions au-dessus d'un diff (copier). */
+.diff-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
 /* ---------- chips multi-projets (U1) ---------- */
 .dot.pulse {
   animation: chip-pulse 1.2s ease-in-out infinite;
@@ -2260,6 +2381,18 @@ button.action-btn.action-done {
   align-items: baseline;
   gap: 14px;
   flex-wrap: wrap;
+}
+
+/* Q4 — recherche du board (id / titre / description). */
+.board-search {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 10px;
+  width: 220px;
 }
 
 .breadcrumb {
@@ -2812,6 +2945,25 @@ button.action-btn.action-done {
 }
 
 /* Dashboard de l'usine (U2) */
+/* Q5 — connexion SSE coupée : chip ambre STATIQUE (pas de pulse, le canal
+   --attention reste réservé à failed/blocked). */
+.sse-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.sse-pill ~ .dash-btn {
+  margin-left: 0;
+}
+
 .dash-btn {
   background: var(--panel-2);
   border: 1px solid var(--border);
