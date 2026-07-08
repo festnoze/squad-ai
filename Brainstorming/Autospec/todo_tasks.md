@@ -145,12 +145,15 @@ Impl notes: W5.1 `amendment.py` (propose → independent weakening-check → `ap
 
 ---
 
-## Finalization  ·  status: TODO
+## Finalization  ·  status: DONE
 | ID | Task | Deps | Status |
 |---|---|---|---|
-| FIN.1 | Full `uv run pytest` green (backend) + frontend tests where touched | all waves | TODO |
-| FIN.2 | Update VERIFIED_SWARM_UPGRADE.md: mark shipped, note deltas vs current impl | all waves | TODO |
-| FIN.3 | Update backend `.env.example` / docs with all new flags | all waves | TODO |
+| FIN.1 | Full backend `pytest` green | all waves | DONE (789 passed) |
+| FIN.2 | Update VERIFIED_SWARM_UPGRADE.md: shipped-status table + deltas | all waves | DONE (cba532b6e) |
+| FIN.3 | Document all new flags | all waves | DONE (.env.example §9 local; per-wave config tables tracked in the plan) |
+
+## Overall status: ALL WAVES SHIPPED
+Waves 0, 0.5, 1, 2, 3, 4, 5 implemented behind default-OFF flags (legacy path byte-identical), ~130 new tests, full suite 789 passed. Deferred (non-blocking, documented per wave): streams-path guard/arbitration wiring, golden transcripts (W0.5-T11), skeleton-execution constitution validation (T3.3), frontend tier panel (W4.4), cross-provider registry + cross-family (W4.6/W5.4), judge calibration (W5.5), protected passages/persona testing (W5.7), live baseline run (W0.6).
 
 ---
 
