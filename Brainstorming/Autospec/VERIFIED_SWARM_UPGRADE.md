@@ -13,6 +13,26 @@ A frontier "boss" orchestrated ~20 cheap workers across 4 model families to rebu
 
 ---
 
+## ✅ Implementation status (SHIPPED on branch `verified-swarm-upgrade`)
+
+All six waves are implemented behind flags (default OFF ⇒ byte-identical legacy behavior), unit- and integration-tested, and committed. Per-task detail + the conflict/dependency map live in [todo_tasks.md](todo_tasks.md).
+
+| Wave | Shipped | Key modules / hooks | Commit |
+|---|---|---|---|
+| 0 | ✅ | `PRESET=verified`, model-field + context telemetry, `scorecard.py` KPIs | `9693a6f` |
+| 0.5 | ✅ | `signatures.py`, `guards.py`, `schema.py`; dev-loop guard hook + flaky rerun | `7c22fed`, `d06489c` |
+| 1 | ✅ | `recovery.py` state machine + `_FORCE_MODEL` escalation ladder | `990b8ec` |
+| 2 | ✅ | `traceability.py` / `classifier.py` / `arbitration.py`; `_amaybe_arbitrate_wrong_test` | `c167fa3`, `707ac7e` |
+| 3 | ✅ | `constitution.py` compiler → `tests/constitution/`; `_amaybe_build_constitution` | `88ec3b8` |
+| 4 | ✅ | `PERSONA_TIERS` + `model_for_role`; per-tier ledger + counterfactual | `09a52d3` |
+| 5 | ✅ | `amendment.py` (human-gated) + scorecard/lessons/critic-independence | `c78e14e` |
+
+**Deferred (documented in [todo_tasks.md](todo_tasks.md), not blocking):** streams-path guard/arbitration wiring (the streams path already has `_aenforce_file_scope`), golden-transcript CI harness (W0.5-T11), run-against-skeleton constitution validation (T3.3), frontend tier panel (W4.4), cross-provider runner registry + cross-family checking (W4.6/W5.4), judge-score calibration (W5.5, needs structured judge events), protected passages / persona testing (W5.7). W0.6 baseline needs a live agent run.
+
+**Test footprint:** ~130 new tests across `test_scorecard/guards/schema/signatures/guards_integration/recovery/traceability/classifier/arbitration/arbitration_integration/constitution/constitution_integration/tier_routing/amendment/wave5`; full backend suite green. Every new env flag is listed in the per-wave **Config additions** table below; they are also written into `backend/.env.example` §9 for operator convenience (that file is git-ignored by the repo's `*.env*` rule, so it is not committed).
+
+---
+
 ## 0. Current-state grounding (verified against code)
 
 | Video pattern | Status in Autospec | Where |
