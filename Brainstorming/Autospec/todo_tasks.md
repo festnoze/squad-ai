@@ -44,16 +44,16 @@ Before W1: the recovery machine needs honest, flake-free, schema-valid signals. 
 
 | ID | Task | Files | Isolation | Deps | Status |
 |---|---|---|---|---|---|
-| W0.5-SIG | Failure-signature normalizer (test node id + exception type; guard verdicts `tampered`/`out_of_scope`/`skeleton`) | `orchestrator/signatures.py` (NEW) | NEW | — | TODO |
-| W0.5-T05 | Test-tamper guard: detect dev edits to QA test files via `git diff --name-only`; revert + flag | `orchestrator/guards.py` (NEW) | NEW | — | TODO |
-| W0.5-T06 | Scope guard: post-hoc file-claim enforcement (warn/strict) reusing `independence.py` claims | `orchestrator/guards.py` (NEW) | NEW | — | TODO |
-| W0.5-T07 | Skeleton detector: AST/grep for pass-only bodies, hardcoded test literals, skip/xfail insertions | `orchestrator/guards.py` (NEW) | NEW | — | TODO |
-| W0.5-T09 | Schema-validated decision outputs: wrapper around `extract_json` with per-call schema + retry-once | `orchestrator/schema.py` (NEW) | NEW | — | TODO |
-| W0.5-T08 | Flaky-check quarantine: rerun a red test once before it counts; quarantine flip-floppers | `pipeline.py` (`_arun_pytest` caller), `config.py` | SHARED | W0.5-SIG | TODO |
-| W0.5-T10 | Hallucinated-import guard: imports must resolve to manifest/stdlib | `orchestrator/guards.py` (NEW), hook in `pipeline.py` | SHARED | — | TODO |
-| W0.5-HOOK | Wire tamper/scope/skeleton guards into the dev loop (pre-`_arun_pytest`); flags gate each | `pipeline.py`, `config.py` | SHARED | T05,T06,T07 | TODO |
+| W0.5-SIG | Failure-signature normalizer (`normalize_signature`, `signatures_from_report`, `same_failure`, guard verdict consts + `guard_signature`) | `orchestrator/signatures.py` (NEW) | NEW | — | DONE (18 tests) |
+| W0.5-T05 | Test-tamper detector (`modified_test_files`) | `orchestrator/guards.py` (NEW) | NEW | — | DONE (in guards, 25 tests) |
+| W0.5-T06 | Scope detector (`out_of_scope_paths`) | `orchestrator/guards.py` (NEW) | NEW | — | DONE |
+| W0.5-T07 | Skeleton detector (`detect_skeleton`, ast-based) | `orchestrator/guards.py` (NEW) | NEW | — | DONE |
+| W0.5-T09 | Schema-validated decision outputs (`validate`/`coerce`/`arun_json` + retry-once) | `orchestrator/schema.py` (NEW) | NEW | — | DONE (26 tests) |
+| W0.5-T08 | Flaky-check quarantine: rerun a red suite once before it counts; record flake | `pipeline.py` (`_arun_pytest` caller), `config.py` | SHARED | W0.5-SIG | TODO |
+| W0.5-T10 | Hallucinated-import detector (`unresolved_imports`, `default_stdlib`) + pipeline wiring | `orchestrator/guards.py` (NEW, DONE); wiring `pipeline.py` | SHARED | — | TODO (detector DONE; wiring pending) |
+| W0.5-HOOK | Wire tamper/scope/skeleton/import guards into both dev-loop paths (snapshot QA tests → run dev → re-check; flags gate each) | `pipeline.py`, `config.py` | SHARED | T05,T06,T07,T10 | TODO |
 | W0.5-T11 | Golden-transcript CI harness: record `fake_agents`/FakeRunner scenario transcripts as goldens | `tests/golden/` (NEW), `tests/test_golden.py` | NEW | — | TODO |
-| W0.5t | Unit tests for each guard + schema wrapper + flake rerun | `tests/test_guards.py`, `tests/test_schema.py` (NEW) | NEW | above | TODO |
+| W0.5t | Unit tests: guards (25) + schema (26) + signatures (18) DONE; guard-integration glue tests pending | `tests/test_guards.py`, `tests/test_schema.py`, `tests/test_signatures.py` (NEW) | NEW | above | PARTIAL |
 
 **Acceptance:** ☐ dev editing a QA test is reverted ☐ out-of-scope diff flagged ☐ skeleton impl flagged ☐ flake not counted ☐ decision JSON schema-validated ☐ hallucinated import caught ☐ goldens in CI
 
