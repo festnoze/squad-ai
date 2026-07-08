@@ -468,6 +468,11 @@ class ProjectState(BaseModel):
     brief: str = ""
     brownfield_path: str = ""  # B1: existing repo to extend ("" = greenfield)
     architecture: str = ""  # current technical design (from the optional Architect phase)
+    # W3: project constitution — non-negotiable project-wide rules derived once
+    # after SPEC; compiled test rules ride the suite (paths in constitution_test_paths,
+    # immutable to W2 fix_test / W5 amendment), advisory rules are prompt-injected.
+    constitution: list[dict] = Field(default_factory=list)
+    constitution_test_paths: list[str] = Field(default_factory=list)
     plan_quality: int = -1  # last refinement score for the PO plan (-1 = not run)
     # Plan review (REVIEW_PLAN): the critic's flagged issues + proposed
     # improvements on the PO breakdown, surfaced in the UI « Revue du plan » panel.

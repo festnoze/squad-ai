@@ -67,7 +67,8 @@ from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from . import guards, signatures  # W0.5 anti-cheating detectors + failure signatures
 from . import recovery  # W1 recovery state machine + escalation ladder
-from . import arbitration, classifier, traceability  # W2 wrong-test arbitration
+from . import arbitration, traceability  # W2 wrong-test arbitration + AC traceability
+from . import constitution as constitution_lib  # W3 project constitution
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import manifests
@@ -289,6 +290,8 @@ def prompts_arbiter_fix_test(story, pkg: str, acceptance: str, instructions: str
         f"Critères d'acceptance (vérité de référence) :\n{acceptance}\n\n"
         f"Instructions de l'arbitre (ce que le test DOIT affirmer) :\n{instructions}\n\n"
         f"Tests actuels :\n{test_blob[:6000]}\n\n"
+        "NE MODIFIE JAMAIS les fichiers sous tests/constitution/ (règles "
+        "non-négociables du projet). "
         "Édite les fichiers de test nécessaires, puis réponds avec un court JSON "
         '{\"summary\": \"...\"}.'
     )
@@ -2563,10 +2566,63 @@ class Pipeline:
 
     # ------------------------------------------------------------ PLAN (PO)
 
+    async def _amaybe_build_constitution(self) -> None:
+        """W3 — derive the project constitution once (after SPEC, before PLAN) and
+        COMPILE it: executable rules become pytest files under tests/constitution/
+        (they then ride the normal suite every round with zero new enforcement),
+        command rules feed the delivery gate, and non-compilable rules become
+        advisory guidance injected into the dev/QA prompts. Best-effort; a failure
+        never blocks planning."""
+        if not settings.constitution_enabled or self.state.constitution:
+            return
+        try:
+            rules = await constitution_lib.aderive_constitution(
+                self._tracked,
+                brief=self.state.brief or self.state.goal,
+                project_name=self.state.name,
+                max_rules=settings.constitution_max_rules,
+            )
+        except AgentError as exc:
+            self._log("constitution", f"Constitution indisponible ({exc}) — ignorée.")
+            return
+        if not rules:
+            return
+        compiled = constitution_lib.compile_rules(rules)
+        ws = workspace_dir(self.state.id)
+        written: list[str] = []
+        for rel, content in compiled.get("tests", []):
+            try:
+                p = ws / rel
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(content, encoding="utf-8")
+                written.append(rel)
+            except OSError:
+                continue
+        self.state.constitution = rules
+        self.state.constitution_test_paths = written
+        # Advisory (non-executable) rules → build guidance, so dev/QA see them.
+        for r in compiled.get("advisory", []):
+            g = f"[Constitution] {r.get('statement', '')}".strip()
+            if g and g not in self.state.build_guidance:
+                self.state.build_guidance.append(g)
+        self._log(
+            "constitution",
+            f"Constitution : {len(written)} règle(s) exécutable(s) sous "
+            f"tests/constitution/, {len(compiled.get('commands', []))} commande(s), "
+            f"{len(compiled.get('advisory', []))} advisory.",
+        )
+        self.monitor.event(
+            "constitution", rules=len(rules), tests=len(written),
+            commands=len(compiled.get("commands", [])),
+            advisory=len(compiled.get("advisory", [])),
+        )
+        self._sync()
+
     async def _aplan_phase(self) -> None:
         self.state.phase = PipelinePhase.PLAN
         self._sync()
         pkg = workspace.package_name(self.state)
+        await self._amaybe_build_constitution()  # W3: standard-once, enforced every round
         plan: dict = {}
         # PO pipeline (RFC po-pipeline-v2): the multi-stage PO replaces the
         # mono-pass maker AND its judge-first review (_arefine_plan). Any
@@ -3941,6 +3997,13 @@ class Pipeline:
         # acceptance criteria (per the arbiter's instructions), then we RERUN — the
         # executed suite, not the agent's word, decides success.
         self._log(f"arbiter:{story.id}", "🔧 Correction du test erroné (agent QA) puis re-vérification.")
+        # W3 immutability: constitution tests are the project's non-negotiable
+        # floor — snapshot them so an over-eager fix cannot weaken them.
+        protected = {
+            rel: (ws / rel).read_bytes()
+            for rel in self.state.constitution_test_paths
+            if (ws / rel).exists()
+        }
         try:
             await self._tracked.arun(
                 prompts_arbiter_fix_test(story, pkg, acceptance, instructions, test_blob),
@@ -3950,6 +4013,14 @@ class Pipeline:
         except AgentError as exc:
             self._log(f"arbiter:{story.id}", f"Correction du test échouée ({exc}) — échec maintenu.")
             return False
+        for rel, original in protected.items():  # restore any touched constitution test
+            p = ws / rel
+            try:
+                if not p.exists() or p.read_bytes() != original:
+                    p.write_bytes(original)
+                    self._log(f"arbiter:{story.id}", f"↩️ règle de constitution protégée : {rel}")
+            except OSError:
+                pass
 
         ok, output, real = await self._arun_pytest(ws=ws)
         if not ok:

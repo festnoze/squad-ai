@@ -222,6 +222,17 @@ class Settings:
     ac_traceability_enabled: bool = field(
         default_factory=lambda: _env_bool("AC_TRACEABILITY", False)
     )
+    # W3: project constitution. When on, a boss-tier phase after SPEC derives a
+    # small set of non-negotiable project-wide rules and COMPILES them to pytest
+    # files under tests/constitution/ (they then ride the normal suite every
+    # round) or delivery-gate commands; non-compilable rules become advisory
+    # (prompt-injected). Off by default.
+    constitution_enabled: bool = field(
+        default_factory=lambda: _env_bool("CONSTITUTION", False)
+    )
+    constitution_max_rules: int = field(
+        default_factory=lambda: _env_int("CONSTITUTION_MAX", 8, minimum=1)
+    )
     # Agent provider: "claude code" (Claude Code CLI harness, the default),
     # "claude" (Anthropic API direct), "codex" (OpenAI CLI), "openai",
     # "openrouter" or "ollama". Switchable at runtime through POST /api/provider.

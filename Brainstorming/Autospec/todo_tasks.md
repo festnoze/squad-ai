@@ -93,8 +93,9 @@ Impl notes: modules `traceability.py` / `classifier.py` / `arbitration.py` + `ar
 
 ---
 
-## Wave 3 — Constitution compiler  ·  status: TODO
+## Wave 3 — Constitution compiler  ·  status: DONE (core; execute-against-skeleton validation deferred)
 Deps: none hard (slots after SPEC). Interacts with W2 (constitution tests immutable to fix_test) and W5 (immutable rules non-amendable).
+Impl notes: `constitution.py` (aderive → compile_rules → render_pytest_file, advisory demotion valve). Wired `_amaybe_build_constitution` at the start of `_aplan_phase`: executable rules written to `tests/constitution/` (ride the normal suite → zero new enforcement), advisory rules → `build_guidance`, stored on `state.constitution` / `state.constitution_test_paths`. W2 fix_test now snapshots + restores constitution tests (immutable floor) and instructs the QA-fix never to touch them. Config `CONSTITUTION` + `CONSTITUTION_MAX`. **Deferred:** the run-against-skeleton validation pass (T3.3) — currently a syntactic `is_runnable_pytest` guarantee at compile time; command-rule execution in the delivery gate (T3.4 commands path).
 
 | ID | Task | Files | Isolation | Deps | Status |
 |---|---|---|---|---|---|
