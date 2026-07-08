@@ -3,6 +3,8 @@
 // table used by `t()` is `messages["<namespace>.<key>"]`.
 import { app } from "./app";
 import { common } from "./common";
+import { palette } from "./palette";
+import { mobileNav } from "./mobileNav";
 import { settings } from "./settings";
 import { projectBar } from "./projectBar";
 import { projectSetup } from "./projectSetup";
@@ -30,6 +32,8 @@ export type Namespace = Record<string, Entry>;
 const namespaces: Record<string, Namespace> = {
   app,
   common,
+  palette,
+  mobileNav,
   settings,
   projectBar,
   projectSetup,

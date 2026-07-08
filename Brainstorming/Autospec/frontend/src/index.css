@@ -177,7 +177,9 @@ main {
   }
 }
 
-/* P1 — <1100px: single column, the rail stacks above the scene (tabbed feel). */
+/* P1/R5 — <1100px: single column driven by the bottom tab bar. Only the active
+   pane (rail or scene) is shown so a narrow viewport shows one thing at a time
+   instead of one very long scroll. */
 @media (max-width: 1099px) {
   :root {
     --rail-w: 1fr;
@@ -185,7 +187,49 @@ main {
   }
   .workspace {
     grid-template-columns: 1fr;
+    /* room for the fixed bottom bar + its own scroll */
+    padding-bottom: 60px;
+    overflow-y: auto;
   }
+  .workspace[data-mobile-pane="rail"] .col-right {
+    display: none;
+  }
+  .workspace[data-mobile-pane="scene"] .col-left {
+    display: none;
+  }
+  .mobile-nav {
+    display: flex;
+  }
+}
+
+/* R5 — bottom tab bar. Hidden by default (desktop shows both columns); the
+   <1100px media query above reveals it. */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 52px;
+  z-index: 60;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.mobile-nav-tab {
+  flex: 1;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.mobile-nav-tab.active {
+  color: var(--accent);
+  box-shadow: inset 0 2px 0 var(--accent);
 }
 
 .col-left,
@@ -2076,6 +2120,115 @@ button.action-btn.action-done {
   gap: 8px;
 }
 
+/* R2 — palette de commandes (Cmd/Ctrl-K). */
+.palette-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 12vh;
+  z-index: 200;
+}
+
+.palette {
+  width: min(640px, 92vw);
+  max-height: 60vh;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.palette-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.palette-chip {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.palette-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.palette-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.palette-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.palette-row.active {
+  background: var(--panel-2);
+}
+
+.palette-row.danger .palette-row-label {
+  color: var(--red);
+}
+
+.palette-row-id {
+  font-family: Consolas, monospace;
+  font-size: 11px;
+  color: var(--muted);
+  flex: none;
+}
+
+.palette-row-label {
+  flex: 1;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette-row-hint,
+.palette-row-status {
+  flex: none;
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.palette-empty {
+  list-style: none;
+  padding: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: center;
+}
+
 /* Q5 — dernière erreur d'un item en échec (tiroir Activité). Couleurs statiques :
    pas de pulse, le canal --attention reste réservé aux pastilles d'état. */
 .activity-last-error-wrap {
@@ -3229,6 +3382,35 @@ button.action-btn.action-done {
   display: none;
 }
 
+/* R5 — <768px: stepper vertical (une étape par ligne : [dot] label … durée).
+   La barre de liaison devient un court segment vertical entre deux dots. */
+@media (max-width: 767px) {
+  .stepper-track {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+  .stepper-cell {
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    font-size: 11px;
+  }
+  .stepper-cell::before {
+    top: -6px;
+    left: 5px;
+    width: 2px;
+    height: 6px;
+  }
+  .stepper-cell-label {
+    text-align: left;
+  }
+  .stepper-elapsed {
+    margin-left: auto;
+  }
+}
+
 .stepper-dot {
   width: 11px;
   height: 11px;
@@ -3413,7 +3595,10 @@ button.attention-chip {
 .activity-rows-wrap {
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
+  min-height: 0;
+  /* R1 — le scroll est délégué à .activity-rows pour que la région « à traiter »
+     reste épinglée en haut et que la liste des lignes normales soit fenêtrable. */
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -3421,6 +3606,7 @@ button.attention-chip {
 
 /* Région « à traiter » épinglée (failed/blocked/approval en premier). */
 .activity-attention-region {
+  flex: none;
   border: 1px solid var(--attention);
   border-radius: 10px;
   background: var(--attention-bg);
@@ -3438,6 +3624,9 @@ button.attention-chip {
 }
 
 .activity-rows {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 8px;

@@ -170,6 +170,33 @@ test("improve_UX: Activité stepper + targeted chat + extend", async ({ page, re
   const astory = aproj.stories.find((s) => s.id === tid);
   expect((astory?.acceptance_criteria ?? []).length).toBeGreaterThan(before);
 
+  // === R2 — palette de commandes (Cmd/Ctrl-K) ==============================
+  await page.keyboard.press("Control+k");
+  const palette = page.getByTestId("command-palette");
+  await expect(palette).toBeVisible();
+  // Le verbe « Retry » demande une cible : un chip cible apparaît.
+  await page.getByTestId("palette-cmd-retry").click();
+  await expect(page.getByTestId("palette-verb-chip")).toBeVisible();
+  await page.keyboard.press("Escape"); // target → root
+  await expect(page.getByTestId("palette-verb-chip")).toBeHidden();
+  await page.keyboard.press("Escape"); // root → fermé
+  await expect(palette).toBeHidden();
+
+  // === R5 — barre d'onglets mobile sous 1100px ==============================
+  await page.setViewportSize({ width: 400, height: 800 });
+  const rail = page.getByTestId("mobile-nav-rail");
+  const scene = page.getByTestId("mobile-nav-scene");
+  await expect(rail).toBeVisible();
+  // Bascule sur la scène : la colonne de gauche (chat/panneaux) se masque.
+  await scene.click();
+  await expect(scene).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".col-left")).toBeHidden();
+  await expect(page.locator(".col-right")).toBeVisible();
+  // Retour au volet « Échange ».
+  await rail.click();
+  await expect(page.locator(".col-left")).toBeVisible();
+  await page.setViewportSize({ width: 1280, height: 800 });
+
   // === nettoyage ============================================================
   await request.delete(`/api/projects/${proj.id}`, { timeout: 10_000 }).catch(() => {});
 });

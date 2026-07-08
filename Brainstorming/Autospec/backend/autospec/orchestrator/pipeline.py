@@ -6258,7 +6258,7 @@ class Pipeline:
     ) -> None:
         """Run `vite preview` in ``root`` and stream its output under ``source``
         (ST-8). Mirrors ``_stream_run_output`` but for a frontend stream."""
-        cmd = toolchain.frontend_run_command()
+        cmd = self._resolve_cmd(toolchain.frontend_run_command())
         try:
             proc = subprocess.Popen(
                 cmd, cwd=str(root),

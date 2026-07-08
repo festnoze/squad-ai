@@ -4,6 +4,7 @@ import { useEscapeToClose } from "../hooks";
 import { LogLine, ProjectState } from "../types";
 import { canResumeBuild, effectiveStatus } from "../work";
 import { useI18n } from "../i18n/i18n";
+import { VirtualList } from "./VirtualList";
 
 interface Props {
   project: ProjectState;
@@ -63,7 +64,6 @@ export function RunPanel({
     needs_attention: t("runPanel.phaseNeedsAttention"),
     error: t("runPanel.phaseError"),
   };
-  const bottomRef = useRef<HTMLDivElement>(null);
   // UI7: post-build delivery/export actions live in an overflow menu so the
   // primary controls (Lancer/Pause/Stop) stay prominent.
   const [menuOpen, setMenuOpen] = useState(false);
@@ -107,11 +107,8 @@ export function RunPanel({
         (q === "" || l.line.toLowerCase().includes(q) || l.source.toLowerCase().includes(q)),
     );
   }, [logs, logFilterActive, logQuery, logSource, errorsOnly]);
-  useEffect(() => {
-    // Pas d'auto-scroll pendant qu'un filtre est actif (on lit un extrait).
-    if (logsExpanded && !logFilterActive)
-      bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs.length, logsExpanded, logFilterActive]);
+  // R1 — l'auto-scroll vers la dernière ligne est géré par VirtualList
+  // (stickBottom), désactivé quand un filtre est actif (on lit un extrait).
 
   const canRun = !["spec", "plan", "analyze", "architect", "build", "idle"].includes(
     project.phase,
@@ -389,14 +386,18 @@ export function RunPanel({
         )}
       </div>
       {logsExpanded && (
-        <div className="logs">
-          {shownLogs.map((l, i) => (
+        <VirtualList
+          className="logs"
+          testid="logs"
+          items={shownLogs}
+          itemHeight={20}
+          stickBottom={!logFilterActive}
+          renderItem={(l, i) => (
             <div key={i} className="log-line">
               <span className="log-source">[{l.source}]</span> {l.line}
             </div>
-          ))}
-          <div ref={bottomRef} />
-        </div>
+          )}
+        />
       )}
     </div>
   );

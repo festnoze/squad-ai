@@ -35,7 +35,9 @@ import {
   updateComponents,
 } from "./api";
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
+import { CommandPalette, paletteItems } from "./components/CommandPalette";
 import { ConfirmHost, confirmAction } from "./components/ConfirmDialog";
+import { MobileNav, type MobilePane } from "./components/MobileNav";
 import { PlanReviewPanel } from "./components/PlanReviewPanel";
 import { LanguagePanel } from "./components/LanguagePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
@@ -139,6 +141,11 @@ export default function App() {
   };
   // Q5 — connexion SSE coupée : pastille « Reconnexion… » dans le header.
   const [sseDown, setSseDown] = useState(false);
+  // R2 — palette de commandes (Cmd/Ctrl-K).
+  const [showPalette, setShowPalette] = useState(false);
+  // R5 — volet actif sur écran étroit (<1100px). Défaut « rail » : le chat/les
+  // panneaux sont pertinents dès la spec (la scène est vide avant le plan).
+  const [mobilePane, setMobilePane] = useState<MobilePane>("rail");
   const [provider, setProviderInfo] = useState<ProviderInfo | null>(null);
   // UI10 : provider + modèle regroupés dans un petit popover compact.
   const [providerMenuOpen, setProviderMenuOpen] = useState(false);
@@ -198,6 +205,17 @@ export default function App() {
     window.addEventListener("resize", apply);
     return () => window.removeEventListener("resize", apply);
   }, []);
+  // R2 — Cmd/Ctrl-K toggles the command palette from anywhere (incl. inputs).
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setShowPalette((o) => !o);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
   // Ids des projets supprimés : empêche un event « state » retardé de
   // ressusciter un projet déjà supprimé.
   const deletedIds = useRef<Set<string>>(new Set());
@@ -210,6 +228,20 @@ export default function App() {
   const visibleProjects = useMemo(
     () => (showArchived ? projects : projects.filter((p) => !p.archived)),
     [projects, showArchived],
+  );
+
+  // R2 — command-palette derived data for the selected project.
+  const palItems = useMemo(() => paletteItems(project?.stories ?? []), [project]);
+  const palHasGraph = useMemo(
+    () =>
+      (project?.stories ?? []).some(
+        (s) => (s.tasks ?? []).length > 0 || (s.depends_on ?? []).length > 0,
+      ),
+    [project],
+  );
+  const palMultiIter = useMemo(
+    () => new Set((project?.epics ?? []).map((e) => e.iteration)).size > 1,
+    [project],
   );
 
   const upsert = (state: ProjectState) =>
@@ -665,6 +697,18 @@ export default function App() {
         </div>
       )}
       <ConfirmHost />
+      <CommandPalette
+        open={showPalette}
+        onClose={() => setShowPalette(false)}
+        items={palItems}
+        projectId={project?.id ?? null}
+        hasProject={!!project}
+        hasGraph={palHasGraph}
+        multiIter={palMultiIter}
+        onNewProject={() => setShowSetup(true)}
+        onOpenDashboard={() => setShowDashboard(true)}
+        onOpenSettings={() => setShowSettings(true)}
+      />
       {showDashboard && <Dashboard onClose={() => setShowDashboard(false)} />}
       {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
       {showSetup && (
@@ -702,7 +746,7 @@ export default function App() {
           )}
         </main>
       ) : (
-        <main className="workspace">
+        <main className="workspace" data-mobile-pane={mobilePane}>
           <div className="col-left">
             {/* `?? défaut` : robustesse face aux anciens états persistés
                 auxquels il manque des champs ajoutés depuis. */}
@@ -798,6 +842,7 @@ export default function App() {
             />
             <CodeViewer projectId={project.id} />
           </div>
+          <MobileNav pane={mobilePane} onChange={setMobilePane} />
         </main>
       )}
     </div>

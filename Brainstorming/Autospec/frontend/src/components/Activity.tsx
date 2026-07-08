@@ -32,6 +32,7 @@ import {
 import { useI18n } from "../i18n/i18n";
 import { LlmActivity } from "./LlmActivity";
 import { Stepper } from "./Stepper";
+import { VirtualList } from "./VirtualList";
 
 type TFn = (key: string, vars?: Record<string, string | number>) => string;
 
@@ -809,13 +810,21 @@ export function Activity({
               {attentionRows.map(renderRow)}
             </div>
           )}
-          <div className="activity-rows" data-testid="activity-rows">
-            {visibleRows.length === 0 ? (
+          {visibleRows.length === 0 ? (
+            <div className="activity-rows" data-testid="activity-rows">
               <p className="placeholder">{t("activity.empty")}</p>
-            ) : (
-              normalRows.map(renderRow)
-            )}
-          </div>
+            </div>
+          ) : (
+            // R1 — fenêtrage au-delà d'un seuil (rendu intégral en deçà, donc
+            // aucun changement pour les petites listes / les tests existants).
+            <VirtualList
+              className="activity-rows"
+              testid="activity-rows"
+              items={normalRows}
+              itemHeight={64}
+              renderItem={(r) => renderRow(r)}
+            />
+          )}
         </div>
       </div>
     </section>

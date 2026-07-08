@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { getIterations } from "../api";
+import { subscribeNav, type NavIntent } from "../navigation";
 import { Epic, ProjectTicks, Stream, Usage, UserStory } from "../types";
 import { useI18n } from "../i18n/i18n";
 import { Activity } from "./Activity";
@@ -115,6 +116,24 @@ export function WorkspaceViews({
     const s = stories.find((x) => x.id === storyId);
     if (s) openStory(s.epic_id, s.id);
   };
+
+  // R2 — the command palette drives navigation through a module-level bus. A ref
+  // holds the latest handler so we subscribe ONCE (stable) yet always see the
+  // current `stories`/view setters (avoids stale closures + resubscribe churn).
+  const navHandler = useRef<(intent: NavIntent) => void>(() => undefined);
+  navHandler.current = (intent) => {
+    if (intent.type === "view") {
+      if (intent.view === "graph" && !hasGraph) return;
+      if (intent.view === "iterations" && !multiIter) return;
+      setView(intent.view);
+    } else if (intent.type === "goto-item") {
+      const item = stories.find(
+        (x) => x.id === intent.storyId || (x.tasks ?? []).some((tk) => tk.id === intent.storyId),
+      );
+      if (item) openStory(item.epic_id, item.id);
+    }
+  };
+  useEffect(() => subscribeNav((intent) => navHandler.current(intent)), []);
 
   return (
     <>
