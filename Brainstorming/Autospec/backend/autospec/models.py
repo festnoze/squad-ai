@@ -428,6 +428,12 @@ class Usage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     agent_calls: int = 0
+    # W4: per-tier breakdown (boss/worker/checker) — the "$2.74 on the meter"
+    # story. cost_by_tier may include estimated cost when a runner returns none.
+    cost_by_tier: dict[str, float] = Field(default_factory=dict)
+    input_tokens_by_tier: dict[str, int] = Field(default_factory=dict)
+    output_tokens_by_tier: dict[str, int] = Field(default_factory=dict)
+    calls_by_tier: dict[str, int] = Field(default_factory=dict)
 
 
 class AgentInteraction(BaseModel):

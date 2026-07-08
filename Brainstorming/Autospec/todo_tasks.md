@@ -109,8 +109,9 @@ Impl notes: `constitution.py` (aderive → compile_rules → render_pytest_file,
 
 ---
 
-## Wave 4 — Tier routing + cost ledger  ·  status: TODO
+## Wave 4 — Tier routing + cost ledger  ·  status: DONE (Phase A; frontend panel + Phase B registry deferred)
 Deps: **W1** (down-tiering safe only under the ladder). Phase A same-harness; Phase B registry is separate.
+Impl notes: `PERSONA_TIERS` map + `model_for_role(role, phase)` with the boss-never-codes guard; config `ROLE_ROUTING` + `MODEL_{BOSS,WORKER,CHECKER}` + `PRICE_<TIER>_{IN,OUT}`. Routed at the chokepoint (precedence: explicit > `_FORCE_MODEL` > `model_for_role` > phase router). Per-tier cost ledger on `Usage` (`cost_by_tier`/`*_tokens_by_tier`/`calls_by_tier`) with zero-cost estimation from tier prices; `_log_cost_counterfactual` emits the "$X real vs frontier-only" line at the delivery gate. **Deferred:** W4.4 frontend usage-panel tier breakdown; W4.6 Phase B cross-provider runner registry (still one runner per pipeline).
 
 | ID | Task | Files | Isolation | Deps | Status |
 |---|---|---|---|---|---|

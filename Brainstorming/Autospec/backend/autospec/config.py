@@ -164,6 +164,43 @@ def _default_phase_models() -> dict:
     return out
 
 
+# W4: which cost tier each agent persona belongs to. boss = expensive mind
+# (plans, reviews, arbitrates, rules — never codes); worker = cheap coder;
+# checker = mid-tier verifier (critic/judge/qa/evaluator). Personas absent from
+# the map fall through to the phase router.
+PERSONA_TIERS: dict[str, str] = {
+    # boss
+    "pm": "boss", "sm": "boss", "po-structure": "boss", "po-spec": "boss",
+    "po-gherkin": "boss", "analyst": "boss", "architect": "boss",
+    "arbiter": "boss", "classifier": "boss", "constitution": "boss", "retro": "boss",
+    # worker
+    "dev": "worker", "dev-frontend": "worker",
+    # checker
+    "qa": "checker", "critic": "checker", "judge": "checker",
+    "evaluator": "checker", "security-reviewer": "checker",
+    "independence-judge": "checker", "tech-writer": "checker",
+}
+
+
+def _default_model_tiers() -> dict:
+    """W4: per-tier model ids from MODEL_BOSS / MODEL_WORKER / MODEL_CHECKER."""
+    out = {}
+    for tier in ("boss", "worker", "checker"):
+        val = os.environ.get(f"MODEL_{tier.upper()}")
+        if val and val.strip():
+            out[tier] = val.strip()
+    return out
+
+
+def _default_tier_prices(direction: str) -> dict:
+    """USD per 1M tokens per tier (PRICE_BOSS_OUT, PRICE_WORKER_IN, …), used to
+    estimate cost when a runner returns none (Codex/OpenAI/Ollama)."""
+    out = {}
+    for tier in ("boss", "worker", "checker"):
+        out[tier] = _env_float(f"PRICE_{tier.upper()}_{direction.upper()}", 0.0, minimum=0.0)
+    return out
+
+
 def _default_model_ladder() -> list[str]:
     """W1: the escalation ladder — comma-separated model ids in COST-ASCENDING
     order (cheapest first). On a retry the recovery machine climbs one rung, so a
@@ -199,6 +236,15 @@ class Settings:
         default_factory=lambda: _env_bool("ESCALATE_ON_RETRY", False)
     )
     model_ladder: list = field(default_factory=_default_model_ladder)
+    # W4: role→tier→model routing. When on, an agent's persona maps to a cost
+    # tier (boss/worker/checker) → model, so the expensive mind reviews/plans/
+    # arbitrates while cheap workers code. Off → the per-phase router is unchanged.
+    role_routing_enabled: bool = field(
+        default_factory=lambda: _env_bool("ROLE_ROUTING", False)
+    )
+    model_tiers: dict = field(default_factory=_default_model_tiers)
+    tier_price_in: dict = field(default_factory=lambda: _default_tier_prices("in"))
+    tier_price_out: dict = field(default_factory=lambda: _default_tier_prices("out"))
     # W1.3 (wired with Wave 2): when a story exhausts its dev attempts, ask a
     # boss-tier classifier for the root cause (too_big / wrong_test /
     # spec_contradiction / genuinely_hard) instead of blindly splitting. Off by
@@ -727,6 +773,34 @@ class Settings:
         if self.agent_provider in ("", "claude code"):
             return self.claude_model
         return None
+
+    def tier_for_role(self, role: str) -> str:
+        """The cost tier ("boss"|"worker"|"checker") for an agent persona, or ""
+        when the role is unmapped."""
+        return PERSONA_TIERS.get(role, "")
+
+    def model_for_role(self, role: str, phase: str) -> str | None:
+        """W4: resolve a call's model by the agent's cost tier, falling back to the
+        per-phase router. Enforces "boss never codes": in the BUILD phase a
+        dev/dev-frontend call can never resolve to the boss-tier model — if a
+        misconfiguration points it there, it falls back to the worker tier (or the
+        phase router). No-op (== ``model_for_phase``) when role routing is off."""
+        if not self.role_routing_enabled:
+            return self.model_for_phase(phase)
+        tier = PERSONA_TIERS.get(role, "")
+        if role in ("dev", "dev-frontend") and phase == "build":
+            tier = "worker"  # boss never codes, regardless of the map
+        model = self.model_tiers.get(tier) if tier else None
+        if model:
+            # Guard: a coding call must not run on the boss model.
+            if phase == "build" and role in ("dev", "dev-frontend"):
+                boss = self.model_tiers.get("boss")
+                if boss and model == boss:
+                    logger.warning("Refusing boss model %s for a build dev call; "
+                                   "falling back to the phase router.", model)
+                    return self.model_for_phase(phase)
+            return model
+        return self.model_for_phase(phase)
 
     def persona_path(self, agent: str) -> Path:
         return self.bmad_dir / "bmm" / "agents" / f"{agent}.md"

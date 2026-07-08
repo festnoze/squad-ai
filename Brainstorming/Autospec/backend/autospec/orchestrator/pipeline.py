@@ -324,8 +324,9 @@ class _UsageTracker:
         _t0 = time.monotonic()
         # W0.3/W0.4: resolve the model once (so both success and error telemetry
         # can attribute it) and record the prompt size for context-budget checks.
-        # Precedence: explicit per-call model > escalation-ladder force > router.
-        chosen = model or _FORCE_MODEL.get() or settings.model_for_phase(phase)
+        # Precedence: explicit per-call model > escalation-ladder force >
+        # role/tier router (W4) which itself falls back to the per-phase router.
+        chosen = model or _FORCE_MODEL.get() or settings.model_for_role(role, phase)
         prompt_chars = len(prompt or "")
         self.pipeline._check_context_budget(role, item_id, prompt_chars, chosen)
         try:
@@ -356,6 +357,22 @@ class _UsageTracker:
         usage.input_tokens += res.input_tokens
         usage.output_tokens += res.output_tokens
         usage.agent_calls += 1
+        # W4: per-tier cost ledger. Attribute this call's tokens/cost to its cost
+        # tier (boss/worker/checker). When the runner reports no cost (Codex/
+        # OpenAI/Ollama), estimate it from the tier's configured per-1M prices so
+        # the "$X on the meter" story holds across providers.
+        tier = settings.tier_for_role(role) or "unrouted"
+        tier_cost = res.cost_usd
+        if tier_cost <= 0.0:
+            tier_cost = (
+                res.input_tokens / 1_000_000 * settings.tier_price_in.get(tier, 0.0)
+                + res.output_tokens / 1_000_000 * settings.tier_price_out.get(tier, 0.0)
+            )
+            usage.cost_usd += tier_cost  # fold the estimate into the headline total too
+        usage.cost_by_tier[tier] = usage.cost_by_tier.get(tier, 0.0) + tier_cost
+        usage.input_tokens_by_tier[tier] = usage.input_tokens_by_tier.get(tier, 0) + res.input_tokens
+        usage.output_tokens_by_tier[tier] = usage.output_tokens_by_tier.get(tier, 0) + res.output_tokens
+        usage.calls_by_tier[tier] = usage.calls_by_tier.get(tier, 0) + 1
         # Per-iteration breakdown: mirror the same deltas into this iteration's
         # bucket (created on first use) so the UI can show cost/tokens per iteration.
         it_usage = self.pipeline.state.iteration_usage.setdefault(
@@ -2245,6 +2262,7 @@ class Pipeline:
         )
         delivery_state.apply_definition_result(self.state, result)
         self._report_traceability(all_iterations)
+        self._log_cost_counterfactual()
         if result.blockers:
             self._delivery_blocked = True
             detail = "\n".join(f"- {i.message}" for i in result.blockers[:8])
@@ -3873,6 +3891,44 @@ class Pipeline:
                 )
             )
         return out
+
+    def _log_cost_counterfactual(self) -> None:
+        """W4: the "$8 vs $100" line. Report the per-tier ledger and, when the boss
+        tier has a price, the counterfactual of running EVERY token through the
+        boss model (frontier-only) versus the actual tiered spend. Best-effort."""
+        if not settings.role_routing_enabled:
+            return
+        try:
+            u = self.state.usage
+            if not u.calls_by_tier:
+                return
+            parts = [
+                f"{tier}: {u.calls_by_tier.get(tier, 0)} appels, "
+                f"{u.cost_by_tier.get(tier, 0.0):.4f}$"
+                for tier in ("boss", "worker", "checker", "unrouted")
+                if u.calls_by_tier.get(tier)
+            ]
+            self._log("cost", "💵 Répartition par tier — " + " · ".join(parts))
+            boss_out = settings.tier_price_out.get("boss", 0.0)
+            boss_in = settings.tier_price_in.get("boss", 0.0)
+            if boss_out or boss_in:
+                frontier = (
+                    u.input_tokens / 1_000_000 * boss_in
+                    + u.output_tokens / 1_000_000 * boss_out
+                )
+                self.monitor.event(
+                    "cost_counterfactual", actual=round(u.cost_usd, 4),
+                    frontier_only=round(frontier, 4),
+                )
+                if frontier > 0:
+                    self._log(
+                        "cost",
+                        f"💵 Contrefactuel : {u.cost_usd:.2f}$ réel vs "
+                        f"{frontier:.2f}$ si tout passait par le modèle boss "
+                        f"(×{frontier / u.cost_usd:.1f})" if u.cost_usd else "",
+                    )
+        except Exception:
+            return
 
     def _report_traceability(self, all_iterations: bool) -> None:
         """W2.0b — advisory AC↔test coverage report. Complements the delivery
