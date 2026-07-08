@@ -164,6 +164,73 @@ def compute(events: list[dict]) -> RunKPIs:
     return k
 
 
+@dataclass
+class ModelScore:
+    """W5.2 — per-model reliability, attributed from the timeline (a continuous
+    audition on real work, stronger than a one-shot tryout)."""
+
+    model: str = ""
+    dev_stories: int = 0            # stories this model made a dev attempt on
+    green_at_first: int = 0         # ...that went green on their first attempt
+    green_eventually: int = 0
+    failed: int = 0
+    escalations_from: int = 0       # times a task was escalated OFF this model
+    calls: int = 0
+
+    @property
+    def green_at_1_rate(self) -> float:
+        return self.green_at_first / self.dev_stories if self.dev_stories else 0.0
+
+
+def model_scorecard(events: list[dict]) -> dict[str, ModelScore]:
+    """Attribute story outcomes to the model that did each story's FIRST dev
+    attempt — the fair basis for "which cheap model actually earns its place".
+
+    Uses the same timeline the KPIs come from: agent events with role dev* carry
+    (item, model); pytest events carry (item, ok) in order; ``escalate`` events
+    mark a promotion off the current model."""
+    first_dev_model: dict[str, str] = {}     # item → model of its first dev attempt
+    pytest_seq: dict[str, list[bool]] = {}
+    scores: dict[str, ModelScore] = {}
+    escalated_from: dict[str, int] = {}
+
+    def _score(model: str) -> ModelScore:
+        return scores.setdefault(model, ModelScore(model=model))
+
+    for ev in events:
+        kind = ev.get("kind")
+        if kind == "agent":
+            model = str(ev.get("model") or "?")
+            _score(model).calls += 1
+            role = str(ev.get("role") or "")
+            item = str(ev.get("item") or "")
+            if role.startswith("dev") and item and not item.startswith("phase:"):
+                first_dev_model.setdefault(item, model)
+        elif kind == "pytest":
+            item = str(ev.get("item") or "")
+            if item and not item.startswith("phase:"):
+                pytest_seq.setdefault(item, []).append(bool(ev.get("ok", False)))
+        elif kind == "escalate":
+            # the story was escalated ONTO ev.model → off its previous model
+            model = str(ev.get("model") or "")
+            if model:
+                escalated_from[model] = escalated_from.get(model, 0)
+
+    for item, model in first_dev_model.items():
+        s = _score(model)
+        seq = pytest_seq.get(item, [])
+        if not seq:
+            continue
+        s.dev_stories += 1
+        if seq[0]:
+            s.green_at_first += 1
+        if any(seq):
+            s.green_eventually += 1
+        else:
+            s.failed += 1
+    return scores
+
+
 def format_report(k: RunKPIs) -> str:
     """Human-readable one-screen KPI summary."""
     lines = [

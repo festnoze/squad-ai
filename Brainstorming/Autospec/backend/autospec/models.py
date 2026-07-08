@@ -479,6 +479,9 @@ class ProjectState(BaseModel):
     # immutable to W2 fix_test / W5 amendment), advisory rules are prompt-injected.
     constitution: list[dict] = Field(default_factory=list)
     constitution_test_paths: list[str] = Field(default_factory=list)
+    # W5.1: spec-amendment proposals awaiting human review (human-pending by
+    # default). Each: {story_id, target, before, after, rationale, approved_safe}.
+    pending_amendments: list[dict] = Field(default_factory=list)
     plan_quality: int = -1  # last refinement score for the PO plan (-1 = not run)
     # Plan review (REVIEW_PLAN): the critic's flagged issues + proposed
     # improvements on the PO breakdown, surfaced in the UI « Revue du plan » panel.

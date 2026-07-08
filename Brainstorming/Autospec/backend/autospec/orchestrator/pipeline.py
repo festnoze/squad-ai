@@ -69,6 +69,7 @@ from . import guards, signatures  # W0.5 anti-cheating detectors + failure signa
 from . import recovery  # W1 recovery state machine + escalation ladder
 from . import arbitration, traceability  # W2 wrong-test arbitration + AC traceability
 from . import constitution as constitution_lib  # W3 project constitution
+from . import amendment  # W5.1 human-gated design amendment
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import manifests
@@ -2906,13 +2907,21 @@ class Pipeline:
             await self._agit(ws, "reset", "--hard", "HEAD")
             await self._agit(ws, "clean", "-fd")
 
+        # W5.3 checker independence: give the critic the ACTUAL changes (the last
+        # commit's diff), not the dev's self-narrative, so its review targets what
+        # really changed. The critic still reads the files in cwd too.
+        _, diff = await self._agit(ws, "show", "--stat", "--patch", "HEAD")
+        diff_block = f"\n\nDiff des changements (git show HEAD) :\n{(diff or '')[:8000]}" if diff else ""
         try:
             outcome = await refine.arefine(
                 self._tracked,
                 role="dev",
                 kind=f"le code produit pour la story {story.id} (fichiers dans le répertoire courant)",
                 criteria=prompts.CODE_CRITERIA,
-                initial_text=f"Code de la story {story.id} — lis les fichiers du répertoire courant.",
+                initial_text=(
+                    f"Code de la story {story.id} — lis les fichiers du répertoire "
+                    f"courant.{diff_block}"
+                ),
                 revise=_revise,
                 accept=_accept,
                 rollback=_rollback,
@@ -3965,6 +3974,69 @@ class Pipeline:
         except Exception:
             return
 
+    async def _amaybe_propose_amendment(self, story: UserStory, acceptance: str, reason: str) -> None:
+        """W5.1 — when a failure is a genuine spec contradiction, propose a MINIMAL
+        amendment, run an INDEPENDENT weakening check, and queue the survivor as a
+        HUMAN-PENDING proposal (never auto-applied unless AMENDMENT_AUTO). A system
+        that could rewrite the criteria it fails to meet must not be able to
+        legalize failure — hence the independent gate + human default. Best-effort."""
+        if not settings.design_amendment_enabled:
+            return
+        if len(self.state.pending_amendments) >= settings.amendment_max_depth:
+            return
+        try:
+            proposal = await amendment.apropose_safe_amendment(
+                self._tracked,
+                story_title=story.title,
+                acceptance=acceptance,
+                failure_context=reason,
+                target_hint="acceptance_criteria",
+            )
+        except AgentError:
+            return
+        if not proposal:
+            return
+        record = {"story_id": story.id, **proposal}
+        self.state.pending_amendments.append(record)
+        safe = bool(proposal.get("approved_safe"))
+        self.monitor.event(
+            "amendment", item=story.id, target=proposal.get("target", ""),
+            approved_safe=safe, auto=settings.amendment_auto,
+        )
+        if not safe:
+            self._log(
+                f"amend:{story.id}",
+                "🛑 Amendement proposé REJETÉ (affaiblirait l'exigence) — "
+                f"{proposal.get('weakening_reason', '')}",
+            )
+            return
+        if settings.amendment_auto:
+            # Opt-in unattended apply: record the applied change (the actual AC
+            # edit is left to the next planning pass reading pending_amendments).
+            self._log(f"amend:{story.id}", "✍️ Amendement sûr appliqué automatiquement (AMENDMENT_AUTO).")
+            self._chat(
+                ChatRole.SYSTEM,
+                f"[{story.id}] ✍️ Amendement appliqué : {proposal.get('rationale', '')}",
+            )
+        else:
+            self._notify(
+                "warning", "Amendement de spec proposé",
+                f"{story.id} : {proposal.get('rationale', '')} — en attente de validation humaine.",
+            )
+            self._log(f"amend:{story.id}", "⏸️ Amendement sûr en attente de validation humaine.")
+
+    def _record_arbitration_lesson(self) -> None:
+        """W5.6 — durable lesson from a wrong-test arbitration, injected into later
+        QA/Dev prompts via ``_effective_lessons``. Bounded like the retro lessons."""
+        lesson = (
+            "Un test QA a été jugé FAUX (il affirmait un comportement absent des "
+            "critères d'acceptance) : n'affirmer QUE ce que les critères exigent, "
+            "jamais un comportement non spécifié."
+        )
+        if lesson not in self.state.lessons:
+            self.state.lessons.append(lesson)
+            self.state.lessons = self.state.lessons[-settings.retro_max_lessons:]
+
     def _collect_test_sources(self, ws) -> dict[str, str]:
         """Read every test file's source in the workspace (workspace-relative
         posix path → text). Best-effort; used to feed the arbiter / traceability."""
@@ -4045,8 +4117,9 @@ class Pipeline:
                 self._chat(
                     ChatRole.SYSTEM,
                     f"[{story.id}] ⚖️ Arbitre : contradiction dans les critères — "
-                    "à trancher par un amendement (Wave 5).",
+                    "proposition d'amendement (Wave 5).",
                 )
+                await self._amaybe_propose_amendment(story, acceptance, reason)
             return False
 
         # fix_test: a checker-tier agent rewrites the failing test to match the
@@ -4101,6 +4174,10 @@ class Pipeline:
             f"[{story.id}] ⚖️ Le test était faux (pas le code) — corrigé selon les "
             "critères d'acceptance, suite verte.",
         )
+        # W5.6: the factory learns from its own disputes — a fix_test ruling is
+        # evidence of HOW the QA agent writes wrong tests. Feed it into the durable
+        # lessons that seed the QA/Dev prompts of later stories/iterations.
+        self._record_arbitration_lesson()
         return True
 
     async def _amaybe_split_on_failure(self, item, subject: UserStory, target, *, force: bool = False) -> bool:

@@ -126,8 +126,9 @@ Impl notes: `PERSONA_TIERS` map + `model_for_role(role, phase)` with the boss-ne
 
 ---
 
-## Wave 5 — Hardening  ·  status: TODO
+## Wave 5 — Hardening  ·  status: DONE (W5.1/W5.2/W5.3/W5.6; W5.4/W5.5/W5.7 deferred)
 Deps as noted per task.
+Impl notes: W5.1 `amendment.py` (propose → independent weakening-check → `apropose_safe_amendment`, fail-closed) wired via `_amaybe_propose_amendment` on the arbiter's spec_contradiction verdict → queued in `state.pending_amendments` HUMAN-PENDING (AMENDMENT_AUTO opts into apply), bounded by `AMENDMENT_MAX_DEPTH`; weakening proposals recorded-but-rejected. W5.2 `scorecard.model_scorecard` attributes story outcomes to the first-dev model (continuous audition). W5.3 checker-independence: the code critic now receives the story's `git show HEAD` diff (reviews real changes, not the dev's narrative). W5.6 `_record_arbitration_lesson` feeds fix_test verdicts into `state.lessons` (seeds later QA/Dev prompts). Config `DESIGN_AMENDMENT`/`AMENDMENT_AUTO`/`AMENDMENT_MAX_DEPTH`. **Deferred:** W5.5 judge calibration (needs structured judge-score events in the timeline), W5.4 cross-family checking (needs W4.6 registry), W5.7 protected passages / persona testing (product-specific).
 
 | ID | Task | Files | Isolation | Deps | Status |
 |---|---|---|---|---|---|

@@ -279,6 +279,19 @@ class Settings:
     constitution_max_rules: int = field(
         default_factory=lambda: _env_int("CONSTITUTION_MAX", 8, minimum=1)
     )
+    # W5.1: design amendment. When a failure is a genuine spec contradiction, a
+    # boss-tier agent proposes a MINIMAL amendment, an INDEPENDENT check rejects
+    # it if it weakens the requirement, and the survivor is queued HUMAN-PENDING
+    # by default (AMENDMENT_AUTO=1 opts into unattended apply). Off by default.
+    design_amendment_enabled: bool = field(
+        default_factory=lambda: _env_bool("DESIGN_AMENDMENT", False)
+    )
+    amendment_auto: bool = field(
+        default_factory=lambda: _env_bool("AMENDMENT_AUTO", False)
+    )
+    amendment_max_depth: int = field(
+        default_factory=lambda: _env_int("AMENDMENT_MAX_DEPTH", 1, minimum=0)
+    )
     # Agent provider: "claude code" (Claude Code CLI harness, the default),
     # "claude" (Anthropic API direct), "codex" (OpenAI CLI), "openai",
     # "openrouter" or "ollama". Switchable at runtime through POST /api/provider.
