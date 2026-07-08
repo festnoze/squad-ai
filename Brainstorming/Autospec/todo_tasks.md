@@ -60,8 +60,9 @@ Impl notes: guards wired into the PRIMARY dev-story path (`_abuild_story`) via `
 
 ---
 
-## Wave 1 — Recovery state machine + escalation ladder  ·  status: TODO
+## Wave 1 — Recovery state machine + escalation ladder  ·  status: DONE (core; classifier + full control-flow delegation carried into W2)
 Deps: **W0.5-T08 (flake filter), W0.5-T09 (schema), W0.5-SIG**. Core is `NEW` + pure-unit-testable; integration is `SHARED`.
+Impl notes: `recovery.py` pure machine (`next_action`, `ladder_model`, `TaskFailureHistory`) — byte-identical legacy sequence when flags off. Escalation wired via `_FORCE_MODEL` contextvar (precedence: explicit model > force > router) set on retry in `_abuild_story`. Config `ESCALATE_ON_RETRY` + `MODEL_LADDER` (cost-ascending) + `CLASSIFY_ON_EXHAUSTION` (flag added; classifier call wired in W2). **Carried to W2:** the boss-tier classifier (W1.3) and replacing the inline retry/split/fail control flow with `next_action` (W1.4) — both pay off once arbitration exists.
 
 | ID | Task | Files | Isolation | Deps | Status |
 |---|---|---|---|---|---|

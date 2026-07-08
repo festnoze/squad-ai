@@ -164,6 +164,15 @@ def _default_phase_models() -> dict:
     return out
 
 
+def _default_model_ladder() -> list[str]:
+    """W1: the escalation ladder — comma-separated model ids in COST-ASCENDING
+    order (cheapest first). On a retry the recovery machine climbs one rung, so a
+    task only reaches the expensive model if the cheap ones actually failed it.
+    Empty (unset) → escalation is a no-op even when ESCALATE_ON_RETRY is on."""
+    raw = os.environ.get("MODEL_LADDER", "") or ""
+    return [m.strip() for m in raw.split(",") if m.strip()]
+
+
 @dataclass
 class Settings:
     bmad_dir: Path = field(default_factory=_default_bmad_dir)
@@ -183,6 +192,20 @@ class Settings:
     # Per-phase model routing (M3): a cheap model for spec/plan, a strong one for
     # build/refine. Populated from MODEL_<PHASE>; falls back to claude_model.
     phase_models: dict = field(default_factory=_default_phase_models)
+    # W1: model-escalation ladder. When ESCALATE_ON_RETRY is on and MODEL_LADDER
+    # is set, a red story's retry climbs to the next (stronger) rung — so the
+    # expensive model is only reached by tasks the cheap ones actually failed.
+    escalate_on_retry_enabled: bool = field(
+        default_factory=lambda: _env_bool("ESCALATE_ON_RETRY", False)
+    )
+    model_ladder: list = field(default_factory=_default_model_ladder)
+    # W1.3 (wired with Wave 2): when a story exhausts its dev attempts, ask a
+    # boss-tier classifier for the root cause (too_big / wrong_test /
+    # spec_contradiction / genuinely_hard) instead of blindly splitting. Off by
+    # default; the recovery machine falls back to split→fail when off.
+    classify_on_exhaustion_enabled: bool = field(
+        default_factory=lambda: _env_bool("CLASSIFY_ON_EXHAUSTION", False)
+    )
     # Agent provider: "claude code" (Claude Code CLI harness, the default),
     # "claude" (Anthropic API direct), "codex" (OpenAI CLI), "openai",
     # "openrouter" or "ollama". Switchable at runtime through POST /api/provider.

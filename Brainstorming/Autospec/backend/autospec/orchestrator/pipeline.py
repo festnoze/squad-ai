@@ -66,6 +66,7 @@ from ..storage import append_interaction, force_delete_workspace, load_interacti
 from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from . import guards, signatures  # W0.5 anti-cheating detectors + failure signatures
+from . import recovery  # W1 recovery state machine + escalation ladder
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import manifests
@@ -240,6 +241,15 @@ _BUILD_ITEM: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "autospec_build_item", default=None
 )
 
+# W1: a forced model id for the current build worker's calls (the escalation
+# ladder sets it on a retry). Read in ``_UsageTracker.arun`` with precedence
+# below an explicit per-call ``model`` arg but above the phase/role router. Set
+# per build worker (own Task context, like _BUILD_ITEM), so it never leaks to
+# siblings or planning-phase calls. None = no override.
+_FORCE_MODEL: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "autospec_force_model", default=None
+)
+
 # Reverse map: the exact system-prompt string ``persona(name)`` returns → the
 # persona name. Lets ``_UsageTracker`` label every call's agent role without
 # touching the ~25 call sites. Built lazily (personas are lru_cached, so the same
@@ -290,7 +300,8 @@ class _UsageTracker:
         _t0 = time.monotonic()
         # W0.3/W0.4: resolve the model once (so both success and error telemetry
         # can attribute it) and record the prompt size for context-budget checks.
-        chosen = model or settings.model_for_phase(phase)
+        # Precedence: explicit per-call model > escalation-ladder force > router.
+        chosen = model or _FORCE_MODEL.get() or settings.model_for_phase(phase)
         prompt_chars = len(prompt or "")
         self.pipeline._check_context_budget(role, item_id, prompt_chars, chosen)
         try:
@@ -3193,6 +3204,25 @@ class Pipeline:
                 story, "retry", attempt=story.attempts,
                 max_attempts=settings.dev_max_attempts, sync=False,
             )
+        # W1: escalation ladder — a retry climbs to a stronger model, so the
+        # expensive model is only reached by a task the cheaper ones failed. Set
+        # per this worker's Task context (like _BUILD_ITEM); attempt 1 stays on
+        # the base rung (normal routing).
+        if (
+            story.attempts > 1
+            and settings.escalate_on_retry_enabled
+            and settings.model_ladder
+        ):
+            forced = recovery.ladder_model(story.attempts, settings.model_ladder)
+            if forced:
+                _FORCE_MODEL.set(forced)
+                self.monitor.event(
+                    "escalate", item=story.id, attempt=story.attempts, model=forced,
+                )
+                self._log(
+                    f"dev:{story.id}",
+                    f"⬆️ Escalade modèle (tentative {story.attempts}/{settings.dev_max_attempts}) → {forced}",
+                )
         self._sync()
         ws = workspace_dir(self.state.id)
         pkg = workspace.package_name(self.state)
