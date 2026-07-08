@@ -79,6 +79,26 @@ def _env_float(name: str, default: float, minimum: float | None = None) -> float
     return value
 
 
+def _env_mode(name: str, default: str = "off",
+              allowed: tuple[str, ...] = ("off", "warn", "strict")) -> str:
+    """Parse a tri-state guard mode env var (off | warn | strict).
+
+    A bare truthy value (1/true/yes/on) maps to ``warn`` (detect + log, the safe
+    observe-first default); a falsy value to ``off``; an explicit off/warn/strict
+    is honored; anything else warns and falls back."""
+    raw = (os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return default
+    if raw in _TRUTHY:
+        return "warn"
+    if raw in _FALSY:
+        return "off"
+    if raw in allowed:
+        return raw
+    logger.warning("Invalid mode %s=%r, using default %s", name, raw, default)
+    return default
+
+
 def _default_bmad_dir() -> Path:
     env = os.environ.get("BMAD_DIR")
     if env:
@@ -254,6 +274,22 @@ class Settings:
     # the timeline instead of degrading an agent invisibly. 0 disables the check.
     context_warn_chars: int = field(
         default_factory=lambda: _env_int("CONTEXT_WARN_CHARS", 0, minimum=0)
+    )
+    # W0.5 anti-cheating guards & harness hardening. Each is a tri-state mode
+    # (off | warn | strict): warn = detect + log + record a failure signature
+    # (advisory); strict = additionally block/revert so a cut corner cannot
+    # survive its check. Default off; the `verified` preset turns them to warn.
+    test_tamper_guard: str = field(
+        default_factory=lambda: _env_mode("TEST_TAMPER_GUARD", "off")
+    )
+    scope_guard: str = field(default_factory=lambda: _env_mode("SCOPE_GUARD", "off"))
+    skeleton_guard: str = field(default_factory=lambda: _env_mode("SKELETON_GUARD", "off"))
+    import_guard: str = field(default_factory=lambda: _env_mode("IMPORT_GUARD", "off"))
+    # Flaky-check quarantine: rerun a red suite once; a pass-on-rerun is treated
+    # as a flake (logged, not a real failure), so the recovery ladder (W1) never
+    # escalates a model over a non-deterministic test.
+    flaky_rerun_enabled: bool = field(
+        default_factory=lambda: _env_bool("FLAKY_RERUN", False)
     )
     # Semaphore(0) would deadlock the build phase, hence the floor of 1.
     max_parallel_devs: int = field(
@@ -592,6 +628,18 @@ class Settings:
             # left untouched. Everything else the preset turns on.
             if env_name not in _SHELL_ENV_KEYS:
                 setattr(self, attr, True)
+        # W0.5: the anti-cheating guards default to observe-first (warn); flaky
+        # rerun on. Same shell-respect rule.
+        for env_name, attr in (
+            ("TEST_TAMPER_GUARD", "test_tamper_guard"),
+            ("SCOPE_GUARD", "scope_guard"),
+            ("SKELETON_GUARD", "skeleton_guard"),
+            ("IMPORT_GUARD", "import_guard"),
+        ):
+            if env_name not in _SHELL_ENV_KEYS:
+                setattr(self, attr, "warn")
+        if "FLAKY_RERUN" not in _SHELL_ENV_KEYS:
+            self.flaky_rerun_enabled = True
 
     def preset_active(self) -> str:
         """The active quality preset name ("" when none) — for UI/telemetry."""

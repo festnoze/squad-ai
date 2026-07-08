@@ -296,6 +296,7 @@ class UserStory(BaseModel):
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
     mutation_score: int = -1  # last mutation-testing robustness score, %% (-1 = not run)
     coverage_score: int = -1  # last test-coverage percentage (-1 = not run)
+    guard_findings: list[str] = Field(default_factory=list)  # W0.5 anti-cheating guard verdict signatures (last dev turn)
     ui: bool = False         # story has a visual/UI dimension (QA routes it to Playwright)
     ui_tests: list[str] = Field(default_factory=list)  # replayable UI test files (tests/ui/…)
     # PO pipeline (S1/S2): estimated complexity of the story ("trivial" |

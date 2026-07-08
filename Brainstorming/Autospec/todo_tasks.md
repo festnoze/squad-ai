@@ -39,8 +39,9 @@ Foundational. All `SHARED`; done first, sequentially. Unblocks every KPI compari
 
 ---
 
-## Wave 0.5 — Anti-cheating guards & harness hardening  ·  status: TODO
+## Wave 0.5 — Anti-cheating guards & harness hardening  ·  status: DONE (core; streams-path wiring + golden transcripts deferred)
 Before W1: the recovery machine needs honest, flake-free, schema-valid signals. Guards are mostly `NEW` (detect logic) + a thin `SHARED` hook in the dev loop.
+Impl notes: guards wired into the PRIMARY dev-story path (`_abuild_story`) via `_snapshot_test_files` → dev turn → `_arun_cheat_guards`; findings recorded on `UserStory.guard_findings`. Flaky rerun centralized in `_arun_pytest`. Config: tri-state modes (`TEST_TAMPER_GUARD`/`SCOPE_GUARD`/`SKELETON_GUARD`/`IMPORT_GUARD` = off|warn|strict) + `FLAKY_RERUN`; `verified` preset sets guards→warn, flaky→on. **Deferred:** streams-path guard wiring (that path already has `_aenforce_file_scope`; tamper/skeleton/import there is a follow-up), and W0.5-T11 golden transcripts.
 
 | ID | Task | Files | Isolation | Deps | Status |
 |---|---|---|---|---|---|

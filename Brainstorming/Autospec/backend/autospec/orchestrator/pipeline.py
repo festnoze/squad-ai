@@ -65,6 +65,7 @@ from ..language_selector import recommend_language
 from ..storage import append_interaction, force_delete_workspace, load_interactions, save_state_payload, workspace_dir
 from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
+from . import guards, signatures  # W0.5 anti-cheating detectors + failure signatures
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import manifests
@@ -248,6 +249,18 @@ _PERSONA_BY_PROMPT: dict[str, str] = {}
 
 class DeliveryBlocked(Exception):
     """A product gate failed; this is actionable delivery work, not a crash."""
+
+
+def _dep_top_name(spec: str) -> str:
+    """Top-level distribution name from a dependency spec line
+    (``fastapi>=0.110`` → ``fastapi``; ``uvicorn[standard]`` → ``uvicorn``).
+    Underscored so it matches import names (``ruamel.yaml`` → ``ruamel``)."""
+    s = spec.strip()
+    for sep in (";", "@", " ", "=", ">", "<", "!", "~", "[", "("):
+        idx = s.find(sep)
+        if idx != -1:
+            s = s[:idx]
+    return s.strip().replace("-", "_").split(".")[0].lower()
 
 
 def _persona_role(system_prompt: str) -> str:
@@ -473,6 +486,206 @@ class Pipeline:
             )
         except Exception:
             return
+
+    # ------------------------------------------------- W0.5 anti-cheating guards
+
+    _GUARD_SKIP_SEGMENTS = frozenset(
+        {".venv", "venv", "node_modules", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
+    )
+
+    def _iter_ws_py_files(self, ws):
+        """Yield (relposix, Path) for every .py file in the workspace, skipping
+        vendored / build / VCS dirs. Best-effort; swallows FS errors."""
+        root = Path(ws)
+        try:
+            for p in root.rglob("*.py"):
+                rel = p.relative_to(root).as_posix()
+                if self._GUARD_SKIP_SEGMENTS & set(rel.split("/")):
+                    continue
+                yield rel, p
+        except OSError:
+            return
+
+    def _snapshot_test_files(self, ws) -> dict[str, bytes]:
+        """W0.5-T05: capture the current bytes of every QA-authored test file, so
+        a dev turn that mutates one can be detected (and, in strict mode, reverted)
+        afterwards. Keyed by workspace-relative posix path. Test files are small
+        and few, so keeping their content in memory is cheap."""
+        snap: dict[str, bytes] = {}
+        if settings.test_tamper_guard == "off":
+            return snap
+        for rel, p in self._iter_ws_py_files(ws):
+            if guards.modified_test_files([rel], []):  # classifies rel as a test file
+                try:
+                    snap[rel] = p.read_bytes()
+                except OSError:
+                    continue
+        return snap
+
+    async def _achanged_paths(self, ws) -> list[str]:
+        """Workspace paths changed since HEAD (best-effort, via git porcelain).
+        Empty on any failure or non-repo — the guards then simply no-op."""
+        try:
+            code, out = await self._agit(ws, "status", "--porcelain")
+        except Exception:
+            return []
+        if code != 0:
+            return []
+        paths: list[str] = []
+        for line in (out or "").splitlines():
+            entry = line[3:].strip() if len(line) > 3 else ""
+            if not entry:
+                continue
+            if "->" in entry:  # rename: keep the destination
+                entry = entry.split("->")[-1].strip()
+            paths.append(entry.strip('"'))
+        return paths
+
+    async def _arun_cheat_guards(self, story, ws, tests_before: dict[str, bytes]) -> list[str]:
+        """W0.5-HOOK: run the enabled anti-cheating / quality guards over the dev's
+        just-produced changes. Returns the list of guard verdict signatures found
+        (for the recovery machine / lessons). Warn mode = detect + log; strict mode
+        = additionally revert tampered tests. Fully best-effort — a guard failure
+        must never break a build."""
+        findings: list[str] = []
+        sid = getattr(story, "id", "?")
+
+        def _record(verdict: str, detail: str, mode: str) -> None:
+            findings.append(signatures.guard_signature(verdict, detail))
+            self.monitor.event("guard", item=sid, verdict=verdict, detail=detail[:200], mode=mode)
+            self._log(f"guard:{sid}", f"{'⛔' if mode == 'strict' else '⚠️'} {verdict}: {detail}")
+
+        # --- T05 test tampering ------------------------------------------------
+        mode = settings.test_tamper_guard
+        if mode != "off" and tests_before:
+            root = Path(ws)
+            for rel, original in tests_before.items():
+                p = root / rel
+                try:
+                    now = p.read_bytes() if p.exists() else None
+                except OSError:
+                    now = None
+                if now != original:
+                    _record(signatures.TAMPERED, rel, mode)
+                    if mode == "strict":
+                        try:  # restore the QA-authored test verbatim
+                            p.parent.mkdir(parents=True, exist_ok=True)
+                            p.write_bytes(original)
+                            self._log(f"guard:{sid}", f"↩️ test restauré : {rel}")
+                        except OSError:
+                            pass
+
+        # The scope/skeleton/import guards operate on the dev's changed files.
+        need_changed = any(
+            getattr(settings, attr) != "off"
+            for attr in ("scope_guard", "skeleton_guard", "import_guard")
+        )
+        changed = await self._achanged_paths(ws) if need_changed else []
+        changed_py = [c for c in changed if c.endswith(".py")]
+
+        # --- T06 scope (declared file claims) ---------------------------------
+        mode = settings.scope_guard
+        if mode != "off" and changed:
+            claims = self._story_file_claims(story)
+            if claims:
+                for rel in guards.out_of_scope_paths(changed, claims):
+                    _record(signatures.OUT_OF_SCOPE, rel, mode)
+
+        # --- T07 skeleton implementations -------------------------------------
+        mode = settings.skeleton_guard
+        if mode != "off":
+            root = Path(ws)
+            for rel in changed_py:
+                if guards.modified_test_files([rel], []):
+                    continue  # skeleton check targets implementation, not tests
+                try:
+                    src = (root / rel).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                for issue in guards.detect_skeleton(src, rel):
+                    _record(signatures.SKELETON, f"{rel}: {issue}", mode)
+
+        # --- T10 hallucinated imports -----------------------------------------
+        mode = settings.import_guard
+        if mode != "off":
+            deps = self._declared_deps(ws)
+            local = self._local_modules(ws)
+            stdlib = guards.default_stdlib()
+            root = Path(ws)
+            for rel in changed_py:
+                try:
+                    src = (root / rel).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                for name in guards.unresolved_imports(src, deps, stdlib, local):
+                    _record("unresolved_import", f"{rel}: {name}", mode)
+
+        return findings
+
+    def _story_file_claims(self, story) -> list[str]:
+        """Declared file scope for a story: the stream's file_root when streams are
+        on, else nothing (→ scope guard no-ops). Kept defensive."""
+        try:
+            if not self._setting("streams_enabled"):
+                return []
+            stream = self._story_stream(story)
+            root = getattr(stream, "file_root", "") or ""
+            return [root] if root else []
+        except Exception:
+            return []
+
+    def _declared_deps(self, ws) -> set[str]:
+        """Top-level distribution names declared in the workspace manifests
+        (pyproject [project.dependencies] + requirements*.txt). Best-effort."""
+        deps: set[str] = set()
+        root = Path(ws)
+        try:
+            pyproject = root / "pyproject.toml"
+            if pyproject.exists():
+                import tomllib
+
+                data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+                proj = data.get("project", {}) if isinstance(data, dict) else {}
+                for spec in proj.get("dependencies", []) or []:
+                    deps.add(_dep_top_name(str(spec)))
+                for group in (proj.get("optional-dependencies", {}) or {}).values():
+                    for spec in group or []:
+                        deps.add(_dep_top_name(str(spec)))
+        except Exception:
+            pass
+        try:
+            for req in root.glob("requirements*.txt"):
+                for line in req.read_text(encoding="utf-8", errors="replace").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        deps.add(_dep_top_name(line))
+        except Exception:
+            pass
+        deps.discard("")
+        return deps
+
+    def _local_modules(self, ws) -> set[str]:
+        """Import names that resolve to the generated project itself (its package
+        plus any top-level module/package dirs in the workspace)."""
+        local: set[str] = set()
+        try:
+            local.add(workspace.package_name(self.state).replace("-", "_"))
+        except Exception:
+            pass
+        root = Path(ws)
+        try:
+            for child in root.iterdir():
+                name = child.name
+                if name.startswith(".") or name in self._GUARD_SKIP_SEGMENTS:
+                    continue
+                if child.is_dir() and (child / "__init__.py").exists():
+                    local.add(name)
+                elif child.is_file() and name.endswith(".py"):
+                    local.add(name[:-3])
+        except OSError:
+            pass
+        local.discard("")
+        return local
 
     def _block_delivery(self, message: str, *, source: str = "delivery") -> None:
         self._delivery_blocked = True
@@ -3026,11 +3239,21 @@ class Pipeline:
                         previous_failure=previous_failure,
                     )
                     dev_persona = persona("dev")
+                # W0.5-T05: snapshot QA-authored tests before the dev turn so
+                # tampering (editing tests to pass) is detectable afterwards.
+                tests_before = self._snapshot_test_files(ws)
                 result = await self._tracked.arun(
                     dev_prompt,
                     system_prompt=dev_persona,
                     cwd=ws,
                 )
+                # W0.5-HOOK: anti-cheating / quality guards over the dev's changes
+                # (tamper/scope/skeleton/import). Advisory by default; strict mode
+                # reverts tampered tests. Findings are recorded on the story so the
+                # recovery machine (W1) and lessons (W5.6) can use them.
+                guard_findings = await self._arun_cheat_guards(story, ws, tests_before)
+                if guard_findings:
+                    story.guard_findings = list(guard_findings)
                 try:
                     reply = extract_json(result.text)
                 except AgentError:
@@ -5715,6 +5938,23 @@ class Pipeline:
                 ok, output, results = await asyncio.to_thread(_run)
         else:
             ok, output, results = await asyncio.to_thread(_run)
+        # W0.5-T08: flaky-check quarantine. A red suite is rerun once; if it now
+        # passes, the failure was non-deterministic (a flake), not real — we keep
+        # the green result and record the flake so the recovery ladder (W1) never
+        # escalates a model over a test that just needed a second run. A suite that
+        # stays red is a real failure and is returned untouched.
+        if not ok and settings.flaky_rerun_enabled:
+            if shared:
+                async with self._shared_suite_lock:
+                    self._guard_shared_venv(ws)
+                    ok2, output2, results2 = await asyncio.to_thread(_run)
+            else:
+                ok2, output2, results2 = await asyncio.to_thread(_run)
+            if ok2:
+                item = _BUILD_ITEM.get() or f"phase:{self.state.phase.value}"
+                self.monitor.event("flaky", item=item, note="red suite passed on rerun")
+                self._log(item, "⚠️ Suite rouge devenue verte au 2ᵉ passage — flaky (non comptée comme échec).")
+                ok, output, results = ok2, output2, results2
         self.monitor.pytest(
             item_id=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",
             ok=ok, summary=(output or "")[-500:],
