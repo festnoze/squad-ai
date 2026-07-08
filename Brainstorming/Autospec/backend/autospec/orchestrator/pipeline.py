@@ -67,6 +67,7 @@ from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from . import guards, signatures  # W0.5 anti-cheating detectors + failure signatures
 from . import recovery  # W1 recovery state machine + escalation ladder
+from . import arbitration, classifier, traceability  # W2 wrong-test arbitration
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import manifests
@@ -273,6 +274,26 @@ def _dep_top_name(spec: str) -> str:
     return s.strip().replace("-", "_").split(".")[0].lower()
 
 
+def prompts_arbiter_fix_test(story, pkg: str, acceptance: str, instructions: str, test_blob: str) -> str:
+    """W2.2 checker-tier prompt: correct the WRONG test to match the acceptance
+    criteria, following the arbiter's instructions. The corrected test must still
+    genuinely verify the behavior — never weaken coverage or delete assertions to
+    force a pass; the executed rerun (not this reply) decides success."""
+    return (
+        "Un arbitre a jugé qu'un test en échec CONTREDIT les critères d'acceptance "
+        f"de la story « {story.title} » (paquet {pkg}). Corrige le(s) test(s) "
+        "concerné(s) dans le répertoire courant pour qu'ils vérifient ce que les "
+        "critères exigent RÉELLEMENT — sans affaiblir la couverture, sans "
+        "supprimer d'assertions pour forcer un vert, sans toucher au code de "
+        "production.\n\n"
+        f"Critères d'acceptance (vérité de référence) :\n{acceptance}\n\n"
+        f"Instructions de l'arbitre (ce que le test DOIT affirmer) :\n{instructions}\n\n"
+        f"Tests actuels :\n{test_blob[:6000]}\n\n"
+        "Édite les fichiers de test nécessaires, puis réponds avec un court JSON "
+        '{\"summary\": \"...\"}.'
+    )
+
+
 def _persona_role(system_prompt: str) -> str:
     if not _PERSONA_BY_PROMPT:
         for name in FALLBACK_PERSONAS:
@@ -407,6 +428,9 @@ class Pipeline:
         # seulement declared_overlap) tant qu'un rival potentiel est en vol —
         # un retry ne doit jamais pouvoir re-conflicter avec un item en cours.
         self._conflict_retry_ids: set[str] = set()
+        # W2: wrong-test arbitrations spent per item this run (bounded by
+        # settings.arbitration_max) — a loop of test rewrites would be checker erosion.
+        self._arbitration_count: dict[str, int] = {}
         self._delivery_blocked = False
         self._resume_event = asyncio.Event()
         self._resume_event.set()  # set = running, cleared = paused
@@ -2217,6 +2241,7 @@ class Pipeline:
             partial=self._setting("partial_delivery_enabled"),
         )
         delivery_state.apply_definition_result(self.state, result)
+        self._report_traceability(all_iterations)
         if result.blockers:
             self._delivery_blocked = True
             detail = "\n".join(f"- {i.message}" for i in result.blockers[:8])
@@ -3377,6 +3402,11 @@ class Pipeline:
                     if story.attempts < settings.dev_max_attempts:
                         story.status = StoryStatus.TODO  # will be rescheduled
                         self._set_stage(story, BuildStage.QUEUED, sync=False)  # B1: requeue
+                    elif await self._amaybe_arbitrate_wrong_test(
+                        story, ws, pkg, tail, is_frontend
+                    ):
+                        # W2.2: a wrong test was corrected and the suite went green.
+                        pass
                     else:
                         story.status = StoryStatus.FAILED
                         self._set_stage(story, BuildStage.FAILED, sync=False)  # B1
@@ -3787,6 +3817,164 @@ class Pipeline:
                 )
             )
         return out
+
+    def _report_traceability(self, all_iterations: bool) -> None:
+        """W2.0b — advisory AC↔test coverage report. Complements the delivery
+        gate's per-criterion green-evidence check with SOURCE-level traceability:
+        acceptance criteria with no test that names them, and ORPHAN tests naming
+        an AC id that does not exist. Best-effort; never blocks."""
+        if not settings.ac_traceability_enabled:
+            return
+        try:
+            stories = (
+                self.state.stories if all_iterations
+                else self.state.stories_of_iteration(self.state.iteration)
+            )
+            all_ac_ids = {c.id for s in stories for c in s.acceptance_criteria}
+            if not all_ac_ids:
+                return
+            ws = workspace_dir(self.state.id)
+            report = traceability.coverage_report(all_ac_ids, self._collect_test_sources(ws))
+            uncovered, orphans = report.get("uncovered", []), report.get("orphans", [])
+            self.monitor.event(
+                "traceability", covered=len(report.get("covered", [])),
+                uncovered=len(uncovered), orphans=len(orphans),
+            )
+            if uncovered:
+                msg = f"Traçabilité : {len(uncovered)} critère(s) sans test nommé ({', '.join(uncovered[:6])})."
+                delivery_state.append_issue(self.state, msg)
+                self._log("traceability", "⚠️ " + msg)
+            if orphans:
+                self._log(
+                    "traceability",
+                    f"⚠️ {len(orphans)} test(s) orphelin(s) référencent un AC inexistant "
+                    f"({', '.join(orphans[:6])}).",
+                )
+        except Exception:
+            return
+
+    def _collect_test_sources(self, ws) -> dict[str, str]:
+        """Read every test file's source in the workspace (workspace-relative
+        posix path → text). Best-effort; used to feed the arbiter / traceability."""
+        out: dict[str, str] = {}
+        for rel, p in self._iter_ws_py_files(ws):
+            if guards.modified_test_files([rel], []):
+                try:
+                    out[rel] = p.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+        return out
+
+    def _story_acceptance_text(self, story: UserStory) -> str:
+        """The story's acceptance criteria + Gherkin as one block — the arbiter's
+        ground truth (what SHOULD be asserted)."""
+        parts = []
+        for c in story.acceptance_criteria:
+            parts.append(f"- [{c.id}] {c.text}")
+        if story.gherkin.strip():
+            parts.append("\nGherkin:\n" + story.gherkin.strip())
+        return "\n".join(parts)
+
+    async def _amaybe_arbitrate_wrong_test(
+        self, story: UserStory, ws, pkg: str, tail: str, is_frontend: bool
+    ) -> bool:
+        """W2.2 — the video's "who checks the checker". A story that exhausted its
+        dev attempts gets ONE boss-tier arbitration: is the failing TEST wrong
+        (contradicts the acceptance criteria)? If the arbiter rules ``fix_test``, a
+        checker-tier agent corrects the test per the arbiter's instructions and the
+        suite is rerun; a green rerun recovers the story. ``fix_impl`` /
+        ``spec_contradiction`` confirm the failure (the story stays failed; a
+        spec contradiction is logged for the human-gated amendment of Wave 5).
+        Executed facts are never overruled — only judgment about what the test
+        SHOULD assert. Best-effort; any error falls through to the normal FAILED."""
+        if not settings.dispute_escalation_enabled or is_frontend:
+            return False
+        if not story.acceptance_criteria:
+            return False  # no ground truth to arbitrate against
+        if self._arbitration_count.get(story.id, 0) >= settings.arbitration_max:
+            return False
+        self._arbitration_count[story.id] = self._arbitration_count.get(story.id, 0) + 1
+
+        acceptance = self._story_acceptance_text(story)
+        test_sources = self._collect_test_sources(ws)
+        test_blob = "\n\n".join(f"# file: {p}\n{src}" for p, src in test_sources.items())
+        try:
+            _, diff = await self._agit(ws, "diff", "HEAD")
+        except Exception:
+            diff = ""
+
+        self._set_recovery(story, "arbitration")  # B1 stage badge
+        self._log(f"arbiter:{story.id}", "⚖️ Arbitrage : le test en échec contredit-il les critères ?")
+        try:
+            ruling = await arbitration.aarbitrate_test(
+                self._tracked,
+                story_title=story.title,
+                acceptance=acceptance,
+                test_source=test_blob,
+                failure_output=tail,
+                impl_diff=diff or "",
+                cwd=ws,
+            )
+        except AgentError as exc:
+            self._log(f"arbiter:{story.id}", f"Arbitrage indisponible ({exc}) — échec maintenu.")
+            return False
+
+        verdict = str(ruling.get("verdict") or "")
+        reason = str(ruling.get("reason") or "")
+        instructions = str(ruling.get("instructions") or "")
+        self.monitor.event("arbitration", item=story.id, verdict=verdict, reason=reason[:200])
+        self._log(f"arbiter:{story.id}", f"Verdict : {verdict} — {reason}")
+
+        if verdict != arbitration.FIX_TEST:
+            # fix_impl → the test was right, the story genuinely failed.
+            # spec_contradiction → out of scope here; recorded for W5 amendment.
+            if verdict == arbitration.SPEC_CONTRADICTION:
+                story.last_error = (f"[arbitrage: contradiction de spec] {reason}\n" + (tail or ""))[:2000]
+                self._chat(
+                    ChatRole.SYSTEM,
+                    f"[{story.id}] ⚖️ Arbitre : contradiction dans les critères — "
+                    "à trancher par un amendement (Wave 5).",
+                )
+            return False
+
+        # fix_test: a checker-tier agent rewrites the failing test to match the
+        # acceptance criteria (per the arbiter's instructions), then we RERUN — the
+        # executed suite, not the agent's word, decides success.
+        self._log(f"arbiter:{story.id}", "🔧 Correction du test erroné (agent QA) puis re-vérification.")
+        try:
+            await self._tracked.arun(
+                prompts_arbiter_fix_test(story, pkg, acceptance, instructions, test_blob),
+                system_prompt=persona("qa"),
+                cwd=ws,
+            )
+        except AgentError as exc:
+            self._log(f"arbiter:{story.id}", f"Correction du test échouée ({exc}) — échec maintenu.")
+            return False
+
+        ok, output, real = await self._arun_pytest(ws=ws)
+        if not ok:
+            story.last_error = (output or tail)[-2000:]
+            self._log(f"arbiter:{story.id}", "❌ Suite toujours rouge après correction du test.")
+            return False
+
+        # Recovered: mark the story done exactly like the normal green path.
+        self._apply_test_states(story, [], real)
+        if real:
+            self.state.green_tests = sorted(n for n, o in real.items() if o == "passed")
+        story.status = StoryStatus.DONE
+        for test in story.test_plan:
+            if test.status == TestState.NONEXISTENT:
+                test.status = TestState.GREEN
+        await self._acommit_story(ws, story.id)
+        self._set_recovery(story, "", sync=False)
+        self._set_stage(story, BuildStage.DONE, sync=False)
+        self._log(f"arbiter:{story.id}", "✅ Test erroné corrigé — suite verte, story livrée.")
+        self._chat(
+            ChatRole.SYSTEM,
+            f"[{story.id}] ⚖️ Le test était faux (pas le code) — corrigé selon les "
+            "critères d'acceptance, suite verte.",
+        )
+        return True
 
     async def _amaybe_split_on_failure(self, item, subject: UserStory, target, *, force: bool = False) -> bool:
         """P6 — adaptive split-on-failure (the « unit too big for one agent session »

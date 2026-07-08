@@ -76,8 +76,9 @@ Impl notes: `recovery.py` pure machine (`next_action`, `ladder_model`, `TaskFail
 
 ---
 
-## Wave 2 — AC↔test traceability + wrong-test arbitration  ·  status: TODO
+## Wave 2 — AC↔test traceability + wrong-test arbitration  ·  status: DONE (core)
 Deps: **W1** (classification is the only entry to arbitration).
+Impl notes: modules `traceability.py` / `classifier.py` / `arbitration.py` + `arbiter`/`classifier` personas. Wiring: `_amaybe_arbitrate_wrong_test` hooked into `_abuild_story`'s exhausted-red branch (before FAILED) — arbiter rules fix_test → checker-tier QA-fix + real rerun (green recovers the story), fix_impl/spec_contradiction confirm failure (spec_contradiction logged for W5 amendment). Bounded by `ARBITRATION_MAX`; backend-only; executed facts never overruled. Traceability advisory (`_report_traceability`) reports uncovered ACs + orphan tests at the delivery gate. Config: `DISPUTE_ESCALATION`, `ARBITRATION_MAX`, `AC_TRACEABILITY`, `CLASSIFY_ON_EXHAUSTION`. **Note:** classifier module built + tested; its call is not yet on the exhaustion path (arbitration currently goes straight to the wrong-test arbiter — classifier routing folds in with W5 amendment). Streams-path arbitration deferred (mirrors the guards decision).
 
 | ID | Task | Files | Isolation | Deps | Status |
 |---|---|---|---|---|---|

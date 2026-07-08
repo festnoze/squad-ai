@@ -206,6 +206,22 @@ class Settings:
     classify_on_exhaustion_enabled: bool = field(
         default_factory=lambda: _env_bool("CLASSIFY_ON_EXHAUSTION", False)
     )
+    # W2: wrong-test arbitration ("who checks the checker"). When on, a story that
+    # exhausted its dev attempts gets one boss-tier arbitration: if the failing
+    # test contradicts the acceptance criteria, a checker-tier agent corrects the
+    # TEST (never the criteria) and the suite is rerun. Executed facts are never
+    # overruled. Bounded by arbitration_max per story per iteration.
+    dispute_escalation_enabled: bool = field(
+        default_factory=lambda: _env_bool("DISPUTE_ESCALATION", False)
+    )
+    arbitration_max: int = field(
+        default_factory=lambda: _env_int("ARBITRATION_MAX", 1, minimum=1)
+    )
+    # W2.0: AC<->test traceability. When on, the delivery pipeline reports ACs with
+    # no executed test and orphan tests (asserting behavior no AC required).
+    ac_traceability_enabled: bool = field(
+        default_factory=lambda: _env_bool("AC_TRACEABILITY", False)
+    )
     # Agent provider: "claude code" (Claude Code CLI harness, the default),
     # "claude" (Anthropic API direct), "codex" (OpenAI CLI), "openai",
     # "openrouter" or "ollama". Switchable at runtime through POST /api/provider.
