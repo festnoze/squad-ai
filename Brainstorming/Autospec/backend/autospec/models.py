@@ -440,6 +440,7 @@ class AgentInteraction(BaseModel):
     item_id: str = ""        # work-item id (US/task), or "phase:<phase>" otherwise
     phase: str = ""          # pipeline phase the call ran in
     persona: str = ""        # agent role (dev/qa/critic/…), reverse-mapped from the system prompt
+    model: str = ""          # resolved model id for this call (tier routing / ladder / scorecard — W0.3)
     prompt: str = ""
     response: str = ""
     ok: bool = True

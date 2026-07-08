@@ -275,8 +275,12 @@ class _UsageTracker:
         active_processes.set(self.pipeline._agent_procs)
         skills_token = active_skills_enabled.set(bool(self.pipeline._setting("skills_enabled")))
         _t0 = time.monotonic()
+        # W0.3/W0.4: resolve the model once (so both success and error telemetry
+        # can attribute it) and record the prompt size for context-budget checks.
+        chosen = model or settings.model_for_phase(phase)
+        prompt_chars = len(prompt or "")
+        self.pipeline._check_context_budget(role, item_id, prompt_chars, chosen)
         try:
-            chosen = model or settings.model_for_phase(phase)
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
@@ -285,12 +289,12 @@ class _UsageTracker:
             # exactly what the operator wants to inspect.
             self.pipeline._record_interaction(
                 item_id=item_id, phase=phase, persona=role, prompt=prompt,
-                response="", ok=False, error=str(exc),
+                response="", ok=False, error=str(exc), model=chosen or "",
             )
             self.pipeline.monitor.agent_call(
                 role=role, item_id=item_id,
                 duration_ms=(time.monotonic() - _t0) * 1000,
-                ok=False, error=str(exc),
+                ok=False, error=str(exc), model=chosen or "", prompt_chars=prompt_chars,
             )
             # Usage-window watchdog (M2): an exhausted Claude session window
             # triggers a clean stop + scheduled auto-resume, then the error
@@ -335,7 +339,7 @@ class _UsageTracker:
         # Capture the round-trip for the live item-activity view (O2).
         self.pipeline._record_interaction(
             item_id=item_id, phase=phase, persona=role, prompt=prompt,
-            response=res.text, ok=True,
+            response=res.text, ok=True, model=chosen or "",
             input_tokens=res.input_tokens, output_tokens=res.output_tokens,
             cost_usd=res.cost_usd, duration_ms=res.duration_ms,
         )
@@ -343,6 +347,7 @@ class _UsageTracker:
             role=role, item_id=item_id,
             duration_ms=res.duration_ms or (time.monotonic() - _t0) * 1000,
             ok=True, in_tokens=res.input_tokens, out_tokens=res.output_tokens,
+            model=chosen or "", prompt_chars=prompt_chars,
         )
         self.pipeline._sync()  # persist + broadcast usage as it accrues
         return res
@@ -444,6 +449,30 @@ class Pipeline:
         if name in self._profile_overrides:
             return self._profile_overrides[name]
         return getattr(settings, name)
+
+    def _check_context_budget(self, role: str, item_id: str, prompt_chars: int, model: str | None) -> None:
+        """W0.4: context-budget telemetry. Silent truncation of an over-long prompt
+        is a classic source of 'mysteriously dumb' agent behaviour that would
+        otherwise burn escalation-ladder rungs (W1) on an unwinnable prompt. We do
+        not truncate here — just flag when a prompt approaches the configured
+        budget so it surfaces in the timeline. Best-effort; never raises."""
+        try:
+            budget = int(getattr(settings, "context_warn_chars", 0) or 0)
+            if budget <= 0 or prompt_chars < budget:
+                return
+            approx_tokens = prompt_chars // 4  # coarse chars→tokens heuristic
+            self.monitor.event(
+                "context_budget", role=role or "?", item=item_id,
+                prompt_chars=prompt_chars, approx_tokens=approx_tokens,
+                model=model or "", budget_chars=budget,
+            )
+            self._log(
+                f"ctx:{item_id}",
+                f"⚠️ Prompt volumineux ({prompt_chars} car. ≈ {approx_tokens} tokens) "
+                f"pour {role or '?'} — proche du budget de contexte.",
+            )
+        except Exception:
+            return
 
     def _block_delivery(self, message: str, *, source: str = "delivery") -> None:
         self._delivery_blocked = True

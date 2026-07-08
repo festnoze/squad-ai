@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
+# Snapshot the keys the operator set in the actual SHELL, before .env fills the
+# rest. A quality preset (PRESET=verified) overrides .env *defaults* but must
+# still yield to a deliberate shell override — this set is how we tell them apart
+# (mirroring load_dotenv's own "shell wins over .env" precedence).
+_SHELL_ENV_KEYS = frozenset(os.environ.keys())
+
 # Load backend/.env if present (shell env vars still take precedence).
 load_dotenv(BACKEND_DIR / ".env")
 
@@ -242,6 +248,12 @@ class Settings:
     )
     agent_timeout_s: float = field(
         default_factory=lambda: _env_float("AGENT_TIMEOUT_S", 1800.0, minimum=1.0)
+    )
+    # W0.4 context-budget telemetry: flag (never truncate) a prompt whose size in
+    # characters approaches this budget, so silent context overflow surfaces in
+    # the timeline instead of degrading an agent invisibly. 0 disables the check.
+    context_warn_chars: int = field(
+        default_factory=lambda: _env_int("CONTEXT_WARN_CHARS", 0, minimum=0)
     )
     # Semaphore(0) would deadlock the build phase, hence the floor of 1.
     max_parallel_devs: int = field(
@@ -549,6 +561,41 @@ class Settings:
     runtime_acceptance_timeout_s: float = field(
         default_factory=lambda: _env_float("RUNTIME_ACCEPTANCE_TIMEOUT_S", 90.0, minimum=10.0)
     )
+
+    def __post_init__(self) -> None:
+        # W0.1: named quality preset applied at construction. ``PRESET=verified``
+        # turns ON the full existing verification gauntlet (refine, plan review,
+        # coverage, mutation, evaluator, security review, runtime acceptance,
+        # strict Definition-of-Done) so the "verified swarm" baseline is one flag
+        # instead of eight. A preset is a QUALITY overlay, orthogonal to the
+        # product-shape profiles; it never overrides a gate the operator set
+        # explicitly via that gate's own env var.
+        preset = os.environ.get("PRESET", "").strip().lower()
+        if preset == "verified":
+            self._apply_verified_preset()
+
+    def _apply_verified_preset(self) -> None:
+        gauntlet = [
+            ("REFINE", "refine_enabled"),
+            ("REVIEW_PLAN", "review_plan_enabled"),
+            ("COVERAGE", "coverage_enabled"),
+            ("MUTATION", "mutation_enabled"),
+            ("EVALUATOR", "evaluator_enabled"),
+            ("SECURITY_REVIEW", "security_review_enabled"),
+            ("RUNTIME_ACCEPTANCE", "runtime_acceptance_enabled"),
+            ("DEFINITION_OF_DONE", "definition_of_done_enabled"),
+            ("DOD_STRICT_CRITERIA", "definition_of_done_strict_criteria"),
+        ]
+        for env_name, attr in gauntlet:
+            # Override .env defaults, but respect a deliberate SHELL choice: only
+            # a gate the operator pinned in their shell (not merely in .env) is
+            # left untouched. Everything else the preset turns on.
+            if env_name not in _SHELL_ENV_KEYS:
+                setattr(self, attr, True)
+
+    def preset_active(self) -> str:
+        """The active quality preset name ("" when none) — for UI/telemetry."""
+        return os.environ.get("PRESET", "").strip().lower()
 
     def po_pipeline_on(self) -> bool:
         """Is the multi-stage PO pipeline active? Anything but the explicit
