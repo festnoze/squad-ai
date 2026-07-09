@@ -6383,6 +6383,83 @@ class Pipeline:
         )
         return ok, output, results
 
+    # ------------------------------- Integration repair loop (fix-until-green)
+
+    async def _arepair_delivery(self, source: str, report: str, averify) -> tuple[bool, str]:
+        """Fix-until-green loop for the delivery gates (smoke run, runtime
+        integration). The delivered app failed a REAL execution check while its
+        test suite is green — a wiring problem (static mount vs asset paths,
+        unregistered router, uninitialised DB…) that no mocked unit test sees.
+        Dispatch a Dev agent with the gate's failure report, require the suite
+        to STAY green (git rollback otherwise), then re-run the gate — up to
+        ``INTEGRATION_FIX_ATTEMPTS`` times. Returns ``(ok, latest detail)``."""
+        detail = report
+        attempts = int(self._setting("integration_fix_attempts") or 0)
+        if attempts <= 0 or settings.fake_agents:
+            return False, detail
+        ws = workspace_dir(self.state.id)
+        if not await self._agit_snapshot(ws, f"pre integration-fix ({source})"):
+            self._log(source, "Réparation impossible (git indisponible) — gate en échec.")
+            return False, detail
+        pkg = workspace.package_name(self.state)
+        for attempt in range(1, attempts + 1):
+            await self._checkpoint()
+            if self._stop_requested:
+                return False, detail
+            self._log(
+                source,
+                f"🔧 Réparation du câblage par un agent Dev (tentative {attempt}/{attempts})…",
+            )
+            self._chat(
+                ChatRole.SYSTEM,
+                f"🔧 Gate {source} en échec — agent Dev dépêché pour réparer "
+                f"(tentative {attempt}/{attempts}).",
+            )
+            self.monitor.event(
+                "integration_fix", source=source, attempt=attempt, detail=detail[:300]
+            )
+            try:
+                await self._tracked.arun(
+                    prompts.dev_fix_integration(
+                        pkg,
+                        detail,
+                        architecture=self.state.architecture,
+                        attempt=attempt,
+                        max_attempts=attempts,
+                    ),
+                    system_prompt=persona("dev"),
+                    cwd=ws,
+                )
+            except AgentError as exc:
+                self._log(source, f"Agent de réparation indisponible : {exc}")
+                return False, detail
+            green, pytest_out, _ = await self._arun_pytest()
+            if not green:
+                await self._agit(ws, "reset", "--hard", "HEAD")
+                await self._agit(ws, "clean", "-fd")
+                self._log(source, "La réparation a cassé la suite pytest — rollback.")
+                detail = (
+                    f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite pytest "
+                    f"(rollback effectué). Sortie pytest :\n{pytest_out[-1500:]}"
+                )
+                continue
+            await self._agit(ws, "add", "-A")
+            await self._agit(ws, "commit", "-m", f"integration fix {source} #{attempt}", "--allow-empty")
+            ok, new_detail = await averify()
+            self.monitor.event(
+                "integration_fix_verify",
+                source=source, attempt=attempt, ok=ok, detail=(new_detail or "")[:300],
+            )
+            if ok:
+                self._log(source, f"✅ Câblage réparé (tentative {attempt}) — gate {source} vert.")
+                self._chat(
+                    ChatRole.SYSTEM,
+                    f"🔧 Gate {source} réparé et revalidé (tentative {attempt}).",
+                )
+                return True, new_detail
+            detail = new_detail or detail
+        return False, detail
+
     # ------------------------------------------------- Smoke-run gate (runnability)
 
     async def _asmoke_phase(self) -> bool:
@@ -6406,6 +6483,14 @@ class Pipeline:
         self._log("smoke", "🚀 Smoke run : démarrage de l'application livrée…")
         ok, detail = await asyncio.to_thread(self._smoke_run_python, ws)
         self.monitor.event("smoke", ok=ok, detail=detail[:300])
+        if not ok:
+
+            async def _averify() -> tuple[bool, str]:
+                return await asyncio.to_thread(self._smoke_run_python, ws)
+
+            ok, detail = await self._arepair_delivery(
+                "smoke", f"Smoke run échoué : {detail}", _averify
+            )
         if ok:
             self._log("smoke", f"✅ Smoke run OK — {detail}")
             self._chat(ChatRole.SYSTEM, f"🚀 Smoke run : l'application démarre ({detail}).")
@@ -6429,11 +6514,26 @@ class Pipeline:
                 self._log("runtime", f"Runtime acceptance ignoré : {result.detail}.")
             return True
         self.monitor.event("runtime_acceptance", ok=result.ok, detail=result.detail[:300])
-        if result.ok:
+        ok, detail = result.ok, result.detail
+        if not ok:
+
+            async def _averify() -> tuple[bool, str]:
+                res = await runtime_acceptance.arun_runtime_acceptance(
+                    self.state,
+                    workspace_dir(self.state.id),
+                    enabled=self._setting("runtime_acceptance_enabled"),
+                    timeout_s=settings.runtime_acceptance_timeout_s,
+                )
+                return res.ok, res.detail
+
+            ok, detail = await self._arepair_delivery(
+                "runtime", f"Intégration full-stack échouée : {detail}", _averify
+            )
+        if ok:
             self._log("runtime", "✅ Runtime acceptance OK.")
             self._chat(ChatRole.SYSTEM, "🧪 Runtime acceptance : parcours navigateur OK.")
             return True
-        msg = f"Runtime acceptance échoué : {result.detail}"
+        msg = f"Runtime acceptance échoué : {detail}"
         self._block_delivery(msg, source="runtime")
         self.state.regressions.append(msg)
         self._notify("error", "Runtime acceptance échoué", msg[:200])

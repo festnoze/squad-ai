@@ -700,11 +700,23 @@ class Settings:
     definition_of_done_strict_criteria: bool = field(
         default_factory=lambda: _env_bool("DOD_STRICT_CRITERIA", False)
     )
+    # ON by default: every delivered web/fullstack build must pass the full
+    # integration check (backend serving the built frontend, assets, API, DB
+    # wiring) before shipping — a green unit suite alone proved able to ship a
+    # blank page (messagerie2). `should_run` still auto-skips CLI/library
+    # projects and demo mode, and profiles keep their explicit overrides.
     runtime_acceptance_enabled: bool = field(
-        default_factory=lambda: _env_bool("RUNTIME_ACCEPTANCE", False)
+        default_factory=lambda: _env_bool("RUNTIME_ACCEPTANCE", True)
     )
     runtime_acceptance_timeout_s: float = field(
         default_factory=lambda: _env_float("RUNTIME_ACCEPTANCE_TIMEOUT_S", 90.0, minimum=10.0)
+    )
+    # When a delivery gate (smoke run / runtime integration) fails, dispatch a
+    # Dev agent with the failure report and re-run the gate, up to this many
+    # attempts, before parking the project in needs_attention. 0 disables the
+    # repair loop (a failing gate then blocks immediately, as before).
+    integration_fix_attempts: int = field(
+        default_factory=lambda: _env_int("INTEGRATION_FIX_ATTEMPTS", 2, minimum=0)
     )
 
     def __post_init__(self) -> None:

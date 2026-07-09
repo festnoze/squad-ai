@@ -411,11 +411,28 @@ Après une suite verte, Autospec ne passe plus directement à `done` :
 - **Smoke run par défaut** (`SMOKE_RUN=1`) : l'application générée est
   réellement démarrée ; une API/web doit ouvrir son port, un CLI doit sortir en
   code 0. Le profil `library-fast` le désactive.
-- **Runtime acceptance web/fullstack** (`RUNTIME_ACCEPTANCE` ou profils
-  `web-ssr` / `fullstack`) : `orchestrator/runtime_acceptance.py` lance le
-  backend et/ou le frontend preview, puis `backend/scripts/runtime_acceptance.js`
-  ouvre Playwright, vérifie une page non vide et l'absence d'erreurs navigateur
-  bloquantes.
+- **Intégration full-stack (runtime acceptance)** (`RUNTIME_ACCEPTANCE`,
+  **ON par défaut** ; auto-skip CLI/librairie/démo) :
+  `orchestrator/runtime_acceptance.py` pilote
+  `backend/scripts/runtime_acceptance.js`. Quand le projet a un backend web ET
+  un frontend, le gate teste l'application **INTÉGRÉE** : build du frontend,
+  démarrage du backend seul, puis Playwright ouvre **l'origine du backend**
+  (celle que l'utilisateur ouvre réellement) et exige : la SPA servie à la
+  racine, chaque asset `.js`/`.css` résolu avec le bon MIME (un `.js` renvoyé
+  en `text/html` par le fallback SPA = page blanche → échec explicite), le
+  conteneur `#root`/`#app` réellement rendu, aucune erreur navigateur, et une
+  **sonde API/DB** (les GET sans paramètre de `/openapi.json` sont appelés — un
+  5xx trahit un câblage backend↔base cassé). Frontend seul → vite preview avec
+  les mêmes contrôles de page ; backend seul → boot + sonde API.
+- **Boucle de réparation « fix until green »** (`INTEGRATION_FIX_ATTEMPTS`,
+  défaut `2`) : quand le smoke run ou le gate d'intégration échoue alors que la
+  suite est verte, `Pipeline._arepair_delivery` dépêche un **agent Dev** avec le
+  rapport d'échec réel (prompt `dev_fix_integration` : montage statique vs base
+  vite, routeur non enregistré, DB non initialisée, CORS…), exige que la suite
+  pytest **reste verte** (snapshot git + rollback sinon), puis **rejoue le
+  gate** — jusqu'à N tentatives avant de parquer le projet en
+  `needs_attention`. `0` désactive la boucle (blocage immédiat, comportement
+  historique).
 - **Definition of Done déterministe** (`orchestrator/delivery_gate.py`) :
   chaque story/tâche doit être effectivement terminée, les critères doivent
   avoir une preuve Gherkin/test plan, et les stories UI doivent déclarer des
@@ -923,8 +940,9 @@ Variables d'environnement (toutes optionnelles) :
 | `SMOKE_RUN` | `1` | démarre réellement l'app livrée avant `done` |
 | `DEFINITION_OF_DONE` | `1` | active le gate déterministe de livraison |
 | `DOD_STRICT_CRITERIA` | `0` | rend bloquante l'absence de preuve verte par critère |
-| `RUNTIME_ACCEPTANCE` | `0` | active le gate navigateur/runtime web/fullstack |
+| `RUNTIME_ACCEPTANCE` | `1` | gate d'**intégration full-stack** (frontend servi par le backend, assets/MIME, sonde API/DB) — auto-skip CLI/librairie/démo |
 | `RUNTIME_ACCEPTANCE_TIMEOUT_S` | `90` | timeout du gate runtime |
+| `INTEGRATION_FIX_ATTEMPTS` | `2` | tentatives de **réparation Dev** quand un gate smoke/intégration échoue (0 = blocage immédiat) |
 
 ---
 

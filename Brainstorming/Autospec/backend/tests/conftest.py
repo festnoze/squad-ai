@@ -51,6 +51,7 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "definition_of_done_enabled", False)
     monkeypatch.setattr(settings, "definition_of_done_strict_criteria", False)
     monkeypatch.setattr(settings, "runtime_acceptance_enabled", False)
+    monkeypatch.setattr(settings, "integration_fix_attempts", 0)
     monkeypatch.setattr(settings, "product_profile", "auto")
     yield tmp_path
     # Drain the shared persist executor BEFORE this test's `workspace_root`
