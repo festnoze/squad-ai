@@ -375,6 +375,18 @@ export async function readFile(
   );
 }
 
+export async function revealFile(
+  projectId: string,
+  path: string,
+): Promise<{ path: string; revealed: boolean }> {
+  return json(
+    await fetch(
+      `/api/projects/${projectId}/files/reveal?path=${encodeURIComponent(path)}`,
+      { method: "POST" },
+    ),
+  );
+}
+
 export async function storyDiff(
   projectId: string,
   storyId: string,

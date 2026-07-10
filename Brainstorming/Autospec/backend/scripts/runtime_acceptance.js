@@ -11,17 +11,49 @@
 //     as text/html → blank page), a dead API, or a broken backend↔database wiring.
 //   - frontend only → vite preview + the same page-integrity checks.
 //   - backend only  → boot + reachable page + API probe.
+//
+// Exit-code contract (the Python side branches on these):
+//   0 = pass (integration OK).
+//   1 = integration/CODE failure — repairable (blank page, wrong asset MIME,
+//       app HTTP 4xx/5xx, broken API probe, empty #root, console errors,
+//       journey click producing a 5xx).
+//   2 = INFRA/ENVIRONMENT failure — NOT repairable (playwright/chromium absent
+//       or unlaunchable, npm/node missing, build tool absent, or the target
+//       backend port already occupied by an EXTERNAL process the gate did not
+//       spawn). Printed as `[runtime] INFRA <reason>`; code failures as
+//       `[runtime] FAIL <reason>`.
+//
+// Env: RUNTIME_BACKEND_PORT, RUNTIME_FRONTEND_PORT, RUNTIME_JOURNEY (when
+// non-empty, run a best-effort write-path interaction after integrity checks).
 
 const fs = require("fs");
 const http = require("http");
+const net = require("net");
 const path = require("path");
 const { spawnSync, spawn } = require("child_process");
 
+// Infra/environment error marker. Errors carrying `.infra === true` are NOT
+// repairable by the Python side → exit code 2. Everything else = code failure
+// (exit 1). See the shared exit-code contract in the header/README.
+class InfraError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = "InfraError";
+    this.infra = true;
+  }
+}
+
+// Resolve chromium from either playwright package. A missing package here is an
+// ENVIRONMENT problem (playwright/chromium not installed), not a code failure.
 let chromium;
 try {
   chromium = require("playwright").chromium;
 } catch {
-  chromium = require("@playwright/test").chromium;
+  try {
+    chromium = require("@playwright/test").chromium;
+  } catch {
+    chromium = null;
+  }
 }
 
 const WS = process.argv[2];
@@ -116,10 +148,37 @@ function waitForHttp(port, timeoutMs) {
   });
 }
 
+// Resolve `true` if NOTHING is listening on the port (a fresh connection is
+// refused), `false` if a server is already accepting connections there.
+function isPortFree(port) {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    const done = (free) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(free);
+    };
+    socket.setTimeout(1500);
+    socket.once("connect", () => done(false)); // someone answered → occupied
+    socket.once("timeout", () => done(true));
+    socket.once("error", () => done(true)); // ECONNREFUSED → free
+    socket.connect(port, "127.0.0.1");
+  });
+}
+
 async function startBackendIfNeeded() {
   if (!BACKEND_WEB) return false;
   const main = path.join(WS, "main.py");
   if (!fs.existsSync(main)) throw new Error("backend web demandé mais main.py absent");
+
+  // Guard against validating a STALE/foreign server: if the target port is
+  // already taken before we spawn anything, this is an external process the
+  // gate did not start → INFRA failure (exit 2), NOT a code failure.
+  if (!(await isPortFree(BACKEND_PORT))) {
+    throw new InfraError(`port :${BACKEND_PORT} déjà occupé par un process externe`);
+  }
 
   let proc = launch("backend", "uv", ["run", "python", "main.py"], WS);
   if (await waitForHttp(BACKEND_PORT, Math.min(12000, remaining()))) return true;
@@ -143,6 +202,14 @@ function runFrontendBuild() {
     encoding: "utf8",
     timeout: remaining(),
   });
+  // A missing `npm`/build tool (ENOENT) is an ENVIRONMENT failure (exit 2),
+  // distinct from a build that ran and failed on the app's code (exit 1).
+  if (res.error) {
+    if (res.error.code === "ENOENT") {
+      throw new InfraError("npm introuvable pour build frontend (outil de build absent)");
+    }
+    throw new InfraError(`échec de lancement de npm run build : ${res.error.message}`);
+  }
   if (res.status !== 0) {
     throw new Error(`build frontend échoué\n${(res.stdout || "")}${(res.stderr || "")}`.slice(-3000));
   }
@@ -189,6 +256,10 @@ async function probeApi(origin) {
     if (!candidates.length) notes.push("openapi.json présent, aucun GET sans paramètre à sonder");
     return `sonde API OK (${notes.join(", ") || "openapi seul"})`;
   }
+  // Fallback (no openapi.json): try a few conventional health endpoints. Only
+  // claim "OK" when we actually got a real, non-404 response < 500. A pure-404
+  // result means we probed NOTHING — that's legitimate for some apps, so stay
+  // neutral rather than fabricate a false OK (or a false failure).
   for (const p of ["/api/health", "/health", "/api"]) {
     const res = await fetchText(origin + p, Math.min(5000, remaining()));
     if (res.status >= 500) {
@@ -198,7 +269,7 @@ async function probeApi(origin) {
       return `sonde API OK (${p} → ${res.status})`;
     }
   }
-  return "sonde API ignorée (pas d'openapi.json ni d'endpoint santé)";
+  return "sonde API ignorée (aucun endpoint santé joignable)";
 }
 
 // Load `target` in a real browser and require an actually-working app:
@@ -209,6 +280,7 @@ async function checkPage(browser, target, requireApp) {
   const origin = new URL(target).origin;
   const problems = [];
   const browserErrors = [];
+  const serverErrors = []; // same-origin responses with status >= 500 (write-path breakage)
   page.on("console", (msg) => {
     if (msg.type() === "error") browserErrors.push(msg.text());
   });
@@ -220,6 +292,9 @@ async function checkPage(browser, target, requireApp) {
     let url;
     try { url = new URL(res.url()); } catch { return; }
     if (url.origin !== origin) return;
+    if (res.status() >= 500) {
+      serverErrors.push(`${res.request().method()} ${url.pathname} → HTTP ${res.status()}`);
+    }
     const isJs = /\.m?js(\?.*)?$/i.test(url.pathname);
     const isCss = /\.css(\?.*)?$/i.test(url.pathname);
     if (!isJs && !isCss) return;
@@ -247,8 +322,25 @@ async function checkPage(browser, target, requireApp) {
     throw new Error(`HTTP ${status} sur ${target}`);
   }
 
-  // Let the SPA bundle execute and render before judging the DOM.
-  await page.waitForTimeout(1500);
+  // Let the SPA bundle execute and render before judging the DOM. Instead of a
+  // fixed sleep (flaky on slow machines, wasteful on fast ones), POLL for the
+  // SPA container to have rendered content, up to a bounded deadline.
+  const settleDeadline = Date.now() + Math.min(4000, remaining());
+  while (Date.now() < settleDeadline) {
+    let rendered = false;
+    try {
+      rendered = await page.evaluate(() => {
+        const root = document.querySelector("#root, #app");
+        if (root) {
+          return root.childElementCount > 0 || !!root.textContent.trim();
+        }
+        // No SPA container: fall back to any visible body text.
+        return !!(document.body && document.body.innerText.trim());
+      });
+    } catch { rendered = false; }
+    if (rendered) break;
+    await page.waitForTimeout(150);
+  }
   const body = (await page.locator("body").innerText({ timeout: 5000 })).trim();
   if (requireApp) {
     if (!body) {
@@ -272,7 +364,78 @@ async function checkPage(browser, target, requireApp) {
   if (problems.length) {
     throw new Error(`intégration KO sur ${target} :\n- ${problems.join("\n- ")}`);
   }
+
+  // Write-path journey (Gherkin-derived happy path). BEST-EFFORT: exercises a
+  // form submit to catch broken POST→DB wiring that GET-only probes miss. It
+  // only FAILS on an OBSERVED 5xx (same-origin) or a NEW page/console error the
+  // interaction triggered — never merely because nothing was found to click.
+  if (process.env.RUNTIME_JOURNEY) {
+    const errorsBefore = browserErrors.length;
+    const serverErrorsBefore = serverErrors.length;
+    const acted = await runJourney(page).catch((e) => {
+      record(`[runtime] journey: interaction interrompue (${String(e).slice(0, 120)})`);
+      return false;
+    });
+    // Let any triggered network settle, bounded by the remaining budget.
+    await page.waitForTimeout(Math.min(1500, remaining(0)));
+
+    const journeyProblems = [];
+    const newServerErrors = serverErrors.slice(serverErrorsBefore);
+    if (newServerErrors.length) {
+      journeyProblems.push(
+        `journey a déclenché une erreur serveur 5xx : ${newServerErrors.slice(0, 5).join(" | ")} ` +
+        `— câblage écriture cassé (POST→DB : router/dépendance/migration ?)`
+      );
+    }
+    const newBrowserErrors = browserErrors.slice(errorsBefore);
+    if (newBrowserErrors.length) {
+      journeyProblems.push(`journey a déclenché des erreurs navigateur : ${newBrowserErrors.slice(0, 5).join(" | ")}`);
+    }
+    if (journeyProblems.length) {
+      throw new Error(`journey KO sur ${target} :\n- ${journeyProblems.join("\n- ")}`);
+    }
+    record(`[runtime] journey ${acted ? "exécuté (formulaire soumis)" : "sans interaction (aucun formulaire/bouton trouvé)"} — aucun 5xx`);
+  }
+
   return body.length;
+}
+
+// BEST-EFFORT interaction: fill visible inputs with plausible values, then click
+// the most prominent submit/primary button. Returns true if it clicked something.
+// Never throws for "nothing found" — resilient by design.
+async function runJourney(page) {
+  let filled = 0;
+  const inputs = await page.locator(
+    "form input:visible, form textarea:visible, input:visible, textarea:visible"
+  ).all().catch(() => []);
+  for (const input of inputs.slice(0, 8)) {
+    try {
+      const type = ((await input.getAttribute("type")) || "text").toLowerCase();
+      if (["hidden", "submit", "button", "checkbox", "radio", "file", "range", "color"].includes(type)) continue;
+      let value = "test";
+      if (type === "email") value = "test@example.com";
+      else if (type === "number") value = "1";
+      else if (type === "password") value = "Test1234!";
+      else if (type === "tel") value = "0102030405";
+      else if (type === "url") value = "https://example.com";
+      else if (type === "date") value = "2024-01-01";
+      await input.fill(value, { timeout: 1500 });
+      filled += 1;
+    } catch { /* skip this input */ }
+  }
+
+  // Prefer an explicit submit; otherwise a button whose text reads like a primary action.
+  let button = page.locator("button[type=submit], input[type=submit]").first();
+  if (!(await button.count().catch(() => 0))) {
+    button = page.getByRole("button", { name: /envoyer|ajouter|créer|creer|enregistrer|save|submit|send|add|create/i }).first();
+  }
+  if (!(await button.count().catch(() => 0))) return false;
+  try {
+    await button.click({ timeout: 2000 });
+  } catch {
+    return false;
+  }
+  return filled > 0 || true;
 }
 
 (async () => {
@@ -300,12 +463,25 @@ async function checkPage(browser, target, requireApp) {
 
     if (backendUp) record(`[runtime] ${await probeApi(backendOrigin)}`);
 
-    browser = await chromium.launch();
+    // Playwright/chromium not resolvable or not launchable → ENVIRONMENT failure.
+    if (!chromium) {
+      throw new InfraError("playwright/chromium introuvable (require playwright/@playwright/test a échoué)");
+    }
+    try {
+      browser = await chromium.launch();
+    } catch (e) {
+      throw new InfraError(`chromium n'a pas pu démarrer (navigateur non installé ?) : ${String(e).slice(0, 300)}`);
+    }
     const visible = await checkPage(browser, target, requireApp);
     record(`[runtime] OK ${target} (${visible} caractères visibles)`);
     process.exit(0);
   } catch (err) {
-    record(`[runtime] FAIL ${err && err.stack ? err.stack : String(err)}`);
+    const detail = err && err.stack ? err.stack : String(err);
+    if (err && err.infra) {
+      record(`[runtime] INFRA ${err.message || detail}`);
+      process.exit(2);
+    }
+    record(`[runtime] FAIL ${detail}`);
     process.exit(1);
   } finally {
     if (browser) await browser.close().catch(() => {});

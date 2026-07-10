@@ -84,6 +84,10 @@ PROFILES: dict[str, ProductProfile] = {
             "smoke_run": True,
             "runtime_acceptance_enabled": True,
             "ui_tests_enabled": True,
+            # Finding 5 : le chemin d'écriture (POST→DB) doit être exercé de bout
+            # en bout — la définition-de-fini stricte force la vérification des
+            # critères d'acceptation par le gate, pas seulement des tests unitaires.
+            "definition_of_done_strict_criteria": True,
         },
     ),
     "fullstack": ProductProfile(
@@ -98,6 +102,8 @@ PROFILES: dict[str, ProductProfile] = {
             "smoke_run": True,
             "runtime_acceptance_enabled": True,
             "ui_tests_enabled": True,
+            # Finding 5 : idem — exercer le parcours d'écriture réel sur fullstack.
+            "definition_of_done_strict_criteria": True,
         },
     ),
     "brownfield": ProductProfile(

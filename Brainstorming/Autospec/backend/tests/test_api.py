@@ -364,6 +364,60 @@ async def test_files_unknown_project_404(green_pytest):
         assert (await client.get("/api/projects/inconnu/files")).status_code == 404
 
 
+async def test_reveal_file_returns_absolute_path(green_pytest, monkeypatch):
+    revealed: list = []
+    monkeypatch.setattr(server, "_reveal_in_explorer", lambda target: revealed.append(target))
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        resp = await client.post(
+            f"/api/projects/{project_id}/files/reveal", params={"path": "main.py"}
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["revealed"] is True
+        assert body["path"].replace("\\", "/").endswith("/main.py")
+        assert len(revealed) == 1
+
+
+async def test_reveal_empty_path_targets_workspace_root(green_pytest, monkeypatch):
+    monkeypatch.setattr(server, "_reveal_in_explorer", lambda target: None)
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        resp = await client.post(f"/api/projects/{project_id}/files/reveal")
+        assert resp.status_code == 200
+        assert resp.json()["path"]  # workspace root, resolved
+
+
+async def test_reveal_traversal_blocked(green_pytest, monkeypatch):
+    monkeypatch.setattr(server, "_reveal_in_explorer", lambda target: None)
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        resp = await client.post(
+            f"/api/projects/{project_id}/files/reveal", params={"path": "../../secret"}
+        )
+        assert resp.status_code == 400
+
+
+async def test_reveal_failure_still_returns_path(green_pytest, monkeypatch):
+    def boom(target):
+        raise OSError("no display")
+
+    monkeypatch.setattr(server, "_reveal_in_explorer", boom)
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        resp = await client.post(
+            f"/api/projects/{project_id}/files/reveal", params={"path": "main.py"}
+        )
+        assert resp.status_code == 200
+        body = resp.json()
+        assert body["revealed"] is False
+        assert body["path"].replace("\\", "/").endswith("/main.py")
+
+
 async def test_interactions_sidecar_hidden_from_explorer_and_export(green_pytest):
     """BUG7: the raw LLM-interaction sidecar (prompts/responses/cost) must not
     leak into the user file tree NOR the delivered export zip — same hiding as

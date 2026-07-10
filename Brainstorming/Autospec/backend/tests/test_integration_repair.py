@@ -43,9 +43,16 @@ def repair_env(monkeypatch):
     async def _arun_pytest(self, ws=None):
         return True, "all green", {}
 
+    async def _stop(self):
+        return None
+
     monkeypatch.setattr(Pipeline, "_agit_snapshot", _agit_snapshot)
     monkeypatch.setattr(Pipeline, "_agit", _agit)
     monkeypatch.setattr(Pipeline, "_arun_pytest", _arun_pytest)
+    # Finding 1 : les gates arrêtent l'app propre + vérifient le port. En test on
+    # neutralise l'arrêt et on considère le port libre (aucun tiers).
+    monkeypatch.setattr(Pipeline, "astop_app", _stop)
+    monkeypatch.setattr(Pipeline, "_port_is_free", staticmethod(lambda port: True))
     return git_calls
 
 
@@ -142,6 +149,87 @@ async def test_repair_skipped_without_git(monkeypatch, repair_env):
 
     assert await pipeline._aruntime_acceptance_phase() is False
     assert runner.calls == []
+
+
+# ------------------------------------------------------ finding 4 : infra result
+
+async def test_runtime_infra_result_skips_repair_loop(monkeypatch, repair_env):
+    """Un résultat infra=True (exit 2 : playwright/node absent) ne dépêche AUCUN
+    agent — needs_attention direct, sans consommer de tentative."""
+    _fake_gate(monkeypatch, [
+        RuntimeAcceptanceResult(ok=False, detail="playwright manquant", infra=True),
+    ])
+    runner = FakeRunner([])
+    state = _state("rt-infra-skip")
+    pipeline = Pipeline(state, runner)
+
+    assert await pipeline._aruntime_acceptance_phase() is False
+    assert pipeline._delivery_blocked is True
+    assert runner.calls == []  # aucun agent de réparation
+    assert any("infra" in r.lower() for r in state.regressions)
+
+
+async def test_runtime_external_port_is_infra(monkeypatch, repair_env):
+    """Finding 1 : port tenu par un tiers → infra, pas de réparation."""
+    monkeypatch.setattr(Pipeline, "_port_is_free", staticmethod(lambda port: False))
+    _fake_gate(monkeypatch, [RuntimeAcceptanceResult(ok=False, detail="peu importe")])
+    runner = FakeRunner([])
+    state = _state("rt-port-busy")
+    pipeline = Pipeline(state, runner)
+
+    assert await pipeline._aruntime_acceptance_phase() is False
+    assert pipeline._delivery_blocked is True
+    assert runner.calls == []
+    assert any("process externe" in r for r in state.regressions)
+
+
+# ------------------------------------------- finding 3 : frontend suite in guard
+
+async def test_repair_checks_frontend_suite(monkeypatch, repair_env):
+    """La réparation doit exiger la suite FRONTEND verte aussi : pytest vert mais
+    Vitest/build rouge => rollback (le filet n'est pas backend-only)."""
+    from autospec.models import Stream, StreamKind
+
+    git_calls = repair_env
+    monkeypatch.setattr(settings, "integration_fix_attempts", 1)
+
+    async def _red_frontend(self, ws=None):
+        return False, "vitest: 1 failed", {}
+
+    monkeypatch.setattr(Pipeline, "_arun_frontend_tests", _red_frontend)
+    _fake_gate(monkeypatch, [RuntimeAcceptanceResult(ok=False, detail="page vide")])
+    runner = FakeRunner(['{"status": "fixed", "summary": "s", "files": []}'])
+    state = _state("rt-fe-guard")
+    state.streams = [Stream(id="frontend", kind=StreamKind.FRONTEND, language="react", file_root="frontend")]
+    pipeline = Pipeline(state, runner)
+
+    assert await pipeline._aruntime_acceptance_phase() is False
+    assert pipeline._delivery_blocked is True
+    # Rollback déclenché par la suite frontend rouge malgré pytest vert.
+    assert ("reset", "--hard", "HEAD") in git_calls
+
+
+async def test_repair_passes_when_both_suites_green(monkeypatch, repair_env):
+    """pytest ET frontend verts → la réparation est acceptée et le gate revalidé."""
+    from autospec.models import Stream, StreamKind
+
+    monkeypatch.setattr(settings, "integration_fix_attempts", 1)
+
+    async def _green_frontend(self, ws=None):
+        return True, "vitest ok + build ok", {}
+
+    monkeypatch.setattr(Pipeline, "_arun_frontend_tests", _green_frontend)
+    _fake_gate(monkeypatch, [
+        RuntimeAcceptanceResult(ok=False, detail="page vide"),
+        RuntimeAcceptanceResult(ok=True, detail="OK"),
+    ])
+    runner = FakeRunner(['{"status": "fixed", "summary": "s", "files": []}'])
+    state = _state("rt-fe-green")
+    state.streams = [Stream(id="frontend", kind=StreamKind.FRONTEND, language="react", file_root="frontend")]
+    pipeline = Pipeline(state, runner)
+
+    assert await pipeline._aruntime_acceptance_phase() is True
+    assert pipeline._delivery_blocked is False
 
 
 # ------------------------------------------------------------------- smoke gate

@@ -40,6 +40,20 @@ def test_fullstack_profile_enables_streams_and_runtime(monkeypatch):
     assert settings.runtime_acceptance_enabled is False
 
 
+def test_web_and_fullstack_profiles_enable_strict_dod(monkeypatch):
+    """Finding 5 : le chemin d'écriture doit être exercé — web-ssr et fullstack
+    activent la définition-de-fini stricte (vérification des critères)."""
+    monkeypatch.setattr(settings, "definition_of_done_strict_criteria", False)
+    for profile in ("web-ssr", "fullstack"):
+        state = ProjectState(id=f"p-dod-{profile}", name="n", goal="g", product_profile=profile)
+        overrides = profiles.resolve_overrides(state)
+        assert overrides["definition_of_done_strict_criteria"] is True
+    # Un profil api n'active PAS le strict DoD (inchangé).
+    api = ProjectState(id="p-dod-api", name="n", goal="g", product_profile="api")
+    assert "definition_of_done_strict_criteria" not in profiles.resolve_overrides(api)
+    assert settings.definition_of_done_strict_criteria is False
+
+
 def test_profile_resolution_is_per_project_not_global(monkeypatch):
     monkeypatch.setattr(settings, "streams_enabled", False)
     full = ProjectState(id="p-prof-full", name="n", goal="g", product_profile="fullstack")

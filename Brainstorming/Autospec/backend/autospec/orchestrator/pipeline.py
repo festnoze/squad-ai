@@ -6397,6 +6397,11 @@ class Pipeline:
         attempts = int(self._setting("integration_fix_attempts") or 0)
         if attempts <= 0 or settings.fake_agents:
             return False, detail
+        # Finding 4 : une panne d'INFRA (lancement impossible, port tenu par un
+        # tiers) ne se répare pas par un agent — on ne gaspille aucune tentative.
+        if self._smoke_looks_like_infra(report):
+            self._log(source, "Échec de forme infra — aucune tentative de réparation dépensée.")
+            return False, detail
         ws = workspace_dir(self.state.id)
         if not await self._agit_snapshot(ws, f"pre integration-fix ({source})"):
             self._log(source, "Réparation impossible (git indisponible) — gate en échec.")
@@ -6434,13 +6439,21 @@ class Pipeline:
                 self._log(source, f"Agent de réparation indisponible : {exc}")
                 return False, detail
             green, pytest_out, _ = await self._arun_pytest()
+            suite_out, suite_name = pytest_out, "pytest"
+            # Finding 3 : le filet de sécurité ne doit pas être backend-only. Si le
+            # projet a un frontend, sa suite Vitest + build doit AUSSI rester verte,
+            # sinon la réparation a pu casser l'UI sans qu'un test backend le voie.
+            if green and self._has_frontend():
+                fe_green, fe_out, _ = await self._arun_frontend_tests()
+                if not fe_green:
+                    green, suite_out, suite_name = False, fe_out, "frontend (Vitest + build)"
             if not green:
                 await self._agit(ws, "reset", "--hard", "HEAD")
                 await self._agit(ws, "clean", "-fd")
-                self._log(source, "La réparation a cassé la suite pytest — rollback.")
+                self._log(source, f"La réparation a cassé la suite {suite_name} — rollback.")
                 detail = (
-                    f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite pytest "
-                    f"(rollback effectué). Sortie pytest :\n{pytest_out[-1500:]}"
+                    f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
+                    f"(rollback effectué). Sortie {suite_name} :\n{suite_out[-1500:]}"
                 )
                 continue
             await self._agit(ws, "add", "-A")
@@ -6462,6 +6475,56 @@ class Pipeline:
 
     # ------------------------------------------------- Smoke-run gate (runnability)
 
+    @staticmethod
+    def _smoke_looks_like_infra(detail: str) -> bool:
+        """Un échec de smoke a-t-il une forme INFRA (env cassé) plutôt qu'un bug
+        de câblage réparable ? On ne dépense pas de tentative d'agent pour ça
+        (finding 4) : lancement impossible (uv/python absent) ou port déjà tenu
+        par un process externe. Le miroir sémantique-vs-infra du canari
+        post-merge (``_looks_like_infra_failure``)."""
+        low = (detail or "").lower()
+        return (
+            "lancement impossible" in low
+            or "process externe" in low
+        )
+
+    def _apark_infra(self, source: str, detail: str) -> None:
+        """Gare la livraison en needs_attention pour une panne d'INFRA (finding 4).
+
+        Un rouge d'infra (playwright/node absent, venv cassée, port occupé par un
+        tiers) n'est pas un défaut de code : on ne dépêche PAS d'agent Dev, on
+        bloque la livraison avec un message clair et on notifie bruyamment."""
+        msg = f"{source} : vérification impossible (infra) — {detail}"
+        self._block_delivery(msg, source=source)
+        self.state.regressions.append(msg)
+        self.monitor.event(source, ok=False, infra=True, detail=detail[:300])
+        self._chat(
+            ChatRole.SYSTEM,
+            f"⚠️ Gate {source} : condition d'infra (non réparable par un agent) — "
+            f"{detail[:200]}",
+        )
+        self._notify("error", f"{source} : infra", msg[:200])
+
+    async def _aensure_own_port_free(self, source: str, port: int) -> tuple[bool, str]:
+        """Avant de booter, arrête l'app PROPRE du projet puis vérifie que le port
+        est libre (finding 1). Si le port RESTE occupé, c'est un process EXTERNE :
+        condition d'infra (vérification impossible), pas un échec de code.
+
+        Retourne ``(free, detail)`` — ``free=False`` => port tenu par un tiers."""
+        await self.astop_app()
+        # Laisse le TIME_WAIT / la fermeture du socket se résorber, sinon on
+        # confondrait notre propre serveur à peine arrêté avec un tiers.
+        for _ in range(6):
+            if self._port_is_free(port):
+                return True, ""
+            await asyncio.sleep(0.5)
+        detail = (
+            f"port :{port} déjà occupé par un process externe — "
+            f"vérification impossible"
+        )
+        self._log(source, f"⚠️ {detail}")
+        return False, detail
+
     async def _asmoke_phase(self) -> bool:
         """Deterministic runnability gate (``SMOKE_RUN``): once the suite
         is green, actually BOOT the delivered app and require it to start, so a
@@ -6477,13 +6540,39 @@ class Pipeline:
         lang = toolchain.normalize(self.state.backend_language.value)
         ws = workspace_dir(self.state.id)
         if lang != "python" or not (ws / "main.py").exists() or not (ws / "pyproject.toml").exists():
-            self._log("smoke", f"Smoke run ignoré (langage {lang} non supporté ou pas de main.py).")
+            # Finding 6 : un backend web NON-python saute les deux gates de boot.
+            # Ce n'est pas un skip silencieux : on AVERTIT que la vérification à
+            # l'exécution est indisponible pour ce langage (sans hard-bloquer).
+            if lang != "python" and self._expects_web_app():
+                warn = (
+                    f"⚠️ Vérification à l'exécution indisponible pour un backend "
+                    f"{lang} — le smoke/runtime gate ne pilote que python. "
+                    f"La runnabilité de cette app n'est PAS vérifiée."
+                )
+                self._log("smoke", warn)
+                self._chat(ChatRole.SYSTEM, warn)
+                self.monitor.event("smoke", ok=True, skipped=True, lang=lang)
+            else:
+                self._log("smoke", f"Smoke run ignoré (langage {lang} non supporté ou pas de main.py).")
             return True
         self.monitor.phase("smoke")
+        # Finding 1 : arrête l'app PROPRE du projet et vérifie que le port est
+        # libre AVANT de booter, sinon le gate validerait un serveur périmé/tiers.
+        port = self._resolve_web_port(ws)
+        if self._expects_web_app() or runtime_acceptance._backend_web_candidate(ws):
+            free, port_detail = await self._aensure_own_port_free("smoke", port)
+            if not free:
+                self._apark_infra("smoke", port_detail)
+                return False
         self._log("smoke", "🚀 Smoke run : démarrage de l'application livrée…")
         ok, detail = await asyncio.to_thread(self._smoke_run_python, ws)
         self.monitor.event("smoke", ok=ok, detail=detail[:300])
         if not ok:
+            # Finding 4 : un échec de forme INFRA (lancement impossible) ne se
+            # répare pas par un agent — on gare directement en needs_attention.
+            if self._smoke_looks_like_infra(detail):
+                self._apark_infra("smoke", detail)
+                return False
 
             async def _averify() -> tuple[bool, str]:
                 return await asyncio.to_thread(self._smoke_run_python, ws)
@@ -6503,9 +6592,10 @@ class Pipeline:
 
     async def _aruntime_acceptance_phase(self) -> bool:
         """Optional browser/runtime acceptance gate for web/fullstack products."""
+        ws = workspace_dir(self.state.id)
         result = await runtime_acceptance.arun_runtime_acceptance(
             self.state,
-            workspace_dir(self.state.id),
+            ws,
             enabled=self._setting("runtime_acceptance_enabled"),
             timeout_s=settings.runtime_acceptance_timeout_s,
         )
@@ -6514,21 +6604,43 @@ class Pipeline:
                 self._log("runtime", f"Runtime acceptance ignoré : {result.detail}.")
             return True
         self.monitor.event("runtime_acceptance", ok=result.ok, detail=result.detail[:300])
+        # Finding 1 : avant de (re)vérifier, arrête l'app PROPRE et exige le port
+        # libre — le gate ne doit jamais valider un serveur périmé/tiers. Si un
+        # process EXTERNE tient le port : condition d'infra (non réparable).
+        port = self._resolve_web_port(ws)
+        free, port_detail = await self._aensure_own_port_free("runtime", port)
+        if not free:
+            self._apark_infra("runtime", port_detail)
+            return False
+        # Finding 4 : un résultat de forme INFRA (playwright/node absent, port
+        # tiers signalé par le gate JS via exit 2) ne se répare pas par un agent.
+        if not result.ok and result.infra:
+            self._apark_infra("runtime", result.detail)
+            return False
         ok, detail = result.ok, result.detail
         if not ok:
 
             async def _averify() -> tuple[bool, str]:
+                await self._aensure_own_port_free("runtime", port)
                 res = await runtime_acceptance.arun_runtime_acceptance(
                     self.state,
-                    workspace_dir(self.state.id),
+                    ws,
                     enabled=self._setting("runtime_acceptance_enabled"),
                     timeout_s=settings.runtime_acceptance_timeout_s,
                 )
+                if not res.ok and res.infra:
+                    # Bascule tardive vers l'infra : signalée via un préfixe pour
+                    # que la boucle ne la prenne ni pour un vert ni pour un bug
+                    # réparable — on garera après la boucle.
+                    return False, f"__INFRA__{res.detail}"
                 return res.ok, res.detail
 
             ok, detail = await self._arepair_delivery(
                 "runtime", f"Intégration full-stack échouée : {detail}", _averify
             )
+            if not ok and detail.startswith("__INFRA__"):
+                self._apark_infra("runtime", detail[len("__INFRA__"):])
+                return False
         if ok:
             self._log("runtime", "✅ Runtime acceptance OK.")
             self._chat(ChatRole.SYSTEM, "🧪 Runtime acceptance : parcours navigateur OK.")
@@ -6576,6 +6688,30 @@ class Pipeline:
         # auto / brownfield: a frontend stream implies a backend serving it.
         return bool(list(workspace.frontend_streams(self.state)))
 
+    def _resolve_web_port(self, ws: Path) -> int:
+        """Port the delivered web app listens on. Delegates to the single source
+        of truth in ``runtime_acceptance`` so the smoke gate and the runtime gate
+        never disagree on the port (finding 2)."""
+        return runtime_acceptance.resolve_web_port(ws)
+
+    @staticmethod
+    def _port_is_free(port: int) -> bool:
+        """Is ``127.0.0.1:<port>`` free (nothing listening)? A ``connect_ex`` that
+        does NOT succeed means no server is accepting connections there."""
+        import socket
+
+        with socket.socket() as s:
+            s.settimeout(1.0)
+            return s.connect_ex(("127.0.0.1", port)) != 0
+
+    def _has_frontend(self) -> bool:
+        """Le projet embarque-t-il un frontend à vérifier ? Un stream frontend
+        déclaré (ST-6), ou un ``frontend/package.json`` sur le disque (finding 3)."""
+        if list(workspace.frontend_streams(self.state)):
+            return True
+        fe = workspace_dir(self.state.id) / "frontend" / "package.json"
+        return fe.exists()
+
     def _smoke_run_python(self, ws: Path) -> tuple[bool, str]:
         """Boot a Python project's entry point and check it is runnable.
 
@@ -6585,7 +6721,6 @@ class Pipeline:
         exit 0 within the timeout. Returns (ok, human-readable detail)."""
         import socket
 
-        text = (ws / "main.py").read_text(encoding="utf-8", errors="replace")
         pyproject = (ws / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
         has_framework = any(
             fw in pyproject
@@ -6602,8 +6737,7 @@ class Pipeline:
         timeout = settings.smoke_run_timeout_s
 
         if is_web:
-            m = re.search(r"port\s*=\s*(\d{4,5})", text)
-            port = int(m.group(1)) if m else settings.smoke_run_port
+            port = self._resolve_web_port(ws)
             try:
                 proc = subprocess.Popen(
                     cmd, cwd=str(ws), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

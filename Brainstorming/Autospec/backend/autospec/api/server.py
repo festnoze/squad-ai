@@ -9,6 +9,8 @@ import os
 import re
 import shutil
 import stat
+import subprocess
+import sys
 import time
 import zipfile
 from contextlib import asynccontextmanager
@@ -1128,6 +1130,53 @@ async def aread_file(project_id: str, path: str) -> dict:
     if truncated:
         content = content[:_MAX_FILE_CHARS]
     return {"path": path, "content": content, "truncated": truncated}
+
+
+def _reveal_in_explorer(target: Path) -> None:
+    """Open the OS file manager at ``target`` (file selected, or dir opened).
+
+    Best-effort and platform-aware: Explorer on Windows, Finder on macOS,
+    ``xdg-open`` elsewhere. ``explorer``/``open`` exit non-zero even on success,
+    so the return code is deliberately ignored.
+    """
+    if sys.platform.startswith("win"):
+        native = str(target)
+        if target.is_dir():
+            subprocess.Popen(["explorer", native])
+        else:
+            # Explorer parses its command line specially: the path must ride in
+            # the same token as ``/select,`` for the file to be highlighted.
+            subprocess.Popen(["explorer", f"/select,{native}"])
+    elif sys.platform == "darwin":
+        args = ["open", str(target)] if target.is_dir() else ["open", "-R", str(target)]
+        subprocess.Popen(args)
+    else:
+        parent = target if target.is_dir() else target.parent
+        subprocess.Popen(["xdg-open", str(parent)])
+
+
+@app.post("/api/projects/{project_id}/files/reveal")
+async def areveal_file(project_id: str, path: str = "") -> dict:
+    """Reveal a workspace file/dir in the OS file manager; return its full path.
+
+    ``path`` is a workspace-relative POSIX path (empty = workspace root). Guarded
+    against traversal. Opening the file manager is best-effort — a failure still
+    returns the resolved absolute path so the caller can copy it.
+    """
+    _pipeline(project_id)
+    ws = workspace_dir(project_id)
+    ws_root = ws.resolve()
+    target = (ws / path).resolve() if path else ws_root
+    if not target.is_relative_to(ws_root):
+        raise HTTPException(400, "chemin invalide")
+    if not target.exists():
+        raise HTTPException(404, "chemin introuvable")
+    revealed = True
+    try:
+        await asyncio.to_thread(_reveal_in_explorer, target)
+    except Exception:
+        revealed = False
+    return {"path": str(target), "revealed": revealed}
 
 
 # Seconds between heartbeat comments on an idle SSE stream. Keeps the connection
