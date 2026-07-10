@@ -158,6 +158,51 @@ Améliore le code en intégrant ces retours. CONTRAINTE ABSOLUE : toute la suite
 objet JSON que précédemment."""
 
 
+def dev_fix_integration(
+    package_name: str,
+    report: str,
+    architecture: str = "",
+    attempt: int = 1,
+    max_attempts: int = 1,
+) -> str:
+    """Repair prompt for the full-stack integration gate: the delivered app was
+    REALLY booted (backend + frontend build + navigateur + sondes API/DB) and
+    something is miswired. The agent fixes the wiring, not the features."""
+    arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    return f"""Tu es le Dev d'un pipeline automatisé. La suite de tests du projet est VERTE,
+mais le GATE D'INTÉGRATION COMPLET vient d'échouer : l'application livrée a été
+réellement démarrée (backend, build frontend, navigateur, sondes API/base de
+données) et elle ne fonctionne pas de bout en bout. Tentative {attempt}/{max_attempts}.
+{arch_block}
+Rapport d'échec du gate (exécution réelle) :
+\"\"\"{report[:6000]}\"\"\"
+
+Ta mission : DIAGNOSTIQUER puis RÉPARER le câblage dans le répertoire courant
+(package `{package_name}`). Causes classiques à vérifier en priorité :
+- le backend ne sert pas le build frontend à la racine, ou le monte sur un
+  chemin (ex. `/static`) qui ne correspond pas aux URLs d'assets du
+  `frontend/dist/index.html` (base vite `/` vs montage) — un fallback SPA qui
+  renvoie du text/html pour un `.js` produit une page blanche ;
+- un routeur/endpoint jamais enregistré sur l'app, un port ou host incohérent ;
+- la base de données jamais initialisée au démarrage (tables/migrations) ;
+- CORS ou URL d'API côté frontend pointant ailleurs que le backend servi.
+
+Règles :
+1. Reproduis d'abord si possible (lance les commandes nécessaires : build
+   frontend, démarrage du serveur, requêtes HTTP) pour confirmer le diagnostic.
+2. Corrige la VRAIE cause côté code/config — n'affaiblis JAMAIS un test, ne
+   supprime aucune vérification, ne contourne pas le gate.
+3. CONTRAINTE ABSOLUE : toute la suite `uv run pytest` doit RESTER verte.
+4. Reste minimal : c'est une réparation de câblage, pas une réécriture.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "status": "fixed" | "failed",
+  "summary": "<diagnostic et correction en 2-3 phrases>",
+  "files": ["<fichiers modifiés>"]
+}}"""
+
+
 # ------------------------------------------------- Decomposition build mode (SK-2)
 
 def decompose_story(

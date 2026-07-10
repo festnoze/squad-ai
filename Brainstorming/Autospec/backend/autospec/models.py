@@ -296,6 +296,7 @@ class UserStory(BaseModel):
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
     mutation_score: int = -1  # last mutation-testing robustness score, %% (-1 = not run)
     coverage_score: int = -1  # last test-coverage percentage (-1 = not run)
+    guard_findings: list[str] = Field(default_factory=list)  # W0.5 anti-cheating guard verdict signatures (last dev turn)
     ui: bool = False         # story has a visual/UI dimension (QA routes it to Playwright)
     ui_tests: list[str] = Field(default_factory=list)  # replayable UI test files (tests/ui/…)
     # PO pipeline (S1/S2): estimated complexity of the story ("trivial" |
@@ -427,6 +428,12 @@ class Usage(BaseModel):
     input_tokens: int = 0
     output_tokens: int = 0
     agent_calls: int = 0
+    # W4: per-tier breakdown (boss/worker/checker) — the "$2.74 on the meter"
+    # story. cost_by_tier may include estimated cost when a runner returns none.
+    cost_by_tier: dict[str, float] = Field(default_factory=dict)
+    input_tokens_by_tier: dict[str, int] = Field(default_factory=dict)
+    output_tokens_by_tier: dict[str, int] = Field(default_factory=dict)
+    calls_by_tier: dict[str, int] = Field(default_factory=dict)
 
 
 class AgentInteraction(BaseModel):
@@ -440,6 +447,7 @@ class AgentInteraction(BaseModel):
     item_id: str = ""        # work-item id (US/task), or "phase:<phase>" otherwise
     phase: str = ""          # pipeline phase the call ran in
     persona: str = ""        # agent role (dev/qa/critic/…), reverse-mapped from the system prompt
+    model: str = ""          # resolved model id for this call (tier routing / ladder / scorecard — W0.3)
     prompt: str = ""
     response: str = ""
     ok: bool = True
@@ -466,6 +474,14 @@ class ProjectState(BaseModel):
     brief: str = ""
     brownfield_path: str = ""  # B1: existing repo to extend ("" = greenfield)
     architecture: str = ""  # current technical design (from the optional Architect phase)
+    # W3: project constitution — non-negotiable project-wide rules derived once
+    # after SPEC; compiled test rules ride the suite (paths in constitution_test_paths,
+    # immutable to W2 fix_test / W5 amendment), advisory rules are prompt-injected.
+    constitution: list[dict] = Field(default_factory=list)
+    constitution_test_paths: list[str] = Field(default_factory=list)
+    # W5.1: spec-amendment proposals awaiting human review (human-pending by
+    # default). Each: {story_id, target, before, after, rationale, approved_safe}.
+    pending_amendments: list[dict] = Field(default_factory=list)
     plan_quality: int = -1  # last refinement score for the PO plan (-1 = not run)
     # Plan review (REVIEW_PLAN): the critic's flagged issues + proposed
     # improvements on the PO breakdown, surfaced in the UI « Revue du plan » panel.

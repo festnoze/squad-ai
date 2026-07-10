@@ -41,11 +41,14 @@ class BuildMonitor:
 
     # -- event kinds -------------------------------------------------------
     def agent_call(self, role, item_id, duration_ms, ok, error="",
-                   in_tokens=0, out_tokens=0):
+                   in_tokens=0, out_tokens=0, model="", prompt_chars=0):
         self._emit(
             "agent", role=role or "?", item=item_id,
             duration_ms=round(duration_ms), ok=ok,
             error=(error or "")[:400], in_tokens=in_tokens, out_tokens=out_tokens,
+            # W0.3: resolved model id per call (tier routing / ladder / scorecard).
+            # W0.4: prompt size, for context-budget telemetry.
+            model=model or "", prompt_chars=prompt_chars,
         )
 
     def pytest(self, item_id, ok, summary=""):

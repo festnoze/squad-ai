@@ -65,6 +65,11 @@ from ..language_selector import recommend_language
 from ..storage import append_interaction, force_delete_workspace, load_interactions, save_state_payload, workspace_dir
 from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
+from . import guards, signatures  # W0.5 anti-cheating detectors + failure signatures
+from . import recovery  # W1 recovery state machine + escalation ladder
+from . import arbitration, traceability  # W2 wrong-test arbitration + AC traceability
+from . import constitution as constitution_lib  # W3 project constitution
+from . import amendment  # W5.1 human-gated design amendment
 from .delivery_gate import evaluate_definition_of_done
 from . import lessons as lesson_store
 from . import manifests
@@ -239,6 +244,15 @@ _BUILD_ITEM: contextvars.ContextVar[str | None] = contextvars.ContextVar(
     "autospec_build_item", default=None
 )
 
+# W1: a forced model id for the current build worker's calls (the escalation
+# ladder sets it on a retry). Read in ``_UsageTracker.arun`` with precedence
+# below an explicit per-call ``model`` arg but above the phase/role router. Set
+# per build worker (own Task context, like _BUILD_ITEM), so it never leaks to
+# siblings or planning-phase calls. None = no override.
+_FORCE_MODEL: contextvars.ContextVar[str | None] = contextvars.ContextVar(
+    "autospec_force_model", default=None
+)
+
 # Reverse map: the exact system-prompt string ``persona(name)`` returns → the
 # persona name. Lets ``_UsageTracker`` label every call's agent role without
 # touching the ~25 call sites. Built lazily (personas are lru_cached, so the same
@@ -248,6 +262,40 @@ _PERSONA_BY_PROMPT: dict[str, str] = {}
 
 class DeliveryBlocked(Exception):
     """A product gate failed; this is actionable delivery work, not a crash."""
+
+
+def _dep_top_name(spec: str) -> str:
+    """Top-level distribution name from a dependency spec line
+    (``fastapi>=0.110`` → ``fastapi``; ``uvicorn[standard]`` → ``uvicorn``).
+    Underscored so it matches import names (``ruamel.yaml`` → ``ruamel``)."""
+    s = spec.strip()
+    for sep in (";", "@", " ", "=", ">", "<", "!", "~", "[", "("):
+        idx = s.find(sep)
+        if idx != -1:
+            s = s[:idx]
+    return s.strip().replace("-", "_").split(".")[0].lower()
+
+
+def prompts_arbiter_fix_test(story, pkg: str, acceptance: str, instructions: str, test_blob: str) -> str:
+    """W2.2 checker-tier prompt: correct the WRONG test to match the acceptance
+    criteria, following the arbiter's instructions. The corrected test must still
+    genuinely verify the behavior — never weaken coverage or delete assertions to
+    force a pass; the executed rerun (not this reply) decides success."""
+    return (
+        "Un arbitre a jugé qu'un test en échec CONTREDIT les critères d'acceptance "
+        f"de la story « {story.title} » (paquet {pkg}). Corrige le(s) test(s) "
+        "concerné(s) dans le répertoire courant pour qu'ils vérifient ce que les "
+        "critères exigent RÉELLEMENT — sans affaiblir la couverture, sans "
+        "supprimer d'assertions pour forcer un vert, sans toucher au code de "
+        "production.\n\n"
+        f"Critères d'acceptance (vérité de référence) :\n{acceptance}\n\n"
+        f"Instructions de l'arbitre (ce que le test DOIT affirmer) :\n{instructions}\n\n"
+        f"Tests actuels :\n{test_blob[:6000]}\n\n"
+        "NE MODIFIE JAMAIS les fichiers sous tests/constitution/ (règles "
+        "non-négociables du projet). "
+        "Édite les fichiers de test nécessaires, puis réponds avec un court JSON "
+        '{\"summary\": \"...\"}.'
+    )
 
 
 def _persona_role(system_prompt: str) -> str:
@@ -275,8 +323,14 @@ class _UsageTracker:
         active_processes.set(self.pipeline._agent_procs)
         skills_token = active_skills_enabled.set(bool(self.pipeline._setting("skills_enabled")))
         _t0 = time.monotonic()
+        # W0.3/W0.4: resolve the model once (so both success and error telemetry
+        # can attribute it) and record the prompt size for context-budget checks.
+        # Precedence: explicit per-call model > escalation-ladder force >
+        # role/tier router (W4) which itself falls back to the per-phase router.
+        chosen = model or _FORCE_MODEL.get() or settings.model_for_role(role, phase)
+        prompt_chars = len(prompt or "")
+        self.pipeline._check_context_budget(role, item_id, prompt_chars, chosen)
         try:
-            chosen = model or settings.model_for_phase(phase)
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
@@ -285,12 +339,12 @@ class _UsageTracker:
             # exactly what the operator wants to inspect.
             self.pipeline._record_interaction(
                 item_id=item_id, phase=phase, persona=role, prompt=prompt,
-                response="", ok=False, error=str(exc),
+                response="", ok=False, error=str(exc), model=chosen or "",
             )
             self.pipeline.monitor.agent_call(
                 role=role, item_id=item_id,
                 duration_ms=(time.monotonic() - _t0) * 1000,
-                ok=False, error=str(exc),
+                ok=False, error=str(exc), model=chosen or "", prompt_chars=prompt_chars,
             )
             # Usage-window watchdog (M2): an exhausted Claude session window
             # triggers a clean stop + scheduled auto-resume, then the error
@@ -304,6 +358,22 @@ class _UsageTracker:
         usage.input_tokens += res.input_tokens
         usage.output_tokens += res.output_tokens
         usage.agent_calls += 1
+        # W4: per-tier cost ledger. Attribute this call's tokens/cost to its cost
+        # tier (boss/worker/checker). When the runner reports no cost (Codex/
+        # OpenAI/Ollama), estimate it from the tier's configured per-1M prices so
+        # the "$X on the meter" story holds across providers.
+        tier = settings.tier_for_role(role) or "unrouted"
+        tier_cost = res.cost_usd
+        if tier_cost <= 0.0:
+            tier_cost = (
+                res.input_tokens / 1_000_000 * settings.tier_price_in.get(tier, 0.0)
+                + res.output_tokens / 1_000_000 * settings.tier_price_out.get(tier, 0.0)
+            )
+            usage.cost_usd += tier_cost  # fold the estimate into the headline total too
+        usage.cost_by_tier[tier] = usage.cost_by_tier.get(tier, 0.0) + tier_cost
+        usage.input_tokens_by_tier[tier] = usage.input_tokens_by_tier.get(tier, 0) + res.input_tokens
+        usage.output_tokens_by_tier[tier] = usage.output_tokens_by_tier.get(tier, 0) + res.output_tokens
+        usage.calls_by_tier[tier] = usage.calls_by_tier.get(tier, 0) + 1
         # Per-iteration breakdown: mirror the same deltas into this iteration's
         # bucket (created on first use) so the UI can show cost/tokens per iteration.
         it_usage = self.pipeline.state.iteration_usage.setdefault(
@@ -335,7 +405,7 @@ class _UsageTracker:
         # Capture the round-trip for the live item-activity view (O2).
         self.pipeline._record_interaction(
             item_id=item_id, phase=phase, persona=role, prompt=prompt,
-            response=res.text, ok=True,
+            response=res.text, ok=True, model=chosen or "",
             input_tokens=res.input_tokens, output_tokens=res.output_tokens,
             cost_usd=res.cost_usd, duration_ms=res.duration_ms,
         )
@@ -343,6 +413,7 @@ class _UsageTracker:
             role=role, item_id=item_id,
             duration_ms=res.duration_ms or (time.monotonic() - _t0) * 1000,
             ok=True, in_tokens=res.input_tokens, out_tokens=res.output_tokens,
+            model=chosen or "", prompt_chars=prompt_chars,
         )
         self.pipeline._sync()  # persist + broadcast usage as it accrues
         return res
@@ -378,6 +449,9 @@ class Pipeline:
         # seulement declared_overlap) tant qu'un rival potentiel est en vol —
         # un retry ne doit jamais pouvoir re-conflicter avec un item en cours.
         self._conflict_retry_ids: set[str] = set()
+        # W2: wrong-test arbitrations spent per item this run (bounded by
+        # settings.arbitration_max) — a loop of test rewrites would be checker erosion.
+        self._arbitration_count: dict[str, int] = {}
         self._delivery_blocked = False
         self._resume_event = asyncio.Event()
         self._resume_event.set()  # set = running, cleared = paused
@@ -444,6 +518,230 @@ class Pipeline:
         if name in self._profile_overrides:
             return self._profile_overrides[name]
         return getattr(settings, name)
+
+    def _check_context_budget(self, role: str, item_id: str, prompt_chars: int, model: str | None) -> None:
+        """W0.4: context-budget telemetry. Silent truncation of an over-long prompt
+        is a classic source of 'mysteriously dumb' agent behaviour that would
+        otherwise burn escalation-ladder rungs (W1) on an unwinnable prompt. We do
+        not truncate here — just flag when a prompt approaches the configured
+        budget so it surfaces in the timeline. Best-effort; never raises."""
+        try:
+            budget = int(getattr(settings, "context_warn_chars", 0) or 0)
+            if budget <= 0 or prompt_chars < budget:
+                return
+            approx_tokens = prompt_chars // 4  # coarse chars→tokens heuristic
+            self.monitor.event(
+                "context_budget", role=role or "?", item=item_id,
+                prompt_chars=prompt_chars, approx_tokens=approx_tokens,
+                model=model or "", budget_chars=budget,
+            )
+            self._log(
+                f"ctx:{item_id}",
+                f"⚠️ Prompt volumineux ({prompt_chars} car. ≈ {approx_tokens} tokens) "
+                f"pour {role or '?'} — proche du budget de contexte.",
+            )
+        except Exception:
+            return
+
+    # ------------------------------------------------- W0.5 anti-cheating guards
+
+    _GUARD_SKIP_SEGMENTS = frozenset(
+        {".venv", "venv", "node_modules", ".git", "__pycache__", ".pytest_cache", "dist", "build"}
+    )
+
+    def _iter_ws_py_files(self, ws):
+        """Yield (relposix, Path) for every .py file in the workspace, skipping
+        vendored / build / VCS dirs. Best-effort; swallows FS errors."""
+        root = Path(ws)
+        try:
+            for p in root.rglob("*.py"):
+                rel = p.relative_to(root).as_posix()
+                if self._GUARD_SKIP_SEGMENTS & set(rel.split("/")):
+                    continue
+                yield rel, p
+        except OSError:
+            return
+
+    def _snapshot_test_files(self, ws) -> dict[str, bytes]:
+        """W0.5-T05: capture the current bytes of every QA-authored test file, so
+        a dev turn that mutates one can be detected (and, in strict mode, reverted)
+        afterwards. Keyed by workspace-relative posix path. Test files are small
+        and few, so keeping their content in memory is cheap."""
+        snap: dict[str, bytes] = {}
+        if settings.test_tamper_guard == "off":
+            return snap
+        for rel, p in self._iter_ws_py_files(ws):
+            if guards.modified_test_files([rel], []):  # classifies rel as a test file
+                try:
+                    snap[rel] = p.read_bytes()
+                except OSError:
+                    continue
+        return snap
+
+    async def _achanged_paths(self, ws) -> list[str]:
+        """Workspace paths changed since HEAD (best-effort, via git porcelain).
+        Empty on any failure or non-repo — the guards then simply no-op."""
+        try:
+            code, out = await self._agit(ws, "status", "--porcelain")
+        except Exception:
+            return []
+        if code != 0:
+            return []
+        paths: list[str] = []
+        for line in (out or "").splitlines():
+            entry = line[3:].strip() if len(line) > 3 else ""
+            if not entry:
+                continue
+            if "->" in entry:  # rename: keep the destination
+                entry = entry.split("->")[-1].strip()
+            paths.append(entry.strip('"'))
+        return paths
+
+    async def _arun_cheat_guards(self, story, ws, tests_before: dict[str, bytes]) -> list[str]:
+        """W0.5-HOOK: run the enabled anti-cheating / quality guards over the dev's
+        just-produced changes. Returns the list of guard verdict signatures found
+        (for the recovery machine / lessons). Warn mode = detect + log; strict mode
+        = additionally revert tampered tests. Fully best-effort — a guard failure
+        must never break a build."""
+        findings: list[str] = []
+        sid = getattr(story, "id", "?")
+
+        def _record(verdict: str, detail: str, mode: str) -> None:
+            findings.append(signatures.guard_signature(verdict, detail))
+            self.monitor.event("guard", item=sid, verdict=verdict, detail=detail[:200], mode=mode)
+            self._log(f"guard:{sid}", f"{'⛔' if mode == 'strict' else '⚠️'} {verdict}: {detail}")
+
+        # --- T05 test tampering ------------------------------------------------
+        mode = settings.test_tamper_guard
+        if mode != "off" and tests_before:
+            root = Path(ws)
+            for rel, original in tests_before.items():
+                p = root / rel
+                try:
+                    now = p.read_bytes() if p.exists() else None
+                except OSError:
+                    now = None
+                if now != original:
+                    _record(signatures.TAMPERED, rel, mode)
+                    if mode == "strict":
+                        try:  # restore the QA-authored test verbatim
+                            p.parent.mkdir(parents=True, exist_ok=True)
+                            p.write_bytes(original)
+                            self._log(f"guard:{sid}", f"↩️ test restauré : {rel}")
+                        except OSError:
+                            pass
+
+        # The scope/skeleton/import guards operate on the dev's changed files.
+        need_changed = any(
+            getattr(settings, attr) != "off"
+            for attr in ("scope_guard", "skeleton_guard", "import_guard")
+        )
+        changed = await self._achanged_paths(ws) if need_changed else []
+        changed_py = [c for c in changed if c.endswith(".py")]
+
+        # --- T06 scope (declared file claims) ---------------------------------
+        mode = settings.scope_guard
+        if mode != "off" and changed:
+            claims = self._story_file_claims(story)
+            if claims:
+                for rel in guards.out_of_scope_paths(changed, claims):
+                    _record(signatures.OUT_OF_SCOPE, rel, mode)
+
+        # --- T07 skeleton implementations -------------------------------------
+        mode = settings.skeleton_guard
+        if mode != "off":
+            root = Path(ws)
+            for rel in changed_py:
+                if guards.modified_test_files([rel], []):
+                    continue  # skeleton check targets implementation, not tests
+                try:
+                    src = (root / rel).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                for issue in guards.detect_skeleton(src, rel):
+                    _record(signatures.SKELETON, f"{rel}: {issue}", mode)
+
+        # --- T10 hallucinated imports -----------------------------------------
+        mode = settings.import_guard
+        if mode != "off":
+            deps = self._declared_deps(ws)
+            local = self._local_modules(ws)
+            stdlib = guards.default_stdlib()
+            root = Path(ws)
+            for rel in changed_py:
+                try:
+                    src = (root / rel).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+                for name in guards.unresolved_imports(src, deps, stdlib, local):
+                    _record("unresolved_import", f"{rel}: {name}", mode)
+
+        return findings
+
+    def _story_file_claims(self, story) -> list[str]:
+        """Declared file scope for a story: the stream's file_root when streams are
+        on, else nothing (→ scope guard no-ops). Kept defensive."""
+        try:
+            if not self._setting("streams_enabled"):
+                return []
+            stream = self._story_stream(story)
+            root = getattr(stream, "file_root", "") or ""
+            return [root] if root else []
+        except Exception:
+            return []
+
+    def _declared_deps(self, ws) -> set[str]:
+        """Top-level distribution names declared in the workspace manifests
+        (pyproject [project.dependencies] + requirements*.txt). Best-effort."""
+        deps: set[str] = set()
+        root = Path(ws)
+        try:
+            pyproject = root / "pyproject.toml"
+            if pyproject.exists():
+                import tomllib
+
+                data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+                proj = data.get("project", {}) if isinstance(data, dict) else {}
+                for spec in proj.get("dependencies", []) or []:
+                    deps.add(_dep_top_name(str(spec)))
+                for group in (proj.get("optional-dependencies", {}) or {}).values():
+                    for spec in group or []:
+                        deps.add(_dep_top_name(str(spec)))
+        except Exception:
+            pass
+        try:
+            for req in root.glob("requirements*.txt"):
+                for line in req.read_text(encoding="utf-8", errors="replace").splitlines():
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        deps.add(_dep_top_name(line))
+        except Exception:
+            pass
+        deps.discard("")
+        return deps
+
+    def _local_modules(self, ws) -> set[str]:
+        """Import names that resolve to the generated project itself (its package
+        plus any top-level module/package dirs in the workspace)."""
+        local: set[str] = set()
+        try:
+            local.add(workspace.package_name(self.state).replace("-", "_"))
+        except Exception:
+            pass
+        root = Path(ws)
+        try:
+            for child in root.iterdir():
+                name = child.name
+                if name.startswith(".") or name in self._GUARD_SKIP_SEGMENTS:
+                    continue
+                if child.is_dir() and (child / "__init__.py").exists():
+                    local.add(name)
+                elif child.is_file() and name.endswith(".py"):
+                    local.add(name[:-3])
+        except OSError:
+            pass
+        local.discard("")
+        return local
 
     def _block_delivery(self, message: str, *, source: str = "delivery") -> None:
         self._delivery_blocked = True
@@ -1964,6 +2262,8 @@ class Pipeline:
             partial=self._setting("partial_delivery_enabled"),
         )
         delivery_state.apply_definition_result(self.state, result)
+        self._report_traceability(all_iterations)
+        self._log_cost_counterfactual()
         if result.blockers:
             self._delivery_blocked = True
             detail = "\n".join(f"- {i.message}" for i in result.blockers[:8])
@@ -2285,10 +2585,63 @@ class Pipeline:
 
     # ------------------------------------------------------------ PLAN (PO)
 
+    async def _amaybe_build_constitution(self) -> None:
+        """W3 — derive the project constitution once (after SPEC, before PLAN) and
+        COMPILE it: executable rules become pytest files under tests/constitution/
+        (they then ride the normal suite every round with zero new enforcement),
+        command rules feed the delivery gate, and non-compilable rules become
+        advisory guidance injected into the dev/QA prompts. Best-effort; a failure
+        never blocks planning."""
+        if not settings.constitution_enabled or self.state.constitution:
+            return
+        try:
+            rules = await constitution_lib.aderive_constitution(
+                self._tracked,
+                brief=self.state.brief or self.state.goal,
+                project_name=self.state.name,
+                max_rules=settings.constitution_max_rules,
+            )
+        except AgentError as exc:
+            self._log("constitution", f"Constitution indisponible ({exc}) — ignorée.")
+            return
+        if not rules:
+            return
+        compiled = constitution_lib.compile_rules(rules)
+        ws = workspace_dir(self.state.id)
+        written: list[str] = []
+        for rel, content in compiled.get("tests", []):
+            try:
+                p = ws / rel
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(content, encoding="utf-8")
+                written.append(rel)
+            except OSError:
+                continue
+        self.state.constitution = rules
+        self.state.constitution_test_paths = written
+        # Advisory (non-executable) rules → build guidance, so dev/QA see them.
+        for r in compiled.get("advisory", []):
+            g = f"[Constitution] {r.get('statement', '')}".strip()
+            if g and g not in self.state.build_guidance:
+                self.state.build_guidance.append(g)
+        self._log(
+            "constitution",
+            f"Constitution : {len(written)} règle(s) exécutable(s) sous "
+            f"tests/constitution/, {len(compiled.get('commands', []))} commande(s), "
+            f"{len(compiled.get('advisory', []))} advisory.",
+        )
+        self.monitor.event(
+            "constitution", rules=len(rules), tests=len(written),
+            commands=len(compiled.get("commands", [])),
+            advisory=len(compiled.get("advisory", [])),
+        )
+        self._sync()
+
     async def _aplan_phase(self) -> None:
         self.state.phase = PipelinePhase.PLAN
         self._sync()
         pkg = workspace.package_name(self.state)
+        await self._amaybe_build_constitution()  # W3: standard-once, enforced every round
         plan: dict = {}
         # PO pipeline (RFC po-pipeline-v2): the multi-stage PO replaces the
         # mono-pass maker AND its judge-first review (_arefine_plan). Any
@@ -2554,13 +2907,21 @@ class Pipeline:
             await self._agit(ws, "reset", "--hard", "HEAD")
             await self._agit(ws, "clean", "-fd")
 
+        # W5.3 checker independence: give the critic the ACTUAL changes (the last
+        # commit's diff), not the dev's self-narrative, so its review targets what
+        # really changed. The critic still reads the files in cwd too.
+        _, diff = await self._agit(ws, "show", "--stat", "--patch", "HEAD")
+        diff_block = f"\n\nDiff des changements (git show HEAD) :\n{(diff or '')[:8000]}" if diff else ""
         try:
             outcome = await refine.arefine(
                 self._tracked,
                 role="dev",
                 kind=f"le code produit pour la story {story.id} (fichiers dans le répertoire courant)",
                 criteria=prompts.CODE_CRITERIA,
-                initial_text=f"Code de la story {story.id} — lis les fichiers du répertoire courant.",
+                initial_text=(
+                    f"Code de la story {story.id} — lis les fichiers du répertoire "
+                    f"courant.{diff_block}"
+                ),
                 revise=_revise,
                 accept=_accept,
                 rollback=_rollback,
@@ -2951,6 +3312,25 @@ class Pipeline:
                 story, "retry", attempt=story.attempts,
                 max_attempts=settings.dev_max_attempts, sync=False,
             )
+        # W1: escalation ladder — a retry climbs to a stronger model, so the
+        # expensive model is only reached by a task the cheaper ones failed. Set
+        # per this worker's Task context (like _BUILD_ITEM); attempt 1 stays on
+        # the base rung (normal routing).
+        if (
+            story.attempts > 1
+            and settings.escalate_on_retry_enabled
+            and settings.model_ladder
+        ):
+            forced = recovery.ladder_model(story.attempts, settings.model_ladder)
+            if forced:
+                _FORCE_MODEL.set(forced)
+                self.monitor.event(
+                    "escalate", item=story.id, attempt=story.attempts, model=forced,
+                )
+                self._log(
+                    f"dev:{story.id}",
+                    f"⬆️ Escalade modèle (tentative {story.attempts}/{settings.dev_max_attempts}) → {forced}",
+                )
         self._sync()
         ws = workspace_dir(self.state.id)
         pkg = workspace.package_name(self.state)
@@ -2997,11 +3377,21 @@ class Pipeline:
                         previous_failure=previous_failure,
                     )
                     dev_persona = persona("dev")
+                # W0.5-T05: snapshot QA-authored tests before the dev turn so
+                # tampering (editing tests to pass) is detectable afterwards.
+                tests_before = self._snapshot_test_files(ws)
                 result = await self._tracked.arun(
                     dev_prompt,
                     system_prompt=dev_persona,
                     cwd=ws,
                 )
+                # W0.5-HOOK: anti-cheating / quality guards over the dev's changes
+                # (tamper/scope/skeleton/import). Advisory by default; strict mode
+                # reverts tampered tests. Findings are recorded on the story so the
+                # recovery machine (W1) and lessons (W5.6) can use them.
+                guard_findings = await self._arun_cheat_guards(story, ws, tests_before)
+                if guard_findings:
+                    story.guard_findings = list(guard_findings)
                 try:
                     reply = extract_json(result.text)
                 except AgentError:
@@ -3095,6 +3485,11 @@ class Pipeline:
                     if story.attempts < settings.dev_max_attempts:
                         story.status = StoryStatus.TODO  # will be rescheduled
                         self._set_stage(story, BuildStage.QUEUED, sync=False)  # B1: requeue
+                    elif await self._amaybe_arbitrate_wrong_test(
+                        story, ws, pkg, tail, is_frontend
+                    ):
+                        # W2.2: a wrong test was corrected and the suite went green.
+                        pass
                     else:
                         story.status = StoryStatus.FAILED
                         self._set_stage(story, BuildStage.FAILED, sync=False)  # B1
@@ -3505,6 +3900,285 @@ class Pipeline:
                 )
             )
         return out
+
+    def _log_cost_counterfactual(self) -> None:
+        """W4: the "$8 vs $100" line. Report the per-tier ledger and, when the boss
+        tier has a price, the counterfactual of running EVERY token through the
+        boss model (frontier-only) versus the actual tiered spend. Best-effort."""
+        if not settings.role_routing_enabled:
+            return
+        try:
+            u = self.state.usage
+            if not u.calls_by_tier:
+                return
+            parts = [
+                f"{tier}: {u.calls_by_tier.get(tier, 0)} appels, "
+                f"{u.cost_by_tier.get(tier, 0.0):.4f}$"
+                for tier in ("boss", "worker", "checker", "unrouted")
+                if u.calls_by_tier.get(tier)
+            ]
+            self._log("cost", "💵 Répartition par tier — " + " · ".join(parts))
+            boss_out = settings.tier_price_out.get("boss", 0.0)
+            boss_in = settings.tier_price_in.get("boss", 0.0)
+            if boss_out or boss_in:
+                frontier = (
+                    u.input_tokens / 1_000_000 * boss_in
+                    + u.output_tokens / 1_000_000 * boss_out
+                )
+                self.monitor.event(
+                    "cost_counterfactual", actual=round(u.cost_usd, 4),
+                    frontier_only=round(frontier, 4),
+                )
+                if frontier > 0:
+                    self._log(
+                        "cost",
+                        f"💵 Contrefactuel : {u.cost_usd:.2f}$ réel vs "
+                        f"{frontier:.2f}$ si tout passait par le modèle boss "
+                        f"(×{frontier / u.cost_usd:.1f})" if u.cost_usd else "",
+                    )
+        except Exception:
+            return
+
+    def _report_traceability(self, all_iterations: bool) -> None:
+        """W2.0b — advisory AC↔test coverage report. Complements the delivery
+        gate's per-criterion green-evidence check with SOURCE-level traceability:
+        acceptance criteria with no test that names them, and ORPHAN tests naming
+        an AC id that does not exist. Best-effort; never blocks."""
+        if not settings.ac_traceability_enabled:
+            return
+        try:
+            stories = (
+                self.state.stories if all_iterations
+                else self.state.stories_of_iteration(self.state.iteration)
+            )
+            all_ac_ids = {c.id for s in stories for c in s.acceptance_criteria}
+            if not all_ac_ids:
+                return
+            ws = workspace_dir(self.state.id)
+            report = traceability.coverage_report(all_ac_ids, self._collect_test_sources(ws))
+            uncovered, orphans = report.get("uncovered", []), report.get("orphans", [])
+            self.monitor.event(
+                "traceability", covered=len(report.get("covered", [])),
+                uncovered=len(uncovered), orphans=len(orphans),
+            )
+            if uncovered:
+                msg = f"Traçabilité : {len(uncovered)} critère(s) sans test nommé ({', '.join(uncovered[:6])})."
+                delivery_state.append_issue(self.state, msg)
+                self._log("traceability", "⚠️ " + msg)
+            if orphans:
+                self._log(
+                    "traceability",
+                    f"⚠️ {len(orphans)} test(s) orphelin(s) référencent un AC inexistant "
+                    f"({', '.join(orphans[:6])}).",
+                )
+        except Exception:
+            return
+
+    async def _amaybe_propose_amendment(self, story: UserStory, acceptance: str, reason: str) -> None:
+        """W5.1 — when a failure is a genuine spec contradiction, propose a MINIMAL
+        amendment, run an INDEPENDENT weakening check, and queue the survivor as a
+        HUMAN-PENDING proposal (never auto-applied unless AMENDMENT_AUTO). A system
+        that could rewrite the criteria it fails to meet must not be able to
+        legalize failure — hence the independent gate + human default. Best-effort."""
+        if not settings.design_amendment_enabled:
+            return
+        if len(self.state.pending_amendments) >= settings.amendment_max_depth:
+            return
+        try:
+            proposal = await amendment.apropose_safe_amendment(
+                self._tracked,
+                story_title=story.title,
+                acceptance=acceptance,
+                failure_context=reason,
+                target_hint="acceptance_criteria",
+            )
+        except AgentError:
+            return
+        if not proposal:
+            return
+        record = {"story_id": story.id, **proposal}
+        self.state.pending_amendments.append(record)
+        safe = bool(proposal.get("approved_safe"))
+        self.monitor.event(
+            "amendment", item=story.id, target=proposal.get("target", ""),
+            approved_safe=safe, auto=settings.amendment_auto,
+        )
+        if not safe:
+            self._log(
+                f"amend:{story.id}",
+                "🛑 Amendement proposé REJETÉ (affaiblirait l'exigence) — "
+                f"{proposal.get('weakening_reason', '')}",
+            )
+            return
+        if settings.amendment_auto:
+            # Opt-in unattended apply: record the applied change (the actual AC
+            # edit is left to the next planning pass reading pending_amendments).
+            self._log(f"amend:{story.id}", "✍️ Amendement sûr appliqué automatiquement (AMENDMENT_AUTO).")
+            self._chat(
+                ChatRole.SYSTEM,
+                f"[{story.id}] ✍️ Amendement appliqué : {proposal.get('rationale', '')}",
+            )
+        else:
+            self._notify(
+                "warning", "Amendement de spec proposé",
+                f"{story.id} : {proposal.get('rationale', '')} — en attente de validation humaine.",
+            )
+            self._log(f"amend:{story.id}", "⏸️ Amendement sûr en attente de validation humaine.")
+
+    def _record_arbitration_lesson(self) -> None:
+        """W5.6 — durable lesson from a wrong-test arbitration, injected into later
+        QA/Dev prompts via ``_effective_lessons``. Bounded like the retro lessons."""
+        lesson = (
+            "Un test QA a été jugé FAUX (il affirmait un comportement absent des "
+            "critères d'acceptance) : n'affirmer QUE ce que les critères exigent, "
+            "jamais un comportement non spécifié."
+        )
+        if lesson not in self.state.lessons:
+            self.state.lessons.append(lesson)
+            self.state.lessons = self.state.lessons[-settings.retro_max_lessons:]
+
+    def _collect_test_sources(self, ws) -> dict[str, str]:
+        """Read every test file's source in the workspace (workspace-relative
+        posix path → text). Best-effort; used to feed the arbiter / traceability."""
+        out: dict[str, str] = {}
+        for rel, p in self._iter_ws_py_files(ws):
+            if guards.modified_test_files([rel], []):
+                try:
+                    out[rel] = p.read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    continue
+        return out
+
+    def _story_acceptance_text(self, story: UserStory) -> str:
+        """The story's acceptance criteria + Gherkin as one block — the arbiter's
+        ground truth (what SHOULD be asserted)."""
+        parts = []
+        for c in story.acceptance_criteria:
+            parts.append(f"- [{c.id}] {c.text}")
+        if story.gherkin.strip():
+            parts.append("\nGherkin:\n" + story.gherkin.strip())
+        return "\n".join(parts)
+
+    async def _amaybe_arbitrate_wrong_test(
+        self, story: UserStory, ws, pkg: str, tail: str, is_frontend: bool
+    ) -> bool:
+        """W2.2 — the video's "who checks the checker". A story that exhausted its
+        dev attempts gets ONE boss-tier arbitration: is the failing TEST wrong
+        (contradicts the acceptance criteria)? If the arbiter rules ``fix_test``, a
+        checker-tier agent corrects the test per the arbiter's instructions and the
+        suite is rerun; a green rerun recovers the story. ``fix_impl`` /
+        ``spec_contradiction`` confirm the failure (the story stays failed; a
+        spec contradiction is logged for the human-gated amendment of Wave 5).
+        Executed facts are never overruled — only judgment about what the test
+        SHOULD assert. Best-effort; any error falls through to the normal FAILED."""
+        if not settings.dispute_escalation_enabled or is_frontend:
+            return False
+        if not story.acceptance_criteria:
+            return False  # no ground truth to arbitrate against
+        if self._arbitration_count.get(story.id, 0) >= settings.arbitration_max:
+            return False
+        self._arbitration_count[story.id] = self._arbitration_count.get(story.id, 0) + 1
+
+        acceptance = self._story_acceptance_text(story)
+        test_sources = self._collect_test_sources(ws)
+        test_blob = "\n\n".join(f"# file: {p}\n{src}" for p, src in test_sources.items())
+        try:
+            _, diff = await self._agit(ws, "diff", "HEAD")
+        except Exception:
+            diff = ""
+
+        self._set_recovery(story, "arbitration")  # B1 stage badge
+        self._log(f"arbiter:{story.id}", "⚖️ Arbitrage : le test en échec contredit-il les critères ?")
+        try:
+            ruling = await arbitration.aarbitrate_test(
+                self._tracked,
+                story_title=story.title,
+                acceptance=acceptance,
+                test_source=test_blob,
+                failure_output=tail,
+                impl_diff=diff or "",
+                cwd=ws,
+            )
+        except AgentError as exc:
+            self._log(f"arbiter:{story.id}", f"Arbitrage indisponible ({exc}) — échec maintenu.")
+            return False
+
+        verdict = str(ruling.get("verdict") or "")
+        reason = str(ruling.get("reason") or "")
+        instructions = str(ruling.get("instructions") or "")
+        self.monitor.event("arbitration", item=story.id, verdict=verdict, reason=reason[:200])
+        self._log(f"arbiter:{story.id}", f"Verdict : {verdict} — {reason}")
+
+        if verdict != arbitration.FIX_TEST:
+            # fix_impl → the test was right, the story genuinely failed.
+            # spec_contradiction → out of scope here; recorded for W5 amendment.
+            if verdict == arbitration.SPEC_CONTRADICTION:
+                story.last_error = (f"[arbitrage: contradiction de spec] {reason}\n" + (tail or ""))[:2000]
+                self._chat(
+                    ChatRole.SYSTEM,
+                    f"[{story.id}] ⚖️ Arbitre : contradiction dans les critères — "
+                    "proposition d'amendement (Wave 5).",
+                )
+                await self._amaybe_propose_amendment(story, acceptance, reason)
+            return False
+
+        # fix_test: a checker-tier agent rewrites the failing test to match the
+        # acceptance criteria (per the arbiter's instructions), then we RERUN — the
+        # executed suite, not the agent's word, decides success.
+        self._log(f"arbiter:{story.id}", "🔧 Correction du test erroné (agent QA) puis re-vérification.")
+        # W3 immutability: constitution tests are the project's non-negotiable
+        # floor — snapshot them so an over-eager fix cannot weaken them.
+        protected = {
+            rel: (ws / rel).read_bytes()
+            for rel in self.state.constitution_test_paths
+            if (ws / rel).exists()
+        }
+        try:
+            await self._tracked.arun(
+                prompts_arbiter_fix_test(story, pkg, acceptance, instructions, test_blob),
+                system_prompt=persona("qa"),
+                cwd=ws,
+            )
+        except AgentError as exc:
+            self._log(f"arbiter:{story.id}", f"Correction du test échouée ({exc}) — échec maintenu.")
+            return False
+        for rel, original in protected.items():  # restore any touched constitution test
+            p = ws / rel
+            try:
+                if not p.exists() or p.read_bytes() != original:
+                    p.write_bytes(original)
+                    self._log(f"arbiter:{story.id}", f"↩️ règle de constitution protégée : {rel}")
+            except OSError:
+                pass
+
+        ok, output, real = await self._arun_pytest(ws=ws)
+        if not ok:
+            story.last_error = (output or tail)[-2000:]
+            self._log(f"arbiter:{story.id}", "❌ Suite toujours rouge après correction du test.")
+            return False
+
+        # Recovered: mark the story done exactly like the normal green path.
+        self._apply_test_states(story, [], real)
+        if real:
+            self.state.green_tests = sorted(n for n, o in real.items() if o == "passed")
+        story.status = StoryStatus.DONE
+        for test in story.test_plan:
+            if test.status == TestState.NONEXISTENT:
+                test.status = TestState.GREEN
+        await self._acommit_story(ws, story.id)
+        self._set_recovery(story, "", sync=False)
+        self._set_stage(story, BuildStage.DONE, sync=False)
+        self._log(f"arbiter:{story.id}", "✅ Test erroné corrigé — suite verte, story livrée.")
+        self._chat(
+            ChatRole.SYSTEM,
+            f"[{story.id}] ⚖️ Le test était faux (pas le code) — corrigé selon les "
+            "critères d'acceptance, suite verte.",
+        )
+        # W5.6: the factory learns from its own disputes — a fix_test ruling is
+        # evidence of HOW the QA agent writes wrong tests. Feed it into the durable
+        # lessons that seed the QA/Dev prompts of later stories/iterations.
+        self._record_arbitration_lesson()
+        return True
 
     async def _amaybe_split_on_failure(self, item, subject: UserStory, target, *, force: bool = False) -> bool:
         """P6 — adaptive split-on-failure (the « unit too big for one agent session »
@@ -5686,13 +6360,170 @@ class Pipeline:
                 ok, output, results = await asyncio.to_thread(_run)
         else:
             ok, output, results = await asyncio.to_thread(_run)
+        # W0.5-T08: flaky-check quarantine. A red suite is rerun once; if it now
+        # passes, the failure was non-deterministic (a flake), not real — we keep
+        # the green result and record the flake so the recovery ladder (W1) never
+        # escalates a model over a test that just needed a second run. A suite that
+        # stays red is a real failure and is returned untouched.
+        if not ok and settings.flaky_rerun_enabled:
+            if shared:
+                async with self._shared_suite_lock:
+                    self._guard_shared_venv(ws)
+                    ok2, output2, results2 = await asyncio.to_thread(_run)
+            else:
+                ok2, output2, results2 = await asyncio.to_thread(_run)
+            if ok2:
+                item = _BUILD_ITEM.get() or f"phase:{self.state.phase.value}"
+                self.monitor.event("flaky", item=item, note="red suite passed on rerun")
+                self._log(item, "⚠️ Suite rouge devenue verte au 2ᵉ passage — flaky (non comptée comme échec).")
+                ok, output, results = ok2, output2, results2
         self.monitor.pytest(
             item_id=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",
             ok=ok, summary=(output or "")[-500:],
         )
         return ok, output, results
 
+    # ------------------------------- Integration repair loop (fix-until-green)
+
+    async def _arepair_delivery(self, source: str, report: str, averify) -> tuple[bool, str]:
+        """Fix-until-green loop for the delivery gates (smoke run, runtime
+        integration). The delivered app failed a REAL execution check while its
+        test suite is green — a wiring problem (static mount vs asset paths,
+        unregistered router, uninitialised DB…) that no mocked unit test sees.
+        Dispatch a Dev agent with the gate's failure report, require the suite
+        to STAY green (git rollback otherwise), then re-run the gate — up to
+        ``INTEGRATION_FIX_ATTEMPTS`` times. Returns ``(ok, latest detail)``."""
+        detail = report
+        attempts = int(self._setting("integration_fix_attempts") or 0)
+        if attempts <= 0 or settings.fake_agents:
+            return False, detail
+        # Finding 4 : une panne d'INFRA (lancement impossible, port tenu par un
+        # tiers) ne se répare pas par un agent — on ne gaspille aucune tentative.
+        if self._smoke_looks_like_infra(report):
+            self._log(source, "Échec de forme infra — aucune tentative de réparation dépensée.")
+            return False, detail
+        ws = workspace_dir(self.state.id)
+        if not await self._agit_snapshot(ws, f"pre integration-fix ({source})"):
+            self._log(source, "Réparation impossible (git indisponible) — gate en échec.")
+            return False, detail
+        pkg = workspace.package_name(self.state)
+        for attempt in range(1, attempts + 1):
+            await self._checkpoint()
+            if self._stop_requested:
+                return False, detail
+            self._log(
+                source,
+                f"🔧 Réparation du câblage par un agent Dev (tentative {attempt}/{attempts})…",
+            )
+            self._chat(
+                ChatRole.SYSTEM,
+                f"🔧 Gate {source} en échec — agent Dev dépêché pour réparer "
+                f"(tentative {attempt}/{attempts}).",
+            )
+            self.monitor.event(
+                "integration_fix", source=source, attempt=attempt, detail=detail[:300]
+            )
+            try:
+                await self._tracked.arun(
+                    prompts.dev_fix_integration(
+                        pkg,
+                        detail,
+                        architecture=self.state.architecture,
+                        attempt=attempt,
+                        max_attempts=attempts,
+                    ),
+                    system_prompt=persona("dev"),
+                    cwd=ws,
+                )
+            except AgentError as exc:
+                self._log(source, f"Agent de réparation indisponible : {exc}")
+                return False, detail
+            green, pytest_out, _ = await self._arun_pytest()
+            suite_out, suite_name = pytest_out, "pytest"
+            # Finding 3 : le filet de sécurité ne doit pas être backend-only. Si le
+            # projet a un frontend, sa suite Vitest + build doit AUSSI rester verte,
+            # sinon la réparation a pu casser l'UI sans qu'un test backend le voie.
+            if green and self._has_frontend():
+                fe_green, fe_out, _ = await self._arun_frontend_tests()
+                if not fe_green:
+                    green, suite_out, suite_name = False, fe_out, "frontend (Vitest + build)"
+            if not green:
+                await self._agit(ws, "reset", "--hard", "HEAD")
+                await self._agit(ws, "clean", "-fd")
+                self._log(source, f"La réparation a cassé la suite {suite_name} — rollback.")
+                detail = (
+                    f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
+                    f"(rollback effectué). Sortie {suite_name} :\n{suite_out[-1500:]}"
+                )
+                continue
+            await self._agit(ws, "add", "-A")
+            await self._agit(ws, "commit", "-m", f"integration fix {source} #{attempt}", "--allow-empty")
+            ok, new_detail = await averify()
+            self.monitor.event(
+                "integration_fix_verify",
+                source=source, attempt=attempt, ok=ok, detail=(new_detail or "")[:300],
+            )
+            if ok:
+                self._log(source, f"✅ Câblage réparé (tentative {attempt}) — gate {source} vert.")
+                self._chat(
+                    ChatRole.SYSTEM,
+                    f"🔧 Gate {source} réparé et revalidé (tentative {attempt}).",
+                )
+                return True, new_detail
+            detail = new_detail or detail
+        return False, detail
+
     # ------------------------------------------------- Smoke-run gate (runnability)
+
+    @staticmethod
+    def _smoke_looks_like_infra(detail: str) -> bool:
+        """Un échec de smoke a-t-il une forme INFRA (env cassé) plutôt qu'un bug
+        de câblage réparable ? On ne dépense pas de tentative d'agent pour ça
+        (finding 4) : lancement impossible (uv/python absent) ou port déjà tenu
+        par un process externe. Le miroir sémantique-vs-infra du canari
+        post-merge (``_looks_like_infra_failure``)."""
+        low = (detail or "").lower()
+        return (
+            "lancement impossible" in low
+            or "process externe" in low
+        )
+
+    def _apark_infra(self, source: str, detail: str) -> None:
+        """Gare la livraison en needs_attention pour une panne d'INFRA (finding 4).
+
+        Un rouge d'infra (playwright/node absent, venv cassée, port occupé par un
+        tiers) n'est pas un défaut de code : on ne dépêche PAS d'agent Dev, on
+        bloque la livraison avec un message clair et on notifie bruyamment."""
+        msg = f"{source} : vérification impossible (infra) — {detail}"
+        self._block_delivery(msg, source=source)
+        self.state.regressions.append(msg)
+        self.monitor.event(source, ok=False, infra=True, detail=detail[:300])
+        self._chat(
+            ChatRole.SYSTEM,
+            f"⚠️ Gate {source} : condition d'infra (non réparable par un agent) — "
+            f"{detail[:200]}",
+        )
+        self._notify("error", f"{source} : infra", msg[:200])
+
+    async def _aensure_own_port_free(self, source: str, port: int) -> tuple[bool, str]:
+        """Avant de booter, arrête l'app PROPRE du projet puis vérifie que le port
+        est libre (finding 1). Si le port RESTE occupé, c'est un process EXTERNE :
+        condition d'infra (vérification impossible), pas un échec de code.
+
+        Retourne ``(free, detail)`` — ``free=False`` => port tenu par un tiers."""
+        await self.astop_app()
+        # Laisse le TIME_WAIT / la fermeture du socket se résorber, sinon on
+        # confondrait notre propre serveur à peine arrêté avec un tiers.
+        for _ in range(6):
+            if self._port_is_free(port):
+                return True, ""
+            await asyncio.sleep(0.5)
+        detail = (
+            f"port :{port} déjà occupé par un process externe — "
+            f"vérification impossible"
+        )
+        self._log(source, f"⚠️ {detail}")
+        return False, detail
 
     async def _asmoke_phase(self) -> bool:
         """Deterministic runnability gate (``SMOKE_RUN``): once the suite
@@ -5709,12 +6540,46 @@ class Pipeline:
         lang = toolchain.normalize(self.state.backend_language.value)
         ws = workspace_dir(self.state.id)
         if lang != "python" or not (ws / "main.py").exists() or not (ws / "pyproject.toml").exists():
-            self._log("smoke", f"Smoke run ignoré (langage {lang} non supporté ou pas de main.py).")
+            # Finding 6 : un backend web NON-python saute les deux gates de boot.
+            # Ce n'est pas un skip silencieux : on AVERTIT que la vérification à
+            # l'exécution est indisponible pour ce langage (sans hard-bloquer).
+            if lang != "python" and self._expects_web_app():
+                warn = (
+                    f"⚠️ Vérification à l'exécution indisponible pour un backend "
+                    f"{lang} — le smoke/runtime gate ne pilote que python. "
+                    f"La runnabilité de cette app n'est PAS vérifiée."
+                )
+                self._log("smoke", warn)
+                self._chat(ChatRole.SYSTEM, warn)
+                self.monitor.event("smoke", ok=True, skipped=True, lang=lang)
+            else:
+                self._log("smoke", f"Smoke run ignoré (langage {lang} non supporté ou pas de main.py).")
             return True
         self.monitor.phase("smoke")
+        # Finding 1 : arrête l'app PROPRE du projet et vérifie que le port est
+        # libre AVANT de booter, sinon le gate validerait un serveur périmé/tiers.
+        port = self._resolve_web_port(ws)
+        if self._expects_web_app() or runtime_acceptance._backend_web_candidate(ws):
+            free, port_detail = await self._aensure_own_port_free("smoke", port)
+            if not free:
+                self._apark_infra("smoke", port_detail)
+                return False
         self._log("smoke", "🚀 Smoke run : démarrage de l'application livrée…")
         ok, detail = await asyncio.to_thread(self._smoke_run_python, ws)
         self.monitor.event("smoke", ok=ok, detail=detail[:300])
+        if not ok:
+            # Finding 4 : un échec de forme INFRA (lancement impossible) ne se
+            # répare pas par un agent — on gare directement en needs_attention.
+            if self._smoke_looks_like_infra(detail):
+                self._apark_infra("smoke", detail)
+                return False
+
+            async def _averify() -> tuple[bool, str]:
+                return await asyncio.to_thread(self._smoke_run_python, ws)
+
+            ok, detail = await self._arepair_delivery(
+                "smoke", f"Smoke run échoué : {detail}", _averify
+            )
         if ok:
             self._log("smoke", f"✅ Smoke run OK — {detail}")
             self._chat(ChatRole.SYSTEM, f"🚀 Smoke run : l'application démarre ({detail}).")
@@ -5727,9 +6592,10 @@ class Pipeline:
 
     async def _aruntime_acceptance_phase(self) -> bool:
         """Optional browser/runtime acceptance gate for web/fullstack products."""
+        ws = workspace_dir(self.state.id)
         result = await runtime_acceptance.arun_runtime_acceptance(
             self.state,
-            workspace_dir(self.state.id),
+            ws,
             enabled=self._setting("runtime_acceptance_enabled"),
             timeout_s=settings.runtime_acceptance_timeout_s,
         )
@@ -5738,11 +6604,48 @@ class Pipeline:
                 self._log("runtime", f"Runtime acceptance ignoré : {result.detail}.")
             return True
         self.monitor.event("runtime_acceptance", ok=result.ok, detail=result.detail[:300])
-        if result.ok:
+        # Finding 1 : avant de (re)vérifier, arrête l'app PROPRE et exige le port
+        # libre — le gate ne doit jamais valider un serveur périmé/tiers. Si un
+        # process EXTERNE tient le port : condition d'infra (non réparable).
+        port = self._resolve_web_port(ws)
+        free, port_detail = await self._aensure_own_port_free("runtime", port)
+        if not free:
+            self._apark_infra("runtime", port_detail)
+            return False
+        # Finding 4 : un résultat de forme INFRA (playwright/node absent, port
+        # tiers signalé par le gate JS via exit 2) ne se répare pas par un agent.
+        if not result.ok and result.infra:
+            self._apark_infra("runtime", result.detail)
+            return False
+        ok, detail = result.ok, result.detail
+        if not ok:
+
+            async def _averify() -> tuple[bool, str]:
+                await self._aensure_own_port_free("runtime", port)
+                res = await runtime_acceptance.arun_runtime_acceptance(
+                    self.state,
+                    ws,
+                    enabled=self._setting("runtime_acceptance_enabled"),
+                    timeout_s=settings.runtime_acceptance_timeout_s,
+                )
+                if not res.ok and res.infra:
+                    # Bascule tardive vers l'infra : signalée via un préfixe pour
+                    # que la boucle ne la prenne ni pour un vert ni pour un bug
+                    # réparable — on garera après la boucle.
+                    return False, f"__INFRA__{res.detail}"
+                return res.ok, res.detail
+
+            ok, detail = await self._arepair_delivery(
+                "runtime", f"Intégration full-stack échouée : {detail}", _averify
+            )
+            if not ok and detail.startswith("__INFRA__"):
+                self._apark_infra("runtime", detail[len("__INFRA__"):])
+                return False
+        if ok:
             self._log("runtime", "✅ Runtime acceptance OK.")
             self._chat(ChatRole.SYSTEM, "🧪 Runtime acceptance : parcours navigateur OK.")
             return True
-        msg = f"Runtime acceptance échoué : {result.detail}"
+        msg = f"Runtime acceptance échoué : {detail}"
         self._block_delivery(msg, source="runtime")
         self.state.regressions.append(msg)
         self._notify("error", "Runtime acceptance échoué", msg[:200])
@@ -5785,6 +6688,30 @@ class Pipeline:
         # auto / brownfield: a frontend stream implies a backend serving it.
         return bool(list(workspace.frontend_streams(self.state)))
 
+    def _resolve_web_port(self, ws: Path) -> int:
+        """Port the delivered web app listens on. Delegates to the single source
+        of truth in ``runtime_acceptance`` so the smoke gate and the runtime gate
+        never disagree on the port (finding 2)."""
+        return runtime_acceptance.resolve_web_port(ws)
+
+    @staticmethod
+    def _port_is_free(port: int) -> bool:
+        """Is ``127.0.0.1:<port>`` free (nothing listening)? A ``connect_ex`` that
+        does NOT succeed means no server is accepting connections there."""
+        import socket
+
+        with socket.socket() as s:
+            s.settimeout(1.0)
+            return s.connect_ex(("127.0.0.1", port)) != 0
+
+    def _has_frontend(self) -> bool:
+        """Le projet embarque-t-il un frontend à vérifier ? Un stream frontend
+        déclaré (ST-6), ou un ``frontend/package.json`` sur le disque (finding 3)."""
+        if list(workspace.frontend_streams(self.state)):
+            return True
+        fe = workspace_dir(self.state.id) / "frontend" / "package.json"
+        return fe.exists()
+
     def _smoke_run_python(self, ws: Path) -> tuple[bool, str]:
         """Boot a Python project's entry point and check it is runnable.
 
@@ -5794,7 +6721,6 @@ class Pipeline:
         exit 0 within the timeout. Returns (ok, human-readable detail)."""
         import socket
 
-        text = (ws / "main.py").read_text(encoding="utf-8", errors="replace")
         pyproject = (ws / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
         has_framework = any(
             fw in pyproject
@@ -5811,8 +6737,7 @@ class Pipeline:
         timeout = settings.smoke_run_timeout_s
 
         if is_web:
-            m = re.search(r"port\s*=\s*(\d{4,5})", text)
-            port = int(m.group(1)) if m else settings.smoke_run_port
+            port = self._resolve_web_port(ws)
             try:
                 proc = subprocess.Popen(
                     cmd, cwd=str(ws), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,

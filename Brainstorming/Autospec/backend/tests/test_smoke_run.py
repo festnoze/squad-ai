@@ -183,3 +183,93 @@ def test_smoke_python_cli_nonzero_fails(monkeypatch):
 
     ok, detail = pipeline._smoke_run_python(ws)
     assert ok is False and "non nulle" in detail
+
+
+# --------------------------------------------------- resolve_web_port (finding 2)
+
+def test_pipeline_resolve_web_port_reads_main_py(monkeypatch):
+    monkeypatch.setattr(settings, "smoke_run_port", 8000)
+    state = _state_with_done_story("smoke-port-main")
+    ws = _scaffold(workspace_dir(state.id), web=True, main_py="import uvicorn\nport = 9411\n")
+    pipeline = Pipeline(state, ScriptedRunner())
+    assert pipeline._resolve_web_port(ws) == 9411
+
+
+def test_pipeline_resolve_web_port_falls_back(monkeypatch):
+    monkeypatch.setattr(settings, "smoke_run_port", 8222)
+    state = _state_with_done_story("smoke-port-fb")
+    ws = _scaffold(workspace_dir(state.id), web=True, main_py="import uvicorn  # no port\n")
+    pipeline = Pipeline(state, ScriptedRunner())
+    assert pipeline._resolve_web_port(ws) == 8222
+
+
+# --------------------------------------- finding 1/4 : external port → infra park
+
+async def test_smoke_external_port_occupied_is_infra_not_repair(monkeypatch):
+    """Finding 1/4 : si le port reste tenu par un process EXTERNE après astop_app,
+    c'est une condition d'infra — pas d'agent Dev, needs_attention direct."""
+    from autospec.models import Stream, StreamKind
+
+    monkeypatch.setattr(settings, "smoke_run", True)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    monkeypatch.setattr(settings, "integration_fix_attempts", 2)
+    state = _state_with_done_story("smoke-port-busy")
+    state.streams = [Stream(id="frontend", kind=StreamKind.FRONTEND, language="react", file_root="frontend")]
+    _scaffold(workspace_dir(state.id), web=True)
+
+    async def _stop(self):
+        return None
+
+    monkeypatch.setattr(Pipeline, "astop_app", _stop)
+    monkeypatch.setattr(Pipeline, "_port_is_free", staticmethod(lambda port: False))
+    # Le smoke ne doit JAMAIS être atteint (on gare avant de booter).
+    monkeypatch.setattr(
+        Pipeline, "_smoke_run_python",
+        lambda self, ws: (_ for _ in ()).throw(AssertionError("ne doit pas booter")),
+    )
+    runner = ScriptedRunner()
+    pipeline = Pipeline(state, runner)
+
+    assert await pipeline._asmoke_phase() is False
+    assert pipeline._delivery_blocked is True
+    assert any("process externe" in r for r in state.regressions)
+
+
+async def test_smoke_launch_impossible_is_infra_not_repair(monkeypatch):
+    """Finding 4 : « lancement impossible » (uv/python absent) ne dépense aucune
+    tentative de réparation — needs_attention direct."""
+    monkeypatch.setattr(settings, "smoke_run", True)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    monkeypatch.setattr(settings, "integration_fix_attempts", 2)
+
+    async def _snapshot(self, ws, label):
+        raise AssertionError("aucune réparation ne doit démarrer")
+
+    monkeypatch.setattr(Pipeline, "_agit_snapshot", _snapshot)
+    state = _state_with_done_story("smoke-launch-ko")
+    _scaffold(workspace_dir(state.id), web=True)
+    monkeypatch.setattr(Pipeline, "_smoke_run_python", lambda self, ws: (False, "lancement impossible : uv absent"))
+    pipeline = Pipeline(state, ScriptedRunner())
+
+    assert await pipeline._asmoke_phase() is False
+    assert pipeline._delivery_blocked is True
+    assert any("infra" in r.lower() for r in state.regressions)
+
+
+async def test_smoke_non_python_web_warns_not_silent(monkeypatch):
+    """Finding 6 : un backend web non-python n'est pas skippé silencieusement —
+    un WARNING est journalisé et le gate ne hard-bloque pas."""
+    from autospec.models import BackendLanguage
+
+    monkeypatch.setattr(settings, "smoke_run", True)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    state = _state_with_done_story("smoke-go")
+    state.backend_language = BackendLanguage.GO
+    state.product_profile = "api"  # intent web
+    logs = []
+    monkeypatch.setattr(Pipeline, "_log", lambda self, src, line: logs.append(line))
+    pipeline = Pipeline(state, ScriptedRunner())
+
+    assert await pipeline._asmoke_phase() is True  # pas de hard-block
+    assert pipeline._delivery_blocked is False
+    assert any("indisponible" in line and "go" in line.lower() for line in logs)

@@ -14,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
+# Snapshot the keys the operator set in the actual SHELL, before .env fills the
+# rest. A quality preset (PRESET=verified) overrides .env *defaults* but must
+# still yield to a deliberate shell override — this set is how we tell them apart
+# (mirroring load_dotenv's own "shell wins over .env" precedence).
+_SHELL_ENV_KEYS = frozenset(os.environ.keys())
+
 # Load backend/.env if present (shell env vars still take precedence).
 load_dotenv(BACKEND_DIR / ".env")
 
@@ -71,6 +77,26 @@ def _env_float(name: str, default: float, minimum: float | None = None) -> float
         logger.warning("%s=%s below minimum, clamping to %s", name, value, minimum)
         value = minimum
     return value
+
+
+def _env_mode(name: str, default: str = "off",
+              allowed: tuple[str, ...] = ("off", "warn", "strict")) -> str:
+    """Parse a tri-state guard mode env var (off | warn | strict).
+
+    A bare truthy value (1/true/yes/on) maps to ``warn`` (detect + log, the safe
+    observe-first default); a falsy value to ``off``; an explicit off/warn/strict
+    is honored; anything else warns and falls back."""
+    raw = (os.environ.get(name) or "").strip().lower()
+    if not raw:
+        return default
+    if raw in _TRUTHY:
+        return "warn"
+    if raw in _FALSY:
+        return "off"
+    if raw in allowed:
+        return raw
+    logger.warning("Invalid mode %s=%r, using default %s", name, raw, default)
+    return default
 
 
 def _default_bmad_dir() -> Path:
@@ -138,6 +164,52 @@ def _default_phase_models() -> dict:
     return out
 
 
+# W4: which cost tier each agent persona belongs to. boss = expensive mind
+# (plans, reviews, arbitrates, rules — never codes); worker = cheap coder;
+# checker = mid-tier verifier (critic/judge/qa/evaluator). Personas absent from
+# the map fall through to the phase router.
+PERSONA_TIERS: dict[str, str] = {
+    # boss
+    "pm": "boss", "sm": "boss", "po-structure": "boss", "po-spec": "boss",
+    "po-gherkin": "boss", "analyst": "boss", "architect": "boss",
+    "arbiter": "boss", "classifier": "boss", "constitution": "boss", "retro": "boss",
+    # worker
+    "dev": "worker", "dev-frontend": "worker",
+    # checker
+    "qa": "checker", "critic": "checker", "judge": "checker",
+    "evaluator": "checker", "security-reviewer": "checker",
+    "independence-judge": "checker", "tech-writer": "checker",
+}
+
+
+def _default_model_tiers() -> dict:
+    """W4: per-tier model ids from MODEL_BOSS / MODEL_WORKER / MODEL_CHECKER."""
+    out = {}
+    for tier in ("boss", "worker", "checker"):
+        val = os.environ.get(f"MODEL_{tier.upper()}")
+        if val and val.strip():
+            out[tier] = val.strip()
+    return out
+
+
+def _default_tier_prices(direction: str) -> dict:
+    """USD per 1M tokens per tier (PRICE_BOSS_OUT, PRICE_WORKER_IN, …), used to
+    estimate cost when a runner returns none (Codex/OpenAI/Ollama)."""
+    out = {}
+    for tier in ("boss", "worker", "checker"):
+        out[tier] = _env_float(f"PRICE_{tier.upper()}_{direction.upper()}", 0.0, minimum=0.0)
+    return out
+
+
+def _default_model_ladder() -> list[str]:
+    """W1: the escalation ladder — comma-separated model ids in COST-ASCENDING
+    order (cheapest first). On a retry the recovery machine climbs one rung, so a
+    task only reaches the expensive model if the cheap ones actually failed it.
+    Empty (unset) → escalation is a no-op even when ESCALATE_ON_RETRY is on."""
+    raw = os.environ.get("MODEL_LADDER", "") or ""
+    return [m.strip() for m in raw.split(",") if m.strip()]
+
+
 @dataclass
 class Settings:
     bmad_dir: Path = field(default_factory=_default_bmad_dir)
@@ -157,6 +229,69 @@ class Settings:
     # Per-phase model routing (M3): a cheap model for spec/plan, a strong one for
     # build/refine. Populated from MODEL_<PHASE>; falls back to claude_model.
     phase_models: dict = field(default_factory=_default_phase_models)
+    # W1: model-escalation ladder. When ESCALATE_ON_RETRY is on and MODEL_LADDER
+    # is set, a red story's retry climbs to the next (stronger) rung — so the
+    # expensive model is only reached by tasks the cheap ones actually failed.
+    escalate_on_retry_enabled: bool = field(
+        default_factory=lambda: _env_bool("ESCALATE_ON_RETRY", False)
+    )
+    model_ladder: list = field(default_factory=_default_model_ladder)
+    # W4: role→tier→model routing. When on, an agent's persona maps to a cost
+    # tier (boss/worker/checker) → model, so the expensive mind reviews/plans/
+    # arbitrates while cheap workers code. Off → the per-phase router is unchanged.
+    role_routing_enabled: bool = field(
+        default_factory=lambda: _env_bool("ROLE_ROUTING", False)
+    )
+    model_tiers: dict = field(default_factory=_default_model_tiers)
+    tier_price_in: dict = field(default_factory=lambda: _default_tier_prices("in"))
+    tier_price_out: dict = field(default_factory=lambda: _default_tier_prices("out"))
+    # W1.3 (wired with Wave 2): when a story exhausts its dev attempts, ask a
+    # boss-tier classifier for the root cause (too_big / wrong_test /
+    # spec_contradiction / genuinely_hard) instead of blindly splitting. Off by
+    # default; the recovery machine falls back to split→fail when off.
+    classify_on_exhaustion_enabled: bool = field(
+        default_factory=lambda: _env_bool("CLASSIFY_ON_EXHAUSTION", False)
+    )
+    # W2: wrong-test arbitration ("who checks the checker"). When on, a story that
+    # exhausted its dev attempts gets one boss-tier arbitration: if the failing
+    # test contradicts the acceptance criteria, a checker-tier agent corrects the
+    # TEST (never the criteria) and the suite is rerun. Executed facts are never
+    # overruled. Bounded by arbitration_max per story per iteration.
+    dispute_escalation_enabled: bool = field(
+        default_factory=lambda: _env_bool("DISPUTE_ESCALATION", False)
+    )
+    arbitration_max: int = field(
+        default_factory=lambda: _env_int("ARBITRATION_MAX", 1, minimum=1)
+    )
+    # W2.0: AC<->test traceability. When on, the delivery pipeline reports ACs with
+    # no executed test and orphan tests (asserting behavior no AC required).
+    ac_traceability_enabled: bool = field(
+        default_factory=lambda: _env_bool("AC_TRACEABILITY", False)
+    )
+    # W3: project constitution. When on, a boss-tier phase after SPEC derives a
+    # small set of non-negotiable project-wide rules and COMPILES them to pytest
+    # files under tests/constitution/ (they then ride the normal suite every
+    # round) or delivery-gate commands; non-compilable rules become advisory
+    # (prompt-injected). Off by default.
+    constitution_enabled: bool = field(
+        default_factory=lambda: _env_bool("CONSTITUTION", False)
+    )
+    constitution_max_rules: int = field(
+        default_factory=lambda: _env_int("CONSTITUTION_MAX", 8, minimum=1)
+    )
+    # W5.1: design amendment. When a failure is a genuine spec contradiction, a
+    # boss-tier agent proposes a MINIMAL amendment, an INDEPENDENT check rejects
+    # it if it weakens the requirement, and the survivor is queued HUMAN-PENDING
+    # by default (AMENDMENT_AUTO=1 opts into unattended apply). Off by default.
+    design_amendment_enabled: bool = field(
+        default_factory=lambda: _env_bool("DESIGN_AMENDMENT", False)
+    )
+    amendment_auto: bool = field(
+        default_factory=lambda: _env_bool("AMENDMENT_AUTO", False)
+    )
+    amendment_max_depth: int = field(
+        default_factory=lambda: _env_int("AMENDMENT_MAX_DEPTH", 1, minimum=0)
+    )
     # Agent provider: "claude code" (Claude Code CLI harness, the default),
     # "claude" (Anthropic API direct), "codex" (OpenAI CLI), "openai",
     # "openrouter" or "ollama". Switchable at runtime through POST /api/provider.
@@ -242,6 +377,28 @@ class Settings:
     )
     agent_timeout_s: float = field(
         default_factory=lambda: _env_float("AGENT_TIMEOUT_S", 1800.0, minimum=1.0)
+    )
+    # W0.4 context-budget telemetry: flag (never truncate) a prompt whose size in
+    # characters approaches this budget, so silent context overflow surfaces in
+    # the timeline instead of degrading an agent invisibly. 0 disables the check.
+    context_warn_chars: int = field(
+        default_factory=lambda: _env_int("CONTEXT_WARN_CHARS", 0, minimum=0)
+    )
+    # W0.5 anti-cheating guards & harness hardening. Each is a tri-state mode
+    # (off | warn | strict): warn = detect + log + record a failure signature
+    # (advisory); strict = additionally block/revert so a cut corner cannot
+    # survive its check. Default off; the `verified` preset turns them to warn.
+    test_tamper_guard: str = field(
+        default_factory=lambda: _env_mode("TEST_TAMPER_GUARD", "off")
+    )
+    scope_guard: str = field(default_factory=lambda: _env_mode("SCOPE_GUARD", "off"))
+    skeleton_guard: str = field(default_factory=lambda: _env_mode("SKELETON_GUARD", "off"))
+    import_guard: str = field(default_factory=lambda: _env_mode("IMPORT_GUARD", "off"))
+    # Flaky-check quarantine: rerun a red suite once; a pass-on-rerun is treated
+    # as a flake (logged, not a real failure), so the recovery ladder (W1) never
+    # escalates a model over a non-deterministic test.
+    flaky_rerun_enabled: bool = field(
+        default_factory=lambda: _env_bool("FLAKY_RERUN", False)
     )
     # Semaphore(0) would deadlock the build phase, hence the floor of 1.
     max_parallel_devs: int = field(
@@ -543,12 +700,71 @@ class Settings:
     definition_of_done_strict_criteria: bool = field(
         default_factory=lambda: _env_bool("DOD_STRICT_CRITERIA", False)
     )
+    # ON by default: every delivered web/fullstack build must pass the full
+    # integration check (backend serving the built frontend, assets, API, DB
+    # wiring) before shipping — a green unit suite alone proved able to ship a
+    # blank page (messagerie2). `should_run` still auto-skips CLI/library
+    # projects and demo mode, and profiles keep their explicit overrides.
     runtime_acceptance_enabled: bool = field(
-        default_factory=lambda: _env_bool("RUNTIME_ACCEPTANCE", False)
+        default_factory=lambda: _env_bool("RUNTIME_ACCEPTANCE", True)
     )
     runtime_acceptance_timeout_s: float = field(
         default_factory=lambda: _env_float("RUNTIME_ACCEPTANCE_TIMEOUT_S", 90.0, minimum=10.0)
     )
+    # When a delivery gate (smoke run / runtime integration) fails, dispatch a
+    # Dev agent with the failure report and re-run the gate, up to this many
+    # attempts, before parking the project in needs_attention. 0 disables the
+    # repair loop (a failing gate then blocks immediately, as before).
+    integration_fix_attempts: int = field(
+        default_factory=lambda: _env_int("INTEGRATION_FIX_ATTEMPTS", 2, minimum=0)
+    )
+
+    def __post_init__(self) -> None:
+        # W0.1: named quality preset applied at construction. ``PRESET=verified``
+        # turns ON the full existing verification gauntlet (refine, plan review,
+        # coverage, mutation, evaluator, security review, runtime acceptance,
+        # strict Definition-of-Done) so the "verified swarm" baseline is one flag
+        # instead of eight. A preset is a QUALITY overlay, orthogonal to the
+        # product-shape profiles; it never overrides a gate the operator set
+        # explicitly via that gate's own env var.
+        preset = os.environ.get("PRESET", "").strip().lower()
+        if preset == "verified":
+            self._apply_verified_preset()
+
+    def _apply_verified_preset(self) -> None:
+        gauntlet = [
+            ("REFINE", "refine_enabled"),
+            ("REVIEW_PLAN", "review_plan_enabled"),
+            ("COVERAGE", "coverage_enabled"),
+            ("MUTATION", "mutation_enabled"),
+            ("EVALUATOR", "evaluator_enabled"),
+            ("SECURITY_REVIEW", "security_review_enabled"),
+            ("RUNTIME_ACCEPTANCE", "runtime_acceptance_enabled"),
+            ("DEFINITION_OF_DONE", "definition_of_done_enabled"),
+            ("DOD_STRICT_CRITERIA", "definition_of_done_strict_criteria"),
+        ]
+        for env_name, attr in gauntlet:
+            # Override .env defaults, but respect a deliberate SHELL choice: only
+            # a gate the operator pinned in their shell (not merely in .env) is
+            # left untouched. Everything else the preset turns on.
+            if env_name not in _SHELL_ENV_KEYS:
+                setattr(self, attr, True)
+        # W0.5: the anti-cheating guards default to observe-first (warn); flaky
+        # rerun on. Same shell-respect rule.
+        for env_name, attr in (
+            ("TEST_TAMPER_GUARD", "test_tamper_guard"),
+            ("SCOPE_GUARD", "scope_guard"),
+            ("SKELETON_GUARD", "skeleton_guard"),
+            ("IMPORT_GUARD", "import_guard"),
+        ):
+            if env_name not in _SHELL_ENV_KEYS:
+                setattr(self, attr, "warn")
+        if "FLAKY_RERUN" not in _SHELL_ENV_KEYS:
+            self.flaky_rerun_enabled = True
+
+    def preset_active(self) -> str:
+        """The active quality preset name ("" when none) — for UI/telemetry."""
+        return os.environ.get("PRESET", "").strip().lower()
 
     def po_pipeline_on(self) -> bool:
         """Is the multi-stage PO pipeline active? Anything but the explicit
@@ -582,6 +798,34 @@ class Settings:
         if self.agent_provider in ("", "claude code"):
             return self.claude_model
         return None
+
+    def tier_for_role(self, role: str) -> str:
+        """The cost tier ("boss"|"worker"|"checker") for an agent persona, or ""
+        when the role is unmapped."""
+        return PERSONA_TIERS.get(role, "")
+
+    def model_for_role(self, role: str, phase: str) -> str | None:
+        """W4: resolve a call's model by the agent's cost tier, falling back to the
+        per-phase router. Enforces "boss never codes": in the BUILD phase a
+        dev/dev-frontend call can never resolve to the boss-tier model — if a
+        misconfiguration points it there, it falls back to the worker tier (or the
+        phase router). No-op (== ``model_for_phase``) when role routing is off."""
+        if not self.role_routing_enabled:
+            return self.model_for_phase(phase)
+        tier = PERSONA_TIERS.get(role, "")
+        if role in ("dev", "dev-frontend") and phase == "build":
+            tier = "worker"  # boss never codes, regardless of the map
+        model = self.model_tiers.get(tier) if tier else None
+        if model:
+            # Guard: a coding call must not run on the boss model.
+            if phase == "build" and role in ("dev", "dev-frontend"):
+                boss = self.model_tiers.get("boss")
+                if boss and model == boss:
+                    logger.warning("Refusing boss model %s for a build dev call; "
+                                   "falling back to the phase router.", model)
+                    return self.model_for_phase(phase)
+            return model
+        return self.model_for_phase(phase)
 
     def persona_path(self, agent: str) -> Path:
         return self.bmad_dir / "bmm" / "agents" / f"{agent}.md"

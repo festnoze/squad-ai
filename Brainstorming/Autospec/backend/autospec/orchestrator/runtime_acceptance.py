@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
+import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..config import BACKEND_DIR, PROJECT_DIR, settings
 from ..models import ProjectState, StoryStatus
-from . import workspace
+from . import toolchain, workspace
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -18,6 +22,38 @@ class RuntimeAcceptanceResult:
     ok: bool
     detail: str
     skipped: bool = False
+    infra: bool = False
+
+
+def resolve_web_port(ws: Path) -> int:
+    """Single source of truth for the web port a delivered app listens on.
+
+    Parse ``ws/main.py`` for ``port = <4-5 digits>`` (the value the generated
+    app actually binds), else fall back to ``settings.smoke_run_port``. Both the
+    smoke gate and the runtime gate MUST resolve the port this way so they never
+    validate a different port than the one the app opens (finding 2)."""
+    main = ws / "main.py"
+    if main.exists():
+        text = main.read_text(encoding="utf-8", errors="replace")
+        m = re.search(r"port\s*=\s*(\d{4,5})", text)
+        if m:
+            return int(m.group(1))
+    return settings.smoke_run_port
+
+
+def _done_journey(state: ProjectState, *, limit: int = 6000) -> str:
+    """Concatenated Gherkin of the DONE stories of the current delivery.
+
+    The JS gate uses it to click through a happy-path journey (finding 5). We
+    truncate to ~``limit`` chars and return ``""`` when nothing is DONE."""
+    chunks: list[str] = []
+    for story in state.stories:
+        if story.effective_status() != StoryStatus.DONE:
+            continue
+        gherkin = (story.gherkin or "").strip()
+        if gherkin:
+            chunks.append(gherkin)
+    return "\n\n".join(chunks)[:limit]
 
 
 def _frontend_root(state: ProjectState, ws: Path) -> Path | None:
@@ -62,6 +98,22 @@ async def arun_runtime_acceptance(
     if not runnable:
         return RuntimeAcceptanceResult(ok=True, detail=reason, skipped=True)
 
+    # Finding 6 : un backend web non-python ne peut pas être vérifié à l'exécution
+    # par ce gate (le script JS pilote un serveur python/node). On journalise un
+    # AVERTISSEMENT plutôt que de bloquer silencieusement.
+    lang = toolchain.normalize(state.backend_language.value)
+    if lang != "python" and _frontend_root(state, ws) is None:
+        logger.warning(
+            "Runtime acceptance : backend %s non-python détecté sans frontend — "
+            "vérification à l'exécution indisponible pour ce langage.",
+            lang,
+        )
+        return RuntimeAcceptanceResult(
+            ok=True,
+            detail=f"backend {lang} non-python : vérification runtime indisponible",
+            skipped=True,
+        )
+
     script = BACKEND_DIR / "scripts" / "runtime_acceptance.js"
     if not script.exists():
         return RuntimeAcceptanceResult(ok=False, detail=f"script introuvable : {script}")
@@ -74,6 +126,10 @@ async def arun_runtime_acceptance(
     if node_path.exists():
         existing = env.get("NODE_PATH", "")
         env["NODE_PATH"] = str(node_path) if not existing else str(node_path) + os.pathsep + existing
+    # Contrat JS #2/#3 : le port résolu (même source que le smoke) et le parcours
+    # Gherkin des stories DONE sont passés par variable d'environnement.
+    env["RUNTIME_BACKEND_PORT"] = str(resolve_web_port(ws))
+    env["RUNTIME_JOURNEY"] = _done_journey(state)
 
     def _run() -> subprocess.CompletedProcess[str]:
         return subprocess.run(
@@ -98,5 +154,15 @@ async def arun_runtime_acceptance(
     try:
         proc = await asyncio.to_thread(_run)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        return RuntimeAcceptanceResult(ok=False, detail=str(exc))
-    return RuntimeAcceptanceResult(ok=proc.returncode == 0, detail=(proc.stdout or "").strip())
+        # Un lancement impossible (node/playwright absent) est une panne d'infra,
+        # pas un bug de câblage réparable.
+        return RuntimeAcceptanceResult(ok=False, detail=str(exc), infra=True)
+    # Convention de code de sortie du gate JS (contrat #4) : 0 = OK, 1 = échec
+    # d'intégration RÉPARABLE, 2 = panne d'INFRA/environnement (playwright/node
+    # absent, ou port occupé par un process externe) — NON réparable.
+    infra = proc.returncode == 2
+    return RuntimeAcceptanceResult(
+        ok=proc.returncode == 0,
+        detail=(proc.stdout or "").strip(),
+        infra=infra,
+    )
