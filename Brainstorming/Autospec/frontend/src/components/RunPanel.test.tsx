@@ -88,6 +88,7 @@ function renderPanel(
   onRetryFailed: () => void = vi.fn(),
   onRun: (args: string) => void = vi.fn(),
   onRestartFromScratch: () => void = vi.fn(),
+  onUndeploy: () => void = vi.fn(),
 ) {
   const utils = render(
     <RunPanel
@@ -108,9 +109,10 @@ function renderPanel(
       onApprove={vi.fn()}
       onReject={vi.fn()}
       onDeploy={vi.fn()}
+      onUndeploy={onUndeploy}
     />,
   );
-  return { ...utils, onRetryFailed, onRun, onRestartFromScratch };
+  return { ...utils, onRetryFailed, onRun, onRestartFromScratch, onUndeploy };
 }
 
 describe("RunPanel", () => {
@@ -246,6 +248,40 @@ describe("RunPanel", () => {
     );
     expect(screen.getByTestId("partial-delivery").textContent).toContain("2");
     expect(screen.queryByText(/⛔ Livraison/)).not.toBeInTheDocument();
+  });
+
+  it("deploy_status 'deployed' : chip 🐳 avec lien vers le port + action Undeploy", () => {
+    const onUndeploy = vi.fn();
+    renderPanel(
+      makeProject({ deploy_status: "deployed", deploy_host_port: 18001 }),
+      [],
+      vi.fn(),
+      vi.fn(),
+      vi.fn(),
+      onUndeploy,
+    );
+    const link = screen.getByRole("link", { name: /Deployed/ });
+    expect(link).toHaveAttribute("href", "http://localhost:18001");
+    const undeploy = screen.getByRole("button", { name: "Undeploy" });
+    fireEvent.click(undeploy);
+    expect(onUndeploy).toHaveBeenCalledTimes(1);
+  });
+
+  it("deploy_status 'failed' : chip rouge avec le détail en title", () => {
+    renderPanel(
+      makeProject({ deploy_status: "failed", deploy_detail: "docker build a échoué" }),
+    );
+    expect(screen.getByTestId("deploy-chip")).toHaveAttribute(
+      "title",
+      "docker build a échoué",
+    );
+  });
+
+  it("deploy_status 'building' : chip en cours (pulsant)", () => {
+    const { container } = renderPanel(makeProject({ deploy_status: "building" }));
+    const chip = screen.getByTestId("deploy-chip");
+    expect(chip.className).toMatch(/deploy-chip-progress/);
+    expect(container.querySelector(".deploy-chip-ok")).toBeNull();
   });
 
   it("resume_at > 0 : bannière de reprise auto + bouton annuler (M2)", () => {

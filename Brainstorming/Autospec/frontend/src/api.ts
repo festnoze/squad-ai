@@ -204,10 +204,16 @@ export async function rollbackProject(projectId: string, iteration: number): Pro
   );
 }
 
-export async function deployProject(projectId: string): Promise<{ created: string[] }> {
+export async function deployProject(
+  projectId: string,
+): Promise<{ created: string[]; deploy_started?: boolean }> {
   return json(
     await fetch(`/api/projects/${projectId}/deploy`, { method: "POST" }),
-  ) as Promise<{ created: string[] }>;
+  ) as Promise<{ created: string[]; deploy_started?: boolean }>;
+}
+
+export async function undeployProject(projectId: string): Promise<void> {
+  await json(await fetch(`/api/projects/${projectId}/undeploy`, { method: "POST" }));
 }
 
 export async function deleteProject(projectId: string): Promise<void> {

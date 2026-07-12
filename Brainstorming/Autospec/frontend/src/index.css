@@ -4137,3 +4137,44 @@ button.attention-chip {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* Docker delivery chip (deployed / failed / in-progress). */
+.deploy-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.deploy-chip-ok {
+  background: #14261a;
+  border-color: #4caf72;
+  color: #4caf72;
+}
+
+.deploy-chip-ok .deploy-chip-link {
+  color: #4caf72;
+  text-decoration: none;
+}
+
+.deploy-chip-ok .deploy-chip-link:hover {
+  text-decoration: underline;
+}
+
+.deploy-chip-failed {
+  background: #2a1418;
+  border-color: #e06c75;
+  color: #e06c75;
+}
+
+.deploy-chip-progress {
+  background: #14202b;
+  border-color: #6ea8ff;
+  color: #6ea8ff;
+  animation: chip-pulse 1.2s ease-in-out infinite;
+}

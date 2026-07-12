@@ -284,6 +284,14 @@ export interface ProjectState {
   delivery_issues?: string[];
   /** P5 : le gate est passé mais des stories FAILED ont été contournées. */
   delivery_partial?: boolean;
+  /** Docker Delivery : "" | building | deploying | verifying | deployed | failed | skipped. */
+  deploy_status?: string;
+  deployed_image?: string;
+  deployed_container?: string;
+  /** Port hôte stable exposé par le conteneur (0 = non déployé). */
+  deploy_host_port?: number;
+  /** Dernier résumé de vérification / tail d'échec du déploiement. */
+  deploy_detail?: string;
   /** §8 : compteurs de calibration par itération (clé = n° d'itération en JSON). */
   calibration?: Record<string, PlanCalibration>;
 }

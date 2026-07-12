@@ -24,6 +24,7 @@ interface Props {
   onApprove: () => void;
   onReject: () => void;
   onDeploy: () => void;
+  onUndeploy: () => void;
 }
 
 function formatTokens(n: number): string {
@@ -49,6 +50,7 @@ export function RunPanel({
   onApprove,
   onReject,
   onDeploy,
+  onUndeploy,
 }: Props) {
   const { t } = useI18n();
   // Phase labels are built inside render so they re-translate on language change.
@@ -181,6 +183,44 @@ export function RunPanel({
               ⛔ Livraison · {project.delivery_issues!.length}
             </span>
           ))}
+        {project.deploy_status === "deployed" && (
+          <span className="deploy-chip deploy-chip-ok" data-testid="deploy-chip">
+            <a
+              className="deploy-chip-link"
+              href={`http://localhost:${project.deploy_host_port ?? 0}`}
+              target="_blank"
+              rel="noreferrer"
+              title={t("runPanel.dockerDeployedTitle", { port: project.deploy_host_port ?? 0 })}
+            >
+              {t("runPanel.dockerDeployed")}
+            </a>
+            <button
+              className="small-btn"
+              onClick={onUndeploy}
+              title={t("runPanel.dockerUndeployTitle")}
+            >
+              {t("runPanel.dockerUndeploy")}
+            </button>
+          </span>
+        )}
+        {project.deploy_status === "failed" && (
+          <span
+            className="deploy-chip deploy-chip-failed"
+            data-testid="deploy-chip"
+            title={project.deploy_detail || t("runPanel.dockerFailed")}
+          >
+            {t("runPanel.dockerFailed")}
+          </span>
+        )}
+        {["building", "deploying", "verifying"].includes(project.deploy_status ?? "") && (
+          <span
+            className="deploy-chip deploy-chip-progress"
+            data-testid="deploy-chip"
+            title={t("runPanel.dockerBuildingTitle")}
+          >
+            {t("runPanel.dockerBuilding")}
+          </span>
+        )}
         {project.awaiting_approval && (
           <span className="approval-banner" title={t("runPanel.approvalTitle")}>
             {t("runPanel.approvalRequired", { phase: project.awaiting_approval })}

@@ -57,6 +57,9 @@ async def test_smoke_gate_passes_when_app_runs(monkeypatch):
     state = _state_with_done_story("smoke-ok")
     pipeline = Pipeline(state, ScriptedRunner())
     _scaffold(workspace_dir(state.id), web=True)
+    # Isole du port :8000 de l'hôte : ce test couvre le CHEMIN de code (l'app
+    # démarre → succès), pas la garde infra « port tenu par un tiers ».
+    monkeypatch.setattr(Pipeline, "_port_is_free", staticmethod(lambda port: True))
     monkeypatch.setattr(Pipeline, "_smoke_run_python", lambda self, ws: (True, "listening :8000"))
 
     await pipeline._asmoke_phase()  # no raise
@@ -69,6 +72,9 @@ async def test_smoke_gate_fails_iteration_when_not_runnable(monkeypatch):
     state = _state_with_done_story("smoke-ko")
     pipeline = Pipeline(state, ScriptedRunner())
     _scaffold(workspace_dir(state.id), web=True)
+    # Isole du port :8000 de l'hôte : on veut atteindre le smoke run (app non
+    # démarrable → échec/réparation), pas la garde infra « port tenu par un tiers ».
+    monkeypatch.setattr(Pipeline, "_port_is_free", staticmethod(lambda port: True))
     monkeypatch.setattr(
         Pipeline, "_smoke_run_python", lambda self, ws: (False, "n'écoute pas")
     )

@@ -272,6 +272,59 @@ async def test_smoke_gate_still_blocks_when_repair_fails(monkeypatch, repair_env
     assert any("Smoke run échoué" in r for r in state.regressions)
 
 
+# ------------------------------------------- prompt_builder routing (docker gate)
+
+async def test_repair_routes_to_custom_prompt_builder(monkeypatch, repair_env):
+    """_arepair_delivery accepte un prompt_builder ad hoc (ex. dev_fix_deploy pour
+    le gate Docker) : l'agent Dev reçoit CE prompt, pas dev_fix_integration."""
+    monkeypatch.setattr(settings, "integration_fix_attempts", 1)
+
+    def _custom_builder(package_name, report, architecture="", attempt=1, max_attempts=1):
+        return f"PROMPT DOCKER SPÉCIFIQUE :: {report}"
+
+    async def _averify():
+        return True, "conteneur sain, réseau OK"
+
+    runner = FakeRunner(['{"status": "fixed", "summary": "s", "files": []}'])
+    state = _state("repair-custom-prompt")
+    pipeline = Pipeline(state, runner)
+
+    ok, detail = await pipeline._arepair_delivery(
+        "docker", "health check KO", _averify, prompt_builder=_custom_builder
+    )
+
+    assert ok is True
+    assert detail == "conteneur sain, réseau OK"
+    assert len(runner.calls) == 1
+    prompt = runner.calls[0]["prompt"]
+    assert prompt.startswith("PROMPT DOCKER SPÉCIFIQUE ::")
+    assert "health check KO" in prompt
+    # Le prompt d'intégration par défaut n'a PAS été utilisé.
+    assert "GATE D'INTÉGRATION" not in prompt
+
+
+async def test_repair_default_prompt_builder_is_integration(monkeypatch, repair_env):
+    """Sans prompt_builder, le chemin par défaut reste dev_fix_integration
+    (aucune régression pour les callers existants smoke/runtime)."""
+    monkeypatch.setattr(settings, "integration_fix_attempts", 1)
+
+    async def _averify():
+        return True, "OK"
+
+    runner = FakeRunner(['{"status": "fixed", "summary": "s", "files": []}'])
+    state = _state("repair-default-prompt")
+    pipeline = Pipeline(state, runner)
+
+    ok, _ = await pipeline._arepair_delivery("integration", "asset en text/html", _averify)
+
+    assert ok is True
+    assert len(runner.calls) == 1
+    prompt = runner.calls[0]["prompt"]
+    # La signature textuelle de dev_fix_integration.
+    assert "GATE D'INTÉGRATION" in prompt
+    assert "asset en text/html" in prompt
+
+
 # ------------------------------------------------------------------ configuration
 
 def test_runtime_acceptance_defaults_on(monkeypatch):

@@ -43,7 +43,7 @@ from ..models import (
     StoryStatus,
     new_id,
 )
-from ..orchestrator import profiles
+from ..orchestrator import docker_deploy, profiles
 from ..orchestrator.events import bus
 from ..orchestrator.pipeline import Pipeline
 from ..forecast import forecast_iteration_cost
@@ -620,6 +620,12 @@ async def adelete_project(project_id: str) -> dict:
     pipeline = pipelines.pop(project_id, None)
     if pipeline:
         await pipeline.adispose()
+    # Best-effort: tear down any Docker container/image before wiping the
+    # workspace, so a deleted project leaves no zombie container on the network.
+    try:
+        await asyncio.to_thread(docker_deploy.undeploy, project_id)
+    except Exception:  # noqa: BLE001 — deletion must not fail on docker hiccups
+        pass
     try:
         # rmtree of a git workspace (read-only packs + chmod retries on Windows)
         # is slow; off the event loop so uvicorn keeps accepting connections
@@ -1017,12 +1023,22 @@ async def adocument_project(project_id: str) -> dict:
 
 @app.post("/api/projects/{project_id}/deploy")
 async def adeploy_project(project_id: str) -> dict:
-    """Generate deployment artifacts (Dockerfile, CI) for the generated product (D1)."""
+    """Generate deployment artifacts (Dockerfile, CI) for the generated product (D1)
+    and, when the project is a deployable web app, kick off a background Docker
+    build+deploy+verify+repair pass. Returns ``{"created": [...], "deploy_started": bool}``."""
     pipeline = _pipeline(project_id)
     try:
         return await pipeline.adeploy()
     except ValueError as exc:
         raise HTTPException(409, str(exc))
+
+
+@app.post("/api/projects/{project_id}/undeploy")
+async def aundeploy_project(project_id: str) -> dict:
+    """Tear down this project's Docker container/image and clear its deploy state."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.aundeploy(), f"Projet inconnu : {project_id}")
+    return {"ok": True}
 
 
 @app.post("/api/projects/{project_id}/evaluate")

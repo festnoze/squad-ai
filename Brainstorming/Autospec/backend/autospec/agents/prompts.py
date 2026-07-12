@@ -203,6 +203,63 @@ Réponds avec EXACTEMENT UN objet JSON :
 }}"""
 
 
+def dev_fix_deploy(
+    package_name: str,
+    report: str,
+    architecture: str = "",
+    attempt: int = 1,
+    max_attempts: int = 1,
+) -> str:
+    """Repair prompt for the Docker delivery gate: the app was REALLY built into
+    an image and run in a container on the shared network, and either the
+    container never became healthy or it can't reach (or be reached by) the other
+    Autospec containers. The agent fixes the packaging/binding, not the features."""
+    arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    return f"""Tu es le Dev d'un pipeline automatisé. La suite de tests du projet est VERTE,
+mais le GATE DE LIVRAISON DOCKER vient d'échouer : l'application a été RÉELLEMENT
+construite en image Docker puis lancée dans un conteneur sur le réseau partagé, et
+soit le conteneur n'est jamais devenu sain (health check HTTP), soit la
+joignabilité inter-conteneurs (DNS par nom de conteneur + sondes HTTP) échoue.
+Tentative {attempt}/{max_attempts}.
+{arch_block}
+Rapport d'échec du gate (build réel + logs conteneur + matrice réseau) :
+\"\"\"{report[:6000]}\"\"\"
+
+Ta mission : DIAGNOSTIQUER puis RÉPARER l'empaquetage/le câblage réseau dans le
+répertoire courant (package `{package_name}`). Tu PEUX modifier à la fois le code
+applicatif ET le `Dockerfile`. Causes classiques à vérifier en priorité :
+- l'application écoute sur `127.0.0.1` (localhost) au lieu de `0.0.0.0` : depuis
+  l'hôte/le réseau Docker le conteneur paraît muet → le health check échoue.
+  Fais écouter le serveur sur `0.0.0.0` (host `0.0.0.0`, pas `localhost`) ;
+- le port sur lequel écoute l'app dans `main.py` ne correspond pas au `EXPOSE`
+  du Dockerfile ni au label `autospec.port` : aligne le port applicatif, le
+  `EXPOSE` et le port publié ;
+- le build frontend (`frontend/dist`) est absent de l'image : dans un Dockerfile
+  multi-stage, le `COPY --from=<stage> /fe/dist ./frontend/dist` (ou vers le
+  répertoire servi) manque ou pointe un mauvais chemin de sortie (ex. sortie
+  Angular vs Vite `dist/`) → le backend sert une page vide ;
+- une dépendance présente dans `.venv` mais ABSENTE de `pyproject.toml` : l'image
+  installe via `uv sync --no-dev` et plante à l'import au démarrage. Déclare la
+  dépendance manquante dans `pyproject.toml` ;
+- des hypothèses de chemins liées à la disposition de l'hôte (chemins absolus,
+  fichiers hors image, cwd) qui n'existent pas dans le conteneur.
+
+Règles :
+1. Reproduis si possible (rebuild de l'image, `docker run`, requêtes HTTP, `docker
+   logs`) pour confirmer le diagnostic avant de corriger.
+2. Corrige la VRAIE cause côté code/config/Dockerfile — n'affaiblis JAMAIS un
+   test, ne supprime aucune vérification, ne contourne pas le gate.
+3. CONTRAINTE ABSOLUE : toute la suite `uv run pytest` doit RESTER verte.
+4. Reste minimal : c'est une réparation d'empaquetage/câblage, pas une réécriture.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "status": "fixed" | "failed",
+  "summary": "<diagnostic et correction en 2-3 phrases>",
+  "files": ["<fichiers modifiés>"]
+}}"""
+
+
 # ------------------------------------------------- Decomposition build mode (SK-2)
 
 def decompose_story(

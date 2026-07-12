@@ -534,6 +534,13 @@ class ProjectState(BaseModel):
     # P5 — partial delivery: the gate passed but some stories FAILED and were
     # shipped around (progress is never all-or-nothing); surfaced in the UI.
     delivery_partial: bool = False
+    # Docker delivery: build/deploy/verify state on the shared autospec network.
+    # All defaults keep pre-docker persisted states loadable (plain defaults).
+    deploy_status: str = ""        # "" | building | deploying | verifying | deployed | failed | skipped
+    deployed_image: str = ""
+    deployed_container: str = ""
+    deploy_host_port: int = 0      # stable host port, reused across redeploys
+    deploy_detail: str = ""        # last verify summary / failure tail (~2000 chars)
     error: str = ""
     created_at: float = Field(default_factory=time.time)
 

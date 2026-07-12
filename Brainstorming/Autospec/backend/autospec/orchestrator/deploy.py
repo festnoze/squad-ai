@@ -9,18 +9,45 @@ from __future__ import annotations
 
 from pathlib import Path
 
-_DOCKERFILE = """# syntax=docker/dockerfile:1
+from ..config import settings
+
+#: First line of every Autospec-generated Dockerfile. Autospec safely
+#: regenerates a Dockerfile that still carries this marker, but never clobbers
+#: one a user has taken over (marker removed).
+MANAGED_MARKER = "# autospec:managed"
+
+_BACKEND_BODY = """# syntax=docker/dockerfile:1
 FROM python:3.12-slim
 WORKDIR /app
 RUN pip install --no-cache-dir uv
 COPY pyproject.toml ./
 RUN uv sync --no-dev || uv sync || true
 COPY . .
-CMD ["uv", "run", "python", "main.py"]
+"""
+
+_FE_BUILD_STAGE = """FROM node:20-alpine AS fe
+WORKDIR /fe
+COPY frontend/package*.json ./
+RUN npm ci || npm install
+COPY frontend/ ./
+RUN npm run build
+"""
+
+_NGINX_SPA_CONF = """server {
+    listen 80;
+    server_name _;
+    root /usr/share/nginx/html;
+    index index.html;
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
 """
 
 _DOCKERIGNORE = """.git
 .venv
+node_modules
+**/node_modules
 __pycache__
 *.pyc
 autospec-state.json
@@ -42,21 +69,98 @@ jobs:
 """
 
 
-def write_deploy_artifacts(ws: Path) -> list[str]:
-    """Write Dockerfile / .dockerignore / CI workflow into ``ws`` if absent.
+def dockerfile_text(port: int, kind: str = "backend") -> str:
+    """Build the managed Dockerfile text for ``kind`` exposing ``port``.
 
-    Idempotent: never overwrites an existing file. Returns the created paths
+    ``kind`` is one of ``"backend"``, ``"fullstack"`` or ``"frontend"``:
+
+    - ``backend``: a python:3.12-slim image running ``main.py`` (``EXPOSE {port}``).
+    - ``fullstack``: multi-stage — the frontend is built with node then served
+      by the python backend from ``./frontend/dist`` (one image, ``EXPOSE {port}``).
+    - ``frontend``: a frontend-only SPA built with node then served by
+      nginx (``EXPOSE 80``, SPA ``try_files`` fallback).
+    """
+    if kind == "frontend":
+        return (
+            f"{MANAGED_MARKER}\n"
+            "# syntax=docker/dockerfile:1\n"
+            f"{_FE_BUILD_STAGE}"
+            "FROM nginx:alpine\n"
+            "COPY --from=fe /fe/dist /usr/share/nginx/html\n"
+            "COPY nginx.conf /etc/nginx/conf.d/default.conf\n"
+            "EXPOSE 80\n"
+        )
+    if kind == "fullstack":
+        return (
+            f"{MANAGED_MARKER}\n"
+            f"{_FE_BUILD_STAGE}"
+            f"{_BACKEND_BODY}"
+            "COPY --from=fe /fe/dist ./frontend/dist\n"
+            f"EXPOSE {port}\n"
+            'CMD ["uv", "run", "python", "main.py"]\n'
+        )
+    # backend (default)
+    return (
+        f"{MANAGED_MARKER}\n"
+        f"{_BACKEND_BODY}"
+        f"EXPOSE {port}\n"
+        'CMD ["uv", "run", "python", "main.py"]\n'
+    )
+
+
+def write_deploy_artifacts(
+    ws: Path, *, port: int | None = None, kind: str = "backend"
+) -> list[str]:
+    """Write Dockerfile / .dockerignore / CI workflow into ``ws``.
+
+    The Dockerfile is (re)written when absent OR when it still carries the
+    managed marker as its first line AND its content differs from the freshly
+    generated text (safe regeneration; a user-edited Dockerfile — marker
+    removed — is never clobbered). The ``.dockerignore``, ``ci.yml`` and the
+    frontend nginx conf keep never-overwrite semantics. ``port=None`` falls
+    back to ``settings.smoke_run_port``. Returns the created/updated paths
     (posix-relative to ``ws``)."""
+    if port is None:
+        port = settings.smoke_run_port
+
+    created: list[str] = []
+
+    dockerfile = ws / "Dockerfile"
+    wanted = dockerfile_text(port, kind)
+    if _should_write_dockerfile(dockerfile, wanted):
+        dockerfile.parent.mkdir(parents=True, exist_ok=True)
+        dockerfile.write_text(wanted, encoding="utf-8")
+        created.append(dockerfile.relative_to(ws).as_posix())
+
+    # Never-overwrite artifacts.
     targets = [
-        (ws / "Dockerfile", _DOCKERFILE),
         (ws / ".dockerignore", _DOCKERIGNORE),
         (ws / ".github" / "workflows" / "ci.yml", _CI),
     ]
-    created: list[str] = []
+    if kind == "frontend":
+        targets.append((ws / "nginx.conf", _NGINX_SPA_CONF))
     for path, content in targets:
         if path.exists():
             continue
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         created.append(path.relative_to(ws).as_posix())
+
     return created
+
+
+def _should_write_dockerfile(path: Path, wanted: str) -> bool:
+    """Whether the managed Dockerfile should be (re)written.
+
+    True when the file is absent, or when it is still Autospec-managed (first
+    line is the marker) and its content has drifted from ``wanted``."""
+    if not path.exists():
+        return True
+    try:
+        current = path.read_text(encoding="utf-8")
+    except OSError:
+        return True
+    first_line = current.splitlines()[0] if current else ""
+    if first_line.strip() != MANAGED_MARKER:
+        return False  # user has taken over the Dockerfile
+    return current != wanted

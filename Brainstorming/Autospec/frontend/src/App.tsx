@@ -23,6 +23,7 @@ import {
   rejectProject,
   rollbackProject,
   deployProject,
+  undeployProject,
   runProject,
   sendChat,
   setProvider,
@@ -821,15 +822,17 @@ export default function App() {
               onReject={guard(() => rejectProject(project.id))}
               onDeploy={guard(async () => {
                 if (!project) return;
-                const { created } = await deployProject(project.id);
+                const { created, deploy_started } = await deployProject(project.id);
+                const artifacts = created.length
+                  ? t("app.deployToastArtifacts", { list: created.join(", ") })
+                  : t("app.deployToastNone");
                 pushToast(
                   "success",
                   t("app.deployToastTitle"),
-                  created.length
-                    ? t("app.deployToastArtifacts", { list: created.join(", ") })
-                    : t("app.deployToastNone"),
+                  deploy_started ? `${artifacts} ${t("app.deployToastStarted")}` : artifacts,
                 );
               })}
+              onUndeploy={guard(() => undeployProject(project.id))}
               onExportZip={() => window.open(exportZipUrl(project.id), "_blank")}
               onGitExport={guard(async () => {
                 const { commit } = await gitExportProject(project.id);

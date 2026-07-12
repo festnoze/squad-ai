@@ -965,6 +965,81 @@ async def test_long_goal_name_is_truncated():
         assert len(name) <= 42
 
 
+async def test_deploy_returns_deploy_started_and_409_while_active(green_pytest, monkeypatch):
+    """POST /deploy writes artifacts and reports whether a container deploy pass
+    was started ; while the pipeline is actively building it is a 409."""
+    from autospec.models import PipelinePhase
+    from autospec.orchestrator import docker_deploy, pipeline as pipeline_mod
+
+    # Never touch a real daemon: force should_run True and stub the background
+    # deploy pass so the API contract is exercised without Docker.
+    monkeypatch.setattr(
+        docker_deploy, "should_run",
+        lambda state, ws, *, enabled: (True, "", "backend"),
+    )
+
+    async def _noop_deploy(self):
+        return None
+
+    monkeypatch.setattr(pipeline_mod.Pipeline, "_adocker_delivery_phase", _noop_deploy)
+
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        project_id = await _acreate_done_project(client)
+
+        resp = await client.post(f"/api/projects/{project_id}/deploy")
+        assert resp.status_code == 200
+        body = resp.json()
+        assert "Dockerfile" in body["created"]
+        assert body["deploy_started"] is True
+
+        # While the pipeline is actively building, deploy is refused (409).
+        server.pipelines[project_id].state.phase = PipelinePhase.BUILD
+        assert (await client.post(f"/api/projects/{project_id}/deploy")).status_code == 409
+
+
+async def test_deploy_unknown_project_404(green_pytest):
+    async with make_client([]) as client:
+        assert (await client.post("/api/projects/nope/deploy")).status_code == 404
+
+
+async def test_undeploy_404_409_200(green_pytest, monkeypatch):
+    """POST /undeploy : 404 unknown project, 409 while a deploy pass runs, 200 on
+    a clean teardown."""
+    from autospec.orchestrator import docker_deploy
+
+    torn_down: list[str] = []
+    monkeypatch.setattr(
+        docker_deploy, "undeploy", lambda project_id: torn_down.append(project_id)
+    )
+
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        # Unknown project -> 404.
+        assert (await client.post("/api/projects/nope/undeploy")).status_code == 404
+
+        project_id = await _acreate_done_project(client)
+
+        # A deploy pass in flight blocks the teardown (409).
+        pipeline = server.pipelines[project_id]
+
+        async def _never():
+            await asyncio.Event().wait()
+
+        pipeline._deploy_task = asyncio.ensure_future(_never())
+        try:
+            assert (
+                await client.post(f"/api/projects/{project_id}/undeploy")
+            ).status_code == 409
+        finally:
+            pipeline._deploy_task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await pipeline._deploy_task  # let the cancellation settle
+
+        # No deploy running -> clean 200, teardown invoked.
+        resp = await client.post(f"/api/projects/{project_id}/undeploy")
+        assert resp.status_code == 200 and resp.json() == {"ok": True}
+        assert torn_down == [project_id]
+
+
 async def test_set_language_override():
     # L2c: override the backend language; unknown -> 422, unknown project -> 404.
     async with make_client([PM_BRIEF]) as client:

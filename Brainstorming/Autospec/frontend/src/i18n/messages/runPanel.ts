@@ -118,4 +118,22 @@ export const runPanel: Namespace = {
     en: "The project shipped its green stories; the failed ones stay visible and retryable.",
     fr: "Le projet livre ses stories vertes ; les échecs restent visibles et relançables.",
   },
+
+  // Docker delivery chip
+  dockerDeployed: { en: "🐳 Deployed", fr: "🐳 Déployé" },
+  dockerDeployedTitle: {
+    en: "Container running — open http://localhost:{port}",
+    fr: "Conteneur en marche — ouvrir http://localhost:{port}",
+  },
+  dockerFailed: { en: "🐳 Deploy failed", fr: "🐳 Déploiement échoué" },
+  dockerBuilding: { en: "🐳 Deploying…", fr: "🐳 Déploiement…" },
+  dockerBuildingTitle: {
+    en: "Docker build / deploy / verify in progress",
+    fr: "Build / déploiement / vérification Docker en cours",
+  },
+  dockerUndeploy: { en: "Undeploy", fr: "Retirer" },
+  dockerUndeployTitle: {
+    en: "Stop and remove the deployed container",
+    fr: "Arrêter et supprimer le conteneur déployé",
+  },
 };

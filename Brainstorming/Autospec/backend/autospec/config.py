@@ -611,6 +611,28 @@ class Settings:
     docker_cmd: str = field(
         default_factory=lambda: os.environ.get("DOCKER_CMD", "docker")
     )
+    # Docker delivery gate: after the delivery gates pass, build each web-facing
+    # project into a Docker image and deploy it to local Docker Desktop on a
+    # shared network (autospec-net), then verify boot health + cross-container
+    # reachability. OFF by default (requires Docker Desktop); driven by profile
+    # overrides and this env var. Reuses docker_cmd and integration_fix_attempts.
+    docker_delivery: bool = field(
+        default_factory=lambda: _env_bool("DOCKER_DELIVERY", False)
+    )
+    docker_network: str = field(
+        default_factory=lambda: os.environ.get("DOCKER_NETWORK", "autospec-net")
+    )
+    docker_build_timeout_s: float = field(
+        default_factory=lambda: _env_float("DOCKER_BUILD_TIMEOUT_S", 600.0, minimum=30.0)
+    )
+    # Health-wait window after the container starts.
+    docker_deploy_timeout_s: float = field(
+        default_factory=lambda: _env_float("DOCKER_DEPLOY_TIMEOUT_S", 60.0, minimum=5.0)
+    )
+    # Base of the stable host-port range assigned to deployed containers.
+    docker_host_port_base: int = field(
+        default_factory=lambda: _env_int("DOCKER_HOST_PORT_BASE", 18000, minimum=1024)
+    )
     # Cross-project lesson library (F1): promote E7 lessons to a shared store
     # injected into every new project's Dev/QA prompts. OFF by default.
     shared_lessons_enabled: bool = field(

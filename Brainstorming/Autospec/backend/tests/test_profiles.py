@@ -54,6 +54,17 @@ def test_web_and_fullstack_profiles_enable_strict_dod(monkeypatch):
     assert settings.definition_of_done_strict_criteria is False
 
 
+def test_docker_delivery_override_per_profile():
+    """Web-facing profiles auto-containerise (docker_delivery True) ; library-fast,
+    cli et brownfield ne le font jamais (False)."""
+    for profile in ("api", "web-ssr", "fullstack"):
+        state = ProjectState(id=f"p-dd-{profile}", name="n", goal="g", product_profile=profile)
+        assert profiles.resolve_overrides(state)["docker_delivery"] is True
+    for profile in ("library-fast", "cli", "brownfield"):
+        state = ProjectState(id=f"p-dd-{profile}", name="n", goal="g", product_profile=profile)
+        assert profiles.resolve_overrides(state)["docker_delivery"] is False
+
+
 def test_profile_resolution_is_per_project_not_global(monkeypatch):
     monkeypatch.setattr(settings, "streams_enabled", False)
     full = ProjectState(id="p-prof-full", name="n", goal="g", product_profile="fullstack")

@@ -472,6 +472,100 @@ Après une suite verte, Autospec ne passe plus directement à `done` :
   `ui_test_files`; un `pytest -m ui` qui ne collecte rien ne valide plus la
   livraison.
 
+### 5.3c Livraison Docker — build, déploiement et vérification réseau
+
+Après une Definition of Done acceptée, un dernier gate (`DOCKER_DELIVERY=1`,
+**OFF par défaut** — nécessite Docker Desktop) **construit, déploie et vérifie**
+réellement le projet dans Docker au lieu de s'arrêter à un process local. La
+phase `Pipeline._adocker_delivery_phase` est intercalée dans `_alifecycle`
+**entre la DoD et la documentation** : elle ne déploie qu'une livraison déjà
+acceptée, et son échec parque l'itération via les mêmes mécaniques
+`_delivery_blocked` que les gates précédents avant que document/évaluation ne
+tournent. Le module `orchestrator/docker_deploy.py` parle au daemon (tout
+subprocess synchrone, appelé via `asyncio.to_thread`, comme
+`runtime_acceptance`), tandis que `orchestrator/deploy.py` reste l'écrivain
+d'artefacts (Dockerfile, `.dockerignore`, `ci.yml`).
+
+- **Build en image** : `deploy.dockerfile_text(port, kind)` régénère un
+  Dockerfile marqué `# autospec:managed` (première ligne) — Autospec réécrit son
+  propre Dockerfile mais ne clobbe jamais un Dockerfile édité à la main.
+  `docker build` streame ses lignes dans le chat (`self._log("docker", …)`).
+- **Réseau commun `autospec-net`** : tous les projets Autospec sont déployés sur
+  un **réseau externe partagé** (`DOCKER_NETWORK`, défaut `autospec-net`),
+  créé au besoin (`ensure_network`, tolère la course « already exists »). C'est
+  ce réseau qui rend la **joignabilité inter-conteneurs** possible (DNS par nom
+  de conteneur).
+- **Nommage et labels** : chaque conteneur s'appelle `autospec-<slug>` (slug
+  sanitizé `[^a-z0-9-]`), image `autospec/<slug>:latest`, et porte les labels
+  `autospec.project=<id>` et `autospec.port=<port interne>`. Ces labels forment un
+  **registre** : `docker ps --filter label=autospec.project` liste les
+  conteneurs vivants, donc les orphelins de projets supprimés disparaissent
+  d'eux-mêmes de la matrice.
+- **Allocation du port hôte** : `allocate_host_port` réutilise
+  `state.deploy_host_port` s'il est déjà fixé (port **stable** entre redéploiements),
+  sinon scanne à partir de `DOCKER_HOST_PORT_BASE` (défaut `18000`) en évitant
+  les ports revendiqués par les conteneurs Autospec (labels), par les autres
+  états persistés (`storage.list_states()`) et par un test de bind hôte (à la
+  `_port_is_free`). Le **port interne** du conteneur est toujours
+  `resolve_web_port(ws)` (80 pour une image frontend-only nginx) — ainsi gate,
+  `EXPOSE` et sondes s'accordent.
+- **Vérification santé + joignabilité croisée** : `wait_healthy` poll 1 s
+  (`docker inspect` — un état `exited`/`dead` échoue vite avec `docker logs`) et
+  une requête HTTP `http://127.0.0.1:<port hôte>/` — **tout statut HTTP (y
+  compris 404) = à l'écoute = sain**. Puis `check_cross_reachability` exécute la
+  matrice complète de sondes entre conteneurs déployés (`docker exec` →
+  `urllib` avec repli busybox `wget` pour les images nginx sans python ; un
+  `HTTPError` prouve DNS+TCP+HTTP donc compte comme joignable).
+- **Boucle « fix until green »** : un échec **réparable** (build cassé, app liée
+  à `127.0.0.1` au lieu de `0.0.0.0`, port ≠ EXPOSE/label, `frontend/dist` absent
+  de l'image, dép présente dans `.venv` mais absente du `pyproject.toml`…)
+  déclenche `Pipeline._arepair_delivery("docker", report, _averify,
+  prompt_builder=prompts.dev_fix_deploy)` — la **même** boucle réutilisée que le
+  gate d'intégration, avec son budget `INTEGRATION_FIX_ATTEMPTS`. L'agent Dev peut
+  éditer le code applicatif **et** le Dockerfile ; la suite pytest doit rester
+  verte (snapshot git + rollback) ; `_averify` rejoue tout
+  `deploy_and_verify` (rebuild + redeploy + revérification).
+- **Contrat infra vs réparable** : une condition d'**infra** (daemon absent —
+  Docker Desktop éteint sous Windows → erreur de connexion named-pipe, réseau
+  impossible à créer) est parquée en `needs_attention` par `_apark_infra`
+  **sans consommer aucune tentative** de réparation (même contrat que le code de
+  sortie `2` du gate d'intégration). Seuls les échecs attribuables au projet
+  courant brûlent des tentatives ; une paire défaillante entre **deux autres**
+  projets n'est qu'un avertissement (jamais brûler les tentatives de A sur un bug
+  de B).
+- **Skip CLI/librairie** : `should_run` saute la livraison Docker (avec un
+  **avertissement explicite** — `deploy_status="skipped"`) quand le gate est off,
+  en mode démo (`FAKE_AGENTS`), sans story DONE, pour un backend web non-python,
+  ou pour un produit non-web (« produit non-web : livraison Docker non
+  applicable »). Les profils `cli`, `library-fast` et `brownfield` désactivent le
+  gate ; `api`/`web-ssr`/`fullstack` l'activent.
+- **Image frontend-only nginx vs fullstack image unique** : un SPA sans backend
+  python (`kind="frontend"`) est bâti en multi-stage `node:20-alpine` → servi par
+  `nginx:alpine` (port conteneur 80, fallback SPA via un `try_files` minimal). Un
+  projet **fullstack** ship en **UNE seule image** multi-stage (frontend construit
+  puis servi par le backend, `COPY --from=fe /fe/dist ./frontend/dist`) — cohérent
+  avec le modèle INTÉGRÉ de la runtime acceptance.
+
+Le déclenchement manuel `POST /api/projects/{id}/deploy` lance la même chaîne en
+tâche de fond (patron `_doc_task`, 409 si déjà en cours) en contournant le flag
+de gate mais en conservant les skips FAKE_AGENTS/non-web ;
+`POST /api/projects/{id}/undeploy` retire le conteneur et efface les champs de
+déploiement. Les champs `deploy_status`/`deployed_image`/`deployed_container`/
+`deploy_host_port`/`deploy_detail` voyagent par `_sync()` → EventBus →
+SSE/WS jusqu'au `RunPanel` (chip 🐳 vert cliquable, rouge avec le détail
+d'échec, ou pulsant pendant build/deploy/verify).
+
+**Variables d'environnement Docker** :
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `DOCKER_DELIVERY` | `0` | Active le gate de livraison Docker (build + deploy + vérification). |
+| `DOCKER_NETWORK` | `autospec-net` | Réseau externe partagé par tous les conteneurs Autospec (joignabilité inter-conteneurs). |
+| `DOCKER_BUILD_TIMEOUT_S` | `600` | Timeout du `docker build` (min 30 s). |
+| `DOCKER_DEPLOY_TIMEOUT_S` | `60` | Temps d'attente santé après démarrage du conteneur (min 5 s). |
+| `DOCKER_HOST_PORT_BASE` | `18000` | Base de scan pour l'allocation du port hôte (min 1024) ; `deploy_host_port` reste stable entre redéploiements. |
+| `DOCKER_CMD` | `docker` | Binaire Docker invoqué (déjà existant, réutilisé). |
+
 ### 5.4 Phase ANALYZE + brief suivant — l'Analyste (`analyst`) puis le PM
 
 En mode auto-spec, après chaque itération livrée (`_anext_feature_phase`) :

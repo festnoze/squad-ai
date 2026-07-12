@@ -77,6 +77,7 @@ from . import plan_pipeline
 from . import regression
 from .build_monitor import BuildMonitor
 from . import deploy
+from . import docker_deploy
 from . import brownfield
 from . import sandbox
 from .events import bus
@@ -461,6 +462,7 @@ class Pipeline:
         self._impact_task: asyncio.Task | None = None
         self._setup_task: asyncio.Task | None = None
         self._doc_task: asyncio.Task | None = None
+        self._deploy_task: asyncio.Task | None = None  # D1 on-demand docker deploy
         self._eval_task: asyncio.Task | None = None   # E6 on-demand evaluation
         self._security_task: asyncio.Task | None = None  # S1 on-demand security review
         self._retro_task: asyncio.Task | None = None  # E7 on-demand retrospective
@@ -993,6 +995,7 @@ class Pipeline:
             self._impact_task,
             self._setup_task,
             self._doc_task,
+            self._deploy_task,
             self._eval_task,
             self._security_task,
             self._retro_task,
@@ -1862,8 +1865,11 @@ class Pipeline:
 
     async def adeploy(self) -> dict:
         """Generate deployment artifacts (Dockerfile, .dockerignore, CI) for the
-        generated product (D1). Idempotent; returns the created files. Raises
-        ValueError (-> 409) while the pipeline is actively building."""
+        generated product (D1) and, when the project is a deployable web app,
+        kick off a background Docker build+deploy+verify+repair pass. Idempotent;
+        returns ``{"created": [...], "deploy_started": bool}``. Raises ValueError
+        (-> 409) while the pipeline is actively building or when a deploy pass is
+        already running."""
         if self.state.phase in (
             PipelinePhase.SPEC, PipelinePhase.ANALYZE, PipelinePhase.PLAN,
             PipelinePhase.ARCHITECT, PipelinePhase.BUILD,
@@ -1871,14 +1877,47 @@ class Pipeline:
             raise ValueError(
                 "la pipeline est active : attends la fin avant de générer le déploiement"
             )
+        if self._deploy_task and not self._deploy_task.done():
+            raise ValueError("un déploiement Docker est déjà en cours")
         ws = workspace.scaffold(self.state)
-        created = await asyncio.to_thread(deploy.write_deploy_artifacts, ws)
+        # Manual trigger: bypass the DOCKER_DELIVERY gate flag but keep the
+        # FAKE_AGENTS / web-candidate skips (never containerise a demo or a
+        # non-web product on an explicit deploy either).
+        run, _reason, kind = docker_deploy.should_run(self.state, ws, enabled=True)
+        created = await asyncio.to_thread(
+            deploy.write_deploy_artifacts,
+            ws,
+            port=self._resolve_web_port(ws),
+            kind=kind or "backend",
+        )
         self._chat(
             ChatRole.SYSTEM,
             "🚀 Artefacts de déploiement générés : "
             + (", ".join(created) if created else "déjà présents."),
         )
-        return {"created": created}
+        deploy_started = False
+        if run:
+            self._deploy_task = asyncio.create_task(self._adeploy_task())
+            deploy_started = True
+        return {"created": created, "deploy_started": deploy_started}
+
+    async def _adeploy_task(self) -> None:
+        try:
+            await self._adocker_delivery_phase()
+        except Exception as exc:  # background task: surface, never crash silently
+            self._chat(ChatRole.SYSTEM, f"Erreur de la livraison Docker : {exc}")
+        finally:
+            self._sync()
+
+    async def aundeploy(self) -> None:
+        """Tear down this project's Docker container/image and clear its deploy
+        state. Raises ValueError (-> 409) while a deploy pass is running."""
+        if self._deploy_task and not self._deploy_task.done():
+            raise ValueError("un déploiement Docker est en cours")
+        await asyncio.to_thread(docker_deploy.undeploy, self.state.id)
+        delivery_state.set_deploy(self.state, status="", detail="")
+        self._chat(ChatRole.SYSTEM, "🐳 Conteneur retiré du réseau Docker.")
+        self._sync()
 
     async def adocument(self) -> None:
         """Tech-writer pass in the background: write the GENERATED project's
@@ -2345,6 +2384,12 @@ class Pipeline:
                 if not await self._aruntime_acceptance_phase():
                     break
                 if not self._apply_definition_of_done():
+                    break
+                # Docker delivery gate (D1): build the accepted delivery into an
+                # image, deploy it on the shared network and network-verify it;
+                # a failure parks the iteration in needs_attention (no-op unless
+                # DOCKER_DELIVERY / non-web project).
+                if not await self._adocker_delivery_phase():
                     break
                 await self._adocument_phase()
                 # Closed-loop product evaluation (E6): exercise the delivered
@@ -6385,7 +6430,9 @@ class Pipeline:
 
     # ------------------------------- Integration repair loop (fix-until-green)
 
-    async def _arepair_delivery(self, source: str, report: str, averify) -> tuple[bool, str]:
+    async def _arepair_delivery(
+        self, source: str, report: str, averify, *, prompt_builder=None
+    ) -> tuple[bool, str]:
         """Fix-until-green loop for the delivery gates (smoke run, runtime
         integration). The delivered app failed a REAL execution check while its
         test suite is green — a wiring problem (static mount vs asset paths,
@@ -6425,7 +6472,7 @@ class Pipeline:
             )
             try:
                 await self._tracked.arun(
-                    prompts.dev_fix_integration(
+                    (prompt_builder or prompts.dev_fix_integration)(
                         pkg,
                         detail,
                         architecture=self.state.architecture,
@@ -6486,6 +6533,9 @@ class Pipeline:
         return (
             "lancement impossible" in low
             or "process externe" in low
+            or "cannot connect to the docker daemon" in low
+            or "error during connect" in low
+            or "docker indisponible" in low
         )
 
     def _apark_infra(self, source: str, detail: str) -> None:
@@ -6649,6 +6699,148 @@ class Pipeline:
         self._block_delivery(msg, source="runtime")
         self.state.regressions.append(msg)
         self._notify("error", "Runtime acceptance échoué", msg[:200])
+        return False
+
+    async def _adocker_delivery_phase(self) -> bool:
+        """Docker delivery gate (D1): build the DoD-accepted delivery into an
+        image, deploy it on the shared ``autospec-net`` network and network-verify
+        it (health + cross-container reachability), repairing in a fix-until-green
+        loop. Infra conditions (daemon down, network unavailable) park the
+        iteration in needs_attention without burning any repair attempt. No-op
+        when the gate is off / demo mode / non-web product."""
+        ws = workspace_dir(self.state.id)
+        enabled = bool(self._setting("docker_delivery"))
+        run, reason, kind = docker_deploy.should_run(self.state, ws, enabled=enabled)
+        if not run:
+            # A non-web product cannot be containerised: when the gate is enabled
+            # we WARN loudly (this app is not delivered as a container) and mark
+            # the deploy as skipped; every other skip stays quiet.
+            if enabled and "non applicable" in reason:
+                warn = (
+                    f"⚠️ Livraison Docker ignorée — {reason}. Cette application n'est "
+                    f"PAS empaquetée en conteneur."
+                )
+                self._log("docker", warn)
+                self._chat(ChatRole.SYSTEM, warn)
+                delivery_state.set_deploy(self.state, status="skipped", detail=reason)
+                self._sync()
+            return True
+
+        self.monitor.phase("docker")
+        port = self._resolve_web_port(ws)
+        # Regenerate the managed Dockerfile for the resolved kind (container port
+        # is 80 for a frontend-only nginx image).
+        await asyncio.to_thread(
+            deploy.write_deploy_artifacts, ws, port=port, kind=kind
+        )
+
+        if self._stop_requested:
+            return False
+
+        # --- infra pre-check : Docker daemon reachable ? ----------------------
+        avail, out = await asyncio.to_thread(docker_deploy.docker_available)
+        if not avail:
+            self._apark_infra("docker", f"docker indisponible — {out}")
+            return False
+
+        network = self._setting("docker_network")
+        host_port = await asyncio.to_thread(docker_deploy.allocate_host_port, self.state)
+        delivery_state.set_deploy(self.state, status="building", host_port=host_port)
+        self._sync()
+
+        if self._stop_requested:
+            return False
+
+        self._log(
+            "docker",
+            f"🐳 Livraison Docker ({kind}) — build & déploiement sur le réseau "
+            f"{network} (port hôte {host_port})…",
+        )
+
+        loop = asyncio.get_running_loop()
+
+        def _on_line(line: str) -> None:
+            loop.call_soon_threadsafe(self._log, "docker", line)
+
+        def _run_deploy() -> docker_deploy.DockerDeployResult:
+            return docker_deploy.deploy_and_verify(
+                self.state,
+                ws,
+                network=network,
+                host_port=host_port,
+                build_timeout=self._setting("docker_build_timeout_s"),
+                deploy_timeout=self._setting("docker_deploy_timeout_s"),
+                on_line=_on_line,
+            )
+
+        result = await asyncio.to_thread(_run_deploy)
+        self.monitor.event("docker", ok=result.ok, infra=result.infra, detail=result.detail[:300])
+
+        if result.infra:
+            delivery_state.set_deploy(
+                self.state, status="failed", image=result.image,
+                container=result.container, detail=result.detail,
+            )
+            self._sync()
+            self._apark_infra("docker", result.detail)
+            return False
+
+        ok, detail = result.ok, result.detail
+        if not ok:
+            if self._stop_requested:
+                return False
+
+            async def _averify() -> tuple[bool, str]:
+                res = await asyncio.to_thread(_run_deploy)
+                return res.ok, res.detail
+
+            dockerfile_text = ""
+            try:
+                dockerfile_text = (ws / "Dockerfile").read_text(
+                    encoding="utf-8", errors="replace"
+                )[:3000]
+            except OSError:
+                pass
+            report = (
+                f"Livraison Docker échouée : {detail}\n\n"
+                f"=== Dockerfile ===\n{dockerfile_text}"
+            )
+            ok, detail = await self._arepair_delivery(
+                "docker", report, _averify, prompt_builder=prompts.dev_fix_deploy
+            )
+
+        if ok:
+            delivery_state.set_deploy(
+                self.state,
+                status="deployed",
+                image=result.image,
+                container=result.container,
+                host_port=host_port,
+                detail=detail,
+            )
+            self._log("docker", f"✅ Livraison Docker OK — {detail}")
+            self._chat(
+                ChatRole.SYSTEM,
+                f"🐳 déployé sur http://localhost:{host_port} (réseau {network}).",
+            )
+            # Foreign-pair reachability warnings are surfaced but never block.
+            if "avertissements (paires tierces)" in detail:
+                self._chat(
+                    ChatRole.SYSTEM,
+                    "⚠️ Joignabilité réseau : certaines paires de conteneurs tiers "
+                    "sont injoignables (voir les logs docker) — non bloquant.",
+                )
+            self._sync()
+            return True
+
+        delivery_state.set_deploy(
+            self.state, status="failed", image=result.image,
+            container=result.container, detail=detail,
+        )
+        msg = f"Livraison Docker échouée : {detail}"
+        self._block_delivery(msg, source="docker")
+        self.state.regressions.append(msg)
+        self._notify("error", "Livraison Docker échouée", msg[:200])
         return False
 
     @staticmethod

@@ -59,6 +59,10 @@ export const app: Namespace = {
     en: "Deployment artifacts already present.",
     fr: "Artefacts de déploiement déjà présents.",
   },
+  deployToastStarted: {
+    en: "Docker build & container start launched — follow the progress on the run panel.",
+    fr: "Build Docker & démarrage du conteneur lancés — suivez la progression sur le panneau d'exécution.",
+  },
   commitToastTitle: { en: "Commit", fr: "Commit" },
   commitToastBody: { en: "Workspace committed: {commit}", fr: "Workspace commité : {commit}" },
   reconnecting: { en: "Reconnecting…", fr: "Reconnexion…" },
