@@ -133,7 +133,11 @@ async def test_frontend_task_starts_only_after_backend_dep_is_merged(streams_on,
     assert state.task("T-front").status == StoryStatus.DONE
 
 
-async def test_cycle_blocks_only_cycle_nodes_without_mass_failing_pending(streams_on):
+async def test_cycle_is_broken_at_ingestion_and_everything_builds(streams_on):
+    """A dependency cycle (here created via a TS extraction pointing back at its
+    parent) is defensively BROKEN when the work graph is built — mirroring
+    ``scheduler.sanitize_dependencies`` at story level — so the batch builds
+    instead of mass-failing. The dropped edge is surfaced, never silent."""
     parent = _us(
         "TS-PARENT",
         tasks=[
@@ -150,14 +154,19 @@ async def test_cycle_blocks_only_cycle_nodes_without_mass_failing_pending(stream
     child.parent_id = "TS-PARENT"
     blocked = _us("US-BLOCKED", stream="backend", depends_on=["TS-PARENT"])
     state = _streams_state([parent, child, blocked], project_id="cycle-no-contam")
-    pipeline = Pipeline(state, ScriptedRunner())
 
+    graph = work_streams.build_work_graph(state)
+    assert work_streams.detect_cycle(graph) is None
+    assert any("cycle" in w.lower() for w in graph.warnings)
+
+    pipeline = Pipeline(state, ScriptedRunner())
     await pipeline._abuild_phase()
 
-    assert state.task("T-INTEGRATE").status == StoryStatus.FAILED
-    assert state.task("T-CHILD-2").status == StoryStatus.FAILED
-    assert state.story("US-BLOCKED").status == StoryStatus.TODO
-    assert "Cycle de dépendances détecté" in state.story("US-BLOCKED").last_error
+    assert state.task("T-INTEGRATE").status == StoryStatus.DONE
+    assert state.task("T-CHILD-2").status == StoryStatus.DONE
+    assert state.story("US-BLOCKED").status == StoryStatus.DONE
+    # The broken edge was surfaced to the chat (plan defect must stay visible).
+    assert any("cycle" in c.content.lower() for c in state.chat)
 
 
 # --------------------------------------------------- (c) merge conflict policy
@@ -412,25 +421,32 @@ async def test_work_item_built_in_a_worktree_not_the_main_workspace(streams_on, 
 
 # ------------------------------------------------------ (e) BUG10 dep cycle
 
-async def test_dependency_cycle_surfaces_precise_path_in_last_error(streams_on):
-    """BUG10: when nothing is ready because two work items depend on each other
-    (a CYCLE), the failed items' ``last_error`` names the cycle path instead of
-    the generic 'dépendance non satisfaite' upstream-failure message."""
+async def test_dependency_cycle_broken_with_precise_path_in_warning(streams_on):
+    """BUG10 (updated for ingestion-time sanitation): a two-task cycle no longer
+    fails the items — the closing edge is dropped when the graph is built, and
+    the precise path is preserved in the warning so the plan defect stays
+    diagnosable. The raw graph (break_cycles=False) still exposes the cycle for
+    callers that must DETECT it (split-snapshot rollback)."""
     back = _task("T-back", "US-1", stream="backend", depends_on=["T-front"])
     front = _task("T-front", "US-1", stream="frontend", depends_on=["T-back"])
     state = _streams_state([_us("US-1", tasks=[back, front])])
-    pipeline = Pipeline(state, ScriptedRunner())
 
+    raw = work_streams.build_work_graph(state, break_cycles=False)
+    assert work_streams.detect_cycle(raw) is not None  # detection path intact
+
+    graph = work_streams.build_work_graph(state)
+    assert work_streams.detect_cycle(graph) is None
+    warning = next(w for w in graph.warnings if "cycle" in w.lower())
+    assert "→" in warning  # precise path named
+
+    pipeline = Pipeline(state, ScriptedRunner())
     await pipeline._abuild_phase()
 
-    # Both cyclic tasks fail with the cycle-specific message (not the generic one).
+    # Both former cycle members actually build (fake agents short-circuit green).
     for tid in ("T-back", "T-front"):
-        task = state.task(tid)
-        assert task.status == StoryStatus.FAILED
-        assert "Cycle" in task.last_error, task.last_error
-        assert "→" in task.last_error
-    # The precise path was surfaced to the chat too.
-    assert any("Cycle de dépendances détecté" in c.content for c in state.chat)
+        assert state.task(tid).status == StoryStatus.DONE
+    # The broken edge reached the chat.
+    assert any("cycle" in c.content.lower() for c in state.chat)
 
 
 # ------------------------------------------------ (f) BUG9 frontend task refs

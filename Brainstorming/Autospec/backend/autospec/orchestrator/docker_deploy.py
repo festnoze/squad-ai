@@ -41,15 +41,26 @@ LABEL_PROJECT = "autospec.project"
 LABEL_PORT = "autospec.port"
 
 # Substrings that mark a "the daemon is not reachable / docker is not installed"
-# condition — an infra problem, never a repairable wiring bug.
-_DAEMON_DOWN_MARKERS = (
+# condition — an infra problem, never a repairable wiring bug. The public tuple
+# is shared with ``Pipeline._smoke_looks_like_infra`` (single source of truth);
+# "no such file or directory" stays PRIVATE to this module: inside a smoke/pytest
+# report it would misclassify an app-level FileNotFoundError as infra.
+DOCKER_INFRA_MARKERS = (
     "error during connect",
     "cannot connect to the docker daemon",
     "pipe/docker_engine",
     "dockerdesktoplinuxengine",
     "is the docker daemon running",
+)
+_DAEMON_DOWN_MARKERS = DOCKER_INFRA_MARKERS + (
     "no such file or directory",  # docker binary invoked but engine socket missing
 )
+
+# Cross-reachability tuning: one retry for pairs involving our own container
+# (a slow cold-start must not burn a repair attempt), and a probe budget for
+# foreign pairs so the matrix stays bounded on big fleets.
+_PROBE_RETRY_DELAY_S = 2.0
+_MAX_FOREIGN_PROBES = 20
 
 
 def slug(project_id: str) -> str:
@@ -250,12 +261,28 @@ def wait_healthy(name: str, host_port: int, *, timeout: float) -> tuple[bool, st
     return False, f"health-wait timeout après {timeout:.0f}s ({last})\n{logs}"
 
 
+_HOST_PORT_RE = re.compile(r"(?:\d{1,3}(?:\.\d{1,3}){3}|\[[^\]]*\]):(\d+)->")
+
+
+def _parse_host_ports(ports_field: str) -> list[int]:
+    """Extract the published HOST ports from a ``docker ps`` ``{{.Ports}}`` field.
+
+    E.g. ``"0.0.0.0:18000->8000/tcp, [::]:18000->8000/tcp"`` → ``[18000]``."""
+    return sorted({int(m) for m in _HOST_PORT_RE.findall(ports_field or "")})
+
+
 def list_deployed() -> list[dict]:
     """Every currently-running Autospec container, from its labels.
 
     Label-based registry: containers of deleted/dead projects self-clean (they
-    just drop out of ``docker ps``)."""
-    fmt = "{{.Names}}\t{{.Label \"" + LABEL_PROJECT + "\"}}\t{{.Label \"" + LABEL_PORT + "\"}}"
+    just drop out of ``docker ps``). ``port`` is the container-INTERNAL port
+    (from the ``autospec.port`` label, used by the cross-container probes);
+    ``host_ports`` are the actually-published HOST ports (from ``{{.Ports}}``,
+    used by the port allocator)."""
+    fmt = (
+        "{{.Names}}\t{{.Label \"" + LABEL_PROJECT + "\"}}\t{{.Label \""
+        + LABEL_PORT + "\"}}\t{{.Ports}}"
+    )
     rc, out = _docker(
         ["ps", "--filter", f"label={LABEL_PROJECT}", "--format", fmt],
         timeout=15.0,
@@ -275,8 +302,11 @@ def list_deployed() -> list[dict]:
             port = int(port_raw)
         except (TypeError, ValueError):
             port = 0
+        host_ports = _parse_host_ports(parts[3]) if len(parts) > 3 else []
         if name:
-            deployed.append({"name": name, "project": project, "port": port})
+            deployed.append(
+                {"name": name, "project": project, "port": port, "host_ports": host_ports}
+            )
     return deployed
 
 
@@ -311,33 +341,61 @@ def probe(src: str, dst: str, dst_port: int) -> tuple[bool, str]:
 
 
 def check_cross_reachability(own_container: str, deployed: list[dict]) -> tuple[bool, str]:
-    """Probe the full N×N matrix between all deployed containers.
+    """Probe reachability between the deployed containers.
 
     A failing pair *involving* ``own_container`` fails this project's gate
-    (attributable, repairable). A failing pair between two *foreign* containers
-    is a warning only — we never burn this project's attempts on another
-    project's bug. Returns ``(ok_for_own, detail)``."""
+    (attributable, repairable) — those pairs are probed FIRST and get ONE retry
+    after ``_PROBE_RETRY_DELAY_S`` so a slow cold-start never burns a repair
+    attempt. A failing pair between two *foreign* containers is a warning only
+    (never our bug to fix); foreign pairs have no retry and stop after
+    ``_MAX_FOREIGN_PROBES`` probes so the matrix stays bounded on big fleets.
+    Returns ``(ok_for_own, detail)``."""
+    import time
+
     ok = True
     lines: list[str] = []
     warnings: list[str] = []
+
+    own_pairs: list[tuple[dict, dict]] = []
+    foreign_pairs: list[tuple[dict, dict]] = []
     for src in deployed:
         for dst in deployed:
-            if src["name"] == dst["name"]:
+            if src["name"] == dst["name"] or not (dst.get("port") or 0):
                 continue
-            dst_port = dst.get("port") or 0
-            if not dst_port:
-                continue
-            reachable, err = probe(src["name"], dst["name"], dst_port)
-            involves_own = own_container in (src["name"], dst["name"])
-            if reachable:
-                lines.append(f"OK   {src['name']} -> {dst['name']}:{dst_port}")
-                continue
-            msg = f"FAIL {src['name']} -> {dst['name']}:{dst_port} ({err})"
-            if involves_own:
-                ok = False
-                lines.append(msg)
+            if own_container in (src["name"], dst["name"]):
+                own_pairs.append((src, dst))
             else:
-                warnings.append(msg)
+                foreign_pairs.append((src, dst))
+
+    for src, dst in own_pairs:
+        dst_port = dst["port"]
+        reachable, err = probe(src["name"], dst["name"], dst_port)
+        if not reachable:
+            # One retry: a peer that just booted may need a moment.
+            time.sleep(_PROBE_RETRY_DELAY_S)
+            reachable, err = probe(src["name"], dst["name"], dst_port)
+        if reachable:
+            lines.append(f"OK   {src['name']} -> {dst['name']}:{dst_port}")
+        else:
+            ok = False
+            lines.append(f"FAIL {src['name']} -> {dst['name']}:{dst_port} ({err})")
+
+    probed = 0
+    for src, dst in foreign_pairs:
+        if probed >= _MAX_FOREIGN_PROBES:
+            warnings.append(
+                f"(budget de sondes atteint : {len(foreign_pairs) - probed} "
+                f"paire(s) tierce(s) non sondée(s))"
+            )
+            break
+        probed += 1
+        dst_port = dst["port"]
+        reachable, err = probe(src["name"], dst["name"], dst_port)
+        if reachable:
+            lines.append(f"OK   {src['name']} -> {dst['name']}:{dst_port}")
+        else:
+            warnings.append(f"FAIL {src['name']} -> {dst['name']}:{dst_port} ({err})")
+
     if warnings:
         lines.append("--- avertissements (paires tierces) ---")
         lines.extend(warnings)
@@ -352,8 +410,10 @@ def undeploy(project_id: str) -> None:
     _docker(["rmi", "-f", image], timeout=60.0)
 
 
-def _host_port_is_free(port: int) -> bool:
-    """Is nothing already listening on ``127.0.0.1:<port>`` ? (bind-test)."""
+def host_port_is_free(port: int) -> bool:
+    """Is nothing already listening on ``127.0.0.1:<port>`` ? (connect-test).
+
+    Single shared implementation — ``Pipeline._port_is_free`` delegates here."""
     with socket.socket() as s:
         s.settimeout(1.0)
         return s.connect_ex(("127.0.0.1", port)) != 0
@@ -363,19 +423,16 @@ def allocate_host_port(state: ProjectState) -> int:
     """Return a stable host port for ``state``.
 
     Reuse ``state.deploy_host_port`` if already assigned. Otherwise scan upward
-    from ``settings.docker_host_port_base`` skipping ports claimed by other
-    autospec containers, by other persisted project states, and by any
-    host-busy port."""
+    from ``settings.docker_host_port_base`` skipping the HOST ports actually
+    published by running autospec containers (authoritative even when a project
+    state file is gone), the ports claimed by other persisted project states,
+    and any host-busy port."""
     if state.deploy_host_port:
         return state.deploy_host_port
 
     claimed: set[int] = set()
     for entry in list_deployed():
-        # A container may publish a different host port than its labelled internal
-        # one; the persisted-state scan below is the authoritative claim set.
-        port = entry.get("port") or 0
-        if port:
-            claimed.add(port)
+        claimed.update(entry.get("host_ports") or [])
     from .. import storage
 
     for other in storage.list_states():
@@ -386,7 +443,7 @@ def allocate_host_port(state: ProjectState) -> int:
 
     port = int(settings.docker_host_port_base)
     while port < 65536:
-        if port not in claimed and _host_port_is_free(port):
+        if port not in claimed and host_port_is_free(port):
             return port
         port += 1
     # Extremely unlikely fallback.
@@ -451,11 +508,17 @@ def deploy_and_verify(
     host_port: int,
     build_timeout: float,
     deploy_timeout: float,
+    kind: str = "",
     on_line=None,
+    on_stage=None,
 ) -> DockerDeployResult:
     """Single entry point: build → deploy → health → cross-reachability.
 
     Also reused as the repair ``averify`` (a full rebuild + redeploy + reverify).
+    ``kind`` is the deploy kind already resolved by the caller (re-derived via
+    :func:`should_run` only when empty). ``on_stage`` (if given) receives
+    ``"building"`` / ``"deploying"`` / ``"verifying"`` as each stage starts so
+    the UI can track progress — including during repair re-verifies.
     Classification contract:
 
     - ``docker_available`` / ``ensure_network`` failures → ``infra`` (park);
@@ -464,98 +527,77 @@ def deploy_and_verify(
 
     ``detail`` concatenates the build tail, the docker logs and the network
     sections."""
-    _run, _reason, kind = should_run(state, ws, enabled=True)
+    if not kind:
+        _, _, kind = should_run(state, ws, enabled=True)
     container_port = 80 if kind == "frontend" else resolve_web_port(ws)
 
     image = image_name(state.id)
     name = container_name(state.id)
 
-    # --- infra pre-checks -------------------------------------------------
-    ok, out = docker_available()
-    if not ok:
-        return DockerDeployResult(
-            ok=False,
-            detail=f"docker indisponible — {out}",
-            infra=True,
-            image=image,
-            container=name,
-            host_port=host_port,
-        )
-    ok, out = ensure_network(network)
-    if not ok:
-        return DockerDeployResult(
-            ok=False,
-            detail=f"réseau {network} indisponible — {out}",
-            infra=True,
-            image=image,
-            container=name,
-            host_port=host_port,
-        )
+    def _stage(stage: str) -> None:
+        if on_stage is not None:
+            try:
+                on_stage(stage)
+            except Exception:  # noqa: BLE001 — a UI hook must never break the deploy
+                pass
 
-    # --- build (repairable) ----------------------------------------------
-    built, build_tail = build_image(ws, image, timeout=build_timeout, on_line=on_line)
-    if not built:
-        detail = "=== docker build (tail) ===\n" + build_tail
+    def _fail(detail: str, *, infra: bool = False) -> DockerDeployResult:
         return DockerDeployResult(
             ok=False,
             detail=detail,
+            infra=infra,
             image=image,
             container=name,
             host_port=host_port,
         )
 
+    # --- infra pre-checks -------------------------------------------------
+    ok, out = docker_available()
+    if not ok:
+        return _fail(f"docker indisponible — {out}", infra=True)
+    ok, out = ensure_network(network)
+    if not ok:
+        return _fail(f"réseau {network} indisponible — {out}", infra=True)
+
+    # --- build (repairable) ----------------------------------------------
+    _stage("building")
+    built, build_tail = build_image(ws, image, timeout=build_timeout, on_line=on_line)
+    if not built:
+        return _fail("=== docker build (tail) ===\n" + build_tail)
+
     # --- deploy (repairable) ---------------------------------------------
+    _stage("deploying")
     started, run_out = replace_container(
         image, name, network, host_port, container_port, state.id
     )
     if not started:
-        detail = (
+        return _fail(
             "=== docker build (tail) ===\n"
             + build_tail
             + "\n\n=== docker run ===\n"
             + run_out
         )
-        return DockerDeployResult(
-            ok=False,
-            detail=detail,
-            image=image,
-            container=name,
-            host_port=host_port,
-        )
 
     # --- health (repairable) ---------------------------------------------
+    _stage("verifying")
     healthy, health_out = wait_healthy(name, host_port, timeout=deploy_timeout)
     if not healthy:
-        detail = (
+        return _fail(
             "=== docker build (tail) ===\n"
             + build_tail[-1500:]
             + "\n\n=== docker logs ===\n"
             + health_out
-        )
-        return DockerDeployResult(
-            ok=False,
-            detail=detail,
-            image=image,
-            container=name,
-            host_port=host_port,
         )
 
     # --- cross-container reachability (repairable for own pairs) ----------
     deployed = list_deployed()
     net_ok, net_detail = check_cross_reachability(name, deployed)
     if not net_ok:
-        detail = (
+        return _fail(
             "=== docker logs ===\n"
             + _container_logs(name)
             + "\n\n=== réseau ===\n"
             + net_detail
-        )
-        return DockerDeployResult(
-            ok=False,
-            detail=detail,
-            image=image,
-            container=name,
-            host_port=host_port,
         )
 
     detail = f"déployé {name} sur http://localhost:{host_port} (réseau {network})"

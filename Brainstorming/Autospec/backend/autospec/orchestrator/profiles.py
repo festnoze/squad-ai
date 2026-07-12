@@ -105,7 +105,15 @@ PROFILES: dict[str, ProductProfile] = {
             "decompose_enabled": True,
             "smoke_run": True,
             "runtime_acceptance_enabled": True,
-            "ui_tests_enabled": True,
+            # Finding 12 : PAS d'exigence pytest-playwright PAR STORY en fullstack.
+            # La preuve UI est fournie de bout en bout par le gate runtime
+            # acceptance (navigateur réel sur l'app INTÉGRÉE) ; les stories UI y
+            # sont implémentées par le STREAM FRONTEND (React/Vitest), dont le
+            # prompt ne peut pas produire de tests pytest-playwright à la racine
+            # du workspace — l'exiger bloquait la DoD de TOUT projet fullstack.
+            # web-ssr garde ui_tests_enabled=True (pages rendues côté serveur :
+            # le dev backend écrit naturellement du pytest-playwright).
+            "ui_tests_enabled": False,
             "docker_delivery": True,
             # Finding 5 : idem — exercer le parcours d'écriture réel sur fullstack.
             "definition_of_done_strict_criteria": True,

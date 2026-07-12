@@ -1909,9 +1909,54 @@ class Pipeline:
         finally:
             self._sync()
 
+    async def averify_delivery(self) -> None:
+        """Re-run the FULL delivery-gate chain (smoke → runtime → DoD → docker)
+        on a dormant project, without rebuilding anything.
+
+        This is the operator's exit from an INFRA park: a gate that could not
+        verify (external process on the port, Docker daemon down…) leaves the
+        project in needs_attention — once the environment is fixed, this replays
+        the gates instead of forcing a pointless story rebuild. Raises ValueError
+        (-> 409) while the pipeline is active or a task is already running."""
+        if self.state.phase in (
+            PipelinePhase.SPEC, PipelinePhase.ANALYZE, PipelinePhase.PLAN,
+            PipelinePhase.ARCHITECT, PipelinePhase.BUILD,
+        ):
+            raise ValueError("la pipeline est active : attends la fin avant de re-vérifier")
+        if self._task and not self._task.done():
+            raise ValueError("une tâche est déjà en cours")
+        if self._deploy_task and not self._deploy_task.done():
+            raise ValueError("un déploiement Docker est en cours")
+        self._stop_requested = False
+        self._delivery_blocked = False
+        delivery_state.reset(self.state)
+        # Set BUILD synchronously BEFORE launching the task so a second
+        # concurrent call is rejected by the phase guard (closes the TOCTOU).
+        self.state.phase = PipelinePhase.BUILD
+        self._sync()
+        self._task = asyncio.create_task(self._averify_delivery_task())
+
+    async def _averify_delivery_task(self) -> None:
+        self._chat(ChatRole.SYSTEM, "🔁 Re-vérification de la livraison (gates)…")
+        try:
+            await self._adelivery_gates()
+        except Exception as exc:  # never leave the pipeline in a broken state
+            self._chat(ChatRole.SYSTEM, f"Erreur lors de la re-vérification : {exc}")
+        finally:
+            if self._stop_requested:
+                self.state.phase = PipelinePhase.STOPPED
+            elif self._delivery_blocked:
+                self.state.phase = PipelinePhase.NEEDS_ATTENTION
+            else:
+                self.state.phase = PipelinePhase.DONE
+            self._sync()
+
     async def aundeploy(self) -> None:
-        """Tear down this project's Docker container/image and clear its deploy
-        state. Raises ValueError (-> 409) while a deploy pass is running."""
+        """Tear down this project's Docker container/image and reset the deploy
+        STATUS/DETAIL. The image/container names and the allocated host port are
+        deliberately KEPT in state (stable identity across redeploys — see
+        ``delivery_state.set_deploy``). Raises ValueError (-> 409) while a
+        deploy pass is running."""
         if self._deploy_task and not self._deploy_task.done():
             raise ValueError("un déploiement Docker est en cours")
         await asyncio.to_thread(docker_deploy.undeploy, self.state.id)
@@ -2334,6 +2379,30 @@ class Pipeline:
         self._sync()
         return True
 
+    async def _adelivery_gates(self, *, all_iterations: bool = False) -> bool:
+        """Run the FULL delivery-gate chain on the current iteration:
+        smoke run → runtime acceptance → Definition of Done → Docker delivery.
+
+        Single source of truth for gate ORDER, shared by the main lifecycle and
+        the rebuild/resume finishers — an iteration completed through a story
+        rebuild or a resume-build must pass exactly the same gates as one built
+        in a single run (they used to skip smoke/runtime/docker entirely).
+        Returns False when a gate blocked the delivery (phase handling stays
+        the caller's job)."""
+        # Runnability gate: boot the delivered app; a non-runnable build fails
+        # the iteration like a red test (no-op unless SMOKE_RUN).
+        if not await self._asmoke_phase():
+            return False
+        if not await self._aruntime_acceptance_phase():
+            return False
+        if not self._apply_definition_of_done(all_iterations=all_iterations):
+            return False
+        # Docker delivery gate (D1): build the accepted delivery into an image,
+        # deploy it on the shared network and network-verify it; a failure parks
+        # the iteration in needs_attention (no-op unless DOCKER_DELIVERY /
+        # non-web project).
+        return await self._adocker_delivery_phase()
+
     async def _alifecycle(self) -> None:
         try:
             self._delivery_blocked = False
@@ -2377,19 +2446,7 @@ class Pipeline:
                 await self._abuild_phase()
                 if self._delivery_blocked:
                     break
-                # Runnability gate: boot the delivered app; a non-runnable build
-                # fails the iteration like a red test (no-op unless SMOKE_RUN).
-                if not await self._asmoke_phase():
-                    break
-                if not await self._aruntime_acceptance_phase():
-                    break
-                if not self._apply_definition_of_done():
-                    break
-                # Docker delivery gate (D1): build the accepted delivery into an
-                # image, deploy it on the shared network and network-verify it;
-                # a failure parks the iteration in needs_attention (no-op unless
-                # DOCKER_DELIVERY / non-web project).
-                if not await self._adocker_delivery_phase():
+                if not await self._adelivery_gates():
                     break
                 await self._adocument_phase()
                 # Closed-loop product evaluation (E6): exercise the delivered
@@ -3658,6 +3715,12 @@ class Pipeline:
                     )
                 }
                 graph = work_streams.build_work_graph(self.state)
+                # Surface graph sanitation loudly (unknown deps dropped, cycles
+                # broken at ingestion): silent repairs hide plan defects.
+                for warning in graph.warnings:
+                    self._log("streams", f"⚠️ {warning}")
+                    if "cycle" in warning.lower():
+                        self._chat(ChatRole.SYSTEM, f"⚠️ {warning}")
                 items = [
                     graph.items[i] for i in graph.order
                     if graph.items[i].story_id in iteration_ids
@@ -4468,7 +4531,12 @@ class Pipeline:
         return safe
 
     def _restore_split_snapshot_if_cycle(self, stories_snapshot: list[UserStory], *, label: str) -> bool:
-        cycle = work_streams.detect_cycle(work_streams.build_work_graph(self.state))
+        # RAW graph (break_cycles=False): this guard's job is to DETECT the cycle
+        # a split remap just created and roll the whole split back — the default
+        # ingestion-time breaking would hide it.
+        cycle = work_streams.detect_cycle(
+            work_streams.build_work_graph(self.state, break_cycles=False)
+        )
         if not cycle:
             return False
         self.state.stories = stories_snapshot
@@ -5635,6 +5703,14 @@ class Pipeline:
         story.last_error = ""
         for t in story.test_plan:
             t.status = TestState.NONEXISTENT
+        # A decomposed story builds through its TASKS: without resetting them a
+        # rebuild is a no-op — tasks still carry attempts == DEV_MAX_ATTEMPTS and
+        # a stale last_error, so they re-fail instantly without any agent run.
+        for task in story.tasks:
+            task.status = StoryStatus.TODO
+            task.attempts = 0
+            task.infra_attempts = 0
+            task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
         delivery_state.reset(self.state)
@@ -5653,7 +5729,9 @@ class Pipeline:
         try:
             await self._abuild_story(story)
             if not self._delivery_blocked:
-                self._apply_definition_of_done()
+                # Same gates as a full lifecycle run — an iteration finished
+                # through a rebuild must not skip smoke/runtime/docker.
+                await self._adelivery_gates()
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la relance de {story.id} : {exc}")
         finally:
@@ -5881,7 +5959,9 @@ class Pipeline:
         try:
             await self._abuild_phase(all_iterations=all_iterations)
             if not self._delivery_blocked:
-                self._apply_definition_of_done(all_iterations=all_iterations)
+                # Same gates as a full lifecycle run — an iteration finished
+                # through resume-build must not skip smoke/runtime/docker.
+                await self._adelivery_gates(all_iterations=all_iterations)
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la reprise du build : {exc}")
         finally:
@@ -6533,9 +6613,9 @@ class Pipeline:
         return (
             "lancement impossible" in low
             or "process externe" in low
-            or "cannot connect to the docker daemon" in low
-            or "error during connect" in low
             or "docker indisponible" in low
+            # Daemon-down markers shared with the docker gate (single source).
+            or any(marker in low for marker in docker_deploy.DOCKER_INFRA_MARKERS)
         )
 
     def _apark_infra(self, source: str, detail: str) -> None:
@@ -6557,8 +6637,13 @@ class Pipeline:
 
     async def _aensure_own_port_free(self, source: str, port: int) -> tuple[bool, str]:
         """Avant de booter, arrête l'app PROPRE du projet puis vérifie que le port
-        est libre (finding 1). Si le port RESTE occupé, c'est un process EXTERNE :
-        condition d'infra (vérification impossible), pas un échec de code.
+        est libre (finding 1). Si le port reste occupé, tente d'abord de tuer les
+        processus ORPHELINS de CE workspace qui le tiennent (finding 10 : sous
+        Windows un superviseur uvicorn/reload survit au taskkill du wrapper uv —
+        le gate suivant le prenait pour un tiers et se parquait en infra). Ce
+        n'est qu'après ce nettoyage ciblé qu'un port toujours occupé est déclaré
+        process EXTERNE : condition d'infra (vérification impossible), pas un
+        échec de code.
 
         Retourne ``(free, detail)`` — ``free=False`` => port tenu par un tiers."""
         await self.astop_app()
@@ -6568,12 +6653,129 @@ class Pipeline:
             if self._port_is_free(port):
                 return True, ""
             await asyncio.sleep(0.5)
+        # Le port est tenu : si c'est par un orphelin de l'USINE — n'importe quel
+        # process lancé depuis ``workspace/`` (smoke-run fuité d'un AUTRE projet
+        # inclus, finding 13), jamais un vrai tiers — on le tue et on re-teste.
+        killed = await asyncio.to_thread(
+            self._kill_workspace_port_holders, port, Path(settings.workspace_root)
+        )
+        if killed:
+            self._log(
+                source,
+                f"♻️ {killed} processus orphelin(s) du workspace tué(s) sur :{port}.",
+            )
+            for _ in range(6):
+                if self._port_is_free(port):
+                    return True, ""
+                await asyncio.sleep(0.5)
         detail = (
             f"port :{port} déjà occupé par un process externe — "
             f"vérification impossible"
         )
         self._log(source, f"⚠️ {detail}")
         return False, detail
+
+    @staticmethod
+    def _topmost_workspace_ancestors(
+        listeners: list[int], workspace_procs: dict[int, int]
+    ) -> list[int]:
+        """For each listening pid, walk UP the parent chain while the parent is
+        also a workspace process, and return the TOPMOST ancestors (deduped).
+
+        Killing only the listener is not enough: a uvicorn reload SUPERVISOR
+        does not hold the port itself and respawns a fresh worker right after
+        the kill — the gate then races a zombie factory. ``workspace_procs``
+        maps pid → ppid for every process whose command line points inside the
+        workspace. Pure function (testable without subprocess)."""
+        tops: list[int] = []
+        for pid in listeners:
+            if pid not in workspace_procs:
+                continue
+            seen = {pid}
+            top = pid
+            while True:
+                parent = workspace_procs.get(top)
+                if parent is None or parent not in workspace_procs or parent in seen:
+                    break
+                seen.add(parent)
+                top = parent
+            if top not in tops:
+                tops.append(top)
+        return tops
+
+    @staticmethod
+    def _kill_workspace_port_holders(port: int, ws: Path) -> int:
+        """Kill the process TREES of this workspace that hold ``port`` — from
+        their topmost workspace ancestor (supervisor included), never a third
+        party. By construction a process whose command line points inside ``ws``
+        is this project's own orphan (leaked smoke run, uvicorn reload
+        supervisor…). Returns the number of trees killed. Best-effort, never
+        raises."""
+        needle = str(ws).lower()
+        killed = 0
+        try:
+            if os.name == "nt":
+                script = (
+                    f"$l = Get-NetTCPConnection -LocalPort {int(port)} -State Listen "
+                    "-ErrorAction SilentlyContinue | "
+                    "Select-Object -ExpandProperty OwningProcess -Unique; "
+                    "'LISTEN:' + ($l -join ','); "
+                    "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
+                    "Where-Object { $_.CommandLine -and "
+                    f"$_.CommandLine.ToLower().Contains('{needle}') }} | "
+                    "ForEach-Object { \"$($_.ProcessId)|$($_.ParentProcessId)\" }"
+                )
+                proc = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", script],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                    text=True, encoding="utf-8", errors="replace", timeout=25,
+                )
+                listeners: list[int] = []
+                workspace_procs: dict[int, int] = {}
+                for line in (proc.stdout or "").splitlines():
+                    line = line.strip()
+                    if line.startswith("LISTEN:"):
+                        listeners = [
+                            int(p) for p in line[len("LISTEN:"):].split(",")
+                            if p.strip().isdigit()
+                        ]
+                    elif "|" in line:
+                        pid_s, _, ppid_s = line.partition("|")
+                        if pid_s.strip().isdigit() and ppid_s.strip().isdigit():
+                            workspace_procs[int(pid_s)] = int(ppid_s)
+                for top in Pipeline._topmost_workspace_ancestors(listeners, workspace_procs):
+                    subprocess.run(
+                        ["taskkill", "/PID", str(top), "/T", "/F"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        check=False, timeout=15,
+                    )
+                    killed += 1
+            else:
+                lsof = subprocess.run(
+                    ["lsof", "-ti", f"tcp:{int(port)}", "-sTCP:LISTEN"],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                    text=True, timeout=20,
+                )
+                listeners = [int(p) for p in (lsof.stdout or "").split() if p.isdigit()]
+                ps = subprocess.run(
+                    ["ps", "-eo", "pid=,ppid=,command="],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                    text=True, timeout=20,
+                )
+                workspace_procs = {}
+                for line in (ps.stdout or "").splitlines():
+                    parts = line.split(None, 2)
+                    if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit() \
+                            and needle in parts[2].lower():
+                        workspace_procs[int(parts[0])] = int(parts[1])
+                for top in Pipeline._topmost_workspace_ancestors(listeners, workspace_procs):
+                    # Kill the whole subtree: children first via pkill -P, then top.
+                    subprocess.run(["pkill", "-9", "-P", str(top)], check=False, timeout=10)
+                    subprocess.run(["kill", "-9", str(top)], check=False, timeout=10)
+                    killed += 1
+        except Exception:  # noqa: BLE001 — cleanup must never break a gate
+            return killed
+        return killed
 
     async def _asmoke_phase(self) -> bool:
         """Deterministic runnability gate (``SMOKE_RUN``): once the suite
@@ -6762,6 +6964,15 @@ class Pipeline:
         def _on_line(line: str) -> None:
             loop.call_soon_threadsafe(self._log, "docker", line)
 
+        def _set_stage(stage: str) -> None:
+            delivery_state.set_deploy(self.state, status=stage)
+            self._sync()
+
+        def _on_stage(stage: str) -> None:
+            # Emitted on the FIRST pass and on every repair re-verify, so the UI
+            # tracks building → deploying → verifying transitions throughout.
+            loop.call_soon_threadsafe(_set_stage, stage)
+
         def _run_deploy() -> docker_deploy.DockerDeployResult:
             return docker_deploy.deploy_and_verify(
                 self.state,
@@ -6770,7 +6981,9 @@ class Pipeline:
                 host_port=host_port,
                 build_timeout=self._setting("docker_build_timeout_s"),
                 deploy_timeout=self._setting("docker_deploy_timeout_s"),
+                kind=kind,
                 on_line=_on_line,
+                on_stage=_on_stage,
             )
 
         result = await asyncio.to_thread(_run_deploy)
@@ -6888,13 +7101,9 @@ class Pipeline:
 
     @staticmethod
     def _port_is_free(port: int) -> bool:
-        """Is ``127.0.0.1:<port>`` free (nothing listening)? A ``connect_ex`` that
-        does NOT succeed means no server is accepting connections there."""
-        import socket
-
-        with socket.socket() as s:
-            s.settimeout(1.0)
-            return s.connect_ex(("127.0.0.1", port)) != 0
+        """Is ``127.0.0.1:<port>`` free (nothing listening)? Delegates to the
+        single shared implementation in :mod:`docker_deploy`."""
+        return docker_deploy.host_port_is_free(port)
 
     def _has_frontend(self) -> bool:
         """Le projet embarque-t-il un frontend à vérifier ? Un stream frontend
@@ -6958,6 +7167,10 @@ class Pipeline:
                 )
             finally:
                 self._terminate_tree(proc)
+                # Double-tap (finding 13) : un superviseur uvicorn reload peut
+                # survivre au taskkill du wrapper uv et respawner un worker —
+                # tue tout arbre de l'usine encore accroché au port.
+                self._kill_workspace_port_holders(port, Path(settings.workspace_root))
 
         # CLI: must run to completion with exit code 0.
         try:

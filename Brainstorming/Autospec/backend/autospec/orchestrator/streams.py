@@ -111,11 +111,15 @@ def dependency_targets(dep_id: str, owner: str, state: ProjectState) -> tuple[st
     return tuple(t for t in targets if t != owner)
 
 
-def build_work_graph(state: ProjectState) -> WorkGraph:
+def build_work_graph(state: ProjectState, *, break_cycles: bool = True) -> WorkGraph:
     """Build the work-item graph for ``state`` (all stories, every iteration).
 
     Unknown dependency ids are dropped and reported in ``graph.warnings`` rather
-    than raising — a malformed agent plan must never crash the pipeline."""
+    than raising — a malformed agent plan must never crash the pipeline. With
+    ``break_cycles`` (default) dependency cycles are defensively broken at
+    ingestion (see :func:`_break_cycles`); pass ``False`` to obtain the RAW
+    graph when the caller wants to *detect* a cycle and act on it (e.g. the
+    split-snapshot rollback)."""
     primary = state.primary_stream_id
     stories_by_id = {s.id: s for s in state.stories}
     task_ids = {t.id for s in state.stories for t in s.tasks}
@@ -181,7 +185,36 @@ def build_work_graph(state: ProjectState) -> WorkGraph:
             graph.items[item.id] = item
             graph.order.append(item.id)
 
+    if break_cycles:
+        _break_cycles(graph)
     return graph
+
+
+def _break_cycles(graph: WorkGraph) -> None:
+    """Defensively break dependency cycles in the work graph.
+
+    Same policy as ``scheduler.sanitize_dependencies`` at story level: a
+    malformed agent plan — or a failure-split whose remapped deps loop across
+    stories (e.g. ``TS-1-T4 → TS-1-T2-S1 → US-1-T3 → US-1-T1 → TS-1-T4``) —
+    must never deadlock or mass-fail the build. Each detected cycle loses its
+    closing back-edge (recorded in ``graph.warnings``); items then build in
+    declaration order like any other."""
+    from dataclasses import replace
+
+    for _ in range(len(graph.items) + 1):
+        cycle = detect_cycle(graph)
+        if not cycle:
+            return
+        # ``cycle`` is [a, …, z, a]: the edge z → a closes the loop.
+        src_id, dst_id = cycle[-2], cycle[-1]
+        src = graph.items[src_id]
+        graph.items[src_id] = replace(
+            src, depends_on=tuple(d for d in src.depends_on if d != dst_id)
+        )
+        graph.warnings.append(
+            f"cycle de dépendances cassé : arête {src_id} → {dst_id} supprimée"
+            f" ({' → '.join(cycle)})"
+        )
 
 
 def detect_cycle(graph: WorkGraph) -> list[str] | None:

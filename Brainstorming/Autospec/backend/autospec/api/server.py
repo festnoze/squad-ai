@@ -1041,6 +1041,16 @@ async def aundeploy_project(project_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/projects/{project_id}/verify")
+async def averify_project(project_id: str) -> dict:
+    """Replay the delivery gates (smoke → runtime → DoD → docker) on a dormant
+    project — the operator's exit from an infra park once the environment is
+    fixed (freed port, restarted Docker daemon…). No rebuild involved."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(pipeline.averify_delivery(), f"Projet inconnu : {project_id}")
+    return {"ok": True}
+
+
 @app.post("/api/projects/{project_id}/evaluate")
 async def aevaluate_project(project_id: str) -> dict:
     """Exercise the generated product and feed findings into the impact pipeline (E6)."""

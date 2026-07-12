@@ -1040,6 +1040,41 @@ async def test_undeploy_404_409_200(green_pytest, monkeypatch):
         assert torn_down == [project_id]
 
 
+async def test_verify_replays_delivery_gates(green_pytest, monkeypatch):
+    """POST /verify : 404 unknown project, 409 while active, 200 on a dormant
+    project — replays the delivery gates without rebuilding (the operator's
+    exit from an infra park once the environment is fixed)."""
+    from autospec.models import PipelinePhase
+    from autospec.orchestrator.pipeline import Pipeline
+
+    gates: list[str] = []
+
+    async def _fake_gates(self, *, all_iterations=False):
+        gates.append("run")
+        return True
+
+    monkeypatch.setattr(Pipeline, "_adelivery_gates", _fake_gates)
+
+    async with make_client([PM_BRIEF, PO_PLAN, QA_TRIVIAL, DEV_GREEN]) as client:
+        assert (await client.post("/api/projects/nope/verify")).status_code == 404
+
+        project_id = await _acreate_done_project(client)
+        gates.clear()  # the initial lifecycle run also went through the gates
+
+        resp = await client.post(f"/api/projects/{project_id}/verify")
+        assert resp.status_code == 200 and resp.json() == {"ok": True}
+
+        pipeline = server.pipelines[project_id]
+        await pipeline._task  # let the background verify finish
+        assert gates == ["run"]
+        assert pipeline.state.phase == PipelinePhase.DONE
+
+        # Active pipeline -> 409.
+        pipeline.state.phase = PipelinePhase.BUILD
+        assert (await client.post(f"/api/projects/{project_id}/verify")).status_code == 409
+        pipeline.state.phase = PipelinePhase.DONE
+
+
 async def test_set_language_override():
     # L2c: override the backend language; unknown -> 422, unknown project -> 404.
     async with make_client([PM_BRIEF]) as client:

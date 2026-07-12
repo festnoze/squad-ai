@@ -35,7 +35,10 @@ def test_fullstack_profile_enables_streams_and_runtime(monkeypatch):
     overrides = profiles.apply_to_settings(state)
     assert overrides["streams_enabled"] is True
     assert overrides["runtime_acceptance_enabled"] is True
-    assert overrides["ui_tests_enabled"] is True
+    # Finding 12 : en fullstack la preuve UI vient du gate runtime acceptance
+    # (navigateur réel sur l'app intégrée), PAS d'une exigence pytest-playwright
+    # par story que le stream frontend ne peut pas produire.
+    assert overrides["ui_tests_enabled"] is False
     assert settings.streams_enabled is False
     assert settings.runtime_acceptance_enabled is False
 

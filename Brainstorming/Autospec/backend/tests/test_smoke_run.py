@@ -5,6 +5,7 @@ runnability check without launching `uv` (the subprocess/socket are faked)."""
 
 import socket as socketmod
 import subprocess
+from pathlib import Path
 
 from autospec.agents.scripted import ScriptedRunner
 from autospec.config import settings
@@ -228,6 +229,10 @@ async def test_smoke_external_port_occupied_is_infra_not_repair(monkeypatch):
 
     monkeypatch.setattr(Pipeline, "astop_app", _stop)
     monkeypatch.setattr(Pipeline, "_port_is_free", staticmethod(lambda port: False))
+    # Un port tenu par un VRAI tiers : le nettoyage ciblé ne trouve rien à tuer.
+    monkeypatch.setattr(
+        Pipeline, "_kill_workspace_port_holders", staticmethod(lambda port, ws: 0)
+    )
     # Le smoke ne doit JAMAIS être atteint (on gare avant de booter).
     monkeypatch.setattr(
         Pipeline, "_smoke_run_python",
@@ -239,6 +244,56 @@ async def test_smoke_external_port_occupied_is_infra_not_repair(monkeypatch):
     assert await pipeline._asmoke_phase() is False
     assert pipeline._delivery_blocked is True
     assert any("process externe" in r for r in state.regressions)
+
+
+def test_topmost_workspace_ancestors_walks_to_supervisor():
+    """Finding 10 v2 : tuer le worker qui écoute ne suffit pas — un superviseur
+    uvicorn reload (qui ne tient PAS le port) respawn un worker aussitôt. Le
+    kill doit viser l'ancêtre workspace le plus haut de la chaîne."""
+    # Chain: uv(100, parent hors workspace) -> supervisor(200) -> worker(300 listener).
+    workspace_procs = {100: 1, 200: 100, 300: 200}
+    tops = Pipeline._topmost_workspace_ancestors([300], workspace_procs)
+    assert tops == [100]
+    # Two listeners of the same tree -> ONE tree kill.
+    workspace_procs[301] = 200
+    assert Pipeline._topmost_workspace_ancestors([300, 301], workspace_procs) == [100]
+    # A listener that is NOT a workspace process is never touched.
+    assert Pipeline._topmost_workspace_ancestors([999], workspace_procs) == []
+    # Cycle-safe (corrupt ppid data must not loop forever).
+    assert Pipeline._topmost_workspace_ancestors([10], {10: 11, 11: 10}) == [11]
+
+
+async def test_port_held_by_own_orphan_is_killed_and_freed(monkeypatch):
+    """Finding 10 : un orphelin de NOTRE workspace (smoke-run fuité, superviseur
+    uvicorn reload) qui tient le port est tué et le gate continue — il n'est
+    jamais classé « process externe » (l'infra-park était systématique sous
+    Windows pour les projets web)."""
+    state = _state_with_done_story("smoke-own-orphan")
+    _scaffold(workspace_dir(state.id), web=True)
+
+    async def _stop(self):
+        return None
+
+    free_after_kill = {"killed": False}
+
+    def _port_is_free(port):
+        return free_after_kill["killed"]
+
+    def _kill(port, ws):
+        # Finding 13 : la needle couvre TOUT le workspace root de l'usine —
+        # l'orphelin d'un AUTRE projet doit aussi être nettoyé.
+        assert str(ws) == str(Path(settings.workspace_root))
+        free_after_kill["killed"] = True
+        return 1
+
+    monkeypatch.setattr(Pipeline, "astop_app", _stop)
+    monkeypatch.setattr(Pipeline, "_port_is_free", staticmethod(_port_is_free))
+    monkeypatch.setattr(Pipeline, "_kill_workspace_port_holders", staticmethod(_kill))
+    pipeline = Pipeline(state, ScriptedRunner())
+
+    free, detail = await pipeline._aensure_own_port_free("smoke", 8000)
+    assert free is True and detail == ""
+    assert free_after_kill["killed"] is True
 
 
 async def test_smoke_launch_impossible_is_infra_not_repair(monkeypatch):

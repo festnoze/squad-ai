@@ -206,22 +206,70 @@ def test_wait_healthy_timeout_with_logs(monkeypatch):
 # ------------------------------------------------- check_cross_reachability
 
 def test_cross_reachability_own_pair_failure_blocks(monkeypatch):
-    """A failing pair INVOLVING the current container fails this project's gate."""
+    """A failing pair INVOLVING the current container fails this project's gate —
+    after ONE retry (a slow cold-start must not instantly burn a repair attempt)."""
     deployed = [
         {"name": "autospec-a", "project": "a", "port": 8000},
         {"name": "autospec-b", "project": "b", "port": 8000},
     ]
+    calls: list[tuple[str, str]] = []
 
     def _probe(src, dst, dst_port):
-        # a → b is broken; the reverse works.
+        calls.append((src, dst))
+        # a → b is broken (persistently); the reverse works.
         if src == "autospec-a" and dst == "autospec-b":
             return False, "connection refused"
         return True, ""
 
     monkeypatch.setattr(docker_deploy, "probe", _probe)
+    monkeypatch.setattr(docker_deploy, "_PROBE_RETRY_DELAY_S", 0.0)
     ok, detail = docker_deploy.check_cross_reachability("autospec-a", deployed)
     assert ok is False
     assert "FAIL autospec-a -> autospec-b" in detail
+    # The failing own pair was probed twice (one retry), the healthy one once.
+    assert calls.count(("autospec-a", "autospec-b")) == 2
+    assert calls.count(("autospec-b", "autospec-a")) == 1
+
+
+def test_cross_reachability_own_pair_recovers_on_retry(monkeypatch):
+    """A transient failure (peer still booting) passes on the retry — the gate
+    stays green and no repair attempt is burned."""
+    deployed = [
+        {"name": "autospec-a", "project": "a", "port": 8000},
+        {"name": "autospec-b", "project": "b", "port": 8000},
+    ]
+    failures = {"n": 0}
+
+    def _probe(src, dst, dst_port):
+        if src == "autospec-a" and dst == "autospec-b" and failures["n"] == 0:
+            failures["n"] += 1
+            return False, "connection refused (booting)"
+        return True, ""
+
+    monkeypatch.setattr(docker_deploy, "probe", _probe)
+    monkeypatch.setattr(docker_deploy, "_PROBE_RETRY_DELAY_S", 0.0)
+    ok, detail = docker_deploy.check_cross_reachability("autospec-a", deployed)
+    assert ok is True
+    assert "FAIL" not in detail
+
+
+def test_cross_reachability_foreign_probe_budget(monkeypatch):
+    """Foreign pairs stop after the probe budget so a big fleet cannot block the
+    gate for minutes; the truncation is stated, never silent."""
+    deployed = [{"name": f"autospec-{i}", "project": str(i), "port": 8000} for i in range(7)]
+    calls = {"n": 0}
+
+    def _probe(src, dst, dst_port):
+        calls["n"] += 1
+        return True, ""
+
+    monkeypatch.setattr(docker_deploy, "probe", _probe)
+    monkeypatch.setattr(docker_deploy, "_MAX_FOREIGN_PROBES", 5)
+    ok, detail = docker_deploy.check_cross_reachability("autospec-0", deployed)
+    assert ok is True
+    # 12 own pairs (0↔each of 6 others, both directions) + 5 foreign (budget).
+    assert calls["n"] == 12 + 5
+    assert "non sondée" in detail
 
 
 def test_cross_reachability_foreign_pair_is_warning_only(monkeypatch):
@@ -260,7 +308,7 @@ def test_allocate_host_port_reuses_persisted(monkeypatch):
 def test_allocate_host_port_returns_base_when_free(monkeypatch):
     monkeypatch.setattr(settings, "docker_host_port_base", 18000)
     monkeypatch.setattr(docker_deploy, "list_deployed", lambda: [])
-    monkeypatch.setattr(docker_deploy, "_host_port_is_free", lambda port: True)
+    monkeypatch.setattr(docker_deploy, "host_port_is_free", lambda port: True)
     from autospec import storage
     monkeypatch.setattr(storage, "list_states", lambda: [])
     state = ProjectState(id="alloc-base", name="a", goal="g")
@@ -268,17 +316,90 @@ def test_allocate_host_port_returns_base_when_free(monkeypatch):
 
 
 def test_allocate_host_port_skips_collisions(monkeypatch):
-    """Base + next are claimed (by a container and by a persisted state); the
-    third is host-busy → we land on base+3."""
+    """Base + next are claimed (by a running container's PUBLISHED host port and
+    by a persisted state); the third is host-busy → we land on base+3."""
     monkeypatch.setattr(settings, "docker_host_port_base", 18000)
-    monkeypatch.setattr(docker_deploy, "list_deployed", lambda: [{"name": "x", "project": "x", "port": 18000}])
+    monkeypatch.setattr(
+        docker_deploy,
+        "list_deployed",
+        lambda: [{"name": "x", "project": "x", "port": 8000, "host_ports": [18000]}],
+    )
     other = ProjectState(id="other", name="o", goal="g")
     other.deploy_host_port = 18001
     from autospec import storage
     monkeypatch.setattr(storage, "list_states", lambda: [other])
-    monkeypatch.setattr(docker_deploy, "_host_port_is_free", lambda port: port != 18002)
+    monkeypatch.setattr(docker_deploy, "host_port_is_free", lambda port: port != 18002)
     state = ProjectState(id="alloc-collide", name="a", goal="g")
     assert docker_deploy.allocate_host_port(state) == 18003
+
+
+def test_allocate_claims_published_ports_even_without_state_file(monkeypatch):
+    """The docker-published HOST port is authoritative: a container whose project
+    state file is gone (deleted project, wiped workspace) still claims its port."""
+    monkeypatch.setattr(settings, "docker_host_port_base", 18000)
+    monkeypatch.setattr(
+        docker_deploy,
+        "list_deployed",
+        # Orphan container: publishes 18000; container-internal port label 8000.
+        lambda: [{"name": "orphan", "project": "gone", "port": 8000, "host_ports": [18000]}],
+    )
+    from autospec import storage
+    monkeypatch.setattr(storage, "list_states", lambda: [])  # no state files at all
+    monkeypatch.setattr(docker_deploy, "host_port_is_free", lambda port: True)
+    state = ProjectState(id="alloc-orphan", name="a", goal="g")
+    assert docker_deploy.allocate_host_port(state) == 18001
+
+
+def test_allocate_ignores_container_internal_port_label(monkeypatch):
+    """The autospec.port label (container-INTERNAL port) must NOT be treated as a
+    host claim: a container labelled 18005 internally but publishing nothing on
+    that host port leaves 18005 available."""
+    monkeypatch.setattr(settings, "docker_host_port_base", 18005)
+    monkeypatch.setattr(
+        docker_deploy,
+        "list_deployed",
+        lambda: [{"name": "x", "project": "x", "port": 18005, "host_ports": [19000]}],
+    )
+    from autospec import storage
+    monkeypatch.setattr(storage, "list_states", lambda: [])
+    monkeypatch.setattr(docker_deploy, "host_port_is_free", lambda port: True)
+    state = ProjectState(id="alloc-label", name="a", goal="g")
+    assert docker_deploy.allocate_host_port(state) == 18005
+
+
+# ------------------------------------------------------ published-port parsing
+
+def test_parse_host_ports_ipv4_and_ipv6():
+    ports = docker_deploy._parse_host_ports(
+        "0.0.0.0:18000->8000/tcp, [::]:18000->8000/tcp, 0.0.0.0:18001->9000/tcp"
+    )
+    assert ports == [18000, 18001]
+
+
+def test_parse_host_ports_empty_and_unpublished():
+    assert docker_deploy._parse_host_ports("") == []
+    assert docker_deploy._parse_host_ports("8000/tcp") == []  # exposed, not published
+
+
+def test_list_deployed_parses_ports_column(monkeypatch):
+    """docker ps now yields a 4th {{.Ports}} column parsed into host_ports."""
+    out = (
+        "autospec-a\ta\t8000\t0.0.0.0:18000->8000/tcp, [::]:18000->8000/tcp\n"
+        "autospec-b\tb\t80\t0.0.0.0:18001->80/tcp\n"
+        "autospec-old\told\t8000\n"  # pre-upgrade 3-column line stays parseable
+    )
+
+    def _script(args):
+        assert args[0] == "ps"
+        return 0, out
+
+    _fake_docker(monkeypatch, _script)
+    deployed = docker_deploy.list_deployed()
+    assert deployed[0] == {
+        "name": "autospec-a", "project": "a", "port": 8000, "host_ports": [18000]
+    }
+    assert deployed[1]["host_ports"] == [18001]
+    assert deployed[2]["host_ports"] == []
 
 
 # ------------------------------------------------------ name sanitisation

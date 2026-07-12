@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import ast
 import re
+import sys
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -216,6 +217,37 @@ def _sanitize_id(rule_id: str) -> str:
     return slug or "rule"
 
 
+def _thirdparty_roots(source: str) -> list[str]:
+    """Every imported root module of ``source`` that is neither stdlib nor
+    ``pytest`` — wherever the import lives (top-level OR nested in a helper /
+    fixture / test body: the agent often writes ``def _client(): from
+    fastapi.testclient import TestClient`` and a nested import raises at RUN
+    time instead of collection time — same red suite, same cascade).
+
+    A constitution test is compiled right after SPEC, BEFORE any story has added
+    its dependencies to the workspace ``pyproject.toml``. Every third-party root
+    found gets a module-level ``pytest.importorskip`` guard: the whole invariant
+    file SKIPS until the dependency lands, then activates automatically."""
+    try:
+        tree = ast.parse(source)
+    except SyntaxError:
+        return []
+    stdlib = getattr(sys, "stdlib_module_names", frozenset())
+    roots: list[str] = []
+    for node in ast.walk(tree):  # ALL imports, nested included
+        if isinstance(node, ast.Import):
+            names = [alias.name for alias in node.names]
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            names = [node.module]
+        else:
+            continue
+        for name in names:
+            root = name.split(".")[0]
+            if root and root not in stdlib and root != "pytest" and root not in roots:
+                roots.append(root)
+    return roots
+
+
 def render_pytest_file(rule: dict) -> "tuple[str, str] | None":
     """Render a ``kind=test`` rule into a ``(path, content)`` seeded-test pair.
 
@@ -238,7 +270,18 @@ def render_pytest_file(rule: dict) -> "tuple[str, str] | None":
         f"# {statement}\n"
         "# Auto-compiled — immutable: do NOT edit or delete (W2/W5 protected).\n\n"
     )
-    content = header + check_code.rstrip() + "\n"
+    guard = ""
+    roots = _thirdparty_roots(check_code)
+    if roots:
+        skips = "\n".join(f'pytest.importorskip("{root}")' for root in roots)
+        guard = (
+            "import pytest\n\n"
+            "# Dépendances potentiellement pas encore livrées à ce stade du build :\n"
+            "# SKIP propre (pas d'échec de collecte) — l'invariant s'active dès\n"
+            "# qu'elles arrivent dans le pyproject du workspace.\n"
+            f"{skips}\n\n"
+        )
+    content = header + guard + check_code.rstrip() + "\n"
     return path, content
 
 

@@ -185,7 +185,13 @@ Ta mission : DIAGNOSTIQUER puis RÉPARER le câblage dans le répertoire courant
   renvoie du text/html pour un `.js` produit une page blanche ;
 - un routeur/endpoint jamais enregistré sur l'app, un port ou host incohérent ;
 - la base de données jamais initialisée au démarrage (tables/migrations) ;
-- CORS ou URL d'API côté frontend pointant ailleurs que le backend servi.
+- CORS ou URL d'API côté frontend pointant ailleurs que le backend servi —
+  en mode intégré la BONNE réparation est presque toujours côté FRONTEND :
+  remplacer les origines absolues codées en dur (`http://localhost:8000/...`)
+  par des URLs RELATIVES (`fetch("/expenses")`) puis rebuilder le frontend
+  (`npm run build`), PAS d'empiler du middleware CORS sur le backend
+  (`localhost` vs `127.0.0.1` restera cross-origin et le conteneur Docker
+  sera servi depuis un autre port hôte).
 
 Règles :
 1. Reproduis d'abord si possible (lance les commandes nécessaires : build
@@ -1782,7 +1788,9 @@ PROCESSUS OBLIGATOIRE (BDD puis TDD, outside-in) :
    des unités parallèles modifieraient en conflit. Le projet DOIT rester
    lançable tel quel. Pour un CLI, expose la commande. Pour une APP WEB / API
    (FastAPI, Flask…), `python main.py` DOIT DÉMARRER LE SERVEUR
-   (`if __name__ == "__main__":` → `uvicorn.run(app, host="127.0.0.1", port=8000)`)
+   (`if __name__ == "__main__":` → `uvicorn.run(app, host="0.0.0.0", port=8000)`
+   — host `0.0.0.0`, PAS `127.0.0.1` : l'app doit rester joignable une fois
+   empaquetée dans un conteneur Docker)
    — SEULE cette évolution du point d'entrée justifie de toucher `main.py` —
    et la DÉPENDANCE D'EXÉCUTION (ex. `uvicorn`) DOIT être déclarée dans
    `pyproject.toml` (`dependencies`). Ne te contente JAMAIS d'imprimer des
@@ -1791,6 +1799,10 @@ PROCESSUS OBLIGATOIRE (BDD puis TDD, outside-in) :
 CONTRAINTES :
 - Ne modifie JAMAIS les fichiers .feature ni autospec-state.json.
 - Ne touche qu'aux fichiers de ce répertoire.
+- TOUT le code applicatif vit dans le package `{package_name}/` existant.
+  N'invente JAMAIS de package top-level supplémentaire (pas de second package
+  parallèle « mieux nommé ») : d'autres unités construisent en parallèle dans
+  `{package_name}/` et un doublon divise le produit en deux implémentations.
 - Code et docstrings en anglais ; messages utilisateur en français.
 
 Quand tu as terminé, réponds avec EXACTEMENT UN objet JSON :
@@ -1873,6 +1885,12 @@ CONTRAINTES :
   backend. Code et identifiants en anglais ; textes utilisateur en français.
 - TypeScript strict, composants fonctionnels + hooks ; pas de dépendance lourde
   non installée.
+- Les appels à l'API backend utilisent des URLs RELATIVES (`fetch("/expenses")`),
+  JAMAIS d'origine absolue en dur (`http://localhost:8000/...`) : en production
+  le frontend buildé est SERVI PAR le backend (même origine) puis empaqueté en
+  conteneur Docker — une origine codée en dur casse les deux (erreurs CORS
+  `localhost` vs `127.0.0.1`, conteneur joignable sur un autre port hôte). En
+  dev Vite, la partie serveur est atteinte via le proxy — pas d'URL absolue.
 
 Quand tu as terminé, réponds avec EXACTEMENT UN objet JSON :
 {{

@@ -11,13 +11,20 @@ from pathlib import Path
 
 from ..config import settings
 
-#: First line of every Autospec-generated Dockerfile. Autospec safely
-#: regenerates a Dockerfile that still carries this marker, but never clobbers
-#: one a user has taken over (marker removed).
+#: Managed marker carried by every Autospec-generated Dockerfile. Autospec
+#: safely regenerates a Dockerfile that still carries this marker, but never
+#: clobbers one a user has taken over (marker removed). It sits on line 2:
+#: the ``# syntax=`` parser directive is only honored by Docker when it is the
+#: very FIRST line of the file.
 MANAGED_MARKER = "# autospec:managed"
 
-_BACKEND_BODY = """# syntax=docker/dockerfile:1
-FROM python:3.12-slim
+_SYNTAX_DIRECTIVE = "# syntax=docker/dockerfile:1"
+
+#: Shared header of every managed Dockerfile: parser directive first (Docker
+#: requirement), managed marker second.
+_HEADER = f"{_SYNTAX_DIRECTIVE}\n{MANAGED_MARKER}\n"
+
+_BACKEND_BODY = """FROM python:3.12-slim
 WORKDIR /app
 RUN pip install --no-cache-dir uv
 COPY pyproject.toml ./
@@ -50,6 +57,9 @@ node_modules
 **/node_modules
 __pycache__
 *.pyc
+*.db
+*.sqlite
+*.sqlite3
 autospec-state.json
 autospec-interactions.jsonl
 build-monitor.jsonl
@@ -82,28 +92,27 @@ def dockerfile_text(port: int, kind: str = "backend") -> str:
     """
     if kind == "frontend":
         return (
-            f"{MANAGED_MARKER}\n"
-            "# syntax=docker/dockerfile:1\n"
-            f"{_FE_BUILD_STAGE}"
-            "FROM nginx:alpine\n"
+            _HEADER
+            + _FE_BUILD_STAGE
+            + "FROM nginx:alpine\n"
             "COPY --from=fe /fe/dist /usr/share/nginx/html\n"
             "COPY nginx.conf /etc/nginx/conf.d/default.conf\n"
             "EXPOSE 80\n"
         )
     if kind == "fullstack":
         return (
-            f"{MANAGED_MARKER}\n"
-            f"{_FE_BUILD_STAGE}"
-            f"{_BACKEND_BODY}"
-            "COPY --from=fe /fe/dist ./frontend/dist\n"
-            f"EXPOSE {port}\n"
+            _HEADER
+            + _FE_BUILD_STAGE
+            + _BACKEND_BODY
+            + "COPY --from=fe /fe/dist ./frontend/dist\n"
+            + f"EXPOSE {port}\n"
             'CMD ["uv", "run", "python", "main.py"]\n'
         )
     # backend (default)
     return (
-        f"{MANAGED_MARKER}\n"
-        f"{_BACKEND_BODY}"
-        f"EXPOSE {port}\n"
+        _HEADER
+        + _BACKEND_BODY
+        + f"EXPOSE {port}\n"
         'CMD ["uv", "run", "python", "main.py"]\n'
     )
 
@@ -152,15 +161,17 @@ def write_deploy_artifacts(
 def _should_write_dockerfile(path: Path, wanted: str) -> bool:
     """Whether the managed Dockerfile should be (re)written.
 
-    True when the file is absent, or when it is still Autospec-managed (first
-    line is the marker) and its content has drifted from ``wanted``."""
+    True when the file is absent, or when it is still Autospec-managed and its
+    content has drifted from ``wanted``. The marker lives on line 2 (after the
+    ``# syntax=`` parser directive); files generated before that reorder carry
+    it on line 1 — both count as managed."""
     if not path.exists():
         return True
     try:
         current = path.read_text(encoding="utf-8")
     except OSError:
         return True
-    first_line = current.splitlines()[0] if current else ""
-    if first_line.strip() != MANAGED_MARKER:
+    head = [line.strip() for line in current.splitlines()[:2]]
+    if MANAGED_MARKER not in head:
         return False  # user has taken over the Dockerfile
     return current != wanted

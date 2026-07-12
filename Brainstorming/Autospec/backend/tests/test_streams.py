@@ -157,10 +157,17 @@ def test_cycle_detection():
     t1 = _task("T1", "US-1", depends_on=["T2"])
     t2 = _task("T2", "US-1", depends_on=["T1"])
     st = _state([_us("US-1", tasks=[t1, t2])])
-    cycle = wg.detect_cycle(wg.build_work_graph(st))
+    # Detection works on the RAW graph (the default build now BREAKS cycles at
+    # ingestion — mirroring scheduler.sanitize_dependencies at story level).
+    raw = wg.build_work_graph(st, break_cycles=False)
+    cycle = wg.detect_cycle(raw)
     assert cycle is not None and set(cycle) >= {"T1", "T2"}
-    assert wg.cycle_nodes(wg.build_work_graph(st)) == {"T1", "T2"}
+    assert wg.cycle_nodes(wg.build_work_graph(st, break_cycles=False)) == {"T1", "T2"}
     assert any("cycle" in w for w in wg.validate(st))
+    # Default build: cycle broken, edge drop surfaced, nothing deadlocks.
+    sanitized = wg.build_work_graph(st)
+    assert wg.detect_cycle(sanitized) is None
+    assert any("cycle" in w.lower() for w in sanitized.warnings)
 
 
 def test_nested_technical_story_cycle_is_detected_with_exact_nodes():
@@ -180,7 +187,7 @@ def test_nested_technical_story_cycle_is_detected_with_exact_nodes():
     child.technical = True
     child.parent_id = "TS-PARENT"
     blocked = _us("US-BLOCKED", depends_on=["TS-PARENT"])
-    graph = wg.build_work_graph(_state([parent, child, blocked]))
+    graph = wg.build_work_graph(_state([parent, child, blocked]), break_cycles=False)
 
     # Depending on the child TS expands to its leaf tasks, so the integration
     # task and child task form the same resolved cycle that broke messagerie2.

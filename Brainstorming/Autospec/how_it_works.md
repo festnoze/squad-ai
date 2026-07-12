@@ -512,10 +512,15 @@ d'artefacts (Dockerfile, `.dockerignore`, `ci.yml`).
 - **Vérification santé + joignabilité croisée** : `wait_healthy` poll 1 s
   (`docker inspect` — un état `exited`/`dead` échoue vite avec `docker logs`) et
   une requête HTTP `http://127.0.0.1:<port hôte>/` — **tout statut HTTP (y
-  compris 404) = à l'écoute = sain**. Puis `check_cross_reachability` exécute la
-  matrice complète de sondes entre conteneurs déployés (`docker exec` →
-  `urllib` avec repli busybox `wget` pour les images nginx sans python ; un
-  `HTTPError` prouve DNS+TCP+HTTP donc compte comme joignable).
+  compris 404) = à l'écoute = sain**. Puis `check_cross_reachability` sonde les
+  conteneurs déployés (`docker exec` → `urllib` avec repli busybox `wget` pour
+  les images nginx sans python ; un `HTTPError` prouve DNS+TCP+HTTP donc compte
+  comme joignable). Les **paires impliquant le projet courant** sont sondées en
+  premier avec **un retry** (2 s) — un pair en cold-start ne brûle jamais une
+  tentative de réparation ; les **paires tierces** (avertissements seulement)
+  sont sondées sans retry dans la limite d'un **budget de 20 sondes** (la
+  troncature est annoncée, jamais silencieuse) pour borner la matrice sur les
+  grosses flottes.
 - **Boucle « fix until green »** : un échec **réparable** (build cassé, app liée
   à `127.0.0.1` au lieu de `0.0.0.0`, port ≠ EXPOSE/label, `frontend/dist` absent
   de l'image, dép présente dans `.venv` mais absente du `pyproject.toml`…)

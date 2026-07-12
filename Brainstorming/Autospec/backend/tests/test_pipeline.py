@@ -481,6 +481,38 @@ async def test_rebuild_failed_story(green_pytest):
     assert pipeline.state.story("US-1").attempts == 1
 
 
+async def test_rebuild_resets_decomposed_tasks(green_pytest):
+    """A decomposed story rebuilds through its TASKS: without resetting them the
+    rebuild is a no-op (tasks keep attempts == max and a stale last_error, so
+    they re-fail instantly without any agent run)."""
+    from autospec.models import Task
+
+    pipeline, _ = make_pipeline(
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN]
+    )
+    pipeline.start()
+    await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+    us1 = pipeline.state.story("US-1")
+    us1.status = StoryStatus.FAILED
+    us1.tasks = [
+        Task(id="US-1-T1", story_id="US-1", status=StoryStatus.FAILED,
+             attempts=2, infra_attempts=1, last_error="stale worktree error"),
+        Task(id="US-1-T2", story_id="US-1", status=StoryStatus.TODO,
+             attempts=0, last_error="Dépendance non satisfaite"),
+    ]
+
+    await pipeline.arebuild_story("US-1")
+    # The reset is synchronous (before the background build starts).
+    for task in pipeline.state.story("US-1").tasks:
+        assert task.status == StoryStatus.TODO
+        assert task.attempts == 0
+        assert task.infra_attempts == 0
+        assert task.last_error == ""
+    if pipeline._task and not pipeline._task.done():
+        pipeline._task.cancel()
+
+
 async def test_rebuild_rejects_concurrent_call(green_pytest):
     # TOCTOU guard: a second rebuild while one is in flight must be rejected.
     pipeline, _ = make_pipeline(

@@ -30,10 +30,18 @@ def test_write_deploy_idempotent(tmp_path):
 
 # ---------------------------------------------------- dockerfile_text variants
 
+def _assert_header(text: str) -> None:
+    """Docker only honors ``# syntax=`` as the very FIRST line; the managed
+    marker sits on line 2."""
+    lines = text.splitlines()
+    assert lines[0] == "# syntax=docker/dockerfile:1"
+    assert lines[1] == MANAGED_MARKER
+
+
 def test_dockerfile_backend_exposes_port():
     """Backend kind : python image running main.py with EXPOSE {port}."""
     text = dockerfile_text(8123, "backend")
-    assert text.startswith(MANAGED_MARKER)
+    _assert_header(text)
     assert "python:3.12-slim" in text
     assert "EXPOSE 8123" in text
     # A pure backend has no frontend build stage / nginx.
@@ -44,7 +52,7 @@ def test_dockerfile_backend_exposes_port():
 def test_dockerfile_fullstack_is_multi_stage_one_image():
     """Fullstack kind : node build stage + python stage serving frontend/dist."""
     text = dockerfile_text(9001, "fullstack")
-    assert text.startswith(MANAGED_MARKER)
+    _assert_header(text)
     assert "FROM node:20-alpine AS fe" in text
     assert "npm run build" in text
     assert "python:3.12-slim" in text
@@ -55,7 +63,7 @@ def test_dockerfile_fullstack_is_multi_stage_one_image():
 def test_dockerfile_frontend_only_serves_via_nginx_port_80():
     """Frontend-only SPA : node build stage → nginx:alpine, container port 80."""
     text = dockerfile_text(1234, "frontend")
-    assert text.startswith(MANAGED_MARKER)
+    _assert_header(text)
     assert "FROM node:20-alpine AS fe" in text
     assert "FROM nginx:alpine" in text
     assert "COPY --from=fe /fe/dist /usr/share/nginx/html" in text
@@ -75,6 +83,21 @@ def test_managed_dockerfile_is_regenerated_on_drift(tmp_path):
     assert "Dockerfile" in created
     body = (tmp_path / "Dockerfile").read_text(encoding="utf-8")
     assert "FROM nginx:alpine" in body
+
+
+def test_legacy_marker_first_dockerfile_is_still_managed(tmp_path):
+    """Dockerfiles generated before the syntax-directive reorder carry the marker
+    on line 1 — they must still count as managed and be regenerated."""
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text(
+        f"{MANAGED_MARKER}\n# syntax=docker/dockerfile:1\nFROM python:3.12-slim\n",
+        encoding="utf-8",
+    )
+    created = write_deploy_artifacts(tmp_path, port=8000, kind="backend")
+    assert "Dockerfile" in created
+    lines = dockerfile.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "# syntax=docker/dockerfile:1"
+    assert lines[1] == MANAGED_MARKER
 
 
 def test_user_owned_dockerfile_is_preserved(tmp_path):

@@ -59,6 +59,74 @@ def test_render_pytest_file_valid_rule():
     assert "def test_no_raw_sql():" in content
 
 
+def test_render_pytest_file_guards_thirdparty_imports():
+    """A check_code with hard third-party imports gets pytest.importorskip guards
+    BEFORE the imports: compiled right after SPEC, the dependency may not have
+    been delivered yet — the invariant must SKIP, not break suite collection."""
+    rule = {
+        "id": "health-contract",
+        "statement": "GET /api/health returns 200.",
+        "kind": "test",
+        "check_code": (
+            "import importlib\n"
+            "import pytest\n"
+            "from fastapi.testclient import TestClient\n"
+            "import httpx\n\n"
+            "def test_health():\n    assert True\n"
+        ),
+    }
+    result = C.render_pytest_file(rule)
+    assert result is not None
+    _, content = result
+    guard_fastapi = content.index('pytest.importorskip("fastapi")')
+    guard_httpx = content.index('pytest.importorskip("httpx")')
+    real_import = content.index("from fastapi.testclient import TestClient")
+    assert guard_fastapi < real_import
+    assert guard_httpx < real_import
+    # stdlib and pytest itself are never guarded.
+    assert 'importorskip("importlib")' not in content
+    assert 'importorskip("pytest")' not in content
+
+
+def test_render_pytest_file_guards_nested_imports_too():
+    """The agent often nests the third-party import in a helper (``def _client():
+    from fastapi.testclient import TestClient``): it then raises at RUN time
+    instead of collection time — same red suite. Nested imports must also
+    trigger the module-level importorskip guard."""
+    rule = {
+        "id": "title-required",
+        "statement": "422 on missing title.",
+        "kind": "test",
+        "check_code": (
+            "import importlib\n\n"
+            "def _client():\n"
+            "    from fastapi.testclient import TestClient\n"
+            "    return TestClient(None)\n\n"
+            "def test_missing_title():\n"
+            "    c = _client()\n    assert c is not None\n"
+        ),
+    }
+    result = C.render_pytest_file(rule)
+    assert result is not None
+    _, content = result
+    assert 'pytest.importorskip("fastapi")' in content
+    # Guard sits at module level, BEFORE the function defs.
+    assert content.index('importorskip("fastapi")') < content.index("def _client")
+
+
+def test_render_pytest_file_stdlib_only_has_no_guard():
+    rule = {
+        "id": "pure-invariant",
+        "statement": "Pure rule.",
+        "kind": "test",
+        "check_code": "import json\n\ndef test_pure():\n    assert json.loads('1') == 1\n",
+    }
+    result = C.render_pytest_file(rule)
+    assert result is not None
+    _, content = result
+    assert "importorskip" not in content
+
+
 def test_render_pytest_file_non_runnable_returns_none():
     rule = {
         "id": "junk",

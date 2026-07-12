@@ -53,6 +53,22 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "runtime_acceptance_enabled", False)
     monkeypatch.setattr(settings, "integration_fix_attempts", 0)
     monkeypatch.setattr(settings, "product_profile", "auto")
+    # Verified-swarm & docker-delivery flags (same hermeticity contract: a
+    # developer's .env enabling them must not add agent calls, gates or docker
+    # subprocesses to tests that don't opt in).
+    monkeypatch.setattr(settings, "escalate_on_retry_enabled", False)
+    monkeypatch.setattr(settings, "role_routing_enabled", False)
+    monkeypatch.setattr(settings, "classify_on_exhaustion_enabled", False)
+    monkeypatch.setattr(settings, "dispute_escalation_enabled", False)
+    monkeypatch.setattr(settings, "ac_traceability_enabled", False)
+    monkeypatch.setattr(settings, "constitution_enabled", False)
+    monkeypatch.setattr(settings, "design_amendment_enabled", False)
+    monkeypatch.setattr(settings, "test_tamper_guard", "off")
+    monkeypatch.setattr(settings, "scope_guard", "off")
+    monkeypatch.setattr(settings, "skeleton_guard", "off")
+    monkeypatch.setattr(settings, "import_guard", "off")
+    monkeypatch.setattr(settings, "flaky_rerun_enabled", False)
+    monkeypatch.setattr(settings, "docker_delivery", False)
     yield tmp_path
     # Drain the shared persist executor BEFORE this test's `workspace_root`
     # monkeypatch is reverted: `_persist` resolves the target path lazily on the
