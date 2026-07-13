@@ -16,6 +16,9 @@ import { chatPanel } from "./chatPanel";
 import { componentsPanel } from "./componentsPanel";
 import { languagePanel } from "./languagePanel";
 import { backlogPanel } from "./backlogPanel";
+import { observationsPanel } from "./observationsPanel";
+import { governancePanel } from "./governancePanel";
+import { knowledgePanel } from "./knowledgePanel";
 import { architecturePanel } from "./architecturePanel";
 import { planReviewPanel } from "./planReviewPanel";
 import { dashboard } from "./dashboard";
@@ -45,6 +48,9 @@ const namespaces: Record<string, Namespace> = {
   componentsPanel,
   languagePanel,
   backlogPanel,
+  observationsPanel,
+  governancePanel,
+  knowledgePanel,
   architecturePanel,
   planReviewPanel,
   dashboard,

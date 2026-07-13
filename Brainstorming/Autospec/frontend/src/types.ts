@@ -225,6 +225,183 @@ export interface Epic {
   iteration: number;
 }
 
+// ---------------------------------------------------------------------------
+// V3-F7 (US-F7.1): observation loop / governance / knowledge types — mirrors of
+// the backend models (`models.py` EngineeringObservation & GovernanceDecision,
+// `orchestrator/knowledge.py` KnowledgeBase entries).
+
+/** V3-F1: the nature of one engineering observation ("pattern" is reserved for
+ * the F5 pattern detector). */
+export type ObservationType =
+  | "workaround"
+  | "tech_debt"
+  | "risk"
+  | "limitation"
+  | "refactoring"
+  | "improvement"
+  | "ambiguity"
+  | "constraint"
+  | "pattern";
+
+/** V3-F1: lifecycle of an observation through the loop (extractor → critic →
+ * router → PO governor). */
+export type ObservationStatus =
+  | "new"
+  | "validated"
+  | "rejected"
+  | "routed"
+  | "actioned"
+  | "persisted"
+  | "deferred"
+  | "dismissed";
+
+export type ObservationUrgency = "low" | "normal" | "high" | "critical";
+
+/** V3-F1: one structured discovery made while building a work item. */
+export interface EngineeringObservation {
+  id: string; // "OBS-<n>"
+  type: ObservationType;
+  summary: string;
+  description: string;
+  evidence: string[];
+  impact: string;
+  confidence: number; // 0..1
+  urgency: string; // ObservationUrgency ("" tolerated on legacy payloads)
+  workaround: string;
+  recommendations: string[];
+  reevaluate_when: string;
+  source_role: string; // "dev" | "qa" | "pattern-detector" | "evaluator" | "security"
+  work_item_id: string;
+  stream: string;
+  iteration: number;
+  status: ObservationStatus;
+  /** Comma-joined router destinations, e.g. "architecture,po" ("" = not routed). */
+  routed_to: string;
+  resolution: string;
+  merged_count: number;
+}
+
+/** V3-F3: what the PO backlog governor decided for one observation. */
+export type GovernanceAction =
+  | "create_task"
+  | "create_story"
+  | "create_epic"
+  | "update_story"
+  | "enrich_criteria"
+  | "defer"
+  | "persist"
+  | "dismiss";
+
+/** V3-F3: decision lifecycle — "proposed" IS the human approval queue. */
+export type GovernanceDecisionStatus =
+  | "proposed"
+  | "approved"
+  | "applied"
+  | "rejected_by_policy"
+  | "rejected_by_human"
+  | "invalid";
+
+/** V3-F3: one traceable PO governance decision over one observation. */
+export interface GovernanceDecision {
+  id: string; // "GOV-<n>"
+  observation_id: string;
+  action: GovernanceAction;
+  target_id: string;
+  /** Story/task/AC content or fields to update (free-form, backend-validated). */
+  payload: Record<string, unknown>;
+  rationale: string;
+  status: GovernanceDecisionStatus | string;
+  iteration: number;
+}
+
+/** V3-F4: traceability fields shared by every knowledge-base entry. */
+export interface KnowledgeEntryBase {
+  id: string;
+  source_observation_id: string;
+  iteration: number;
+  created_at: number;
+}
+
+/** One durable note (component memory or architecture note). */
+export interface MemoryEntry extends KnowledgeEntryBase {
+  text: string;
+  kind: string;
+}
+
+/** An Architecture Decision Record. */
+export interface Adr extends KnowledgeEntryBase {
+  title: string;
+  decision: string;
+  context: string;
+  status: string; // proposed | accepted | superseded
+}
+
+/** One technical-debt register entry. */
+export interface DebtEntry extends KnowledgeEntryBase {
+  title: string;
+  detail: string;
+  effort_estimate: string;
+  interest: string;
+  urgency: string;
+}
+
+/** One risk register entry. */
+export interface RiskEntry extends KnowledgeEntryBase {
+  title: string;
+  detail: string;
+  likelihood: string; // low | medium | high | ""
+  mitigation: string;
+  urgency: string;
+}
+
+/** An idea deliberately NOT turned into work yet (F3 DEFER). */
+export interface PendingIdea extends KnowledgeEntryBase {
+  title: string;
+  detail: string;
+  value_hint: string;
+  reevaluate_when: string;
+}
+
+export type KnowledgeEntry = MemoryEntry | Adr | DebtEntry | RiskEntry | PendingIdea;
+
+/** The whole per-project software memory (GET /knowledge). */
+export interface KnowledgeBase {
+  component_memory: Record<string, MemoryEntry[]>;
+  architecture_notes: MemoryEntry[];
+  adrs: Adr[];
+  debt_register: DebtEntry[];
+  risk_register: RiskEntry[];
+  pending_ideas: PendingIdea[];
+}
+
+/** Backend section names for the PATCH/DELETE knowledge endpoints. */
+export type KnowledgeSection =
+  | "component_memory"
+  | "architecture_notes"
+  | "adrs"
+  | "debt_register"
+  | "risk_register"
+  | "pending_ideas";
+
+/** US-F4.4: the human-editable fields of one knowledge entry (allowlisted
+ * backend-side; traceability fields are immutable). */
+export interface KnowledgeEntryPatch {
+  text?: string;
+  title?: string;
+  detail?: string;
+  kind?: string;
+  status?: string;
+  urgency?: string;
+  value_hint?: string;
+  reevaluate_when?: string;
+  mitigation?: string;
+  likelihood?: string;
+  interest?: string;
+  effort_estimate?: string;
+  decision?: string;
+  context?: string;
+}
+
 export interface Usage {
   cost_usd: number;
   input_tokens: number;
@@ -256,6 +433,11 @@ export interface ProjectState {
   chat: ChatMessage[];
   feedback: string[];
   findings?: Finding[]; // E6 evaluator observations
+  // V3-F1/F3 : observations d'ingénierie structurées + journal de gouvernance
+  // PO (les décisions « proposed » forment la file d'approbation humaine).
+  // Optionnels : absents des états legacy / feature flags OFF.
+  observations?: EngineeringObservation[];
+  governance_log?: GovernanceDecision[];
   lessons?: string[]; // E7 durable retro lessons
   retro_recommendations?: string[]; // E7 tuning advice
   iteration: number;
@@ -385,6 +567,22 @@ export type WsEvent =
       items: TickItem[];
       counts: TickCounts;
       stall_reason: StallReason;
+    }
+  // V3-F7 (US-F7.5): granular observation-loop events. Merged into the held
+  // project state (upsert by id) so the panels update live between full
+  // `state` snapshots.
+  | { type: "observation"; project_id: string; observation: EngineeringObservation }
+  | {
+      type: "observation_update";
+      project_id: string;
+      observations: EngineeringObservation[];
+    }
+  | { type: "governance_decision"; project_id: string; decision: GovernanceDecision }
+  | {
+      type: "approval_pending";
+      project_id: string;
+      kind: string;
+      decision_ids: string[];
     };
 
 /** Body for editing an existing user story (all fields optional). */

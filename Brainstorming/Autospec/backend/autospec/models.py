@@ -16,6 +16,7 @@ class PipelinePhase(str, Enum):
     PLAN = "plan"          # PO is breaking the brief into epics / user stories
     ARCHITECT = "architect"  # Architect designs the technical solution (optional phase)
     BUILD = "build"        # dev agents are implementing stories (BDD/TDD)
+    GOVERN = "govern"      # PO backlog governor digesting the iteration's observations (V3-F3)
     DONE = "done"          # iteration finished, waiting for user (or next auto-spec cycle)
     STOPPED = "stopped"
     NEEDS_ATTENTION = "needs_attention"  # generated product needs user/agent repair, not an orchestrator crash
@@ -420,6 +421,110 @@ class Finding(BaseModel):
     iteration: int = 1
 
 
+class ObservationType(str, Enum):
+    """V3-F1: the nature of one engineering observation captured after a work
+    item. ``PATTERN`` is reserved for the F5 pattern detector (never emitted by
+    the per-item extractor)."""
+
+    WORKAROUND = "workaround"
+    TECH_DEBT = "tech_debt"
+    RISK = "risk"
+    LIMITATION = "limitation"
+    REFACTORING = "refactoring"
+    IMPROVEMENT = "improvement"
+    AMBIGUITY = "ambiguity"
+    CONSTRAINT = "constraint"
+    PATTERN = "pattern"
+
+
+class ObservationStatus(str, Enum):
+    """V3-F1: lifecycle of an observation through the observation loop. F1 only
+    emits ``NEW``; the later stages (critic F2, router F2, PO governor F3) move
+    it through the other states."""
+
+    NEW = "new"
+    VALIDATED = "validated"
+    REJECTED = "rejected"
+    ROUTED = "routed"
+    ACTIONED = "actioned"
+    PERSISTED = "persisted"
+    DEFERRED = "deferred"
+    DISMISSED = "dismissed"
+
+
+class EngineeringObservation(BaseModel):
+    """V3-F1: one structured discovery made while building a work item — a
+    workaround applied, debt taken on, a risk, an ambiguity in the spec, a
+    constraint discovered… Emitted by the observation extractor after each
+    work item (DONE and FAILED alike), or converted from E6/S1 findings. The
+    extractor observes; it never decides the roadmap. All defaults are safe so
+    a legacy persisted state (without observations) loads unchanged."""
+
+    id: str                      # "OBS-<n>" (from ProjectState.observation_seq)
+    type: ObservationType
+    summary: str                 # one line
+    description: str = ""
+    evidence: list[str] = Field(default_factory=list)   # transcript excerpts, file paths, test output
+    impact: str = ""             # impacted component/story + consequence
+    confidence: float = 0.5      # 0..1 (self-assessed by the extractor, revised by the F2 critic)
+    urgency: str = "normal"      # "low" | "normal" | "high" | "critical"
+    workaround: str = ""         # the workaround applied, if any
+    recommendations: list[str] = Field(default_factory=list)
+    reevaluate_when: str = ""    # re-evaluation condition (vision §8)
+    source_role: str = ""        # "dev" | "qa" | "pattern-detector" | "evaluator" | "security"
+    work_item_id: str = ""       # originating story/task
+    stream: str = ""             # the work item's stream
+    iteration: int = 0
+    status: ObservationStatus = ObservationStatus.NEW
+    # V3-F2: comma-joined destinations set by the router (a multi-destination
+    # observation reads e.g. "architecture,po"). "" = not routed yet.
+    routed_to: str = ""          # "po"|"architecture"|"debt"|"risk"|"security"|"discovery"
+    resolution: str = ""         # final decision (filled by F3)
+    # V3-F2: how many near-duplicate observations the deterministic critic
+    # merged INTO this one (repeated signal = strong signal — feeds F5). Safe
+    # default so legacy persisted states load unchanged.
+    merged_count: int = 0
+
+    @field_validator("confidence")
+    @classmethod
+    def _clamp_confidence(cls, v: float) -> float:
+        """Clamp to 0..1 so out-of-range agent output or a legacy persisted
+        state never fails validation (same philosophy as ``_clamp_1_5``)."""
+        return max(0.0, min(1.0, v))
+
+
+class GovernanceAction(str, Enum):
+    """V3-F3: what the PO backlog governor decides for one po-routed
+    observation (or one re-evaluated pending idea). Not every observation
+    becomes work: DEFER/PERSIST/DISMISS are first-class outcomes."""
+
+    CREATE_TASK = "create_task"          # technical task attached to an existing story
+    CREATE_STORY = "create_story"        # new US or TS (technical=True + contract)
+    CREATE_EPIC = "create_epic"          # new epic (stories arrive via create_story)
+    UPDATE_STORY = "update_story"        # description/priority of a NON-shipped story
+    ENRICH_CRITERIA = "enrich_criteria"  # APPEND acceptance criteria (never remove)
+    DEFER = "defer"                      # → pending_ideas (F4 memory) with reevaluate_when
+    PERSIST = "persist"                  # → memory only (debt/risk/architecture)
+    DISMISS = "dismiss"                  # ignore, mandatory rationale
+
+
+class GovernanceDecision(BaseModel):
+    """V3-F3: one traceable PO governance decision over one observation.
+    ``status``: proposed | approved | applied | rejected_by_policy |
+    rejected_by_human | invalid — a decision left ``proposed`` IS the human
+    approval queue (GOVERNANCE_AUTO=0; the F6 policy engine will refine this).
+    All defaults are safe so a legacy persisted state loads unchanged."""
+
+    id: str                      # "GOV-<n>" (from ProjectState.governance_seq)
+    observation_id: str          # source observation (or pending-idea) id
+    action: GovernanceAction
+    target_id: str = ""          # targeted story/epic, when relevant
+    payload: dict = Field(default_factory=dict)  # story/task/AC content, fields to update
+    rationale: str = ""
+    status: str = "proposed"
+    iteration: int = 0
+
+
 class Usage(BaseModel):
     """Accumulated token/cost observability for a project, summed across every
     agent call (parsed from the Claude CLI's per-call usage)."""
@@ -508,6 +613,33 @@ class ProjectState(BaseModel):
     chat: list[ChatMessage] = Field(default_factory=list)
     feedback: list[str] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)  # E6 evaluator observations
+    # V3-F1: structured engineering observations extracted after each work item
+    # (plus converted E6/S1 findings). ``observation_seq`` backs the sequential
+    # "OBS-<n>" ids. Legacy persisted states default to [] / 0 (loop not yet fed).
+    observations: list[EngineeringObservation] = Field(default_factory=list)
+    observation_seq: int = 0
+    # V3-F3: the permanent PO governance journal (every decision is traceable to
+    # its source observation) + the sequential "GOV-<n>" id counter. Decisions
+    # whose status is "proposed" form the human approval queue. Legacy persisted
+    # states default to [] / 0 (governor not yet run).
+    governance_log: list[GovernanceDecision] = Field(default_factory=list)
+    governance_seq: int = 0
+    # V3-F6: the autonomy downgrades journal — one line per deterministic
+    # downgrade applied by the policy engine ("iter <n> [<domain>] <reason> :
+    # <from>→<to>"), deduplicated. Legacy persisted states default to [].
+    autonomy_log: list[str] = Field(default_factory=list)
+    # V3-F5: pattern-detector watermark — how far the ambient detector had
+    # consumed the signal streams at its last run (observation-id allocations
+    # + total guard findings). New signals are counted from here; below
+    # PATTERN_MIN_SIGNALS the detector makes ZERO LLM call. Legacy persisted
+    # states default to 0/0 (every signal is new on the first run).
+    pattern_last_obs_seq: int = 0
+    pattern_last_guard_count: int = 0
+    # V3-F8: workspace fingerprint at the last code-map build (git HEAD+status
+    # hash, or a file count/mtime hash). Unchanged fingerprint ⇒ the whole
+    # cartographer refresh is skipped (zero work). Legacy persisted states
+    # default to "" (first refresh always builds).
+    code_map_fingerprint: str = ""
     lessons: list[str] = Field(default_factory=list)  # E7 durable retro lessons (injected into prompts)
     # PO pipeline (§6): per-iteration calibration counters + structured sizing
     # lessons emitted by reactive splits, injected into the next S1 prompt.

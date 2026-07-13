@@ -46,4 +46,9 @@ export const projectBar: Namespace = {
     en: "📦 Archived ({count})",
     fr: "📦 Archivés ({count})",
   },
+  // V3-F7 (US-F7.5): pending governance approvals counter.
+  approvalsPending: {
+    en: "{count} governance decision(s) awaiting approval",
+    fr: "{count} décision(s) de gouvernance en attente d'approbation",
+  },
 };

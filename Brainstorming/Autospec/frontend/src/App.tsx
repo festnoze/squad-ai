@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  approveGovernanceDecision,
   archiveProject,
   cancelResume,
   connectEvents,
@@ -8,6 +9,7 @@ import {
   documentProject,
   errorMessage,
   interruptProject,
+  rejectGovernanceDecision,
   exportZipUrl,
   discoverModels,
   getProvider,
@@ -42,6 +44,9 @@ import { MobileNav, type MobilePane } from "./components/MobileNav";
 import { PlanReviewPanel } from "./components/PlanReviewPanel";
 import { LanguagePanel } from "./components/LanguagePanel";
 import { BacklogPanel } from "./components/BacklogPanel";
+import { ObservationsPanel } from "./components/ObservationsPanel";
+import { GovernancePanel } from "./components/GovernancePanel";
+import { KnowledgePanel } from "./components/KnowledgePanel";
 import { WorkspaceViews } from "./components/WorkspaceViews";
 import { Dashboard } from "./components/Dashboard";
 import { ChatPanel } from "./components/ChatPanel";
@@ -56,6 +61,8 @@ import { useEscapeToClose } from "./hooks";
 import { subscribeToasts } from "./toast";
 import { useI18n } from "./i18n/i18n";
 import {
+  EngineeringObservation,
+  GovernanceDecision,
   GuidanceEntry,
   ProductComponent,
   ProjectState,
@@ -114,6 +121,19 @@ interface NotifyToast {
   level: string;
   title: string;
   body: string;
+}
+
+/** V3-F7 (US-F7.5): upsert-by-id merge for the granular observation-loop
+ * events (`observation`, `observation_update`, `governance_decision`) into the
+ * lists held in project state — a live update between full `state` snapshots. */
+function upsertById<T extends { id: string }>(list: T[], items: T[]): T[] {
+  const next = [...list];
+  for (const item of items) {
+    const i = next.findIndex((x) => x.id === item.id);
+    if (i === -1) next.push(item);
+    else next[i] = item;
+  }
+  return next;
 }
 
 export default function App() {
@@ -256,6 +276,32 @@ export default function App() {
       return next;
     });
 
+  // V3-F7 (US-F7.5): apply a pure patch to ONE held project (no-op when the
+  // project is unknown — a granular event never creates a ghost project).
+  const patchProject = (projectId: string, fn: (p: ProjectState) => ProjectState) =>
+    setProjects((prev) => prev.map((p) => (p.id === projectId ? fn(p) : p)));
+
+  // V3-F7: merge freshly pushed observations into a project's state.
+  const mergeObservations = (projectId: string, items: EngineeringObservation[]) =>
+    patchProject(projectId, (p) => ({
+      ...p,
+      observations: upsertById(p.observations ?? [], items),
+    }));
+
+  // V3-F7: merge one governance decision into a project's journal.
+  const mergeDecision = (projectId: string, decision: GovernanceDecision) =>
+    patchProject(projectId, (p) => ({
+      ...p,
+      governance_log: upsertById(p.governance_log ?? [], [decision]),
+    }));
+
+  // V3-F7: knowledge-base refresh signal per project. The KB lives in its own
+  // file (not in ProjectState); bumping this key makes KnowledgePanel refetch
+  // after the events that write to it (routing + governance).
+  const [kbRefresh, setKbRefresh] = useState<Record<string, number>>({});
+  const bumpKbRefresh = (projectId: string) =>
+    setKbRefresh((prev) => ({ ...prev, [projectId]: (prev[projectId] ?? 0) + 1 }));
+
   useEffect(() => {
     listProjects()
       .then((list) => {
@@ -310,6 +356,24 @@ export default function App() {
               stallReason: event.stall_reason,
             },
           }));
+        } else if (event.type === "observation") {
+          // V3-F7: one freshly extracted observation — merged into the held
+          // state so the panel updates live (a full `state` follows anyway).
+          if (deletedIds.current.has(event.project_id)) return;
+          mergeObservations(event.project_id, [event.observation]);
+        } else if (event.type === "observation_update") {
+          // V3-F7: critic/router batch update — statuses/destinations changed,
+          // and routed observations may have written to the knowledge base.
+          if (deletedIds.current.has(event.project_id)) return;
+          mergeObservations(event.project_id, event.observations);
+          bumpKbRefresh(event.project_id);
+        } else if (event.type === "governance_decision") {
+          // V3-F7: one PO decision (proposed/applied/rejected…) — feeds the
+          // governance journal AND the pending-approvals badge; applied
+          // decisions may have written to the knowledge base.
+          if (deletedIds.current.has(event.project_id)) return;
+          mergeDecision(event.project_id, event.decision);
+          bumpKbRefresh(event.project_id);
         } else if (event.type === "notify") {
           const id = ++toastIdRef.current;
           const toast = { id, level: event.level, title: event.title, body: event.body };
@@ -483,6 +547,25 @@ export default function App() {
   // Enveloppe une action API : toute erreur remonte dans le bandeau d'erreur.
   const guard = (fn: () => Promise<void>) => () =>
     fn().catch((e) => setError(errorMessage(e)));
+
+  // V3-F7 (US-F7.3) : approuver/rejeter une décision de gouvernance. La
+  // décision retournée est fusionnée immédiatement (l'événement SSE
+  // `governance_decision` qui suit est idempotent — upsert par id).
+  const [governanceBusyId, setGovernanceBusyId] = useState<string | null>(null);
+  const handleGovernance = (
+    projectId: string,
+    decisionId: string,
+    action: () => Promise<GovernanceDecision>,
+  ) => {
+    setGovernanceBusyId(decisionId);
+    action()
+      .then((decision) => {
+        mergeDecision(projectId, decision);
+        bumpKbRefresh(projectId);
+      })
+      .catch((e) => setError(errorMessage(e)))
+      .finally(() => setGovernanceBusyId(null));
+  };
 
   const projectLogs = useMemo(
     () => logs.filter((l) => l.projectId === selectedId),
@@ -789,6 +872,33 @@ export default function App() {
               issues={project.plan_review_issues ?? []}
               suggestions={project.plan_review_suggestions ?? []}
               calibration={project.calibration?.[String(project.iteration ?? 1)]}
+            />
+            {/* V3-F7 : boucle d'observation — panneaux invisibles (null) tant
+                que le projet n'a ni observation, ni décision, ni mémoire
+                (feature flags OFF → colonne inchangée). */}
+            <ObservationsPanel
+              observations={project.observations ?? []}
+              decisions={project.governance_log ?? []}
+            />
+            <GovernancePanel
+              decisions={project.governance_log ?? []}
+              observations={project.observations ?? []}
+              busyId={governanceBusyId}
+              onApprove={(id) =>
+                handleGovernance(project.id, id, () =>
+                  approveGovernanceDecision(project.id, id),
+                )
+              }
+              onReject={(id, reason) =>
+                handleGovernance(project.id, id, () =>
+                  rejectGovernanceDecision(project.id, id, reason),
+                )
+              }
+            />
+            <KnowledgePanel
+              projectId={project.id}
+              refreshKey={kbRefresh[project.id] ?? 0}
+              observations={project.observations ?? []}
             />
           </div>
           <div className="col-right">

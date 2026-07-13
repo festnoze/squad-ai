@@ -43,7 +43,7 @@ from ..models import (
     StoryStatus,
     new_id,
 )
-from ..orchestrator import docker_deploy, profiles
+from ..orchestrator import docker_deploy, governance, knowledge, profiles
 from ..orchestrator.events import bus
 from ..orchestrator.pipeline import Pipeline
 from ..forecast import forecast_iteration_cost
@@ -83,7 +83,11 @@ def _is_excluded_file(name: str) -> bool:
     LLM-interaction log, which holds prompts/responses/token-cost) so they leak
     neither into the user-facing file tree nor the delivered export zip. Uses
     the ``storage`` filename constants as the single source of truth."""
-    if name in (storage.STATE_FILENAME, storage.INTERACTIONS_FILENAME):
+    if name in (
+        storage.STATE_FILENAME,
+        storage.INTERACTIONS_FILENAME,
+        knowledge.KNOWLEDGE_FILENAME,
+    ):
         return True
     if name.endswith(".pyc"):
         return True
@@ -972,6 +976,195 @@ async def aitem_interactions(project_id: str, item_id: str, limit: int = 20) -> 
     else:
         data = await asyncio.to_thread(load_interactions, project_id, item_id, limit)
     return {"item_id": item_id, "interactions": data}
+
+
+@app.get("/api/projects/{project_id}/knowledge")
+async def aget_knowledge(project_id: str) -> dict:
+    """V3-F4 (US-F4.1): the project's software knowledge base (component memory,
+    architecture notes, ADRs, debt/risk registers, pending ideas). An empty base
+    when nothing was persisted yet; 404 for an unknown project."""
+    if project_id not in pipelines and not await asyncio.to_thread(load_state, project_id):
+        raise HTTPException(404, f"Projet inconnu : {project_id}")
+    kb = await asyncio.to_thread(knowledge.load_knowledge, project_id)
+    return kb.model_dump(mode="json")
+
+
+class KnowledgeEditRequest(BaseModel):
+    """US-F4.4: human PATCH of one knowledge entry — text/status fields only
+    (the traceability fields id/source_observation_id/created_at are immutable).
+    Only the fields actually set are applied (and only those the entry has)."""
+
+    text: str | None = None
+    title: str | None = None
+    detail: str | None = None
+    kind: str | None = None
+    status: str | None = None
+    urgency: str | None = None
+    value_hint: str | None = None
+    reevaluate_when: str | None = None
+    mitigation: str | None = None
+    likelihood: str | None = None
+    interest: str | None = None
+    effort_estimate: str | None = None
+    decision: str | None = None
+    context: str | None = None
+
+
+async def _aknowledge_for_edit(project_id: str):
+    """Load a project's knowledge base for an edit endpoint (404-checked)."""
+    if project_id not in pipelines and not await asyncio.to_thread(load_state, project_id):
+        raise HTTPException(404, f"Projet inconnu : {project_id}")
+    return await asyncio.to_thread(knowledge.load_knowledge, project_id)
+
+
+@app.patch("/api/projects/{project_id}/knowledge/{section}/{entry_id}")
+async def aedit_knowledge_entry(
+    project_id: str, section: str, entry_id: str, req: KnowledgeEditRequest
+) -> dict:
+    """US-F4.4: edit one knowledge entry (human curation)."""
+    kb = await _aknowledge_for_edit(project_id)
+    fields = {k: v for k, v in req.model_dump(exclude_unset=True).items() if v is not None}
+    try:
+        entry = knowledge.edit_entry(kb, section, entry_id, fields)
+    except KeyError:
+        raise HTTPException(404, f"Section ou entrée inconnue : {section}/{entry_id}")
+    except ValueError as exc:
+        raise HTTPException(422, str(exc))
+    await asyncio.to_thread(knowledge.save_knowledge, project_id, kb)
+    return {"ok": True, "entry": entry.model_dump(mode="json")}
+
+
+@app.delete("/api/projects/{project_id}/knowledge/{section}/{entry_id}")
+async def adelete_knowledge_entry(project_id: str, section: str, entry_id: str) -> dict:
+    """US-F4.4: delete one knowledge entry — it is no longer injected anywhere."""
+    kb = await _aknowledge_for_edit(project_id)
+    try:
+        knowledge.delete_entry(kb, section, entry_id)
+    except KeyError:
+        raise HTTPException(404, f"Section ou entrée inconnue : {section}/{entry_id}")
+    await asyncio.to_thread(knowledge.save_knowledge, project_id, kb)
+    return {"ok": True}
+
+
+# ------------------------------------------ PO backlog governance (V3-F3)
+
+
+class GovernanceRejectRequest(BaseModel):
+    reason: str = ""
+
+
+def _governance_state(project_id: str) -> ProjectState | None:
+    """The live pipeline state when the project is loaded, else the persisted
+    one (governance must work mid-dormancy)."""
+    pipeline = pipelines.get(project_id)
+    return pipeline.state if pipeline is not None else load_state(project_id)
+
+
+@app.get("/api/projects/{project_id}/governance")
+async def aget_governance(project_id: str) -> dict:
+    """US-F3.4: the permanent governance journal — decisions whose status is
+    "proposed" form the human approval queue."""
+    state = await asyncio.to_thread(_governance_state, project_id)
+    if state is None:
+        raise HTTPException(404, f"Projet inconnu : {project_id}")
+    return {"decisions": [d.model_dump(mode="json") for d in state.governance_log]}
+
+
+@app.post("/api/projects/{project_id}/governance/{decision_id}/approve")
+async def aapprove_governance_decision(project_id: str, decision_id: str) -> dict:
+    """US-F3.4: approve one proposed decision — applied NOW (even while the
+    project is dormant). 404 unknown decision, 409 already handled."""
+    pipeline = pipelines.get(project_id)
+    if pipeline is not None:
+        decision = await _acall_pipeline(
+            pipeline.aapprove_governance(decision_id),
+            f"Décision inconnue : {decision_id}",
+        )
+        return {"ok": True, "decision": decision.model_dump(mode="json")}
+    # Dormant project without a live pipeline (e.g. state on disk only): apply
+    # against the persisted state + knowledge, then persist both.
+    state = await asyncio.to_thread(load_state, project_id)
+    if state is None:
+        raise HTTPException(404, f"Projet inconnu : {project_id}")
+    kb = await asyncio.to_thread(knowledge.load_knowledge, project_id)
+    try:
+        decision = governance.approve(state, kb, decision_id)
+    except KeyError:
+        raise HTTPException(404, f"Décision inconnue : {decision_id}")
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    await asyncio.to_thread(storage.save_state, state)
+    if decision.payload.get("kb_dirty"):
+        await asyncio.to_thread(knowledge.save_knowledge, project_id, kb)
+    bus.publish(
+        {
+            "type": "governance_decision",
+            "project_id": project_id,
+            "decision": decision.model_dump(mode="json"),
+        }
+    )
+    return {"ok": True, "decision": decision.model_dump(mode="json")}
+
+
+@app.post("/api/projects/{project_id}/governance/{decision_id}/reject")
+async def areject_governance_decision(
+    project_id: str, decision_id: str, req: GovernanceRejectRequest | None = None
+) -> dict:
+    """US-F3.4: reject one proposed decision — rejected_by_human + the source
+    observation DISMISSED. 404 unknown decision, 409 already handled."""
+    reason = (req.reason if req else "").strip()
+    pipeline = pipelines.get(project_id)
+    if pipeline is not None:
+        decision = await _acall_pipeline(
+            pipeline.areject_governance(decision_id, reason),
+            f"Décision inconnue : {decision_id}",
+        )
+        return {"ok": True, "decision": decision.model_dump(mode="json")}
+    state = await asyncio.to_thread(load_state, project_id)
+    if state is None:
+        raise HTTPException(404, f"Projet inconnu : {project_id}")
+    kb = await asyncio.to_thread(knowledge.load_knowledge, project_id)
+    try:
+        decision = governance.reject(state, kb, decision_id, reason)
+    except KeyError:
+        raise HTTPException(404, f"Décision inconnue : {decision_id}")
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+    await asyncio.to_thread(storage.save_state, state)
+    bus.publish(
+        {
+            "type": "governance_decision",
+            "project_id": project_id,
+            "decision": decision.model_dump(mode="json"),
+        }
+    )
+    return {"ok": True, "decision": decision.model_dump(mode="json")}
+
+
+@app.get("/api/projects/{project_id}/approvals")
+async def aget_approvals(project_id: str) -> dict:
+    """V3-F6 (US-F6.3): unified READ-ONLY view of everything awaiting a human —
+    governance decisions still ``proposed`` (acted on via the governance
+    approve/reject endpoints) and safe spec amendments pending validation
+    (W5.1, ``approved_safe`` and not yet applied). Works mid-dormancy."""
+    state = await asyncio.to_thread(_governance_state, project_id)
+    if state is None:
+        raise HTTPException(404, f"Projet inconnu : {project_id}")
+    governance_pending = [
+        d.model_dump(mode="json")
+        for d in state.governance_log
+        if d.status == "proposed"
+    ]
+    amendments_pending = [
+        {"index": i, **a}
+        for i, a in enumerate(state.pending_amendments)
+        if bool(a.get("approved_safe")) and not a.get("applied")
+    ]
+    return {
+        "governance": governance_pending,
+        "amendments": amendments_pending,
+        "count": len(governance_pending) + len(amendments_pending),
+    }
 
 
 @app.post("/api/projects/{project_id}/stories/reorder")

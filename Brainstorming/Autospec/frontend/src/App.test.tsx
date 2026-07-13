@@ -210,6 +210,72 @@ describe("App — gestion des évènements WebSocket", () => {
     expect(queryProjectOption(/Projet/)).not.toBeInTheDocument();
   });
 
+  it("un event 'governance_decision' alimente le badge ⚖ en live (US-F7.5)", async () => {
+    render(<App />);
+    await waitFor(() => expect(capturedOnEvent).not.toBeNull());
+
+    // Projet actif (chip rendue) sans décision : pas de badge.
+    emit({ type: "state", project_id: "p1", state: makeProject({ phase: "build" }) });
+    await findProjectOption(/Projet Alpha/);
+    expect(document.body.querySelector(".chip-approvals")).toBeNull();
+
+    emit({
+      type: "governance_decision",
+      project_id: "p1",
+      decision: {
+        id: "GOV-1",
+        observation_id: "OBS-1",
+        action: "create_story",
+        target_id: "",
+        payload: {},
+        rationale: "",
+        status: "proposed",
+        iteration: 1,
+      },
+    });
+    expect(await screen.findByText("⚖ 1")).toBeInTheDocument();
+
+    // La même décision passe « applied » (upsert par id) : badge retiré.
+    emit({
+      type: "governance_decision",
+      project_id: "p1",
+      decision: {
+        id: "GOV-1",
+        observation_id: "OBS-1",
+        action: "create_story",
+        target_id: "",
+        payload: {},
+        rationale: "",
+        status: "applied",
+        iteration: 1,
+      },
+    });
+    await waitFor(() =>
+      expect(document.body.querySelector(".chip-approvals")).toBeNull(),
+    );
+  });
+
+  it("un 'governance_decision' pour un projet inconnu est ignoré (pas de fantôme)", async () => {
+    render(<App />);
+    await waitFor(() => expect(capturedOnEvent).not.toBeNull());
+    emit({
+      type: "governance_decision",
+      project_id: "ghost",
+      decision: {
+        id: "GOV-1",
+        observation_id: "OBS-1",
+        action: "dismiss",
+        target_id: "",
+        payload: {},
+        rationale: "",
+        status: "proposed",
+        iteration: 1,
+      },
+    });
+    await Promise.resolve();
+    expect(queryProjectOption(/Projet/)).not.toBeInTheDocument();
+  });
+
   it("un event 'notify' affiche un toast (U3)", async () => {
     render(<App />);
     await waitFor(() => expect(capturedOnEvent).not.toBeNull());

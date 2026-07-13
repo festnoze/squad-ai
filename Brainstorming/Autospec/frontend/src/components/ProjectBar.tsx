@@ -55,6 +55,13 @@ function progress(p: ProjectState): { done: number; total: number } | null {
   };
 }
 
+/** V3-F7 (US-F7.5) : décisions de gouvernance en attente d'approbation
+ * humaine. Le journal arrive via l'état projet (events `state` +
+ * `governance_decision` fusionnés dans App) → compteur live. */
+function pendingApprovals(p: ProjectState): number {
+  return (p.governance_log ?? []).filter((d) => d.status === "proposed").length;
+}
+
 /** Ordre d'affichage (UI3) : en cours → en pause → dormant → terminé. */
 function statusRank(p: ProjectState): number {
   if (ACTIVE_PHASES.includes(p.phase)) return p.paused ? 1 : 0;
@@ -156,6 +163,15 @@ export function ProjectBar({
                 title={t("projectBar.progressTitle", { done: prog.done, total: prog.total })}
               >
                 {prog.done}/{prog.total}
+              </span>
+            )}
+            {pendingApprovals(p) > 0 && (
+              <span
+                className="chip-approvals pulse"
+                role="status"
+                title={t("projectBar.approvalsPending", { count: pendingApprovals(p) })}
+              >
+                ⚖ {pendingApprovals(p)}
               </span>
             )}
             {working && (

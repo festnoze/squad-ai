@@ -90,9 +90,16 @@ def save_state_payload(project_id: str, payload: str) -> None:
     Split out from ``save_state`` so the (loop-bound) JSON serialization and the
     (blocking, offloadable) file I/O can happen on different threads without the
     state mutating mid-write."""
+    save_project_file(project_id, STATE_FILENAME, payload)
+
+
+def save_project_file(project_id: str, filename: str, payload: str) -> None:
+    """Atomically write one pre-serialized sidecar ``payload`` into a project's
+    workspace (state, knowledge base…): same temp-file + os.replace + retry
+    pattern for every per-project JSON artifact."""
     ws = workspace_dir(project_id)
     ws.mkdir(parents=True, exist_ok=True)
-    final = ws / STATE_FILENAME
+    final = ws / filename
     # Atomic write: serialize to a temp file, then os.replace() into place. The
     # temp lives in a SIBLING ``.tmp/`` dir (same volume as the workspace, so the
     # replace stays atomic) rather than INSIDE the workspace — otherwise the
@@ -119,8 +126,8 @@ def save_state_payload(project_id: str, payload: str) -> None:
                 pass
             time.sleep(_SAVE_BACKOFF_S * (attempt + 1))
     logger.warning(
-        "Could not persist state for project %s after %d retries: %s",
-        project_id, _SAVE_RETRIES, last_exc,
+        "Could not persist %s for project %s after %d retries: %s",
+        filename, project_id, _SAVE_RETRIES, last_exc,
     )
 
 

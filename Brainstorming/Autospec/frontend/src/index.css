@@ -4178,3 +4178,364 @@ button.attention-chip {
   color: #6ea8ff;
   animation: chip-pulse 1.2s ease-in-out infinite;
 }
+
+/* ---------- V3-F7 : observations / gouvernance / mémoire ---------- */
+
+/* Compteur discret dans l'en-tête d'un panneau repliable. */
+.panel-count {
+  font-size: 10px;
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  margin-left: 6px;
+}
+
+.obs-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.obs-filters select {
+  font-size: 11px;
+  padding: 3px 6px;
+  max-width: 160px;
+}
+
+.obs-list {
+  overflow-y: auto;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.obs-item {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.obs-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.obs-id {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  font-size: 11px;
+}
+
+.obs-summary {
+  flex: 1;
+  min-width: 140px;
+}
+
+.obs-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.obs-stream,
+.obs-iter {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  font-size: 10px;
+}
+
+.badge-urgency-low {
+  color: var(--muted);
+}
+
+.badge-urgency-normal {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.badge-urgency-high {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.badge-urgency-critical {
+  color: #fff;
+  background: var(--red);
+  border-color: var(--red);
+}
+
+.badge-obs-status {
+  color: var(--muted);
+}
+
+.badge-obs-actioned,
+.badge-obs-persisted {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.badge-obs-rejected,
+.badge-obs-dismissed {
+  color: var(--red);
+}
+
+.obs-detail {
+  padding: 4px 10px 8px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 11px;
+}
+
+.obs-detail ul {
+  margin: 2px 0 0;
+  padding-left: 18px;
+}
+
+.obs-description {
+  margin: 4px 0 0;
+}
+
+.obs-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.obs-linked-decision {
+  color: var(--accent);
+}
+
+/* --- gouvernance --- */
+.gov-pending-count {
+  margin-left: 6px;
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--amber);
+  color: #1a1408;
+  font-weight: 700;
+  animation: chip-pulse 1.2s ease-in-out infinite;
+}
+
+.gov-pending h3,
+.gov-history h3 {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin: 6px 0 4px;
+}
+
+.gov-decision {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.gov-decision.gov-proposed {
+  border-color: var(--amber);
+}
+
+.gov-diff-line {
+  font-family: Consolas, monospace;
+  font-size: 11px;
+}
+
+.gov-rationale,
+.gov-source {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.gov-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.gov-reject-reason {
+  flex: 1;
+  min-width: 120px;
+  font-size: 11px;
+  padding: 3px 6px;
+}
+
+.gov-history-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gov-id {
+  color: var(--muted);
+  font-family: Consolas, monospace;
+  font-size: 11px;
+}
+
+.badge-gov-applied,
+.badge-gov-approved {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.badge-gov-rejected_by_policy,
+.badge-gov-rejected_by_human,
+.badge-gov-invalid {
+  color: var(--red);
+  border-color: var(--red);
+}
+
+/* --- mémoire logicielle --- */
+.kn-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.kn-tab {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+
+.kn-tab.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.kn-count {
+  margin-left: 5px;
+  font-family: Consolas, monospace;
+  font-size: 10px;
+}
+
+.kn-entries {
+  overflow-y: auto;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.kn-entry {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kn-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.kn-title {
+  flex: 1;
+}
+
+.kn-actions {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.kn-body {
+  font-size: 11px;
+}
+
+.kn-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.kn-group h4 {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 6px 0 4px;
+}
+
+.kn-edit-form {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kn-edit-form input,
+.kn-edit-form textarea {
+  font-size: 11px;
+  width: 100%;
+}
+
+.kn-edit-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.badge-adr-accepted {
+  color: var(--green);
+  border-color: var(--green);
+}
+
+.badge-adr-proposed {
+  color: var(--amber);
+  border-color: var(--amber);
+}
+
+.badge-adr-superseded {
+  color: var(--muted);
+}
+
+/* --- badge d'approbations en attente (ProjectBar) --- */
+.chip-approvals {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 99px;
+  background: var(--amber);
+  color: #1a1408;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.chip-approvals.pulse {
+  animation: chip-pulse 1.2s ease-in-out infinite;
+}

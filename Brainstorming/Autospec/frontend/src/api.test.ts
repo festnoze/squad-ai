@@ -1,11 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  approveGovernanceDecision,
   clientUuid,
   connectEvents,
   createProject,
+  deleteKnowledgeEntry,
   discoverModels,
   extendStory,
+  getGovernance,
+  getKnowledge,
   getProvider,
+  patchKnowledgeEntry,
+  rejectGovernanceDecision,
   setProvider,
   storyChat,
   taskChat,
@@ -174,5 +180,71 @@ describe("connectEvents — statut de connexion (Q5)", () => {
     FakeEventSource.last!.onerror!();
     expect(statuses).toEqual([true, false]);
     off();
+  });
+});
+
+describe("api — gouvernance & mémoire logicielle (US-F7.1)", () => {
+  const ok = (payload: unknown) => ({
+    ok: true,
+    status: 200,
+    json: async () => payload,
+    text: async () => "",
+  });
+
+  it("getGovernance extrait la liste des décisions", async () => {
+    const decision = { id: "GOV-1", status: "proposed" };
+    const fetchMock = mockFetchSequence(ok({ decisions: [decision] }));
+    const decisions = await getGovernance("p1");
+    expect(decisions).toEqual([decision]);
+    expect(fetchMock).toHaveBeenCalledWith("/api/projects/p1/governance", undefined);
+  });
+
+  it("approveGovernanceDecision poste sur /approve et renvoie la décision", async () => {
+    const decision = { id: "GOV-1", status: "applied" };
+    const fetchMock = mockFetchSequence(ok({ ok: true, decision }));
+    const res = await approveGovernanceDecision("p1", "GOV-1");
+    expect(res).toEqual(decision);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/p1/governance/GOV-1/approve",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("rejectGovernanceDecision poste le motif sur /reject", async () => {
+    const decision = { id: "GOV-1", status: "rejected_by_human" };
+    const fetchMock = mockFetchSequence(ok({ ok: true, decision }));
+    const res = await rejectGovernanceDecision("p1", "GOV-1", "trop tôt");
+    expect(res).toEqual(decision);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/projects/p1/governance/GOV-1/reject");
+    expect(JSON.parse((init as RequestInit).body as string)).toEqual({ reason: "trop tôt" });
+  });
+
+  it("getKnowledge renvoie la base telle quelle (GET idempotent)", async () => {
+    const kb = { adrs: [], debt_register: [] };
+    const fetchMock = mockFetchSequence(ok(kb));
+    expect(await getKnowledge("p1")).toEqual(kb);
+    expect(fetchMock).toHaveBeenCalledWith("/api/projects/p1/knowledge", undefined);
+  });
+
+  it("patchKnowledgeEntry PATCHe les champs et renvoie l'entrée", async () => {
+    const entry = { id: "debt-1", title: "Titre édité" };
+    const fetchMock = mockFetchSequence(ok({ ok: true, entry }));
+    const res = await patchKnowledgeEntry("p1", "debt_register", "debt-1", {
+      title: "Titre édité",
+    });
+    expect(res).toEqual(entry);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("/api/projects/p1/knowledge/debt_register/debt-1");
+    expect((init as RequestInit).method).toBe("PATCH");
+  });
+
+  it("deleteKnowledgeEntry supprime l'entrée (DELETE)", async () => {
+    const fetchMock = mockFetchSequence(ok({ ok: true }));
+    await deleteKnowledgeEntry("p1", "pending_ideas", "idea-1");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/projects/p1/knowledge/pending_ideas/idea-1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
   });
 });

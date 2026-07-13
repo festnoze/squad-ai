@@ -279,7 +279,10 @@ async def test_repair_routes_to_custom_prompt_builder(monkeypatch, repair_env):
     le gate Docker) : l'agent Dev reçoit CE prompt, pas dev_fix_integration."""
     monkeypatch.setattr(settings, "integration_fix_attempts", 1)
 
-    def _custom_builder(package_name, report, architecture="", attempt=1, max_attempts=1):
+    def _custom_builder(package_name, report, architecture="", attempt=1,
+                        max_attempts=1, knowledge=""):
+        # V3-F4.3 : le contrat prompt_builder porte aussi `knowledge` (comme
+        # dev_fix_integration / dev_fix_deploy).
         return f"PROMPT DOCKER SPÉCIFIQUE :: {report}"
 
     async def _averify():

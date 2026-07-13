@@ -69,6 +69,36 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "import_guard", "off")
     monkeypatch.setattr(settings, "flaky_rerun_enabled", False)
     monkeypatch.setattr(settings, "docker_delivery", False)
+    # V3-F1: observations add an extractor LLM call per terminal work item — a
+    # developer's .env enabling them must not change tests that don't opt in.
+    monkeypatch.setattr(settings, "observations_enabled", False)
+    # V3-F2: the critic/router chain adds a batched checker call after each
+    # extraction — pin it OFF (its default is ON) so F1-only tests keep their
+    # NEW-status observations, and pin the optional LLM router for hermeticity.
+    monkeypatch.setattr(settings, "observation_critic_enabled", False)
+    monkeypatch.setattr(settings, "observation_router_llm", False)
+    # V3-F5: the pattern detector adds a boss-tier call just before GOVERN —
+    # pin it OFF so a developer's .env can never change tests that don't opt in.
+    monkeypatch.setattr(settings, "pattern_detector_enabled", False)
+    # V3-F3/F4: governance adds a GOVERN phase (a boss-tier PO call) and the
+    # knowledge flag injects memory blocks into prompts — pin both OFF so a
+    # developer's .env can never change tests that don't opt in.
+    monkeypatch.setattr(settings, "governance_enabled", False)
+    monkeypatch.setattr(settings, "governance_auto", False)
+    monkeypatch.setattr(settings, "knowledge_enabled", False)
+    # V3-F8: the cartographer adds a build-start refresh (workspace scan + an
+    # optional worker call) and prompt blocks — pin it OFF so a developer's
+    # .env can never change tests that don't opt in.
+    monkeypatch.setattr(settings, "cartographer_enabled", False)
+    # V3-F6: pin the autonomy policy to its defaults (level 2 = today's exact
+    # behaviour, no per-domain override) — a developer's .env raising or
+    # lowering the autonomy must not change any gate in tests that don't opt in.
+    monkeypatch.setattr(settings, "autonomy_level", 2)
+    monkeypatch.setattr(settings, "autonomy_backlog_changes", None)
+    monkeypatch.setattr(settings, "autonomy_spec_amendments", None)
+    monkeypatch.setattr(settings, "autonomy_memory_writes", None)
+    monkeypatch.setattr(settings, "autonomy_delivery", None)
+    monkeypatch.setattr(settings, "autonomy_next_feature", None)
     yield tmp_path
     # Drain the shared persist executor BEFORE this test's `workspace_root`
     # monkeypatch is reverted: `_persist` resolves the target path lazily on the

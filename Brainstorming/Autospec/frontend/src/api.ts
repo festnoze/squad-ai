@@ -2,6 +2,11 @@ import {
   AgentInteraction,
   FileContent,
   FileListing,
+  GovernanceDecision,
+  KnowledgeBase,
+  KnowledgeEntry,
+  KnowledgeEntryPatch,
+  KnowledgeSection,
   NewStoryBody,
   ProductComponent,
   ProjectState,
@@ -610,6 +615,90 @@ export async function extendStory(
     }),
   );
   return state;
+}
+
+// ---------------------------------------------------------------------------
+// V3-F7 (US-F7.1): observation loop — knowledge base + PO governance clients.
+
+/** V3-F4: the project's software knowledge base (ADRs, dette, risques, idées
+ * en suspens, mémoire composant). Idempotent GET → safe to retry. */
+export async function getKnowledge(projectId: string): Promise<KnowledgeBase> {
+  return json(await fetchIdempotent(`/api/projects/${projectId}/knowledge`));
+}
+
+/** US-F4.4: human PATCH of one knowledge entry (allowlisted text/status fields
+ * only). Pure field replacement → idempotent, safe to retry. */
+export async function patchKnowledgeEntry(
+  projectId: string,
+  section: KnowledgeSection,
+  entryId: string,
+  fields: KnowledgeEntryPatch,
+): Promise<KnowledgeEntry> {
+  const r = await json<{ ok: boolean; entry: KnowledgeEntry }>(
+    await fetchIdempotent(
+      `/api/projects/${projectId}/knowledge/${section}/${encodeURIComponent(entryId)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields),
+      },
+    ),
+  );
+  return r.entry;
+}
+
+/** US-F4.4: delete one knowledge entry — it is no longer injected anywhere. */
+export async function deleteKnowledgeEntry(
+  projectId: string,
+  section: KnowledgeSection,
+  entryId: string,
+): Promise<void> {
+  await json(
+    await fetch(
+      `/api/projects/${projectId}/knowledge/${section}/${encodeURIComponent(entryId)}`,
+      { method: "DELETE" },
+    ),
+  );
+}
+
+/** US-F3.4: the permanent governance journal — decisions whose status is
+ * "proposed" form the human approval queue. Idempotent GET. */
+export async function getGovernance(projectId: string): Promise<GovernanceDecision[]> {
+  const r = await json<{ decisions: GovernanceDecision[] }>(
+    await fetchIdempotent(`/api/projects/${projectId}/governance`),
+  );
+  return r.decisions;
+}
+
+/** US-F3.4: approve one proposed decision — applied immediately (409 when the
+ * decision was already handled, so NOT retried through fetchIdempotent). */
+export async function approveGovernanceDecision(
+  projectId: string,
+  decisionId: string,
+): Promise<GovernanceDecision> {
+  const r = await json<{ ok: boolean; decision: GovernanceDecision }>(
+    await fetch(`/api/projects/${projectId}/governance/${decisionId}/approve`, {
+      method: "POST",
+    }),
+  );
+  return r.decision;
+}
+
+/** US-F3.4: reject one proposed decision (rejected_by_human + the source
+ * observation dismissed). The reason is optional. */
+export async function rejectGovernanceDecision(
+  projectId: string,
+  decisionId: string,
+  reason = "",
+): Promise<GovernanceDecision> {
+  const r = await json<{ ok: boolean; decision: GovernanceDecision }>(
+    await fetch(`/api/projects/${projectId}/governance/${decisionId}/reject`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason }),
+    }),
+  );
+  return r.decision;
 }
 
 export async function getMetrics(): Promise<Metrics> {

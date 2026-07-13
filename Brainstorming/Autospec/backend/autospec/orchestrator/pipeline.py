@@ -11,6 +11,7 @@ import contextvars
 import copy
 import fnmatch
 import json
+import logging
 import os
 import re
 import shlex
@@ -42,11 +43,15 @@ from ..models import (
     Component,
     ComponentStatus,
     DEFAULT_STREAM_CATALOG,
+    EngineeringObservation,
     Epic,
     FeatureHypothesis,
     Finding,
+    GovernanceDecision,
     GuidanceEntry,
     HypothesisStatus,
+    ObservationStatus,
+    ObservationType,
     PipelinePhase,
     PlannedTest,
     ProjectState,
@@ -66,6 +71,12 @@ from ..storage import append_interaction, force_delete_workspace, load_interacti
 from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from . import guards, signatures  # W0.5 anti-cheating detectors + failure signatures
+from . import knowledge as knowledge_lib  # V3-F4 software knowledge base
+from . import observations as observations_lib  # V3-F2 observation critic & router
+from . import governance as governance_lib  # V3-F3 PO backlog governor
+from . import pattern_detector  # V3-F5 ambient pattern detector
+from . import cartographer  # V3-F8 codebase cartographer (module graph + memory)
+from . import policy  # V3-F6 autonomy policy engine (allow/require_human/deny)
 from . import recovery  # W1 recovery state machine + escalation ladder
 from . import arbitration, traceability  # W2 wrong-test arbitration + AC traceability
 from . import constitution as constitution_lib  # W3 project constitution
@@ -81,6 +92,8 @@ from . import docker_deploy
 from . import brownfield
 from . import sandbox
 from .events import bus
+
+logger = logging.getLogger(__name__)
 
 _REFINE_ROLE_TO_CHAT = {"critic": ChatRole.CRITIC, "judge": ChatRole.JUDGE}
 
@@ -233,6 +246,67 @@ def _unique_id(raw: str, prefix: str, taken: set[str]) -> str:
     while f"{prefix}-{n}" in taken:
         n += 1
     return f"{prefix}-{n}"
+
+
+_OBSERVATION_URGENCIES = ("low", "normal", "high", "critical")
+
+
+def _str_list(value) -> list[str]:
+    """Coerce an agent-supplied field to a clean list of non-empty strings."""
+    if not isinstance(value, list):
+        return []
+    return [str(x).strip() for x in value if str(x).strip()]
+
+
+def _coerce_observations(reply: dict, *, max_items: int) -> list[dict]:
+    """V3-F1 (US-F1.2): validate the extractor's raw JSON into
+    ``EngineeringObservation`` kwargs (the pipeline adds id/work-item/stream/
+    iteration). Tolerant by contract: a malformed list or entry yields fewer
+    (or zero) observations, never an exception — extraction is fail-open."""
+    items = reply.get("observations")
+    if not isinstance(items, list):
+        return []
+    out: list[dict] = []
+    for data in items:
+        if len(out) >= max_items:
+            break
+        if not isinstance(data, dict):
+            continue
+        summary = str(data.get("summary") or "").strip()
+        if not summary:
+            continue
+        try:
+            obs_type = ObservationType(str(data.get("type") or "").strip().lower())
+        except ValueError:
+            continue
+        if obs_type == ObservationType.PATTERN:
+            continue  # reserved for the F5 pattern detector, never the extractor
+        try:
+            confidence = float(data.get("confidence", 0.5))
+        except (TypeError, ValueError):
+            confidence = 0.5
+        urgency = str(data.get("urgency") or "normal").strip().lower()
+        if urgency not in _OBSERVATION_URGENCIES:
+            urgency = "normal"
+        source_role = str(data.get("source_role") or "dev").strip().lower()
+        if source_role not in ("dev", "qa"):
+            source_role = "dev"
+        out.append(
+            {
+                "type": obs_type,
+                "summary": summary,
+                "description": str(data.get("description") or ""),
+                "evidence": _str_list(data.get("evidence")),
+                "impact": str(data.get("impact") or ""),
+                "confidence": max(0.0, min(1.0, confidence)),
+                "urgency": urgency,
+                "workaround": str(data.get("workaround") or ""),
+                "recommendations": _str_list(data.get("recommendations")),
+                "reevaluate_when": str(data.get("reevaluate_when") or ""),
+                "source_role": source_role,
+            }
+        )
+    return out
 
 
 # The work item (user story / task id) the current agent call belongs to. Set by
@@ -514,6 +588,10 @@ class Pipeline:
         # B-IDEA: set when the user resolves the brainstorming offer.
         self._brainstorm_event = asyncio.Event()
         self._brainstorm_accepted = False
+        # V3-F8: the iteration's code map (derived, NOT persisted) — kept for
+        # prompt injection; also published to the cartographer's registry so
+        # the prompt seams (po_structure S1, dev knowledge_context) can read it.
+        self._code_map: cartographer.CodeMap | None = None
 
     def _setting(self, name: str):
         """Read a setting with this pipeline's product-profile overrides applied."""
@@ -1661,6 +1739,10 @@ class Pipeline:
             f"🧩 Mode brownfield : {copied} fichier(s) existant(s) intégrés au workspace.",
         )
         self._sync()
+        # V3-F8: map the seeded repo BEFORE the first plan — brownfield is where
+        # the cartographer pays most (S1 sizes against the real module graph).
+        # Strict no-op unless CARTOGRAPHER; fail-open.
+        await self._arefresh_code_map()
 
     async def _aselect_language(self) -> None:
         """L2: choose the backend language from the brief/goal. Env-gated by
@@ -1829,6 +1911,24 @@ class Pipeline:
             ChatRole.ARCHITECT,
             f"🧱 {reply.get('message', '')}\nComposants proposés : {listing or '(aucun)'}",
         )
+        # V3-F6: the components setup is human-gated at default autonomy (the
+        # existing UI gate, REQUIRE_HUMAN) — an explicit autonomy ≥ 5 (or ≥ 4
+        # with validation evidence) launches the setup of the pre-approved
+        # (mandatory) components unattended.
+        if (
+            components
+            and policy.decide("delivery", "setup_components", self.state, {})
+            is policy.Decision.ALLOW
+        ):
+            try:
+                await self.asetup_components()
+                self._log(
+                    "components",
+                    "🧱 Setup des composants approuvés lancé automatiquement "
+                    "(politique d'autonomie).",
+                )
+            except ValueError:
+                pass  # nothing approved / already running — the UI gate remains
 
     async def aset_components(self, items: list[dict]) -> list[Component]:
         """Replace the components list (user validation/edition from the UI)."""
@@ -2012,6 +2112,182 @@ class Pipeline:
             + (" README.md écrit dans le workspace." if readme else ""),
         )
 
+    # ------------------------------------- engineering observations (V3-F1)
+
+    def _next_observation_id(self) -> str:
+        """Allocate the next sequential observation id ("OBS-<n>")."""
+        self.state.observation_seq += 1
+        return f"OBS-{self.state.observation_seq}"
+
+    def _add_observation(self, obs: EngineeringObservation) -> None:
+        """Append one observation to the state and broadcast it (SSE event
+        ``observation``). Persistence is the caller's ``_sync``."""
+        self.state.observations.append(obs)
+        bus.publish(
+            {
+                "type": "observation",
+                "project_id": self.state.id,
+                "observation": obs.model_dump(mode="json"),
+            }
+        )
+
+    def _observation_transcript(self, item_id: str, limit: int = 8) -> str:
+        """The recent agent round-trips of a work item (dev/QA/critic…) as the
+        extractor's transcript tail. Served from the in-memory interaction ring
+        (seeded from the JSONL sidecar at pipeline creation), bounded so the
+        extractor call stays a cheap worker-tier read."""
+        parts: list[str] = []
+        for rec in self.interactions.for_item(item_id, limit=limit):
+            text = (rec.response or rec.error or "").strip()
+            if not text:
+                continue
+            parts.append(f"[{rec.persona or '?'}] {text[-1500:]}")
+        return "\n\n".join(parts)[-8000:]
+
+    async def _aextract_observations(self, item, subject, target) -> None:
+        """V3-F1 (US-F1.3): after a work item ends DONE or FAILED (failures are
+        the richest source of discoveries), a worker-tier extractor distils the
+        item's transcript tail into 0..N structured observations, appended to
+        ``state.observations`` and broadcast on the bus. Fail-open by contract:
+        any error → 0 observations + a warning, never a blocked build. Flag OFF
+        → strictly zero extra LLM calls (the first check returns before any work)."""
+        if not self._setting("observations_enabled"):
+            return
+        if target.status not in (StoryStatus.DONE, StoryStatus.FAILED):
+            return  # requeued/split items are observed on their terminal pass
+        try:
+            # The Task adapter (`subject`) can lag the persistent model: align
+            # its outcome so the prompt reports the real terminal status.
+            subject.status = target.status
+            subject.last_error = getattr(target, "last_error", "") or subject.last_error
+            result = await self._tracked.arun(
+                prompts.observation_extract(
+                    self.state, subject, self._observation_transcript(item.id)
+                ),
+                system_prompt=persona("observer"),
+            )
+            entries = _coerce_observations(
+                extract_json(result.text),
+                max_items=self._setting("observations_max_per_item"),
+            )
+            if not entries:
+                return
+            stream = getattr(target, "stream", "") or self.state.primary_stream_id
+            created: list[EngineeringObservation] = []
+            for entry in entries:
+                obs = EngineeringObservation(
+                    id=self._next_observation_id(),
+                    work_item_id=item.id,
+                    stream=stream,
+                    iteration=self.state.iteration,
+                    **entry,
+                )
+                self._add_observation(obs)
+                created.append(obs)
+            self._log(
+                f"obs:{item.id}",
+                f"🔭 {len(entries)} observation(s) d'ingénierie extraite(s) de {item.id}.",
+            )
+            # V3-F2: critic (deterministic → LLM batché) + router + F4 memory
+            # writes over the fresh batch. Fail-open inside; flag-gated inside.
+            await self._aprocess_observations(item.id, created)
+        except Exception as exc:  # noqa: BLE001 — fail-open: never block the build
+            logger.warning("Observation extraction failed for %s: %s", item.id, exc)
+            self._log(
+                f"obs:{item.id}",
+                f"⚠️ Extraction d'observations impossible pour {item.id} ({exc}) — ignorée.",
+            )
+
+    def _findings_to_observations(
+        self, findings: list[Finding], *, source_role: str
+    ) -> list[EngineeringObservation]:
+        """V3-F1 (US-F1.4): mirror E6/S1 findings as structured observations, in
+        ADDITION to the existing free-text feedback plumbing (which is preserved
+        untouched — and remains the only path when the flag is off). Mapping:
+        security → risk; evaluator bug/integration → risk, ux/gap → improvement.
+        Returns the created observations so the F2 chain can process them."""
+        if not self._setting("observations_enabled"):
+            return []
+        created: list[EngineeringObservation] = []
+        for f in findings:
+            if source_role == "security" or f.kind in ("bug", "integration"):
+                obs_type = ObservationType.RISK
+            else:
+                obs_type = ObservationType.IMPROVEMENT
+            urgency = {"high": "high", "medium": "normal", "low": "low"}.get(
+                f.severity, "normal"
+            )
+            obs = EngineeringObservation(
+                id=self._next_observation_id(),
+                type=obs_type,
+                summary=f.title or f.id,
+                description=f.detail,
+                evidence=[f"{f.id} [{f.severity}/{f.kind}] {f.detail}".strip()],
+                urgency=urgency,
+                source_role=source_role,
+                iteration=self.state.iteration,
+            )
+            self._add_observation(obs)
+            created.append(obs)
+        return created
+
+    async def _aprocess_observations(
+        self, source: str, new_obs: list[EngineeringObservation]
+    ) -> None:
+        """V3-F2/F4 (US-F4.2): run the observation critic (deterministic then
+        one batched checker-tier LLM call) and the deterministic router over a
+        fresh batch, write the routed debt/risk/architecture entries into the
+        project knowledge base, then persist state + knowledge and broadcast an
+        ``observation_update`` SSE event. Fail-open by contract (a critic/router
+        failure never blocks the build); the chain only runs when BOTH
+        OBSERVATIONS and OBSERVATION_CRITIC are on (flag off ⇒ strictly no extra
+        LLM call, observations stay NEW as in F1)."""
+        if not new_obs:
+            return
+        if not (
+            self._setting("observations_enabled")
+            and self._setting("observation_critic_enabled")
+        ):
+            return
+        try:
+            kb = knowledge_lib.load_knowledge(self.state.id)
+            outcome = await observations_lib.aprocess_new_observations(
+                self.state, new_obs, kb, self._tracked.arun
+            )
+            if outcome.kb_dirty:
+                knowledge_lib.save_knowledge(self.state.id, kb)
+            bus.publish(
+                {
+                    "type": "observation_update",
+                    "project_id": self.state.id,
+                    "observations": [
+                        o.model_dump(mode="json") for o in outcome.touched
+                    ],
+                }
+            )
+            routed = [
+                o for o in outcome.survivors
+                if o.status in (ObservationStatus.ROUTED, ObservationStatus.PERSISTED)
+            ]
+            persisted = [
+                o for o in outcome.survivors
+                if o.status == ObservationStatus.PERSISTED
+            ]
+            self._log(
+                f"obs:{source}",
+                f"🧭 Observations de {source} : {len(routed)} routée(s) "
+                f"({len(persisted)} mémorisée(s)), "
+                f"{len(outcome.rejected) + len(outcome.survivors) - len(routed)} rejetée(s), "
+                f"{len(outcome.merged)} fusionnée(s).",
+            )
+            self._sync()
+        except Exception as exc:  # noqa: BLE001 — fail-open: never block the build
+            logger.warning("Observation processing failed for %s: %s", source, exc)
+            self._log(
+                f"obs:{source}",
+                f"⚠️ Critique/routage des observations impossible ({exc}) — ignoré.",
+            )
+
     # ------------------------------------------------ product evaluator (E6)
 
     async def aevaluate(self) -> None:
@@ -2127,6 +2403,11 @@ class Pipeline:
                 )
             )
         self.state.findings.extend(new_findings)
+        # V3-F1 (US-F1.4): mirror the findings as structured observations
+        # (flag-gated inside; the free-text feedback below is unchanged), then
+        # V3-F2: critic + router + F4 memory writes over the converted batch.
+        converted = self._findings_to_observations(new_findings, source_role="evaluator")
+        await self._aprocess_observations("evaluator", converted)
         lines = [f"[{f.severity}/{f.kind}] {f.title} — {f.detail}" for f in new_findings]
         # Findings are evidence for the next analysis: surface them in the
         # feedback list (UI) on top of the evaluator's chat message.
@@ -2247,6 +2528,11 @@ class Pipeline:
                 )
             )
         self.state.findings.extend(new_findings)
+        # V3-F1 (US-F1.4): mirror the findings as structured observations
+        # (flag-gated inside; the free-text feedback below is unchanged), then
+        # V3-F2: critic + router + F4 memory writes over the converted batch.
+        converted = self._findings_to_observations(new_findings, source_role="security")
+        await self._aprocess_observations("security", converted)
         lines = [f"[{f.severity}/{f.kind}] {f.title} — {f.detail}" for f in new_findings]
         self.state.feedback.extend(lines)
         self._chat(
@@ -2325,6 +2611,307 @@ class Pipeline:
         )
         self._sync()
 
+    # --------------------------------------- codebase cartographer (V3-F8)
+
+    async def _arefresh_code_map(self) -> None:
+        """V3-F8: refresh the code map at the iteration's build start. Strict
+        no-op unless CARTOGRAPHER is on AND the knowledge base is live
+        (KNOWLEDGE or GOVERNANCE — the LLM stage writes component_memory).
+        Fingerprint gate first: an unchanged workspace (git HEAD + status, or
+        file mtime hash) costs strictly ZERO work — no rebuild, no LLM call.
+        Otherwise: deterministic module graph (kept on ``self._code_map`` and
+        the registry for this iteration's prompts) → optional ONE worker-tier
+        per-component summary call written into the F4 component memory
+        (kind="cartography", replace-not-append). Fail-open: any failure logs
+        and moves on — the cartographer never blocks a build."""
+        if not settings.cartographer_on():
+            return
+        try:
+            ws = workspace_dir(self.state.id)
+            fingerprint = cartographer.map_fingerprint(ws)
+            if fingerprint and fingerprint == self.state.code_map_fingerprint:
+                self._log(
+                    "cartographer",
+                    "🗺️ Carte du code : workspace inchangé (empreinte identique) "
+                    "— rafraîchissement sauté.",
+                )
+                return
+            code_map = await asyncio.to_thread(
+                cartographer.build_code_map, ws, self.state.effective_streams()
+            )
+            self._code_map = code_map
+            cartographer.set_current_map(self.state.id, code_map)
+            self.state.code_map_fingerprint = fingerprint
+            files = sum(m.file_count for m in code_map.streams.values())
+            edges = sum(len(m.edges) for m in code_map.streams.values())
+            self._log(
+                "cartographer",
+                f"🗺️ Carte du code rafraîchie : {files} module(s), "
+                f"{edges} dépendance(s) interne(s) "
+                f"({', '.join(sorted(code_map.streams))}).",
+            )
+            if self._setting("cartographer_llm_enabled") and not code_map.is_empty():
+                kb = knowledge_lib.load_knowledge(self.state.id)
+                if await cartographer.asummarize_components(
+                    kb, code_map, self._tracked.arun, iteration=self.state.iteration
+                ):
+                    knowledge_lib.save_knowledge(self.state.id, kb)
+                    self._log(
+                        "cartographer",
+                        "🗺️ Résumés par composant écrits dans la mémoire "
+                        "logicielle (kind=cartography).",
+                    )
+            self._sync()
+        except Exception as exc:  # noqa: BLE001 — fail-open: never block the build
+            logger.warning("Cartographer refresh failed for %s: %s", self.state.id, exc)
+            self._log("cartographer", f"⚠️ Cartographe indisponible ({exc}) — ignoré.")
+
+    # --------------------------------------- pattern detector (V3-F5)
+
+    async def _adetect_patterns(self) -> None:
+        """V3-F5: the ambient pattern detector — runs JUST BEFORE the GOVERN
+        phase so the PO receives the meta-observations of the same cycle.
+        Event-driven, never a permanent loop: below PATTERN_MIN_SIGNALS new
+        signals since the persisted watermark ⇒ strictly ZERO LLM call (and
+        the watermark stays put, so signals keep accumulating). Above it, ONE
+        boss-tier call over the deterministic aggregates emits at most
+        PATTERN_MAX_FINDINGS type=PATTERN meta-observations, which go back
+        through the F2 critic/router chain (pattern → architecture, + po when
+        the urgency is high) — the detector proposes, the PO governs. The
+        watermark advances AFTER a run attempt (success or failure: the same
+        saturated signals are analyzed once, not re-paid every iteration) and
+        INCLUDES the detector's own emissions so it can never self-trigger.
+        Fail-open everywhere; flag-gated (PATTERN_DETECTOR, only effective
+        with OBSERVATIONS)."""
+        if not (
+            self._setting("pattern_detector_enabled")
+            and self._setting("observations_enabled")
+        ):
+            return
+        try:
+            signals = pattern_detector.count_new_signals(self.state)
+            threshold = self._setting("pattern_min_signals")
+            if signals < threshold:
+                self._log(
+                    "pattern",
+                    f"🔬 Détecteur de motifs : {signals} signal(aux) nouveau(x) "
+                    f"< seuil {threshold} — analyse différée.",
+                )
+                return
+            kb = knowledge_lib.load_knowledge(self.state.id)
+            aggregates = pattern_detector.aggregate_signals(self.state, kb)
+            self._log(
+                "pattern",
+                f"🔬 Détecteur de motifs : {signals} signaux nouveaux — analyse "
+                f"des agrégats de l'itération {self.state.iteration}.",
+            )
+            try:
+                result = await self._tracked.arun(
+                    prompts.pattern_detect(self.state, aggregates),
+                    system_prompt=persona("pattern-detector"),
+                )
+                findings = pattern_detector.coerce_findings(
+                    extract_json(result.text),
+                    max_findings=self._setting("pattern_max_findings"),
+                    known_streams=pattern_detector.known_streams(self.state),
+                )
+                created: list[EngineeringObservation] = []
+                for entry in findings:
+                    obs = EngineeringObservation(
+                        id=self._next_observation_id(),
+                        type=ObservationType.PATTERN,
+                        source_role="pattern-detector",
+                        work_item_id="",
+                        iteration=self.state.iteration,
+                        **entry,
+                    )
+                    self._add_observation(obs)  # broadcasts SSE ``observation``
+                    created.append(obs)
+                if created:
+                    self._log(
+                        "pattern",
+                        f"🔬 {len(created)} méta-observation(s) de motif émise(s) "
+                        f"({', '.join(o.id for o in created)}).",
+                    )
+                    # F2 chain: critic + router (pattern → architecture + po si
+                    # urgence haute) — gouvernées comme les autres.
+                    await self._aprocess_observations("pattern-detector", created)
+                else:
+                    self._log("pattern", "🔬 Aucun motif transverse détecté.")
+            finally:
+                pattern_detector.advance_watermark(self.state)
+                self._sync()
+        except Exception as exc:  # noqa: BLE001 — fail-open: never block the lifecycle
+            logger.warning("Pattern detector failed for %s: %s", self.state.id, exc)
+            self._log(
+                "pattern",
+                f"⚠️ Détecteur de motifs indisponible ({exc}) — ignoré.",
+            )
+
+    # --------------------------------------- PO backlog governor (V3-F3)
+
+    def _publish_governance(self, decision: GovernanceDecision) -> None:
+        """Broadcast one governance decision (SSE ``governance_decision``)."""
+        bus.publish(
+            {
+                "type": "governance_decision",
+                "project_id": self.state.id,
+                "decision": decision.model_dump(mode="json"),
+            }
+        )
+
+    def _governance_verdict(self, decision: GovernanceDecision) -> policy.Decision:
+        """V3-F6: the policy verdict for ONE unattended governance application.
+        The decision itself is a backlog change; a PERSIST/DEFER additionally
+        writes the F4 knowledge base, so the memory_writes domain must also
+        allow it (a human approval via the endpoints satisfies both gates —
+        this check only guards the UNATTENDED path)."""
+        verdict = policy.decide(
+            "backlog_changes", decision.action.value, self.state, {}
+        )
+        if verdict is policy.Decision.ALLOW and decision.action.value in ("persist", "defer"):
+            memory = policy.decide(
+                "memory_writes", decision.action.value, self.state, {}
+            )
+            if memory is not policy.Decision.ALLOW:
+                return memory
+        return verdict
+
+    async def _agovern_phase(self) -> None:
+        """V3-F3: the GOVERN phase, end of iteration (after the delivery gates,
+        before the retro — so E7 can digest the governance decisions too). ONE
+        boss-tier PO call decides every po-routed observation (+ the pending
+        ideas whose ``reevaluate_when`` is plausibly met), then the decisions
+        are applied deterministically under the hard guardrails of
+        ``governance.apply_decision``. Each application is gated by the F6
+        policy engine (``decide("backlog_changes", …)``): ALLOW applies now,
+        REQUIRE_HUMAN leaves the decision ``proposed`` — the human approval
+        queue consumed by the approve/reject endpoints — and DENY marks it
+        ``rejected_by_policy``. At default autonomy (level 2) every decision
+        stays proposed, exactly like the former GOVERNANCE_AUTO=0; the
+        deprecated GOVERNANCE_AUTO=1 flag still works (read as an
+        AUTONOMY_BACKLOG_CHANGES=5 pin).
+        Flag-gated (GOVERNANCE, only effective with OBSERVATIONS); no-op when
+        the governance queue AND the pending ideas are empty; fail-open on a
+        malformed PO output (warning, zero decision, iteration completes)."""
+        if not (
+            self._setting("governance_enabled")
+            and self._setting("observations_enabled")
+        ):
+            return
+        kb = knowledge_lib.load_knowledge(self.state.id)
+        queued = governance_lib.po_queue(self.state)
+        if not queued and not kb.pending_ideas:
+            return
+        self.state.phase = PipelinePhase.GOVERN
+        self._sync()
+        self._log(
+            "govern",
+            f"⚖️ Gouvernance du backlog : {len(queued)} observation(s) en file, "
+            f"{len(kb.pending_ideas)} idée(s) en suspens à réévaluer.",
+        )
+        try:
+            result = await self._tracked.arun(
+                prompts.po_govern(
+                    self.state, queued, kb, governance_lib.quotas_remaining(self.state)
+                ),
+                system_prompt=persona("po-governor"),
+            )
+            reply = extract_json(result.text)
+        except Exception as exc:  # noqa: BLE001 — fail-open: iteration completes
+            logger.warning("PO governor failed for %s: %s", self.state.id, exc)
+            self._log(
+                "govern",
+                f"⚠️ Gouvernance indisponible ({exc}) — itération terminée sans décision.",
+            )
+            return
+        decisions, warnings = governance_lib.coerce_decisions(self.state, reply, kb)
+        for w in warnings:
+            self._log("govern", f"⚠️ Gouvernance : {w}")
+        if not decisions:
+            self._log("govern", "Gouvernance : aucune décision exploitable — rien à appliquer.")
+            self._sync()
+            return
+        self.state.governance_log.extend(decisions)
+        kb_dirty = False
+        for decision in decisions:
+            verdict = self._governance_verdict(decision)
+            if verdict is policy.Decision.ALLOW:
+                outcome = governance_lib.apply_decision(self.state, kb, decision)
+                kb_dirty = kb_dirty or bool(decision.payload.get("kb_dirty"))
+                self._log(
+                    "govern",
+                    f"{decision.id} [{decision.action.value} ← {decision.observation_id}] : {outcome}.",
+                )
+            elif verdict is policy.Decision.DENY:
+                decision.status = "rejected_by_policy"
+                self._log(
+                    "govern",
+                    f"⛔ {decision.id} [{decision.action.value}] refusée par la "
+                    f"politique d'autonomie (deny).",
+                )
+            # REQUIRE_HUMAN: the decision stays "proposed" — THE approval queue.
+        # V3-F4.4: compact any oversized knowledge section (worker tier,
+        # fail-open — a failed synthesis just skips that section).
+        kb_dirty = await knowledge_lib.acompact_knowledge(kb, self._tracked.arun) or kb_dirty
+        if kb_dirty:
+            knowledge_lib.save_knowledge(self.state.id, kb)
+        for decision in decisions:
+            self._publish_governance(decision)
+        pending = [d for d in decisions if d.status == "proposed"]
+        if pending:
+            bus.publish(
+                {
+                    "type": "approval_pending",
+                    "project_id": self.state.id,
+                    "kind": "governance",
+                    "decision_ids": [d.id for d in pending],
+                }
+            )
+            self._chat(
+                ChatRole.PO,
+                f"⚖️ Gouvernance du backlog : {len(pending)} décision(s) en attente "
+                f"d'approbation humaine (politique d'autonomie).",
+            )
+        else:
+            applied = sum(1 for d in decisions if d.status == "applied")
+            invalid = sum(1 for d in decisions if d.status == "invalid")
+            denied = sum(1 for d in decisions if d.status == "rejected_by_policy")
+            self._chat(
+                ChatRole.PO,
+                f"⚖️ Gouvernance du backlog : {applied} décision(s) appliquée(s), "
+                f"{invalid} invalide(s), sur {len(decisions)}."
+                + (f" {denied} refusée(s) par la politique." if denied else ""),
+            )
+        self._sync()
+
+    async def aapprove_governance(self, decision_id: str) -> GovernanceDecision:
+        """US-F3.4: approve one ``proposed`` governance decision — applied NOW,
+        even while the project is dormant (no active lifecycle needed).
+        KeyError → 404, ValueError (already handled) → 409."""
+        kb = knowledge_lib.load_knowledge(self.state.id)
+        decision = governance_lib.approve(self.state, kb, decision_id)
+        if decision.payload.get("kb_dirty"):
+            knowledge_lib.save_knowledge(self.state.id, kb)
+        self._log(
+            "govern",
+            f"✅ {decision.id} approuvée par l'humain → {decision.status} "
+            f"({decision.payload.get('applied_action', decision.action.value)}).",
+        )
+        self._publish_governance(decision)
+        self._sync()
+        return decision
+
+    async def areject_governance(self, decision_id: str, reason: str = "") -> GovernanceDecision:
+        """US-F3.4: reject one ``proposed`` governance decision —
+        ``rejected_by_human`` + the source observation DISMISSED."""
+        kb = knowledge_lib.load_knowledge(self.state.id)
+        decision = governance_lib.reject(self.state, kb, decision_id, reason)
+        self._log("govern", f"⛔ {decision.id} rejetée par l'humain.")
+        self._publish_governance(decision)
+        self._sync()
+        return decision
+
     # ------------------------------------------------------------ lifecycle
 
     def _apply_definition_of_done(self, *, all_iterations: bool = False) -> bool:
@@ -2400,7 +2987,17 @@ class Pipeline:
         # Docker delivery gate (D1): build the accepted delivery into an image,
         # deploy it on the shared network and network-verify it; a failure parks
         # the iteration in needs_attention (no-op unless DOCKER_DELIVERY /
-        # non-web project).
+        # non-web project). V3-F6: the UNATTENDED deploy is policy-gated (ALLOW
+        # at default autonomy); at level ≤ 1 the human keeps the « Déployer »
+        # button (adeploy/averify_delivery bypass — they ARE the human approval).
+        if policy.decide("delivery", "docker_deploy", self.state, {}) is not policy.Decision.ALLOW:
+            if self._setting("docker_delivery"):
+                self._log(
+                    "docker",
+                    "⏸️ Déploiement Docker non lancé — la politique d'autonomie "
+                    "requiert une validation humaine (bouton « Déployer »).",
+                )
+            return True
         return await self._adocker_delivery_phase()
 
     async def _alifecycle(self) -> None:
@@ -2455,11 +3052,31 @@ class Pipeline:
                 # Security & supply-chain review (S1): audit the delivered
                 # code and dependencies, feeding findings into the impact pipeline.
                 await self._asecurity_phase()
+                # Pattern detector (V3-F5): aggregate the accumulated signals
+                # into type=PATTERN meta-observations JUST BEFORE governance,
+                # so the PO receives them in the same cycle.
+                await self._adetect_patterns()
+                # PO backlog governance (V3-F3): after the delivery gates (and
+                # the evaluator/security observations), before the retro — so
+                # E7 digests the governance decisions of the same cycle.
+                await self._agovern_phase()
                 # Factory retrospective (E7): distil this iteration's signals
                 # into durable lessons before the next one starts.
                 await self._aretro_phase()
                 await self._asnapshot_iteration()
                 if not self.state.auto_spec or self._stop_requested:
+                    break
+                # V3-F6: picking the next hypothesis unattended is policy-gated
+                # (ALLOW at default autonomy; level ≤ 1 hands the wheel back).
+                if (
+                    policy.decide("next_feature", "select_hypothesis", self.state, {})
+                    is not policy.Decision.ALLOW
+                ):
+                    self._chat(
+                        ChatRole.SYSTEM,
+                        "⏸️ Auto-spec suspendu — la politique d'autonomie requiert "
+                        "une validation humaine pour choisir la prochaine feature.",
+                    )
                     break
                 await self._anext_feature_phase()
 
@@ -2992,6 +3609,13 @@ class Pipeline:
                     guidance="\n".join(self.state.build_guidance),
                     lessons="\n".join(self._effective_lessons()),
                     available_skills=self._skills_catalog("dev"),
+                    # V3-F4.3: the stream's component memory + active constraints/
+                    # workarounds ("" when KNOWLEDGE and GOVERNANCE are off).
+                    knowledge=prompts.knowledge_context(
+                        self.state,
+                        stream=story.stream or self.state.primary_stream_id,
+                        audience="dev",
+                    ),
                 ),
                 system_prompt=persona("dev"),
                 cwd=ws,
@@ -3320,6 +3944,12 @@ class Pipeline:
         # across iterations, and dependency readiness needs the DONE stories of
         # earlier iterations in the pool to resolve (scheduler.ready_stories
         # derives "done" only from the pool it is given).
+        #
+        # V3-F8: refresh the code map at the iteration's build start (strict
+        # no-op unless CARTOGRAPHER; fingerprint-gated; fail-open) so this
+        # iteration's dev prompts carry the hot-files caution and the NEXT S1
+        # plans against the real module graph.
+        await self._arefresh_code_map()
         caps = provider_capabilities(settings.agent_provider)
         if not settings.fake_agents and not caps.reliable_for_build:
             msg = (
@@ -4085,9 +4715,11 @@ class Pipeline:
     async def _amaybe_propose_amendment(self, story: UserStory, acceptance: str, reason: str) -> None:
         """W5.1 — when a failure is a genuine spec contradiction, propose a MINIMAL
         amendment, run an INDEPENDENT weakening check, and queue the survivor as a
-        HUMAN-PENDING proposal (never auto-applied unless AMENDMENT_AUTO). A system
-        that could rewrite the criteria it fails to meet must not be able to
-        legalize failure — hence the independent gate + human default. Best-effort."""
+        HUMAN-PENDING proposal (auto-applied only when the F6 policy allows it:
+        autonomy ≥ 4 with the independent check passed, or the deprecated
+        AMENDMENT_AUTO=1 compat pin). A system that could rewrite the criteria it
+        fails to meet must not be able to legalize failure — hence the independent
+        gate + human default. Best-effort."""
         if not settings.design_amendment_enabled:
             return
         if len(self.state.pending_amendments) >= settings.amendment_max_depth:
@@ -4118,9 +4750,19 @@ class Pipeline:
                 f"{proposal.get('weakening_reason', '')}",
             )
             return
-        if settings.amendment_auto:
-            # Opt-in unattended apply: record the applied change (the actual AC
+        # V3-F6: the apply gate is the policy engine — the deprecated
+        # AMENDMENT_AUTO=1 flag still works (read as an AUTONOMY_SPEC_AMENDMENTS=5
+        # pin) and level 4 auto-applies because the amendment reaching this point
+        # ALREADY passed the independent weakening check (judge_validated).
+        verdict = policy.decide(
+            "spec_amendments", "apply_amendment", self.state,
+            {"judge_validated": safe},
+        )
+        if verdict is policy.Decision.ALLOW:
+            # Unattended apply: record the applied change (the actual AC
             # edit is left to the next planning pass reading pending_amendments).
+            # The marker keeps it out of the pending /approvals view.
+            record["applied"] = True
             self._log(f"amend:{story.id}", "✍️ Amendement sûr appliqué automatiquement (AMENDMENT_AUTO).")
             self._chat(
                 ChatRole.SYSTEM,
@@ -4132,6 +4774,16 @@ class Pipeline:
                 f"{story.id} : {proposal.get('rationale', '')} — en attente de validation humaine.",
             )
             self._log(f"amend:{story.id}", "⏸️ Amendement sûr en attente de validation humaine.")
+            # US-F6.3: surface the pending amendment in the unified approvals
+            # feed (same event the governance queue publishes).
+            bus.publish(
+                {
+                    "type": "approval_pending",
+                    "project_id": self.state.id,
+                    "kind": "amendment",
+                    "story_id": story.id,
+                }
+            )
 
     def _record_arbitration_lesson(self) -> None:
         """W5.6 — durable lesson from a wrong-test arbitration, injected into later
@@ -4957,6 +5609,10 @@ class Pipeline:
         finally:
             if worktree is not None:
                 await self._aworktree_remove(ws, worktree, branch, keep_branch=keep_branch)
+            # V3-F1: a TERMINAL item (DONE or FAILED — requeues are skipped
+            # inside) yields its engineering observations. Fail-open and flag-
+            # gated; runs before the closing _sync so one write persists both.
+            await self._aextract_observations(item, subject, target)
             self._sync()
 
     def _persistent_for(self, subject: UserStory):
@@ -6233,6 +6889,13 @@ class Pipeline:
                     lessons="\n".join(self._effective_lessons()),
                     backend_language=self.state.backend_language.value,
                     available_skills=self._skills_catalog("qa"),
+                    # V3-F4.3: the stream's constraint/limitation memory ("" when
+                    # KNOWLEDGE and GOVERNANCE are off — prompt byte-identical).
+                    knowledge=prompts.knowledge_context(
+                        self.state,
+                        stream=story.stream or self.state.primary_stream_id,
+                        audience="qa",
+                    ),
                 ),
                 system_prompt=persona("qa"),
             )
@@ -6558,6 +7221,13 @@ class Pipeline:
                         architecture=self.state.architecture,
                         attempt=attempt,
                         max_attempts=attempts,
+                        # V3-F4.3: the primary stream's component memory ("" when
+                        # KNOWLEDGE and GOVERNANCE are off — prompt byte-identical).
+                        knowledge=prompts.knowledge_context(
+                            self.state,
+                            stream=self.state.primary_stream_id,
+                            audience="dev",
+                        ),
                     ),
                     system_prompt=persona("dev"),
                     cwd=ws,

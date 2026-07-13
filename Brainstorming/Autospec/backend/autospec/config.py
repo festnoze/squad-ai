@@ -7,6 +7,7 @@ import os
 import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import overload
 
 from dotenv import load_dotenv
 
@@ -97,6 +98,28 @@ def _env_mode(name: str, default: str = "off",
         return raw
     logger.warning("Invalid mode %s=%r, using default %s", name, raw, default)
     return default
+
+
+@overload
+def _env_level(name: str, default: int) -> int: ...
+@overload
+def _env_level(name: str, default: None) -> int | None: ...
+def _env_level(name: str, default: int | None) -> int | None:
+    """V3-F6: parse an autonomy level env var (int 0..5). Unset/empty falls
+    back to the default (``None`` = inherit the global level); a non-numeric
+    value warns and falls back; an out-of-range value warns and clamps."""
+    raw = os.environ.get(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw)
+    except ValueError:
+        logger.warning("Invalid autonomy level %s=%r, using default %s", name, raw, default)
+        return default
+    clamped = max(0, min(5, value))
+    if clamped != value:
+        logger.warning("%s=%s out of range 0..5, clamping to %s", name, value, clamped)
+    return clamped
 
 
 def _default_bmad_dir() -> Path:
@@ -286,6 +309,9 @@ class Settings:
     design_amendment_enabled: bool = field(
         default_factory=lambda: _env_bool("DESIGN_AMENDMENT", False)
     )
+    # DEPRECATED (V3-F6): superseded by the autonomy policy engine —
+    # AMENDMENT_AUTO=1 is now read as an explicit AUTONOMY_SPEC_AMENDMENTS=5
+    # pin (kept for compatibility).
     amendment_auto: bool = field(
         default_factory=lambda: _env_bool("AMENDMENT_AUTO", False)
     )
@@ -556,6 +582,162 @@ class Settings:
     security_audit_timeout_s: float = field(
         default_factory=lambda: _env_float("SECURITY_AUDIT_TIMEOUT_S", 60.0, minimum=1.0)
     )
+    # Engineering Observations (V3-F1): after each work item ends (DONE and
+    # FAILED alike — failures are the richest source of discoveries), a
+    # lightweight extractor reads the item's transcript tail and emits 0..N
+    # structured EngineeringObservation entries on the state. E6/S1 findings are
+    # also mirrored as observations. Fail-open by contract (an extraction error
+    # never blocks the build). OFF by default: flag off = zero extra LLM calls.
+    observations_enabled: bool = field(
+        default_factory=lambda: _env_bool("OBSERVATIONS", False)
+    )
+    observations_max_per_item: int = field(
+        default_factory=lambda: _env_int("OBSERVATIONS_MAX_PER_ITEM", 3, minimum=1)
+    )
+    # Cost tier of the extractor ("worker" by default: reading a transcript tail
+    # is cheap-mind work). Registered on PERSONA_TIERS for the observer persona.
+    observations_role_tier: str = field(
+        default_factory=lambda: (
+            os.environ.get("OBSERVATIONS_ROLE_TIER") or "worker"
+        ).strip().lower()
+    )
+    # Observation Critic & Router (V3-F2): after extraction, a deterministic
+    # critic rejects evidence-less observations and merges near-duplicates, a
+    # batched checker-tier LLM critic (role "observation-critic", never the
+    # extractor — no agent validates its own work) confirms evidence supports
+    # each claim, then a deterministic router dispatches by type (po/
+    # architecture/debt/risk/security) and writes debt/risk/architecture into
+    # the F4 knowledge base. ON by default but the whole chain only runs when
+    # OBSERVATIONS=1; fail-open by contract (never blocks the build).
+    observation_critic_enabled: bool = field(
+        default_factory=lambda: _env_bool("OBSERVATION_CRITIC", True)
+    )
+    # Token-similarity (Jaccard) threshold above which a new observation is a
+    # near-duplicate of an existing one of the same stream and gets merged.
+    observation_dedup_threshold: float = field(
+        default_factory=lambda: _env_float(
+            "OBSERVATION_DEDUP_THRESHOLD", 0.75, minimum=0.0
+        )
+    )
+    # Optional LLM router (checker tier) consulted ONLY for low-confidence
+    # validated observations; the deterministic table stays the authority on
+    # any failure. OFF by default (the table covers every type).
+    observation_router_llm: bool = field(
+        default_factory=lambda: _env_bool("OBSERVATION_ROUTER_LLM", False)
+    )
+    # PO Backlog Governor (V3-F3): a GOVERN phase at the end of each iteration
+    # where a boss-tier PO digests the po-routed observations (+ re-evaluated
+    # pending ideas) into traceable backlog decisions (create/update/enrich/
+    # defer/persist/dismiss), applied deterministically under hard guardrails
+    # (shipped stories immutable, AC enrich-only, per-iteration quotas). OFF by
+    # default and only effective when OBSERVATIONS is also on.
+    governance_enabled: bool = field(
+        default_factory=lambda: _env_bool("GOVERNANCE", False)
+    )
+    # Unattended application of governance decisions. Default OFF: decisions
+    # stay "proposed" in the governance log (the human approval queue) until
+    # the approve/reject endpoints act on them. DEPRECATED (V3-F6): superseded
+    # by the autonomy policy engine — GOVERNANCE_AUTO=1 is now read as an
+    # explicit AUTONOMY_BACKLOG_CHANGES=5 pin (kept for compatibility).
+    governance_auto: bool = field(
+        default_factory=lambda: _env_bool("GOVERNANCE_AUTO", False)
+    )
+    # Pattern Detector (V3-F5): an ambient agent at the end of each iteration
+    # (hook just BEFORE the GOVERN phase, so the PO receives the meta-
+    # observations of the same cycle) that aggregates the accumulated signals
+    # (observations + merge recurrences, guard findings, calibration counters,
+    # debt register) DETERMINISTICALLY, then makes ONE boss-tier call over the
+    # aggregates to surface type=PATTERN meta-observations — routed through
+    # the F2 chain like any other (the detector proposes, the PO decides).
+    # Event-driven, never a permanent LLM loop: below PATTERN_MIN_SIGNALS new
+    # signals since the persisted watermark ⇒ strictly zero LLM call. OFF by
+    # default and only effective when OBSERVATIONS is also on.
+    pattern_detector_enabled: bool = field(
+        default_factory=lambda: _env_bool("PATTERN_DETECTOR", False)
+    )
+    pattern_min_signals: int = field(
+        default_factory=lambda: _env_int("PATTERN_MIN_SIGNALS", 5, minimum=1)
+    )
+    pattern_max_findings: int = field(
+        default_factory=lambda: _env_int("PATTERN_MAX_FINDINGS", 3, minimum=1)
+    )
+    # V3-F6 — Policy Engine d'autonomie (orchestrator/policy.py). The global
+    # RECOMMENDED autonomy level 0..5. Default 2 = today's behaviour exactly:
+    # backlog/spec changes human-gated, memory writes + docker deploy +
+    # next-feature unattended, components setup behind its UI gate. The engine
+    # only ever DOWNGRADES from deterministic distrust signals (guard findings,
+    # repeated arbitrations, budget, first iteration) — never promotes.
+    autonomy_level: int = field(
+        default_factory=lambda: _env_level("AUTONOMY_LEVEL", 2)
+    )
+    # Optional per-domain overrides (unset = inherit AUTONOMY_LEVEL). The
+    # legacy AMENDMENT_AUTO / GOVERNANCE_AUTO flags are read as =5 pins.
+    autonomy_backlog_changes: int | None = field(
+        default_factory=lambda: _env_level("AUTONOMY_BACKLOG_CHANGES", None)
+    )
+    autonomy_spec_amendments: int | None = field(
+        default_factory=lambda: _env_level("AUTONOMY_SPEC_AMENDMENTS", None)
+    )
+    autonomy_memory_writes: int | None = field(
+        default_factory=lambda: _env_level("AUTONOMY_MEMORY_WRITES", None)
+    )
+    autonomy_delivery: int | None = field(
+        default_factory=lambda: _env_level("AUTONOMY_DELIVERY", None)
+    )
+    autonomy_next_feature: int | None = field(
+        default_factory=lambda: _env_level("AUTONOMY_NEXT_FEATURE", None)
+    )
+    # Anti-runaway quotas: what one iteration's governance may create/modify.
+    govern_max_new_stories: int = field(
+        default_factory=lambda: _env_int("GOVERN_MAX_NEW_STORIES", 3, minimum=0)
+    )
+    govern_max_new_epics: int = field(
+        default_factory=lambda: _env_int("GOVERN_MAX_NEW_EPICS", 1, minimum=0)
+    )
+    govern_max_updates: int = field(
+        default_factory=lambda: _env_int("GOVERN_MAX_UPDATES", 5, minimum=0)
+    )
+    # Cost tier of the po-governor persona (backlog decisions = strong mind).
+    govern_role_tier: str = field(
+        default_factory=lambda: (
+            os.environ.get("GOVERN_ROLE_TIER") or "boss"
+        ).strip().lower()
+    )
+    # Software knowledge base injection (V3-F4.3): inject the relevant memory
+    # (component memory, debt, risks, ADRs, pending ideas) into the dev/po/
+    # architect/qa prompts. OFF by default; AUTO-considered ON when GOVERNANCE
+    # is on (see ``knowledge_injection_on``). Flag off ⇒ prompts byte-identical.
+    knowledge_enabled: bool = field(
+        default_factory=lambda: _env_bool("KNOWLEDGE", False)
+    )
+    # Cap on the entries one injected knowledge block may carry (most recent /
+    # most urgent first) — bounds prompt growth.
+    knowledge_inject_max: int = field(
+        default_factory=lambda: _env_int("KNOWLEDGE_INJECT_MAX", 10, minimum=1)
+    )
+    # V3-F4.4: above this size a knowledge section is compacted by a worker-tier
+    # merge/synthesis call (newest entries kept verbatim, oldest synthesized).
+    knowledge_max_per_section: int = field(
+        default_factory=lambda: _env_int("KNOWLEDGE_MAX_PER_SECTION", 50, minimum=1)
+    )
+    # V3-F8 — Codebase Cartographer: deterministic module graph of the generated
+    # repo (imports AST/regex → fan-in/fan-out, hot files, orphans), refreshed at
+    # build start when the workspace fingerprint changed, injected into the PO
+    # S1 prompt (sizing/files_hint) and the dev prompts (hot-files caution). OFF
+    # by default and only effective when the knowledge base is active (KNOWLEDGE
+    # or GOVERNANCE) — its LLM stage writes component_memory.
+    cartographer_enabled: bool = field(
+        default_factory=lambda: _env_bool("CARTOGRAPHER", False)
+    )
+    # The optional worker-tier sub-stage: per-component role/convention summaries
+    # written into component_memory (kind="cartography", replace-not-append).
+    cartographer_llm_enabled: bool = field(
+        default_factory=lambda: _env_bool("CARTOGRAPHER_LLM", True)
+    )
+    # Top-N hot files (highest fan-in) surfaced in the map/dev caution blocks.
+    cartographer_hot_files: int = field(
+        default_factory=lambda: _env_int("CARTOGRAPHER_HOT_FILES", 5, minimum=1)
+    )
     # Optional Langfuse tracing of every agent call (O1): one generation per call
     # (phase, project, model, tokens, cost, duration). OFF by default; needs the
     # `langfuse` package + LANGFUSE_* env vars. Lazily imported, no-op when
@@ -752,6 +934,37 @@ class Settings:
         preset = os.environ.get("PRESET", "").strip().lower()
         if preset == "verified":
             self._apply_verified_preset()
+        # V3-F1: route the observer persona (observation extractor) to its
+        # configured cost tier. An invalid value falls back to worker so a typo
+        # can never route the call to a missing tier.
+        if self.observations_role_tier not in ("boss", "worker", "checker"):
+            logger.warning(
+                "Invalid OBSERVATIONS_ROLE_TIER=%r, using worker",
+                self.observations_role_tier,
+            )
+            self.observations_role_tier = "worker"
+        PERSONA_TIERS["observer"] = self.observations_role_tier
+        # V3-F2: the observation critic is a mid-tier VERIFIER (like critic/
+        # judge/qa) and a role distinct from the extractor — no agent validates
+        # its own work.
+        PERSONA_TIERS["observation-critic"] = "checker"
+        # V3-F3: the PO backlog governor decides backlog changes — a strong-mind
+        # call by default (GOVERN_ROLE_TIER=boss); an invalid value falls back.
+        if self.govern_role_tier not in ("boss", "worker", "checker"):
+            logger.warning(
+                "Invalid GOVERN_ROLE_TIER=%r, using boss", self.govern_role_tier
+            )
+            self.govern_role_tier = "boss"
+        PERSONA_TIERS["po-governor"] = self.govern_role_tier
+        # V3-F4.4: knowledge compaction is a cheap synthesis job (worker tier,
+        # same philosophy as the F1 lessons).
+        PERSONA_TIERS["knowledge-curator"] = "worker"
+        # V3-F8: summarizing the deterministic code map into per-component
+        # notes is cheap-mind work — worker tier, one call per refresh at most.
+        PERSONA_TIERS["cartographer"] = "worker"
+        # V3-F5: reading cross-cutting trends out of aggregated signals is
+        # strong-mind work (one call per iteration at most) — boss tier.
+        PERSONA_TIERS["pattern-detector"] = "boss"
 
     def _apply_verified_preset(self) -> None:
         gauntlet = [
@@ -787,6 +1000,18 @@ class Settings:
     def preset_active(self) -> str:
         """The active quality preset name ("" when none) — for UI/telemetry."""
         return os.environ.get("PRESET", "").strip().lower()
+
+    def knowledge_injection_on(self) -> bool:
+        """V3-F4.3: is knowledge injection into prompts active? KNOWLEDGE=1
+        turns it on explicitly; GOVERNANCE=1 auto-considers it on (a governor
+        without injected memory would decide blind)."""
+        return self.knowledge_enabled or self.governance_enabled
+
+    def cartographer_on(self) -> bool:
+        """V3-F8: is the codebase cartographer active? Requires the knowledge
+        base to be live (KNOWLEDGE or GOVERNANCE) — the LLM stage writes into
+        ``component_memory`` and the injections ride the knowledge flow."""
+        return self.cartographer_enabled and self.knowledge_injection_on()
 
     def po_pipeline_on(self) -> bool:
         """Is the multi-stage PO pipeline active? Anything but the explicit

@@ -141,6 +141,52 @@ describe("ProjectBar — surveillance multi-projets (U1)", () => {
   });
 });
 
+describe("ProjectBar — compteur d'approbations en attente (US-F7.5)", () => {
+  const makeDecision = (id: string, status: string) => ({
+    id,
+    observation_id: "OBS-1",
+    action: "create_story" as const,
+    target_id: "",
+    payload: {},
+    rationale: "",
+    status,
+    iteration: 1,
+  });
+
+  it("affiche ⚖ N pour les décisions « proposed » (badge pulsant)", () => {
+    renderBar(
+      [
+        makeProject({
+          phase: "build",
+          governance_log: [
+            makeDecision("GOV-1", "proposed"),
+            makeDecision("GOV-2", "proposed"),
+            makeDecision("GOV-3", "applied"), // traitée : pas comptée
+          ],
+        }),
+      ],
+    );
+    const badge = screen.getByTitle(/2 governance decision\(s\) awaiting approval/);
+    expect(badge).toHaveTextContent("⚖ 2");
+    expect(badge.classList.contains("pulse")).toBe(true);
+  });
+
+  it("aucune décision en attente → pas de badge", () => {
+    renderBar([
+      makeProject({
+        phase: "build",
+        governance_log: [makeDecision("GOV-1", "applied")],
+      }),
+    ]);
+    expect(document.body.querySelector(".chip-approvals")).toBeNull();
+  });
+
+  it("journal absent (état legacy) → pas de badge ni de crash", () => {
+    renderBar([makeProject({ phase: "build" })]);
+    expect(document.body.querySelector(".chip-approvals")).toBeNull();
+  });
+});
+
 describe("ProjectBar — sélecteur de projet", () => {
   it("liste tous les projets et reflète le projet courant", () => {
     renderBar(

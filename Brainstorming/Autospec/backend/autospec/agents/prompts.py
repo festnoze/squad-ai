@@ -8,6 +8,7 @@ import json
 from ..config import settings
 from ..models import (
     DEFAULT_STREAM_CATALOG,
+    EngineeringObservation,
     FeatureHypothesis,
     HypothesisStatus,
     ProjectState,
@@ -146,9 +147,10 @@ def dev_revise(
     guidance: str = "",
     lessons: str = "",
     available_skills: str = "",
+    knowledge: str = "",
 ) -> str:
     return f"""{dev_story(story, package_name, feature_rel_path, architecture, guidance, lessons=lessons, available_skills=available_skills)}
-
+{knowledge}
 ⚠️ BOUCLE DE RAFFINEMENT — le code de cette story passe déjà au vert, mais un
 critique a relevé des points d'amélioration :
 {critique}
@@ -164,6 +166,7 @@ def dev_fix_integration(
     architecture: str = "",
     attempt: int = 1,
     max_attempts: int = 1,
+    knowledge: str = "",
 ) -> str:
     """Repair prompt for the full-stack integration gate: the delivered app was
     REALLY booted (backend + frontend build + navigateur + sondes API/DB) and
@@ -173,7 +176,7 @@ def dev_fix_integration(
 mais le GATE D'INTÉGRATION COMPLET vient d'échouer : l'application livrée a été
 réellement démarrée (backend, build frontend, navigateur, sondes API/base de
 données) et elle ne fonctionne pas de bout en bout. Tentative {attempt}/{max_attempts}.
-{arch_block}
+{arch_block}{knowledge}
 Rapport d'échec du gate (exécution réelle) :
 \"\"\"{report[:6000]}\"\"\"
 
@@ -215,6 +218,7 @@ def dev_fix_deploy(
     architecture: str = "",
     attempt: int = 1,
     max_attempts: int = 1,
+    knowledge: str = "",
 ) -> str:
     """Repair prompt for the Docker delivery gate: the app was REALLY built into
     an image and run in a container on the shared network, and either the
@@ -227,7 +231,7 @@ construite en image Docker puis lancée dans un conteneur sur le réseau partag�
 soit le conteneur n'est jamais devenu sain (health check HTTP), soit la
 joignabilité inter-conteneurs (DNS par nom de conteneur + sondes HTTP) échoue.
 Tentative {attempt}/{max_attempts}.
-{arch_block}
+{arch_block}{knowledge}
 Rapport d'échec du gate (build réel + logs conteneur + matrice réseau) :
 \"\"\"{report[:6000]}\"\"\"
 
@@ -849,6 +853,514 @@ Réponds avec EXACTEMENT UN objet JSON :
 }}"""
 
 
+# ------------------------------------------- Engineering observations (V3-F1)
+
+def observation_extract(state: ProjectState, item: UserStory, transcript_tail: str) -> str:
+    """V3-F1 (US-F1.2): distil a just-finished work item's transcript (DONE and
+    FAILED alike — failures are the richest source of discoveries) into 0..N
+    structured engineering observations. The extractor observes; the PO decides
+    (governance is a later stage) — hence no roadmap language here."""
+    criteria = _criteria_block(item) or "(aucun)"
+    guards = "\n".join(
+        f"- {g}" for g in (getattr(item, "guard_findings", None) or [])
+    ) or "(aucun)"
+    last_error = (item.last_error or "").strip()[-2000:] or "(aucune)"
+    max_obs = settings.observations_max_per_item
+    return f"""Tu es l'OBSERVATEUR D'INGÉNIERIE d'un pipeline automatisé. Un item de travail
+vient de se terminer (statut final : {item.status.value}) pour le produit
+« {state.name} ». Ta mission : extraire de sa transcription les DÉCOUVERTES
+D'INGÉNIERIE durables — tu observes, tu ne décides RIEN de la roadmap.
+
+Item de travail « {item.id} — {item.title} » :
+\"\"\"{item.description or '(pas de description)'}\"\"\"
+
+Critères d'acceptance :
+{criteria}
+
+Dernière erreur enregistrée :
+\"\"\"{last_error}\"\"\"
+
+Signalements des gardes anti-triche :
+{guards}
+
+Queue de transcription des agents (dev + QA, du plus ancien au plus récent) :
+\"\"\"{transcript_tail or '(aucune transcription capturée)'}\"\"\"
+
+Cherche UNIQUEMENT des découvertes concrètes et étayées par la transcription :
+- workaround : un contournement a été appliqué au lieu de la vraie solution ;
+- tech_debt : une dette technique a été contractée (raccourci, duplication…) ;
+- risk : un risque identifié (fragilité, cas non couvert, dépendance douteuse) ;
+- limitation : une limite du produit ou de l'approche découverte en construisant ;
+- refactoring : une opportunité de refactoring repérée mais non traitée ;
+- improvement : une amélioration possible hors du périmètre de l'item ;
+- ambiguity : une ambiguïté ou contradiction dans la spec/les critères ;
+- constraint : une contrainte technique découverte (API, format, environnement).
+Pas de spéculation, pas de paraphrase du travail accompli : si rien de notable,
+renvoie une liste "observations" VIDE. AU MAXIMUM {max_obs} observations, les
+plus importantes d'abord.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français résumant ta lecture>",
+  "observations": [
+    {{"type": "workaround|tech_debt|risk|limitation|refactoring|improvement|ambiguity|constraint",
+      "summary": "<une ligne en français>",
+      "description": "<détail en français>",
+      "evidence": ["<extrait de transcription, chemin de fichier ou sortie de test>"],
+      "impact": "<composant/story impactés + conséquence>",
+      "confidence": <0.0-1.0>,
+      "urgency": "low|normal|high|critical",
+      "workaround": "<contournement appliqué, sinon vide>",
+      "recommendations": ["<piste d'action concrète>"],
+      "reevaluate_when": "<condition de réévaluation, sinon vide>",
+      "source_role": "dev|qa"}}
+  ]
+}}"""
+
+
+def _observations_json(observations: list[EngineeringObservation]) -> str:
+    """Bounded JSON rendering of observations for the critic/router prompts:
+    only the fields the judge needs, evidence and free text truncated so a
+    batched call stays a cheap checker-tier read."""
+    return json.dumps(
+        [
+            {
+                "id": o.id,
+                "type": o.type.value,
+                "summary": o.summary[:300],
+                "description": o.description[:500],
+                "evidence": [str(e)[:300] for e in o.evidence[:6]],
+                "impact": o.impact[:300],
+                "confidence": o.confidence,
+                "urgency": o.urgency,
+                "source_role": o.source_role,
+                "stream": o.stream,
+            }
+            for o in observations
+        ],
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+def observation_critic(state: ProjectState, observations: list[EngineeringObservation]) -> str:
+    """V3-F2 (US-F2.2): one BATCHED checker-tier call judging every surviving
+    observation of a work item — does the evidence support the claim? The critic
+    is a role distinct from the extractor (no agent validates its own work)."""
+    return f"""Tu es le CRITIQUE DES OBSERVATIONS d'un pipeline automatisé pour le produit
+« {state.name} ». Un extracteur INDÉPENDANT vient d'émettre les observations
+d'ingénierie ci-dessous. Ta mission : pour CHACUNE, vérifier que les PREUVES
+(evidence) soutiennent concrètement l'affirmation, puis réviser sa confiance et
+son urgence. Tu juges le travail de l'extracteur, jamais le tien.
+
+Observations à juger :
+{_observations_json(observations)}
+
+Règles :
+- "validate" si les preuves soutiennent concrètement le résumé ;
+- "reject" si l'affirmation est spéculative, hors sujet ou non étayée par les
+  preuves fournies (motif obligatoire) ;
+- révise "confidence" (0.0-1.0) et "urgency" (low|normal|high|critical) à la
+  hausse comme à la baisse selon la force des preuves — pas de complaisance.
+Rends UN verdict par observation, en réutilisant EXACTEMENT son "id".
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français résumant ton jugement>",
+  "verdicts": [
+    {{"id": "OBS-1", "verdict": "validate|reject", "confidence": <0.0-1.0>,
+      "urgency": "low|normal|high|critical", "reason": "<une phrase en français>"}}
+  ]
+}}"""
+
+
+def observation_route(state: ProjectState, observations: list[EngineeringObservation]) -> str:
+    """V3-F2 (optional, OBSERVATION_ROUTER_LLM): route the low-confidence /
+    multi-impact validated observations. The deterministic table remains the
+    authority on any failure — this call only refines ambiguous cases."""
+    return f"""Tu es le ROUTEUR DES OBSERVATIONS d'un pipeline automatisé pour le produit
+« {state.name} ». Les observations validées ci-dessous sont ambiguës (confiance
+basse ou impact multiple) : choisis leur(s) destination(s).
+
+Observations à router :
+{_observations_json(observations)}
+
+Destinations autorisées (1 à 2 par observation, la principale d'abord) :
+- "po" : gouvernance du backlog (ambiguïté de spec, amélioration, limitation) ;
+- "architecture" : mémoire d'architecture (refactoring, contrainte, pattern) ;
+- "debt" : registre de dette technique (dette, workaround) ;
+- "risk" : registre de risques ;
+- "security" : filière sécurité.
+Rends UNE entrée par observation, en réutilisant EXACTEMENT son "id".
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français>",
+  "routes": [
+    {{"id": "OBS-1", "destinations": ["po"]}}
+  ]
+}}"""
+
+
+def pattern_detect(state: ProjectState, aggregates: dict) -> str:
+    """V3-F5 (US-F5.2): ONE boss-tier call over the DETERMINISTIC signal
+    aggregates (observations by type/stream with merge weights, recurrences,
+    guard findings, first-attempt failure rate, calibration counters, debt per
+    stream). The detector formulates at most PATTERN_MAX_FINDINGS type=PATTERN
+    meta-observations with NUMERIC evidence — it proposes, the PO governs."""
+    max_findings = settings.pattern_max_findings
+    streams = ", ".join(s.id for s in state.effective_streams())
+    return f"""Tu es le DÉTECTEUR DE MOTIFS d'un pipeline automatisé pour le produit
+« {state.name} ». L'itération {state.iteration} se termine. Voici les AGRÉGATS
+DÉTERMINISTES des signaux accumulés (observations d'ingénierie pondérées par
+leurs récurrences, signalements des gardes anti-triche, taux d'échec en
+première tentative, compteurs de calibration, registre de dette) :
+{json.dumps(aggregates, ensure_ascii=False, indent=2)}
+
+Streams du projet : {streams}.
+
+Ta mission : détecter les TENDANCES TRANSVERSES que personne ne voit tâche par
+tâche — un composant fragile qui concentre les échecs, une accumulation de
+workarounds/dette sur un même stream, un besoin de refactoring global, une
+récurrence anormale d'un même signal. Tu observes et tu PROPOSES : tu ne
+décides RIEN de la roadmap (le PO gouverne).
+
+Règles :
+- chaque motif doit être PROUVÉ par les agrégats ci-dessus : le champ
+  "evidence" CITE les chiffres exacts (ex. « 4/6 observations tech_debt sur le
+  stream frontend », « taux d'échec 1re tentative 0.5 ») ;
+- pas de spéculation, pas de paraphrase d'une observation isolée : un motif
+  agrège PLUSIEURS signaux ; si rien de transverse ne ressort, renvoie une
+  liste "patterns" VIDE ;
+- "stream" = le stream concerné quand il est identifiable, sinon vide ;
+- AU MAXIMUM {max_findings} motifs, les plus importants d'abord.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français résumant ta lecture>",
+  "patterns": [
+    {{"summary": "<une ligne en français>",
+      "description": "<détail en français>",
+      "evidence": ["<preuve CHIFFRÉE tirée des agrégats>"],
+      "impact": "<composant/stream impacté + conséquence>",
+      "urgency": "low|normal|high|critical",
+      "stream": "<stream concerné, sinon vide>",
+      "recommendations": ["<piste d'action concrète>"]}}
+  ]
+}}"""
+
+
+# ------------------------------------- Software knowledge base (V3-F4.3/F4.4)
+
+_KNOWLEDGE_URGENCY_RANK = {"critical": 3, "high": 2, "normal": 1, "low": 0}
+
+
+def _knowledge_lines_dev(kb, stream: str) -> list[str]:
+    """Dev audience: the stream's component memory (active constraints and
+    workarounds included by construction — US-F4.2 writes them there)."""
+    entries = sorted(
+        kb.component_memory.get(stream, []),
+        key=lambda e: e.created_at,
+        reverse=True,
+    )
+    return [f"- [{e.kind or 'note'}] {e.text}" for e in entries]
+
+
+def _knowledge_lines_qa(kb, stream: str) -> list[str]:
+    """QA audience: the stream's constraint/limitation entries only (avoid
+    re-testing the impossible)."""
+    entries = sorted(
+        (
+            e
+            for e in kb.component_memory.get(stream, [])
+            if e.kind in ("constraint", "limitation")
+        ),
+        key=lambda e: e.created_at,
+        reverse=True,
+    )
+    return [f"- [{e.kind}] {e.text}" for e in entries]
+
+
+def _knowledge_lines_po(kb) -> list[str]:
+    """PO audience: open pending ideas, top-5 debt by urgency, high risks."""
+    lines: list[str] = []
+    for idea in sorted(kb.pending_ideas, key=lambda i: i.created_at, reverse=True):
+        when = f" (à revoir quand : {idea.reevaluate_when})" if idea.reevaluate_when else ""
+        lines.append(f"- [idée en suspens] {idea.title}{when}")
+    top_debt = sorted(
+        kb.debt_register,
+        key=lambda d: (_KNOWLEDGE_URGENCY_RANK.get(d.urgency, 1), d.created_at),
+        reverse=True,
+    )[:5]
+    for debt in top_debt:
+        interest = f" — s'aggrave si : {debt.interest}" if debt.interest else ""
+        lines.append(f"- [dette/{debt.urgency}] {debt.title}{interest}")
+    for risk in sorted(kb.risk_register, key=lambda r: r.created_at, reverse=True):
+        if risk.likelihood == "high" or risk.urgency in ("high", "critical"):
+            mitigation = f" — mitigation : {risk.mitigation}" if risk.mitigation else ""
+            lines.append(f"- [risque/{risk.likelihood or risk.urgency}] {risk.title}{mitigation}")
+    return lines
+
+
+def _knowledge_lines_architect(kb) -> list[str]:
+    """Architect audience: accepted ADRs + architecture notes."""
+    lines = [
+        f"- [ADR accepté] {a.title} : {a.decision}"
+        for a in kb.adrs
+        if a.status == "accepted"
+    ]
+    notes = sorted(kb.architecture_notes, key=lambda e: e.created_at, reverse=True)
+    lines.extend(f"- [{e.kind or 'note'}] {e.text}" for e in notes)
+    return lines
+
+
+def knowledge_block(kb, *, stream: str = "", audience: str = "dev") -> str:
+    """V3-F4.3: render the audience-relevant slice of the software knowledge
+    base as a bounded French prompt block — capped at KNOWLEDGE_INJECT_MAX
+    entries (most recent / most urgent first), empty string when nothing
+    relevant, so a caller can inject it unconditionally."""
+    if audience == "dev":
+        lines = _knowledge_lines_dev(kb, stream)
+    elif audience == "qa":
+        lines = _knowledge_lines_qa(kb, stream)
+    elif audience == "po":
+        lines = _knowledge_lines_po(kb)
+    elif audience == "architect":
+        lines = _knowledge_lines_architect(kb)
+    else:
+        lines = []
+    lines = lines[: settings.knowledge_inject_max]
+    if not lines:
+        return ""
+    return (
+        "\nMémoire logicielle du projet (connaissance accumulée — à respecter) :\n"
+        + "\n".join(lines)
+        + "\n"
+    )
+
+
+def knowledge_context(state: ProjectState, *, stream: str = "", audience: str = "dev") -> str:
+    """The gated knowledge block for a project: loads the F4 base and renders
+    :func:`knowledge_block`, or returns "" when injection is off (KNOWLEDGE=0
+    and GOVERNANCE=0 — the flag-off prompts stay byte-identical, and no disk
+    read happens). Fail-open: any load error yields an empty block.
+
+    V3-F8: for the dev audience, the cartographer's hot-files caution line is
+    appended (gated by CARTOGRAPHER — "" and byte-identical when off). The
+    per-component cartography summaries need no seam here: they live in
+    ``component_memory`` (kind="cartography") and already flow through
+    :func:`knowledge_block` above."""
+    if not settings.knowledge_injection_on():
+        return ""
+    try:
+        # Lazy import: prompts is imported by orchestrator modules — importing
+        # the knowledge store at module load would tighten the cycle for nothing.
+        from ..orchestrator.knowledge import load_knowledge
+
+        block = knowledge_block(load_knowledge(state.id), stream=stream, audience=audience)
+    except Exception:  # noqa: BLE001 — a broken memory must never break a prompt
+        block = ""
+    if audience == "dev" and settings.cartographer_on():
+        try:
+            from ..orchestrator import cartographer
+
+            block += cartographer.hot_files_line(
+                state.id, stream or state.primary_stream_id
+            )
+        except Exception:  # noqa: BLE001 — a broken map must never break a prompt
+            pass
+    return block
+
+
+def cartography_context(state: ProjectState) -> str:
+    """V3-F8: the deterministic code-map block for the PO S1 prompt (helps the
+    sizing and ``files_hint`` judgments against the REAL repo). "" when the
+    cartographer is off or no map was built yet — the flag-off prompt stays
+    byte-identical. Fail-open: any error yields an empty block."""
+    if not settings.cartographer_on():
+        return ""
+    try:
+        from ..orchestrator import cartographer
+
+        return cartographer.map_block(cartographer.current_map(state.id))
+    except Exception:  # noqa: BLE001 — a broken map must never break a prompt
+        return ""
+
+
+def cartographer_summarize(digest: str) -> str:
+    """V3-F8 (US-F8.2): ONE worker-tier call over the deterministic map digest →
+    per-component role/convention summaries. Each summary replaces the
+    component's previous cartography entries in the F4 component memory."""
+    return f"""Tu es le CARTOGRAPHE du code d'un pipeline automatisé. Voici la carte
+DÉTERMINISTE du repo généré (modules, dépendances internes réelles, fichiers à
+fort fan-in, orphelins) :
+\"\"\"{digest}\"\"\"
+
+Pour CHAQUE composant (stream) présent dans la carte, produis un résumé d'1 à 2
+phrases : son RÔLE dans le projet et les CONVENTIONS observables (organisation
+des modules, points de couplage, zones sensibles à fort fan-in — à modifier
+avec prudence). Reste FACTUEL : ne cite que des modules présents dans la carte.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{"message": "<une phrase en français>",
+ "components": [{{"stream": "<id du stream>", "summary": "<résumé en français>"}}]}}"""
+
+
+def knowledge_compact(section_label: str, entries: list[str]) -> str:
+    """V3-F4.4: one worker-tier synthesis call over the OLDEST entries of an
+    oversized knowledge section (the newest entries are kept verbatim by the
+    caller). The reply's entries REPLACE the given ones."""
+    listing = "\n".join(f"- {e}" for e in entries)
+    return f"""Tu es le curateur de la MÉMOIRE LOGICIELLE d'un pipeline automatisé. La section
+« {section_label} » de la mémoire du projet dépasse son plafond : synthétise les
+entrées les PLUS ANCIENNES ci-dessous en un nombre réduit d'entrées denses.
+
+Entrées anciennes à synthétiser :
+{listing}
+
+Règles :
+- fusionne les doublons/redites, conserve CHAQUE fait durable (contrainte,
+  dette, risque, décision) — tu condenses, tu n'oublies pas ;
+- chaque entrée produite est UNE ligne autonome en français ;
+- produis STRICTEMENT MOINS d'entrées que la liste d'origine.
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{"message": "<une phrase en français>", "entries": ["<entrée synthétique>", "..."]}}"""
+
+
+# ----------------------------------------------- PO Backlog Governor (V3-F3)
+
+def _govern_observations_json(observations: list[EngineeringObservation]) -> str:
+    """Bounded JSON of the po-queued observations for the governor prompt —
+    richer than the critic view (recommendations + reevaluate_when drive the
+    decision) but still truncated so the call stays one bounded read."""
+    return json.dumps(
+        [
+            {
+                "id": o.id,
+                "type": o.type.value,
+                "summary": o.summary[:300],
+                "description": o.description[:500],
+                "evidence": [str(e)[:200] for e in o.evidence[:4]],
+                "impact": o.impact[:300],
+                "confidence": o.confidence,
+                "urgency": o.urgency,
+                "workaround": o.workaround[:200],
+                "recommendations": [str(r)[:200] for r in o.recommendations[:4]],
+                "reevaluate_when": o.reevaluate_when[:200],
+                "work_item_id": o.work_item_id,
+                "stream": o.stream,
+            }
+            for o in observations
+        ],
+        ensure_ascii=False,
+        indent=2,
+    )
+
+
+def po_govern(
+    state: ProjectState,
+    observations: list[EngineeringObservation],
+    kb,
+    quotas: dict[str, int],
+) -> str:
+    """V3-F3 (US-F3.2): ONE boss-tier call where the PO governs the backlog —
+    every po-routed observation (and every pending idea whose re-evaluation
+    condition is plausibly met) gets exactly one decision. The hard guardrails
+    (shipped stories immutable, AC enrich-only, quotas) are ALSO enforced
+    deterministically by ``governance.apply_decision`` — the prompt states them
+    so the PO proposes applicable decisions, never as the enforcement layer."""
+    epics = [{"id": e.id, "title": e.title} for e in state.epics]
+    backlog = [
+        {"id": s.id, "title": s.title, "status": s.status.value, "iteration": s.iteration}
+        for s in state.stories
+    ]
+    ideas = [
+        {
+            "id": i.id,
+            "title": i.title,
+            "detail": i.detail[:300],
+            "value_hint": i.value_hint[:200],
+            "reevaluate_when": i.reevaluate_when[:200],
+        }
+        for i in kb.pending_ideas
+    ]
+    top_debt = sorted(
+        kb.debt_register,
+        key=lambda d: (_KNOWLEDGE_URGENCY_RANK.get(d.urgency, 1), d.created_at),
+        reverse=True,
+    )[:5]
+    debt = [
+        {"title": d.title, "urgency": d.urgency, "interest": d.interest[:200]}
+        for d in top_debt
+    ]
+    streams = ", ".join(s.id for s in state.effective_streams())
+    return f"""Tu es le PO d'un pipeline automatisé, en charge de la GOUVERNANCE DU BACKLOG du
+produit « {state.name} ». L'itération {state.iteration} vient de se terminer :
+les observations d'ingénierie routées vers toi (et les idées en suspens dont la
+condition de réévaluation est peut-être atteinte) attendent UNE décision chacune.
+Tu gouvernes : l'extracteur observe, toi seul décides du backlog.
+
+Observations en file de gouvernance :
+{_govern_observations_json(observations)}
+
+Idées en suspens (ne décide QUE celles dont `reevaluate_when` te semble
+plausiblement atteint ; les autres restent en suspens — aucune décision) :
+{json.dumps(ideas, ensure_ascii=False, indent=2)}
+
+Backlog actuel — epics :
+{json.dumps(epics, ensure_ascii=False)}
+Backlog actuel — stories :
+{json.dumps(backlog, ensure_ascii=False)}
+
+Top dette technique (registre F4) :
+{json.dumps(debt, ensure_ascii=False)}
+
+Quotas RESTANTS pour cette itération (au-delà, la décision sera différée
+d'office en idée en suspens) : {quotas.get("stories", 0)} nouvelle(s) story(ies),
+{quotas.get("epics", 0)} nouvel(aux) epic(s), {quotas.get("updates", 0)} mise(s) à jour.
+Streams du projet : {streams}.
+
+Actions possibles (champ "action", UNE décision par observation/idée) :
+- "create_task" : tâche technique rattachée à une story existante NON livrée —
+  target_id = id de la story ; payload {{"title", "description",
+  "acceptance_criteria": ["..."], "stream", "depends_on": [ids de tâches]}} ;
+- "create_story" : nouvelle US (ou Technical Story : "technical": true +
+  "contract") — payload {{"title", "description", "epic_id" (epic EXISTANT),
+  "acceptance_criteria": ["..."], "gherkin", "priority" (1-5), "depends_on":
+  [ids de stories], "stream", "technical", "contract", "ui"}} ; elle sera
+  planifiée à l'itération {state.iteration + 1} ;
+- "create_epic" : nouvel epic — payload {{"title", "description"}} (les stories
+  embryonnaires arrivent via des décisions "create_story" séparées qui le
+  référencent) ;
+- "update_story" : modifier description/priorité d'une story NON livrée —
+  target_id = id de la story ; payload {{"description", "priority"}} ;
+- "enrich_criteria" : AJOUTER des critères d'acceptance à une story NON livrée —
+  target_id = id de la story ; payload {{"acceptance_criteria": ["..."]}} ;
+- "defer" : idée à garder sans en faire du travail — payload {{"title",
+  "value_hint", "reevaluate_when"}} ;
+- "persist" : mémoriser seulement — payload {{"section": "debt|risk|architecture"}} ;
+- "dismiss" : écarter, motif OBLIGATOIRE dans "rationale".
+
+Règles DURES (appliquées déterministiquement, ne les contourne pas) :
+- une story livrée (done/green) et ses critères sont un CONTRAT immuable : toute
+  évolution passe par une NOUVELLE story (un update sur une story livrée sera
+  converti d'office en create_story) ;
+- les critères d'acceptance ne sont JAMAIS supprimés ni réécrits — seulement
+  enrichis ;
+- respecte les quotas restants ci-dessus ;
+- toute décision porte un "rationale" en français (obligatoire pour "dismiss").
+
+Réponds avec EXACTEMENT UN objet JSON :
+{{
+  "message": "<une phrase en français résumant ta gouvernance>",
+  "decisions": [
+    {{"observation_id": "OBS-1", "action": "create_story", "target_id": "",
+      "payload": {{}}, "rationale": "<pourquoi, en français>"}}
+  ]
+}}"""
+
+
 # ------------------------------------------------- Solution agent (components)
 
 def language_proposal(state: ProjectState) -> str:
@@ -977,12 +1489,15 @@ Réponds avec EXACTEMENT UN objet JSON :
 def architect_design(state: ProjectState, package_name: str) -> str:
     titles = [s.title for s in state.stories_of_iteration(state.iteration)]
     stories = "\n".join(f"- {t}" for t in titles) or "(aucune)"
+    # V3-F4.3: accepted ADRs + architecture notes ("" when injection is off —
+    # the flag-off prompt stays byte-identical).
+    knowledge = knowledge_context(state, audience="architect")
     return f"""Tu es l'architecte technique d'un pipeline automatisé. Voici le brief produit :
 \"\"\"{state.brief}\"\"\"
 
 Stories planifiées de l'itération courante :
 {stories}
-
+{knowledge}
 Ta mission : produis un design technique CONCIS pour le package `{package_name}`,
 qui guidera le QA et le développeur. Pas de sur-ingénierie : juste assez pour
 guider l'implémentation (architecture cible en couches/modules, composants clés,
@@ -1055,12 +1570,15 @@ def po_plan(state: ProjectState, package_name: str) -> str:
         for s in state.stories
     ]
     streams_block = _streams_plan_block(state)
+    # V3-F4.3: pending ideas + top debt + high risks ("" when injection is off —
+    # the flag-off prompt stays byte-identical).
+    knowledge = knowledge_context(state, audience="po")
     return f"""Tu es le PO/Scrum Master d'un pipeline automatisé. Voici le brief produit :
 \"\"\"{state.brief}\"\"\"
 
 Stories déjà existantes dans le projet (itérations précédentes) :
 {json.dumps(existing, ensure_ascii=False)}
-
+{knowledge}
 Ta mission : découpe ce brief en 1 à 3 EPICs, chacune contenant 1 à 5 user
 stories. Adapte la granularité à la complexité : une petite feature = 1 epic /
 1-2 stories. Chaque story doit :
@@ -1292,7 +1810,7 @@ Brief produit :
 
 Stories déjà existantes dans le projet (itérations précédentes) :
 {json.dumps(existing, ensure_ascii=False)}
-{_sizing_lessons_block(state)}{_structure_streams_block(state)}
+{_sizing_lessons_block(state)}{_structure_streams_block(state)}{knowledge_context(state, audience="po")}{cartography_context(state)}
 {sizing_rules()}
 
 Ta mission : découpe ce brief en 1 à 3 EPICs contenant chacun 1 à 5 user
@@ -1565,6 +2083,7 @@ def qa_test_plan(
     lessons: str = "",
     backend_language: str = "python",
     available_skills: str = "",
+    knowledge: str = "",
 ) -> str:
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
     lang_block = _language_block(backend_language)
@@ -1576,7 +2095,7 @@ def qa_test_plan(
     )
     return f"""Tu es l'architecte de tests d'un pipeline automatisé BDD/TDD. Le code cible est
 {prof['project']} ; tests lancés par `{prof['test_cmd']}`.
-{arch_block}{available_skills}{lang_block}{lessons_block}
+{arch_block}{available_skills}{lang_block}{lessons_block}{knowledge}
 
 User story à couvrir : {story.id} — {story.title}
 Description : {story.description}
