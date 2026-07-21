@@ -1,0 +1,62 @@
+# ============================================================
+# PROSPECTION TARGETS — sources, search queries, caps.
+# Edit freely; agents re-read this on every run.
+# ============================================================
+
+scoring:
+  threshold: 0.6            # missions below never reach the writer
+  max_drafts_per_run: 10    # writer stops after N drafts per /prospect run
+
+caps:
+  daily_email_cap: 5        # hard-enforced in scripts/send_email.py via .env too
+  max_followups: 2
+  followup_after_days: 5
+
+queries:
+  fr:
+    - "AI Engineer freelance full remote"
+    - "ingénieur IA générative mission freelance télétravail"
+    - "LLM RAG LangGraph mission freelance"
+    - "GenAI agents freelance télétravail complet"
+    - "Forward Deployed Engineer France remote"
+    - "lead IA freelance TJM remote"
+  en:
+    - "AI engineer contract remote LLM RAG"
+    - "GenAI engineer freelance remote"
+    - "forward deployed engineer contract remote"
+    - "LLM agents contractor remote UK US"
+    - "AI solutions engineer contract fully remote"
+
+sources:
+  boards:                   # no-login APIs/RSS — scripts/fetch_boards.py
+    enabled: true
+    keywords: [ai, llm, genai, "generative ai", rag, agents, langchain, langgraph,
+               "machine learning", python, "ai engineer", "forward deployed",
+               anthropic, openai, claude, gpt]
+    endpoints: [remoteok, remotive, weworkremotely]
+  platforms:                # logged-in browsing via Playwright persistent profile
+    enabled: true
+    list:
+      - { name: malt,             url: "https://www.malt.fr",              lang: fr }
+      - { name: comet,            url: "https://www.comet.co",             lang: fr }
+      - { name: freework,         url: "https://www.free-work.com",        lang: fr }
+      - { name: lehibou,          url: "https://www.lehibou.com",          lang: fr }
+      - { name: freelancerepublik, url: "https://www.freelancerepublik.com", lang: fr }
+      - { name: upwork,           url: "https://www.upwork.com",           lang: en }
+      - { name: contra,           url: "https://contra.com",               lang: en }
+      - { name: braintrust,       url: "https://www.usebraintrust.com",    lang: en }
+  jobboards:                # LinkedIn & co — logged-in browsing
+    enabled: true
+    list:
+      - { name: linkedin, url: "https://www.linkedin.com/jobs", filters: "remote + contract" }
+      - { name: wttj,     url: "https://www.welcometothejungle.com", filters: "télétravail total + freelance" }
+      - { name: indeed,   url: "https://fr.indeed.com", filters: "remote + freelance/contrat" }
+  direct:                   # cold outreach discovery via WebSearch
+    enabled: true
+    monthly_new_targets: 20         # per CPIR plan: ~20 identified companies/month
+    company_profiles:
+      - "French PME/ETI/scale-ups industrializing GenAI (chatbots, copilots, RAG)"
+      - "ESN / consulting firms staffing AI missions (sous-traitance)"
+      - "EdTech and training organizations building AI features"
+      - "UK/US startups hiring AI engineers with remote-friendly culture"
+      - "Companies needing EU AI Act / GDPR-aware AI implementation"

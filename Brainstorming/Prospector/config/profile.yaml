@@ -1,0 +1,131 @@
+# ============================================================
+# CANDIDATE PROFILE — single source of truth for scoring and
+# drafting. Derived from ../CV (data-driven CV), ANALYSE-CV.md,
+# and the CPIR business dossier (2026). All facts are TRUE —
+# agents must never claim anything beyond this file + the CVs.
+# ============================================================
+
+identity:
+  name: "Etienne Millerioux"
+  title: "Lead AI Engineer / Forward Deployed Engineer"
+  location: "Montpellier, France"        # relocation to Strasbourg planned — full-remote by design
+  linkedin: "https://www.linkedin.com/in/etiennemillerioux34"
+  phone: "+33 (0)6 68 42 23 88"
+  email: ""                              # dedicated Gmail — fill once created (also in .env)
+  languages:
+    fr: native
+    en: fluent                           # professional working proficiency
+
+# Titles to hunt for, with match weight (0-1). Scorer uses fuzzy/semantic match.
+target_titles:
+  - { title: "AI Engineer",                       weight: 1.0 }
+  - { title: "Lead AI Engineer",                  weight: 1.0 }
+  - { title: "GenAI Engineer",                    weight: 1.0 }
+  - { title: "LLM Engineer",                      weight: 1.0 }
+  - { title: "Forward Deployed Engineer",         weight: 1.0 }
+  - { title: "AI Solutions Engineer",             weight: 0.9 }
+  - { title: "AI-augmented Software Engineer",    weight: 0.9 }
+  - { title: "RAG / Agents Engineer",             weight: 1.0 }
+  - { title: "Machine Learning Engineer",         weight: 0.7 }   # only if GenAI/LLM-flavored
+  - { title: "AI Consultant",                     weight: 0.9 }
+  - { title: "Lead Fullstack Developer",          weight: 0.5 }   # fallback (Python or .NET)
+  - { title: "Software Architect",                weight: 0.5 }   # fallback
+
+# Skills with weights — scorer computes overlap with mission stack/description.
+skills:
+  core:        # weight 1.0
+    - LLM applications (chatbots, callbots, copilots) in production
+    - RAG pipelines (ingestion, chunking, embeddings, hybrid search, reranking, HyDE)
+    - Agents & multi-agent workflows (LangGraph, Google ADK, MCP, tools/function calling)
+    - LLM evaluation (LLM-as-a-judge, Langfuse, RAGAs, observability)
+    - Python, FastAPI, SQLAlchemy, PostgreSQL
+    - Prompt engineering
+    - AI-assisted development (Claude Code, Cursor)
+  strong:      # weight 0.7
+    - Vector DBs (QDrant, Pinecone), Redis
+    - C# / .NET Core, Angular, TypeScript
+    - Clean / Hexagonal Architecture, DDD, CQRS, Event sourcing
+    - TDD / BDD (xUnit, Specflow, Gherkin), testing strategy
+    - Docker, CI/CD (GitLab, GitHub, Azure DevOps), GCP, Azure
+    - Technical leadership, Scrum / SAFe, mentoring
+  contextual:  # weight 0.4
+    - RGPD / EU AI Act compliance awareness
+    - ML basics (TensorFlow, pattern recognition, NLP)
+    - EdTech domain (e-learning leader), trading systems, industrial clients
+
+experience_highlights:      # the writer picks 2-3 per letter, matched to the mission
+  - id: studi-genai
+    fr: "Conception et développement de bout en bout des chatbots et du callbot IA du leader français du e-learning — systèmes LLM en production servant les apprenants au quotidien (RAG complet, multi-agents LangGraph/ADK/MCP, évaluations LLM-as-a-judge Langfuse/RAGAs)."
+    en: "Designed and built end-to-end the chatbots and AI callbot of France's leading e-learning provider — production LLM systems serving learners daily (full RAG pipelines, multi-agent LangGraph/ADK/MCP architectures, LLM-as-a-judge evaluation with Langfuse/RAGAs)."
+  - id: studi-fullstack
+    fr: "Direction technique de la plateforme e-learning (C#/.NET Core, Angular, DDD, Clean/Hexagonal, CQRS, Event sourcing), coordination d'équipes offshore, industrialisation des tests et du déploiement."
+    en: "Technical lead of the e-learning platform (C#/.NET Core, Angular, DDD, Clean/Hexagonal architecture, CQRS, event sourcing), offshore team coordination, test and deployment industrialization."
+  - id: evaluation-culture
+    fr: "Culture de l'évaluation rare sur le marché : frameworks LLM-as-a-judge, datasets de test, observabilité — condition de la fiabilité et de la conformité des systèmes IA."
+    en: "A rare evaluation-first culture: LLM-as-a-judge frameworks, test datasets, observability — the backbone of reliable, compliant AI systems."
+  - id: kalisys
+    fr: "16 ans de gérance de SARL (KALISYS) : relation client, cadrage, maîtrise d'œuvre, missions en régie multi-clients — habitué à l'autonomie complète et au contexte client."
+    en: "16 years running my own consultancy (KALISYS): client relations, scoping, delivery ownership, multi-client consulting — fully autonomous and client-facing by habit."
+  - id: seniority
+    fr: "25 ans de développement et d'architecture logicielle : l'IA intégrée dans des SI complexes en respectant les standards du logiciel d'entreprise."
+    en: "25 years of software engineering and architecture: AI integrated into complex systems while honoring production software standards."
+  - id: schneider
+    fr: "Lead tech & Scrum Master chez Schneider Electric ; solutions de trading algorithmique avec ML (TensorFlow, reconnaissance de patterns)."
+    en: "Tech lead & Scrum Master at Schneider Electric; algorithmic-trading solutions with ML (TensorFlow, pattern recognition)."
+
+differentiators:            # usable verbatim in letters
+  - fr: "Des systèmes LLM réellement en production, pas des POCs."
+    en: "LLM systems actually in production, not POCs."
+  - fr: "Double profil architecte logiciel senior + ingénieur IA générative."
+    en: "Dual profile: senior software architect + production GenAI engineer."
+  - fr: "Expertise évaluation/observabilité (LLM-as-a-judge) répondant aux exigences de fiabilité et de conformité (RGPD, AI Act)."
+    en: "Evaluation/observability expertise (LLM-as-a-judge) meeting reliability and compliance requirements (GDPR, EU AI Act)."
+
+offers:                     # from the CPIR dossier — useful for cold outreach
+  - name_fr: "Conseil en intégration de l'IA (cadrage, cas d'usage, RGPD / AI Act)"
+    name_en: "AI integration consulting (scoping, use cases, GDPR / EU AI Act)"
+    tjm_eur: 1200
+  - name_fr: "Exécution — AI Engineer / Forward Deployed Engineer (IA produit + IA dans la chaîne de dev)"
+    name_en: "Execution — AI Engineer / Forward Deployed Engineer (product AI + AI in the delivery pipeline)"
+    tjm_eur: 800
+  - name_fr: "Formation et acculturation des équipes (dev, ops, produit)"
+    name_en: "Team training & enablement (dev, ops, product)"
+    tjm_eur: 1100
+packaged_offers:
+  - fr: "Audit d'opportunité IA + conformité AI Act (5 jours)"
+    en: "AI opportunity audit + EU AI Act compliance check (5 days)"
+  - fr: "POC RAG sur vos données (10 jours)"
+    en: "RAG POC on your data (10 days)"
+  - fr: "Formation IA pour équipe de développement (2-3 jours)"
+    en: "AI training for a development team (2-3 days)"
+
+rates:
+  execution_tjm_eur: 800          # deliberately competitive for ramp-up
+  consulting_tjm_eur: 1200
+  training_tjm_eur: 1100
+  min_acceptable_tjm_eur: 600     # below this → red flag in scoring
+  usd_daily_hint: "USD 900-1300/day for US missions (indicative)"
+
+# Hard geo/language rules — violations are eliminatory in scoring.
+geo_rules:
+  fr:                      # apply in FRENCH when...
+    mission_country: [France]
+  en:                      # apply in ENGLISH when...
+    mission_country: [UK, USA, Ireland, Canada, Australia, New Zealand,
+                      Netherlands, Germany, Switzerland, Nordics, Remote-worldwide]
+    note: "Any country is fine if the working environment is English-speaking."
+  remote: full_remote_only        # hybrid/on-site → eliminatory
+  exceptions: "Occasional on-site kickoffs acceptable if mission is France (TGV: Montpellier/Paris/Strasbourg)."
+
+engagement:
+  wanted: [freelance, contract, mission, "contract-to-hire (contract phase)"]
+  excluded: [permanent, CDI, internship, part-time under 3 days/week]
+  availability: "See CPIR calendar — commercial start Oct 2026 (optimistic) / early 2027 (prudent). Mention availability honestly in letters when asked."
+
+red_flags:                 # each subtracts score; 'eliminatory: true' kills the mission
+  - { pattern: "on-site / hybrid mandatory",          eliminatory: true }
+  - { pattern: "permanent position only (CDI)",       eliminatory: true }
+  - { pattern: "TJM under min_acceptable",            eliminatory: false, penalty: 0.3 }
+  - { pattern: "staffing spam / mass-posted offer",   eliminatory: false, penalty: 0.2 }
+  - { pattern: "pure data-science/classic-ML with no GenAI", eliminatory: false, penalty: 0.2 }
+  - { pattern: "junior/mid-level rate or expectations", eliminatory: false, penalty: 0.2 }

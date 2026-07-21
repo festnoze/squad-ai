@@ -196,6 +196,31 @@ def _clamp_1_5(value, default: int = 3) -> int:
 _SCOPE_ALLOWED_PREFIXES = ("tests/", "features/")
 
 
+def _parse_overwritten_files(merge_output: str) -> list[str]:
+    """D8 - the file list of a PRE-merge git abort (« Your local changes to the
+    following files would be overwritten by merge: », untracked variant
+    included). These failures never reach the conflicted-index state, so
+    ``diff --diff-filter=U`` sees nothing; the paths only exist in the merge's
+    own output, as indented lines between the header and the trailing
+    « Please … / Aborting » advice. Pure function (testable without git)."""
+    files: list[str] = []
+    collecting = False
+    for line in (merge_output or "").splitlines():
+        low = line.strip().lower()
+        if "would be overwritten by" in low:
+            collecting = True
+            continue
+        if not collecting:
+            continue
+        if not line.strip() or line[:1] not in ("\t", " "):
+            collecting = False
+            continue
+        path = line.strip()
+        if path and path not in files:
+            files.append(path)
+    return files
+
+
 def _file_in_scope(path: str, globs: list[str], zone: str) -> bool:
     """Is a repo-relative file within a work item's declared scope? In scope:
     it matches a declared glob (or lives under a directory glob), lives under
@@ -3336,8 +3361,20 @@ class Pipeline:
                 written.append(rel)
             except OSError:
                 continue
+        # Skip-valve conftest (D1/D3) : semé À CÔTÉ des tests, et protégé comme
+        # eux (constitution_test_paths) - l'affaiblir reviendrait à truquer le
+        # gate. Il ne compte PAS comme une règle dans les logs/événements.
+        support_written: list[str] = []
+        for rel, content in compiled.get("support", []):
+            try:
+                p = ws / rel
+                p.parent.mkdir(parents=True, exist_ok=True)
+                p.write_text(content, encoding="utf-8")
+                support_written.append(rel)
+            except OSError:
+                continue
         self.state.constitution = rules
-        self.state.constitution_test_paths = written
+        self.state.constitution_test_paths = written + support_written
         # Advisory (non-executable) rules → build guidance, so dev/QA see them.
         for r in compiled.get("advisory", []):
             g = f"[Constitution] {r.get('statement', '')}".strip()
@@ -3586,7 +3623,25 @@ class Pipeline:
             self.state.plan_quality = outcome.score
             self.state.plan_review_issues = list(outcome.issues)
             self.state.plan_review_suggestions = list(outcome.suggestions)
-            n = len(outcome.issues)
+            # D5 (run supervisé 2026-07-20) : l'ouverture judge-first s'arrête au
+            # seuil AVANT tout tour de critique - un score ≥ seuil au 1er coup
+            # laissait des findings actionnables (US trop larges, recouvrement de
+            # périmètre) NI persistés NI corrigés, qui se matérialisaient ensuite
+            # en couches dupliquées. On collecte AU MOINS UNE passe de critique
+            # (sans révision) pour que le panneau de revue expose ces points.
+            if outcome.rounds == 0 and outcome.stopped_reason == "threshold":
+                _, issues, suggestions = await refine._acritique(
+                    self._tracked,
+                    "le plan produit (epics & user stories)",
+                    outcome.text,
+                    prompts.PLAN_CRITERIA,
+                    None,
+                    self._emit_refine,
+                )
+                if issues or suggestions:
+                    self.state.plan_review_issues = issues
+                    self.state.plan_review_suggestions = suggestions
+            n = len(self.state.plan_review_issues)
             self._chat(
                 ChatRole.SYSTEM,
                 f"Revue du plan en {outcome.rounds} tour(s) — qualité {outcome.score}/100, "
@@ -5969,13 +6024,25 @@ class Pipeline:
         self._log("streams", f"↩️ Merge de {wid} reverté — HEAD redevient vert.")
         return True
 
-    async def _aconflict_files(self, repo) -> list[str]:
+    async def _aconflict_files(self, repo, merge_output: str = "") -> list[str]:
         """The unmerged paths of the in-progress (failed) merge — read BEFORE
-        ``merge --abort`` wipes the state. Best-effort: [] when git fails."""
+        ``merge --abort`` wipes the state. Best-effort: [] when git fails.
+
+        D8 : certains échecs de merge n'entrent JAMAIS en état de conflit -
+        git avorte AVANT (« Your local changes to the following files would be
+        overwritten by merge: », « untracked working tree files would be
+        overwritten »). ``diff --diff-filter=U`` est vide dans ce cas ; on
+        repêche alors la liste de fichiers directement dans ``merge_output``
+        pour que l'attribution/le footprint restent possibles."""
         code, out = await self._agit(repo, "diff", "--name-only", "--diff-filter=U")
-        if code != 0:
-            return []
-        return [line.strip() for line in out.splitlines() if line.strip()]
+        files = (
+            []
+            if code != 0
+            else [line.strip() for line in out.splitlines() if line.strip()]
+        )
+        if not files and merge_output:
+            files = _parse_overwritten_files(merge_output)
+        return files
 
     async def _aresolve_manifest_conflicts(self, repo, conflict_files: list[str]) -> bool:
         """Auto-resolve a merge whose ONLY conflicts are dependency MANIFESTS
@@ -6155,15 +6222,56 @@ class Pipeline:
             )
             action = "modifications superflues, retirées avant merge"
         else:
+            # D7 (run supervisé 2026-07-20) : le retrait TOUT-OU-RIEN garde TOUS
+            # les fichiers dès qu'UN seul est porteur de tests - y compris un
+            # artefact binaire manifestement toxique (recipes.db) qui casse
+            # ensuite le merge. Repli PAR FICHIER : chaque retrait est testé
+            # individuellement, les verts sont conservés, seuls les porteurs
+            # restent (et sont déclarés).
             await self._agit(worktree, "reset", "--hard", tip)
             await self._agit(worktree, "clean", "-fd")
-            self._merge_scope_hints(target, out)
-            self._log(
-                f"dev:{item.id}",
-                f"⚠️ Retrait impossible (suite rouge sans {listing}) — fichiers "
-                "conservés mais DÉCLARÉS : les rivaux seront sérialisés.",
+            removed: list[str] = []
+            kept: list[str] = list(out[4:])  # au-delà du budget de runs : déclarés
+            for f in out[:4]:
+                restored, _ = await self._agit(worktree, "checkout", base, "--", f)
+                if restored != 0:  # absent à la base : fichier NOUVEAU parasite
+                    await self._agit(worktree, "rm", "-f", "--ignore-unmatch", "--", f)
+                if is_frontend:
+                    ok_one, _, _ = await self._arun_frontend_tests(ws=worktree)
+                else:
+                    ok_one, _, _ = await self._arun_pytest(ws=worktree)
+                if ok_one:
+                    removed.append(f)
+                else:  # porteur : on le restaure tel que livré et on le déclare
+                    await self._agit(worktree, "checkout", tip, "--", f)
+                    kept.append(f)
+            if removed:
+                await self._agit(worktree, "add", "-A")
+                await self._agit(
+                    worktree, "commit", "-m",
+                    f"scope gate: retire les fichiers hors périmètre de {item.id} (par fichier)",
+                )
+                self._log(
+                    f"dev:{item.id}",
+                    f"✂️ Hors-périmètre retiré PAR FICHIER ({', '.join(removed[:5])}) - "
+                    f"conservé(s) car porteur(s) : {', '.join(kept[:5]) or '(aucun)'}.",
+                )
+            if kept:
+                self._merge_scope_hints(target, kept)
+                self._log(
+                    f"dev:{item.id}",
+                    f"⚠️ Retrait impossible pour {', '.join(kept[:5])} - fichiers "
+                    "conservés mais DÉCLARÉS : les rivaux seront sérialisés.",
+                )
+            action = (
+                "modifications partiellement retirées (par fichier), reste déclaré"
+                if removed and kept
+                else (
+                    "modifications superflues, retirées avant merge (par fichier)"
+                    if removed
+                    else "modifications porteuses, conservées et déclarées"
+                )
             )
-            action = "modifications porteuses, conservées et déclarées"
         lesson = (
             f"Itération {self.state.iteration} : « {getattr(target, 'title', '') or item.id} » "
             f"a débordé de son périmètre fichiers sur {listing} ({action}) — déclarer des "
@@ -6284,7 +6392,7 @@ class Pipeline:
             )
             if code == 0:
                 return True, []
-            conflict_files = await self._aconflict_files(repo)
+            conflict_files = await self._aconflict_files(repo, merge_output=out)
             # Manifest conflicts (pyproject/package.json/lockfiles) are the one
             # STRUCTURAL collision no zone separation can avoid — two parallel
             # tasks legitimately adding a dependency each. Union-merge them
@@ -6315,7 +6423,7 @@ class Pipeline:
                             f"✅ {wid} préservé : rebase sur HEAD à jour puis merge.",
                         )
                         return True, []
-                    for f in await self._aconflict_files(repo):
+                    for f in await self._aconflict_files(repo, merge_output=out):
                         if f not in conflict_files:
                             conflict_files.append(f)
                     await self._agit(repo, "merge", "--abort")
@@ -7211,7 +7319,10 @@ class Pipeline:
                 f"(tentative {attempt}/{attempts}).",
             )
             self.monitor.event(
-                "integration_fix", source=source, attempt=attempt, detail=detail[:300]
+                # QUEUE du rapport, pas la tête : la tête d'un log de gate n'est
+                # que du bruit de démarrage (warnings npm/node), l'erreur réelle
+                # est à la FIN (D9, run supervisé 2026-07-20).
+                "integration_fix", source=source, attempt=attempt, detail=detail[-600:]
             )
             try:
                 await self._tracked.arun(
@@ -7258,8 +7369,21 @@ class Pipeline:
             ok, new_detail = await averify()
             self.monitor.event(
                 "integration_fix_verify",
-                source=source, attempt=attempt, ok=ok, detail=(new_detail or "")[:300],
+                source=source, attempt=attempt, ok=ok, detail=(new_detail or "")[-600:],
             )
+            # Bascule tardive vers l'INFRA (D10b) : un verdict de re-vérification
+            # de forme infra (port tenu par un tiers, daemon down, marqueur
+            # __INFRA__ du gate JS) ne se répare pas par un agent - on interrompt
+            # la boucle SANS dépenser les tentatives restantes ; l'appelant gare.
+            if not ok:
+                shaped = str(new_detail or "")
+                if shaped.startswith("__INFRA__") or self._smoke_looks_like_infra(shaped):
+                    self._log(
+                        source,
+                        "Échec de forme infra au re-verify - boucle de réparation "
+                        "interrompue (aucune tentative supplémentaire dépensée).",
+                    )
+                    return False, shaped or detail
             if ok:
                 self._log(source, f"✅ Câblage réparé (tentative {attempt}) — gate {source} vert.")
                 self._chat(
@@ -7488,7 +7612,7 @@ class Pipeline:
                 return False
         self._log("smoke", "🚀 Smoke run : démarrage de l'application livrée…")
         ok, detail = await asyncio.to_thread(self._smoke_run_python, ws)
-        self.monitor.event("smoke", ok=ok, detail=detail[:300])
+        self.monitor.event("smoke", ok=ok, detail=detail[-600:])
         if not ok:
             # Finding 4 : un échec de forme INFRA (lancement impossible) ne se
             # répare pas par un agent — on gare directement en needs_attention.
@@ -7506,6 +7630,11 @@ class Pipeline:
             self._log("smoke", f"✅ Smoke run OK — {detail}")
             self._chat(ChatRole.SYSTEM, f"🚀 Smoke run : l'application démarre ({detail}).")
             return True
+        # Bascule tardive vers l'infra (D10b) : la boucle de réparation peut se
+        # terminer sur un verdict de forme infra - on gare, on ne blâme pas le code.
+        if self._smoke_looks_like_infra(detail):
+            self._apark_infra("smoke", detail)
+            return False
         msg = f"Smoke run échoué : {detail}"
         self._block_delivery(msg, source="smoke")
         self.state.regressions.append(msg)
@@ -7515,6 +7644,19 @@ class Pipeline:
     async def _aruntime_acceptance_phase(self) -> bool:
         """Optional browser/runtime acceptance gate for web/fullstack products."""
         ws = workspace_dir(self.state.id)
+        # D10a : nettoie le port AVANT la passe initiale aussi - une passe de
+        # gate précédente (smoke) peut avoir fuité son enfant backend sous
+        # Windows ; sans ce nettoyage la passe initiale échoue « port occupé »
+        # et la boucle de réparation démarre pour un problème d'environnement.
+        runnable, _ = runtime_acceptance.should_run(
+            self.state, ws, enabled=self._setting("runtime_acceptance_enabled")
+        )
+        if runnable:
+            pre_port = self._resolve_web_port(ws)
+            free, port_detail = await self._aensure_own_port_free("runtime", pre_port)
+            if not free:
+                self._apark_infra("runtime", port_detail)
+                return False
         result = await runtime_acceptance.arun_runtime_acceptance(
             self.state,
             ws,
@@ -7525,7 +7667,7 @@ class Pipeline:
             if self._setting("runtime_acceptance_enabled"):
                 self._log("runtime", f"Runtime acceptance ignoré : {result.detail}.")
             return True
-        self.monitor.event("runtime_acceptance", ok=result.ok, detail=result.detail[:300])
+        self.monitor.event("runtime_acceptance", ok=result.ok, detail=result.detail[-600:])
         # Finding 1 : avant de (re)vérifier, arrête l'app PROPRE et exige le port
         # libre — le gate ne doit jamais valider un serveur périmé/tiers. Si un
         # process EXTERNE tient le port : condition d'infra (non réparable).

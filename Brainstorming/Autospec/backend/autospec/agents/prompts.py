@@ -314,6 +314,12 @@ VIDE ou à un seul élément.
   permet de PARALLÉLISER en sûreté : deux sous-tâches qui revendiquent un MÊME
   fichier seront sérialisées automatiquement. Vise des zones DISJOINTES par couche ;
   ne JAMAIS laisser deux sous-tâches réécrire le même fichier sans `depends_on`.
+- CONVENTION D'AUTO-ENREGISTREMENT : le scaffold câble les features via
+  `{package_name}/features/<module>.py` (hook `register()`). Si une sous-tâche doit
+  enregistrer/exposer sa feature, son `file_globs` DOIT inclure son module
+  `{package_name}/features/<son_module>.py` - sinon le scope guard retirera ce
+  fichier légitime avant merge. Une sous-tâche de couche interne (entité,
+  repository, service) n'a PAS à créer de module features/ : ne pas en générer.
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{
@@ -1502,6 +1508,12 @@ Ta mission : produis un design technique CONCIS pour le package `{package_name}`
 qui guidera le QA et le développeur. Pas de sur-ingénierie : juste assez pour
 guider l'implémentation (architecture cible en couches/modules, composants clés,
 conventions de nommage, contraintes transverses).
+
+Si le produit est une app WEB avec un frontend buildé (SPA React/Vite…), le design
+DOIT inclure l'exigence d'INTÉGRATION (mode INTÉGRÉ) : le backend sert le build
+`frontend/dist` à la racine `/` (montage statique + fallback SPA) et le frontend
+consomme l'API en URLs RELATIVES (`/api/...`, jamais `http://localhost:...`).
+C'est vérifié à l'exécution par la gate runtime - un montage manquant est un échec.
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{"message": "<une phrase, français>", "design": "<markdown court : architecture cible (couches/modules), composants clés, conventions de nommage, contraintes transverses>"}}"""

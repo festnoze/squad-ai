@@ -109,6 +109,9 @@ __pycache__/
 .pytest_cache/
 autospec-report-*.json
 .report.json
+*.db
+*.sqlite
+*.sqlite3
 """ + BOOKKEEPING_IGNORE
 
 # ---- Go (L2g) -------------------------------------------------------------

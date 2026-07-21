@@ -191,6 +191,79 @@ def test_compile_rules_demotes_junk_test_to_advisory():
 
 
 # --------------------------------------------------------------------------- #
+# Skip valve (D1/D3 - run supervisé 2026-07-20)
+# --------------------------------------------------------------------------- #
+
+def test_compile_rules_ships_conftest_valve_with_tests():
+    rules = [
+        {
+            "id": "r1",
+            "statement": "s1",
+            "kind": "test",
+            "check_code": "def test_one():\n    assert True\n",
+        }
+    ]
+    compiled = C.compile_rules(rules)
+    assert compiled["support"] == [(C.CONFTEST_PATH, C.CONFTEST_CONTENT)]
+    # The valve is support, never counted as a rule.
+    assert all(p != C.CONFTEST_PATH for p, _ in compiled["tests"])
+
+
+def test_compile_rules_no_tests_no_conftest():
+    compiled = C.compile_rules(
+        [{"id": "adv", "statement": "advice only", "kind": "advisory"}]
+    )
+    assert compiled["support"] == []
+
+
+def test_conftest_valve_is_valid_python():
+    import ast as _ast
+
+    _ast.parse(C.CONFTEST_CONTENT)
+    assert "pytest_runtest_makereport" in C.CONFTEST_CONTENT
+
+
+def test_build_prompt_states_incremental_skip_contract():
+    prompt = C.build_prompt(brief="a web app")
+    assert "INCREMENTAL-BUILD CONTRACT" in prompt
+    assert "SKIP" in prompt
+
+
+def test_conftest_valve_converts_import_rooted_failure_to_skip(tmp_path):
+    """Functional proof: a constitution-style test that wraps a missing-module
+    error in RuntimeError (the observed ``test_api_namespace`` pattern) SKIPS
+    under the valve, while a genuine violation (AssertionError) still FAILS."""
+    import subprocess
+    import sys
+
+    const = tmp_path / "tests" / "constitution"
+    const.mkdir(parents=True)
+    (const / "conftest.py").write_text(C.CONFTEST_CONTENT, encoding="utf-8")
+    (const / "test_end_state.py").write_text(
+        "import importlib\n\n"
+        "def _load_app():\n"
+        "    try:\n"
+        "        return importlib.import_module('module_pas_encore_construit')\n"
+        "    except Exception as e:\n"
+        "        raise RuntimeError('FastAPI app not found: %r' % e)\n\n"
+        "def test_needs_app():\n"
+        "    _load_app()\n\n"
+        "def test_real_violation():\n"
+        "    assert 1 == 2\n",
+        encoding="utf-8",
+    )
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", str(const), "-q", "--no-header", "-p", "no:cacheprovider"],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        cwd=str(tmp_path),
+    )
+    out = proc.stdout + proc.stderr
+    assert "1 failed" in out and "1 skipped" in out, out
+
+
+# --------------------------------------------------------------------------- #
 # immutable_test_paths
 # --------------------------------------------------------------------------- #
 

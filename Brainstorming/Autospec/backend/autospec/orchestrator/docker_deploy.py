@@ -51,6 +51,9 @@ DOCKER_INFRA_MARKERS = (
     "pipe/docker_engine",
     "dockerdesktoplinuxengine",
     "is the docker daemon running",
+    # Windows : Docker Desktop lancé dans la session d'un AUTRE utilisateur -
+    # l'ACL du named pipe refuse notre process (vu en run supervisé 2026-07-20).
+    "permission denied while trying to connect",
 )
 _DAEMON_DOWN_MARKERS = DOCKER_INFRA_MARKERS + (
     "no such file or directory",  # docker binary invoked but engine socket missing

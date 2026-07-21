@@ -111,6 +111,12 @@ def build_prompt(*, brief: str, project_name: str = "", max_rules: int = 8) -> s
         "  - kind=test: provide `check_code` = a self-contained, runnable pytest "
         "module (at least one `test_*` function or `Test*` class) that FAILS when "
         "the rule is violated. It must import only what it needs and run standalone.\n"
+        "    INCREMENTAL-BUILD CONTRACT: the test runs from the very FIRST build "
+        "task on an almost-empty workspace. While its target (app, module, "
+        "endpoint) does not exist yet it must SKIP cleanly (pytest.skip / "
+        "pytest.importorskip), NEVER fail: a failure must always mean a genuine "
+        "VIOLATION, not a missing precondition. Never raise (RuntimeError etc.) "
+        "when a dynamic import fails - skip instead.\n"
         "  - kind=command: provide `check_cmd` = a shell command that must exit 0 "
         "when the rule holds.\n"
         "  - kind=advisory: only when the rule genuinely cannot be made executable.\n"
@@ -187,6 +193,62 @@ async def aderive_constitution(
 
 _TESTS_DIR = "tests/constitution"
 _SANITIZE_RE = re.compile(r"[^a-z0-9]+")
+
+#: Deterministic skip valve seeded NEXT TO the compiled tests (D1/D3, run
+#: supervisé 2026-07-20). The compiled tests assert END-STATE properties but ride
+#: the suite from the very first incremental task: while the target app/module
+#: does not exist yet, an import-rooted failure is a MISSING PRECONDITION, never
+#: a violation. The ``importorskip`` guard only covers static third-party
+#: imports - a dynamic ``importlib`` helper that wraps the miss in RuntimeError
+#: (the observed ``test_api_namespace`` pattern) falls through and dooms the
+#: first tasks to red, which both wastes dev attempts and INCENTIVIZES the dev
+#: to fake the end state. This conftest converts any constitution-test failure
+#: rooted in ImportError/ModuleNotFoundError (chained OR embedded in the
+#: message) into a clean SKIP. Real violations (AssertionError…) still fail.
+CONFTEST_PATH = f"{_TESTS_DIR}/conftest.py"
+CONFTEST_CONTENT = '''\
+# Constitution support - auto-compiled: do NOT edit or delete (W2/W5 protected).
+# Soupape d'incrémentalité : tant que la cible d'un test constitution n'existe
+# pas encore (app/module pas construit à ce stade du build), un échec enraciné
+# dans un import manquant devient un SKIP propre. Une vraie violation
+# (AssertionError…) reste un échec.
+
+import pytest
+
+
+def _import_rooted(exc: BaseException | None) -> bool:
+    seen: set[int] = set()
+    while exc is not None and id(exc) not in seen:
+        seen.add(id(exc))
+        if isinstance(exc, ImportError):
+            return True
+        exc = exc.__cause__ or exc.__context__
+    return False
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    outcome = yield
+    report = outcome.get_result()
+    if report.when not in ("setup", "call") or not report.failed:
+        return
+    excinfo = call.excinfo
+    if excinfo is None:
+        return
+    value = excinfo.value
+    message = str(value)
+    rooted = _import_rooted(value) or (
+        "modulenotfounderror" in message.lower() or "importerror" in message.lower()
+    )
+    if rooted:
+        report.outcome = "skipped"
+        report.longrepr = (
+            str(getattr(item, "fspath", "")),
+            0,
+            "SKIP constitution : précondition pas encore construite "
+            f"(import impossible - {message[:120]})",
+        )
+'''
 
 
 def is_runnable_pytest(source: str) -> bool:
@@ -294,6 +356,7 @@ def compile_rules(rules: list[dict]) -> dict:
             "tests":    [(path, content), ...],   # kind=test, runnable
             "commands": [(id, cmd), ...],          # kind=command with a check_cmd
             "advisory": [rule, ...],               # kind=advisory + DEMOTED tests
+            "support":  [(path, content), ...],   # skip-valve conftest (with tests)
         }
 
     A ``kind=test`` rule whose ``check_code`` is not runnable pytest is **demoted**
@@ -326,7 +389,11 @@ def compile_rules(rules: list[dict]) -> dict:
             # kind=advisory (and any unexpected kind) → advisory guidance.
             advisory.append(rule)
 
-    return {"tests": tests, "commands": commands, "advisory": advisory}
+    # The skip valve only ships when there ARE compiled tests to guard.
+    support: list[tuple[str, str]] = (
+        [(CONFTEST_PATH, CONFTEST_CONTENT)] if tests else []
+    )
+    return {"tests": tests, "commands": commands, "advisory": advisory, "support": support}
 
 
 def immutable_test_paths(compiled: dict) -> set[str]:

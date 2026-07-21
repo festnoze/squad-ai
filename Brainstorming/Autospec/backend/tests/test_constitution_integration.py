@@ -30,8 +30,12 @@ async def test_constitution_phase_writes_executable_rules(monkeypatch):
     await pipeline._amaybe_build_constitution()
 
     assert len(pipeline.state.constitution) == 2
-    assert len(pipeline.state.constitution_test_paths) == 1
-    written = pipeline.state.constitution_test_paths[0]
+    # 1 règle compilée + le conftest soupape (D1/D3) - protégé comme les tests.
+    paths = pipeline.state.constitution_test_paths
+    assert len(paths) == 2
+    assert "tests/constitution/conftest.py" in paths
+    assert (ws / "tests/constitution/conftest.py").exists()
+    written = next(p for p in paths if "conftest" not in p)
     assert written.startswith("tests/constitution/test_") and written.endswith(".py")
     assert (ws / written).exists()
     # advisory rule surfaced as build guidance for dev/QA

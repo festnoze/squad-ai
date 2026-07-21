@@ -1,0 +1,6 @@
+venv/
+.env
+data/prospector.db
+logs/
+browser_profile/
+__pycache__/

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Full Resume – Etienne Millerioux</title>
+
+  <!-- Font Awesome icons — requires an internet connection -->
+  <link
+    rel="stylesheet"
+    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
+    integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"
+  />
+  <link rel="stylesheet" href="cv.css">
+  <link rel="stylesheet" href="cv_full.css">
+
+  <!--
+    ╔══════════════════════════════════════════════════════════╗
+    ║  DATA — page 1: same files as the short resume.         ║
+    ║  Detailed pages: data/experience_full.js.               ║
+    ╚══════════════════════════════════════════════════════════╝
+  -->
+  <script src="data/name.js"></script>
+  <script src="data/contact.js"></script>
+  <script src="data/summary.js"></script>
+  <script src="data/skills.js"></script>
+  <script src="data/experience.js"></script>
+  <script src="data/education.js"></script>
+  <script src="data/languages.js"></script>
+  <script src="data/sidebar_skills.js"></script>
+  <script src="data/experience_full.js"></script>
+</head>
+
+<body>
+  <!-- ══════════════════════════════════════════════════════
+       PAGE 1 — identical to the short resume
+       ══════════════════════════════════════════════════════ -->
+  <div class="cv-page cv-page-top">
+
+    <div class="cell-nom">
+      <h1 id="cv-name"></h1>
+    </div>
+
+    <div class="cell-titre">
+      <div class="cv-title-block">
+        <p class="cv-main-title" id="cv-main-title"></p>
+        <p class="cv-sub-title"  id="cv-sub-title"></p>
+      </div>
+    </div>
+
+    <!-- Floating photo (overlaps title / skills) -->
+    <img src="photo.jpg" alt="Photo of Etienne Millerioux" class="cv-photo">
+
+    <div class="cell-contact">
+      <div id="cv-contact"></div>
+    </div>
+
+    <div class="cell-sidebar-tools">
+      <div>
+        <h2 class="section-title section-title-left">Stack</h2>
+        <div id="cv-sidebar-skills"></div>
+      </div>
+
+      <div>
+        <h2 class="section-title section-title-left">Languages</h2>
+        <div id="cv-languages"></div>
+      </div>
+    </div>
+
+    <div class="cell-skills">
+      <h2 class="section-title">Skills</h2>
+      <ul id="cv-skills"></ul>
+
+      <h2 class="section-title" style="margin-top: 22px;">Education</h2>
+      <div id="cv-education"></div>
+    </div>
+
+  </div><!-- /.cv-page -->
+
+  <!-- ══════════════════════════════════════════════════════
+       PAGE 2 — Experience (summary)
+       ══════════════════════════════════════════════════════ -->
+  <div class="cv-experiences">
+    <div class="detail-header">
+      <div class="detail-header-name" id="cv-exp-name"></div>
+      <div class="detail-header-title" id="cv-exp-title"></div>
+    </div>
+
+    <div class="cv-experiences-body">
+      <h2 class="section-title">Experience</h2>
+      <div id="cv-experience"></div>
+    </div>
+  </div><!-- /.cv-experiences -->
+
+  <!-- ══════════════════════════════════════════════════════
+       PAGES 3+ — Detailed professional experience
+       ══════════════════════════════════════════════════════ -->
+  <div class="cv-detail">
+    <div class="detail-header">
+      <div class="detail-header-name" id="cv-detail-name"></div>
+      <div class="detail-header-title" id="cv-detail-title"></div>
+    </div>
+
+    <div class="detail-body">
+      <h2 class="section-title">Detailed professional experience</h2>
+      <div id="cv-experience-full"></div>
+    </div>
+  </div><!-- /.cv-detail -->
+
+  <script>
+    // ── Utility: escape HTML characters ───────────────────────────────────
+    function esc(str) {
+      if (!str) return '';
+      return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    // ── Name ──────────────────────────────────────────────────────────────
+    document.getElementById('cv-name').textContent = NAME.firstName + ' ' + NAME.lastName;
+
+    // ── Title / target role (cell 2) ──────────────────────────────────────
+    document.getElementById('cv-main-title').textContent = SUMMARY.main;
+    document.getElementById('cv-sub-title').textContent  = SUMMARY.sub;
+
+    // ── Contact (cell 3) ──────────────────────────────────────────────────
+    const contactEl = document.getElementById('cv-contact');
+    CONTACT.items.forEach(item => {
+      const div  = document.createElement('div');
+      div.className = 'contact-item';
+      const icon = document.createElement('i');
+      icon.className = item.icon;
+      div.appendChild(icon);
+      const span = document.createElement('span');
+      if (item.href) {
+        const a = document.createElement('a');
+        a.href      = item.href;
+        a.innerHTML = item.value;
+        span.appendChild(a);
+      } else {
+        span.innerHTML = item.value;
+      }
+      div.appendChild(span);
+      contactEl.appendChild(div);
+    });
+
+    // ── Skills ────────────────────────────────────────────────────────────
+    const skillsEl = document.getElementById('cv-skills');
+    SKILLS.forEach(skill => {
+      const li = document.createElement('li');
+      if (skill.group) {
+        li.className = 'skills-group';
+        li.innerHTML = skill.group;
+      } else {
+        li.innerHTML = `<span class="skill-title">${skill.title}</span>: ${skill.desc}.`;
+      }
+      skillsEl.appendChild(li);
+    });
+
+    // ── Experience (summary, page 2) ──────────────────────────────────────
+    const expEl = document.getElementById('cv-experience');
+    EXPERIENCE.forEach(group => {
+      const groupDiv = document.createElement('div');
+      groupDiv.className = 'exp-group';
+
+      const companyDiv = document.createElement('div');
+      companyDiv.className = 'exp-company-header';
+      companyDiv.textContent = group.company;
+      groupDiv.appendChild(companyDiv);
+
+      group.positions.forEach((role, i) => {
+        const roleDiv = document.createElement('div');
+        roleDiv.className = 'exp-role' + (i === group.positions.length - 1 ? ' exp-role-last' : '');
+        roleDiv.innerHTML = `
+          <div class="exp-dates">${esc(role.period)}</div>
+          <div class="exp-header">
+            <span class="exp-title-inline">${role.title}</span>
+          </div>
+          ${role.description
+            ? `<div class="exp-description">${role.description}</div>`
+            : ''}
+          ${role.techs
+            ? `<div class="exp-techs"><span class="exp-techs-label">Stack: </span>${esc(role.techs)}</div>`
+            : ''}
+        `;
+        groupDiv.appendChild(roleDiv);
+      });
+
+      expEl.appendChild(groupDiv);
+    });
+
+    // ── Education ─────────────────────────────────────────────────────────
+    const eduEl = document.getElementById('cv-education');
+    EDUCATION.forEach(edu => {
+      const div = document.createElement('div');
+      div.className = 'edu-item';
+      div.innerHTML = `
+        <span class="edu-degree">${edu.degree}</span>
+        <span class="edu-sep">&nbsp;—&nbsp;</span>
+        <span class="edu-dates">${esc(edu.period)}</span>
+        ${edu.school ? `<span class="edu-school">&nbsp;(${esc(edu.school)})</span>` : ''}
+      `;
+      eduEl.appendChild(div);
+    });
+
+    // ── Skills sidebar ────────────────────────────────────────────────────
+    const sideSkillsEl = document.getElementById('cv-sidebar-skills');
+    TOOLS.forEach(item => {
+      const div = document.createElement('div');
+      div.className = 'sidebar-skill-item';
+      div.innerHTML = `
+        <span class="sidebar-skill-label">${item.label}</span>
+        <span class="sidebar-skill-tags">${item.tags}</span>
+      `;
+      sideSkillsEl.appendChild(div);
+    });
+
+    // ── Languages ─────────────────────────────────────────────────────────
+    const langEl = document.getElementById('cv-languages');
+    LANGUAGES.forEach(lang => {
+      const div = document.createElement('div');
+      div.className = 'lang-item';
+      div.innerHTML = `
+        <span class="lang-name">${esc(lang.name)}</span>
+        <span class="lang-level">${esc(lang.level)}</span>
+      `;
+      langEl.appendChild(div);
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    // DETAILED PAGES
+    // ══════════════════════════════════════════════════════════════════════
+
+    // ── Reminder headers (page 2 + detailed pages) ────────────────────────
+    const fullName = NAME.firstName + ' ' + NAME.lastName;
+    document.getElementById('cv-exp-name').textContent    = fullName;
+    document.getElementById('cv-exp-title').textContent   = SUMMARY.main;
+    document.getElementById('cv-detail-name').textContent = fullName;
+    document.getElementById('cv-detail-title').textContent = SUMMARY.main;
+
+    // ── Detailed experience cards ─────────────────────────────────────────
+    const expFullEl = document.getElementById('cv-experience-full');
+    EXPERIENCE_FULL.forEach(exp => {
+      const div = document.createElement('div');
+      div.className = 'exp-detail';
+      div.innerHTML = `
+        <div class="exp-detail-header">
+          <div class="exp-detail-company">${exp.company}</div>
+          <div class="exp-detail-title">${exp.title}</div>
+          <div class="exp-detail-period">${esc(exp.period)}</div>
+        </div>
+        <div class="exp-detail-body">
+          ${exp.synthese ? `
+          <div class="exp-detail-row">
+            <div class="exp-detail-label">Summary</div>
+            <div class="exp-detail-value">${exp.synthese}</div>
+          </div>` : ''}
+          ${exp.role ? `
+          <div class="exp-detail-row">
+            <div class="exp-detail-label">Role</div>
+            <div class="exp-detail-value">${exp.role}</div>
+          </div>` : ''}
+          ${exp.realisations && exp.realisations.length ? `
+          <div class="exp-detail-row">
+            <div class="exp-detail-label">Achievements</div>
+            <div class="exp-detail-value">
+              <ul>${exp.realisations.map(r => `<li>${r}</li>`).join('')}</ul>
+            </div>
+          </div>` : ''}
+          ${exp.env ? `
+          <div class="exp-detail-row">
+            <div class="exp-detail-label">Environment</div>
+            <div class="exp-detail-value exp-detail-env">${exp.env}</div>
+          </div>` : ''}
+        </div>
+      `;
+      expFullEl.appendChild(div);
+    });
+  </script>
+</body>
+</html>

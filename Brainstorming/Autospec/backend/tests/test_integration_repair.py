@@ -105,6 +105,30 @@ async def test_runtime_gate_blocks_after_exhausted_attempts(monkeypatch, repair_
     assert any("Runtime acceptance échoué" in issue for issue in state.delivery_issues)
 
 
+async def test_repair_loop_stops_on_late_infra_verify(monkeypatch, repair_env):
+    """D10b (run supervisé 2026-07-20) : un verdict de RE-vérification de forme
+    INFRA (port tenu par un tiers → __INFRA__ via le wrapper averify) interrompt
+    la boucle SANS dépêcher le dev suivant - l'infra ne se répare pas par agent."""
+    monkeypatch.setattr(settings, "integration_fix_attempts", 2)
+    _fake_gate(monkeypatch, [
+        RuntimeAcceptanceResult(ok=False, detail="page vide sur /"),
+        RuntimeAcceptanceResult(
+            ok=False,
+            detail="port :8000 déjà occupé par un process externe - vérification impossible",
+            infra=True,
+        ),
+    ])
+    runner = FakeRunner(['{"status": "fixed", "summary": "essai 1", "files": []}'])
+    state = _state("fix-infra-verify")
+    pipeline = Pipeline(state, runner)
+
+    assert await pipeline._aruntime_acceptance_phase() is False
+    # Un seul dev dépêché : la bascule infra n'a PAS consommé la 2e tentative.
+    assert len(runner.calls) == 1
+    # Parqué comme une condition d'infra, pas blâmé comme un échec de code.
+    assert any("process externe" in r for r in state.regressions)
+
+
 async def test_repair_rolls_back_when_fix_breaks_the_suite(monkeypatch, repair_env):
     """La réparation ne doit JAMAIS troquer un gate vert contre une suite rouge."""
     git_calls = repair_env

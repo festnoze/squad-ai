@@ -1,0 +1,257 @@
+/* ============================================================
+   CV FULL — Etienne Millerioux
+   Extension multi-pages de cv.css (chargé avant ce fichier).
+   Page 1 : identique au CV synthétique.
+   Pages suivantes : expériences détaillées, même palette :
+     teal sombre  #3b6070 · teal moyen #4d7585
+     bleu-gris    #c8d8dd · texte      #2c4a56
+   ============================================================ */
+
+body {
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+}
+
+/* ─── Page 1 — sans les expériences ─────────────────────────────
+   Les expériences sont déplacées sur leur propre page (page 2).
+   La grille ne garde donc que 3 rangées ; la 3e (Stack/Langues à
+   gauche, bas des Compétences à droite) passe en 1fr pour s'étirer
+   et remplir toute la hauteur A4 — évite le vide en bas de page. */
+.cv-page-top {
+  grid-template-rows: auto auto 1fr;
+}
+
+/* Compétences + Formation légèrement agrandies/aérées pour remplir
+   la page 1 (la Formation est remontée ici, sous les Compétences). */
+.cv-page-top .cell-skills #cv-skills {
+  gap: 9px;
+}
+
+.cv-page-top .cell-skills #cv-skills li {
+  font-size: 14.75px;
+  line-height: 1.5;
+}
+
+.cv-page-top .cell-skills #cv-skills li.skills-group {
+  margin-top: 30px;
+}
+
+.cv-page-top .cell-skills #cv-skills li.skills-group:first-child {
+  margin-top: 4px;
+}
+
+/* Un peu plus d'air dans la colonne gauche (Stack / Langues) */
+.cv-page-top .cell-sidebar-tools {
+  gap: 24px;
+}
+
+.cv-page-top .lang-item {
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+}
+
+/* ─── Page 2 — Expériences (synthèse) + Formation ───────────────
+   Feuille A4 blanche autonome, même bandeau d'en-tête que les
+   pages détaillées. */
+.cv-experiences {
+  width: 210mm;
+  background: #ffffff;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.cv-experiences-body {
+  padding: 20px 26px 28px;
+}
+
+/* Reprend le style des titres de section "cellule claire" (gradient) */
+.cv-experiences-body .section-title {
+  color: #2c4a56;
+  border-bottom: none;
+  background: linear-gradient(to right, #a8bec6, #ffffff 60%);
+  padding: 6px 10px;
+  margin-left: -10px;
+  margin-right: -10px;
+  border-radius: 4px;
+}
+
+/* ─── Feuille "détails" (pages 3+) ──────────────────────────── */
+.cv-detail {
+  width: 210mm;
+  background: #ffffff;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+/* Bandeau d'en-tête : rappel nom + titre (même duo de cellules
+   que la page 1 : teal sombre à gauche, gradient clair à droite) */
+.detail-header {
+  display: grid;
+  grid-template-columns: 35% 65%;
+}
+
+.detail-header-name {
+  background: #3b6070;
+  color: white;
+  padding: 14px 22px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  text-shadow: 0px 0px 14px rgba(250, 250, 250, 0.25);
+}
+
+.detail-header-title {
+  background: linear-gradient(to right, #c8d8dd 40%, #9cb7bd 95%);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  font-size: 15px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #284652;
+}
+
+.detail-body {
+  padding: 20px 26px 28px;
+}
+
+/* ─── Fiche expérience détaillée ────────────────────────────── */
+.exp-detail {
+  margin-bottom: 16px;
+  border: 1px solid #dde7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.exp-detail-header {
+  background: linear-gradient(to right, #c8d8dd, #eef4f6 85%);
+  border-left: 4px solid #4d7585;
+  padding: 8px 12px;
+}
+
+.exp-detail-company {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #2c4a56;
+}
+
+.exp-detail-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #2c4a56;
+  margin-top: 2px;
+}
+
+.exp-detail-period {
+  font-size: 11px;
+  color: #4d7585;
+  font-style: italic;
+  margin-top: 2px;
+  letter-spacing: 0.3px;
+}
+
+.exp-detail-body {
+  padding: 10px 14px 12px;
+}
+
+.exp-detail-row {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 6px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: #3a3a3a;
+}
+
+.exp-detail-label {
+  flex: 0 0 105px;
+  font-weight: 700;
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: #51889e;
+  padding-top: 1px;
+}
+
+.exp-detail-value {
+  flex: 1;
+}
+
+.exp-detail-value ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.exp-detail-value li {
+  margin-bottom: 2px;
+}
+
+.exp-detail-env {
+  font-style: italic;
+  color: #7a9aaa;
+  font-size: 11px;
+}
+
+/* ─── Impression : pagination multi-pages ───────────────────── */
+@media print {
+  html, body {
+    overflow: visible !important;
+  }
+
+  body {
+    display: block;
+  }
+
+  /* La page 1 conserve sa grille, mais doit être suivie
+     d'un saut de page (cv.css la déclare page-break-after: avoid) */
+  .cv-page {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  /* cv.css force min-height:0 en impression → on rétablit la pleine
+     hauteur A4 pour que la page 1 remplisse la feuille (la 3e rangée
+     1fr s'étire jusqu'en bas). */
+  .cv-page-top {
+    min-height: 297mm !important;
+    height: auto !important;
+  }
+
+  /* Page 2 : feuille des expériences, suivie d'un saut de page */
+  .cv-experiences {
+    box-shadow: none;
+    width: 210mm;
+    page-break-after: always !important;
+    break-after: page !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .cv-detail {
+    box-shadow: none;
+    width: 210mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .detail-body {
+    padding-top: 14px;
+  }
+
+  /* Le CV synthétique peut déborder sur une 2e page :
+     ne jamais couper un poste ou une ligne de formation en deux */
+  .exp-role,
+  .edu-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

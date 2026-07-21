@@ -343,8 +343,11 @@ async def test_po_refinement_invoked_when_enabled(green_pytest, monkeypatch):
     monkeypatch.setattr(settings, "refine_po", True)
     monkeypatch.setattr(settings, "refine_dev", False)  # no git in this test
     judge_pass = json.dumps({"score": 92, "verdict": "plan solide"})
+    # D5 : après un arrêt au seuil en 0 tour, UNE passe de critique collecte
+    # tout de même les findings (ici : critique satisfaite, rien à signaler).
+    critic_ok = json.dumps({"reflection": "RAS", "issues": [], "suggestions": []})
     pipeline, _ = make_pipeline(
-        [PM_BRIEF, po_plan_reply(1, with_dep=False), judge_pass, QA_PLAN, DEV_GREEN]
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), judge_pass, critic_ok, QA_PLAN, DEV_GREEN]
     )
     pipeline.start()
     await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
@@ -363,8 +366,9 @@ async def test_plan_quality_stored_when_refine_enabled(green_pytest, monkeypatch
     monkeypatch.setattr(settings, "refine_po", True)
     monkeypatch.setattr(settings, "refine_dev", False)  # no git in this test
     judge = json.dumps({"score": 92, "verdict": "ok"})
+    critic_ok = json.dumps({"reflection": "RAS", "issues": [], "suggestions": []})
     pipeline, _ = make_pipeline(
-        [PM_BRIEF, po_plan_reply(1, with_dep=False), judge, QA_PLAN, DEV_GREEN]
+        [PM_BRIEF, po_plan_reply(1, with_dep=False), judge, critic_ok, QA_PLAN, DEV_GREEN]
     )
     pipeline.start()
     await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
