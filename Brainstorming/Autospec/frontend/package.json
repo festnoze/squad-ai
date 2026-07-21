@@ -8,7 +8,8 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "test:unit": "vitest run",
-    "test:e2e": "npm run build && playwright test"
+    "test:e2e": "npm run build && playwright test",
+    "test:e2e:streams": "npm run build && playwright test -c playwright.streams.config.ts"
   },
   "dependencies": {
     "@dagrejs/dagre": "^3.0.0",

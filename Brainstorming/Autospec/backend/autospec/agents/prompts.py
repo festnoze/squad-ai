@@ -277,16 +277,30 @@ def decompose_story(
     package_name: str,
     architecture: str = "",
     available_skills: str = "",
+    existing_plan: str = "",
 ) -> str:
     """SK-2: split a backend story into per-LAYER sub-tasks, each built by a
     focused subagent (tiny context window) in parallel then aggregated. The
-    unique marker ``en SOUS-TÂCHES par COUCHE`` keys the ScriptedRunner reply."""
+    unique marker ``en SOUS-TÂCHES par COUCHE`` keys the ScriptedRunner reply.
+
+    ``existing_plan`` (P7, run supervisé 2026-07-20) lists the modules already
+    planned by OTHER stories' tasks so the architect REUSES them instead of
+    re-creating a parallel equivalent (the observed orm.py/entities.py
+    duplication)."""
     arch_block = f"\nContexte architecture (à respecter) :\n{architecture}\n" if architecture else ""
+    existing_block = (
+        "\nMODULES DÉJÀ PLANIFIÉS par d'autres stories (RÉUTILISE ces fichiers et"
+        "\nleurs contrats ; n'en recrée JAMAIS d'équivalent parallèle - une"
+        "\nsous-tâche qui a besoin d'un de ces modules le CONSOMME, elle ne le"
+        "\nréécrit pas) :\n" + existing_plan + "\n"
+        if existing_plan
+        else ""
+    )
     return f"""Tu es l'architecte d'un pipeline automatisé. Tu DÉCOMPOSES une user story
 backend en SOUS-TÂCHES par COUCHE : chacune est confiée à un sous-agent focalisé
 (fenêtre de contexte réduite), les sous-tâches indépendantes sont construites EN
 PARALLÈLE, puis leurs résultats sont agrégés et la suite de tests rejouée.
-{arch_block}{available_skills}
+{arch_block}{existing_block}{available_skills}
 User story à décomposer : {story.id} — {story.title}
 Description : {story.description}
 Critères d'acceptance (réutilise leurs ids) :
@@ -2334,6 +2348,11 @@ CONTRAINTES :
   N'invente JAMAIS de package top-level supplémentaire (pas de second package
   parallèle « mieux nommé ») : d'autres unités construisent en parallèle dans
   `{package_name}/` et un doublon divise le produit en deux implémentations.
+- TRAÇABILITÉ : chaque fonction de test porte, juste au-dessus de son `def`, un
+  commentaire `# AC: {story.id}.<id du critère>` listant les critères qu'elle
+  vérifie (ex. `# AC: {story.id}.AC-1` ; plusieurs ids séparés par des
+  virgules). La gate de livraison s'en sert pour prouver que chaque critère a
+  un test qui le nomme.
 - Code et docstrings en anglais ; messages utilisateur en français.
 
 Quand tu as terminé, réponds avec EXACTEMENT UN objet JSON :
@@ -2416,6 +2435,10 @@ CONTRAINTES :
   backend. Code et identifiants en anglais ; textes utilisateur en français.
 - TypeScript strict, composants fonctionnels + hooks ; pas de dépendance lourde
   non installée.
+- TRAÇABILITÉ : chaque test porte, juste au-dessus de son `it(...)`/`test(...)`,
+  un commentaire `// AC: {story.id}.<id du critère>` listant les critères qu'il
+  vérifie (ex. `// AC: {story.id}.AC-1` ; plusieurs ids séparés par des
+  virgules). La gate de livraison s'en sert pour prouver la couverture.
 - Les appels à l'API backend utilisent des URLs RELATIVES (`fetch("/expenses")`),
   JAMAIS d'origine absolue en dur (`http://localhost:8000/...`) : en production
   le frontend buildé est SERVI PAR le backend (même origine) puis empaqueté en

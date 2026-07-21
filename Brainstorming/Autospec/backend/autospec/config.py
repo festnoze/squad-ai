@@ -302,6 +302,12 @@ class Settings:
     constitution_max_rules: int = field(
         default_factory=lambda: _env_int("CONSTITUTION_MAX", 8, minimum=1)
     )
+    # P5 (run supervisé 2026-07-20) : la dérivation de constitution était l'étape
+    # la plus lente du planning (339 s / 18k tokens). Modèle dédié optionnel ;
+    # VIDE = le modèle courant du provider (comportement historique).
+    constitution_model: str = field(
+        default_factory=lambda: os.environ.get("CONSTITUTION_MODEL", "").strip()
+    )
     # W5.1: design amendment. When a failure is a genuine spec contradiction, a
     # boss-tier agent proposes a MINIMAL amendment, an INDEPENDENT check rejects
     # it if it weakens the requirement, and the survivor is queued HUMAN-PENDING

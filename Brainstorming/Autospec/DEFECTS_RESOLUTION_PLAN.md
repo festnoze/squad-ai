@@ -46,3 +46,25 @@ voit pas les nodeids des stories frontend ; à vérifier séparément.
 F1 (gitignore) → F2 (constitution) → F3+F4+F5 (repair loop/troncature/port) →
 F6+F7 (merge/scope) → F8+F9 (prompts architecture/décomposition) → F10
 (critic-first plan) → F11 (marqueur docker) → tests backend complets.
+
+---
+
+## Round 2 - améliorations (2026-07-21, tout livré et vert)
+
+| # | Amélioration | Livraison |
+|---|---|---|
+| P1 | Traceability `covered=0` : ids d'AC qualifiés par story (`US-1.AC-2`), scan des sources Vitest, convention `# AC:` injectée dans les prompts dev backend+frontend, marqueurs non qualifiés exclus des orphelins | pipeline.py `_report_traceability` + `_collect_frontend_test_sources`, prompts dev_story/_frontend |
+| P2 | Statut effectif des stories à tâches : `effective_status_value` existait déjà côté API ; les 3 événements OUTCOME utilisent désormais `effective_status()` | pipeline.py |
+| P3 | Fuite de process du gate JS : `reapWorkspacePortHolders(port)` en finally (win32 PowerShell / POSIX lsof, filtré sur la cmdline du workspace) | scripts/runtime_acceptance.js |
+| P4 | `TEST_TAMPER_GUARD=strict` (.env) - un test QA modifié est restauré tel quel. SCOPE_GUARD reste warn : strict n'y ajoute que du marquage, l'enforcement réel est le retrait per-file (F7) | backend/.env |
+| P5 | Constitution : contrainte COMPACTNESS (~40 lignes/check_code) + `CONSTITUTION_MODEL` (routage optionnel, réglé sur sonnet dans .env) | constitution.py, config.py, .env |
+| P6 | Décompositions parallélisées : appels architecte en `asyncio.gather` bornés par `max_parallel_devs`, matérialisation séquentielle (ids uniques + floor d'indépendance) | pipeline.py `_adecompose_pending` |
+| P7 | Anti-duplication inter-US : bloc « MODULES DÉJÀ PLANIFIÉS » (tâches des autres stories + file_globs) injecté dans le prompt de décomposition | pipeline.py `_existing_plan_block`, prompts.decompose_story |
+| P8 | `PARTIAL_DELIVERY=1` (.env) : les stories vertes sont livrées même si une story échoue (P5/DoD incrémental) | backend/.env |
+| P9 | Branche po-pipeline-v2 : DÉJÀ intégralement mergée dans main (0 commit propre). Éval A/B scripted exécutée : pipeline « on » gagne sur dimensionnement des feuilles (2/2 vs 0/2 au budget) et taxonomie des critères (4/4 vs 0/2), sans dégradation ; DAG égal. `PO_PIPELINE` reste off en attendant la confirmation provider réel exigée par le RFC | scripts/eval_po_pipeline.py |
+| P10 | ST-17 : harnais e2e Playwright multi-stream dédié (`playwright.streams.config.ts`, port 8124, STREAMS=1, workspace hermétique) + spec `streams.spec.ts` (filtre par stream, tâches T-1/T-2, badge du stream non primaire, rollup done). `npm run test:e2e:streams` | frontend/e2e-streams/ |
+| P11 | Hint actionnable quand le pipe Docker est refusé : « Docker Desktop est lancé dans la session Windows d'un autre utilisateur - relancez-le dans VOTRE session » | docker_deploy.py |
+| BONUS | Bug CSS préexistant découvert par la revalidation e2e : la barre d'onglets mobile (R5) était invisible à TOUTE largeur - la règle de base `display:none` venait APRÈS l'override du media query (<1100px) dans l'ordre source. Override déplacé après la base | frontend/src/index.css |
+
+Validation round 2 : backend 1159 pytest verts (+4 nouveaux), Vitest 239 verts,
+e2e standard 2/2 verts (dont le bug CSS mobile corrigé), e2e streams 1/1 vert.

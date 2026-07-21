@@ -557,7 +557,18 @@ def deploy_and_verify(
     # --- infra pre-checks -------------------------------------------------
     ok, out = docker_available()
     if not ok:
-        return _fail(f"docker indisponible — {out}", infra=True)
+        detail = f"docker indisponible — {out}"
+        # PRE-1 (run supervisé 2026-07-20) : « permission denied » sur le named
+        # pipe = Docker Desktop tourne presque toujours dans la session Windows
+        # d'un AUTRE utilisateur - l'utilisateur peut agir, dis-lui comment.
+        if "permission denied while trying to connect" in (out or "").lower():
+            detail += (
+                "\nCause probable : Docker Desktop est lancé dans la session "
+                "Windows d'un autre utilisateur (l'ACL du pipe refuse ce "
+                "process). Relancez Docker Desktop dans VOTRE session, puis "
+                "relancez le déploiement."
+            )
+        return _fail(detail, infra=True)
     ok, out = ensure_network(network)
     if not ok:
         return _fail(f"réseau {network} indisponible — {out}", infra=True)

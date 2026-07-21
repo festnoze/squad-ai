@@ -3126,7 +3126,7 @@ class Pipeline:
                 self._notify("success", "Itération terminée", self.state.name)
             self.monitor.event(
                 "outcome", result=self.state.phase.value,
-                stories=[{"id": s.id, "status": s.status.value} for s in self.state.stories],
+                stories=[{"id": s.id, "status": s.effective_status().value} for s in self.state.stories],
             )
         except DeliveryBlocked:
             self.state.phase = PipelinePhase.NEEDS_ATTENTION
@@ -3134,7 +3134,7 @@ class Pipeline:
             self._chat(ChatRole.SYSTEM, "Itération à reprendre : livraison non validée.")
             self.monitor.event(
                 "outcome", result=self.state.phase.value,
-                stories=[{"id": s.id, "status": s.status.value} for s in self.state.stories],
+                stories=[{"id": s.id, "status": s.effective_status().value} for s in self.state.stories],
             )
         except Exception as exc:  # surface any pipeline failure to the UI
             if self._stop_requested:
@@ -3155,7 +3155,7 @@ class Pipeline:
             self.monitor.event(
                 "outcome", result=self.state.phase.value,
                 error=self.state.error,
-                stories=[{"id": s.id, "status": s.status.value} for s in self.state.stories],
+                stories=[{"id": s.id, "status": s.effective_status().value} for s in self.state.stories],
             )
 
     # ------------------------------------------------------------ SPEC (PM)
@@ -3344,6 +3344,8 @@ class Pipeline:
                 brief=self.state.brief or self.state.goal,
                 project_name=self.state.name,
                 max_rules=settings.constitution_max_rules,
+                # P5 : routage optionnel vers un modèle plus rapide/économique.
+                model=settings.constitution_model or None,
             )
         except AgentError as exc:
             self._log("constitution", f"Constitution indisponible ({exc}) — ignorée.")
@@ -4740,16 +4742,31 @@ class Pipeline:
         if not settings.ac_traceability_enabled:
             return
         try:
+            # P1 (run supervisé 2026-07-20) : les ids de critères (AC-1..AC-4)
+            # sont RÉUTILISÉS par toutes les stories - dédupliqués dans un set
+            # global, le rapport ne « déclarait » que 4 critères sur ~35. Les
+            # ids sont désormais QUALIFIÉS par story (US-1.AC-2) ; les prompts
+            # dev demandent le marqueur qualifié correspondant.
             stories = (
                 self.state.stories if all_iterations
                 else self.state.stories_of_iteration(self.state.iteration)
             )
-            all_ac_ids = {c.id for s in stories for c in s.acceptance_criteria}
+            all_ac_ids = {
+                f"{s.id}.{c.id}" for s in stories for c in s.acceptance_criteria
+            }
             if not all_ac_ids:
                 return
             ws = workspace_dir(self.state.id)
-            report = traceability.coverage_report(all_ac_ids, self._collect_test_sources(ws))
+            sources = self._collect_test_sources(ws)
+            # Les stories frontend sont vérifiées par Vitest : le matcher étant
+            # du texte brut (regex), les .test.ts(x) se scannent tels quels.
+            sources.update(self._collect_frontend_test_sources(ws))
+            report = traceability.coverage_report(all_ac_ids, sources)
             uncovered, orphans = report.get("uncovered", []), report.get("orphans", [])
+            # Un marqueur NON qualifié (`AC: AC-2`, style legacy/ambigu) n'est
+            # pas un test d'un critère inexistant : on ne le compte pas orphelin.
+            declared_bare = {c.id for s in stories for c in s.acceptance_criteria}
+            orphans = [o for o in orphans if o not in declared_bare]
             self.monitor.event(
                 "traceability", covered=len(report.get("covered", [])),
                 uncovered=len(uncovered), orphans=len(orphans),
@@ -4861,6 +4878,26 @@ class Pipeline:
                 try:
                     out[rel] = p.read_text(encoding="utf-8", errors="replace")
                 except OSError:
+                    continue
+        return out
+
+    @staticmethod
+    def _collect_frontend_test_sources(ws) -> dict[str, str]:
+        """P1 - the frontend Vitest sources (workspace-relative posix path →
+        text), so AC traceability sees the tests that cover frontend stories.
+        Best-effort; node_modules excluded."""
+        out: dict[str, str] = {}
+        root = Path(ws) / "frontend" / "src"
+        if not root.is_dir():
+            return out
+        for pattern in ("*.test.ts", "*.test.tsx", "*.spec.ts", "*.spec.tsx"):
+            for p in root.rglob(pattern):
+                if "node_modules" in p.parts:
+                    continue
+                try:
+                    rel = p.relative_to(ws).as_posix()
+                    out[rel] = p.read_text(encoding="utf-8", errors="replace")
+                except (OSError, ValueError):
                     continue
         return out
 
@@ -6893,26 +6930,60 @@ class Pipeline:
 
     async def _adecompose_pending(self, all_iterations: bool = False) -> None:
         """SK-2: decompose each not-yet-decomposed backend story of the build
-        pool into layered sub-tasks (best-effort, per story)."""
+        pool into layered sub-tasks (best-effort, per story).
+
+        P6 (run supervisé 2026-07-20) : les appels architecte sont indépendants
+        par story - ils partent EN PARALLÈLE (bornés par ``max_parallel_devs``,
+        ~1 min sérielle par story observée sinon). La MATÉRIALISATION reste
+        séquentielle : l'unicité projet-wide des ids de tâches et le floor
+        d'indépendance lisent l'état partagé."""
         pool = (
             self.state.stories
             if all_iterations
             else self.state.stories_of_iteration(self.state.iteration)
         )
-        for story in pool:
-            if (
-                story.status in (StoryStatus.TODO, StoryStatus.RED)
-                and not story.tasks
-                and not self._is_frontend_story(story)
-            ):
-                await self._adecompose_story(story)
+        eligible = [
+            story
+            for story in pool
+            if story.status in (StoryStatus.TODO, StoryStatus.RED)
+            and not story.tasks
+            and not self._is_frontend_story(story)
+        ]
+        if not eligible:
+            return
+        sem = asyncio.Semaphore(max(1, int(settings.max_parallel_devs)))
 
-    async def _adecompose_story(self, story: UserStory) -> None:
-        """Ask the architect to split a backend story into layered sub-tasks
-        (entity → service → endpoint → tests), materialized as the story's Tasks
-        so the parallel worktree engine builds each in a focused subagent (tiny
-        context window) and aggregates them. Non-fatal and conservative: a failure
-        or a trivial (<2 tasks) split leaves the story taskless (built whole)."""
+        async def _acall(story: UserStory):
+            async with sem:
+                return await self._adecompose_agent_call(story)
+
+        replies = await asyncio.gather(*(_acall(s) for s in eligible))
+        for story, reply in zip(eligible, replies):
+            if reply is not None:
+                self._materialize_decomposition(story, reply)
+
+    def _existing_plan_block(self, story: UserStory) -> str:
+        """P7 - the modules already claimed by OTHER stories' tasks, injected in
+        the decompose prompt so the architect reuses them instead of planning a
+        parallel equivalent (the observed orm.py/entities.py duplication)."""
+        lines: list[str] = []
+        for s in self.state.stories:
+            if s.id == story.id:
+                continue
+            for t in s.tasks:
+                globs = ", ".join((t.files_hint or [])[:4])
+                entry = f"- {t.id} ({s.id}) : {t.title}"
+                if globs:
+                    entry += f" - fichiers : {globs}"
+                lines.append(entry)
+                if len(lines) >= 30:
+                    return "\n".join(lines)
+        return "\n".join(lines)
+
+    async def _adecompose_agent_call(self, story: UserStory) -> dict | None:
+        """The architect call of a decomposition (parallel-safe: no shared-state
+        mutation). Returns the parsed reply, or ``None`` when unavailable or
+        trivial (<2 tasks) - the story is then built whole."""
         pkg = workspace.package_name(self.state)
         self._log(f"decompose:{story.id}", f"Décomposition de {story.id} en sous-tâches par couche…")
         try:
@@ -6920,6 +6991,7 @@ class Pipeline:
                 prompts.decompose_story(
                     story, pkg, self.state.architecture,
                     available_skills=self._skills_catalog("dev"),
+                    existing_plan=self._existing_plan_block(story),
                 ),
                 system_prompt=persona("architect"),
             )
@@ -6929,11 +7001,28 @@ class Pipeline:
                 f"decompose:{story.id}",
                 f"Décomposition indisponible ({exc}) — story construite en bloc.",
             )
-            return
+            return None
         raw = [t for t in (reply.get("tasks") or []) if isinstance(t, dict)]
         if len(raw) < 2:
             self._log(f"decompose:{story.id}", "Story non décomposée (triviale) — construite en bloc.")
+            return None
+        return reply
+
+    async def _adecompose_story(self, story: UserStory) -> None:
+        """Ask the architect to split a backend story into layered sub-tasks
+        (entity → service → endpoint → tests), materialized as the story's Tasks
+        so the parallel worktree engine builds each in a focused subagent (tiny
+        context window) and aggregates them. Non-fatal and conservative: a failure
+        or a trivial (<2 tasks) split leaves the story taskless (built whole)."""
+        reply = await self._adecompose_agent_call(story)
+        if reply is None:
             return
+        self._materialize_decomposition(story, reply)
+
+    def _materialize_decomposition(self, story: UserStory, reply: dict) -> None:
+        """Materialize a decompose reply into the story's Tasks (sequential:
+        project-wide-unique ids + independence floor read shared state)."""
+        raw = [t for t in (reply.get("tasks") or []) if isinstance(t, dict)]
         # Project-wide-unique task ids; remap the agent's local ids in depends_on.
         taken = {t.id for t in self.state.all_tasks()} | {s.id for s in self.state.stories}
         valid_ac = {c.id: c for c in story.acceptance_criteria}

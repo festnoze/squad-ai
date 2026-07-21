@@ -197,13 +197,11 @@ main {
   .workspace[data-mobile-pane="scene"] .col-left {
     display: none;
   }
-  .mobile-nav {
-    display: flex;
-  }
 }
 
 /* R5 — bottom tab bar. Hidden by default (desktop shows both columns); the
-   <1100px media query above reveals it. */
+   <1100px media query BELOW reveals it — the override must come AFTER the base
+   rule in source order (same specificity: last declaration wins, media or not). */
 .mobile-nav {
   display: none;
   position: fixed;
@@ -215,6 +213,12 @@ main {
   background: var(--panel);
   border-top: 1px solid var(--border);
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 1099px) {
+  .mobile-nav {
+    display: flex;
+  }
 }
 
 .mobile-nav-tab {

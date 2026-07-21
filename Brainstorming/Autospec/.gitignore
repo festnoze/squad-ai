@@ -12,3 +12,4 @@ frontend/test-results/
 frontend/playwright-report/
 frontend/.cache/
 .playwright/
+backend/.e2e-workspace-streams/

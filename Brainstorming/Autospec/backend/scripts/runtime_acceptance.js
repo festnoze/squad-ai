@@ -87,6 +87,39 @@ function killTree(proc) {
   }
 }
 
+// D10a (run supervisé 2026-07-20) : avec `shell: true` (win32), proc.pid est
+// celui du SHELL et `taskkill /T` peut rater un descendant re-parenté (uv run →
+// python orphelin restant à l'écoute). Filet final : tuer tout process qui
+// écoute encore sur `port` ET dont la ligne de commande pointe dans le
+// workspace — jamais un tiers. Best-effort, ne lève jamais.
+function reapWorkspacePortHolders(port) {
+  try {
+    const needle = String(WS).toLowerCase();
+    if (process.platform === "win32") {
+      const script =
+        `$l = Get-NetTCPConnection -LocalPort ${Number(port)} -State Listen ` +
+        `-ErrorAction SilentlyContinue | Select-Object -ExpandProperty OwningProcess -Unique; ` +
+        `foreach ($p in $l) { $ci = Get-CimInstance Win32_Process -Filter "ProcessId=$p" ` +
+        `-ErrorAction SilentlyContinue; if ($ci -and $ci.CommandLine -and ` +
+        `$ci.CommandLine.ToLower().Contains('${needle.replace(/'/g, "''")}')) { ` +
+        `taskkill /PID $p /T /F | Out-Null } }`;
+      spawnSync("powershell", ["-NoProfile", "-Command", script], { stdio: "ignore", timeout: 20000 });
+    } else {
+      const lsof = spawnSync("lsof", ["-ti", `tcp:${Number(port)}`, "-sTCP:LISTEN"], {
+        encoding: "utf8", timeout: 15000,
+      });
+      for (const pid of String(lsof.stdout || "").split(/\s+/).filter(Boolean)) {
+        const ps = spawnSync("ps", ["-o", "command=", "-p", pid], { encoding: "utf8", timeout: 10000 });
+        if (String(ps.stdout || "").toLowerCase().includes(needle)) {
+          spawnSync("kill", ["-9", pid], { stdio: "ignore", timeout: 10000 });
+        }
+      }
+    }
+  } catch {
+    /* le nettoyage ne doit jamais faire échouer le gate */
+  }
+}
+
 function launch(label, cmd, args, cwd) {
   record(`[runtime] launch ${label}: ${cmd} ${args.join(" ")}`);
   const proc = spawn(cmd, args, {
@@ -486,5 +519,8 @@ async function runJourney(page) {
   } finally {
     if (browser) await browser.close().catch(() => {});
     for (const proc of procs) killTree(proc);
+    // Filet anti-zombie : un descendant re-parenté peut survivre au killTree.
+    if (BACKEND_WEB) reapWorkspacePortHolders(BACKEND_PORT);
+    if (FRONTEND) reapWorkspacePortHolders(FRONTEND_PORT);
   }
 })();
