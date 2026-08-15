@@ -154,7 +154,10 @@ class Game {
     });
 
     await this.loading.step(88, 'compiling shaders');
-    this.postfx = new PostFX(this.engine.renderer, this.engine.scene, this.cameraRig.camera, QUALITY_DEFAULT);
+    this.postfx = new PostFX(
+      this.engine.renderer, this.engine.scene, this.cameraRig.camera,
+      QUALITY_DEFAULT, this.atmosphere.sun,
+    );
     if (!POST_ENABLED) this.postfx.enabled = false;
     this.engine.drawOverride = () => this.postfx.render();
     // Warm the pipeline cache so the first seconds are not a stutter-fest.
@@ -474,6 +477,7 @@ class Game {
     this.hud.setVitals(this.player.health, this.player.armour);
     this.hud.setMoney(this.money);
     this.hud.setClock(this.atmosphere.clockString());
+    this.postfx.setSunElevation(this.atmosphere.sunAbove);
     this.hud.setWanted(this.wanted.stars);
     this.hud.setVehicle(car ? car.speedKmh : null, car ? car.gearLabel : '');
     this.hud.setWeapon(

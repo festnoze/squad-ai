@@ -68,6 +68,18 @@ const SHOTS = {
     g.freeCam.yaw = Math.PI * 1.25;
     g.freeCam.pitch = -0.42;
   },
+  /** Street level looking straight into a low sun down an avenue - the godray test. */
+  sunward: () => {
+    const g = window.game;
+    g.atmosphere.timeOfDay = 7.1;
+    g.atmosphere.paused = true;
+    g.atmosphere.update(0, g.cameraTarget);
+    const s = g.atmosphere.sunDirection;
+    g.freeCam.enable(g.cameraRig.camera);
+    g.freeCam.position.set(-40, 6, 40);
+    g.freeCam.yaw = Math.atan2(s.x, s.z);
+    g.freeCam.pitch = 0.12;
+  },
   /** Three-quarter view of the harbour bridge, from the water off its south side. */
   bridge: () => {
     const g = window.game;
@@ -137,7 +149,7 @@ const SHOTS = {
 };
 
 function parseArgs(argv) {
-  const args = { out: 'shots/shot.png', shot: 'street', webgl: false, time: null, wait: 2.5, post: true, url: null, width: 1600, height: 900 };
+  const args = { out: 'shots/shot.png', shot: 'street', webgl: false, time: null, wait: 2.5, post: true, url: null, width: 1600, height: 900, quality: null };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--webgl') args.webgl = true;
@@ -151,6 +163,13 @@ function parseArgs(argv) {
     else if (a === '--height') args.height = Number(argv[++i]);
     // Arbitrary page-side code, evaluated after the shot is set up. For one-off probes.
     else if (a === '--js') args.js = argv[++i];
+    else if (a === '--quality') args.quality = argv[++i];
+    else {
+      // Unknown flags used to be ignored silently, which made a mistyped option look
+      // like the feature under test simply had no effect. Fail loudly instead.
+      console.error(`Unknown argument "${a}". See the header of this file for usage.`);
+      process.exit(2);
+    }
   }
   return args;
 }
@@ -178,6 +197,7 @@ function buildQuery(a) {
   const q = new URLSearchParams();
   if (a.webgl) q.set('webgl', '1');
   if (!a.post) q.set('post', 'off');
+  if (a.quality) q.set('quality', a.quality);
   const s = q.toString();
   return s ? `?${s}` : '';
 }

@@ -226,6 +226,7 @@ export class Weather {
     atmo.weatherDim = dim;
     atmo.weatherFlash = this.lightning;
     if (atmo.scene.fog) atmo.fogScale = this.fogScale;
+    atmo.wetness = this.wetness;
   }
 
   dispose() {

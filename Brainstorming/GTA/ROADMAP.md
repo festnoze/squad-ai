@@ -78,7 +78,13 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
 
 ## Iteration 6 - Polish  `[ ]`
 - [x] Dynamic weather: clear/cloudy/rain/storm, wet roads, lightning
-- [ ] Volumetric fog / godrays
+- [x] Height fog: haze pools below a 155 m plane (deepens in rain) with a forward-
+      scattering lobe that warms towards the sun. Replaces the uniform FogExp2 shading
+      via `scene.fogNode`; `?fog=flat` restores the old one for comparison
+- [~] Godrays: the TSL `godrays` pass runs on `?quality=ultra` and does contribute
+      (A/B verified), but with `depthAwareBlend` it reads as a warm bleed around the sun
+      rather than as distinct shafts - crank the density and the whole frame washes flat
+      rather than streaking. Shipped conservatively and named honestly
 - [x] Day/night cycle: street lights, lit windows, headlights, pooled real lights
 - [x] Neon: 354 shopfronts, tubes + blade signs + graded pavement spill
 - [x] Radio: 4 procedurally generated stations (scales, chords, drums), car-only

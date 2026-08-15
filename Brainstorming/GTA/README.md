@@ -278,3 +278,35 @@ single strut the leg is already most of the way inboard by the time it reaches d
 height, so two 3 m columns end up in the carriageway. Real A-frame towers are vertical to
 deck level and only converge above it, which is also the only way the deck can pass
 through them.
+
+**Height fog beats distance fog in a city, and the difference is visible in one A/B.**
+`FogExp2` greys everything at a given depth equally, so downtown towers wash out at the
+same rate as the low-rise behind them and the skyline flattens. Fogging by how far a
+fragment sits *below* a height plane instead leaves the towers dark and solid while the
+low-rise and the coastline dissolve - the skyline rises out of the haze. `?fog=flat`
+keeps the old uniform shading so the two can be shot from the same camera.
+
+The density does not carry over between the two. `exponentialHeightFogFactor` multiplies
+by `(height - y)` as well as by depth before squaring, so it is roughly two orders of
+magnitude more sensitive than `FogExp2.density`; the first attempt reused the number
+directly and buried the entire city in white at 600 m. The ratio in `VolumetricFog` is
+fitted, not converted, and it is commented as such.
+
+**The godrays stage does not produce godrays.** The TSL `godrays` pass raymarches the
+sun's shadow map and it genuinely contributes - the A/B at `?quality=ultra` shows a warm
+bleed spreading from the sun aperture that is absent at `high`. But composited through
+`depthAwareBlend`, which lerps the scene toward a flat colour by ray density, raising the
+density does not sharpen the shafts, it washes the whole frame beige. Two things work
+against shafts here: at street level in a canyon almost the entire marched volume is
+either lit or shadowed rather than sliced, and the shadow frustum is a 150 m follow box.
+It ships at a conservative density, faded out with sun elevation, described as a bleed.
+
+**`depthAwareBlend` needs texture nodes, not passes.** It samples every input at offset
+UVs, so a bare pass or an arithmetic node (which is what the AO stage leaves behind) has
+no `.sample()` and the shader build dies with `blendNode.sample is not a function`.
+`getTextureNode()` on the passes, `convertToTexture()` on everything else.
+
+**`tools/shoot.mjs` now rejects unknown arguments.** It silently ignored them, so
+`--quality ultra` against a build that had no such flag rendered at the default and
+looked exactly like a feature that did nothing. Any harness that swallows a typo will
+eventually cost an hour of debugging the wrong thing.

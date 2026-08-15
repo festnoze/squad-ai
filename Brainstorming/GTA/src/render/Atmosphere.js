@@ -15,6 +15,7 @@ import {
   PMREMGenerator, Scene, FogExp2, Group,
 } from 'three/webgpu';
 import { SkyDome } from './SkyDome.js';
+import { VolumetricFog } from './VolumetricFog.js';
 
 /** Skydome radius. Kept comfortably inside `CameraRig`'s far plane (12000). */
 export const SKY_RADIUS = 8000;
@@ -76,7 +77,19 @@ export class Atmosphere {
     // `?fog=off` disables atmospheric fog at construction. Node materials bake the fog
     // term in at compile time, so this has to be decided before the first render.
     this.fogEnabled = new URLSearchParams(location.search).get('fog') !== 'off';
+    /** Written by Weather; deepens the haze layer and kills the scattering lobe. */
+    this.wetness = 0;
     if (this.fogEnabled) this.scene.fog = new FogExp2(0x9fb6cc, 0.00085);
+
+    /*
+     * Height fog overrides the shading of the FogExp2 above, which stays on as the data
+     * holder Weather and this class write into. `?fog=flat` keeps the old uniform fog,
+     * which is the honest comparison shot for judging whether the height falloff helps.
+     */
+    this.heightFog = new VolumetricFog(scene);
+    if (this.fogEnabled && new URLSearchParams(location.search).get('fog') !== 'flat') {
+      this.heightFog.attach();
+    }
 
     // A second, small dome is baked into the environment map. Reusing the same analytic
     // model keeps reflections consistent with what the player can actually see.
@@ -126,6 +139,8 @@ export class Atmosphere {
     // Light intensity and colour track elevation; below the horizon we fall back to
     // moonlight so the city is navigable at night.
     const above = MathUtils.clamp(elevation / 14, 0, 1);
+    /** How far the sun is above the horizon, 0-1. Read by PostFX to fade the godrays. */
+    this.sunAbove = above;
     const night = 1 - above;
     sunColorForElevation(elevation, this.sunColor);
     if (elevation > -2) {
@@ -161,6 +176,14 @@ export class Atmosphere {
       // Match the fog to the sky's own horizon colour so distant geometry dissolves
       // into the skyline instead of into an unrelated grey.
       this.scene.fog.color.copy(this.skyDome.horizonColor);
+      this.heightFog.update({
+        horizon: this.skyDome.horizonColor,
+        sun: this.sunColor,
+        sunDirection: this.sunDirection,
+        density: this.scene.fog.density,
+        night,
+        wetness: this.wetness,
+      });
     }
 
     // Keep the shadow frustum tight around the action.
