@@ -243,6 +243,85 @@ ok('mission counter agrees with mission states',
   g.missions.completed === g.missions.missions.filter(m => m.state === 'complete').length,
   `counter ${g.missions.completed} vs ${g.missions.missions.filter(m => m.state === 'complete').length} flagged`);
 
+/* -------- pickups, settings and the render pipeline -------- */
+const at = (item) => { g.player.body.setTranslation({ x: item.x, y: 1.2, z: item.z }, true); };
+const find = (type) => g.pickups.items.find((i) => i.type === type && !i.taken);
+
+/* ---------------------------------------------------------------- pickups */
+const took0 = g.pickups.collected;
+
+// Health pickup while already at full health must NOT be consumed.
+g.player.health = 100;
+const hFull = find('health');
+if (hFull) { at(hFull); await wait(1.2);
+  ok('full-health player does not waste a health pickup', !hFull.taken, `taken=${hFull.taken}`); }
+
+g.player.health = 40;
+const h = find('health');
+if (h) { at(h); await wait(1.2);
+  ok('health pickup heals and is consumed', g.player.health > 40 && h.taken,
+    `hp 40 -> ${g.player.health}, taken ${h.taken}`); }
+
+g.player.armour = 0;
+const a = find('armour');
+if (a) { at(a); await wait(1.2);
+  ok('armour pickup raises armour', g.player.armour > 0, `armour ${g.player.armour}`); }
+
+g.weapons.owned = new Set(['unarmed', 'pistol']);
+const wpn = g.pickups.items.find((i) => !i.taken && ['smg', 'shotgun', 'rifle'].includes(i.type));
+if (wpn) { at(wpn); await wait(1.2);
+  ok('weapon pickup grants the weapon', g.weapons.owned.has(wpn.type),
+    `${wpn.type}: owned [${[...g.weapons.owned]}]`); }
+
+ok('collected counter tracks pickups', g.pickups.collected > took0,
+  `${took0} -> ${g.pickups.collected}`);
+
+/* --------------------------------------------------------------- settings */
+const framesAt = () => E.frame;
+
+// Volume
+g.audio.setVolume(0.2);
+ok('volume setting reaches the audio graph',
+  Math.abs(g.audio.volume - 0.2) < 0.001 && (!g.audio.master || Math.abs(g.audio.master.gain.value - 0.2) < 0.001),
+  `volume ${g.audio.volume}, gain ${g.audio.master && g.audio.master.gain.value}`);
+g.audio.setVolume(0.65);
+
+// Resolution scale must actually resize the drawing buffer.
+const w0 = E.renderer.domElement.width;
+E.setResolutionScale(0.5);
+await wait(0.5);
+const w1 = E.renderer.domElement.width;
+ok('resolution scale resizes the framebuffer', w1 < w0, `${w0}px -> ${w1}px`);
+E.setResolutionScale(1);
+await wait(0.5);
+ok('resolution scale restores', E.renderer.domElement.width === w0, `back to ${E.renderer.domElement.width}px`);
+
+// Quality switch rebuilds the post chain and keeps rendering.
+const q0 = g.postfx.quality;
+const f0 = framesAt();
+g.postfx.setQuality('ultra');
+await wait(2);
+ok('quality switch to ultra keeps rendering', E.frame > f0 + 5 && g.postfx.quality === 'ultra',
+  `${q0} -> ${g.postfx.quality}, +${E.frame - f0} frames`);
+const f1 = framesAt();
+g.postfx.setQuality('low');
+await wait(2);
+ok('quality switch to low keeps rendering', E.frame > f1 + 5 && g.postfx.quality === 'low',
+  `+${E.frame - f1} frames`);
+g.postfx.setQuality(q0);
+await wait(1.5);
+
+// Post FX off/on must not black-screen.
+const f2 = framesAt();
+g.postfx.enabled = false;
+await wait(1.5);
+ok('post fx off keeps rendering', E.frame > f2 + 5, `+${E.frame - f2} frames`);
+const f3 = framesAt();
+g.postfx.enabled = true && !!g.postfx.post;
+await wait(1.5);
+ok('post fx back on keeps rendering', E.frame > f3 + 5 && g.postfx.enabled, `+${E.frame - f3} frames`);
+
+
 return { simSeconds: Math.round(simT), wallSeconds: Math.round((performance.now()-T0)/1000),
   ranOutOfTime: out(), passed: log.filter(l=>l.pass).length, total: log.length,
   failures: log.filter(l=>!l.pass), log };

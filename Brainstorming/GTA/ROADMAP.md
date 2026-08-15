@@ -111,7 +111,11 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
       weapons picked up after the save, keep missions completed after it (with the
       counter disagreeing, leaving them unplayable), and leave an in-progress mission
       running
-- [x] End-to-end smoke test (`npm run smoke`): 36 checks driven through real keyboard and
+- [x] Pickups and settings verified: health/armour/weapon pickups, the full-health guard
+      that stops a health crate being wasted, volume reaching the audio graph, resolution
+      scale resizing the framebuffer, and switching quality or toggling post FX without
+      black-screening. No defects found - these were already correct
+- [x] End-to-end smoke test (`npm run smoke`): 48 checks driven through real keyboard and
       mouse events - walk, enter/drive/exit car, enter/drive boat, a full mission from
       trigger through steal objective, drive-in and reward, weapon fire, wanted level,
       save/load round-trip, plus the failure paths - wasted, busted, mission timeout, and

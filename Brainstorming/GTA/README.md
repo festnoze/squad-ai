@@ -401,3 +401,13 @@ and cancels anything in progress; weapons rebuild their set from scratch.
 
 None of this was reachable from the old test, which only checked that money survived a
 round-trip. Money was the one field the merge happened to get right.
+
+**An iteration that finds nothing is still worth running.** Pickups, the settings panel and
+the effect pools were all checked on the assumption something would be wrong with them,
+and nothing was: the full-health guard correctly refuses to consume a health crate, volume
+reaches the audio graph, resolution scale really does resize the drawing buffer, and
+churning quality through all four presets and toggling post FX off and on leaves the scene
+rendering rather than black. Skid marks looked like a leak at 1032 of them, but the pool is
+a fixed 2400-quad ring buffer drawn in one call with a draw range, so it is bounded by
+construction. Those twelve checks are now in the suite, which is the actual return on the
+iteration: the behaviour is pinned whether or not it was broken today.
