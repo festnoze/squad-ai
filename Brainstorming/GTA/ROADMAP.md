@@ -115,6 +115,10 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
       that stops a health crate being wasted, volume reaching the audio graph, resolution
       scale resizing the framebuffer, and switching quality or toggling post FX without
       black-screening. No defects found - these were already correct
+- [x] Ambient fill rig: a non-shadowing fill light opposite the sun, plus a much stronger
+      hemisphere and ambient floor. The player's spawn view went from 90.6% of pixels
+      below luminance 16 (median: pure black) to 49.6% with a median of 16.6. Tuned
+      against `tools/luma.mjs`, not by eye
 - [x] End-to-end smoke test (`npm run smoke`): 48 checks driven through real keyboard and
       mouse events - walk, enter/drive/exit car, enter/drive boat, a full mission from
       trigger through steal objective, drive-in and reward, weapon fire, wanted level,

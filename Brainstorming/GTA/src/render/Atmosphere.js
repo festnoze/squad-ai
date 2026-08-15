@@ -74,6 +74,26 @@ export class Atmosphere {
     this.ambient = new AmbientLight(0xffffff, 0.12);
     scene.add(this.ambient);
 
+    /*
+     * Fill light.
+     *
+     * A city of tall blocks and narrow streets shadows almost all of its own ground, and
+     * with only a hemisphere plus a small ambient term to fill it, 91% of a street-level
+     * frame measured below luminance 16 - the median pixel was pure black. Raising the
+     * ambient alone fixes that by flattening everything, including the sunlit faces.
+     *
+     * A second directional light, aimed back from the opposite side and casting no
+     * shadow, lifts the surfaces the sun cannot reach while barely touching the ones it
+     * can: a sunlit wall is already dominated by a key light several times stronger, and a
+     * shadowed wall has nothing else. That keeps the contrast that makes the skyline read
+     * while making the streets legible.
+     */
+    this.fill = new DirectionalLight(0xa8c6ff, 0.0);
+    this.fill.castShadow = false;
+    this.fillRig = new Group();
+    this.fillRig.add(this.fill, this.fill.target);
+    scene.add(this.fillRig);
+
     // `?fog=off` disables atmospheric fog at construction. Node materials bake the fog
     // term in at compile time, so this has to be decided before the first render.
     this.fogEnabled = new URLSearchParams(location.search).get('fog') !== 'off';
@@ -154,14 +174,27 @@ export class Atmosphere {
       this.sunDirection.set(0.3, 0.75, -0.4).normalize();
     }
 
-    // The baked sky environment already supplies most of the ambient term, so the
-    // fill lights stay low - otherwise midday concrete blows straight to white.
     // Overcast raises the diffuse fill even as it cuts the sun: that flat, shadowless
     // look is most of what makes a sky read as heavy rather than merely dark.
     const overcast = 1 - this.weatherDim;
-    this.hemi.intensity = (0.24 + above * 0.16) * (1 + overcast * 0.8);
+    /*
+     * These are much larger than they look. They were tuned against a luminance histogram
+     * of the player's own spawn view, not by eye: the street used to render with 91% of
+     * its pixels below luminance 16 and a median of pure black, which is not moody, it is
+     * unreadable. See `tools/luma.mjs`.
+     */
+    this.hemi.intensity = (1.08 + above * 0.74) * (1 + overcast * 0.8);
     this.hemi.color.setHex(0x9fc4ff).lerp(new Color(0x3a4560), night * 0.8);
-    this.ambient.intensity = 0.05 + above * 0.02 + overcast * 0.06;
+    this.hemi.groundColor.setHex(0x6b5f4e).lerp(new Color(0x2a2622), night * 0.7);
+    this.ambient.intensity = 0.24 + above * 0.14 + overcast * 0.10;
+
+    /*
+     * Fill comes from the opposite side of the sky and slightly higher, so it reaches the
+     * faces the key light misses. It never goes to zero: at night the city is lit by its
+     * own sky glow, and a moonlit street with no fill at all is unnavigable.
+     */
+    this.fill.intensity = (0.60 + above * 0.88) * (1 + overcast * 0.5);
+    this.fill.color.setHex(0xa8c6ff).lerp(new Color(0x5a6c92), night * 0.6);
 
     // Lightning: a hard, brief lift on the ambient terms.
     if (this.weatherFlash > 0) {
@@ -191,6 +224,16 @@ export class Atmosphere {
     this.sun.position.copy(focus).addScaledVector(this.sunDirection, d);
     this.sun.target.position.copy(focus);
     this.sun.target.updateMatrixWorld();
+
+    // Fill sits opposite the sun in plan but always high, so it never rakes along the
+    // street and never reads as a second sun.
+    this._fillDir ??= new Vector3();
+    this._fillDir.set(-this.sunDirection.x, 0, -this.sunDirection.z);
+    if (this._fillDir.lengthSq() < 1e-6) this._fillDir.set(1, 0, 0);
+    this._fillDir.normalize().setY(1.15).normalize();
+    this.fill.position.copy(focus).addScaledVector(this._fillDir, 260);
+    this.fill.target.position.copy(focus);
+    this.fill.target.updateMatrixWorld();
     this.skyDome.setCenter(focus.x, focus.z);
 
     // Rebake the environment a few times per in-game hour, not per frame.

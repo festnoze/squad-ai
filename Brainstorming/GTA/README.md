@@ -411,3 +411,20 @@ rendering rather than black. Skid marks looked like a leak at 1032 of them, but 
 a fixed 2400-quad ring buffer drawn in one call with a draw range, so it is bounded by
 construction. Those twelve checks are now in the suite, which is the actual return on the
 iteration: the behaviour is pinned whether or not it was broken today.
+
+**"Too dark" is measurable, and measuring it changed the fix.** `tools/luma.mjs` decodes a
+screenshot and reports what fraction of the frame sits below a luminance threshold. The
+player's spawn view had **90.6% of its pixels below 16, with a median of pure black** -
+which is not a mood, it is an unreadable frame.
+
+Measuring also killed two plausible-sounding diagnoses before they cost anything. Raising
+tone-mapping exposure by 60% moved the near-black fraction by less than one point, because
+p10 was *exactly* zero and no exposure lifts a true black. Dropping the fully-metallic
+materials to a quarter of their metalness changed the histogram by nothing at all to four
+significant figures. What the frame actually needed was a fill light the sun's shadows
+cannot reach, because a city of tall blocks shadows its own ground almost everywhere.
+
+One more thing measurement caught: the `avenue` camera improved far less than the others
+and looked like a failure. Raycasting through the black pixels showed geometry **8 m from
+the lens** - that shot is jammed against a building, so most of its frame is one wall. It
+is a bad vantage for judging lighting, not evidence of a bad fix.
