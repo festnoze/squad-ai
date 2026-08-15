@@ -68,6 +68,37 @@ const SHOTS = {
     g.freeCam.yaw = Math.PI * 1.25;
     g.freeCam.pitch = -0.42;
   },
+  /** Three-quarter view of the harbour bridge, from the water off its south side. */
+  bridge: () => {
+    const g = window.game;
+    const span = g.bridges.spans[0];
+    const mx = (span.a.x + span.b.x) / 2, mz = (span.a.z + span.b.z) / 2;
+    g.freeCam.enable(g.cameraRig.camera);
+    g.freeCam.position.set(mx + 300, 70, mz - 300);
+    g.freeCam.yaw = Math.atan2(-300, 300);
+    g.freeCam.pitch = -0.13;
+  },
+  /** On the harbour bridge deck, looking along it. */
+  ondeck: () => {
+    const g = window.game;
+    const span = g.bridges.spans[0];
+    const p0 = span.points[Math.floor(span.points.length * 0.18)];
+    const p1 = span.points[Math.floor(span.points.length * 0.24)];
+    g.freeCam.enable(g.cameraRig.camera);
+    g.freeCam.position.set(p0.x, p0.y + 2.4, p0.z);
+    g.freeCam.yaw = Math.atan2(p1.x - p0.x, p1.z - p0.z);
+    g.freeCam.pitch = -0.02;
+  },
+  /** Marina bridge from the north-west shore. */
+  marina: () => {
+    const g = window.game;
+    const span = g.bridges.spans[1];
+    const mx = (span.a.x + span.b.x) / 2, mz = (span.a.z + span.b.z) / 2;
+    g.freeCam.enable(g.cameraRig.camera);
+    g.freeCam.position.set(mx - 300, 55, mz - 240);
+    g.freeCam.yaw = Math.atan2(300, 240);
+    g.freeCam.pitch = -0.1;
+  },
   /** The harbour: docks, moored boats and open water. */
   bay: () => {
     const g = window.game;

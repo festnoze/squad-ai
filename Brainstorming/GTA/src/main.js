@@ -21,6 +21,7 @@ import { StreetProps } from './world/StreetProps.js';
 import { Signage } from './world/Signage.js';
 import { Neon } from './world/Neon.js';
 import { Highway } from './world/Highway.js';
+import { Bridges } from './world/Bridges.js';
 import { NightLights } from './render/NightLights.js';
 import { Boat, BOAT_CLASSES } from './entities/Boat.js';
 import { Player, PLAYER_STATE } from './entities/Player.js';
@@ -102,6 +103,9 @@ class Game {
     this.nightLights = new NightLights(this.engine.scene, this.props.lamps);
     this.highway = new Highway(this.physics, this.city);
     for (const mesh of this.highway.meshes) this.engine.scene.add(mesh);
+
+    this.bridges = new Bridges(this.physics, this.city, this.island);
+    for (const mesh of this.bridges.meshes) this.engine.scene.add(mesh);
     this.signage = new Signage(this.physics, this.city);
     for (const mesh of this.signage.meshes) this.engine.scene.add(mesh);
     this.neon = new Neon(this.city);
@@ -191,7 +195,7 @@ class Game {
 
     await this.loading.step(94, 'drawing the map');
     this.minimap = new Minimap(this.hud.el.minimap, {
-      island: this.island, city: this.city, highway: this.highway,
+      island: this.island, city: this.city, highway: this.highway, bridges: this.bridges,
     });
     // Collision damage: Rapier reports contact force magnitudes, which the manager turns
     // into vehicle damage. Wired once, here, rather than polled per frame.

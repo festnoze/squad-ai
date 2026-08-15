@@ -53,7 +53,13 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
       barrier and stalls; behind `?hwtraffic=N`, off by default
 - [x] Traffic AI: lookahead rolls onto next edge, cross-track correction, scan ignores walls
 - [x] Traffic flow fixed: lane offsets were off the carriageway (24.5/28 flowing, 26 km/h)
-- [ ] Bridges over water, tunnels
+- [x] Bridges over water: two cable-stayed spans, the 909 m Harbour Bridge (26 m
+      clearance) and the 684 m Marina Bridge (16 m). Measured shortcuts - they replace
+      1478 m and 1150 m road detours around the two inlets. Own map layer, not spliced
+      into the ground road graph
+- [ ] Tunnels - deliberately deferred. The island is flat, so there is no relief to bore
+      through and a tunnel would only duplicate what the bridges already do. Worth
+      revisiting only if the terrain grows hills or the city gets a grade-separated core
 - [x] Street trees, hedges, planters, containers, rooftop plant
 - [x] Lamp posts, traffic lights, hydrants, benches, bins, bus shelters
 - [x] Rooftop billboards + wall signs (shared atlas, one draw call)

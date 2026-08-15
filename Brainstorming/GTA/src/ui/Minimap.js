@@ -28,6 +28,8 @@ const COLOURS = {
   ped: '#c9cdd4',
   pickup: '#57cc99',
   waypoint: '#4cc9f0',
+  bridge: '#b7a68b',
+  bridgeEdge: '#4a4238',
 };
 
 export class Minimap {
@@ -35,12 +37,13 @@ export class Minimap {
    * @param {HTMLCanvasElement} canvas the small radar canvas in the HUD
    * @param {object} world `{ island, city, ocean }`
    */
-  constructor(canvas, { island, city, highway = null }) {
+  constructor(canvas, { island, city, highway = null, bridges = null }) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.island = island;
     this.city = city;
     this.highway = highway;
+    this.bridges = bridges;
 
     /** World-space extent covered by the baked bitmap. */
     this.extent = 1750;
@@ -144,6 +147,25 @@ export class Minimap {
         });
         ctx.closePath();
         ctx.stroke();
+      }
+    }
+
+    /* -------------------------------------------------------------- bridges */
+    // Drawn over the highway: a bridge is the one crossing on the map that decides a
+    // route, so it has to survive being covered by whatever else runs near the shore.
+    if (this.bridges) {
+      for (const span of this.bridges.spans) {
+        const [ax, az] = this._toMap(span.a.x, span.a.z);
+        const [bx, bz] = this._toMap(span.b.x, span.b.z);
+        for (const pass of ['edge', 'fill']) {
+          ctx.strokeStyle = pass === 'edge' ? COLOURS.bridgeEdge : COLOURS.bridge;
+          ctx.lineWidth = (pass === 'edge' ? 24 : 17) * scale;
+          ctx.lineCap = 'butt';
+          ctx.beginPath();
+          ctx.moveTo(ax, az);
+          ctx.lineTo(bx, bz);
+          ctx.stroke();
+        }
       }
     }
 

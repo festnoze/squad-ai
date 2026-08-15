@@ -257,3 +257,24 @@ looks like a bug and is not one.
 does not, so traffic keeps moving and missions keep running while it is open. It only
 releases pointer lock so the list is clickable. Its list re-renders every 20 frames rather
 than every frame - the distances tick visibly but the DOM work is negligible.
+
+**Bridge decks are wound the same way the highway ring is, and that is load-bearing.**
+The deck quads go (left0, left1, right1, right0), which only faces upward if the
+along-deck and across-deck vectors form a right-handed frame with up. Taking the obvious
+perpendicular `(-uz, ux)` gives the *left*-handed one, and the entire carriageway renders
+unlit black. It looks exactly like a broken material and it is a sign error - two
+characters.
+
+**A pitched deck needs a pitched collider.** `addStaticBox` was yaw-only, which is fine
+for a level viaduct and wrong for a bridge approach: yaw-only boxes under a 10% grade are
+a staircase, and the wheel raycasts find the flat top of each step. `addStaticBoxQuat`
+takes a full rotation, built from the segment direction as yaw = atan2(dx, dz) and
+pitch = -asin(dy). Verified by driving: the car climbs 4 m -> 28 m across the approach at
+up to 125 km/h, dead on the centreline, with its Y matching `deckHeightAt` to within a
+metre the whole way.
+
+**A tower leg that leans all the way from footing to apex stands in the road.** With a
+single strut the leg is already most of the way inboard by the time it reaches deck
+height, so two 3 m columns end up in the carriageway. Real A-frame towers are vertical to
+deck level and only converge above it, which is also the only way the deck can pass
+through them.

@@ -79,6 +79,25 @@ export class Physics {
     return { body, collider };
   }
 
+  /**
+   * Static box with a full rotation rather than yaw only.
+   *
+   * Needed by anything whose surface is pitched as well as turned - a bridge approach
+   * ramp, a road on a slope. A yaw-only collider under a pitched deck is a staircase:
+   * the wheel raycasts find the flat top of each box and the car hammers up it.
+   */
+  addStaticBoxQuat(position, halfExtents, quat, group = GROUP.BUILDING) {
+    const bodyDesc = RAPIER.RigidBodyDesc.fixed()
+      .setTranslation(position.x, position.y, position.z)
+      .setRotation({ x: quat.x, y: quat.y, z: quat.z, w: quat.w });
+    const body = this.world.createRigidBody(bodyDesc);
+    const cd = RAPIER.ColliderDesc.cuboid(halfExtents.x, halfExtents.y, halfExtents.z)
+      .setCollisionGroups(groups(group))
+      .setFriction(0.9);
+    const collider = this.world.createCollider(cd, body);
+    return { body, collider };
+  }
+
   /** Infinite-ish ground plane approximation (a very wide, thin box). */
   addGround(y = 0, halfSize = 4096, group = GROUP.TERRAIN) {
     const bodyDesc = RAPIER.RigidBodyDesc.fixed().setTranslation(0, y - 2, 0);
