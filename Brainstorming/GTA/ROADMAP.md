@@ -1,0 +1,83 @@
+# Liberty Horizon - Roadmap
+
+GTA V-style open-world sandbox. Target: on-foot player, drivable cars, drivable boats,
+a full island map, and a mission chain. Rendering is Three.js **WebGPU** (Chrome maps
+WebGPU to **D3D12**, so it runs natively on the NVIDIA GPU) with automatic WebGL2 fallback.
+Physics is **Rapier3D** (Rust compiled to WASM, SIMD).
+
+Run: `npm run dev` -> http://localhost:8092
+
+Legend: `[ ]` todo `[~]` in progress `[x]` done
+
+---
+
+## Iteration 1 - Engine foundation + city + player on foot  `[x]`
+- [x] Project scaffold (Vite, three 0.185, rapier3d-compat 0.20)
+- [x] `Engine`: WebGPURenderer w/ WebGL2 fallback, ACES tone mapping, HDR pipeline
+- [x] Fixed-timestep game loop decoupled from render
+- [x] Input system (keyboard + mouse look + pointer lock + gamepad)
+- [x] Procedural PBR texture factory (albedo/normal/roughness/AO from FBM noise)
+- [x] Material library: asphalt, concrete, glass curtain wall, brick, sand, grass, metal
+- [x] Analytic `SkyDome` + time-of-day sun + PMREM environment
+- [x] Post-processing: GTAO + bloom + SMAA (graceful degrade)
+- [x] Rapier physics world wrapper w/ fixed step
+- [x] Procedural city: road grid, sidewalks, city blocks, instanced buildings
+- [x] Static colliders for buildings/ground
+- [x] Player: capsule kinematic character controller, walk/sprint/jump
+- [x] Third-person orbit camera with collision-aware boom
+- [x] Verified booting in Chrome with no console errors
+
+## Iteration 2 - Cars  `[~]`
+- [x] `Vehicle`: Rapier `DynamicRayCastVehicleController` (4-wheel raycast)
+- [x] Engine curve, gearbox, throttle/brake/handbrake, Ackermann steering
+- [x] Procedural car mesh (body, glass, wheels, lights) - multiple classes
+- [x] Enter/exit vehicle, camera mode switch, chase camera with speed FOV
+- [x] Wheel visual sync (spin, steer, suspension travel)
+- [x] Engine audio (WebAudio synth: revs, gearing, tyre squeal, horn, sirens)
+- [x] Skid marks (lit ribbon decals) + tyre smoke + engine smoke
+- [x] Traffic AI cars following the road network
+- [x] Collision damage (contact-force driven, paint darkens, driver takes a hit)
+
+## Iteration 3 - Boats + water  `[~]`
+- [x] Ocean: analytic waves + scrolling normals (cross-backend; WaterMesh is WebGPU-only)
+- [x] Buoyancy solver (multi-point volume sampling) + hydrodynamic drag
+- [x] `Boat`: throttle, rudder, planing, run-aground  (wake/spray still todo)
+- [x] Harbour, marina, docks, beach transition geometry
+- [x] Swimming: buoyant surface swim, prone pose, splash on entry/exit
+
+## Iteration 4 - Full map  `[~]`
+- [x] Island terrain: coastline field, beaches, sea wall, heightfield collider
+- [x] Districts: Downtown, Midtown, Suburbs, Industrial, Docks, Beachfront
+- [x] Elevated ring highway: deck, barriers, piers, 4 ramps, overpasses, on map
+- [~] AI traffic on the highway: holds the deck (11/12) but crawls into the inner
+      barrier and stalls; behind `?hwtraffic=N`, off by default
+- [x] Traffic AI: lookahead rolls onto next edge, cross-track correction, scan ignores walls
+- [x] Traffic flow fixed: lane offsets were off the carriageway (24.5/28 flowing, 26 km/h)
+- [ ] Bridges over water, tunnels
+- [x] Street trees, hedges, planters, containers, rooftop plant
+- [x] Lamp posts, traffic lights, hydrants, benches, bins, bus shelters
+- [x] Rooftop billboards + wall signs (shared atlas, one draw call)
+- [x] Minimap + world map (radar, streets, blips)
+- [x] Vehicle LOD (draw calls 656 -> 292) + frustum culling
+
+## Iteration 5 - Gameplay & missions  `[x]`
+- [x] Pedestrian crowds (pavement routes, fleeing, knockdowns, LOD)
+- [x] Wanted level (heat/stars, engagement gate) + police A* pursuit + busted
+- [x] Weapons (4, hitscan, recoil, reload) + world pickups (health/armour/ammo/guns)
+- [x] Mission framework (objectives, triggers, world markers, rewards)
+- [x] 8 missions (drive, sail, timed runs, collect, wait)
+- [x] Save/load (localStorage, autosave, versioned), money, stats
+- [x] Phone menu (`T`): jobs sorted by distance with one-click waypoints, a stats page
+      and a layout-aware controls page. Does not pause the world
+
+## Iteration 6 - Polish  `[ ]`
+- [x] Dynamic weather: clear/cloudy/rain/storm, wet roads, lightning
+- [ ] Volumetric fog / godrays
+- [x] Day/night cycle: street lights, lit windows, headlights, pooled real lights
+- [x] Neon: 354 shopfronts, tubes + blade signs + graded pavement spill
+- [x] Radio: 4 procedurally generated stations (scales, chords, drums), car-only
+- [x] Ambient soundscape: three continuous noise beds (city hum / wind / surf) mixed from
+      district density, altitude, speed, distance to shore and time of day
+- [x] Pause menu with stats/settings/save tabs, quality + resolution + volume
+- [x] Profiler + CPU pass: frame CPU 51.5ms -> 17.1ms (sleeping vehicles)
+- [ ] Verify 60 fps at 1080p on real GPU hardware (headless numbers are not representative)

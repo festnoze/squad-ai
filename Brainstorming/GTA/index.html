@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Liberty Horizon</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="/src/ui/styles.css" />
+</head>
+<body>
+  <canvas id="viewport"></canvas>
+
+  <div id="loading">
+    <div class="logo">LIBERTY<span>HORIZON</span></div>
+    <div class="bar"><i id="loading-bar"></i></div>
+    <div class="status" id="loading-status">booting</div>
+  </div>
+
+  <div id="hud" hidden>
+    <div id="hud-topleft">
+      <div id="minimap"><canvas id="minimap-canvas" width="256" height="256"></canvas></div>
+      <div id="bars">
+        <div class="bar-health"><i id="bar-health"></i></div>
+        <div class="bar-armour"><i id="bar-armour"></i></div>
+      </div>
+    </div>
+    <div id="hud-topright">
+      <div id="money">$0</div>
+      <div id="wanted"></div>
+      <div id="clock">12:00</div>
+    </div>
+    <div id="speedo" hidden>
+      <div class="kmh"><b id="speed-value">0</b><span>km/h</span></div>
+      <div class="gear" id="gear-value">N</div>
+    </div>
+    <div id="objective" hidden><h4 id="objective-title"></h4><p id="objective-text"></p></div>
+    <div id="subtitle" hidden></div>
+    <div id="crosshair" hidden></div>
+    <div id="weapon" hidden></div>
+    <div id="prompt" hidden></div>
+    <div id="stats"></div>
+  </div>
+
+  <div id="pause" hidden>
+    <div class="panel">
+      <h2>PAUSED</h2>
+      <div id="pause-body"></div>
+      <p class="hint">Esc to resume</p>
+    </div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
