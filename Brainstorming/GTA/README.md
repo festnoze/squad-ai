@@ -385,3 +385,19 @@ exposed a real bug in the feature I had just written: the muzzle sits above the 
 roof and the ray was not excluding the shooter's own collider, so officers were taking
 cover behind their own cars. One shot in twelve seconds became six, and the damage from a
 single unit went from 9.6 to 37.3.
+
+**A load that can only ever give you more is not a load.** `SaveGame.load` merged the
+saved state into the live one instead of replacing it. It added the saved weapons to the
+set the player already held, and marked the saved missions complete without clearing the
+rest - so loading a save from before you found the rifle left you holding the rifle, and a
+mission finished after the save stayed finished.
+
+That last one was the worst of the three, because it left the game *self-contradictory*:
+`completed` was assigned `done.size` from the save while the mission itself still carried
+`state: 'complete'` and its start marker stayed hidden. The counter read 0 of 8, the
+mission could never be triggered again, and nothing in the UI explained why. Missions now
+go through `restoreProgress()`, which sets every mission's state and marker from the save
+and cancels anything in progress; weapons rebuild their set from scratch.
+
+None of this was reachable from the old test, which only checked that money survived a
+round-trip. Money was the one field the merge happened to get right.

@@ -217,6 +217,32 @@ g.money = 4321; const wrote = g.save.save(); g.money = 0; g.save.load(); await w
 ok('save writes', !!wrote);
 ok('load restores money', g.money === 4321, `money=${g.money}`);
 
+/*
+ * Save/load fidelity. Loading has to *replace* progress, not merge into it - the original
+ * only ever added the saved weapons and marked the saved missions complete, so anything
+ * gained after the save survived a load of an older one.
+ */
+g.weapons.owned = new Set(['unarmed', 'pistol']); g.weapons.select('pistol');
+g.missions.restoreProgress([]);
+g.money = 1000;
+g.save.save();
+g.weapons.give('rifle', 90);
+g.missions.missions[0].state = 'complete'; g.missions.completed = 1;
+const laterMission = g.missions.missions.find(x => x.state === 'available');
+g.missions.start(laterMission);
+g.money = 9999;
+await wait(0.5);
+g.save.load(); await wait(0.6);
+ok('load drops weapons gained after the save', !g.weapons.owned.has('rifle'),
+  `owned [${[...g.weapons.owned]}]`);
+ok('load reverts missions completed after the save',
+  g.missions.missions[0].state === 'available', g.missions.missions[0].state);
+ok('load cancels a mission in progress', g.missions.active === null,
+  String(g.missions.active && g.missions.active.name));
+ok('mission counter agrees with mission states',
+  g.missions.completed === g.missions.missions.filter(m => m.state === 'complete').length,
+  `counter ${g.missions.completed} vs ${g.missions.missions.filter(m => m.state === 'complete').length} flagged`);
+
 return { simSeconds: Math.round(simT), wallSeconds: Math.round((performance.now()-T0)/1000),
   ranOutOfTime: out(), passed: log.filter(l=>l.pass).length, total: log.length,
   failures: log.filter(l=>!l.pass), log };

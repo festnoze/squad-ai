@@ -123,8 +123,16 @@ export class SaveGame {
 
     if (data.weapons) {
       const w = data.weapons;
+      /*
+       * Replace the inventory rather than merging into it. Adding the saved weapons to
+       * whatever the player currently holds means loading an older save leaves them
+       * carrying everything picked up since - a load that can only ever give you more is
+       * not a load.
+       */
       if (Array.isArray(w.owned)) {
+        g.weapons.owned = new Set(['unarmed']);
         for (const kind of w.owned) if (g.weapons.ammo[kind]) g.weapons.owned.add(kind);
+        if (!g.weapons.owned.has(g.weapons.current)) g.weapons.select('unarmed');
       }
       if (w.ammo) {
         for (const [kind, state] of Object.entries(w.ammo)) {
@@ -137,13 +145,11 @@ export class SaveGame {
     }
 
     if (data.missions) {
-      const done = new Set(data.missions.completed ?? []);
-      for (const m of g.missions.missions) {
-        if (!done.has(m.id)) continue;
-        m.state = 'complete';
-        g.missions.startMarkers.get(m.id)?.hide();
-      }
-      g.missions.completed = done.size;
+      // Replaces every mission's state and cancels anything in progress. The old version
+      // only ever marked the saved ones complete, so a mission finished *after* the save
+      // stayed finished with its marker hidden while the counter it set said zero - the
+      // two disagreed, and the mission became permanently unplayable.
+      g.missions.restoreProgress(data.missions.completed ?? []);
       g.missions.earned = data.missions.earned ?? 0;
     }
 

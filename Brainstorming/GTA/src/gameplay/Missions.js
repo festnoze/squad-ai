@@ -397,6 +397,30 @@ export class MissionManager {
     this._endMission();
   }
 
+  /**
+   * Drop the current mission without failing it, and put every mission into the state a
+   * save describes. Used by `SaveGame.load`, which has to *replace* progress rather than
+   * merge into it: marking the saved ones complete and leaving the rest alone means a
+   * mission finished after the save stays finished, and its start marker stays hidden,
+   * while the completion counter says otherwise.
+   *
+   * @param {Set<string>|string[]} completedIds mission ids complete at save time
+   */
+  restoreProgress(completedIds) {
+    const done = completedIds instanceof Set ? completedIds : new Set(completedIds ?? []);
+    if (this.active) this._endMission();
+    for (const m of this.missions) {
+      const isDone = done.has(m.id);
+      m.state = isDone ? MISSION_STATE.COMPLETE : MISSION_STATE.AVAILABLE;
+      const marker = this.startMarkers.get(m.id);
+      if (!marker) continue;
+      if (isDone) marker.hide();
+      else marker.place(m.start.x, 0.2, m.start.z, 4);
+    }
+    this.completed = done.size;
+    return this.completed;
+  }
+
   _endMission() {
     this.active = null;
     this.objectiveIndex = 0;

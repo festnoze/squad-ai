@@ -107,7 +107,11 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
 - [x] Police return fire (3 stars up, line-of-sight raycast, accuracy falling off with
       range). Before this, vehicle collisions were the *only* damage source in the game
 - [x] Being busted now also fails the active mission, as dying does
-- [x] End-to-end smoke test (`npm run smoke`): 32 checks driven through real keyboard and
+- [x] Save/load replaces progress instead of merging into it. Loading used to keep
+      weapons picked up after the save, keep missions completed after it (with the
+      counter disagreeing, leaving them unplayable), and leave an in-progress mission
+      running
+- [x] End-to-end smoke test (`npm run smoke`): 36 checks driven through real keyboard and
       mouse events - walk, enter/drive/exit car, enter/drive boat, a full mission from
       trigger through steal objective, drive-in and reward, weapon fire, wanted level,
       save/load round-trip, plus the failure paths - wasted, busted, mission timeout, and
