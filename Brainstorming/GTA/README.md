@@ -336,3 +336,21 @@ The third fix needed a second, slower timer rather than loosening the first. Loo
 throttle test is what cost a third of the city's traffic once before (it is in the git
 history); twelve seconds below walking pace is a different question from "wants to move
 and cannot", and it deserves its own counter.
+
+**A test that bypasses input cannot catch input bugs.** The first version of the smoke
+test poked game state directly - `setLinvel` on the player, `traffic.enter()` for the
+car - and reported four failures that were all defects in the test. The player is a
+kinematic character controller and ignores rigid-body velocity; vehicle entry is gated on
+`input.pressed('interact')`, an edge that never fires unless a key actually goes down.
+Rewritten to dispatch real `KeyboardEvent`s and `MouseEvent`s at the window, it exercises
+the same path a player does, and every one of those four "failures" passed.
+
+**One exception per frame cost 36x the frame budget.** `Boat` has `speedKmh` and
+`gearLabel` but no `rpm` - it has a throttle, not a gearbox. The HUD debug line read
+`car.rpm.toFixed(0)` for any vehicle, so every frame the player spent in a boat threw and
+took the rest of the render update with it. The smoke test ran 11 seconds of simulation in
+420 seconds of wall clock; with the guard added, 22 seconds in 22. Nothing about this was
+visible in a screenshot - the boat still floated, still steered, and the frame still drew.
+It needed a test that got in the boat and kept playing.
+
+Run it with `npm run smoke` against a dev server on 8092.

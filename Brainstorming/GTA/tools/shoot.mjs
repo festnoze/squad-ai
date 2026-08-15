@@ -18,7 +18,7 @@
 import { chromium } from 'playwright-core';
 import { mkdir } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 const CHROME_CANDIDATES = [
   'C:/Users/e.millerioux/AppData/Local/ms-playwright/chromium-1223/chrome-win64/chrome.exe',
@@ -67,6 +67,19 @@ const SHOTS = {
     g.freeCam.position.set(700, 70, 700);
     g.freeCam.yaw = Math.PI * 1.25;
     g.freeCam.pitch = -0.42;
+  },
+  /** Along the elevated ring, low and close, to judge highway traffic. */
+  highway: () => {
+    const g = window.game;
+    const R = g.highway.radius, a = 0.6;
+    g.freeCam.enable(g.cameraRig.camera);
+    const px = Math.cos(a) * R, py = g.highway.height + 15, pz = Math.sin(a) * R;
+    g.freeCam.position.set(px, py, pz);
+    // Aim at a point further round the deck. Deriving the yaw from the tangent by hand
+    // got the sign wrong twice; aiming at an actual target cannot.
+    const tx = Math.cos(a + 0.5) * R, ty = g.highway.height, tz = Math.sin(a + 0.5) * R;
+    g.freeCam.yaw = Math.atan2(tx - px, tz - pz);
+    g.freeCam.pitch = Math.atan2(ty - py, Math.hypot(tx - px, tz - pz));
   },
   /** Street level looking straight into a low sun down an avenue - the godray test. */
   sunward: () => {
@@ -163,6 +176,7 @@ function parseArgs(argv) {
     else if (a === '--height') args.height = Number(argv[++i]);
     // Arbitrary page-side code, evaluated after the shot is set up. For one-off probes.
     else if (a === '--js') args.js = argv[++i];
+    else if (a === '--js-file') args.js = readFileSync(argv[++i], 'utf8');
     else if (a === '--quality') args.quality = argv[++i];
     else {
       // Unknown flags used to be ignored silently, which made a mistyped option look

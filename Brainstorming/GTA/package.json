@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "vite --port 8092 --strictPort",
     "build": "vite build",
-    "preview": "vite preview --port 8092 --strictPort"
+    "preview": "vite preview --port 8092 --strictPort",
+    "smoke": "node tools/shoot.mjs --shot street --out shots/smoke.png --url \"http://localhost:8092/?post=off&hwtraffic=0\" --wait 3 --js-file tools/smoke-probe.js"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "0.20.0",

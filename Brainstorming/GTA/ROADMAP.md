@@ -98,4 +98,10 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
       district density, altitude, speed, distance to shore and time of day
 - [x] Pause menu with stats/settings/save tabs, quality + resolution + volume
 - [x] Profiler + CPU pass: frame CPU 51.5ms -> 17.1ms (sleeping vehicles)
+- [x] Highway traffic on by default (26 cars). Every car holds the deck across 130 s;
+      median gap 139 m on the 4 km ring, +1.5 ms over 14 cars
+- [x] End-to-end smoke test (`npm run smoke`): 14 checks driven through real keyboard and
+      mouse events - walk, enter/drive/exit car, enter/drive boat, mission start and
+      objective, weapon fire, wanted level, save/load round-trip. Exits with the failures
+      listed. Found a per-frame exception in the boat HUD path that no screenshot could
 - [ ] Verify 60 fps at 1080p on real GPU hardware (headless numbers are not representative)

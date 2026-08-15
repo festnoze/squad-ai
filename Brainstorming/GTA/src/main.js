@@ -127,21 +127,22 @@ class Game {
     this.traffic.spawnParked(110);
     this.traffic.spawnTraffic(28);
     /*
-     * The highway graph is built (and drives correctly under manual control), but AI
-     * traffic on it is DISABLED.
+     * Highway traffic, on by default. `?hwtraffic=N` overrides the count; 0 empties it.
      *
-     * The lane-following autopilot is not yet accurate enough for an elevated road. On a
-     * street, drifting a metre out of lane is invisible; on a viaduct with an eight-metre
-     * margin it means cars leaving the deck, and once off they wander the map chasing ring
-     * waypoints from ground level. Measured 3 of 12 still on the deck after twelve
-     * seconds. An empty expressway is better than that, so this stays off until the
-     * controller holds a lane properly - most likely a full lateral PID with the deck
-     * edges as hard constraints, not another gain tweak.
+     * This was off for a long time behind a comment blaming the lane-following autopilot
+     * for cars leaving the deck. That diagnosis was wrong. The cars were not drifting off
+     * the edge - they were being *teleported* off it, by a stuck-recovery path that
+     * hardcoded ground height and so dropped them onto the streets below whenever the
+     * timer fired. The giveaway was that they landed at their correct ring radius. With
+     * that fixed, every car holds the deck across 130 s of simulation and the ring
+     * sustains ~40 km/h, so there is no longer any reason to run an empty expressway.
+     *
+     * 26 is a density choice, not a performance one: it halves the median gap between
+     * cars to 139 m on a 4 km ring, and costs 1.5 ms more than 14 did.
      */
     this.highway.buildNetwork();
-    if (PARAMS.has('hwtraffic')) {
-      this.traffic.spawnOnNetwork(this.highway.network, Number(PARAMS.get('hwtraffic')) || 6);
-    }
+    const hwCars = PARAMS.has('hwtraffic') ? Number(PARAMS.get('hwtraffic')) : 26;
+    if (hwCars > 0) this.traffic.spawnOnNetwork(this.highway.network, hwCars);
     // A car waiting right where the player starts, so driving is one keypress away.
     this._spawnStarterCar();
     this._spawnBoats();
@@ -497,8 +498,14 @@ class Game {
       `${this.engine.backend}`,
       `draws ${this.engine.stats.drawCalls}  tris ${(this.engine.stats.triangles / 1000).toFixed(0)}k`,
       `pos ${this.cameraTarget.x.toFixed(0)} ${this.cameraTarget.y.toFixed(1)} ${this.cameraTarget.z.toFixed(0)}`,
+      // A boat has a throttle and a gear label but no gearbox and therefore no `rpm`.
+      // Reading it unconditionally threw here on every single frame the player was
+      // aboard one, which took the rest of the render update down with it and ran the
+      // game at a fraction of real time. Found by an end-to-end input-level smoke test;
+      // no amount of looking at screenshots would have surfaced it.
       car
-        ? `${car.spec.label}  ${car.speedKmh.toFixed(0)} km/h  gear ${car.gearLabel}  ${car.rpm.toFixed(0)} rpm`
+        ? `${car.spec.label}  ${car.speedKmh.toFixed(0)} km/h  gear ${car.gearLabel}`
+          + (car.isBoat ? '' : `  ${car.rpm.toFixed(0)} rpm`)
         : `spd ${(this.player.speed * 3.6).toFixed(0)} km/h  ${this.player.isSwimming ? 'swimming' : this.player.grounded ? 'grounded' : 'air'}`,
       `cars ${this.traffic.count} (${this.traffic.trafficCount} ai)   post ${this.postfx.enabled ? this.postfx.quality : 'off'}`,
       `missions ${this.missions.completed}/${this.missions.missions.length}   earned $${this.missions.earned}`,
