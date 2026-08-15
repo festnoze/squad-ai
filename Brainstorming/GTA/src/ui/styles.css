@@ -219,3 +219,11 @@ html, body {
   padding: 8px; text-align: center; font-size: 11px; letter-spacing: .2em;
   color: var(--dim); border-top: 1px solid rgba(255,255,255,.08);
 }
+
+/* Damage flash: a red vignette at the screen edge, never over the centre. */
+#damage-flash {
+  position: fixed; inset: 0; z-index: 60; pointer-events: none; opacity: 0;
+  transition: opacity 90ms linear;
+  background: radial-gradient(ellipse at center,
+    rgba(200, 26, 26, 0) 42%, rgba(190, 22, 22, 0.55) 78%, rgba(150, 12, 12, 0.85) 100%);
+}

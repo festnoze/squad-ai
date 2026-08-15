@@ -84,6 +84,23 @@ export class HUD {
     this._set('objText', this.el.objectiveText, text ?? '');
   }
 
+  /**
+   * Red edge flash when the player takes a hit.
+   *
+   * Being shot at from off-screen is otherwise only visible as the health bar ticking
+   * down in the corner, which is not where anyone is looking during a chase.
+   */
+  flashDamage(strength = 1) {
+    if (!this._damageEl) {
+      const el = document.createElement('div');
+      el.id = 'damage-flash';
+      document.body.appendChild(el);
+      this._damageEl = el;
+    }
+    this._damageTimer = Math.min(0.5, 0.28 * strength);
+    this._damageEl.style.opacity = String(Math.min(0.6, 0.42 * strength));
+  }
+
   /** Transient centre-screen line, e.g. mission dialogue. */
   say(text, seconds = 3.5) {
     this.el.subtitle.textContent = text;
@@ -129,6 +146,15 @@ export class HUD {
     if (this._subtitleTimer > 0) {
       this._subtitleTimer -= dt;
       if (this._subtitleTimer <= 0) this.el.subtitle.hidden = true;
+    }
+    if (this._damageTimer > 0) {
+      this._damageTimer -= dt;
+      const el = this._damageEl;
+      if (el) {
+        el.style.opacity = this._damageTimer > 0
+          ? String(Math.max(0, Number(el.style.opacity) - dt * 1.6))
+          : '0';
+      }
     }
   }
 }

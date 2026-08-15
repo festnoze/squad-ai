@@ -131,6 +131,88 @@ ok('weapon fires on click', g.weapons.shotsFired > s0, `${g.weapons.shotsFired -
 g.wanted.report(3.5, 'smoke'); await wait(0.8);
 ok('wanted rises', g.wanted.stars > 0, `stars ${g.wanted.stars}`);
 
+// --- failure paths ------------------------------------------------------------
+// Everything above proves the happy path. These prove the game can also tell you no.
+
+// Wasted: health to zero must respawn, bill the player and end the current job.
+const m2 = g.missions.missions.find(x => x.state === 'available');
+g.missions.start(m2); await wait(0.6);
+const cashBeforeDeath = g.money, deathsBefore = g.deaths ?? 0;
+g.player.health = 4;
+g.player.damage(50);
+await wait(1.2);
+ok('death respawns with full health', g.player.health === 100, `hp ${g.player.health}`);
+ok('death charges a hospital fee', g.money === Math.max(0, cashBeforeDeath - 750),
+  `${cashBeforeDeath} -> ${g.money}`);
+ok('death ends the active mission', g.missions.active === null, String(g.missions.active));
+ok('death is counted', (g.deaths ?? 0) === deathsBefore + 1, String(g.deaths));
+
+// Busted: the arrest path must also end the job and clear the stars.
+const m3 = g.missions.missions.find(x => x.state === 'available');
+g.missions.start(m3); await wait(0.6);
+const cashBeforeBust = g.money, bustsBefore = g.wanted.busted;
+g.wanted.report(5, 'smoke'); await wait(0.4);
+g.wanted._bust(); await wait(0.8);
+ok('busted clears the wanted level', g.wanted.stars === 0, `stars ${g.wanted.stars}`);
+ok('busted ends the active mission', g.missions.active === null, String(g.missions.active));
+ok('busted is counted and fined', g.wanted.busted === bustsBefore + 1 && g.money === Math.max(0, cashBeforeBust - 500),
+  `busts ${g.wanted.busted}, ${cashBeforeBust} -> ${g.money}`);
+
+// Mission timeout: a timed objective must fail itself and return the mission to the pool.
+const timed = g.missions.missions.find(x => x.objectives.some(o => o.timeLimit));
+if (timed) {
+  g.missions.start(timed); await wait(0.5);
+  // Skip to the timed objective, then run the clock out.
+  let guard = 0;
+  while (g.missions.active && !g.missions.currentObjective.timeLimit && guard++ < 6) g.missions._advance();
+  const timedObj = g.missions.active && g.missions.currentObjective;
+  if (timedObj && timedObj.timeLimit) {
+    g.missions.timer = 0.4;
+    await wait(1.5);
+    ok('timed objective fails on the clock', g.missions.active === null, String(g.missions.active));
+    ok('failed mission returns to the pool', timed.state === 'available', timed.state);
+  } else ok('timed objective reachable', false, 'could not reach a timed objective');
+} else ok('a timed mission exists', false);
+
+/*
+ * Police return fire. Asserting the method exists would pass while it did nothing, so
+ * this stands a cruiser next to the player at four stars, gives it line of sight, and
+ * checks the health bar actually moves.
+ */
+g.wanted.clear(); await wait(0.3);
+g.player.teleport(g.city.playerSpawn());
+await wait(0.5);
+g.wanted.report(9, 'smoke');
+let dispatchGuard = 0;
+while (g.wanted.units.length === 0 && dispatchGuard++ < 40 && !out()) await wait(0.5);
+ok('police units dispatch at a high wanted level',
+  g.wanted.units.length > 0, `${g.wanted.units.length} units, ${g.wanted.stars} stars`);
+if (g.wanted.units.length) {
+  const unit = g.wanted.units[0];
+  const pp = g.player.position;
+  unit.vehicle.body.setTranslation({ x: pp.x + 9, y: 1.0, z: pp.z }, true);
+  unit.vehicle.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+  unit.seen = true;
+  unit.fireTimer = 0;
+  const hpBefore = g.player.health;
+  const deathsBefore2 = g.deaths ?? 0;
+  let fired = 0;
+  const shotHook = g.wanted.onShot;
+  g.wanted.onShot = (from, hitP) => { fired++; shotHook?.(from, hitP); };
+  for (let i = 0; i < 24 && !out(); i++) {
+    unit.seen = true;
+    const q = g.player.position;
+    unit.vehicle.body.setTranslation({ x: q.x + 9, y: 1.0, z: q.z }, true);
+    await wait(0.5);
+  }
+  g.wanted.onShot = shotHook;
+  ok('police open fire', fired > 0, `${fired} shots`);
+  ok('police gunfire damages the player',
+    g.player.health < hpBefore || (g.deaths ?? 0) > deathsBefore2,
+    `hp ${hpBefore} -> ${g.player.health}, deaths ${deathsBefore2} -> ${g.deaths ?? 0}`);
+}
+g.wanted.clear();
+
 g.money = 4321; const wrote = g.save.save(); g.money = 0; g.save.load(); await wait(0.4);
 ok('save writes', !!wrote);
 ok('load restores money', g.money === 4321, `money=${g.money}`);

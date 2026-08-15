@@ -306,6 +306,52 @@ export class WantedSystem {
     } else {
       unit.bustTimer = 0;
     }
+
+    this._shootAt(unit, dt, distance);
+  }
+
+  /**
+   * Return fire.
+   *
+   * Until this existed, vehicle collisions were the *only* thing in the game that could
+   * take a point of health off the player - police could ram you and arrest you but never
+   * hurt you, which made a five-star wanted level a chase with no stakes.
+   *
+   * Officers only open fire from three stars up, and only once a unit has actually seen
+   * the player: being shot by a car that has not found you yet reads as a bug, not as
+   * danger. The shot is a raycast so cover genuinely works, and the fire rate is per unit
+   * so a bigger response is a heavier one.
+   */
+  _shootAt(unit, dt, distance) {
+    unit.fireTimer = (unit.fireTimer ?? this.rng?.() ?? 0.7) - dt;
+    if (this.stars < 3 || !unit.seen || distance > 34 || distance < 3) return;
+    if (unit.fireTimer > 0) return;
+    unit.fireTimer = 0.55 + Math.random() * 0.7;
+
+    const p = this.player.position;
+    const t = unit.vehicle.body.translation();
+    // Fire from just above the cruiser's roofline towards the player's chest.
+    this._from ??= new Vector3();
+    this._dir ??= new Vector3();
+    this._from.set(t.x, t.y + 1.1, t.z);
+    this._dir.set(p.x - this._from.x, (p.y + 0.9) - this._from.y, p.z - this._from.z).normalize();
+
+    // Exclude the shooter's own cruiser: the muzzle sits just above its roof and the ray
+    // otherwise clips the bodywork it is fired from, so the officer takes cover behind
+    // his own car and almost never gets a shot away.
+    const hit = this.physics.raycast(
+      this._from, this._dir, distance + 2,
+      groups(GROUP.PED, GROUP.PLAYER | GROUP.BUILDING | GROUP.PROP | GROUP.TERRAIN | GROUP.VEHICLE),
+      unit.vehicle.collider,
+    );
+    // Anything solid in the way is cover. Only a clear line reaches the player.
+    if (hit && hit.collider !== this.player.collider) return;
+
+    // Accuracy falls off with range so a sprint for cover is worth making.
+    const aim = MathUtils.clamp(1 - distance / 44, 0.15, 0.85);
+    if (Math.random() > aim) { this.onShot?.(this._from, false); return; }
+    this.player.damage(7 + Math.random() * 5);
+    this.onShot?.(this._from, true);
   }
 
   _bust() {

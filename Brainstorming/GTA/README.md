@@ -367,3 +367,21 @@ separates "wedged" from "never accelerated" without another debugging round.
 state and the body is not stepped; `Missions._playerPoint` reads the vehicle instead.
 Anything measuring the player's progress has to do the same or it measures a parked
 corpse - the smoke test reported a constant 620 m to a goal it was driving straight at.
+
+**The player could not die, and nothing in the game could hurt them.** `Player.damage()`
+has always returned `true` at zero health, and the single call site - vehicle collision
+damage - discarded the result. Nothing anywhere read `player.health`. So the bar emptied
+and play carried on. Worse, that collision was the *only* damage source in the entire
+codebase: police could ram you and arrest you but never shoot you, which made a five-star
+wanted level a chase with no stakes. Both are fixed, and the health check now lives in one
+place in the fixed step rather than at each damage site, so a future damage source cannot
+forget to handle killing the player.
+
+**"It exists" is not a test.** The first version of the police-gunfire check asserted
+`typeof wanted._shootAt === 'function'`, which would pass just as happily if the method
+returned immediately every time. Replacing it with a live pursuit - stand a cruiser next
+to the player at four stars, give it line of sight, watch the health bar - immediately
+exposed a real bug in the feature I had just written: the muzzle sits above the cruiser's
+roof and the ray was not excluding the shooter's own collider, so officers were taking
+cover behind their own cars. One shot in twelve seconds became six, and the damage from a
+single unit went from 9.6 to 37.3.

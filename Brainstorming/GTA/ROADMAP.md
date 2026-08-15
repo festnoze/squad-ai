@@ -100,9 +100,17 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
 - [x] Profiler + CPU pass: frame CPU 51.5ms -> 17.1ms (sleeping vehicles)
 - [x] Highway traffic on by default (26 cars). Every car holds the deck across 130 s;
       median gap 139 m on the 4 km ring, +1.5 ms over 14 cars
-- [x] End-to-end smoke test (`npm run smoke`): 20 checks driven through real keyboard and
+- [x] Player can die. "Wasted" respawns at full health for a $750 hospital fee, drops
+      armour, clears the wanted level and fails the active job. `damage()` had always
+      returned true at zero health and the one call site discarded it, so the bar simply
+      emptied and play continued
+- [x] Police return fire (3 stars up, line-of-sight raycast, accuracy falling off with
+      range). Before this, vehicle collisions were the *only* damage source in the game
+- [x] Being busted now also fails the active mission, as dying does
+- [x] End-to-end smoke test (`npm run smoke`): 32 checks driven through real keyboard and
       mouse events - walk, enter/drive/exit car, enter/drive boat, a full mission from
       trigger through steal objective, drive-in and reward, weapon fire, wanted level,
-      save/load round-trip. Found a per-frame exception in the boat HUD path that no
-      screenshot could, and runs at real time (31 s of simulation in 34 s of wall clock)
+      save/load round-trip, plus the failure paths - wasted, busted, mission timeout, and
+      live police gunfire measured on the health bar. Found a per-frame exception in the
+      boat HUD path that no screenshot could
 - [ ] Verify 60 fps at 1080p on real GPU hardware (headless numbers are not representative)

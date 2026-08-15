@@ -184,6 +184,14 @@ class Game {
     this.wanted.onBusted = () => {
       this.money = Math.max(0, this.money - 500);
       this.player.teleport(this.city.playerSpawn());
+      // Being arrested ends the job. Without this the mission kept running while the
+      // player stood outside the police station on the far side of the map.
+      this.missions?.fail('busted');
+    };
+    this.wanted.onShot = (from, hitPlayer) => {
+      this.audio.gunshot('pistol');
+      if (hitPlayer) this.hud.flashDamage?.();
+      void from;
     };
     this.missions = new MissionManager({
       scene: this.engine.scene, player: this.player, traffic: this.traffic,
@@ -448,6 +456,11 @@ class Game {
       if (hit > 14) this.player.damage(hit * 0.35);
     }
 
+    // Health is checked in one place rather than at each damage site, so nothing can add
+    // a new way to hurt the player and forget to handle killing them. `damage()` has
+    // always returned true at zero health and every call site discarded it.
+    if (this.player.health <= 0) this._onWasted();
+
     // Splash on entering or leaving the water. The smoke pool doubles as spray: same
     // billboards, brighter tint, shorter life.
     if (this.player.enteredWaterThisStep || this.player.leftWaterThisStep) {
@@ -684,6 +697,32 @@ class Game {
     } else {
       this.hud.setPrompt(null);
     }
+  }
+
+  /**
+   * Wasted.
+   *
+   * The player could not die before this existed: `Player.damage()` returned true at zero
+   * health and the single call site threw the result away, so the health bar simply
+   * emptied and play continued. That made every threat in the game cosmetic.
+   *
+   * Recovery is deliberately not free but not punishing either - a hospital fee and the
+   * loss of armour and the current job, which is what makes running from a wanted level
+   * a decision rather than a formality.
+   */
+  _onWasted() {
+    this.player.health = 100;
+    this.player.armour = 0;
+    this.money = Math.max(0, this.money - 750);
+    // Out of the car first: respawning while still bound to a vehicle leaves the camera
+    // following an empty wreck across the map.
+    if (this.traffic.playerVehicle) this.traffic.exit(this.player);
+    this.wanted.clear();
+    this.missions.fail('wasted');
+    this.player.teleport(this.city.playerSpawn());
+    this.weapons.reload();
+    this.hud.say('Wasted  -  $750 in medical bills', 4);
+    this.deaths = (this.deaths ?? 0) + 1;
   }
 
   togglePause() {
