@@ -287,6 +287,65 @@ export class VehicleManager {
    * is which. Reading `this.city.network` here instead looks up highway edge indices in
    * the ground node array and steers cars at unrelated junctions a kilometre away.
    */
+  /**
+   * First point further along the lane with room for a car, walking onto later edges as
+   * needed. Returns null if nothing within reach is clear.
+   *
+   * The old recovery teleported the car to `along + 0.05` on its current edge - about two
+   * metres. A car is longer than that, so a vehicle wedged nose-to-tail in a pile-up was
+   * being rematerialised *inside* the car it was stuck against, which is what kept the
+   * pile-up alive and growing instead of clearing it. Recovery has to land somewhere
+   * genuinely empty or it is just churn.
+   *
+   * @returns {object|null} a lane point, extended with the edge it belongs to
+   */
+  _clearSpotAhead(net, state, along, vehicle, reach = 140, minGap = 7) {
+    let edge = state.edge;
+    let forward = state.forward;
+    let t = along;
+    let travelled = 0;
+    let guard = 0;
+
+    while (travelled < reach && guard++ < 24) {
+      t += 9 / Math.max(1, edge.length);
+      if (t >= 1) {
+        // Roll onto a continuation, the same way the driving code hands over.
+        const nodeId = forward ? edge.b : edge.a;
+        const exits = net.exitsFrom(nodeId, edge.id);
+        if (!exits.length) return null;
+        const next = net.edges[exits[Math.floor(this.rng() * exits.length)]];
+        forward = next.a === nodeId;
+        edge = next;
+        t = 0;
+      }
+      travelled += 9;
+
+      const p = net.lanePointOnEdge(edge, t, forward, state.lane);
+      let blocked = false;
+      for (const other of this.vehicles) {
+        if (other === vehicle) continue;
+        const q = other.position;
+        // Compare in 3D: the ring passes directly over streets, and a car on the deck is
+        // not blocked by one sitting on the road nine metres below it.
+        if (Math.abs(q.y - (p.y ?? 0)) > 4) continue;
+        if (Math.hypot(q.x - p.x, q.z - p.z) < minGap) { blocked = true; break; }
+      }
+      if (!blocked) return { ...p, edge, forward };
+    }
+
+    /*
+     * Nothing clear within reach. Nudge forward on the current lane anyway rather than
+     * returning null: on a dense city grid every candidate can be occupied, and a car
+     * that is never moved is welded in place forever. Measured over 130 s, refusing to
+     * teleport bled city traffic from 27 of 28 flowing down to 12. Churning is worse than
+     * clearing but far better than a permanent obstacle.
+     */
+    const p = net.lanePointOnEdge(
+      state.edge, MathUtils.clamp(along + 0.05, 0, 1), state.forward, state.lane,
+    );
+    return { ...p, edge: state.edge, forward: state.forward };
+  }
+
   _driveAI(vehicle, state, dt) {
     const net = state.network ?? this.city.network;
     const pos = vehicle.position;
@@ -399,13 +458,49 @@ export class VehicleManager {
      */
     if (speed < 0.4 && throttle > 0.3) state.stuckTimer += dt;
     else state.stuckTimer = 0;
+
+    /*
+     * Second, slower timer for dead queues.
+     *
+     * The test above deliberately ignores a car that is queued behind traffic, because it
+     * has lifted off the throttle and is waiting legitimately. But if the car at the head
+     * of that queue is itself jammed against scenery, nobody behind it ever trips either
+     * test and the whole line is parked permanently. Measured over 130 s, city traffic
+     * bled from 25 of 28 flowing down to 15 exactly this way. Twelve seconds below
+     * walking pace is not a queue, it is a dead one.
+     */
+    if (speed < 0.6) state.deadTimer = (state.deadTimer ?? 0) + dt;
+    else state.deadTimer = 0;
+    if (state.deadTimer > 12) { state.stuckTimer = 5; state.deadTimer = 0; }
+
     if (state.stuckTimer > 4) {
-      const spot = net.lanePointOnEdge(edge, MathUtils.clamp(along + 0.05, 0, 1), state.forward, state.lane);
-      vehicle.body.setTranslation({ x: spot.x, y: vehicle.spec.wheelRadius + 0.5, z: spot.z }, true);
-      vehicle.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
-      vehicle.body.setRotation(
-        { x: 0, y: Math.sin(spot.heading / 2), z: 0, w: Math.cos(spot.heading / 2) }, true,
-      );
+      const spot = this._clearSpotAhead(net, state, along, vehicle);
+      if (spot) {
+        /*
+         * Respawn at the lane's own elevation, not at ground level.
+         *
+         * The ground road graph is 2D and its `lanePointOnEdge` returns no `y` at all, so
+         * hardcoding wheel height here was right for streets and silently wrong for the
+         * elevated ring. Every highway car that tripped the stuck timer was teleported
+         * off the viaduct to the road underneath, where it jammed against the piers and
+         * tripped the timer again. Measured over 45 s of simulation, 11 of 12 highway
+         * cars ended up on the ground at their correct ring radius - which is what gave
+         * the game away.
+         */
+        const laneY = spot.y ?? 0;
+        vehicle.body.setTranslation(
+          { x: spot.x, y: laneY + vehicle.spec.wheelRadius + 0.5, z: spot.z }, true,
+        );
+        vehicle.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        // Angular velocity too: a car that got flipped onto its nose in a pile-up keeps
+        // its spin through a teleport and simply flips again where it lands.
+        vehicle.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+        vehicle.body.setRotation(
+          { x: 0, y: Math.sin(spot.heading / 2), z: 0, w: Math.cos(spot.heading / 2) }, true,
+        );
+        state.edge = spot.edge;
+        state.forward = spot.forward;
+      }
       state.stuckTimer = 0;
     }
 

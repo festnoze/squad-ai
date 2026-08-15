@@ -310,3 +310,29 @@ no `.sample()` and the shader build dies with `blendNode.sample is not a functio
 `--quality ultra` against a build that had no such flag rendered at the default and
 looked exactly like a feature that did nothing. Any harness that swallows a typo will
 eventually cost an hour of debugging the wrong thing.
+
+**Measure traffic in simulation time, over minutes, or do not believe the number.** Two
+figures published earlier in this build were wrong the same way: "highway holds the deck
+11/12" and "city traffic 24.5/28 flowing at 26 km/h". Both were sampled seconds after
+spawn, during the phase where cars are still accelerating and no jam has had time to form.
+Run either for two minutes and the highway drops to 1/12 on the deck and the city to
+15/28. Sampling wall-clock makes it worse: the fixed-step loop caps at five steps a frame
+and *discards* the remainder, so at 5 fps headless the simulation runs at a third of real
+time and a "12 second" test is four seconds of game. Hook a fixed callback, accumulate
+`dt`, and drive the test off that.
+
+**One recovery path, three separate bugs, all invisible to a short test.** Stuck cars are
+teleported forward along their lane. That code (a) hardcoded wheel height, which is right
+for the 2D street graph whose `lanePointOnEdge` returns no `y` at all and catastrophic
+for a deck 9.5 m up - highway cars were teleported off the viaduct one at a time, which is
+why they ended up on the ground *at their correct ring radius*; (b) nudged the car
+`along + 0.05`, about two metres, which is shorter than a car, so a vehicle wedged
+nose-to-tail was rematerialised inside its neighbour and the pile-up fed itself; and (c)
+only counted a car as stuck if it was *asking for throttle*, deliberately excluding cars
+queued legitimately - but when the lead car is jammed against scenery, nobody in the queue
+trips either test and the whole line parks permanently.
+
+The third fix needed a second, slower timer rather than loosening the first. Loosening the
+throttle test is what cost a third of the city's traffic once before (it is in the git
+history); twelve seconds below walking pace is a different question from "wants to move
+and cannot", and it deserves its own counter.

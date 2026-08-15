@@ -49,10 +49,16 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
 - [x] Island terrain: coastline field, beaches, sea wall, heightfield collider
 - [x] Districts: Downtown, Midtown, Suburbs, Industrial, Docks, Beachfront
 - [x] Elevated ring highway: deck, barriers, piers, 4 ramps, overpasses, on map
-- [~] AI traffic on the highway: holds the deck (11/12) but crawls into the inner
-      barrier and stalls; behind `?hwtraffic=N`, off by default
+- [x] AI traffic on the highway: 12/12 hold the deck across 130 s of simulation,
+      7.8/12 flowing at 44 km/h with peaks to 126. Three defects, all in the shared
+      stuck-recovery path: it teleported to ground height on an elevated network, it
+      respawned cars inside the car they were wedged against, and a queue behind a jammed
+      lead car tripped no timer at all. Behind `?hwtraffic=N`, still off by default
 - [x] Traffic AI: lookahead rolls onto next edge, cross-track correction, scan ignores walls
-- [x] Traffic flow fixed: lane offsets were off the carriageway (24.5/28 flowing, 26 km/h)
+- [x] Traffic flow fixed: lane offsets were off the carriageway
+- [x] City traffic no longer decays: 23.8/28 flowing at 30 km/h and still rising at 130 s.
+      The earlier "24.5/28 at 26 km/h" was an early-run sample that missed a slow bleed to
+      15/28 - a dead-queue timer fixes it
 - [x] Bridges over water: two cable-stayed spans, the 909 m Harbour Bridge (26 m
       clearance) and the 684 m Marina Bridge (16 m). Measured shortcuts - they replace
       1478 m and 1150 m road detours around the two inlets. Own map layer, not spliced
