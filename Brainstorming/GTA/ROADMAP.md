@@ -100,8 +100,9 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
 - [x] Profiler + CPU pass: frame CPU 51.5ms -> 17.1ms (sleeping vehicles)
 - [x] Highway traffic on by default (26 cars). Every car holds the deck across 130 s;
       median gap 139 m on the 4 km ring, +1.5 ms over 14 cars
-- [x] End-to-end smoke test (`npm run smoke`): 14 checks driven through real keyboard and
-      mouse events - walk, enter/drive/exit car, enter/drive boat, mission start and
-      objective, weapon fire, wanted level, save/load round-trip. Exits with the failures
-      listed. Found a per-frame exception in the boat HUD path that no screenshot could
+- [x] End-to-end smoke test (`npm run smoke`): 20 checks driven through real keyboard and
+      mouse events - walk, enter/drive/exit car, enter/drive boat, a full mission from
+      trigger through steal objective, drive-in and reward, weapon fire, wanted level,
+      save/load round-trip. Found a per-frame exception in the boat HUD path that no
+      screenshot could, and runs at real time (31 s of simulation in 34 s of wall clock)
 - [ ] Verify 60 fps at 1080p on real GPU hardware (headless numbers are not representative)

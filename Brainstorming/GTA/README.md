@@ -354,3 +354,16 @@ visible in a screenshot - the boat still floated, still steered, and the frame s
 It needed a test that got in the boat and kept playing.
 
 Run it with `npm run smoke` against a dev server on 8092.
+
+**Teleporting an entity in a physics world needs a destination that exists.** Completing a
+mission in the smoke test means getting a car to the objective, and the obvious shortcut -
+drop it forty metres short along the straight line from the mission start - puts it inside
+a city block about as often as not. A car spawned inside a building sits at full throttle
+reading zero, which looks exactly like a broken drivetrain. Placing it on an actual road
+node adjacent to the goal fixed it in one go, and recording top speed during the run
+separates "wedged" from "never accelerated" without another debugging round.
+
+**While DRIVING, `player.position` is stale.** `Player.update` returns early in that
+state and the body is not stepped; `Missions._playerPoint` reads the vehicle instead.
+Anything measuring the player's progress has to do the same or it measures a parked
+corpse - the smoke test reported a constant 620 m to a goal it was driving straight at.
