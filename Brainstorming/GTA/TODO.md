@@ -153,8 +153,104 @@ new draw calls. Only worth it after 16 shows headroom.
 
 ---
 
+# Batch 2 - second pass (2026-08-15)
+
+Grounded the same way as batch 1: everything below was checked absent from the code before
+being proposed (no PannerNode anywhere in `Audio.js`, one hardcoded save `KEY`, fixed
+`radarSpan = 260`, no flying or two-wheeled vehicle class, no ambient-event system, no
+i18n layer).
+
+## P2+ - play value
+
+### 19. Repeatable side hustles: taxi and vigilante  `M`
+Missions are finite (8, soon ~14); once done, the world has no money loop. Enter a taxi
+(new livery on an existing sedan spec) and press a key to start fares: pick a random road
+node, deliver a ped within a soft timer, pay scales with distance. Same skeleton in a
+police car gives vigilante (chase the marked AI car, task 5's chase logic). Infinite,
+procedural, and reuses missions' objective markers without touching the mission table.
+- *Accept:* three consecutive fares complete and pay through real input in the smoke
+  suite; leaving the vehicle cancels the hustle and returns the world to idle.
+
+### 20. Hidden packages  `S`
+A classic collectible layer the pickup system already carries: 30 packages placed on
+rooftops, pier ends, the bridge towers and park corners (spawn logic can reuse the
+existing prop-collision checks), a running counter on the Phone stats page, money bonus
+every 10, all persisted in the save.
+- *Accept:* collecting increments a persisted counter; bonus paid at 10; counter and
+  remaining package positions survive a save/load round-trip in the fidelity checks.
+
+### 21. Ambient street events  `M`
+Between missions the city never surprises: no fender-benders, no NPC police stops. A
+lightweight director rolls every ~90 s within 150 m of the player: two AI cars collide
+(drive them at a shared point), a cruiser pulls over a speeder (both already exist), or a
+ped argument (two peds face off with the flee state inverted). Pure choreography over
+existing systems; despawn when the player leaves.
+- *Accept:* over 10 minutes of sim, at least 4 distinct events trigger within sight; none
+  raises the player's wanted level or strands actors (event actors return to their pools).
+
+### 22. Motorbike vehicle class  `L`
+Every vehicle is a four-wheel box or a boat. A bike needs a two-wheel controller (lean
+into `steer`, gyroscopic uprighting torque while moving, fall-over when stopped without
+input) and exposes the player to task 2's fall damage on a crash - which is what makes it
+a different way to drive rather than a thinner car.
+- *Accept:* rides stably through the smoke-suite drive test at 60+ km/h, leans visibly in
+  a screenshot, and a 60 km/h wall crash ejects the rider with health loss.
+
+## P4+ - feel and QoL
+
+### 23. Positional audio  `M`
+Every sound plays at full volume in both ears regardless of where it happens; a gunshot
+across the map sounds like one beside the player. Route per-source sounds (gunshots,
+horns, sirens, impacts, splashes) through shared `PannerNode`s driven from the listener's
+camera pose; keep beds (ambience, radio, engine) on the master bus as they are.
+- *Accept:* headless probe places two gunshots 5 m left and 200 m right of the camera and
+  reads back distinct pan/gain on the panner graph; siren audibly attenuates with distance.
+
+### 24. Minimap zoom control  `S`
+`radarSpan` is a hardcoded 260 m, tuned for on-foot play; at 120 km/h on the highway the
+radar shows only road already behind the player. Scale span with player speed (260 m at a
+walk to ~520 m at speed, smoothed), plus manual override with the mouse wheel while the
+full map is open.
+- *Accept:* probe reads `radarSpan` at rest and at highway speed and sees the spread;
+  wheel zoom on the world map changes the drawn extent between fixed bounds.
+
+### 25. Multiple save slots  `S`
+One hardcoded `localStorage` key means one life; an experiment overwrites a good run. Three
+slots with timestamps and a summary line (money, jobs done, clock) in the pause menu's
+save tab, using `describe()` which already exists.
+- *Accept:* save to slot 2, corrupt slot 1's raw JSON by hand, slot 2 still loads and slot
+  1 reports unreadable instead of throwing; covered in the fidelity checks.
+
+### 26. Kill cam / wasted cinematic  `S`
+Death currently teleports instantly, which reads as a glitch rather than a consequence. On
+wasted or busted: 2 s slow-motion orbit of the body or arrest (free camera rig already
+orbits), desaturate via the post chain, then the existing respawn.
+- *Accept:* scripted death shows the orbit frames (screenshot mid-cinematic), sim time
+  scale returns to exactly 1.0 after, and the smoke-suite death checks still pass.
+
+### 27. French localization  `M`
+All UI strings are hardcoded English while the input layer already speaks AZERTY. Pull
+HUD/Phone/pause/mission strings into a table keyed by id, ship `en` and `fr`, pick by
+`navigator.language` with a pause-menu override persisted with task 12's settings.
+- *Accept:* with `fr` forced, a screenshot sweep of HUD, Phone tabs, pause menu and a
+  mission briefing shows no English; mission names stay as proper nouns by design.
+
+### 28. Wet-road reflections (SSR)  `S` *(spike, timeboxed)*
+three ships a TSL `SSRNode` alongside the GTAO/bloom already in use. Rain's wet-road look
+is currently roughness/darkening only; real screen-space reflections of neon and
+headlights on wet asphalt is the single biggest night-rain payoff available. Ultra-only,
+behind the same graceful-degradation wrapper as the other passes - and abandoned honestly
+if it washes out like the godrays did.
+- *Accept:* same-camera A/B at night in rain shows lights mirrored on the carriageway, or
+  the spike is closed with the measured reason in the README.
+
+---
+
 ## Explicitly not proposed
 
+- **Helicopters / planes** - flight trivialises the map (the island is 2.6 km across and
+  every mission is ground- or water-based) and needs its own camera, controls and failure
+  rules; a motorbike (22) adds a new way to drive for a tenth of the cost.
 - **Multiplayer** - the fixed-step sim is not deterministic across machines and nothing
   is architected for rollback; this is a rewrite, not a task.
 - **Tunnels** - still deferred for the reason in ROADMAP.md: the island is flat and
