@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>ASHFALL - Sector 7</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128299;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ===================== in-game HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div id="vignette"></div>
+    <div id="damage-flash"></div>
+    <div id="lowhealth"></div>
+
+    <div id="crosshair" data-hidden="false">
+      <span class="ch ch-top"></span>
+      <span class="ch ch-bottom"></span>
+      <span class="ch ch-left"></span>
+      <span class="ch ch-right"></span>
+      <span class="ch-dot"></span>
+      <span id="hitmarker">
+        <i class="hm hm-tl"></i><i class="hm hm-tr"></i><i class="hm hm-bl"></i><i class="hm hm-br"></i>
+      </span>
+    </div>
+
+    <div id="dmg-dirs"></div>
+
+    <div id="topbar">
+      <div class="stat">
+        <span class="stat-label">WAVE</span>
+        <span class="stat-value" id="wave-value">1</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">HOSTILES</span>
+        <span class="stat-value" id="enemies-value">0</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">SCORE</span>
+        <span class="stat-value" id="score-value">0</span>
+      </div>
+    </div>
+
+    <div id="banner"><span id="banner-title"></span><span id="banner-sub"></span></div>
+    <div id="toasts"></div>
+
+    <div id="bottom-left">
+      <div class="hp-row">
+        <span class="hp-icon">&#10010;</span>
+        <div class="hp-bar"><div class="hp-fill" id="hp-fill"></div><div class="hp-ghost" id="hp-ghost"></div></div>
+        <span class="hp-num" id="hp-num">100</span>
+      </div>
+      <div class="status-row" id="status-row"></div>
+    </div>
+
+    <div id="bottom-right">
+      <div class="weapon-name" id="weapon-name">AR-7 "SCAVENGER"</div>
+      <div class="ammo">
+        <span class="ammo-mag" id="ammo-mag">30</span>
+        <span class="ammo-sep">/</span>
+        <span class="ammo-reserve" id="ammo-reserve">120</span>
+      </div>
+      <div class="reload-bar"><div class="reload-fill" id="reload-fill"></div></div>
+      <div class="reload-text" id="reload-text">RELOADING</div>
+    </div>
+
+    <div id="killfeed"></div>
+  </div>
+
+  <!-- ===================== overlay screens ===================== -->
+  <div id="screen-loading" class="screen">
+    <div class="panel">
+      <h1 class="title">ASHFALL</h1>
+      <p class="subtitle">SECTOR 7 &mdash; DEAD CITY</p>
+      <p class="loading-line" id="loading-line">BUILDING CITY...</p>
+    </div>
+  </div>
+
+  <div id="screen-menu" class="screen hidden">
+    <div class="panel">
+      <h1 class="title">ASHFALL</h1>
+      <p class="subtitle">SECTOR 7 &mdash; DEAD CITY</p>
+      <p class="blurb">
+        The evacuation convoy left eleven years ago. Whatever is still moving
+        down there is not looking for survivors. Hold the block, wave after wave,
+        with one rifle and whatever the dead drop.
+      </p>
+      <div class="controls-grid">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Move (QWERTY / AZERTY)</div>
+        <div><kbd>SHIFT</kbd></div><div>Sprint</div>
+        <div><kbd>CTRL</kbd> / <kbd>C</kbd></div><div>Crouch</div>
+        <div><kbd>SPACE</kbd></div><div>Jump</div>
+        <div><kbd>LMB</kbd></div><div>Fire</div>
+        <div><kbd>RMB</kbd></div><div>Aim down sight</div>
+        <div><kbd>R</kbd></div><div>Reload</div>
+        <div><kbd>M</kbd></div><div>Mute audio</div>
+        <div><kbd>ESC</kbd></div><div>Pause</div>
+      </div>
+      <button class="btn" id="btn-start">DROP IN</button>
+      <p class="hint">Click the button, then move the mouse to look around.</p>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">PAUSED</h1>
+      <div class="controls-grid compact">
+        <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Move</div>
+        <div><kbd>SHIFT</kbd></div><div>Sprint</div>
+        <div><kbd>CTRL</kbd></div><div>Crouch</div>
+        <div><kbd>LMB</kbd> / <kbd>RMB</kbd></div><div>Fire / Aim</div>
+        <div><kbd>R</kbd></div><div>Reload</div>
+        <div><kbd>M</kbd></div><div>Mute audio</div>
+      </div>
+      <div class="slider-row">
+        <label for="sens">MOUSE SENSITIVITY</label>
+        <input type="range" id="sens" min="4" max="40" step="1" value="22" />
+        <span id="sens-value">2.2</span>
+      </div>
+      <button class="btn" id="btn-resume">RESUME</button>
+      <button class="btn ghost" id="btn-restart-pause">RESTART RUN</button>
+    </div>
+  </div>
+
+  <div id="screen-gameover" class="screen hidden">
+    <div class="panel">
+      <h1 class="title dead">YOU DIED</h1>
+      <p class="subtitle" id="go-sub">The ash settles over Sector 7.</p>
+      <div class="results">
+        <div class="result"><span id="go-wave">1</span><label>WAVES SURVIVED</label></div>
+        <div class="result"><span id="go-kills">0</span><label>KILLS</label></div>
+        <div class="result"><span id="go-score">0</span><label>SCORE</label></div>
+        <div class="result"><span id="go-acc">0%</span><label>ACCURACY</label></div>
+        <div class="result"><span id="go-time">0:00</span><label>TIME</label></div>
+        <div class="result"><span id="go-best">0</span><label>BEST WAVE</label></div>
+      </div>
+      <button class="btn" id="btn-restart">TRY AGAIN</button>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">SYSTEM FAILURE</h1>
+      <pre id="error-text"></pre>
+      <p class="hint">Serve this folder over HTTP (see README) and use a WebGL2 browser.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  window.addEventListener('error', (e) => {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (s && t && s.classList.contains('hidden')) {
+      t.textContent = (e.message || 'Unknown error') + '\n' + (e.filename || '') + ':' + (e.lineno || '');
+      document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+      s.classList.remove('hidden');
+    }
+  });
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

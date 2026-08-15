@@ -2445,6 +2445,13 @@ CONTRAINTES :
   conteneur Docker — une origine codée en dur casse les deux (erreurs CORS
   `localhost` vs `127.0.0.1`, conteneur joignable sur un autre port hôte). En
   dev Vite, la partie serveur est atteinte via le proxy — pas d'URL absolue.
+- PROXY DEV **ET** PREVIEW (obligatoire) : si tu configures un proxy Vite pour
+  rediriger les appels API relatifs vers le backend, déclare-le à l'IDENTIQUE
+  sous `server.proxy` ET sous `preview.proxy` dans `vite.config.ts`. `vite
+  preview` (qui sert le build) N'UTILISE PAS `server.proxy` — c'est le mode
+  employé pour lancer l'app livrée ; un proxy présent seulement sous `server`
+  fait tourner l'app mais renvoie 404 sur tous ses appels API. Factorise l'objet
+  proxy dans une const et réutilise-la pour les deux clés.
 
 Quand tu as terminé, réponds avec EXACTEMENT UN objet JSON :
 {{

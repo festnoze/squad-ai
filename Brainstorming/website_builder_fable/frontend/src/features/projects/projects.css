@@ -1,0 +1,137 @@
+/* OWNED BY: frontend-projects agent (src/features/projects/**).
+   Styles specific to the projects dashboard; builds on src/styles.css variables. */
+
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-4);
+}
+
+.project-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.project-card-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.project-card-desc {
+  flex: 1;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  min-height: 20px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.project-card-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.project-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.project-card-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  background: #fef2f2;
+  font-size: 13px;
+}
+
+.project-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  flex: none;
+}
+
+/* Modal */
+.projects-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.5);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-8) var(--space-4);
+  z-index: 50;
+  overflow-y: auto;
+}
+
+.projects-modal {
+  width: 100%;
+  max-width: 520px;
+}
+
+.projects-form-row {
+  display: flex;
+  gap: var(--space-4);
+}
+
+.projects-form-row .field {
+  flex: 1;
+}
+
+.projects-color-input {
+  width: 48px;
+  height: 34px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.projects-color-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.projects-form-error {
+  margin-bottom: var(--space-4);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  background: #fef2f2;
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.projects-page-error {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius);
+  background: #fef2f2;
+  color: var(--color-danger);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.projects-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

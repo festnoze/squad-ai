@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>ABYSSE - Expedition Kaloa</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#129428;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- Full screen colour washes driven by the game state -->
+  <div id="fx-layer">
+    <div id="fx-vignette"></div>
+    <div id="fx-water"></div>
+    <div id="fx-damage"></div>
+    <div id="fx-oxygen"></div>
+    <div id="fx-flash"></div>
+    <div id="fx-fade"></div>
+  </div>
+
+  <!-- ===================================================================
+       Dive HUD
+       =================================================================== -->
+  <div id="hud" class="hidden">
+
+    <div id="crosshair" data-mode="idle">
+      <span class="ch-dot"></span>
+      <span class="ch-arm ch-n"></span>
+      <span class="ch-arm ch-s"></span>
+      <span class="ch-arm ch-e"></span>
+      <span class="ch-arm ch-w"></span>
+      <svg id="ch-reload" viewBox="0 0 40 40"><circle cx="20" cy="20" r="17"></circle></svg>
+    </div>
+
+    <!-- Vitals, bottom left -->
+    <div id="vitals">
+      <div class="vital vital-oxygen">
+        <span class="vital-icon">O2</span>
+        <div class="vital-bar"><div class="vital-fill" id="oxygen-fill"></div></div>
+        <span class="vital-num" id="oxygen-num">100</span>
+      </div>
+      <div class="vital vital-health">
+        <span class="vital-icon">SV</span>
+        <div class="vital-bar"><div class="vital-fill" id="health-fill"></div></div>
+        <span class="vital-num" id="health-num">100</span>
+      </div>
+      <div class="vital vital-stamina">
+        <span class="vital-icon">EN</span>
+        <div class="vital-bar"><div class="vital-fill" id="stamina-fill"></div></div>
+        <span class="vital-num" id="stamina-num">100</span>
+      </div>
+    </div>
+
+    <!-- Depth gauge, left edge -->
+    <div id="depth-block">
+      <canvas id="depth-gauge" width="86" height="420"></canvas>
+      <div id="depth-readout">
+        <span id="depth-value">0</span><span id="depth-unit">m</span>
+      </div>
+      <div id="biome-label">Surface</div>
+    </div>
+
+    <!-- Weapon + net, bottom right -->
+    <div id="weapon-block">
+      <div id="net-strip">
+        <span id="net-label">FILET</span>
+        <div id="net-slots"></div>
+      </div>
+      <div id="weapon-row">
+        <span id="weapon-name">Harpon</span>
+        <span id="weapon-ammo"><b id="ammo-mag">1</b><i>/</i><span id="ammo-reserve">12</span></span>
+      </div>
+      <div id="weapon-hint">1 2 3 pour changer &middot; R pour recharger</div>
+    </div>
+
+    <!-- Compass, top centre -->
+    <div id="compass">
+      <div id="compass-strip"></div>
+      <div id="compass-needle"></div>
+      <div id="compass-markers"></div>
+    </div>
+
+    <!-- Scanner, centre right of the crosshair -->
+    <div id="scanner" class="hidden">
+      <div id="scan-name">Inconnu</div>
+      <div id="scan-latin"></div>
+      <div id="scan-bar"><div id="scan-fill"></div></div>
+      <div id="scan-status">Analyse en cours</div>
+      <div id="scan-health"><div id="scan-health-fill"></div></div>
+    </div>
+
+    <!-- Objective, top left -->
+    <div id="objective">
+      <span id="objective-icon">&#9678;</span>
+      <span id="objective-text">Trouvez de nouvelles especes</span>
+    </div>
+
+    <!-- Progress chips, top right -->
+    <div id="progress-chips">
+      <div class="chip" id="chip-species"><b id="chip-species-num">0</b><span>especes</span></div>
+      <div class="chip" id="chip-medals"><b id="chip-medals-num">0</b><span>medailles</span></div>
+      <div class="chip" id="chip-cargo"><b id="chip-cargo-num">0</b><span>en soute</span></div>
+    </div>
+
+    <!-- Threat indicator -->
+    <div id="threat" class="hidden">
+      <div id="threat-ring"></div>
+      <div id="threat-text">PREDATEUR</div>
+    </div>
+
+    <!-- Damage direction arrows get injected here -->
+    <div id="damage-arrows"></div>
+
+    <!-- Interaction prompt -->
+    <div id="prompt" class="hidden"><b id="prompt-key">E</b><span id="prompt-text"></span></div>
+
+    <!-- Toast stack -->
+    <div id="toasts"></div>
+  </div>
+
+  <!-- ===================================================================
+       Loading
+       =================================================================== -->
+  <div id="loading" class="screen">
+    <div class="load-inner">
+      <h1 class="brand">ABYSSE</h1>
+      <p class="brand-sub">Expedition Kaloa</p>
+      <div class="load-bar"><div class="load-fill" id="load-fill"></div></div>
+      <p class="load-step" id="load-step">Mise a l eau</p>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Title
+       =================================================================== -->
+  <div id="title" class="screen hidden">
+    <div class="title-bg"></div>
+    <div class="title-inner">
+      <h1 class="brand big">ABYSSE</h1>
+      <p class="brand-sub">Expedition Kaloa &middot; Institut oceanographique</p>
+      <div class="title-menu">
+        <button class="btn primary" id="btn-play">Plonger</button>
+        <button class="btn" id="btn-codex">Carnet d especes</button>
+        <button class="btn" id="btn-skins">Combinaisons</button>
+        <button class="btn" id="btn-help">Commandes</button>
+        <button class="btn subtle" id="btn-reset">Effacer la progression</button>
+      </div>
+      <div class="title-stats" id="title-stats"></div>
+      <p class="title-foot">three.js r169 &middot; aucun asset externe</p>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Codex
+       =================================================================== -->
+  <div id="codex" class="screen hidden">
+    <div class="panel wide">
+      <header class="panel-head">
+        <h2>Carnet d especes</h2>
+        <span class="panel-sub" id="codex-count">0 / 16 identifiees</span>
+        <button class="btn ghost close" data-close="codex">Fermer</button>
+      </header>
+      <div class="codex-body">
+        <div id="codex-grid"></div>
+        <aside id="codex-detail">
+          <p class="codex-empty">Selectionnez une espece.</p>
+        </aside>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Scientist debrief
+       =================================================================== -->
+  <div id="scientist" class="screen hidden">
+    <div class="panel">
+      <header class="panel-head">
+        <h2>Dr. Elina Vasseur</h2>
+        <span class="panel-sub">Laboratoire de terrain</span>
+      </header>
+      <div id="sci-dialogue" class="dialogue"></div>
+      <div id="sci-results"></div>
+      <footer class="panel-foot">
+        <button class="btn primary" id="sci-continue">Continuer</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Skin picker
+       =================================================================== -->
+  <div id="skins" class="screen hidden">
+    <div class="panel wide">
+      <header class="panel-head">
+        <h2>Combinaisons</h2>
+        <span class="panel-sub" id="skins-sub">Choisissez votre livree</span>
+        <button class="btn ghost close" data-close="skins">Fermer</button>
+      </header>
+      <div id="skin-grid"></div>
+      <footer class="panel-foot">
+        <p id="skin-desc" class="skin-desc"></p>
+        <button class="btn primary" id="skin-confirm">Equiper</button>
+      </footer>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Pause
+       =================================================================== -->
+  <div id="pause" class="screen hidden">
+    <div class="panel narrow">
+      <header class="panel-head"><h2>Pause</h2></header>
+      <div class="pause-menu">
+        <button class="btn primary" id="btn-resume">Reprendre</button>
+        <button class="btn" id="btn-pause-codex">Carnet d especes</button>
+        <button class="btn" id="btn-pause-help">Commandes</button>
+        <button class="btn" id="btn-mute">Couper le son</button>
+        <button class="btn subtle" id="btn-quit">Retour au menu</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Help
+       =================================================================== -->
+  <div id="help" class="screen hidden">
+    <div class="panel">
+      <header class="panel-head">
+        <h2>Commandes</h2>
+        <button class="btn ghost close" data-close="help">Fermer</button>
+      </header>
+      <div class="help-grid">
+        <div><b>Z Q S D</b><span>Nager / marcher</span></div>
+        <div><b>Espace</b><span>Monter / sauter</span></div>
+        <div><b>Ctrl</b><span>Descendre</span></div>
+        <div><b>Maj</b><span>Palmage rapide</span></div>
+        <div><b>Souris</b><span>Regarder</span></div>
+        <div><b>Clic gauche</b><span>Tirer</span></div>
+        <div><b>1 2 3</b><span>Harpon / aiguilles / baton</span></div>
+        <div><b>R</b><span>Recharger</span></div>
+        <div><b>F</b><span>Lampe</span></div>
+        <div><b>E</b><span>Interagir</span></div>
+        <div><b>Tab</b><span>Carnet d especes</span></div>
+        <div><b>Echap</b><span>Pause</span></div>
+      </div>
+      <div class="help-note">
+        <p>Chaque espece rapportee au sous-marin part en soute. Remontez a la surface, marchez jusqu au laboratoire et montrez vos prises a la scientifique. Toute espece inedite vaut une medaille, et trois medailles ouvrent une nouvelle combinaison.</p>
+        <p>Surveillez l oxygene: il descend d autant plus vite que vous plongez profond. Le sous-marin recharge la bouteille, les munitions et les soins.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Death
+       =================================================================== -->
+  <div id="dead" class="screen hidden">
+    <div class="panel narrow dead-panel">
+      <h2 id="dead-title">Noye</h2>
+      <p id="dead-text">La bouteille etait vide a soixante metres.</p>
+      <div id="dead-stats"></div>
+      <button class="btn primary" id="btn-respawn">Reprendre au sous-marin</button>
+    </div>
+  </div>
+
+  <!-- ===================================================================
+       Transit cinematic caption
+       =================================================================== -->
+  <div id="transit" class="hidden">
+    <div id="transit-text">Remontee en cours</div>
+    <div id="transit-sub"></div>
+  </div>
+
+  <!-- ===================================================================
+       Fatal error
+       =================================================================== -->
+  <div id="error" class="screen hidden">
+    <div class="panel narrow">
+      <h2>Panne de systeme</h2>
+      <p id="error-msg"></p>
+      <pre id="error-stack"></pre>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // Declared before the module loads so an import error still reaches the user.
+  window.__fail = function (message, stack) {
+    var screens = document.querySelectorAll('.screen');
+    for (var i = 0; i < screens.length; i++) screens[i].classList.add('hidden');
+    var hud = document.getElementById('hud');
+    if (hud) hud.classList.add('hidden');
+    var box = document.getElementById('error');
+    if (!box) return;
+    box.classList.remove('hidden');
+    document.getElementById('error-msg').textContent = message || 'Erreur inconnue';
+    document.getElementById('error-stack').textContent = stack || '';
+  };
+  window.addEventListener('error', function (e) {
+    window.__fail(e.message, e.error && e.error.stack ? e.error.stack : '');
+  });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason;
+    window.__fail(r && r.message ? r.message : String(r), r && r.stack ? r.stack : '');
+  });
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

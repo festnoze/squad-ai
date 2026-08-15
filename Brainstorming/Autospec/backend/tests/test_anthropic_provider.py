@@ -26,9 +26,9 @@ def test_make_runner_anthropic():
 
 
 def test_provider_model_anthropic(monkeypatch):
-    monkeypatch.setattr(cfg, "anthropic_model", "claude-sonnet-4-6")
-    assert provider_model("claude") == "claude-sonnet-4-6"
-    assert provider_model("anthropic") == "claude-sonnet-4-6"
+    monkeypatch.setattr(cfg, "anthropic_model", "claude-sonnet-5")
+    assert provider_model("claude") == "claude-sonnet-5"
+    assert provider_model("anthropic") == "claude-sonnet-5"
 
 
 def test_anthropic_no_key_raises(monkeypatch):

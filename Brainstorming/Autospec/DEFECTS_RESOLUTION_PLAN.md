@@ -68,3 +68,32 @@ F6+F7 (merge/scope) → F8+F9 (prompts architecture/décomposition) → F10
 
 Validation round 2 : backend 1159 pytest verts (+4 nouveaux), Vitest 239 verts,
 e2e standard 2/2 verts (dont le bug CSS mobile corrigé), e2e streams 1/1 vert.
+
+---
+
+## Round 3 - D13 : proxy Vite absent en preview (2026-07-24)
+
+Symptôme (projet LMS) : en mode « run », l'app tourne mais le frontend renvoie
+404 sur tous ses appels API. CAUSE : le mode run sert le build via
+`vite preview` (`_start_frontend_previews` → `npm run preview`), or le proxy API
+n'était configuré que sous `server.proxy` (mode `vite` dev). `vite preview`
+utilise `preview.proxy`, une clé DISTINCTE qui n'hérite PAS de `server.proxy` -
+la page charge, les `fetch("/catalog")` frappent le serveur preview → 404.
+
+Fixes :
+- **Prompt dev frontend** (`dev_story_frontend`, fix principal - l'agent réécrit
+  vite.config.ts) : règle explicite « déclare le proxy à l'identique sous
+  `server.proxy` ET `preview.proxy` ; `vite preview` est le mode de lancement de
+  l'app livrée ».
+- **Scaffold** (`FE_VITE_CONFIG_TEMPLATE`, filet) : baseline fonctionnelle qui
+  proxifie `/api` vers `VITE_BACKEND_URL` (défaut 127.0.0.1:8000) sous les DEUX
+  clés, avec un commentaire expliquant le piège.
+- **Instance LMS** corrigée (proxy factorisé, appliqué à server+preview) et
+  VÉRIFIÉE de bout en bout : `vite preview` sur :4173 proxifie `/health` (200,
+  `{"status":"ok"}`) et `/catalog` (200) vers le backend :8000.
+
+Note IPv6 : `vite preview` écoute sur `[::1]` (localhost IPv6) - accéder via
+`http://localhost:4173/`, pas `http://127.0.0.1:4173/`.
+
+Validation round 3 : backend 1159 pytest verts, test scaffold étendu
+(assert server+preview), preview LMS proxifie réellement l'API.

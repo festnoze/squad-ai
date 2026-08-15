@@ -142,12 +142,42 @@ async def test_discover_falls_back_to_static_on_error(monkeypatch):
     assert models == list(discovery.provider_models("ollama"))
 
 
-async def test_discover_claude_is_static(monkeypatch):
-    monkeypatch.setattr(discovery.settings, "claude_model", "claude-opus-4-8")
+async def test_discover_claude_static_without_key(monkeypatch):
+    # Without an Anthropic key, both claude providers degrade to the static
+    # suggestions (the CLI harness itself needs no key, so this must not fail).
+    monkeypatch.setattr(discovery.settings, "anthropic_api_key", "")
+    monkeypatch.setattr(discovery.settings, "claude_model", "claude-opus-5")
     models, source = await discovery.adiscover_models("claude code")
     assert source == "static"
-    assert models[0] == "claude-opus-4-8"
-    # The Anthropic API provider ("claude") is static too (no list endpoint).
+    assert models[0] == "claude-opus-5"
     models, source = await discovery.adiscover_models("claude")
     assert source == "static"
-    assert "claude-opus-4-8" in models
+    assert "claude-opus-5" in models and "claude-fable-5" in models
+
+
+async def test_discover_claude_live_with_key(monkeypatch):
+    # With a key, both claude providers list the live Anthropic catalogue —
+    # the CLI accepts the same model ids as the API.
+    monkeypatch.setattr(discovery.settings, "anthropic_api_key", "sk-ant-test")
+    monkeypatch.setattr(
+        discovery.settings, "anthropic_base_url", "https://api.anthropic.com/v1"
+    )
+
+    def fake_get(url, headers=None):
+        assert url.startswith("https://api.anthropic.com/v1/models")
+        assert headers and headers["x-api-key"] == "sk-ant-test"
+        assert headers["anthropic-version"] == "2023-06-01"
+        return {"data": [
+            {"id": "claude-fable-5"},
+            {"id": "claude-opus-5"},
+            {"id": "claude-haiku-4-5-20251001"},
+        ]}
+
+    monkeypatch.setattr(discovery, "_http_get_json", fake_get)
+    models, source = await discovery.adiscover_models("claude")
+    assert source == "live"
+    # The API order (newest first) is preserved as-is.
+    assert models == ["claude-fable-5", "claude-opus-5", "claude-haiku-4-5-20251001"]
+    models, source = await discovery.adiscover_models("claude code")
+    assert source == "live"
+    assert "claude-opus-5" in models

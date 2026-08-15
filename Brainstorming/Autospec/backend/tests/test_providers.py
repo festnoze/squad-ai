@@ -64,20 +64,23 @@ def test_provider_model_reads_settings(monkeypatch):
     monkeypatch.setattr(settings, "openai_model", "gpt-test")
     monkeypatch.setattr(settings, "ollama_model", "llama-test")
     monkeypatch.setattr(settings, "claude_model", None)
-    monkeypatch.setattr(settings, "anthropic_model", "claude-opus-4-8")
+    monkeypatch.setattr(settings, "anthropic_model", "claude-opus-5")
     assert provider_model("openai") == "gpt-test"
     assert provider_model("ollama") == "llama-test"
     assert provider_model("claude code") == "(défaut CLI)"
     # "claude" reads the Anthropic API model.
-    assert provider_model("claude") == "claude-opus-4-8"
+    assert provider_model("claude") == "claude-opus-5"
 
 
 def test_provider_models_lists_choices(monkeypatch):
     monkeypatch.setattr(settings, "claude_model", None)
+    monkeypatch.setattr(settings, "anthropic_model", "claude-opus-5")
     # Claude Code default placeholder is not injected as a selectable model;
-    # Opus 4.8 leads both Claude lists.
-    assert provider_models("claude code")[0] == "claude-opus-4-8"
-    assert provider_models("claude")[0] == "claude-opus-4-8"
+    # Opus 5 leads both Claude lists, with Fable 5 offered alongside.
+    assert provider_models("claude code")[0] == "claude-opus-5"
+    assert provider_models("claude")[0] == "claude-opus-5"
+    assert "claude-fable-5" in provider_models("claude code")
+    assert "claude-fable-5" in provider_models("claude")
     assert "gpt-4.1" in provider_models("openai")
 
 

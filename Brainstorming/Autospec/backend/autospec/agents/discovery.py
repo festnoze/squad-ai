@@ -9,8 +9,10 @@ static guess:
 - ``openai``  : ``GET {base_url}/models`` with the API key — the models the key
   can actually access (filtered to chat-capable ids).
 - ``codex``   : reuses the OpenAI catalogue (the Codex CLI runs OpenAI models).
-- ``claude code`` (CLI) / ``claude`` (Anthropic API) : static choices (no public
-  list endpoint / the CLI exposes only aliases).
+- ``claude`` (Anthropic API) / ``claude code`` (CLI) : the Anthropic
+  ``GET {base}/models`` endpoint when an ANTHROPIC_API_KEY is configured — the
+  CLI accepts the same model ids, so both providers share the catalogue. Without
+  a key they degrade to the static suggestions.
 
 All network/subprocess work runs in a worker thread (the event loop on Windows is
 a SelectorEventLoop). Callers fall back to the static ``provider_models`` list on
@@ -90,6 +92,26 @@ def _discover_openrouter_sync() -> list[str]:
     return top
 
 
+def _discover_anthropic_sync() -> list[str]:
+    """Anthropic ``GET {base}/models`` — the catalogue the key can reach, newest
+    first. Serves both the "claude" (API) and "claude code" (CLI) providers:
+    the CLI accepts the same model ids."""
+    if not settings.anthropic_api_key:
+        raise RuntimeError("clé API Anthropic absente")
+    data = _http_get_json(
+        f"{settings.anthropic_base_url}/models?limit=100",
+        headers={
+            "x-api-key": settings.anthropic_api_key,
+            "anthropic-version": "2023-06-01",
+        },
+    )
+    ids = [str(m.get("id") or "").strip() for m in (data.get("data") or []) if isinstance(m, dict)]
+    models = [i for i in ids if i]
+    if not models:
+        raise RuntimeError("aucun modèle Anthropic renvoyé")
+    return models
+
+
 async def adiscover_models(provider: str) -> tuple[list[str], str]:
     """Return ``(models, source)`` for a provider. ``source`` is ``"live"`` when
     discovery succeeded, else ``"static"`` (the suggested fallback list).
@@ -108,6 +130,10 @@ async def adiscover_models(provider: str) -> tuple[list[str], str]:
             # Codex runs OpenAI models — reuse the OpenAI catalogue when a key is
             # configured, else fall back to the static codex suggestions.
             return (await asyncio.to_thread(_discover_openai_sync)), "live"
+        if p in ("claude", "claude code", "anthropic"):
+            # Both claude providers run Anthropic models — reuse the Anthropic
+            # catalogue when a key is configured, else the static suggestions.
+            return (await asyncio.to_thread(_discover_anthropic_sync)), "live"
     except (urllib.error.URLError, OSError, ValueError, RuntimeError):
         pass
     return provider_models(p), "static"

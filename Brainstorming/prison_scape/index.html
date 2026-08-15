@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PRISON SCAPE</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128142;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ======================= in-game HUD ======================= -->
+  <div id="hud" class="hidden">
+    <div id="vignette"></div>
+    <div id="damage-flash"></div>
+
+    <div id="crosshair">
+      <span class="ch ch-top"></span>
+      <span class="ch ch-bottom"></span>
+      <span class="ch ch-left"></span>
+      <span class="ch ch-right"></span>
+      <span class="ch-dot"></span>
+      <span id="hitmarker" class="hidden">
+        <i class="hm hm-tl"></i><i class="hm hm-tr"></i><i class="hm hm-bl"></i><i class="hm hm-br"></i>
+      </span>
+    </div>
+
+    <div id="zone-name"></div>
+
+    <!-- detection meter, top centre -->
+    <div id="detect" data-level="calm">
+      <div id="detect-label">DISCRETION</div>
+      <div id="detect-track"><div id="detect-fill"></div></div>
+    </div>
+
+    <!-- shared lockdown countdown: one clock for every guard and camera calling -->
+    <div id="lockdown" class="hidden">
+      <div id="lockdown-head">
+        <span id="lockdown-label">ALERTE RADIO</span>
+        <span id="lockdown-time">0.0s</span>
+      </div>
+      <div id="lockdown-track"><div id="lockdown-fill"></div></div>
+      <div id="lockdown-sub">Neutralisez les sources pour arreter l'appel</div>
+    </div>
+
+    <!-- objective, top left -->
+    <div id="objective">
+      <div class="panel-title">OBJECTIF</div>
+      <div id="objective-text">&nbsp;</div>
+      <div id="cams-row"><span class="panel-title">CAMERAS DETRUITES</span> <span id="cams-value">0/8</span></div>
+      <div id="guards-row"><span class="panel-title">POLICIERS EN SERVICE</span> <span id="guards-value">10/10</span></div>
+    </div>
+
+    <div id="compass" class="hidden"></div>
+
+    <!-- discovered-rooms floor plan -->
+    <div id="minimap-wrap">
+      <div id="minimap-head">
+        <span id="minimap-title">PLAN</span>
+        <span id="minimap-count">0/0</span>
+      </div>
+      <canvas id="minimap"></canvas>
+      <div id="minimap-hint"><kbd>M</kbd> agrandir</div>
+    </div>
+
+    <!-- vitals, bottom left -->
+    <div id="vitals">
+      <div class="vital-row">
+        <span class="vital-label">SANTE</span>
+        <span id="health-value">100</span>
+      </div>
+      <div id="health-track"><div id="health-bar"></div></div>
+      <div id="disguise-chip" class="hidden">UNIFORME DE POLICIER</div>
+    </div>
+
+    <!-- weapon, bottom right -->
+    <div id="weapon">
+      <div id="weapon-name">MAINS NUES</div>
+      <div id="weapon-ammo"><span id="ammo-value">--</span><span id="ammo-reserve"></span></div>
+    </div>
+
+    <div id="toast"></div>
+    <div id="prompt" class="hidden"></div>
+  </div>
+
+  <div id="subtitle" class="hidden"></div>
+  <div id="skip-hint" class="hidden">ESPACE / ECHAP &mdash; passer l'introduction</div>
+  <div id="fatal" class="hidden"></div>
+
+  <!-- ========================== menu =========================== -->
+  <section id="screen-menu" class="screen">
+    <div class="screen-inner">
+      <div class="kicker">PENITENCIER DE BLACKRIDGE &mdash; QUARTIER HAUTE SECURITE</div>
+      <h1>PRISON<span>SCAPE</span></h1>
+      <p class="tagline">
+        Vous avez vole le Coeur de Valmont. Ils vous ont pris douze ans.<br />
+        Il vous reste une nuit, quelques armes et huit cameras a faire taire.
+      </p>
+
+      <div class="menu-buttons">
+        <button id="btn-start" class="primary">VOIR L'INTRODUCTION ET JOUER</button>
+        <button id="btn-skip-menu">JOUER DIRECTEMENT</button>
+      </div>
+
+      <div class="columns">
+        <div>
+          <h3>COMMANDES</h3>
+          <ul class="keys">
+            <li><kbd>Z Q S D</kbd> / <kbd>W A S D</kbd> se deplacer</li>
+            <li><kbd>MAJ</kbd> courir &mdash; bruyant</li>
+            <li><kbd>CTRL</kbd> / <kbd>C</kbd> s'accroupir &mdash; discret</li>
+            <li><kbd>ESPACE</kbd> sauter</li>
+            <li><kbd>CLIC G</kbd> tirer &nbsp; <kbd>R</kbd> recharger</li>
+            <li><kbd>F</kbd> coup de poing (ou <kbd>CLIC G</kbd> a mains nues)</li>
+            <li><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> changer d'arme</li>
+            <li><kbd>E</kbd> prendre l'uniforme d'un policier</li>
+            <li><kbd>M</kbd> agrandir le plan des salles visitees</li>
+            <li><kbd>ECHAP</kbd> pause</li>
+          </ul>
+        </div>
+        <div>
+          <h3>REGLES DE SURVIE</h3>
+          <ul class="rules">
+            <li><b>Les cameras</b> balaient un cone bleu. Restez dedans deux secondes et c'est fini.</li>
+            <li><b>Les gardes</b> voient devant eux et entendent vos pas. Reperes, ils appellent la radio : abattez-les avant la fin de l'appel.</li>
+            <li><b>Detruisez une camera</b> et la porte de securite qu'elle commandait s'ouvre.</li>
+            <li><b>Un uniforme vole</b> rend les cameras aveugles et retarde les gardes &mdash; jusqu'au premier coup de feu.</li>
+            <li><b>Sans arme, frappez.</b> Un coup dans le dos assomme en silence ; de face, il coupe la radio et l'appel repart de zero.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="footnote">Aucun asset externe : geometrie, textures, sons et cinematique sont generes par le code.</div>
+    </div>
+  </section>
+
+  <!-- ========================= pause ============================ -->
+  <section id="screen-pause" class="screen hidden">
+    <div class="screen-inner narrow">
+      <h2>PAUSE</h2>
+      <div class="menu-buttons">
+        <button id="btn-resume" class="primary">REPRENDRE</button>
+        <button id="btn-restart-pause">RECOMMENCER</button>
+        <button id="btn-quit-pause">MENU PRINCIPAL</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ======================== game over ========================= -->
+  <section id="screen-over" class="screen hidden">
+    <div class="screen-inner narrow">
+      <div class="kicker bad">EVASION ECHOUEE</div>
+      <h2>REPERE</h2>
+      <p id="over-reason" class="reason"></p>
+      <p id="over-stats" class="stats"></p>
+      <div class="menu-buttons">
+        <button id="btn-restart" class="primary">REESSAYER</button>
+        <button id="btn-quit">MENU PRINCIPAL</button>
+      </div>
+      <div class="footnote">Astuce : accroupi, vous etes deux fois plus lent a reperer et presque inaudible.</div>
+    </div>
+  </section>
+
+  <!-- ========================== win ============================= -->
+  <section id="screen-win" class="screen hidden">
+    <div class="screen-inner narrow">
+      <div class="kicker good">PORTE PRINCIPALE FRANCHIE</div>
+      <h2>EVADE</h2>
+      <p class="reason">Blackridge est derriere vous. Le Coeur de Valmont, lui, est toujours dans un coffre.</p>
+      <p id="win-stats" class="stats"></p>
+      <div class="menu-buttons">
+        <button id="btn-restart-win" class="primary">REJOUER</button>
+        <button id="btn-quit-win">MENU PRINCIPAL</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

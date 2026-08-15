@@ -27,7 +27,7 @@ def test_model_for_phase_does_not_leak_claude_model_to_other_providers(monkeypat
     # passed to the codex/openai/... runners (they have their own settings).
     monkeypatch.setattr(cfg, "agent_provider", "codex")
     monkeypatch.setattr(cfg, "phase_models", {"build": "strong-model"})
-    monkeypatch.setattr(cfg, "claude_model", "claude-opus-4-8")
+    monkeypatch.setattr(cfg, "claude_model", "claude-opus-5")
     assert cfg.model_for_phase("build") == "strong-model"  # explicit override wins
     assert cfg.model_for_phase("spec") is None
 

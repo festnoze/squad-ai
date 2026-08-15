@@ -179,6 +179,11 @@ def test_frontend_scaffold_writes_expected_files(monkeypatch):
     pkg = json.loads((root / "package.json").read_text(encoding="utf-8"))
     assert pkg["scripts"]["build"] == "tsc && vite build"
     assert "vitest" in pkg["devDependencies"]
+    # Le scaffold proxifie l'API sous server ET preview (le mode « run » sert le
+    # build via `vite preview`, qui n'utilise pas `server.proxy`).
+    vite_cfg = (root / "vite.config.ts").read_text(encoding="utf-8")
+    assert "server: { proxy }" in vite_cfg
+    assert "preview: { proxy }" in vite_cfg
     # Backend skeleton still present at the repo root.
     from autospec.storage import workspace_dir
 

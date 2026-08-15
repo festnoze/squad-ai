@@ -215,7 +215,7 @@ chaque `push` et `pull_request` avec 3 jobs sur `ubuntu-latest` :
 | --- | --- | --- |
 | `BMAD_DIR` | `../_bmad` | Dossier d'installation BMAD |
 | `CLAUDE_CMD` | auto (`claude.cmd`) | Binaire Claude Code |
-| `CLAUDE_MODEL` | `claude-opus-4-8` | Modèle à utiliser (provider claude code) |
+| `CLAUDE_MODEL` | `claude-opus-5` | Modèle à utiliser (provider claude code) |
 | `AGENT_PROVIDER` | `claude code` | Provider d'agents : `claude code` (harness CLI), `claude` (API Anthropic), `openai`, `ollama` (LangChain) |
 | `OPENAI_API_KEY` | (ou `OPENAI_API_KEY`) | Clé API du provider openai |
 | `OPENAI_MODEL` | `gpt-4o-mini` | Modèle OpenAI |

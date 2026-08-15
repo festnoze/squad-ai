@@ -24,7 +24,8 @@ def make_client(replies: list[str]) -> httpx.AsyncClient:
 
 async def test_get_provider_defaults(monkeypatch):
     monkeypatch.setattr(settings, "agent_provider", "claude code")
-    monkeypatch.setattr(settings, "claude_model", "claude-opus-4-8")
+    monkeypatch.setattr(settings, "claude_model", "claude-opus-5")
+    monkeypatch.setattr(settings, "anthropic_model", "claude-opus-5")
     async with make_client([]) as client:
         data = (await client.get("/api/provider")).json()
         assert data["provider"] == "claude code"
@@ -33,10 +34,11 @@ async def test_get_provider_defaults(monkeypatch):
         assert data["available"] == [
             "claude code", "claude", "codex", "openai", "openrouter", "ollama",
         ]
-        # Adaptive 2nd dropdown: per-provider model choices, Opus 4.8 first.
-        assert data["model"] == "claude-opus-4-8"
-        assert data["models"]["claude code"][0] == "claude-opus-4-8"
-        assert data["models"]["claude"][0] == "claude-opus-4-8"
+        # Adaptive 2nd dropdown: per-provider model choices, Opus 5 first.
+        assert data["model"] == "claude-opus-5"
+        assert data["models"]["claude code"][0] == "claude-opus-5"
+        assert data["models"]["claude"][0] == "claude-opus-5"
+        assert "claude-fable-5" in data["models"]["claude code"]
         assert "gpt-4.1" in data["models"]["openai"]
         assert data["models"]["codex"]  # codex has suggested models too
         assert data["models"]["openrouter"]  # OpenRouter has fallback suggestions
@@ -49,17 +51,17 @@ async def test_switch_claude_api_model(monkeypatch):
     async with make_client([]) as client:
         resp = await client.post(
             "/api/provider",
-            json={"provider": "claude", "model": "claude-sonnet-4-6"},
+            json={"provider": "claude", "model": "claude-sonnet-5"},
         )
         assert resp.status_code == 200
         data = resp.json()
         assert data["ok"] is True
         # "claude" goes through the Anthropic API (LangChain), not the CLI.
         assert data["provider"] == "claude"
-        assert data["model"] == "claude-sonnet-4-6"
+        assert data["model"] == "claude-sonnet-5"
         assert data["capabilities"]["execution_model"] == "langchain_file_tools"
         assert data["capabilities"]["can_run_shell"] is False
-        assert settings.anthropic_model == "claude-sonnet-4-6"
+        assert settings.anthropic_model == "claude-sonnet-5"
 
 
 async def test_switch_provider_updates_pipelines(monkeypatch):

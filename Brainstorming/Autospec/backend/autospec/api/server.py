@@ -472,9 +472,11 @@ async def aget_provider_models(provider: str) -> dict:
     """Live model discovery for a provider: the models actually reachable.
 
     ``ollama`` queries the Ollama daemon (the API behind ``ollama list``),
-    ``openai``/``codex`` query the OpenAI ``/models`` endpoint with the key.
-    Falls back to the static suggestions (``source: "static"``) on any failure,
-    so the selector keeps working offline."""
+    ``openai``/``codex`` query the OpenAI ``/models`` endpoint with the key,
+    ``claude``/``claude code`` query the Anthropic ``/models`` endpoint when an
+    ANTHROPIC_API_KEY is configured. Falls back to the static suggestions
+    (``source: "static"``) on any failure, so the selector keeps working
+    offline."""
     p = provider.strip().lower()
     models, source = await adiscover_models(p)
     return {"provider": p, "models": models, "source": source}

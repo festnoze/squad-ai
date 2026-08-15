@@ -239,9 +239,9 @@ class Settings:
     workspace_root: Path = field(default_factory=_default_workspace_root)
     claude_cmd: str = field(default_factory=_resolve_claude_cmd)
     # Default model of the Claude Code CLI harness ("claude code" provider):
-    # Opus 4.8 unless CLAUDE_MODEL overrides it.
+    # Opus 5 (the current Opus) unless CLAUDE_MODEL overrides it.
     claude_model: str | None = field(
-        default_factory=lambda: os.environ.get("CLAUDE_MODEL") or "claude-opus-4-8"
+        default_factory=lambda: os.environ.get("CLAUDE_MODEL") or "claude-opus-5"
     )
     # Codex CLI harness: the OpenAI counterpart of the Claude Code CLI, driven
     # headless via ``codex exec``.
@@ -369,7 +369,14 @@ class Settings:
         default_factory=lambda: os.environ.get("ANTHROPIC_API_KEY", "")
     )
     anthropic_model: str = field(
-        default_factory=lambda: os.environ.get("ANTHROPIC_MODEL", "claude-opus-4-8")
+        default_factory=lambda: os.environ.get("ANTHROPIC_MODEL", "claude-opus-5")
+    )
+    # Base URL of the Anthropic API — also used by live model discovery
+    # (GET {base}/models) for the "claude" and "claude code" providers.
+    anthropic_base_url: str = field(
+        default_factory=lambda: os.environ.get(
+            "ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1"
+        ).rstrip("/")
     )
     anthropic_price_in: float = field(
         default_factory=lambda: _env_float("ANTHROPIC_PRICE_IN", 0.0, minimum=0.0)

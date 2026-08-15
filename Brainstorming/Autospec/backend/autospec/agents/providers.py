@@ -333,16 +333,20 @@ MODEL_CHOICES: dict[str, tuple[str, ...]] = {
     # can override). Empty model = the codex CLI default.
     "codex": ("gpt-5.3-codex", "gpt-5.4-codex", "o4-mini"),
     # The Claude Code CLI accepts full model ids (and short aliases like "opus").
+    # Static fallback only — the live list comes from the Anthropic /v1/models
+    # endpoint when an ANTHROPIC_API_KEY is configured (see agents/discovery.py).
     "claude code": (
-        "claude-opus-4-8",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5-20251001",
+        "claude-opus-5",
+        "claude-fable-5",
+        "claude-sonnet-5",
+        "claude-haiku-4-5",
     ),
-    # Anthropic API ("claude") needs the full model ids.
+    # Anthropic API ("claude") accepts the same ids (aliases resolve server-side).
     "claude": (
-        "claude-opus-4-8",
-        "claude-sonnet-4-6",
-        "claude-haiku-4-5-20251001",
+        "claude-opus-5",
+        "claude-fable-5",
+        "claude-sonnet-5",
+        "claude-haiku-4-5",
     ),
     "openai": (
         "gpt-4.1",

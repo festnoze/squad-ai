@@ -202,16 +202,31 @@ FE_TSCONFIG_TEMPLATE = """{
 }
 """
 
-FE_VITE_CONFIG_TEMPLATE = """import { defineConfig } from "vite";
+FE_VITE_CONFIG_TEMPLATE = """import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
-  plugins: [react()],
-  test: {
-    globals: true,
-    environment: "jsdom",
-    setupFiles: ["./src/setupTests.ts"],
-  },
+// Le frontend appelle l'API en URLs RELATIVES (`fetch("/api/...")`). Vite le
+// sert sur son propre port alors que le backend écoute ailleurs
+// (127.0.0.1:8000 par défaut, surchargeable via VITE_BACKEND_URL) : sans proxy,
+// ces appels frappent le serveur Vite et échouent.
+// IMPORTANT : `server.proxy` ne s'applique QU'À `vite` (dev). Le mode « run »
+// d'Autospec sert le build via `vite preview`, qui utilise `preview.proxy` —
+// une clé DISTINCTE. Le même proxy DOIT donc être déclaré sous les deux, sinon
+// l'app tourne mais ses appels API renvoient 404 en preview.
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, ".", "");
+  const target = env.VITE_BACKEND_URL?.trim() || "http://127.0.0.1:8000";
+  const proxy = { "/api": { target, changeOrigin: true } };
+  return {
+    plugins: [react()],
+    server: { proxy },
+    preview: { proxy },
+    test: {
+      globals: true,
+      environment: "jsdom",
+      setupFiles: ["./src/setupTests.ts"],
+    },
+  };
 });
 """
 

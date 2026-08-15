@@ -111,7 +111,7 @@ All six waves are implemented behind flags (default OFF ⇒ byte-identical legac
 - Every transition emits a BuildMonitor event: `{"kind":"recovery","action":...,"reason":...,"signatures":[...]}`.
 
 ### T1.2 — Model-escalation ladder (`ESCALATE_ON_RETRY`, default off)
-- **Config:** `model_ladder: list[str]` from `MODEL_LADDER` (comma-separated, cost-ascending; e.g. `claude-haiku-4-5-20251001,claude-sonnet-4-6,claude-opus-4-8`). Phase A is **same-harness only** (Claude-family via the CLI's `--model`) — no runner changes. Cross-provider rungs arrive with W4b.
+- **Config:** `model_ladder: list[str]` from `MODEL_LADDER` (comma-separated, cost-ascending; e.g. `claude-haiku-4-5,claude-sonnet-5,claude-opus-5`). Phase A is **same-harness only** (Claude-family via the CLI's `--model`) — no runner changes. Cross-provider rungs arrive with W4b.
 - **Mechanism:** attempt *n* runs on rung *n* (clamped to the top). Thread the forced model via a `_FORCE_MODEL` contextvar (mirroring `_BUILD_ITEM`, pipeline.py:238) read in `_UsageTracker.arun` with precedence: explicit `model` arg > `_FORCE_MODEL` > router. Escalation applies to the **dev call of that attempt** (and its QA-fix companion), not globally.
 - Fresh rung ⇒ fresh session (no `session_id` carry-over): a stronger model gets fresh eyes plus the structured failure feedback the loop already builds.
 - Ladder exhausted ⇒ `CLASSIFY` (T1.3), not immediate split. Each escalation logged: "task X promoted haiku→sonnet (signature S recurring)".

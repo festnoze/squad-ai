@@ -29,7 +29,11 @@
       "Bash(source:*)",
       "Bash(del \"C:\\\\Dev\\\\squad-ai\\\\Brainstorming\\\\aculifting-site\\\\part2.html\" \"C:\\\\Dev\\\\squad-ai\\\\Brainstorming\\\\aculifting-site\\\\part3.html\")",
       "Bash(tail:*)",
-      "Bash(npx expo:*)"
+      "Bash(npx expo:*)",
+      "mcp__playwright__browser_evaluate",
+      "Bash(mv shots/final-descent.png docs/screenshot.png)",
+      "Bash(rmdir shots *)",
+      "Bash(git -C \"C:/Dev/squad-ai/Brainstorming\" status --short -- wipeout)"
     ]
   },
   "hooks": {
