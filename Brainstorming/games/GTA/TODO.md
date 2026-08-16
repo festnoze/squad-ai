@@ -65,8 +65,10 @@ approach axis into the target-speed clamp the obstacle scan already uses.
   samples stopped at a mean of 7.8 km/h while the crossing axis ran at 46.7, 11.3 junctions
   crossed per car against 11.2 with the signals detached (so the grid did not slow down), no
   car parked in a junction box, and the lit lens agreeing with the phase the cars obey on
-  40 of 40 samples. Run it a second time with `&lights=off` in the URL for the with/without
-  pair from identical conditions.
+  40 of 40 samples. The `&lights=off` run is the other half of the pair and fails five of the
+  same twelve checks from identical conditions: 0% of 106 red-band samples stopped at a mean
+  of 51.5 km/h, 24 runners of 39 signalled crossings, 15 box stalls, 25.04/28 flowing. So the
+  signals cost about three quarters of a car of flow and remove every red-runner.
 
 ### 4. Police escalation tiers  `M`
 Pursuit is one cruiser archetype at all star levels. Tie response to stars: 1-2 stars

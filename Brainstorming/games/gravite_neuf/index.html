@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>GRAVITE NEUF</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#129535;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ======================= in-game HUD ======================= -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div id="hud-level">
+        <span class="cap">Niveau</span>
+        <b id="hud-index">1</b><i>/<span id="hud-total">14</span></i>
+        <em id="hud-name">Premier basculement</em>
+      </div>
+      <div id="hud-stats">
+        <div class="stat"><span>Coups</span><b id="hud-moves">0</b></div>
+        <div class="stat"><span>Par</span><b id="hud-par">1</b></div>
+        <div class="stat" id="stat-keys"><span>Cles</span><b id="hud-keys">0/0</b></div>
+        <div class="stat"><span>Annulations</span><b id="hud-undo">0</b></div>
+      </div>
+    </div>
+
+    <div id="hud-grav">
+      <span class="cap">Bas actuel</span>
+      <b id="grav-axis">-Y</b>
+      <i id="grav-swatch"></i>
+    </div>
+
+    <p id="hud-hint"></p>
+
+    <div id="hud-help">
+      <span><kbd>&#8593;</kbd><kbd>&#8592;</kbd><kbd>&#8595;</kbd><kbd>&#8594;</kbd> basculer</span>
+      <span><kbd>A</kbd> haut <kbd>E</kbd> bas</span>
+      <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler</span>
+      <span><kbd>R</kbd> recommencer</span>
+      <span><kbd>Echap</kbd> pause</span>
+    </div>
+
+    <div id="banner" class="hidden"><b id="banner-title"></b><span id="banner-sub"></span></div>
+    <div id="toasts"></div>
+  </div>
+
+  <!-- ======================= overlay screens ======================= -->
+  <div id="screen-loading" class="screen">
+    <div class="panel">
+      <h1 class="title">GRAVITE NEUF</h1>
+      <p class="subtitle">Construction de la structure...</p>
+      <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+      <p class="hint" id="loading-line">Initialisation</p>
+    </div>
+  </div>
+
+  <div id="screen-title" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title">GRAVITE NEUF</h1>
+      <p class="subtitle">Sokoban a gravite orientable</p>
+      <p class="blurb">
+        Une structure de cubes flotte dans le vide. Vous etes le cube dore, et vous ne
+        vous deplacez jamais : vous choisissez ou est le bas. Tout ce qui n'est pas
+        fixe tombe alors dans cette direction, jusqu'a rencontrer un obstacle. Amenez
+        le cube sur la sortie, toutes les cles ramassees.
+      </p>
+      <div class="row">
+        <button class="btn" id="btn-play">Commencer</button>
+        <button class="btn ghost" id="btn-clear">Effacer la progression</button>
+      </div>
+      <div id="level-grid"></div>
+      <div class="controls-grid">
+        <div><kbd>&#8593;</kbd><kbd>&#8595;</kbd><kbd>&#8592;</kbd><kbd>&#8594;</kbd></div><div>Gravite horizontale, relative a la camera</div>
+        <div><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Idem, au clavier</div>
+        <div><kbd>A</kbd><kbd>Espace</kbd></div><div>Gravite vers le haut de l'ecran</div>
+        <div><kbd>E</kbd><kbd>Maj</kbd></div><div>Gravite vers le bas de l'ecran</div>
+        <div><kbd>Ctrl</kbd>+<kbd>Z</kbd></div><div>Annuler (illimite)</div>
+        <div><kbd>R</kbd></div><div>Recommencer le niveau</div>
+        <div><kbd>N</kbd><kbd>P</kbd></div><div>Niveau suivant / precedent</div>
+        <div><kbd>Souris</kbd></div><div>Orbiter, molette pour zoomer</div>
+        <div><kbd>Echap</kbd></div><div>Pause</div>
+        <div><kbd>M</kbd></div><div>Couper le son</div>
+      </div>
+      <p class="hint">Aucune punition : chaque erreur s'annule d'une touche.</p>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">PAUSE</h1>
+      <p class="subtitle" id="pause-sub">Niveau 1</p>
+      <div class="slider-row">
+        <label for="volume">Volume</label>
+        <input type="range" id="volume" min="0" max="100" step="1" value="55" />
+        <span id="volume-value">55</span>
+      </div>
+      <div class="row">
+        <button class="btn" id="btn-resume">Reprendre</button>
+        <button class="btn ghost" id="btn-restart-pause">Recommencer</button>
+        <button class="btn ghost" id="btn-title-pause">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-win" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small" id="win-title">NIVEAU RESOLU</h1>
+      <p class="subtitle" id="win-sub"></p>
+      <p class="medal" id="win-medal"></p>
+      <div class="row">
+        <button class="btn" id="btn-next">Niveau suivant</button>
+        <button class="btn ghost" id="btn-replay">Rejouer</button>
+        <button class="btn ghost" id="btn-title-win">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-end" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">STRUCTURE COMPLETE</h1>
+      <p class="subtitle">Les quatorze niveaux sont resolus.</p>
+      <p class="blurb" id="end-stats"></p>
+      <div class="row">
+        <button class="btn" id="btn-title-end">Retour au menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">DEFAILLANCE</h1>
+      <pre id="error-text"></pre>
+      <p class="hint">Servir ce dossier en HTTP (console arcade) avec un navigateur WebGL2.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  function fail(message, where) {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (!s || !t || !s.classList.contains('hidden')) return;
+    t.textContent = String(message || 'Erreur inconnue') + (where ? '\n' + where : '');
+    document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    s.classList.remove('hidden');
+  }
+  window.addEventListener('error', (e) => fail(e.message, (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) =>
+    fail(e.reason && e.reason.message ? e.reason.message : e.reason, e.reason && e.reason.stack)
+  );
+  window.__fail = fail;
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

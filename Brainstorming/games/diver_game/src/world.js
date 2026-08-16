@@ -80,16 +80,48 @@ function smoothstep(a, b, x) {
   return t * t * (3 - 2 * t);
 }
 
-/** Height of the radial seabed profile at island distance d. */
+/**
+ * Height of the radial seabed profile at island distance d.
+ *
+ * Monotone cubic rather than a smoothstep per segment. smoothstep flattens to
+ * zero slope at *both* ends of every segment, so each control distance became a
+ * terrace: a ring of level seabed around the island every couple of hundred
+ * metres, with a crease where the next slope started. It was invisible while
+ * the seabed was soft and blurry, and stood out as a straight seam once the
+ * relief and the normals got sharper. The Hermite form below keeps exactly the
+ * same depth at every control point, so biomes and gameplay distances do not
+ * move, but its slope is continuous across them.
+ */
 function profileDepth(d) {
+  const n = PROFILE_D.length;
   if (d <= PROFILE_D[0]) return PROFILE_H[0];
-  for (let i = 1; i < PROFILE_D.length; i++) {
-    if (d <= PROFILE_D[i]) {
-      const t = smoothstep(PROFILE_D[i - 1], PROFILE_D[i], d);
-      return lerp(PROFILE_H[i - 1], PROFILE_H[i], t);
-    }
-  }
-  return PROFILE_H[PROFILE_H.length - 1];
+  if (d >= PROFILE_D[n - 1]) return PROFILE_H[n - 1];
+  let i = 1;
+  while (i < n - 1 && d > PROFILE_D[i]) i++;
+  const d0 = PROFILE_D[i - 1];
+  const d1 = PROFILE_D[i];
+  const h0 = PROFILE_H[i - 1];
+  const h1 = PROFILE_H[i];
+  const span = d1 - d0;
+  const secant = (h1 - h0) / span;
+  const before = i > 1 ? (h0 - PROFILE_H[i - 2]) / (d0 - PROFILE_D[i - 2]) : secant;
+  const after = i < n - 1 ? (PROFILE_H[i + 1] - h1) / (PROFILE_D[i + 1] - d1) : secant;
+  // Fritsch-Carlson limiter: tangents capped at three times the local secant,
+  // which is what stops a cubic from bulging back up inside a descending step.
+  const lim = 3 * Math.abs(secant);
+  let m0 = (before + secant) * 0.5;
+  let m1 = (secant + after) * 0.5;
+  if (Math.abs(m0) > lim) m0 = Math.sign(m0) * lim;
+  if (Math.abs(m1) > lim) m1 = Math.sign(m1) * lim;
+  const t = (d - d0) / span;
+  const t2 = t * t;
+  const t3 = t2 * t;
+  return (
+    (2 * t3 - 3 * t2 + 1) * h0 +
+    (t3 - 2 * t2 + t) * span * m0 +
+    (-2 * t3 + 3 * t2) * h1 +
+    (t3 - t2) * span * m1
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -100,9 +132,16 @@ function profileDepth(d) {
 
 function buildNoise(rng) {
   const perm = new Uint16Array(512);
-  const vals = new Float32Array(256);
+  // Unit gradient per lattice point instead of a scalar value. Value noise puts
+  // every hill and hollow exactly on a lattice point, which is what gave the
+  // seabed its melted, grid-aligned look; gradient noise puts them in between,
+  // so ridges and hollows run at arbitrary angles.
+  const gx = new Float32Array(256);
+  const gy = new Float32Array(256);
   for (let i = 0; i < 256; i++) {
-    vals[i] = rng();
+    const a = rng() * Math.PI * 2;
+    gx[i] = Math.cos(a);
+    gy[i] = Math.sin(a);
     perm[i] = i;
   }
   // Fisher-Yates shuffle of the permutation table.
@@ -114,23 +153,30 @@ function buildNoise(rng) {
   }
   for (let i = 0; i < 256; i++) perm[i + 256] = perm[i];
 
-  /** Smooth value noise in [0, 1]. */
+  /** Smooth gradient (Perlin) noise in [0, 1]. */
   function noise2(x, y) {
     const xi = Math.floor(x);
     const yi = Math.floor(y);
     const xf = x - xi;
     const yf = y - yi;
-    const u = xf * xf * (3 - 2 * xf);
-    const v = yf * yf * (3 - 2 * yf);
+    // Quintic fade rather than smoothstep: its second derivative vanishes at
+    // the lattice, so the shading has no crease along the grid lines.
+    const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10);
+    const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10);
     const X = xi & 255;
     const Y = yi & 255;
-    const p00 = vals[perm[X + perm[Y]] & 255];
-    const p10 = vals[perm[X + 1 + perm[Y]] & 255];
-    const p01 = vals[perm[X + perm[Y + 1]] & 255];
-    const p11 = vals[perm[X + 1 + perm[Y + 1]] & 255];
-    const a = p00 + (p10 - p00) * u;
-    const b = p01 + (p11 - p01) * u;
-    return a + (b - a) * v;
+    const h00 = perm[X + perm[Y]] & 255;
+    const h10 = perm[X + 1 + perm[Y]] & 255;
+    const h01 = perm[X + perm[Y + 1]] & 255;
+    const h11 = perm[X + 1 + perm[Y + 1]] & 255;
+    const n00 = gx[h00] * xf + gy[h00] * yf;
+    const n10 = gx[h10] * (xf - 1) + gy[h10] * yf;
+    const n01 = gx[h01] * xf + gy[h01] * (yf - 1);
+    const n11 = gx[h11] * (xf - 1) + gy[h11] * (yf - 1);
+    const a = n00 + (n10 - n00) * u;
+    const b = n01 + (n11 - n01) * u;
+    // 2D gradient noise spans about [-sqrt(2)/2, sqrt(2)/2]; remap to [0, 1].
+    return (a + (b - a) * v) * 0.7071 + 0.5;
   }
 
   /** Fractal brownian motion, normalised to [0, 1]. */
@@ -148,14 +194,27 @@ function buildNoise(rng) {
     return sum / norm;
   }
 
-  /** Ridged noise in [0, 1], sharp crests, good for rocky terrain. */
+  /**
+   * Ridged noise in [0, 1], crests, good for rocky terrain.
+   *
+   * The crest sits exactly where the absolute value folds, and a true abs()
+   * folds to a zero-width edge. On a 6 m mesh that averaged away; on a 3.5 m
+   * one it draws a thin seam straight across the sand. The smooth abs below
+   * rounds the fold over a fixed width, so a crest reads as a ridge instead of
+   * a crack, without moving it or changing its amplitude.
+   */
+  const RIDGE_ROUND = 0.16;
+
   function ridged(x, y, octaves) {
     let amp = 0.5;
     let freq = 1;
     let sum = 0;
     let norm = 0;
     for (let i = 0; i < octaves; i++) {
-      const n = 1 - Math.abs(2 * noise2(x * freq, y * freq) - 1);
+      const t = 2 * noise2(x * freq, y * freq) - 1;
+      // sqrt(t^2 + k^2) - k equals |t| away from zero and rounds it within +/-k.
+      const folded = Math.sqrt(t * t + RIDGE_ROUND * RIDGE_ROUND) - RIDGE_ROUND;
+      const n = 1 - folded;
       sum += n * n * amp;
       norm += amp;
       amp *= 0.5;
@@ -250,7 +309,9 @@ function makeArchGeometry(noise, seed) {
 
 /** Brain coral: squashed sphere with bumpy displacement. */
 function makeBrainCoralGeometry(noise, seed) {
-  const geo = new THREE.SphereGeometry(0.55, 12, 9);
+  // 12x9 was 192 triangles for a 55 cm lump drawn 1500 times. At 8x6 the
+  // silhouette is indistinguishable through the fog and it costs 80.
+  const geo = new THREE.SphereGeometry(0.55, 8, 6);
   displaceRadial(geo, noise, 0.4, 4.2, seed);
   geo.scale(1, 0.62, 1);
   geo.translate(0, 0.22, 0);
@@ -261,7 +322,10 @@ function makeBrainCoralGeometry(noise, seed) {
 function makeBranchCoralGeometry(rng) {
   const parts = [];
   function branch(origin, dir, len, rad, depth) {
-    const seg = new THREE.CylinderGeometry(rad * 0.6, rad, len, 5, 1);
+    // Open ended, and 4 sides instead of 5: the caps were interior faces buried
+    // in the parent branch or facing away at the twig tips, so they were 40% of
+    // this geometry drawn 1200 times for nothing.
+    const seg = new THREE.CylinderGeometry(rad * 0.6, rad, len, 4, 1, true);
     seg.translate(0, len * 0.5, 0);
     _q1.setFromUnitVectors(UP, dir);
     _m1.compose(origin, _q1, _v3.set(1, 1, 1));
@@ -291,9 +355,10 @@ function makeBranchCoralGeometry(rng) {
 
 /** Table coral: stalk plus a wide flattened disc with a wavy rim. */
 function makeTableCoralGeometry(noise, seed) {
-  const stalk = new THREE.CylinderGeometry(0.1, 0.16, 0.55, 7, 1);
+  // Stalk open ended: both caps are buried, one in the disc and one in the sand.
+  const stalk = new THREE.CylinderGeometry(0.1, 0.16, 0.55, 6, 1, true);
   stalk.translate(0, 0.27, 0);
-  const top = new THREE.CylinderGeometry(1.35, 1.0, 0.16, 14, 1);
+  const top = new THREE.CylinderGeometry(1.35, 1.0, 0.16, 12, 1);
   const p = top.attributes.position;
   for (let i = 0; i < p.count; i++) {
     const x = p.getX(i);
@@ -320,14 +385,18 @@ function makeSeaFanGeometry() {
 /** Anemone: squashed base sphere plus a crown of tentacle cones. */
 function makeAnemoneGeometry(rng) {
   const parts = [];
-  const base = new THREE.SphereGeometry(0.24, 8, 6);
+  const base = new THREE.SphereGeometry(0.24, 7, 5);
   base.scale(1, 0.5, 1);
   base.translate(0, 0.1, 0);
   parts.push(base);
-  const tentacles = 16;
+  // 16 tentacles of 32 triangles each made this 592 triangles for a hand sized
+  // animal placed 520 times, more than three times the whole terrain per 1000
+  // instances. 10 open ended tentacles of 16 read the same at any distance the
+  // fog allows; the 1.8 cm tip hole is never resolvable.
+  const tentacles = 10;
   for (let i = 0; i < tentacles; i++) {
     const len = 0.4 + rng() * 0.25;
-    const t = new THREE.CylinderGeometry(0.018, 0.05, len, 4, 3);
+    const t = new THREE.CylinderGeometry(0.018, 0.05, len, 4, 2, true);
     t.translate(0, len * 0.5, 0);
     const ang = (i / tentacles) * TAU + rng() * 0.4;
     const tilt = 0.25 + rng() * 0.55;
@@ -353,10 +422,11 @@ function makePolypGeometry(rng) {
     const h = 0.45 + rng() * 0.5;
     const ox = (rng() - 0.5) * 0.4;
     const oz = (rng() - 0.5) * 0.4;
-    const tube = new THREE.CylinderGeometry(0.045, 0.075, h, 5, 1);
+    // Open ended: the tip sphere caps the top and the ground caps the bottom.
+    const tube = new THREE.CylinderGeometry(0.045, 0.075, h, 5, 1, true);
     tube.translate(ox, h * 0.5, oz);
     parts.push(tube);
-    const tip = new THREE.SphereGeometry(0.09, 6, 5);
+    const tip = new THREE.SphereGeometry(0.09, 5, 4);
     tip.translate(ox, h, oz);
     parts.push(tip);
   }
@@ -524,6 +594,33 @@ export function createWorld(scene, textures) {
     const n1 = noise.fbm(x * 0.008 + 7.3, z * 0.008 + 2.1, 4) - 0.5;
     const depthT = clamp01((-h - 12) / 60);
     h += n1 * (6 + 22 * depthT);
+
+    // Reef scale shape. The depth ramp above deliberately keeps the lagoon
+    // gentle, but "gentle" had become "billiard table": the shallow reef read
+    // as a desert with no hummocks and no channels. This band restores that
+    // shape without steepening anything. It fades out above 4 m so the beach
+    // and the shoreline keep the profile they were authored with, and again
+    // below 46 m where the broad depth relief takes over.
+    const reefShape =
+      smoothstep(-4, -16, h) * (1 - smoothstep(-30, -46, h));
+    if (reefShape > 0.001) {
+      const reef = noise.fbm(x * 0.016 + 61.7, z * 0.016 + 43.2, 3) - 0.5;
+      h += reef * 6.0 * reefShape;
+    }
+
+    // Relief at swimming scale. The octave above has a 125 m wavelength: from
+    // two metres above the sand that is a flat plain, whatever its amplitude.
+    // These two are what the diver actually reads as ground - dune fields at
+    // ~22 m and a low swell at ~11 m - and they run everywhere, including the
+    // shallow lagoon that the depth ramp above leaves almost untouched.
+    // Both wavelengths stay well above the 3.5 m terrain quad: at ~3 samples
+    // per wave the mesh cannot reconstruct the crest and the reconstruction
+    // error shows as long straight creases across the sand.
+    const dune = noise.fbm(x * 0.035 + 31.4, z * 0.035 + 17.9, 3) - 0.5;
+    const swell = noise.noise2(x * 0.058 + 5.1, z * 0.058 + 2.7) - 0.5;
+    // Faded out on steep ground so it never fights the trench and canyon walls.
+    const gentle = 1 - clamp01((-h - 96) / 60);
+    h += (dune * 3.6 + swell * 1.5) * gentle;
 
     // Ridge and ravine band for the rocky zone.
     const band = smoothstep(680, 810, d) * (1 - smoothstep(980, 1140, d));
@@ -764,7 +861,12 @@ export function createWorld(scene, textures) {
   // sand / beach / rock texture blend in a small shader patch)
   // -------------------------------------------------------------------------
 
-  const RES = 300;
+  // 300 gave 6 m quads: wide enough that any relief below a 12 m wavelength was
+  // averaged away before it ever reached the screen. 512 brings the quad to
+  // 3.5 m, which is what the dune and swell octaves in seabedAt need to survive.
+  // The extra triangles are paid for by the prop budget (see the geometry
+  // builders above): the scene total goes down, not up.
+  const RES = 512;
   const SIDE = RES + 1;
   const STEP = (WORLD.halfSize * 2) / RES;
 
@@ -804,7 +906,35 @@ export function createWorld(scene, textures) {
     terrainGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     terrainGeo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     terrainGeo.setIndex(new THREE.BufferAttribute(indices, 1));
-    terrainGeo.computeVertexNormals();
+
+    // Normals by central difference on the height grid rather than
+    // computeVertexNormals(). For a heightfield this is the exact surface
+    // normal; computeVertexNormals averages the triangle fan around each
+    // vertex, and because every quad is split along the same diagonal that
+    // average leans consistently one way, which shows up as a faint diagonal
+    // corduroy across the whole seabed.
+    const normalsArr = new Float32Array(SIDE * SIDE * 3);
+    for (let iz = 0; iz < SIDE; iz++) {
+      for (let ix = 0; ix < SIDE; ix++) {
+        const i = iz * SIDE + ix;
+        const xm = ix > 0 ? ix - 1 : ix;
+        const xp = ix < SIDE - 1 ? ix + 1 : ix;
+        const zm = iz > 0 ? iz - 1 : iz;
+        const zp = iz < SIDE - 1 ? iz + 1 : iz;
+        // Edge vertices fall back to a one-sided difference, hence the span.
+        const dhx =
+          (positions[(iz * SIDE + xp) * 3 + 1] - positions[(iz * SIDE + xm) * 3 + 1]) /
+          ((xp - xm) * STEP);
+        const dhz =
+          (positions[(zp * SIDE + ix) * 3 + 1] - positions[(zm * SIDE + ix) * 3 + 1]) /
+          ((zp - zm) * STEP);
+        const inv = 1 / Math.sqrt(dhx * dhx + dhz * dhz + 1);
+        normalsArr[i * 3] = -dhx * inv;
+        normalsArr[i * 3 + 1] = inv;
+        normalsArr[i * 3 + 2] = -dhz * inv;
+      }
+    }
+    terrainGeo.setAttribute('normal', new THREE.BufferAttribute(normalsArr, 3));
 
     // Second pass: vertex tints plus rock / beach blend weights from the
     // heights and the computed normals.
@@ -849,14 +979,16 @@ export function createWorld(scene, textures) {
     new THREE.MeshStandardMaterial({
       map: textures.sand,
       normalMap: textures.sandNormal,
+      roughnessMap: textures.sandRough,
       vertexColors: true,
-      roughness: 0.96,
+      roughness: 1.0,
       metalness: 0.0,
     })
   );
   terrainMat.onBeforeCompile = (shader) => {
     shader.uniforms.uRockMap = { value: textures.rock };
     shader.uniforms.uBeachMap = { value: textures.beachSand };
+    shader.uniforms.uMacro = { value: textures.noise };
     shader.vertexShader = shader.vertexShader
       .replace(
         '#include <common>',
@@ -869,12 +1001,22 @@ export function createWorld(scene, textures) {
     shader.fragmentShader = shader.fragmentShader
       .replace(
         '#include <common>',
-        '#include <common>\nuniform sampler2D uRockMap;\nuniform sampler2D uBeachMap;\nvarying float vRock;\nvarying float vBeach;'
+        '#include <common>\nuniform sampler2D uRockMap;\nuniform sampler2D uBeachMap;\nuniform sampler2D uMacro;\nvarying float vRock;\nvarying float vBeach;'
       )
       .replace(
         '#include <map_fragment>',
         `#ifdef USE_MAP
+        // The sand map covers 16 m and the world is 1800 m across, so it
+        // repeats about 110 times along each axis. The fix is a very low
+        // frequency lightness drift: it breaks the eye's ability to lock onto a
+        // repeating patch, and unlike averaging in a second rotated lookup it
+        // leaves the ripples intact. (That was tried: blending two lookups of a
+        // directional pattern cancels the direction, and the rotated copy shows
+        // up as long diagonal streaks of its own.)
         vec4 sandTexel = texture2D( map, vMapUv );
+        float macro = texture2D( uMacro, vMapUv * 0.014 ).r;
+        float macroFine = texture2D( uMacro, vMapUv * 0.11 ).r;
+        sandTexel.rgb *= 0.80 + macro * 0.30 + macroFine * 0.12;
         vec4 rockTexel = texture2D( uRockMap, vMapUv * 1.6 );
         vec4 beachTexel = texture2D( uBeachMap, vMapUv * 2.1 );
         vec4 texelColor = mix( mix( sandTexel, beachTexel, vBeach ), rockTexel, vRock );
@@ -896,19 +1038,28 @@ export function createWorld(scene, textures) {
     new THREE.MeshStandardMaterial({
       map: textures.rock,
       normalMap: textures.rockNormal,
-      roughness: 0.97,
+      roughnessMap: textures.rockRough,
+      roughness: 1.0,
       metalness: 0.0,
     })
   );
 
   const brainMat = own(
-    new THREE.MeshStandardMaterial({ map: textures.coral, roughness: 0.85 })
+    new THREE.MeshStandardMaterial({
+      map: textures.coral,
+      normalMap: textures.coralNormal,
+      roughness: 0.85,
+    })
   );
   const branchMat = own(
     new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.0 })
   );
   const tableMat = own(
-    new THREE.MeshStandardMaterial({ map: textures.coral, roughness: 0.85 })
+    new THREE.MeshStandardMaterial({
+      map: textures.coral,
+      normalMap: textures.coralNormal,
+      roughness: 0.85,
+    })
   );
   const fanMat = own(
     new THREE.MeshStandardMaterial({

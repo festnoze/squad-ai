@@ -33,8 +33,13 @@ strictement les signatures decrites ici, sinon l'integration casse.
 ## `textures.js`
 
 ```js
-export function createTextures(): Textures
+export function createTextures(renderer?): Textures
 ```
+
+`renderer` est optionnel et sert uniquement a lire
+`renderer.capabilities.getMaxAnisotropy()`. Sans lui le filtrage retombe sur
+une valeur fixe de 4, ce qui laisse le sable s empater des qu il est vu en
+rasant: passer le renderer quand il existe.
 
 `Textures` est un objet plat. **Toutes** ces cles doivent exister et etre des
 `THREE.Texture` valides (generees via canvas 2D), plus `dispose()`.
@@ -43,9 +48,13 @@ export function createTextures(): Textures
 |---|---|---|
 | `sand` | fond sableux | tileable, `RepeatWrapping`, `SRGBColorSpace` |
 | `sandNormal` | relief du sable | normal map, pas de colorSpace sRGB |
+| `sandRough` | rugosite du sable | greyscale, meme champ de hauteur que `sandNormal` |
+| `beachNormal` | relief du sable de plage | normal map |
 | `rock` | rochers et falaises | tileable |
 | `rockNormal` | relief rocheux | normal map |
+| `rockRough` | rugosite rocheuse | greyscale, meme champ de hauteur que `rockNormal` |
 | `coral` | surfaces coralliennes | tileable, colore |
+| `coralNormal` | relief des polypes | normal map |
 | `kelp` | lame de kelp | avec alpha, non tileable |
 | `caustics` | motif de caustiques | tileable, niveaux de gris clairs |
 | `noise` | bruit generique | tileable, gris |

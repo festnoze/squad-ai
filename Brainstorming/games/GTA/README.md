@@ -282,15 +282,16 @@ node tools/shoot.mjs --shot street --url "http://localhost:8092/?post=off&hwtraf
 **Fall damage and drowning** - 17 checks. Stands the player on the real highway deck, reads
 back where they settled, steps them off that same edge, and compares it with flat-street
 control drops of 2 m, 9.5 m and 16 m plus a jump driven by a real key press. Then swims
-them out past the shelf and watches the breath meter empty, turn red, drain health and
-kill.
+them out past the shelf and watches the breath meter go red, empty, start draining health
+and kill.
 
 ```bash
 node tools/shoot.mjs --shot street --url "http://localhost:8092/?post=off&hwtraffic=0" --wait 3 --js-file tools/probe-falldmg.js --out shots/probe-falldmg.png
 ```
 
-**Breath-meter capture aid** - no assertions. Leaves the player treading water with the bar
-low and red so the screenshot catches it next to health and armour.
+**Breath-meter capture aid** - no assertions. Leaves the player treading water with the
+meter part drained (it returns the exact figure; 35% on the run here) so the screenshot
+catches the bar next to health and armour.
 
 ```bash
 node tools/shoot.mjs --shot street --url "http://localhost:8092/?post=off&hwtraffic=0" --wait 3 --js-file tools/probe-falldmg-hud.js --out shots/probe-falldmg-hud.png
@@ -313,9 +314,16 @@ always taken over the first 120 s either way). It exists because the probe gives
 560 s of wall clock, and a headless software renderer on a busy machine does not always fit
 240 s of simulation inside that.
 
+One check is close to its threshold and worth knowing about before it costs an hour: the
+mean speed in the red band has to come in under 8 km/h, and back-to-back runs here measured
+7.8 and 9.5. A single miss on that one line is variance in which junctions the cars happened
+to meet, not a regression - re-run it before believing it. Every other check has clear air
+between the measurement and its threshold.
+
 Add `&lights=off` to the URL for the baseline half of the pair: it detaches the signal
 reference from the autopilot, so the same run measures the same city with the lights
-ignored.
+ignored. That run is *meant* to fail five of the twelve checks - it is the negative proof,
+and a green one would mean the probe is not measuring obedience at all.
 
 ```bash
 node tools/shoot.mjs --shot street --url "http://localhost:8092/?post=off&hwtraffic=0&lights=off" --wait 3 --js-file tools/probe-lights.js --out shots/probe-lights-base.png

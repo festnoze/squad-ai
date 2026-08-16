@@ -112,12 +112,58 @@ function makeValueNoise(rng, px, py) {
   };
 }
 
-/** Fractional Brownian motion built from stacked tileable value noises.
+/**
+ * Tileable gradient (Perlin) noise with independent wrap periods.
+ *
+ * Value noise interpolates random *values* sitting on the lattice, so every
+ * extremum lands on a lattice point and the result reads as blobs lined up on
+ * a grid. Gradient noise interpolates random *directions* instead: extrema
+ * fall between lattice points and features cross the grid at any angle, which
+ * is what makes sand ripples and rock strata look eroded rather than knitted.
+ */
+function makeGradientNoise(rng, px, py) {
+  py = py || px;
+  const gx = new Float32Array(px * py);
+  const gy = new Float32Array(px * py);
+  for (let i = 0; i < px * py; i++) {
+    const a = rng() * Math.PI * 2;
+    gx[i] = Math.cos(a);
+    gy[i] = Math.sin(a);
+  }
+  return function noise(x, y) {
+    const xi = Math.floor(x);
+    const yi = Math.floor(y);
+    const xf = x - xi;
+    const yf = y - yi;
+    // Quintic fade: its second derivative vanishes at the lattice, so no
+    // crease shows along the grid lines the way smoothstep leaves one.
+    const u = xf * xf * xf * (xf * (xf * 6 - 15) + 10);
+    const v = yf * yf * yf * (yf * (yf * 6 - 15) + 10);
+    const x0 = ((xi % px) + px) % px;
+    const y0 = ((yi % py) + py) % py;
+    const x1 = (x0 + 1) % px;
+    const y1 = (y0 + 1) % py;
+    const i00 = y0 * px + x0;
+    const i10 = y0 * px + x1;
+    const i01 = y1 * px + x0;
+    const i11 = y1 * px + x1;
+    const n00 = gx[i00] * xf + gy[i00] * yf;
+    const n10 = gx[i10] * (xf - 1) + gy[i10] * yf;
+    const n01 = gx[i01] * xf + gy[i01] * (yf - 1);
+    const n11 = gx[i11] * (xf - 1) + gy[i11] * (yf - 1);
+    const a = n00 + (n10 - n00) * u;
+    const b = n01 + (n11 - n01) * u;
+    // 2D gradient noise spans about [-sqrt(2)/2, sqrt(2)/2]; remap to [0, 1].
+    return (a + (b - a) * v) * 0.7071 + 0.5;
+  };
+}
+
+/** Fractional Brownian motion built from stacked tileable gradient noises.
  *  fx and fy are the base frequencies (integer, so the result tiles). */
 function makeFbm(rng, fx, fy, octaves) {
   const layers = [];
   for (let o = 0; o < octaves; o++) {
-    layers.push(makeValueNoise(rng, fx << o, fy << o));
+    layers.push(makeGradientNoise(rng, fx << o, fy << o));
   }
   return function fbm(u, v) {
     let sum = 0;
@@ -184,6 +230,22 @@ function mixInto(out, a, b, t) {
   out[2] = a[2] + (b[2] - a[2]) * t;
 }
 
+/**
+ * Greyscale roughness map from the same height field that fed the normal map.
+ * Crests are scoured smooth and troughs collect loose sediment, so tying
+ * roughness to height makes the ripples catch the light instead of leaving the
+ * whole ground under one flat roughness constant.
+ */
+function roughnessCanvas(size, height, lo, hi) {
+  return fillPixels(size, size, (u, v, out, x, y) => {
+    // three.js samples roughness from the green channel; grey keeps it obvious.
+    const g = clampByte((lo + (hi - lo) * height[y * size + x]) * 255);
+    out[0] = g;
+    out[1] = g;
+    out[2] = g;
+  });
+}
+
 /** Sobel-ish normal map derived from a wrapped height field (0..1 values). */
 function normalCanvas(size, height, strength) {
   return fillPixels(size, size, (u, v, out, x, y) => {
@@ -208,20 +270,32 @@ function normalCanvas(size, height, strength) {
  *  Returns the canvas plus the height field so the normal map can match. */
 function buildSand(rng, size, baseHex, rippleAmp, grainAmp, speckColor) {
   const warp = makeFbm(rng, 4, 4, 3);
-  const grain = makeFbm(rng, 24, 24, 3);
+  const grain = makeFbm(rng, 24, 24, 4);
+  const fine = makeFbm(rng, 48, 48, 2);
   const height = new Float32Array(size * size);
   const base = hexToRgb(baseHex);
   const canvas = fillPixels(size, size, (u, v, out, x, y) => {
     const w = warp(u, v);
-    const band = Math.sin((v * 6 + w * 1.7) * Math.PI * 2);
+    // Two ripple trains at different scales and angles. A single sine reads as
+    // corduroy as soon as the texture repeats; crossing trains read as sand.
+    const main = Math.sin((v * 6 + u * 1.5 + w * 1.7) * Math.PI * 2);
+    const cross = Math.sin((v * 11 - u * 4 + w * 2.6) * Math.PI * 2);
+    // Real ripples are asymmetric: a sharp crest above a long flat trough. The
+    // gamma below spends most of the range low, which gives that profile.
+    const shaped = Math.pow(main * 0.5 + 0.5, 1.8) * 2 - 1;
+    const band = shaped * 0.82 + cross * 0.18;
     const g = grain(u, v) - 0.5;
-    height[y * size + x] = clamp01(0.5 + band * 0.22 + g * 0.7);
-    const light = 1 + band * rippleAmp + g * grainAmp + (w - 0.5) * 0.1;
+    const f = fine(u, v) - 0.5;
+    height[y * size + x] = clamp01(0.5 + band * 0.28 + g * 0.55 + f * 0.26);
+    const light =
+      1 + band * rippleAmp + g * grainAmp + f * grainAmp * 0.55 + (w - 0.5) * 0.1;
     out[0] = clampByte(base[0] * light);
     out[1] = clampByte(base[1] * light);
     out[2] = clampByte(base[2] * light);
   });
-  drawSpecks(canvas, rng, 160, speckColor, 1.1, 0.35);
+  // Many small specks rather than few big ones: a handful of large blobs are
+  // landmarks, and landmarks are exactly what makes a repeat visible.
+  drawSpecks(canvas, rng, 520, speckColor, 0.65, 0.22);
   return { canvas, height };
 }
 
@@ -266,15 +340,20 @@ function buildCoral(rng, size) {
     const shade = 0.72 + rng() * 0.45;
     cellColors.push([c[0] * shade, c[1] * shade, c[2] * shade]);
   }
-  return fillPixels(size, size, (u, v, out) => {
+  const height = new Float32Array(size * size);
+  const canvas = fillPixels(size, size, (u, v, out, x, y) => {
     cells(u, v);
     const col = cellColors[_wid];
     const crevice = 0.3 + 0.7 * smoothstep(0.008, 0.06, _wf2 - _wf1);
     const b = 0.85 + (bump(u, v) - 0.5) * 0.55;
+    // Each polyp is a rounded lobe: full height at the cell centre, cut down
+    // sharply in the crevice between cells.
+    height[y * size + x] = clamp01(crevice * 0.75 + (b - 0.6) * 0.5);
     out[0] = clampByte(col[0] * crevice * b);
     out[1] = clampByte(col[1] * crevice * b);
     out[2] = clampByte(col[2] * crevice * b);
   });
+  return { canvas, height };
 }
 
 /** Bright thin Worley filaments on black. Two overlapping scales so the
@@ -724,6 +803,11 @@ function buildFlare(size) {
 // 5. Assembly
 // ---------------------------------------------------------------------------
 
+// Set once from the renderer in createTextures(). The seabed is almost always
+// seen at a grazing angle, which is exactly the case anisotropic filtering
+// exists for: at 4 the sand smears into mush a few metres ahead of the diver.
+let _anisotropy = 4;
+
 function toTexture(canvas, opts) {
   opts = opts || {};
   const tex = new THREE.CanvasTexture(canvas);
@@ -732,25 +816,33 @@ function toTexture(canvas, opts) {
     tex.wrapT = THREE.RepeatWrapping;
   }
   if (opts.srgb) tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
+  tex.anisotropy = _anisotropy;
   return tex;
 }
 
-export function createTextures() {
+/** `renderer` is optional: without it the filtering falls back to the old
+ *  fixed value, so the texture set still builds in a headless test. */
+export function createTextures(renderer) {
+  _anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 4;
   const rng = makeRandom(48151623);
 
-  const sandBuild = buildSand(rng, 256, PALETTE.sand, 0.07, 0.2, 'rgba(96, 78, 52, 1)');
-  const beachBuild = buildSand(rng, 256, 0xe8dcb8, 0.045, 0.14, 'rgba(180, 150, 110, 1)');
+  const sandBuild = buildSand(rng, 256, PALETTE.sand, 0.09, 0.24, 'rgba(96, 78, 52, 1)');
+  const beachBuild = buildSand(rng, 256, 0xe8dcb8, 0.06, 0.17, 'rgba(180, 150, 110, 1)');
   const rockBuild = buildRock(rng, 256);
+  const coralBuild = buildCoral(rng, 256);
 
   const textures = {
     // Ground and structures
     sand: toTexture(sandBuild.canvas, { repeat: true, srgb: true }),
-    sandNormal: toTexture(normalCanvas(256, sandBuild.height, 2.2), { repeat: true }),
+    sandNormal: toTexture(normalCanvas(256, sandBuild.height, 2.8), { repeat: true }),
+    sandRough: toTexture(roughnessCanvas(256, sandBuild.height, 0.72, 1.0), { repeat: true }),
     rock: toTexture(rockBuild.canvas, { repeat: true, srgb: true }),
-    rockNormal: toTexture(normalCanvas(256, rockBuild.height, 3.0), { repeat: true }),
-    coral: toTexture(buildCoral(rng, 256), { repeat: true, srgb: true }),
+    rockNormal: toTexture(normalCanvas(256, rockBuild.height, 3.4), { repeat: true }),
+    rockRough: toTexture(roughnessCanvas(256, rockBuild.height, 0.66, 1.0), { repeat: true }),
+    coral: toTexture(coralBuild.canvas, { repeat: true, srgb: true }),
+    coralNormal: toTexture(normalCanvas(256, coralBuild.height, 2.4), { repeat: true }),
     beachSand: toTexture(beachBuild.canvas, { repeat: true, srgb: true }),
+    beachNormal: toTexture(normalCanvas(256, beachBuild.height, 2.2), { repeat: true }),
     plank: toTexture(buildPlank(rng, 256), { repeat: true, srgb: true }),
     labWall: toTexture(buildLabWall(rng, 256), { repeat: true, srgb: true }),
     hullPanel: toTexture(buildHullPanel(rng, 256), { repeat: true, srgb: true }),

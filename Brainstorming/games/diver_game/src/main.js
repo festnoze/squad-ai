@@ -173,7 +173,7 @@ async function boot() {
   // -------------------------------------------------------------- subsystems
   hud.setLoading(0.08, 'Generation des textures');
   await paint();
-  const textures = createTextures();
+  const textures = createTextures(renderer);
 
   hud.setLoading(0.24, 'Mise en eau');
   await paint();

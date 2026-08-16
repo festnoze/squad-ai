@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ARCADE</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#127918;</text></svg>">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body data-view="gallery">
+
+  <!-- ============================ console ============================ -->
+  <div id="gallery" class="gallery">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">&#127918;</span>
+        <div>
+          <h1>ARCADE</h1>
+          <p class="brand-sub">Une origine, un processus, un jeu a la fois</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <input id="search" class="search" type="search" placeholder="Filtrer&hellip;  (touche /)" aria-label="Filtrer les jeux" autocomplete="off">
+        <span id="summary" class="summary">chargement&hellip;</span>
+      </div>
+    </header>
+
+    <main>
+      <section id="grid" class="grid" aria-live="polite"></section>
+      <p id="empty" class="empty" hidden>
+        Aucun jeu dans <code>games/</code>. Un jeu, c'est un dossier qui livre un
+        <code>index.html</code> a sa racine ou dans <code>dist/</code>.
+      </p>
+    </main>
+
+    <footer class="footer">
+      <kbd>&larr;</kbd><kbd>&rarr;</kbd> naviguer &middot; <kbd>Entree</kbd> jouer &middot;
+      <kbd>/</kbd> filtrer &middot; en jeu&nbsp;: <kbd>F2</kbd> (ou <kbd>Maj</kbd>+<kbd>Echap</kbd>) pour revenir
+    </footer>
+  </div>
+
+  <!-- ============================= scene ============================= -->
+  <!-- Une seule iframe existe dans tout le document. La retirer suffit a
+       arreter completement le jeu: c'est la garantie "un seul jeu a la fois". -->
+  <div id="stage" class="stage" hidden>
+    <div id="stagebar" class="stagebar">
+      <button id="back" class="back" type="button">
+        <span aria-hidden="true">&#9664;</span> Console
+      </button>
+      <span id="playing" class="playing"></span>
+      <span class="stagebar-hint"><kbd>F2</kbd> pour revenir</span>
+      <button id="reload" class="ghost" type="button" title="Relancer le jeu depuis zero">Relancer</button>
+      <button id="fullscreen" class="ghost" type="button">Plein ecran</button>
+    </div>
+    <div id="frame-slot" class="frame-slot"></div>
+    <div id="loading" class="loading" hidden><span class="spinner"></span>chargement&hellip;</div>
+  </div>
+
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

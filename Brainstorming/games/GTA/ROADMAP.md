@@ -145,11 +145,14 @@ Legend: `[ ]` todo `[~]` in progress `[x]` done
 - [x] AI traffic reads the traffic lights it drives past. `VehicleManager._driveAI` folds the
       signal phase for the car's approach axis into the same target-speed clamp the obstacle
       scan uses, with a hold cap so a red can never park a car for ever. Over 120 s of
-      simulation the city flows 24.30 of 28 cars with the signals live, against the 23.8/28
-      baseline with them detached, and 0 cars crossed a solid red across 26 signalled
-      crossings. On the red band, 57% of 311 samples were stopped and the mean was 7.8 km/h
-      while the crossing axis ran at 46.7; the lit lens agreed with the phase the cars obey
-      on 40 of 40 samples. 12/12 on `tools/probe-lights.js`
+      simulation the city flows 24.30 of 28 cars with the signals live, above the 23.8/28
+      baseline the grid has to hold, and 0 cars crossed a solid red across 26 signalled
+      crossings. On the red band 57% of 311 samples were stopped, at a mean of 7.8 km/h while
+      the crossing axis ran at 46.7, and the lit lens agreed with the phase the cars obey on
+      40 of 40 samples. The same probe with `&lights=off` is the negative half of the pair and
+      fails five of its twelve checks: 0% of the red band stopped, mean 51.5 km/h, 24 runners
+      of 39 signalled crossings and 15 box stalls, for 25.04/28 flowing. Obedience costs
+      three quarters of a car of flow and buys every red. 12/12 on `tools/probe-lights.js`
 - [x] Preferences persist. Quality, resolution scale, volume and the post toggle are written
       to their own `localStorage` key (not the save slot) and read synchronously at module
       load, because the preset decides which post stages exist and the scale decides how big

@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PRISMA - puzzle optique</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128142;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ======================= in-game HUD ======================= -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div id="hud-level">
+        <span id="level-index">01</span>
+        <span id="level-name">-</span>
+      </div>
+      <div id="hud-stats">
+        <div class="stat"><span class="stat-label">Cibles</span><b id="stat-targets">0/0</b></div>
+        <div class="stat"><span class="stat-label">Posees</span><b id="stat-pieces">0</b></div>
+        <div class="stat"><span class="stat-label">Optimum</span><b id="stat-optimum">0</b></div>
+      </div>
+    </div>
+
+    <div id="targets-strip"></div>
+
+    <div id="hint-bar"><span id="hint-text"></span></div>
+
+    <div id="bottom-bar">
+      <div id="inventory"></div>
+      <div id="toolbar">
+        <button class="tool" id="btn-undo">Annuler <kbd>Ctrl+Z</kbd></button>
+        <button class="tool" id="btn-restart">Recommencer <kbd>R</kbd></button>
+        <button class="tool" id="btn-menu">Niveaux <kbd>Echap</kbd></button>
+        <button class="tool" id="btn-mute">Son <kbd>M</kbd></button>
+      </div>
+    </div>
+
+    <div id="toasts"></div>
+    <div id="banner"><span id="banner-title"></span><span id="banner-sub"></span></div>
+  </div>
+
+  <!-- ======================= overlay screens ======================= -->
+  <div id="screen-loading" class="screen">
+    <div class="panel">
+      <h1 class="title">PRISMA</h1>
+      <p class="subtitle">Chambre optique</p>
+      <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+      <p class="hint-line" id="loading-line">Initialisation...</p>
+    </div>
+  </div>
+
+  <div id="screen-title" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title">PRISMA</h1>
+      <p class="subtitle">Puzzle optique &middot; 14 chambres</p>
+      <p class="blurb">
+        Un emetteur, un faisceau blanc, des cibles qui attendent chacune une couleur
+        precise. Posez des miroirs, des prismes, des filtres, des splitters et des
+        combinateurs sur la grille : le faisceau se recalcule a chaque geste. Aucune
+        contrainte de temps, aucune punition, un nombre d annulations illimite.
+      </p>
+      <div class="controls-grid">
+        <div><kbd>Clic gauche</kbd></div><div>Poser ou selectionner un composant</div>
+        <div><kbd>Clic droit</kbd><kbd>Espace</kbd></div><div>Tourner le composant vise</div>
+        <div><kbd>Molette</kbd></div><div>Tourner si un composant est vise, sinon zoomer</div>
+        <div><kbd>1</kbd>..<kbd>5</kbd></div><div>Choisir le type de composant</div>
+        <div><kbd>Suppr</kbd><kbd>Clic milieu</kbd></div><div>Retirer le composant vise</div>
+        <div><kbd>Ctrl+Z</kbd></div><div>Annuler (illimite)</div>
+        <div><kbd>R</kbd></div><div>Recommencer le niveau</div>
+        <div><kbd>Souris glissee</kbd></div><div>Orbiter autour de la chambre</div>
+        <div><kbd>C</kbd></div><div>Recadrer la camera</div>
+        <div><kbd>H</kbd></div><div>Rappel de la regle du niveau</div>
+        <div><kbd>M</kbd></div><div>Couper le son</div>
+        <div><kbd>Echap</kbd></div><div>Pause</div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btn-play">Continuer</button>
+        <button class="btn ghost" id="btn-levels">Choisir un niveau</button>
+      </div>
+      <p class="hint-line">Le son est synthetise en direct. Aucun fichier externe.</p>
+    </div>
+  </div>
+
+  <div id="screen-levels" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title small">Chambres</h1>
+      <p class="subtitle" id="levels-sub">-</p>
+      <div id="level-grid"></div>
+      <div class="btn-row">
+        <button class="btn ghost" id="btn-levels-back">Retour</button>
+        <button class="btn ghost danger" id="btn-wipe">Effacer la progression</button>
+      </div>
+      <p class="hint-line">Or : au nombre optimal de composants. Argent : +1. Bronze : +2.</p>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">Pause</h1>
+      <p class="subtitle" id="pause-sub">-</p>
+      <div class="slider-row">
+        <label for="volume">Volume</label>
+        <input type="range" id="volume" min="0" max="100" step="1" value="60" />
+        <span id="volume-value">60</span>
+      </div>
+      <div class="btn-row column">
+        <button class="btn" id="btn-resume">Reprendre</button>
+        <button class="btn ghost" id="btn-restart-pause">Recommencer le niveau</button>
+        <button class="btn ghost" id="btn-levels-pause">Choisir un niveau</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-win" class="screen hidden">
+    <div class="panel">
+      <div id="win-medal" class="medal">-</div>
+      <h1 class="title small" id="win-title">Chambre resolue</h1>
+      <p class="subtitle" id="win-sub">-</p>
+      <p class="blurb" id="win-detail">-</p>
+      <div class="btn-row column">
+        <button class="btn" id="btn-next">Chambre suivante</button>
+        <button class="btn ghost" id="btn-retry">Refaire en moins de composants</button>
+        <button class="btn ghost" id="btn-win-levels">Liste des chambres</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-end" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title">Chambre finale eteinte</h1>
+      <p class="subtitle">Les 14 chambres sont resolues</p>
+      <p class="blurb" id="end-stats">-</p>
+      <div class="btn-row">
+        <button class="btn" id="btn-end-levels">Revoir les chambres</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">Defaillance optique</h1>
+      <pre id="error-text"></pre>
+      <p class="hint-line">Servir ce dossier en HTTP (console arcade) avec un navigateur WebGL2.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  function fail(message, where) {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (!s || !t || !s.classList.contains('hidden')) return;
+    t.textContent = String(message || 'Erreur inconnue') + (where ? '\n' + where : '');
+    document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    document.getElementById('hud').classList.add('hidden');
+    s.classList.remove('hidden');
+  }
+  window.addEventListener('error', (e) => fail(e.message, (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) =>
+    fail(e.reason && e.reason.message ? e.reason.message : e.reason, e.reason && e.reason.stack),
+  );
+  window.__fail = fail;
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

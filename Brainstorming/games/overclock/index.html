@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>OVERCLOCK</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#129302;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===================== programming panel (DOM) ===================== -->
+  <aside id="panel">
+    <header id="panel-head">
+      <div id="panel-brand">OVERCLOCK</div>
+      <div id="level-name">NIVEAU</div>
+      <div id="level-hint"></div>
+    </header>
+
+    <section class="block">
+      <h3 class="block-title">JEU D INSTRUCTIONS</h3>
+      <div id="palette"></div>
+      <p class="block-note" id="palette-note">Glisser vers un slot, ou selectionner puis cliquer. Touches 1 a 9.</p>
+    </section>
+
+    <section class="block grow">
+      <h3 class="block-title">PROGRAMME</h3>
+      <div id="procs"></div>
+      <p class="block-note">Clic sur un slot pose : change la condition de couleur. Clic droit : vider.</p>
+    </section>
+
+    <footer id="panel-foot">
+      <div id="budget">
+        <span class="budget-cell"><i>UTILISEES</i><b id="budget-used">0</b></span>
+        <span class="budget-cell"><i>OPTIMUM</i><b id="budget-optimal">0</b></span>
+        <span class="budget-cell"><i>MEDAILLE</i><b id="budget-medal">-</b></span>
+      </div>
+      <div class="btn-row">
+        <button class="btn primary" id="btn-run">EXECUTER</button>
+        <button class="btn" id="btn-step" title="F10">PAS A PAS</button>
+        <button class="btn ghost" id="btn-stop" title="Echap">ARRET</button>
+      </div>
+      <div class="btn-row speeds" id="speed-row">
+        <span class="row-label">VITESSE</span>
+        <button class="chip" data-speed="0.5">x0.5</button>
+        <button class="chip on" data-speed="1">x1</button>
+        <button class="chip" data-speed="2">x2</button>
+        <button class="chip" data-speed="4">x4</button>
+      </div>
+      <div class="btn-row">
+        <button class="btn ghost small" id="btn-undo" title="Ctrl+Z">ANNULER</button>
+        <button class="btn ghost small" id="btn-reset-prog" title="R">EFFACER</button>
+        <button class="btn ghost small" id="btn-levels">NIVEAUX</button>
+      </div>
+    </footer>
+  </aside>
+
+  <!-- ===================== 3D stage ===================== -->
+  <main id="stage">
+    <canvas id="scene"></canvas>
+
+    <div id="topbar">
+      <span class="tb-cell"><i>NIVEAU</i><b id="hud-level">1 / 14</b></span>
+      <span class="tb-cell"><i>CIBLES</i><b id="hud-targets">0 / 0</b></span>
+      <span class="tb-cell"><i>PILE</i><b id="hud-stack">0</b></span>
+      <span class="tb-cell"><i>PAS</i><b id="hud-steps">0</b></span>
+      <span class="tb-cell wide"><i>ETAT</i><b id="hud-status">EDITION</b></span>
+    </div>
+
+    <div id="cam-hint">Souris : orbite &middot; Molette : zoom &middot; Entree : executer</div>
+    <div id="toast"></div>
+  </main>
+
+  <!-- ===================== overlay screens ===================== -->
+  <div id="screen-title" class="screen">
+    <div class="sheet wide">
+      <h1 class="title">OVERCLOCK</h1>
+      <p class="subtitle">ENTREPOT AUTOMATISE &middot; UNITE DE VOL PROGRAMMABLE</p>
+      <p class="blurb">
+        Vous ne pilotez rien. Vous ecrivez le programme du drone, vous appuyez sur
+        EXECUTER, et vous regardez. Le drone n a que quelques instructions et tres peu
+        de slots : pour couvrir un entrepot entier il faut des procedures qui s appellent
+        elles memes et des conditions de couleur. Allumer toutes les cibles termine le niveau.
+      </p>
+      <div class="cols">
+        <div class="controls-grid">
+          <div><kbd>Entree</kbd></div><div>Executer le programme</div>
+          <div><kbd>Echap</kbd></div><div>Arreter le run / menu</div>
+          <div><kbd>F10</kbd></div><div>Pas a pas</div>
+          <div><kbd>Ctrl</kbd><kbd>Z</kbd></div><div>Annuler une edition</div>
+          <div><kbd>R</kbd></div><div>Effacer le programme</div>
+        </div>
+        <div class="controls-grid">
+          <div><kbd>1</kbd>..<kbd>9</kbd></div><div>Poser une instruction</div>
+          <div><kbd>&#8592;</kbd><kbd>&#8594;</kbd></div><div>Naviguer les slots</div>
+          <div><kbd>C</kbd></div><div>Condition de couleur</div>
+          <div><kbd>Suppr</kbd></div><div>Vider le slot</div>
+          <div><kbd>Souris</kbd></div><div>Orbite et zoom</div>
+        </div>
+      </div>
+      <div class="btn-row center">
+        <button class="btn primary" id="btn-play">COMMENCER</button>
+        <button class="btn" id="btn-continue">REPRENDRE</button>
+        <button class="btn ghost" id="btn-title-levels">CHOISIR UN NIVEAU</button>
+      </div>
+      <p class="hint">Le son est synthetise en direct, il demarre au premier clic.</p>
+    </div>
+  </div>
+
+  <div id="screen-levels" class="screen hidden">
+    <div class="sheet wide">
+      <h1 class="title small">NIVEAUX</h1>
+      <p class="subtitle">Or si le programme tient dans l optimum, argent a +2, bronze a +4</p>
+      <div id="level-grid"></div>
+      <div class="btn-row center">
+        <button class="btn ghost" id="btn-levels-back">RETOUR</button>
+        <button class="btn ghost" id="btn-wipe">EFFACER LA PROGRESSION</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="sheet">
+      <h1 class="title small">PAUSE</h1>
+      <div class="slider-row">
+        <label for="volume">VOLUME</label>
+        <input type="range" id="volume" min="0" max="100" step="1" value="60" />
+        <span id="volume-value">60</span>
+      </div>
+      <div class="btn-row center">
+        <button class="btn primary" id="btn-resume">REPRENDRE</button>
+        <button class="btn" id="btn-pause-levels">NIVEAUX</button>
+        <button class="btn ghost" id="btn-pause-title">ECRAN TITRE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-win" class="screen hidden">
+    <div class="sheet">
+      <h1 class="title small" id="win-title">NIVEAU RESOLU</h1>
+      <div id="win-medal">OR</div>
+      <p class="subtitle" id="win-sub"></p>
+      <table id="win-table">
+        <tbody>
+          <tr><td>INSTRUCTIONS UTILISEES</td><td id="win-used">0</td></tr>
+          <tr><td>OPTIMUM CONNU</td><td id="win-optimal">0</td></tr>
+          <tr><td>PAS EXECUTES</td><td id="win-steps">0</td></tr>
+          <tr><td>MEILLEUR PERSONNEL</td><td id="win-best">-</td></tr>
+        </tbody>
+      </table>
+      <div class="btn-row center">
+        <button class="btn primary" id="btn-next">NIVEAU SUIVANT</button>
+        <button class="btn" id="btn-retry">REESSAYER</button>
+        <button class="btn ghost" id="btn-win-levels">NIVEAUX</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-end" class="screen hidden">
+    <div class="sheet">
+      <h1 class="title small">ENTREPOT CERTIFIE</h1>
+      <p class="blurb">
+        Les quatorze zones tournent en autonomie. Le drone n a jamais recu un seul
+        ordre direct : tout ce qu il fait, vous l avez ecrit.
+      </p>
+      <p class="subtitle" id="end-sub"></p>
+      <div class="btn-row center">
+        <button class="btn primary" id="btn-end-levels">REVOIR LES NIVEAUX</button>
+        <button class="btn ghost" id="btn-end-title">ECRAN TITRE</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="sheet">
+      <h1 class="title small dead">DEFAILLANCE SYSTEME</h1>
+      <pre id="error-text"></pre>
+      <p class="hint">Servir ce dossier en HTTP (console arcade) avec un navigateur WebGL2.</p>
+    </div>
+  </div>
+
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  function fail(message, where) {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (!s || !t || !s.classList.contains('hidden')) return;
+    t.textContent = String(message || 'Erreur inconnue') + (where ? '\n' + where : '');
+    document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    s.classList.remove('hidden');
+  }
+  window.addEventListener('error', (e) => fail(e.message, (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) => fail(e.reason && e.reason.message ? e.reason.message : e.reason, e.reason && e.reason.stack));
+  window.__fail = fail;
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

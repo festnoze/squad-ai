@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PONTS DE FORTUNE</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128739;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ======================= chantier ======================= -->
+  <div id="hud" class="hidden">
+
+    <div id="panel-level" class="plate">
+      <div class="plate-head">
+        <span id="hud-level-index">1 / 14</span>
+        <b id="hud-level-name">CHANTIER</b>
+      </div>
+      <p id="hud-level-brief"></p>
+      <p id="hud-level-hint"></p>
+    </div>
+
+    <div id="panel-budget" class="plate">
+      <div class="budget-row">
+        <span class="budget-label">CREDITS</span>
+        <b id="budget-left">0</b>
+        <i>/ <span id="budget-total">0</span></i>
+      </div>
+      <div class="budget-bar"><div id="budget-fill"></div></div>
+      <div class="budget-row small">
+        <span class="budget-label">DEPENSE</span>
+        <span id="budget-spent">0</span>
+        <span class="budget-label">PIECES</span>
+        <span id="budget-count">0</span>
+      </div>
+    </div>
+
+    <div id="palette" class="plate">
+      <button class="mat-btn" data-mat="wood" type="button">
+        <kbd>1</kbd><span class="mat-name">BOIS</span><span class="mat-cost">0/m</span>
+      </button>
+      <button class="mat-btn" data-mat="steel" type="button">
+        <kbd>2</kbd><span class="mat-name">ACIER</span><span class="mat-cost">0/m</span>
+      </button>
+      <button class="mat-btn" data-mat="cable" type="button">
+        <kbd>3</kbd><span class="mat-name">CABLE</span><span class="mat-cost">0/m</span>
+      </button>
+      <button class="mat-btn" data-mat="road" type="button">
+        <kbd>4</kbd><span class="mat-name">ROUTE</span><span class="mat-cost">0/m</span>
+      </button>
+      <p id="mat-blurb"></p>
+    </div>
+
+    <div id="cursor-info"><b id="cursor-cost"></b><span id="cursor-reason"></span></div>
+
+    <div id="actions">
+      <button class="btn wide" id="btn-test" type="button">LANCER LE CONVOI <kbd>ESPACE</kbd></button>
+      <div class="btn-row">
+        <button class="btn ghost" id="btn-undo" type="button">ANNULER <kbd>CTRL+Z</kbd></button>
+        <button class="btn ghost" id="btn-clear" type="button">TOUT EFFACER <kbd>R</kbd></button>
+        <button class="btn ghost" id="btn-view" type="button">VUE DE COTE <kbd>V</kbd></button>
+      </div>
+    </div>
+
+    <div id="panel-test" class="plate">
+      <div class="test-row"><span>CONVOI</span><b id="test-status">EN ATTENTE</b></div>
+      <div class="test-row"><span>CHARGE</span><b id="test-load">0 t</b></div>
+      <div class="test-row"><span>CONTRAINTE MAX</span><b id="stress-label">0 %</b></div>
+      <div class="stress-bar"><div id="stress-fill"></div></div>
+      <div class="legend">
+        <span><i class="sw comp"></i>COMPRESSION</span>
+        <span><i class="sw tens"></i>TRACTION</span>
+      </div>
+      <button class="btn ghost" id="btn-abort" type="button">RETOUR AU CHANTIER <kbd>ESPACE</kbd></button>
+    </div>
+
+    <div id="replay-banner"><b>RUPTURE</b><span id="replay-note">ralenti 0.2x</span></div>
+
+    <div id="toasts"></div>
+    <div id="controls-hint">
+      GLISSER : tracer &middot; CLIC DROIT : retirer &middot; MOLETTE : zoom &middot; CLIC MILIEU : deplacer &middot; CLIC DROIT GLISSE : pivoter
+    </div>
+  </div>
+
+  <!-- ======================= ecrans ======================= -->
+  <div id="screen-loading" class="screen">
+    <div class="panel">
+      <h1 class="title">PONTS DE FORTUNE</h1>
+      <p class="subtitle">BUREAU D ETUDES &middot; TRAVAUX PUBLICS</p>
+      <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+      <p class="hint" id="loading-line">CHARGEMENT...</p>
+    </div>
+  </div>
+
+  <div id="screen-title" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title">PONTS DE FORTUNE</h1>
+      <p class="subtitle">CONSTRUIRE, PUIS REGARDER</p>
+      <p class="blurb">
+        Un ravin, un budget serre, quatre materiaux. Vous dessinez la structure
+        dans le plan du pont, puis vous lancez le convoi et vous regardez la
+        physique trancher. Bleu, le membre est en compression. Rouge, il est en
+        traction. Quand la couleur sature, il ne reste plus grand chose avant la
+        rupture.
+      </p>
+      <div class="controls-grid">
+        <div><kbd>GLISSER</kbd></div><div>Tracer un element entre deux noeuds</div>
+        <div><kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd></div><div>Bois, acier, cable, route</div>
+        <div><kbd>CLIC DROIT</kbd></div><div>Retirer un element (rembourse)</div>
+        <div><kbd>CTRL</kbd><kbd>Z</kbd></div><div>Annuler, sans limite</div>
+        <div><kbd>ESPACE</kbd></div><div>Lancer le test / revenir au chantier</div>
+        <div><kbd>R</kbd></div><div>Tout effacer</div>
+        <div><kbd>V</kbd></div><div>Revenir a la vue de cote</div>
+        <div><kbd>C</kbd></div><div>Camera libre / suivre le convoi</div>
+        <div><kbd>MOLETTE</kbd></div><div>Zoom &middot; clic milieu : deplacer la vue</div>
+        <div><kbd>ECHAP</kbd></div><div>Pause</div>
+      </div>
+      <p class="hint" id="title-progress">AUCUN CHANTIER TERMINE</p>
+      <button class="btn" id="btn-play" type="button">REPRENDRE LE CHANTIER</button>
+      <button class="btn ghost" id="btn-levels" type="button">CHOISIR UN CHANTIER</button>
+    </div>
+  </div>
+
+  <div id="screen-levels" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title small">CHANTIERS</h1>
+      <div id="level-grid"></div>
+      <button class="btn ghost" id="btn-levels-back" type="button">RETOUR</button>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">PAUSE</h1>
+      <div class="slider-row">
+        <label for="volume">VOLUME</label>
+        <input type="range" id="volume" min="0" max="100" step="1" value="70" />
+        <span id="volume-value">70</span>
+      </div>
+      <button class="btn" id="btn-resume" type="button">REPRENDRE</button>
+      <button class="btn ghost" id="btn-restart-level" type="button">RECOMMENCER LE CHANTIER</button>
+      <button class="btn ghost" id="btn-quit" type="button">LISTE DES CHANTIERS</button>
+    </div>
+  </div>
+
+  <div id="screen-win" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small" id="win-title">CONVOI PASSE</h1>
+      <p class="subtitle" id="win-sub"></p>
+      <ul id="win-stats"></ul>
+      <button class="btn" id="btn-next" type="button">CHANTIER SUIVANT</button>
+      <button class="btn ghost" id="btn-replay-level" type="button">AMELIORER CE PONT</button>
+      <button class="btn ghost" id="btn-win-levels" type="button">LISTE DES CHANTIERS</button>
+    </div>
+  </div>
+
+  <div id="screen-lose" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">LE PONT A CEDE</h1>
+      <p class="subtitle" id="lose-reason"></p>
+      <p class="hint" id="lose-detail"></p>
+      <button class="btn" id="btn-retry" type="button">RETOUR AU CHANTIER</button>
+      <button class="btn ghost" id="btn-lose-levels" type="button">LISTE DES CHANTIERS</button>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">DEFAILLANCE</h1>
+      <pre id="error-text"></pre>
+      <p class="hint">Servir ce dossier en HTTP (console arcade) avec un navigateur WebGL2.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  function fail(message, where) {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (!s || !t || !s.classList.contains('hidden')) return;
+    t.textContent = String(message || 'Erreur inconnue') + (where ? '\n' + where : '');
+    document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    s.classList.remove('hidden');
+  }
+  window.addEventListener('error', (e) => fail(e.message, (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) => fail(e.reason && e.reason.message ? e.reason.message : e.reason, e.reason && e.reason.stack));
+  window.__fail = fail;
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

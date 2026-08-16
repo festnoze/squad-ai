@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>PARADOXE - cooperer avec ses clones temporels</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#9203;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ===================== in-run HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div id="fx-rewind"></div>
+    <div id="fx-flash"></div>
+
+    <div id="hud-top">
+      <div id="hud-level">
+        <span id="hud-level-index">01 / 14</span>
+        <b id="hud-level-name">Arene</b>
+      </div>
+      <div id="hud-timer">
+        <div id="hud-timer-bar"><div id="hud-timer-fill"></div></div>
+        <span id="hud-timer-value">0.0</span>
+      </div>
+      <div id="hud-clones">
+        <span class="hud-label">CLONES</span>
+        <div id="hud-clone-dots"></div>
+        <span id="hud-clone-text">0 / 3</span>
+      </div>
+    </div>
+
+    <p id="hud-hint"></p>
+    <div id="hud-banner"><b id="hud-banner-title"></b><span id="hud-banner-sub"></span></div>
+    <div id="hud-toast"></div>
+
+    <div id="hud-bottom">
+      <div id="timeline-wrap">
+        <canvas id="timeline"></canvas>
+      </div>
+      <div id="hud-keys">
+        <span><kbd>ZQSD</kbd> bouger</span>
+        <span><kbd>ESPACE</kbd> sauter</span>
+        <span><kbd>E</kbd> caisse</span>
+        <span><kbd>R</kbd> rembobiner</span>
+        <span><kbd>CTRL</kbd>+<kbd>Z</kbd> annuler</span>
+        <span><kbd>T</kbd> recommencer</span>
+        <span><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> camera</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== overlay screens ===================== -->
+  <div id="screen-loading" class="screen">
+    <div class="panel">
+      <h1 class="title glitch" data-text="PARADOXE">PARADOXE</h1>
+      <p class="subtitle">SYNCHRONISATION DE LA LIGNE DE TEMPS</p>
+      <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+    </div>
+  </div>
+
+  <div id="screen-menu" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title glitch" data-text="PARADOXE">PARADOXE</h1>
+      <p class="subtitle">COOPERER AVEC SES PROPRES CLONES TEMPORELS</p>
+      <p class="blurb">
+        Vous disposez de quelques secondes par passe. Quand le temps est ecoule (ou
+        quand vous rembobinez), tout revient a zero et un <b>clone</b> rejoue exactement
+        ce que vous venez de faire, image par image. Le clone 1 maintient le bouton, le
+        clone 2 franchit la porte, vous posez la caisse. Empechez un clone de refaire
+        son geste et la ligne de temps casse : paradoxe.
+      </p>
+      <div class="controls-grid">
+        <div><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Se deplacer (ou les fleches)</div>
+        <div><kbd>ESPACE</kbd></div><div>Sauter</div>
+        <div><kbd>E</kbd></div><div>Prendre / poser une caisse</div>
+        <div><kbd>R</kbd></div><div>Rembobiner tout de suite</div>
+        <div><kbd>CTRL</kbd><kbd>Z</kbd></div><div>Annuler le dernier clone</div>
+        <div><kbd>T</kbd></div><div>Recommencer le niveau</div>
+        <div><kbd>SOURIS</kbd></div><div>Glisser pour orienter, molette pour zoomer</div>
+        <div><kbd>TRACKPAD</kbd></div><div>Deux doigts sur le cote pour tourner, vers le haut pour zoomer, MAJ pour incliner</div>
+        <div><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></div><div>Orienter la camera sans souris</div>
+        <div><kbd>ECHAP</kbd></div><div>Pause</div>
+        <div><kbd>M</kbd></div><div>Couper le son</div>
+      </div>
+      <p class="hint" id="menu-progress">Aucun niveau resolu</p>
+      <div class="row">
+        <button class="btn" id="btn-play">COMMENCER</button>
+        <button class="btn ghost" id="btn-levels">NIVEAUX</button>
+      </div>
+      <p class="hint small">Tout est genere en direct : aucun fichier image, aucun fichier son.</p>
+    </div>
+  </div>
+
+  <div id="screen-levels" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title small">ARENES</h1>
+      <p class="subtitle">Le nombre affiche est votre meilleur resultat en clones</p>
+      <div id="level-grid"></div>
+      <button class="btn ghost" id="btn-levels-back">RETOUR</button>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">PAUSE</h1>
+      <div class="controls-grid compact">
+        <div><kbd>R</kbd></div><div>Rembobiner (garde la passe)</div>
+        <div><kbd>CTRL</kbd><kbd>Z</kbd></div><div>Annuler le dernier clone</div>
+        <div><kbd>T</kbd></div><div>Repartir de zero</div>
+      </div>
+      <button class="btn" id="btn-resume">REPRENDRE</button>
+      <button class="btn ghost" id="btn-restart-level">RECOMMENCER</button>
+      <button class="btn ghost" id="btn-pause-menu">MENU</button>
+    </div>
+  </div>
+
+  <div id="screen-win" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small good" id="win-title">Resolu</h1>
+      <p class="subtitle" id="win-detail"></p>
+      <p class="medal hidden" id="win-medal">MEDAILLE : boucle minimale</p>
+      <button class="btn" id="btn-next">NIVEAU SUIVANT</button>
+      <button class="btn ghost" id="btn-replay">REJOUER</button>
+    </div>
+  </div>
+
+  <div id="screen-fail" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead" id="fail-title">Paradoxe temporel</h1>
+      <p class="subtitle" id="fail-detail"></p>
+      <button class="btn" id="btn-fail-undo">ANNULER LE DERNIER CLONE</button>
+      <button class="btn ghost" id="btn-fail-retry">RECOMMENCER LE NIVEAU</button>
+    </div>
+  </div>
+
+  <div id="screen-end" class="screen hidden">
+    <div class="panel">
+      <h1 class="title glitch" data-text="BOUCLE FERMEE">BOUCLE FERMEE</h1>
+      <p class="subtitle">Les quatorze arenes sont derriere vous</p>
+      <p class="blurb" id="end-detail"></p>
+      <button class="btn" id="btn-end-menu">MENU</button>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">DEFAILLANCE TEMPORELLE</h1>
+      <pre id="error-text"></pre>
+      <p class="hint">Servir ce dossier en HTTP (console arcade) avec un navigateur WebGL2.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  function fail(message, where) {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (!s || !t || !s.classList.contains('hidden')) return;
+    t.textContent = String(message || 'Erreur inconnue') + (where ? '\n' + where : '');
+    document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    s.classList.remove('hidden');
+  }
+  window.addEventListener('error', (e) => fail(e.message, (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) =>
+    fail(e.reason && e.reason.message ? e.reason.message : e.reason, e.reason && e.reason.stack),
+  );
+  window.__fail = fail;
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
