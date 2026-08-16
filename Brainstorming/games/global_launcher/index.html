@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GLOBAL LAUNCHER</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">&#9654;</span>
+      <div>
+        <h1>GLOBAL LAUNCHER</h1>
+        <p class="brand-sub">Jeux du dossier <code>games/</code></p>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <span id="summary" class="summary">chargement...</span>
+      <button id="refresh" class="ghost" type="button">Rafraichir</button>
+    </div>
+  </header>
+
+  <main>
+    <section id="grid" class="grid" aria-live="polite"></section>
+    <p id="empty" class="empty" hidden>Aucun jeu detecte dans <code>games/</code>. Un jeu doit avoir un <code>index.html</code> a sa racine.</p>
+  </main>
+
+  <dialog id="logs" class="logs">
+    <header>
+      <h2 id="logs-title">Journal</h2>
+      <button id="logs-close" class="ghost" type="button">Fermer</button>
+    </header>
+    <pre id="logs-body"></pre>
+  </dialog>
+
+  <footer class="footer">
+    Le launcher demarre le serveur du jeu s'il ne tourne pas deja, puis ouvre le jeu dans un nouvel onglet.
+  </footer>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>

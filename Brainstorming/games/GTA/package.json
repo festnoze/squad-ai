@@ -1,0 +1,22 @@
+{
+  "name": "liberty-horizon",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Open-world GTA-style sandbox: on-foot, cars, boats, missions. Three.js WebGPU (D3D12) + Rapier3D.",
+  "scripts": {
+    "dev": "vite --port 8092 --strictPort",
+    "build": "vite build",
+    "preview": "vite preview --port 8092 --strictPort",
+    "smoke": "node tools/shoot.mjs --shot street --out shots/smoke.png --url \"http://localhost:8092/?post=off&hwtraffic=0\" --wait 3 --js-file tools/smoke-probe.js",
+    "smoke:settings": "node tools/probe-settings-run.mjs --out shots/probe-settings.png"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "0.20.0",
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.62.1",
+    "vite": "^7.1.0"
+  }
+}

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="description" content="Exploration spatiale procedurale : trouver une planete terraformable." />
+    <title>TERRAFORM ODYSSEY</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2032%2032'%3E%3Crect%20width='32'%20height='32'%20rx='7'%20fill='%2305080d'/%3E%3Ccircle%20cx='15'%20cy='14'%20r='7'%20fill='%236fe3ff'/%3E%3Cpath%20d='M9%2016.5c3%202%209%202%2012%200'%20fill='none'%20stroke='%2305080d'%20stroke-width='1.4'%20opacity='.5'/%3E%3Cellipse%20cx='15'%20cy='16'%20rx='13'%20ry='4'%20fill='none'%20stroke='%23ffb648'%20stroke-width='2'%20transform='rotate(-20%2015%2016)'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <canvas id="scene"></canvas>
+
+    <div id="ui">
+      <!-- ================= ECRAN TITRE (H01) ================= -->
+      <section id="title">
+        <div class="title-inner">
+          <p class="eyebrow" data-str="titleEyebrow">MISSION ARCHE 09</p>
+          <h1 id="title-logo">TERRAFORM ODYSSEY</h1>
+          <p class="tagline" data-str="tagline">Un systeme entier. Une seule chance de recommencer.</p>
+
+          <div class="briefing panel">
+            <h2 class="panel-title" data-str="briefingTitle">BRIEFING</h2>
+            <p data-str="briefing">
+              Terra Prime est perdue. Votre vaisseau de reconnaissance emporte les dernieres
+              semences de l'humanite. Trouvez, dans ce systeme, un monde ou la vie a deja pris.
+            </p>
+            <p class="briefing-goal" data-str="briefingElements">
+              Une planete n'est declaree terraformable que si vous y confirmez les trois elements :
+              oceans liquides, vegetation arboree et vie animale.
+            </p>
+            <ol class="briefing-steps">
+              <li><span class="step-num">1</span><span data-str="briefingStep1">Selectionnez une cible dans le panneau de navigation.</span></li>
+              <li><span class="step-num">2</span><span data-str="briefingStep2">Descendez en atmosphere et approchez la surface.</span></li>
+              <li><span class="step-num">3</span><span data-str="briefingStep3">Maintenez F pour analyser ce que vous survolez.</span></li>
+            </ol>
+          </div>
+
+          <div class="title-actions">
+            <label class="field">
+              <span data-str="systemLabel">SYSTEME</span>
+              <select id="system">
+                <option value="odyssey">Odyssee</option>
+                <option value="sol1">Sol-1 (systeme terrestre)</option>
+                <option value="random">Genere aleatoirement</option>
+              </select>
+            </label>
+            <label class="field">
+              <span data-str="qualityLabel">QUALITE GRAPHIQUE</span>
+              <select id="quality">
+                <option value="low" data-str="qualityLow">Basse</option>
+                <option value="medium" data-str="qualityMedium">Moyenne</option>
+                <option value="high" data-str="qualityHigh">Haute</option>
+                <option value="ultra" data-str="qualityUltra">Ultra</option>
+              </select>
+            </label>
+            <button id="start" type="button" data-str="startButton">DECOLLER</button>
+          </div>
+          <p id="system-summary" class="system-summary"></p>
+
+          <div class="title-controls">
+            <h2 class="panel-title" data-str="controlsTitle">COMMANDES</h2>
+            <ul class="key-grid">
+              <li><kbd>Z</kbd><kbd>S</kbd><span>Descendre / monter</span></li>
+              <li><kbd>Q</kbd><kbd>D</kbd><span>Tourner a gauche / a droite</span></li>
+              <li><kbd>Souris</kbd><span>Visee (cliquez pour capturer)</span></li>
+              <li><kbd>Espace</kbd><span>Poussee</span></li>
+              <li><kbd>Maj</kbd><span>Postcombustion, et vitesse pulse dans le vide</span></li>
+              <li><kbd>Ctrl</kbd><kbd>X</kbd><span>Freins</span></li>
+              <li><kbd>T</kbd><kbd>R</kbd><span>Cible de navigation</span></li>
+              <li><kbd>C</kbd><span>Aligner le nez sur la cible (maintenir)</span></li>
+              <li><kbd>J</kbd><span>Saut hyperspatial vers la cible</span></li>
+              <li><kbd>F</kbd><span>Analyser</span></li>
+              <li><kbd>H</kbd><span>Aide complete</span></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= HUD ================= -->
+      <div id="hud" class="hidden">
+        <!-- Etiquettes des corps, projetees a l'ecran (H10) -->
+        <div id="planet-labels"></div>
+
+        <!-- Reticule et horizon artificiel (H02) -->
+        <div id="crosshair">
+          <svg viewBox="-40 -40 80 80" aria-hidden="true">
+            <circle class="ch-ring" cx="0" cy="0" r="17" />
+            <path class="ch-tick" d="M-30 0h9M21 0h9M0 -30v9M0 21v9" />
+            <circle class="ch-dot" cx="0" cy="0" r="1.6" />
+          </svg>
+        </div>
+
+        <div id="horizon">
+          <svg viewBox="-120 -70 240 140" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+            <g id="horizon-line">
+              <line class="hz-main" x1="-108" y1="0" x2="108" y2="0" />
+              <line class="hz-up" x1="-32" y1="-26" x2="32" y2="-26" />
+              <line class="hz-up" x1="-20" y1="-52" x2="20" y2="-52" />
+              <line class="hz-dn" x1="-32" y1="26" x2="32" y2="26" />
+              <line class="hz-dn" x1="-20" y1="52" x2="20" y2="52" />
+            </g>
+            <g id="horizon-fixed">
+              <path d="M-52 0h22M30 0h22" />
+              <path d="M-30 0l6 5M30 0l-6 5" />
+            </g>
+          </svg>
+        </div>
+
+        <!-- Anneau de scan central -->
+        <div id="scan-ring" class="hidden">
+          <svg viewBox="0 0 120 120" aria-hidden="true">
+            <circle class="scan-bg" cx="60" cy="60" r="47.7465" />
+            <circle class="scan-fg" cx="60" cy="60" r="47.7465" />
+          </svg>
+          <span id="scan-label">ANALYSE</span>
+        </div>
+
+        <!-- Fiche planetaire (H05) -->
+        <div id="planet-panel" class="panel corner">
+          <h2 class="panel-title" data-str="planetTitle">CORPS SURVOLE</h2>
+          <div id="planet-name" class="big">ESPACE PROFOND</div>
+          <div id="planet-type" class="sub">- - -</div>
+          <dl class="rows">
+            <div class="row"><dt data-str="labelTemp">TEMPERATURE</dt><dd id="planet-temp">- - -</dd></div>
+            <div class="row"><dt data-str="labelBiome">BIOME</dt><dd id="biome">- - -</dd></div>
+            <div class="row"><dt data-str="labelLocalTime">HEURE LOCALE</dt><dd id="local-time">--:--</dd></div>
+            <div class="row"><dt data-str="labelAtmo">ATMOSPHERE</dt><dd id="atmo">0 %</dd></div>
+          </dl>
+        </div>
+
+        <!-- Panneau de navigation (H03) -->
+        <div id="nav-panel" class="panel corner">
+          <h2 class="panel-title" data-str="navTitle">NAVIGATION</h2>
+          <ul id="nav-list"></ul>
+          <div id="target">
+            <span class="target-label" data-str="targetTitle">CIBLE</span>
+            <span id="target-name">AUCUNE CIBLE</span>
+            <span id="target-distance">-</span>
+          </div>
+        </div>
+
+        <!-- Bandeau telemetrie (H05) -->
+        <div id="telemetry" class="panel corner">
+          <div class="gauge">
+            <span class="gauge-label" data-str="labelSpeed">VITESSE</span>
+            <span id="speed" class="gauge-value">0 m/s</span>
+          </div>
+          <div class="gauge">
+            <span class="gauge-label" data-str="labelAltitude">ALTITUDE</span>
+            <span id="altitude" class="gauge-value">- - -</span>
+          </div>
+          <div class="gauge gauge-thrust">
+            <span class="gauge-label" data-str="labelThrust">POUSSEE</span>
+            <span class="bar"><i id="thrust-bar"></i></span>
+          </div>
+        </div>
+
+        <!-- Tracker des 3 elements (H04) -->
+        <div id="elements">
+          <div class="element" id="el-ocean">
+            <svg class="ring" viewBox="0 0 40 40" aria-hidden="true">
+              <circle class="ring-bg" cx="20" cy="20" r="15.9155" />
+              <circle class="ring-fg" cx="20" cy="20" r="15.9155" />
+              <path class="ring-check" d="M12.8 20.4l4.6 4.6 9.8-10" />
+            </svg>
+            <span class="el-label" data-str="elOcean">OCEANS</span>
+          </div>
+          <div class="element" id="el-trees">
+            <svg class="ring" viewBox="0 0 40 40" aria-hidden="true">
+              <circle class="ring-bg" cx="20" cy="20" r="15.9155" />
+              <circle class="ring-fg" cx="20" cy="20" r="15.9155" />
+              <path class="ring-check" d="M12.8 20.4l4.6 4.6 9.8-10" />
+            </svg>
+            <span class="el-label" data-str="elTrees">ARBRES</span>
+          </div>
+          <div class="element" id="el-fauna">
+            <svg class="ring" viewBox="0 0 40 40" aria-hidden="true">
+              <circle class="ring-bg" cx="20" cy="20" r="15.9155" />
+              <circle class="ring-fg" cx="20" cy="20" r="15.9155" />
+              <path class="ring-check" d="M12.8 20.4l4.6 4.6 9.8-10" />
+            </svg>
+            <span class="el-label" data-str="elFauna">VIE ANIMALE</span>
+          </div>
+        </div>
+
+        <!-- Minimap planetaire (H06) -->
+        <div id="minimap" class="panel corner">
+          <h2 class="panel-title" data-str="mapTitle">CARTOGRAPHIE</h2>
+          <canvas id="minimap-canvas" width="256" height="128"></canvas>
+        </div>
+
+        <!-- Indice contextuel et toasts (H07) -->
+        <div id="hint" class="hidden"></div>
+        <div id="toasts"></div>
+      </div>
+
+      <!-- ================= ECRAN DE VICTOIRE (H08) ================= -->
+      <section id="win" class="hidden">
+        <div class="win-inner panel">
+          <p class="eyebrow" data-str="winEyebrow">TRANSMISSION VERS L'ARCHE</p>
+          <h2 id="win-title" data-str="winTitle">MONDE TERRAFORMABLE CONFIRME</h2>
+          <p id="win-lead" data-str="winLead">
+            Les trois marqueurs biologiques sont valides. Le convoi peut appareiller.
+          </p>
+          <dl id="win-stats">
+            <div class="row"><dt data-str="winLabelPlanet">PLANETE</dt><dd id="win-planet-name">-</dd></div>
+            <div class="row"><dt data-str="winLabelTime">TEMPS DE MISSION</dt><dd id="win-time">-</dd></div>
+            <div class="row"><dt data-str="winLabelVisited">CORPS VISITES</dt><dd id="win-visited">-</dd></div>
+            <div class="row"><dt data-str="winLabelDistance">DISTANCE PARCOURUE</dt><dd id="win-distance">-</dd></div>
+          </dl>
+          <p id="win-footer" data-str="winFooter">Rapport archive. Fin de la reconnaissance.</p>
+          <button id="restart" type="button" data-str="restartButton">NOUVELLE SEED</button>
+        </div>
+      </section>
+
+      <!-- ================= AIDE (H09) ================= -->
+      <div id="help" class="hidden">
+        <div class="help-inner panel">
+          <h2 class="panel-title" data-str="helpTitle">COMMANDES</h2>
+          <table class="help-table">
+            <tbody>
+              <tr><th><kbd>Z</kbd> / <kbd>S</kbd></th><td>Descendre / monter</td></tr>
+              <tr><th><kbd>Q</kbd> / <kbd>D</kbd></th><td>Tourner a gauche / a droite</td></tr>
+              <tr><th><kbd>&#8593;</kbd><kbd>&#8595;</kbd><kbd>&#8592;</kbd><kbd>&#8594;</kbd></th><td>Meme chose aux fleches (haut = monter)</td></tr>
+              <tr><th><kbd>A</kbd> / <kbd>E</kbd></th><td>Roulis, pour se remettre a plat (facultatif)</td></tr>
+              <tr><th><kbd>Souris</kbd></th><td>Visee libre, clic pour capturer le curseur</td></tr>
+              <tr><th><kbd>Espace</kbd></th><td>Poussee moteur</td></tr>
+              <tr><th><kbd>Maj</kbd></th><td>Postcombustion en atmosphere. Dans le vide : propulsion pulse, sans limite d'acceleration. La vitesse maximale depend seulement de votre distance au corps le plus proche, elle retombe donc d'elle-meme en approche.</td></tr>
+              <tr><th><kbd>Ctrl</kbd> / <kbd>X</kbd></th><td>Freins et retrofusees</td></tr>
+              <tr><th><kbd>F</kbd></th><td>Scanner l'element survole</td></tr>
+              <tr><th><kbd>T</kbd> / <kbd>R</kbd></th><td>Cible de navigation suivante / precedente</td></tr>
+              <tr><th><kbd>C</kbd></th><td>Maintenir pour aligner le nez sur la cible</td></tr>
+              <tr><th><kbd>J</kbd></th><td>Saut hyperspatial vers la cible</td></tr>
+              <tr><th><kbd>M</kbd></th><td>Afficher les orbites</td></tr>
+              <tr><th><kbd>V</kbd></th><td>Changer de vue (poursuite, cockpit, orbite)</td></tr>
+              <tr><th><kbd>L</kbd></th><td>Atterrissage assiste / decollage</td></tr>
+              <tr><th><kbd>H</kbd></th><td>Afficher ou masquer cette aide</td></tr>
+              <tr><th><kbd>G</kbd></th><td>Panneau de reglages</td></tr>
+            </tbody>
+          </table>
+          <p class="help-foot" data-str="helpFooter">Appuyez sur H pour reprendre les commandes.</p>
+        </div>
+      </div>
+
+      <!-- ================= CHARGEMENT ================= -->
+      <div id="loading">
+        <div class="loading-inner">
+          <div class="loading-ring"></div>
+          <p id="loading-text" data-str="loadingText">Generation du systeme...</p>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>
