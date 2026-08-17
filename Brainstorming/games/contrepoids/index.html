@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>CONTREPOIDS</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#9878;&#65039;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ======================= in-game HUD ======================= -->
+  <div id="hud" class="hidden">
+    <div id="hud-top">
+      <div id="hud-level">
+        <span class="cap">Niveau</span>
+        <b id="hud-index">1</b><i>/<span id="hud-total">12</span></i>
+        <em id="hud-name">Premier contrepoids</em>
+      </div>
+      <div id="hud-stats">
+        <div class="stat"><span>Actions</span><b id="hud-moves">0</b></div>
+        <div class="stat"><span>Par</span><b id="hud-par">1</b></div>
+        <div class="stat"><span>Annulations</span><b id="hud-undo">0</b></div>
+        <div class="stat" id="stat-holding"><span>En main</span><b id="hud-holding">-</b></div>
+      </div>
+    </div>
+
+    <p id="hud-hint"></p>
+
+    <div id="hud-help">
+      <span><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> se deplacer</span>
+      <span><kbd>Espace</kbd> sauter</span>
+      <span><kbd>E</kbd> prendre / poser / pousser</span>
+      <span><kbd>Ctrl</kbd>+<kbd>Z</kbd> annuler</span>
+      <span><kbd>R</kbd> recommencer</span>
+      <span><kbd>Souris</kbd> orbiter</span>
+      <span><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd> orbiter</span>
+      <span><kbd>Echap</kbd> pause</span>
+    </div>
+
+    <div id="banner" class="hidden"><b id="banner-title"></b><span id="banner-sub"></span></div>
+    <div id="toasts"></div>
+  </div>
+
+  <!-- ======================= overlay screens ======================= -->
+  <div id="screen-loading" class="screen">
+    <div class="panel">
+      <h1 class="title">CONTREPOIDS</h1>
+      <p class="subtitle">Descente dans le puits...</p>
+      <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+      <p class="hint" id="loading-line">Initialisation</p>
+    </div>
+  </div>
+
+  <div id="screen-title" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title">CONTREPOIDS</h1>
+      <p class="subtitle">Un puits de mine sans moteur</p>
+      <p class="blurb">
+        Rien ici n'a de moteur : les plateformes suspendues ne bougent que par
+        difference de poids sur des cordes et des poulies. Vous portez un seul
+        objet a la fois, et votre propre corps compte comme un poids des que
+        vous vous tenez sur une plateforme. Atteignez la sortie en haut du
+        puits.
+      </p>
+      <div class="row">
+        <button class="btn" id="btn-play">Commencer</button>
+        <button class="btn ghost" id="btn-clear">Effacer la progression</button>
+      </div>
+      <div id="level-grid"></div>
+      <div class="controls-grid">
+        <div><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd></div><div>Se deplacer / monter-descendre d'une plateforme adjacente</div>
+        <div><kbd>&#8593;</kbd><kbd>&#8592;</kbd><kbd>&#8595;</kbd><kbd>&#8594;</kbd></div><div>Idem, au clavier fleches</div>
+        <div><kbd>E</kbd></div><div>Prendre / poser l'objet sous la main, ou pousser une enclume a niveau egal</div>
+        <div><kbd>Espace</kbd></div><div>Sauter d'un cran pour rattraper une plateforme qui vient de monter</div>
+        <div><kbd>Ctrl</kbd>+<kbd>Z</kbd></div><div>Annuler (illimite)</div>
+        <div><kbd>R</kbd></div><div>Recommencer le niveau</div>
+        <div><kbd>Souris</kbd></div><div>Glisser pour orbiter, molette pour zoomer</div>
+        <div><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></div><div>Orbiter au clavier</div>
+        <div><kbd>Echap</kbd></div><div>Pause</div>
+        <div><kbd>M</kbd></div><div>Couper le son</div>
+      </div>
+      <p class="hint">Aucune punition : chaque erreur s'annule d'une touche, et R recommence instantanement.</p>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">PAUSE</h1>
+      <p class="subtitle" id="pause-sub">Niveau 1</p>
+      <div class="slider-row">
+        <label for="volume">Volume</label>
+        <input type="range" id="volume" min="0" max="100" step="1" value="55" />
+        <span id="volume-value">55</span>
+      </div>
+      <div class="row">
+        <button class="btn" id="btn-resume">Reprendre</button>
+        <button class="btn ghost" id="btn-restart-pause">Recommencer</button>
+        <button class="btn ghost" id="btn-title-pause">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-win" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small" id="win-title">NIVEAU RESOLU</h1>
+      <p class="subtitle" id="win-sub"></p>
+      <p class="medal" id="win-medal"></p>
+      <div class="row">
+        <button class="btn" id="btn-next">Niveau suivant</button>
+        <button class="btn ghost" id="btn-replay">Rejouer</button>
+        <button class="btn ghost" id="btn-title-win">Menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-end" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">LE PUITS EST FRANCHI</h1>
+      <p class="subtitle">Les douze niveaux sont resolus.</p>
+      <p class="blurb" id="end-stats"></p>
+      <div class="row">
+        <button class="btn" id="btn-title-end">Retour au menu</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">DEFAILLANCE</h1>
+      <pre id="error-text"></pre>
+      <p class="hint">Servir ce dossier en HTTP (console arcade) avec un navigateur WebGL2.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  function fail(message, where) {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (!s || !t || !s.classList.contains('hidden')) return;
+    t.textContent = String(message || 'Erreur inconnue') + (where ? '\n' + where : '');
+    document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    s.classList.remove('hidden');
+  }
+  window.addEventListener('error', (e) => fail(e.message, (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) =>
+    fail(e.reason && e.reason.message ? e.reason.message : e.reason, e.reason && e.reason.stack)
+  );
+  window.__fail = fail;
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

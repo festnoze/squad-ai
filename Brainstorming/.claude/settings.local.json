@@ -33,7 +33,10 @@
       "mcp__playwright__browser_evaluate",
       "Bash(mv shots/final-descent.png docs/screenshot.png)",
       "Bash(rmdir shots *)",
-      "Bash(git -C \"C:/Dev/squad-ai/Brainstorming\" status --short -- wipeout)"
+      "Bash(git -C \"C:/Dev/squad-ai/Brainstorming\" status --short -- wipeout)",
+      "Bash(\"C:/Users/e.millerioux/AppData/Local/Microsoft/WinGet/Links/godot.exe\" --headless --path c:/Dev/squad-ai/Brainstorming/games/cubeforge --script res://tests/run_tests.gd)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(\"C:/Users/e.millerioux/AppData/Local/Microsoft/WinGet/Links/godot.exe\" --headless --path . --script res://tests/run_tests.gd)"
     ]
   },
   "hooks": {

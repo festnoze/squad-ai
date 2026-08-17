@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>AIGUILLAGE - poste de nuit</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128646;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ======================= in level HUD ======================= -->
+  <div id="hud" class="hidden">
+    <div id="hud-top-left">
+      <p class="hud-level-name" id="hud-level-name">Niveau</p>
+      <p class="hud-sub" id="hud-train-count">0 / 0 trains</p>
+    </div>
+    <div id="hud-top-right">
+      <p class="hud-clock-label">TEMPS</p>
+      <p class="hud-clock" id="hud-clock">0:00</p>
+    </div>
+    <div id="hud-teach" class="hidden"><span id="hud-teach-text"></span></div>
+    <div id="toasts"></div>
+    <div id="banner"><span id="banner-title"></span><span id="banner-sub"></span></div>
+
+    <div id="hud-bottom-left">
+      <button id="btn-tactical" class="btn tactical" title="Pause tactique (Espace)">
+        <span class="tactical-icon">&#10074;&#10074;</span>
+        <span class="tactical-label">PAUSE TACTIQUE</span>
+      </button>
+      <div class="bar pause-budget"><div class="bar-fill" id="pause-budget-fill"></div></div>
+    </div>
+    <div id="hud-bottom-right">
+      <button id="btn-mute-hud" class="icon-btn" title="Couper le son (M)">&#128266;</button>
+      <button id="btn-escape-hud" class="icon-btn" title="Pause (Echap)">&#9646;&#9646;</button>
+    </div>
+  </div>
+
+  <!-- ======================= overlay screens ======================= -->
+  <div id="screen-loading" class="screen">
+    <div class="panel">
+      <h1 class="title">AIGUILLAGE</h1>
+      <p class="subtitle">POSTE DE NUIT</p>
+      <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
+      <p class="loading-line" id="loading-line">Initialisation...</p>
+    </div>
+  </div>
+
+  <div id="screen-menu" class="screen hidden main-menu">
+    <div class="menu-shell">
+      <div class="menu-kicker">POSTE D'AIGUILLAGE DE NUIT</div>
+      <h1 class="title hero">AIGUILLAGE</h1>
+      <p class="menu-tagline">Vous ne conduisez aucun train. Vous ne touchez qu'aux aiguillages.</p>
+      <button class="btn primary-cta" id="btn-play">JOUER</button>
+      <button class="btn ghost" id="btn-controls">COMMANDES</button>
+      <div class="menu-footer"><span>12 NIVEAUX</span><span>4 COULEURS</span><span>0 COLLISION TOLEREE</span></div>
+    </div>
+  </div>
+
+  <div id="screen-controls" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title small">COMMANDES</h1>
+      <div class="controls-grid">
+        <div><kbd>Clic gauche</kbd></div><div>Basculer un aiguillage / rappeler un train en attente</div>
+        <div><kbd>Glisser souris</kbd></div><div>Orbiter la camera</div>
+        <div><kbd>I</kbd><kbd>J</kbd><kbd>K</kbd><kbd>L</kbd></div><div>Orbiter au clavier</div>
+        <div><kbd>Molette</kbd></div><div>Zoomer (glissement lateral = orbite)</div>
+        <div><kbd>Espace</kbd></div><div>Pause tactique (gele les trains)</div>
+        <div><kbd>R</kbd></div><div>Recommencer le niveau</div>
+        <div><kbd>M</kbd></div><div>Couper le son</div>
+        <div><kbd>Echap</kbd></div><div>Menu pause</div>
+      </div>
+      <button class="btn ghost" id="btn-controls-back">RETOUR</button>
+    </div>
+  </div>
+
+  <div id="screen-levels" class="screen hidden level-screen">
+    <div class="level-shell">
+      <div class="level-heading">
+        <div>
+          <p class="eyebrow">POSTE / SELECTION</p>
+          <h1 class="title small">CHOISISSEZ UN POSTE</h1>
+        </div>
+        <button class="text-btn" id="btn-level-back">&larr; MENU PRINCIPAL</button>
+      </div>
+      <div class="level-grid" id="level-grid"></div>
+      <div class="level-detail">
+        <div>
+          <h2 id="level-name">-</h2>
+          <p class="hint" id="level-teach"></p>
+          <p class="hint" id="level-best">Meilleur score : -</p>
+        </div>
+        <div class="level-actions">
+          <button class="btn" id="btn-start">PRENDRE LE POSTE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">PAUSE</h1>
+      <div class="controls-grid compact">
+        <div><kbd>Clic</kbd></div><div>Aiguiller / rappeler</div>
+        <div><kbd>I J K L</kbd></div><div>Orbiter</div>
+        <div><kbd>Espace</kbd></div><div>Pause tactique</div>
+        <div><kbd>R</kbd></div><div>Recommencer</div>
+      </div>
+      <div class="slider-row">
+        <label for="volume">VOLUME</label>
+        <input type="range" id="volume" min="0" max="100" step="1" value="70" />
+        <span id="volume-value">70</span>
+      </div>
+      <button class="btn" id="btn-resume">REPRENDRE</button>
+      <button class="btn ghost" id="btn-restart-pause">RECOMMENCER</button>
+      <button class="text-btn" id="btn-menu-pause">MENU PRINCIPAL</button>
+    </div>
+  </div>
+
+  <div id="screen-results" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small" id="results-title">POSTE TERMINE</h1>
+      <p class="subtitle" id="results-sub">-</p>
+      <div class="results-stats">
+        <div class="results-stat"><b id="results-delivered">0</b><span>livres</span></div>
+        <div class="results-stat"><b id="results-total">0</b><span>attendus</span></div>
+        <div class="results-stat"><b id="results-late">0</b><span>en retard</span></div>
+      </div>
+      <div id="results-stars" class="results-stars"></div>
+      <button class="btn" id="btn-results-next">NIVEAU SUIVANT</button>
+      <button class="btn ghost" id="btn-results-retry">REJOUER</button>
+      <button class="text-btn" id="btn-results-menu">MENU PRINCIPAL</button>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">DEFAILLANCE SYSTEME</h1>
+      <pre id="error-text"></pre>
+      <p class="hint">Servir ce dossier en HTTP (voir README) avec un navigateur WebGL2.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  function fail(message, where) {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (!s || !t || !s.classList.contains('hidden')) return;
+    t.textContent = String(message || 'Erreur inconnue') + (where ? '\n' + where : '');
+    document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    s.classList.remove('hidden');
+  }
+  window.addEventListener('error', (e) => fail(e.message, (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) => fail(e.reason && e.reason.message ? e.reason.message : e.reason, e.reason && e.reason.stack));
+  window.__fail = fail;
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

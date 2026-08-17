@@ -1,0 +1,73 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://src/main.gd" id="s_main"]
+[ext_resource type="Script" path="res://src/world/world.gd" id="s_world"]
+[ext_resource type="Script" path="res://src/player/player.gd" id="s_player"]
+[ext_resource type="Script" path="res://src/player/interaction.gd" id="s_interaction"]
+[ext_resource type="Script" path="res://src/render/sky.gd" id="s_sky"]
+[ext_resource type="Script" path="res://src/ui/hud.gd" id="s_hud"]
+[ext_resource type="Script" path="res://src/ui/inventory_ui.gd" id="s_inventory_ui"]
+[ext_resource type="Script" path="res://src/ui/pause_menu.gd" id="s_pause_menu"]
+[ext_resource type="Script" path="res://src/entities/settlement_manager.gd" id="s_settlements"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("s_main")
+
+[node name="World" type="Node3D" parent="."]
+script = ExtResource("s_world")
+
+[node name="Player" type="Node3D" parent="."]
+script = ExtResource("s_player")
+
+[node name="Interaction" type="Node3D" parent="."]
+script = ExtResource("s_interaction")
+
+[node name="Settlements" type="Node3D" parent="."]
+script = ExtResource("s_settlements")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0.866025, 0, -0.866025, 0.5, 0, 80, 0)
+light_energy = 1.0
+shadow_enabled = true
+directional_shadow_mode = 2
+directional_shadow_split_1 = 0.05
+directional_shadow_split_2 = 0.16
+directional_shadow_split_3 = 0.45
+directional_shadow_max_distance = 220.0
+directional_shadow_blend_splits = true
+directional_shadow_normal_bias = 1.4
+directional_shadow_bias = 0.05
+
+[node name="Moon" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -0.5, -0.866025, 0, 0.866025, -0.5, 0, 80, 0)
+light_energy = 0.12
+light_color = Color(0.62, 0.72, 1, 1)
+shadow_enabled = false
+
+[node name="Sky" type="Node" parent="."]
+script = ExtResource("s_sky")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+layer = 1
+script = ExtResource("s_hud")
+
+[node name="Screens" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="InventoryUi" type="Control" parent="Screens"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("s_inventory_ui")
+
+[node name="PauseMenu" type="Control" parent="Screens"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("s_pause_menu")

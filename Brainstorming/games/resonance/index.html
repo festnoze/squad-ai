@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>RESONANCE - Caverne des interferences</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128302;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ======================= in-game HUD ======================= -->
+  <div id="hud" class="hidden">
+    <div id="top-left">
+      <div id="level-line"><span id="level-num">1 / 12</span><b id="level-name">Premier eclat</b></div>
+      <p id="hint"></p>
+    </div>
+
+    <div id="top-right">
+      <div id="chips">
+        <button class="chip" id="chip-0"><i class="dot band-0"></i><span>grave</span><b id="stock-0">0</b><kbd>1</kbd></button>
+        <button class="chip" id="chip-1"><i class="dot band-1"></i><span>médium</span><b id="stock-1">0</b><kbd>2</kbd></button>
+        <button class="chip" id="chip-2"><i class="dot band-2"></i><span>aigu</span><b id="stock-2">0</b><kbd>3</kbd></button>
+      </div>
+      <div id="counters">
+        <span>optimum <b id="par-value">1</b></span>
+        <span>record <b id="best-value">-</b></span>
+        <span>poses <b id="poses-value">0</b></span>
+        <span>son <b id="mute-state">actif (M)</b></span>
+      </div>
+    </div>
+
+    <div id="bottom-bar">
+      <span><kbd>clic</kbd> poser / sélectionner</span>
+      <span><kbd>G</kbd>/<kbd>clic droit</kbd> phase</span>
+      <span><kbd>F</kbd> fréquence</span>
+      <span><kbd>Suppr</kbd> retirer</span>
+      <span><kbd>Ctrl+Z</kbd> annuler</span>
+      <span><kbd>R</kbd> recommencer</span>
+      <span><kbd>glisser</kbd>/<kbd>IJKL</kbd> orbiter</span>
+      <span><kbd>Échap</kbd> pause</span>
+    </div>
+
+    <div id="banner-fail" class="hidden">
+      <b>Cristal interdit brisé !</b>
+      <span>Ctrl+Z pour annuler (le cristal est restauré) ou R pour recommencer.</span>
+    </div>
+
+    <div id="toasts"></div>
+  </div>
+
+  <!-- ======================= screens ======================= -->
+  <div id="screen-title" class="screen">
+    <div class="panel">
+      <p class="kicker">CAVERNE DES INTERFÉRENCES</p>
+      <h1 class="title">RÉSONANCE</h1>
+      <p class="pitch">Posez des diapasons, sculptez les ondes. Là où elles arrivent en phase,
+        la lumière enfle et les cristaux cèdent ; en opposition, le silence protège
+        les cristaux interdits. Brisez toutes les cibles, épargnez les rouges.</p>
+      <button class="btn" id="btn-play">JOUER</button>
+      <div class="controls-grid">
+        <div><kbd>1 2 3</kbd></div><div>choisir la fréquence</div>
+        <div><kbd>clic</kbd></div><div>poser / sélectionner un diapason</div>
+        <div><kbd>G</kbd> / <kbd>clic droit</kbd></div><div>tourner la phase d'un quart de période</div>
+        <div><kbd>F</kbd> / <kbd>molette</kbd></div><div>changer la fréquence du diapason sélectionné</div>
+        <div><kbd>Suppr</kbd> / <kbd>clic milieu</kbd></div><div>retirer</div>
+        <div><kbd>Ctrl+Z</kbd> · <kbd>R</kbd></div><div>annuler (illimité) · recommencer</div>
+        <div><kbd>glisser</kbd> · <kbd>molette</kbd> · <kbd>IJKL</kbd></div><div>orbiter et zoomer</div>
+        <div><kbd>N</kbd> / <kbd>P</kbd> · <kbd>M</kbd> · <kbd>Échap</kbd></div><div>niveaux · son · pause</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">PAUSE</h1>
+      <p class="pitch">Les ondes retiennent leur souffle.</p>
+      <button class="btn" id="btn-resume">REPRENDRE</button>
+      <button class="btn ghost" id="btn-restart-pause">RECOMMENCER LE NIVEAU</button>
+      <button class="text-btn" id="btn-title-pause">ÉCRAN TITRE</button>
+    </div>
+  </div>
+
+  <div id="screen-complete" class="screen hidden">
+    <div class="panel">
+      <p class="kicker">NIVEAU RÉSOLU</p>
+      <h1 class="title small" id="complete-name">-</h1>
+      <div id="complete-medal" data-medal="or">OR</div>
+      <p class="pitch" id="complete-detail">-</p>
+      <button class="btn" id="btn-next">Niveau suivant (N)</button>
+      <button class="btn ghost" id="btn-replay">REJOUER (R)</button>
+    </div>
+  </div>
+
+  <div id="screen-end" class="screen hidden">
+    <div class="panel">
+      <p class="kicker">DOUZE CHAMBRES APAISÉES</p>
+      <h1 class="title">RÉSONANCE</h1>
+      <p class="pitch">Tous les cristaux cibles ont chanté leur dernière note.
+        La caverne retombe dans un silence violet. Merci d'avoir joué :
+        les médailles vous attendent si l'optimum vous a échappé.</p>
+      <button class="btn" id="btn-end-title">ÉCRAN TITRE</button>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small danger">DISSONANCE FATALE</h1>
+      <pre id="error-text"></pre>
+      <p class="pitch">Servez ce dossier en HTTP (console arcade du dépôt) avec un navigateur WebGL2.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  function fail(message, where) {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (!s || !t || !s.classList.contains('hidden')) return;
+    t.textContent = String(message || 'Erreur inconnue') + (where ? '\n' + where : '');
+    document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+    s.classList.remove('hidden');
+  }
+  window.addEventListener('error', (e) => fail(e.message, (e.filename || '') + ':' + (e.lineno || '')));
+  window.addEventListener('unhandledrejection', (e) => fail(e.reason && e.reason.message ? e.reason.message : e.reason, e.reason && e.reason.stack));
+  window.__fail = fail;
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>

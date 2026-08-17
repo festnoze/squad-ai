@@ -235,8 +235,19 @@ function neon(hex, intensity) {
 // createTrack
 // ---------------------------------------------------------------------------
 
-export function createTrack(textures) {
+export function createTrack(textures, options) {
   const tex = textures || {};
+  const opts = options || {};
+  const control = Array.isArray(opts.control) && opts.control.length >= 8 ? opts.control : CONTROL;
+  const centreX = Array.isArray(opts.centre) ? Number(opts.centre[0]) || 0 : CENTRE_X;
+  const centreZ = Array.isArray(opts.centre) ? Number(opts.centre[1]) || 0 : CENTRE_Z;
+  const padSpec = Array.isArray(opts.pads) && opts.pads.length ? opts.pads : PAD_SPEC;
+  const accentPrimary = opts.primary === undefined ? PALETTE.cyan : opts.primary;
+  const accentSecondary = opts.secondary === undefined ? PALETTE.magenta : opts.secondary;
+  const wallColor = opts.wall === undefined ? PALETTE.wall : opts.wall;
+  const wallTrim = opts.wallTrim === undefined ? PALETTE.wallTrim : opts.wallTrim;
+  const surface = opts.surface || {};
+  const wallSurface = opts.wallSurface || {};
   const geometries = [];
   const materials = [];
   const group = new THREE.Group();
@@ -252,14 +263,14 @@ export function createTrack(textures) {
   };
 
   // -- curve ---------------------------------------------------------------
-  const cpCount = CONTROL.length;
+  const cpCount = control.length;
   const cpPoints = new Array(cpCount);
   const cpHalfWidth = new Float32Array(cpCount);
   const cpBank = new Float32Array(cpCount);
   const tagIndex = {};
   for (let i = 0; i < cpCount; i++) {
-    const c = CONTROL[i];
-    cpPoints[i] = new THREE.Vector3(c[0] + CENTRE_X, c[1], c[2] + CENTRE_Z);
+    const c = control[i];
+    cpPoints[i] = new THREE.Vector3(c[0] + centreX, c[1], c[2] + centreZ);
     cpHalfWidth[i] = THREE.MathUtils.clamp(c[3], TRACK.halfWidthMin, TRACK.halfWidthMax);
     cpBank[i] = c[4] * DEG;
     if (c[5]) tagIndex[c[5]] = i;
@@ -548,7 +559,7 @@ export function createTrack(textures) {
   // -- boost pads ----------------------------------------------------------
   const padHalfLength = TRACK.boostPadLength * 0.5;
   const padHalfWidth = TRACK.boostPadHalfWidth;
-  const boostPads = PAD_SPEC.map((spec) => {
+  const boostPads = padSpec.map((spec) => {
     const s = wrapS(spec.at * length);
     const limit = halfWidthAt(s) - padHalfWidth - 1.2;
     return {
@@ -650,7 +661,8 @@ export function createTrack(textures) {
   const columns = Math.max(2, TRACK.roadColumns | 0);
   const rows = sampleCount + 1;
   // whole number of texture tiles so the asphalt has no seam at the start line
-  const roadTiles = Math.max(1, Math.round(length / 32));
+  const roadTileLength = Math.max(8, Number(surface.tileLength) || 32);
+  const roadTiles = Math.max(1, Math.round(length / roadTileLength));
   const vPerMetre = roadTiles / length;
   {
     const road = new MeshBuilder(false);
@@ -684,16 +696,19 @@ export function createTrack(textures) {
       new THREE.MeshStandardMaterial({
         // White: the tarmac colour is already baked into the road map, and
         // multiplying it by PALETTE.asphalt a second time squared it into black.
-        color: 0xffffff,
+        color: surface.color === undefined ? 0xffffff : surface.color,
         map: setRepeat(tex.road || null),
         normalMap: setRepeat(tex.roadNormal || null),
         roughnessMap: setRepeat(tex.roadRough || null),
-        roughness: 1.0,
-        metalness: 0.12,
-        envMapIntensity: 0.35,
+        roughness: surface.roughness === undefined ? 1.0 : surface.roughness,
+        metalness: surface.metalness === undefined ? 0.12 : surface.metalness,
+        envMapIntensity: surface.envMapIntensity === undefined ? 0.45 : surface.envMapIntensity,
       }),
     );
-    if (mat.normalMap) mat.normalScale.set(0.85, 0.85);
+    if (mat.normalMap) {
+      const normalScale = surface.normalScale === undefined ? 0.85 : surface.normalScale;
+      mat.normalScale.set(normalScale, normalScale);
+    }
     const mesh = new THREE.Mesh(keepGeometry(road.build()), mat);
     mesh.name = 'road';
     mesh.receiveShadow = true;
@@ -703,7 +718,7 @@ export function createTrack(textures) {
   // --- emissive edge strips and centre line -------------------------------
   {
     const strips = new MeshBuilder(true);
-    const edgeColour = neon(PALETTE.cyan, 3.1);
+    const edgeColour = neon(accentPrimary, 3.1);
     const centreColour = neon(PALETTE.white, 0.5);
     const stripWidth = TRACK.edgeStripWidth;
     const lift = 0.03;
@@ -831,18 +846,21 @@ export function createTrack(textures) {
     }
     const mat = keepMaterial(
       new THREE.MeshStandardMaterial({
-        color: PALETTE.wall,
+        color: wallColor,
         map: setRepeat(tex.wall || null),
         normalMap: setRepeat(tex.wallNormal || null),
         emissive: new THREE.Color(0xffffff),
         emissiveMap: setRepeat(tex.wallEmissive || null),
         emissiveIntensity: tex.wallEmissive ? 2.6 : 0,
-        roughness: 0.72,
-        metalness: 0.45,
-        envMapIntensity: 0.5,
+        roughness: wallSurface.roughness === undefined ? 0.72 : wallSurface.roughness,
+        metalness: wallSurface.metalness === undefined ? 0.45 : wallSurface.metalness,
+        envMapIntensity: wallSurface.envMapIntensity === undefined ? 0.58 : wallSurface.envMapIntensity,
       }),
     );
-    if (mat.normalMap) mat.normalScale.set(1.0, 1.0);
+    if (mat.normalMap) {
+      const normalScale = wallSurface.normalScale === undefined ? 1.0 : wallSurface.normalScale;
+      mat.normalScale.set(normalScale, normalScale);
+    }
     const mesh = new THREE.Mesh(keepGeometry(walls.build()), mat);
     mesh.name = 'walls';
     mesh.receiveShadow = true;
@@ -950,7 +968,7 @@ export function createTrack(textures) {
     }
     const shellMat = keepMaterial(
       new THREE.MeshStandardMaterial({
-        color: PALETTE.wall,
+        color: wallColor,
         map: setRepeat(tex.wall || null),
         normalMap: setRepeat(tex.wallNormal || null),
         // No light reaches inside the vault, so without a faint self lit term
@@ -979,7 +997,7 @@ export function createTrack(textures) {
       new THREE.MeshBasicMaterial({
         // Above ~1 the rings saturate to flat white and swallow the whole
         // frame once the bloom picks them up.
-        color: neon(PALETTE.cyan, 0.4),
+        color: neon(accentPrimary, 0.4),
         side: THREE.DoubleSide,
         toneMapped: false,
       }),
@@ -1007,8 +1025,8 @@ export function createTrack(textures) {
       }
     }
     const podSets = [
-      { list: primary, colour: neon(PALETTE.cyan, 2.6), name: 'podsCyan' },
-      { list: accent, colour: neon(PALETTE.magenta, 2.2), name: 'podsMagenta' },
+      { list: primary, colour: neon(accentPrimary, 2.6), name: 'podsPrimary' },
+      { list: accent, colour: neon(accentSecondary, 2.2), name: 'podsSecondary' },
     ];
     for (const set of podSets) {
       if (!set.list.length) continue;
@@ -1035,8 +1053,8 @@ export function createTrack(textures) {
     const podGeo = new THREE.BoxGeometry(0.9, 0.5, 0.9);
     const m = new THREE.Matrix4();
     const scale = new THREE.Matrix4();
-    const glowColour = neon(PALETTE.cyan, 2.8);
-    const glowAccent = neon(PALETTE.magenta, 2.4);
+    const glowColour = neon(accentPrimary, 2.8);
+    const glowAccent = neon(accentSecondary, 2.4);
 
     const addGantry = (i, height, accent) => {
       const hw = hwA[wrapIndex(i)];
@@ -1082,7 +1100,7 @@ export function createTrack(textures) {
 
     const structureMat = keepMaterial(
       new THREE.MeshStandardMaterial({
-        color: PALETTE.wallTrim,
+        color: wallTrim,
         roughness: 0.42,
         metalness: 0.78,
         envMapIntensity: 0.7,
@@ -1352,7 +1370,7 @@ export function createTrack(textures) {
 
     const mat = keepMaterial(
       new THREE.MeshStandardMaterial({
-        color: PALETTE.wall,
+        color: wallColor,
         map: setRepeat(tex.wall || null),
         roughness: 0.8,
         metalness: 0.4,

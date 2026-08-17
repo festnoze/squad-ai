@@ -12,7 +12,6 @@
 import * as THREE from 'three';
 import {
   GAME_TITLE,
-  TRACK_NAME,
   PALETTE,
   TRACK,
   SHIP,
@@ -23,7 +22,6 @@ import {
 } from './config.js';
 import { createTextures } from './textures.js';
 import { createTrack } from './track.js';
-import { createWorld } from './world.js';
 import { createFX } from './fx.js';
 import { createShip } from './ship.js';
 import { createAI, updateAI } from './ai.js';
@@ -32,6 +30,8 @@ import { createPost } from './post.js';
 import { createHUD } from './hud.js';
 import { createAudio } from './audio.js';
 import { createInput } from './input.js';
+import { LEVELS, getLevel } from './levels.js';
+import { createEnvironment } from './environment.js';
 
 // ---------------------------------------------------------------------------
 // Small helpers
@@ -187,7 +187,6 @@ const engineParams = { speed01: 0, throttle01: 0, boost: false, airborne: false 
 // per second. None of these helpers takes rest arguments, so nothing allocates.
 // ---------------------------------------------------------------------------
 
-const GHOST_STORAGE_KEY = 'velocitron.ghost.akari.v1';
 // Pale cyan white: distinct from the four liveries (cyan, magenta, lime, amber).
 const GHOST_COLOR = 0xd6f4ff;
 
@@ -195,6 +194,10 @@ let ghost = null;
 let ghostRecording = false;
 let ghostShown = false;
 let prevLapStarted = false;
+
+let currentLevel = LEVELS[0];
+let selectedLevel = currentLevel;
+let levelLoading = false;
 
 async function createGhostSystem() {
   try {
@@ -205,7 +208,7 @@ async function createGhostSystem() {
       textures,
       scene,
       color: GHOST_COLOR,
-      storageKey: GHOST_STORAGE_KEY,
+      storageKey: 'velocitron.ghost.' + currentLevel.id + '.v1',
     });
     if (!g || typeof g.update !== 'function' || typeof g.sample !== 'function') return;
     ghost = g;
@@ -439,18 +442,18 @@ async function boot() {
   await paint();
   textures = createTextures(renderer);
 
-  setLoading(28, 'TRACE DU CIRCUIT AKARI...');
+  setLoading(28, 'TRACE DU CIRCUIT...');
   await paint();
-  track = createTrack(textures);
+  track = createTrack(textures, currentLevel.track);
   if (track.group && !track.group.parent) scene.add(track.group);
   frameCam = track.makeFrame();
   frameClamp = track.makeFrame();
   frameEvent = track.makeFrame();
   menuAnchor.s = track.startS;
 
-  setLoading(48, 'CONSTRUCTION DE NEO KYOTO...');
+  setLoading(48, 'CONSTRUCTION DU MONDE...');
   await paint();
-  world = createWorld(scene, track, textures, renderer);
+  world = await createWorldForLevel(currentLevel);
   if (world.group && !world.group.parent) scene.add(world.group);
 
   setLoading(62, 'ALLUMAGE DES EFFETS...');
@@ -501,6 +504,73 @@ async function boot() {
   lastTime = performance.now();
   rafId = requestAnimationFrame(loop);
   window.__ready = true;
+}
+
+function createWorldForLevel(level) {
+  return createEnvironment(scene, track, textures, renderer, level);
+}
+
+async function loadLevel(level) {
+  if (!level || levelLoading || level.id === currentLevel.id) return;
+  levelLoading = true;
+  setState('loading');
+  showScreen('screen-loading');
+  setLoading(8, 'DECHARGEMENT DU CIRCUIT...');
+  await paint();
+
+  try {
+    if (ghost && typeof ghost.dispose === 'function') ghost.dispose();
+    ghost = null;
+    if (hud && typeof hud.dispose === 'function') hud.dispose();
+    if (fx && typeof fx.dispose === 'function') fx.dispose();
+    for (let i = 0; i < ships.length; i++) {
+      if (ships[i].mesh && ships[i].mesh.parent) ships[i].mesh.parent.remove(ships[i].mesh);
+      if (typeof ships[i].dispose === 'function') ships[i].dispose();
+    }
+    ships = [];
+    ais = [];
+    if (world && typeof world.dispose === 'function') world.dispose();
+    if (track && typeof track.dispose === 'function') track.dispose();
+
+    currentLevel = level;
+    setLoading(28, 'TRACE DE ' + level.shortName + '...');
+    await paint();
+    track = createTrack(textures, level.track);
+    if (track.group && !track.group.parent) scene.add(track.group);
+    frameCam = track.makeFrame();
+    frameClamp = track.makeFrame();
+    frameEvent = track.makeFrame();
+    menuAnchor.s = track.startS;
+    menuAnchor.x = 0;
+    menuAnchor.h = SHIP.hoverHeight;
+
+    setLoading(52, 'CONSTRUCTION DE ' + level.location + '...');
+    await paint();
+    world = await createWorldForLevel(level);
+
+    setLoading(72, 'PREPARATION DES APPAREILS...');
+    await paint();
+    fx = createFX(scene, textures);
+    buildShips();
+
+    setLoading(84, 'RELECTURE DU MEILLEUR TOUR...');
+    await paint();
+    await createGhostSystem();
+    hud = createHUD(track);
+    hud.hide();
+    buildRace();
+    resetCameraRig();
+    applySize();
+    exposeGlobals();
+    updateLevelUI(level);
+
+    setLoading(100, 'PRET');
+    await paint();
+    setState('menu');
+    showScreen('screen-levels');
+  } finally {
+    levelLoading = false;
+  }
 }
 
 function buildShips() {
@@ -628,6 +698,9 @@ function exposeGlobals() {
     input,
     textures,
     ghost,
+    level: currentLevel,
+    levels: LEVELS,
+    loadLevel: (id) => loadLevel(getLevel(id)),
     clearGhostRecord: ghostClearRecord,
     startRace,
     restartRace,
@@ -665,12 +738,27 @@ function startRace() {
   setState('countdown');
   audio.startEngine();
   audio.startMusic();
-  hud.banner(TRACK_NAME, RACE.laps + ' TOURS', 2200);
+  hud.banner(currentLevel.name, RACE.laps + ' TOURS', 2200);
 }
 
 function restartRace() {
   setState('menu');
   startRace();
+}
+
+function returnToMenu() {
+  if (input) input.releaseAll();
+  if (audio) audio.stopEngine();
+  ghostAbortLap();
+  ghostSetVisible(false);
+  cockpit = false;
+  if (hud) {
+    hud.setCountdown(null);
+    hud.hide();
+  }
+  if (playerShip) menuAnchor.s = playerShip.s;
+  setState('menu');
+  showScreen('screen-menu');
 }
 
 function togglePause() {
@@ -722,7 +810,7 @@ function showResults() {
   const best = bestMs !== null ? hud.formatTime(bestMs) : '--:--.---';
   const recordMs = ghostRecordMs();
   const record = recordMs !== null ? ' - RECORD FANTOME ' + hud.formatTime(recordMs) : '';
-  hud.results(rows, title, TRACK_NAME + ' - MEILLEUR TOUR ' + best + record);
+  hud.results(rows, title, currentLevel.name + ' - MEILLEUR TOUR ' + best + record);
   publishRecord();
   hud.setCountdown(null);
   hud.hide();
@@ -773,11 +861,41 @@ function shipBestLap(ship) {
 // ---------------------------------------------------------------------------
 
 function bindUI() {
+  const play = byId('btn-play');
+  if (play) play.addEventListener('click', () => showScreen('screen-levels'));
+
+  const controls = byId('btn-controls');
+  if (controls) controls.addEventListener('click', () => showScreen('screen-controls'));
+  const controlsBack = byId('btn-controls-back');
+  if (controlsBack) controlsBack.addEventListener('click', () => showScreen('screen-menu'));
+  const levelBack = byId('btn-level-back');
+  if (levelBack) levelBack.addEventListener('click', () => showScreen('screen-menu'));
+
+  const cards = document.querySelectorAll('.level-card[data-level]');
+  for (let i = 0; i < cards.length; i++) {
+    cards[i].addEventListener('click', () => {
+      selectedLevel = getLevel(cards[i].dataset.level);
+      for (let n = 0; n < cards.length; n++) {
+        cards[n].classList.toggle('selected', cards[n] === cards[i]);
+      }
+      updateLevelUI(selectedLevel);
+    });
+  }
+
   const start = byId('btn-start');
   if (start) {
-    start.addEventListener('click', () => {
+    start.addEventListener('click', async () => {
+      if (levelLoading) return;
       audio.resume();
-      startRace();
+      start.disabled = true;
+      start.textContent = 'CHARGEMENT...';
+      try {
+        if (selectedLevel.id !== currentLevel.id) await loadLevel(selectedLevel);
+        startRace();
+      } finally {
+        start.disabled = false;
+        start.textContent = 'LANCER LA COURSE';
+      }
     });
   }
   const resume = byId('btn-resume');
@@ -789,9 +907,15 @@ function bindUI() {
   const restart = byId('btn-restart');
   if (restart) restart.addEventListener('click', restartRace);
 
+  const menuPause = byId('btn-menu-pause');
+  if (menuPause) menuPause.addEventListener('click', returnToMenu);
+  const menuResults = byId('btn-menu-results');
+  if (menuResults) menuResults.addEventListener('click', returnToMenu);
+
   const clearRecord = byId('btn-clear-record');
   if (clearRecord) {
     clearRecord.addEventListener('click', () => {
+      if (selectedLevel.id !== currentLevel.id) return;
       ghostClearRecord();
       clearRecord.textContent = 'RECORD EFFACE';
       setTimeout(() => {
@@ -833,6 +957,20 @@ function bindUI() {
     lastTime = performance.now();
     resetFrameStats();
   });
+}
+
+function updateLevelUI(level) {
+  const location = byId('level-location');
+  const name = byId('level-name');
+  const description = byId('level-description');
+  if (location) location.textContent = level.location;
+  if (name) name.textContent = level.shortName;
+  if (description) description.textContent = level.description;
+  const record = byId('menu-record');
+  const clear = byId('btn-clear-record');
+  if (clear) clear.disabled = level.id !== currentLevel.id;
+  if (record && level.id !== currentLevel.id) record.textContent = 'RECORD FANTOME : CHARGEZ LE CIRCUIT';
+  else publishRecord();
 }
 
 function bindInput() {
@@ -887,6 +1025,9 @@ function loop(now) {
   let dt = rawMs / 1000;
   if (!(dt > 0)) dt = 0;
   if (dt > DT_MAX) dt = DT_MAX;
+  // Level switching disposes and rebuilds the scene across several painted
+  // loading steps. Keep the last rendered frame until every subsystem exists.
+  if (levelLoading) return;
   // elapsed only drives the shake oscillator, so it freezes with the image.
   if (state !== 'paused') elapsed += dt;
 
@@ -910,7 +1051,7 @@ function loop(now) {
   const visualDt = state === 'paused' ? 0 : dt;
 
   fx.update(visualDt, camera, ships);
-  world.update(visualDt, camera.position, speed01);
+  world.update(visualDt, camera.position, speed01, playerShip);
   updateCamera(visualDt, running);
 
   if (running) updateHUD(dt, speed01);
@@ -1056,7 +1197,7 @@ function consumeRaceEvents() {
 
   if (ev.finish && !finishAnnounced) {
     finishAnnounced = true;
-    hud.banner('ARRIVEE', TRACK_NAME, 2600);
+    hud.banner('ARRIVEE', currentLevel.name, 2600);
   }
 
   resetRaceEvents(ev);

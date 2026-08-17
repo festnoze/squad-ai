@@ -1,11 +1,15 @@
 # VELOCITRON
 
-Course anti-gravite dans le navigateur, inspiree de Wipeout. Un circuit
-(Circuit Akari, Neo Kyoto), un appareil, trois rivaux, trois tours.
+Course anti-gravite dans le navigateur, inspiree de Wipeout. Trois circuits,
+trois environnements complets, un appareil, trois rivaux et trois tours.
 
-Three.js r169 vendorise, **zero build, zero dependance, zero asset binaire** :
-toutes les textures sont peintes dans un canvas 2D, tous les sons sont
-synthetises en Web Audio, toute la geometrie est generee en code.
+Three.js r169 vendorise, **zero build et zero dependance**. Les textures de
+surface sont peintes dans un canvas 2D, les panoramas sont des assets locaux,
+les sons sont synthetises en Web Audio et la geometrie est generee en code.
+
+Les environnements partagent un controleur unique (panorama, parallax, vent,
+brouillard, reponse a la vitesse et materiel de piste), puis ajoutent leur
+logique propre : megapole nocturne, littoral marin ou faille psychedelique.
 
 ![Circuit Akari](docs/screenshot.jpeg)
 
@@ -87,6 +91,9 @@ meme si le decor change.
 | `src/ai.js` | Pilotes rivaux (ligne de course + profil de vitesse) |
 | `src/race.js` | Grille, decompte, tours, checkpoints, classement |
 | `src/world.js` | Ciel, ville, lumieres, trafic, decor |
+| `src/environment.js` | Panoramas, logique environnementale partagee, detail de piste |
+| `src/themed-world.js` | Ocean, falaises, architecture cotiere, cristaux et faille |
+| `src/levels.js` | Identite, spline et profil materiau des trois circuits |
 | `src/fx.js` | Particules, reacteurs, trainees, explosions |
 | `src/post.js` | Bloom, flou radial, aberration, grain, tonemapping ACES |
 | `src/ghost.js` | Enregistrement, persistance et rejeu du meilleur tour |

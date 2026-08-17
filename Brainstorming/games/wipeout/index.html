@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>VELOCITRON - Circuit Akari</title>
+<title>VELOCITRON - Championnat AG-2199</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128758;</text></svg>" />
 <link rel="stylesheet" href="./styles.css" />
 <script type="importmap">
@@ -83,36 +83,67 @@
   <div id="screen-loading" class="screen">
     <div class="panel">
       <h1 class="title glitch" data-text="VELOCITRON">VELOCITRON</h1>
-      <p class="subtitle">CIRCUIT AKARI &middot; NEO KYOTO</p>
+      <p class="subtitle">CHAMPIONNAT ANTI-GRAVITE &middot; AG-2199</p>
       <div class="loading-bar"><div class="loading-fill" id="loading-fill"></div></div>
       <p class="loading-line" id="loading-line">INITIALISATION...</p>
     </div>
   </div>
 
-  <div id="screen-menu" class="screen hidden">
-    <div class="panel wide">
-      <h1 class="title glitch" data-text="VELOCITRON">VELOCITRON</h1>
-      <p class="subtitle">CIRCUIT AKARI &middot; NEO KYOTO &middot; 3 TOURS</p>
-      <p class="blurb">
-        Ligue anti-gravite AG-2199. Un circuit, un appareil, trois rivaux et
-        aucune barriere de securite. Le bouclier ne se recharge que sur les
-        plaques d'energie : frotter les murs a 500 km/h se paye.
-      </p>
-      <div class="controls-grid">
-        <div><kbd>Z</kbd></div><div>Accelerer</div>
-        <div><kbd>S</kbd></div><div>Freiner / reculer</div>
-        <div><kbd>Q</kbd><kbd>D</kbd></div><div>Diriger</div>
-        <div><kbd>A</kbd><kbd>E</kbd></div><div>Aerofreins (virages serres)</div>
-        <div><kbd>ESPACE</kbd></div><div>Turbo</div>
-        <div><kbd>R</kbd></div><div>Se remettre sur la piste</div>
-        <div><kbd>C</kbd></div><div>Camera (poursuite / cockpit)</div>
-        <div><kbd>M</kbd></div><div>Couper le son</div>
-        <div><kbd>ECHAP</kbd></div><div>Pause</div>
+  <div id="screen-menu" class="screen hidden main-menu">
+    <div class="menu-shell">
+      <div class="menu-kicker">CHAMPIONNAT ANTI-GRAVITE &middot; AG-2199</div>
+      <h1 class="title hero glitch" data-text="VELOCITRON">VELOCITRON</h1>
+      <p class="menu-tagline">TROIS MONDES. UNE SEULE TRAJECTOIRE PARFAITE.</p>
+      <button class="btn primary-cta" id="btn-play">JOUER</button>
+      <button class="btn ghost" id="btn-controls">COMMANDES</button>
+      <div class="menu-footer"><span>3 CIRCUITS</span><span>3 TOURS</span><span>4 PILOTES</span></div>
+    </div>
+  </div>
+
+  <div id="screen-levels" class="screen hidden level-screen">
+    <div class="level-shell">
+      <div class="level-heading">
+        <div>
+          <p class="eyebrow">CHAMPIONNAT / SELECTION</p>
+          <h1 class="title small">CHOISISSEZ VOTRE CIRCUIT</h1>
+        </div>
+        <button class="text-btn" id="btn-level-back">&larr; MENU PRINCIPAL</button>
       </div>
-      <p class="hint" id="menu-record">RECORD FANTOME : --:--.---</p>
-      <button class="btn" id="btn-start">LANCER LA COURSE</button>
-      <button class="btn ghost" id="btn-clear-record">EFFACER LE RECORD</button>
-      <p class="hint">Casque recommande. Le son est genere en direct.</p>
+      <div class="level-grid" id="level-grid">
+        <button class="level-card selected" data-level="akari" style="--level:#22e0ff">
+          <span class="level-number">01</span><span class="level-art city-art"></span>
+          <span class="level-copy"><b>CIRCUIT AKARI</b><i>NEO KYOTO</i><small>4.0 KM &middot; INTERMEDIAIRE</small></span>
+        </button>
+        <button class="level-card" data-level="azur" style="--level:#40e8ff">
+          <span class="level-number">02</span><span class="level-art coast-art"></span>
+          <span class="level-copy"><b>HORIZON MARIN</b><i>COTE D'AZUR</i><small>3.8 KM &middot; RAPIDE</small></span>
+        </button>
+        <button class="level-card" data-level="prism" style="--level:#ff4df0">
+          <span class="level-number">03</span><span class="level-art prism-art"></span>
+          <span class="level-copy"><b>KALEIDOSCOPE</b><i>FAILLE PRISMATIQUE</i><small>4.3 KM &middot; EXPERT</small></span>
+        </button>
+      </div>
+      <div class="level-detail">
+        <div><span id="level-location">NEO KYOTO</span><h2 id="level-name">CIRCUIT AKARI</h2><p id="level-description">Neons, viaducs vertigineux et virages releves au-dessus de la megapole.</p></div>
+        <div class="level-actions">
+          <p class="hint" id="menu-record">RECORD FANTOME : --:--.---</p>
+          <button class="btn" id="btn-start">LANCER LA COURSE</button>
+          <button class="text-btn danger" id="btn-clear-record">EFFACER LE RECORD</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="screen-controls" class="screen hidden">
+    <div class="panel wide">
+      <h1 class="title small">COMMANDES</h1>
+      <div class="controls-grid">
+        <div><kbd>Z</kbd></div><div>Accelerer</div><div><kbd>S</kbd></div><div>Freiner / reculer</div>
+        <div><kbd>Q</kbd><kbd>D</kbd></div><div>Diriger</div><div><kbd>A</kbd><kbd>E</kbd></div><div>Aerofreins</div>
+        <div><kbd>ESPACE</kbd></div><div>Turbo</div><div><kbd>R</kbd></div><div>Remise en piste</div>
+        <div><kbd>C</kbd></div><div>Camera</div><div><kbd>ECHAP</kbd></div><div>Pause</div>
+      </div>
+      <button class="btn ghost" id="btn-controls-back">RETOUR</button>
     </div>
   </div>
 
@@ -133,6 +164,7 @@
       </div>
       <button class="btn" id="btn-resume">REPRENDRE</button>
       <button class="btn ghost" id="btn-restart-pause">RECOMMENCER</button>
+      <button class="text-btn" id="btn-menu-pause">MENU PRINCIPAL</button>
     </div>
   </div>
 
@@ -145,6 +177,7 @@
         <tbody id="results-body"></tbody>
       </table>
       <button class="btn" id="btn-restart">REJOUER</button>
+      <button class="btn ghost" id="btn-menu-results">MENU PRINCIPAL</button>
     </div>
   </div>
 

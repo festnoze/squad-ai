@@ -1473,6 +1473,7 @@ export function createWorld(scene, track, textures, renderer) {
     _time: 0,
     _lightTimer: 0,
     update: null,
+    setEnvironmentState: null,
     dispose: null,
   };
 
@@ -1538,6 +1539,19 @@ export function createWorld(scene, track, textures, renderer) {
     for (let i = 0; i < billboards.materials.length; i++) {
       billboards.materials[i].opacity = panel;
     }
+  };
+
+  // Shared environment controller hook. City fog and ambient response now use
+  // the same speed/progress contract as the coast and prism worlds.
+  world.setEnvironmentState = function setEnvironmentState(state) {
+    if (!state) return;
+    const speed = state.speed01 > 0 ? Math.min(1, state.speed01) : 0;
+    const progress = state.raceProgress || 0;
+    if (scene.fog && scene.fog.isFogExp2) {
+      scene.fog.density = FOG_DENSITY * (1 + Math.sin(progress * Math.PI * 2) * 0.055);
+    }
+    if (world.sun) world.sun.intensity = 1.55 * (1 - speed * 0.045);
+    if (world.hemi) world.hemi.intensity = 0.6 * (1 - speed * 0.035);
   };
 
   world.dispose = function dispose() {

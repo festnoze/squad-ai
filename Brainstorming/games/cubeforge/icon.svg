@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3f7fd0"/>
+      <stop offset="1" stop-color="#9dc8ef"/>
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" fill="url(#sky)"/>
+  <!-- isometric grass block -->
+  <path d="M64 24 L112 50 L64 76 L16 50 Z" fill="#6fbb3f"/>
+  <path d="M64 30 L104 52 L64 74 L24 52 Z" fill="#84d24d" opacity="0.55"/>
+  <path d="M16 50 L64 76 L64 112 L16 86 Z" fill="#6b4a2f"/>
+  <path d="M112 50 L64 76 L64 112 L112 86 Z" fill="#8a6140"/>
+  <path d="M16 50 L64 76 L64 84 L16 58 Z" fill="#4e9c2c"/>
+  <path d="M112 50 L64 76 L64 84 L112 58 Z" fill="#5cae35"/>
+</svg>

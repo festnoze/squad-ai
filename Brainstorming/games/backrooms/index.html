@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>BACKROOMS</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='14' font-size='14'>&#128683;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js"
+  }
+}
+</script>
+</head>
+<body>
+<div id="app">
+  <canvas id="scene"></canvas>
+
+  <!-- ===================== in-game HUD ===================== -->
+  <div id="hud" class="hidden">
+    <div id="vignette"></div>
+    <div id="desat"></div>
+    <div id="contact-flash"></div>
+
+    <div id="crosshair"></div>
+
+    <div id="topbar">
+      <div class="stat">
+        <span class="stat-label" id="hud-level-name">Niveau</span>
+        <span class="stat-value" id="hud-level-num">1 / 12</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">TEMPS</span>
+        <span class="stat-value" id="hud-timer">0:00</span>
+      </div>
+      <div class="stat">
+        <span class="stat-label">RENCONTRES</span>
+        <span class="stat-value" id="hud-encounters">0</span>
+      </div>
+      <button id="btn-mute" title="Couper le son (M)">&#128266;</button>
+    </div>
+
+    <div id="toast-container"></div>
+    <div id="interact-hint" class="hidden">E : interagir</div>
+
+    <div id="bottom-left">
+      <div class="bar-row">
+        <span class="bar-label">ENDURANCE</span>
+        <div class="bar"><div class="bar-fill stamina" id="stamina-fill"></div></div>
+      </div>
+      <div class="bar-row hidden" id="battery-row">
+        <span class="bar-label">LAMPE</span>
+        <div class="bar"><div class="bar-fill battery" id="battery-fill"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== overlay screens ===================== -->
+  <div id="screen-loading" class="screen">
+    <div class="panel">
+      <h1 class="title">BACKROOMS</h1>
+      <p class="subtitle">Vous n auriez pas du sortir de la realite.</p>
+      <p class="loading-line" id="loading-line">Chargement...</p>
+    </div>
+  </div>
+
+  <div id="screen-menu" class="screen hidden">
+    <div class="panel">
+      <h1 class="title">BACKROOMS</h1>
+      <p class="subtitle">Un dedale de salles anormales, encore et encore.</p>
+      <p class="blurb">
+        Vous avez glisse hors de la realite dans un dedale de salles vides qui se
+        ressemblent toutes. A chaque Niveau, trouvez la sortie avant qu une
+        silhouette noire ne remarque votre bruit, votre lumiere, ou votre ombre.
+        Aucune arme. Fuir, se cacher, ou faire moins de bruit : voila tout ce qui
+        marche ici.
+      </p>
+      <div class="controls-grid">
+        <div><kbd>Z</kbd><kbd>Q</kbd><kbd>S</kbd><kbd>D</kbd> / <kbd>&#8592;</kbd><kbd>&#8593;</kbd><kbd>&#8595;</kbd><kbd>&#8594;</kbd></div><div>Se deplacer</div>
+        <div><kbd>Souris</kbd></div><div>Regarder (glisser-souris si le pointeur n est pas verrouille)</div>
+        <div><kbd>J</kbd><kbd>L</kbd> / <kbd>I</kbd><kbd>K</kbd></div><div>Regarder au clavier (lacet / tangage)</div>
+        <div><kbd>Maj</kbd></div><div>Courir (fatigue, bruit accru)</div>
+        <div><kbd>Ctrl</kbd></div><div>S accroupir (silencieux, plus lent)</div>
+        <div><kbd>E</kbd></div><div>Interagir (porte, objet, lampe)</div>
+        <div><kbd>R</kbd></div><div>Recommencer le Niveau</div>
+        <div><kbd>M</kbd></div><div>Couper le son</div>
+        <div><kbd>Echap</kbd></div><div>Pause</div>
+      </div>
+      <button class="btn" id="btn-start">ENTRER DANS LE DEDALE</button>
+      <button class="btn ghost" id="btn-reset-progress">Effacer la progression</button>
+      <p class="hint" id="menu-continue-hint"></p>
+    </div>
+  </div>
+
+  <div id="screen-levelintro" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small" id="intro-title">Niveau</h1>
+      <p class="subtitle" id="intro-progress">Niveau 1 / 12</p>
+      <p class="blurb" id="intro-text"></p>
+      <p class="hint" id="intro-best"></p>
+      <button class="btn" id="btn-intro-start">COMMENCER</button>
+    </div>
+  </div>
+
+  <div id="screen-levelcomplete" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">SORTIE TROUVEE</h1>
+      <div class="medal" id="complete-medal">or</div>
+      <div class="results">
+        <div class="result"><span id="complete-time">0:00</span><label>TEMPS</label></div>
+        <div class="result"><span id="complete-encounters">0</span><label>RENCONTRES</label></div>
+      </div>
+      <button class="btn" id="btn-next-level">NIVEAU SUIVANT</button>
+      <button class="btn hidden" id="btn-finish-run">VOIR LE BILAN FINAL</button>
+    </div>
+  </div>
+
+  <div id="screen-finale" class="screen hidden">
+    <div class="panel">
+      <h1 class="title">VOUS AVEZ TROUVE LA SORTIE</h1>
+      <p class="subtitle">Le dedale ne vous retient plus. Pour l instant.</p>
+      <div class="results">
+        <div class="result"><span id="finale-levels">12</span><label>NIVEAUX TRAVERSES</label></div>
+        <div class="result"><span id="finale-encounters">0</span><label>RENCONTRES TOTALES</label></div>
+        <div class="result"><span id="finale-time">0:00</span><label>TEMPS TOTAL</label></div>
+      </div>
+      <button class="btn" id="btn-back-to-menu">RETOUR AU MENU</button>
+    </div>
+  </div>
+
+  <div id="screen-pause" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small">PAUSE</h1>
+      <div class="slider-row">
+        <label for="sens-slider">SENSIBILITE SOURIS</label>
+        <input type="range" id="sens-slider" min="5" max="120" step="1" value="26" />
+        <span id="sens-value">0.0026</span>
+      </div>
+      <div class="slider-row">
+        <label for="invert-y">INVERSER L AXE VERTICAL</label>
+        <input type="checkbox" id="invert-y" />
+      </div>
+      <div class="slider-row">
+        <label for="volume-slider">VOLUME</label>
+        <input type="range" id="volume-slider" min="0" max="100" step="1" value="75" />
+      </div>
+      <button class="btn" id="btn-resume">REPRENDRE</button>
+      <button class="btn ghost" id="btn-restart-pause">RECOMMENCER LE NIVEAU</button>
+      <button class="btn ghost" id="btn-quit-pause">QUITTER AU MENU</button>
+    </div>
+  </div>
+
+  <div id="screen-error" class="screen hidden">
+    <div class="panel">
+      <h1 class="title small dead">DEFAILLANCE</h1>
+      <pre id="error-text"></pre>
+      <p class="hint">Servez ce dossier en HTTP et utilisez un navigateur compatible WebGL2.</p>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+  // Surface any boot error instead of leaving a black screen.
+  window.addEventListener('error', (e) => {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (s && t && s.classList.contains('hidden')) {
+      t.textContent = (e.message || 'Erreur inconnue') + '\n' + (e.filename || '') + ':' + (e.lineno || '');
+      document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+      s.classList.remove('hidden');
+    }
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    const s = document.getElementById('screen-error');
+    const t = document.getElementById('error-text');
+    if (s && t && s.classList.contains('hidden')) {
+      t.textContent = 'Promesse rejetee: ' + (e.reason && e.reason.message ? e.reason.message : String(e.reason));
+      document.querySelectorAll('.screen').forEach((el) => el.classList.add('hidden'));
+      s.classList.remove('hidden');
+    }
+  });
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
