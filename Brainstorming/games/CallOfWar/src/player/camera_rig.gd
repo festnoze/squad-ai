@@ -20,6 +20,18 @@ extends Node3D
 const PITCH_LIMIT := 1.5
 ## Seconds to blend in or out of the aiming field of view.
 const AIM_BLEND_TIME := 0.12
+## Seconds to raise or lower a scope (binoculars). Slightly slower than the
+## sights: the optics come up to the eye, they are not snapped there.
+const SCOPE_BLEND_TIME := 0.16
+## Hard floor of the scoped field of view, in degrees.
+const SCOPE_FOV_MIN := 4.0
+## Lower bound of the mouse sensitivity scaling while aiming. The iron sights
+## never narrow the view by more than about a third.
+const SENSITIVITY_FLOOR := 0.35
+## Same bound while a scope is up. A x8 magnification divides the field of view
+## by eight, so the sensitivity has to be allowed to follow it all the way down
+## or the view becomes impossible to steer.
+const SCOPE_SENSITIVITY_FLOOR := 0.08
 ## Share of a recoil kick that never comes back. This is the muzzle climb.
 const RECOIL_PERMANENT := 0.26
 ## Spring constants of the transient recoil.
@@ -57,6 +69,9 @@ var _pivot: Node3D = null
 var _built := false
 var _base_fov := 82.0
 var _aim_blend := 0.0
+var _scope_active := false
+var _scope_fov := 10.0
+var _scope_blend := 0.0
 var _eye_height := 1.68
 var _height_seeded := false
 
@@ -117,10 +132,14 @@ func look(relative: Vector2) -> void:
 		sensitivity = Game.mouse_sensitivity
 		inverted = Game.invert_y
 	# Aiming narrows the field of view, so scale the sensitivity with it and
-	# keep the same angular travel per centimetre of mouse.
+	# keep the same angular travel per centimetre of mouse. A scope reuses the
+	# very same rule, only with a much lower floor.
 	var zoom_scale := 1.0
 	if camera != null and _base_fov > 1.0:
-		zoom_scale = clampf(camera.fov / _base_fov, 0.35, 1.0)
+		var floor_scale := SENSITIVITY_FLOOR
+		if _scope_active or _scope_blend > 0.0:
+			floor_scale = SCOPE_SENSITIVITY_FLOOR
+		zoom_scale = clampf(camera.fov / _base_fov, floor_scale, 1.0)
 	var step := sensitivity * zoom_scale
 	yaw -= relative.x * step
 	var vertical := relative.y * step
@@ -188,8 +207,25 @@ func forward() -> Vector3:
 
 func set_base_fov(fov: float) -> void:
 	_base_fov = clampf(fov, 40.0, 130.0)
-	if camera != null and _aim_blend <= 0.0:
+	# Never snap the camera back while an optic is up: the settings menu can
+	# change the field of view at any moment, including with the binoculars out.
+	if camera != null and _aim_blend <= 0.0 and not _scope_active and _scope_blend <= 0.0:
 		camera.fov = _base_fov
+
+
+## Raises or lowers an optic (binoculars, telescopic sight). `fov` is the scoped
+## field of view in degrees and is only read while `active` is true. The scope
+## wins over the aim blend, and [method look] scales the mouse sensitivity down
+## with it so the magnified view stays steerable.
+func set_scope(active: bool, fov: float) -> void:
+	if active:
+		_scope_fov = clampf(fov, SCOPE_FOV_MIN, 130.0)
+	_scope_active = active
+
+
+## True while an optic is up or still blending in or out.
+func is_scoped() -> bool:
+	return _scope_active or _scope_blend > 0.0
 
 
 # --- internals ---------------------------------------------------------------
@@ -285,11 +321,20 @@ func _update_fov(delta: float, is_aiming: bool, aim_fov_scale: float) -> void:
 	var goal := 1.0 if is_aiming else 0.0
 	var rate := delta / maxf(AIM_BLEND_TIME, 0.001)
 	_aim_blend = move_toward(_aim_blend, goal, rate)
+	var scope_goal := 1.0 if _scope_active else 0.0
+	var scope_rate := delta / maxf(SCOPE_BLEND_TIME, 0.001)
+	_scope_blend = move_toward(_scope_blend, scope_goal, scope_rate)
 	if camera == null:
 		return
 	var eased := _aim_blend * _aim_blend * (3.0 - 2.0 * _aim_blend)
 	var scale := clampf(aim_fov_scale, 0.2, 1.0)
-	camera.fov = lerpf(_base_fov, _base_fov * scale, eased)
+	var value := lerpf(_base_fov, _base_fov * scale, eased)
+	if _scope_blend > 0.0:
+		# `move_toward` lands exactly on 0.0, so a closed scope leaves the field
+		# of view exactly where the settings put it.
+		var scope_eased := _scope_blend * _scope_blend * (3.0 - 2.0 * _scope_blend)
+		value = lerpf(value, _scope_fov, scope_eased)
+	camera.fov = value
 
 
 func _apply() -> void:

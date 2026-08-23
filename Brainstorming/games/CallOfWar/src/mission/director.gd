@@ -21,10 +21,30 @@
 ## Garrison memory. `_garrison_left` keeps, for the whole session, how many men
 ## a site still owes. Killing four of the six defenders of a farm and walking
 ## away means two men are there when you come back, not six.
+##
+## The Maquis layer adds three ways for the campaign to answer back.
+##
+##  * Counter attacks. A liberated sector may be assaulted once, announced a
+##    minute and a half ahead. The assault draws on the SAME budgets as
+##    everything else instead of adding to them, and losing it never cancels a
+##    capture: `War.capture_sector` stays idempotent and the sector is merely
+##    flagged contested, with a thinned garrison walking back in.
+##  * Radio isolation. A site whose mast fell before anybody raised the alarm
+##    stops being a source of reinforcement waves. That is the mechanical payoff
+##    of scouting a garrison with the binoculars before touching it.
+##  * Resistance caches. Every liberated sector gets one crate at its safe
+##    house, five minutes of play between two uses, so resupply is a place on
+##    the map rather than a menu.
 class_name Director
 extends Node
 
 signal event_announced(text: String)
+## A counter attack has been announced on this sector. The HUD banners it here,
+## the first squad only lands `CA_WARNING` seconds later.
+signal counter_attack_started(sector_id: int)
+## `held` is true when the assault was broken, false when the player died or was
+## simply not there. False also marks the sector contested in `War`.
+signal counter_attack_resolved(sector_id: int, held: bool)
 
 # --- Budget ----------------------------------------------------------------
 
@@ -62,6 +82,56 @@ const AMBIENCE_MIN := 40.0
 const AMBIENCE_MAX := 120.0
 const RECYCLE_GAP := 1.0
 
+# --- Counter attacks -------------------------------------------------------
+
+## Odds that a captured sector earns a counter attack. Rolled once, the moment
+## the sector falls, and never again for that sector.
+const CA_CHANCE := 0.4
+const CA_DELAY_MIN := 360.0
+const CA_DELAY_MAX := 840.0
+## Seconds between the radio warning and the first squad order.
+const CA_WARNING := 90.0
+const CA_SQUADS_MIN := 2
+const CA_SQUADS_MAX := 3
+## The column forms on a ring around the sector, never on its doorstep.
+const CA_RING_MIN := 130.0
+const CA_RING_MAX := 210.0
+## A counter attack order is worth waiting for far longer than a routine one: it
+## is an announced beat, not ambience, and dropping it because the player spent
+## forty seconds looking that way would leave the HUD lying about an assault
+## that never came.
+const CA_ORDER_LIFE := 150.0
+## Farther than this from the sector and the player is not defending it.
+const CA_ABSENT_DISTANCE := 400.0
+## Seconds of absence after which the sector falls without a shot fired.
+const CA_ABSENT_SECONDS := 75.0
+## Hard stop, so a stalled assault can never hold squads hostage forever.
+const CA_MAX_SECONDS := 420.0
+## Share of the original garrison that moves back into a lost sector.
+const CA_GARRISON_SHARE := 0.5
+const CA_GARRISON_MIN := 3
+## Retry delay when the moment is wrong: timed objective running, player down.
+const CA_RETRY := 30.0
+
+## Counter attack states. Only WARNED and ASSAULT count as "active": before
+## that nothing exists on the map and nothing has been promised to the player.
+const CA_IDLE := 0
+const CA_PLANNED := 1
+const CA_WARNED := 2
+const CA_ASSAULT := 3
+
+# --- Resistance caches -----------------------------------------------------
+
+## Game seconds between two uses of the same cache. Long enough that it shapes
+## the round trips instead of replacing them.
+const CACHE_COOLDOWN := 300.0
+
+# --- Radio isolation -------------------------------------------------------
+
+## How close the alert has to be to a site for that site to count as its source,
+## and therefore for its destroyed mast to silence the waves.
+const ISOLATION_RANGE := 260.0
+
 # --- Ambience --------------------------------------------------------------
 
 const PLANE_SPEED := 92.0
@@ -82,6 +152,7 @@ const K_PATROL := 1
 const K_REINFORCE := 2
 const K_ALLY := 3
 const K_OFFICER := 4
+const K_COUNTER := 5
 
 
 ## One pending spawn. Orders are the only way anything is created.
@@ -97,6 +168,9 @@ class _Order extends RefCounted:
 	var anchor: Vector3 = Vector3.ZERO
 	var radius: float = 30.0
 	var life: float = ORDER_LIFE
+	## Part of the running counter attack, which is bookkept apart: these squads
+	## are never recycled and their loss is what resolves the assault.
+	var counter: bool = false
 
 
 ## One delayed sound or blast, so an artillery salvo is spread over seconds.
@@ -107,6 +181,101 @@ class _Cue extends RefCounted:
 	var volume: float = 0.0
 	var pitch: float = 1.0
 	var blast: float = 0.0
+
+
+## A Resistance supply cache: a couple of crates dropped at the safe house of a
+## liberated sector. Not a vending machine, a place you walk back to: one use
+## every `CACHE_COOLDOWN` seconds of play.
+##
+## It reports through a signal rather than by calling the Director back, so the
+## crate never needs to know the class that built it.
+class _Cache extends Node3D:
+	signal used(cache: Node, user: Node)
+
+	var site_id: int = -1
+	var cooldown: float = 0.0
+
+	## Whole minutes already written into the prompt. The player reads that meta
+	## every single frame, so the label is only rebuilt when it changes.
+	var _shown: int = -1
+
+	func setup(id: int) -> void:
+		site_id = id
+		add_to_group("usable")
+		set_meta("surface", "wood")
+		_build()
+		_refresh_prompt()
+
+	func is_ready() -> bool:
+		return cooldown <= 0.0
+
+	func start_cooldown(seconds: float) -> void:
+		cooldown = maxf(0.0, seconds)
+		_refresh_prompt()
+
+	func tick(delta: float) -> void:
+		if cooldown <= 0.0:
+			return
+		cooldown = maxf(0.0, cooldown - delta)
+		_refresh_prompt()
+
+	## The player looks for `interact` on whatever he is aiming at, so this is
+	## the whole contract with him. The refill itself belongs to the Director,
+	## which owns the announcements.
+	func interact(player: Node) -> void:
+		used.emit(self, player)
+
+	func _refresh_prompt() -> void:
+		var minutes: int = int(ceil(cooldown / 60.0))
+		if minutes == _shown:
+			return
+		_shown = minutes
+		if minutes <= 0:
+			set_meta("prompt", "Ravitaillement de la Résistance [E]")
+		else:
+			set_meta("prompt", "Cache vide, revenez dans %d min" % minutes)
+
+	func _build() -> void:
+		var wood: Material = MatLib.get_material("wood")
+		var cloth: Material = MatLib.get_material("cloth")
+
+		var big := MeshInstance3D.new()
+		var big_mesh := BoxMesh.new()
+		big_mesh.size = Vector3(1.15, 0.78, 0.82)
+		big.mesh = big_mesh
+		big.position = Vector3(0.0, 0.39, 0.0)
+		big.material_override = wood
+		add_child(big)
+
+		var tarp := MeshInstance3D.new()
+		var tarp_mesh := BoxMesh.new()
+		tarp_mesh.size = Vector3(1.26, 0.09, 0.94)
+		tarp.mesh = tarp_mesh
+		tarp.position = Vector3(0.0, 0.81, 0.0)
+		tarp.material_override = cloth
+		add_child(tarp)
+
+		var small := MeshInstance3D.new()
+		var small_mesh := BoxMesh.new()
+		small_mesh.size = Vector3(0.6, 0.42, 0.52)
+		small.mesh = small_mesh
+		small.position = Vector3(0.2, 1.07, -0.08)
+		small.rotation.y = 0.42
+		small.material_override = wood
+		add_child(small)
+
+		var body := StaticBody3D.new()
+		body.name = "Coque"
+		body.collision_layer = Layers.PROP
+		body.collision_mask = 0
+		body.set_meta("surface", "wood")
+		var shape := CollisionShape3D.new()
+		var box := BoxShape3D.new()
+		box.size = Vector3(1.3, 1.3, 1.0)
+		shape.shape = box
+		shape.position.y = box.size.y * 0.5
+		body.add_child(shape)
+		add_child(body)
 
 
 var _world: GameWorld = null
@@ -128,6 +297,32 @@ var _soldier_site: Dictionary = {}
 var _officer_done: Dictionary = {}
 ## site id -> true once a friendly cell has been placed there.
 var _ally_done: Dictionary = {}
+
+## site id -> true once its radio mast fell before anybody called for help.
+var _isolated: Dictionary = {}
+## site id -> _Cache, one crate per liberated sector.
+var _caches: Dictionary = {}
+
+var _ca_state: int = CA_IDLE
+var _ca_sector: int = -1
+## Seconds left before the next transition of `_ca_state`.
+var _ca_timer: float = 0.0
+## Squads of the running assault. Untyped on purpose: every entry is checked
+## with `is_instance_valid` BEFORE any cast, and a typed array would force the
+## cast first, which is exactly how a freed squad takes the game down.
+var _ca_squads: Array = []
+## Counter attack orders queued and not spent yet.
+var _ca_pending: int = 0
+## Counter attack squads actually put on the ground.
+var _ca_spawned: int = 0
+## Seconds the player has spent away from the sector under assault.
+var _ca_away: float = 0.0
+var _ca_elapsed: float = 0.0
+## sector id -> true once the dice were rolled for it. One roll per sector.
+var _ca_rolled: Dictionary = {}
+## Raised by the `died` signal. Polling would miss it: Main revives the player
+## inside the same frame, so `is_alive()` is true again by the next tick.
+var _ca_player_down: bool = false
 
 var _rng := RandomNumberGenerator.new()
 var _player_pos := Vector3.ZERO
@@ -177,6 +372,9 @@ func setup(game_world: GameWorld, player_node: Player, tracker: ObjectiveTracker
 			_home_site_id = home.id
 	if not War.sector_captured.is_connected(_on_sector_captured):
 		War.sector_captured.connect(_on_sector_captured)
+	if _player != null and is_instance_valid(_player) \
+			and not _player.died.is_connected(_on_player_died):
+		_player.died.connect(_on_player_died)
 
 	_ambience_gap = _rng.randf_range(20.0, 45.0)
 	_patrol_gap = _rng.randf_range(12.0, 25.0)
@@ -192,6 +390,7 @@ func _on_sector_captured(sector_id: int) -> void:
 		if squad != null and is_instance_valid(squad) and squad.faction == War.AXIS:
 			_release_squad(squad)
 	_garrison_squads[sector_id] = []
+	_roll_counter_attack(sector_id)
 
 
 # ---------------------------------------------------------------------------
@@ -217,6 +416,8 @@ func tick(delta: float) -> void:
 		_queue_patrol(false)
 
 	_tick_reinforcements(delta)
+	_tick_counter_attack(delta)
+	_tick_caches(delta)
 
 	_ambience_gap -= delta
 	if _ambience_gap <= 0.0:
@@ -245,6 +446,43 @@ func live_soldier_count() -> int:
 	for soldier in _lone:
 		if soldier != null and is_instance_valid(soldier) and soldier.is_alive():
 			total += 1
+	return total + _companion_count()
+
+
+## Recruited companions are bodies in the world that this node no longer owns:
+## adoption pulls the man out of his squad and reparents him under the companion
+## manager, so he silently leaves the count above. Without this, the budget
+## would believe it has two free slots that the physics step does not have, and
+## a counter attack would spawn OVER the ceiling of sixty men instead of drawing
+## on it.
+func _companion_count() -> int:
+	if not is_inside_tree():
+		return 0
+	var nodes: Array = get_tree().get_nodes_in_group("companions")
+	if nodes.is_empty():
+		return 0
+	var manager: Node = nodes[0]
+	if manager == null or not is_instance_valid(manager):
+		return 0
+	if not manager.has_method("members"):
+		# Older or partial build of the module: the headcount is still better
+		# than pretending there is nobody there.
+		if manager.has_method("count"):
+			return maxi(0, int(manager.call("count")))
+		return 0
+	var total: int = 0
+	for entry in manager.call("members"):
+		if entry == null or not is_instance_valid(entry):
+			continue
+		var man: Soldier = entry
+		if not man.is_alive():
+			continue
+		# A freed prisoner who was then recruited is still in `_lone`, where he
+		# has already been counted once. Counting him twice would shrink the
+		# budget rather than protect it.
+		if _lone.has(man):
+			continue
+		total += 1
 	return total
 
 
@@ -275,6 +513,55 @@ func send_reinforcements(pos: Vector3, count: int) -> void:
 		_orders.append(order)
 
 
+## Cuts the reinforcement waves coming from a site whose radio mast was blown.
+## This is what pays for scouting: spot the mast with the binoculars, destroy it
+## before anybody sees you, and the garrison you are about to hit cannot call a
+## soul. Calling it twice changes nothing.
+func isolate_site(site_id: int) -> void:
+	if site_id < 0 or _isolated.has(site_id):
+		return
+	_isolated[site_id] = true
+	# A counter attack that is only planned is called off with the mast: nobody
+	# up the chain knows this sector needs help any more. One already announced
+	# stands, the column is on the road and no radio recalls it.
+	if _ca_state == CA_PLANNED and _ca_sector == site_id:
+		_ca_state = CA_IDLE
+		_ca_sector = -1
+		_ca_timer = 0.0
+	event_announced.emit("Radio détruite: la garnison de %s ne peut plus appeler de renforts."
+			% _place_name(site_id))
+
+
+func is_site_isolated(site_id: int) -> bool:
+	return _isolated.has(site_id)
+
+
+## The sector under counter attack right now, -1 when there is none. A counter
+## attack that is merely planned does not count: nothing is on the map yet and
+## nothing has been promised to the player.
+func active_counter_attack() -> int:
+	if _ca_state == CA_WARNED or _ca_state == CA_ASSAULT:
+		return _ca_sector
+	return -1
+
+
+## Immediate trigger, for the objectives and the test probe. It skips the delay
+## and the timed objective guard, because the caller is the one who decided this
+## is the moment. The two hard rules stand: never the drop zone village, never
+## two counter attacks at once.
+func force_counter_attack(sector_id: int) -> void:
+	if sector_id < 0 or sector_id == _home_site_id or _ca_state != CA_IDLE:
+		return
+	if _site_of(sector_id) == null:
+		return
+	_ca_rolled[sector_id] = true
+	_ca_sector = sector_id
+	_ca_state = CA_WARNED
+	_ca_timer = 0.0
+	_announce_counter_attack()
+	_launch_counter_attack()
+
+
 ## Frees every spawned squad. Called on shutdown and on scene reload.
 func clear_all() -> void:
 	for squad in _squads:
@@ -293,18 +580,43 @@ func clear_all() -> void:
 	_cues.clear()
 	_garrison_squads.clear()
 	_soldier_site.clear()
+	for site_id in _caches.keys():
+		var raw: Variant = _caches[site_id]
+		if raw == null or not is_instance_valid(raw):
+			continue
+		var cache: _Cache = raw
+		if cache.used.is_connected(_on_cache_used):
+			cache.used.disconnect(_on_cache_used)
+		cache.queue_free()
+	_caches.clear()
+	_ca_squads.clear()
+	_ca_rolled.clear()
+	_isolated.clear()
+	_ca_state = CA_IDLE
+	_ca_sector = -1
+	_ca_timer = 0.0
+	_ca_pending = 0
+	_ca_spawned = 0
+	_ca_away = 0.0
+	_ca_elapsed = 0.0
+	_ca_player_down = false
 	if _plane != null and is_instance_valid(_plane):
 		_plane.queue_free()
 	_plane = null
 	_plane_left = 0.0
 	if War.sector_captured.is_connected(_on_sector_captured):
 		War.sector_captured.disconnect(_on_sector_captured)
+	if _player != null and is_instance_valid(_player) \
+			and _player.died.is_connected(_on_player_died):
+		_player.died.disconnect(_on_player_died)
 	_ready_to_run = false
 
 
 func debug_line() -> String:
-	return "Director %d soldats, %d escouades, %d ordres, alerte %s" % [
-		live_soldier_count(), _squads.size(), _orders.size(), War.alert_name()]
+	var target: int = active_counter_attack()
+	var counter: String = "aucune" if target < 0 else "secteur %d" % target
+	return "Director %d soldats, %d escouades, %d ordres, alerte %s, contre-attaque %s" % [
+		live_soldier_count(), _squads.size(), _orders.size(), War.alert_name(), counter]
 
 
 # ---------------------------------------------------------------------------
@@ -324,7 +636,11 @@ func _scan_sites() -> void:
 		if built == null:
 			continue
 		if site.is_sector and War.is_sector_captured(site.id):
+			if War.is_sector_contested(site.id):
+				_hold_contested(site, built)
+				continue
 			_ensure_allies(site, built)
+			_ensure_cache(site, built)
 			continue
 		# The drop zone village always hides a Resistance cell, captured or not.
 		if site.id == _home_site_id:
@@ -370,6 +686,25 @@ func _ensure_garrison(site: Layout.Site, built: SiteBuilder.BuiltSite) -> void:
 		officer.anchor = at
 		officer.radius = maxf(18.0, site.radius * 0.6)
 		_orders.append(officer)
+
+
+## A contested sector is Axis ground again, held by a thinned garrison. The
+## capture itself was never taken back and neither was the objective chain: only
+## the ground has to be walked over a second time. Once that garrison is gone
+## the flag comes off, so the state can always be played out of, even if the
+## objective layer never replays its capture step.
+func _hold_contested(site: Layout.Site, built: SiteBuilder.BuiltSite) -> void:
+	if not _garrison_left.has(site.id):
+		# Reached on a reloaded save: the ledger of who still owes men does not
+		# survive to disk, only the contested flag does.
+		_garrison_left[site.id] = maxi(CA_GARRISON_MIN,
+				int(round(float(site.garrison) * CA_GARRISON_SHARE)))
+	var left: int = int(_garrison_left[site.id])
+	if left <= 0 and _garrison_alive(site.id) <= 0 and not _pending_for(site.id):
+		War.clear_contested(site.id)
+		event_announced.emit("%s est de nouveau entre nos mains." % _place_name(site.id))
+		return
+	_ensure_garrison(site, built)
 
 
 func _site_anchor(site: Layout.Site) -> Vector3:
@@ -548,10 +883,34 @@ func _tick_reinforcements(delta: float) -> void:
 	if _wave_gap > 0.0 or _waves >= REINFORCE_MAX_WAVES:
 		return
 	_wave_gap = REINFORCE_GAP
+	if _alert_source_isolated():
+		# The garrison that raised the alarm has no mast left. Nobody comes, and
+		# the wave counter does not move either: walk into the next valley and
+		# the waves start again from a site that can still call.
+		return
 	_waves += 1
 	send_reinforcements(_last_known, 3 + _waves)
 	if _waves == 1:
 		event_announced.emit("Des renforts allemands convergent vers votre position.")
+
+
+## Is the alert coming from a site whose radio is down? The last known position
+## of the player is where the hunt is centred, so the nearest site to it is the
+## one that would be picking up the telephone.
+func _alert_source_isolated() -> bool:
+	if _isolated.is_empty() or _world == null:
+		return false
+	var layout: Layout = _world.layout()
+	if layout == null:
+		return false
+	var near: Layout.Site = layout.nearest_site(_last_known.x, _last_known.z)
+	if near == null:
+		return false
+	var dx: float = near.center.x - _last_known.x
+	var dz: float = near.center.y - _last_known.z
+	if dx * dx + dz * dz > ISOLATION_RANGE * ISOLATION_RANGE:
+		return false
+	return _isolated.has(near.id)
 
 
 ## A point on a ring around `pos`, preferring one the player cannot watch.
@@ -586,6 +945,8 @@ func _tick_orders(delta: float) -> void:
 		var order: _Order = _orders[index]
 		order.life -= delta
 		if order.life <= 0.0:
+			if order.counter:
+				_ca_pending = maxi(0, _ca_pending - 1)
 			_orders.remove_at(index)
 		index -= 1
 
@@ -610,6 +971,9 @@ func _execute(order: _Order) -> void:
 		var officer := _make_soldier(order.faction, Soldier.R_OFFICER, order.position, -1)
 		if officer != null:
 			officer.order_hold(order.position)
+			# He is not charged to the garrison strength, but the documents on
+			# his body still have to name the RIGHT site on the map.
+			officer.set_home_site(order.site_id)
 		return
 
 	var squad := Squad.new()
@@ -627,6 +991,7 @@ func _execute(order: _Order) -> void:
 			member.died.connect(_on_soldier_died)
 		if order.site_id >= 0:
 			_soldier_site[member.get_instance_id()] = order.site_id
+			member.set_home_site(order.site_id)
 
 	if order.kind == K_GARRISON or order.kind == K_ALLY:
 		if order.site_id >= 0:
@@ -636,6 +1001,12 @@ func _execute(order: _Order) -> void:
 		squad.order_defend(order.anchor, order.radius)
 	elif order.has_target:
 		squad.order_attack(order.target)
+
+	if order.counter:
+		_ca_pending = maxi(0, _ca_pending - 1)
+		if _ca_state == CA_ASSAULT:
+			_ca_squads.append(squad)
+			_ca_spawned += 1
 
 
 func _pending_for(site_id: int) -> bool:
@@ -707,6 +1078,8 @@ func _make_soldier(faction: int, rank: int, at: Vector3, site_id: int) -> Soldie
 	var soldier := Soldier.new()
 	soldier.name = "Soldier%d" % (Time.get_ticks_usec() & 0xFFFFF)
 	add_child(soldier)
+	# Before setup(), which is what builds the body.
+	soldier.species = CharacterModels.pick_species(faction, _rng)
 	soldier.setup(_world, faction, rank, at)
 	if not soldier.died.is_connected(_on_soldier_died):
 		soldier.died.connect(_on_soldier_died)
@@ -745,11 +1118,64 @@ func _recycle() -> void:
 		if squad.alive_count() <= 0:
 			_release_squad(squad)
 			continue
+		if _is_counter_squad(squad):
+			# An announced assault that dissolves on its way in is a far worse
+			# defect than four extra soldiers on the far side of the valley.
+			continue
 		if squad.center().distance_to(_player_pos) < RECYCLE_DISTANCE:
 			continue
 		if _engaged(squad):
 			continue
 		_release_squad(squad)
+
+
+func _is_counter_squad(squad: Squad) -> bool:
+	return _ca_squads.has(squad)
+
+
+func _is_companion(man: Soldier) -> bool:
+	if man == null or not is_instance_valid(man) or not is_inside_tree():
+		return false
+	var nodes: Array = get_tree().get_nodes_in_group("companions")
+	if nodes.is_empty():
+		return false
+	var manager: Node = nodes[0]
+	if manager == null or not is_instance_valid(manager) \
+			or not manager.has_method("is_companion"):
+		return false
+	return bool(manager.call("is_companion", man))
+
+
+## Pulls the quietest squads out until `extra` more men fit in the budget. Only
+## squads that are far away, out of contact and not part of the assault are
+## touched, so nothing ever vanishes where the player could notice.
+func _make_room(extra: int) -> void:
+	var guard: int = 0
+	while not _has_room(extra) and guard < MAX_SQUADS:
+		guard += 1
+		var victim: Squad = _quietest_squad()
+		if victim == null:
+			return
+		_release_squad(victim)
+
+
+func _quietest_squad() -> Squad:
+	var best: Squad = null
+	var best_distance: float = RECYCLE_DISTANCE
+	var index: int = _squads.size() - 1
+	while index >= 0:
+		var raw: Variant = _squads[index]
+		index -= 1
+		if raw == null or not is_instance_valid(raw):
+			continue
+		var squad: Squad = raw
+		if _is_counter_squad(squad) or _engaged(squad):
+			continue
+		var distance: float = squad.center().distance_to(_player_pos)
+		if distance > best_distance:
+			best_distance = distance
+			best = squad
+	return best
 
 
 func _engaged(squad: Squad) -> bool:
@@ -765,6 +1191,17 @@ func _engaged(squad: Squad) -> bool:
 ## Sends a squad away without counting its members as casualties: they are
 ## still alive somewhere off screen, they simply stopped being simulated.
 func _release_squad(squad: Squad) -> void:
+	# Adoption already pulls a companion out of `squad.members`, so recycling
+	# should never be able to reach one. This is the belt to that pair of
+	# braces: a recruited resistant who evaporates while the player walks is
+	# one of the most visible defects there is, and it costs one loop to make
+	# it impossible rather than merely unlikely.
+	for entry in squad.members.duplicate():
+		if entry == null or not is_instance_valid(entry):
+			continue
+		var member: Soldier = entry
+		if _is_companion(member):
+			squad.release_member(member)
 	_detach_squad(squad)
 	_squads.erase(squad)
 	squad.despawn()
@@ -784,6 +1221,7 @@ func _detach_squad(squad: Squad) -> void:
 		var list: Array = _garrison_squads[site_id]
 		list.erase(squad)
 		_garrison_squads[site_id] = list
+	_ca_squads.erase(squad)
 
 
 func _on_squad_wiped(squad: Squad) -> void:
@@ -805,6 +1243,418 @@ func _on_soldier_died(soldier: Soldier) -> void:
 		# The tracker also hears about kills from the weapon code; reporting the
 		# same death twice is harmless, an objective only completes once.
 		_tracker.report_kill(soldier, null)
+
+
+## Going down during an assault loses the sector. The flag is read on the next
+## tick, where the whole state machine lives: resolving from inside a signal
+## would run while Main is still busy reviving the player.
+func _on_player_died() -> void:
+	if _ca_state == CA_ASSAULT:
+		_ca_player_down = true
+
+
+# ---------------------------------------------------------------------------
+# Counter attacks
+# ---------------------------------------------------------------------------
+
+## One roll per sector, at the moment it falls. Losing the roll is final: the
+## player is never told, so a sector that stays quiet is simply a sector the
+## Wehrmacht wrote off.
+func _roll_counter_attack(sector_id: int) -> void:
+	if sector_id < 0 or sector_id == _home_site_id:
+		return
+	if _ca_rolled.has(sector_id):
+		return
+	_ca_rolled[sector_id] = true
+	# Never two at once, and never against a garrison whose mast is down: there
+	# is nobody left there to ask for the column.
+	if _ca_state != CA_IDLE or is_site_isolated(sector_id):
+		return
+	if _rng.randf() >= CA_CHANCE:
+		return
+	_ca_sector = sector_id
+	_ca_state = CA_PLANNED
+	_ca_timer = _rng.randf_range(CA_DELAY_MIN, CA_DELAY_MAX)
+	_ca_player_down = false
+
+
+func _tick_counter_attack(delta: float) -> void:
+	match _ca_state:
+		CA_PLANNED:
+			_ca_timer -= delta
+			if _ca_timer > 0.0:
+				return
+			if not _can_start_counter_attack():
+				_ca_timer = CA_RETRY
+				return
+			_ca_state = CA_WARNED
+			_ca_timer = CA_WARNING
+			_announce_counter_attack()
+		CA_WARNED:
+			_ca_timer -= delta
+			if _ca_timer > 0.0:
+				return
+			_launch_counter_attack()
+		CA_ASSAULT:
+			_tick_assault(delta)
+
+
+## A counter attack must never land on top of something the player is already
+## racing against, and never on a player who is not there to hear the warning.
+func _can_start_counter_attack() -> bool:
+	if _site_of(_ca_sector) == null or is_site_isolated(_ca_sector):
+		return false
+	if _timed_objective_running():
+		return false
+	if _player == null or not is_instance_valid(_player) or not _player.is_alive():
+		return false
+	return true
+
+
+func _timed_objective_running() -> bool:
+	if _tracker == null or not is_instance_valid(_tracker):
+		return false
+	for entry in _tracker.active():
+		var obj: MissionDefs.Objective = entry
+		if obj != null and obj.time_limit > 0.0:
+			return true
+	return false
+
+
+func _announce_counter_attack() -> void:
+	_ca_player_down = false
+	event_announced.emit("Contre-attaque allemande annoncée sur %s, tenez la position."
+			% _place_name(_ca_sector))
+	counter_attack_started.emit(_ca_sector)
+	_counter_attack_radio()
+
+
+## The warning is also heard, not only read: a couple of German voices carried
+## over from far enough away to read as a radio net waking up rather than as a
+## man shouting in the next hedge.
+func _counter_attack_radio() -> void:
+	if _world == null:
+		return
+	var direction: Vector3 = _sector_center(_ca_sector) - _player_pos
+	direction.y = 0.0
+	if direction.length_squared() < 1.0:
+		direction = Vector3.FORWARD
+	direction = direction.normalized()
+	var at: Vector3 = Heightfield.clamp_to_bounds(_player_pos + direction * 150.0)
+	at.y = _world.ground_y(at.x, at.z) + 1.6
+	_cue("distant_battle", at, 0.2, -6.0, 0.85, 0.0)
+	for i in 2:
+		_cue("german_alert", at, 0.8 + float(i) * _rng.randf_range(1.1, 1.8), -9.0,
+				_rng.randf_range(0.88, 1.02), 0.0)
+
+
+## Two or three squads converge on the sector. They are ordered like anything
+## else, one order at a time, `SPAWN_GAP` apart and only where the player cannot
+## watch them appear, so the column walks in instead of materialising.
+func _launch_counter_attack() -> void:
+	var site: Layout.Site = _site_of(_ca_sector)
+	if site == null:
+		# The world has no such sector any more: nothing was ever put on the
+		# ground, so nothing is taken from the player either.
+		_resolve_counter_attack(true)
+		return
+	var center: Vector3 = _site_anchor(site)
+	var wanted: int = _rng.randi_range(CA_SQUADS_MIN, CA_SQUADS_MAX)
+	_ca_squads.clear()
+	_ca_pending = 0
+	_ca_spawned = 0
+	_ca_away = 0.0
+	_ca_elapsed = 0.0
+	# The assault DRAWS ON the standing budgets instead of adding to them, so
+	# the room it needs is made first, by pulling out squads nobody can see.
+	_make_room(wanted * SQUAD_MAX_SIZE)
+	for i in wanted:
+		var order := _Order.new()
+		order.kind = K_COUNTER
+		order.counter = true
+		# No site id on purpose: these men are not the garrison of the sector
+		# and their deaths must not be charged to `_garrison_left`.
+		order.site_id = -1
+		order.size = SQUAD_MAX_SIZE
+		order.faction = War.AXIS
+		order.position = _ring_point(center, CA_RING_MIN, CA_RING_MAX)
+		order.target = center
+		order.has_target = true
+		order.anchor = center
+		order.radius = 45.0
+		order.life = CA_ORDER_LIFE
+		# Ahead of the routine queue: a farm that fills up a few seconds late
+		# costs nothing, an announced assault that never shows up costs the HUD
+		# its credibility.
+		_orders.insert(0, order)
+		_ca_pending += 1
+	_ca_state = CA_ASSAULT
+
+
+func _tick_assault(delta: float) -> void:
+	_ca_elapsed += delta
+	var alive: int = _prune_counter_squads()
+
+	if _ca_player_down:
+		_resolve_counter_attack(false)
+		return
+
+	if _player_pos.distance_to(_sector_center(_ca_sector)) > CA_ABSENT_DISTANCE:
+		_ca_away += delta
+	else:
+		_ca_away = 0.0
+	# Absent too long, or an assault that never resolved itself: either way the
+	# sector was not defended and it falls.
+	if _ca_away >= CA_ABSENT_SECONDS or _ca_elapsed >= CA_MAX_SECONDS:
+		_resolve_counter_attack(false)
+		return
+
+	if _ca_pending <= 0 and alive <= 0:
+		# Either the assault was broken, or it never found a single spot it could
+		# form up on unseen. Both leave the sector in the player's hands; only
+		# the first one pays.
+		_resolve_counter_attack(true)
+
+
+## Drops dead and freed squads and returns how many attackers are still up.
+func _prune_counter_squads() -> int:
+	var alive: int = 0
+	var index: int = _ca_squads.size() - 1
+	while index >= 0:
+		# Validity is checked on the RAW entry, before any cast: assigning a
+		# freed object into a typed variable is itself the error.
+		var raw: Variant = _ca_squads[index]
+		if raw == null or not is_instance_valid(raw):
+			_ca_squads.remove_at(index)
+			index -= 1
+			continue
+		var squad: Squad = raw
+		var count: int = squad.alive_count()
+		if count <= 0:
+			_ca_squads.remove_at(index)
+		else:
+			alive += count
+		index -= 1
+	return alive
+
+
+func _resolve_counter_attack(held: bool) -> void:
+	var sector: int = _ca_sector
+	# How many squads actually reached the ground, read before the state is
+	# wiped: an assault nobody ever saw is not a victory to be paid for.
+	var landed: int = _ca_spawned
+	_drop_counter_orders()
+	_ca_state = CA_IDLE
+	_ca_sector = -1
+	_ca_timer = 0.0
+	_ca_pending = 0
+	_ca_spawned = 0
+	_ca_away = 0.0
+	_ca_elapsed = 0.0
+	_ca_player_down = false
+	if sector < 0:
+		_ca_squads.clear()
+		return
+	var place: String = _place_name(sector)
+	if held:
+		_ca_squads.clear()
+		# The signal is emitted either way, always exactly once per announced
+		# counter attack, or the HUD would keep a banner it can never take down.
+		if landed > 0:
+			event_announced.emit("Contre-attaque repoussée, %s tient." % place)
+			# The reward for holding: the cache is worth walking to again.
+			_reward_cache(sector)
+	else:
+		# NEVER an undo of the capture. `War.capture_sector` stays idempotent,
+		# the objective chain of the sector stays earned, and what the player
+		# lost is the quiet of the sector, not the sector.
+		War.mark_contested(sector)
+		_reoccupy(sector)
+		event_announced.emit("%s retombe aux mains de la Wehrmacht." % place)
+	counter_attack_resolved.emit(sector, held)
+
+
+func _drop_counter_orders() -> void:
+	var index: int = _orders.size() - 1
+	while index >= 0:
+		var order: _Order = _orders[index]
+		if order.counter:
+			_orders.remove_at(index)
+		index -= 1
+
+
+## A lost sector gets a thinned garrison back, and the survivors of the assault
+## ARE that garrison: turning them around costs nothing, where despawning them
+## to spawn a garrison would pay for the same men twice.
+func _reoccupy(sector_id: int) -> void:
+	var site: Layout.Site = _site_of(sector_id)
+	if site == null:
+		_ca_squads.clear()
+		return
+	_garrison_left[sector_id] = maxi(CA_GARRISON_MIN,
+			int(round(float(site.garrison) * CA_GARRISON_SHARE)))
+	# The Resistance cell goes to ground and takes its cache with it. Both come
+	# back on their own once the sector is cleared again.
+	_ally_done.erase(sector_id)
+	_release_allies(sector_id)
+	_remove_cache(sector_id)
+
+	var center: Vector3 = _site_anchor(site)
+	var radius: float = maxf(20.0, site.radius * 0.8)
+	var list: Array = _garrison_squads.get(sector_id, [])
+	for entry in _ca_squads:
+		if entry == null or not is_instance_valid(entry):
+			continue
+		var squad: Squad = entry
+		if squad.alive_count() <= 0:
+			continue
+		squad.order_defend(center, radius)
+		list.append(squad)
+		for member in squad.members:
+			if member == null or not is_instance_valid(member):
+				continue
+			_soldier_site[member.get_instance_id()] = sector_id
+			member.set_home_site(sector_id)
+	_garrison_squads[sector_id] = list
+	_ca_squads.clear()
+
+
+func _release_allies(sector_id: int) -> void:
+	var squads: Array = _garrison_squads.get(sector_id, [])
+	for entry in squads.duplicate():
+		if entry == null or not is_instance_valid(entry):
+			continue
+		var squad: Squad = entry
+		if squad.faction == War.ALLIED:
+			_release_squad(squad)
+
+
+# ---------------------------------------------------------------------------
+# Resistance caches
+# ---------------------------------------------------------------------------
+
+func _ensure_cache(site: Layout.Site, built: SiteBuilder.BuiltSite) -> void:
+	var raw: Variant = _caches.get(site.id)
+	if raw != null and is_instance_valid(raw):
+		return
+	var cache := _Cache.new()
+	cache.name = "Cache%d" % site.id
+	add_child(cache)
+	cache.global_position = _cache_spot(site, built)
+	cache.setup(site.id)
+	cache.used.connect(_on_cache_used)
+	_caches[site.id] = cache
+
+
+## Beside the flag rather than on it, and always the same spot for a given
+## sector, so the player learns where his supplies live.
+func _cache_spot(site: Layout.Site, built: SiteBuilder.BuiltSite) -> Vector3:
+	var at: Vector3 = _site_anchor(site)
+	var anchor: Variant = built.objective_anchors.get(MissionDefs.ANCHOR_FLAG)
+	if typeof(anchor) == TYPE_VECTOR3:
+		at = anchor
+	var angle: float = float(site.id) * 1.37
+	var spot: Vector3 = at + Vector3(cos(angle), 0.0, sin(angle)) * 2.6
+	spot = Heightfield.clamp_to_bounds(spot)
+	spot.y = _world.ground_y(spot.x, spot.z)
+	return spot
+
+
+func _remove_cache(site_id: int) -> void:
+	var raw: Variant = _caches.get(site_id)
+	_caches.erase(site_id)
+	if raw == null or not is_instance_valid(raw):
+		return
+	var cache: _Cache = raw
+	if cache.used.is_connected(_on_cache_used):
+		cache.used.disconnect(_on_cache_used)
+	cache.queue_free()
+
+
+func _reward_cache(site_id: int) -> void:
+	var raw: Variant = _caches.get(site_id)
+	if raw == null or not is_instance_valid(raw):
+		return
+	var cache: _Cache = raw
+	cache.start_cooldown(0.0)
+
+
+func _tick_caches(delta: float) -> void:
+	if _caches.is_empty():
+		return
+	for site_id in _caches.keys():
+		var raw: Variant = _caches[site_id]
+		if raw == null or not is_instance_valid(raw):
+			_caches.erase(site_id)
+			continue
+		var cache: _Cache = raw
+		cache.tick(delta)
+
+
+func _on_cache_used(cache: Node, user: Node) -> void:
+	if cache == null or not is_instance_valid(cache):
+		return
+	var box: _Cache = cache as _Cache
+	if box == null:
+		return
+	if user == null or not is_instance_valid(user):
+		return
+	var player: Player = user as Player
+	if player == null:
+		return
+	if not box.is_ready():
+		Sfx.play_at("ui_click", box.global_position, -9.0, 0.7)
+		return
+	var given: int = _restock(player)
+	if given <= 0:
+		# Nothing left to give: the cache is not spent for a wasted trip.
+		Sfx.play_at("ui_click", box.global_position, -9.0, 0.9)
+		return
+	box.start_cooldown(CACHE_COOLDOWN)
+	Sfx.play_at("reload_in", box.global_position, -2.0, 0.95)
+	event_announced.emit("Cache de la Résistance: munitions et grenades au complet.")
+
+
+## Fills the reserve of every weapon the player carries, grenades included,
+## through the public path so the HUD hears about it. Returns how many rounds
+## were actually handed over.
+func _restock(player: Player) -> int:
+	var given: int = 0
+	for entry in player.weapons:
+		if entry == null:
+			continue
+		var weapon: Weapon = entry
+		if weapon.id == WeaponDefs.NONE:
+			continue
+		given += player.give_ammo(weapon.id, WeaponDefs.reserve_max(weapon.id))
+	return given
+
+
+# ---------------------------------------------------------------------------
+# Sites
+# ---------------------------------------------------------------------------
+
+func _site_of(site_id: int) -> Layout.Site:
+	if _world == null or site_id < 0:
+		return null
+	var layout: Layout = _world.layout()
+	if layout == null:
+		return null
+	return layout.site_by_id(site_id)
+
+
+func _sector_center(sector_id: int) -> Vector3:
+	var site: Layout.Site = _site_of(sector_id)
+	if site == null:
+		return _player_pos
+	return _site_anchor(site)
+
+
+func _place_name(site_id: int) -> String:
+	var site: Layout.Site = _site_of(site_id)
+	if site == null or site.display_name.is_empty():
+		return "ce secteur"
+	return site.display_name
 
 
 # ---------------------------------------------------------------------------

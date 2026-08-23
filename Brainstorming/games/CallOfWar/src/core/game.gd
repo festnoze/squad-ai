@@ -38,6 +38,7 @@ const _DEF_MOUSE_SENSITIVITY := 0.0024
 const _DEF_INVERT_Y := false
 const _DEF_FOV := 82.0
 const _DEF_VIEW_DISTANCE := 9
+const _DEF_ADAPTIVE_QUALITY := true
 const _DEF_SFX_VOLUME := 0.85
 const _DEF_MUSIC_VOLUME := 0.5
 const _DEF_DIFFICULTY := 1
@@ -126,6 +127,16 @@ var view_distance: int = _DEF_VIEW_DISTANCE:
 		if v == view_distance:
 			return
 		view_distance = v
+		_notify_changed()
+
+## Lets the quality ladder trade image quality for frame rate on its own.
+## Off pins everything at the top rung, which is what a benchmark or a capture
+## run wants: a picture that does not change quality mid shot.
+var adaptive_quality: bool = _DEF_ADAPTIVE_QUALITY:
+	set(value):
+		if value == adaptive_quality:
+			return
+		adaptive_quality = value
 		_notify_changed()
 
 var sfx_volume: float = _DEF_SFX_VOLUME:
@@ -303,6 +314,7 @@ func load_settings() -> void:
 	invert_y = _read_bool(cfg, _SEC_INPUT, "invert_y", _DEF_INVERT_Y)
 	fov = _read_float(cfg, _SEC_VIDEO, "fov", _DEF_FOV)
 	view_distance = _read_int(cfg, _SEC_VIDEO, "view_distance", _DEF_VIEW_DISTANCE)
+	adaptive_quality = _read_bool(cfg, _SEC_VIDEO, "adaptive_quality", _DEF_ADAPTIVE_QUALITY)
 	fullscreen = _read_bool(cfg, _SEC_VIDEO, "fullscreen", _DEF_FULLSCREEN)
 	show_fps = _read_bool(cfg, _SEC_VIDEO, "show_fps", _DEF_SHOW_FPS)
 	show_debug = _read_bool(cfg, _SEC_VIDEO, "show_debug", _DEF_SHOW_DEBUG)
@@ -331,6 +343,7 @@ func save_settings() -> void:
 	cfg.set_value(_SEC_INPUT, "invert_y", invert_y)
 	cfg.set_value(_SEC_VIDEO, "fov", fov)
 	cfg.set_value(_SEC_VIDEO, "view_distance", view_distance)
+	cfg.set_value(_SEC_VIDEO, "adaptive_quality", adaptive_quality)
 	cfg.set_value(_SEC_VIDEO, "fullscreen", fullscreen)
 	cfg.set_value(_SEC_VIDEO, "show_fps", show_fps)
 	cfg.set_value(_SEC_VIDEO, "show_debug", show_debug)
@@ -363,6 +376,7 @@ func _assign_defaults() -> void:
 	invert_y = _DEF_INVERT_Y
 	fov = _DEF_FOV
 	view_distance = _DEF_VIEW_DISTANCE
+	adaptive_quality = _DEF_ADAPTIVE_QUALITY
 	sfx_volume = _DEF_SFX_VOLUME
 	music_volume = _DEF_MUSIC_VOLUME
 	difficulty = _DEF_DIFFICULTY

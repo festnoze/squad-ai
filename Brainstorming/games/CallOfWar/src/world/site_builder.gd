@@ -24,6 +24,15 @@ const SPAWN_LIFT := 0.12
 ## Fraction of the site radius that is guaranteed flat (Layout.SITE_CORE).
 const CORE := 0.66
 
+## Occluder boxes are measured from a structure's bounds and then shrunk, so
+## that the box is always strictly inside the solid it stands for. An occluder
+## that claims more than the building fills culls geometry the player can
+## actually see, which reads as holes opening in the world.
+const _OCC_INSET := 0.78       # kept off the walls and inside the eaves
+const _OCC_ROOF := 0.62        # capped under the pitch of the roof
+const _OCC_MIN_SIDE := 3.0     # metres; below this a box hides nothing useful
+const _OCC_MIN_HEIGHT := 2.2
+
 
 ## The result of building one site.
 class BuiltSite extends RefCounted:
@@ -46,6 +55,10 @@ class _Ctx extends RefCounted:
 	var xform := Transform3D.IDENTITY
 	var radius := 40.0
 	var core := 26.0
+	## Box occluders measured from the placed structures, as
+	## {"xf": Transform3D in site space, "size": Vector3}.
+	var occluders: Array[Dictionary] = []
+
 	## Occupied footprints, Vector3(local x, local z, radius).
 	var blocked: Array[Vector3] = []
 
@@ -101,6 +114,9 @@ class _Ctx extends RefCounted:
 		node.transform = child
 		root.add_child(node)
 		blocked.append(Vector3(pos.x, pos.z, maxf(0.5, foot)))
+		# Measured here and not later because `_merge_meshes` frees the very
+		# nodes this reads before anything else gets a chance to look at them.
+		_note_occluder(node, child)
 		var b := xform.basis * child.basis
 		for raw in local_cover:
 			var cp := raw as Structures.CoverPoint
@@ -110,6 +126,75 @@ class _Ctx extends RefCounted:
 					xform * (child * cp.position),
 					(b * cp.normal).normalized(), cp.is_high))
 		return child
+
+	## Records a box occluder for a structure solid enough to hide what is
+	## behind it, so the renderer can skip that geometry instead of drawing it
+	## and throwing it away at the depth test.
+	##
+	## An occluder MUST stay inside the real solid. Claim more than the building
+	## actually fills and the renderer culls things that are in fact visible,
+	## which reads as holes opening in the world as the player walks. So the
+	## measured bounds are inset hard: `_OCC_INSET` off the sides, and only up
+	## to `_OCC_ROOF` of the height, which keeps the box under the pitch of the
+	## roof and inside the eaves.
+	##
+	## Small structures are skipped outright. A fence post occludes nothing and
+	## every occluder costs time in the rasteriser.
+	func _note_occluder(node: Node3D, child: Transform3D) -> void:
+		var box: AABB = _local_bounds(node)
+		if box.size == Vector3.ZERO:
+			return
+		var w: float = box.size.x * _OCC_INSET
+		var d: float = box.size.z * _OCC_INSET
+		var h: float = box.size.y * _OCC_ROOF
+		if w < _OCC_MIN_SIDE or d < _OCC_MIN_SIDE or h < _OCC_MIN_HEIGHT:
+			return
+		# Centre of the inset box, in the structure's own space, then carried
+		# into site space by the transform it was just placed with.
+		var centre := Vector3(
+			box.position.x + box.size.x * 0.5,
+			box.position.y + h * 0.5,
+			box.position.z + box.size.z * 0.5)
+		occluders.append({
+			"xf": child * Transform3D(Basis.IDENTITY, centre),
+			"size": Vector3(w, h, d),
+		})
+
+	## Merged bounds of every mesh under a node, in that node's own space.
+	static func _local_bounds(node: Node3D) -> AABB:
+		var out := AABB()
+		var first := true
+		var stack: Array[Node] = [node]
+		while not stack.is_empty():
+			var current: Node = stack.pop_back()
+			for c in current.get_children():
+				stack.append(c)
+			var mi := current as MeshInstance3D
+			if mi == null or mi.mesh == null:
+				continue
+			# Relative to `node`, so a mesh nested under an offset holder counts
+			# where it actually sits rather than at the structure origin. Walked
+			# by hand rather than through `global_transform`, which would depend
+			# on whether the site root happens to be in the tree yet.
+			var local: AABB = _relative_xf(node, mi) * mi.mesh.get_aabb()
+			if first:
+				out = local
+				first = false
+			else:
+				out = out.merge(local)
+		return out
+
+	## Transform of `mi` expressed in `node` space, walked by hand because the
+	## structure is measured before it is ever inside the scene tree.
+	static func _relative_xf(node: Node3D, mi: Node3D) -> Transform3D:
+		var xf := Transform3D.IDENTITY
+		var current: Node = mi
+		while current != null and current != node:
+			var as_3d := current as Node3D
+			if as_3d != null:
+				xf = as_3d.transform * xf
+			current = current.get_parent()
+		return xf
 
 	## Reserves a footprint without building anything (squares, roads, yards).
 	func mark(lx: float, lz: float, r: float) -> void:
@@ -986,7 +1071,38 @@ static func _finalise(ctx: _Ctx) -> void:
 		_loop_patrol(ctx, ctx.core * 0.7, ctx.core * 0.6, 0.0, 8)
 	if bs.interest_points.is_empty():
 		ctx.add_interest(0.0, 1.5, 0.0)
+	# Occluders first: the merge frees the meshes they were measured from, and
+	# the occluder nodes themselves carry no mesh, so the merge ignores them.
+	_spawn_occluders(ctx)
 	_merge_meshes(ctx.root)
+
+
+## Turns the measured boxes into occluder nodes, when occlusion culling is on.
+##
+## MEASURED AND TURNED OFF. Godot rasterises the occluders on the CPU every
+## frame, and the pocket is open bocage: standing in the largest village of the
+## map produced fourteen boxes, which is nowhere near enough cover to pay for
+## the pass. Three runs each way at 1600x900 averaged 17.0 ms with it against
+## 15.1 ms without, with enough run to run spread that the only safe reading is
+## "no gain here, possibly a loss".
+##
+## The generation is kept and gated on the project setting rather than deleted,
+## because the conclusion is about THIS world, not about the technique: a denser
+## town, taller buildings or a bigger draw distance would move the balance, and
+## then it is one flag away.
+static func _spawn_occluders(ctx: _Ctx) -> void:
+	if ctx.occluders.is_empty():
+		return
+	if not bool(ProjectSettings.get_setting(
+			"rendering/occlusion_culling/use_occlusion_culling", false)):
+		return
+	for entry in ctx.occluders:
+		var shape := BoxOccluder3D.new()
+		shape.size = entry["size"] as Vector3
+		var node := OccluderInstance3D.new()
+		node.occluder = shape
+		node.transform = entry["xf"] as Transform3D
+		ctx.root.add_child(node)
 
 
 ## Collapses every static MeshInstance3D of the site into one mesh per

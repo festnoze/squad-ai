@@ -18,6 +18,20 @@
 ## nothing else listens to the matching signal. `main.gd` connects
 ## `objective_completed` and `War.sector_captured` and plays them itself, and
 ## two copies of the same sample in the same frame is an audible defect.
+##
+## Capture style (v2, contract 11.8). Every sector is chronometered from the
+## start of its first objective to its capture, and the peak alert reached over
+## that window decides whether the capture counts as silent. Both feed the
+## debriefing screen. The chrono is expressed in `War.play_seconds`, the
+## campaign clock, and not in `Time.get_ticks_msec()`: the campaign clock is
+## serialised with the war state and restored *before* this tracker loads, so a
+## start stamp taken in that clock stays meaningful across a save and a reload.
+##
+## Nothing in that accounting sits on the critical path of a completion. Every
+## call into `War` and into the `Director` is guarded by `has_method`, because
+## the worst defect this file can carry is a campaign dead end: an objective
+## that can never complete makes the game unfinishable, and a missing statistic
+## is worth a blank debrief line, never that.
 class_name ObjectiveTracker
 extends Node
 
@@ -62,6 +76,15 @@ const RETRY_SECONDS := 30.0
 const ESCORT_RADIUS := 14.0
 ## Distance under which an objective marker is not moved again.
 const MARKER_EPSILON := 0.75
+
+## Bounds clamped onto a sector chrono before it reaches the debriefing.
+##
+## They exist for the reload path. A save written before the chrono existed
+## carries no start stamp for a sector already under way, and an unguarded
+## subtraction would then report either zero second or the whole campaign as the
+## capture time. A clamp turns both absurdities into a plausible figure.
+const SECTOR_TIME_MIN := 1.0
+const SECTOR_TIME_MAX := 3600.0
 
 const _ENEMY_SCAN_INTERVAL := 0.35
 const _ANCHOR_INTERVAL := 0.8
@@ -138,6 +161,15 @@ var _counted: Dictionary = {}
 
 var _completed_all: bool = false
 
+## Sector id -> reading of the campaign clock when its first objective started.
+## Serialised, so the chrono of a sector left half taken survives a reload.
+var _sector_started: Dictionary = {}
+## Sector ids already handed to `War.record_sector_result`. A sector contested
+## by a counter attack keeps its objective chain acquired and only replays the
+## ground fight, so this guard is what stops a retake from writing a second,
+## incoherent result over the run the player actually did.
+var _sector_reported: Dictionary = {}
+
 
 func _ready() -> void:
 	set_process(false)
@@ -163,11 +195,17 @@ func setup(game_world: GameWorld, player_node: Player) -> void:
 	_by_id.clear()
 	_state.clear()
 	_rt.clear()
+	_sector_started.clear()
+	_sector_reported.clear()
 	for entry in _objectives:
 		var obj: MissionDefs.Objective = entry
 		_by_id[obj.id] = obj
 		_state[obj.id] = ST_LOCKED
 		_rt[obj.id] = _Rt.new()
+		# A sector the war state already holds was taken in a previous session:
+		# its result belongs to that run and must not be written again.
+		if obj.sector_id >= 0 and War.is_sector_captured(obj.sector_id):
+			_sector_reported[obj.sector_id] = true
 
 	# The war state may already know the sectors when a save is being loaded.
 	if War.sector_count() == 0:
@@ -265,6 +303,10 @@ func start(objective_id: int) -> void:
 	rt.timer = obj.time_limit
 	_rt[objective_id] = rt
 	_tracked_id = objective_id
+	# The sector chrono opens on the first objective of the sector to go live.
+	# Later objectives of the same chain find the stamp already there, and a
+	# failed objective re-arming through `_process` never reaches this point.
+	_note_sector_start(obj.sector_id)
 	objective_started.emit(obj)
 
 
@@ -611,7 +653,18 @@ func report_kill(victim: Node, killer: Node) -> void:
 ## `tag` is the loose identifier of whatever blew up. An objective accepts it
 ## when the tag carries its own tag or its anchor key, or simply when the blast
 ## happened on top of the objective.
+##
+## A radio mast dropped while the garrison is still at most searching isolates
+## its site (contract 11.8): that is the whole payoff of the reconnaissance
+## loop, spot the mast through the binoculars, cut it before being seen, then
+## fight a garrison that cannot call anyone. Once the general alert is up the
+## sabotage buys nothing, the call has already gone out.
 func report_destroyed(tag: String, position: Vector3) -> void:
+	# Sampled before the loop on purpose: completing one of these objectives
+	# raises the alert to FULL, so reading it afterwards would deny the
+	# isolation to the very player who earned it.
+	var was_quiet: bool = War.alert_level <= War.ALERT_SEARCHING
+	var lowered_tag: String = tag.to_lower()
 	for entry in _objectives:
 		var obj: MissionDefs.Objective = entry
 		if _state.get(obj.id, ST_LOCKED) != ST_ACTIVE:
@@ -627,6 +680,10 @@ func report_destroyed(tag: String, position: Vector3) -> void:
 		if not matched and position.distance_to(obj.position) <= maxf(obj.radius, 15.0):
 			matched = true
 		if matched:
+			var is_radio: bool = obj._anchor == MissionDefs.ANCHOR_RADIO \
+				or lowered_tag.contains(MissionDefs.ANCHOR_RADIO)
+			if is_radio and was_quiet:
+				_isolate_site(obj._site_id)
 			War.raise_alert(War.ALERT_FULL)
 			_complete(obj)
 
@@ -675,6 +732,11 @@ func _complete(obj: MissionDefs.Objective) -> void:
 		_drop_marker()
 	if _tracked_id == obj.id:
 		_tracked_id = -1
+	# An observation point held to the end is a piece of intelligence: it opens
+	# the site on the map and counts on the debriefing (contract 11.8). The
+	# early return above already guarantees one credit per objective.
+	if obj.kind == MissionDefs.O_RECON and War.has_method("record_intel"):
+		War.record_intel()
 	if objective_completed.get_connections().is_empty():
 		Sfx.play("objective_done")
 	objective_completed.emit(obj)
@@ -708,6 +770,10 @@ func _check_sector(sector_id: int) -> void:
 			continue
 		if _state.get(obj.id, ST_LOCKED) != ST_DONE:
 			return
+	# Before `capture_sector`, never after: `main.gd` reads `War.sector_result`
+	# from its `sector_captured` handler to announce the run, so the result has
+	# to be on the shelf when that signal fires.
+	_record_capture_style(sector_id)
 	if War.sector_captured.get_connections().is_empty():
 		Sfx.play("sector_captured")
 	War.capture_sector(sector_id)
@@ -722,6 +788,88 @@ func _check_campaign() -> void:
 			return
 	_completed_all = true
 	campaign_completed.emit()
+
+
+# ---------------------------------------------------------------------------
+# Capture style and isolation (contract 11.8)
+# ---------------------------------------------------------------------------
+
+## Opens the chrono of a sector. Idempotent: the first objective of the chain to
+## go live wins, every later one finds the stamp already in place.
+##
+## A sector already reported, or already held by the war state, is left alone.
+## That is what keeps a counter attack from restarting a chrono that has already
+## produced its debriefing line.
+func _note_sector_start(sector_id: int) -> void:
+	if sector_id < 0:
+		return
+	if _sector_started.has(sector_id) or _sector_reported.has(sector_id):
+		return
+	if War.is_sector_captured(sector_id):
+		return
+	_sector_started[sector_id] = _campaign_clock()
+
+
+## Duration of the sector run, in seconds of campaign time, clamped.
+##
+## A missing start stamp resolves to "now", so the clamp floor applies rather
+## than the whole campaign: that is the v1 save case, and a one second capture
+## reads far better on the debriefing than a four hour one.
+func _sector_elapsed(sector_id: int) -> float:
+	var now: float = _campaign_clock()
+	var start: float = float(_sector_started.get(sector_id, now))
+	return clampf(now - start, SECTOR_TIME_MIN, SECTOR_TIME_MAX)
+
+
+## The campaign clock the chronos are expressed in. `War.play_seconds` only
+## advances while the game runs and is carried by the war state save, which is
+## restored before this tracker loads, so a stamp taken in it survives a reload.
+func _campaign_clock() -> float:
+	return maxf(0.0, War.play_seconds)
+
+
+## Was the sector taken without the garrison ever raising the general alarm?
+## `peak_alert` is the highest level reached since the previous capture, which
+## is the point: `alert_level` decays on its own and would hand out a silent
+## capture to a player who simply waited out the search.
+func _capture_was_silent() -> bool:
+	if War.has_method("peak_alert"):
+		return War.peak_alert() <= War.ALERT_SEARCHING
+	return War.alert_level <= War.ALERT_SEARCHING
+
+
+## Files the run of one sector for the debriefing, then opens a fresh stealth
+## window for the next one.
+##
+## Every call is optional. `War` may not carry the v2 accounting yet, and losing
+## a statistic is acceptable where blocking a capture is not: this function sits
+## next to the critical path of the campaign, never on it.
+func _record_capture_style(sector_id: int) -> void:
+	if sector_id < 0 or _sector_reported.has(sector_id):
+		return
+	_sector_reported[sector_id] = true
+	var silent: bool = _capture_was_silent()
+	var seconds: float = _sector_elapsed(sector_id)
+	_sector_started.erase(sector_id)
+	if silent and War.has_method("record_silent_capture"):
+		War.record_silent_capture()
+	if War.has_method("record_sector_result"):
+		War.record_sector_result(sector_id, seconds, silent)
+	if War.has_method("reset_peak_alert"):
+		War.reset_peak_alert()
+
+
+## Cuts the reinforcement line of a site whose radio mast just fell. The
+## `Director` publishes itself in the `"director"` group; when it is absent, or
+## when it does not carry the v2 method yet, the sabotage simply stays a plain
+## destruction objective.
+func _isolate_site(site_id: int) -> void:
+	if site_id < 0:
+		return
+	var director: Node = _director()
+	if director == null or not director.has_method("isolate_site"):
+		return
+	director.isolate_site(site_id)
 
 
 # ---------------------------------------------------------------------------
@@ -988,13 +1136,25 @@ func to_dict() -> Dictionary:
 			runtime[key] = rt.to_dict()
 		if obj._anchor_done:
 			positions[key] = [obj.position.x, obj.position.y, obj.position.z]
+	# Sector chronos travel as campaign clock readings, not as elapsed times, so
+	# reloading in the middle of a sector resumes the run instead of restarting
+	# it. Keys are strings because a JSON round trip turns integer keys into
+	# strings anyway; `from_dict` parses them back either way.
+	var started: Dictionary = {}
+	for raw_sector in _sector_started:
+		started[str(raw_sector)] = float(_sector_started[raw_sector])
+	var reported: Array = []
+	for raw_sector in _sector_reported:
+		reported.append(int(raw_sector))
 	return {
-		"version": 1,
+		"version": 2,
 		"tracked": _tracked_id,
 		"completed": _completed_all,
 		"states": states,
 		"runtime": runtime,
 		"positions": positions,
+		"sector_started": started,
+		"sector_reported": reported,
 	}
 
 
@@ -1028,6 +1188,42 @@ func from_dict(data: Dictionary) -> void:
 			if raw.size() == 3:
 				obj.position = Vector3(float(raw[0]), float(raw[1]), float(raw[2]))
 				obj._anchor_done = true
+	_restore_sector_clocks(data)
 	_tracked_id = int(data.get("tracked", -1))
 	_completed_all = bool(data.get("completed", false))
 	_unlock_ready()
+
+
+## Rebuilds the sector chronos out of a save, tolerating a file that predates
+## them. Called once the objective states are back in place, since the repair
+## pass below reads them.
+func _restore_sector_clocks(data: Dictionary) -> void:
+	_sector_started.clear()
+	_sector_reported.clear()
+
+	var raw_started: Variant = data.get("sector_started", {})
+	if typeof(raw_started) == TYPE_DICTIONARY:
+		var started: Dictionary = raw_started
+		for key_variant in started:
+			_sector_started[int(str(key_variant))] = float(started[key_variant])
+
+	var raw_reported: Variant = data.get("sector_reported", [])
+	if typeof(raw_reported) == TYPE_ARRAY:
+		for value in (raw_reported as Array):
+			_sector_reported[int(value)] = true
+
+	# Repair pass, for a v1 save and for anything else that came back without a
+	# stamp. A sector the war state already holds is closed for good, so it may
+	# never be reported again. A sector still being fought over restarts its
+	# chrono at the reload: the player loses the minutes he spent before saving,
+	# which is a mild injustice, where subtracting from a stamp that does not
+	# exist would report the entire campaign as the capture time.
+	for entry in _objectives:
+		var obj: MissionDefs.Objective = entry
+		if obj.sector_id < 0:
+			continue
+		if War.is_sector_captured(obj.sector_id):
+			_sector_reported[obj.sector_id] = true
+			continue
+		if _state.get(obj.id, ST_LOCKED) == ST_ACTIVE:
+			_note_sector_start(obj.sector_id)

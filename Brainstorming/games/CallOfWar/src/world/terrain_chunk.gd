@@ -25,6 +25,17 @@ const PROPS_FAR := 1
 const PROPS_NONE := 2
 ## Terrain texture repeats every 8 m.
 const UV_SCALE := 0.125
+## Colour noise of Heightfield.color_at: frequency of the low band that tints
+## every biome. Mirrored here because the grid path evaluates the very same
+## noise function, with the same seed offset, at the same coordinates.
+const COLOR_NOISE_FREQ := 0.011
+## Slope tint of Heightfield.color_at: gain, threshold and strength of the earth
+## and rock that shows through on steep ground.
+const STEEP_GAIN := 1.7
+const STEEP_BIAS := 0.28
+const STEEP_MIX := 0.75
+## Target spacing, in metres, of the biome lattice. See _biome_grid().
+const BIOME_LATTICE := 4.0
 ## Full prop nodes created per frame while a tile spreads its vegetation.
 const NODE_JOB_SIZE := 12
 
@@ -70,6 +81,29 @@ static func build_data(hf: Heightfield, tile_x: int, tile_z: int, level: int) ->
 	var ox: float = float(tile_x) * TILE
 	var oz: float = float(tile_z) * TILE
 
+	# PADDED HEIGHT GRID. The vertex grid plus one ring of samples just outside
+	# the tile, so the finite differences below stay exact right up to the
+	# border. Normals and slope tint are then read from this grid instead of
+	# calling Heightfield.normal_at() and Heightfield.color_at() per vertex,
+	# which resampled the noise six more times for each one.
+	#
+	# The padding is what keeps the tiles stitched together: two neighbouring
+	# tiles of the same LOD sample the shared edge, and the ring beyond it, at
+	# exactly the same world coordinates, so they agree bit for bit on the normal
+	# and the colour of every vertex they have in common. Without that ring each
+	# tile would fall back on a one sided difference along its border and a line
+	# of shadow would run down every 64 m seam of the map.
+	var pn: int = n + 2
+	var grid := PackedFloat32Array()
+	grid.resize(pn * pn)
+	for j in pn:
+		var sz: float = oz + float(j - 1) * step
+		var row: int = j * pn
+		for i in pn:
+			grid[row + i] = hf.height_at(ox + float(i - 1) * step, sz)
+
+	var biomes: PackedInt32Array = _biome_grid(hf, grid, pn, n, res, step, ox, oz)
+
 	var verts := PackedVector3Array()
 	var norms := PackedVector3Array()
 	var cols := PackedColorArray()
@@ -79,19 +113,30 @@ static func build_data(hf: Heightfield, tile_x: int, tile_z: int, level: int) ->
 	cols.resize(n * n)
 	uvs.resize(n * n)
 
+	# Central differences over one grid step: the same expression as
+	# Heightfield.normal_at(), fed with the samples this function already owns.
+	var span: float = 2.0 * step
+	var inv_span: float = 1.0 / span
 	var min_y := 1.0e20
 	var max_y := -1.0e20
 	for j in n:
 		var lz: float = float(j) * step
 		var wz: float = oz + lz
+		var base_row: int = (j + 1) * pn + 1
 		for i in n:
 			var lx: float = float(i) * step
 			var wx: float = ox + lx
-			var h: float = hf.height_at(wx, wz)
+			var g: int = base_row + i
+			var h: float = grid[g]
+			var hxm: float = grid[g - 1]
+			var hxp: float = grid[g + 1]
+			var hzm: float = grid[g - pn]
+			var hzp: float = grid[g + pn]
 			var idx: int = j * n + i
 			verts[idx] = Vector3(lx, h, lz)
-			norms[idx] = hf.normal_at(wx, wz)
-			cols[idx] = hf.color_at(wx, wz)
+			norms[idx] = Vector3(hxm - hxp, span, hzm - hzp).normalized()
+			cols[idx] = _vertex_color(hf, biomes[idx], wx, wz,
+					(hxp - hxm) * inv_span, (hzp - hzm) * inv_span)
 			uvs[idx] = Vector2(wx, wz) * UV_SCALE
 			min_y = minf(min_y, h)
 			max_y = maxf(max_y, h)
@@ -161,6 +206,136 @@ static func build_data(hf: Heightfield, tile_x: int, tile_z: int, level: int) ->
 		"props": props,
 		"aabb": box,
 	}
+
+
+## Biome of every vertex of the tile, in vertex order.
+##
+## `Heightfield.biome_at()` is the most expensive call left on this path (about
+## 35 us) because it resamples the height internally, and the vertex colour needs
+## it. Biomes are large and locally uniform, so they are resolved on a coarser
+## WORLD ALIGNED lattice and reused for the vertices in between, but only when
+## the four corners of the lattice cell agree. A vertex sitting in a cell whose
+## corners disagree is on a biome boundary and is resolved exactly, so no edge is
+## ever displaced.
+##
+## Every vertex of the tile border is resolved exactly as well, whatever the
+## lattice says. That is not a detail of the optimisation but the seam rule: the
+## tile next door sees a different half of the lattice around those shared
+## vertices, so only an exact value is guaranteed to match on both sides.
+##
+## The lattice is local to the call, like everything else here: build_data() runs
+## on worker threads and owns no shared state.
+static func _biome_grid(hf: Heightfield, grid: PackedFloat32Array, pn: int, n: int,
+		res: int, step: float, ox: float, oz: float) -> PackedInt32Array:
+	var out := PackedInt32Array()
+	out.resize(n * n)
+	# One lattice node every BIOME_LATTICE metres, never coarser than the vertex
+	# grid itself and always an exact divisor of it.
+	var stride: int = maxi(1, int(BIOME_LATTICE / step))
+	while stride > 1 and res % stride != 0:
+		stride -= 1
+	var lm: int = res / stride + 1
+	var lat := PackedInt32Array()
+	lat.resize(lm * lm)
+	for b in lm:
+		var j: int = b * stride
+		var wz: float = oz + float(j) * step
+		var lat_row: int = b * lm
+		var grid_row: int = (j + 1) * pn + 1
+		for a in lm:
+			var i: int = a * stride
+			lat[lat_row + a] = _biome_of(hf, grid[grid_row + i], ox + float(i) * step, wz)
+	if stride == 1:
+		# The lattice IS the vertex grid: every value is already exact.
+		for j in n:
+			var src: int = j * lm
+			var dst: int = j * n
+			for i in n:
+				out[dst + i] = lat[src + i]
+		return out
+
+	for j in n:
+		var wz2: float = oz + float(j) * step
+		var jj: int = j % stride
+		var b0: int = j / stride
+		var b1: int = b0 + 1 if jj > 0 else b0
+		var edge_z: bool = j == 0 or j == res
+		var dst2: int = j * n
+		var grid_row2: int = (j + 1) * pn + 1
+		for i in n:
+			var ii: int = i % stride
+			var a0: int = i / stride
+			if ii == 0 and jj == 0:
+				out[dst2 + i] = lat[b0 * lm + a0]
+				continue
+			if edge_z or i == 0 or i == res:
+				out[dst2 + i] = _biome_of(hf, grid[grid_row2 + i], ox + float(i) * step, wz2)
+				continue
+			var a1: int = a0 + 1 if ii > 0 else a0
+			var corner: int = lat[b0 * lm + a0]
+			if corner == lat[b0 * lm + a1] and corner == lat[b1 * lm + a0] \
+					and corner == lat[b1 * lm + a1]:
+				out[dst2 + i] = corner
+			else:
+				out[dst2 + i] = _biome_of(hf, grid[grid_row2 + i], ox + float(i) * step, wz2)
+	return out
+
+
+## Biome at a point whose height is already known. Mirrors the first test of
+## `Heightfield.biome_at()`, so a vertex under the water table costs nothing at
+## all instead of a full lookup that would sample the height a third time.
+static func _biome_of(hf: Heightfield, h: float, wx: float, wz: float) -> int:
+	if h < Heightfield.WATER_LEVEL:
+		return Heightfield.B_WATER
+	return hf.biome_at(wx, wz)
+
+
+## Vertex colour, from the biome and from the ground gradient already read off
+## the height grid. This is `Heightfield.color_at()` with its two costly inputs
+## handed to it instead of resampled: the biome comes from _biome_grid(), and the
+## slope, which color_at() pays three extra height samples for, comes from the
+## central differences of the padded grid.
+##
+## `gx` and `gz` are the gradient in metres per metre. The palette mix below is
+## the one of `color_at()`, which stays the reference; only the way its two
+## inputs are obtained changes. The noise function and its seed offset are read
+## straight from Heightfield rather than copied, so the low frequency tint stays
+## identical instead of merely similar.
+static func _vertex_color(hf: Heightfield, biome: int, wx: float, wz: float,
+		gx: float, gz: float) -> Color:
+	var tone: float = Heightfield._value_noise(wx * COLOR_NOISE_FREQ, wz * COLOR_NOISE_FREQ,
+			hf.world_seed + Heightfield._S_COLOR)
+	var base := Palette.GRASS_SUMMER
+	if biome == Heightfield.B_FIELD:
+		base = Palette.WHEAT.lerp(Palette.DIRT, 0.34 + tone * 0.26)
+	elif biome == Heightfield.B_MEADOW:
+		base = Palette.GRASS_SUMMER.lerp(Palette.GRASS_DRY, tone * 0.55)
+	elif biome == Heightfield.B_ORCHARD:
+		base = Palette.GRASS_SUMMER.lerp(Palette.LEAF_LIGHT, 0.25 + tone * 0.2)
+	elif biome == Heightfield.B_FOREST:
+		base = Palette.LEAF_DARK.lerp(Palette.DIRT, 0.35 + tone * 0.3)
+	elif biome == Heightfield.B_MARSH:
+		base = Palette.MUD.lerp(Palette.GRASS_DRY, tone * 0.4)
+	elif biome == Heightfield.B_ROAD:
+		base = Palette.ROAD.lerp(Palette.DIRT, tone * 0.6)
+	elif biome == Heightfield.B_VILLAGE:
+		base = Palette.DIRT.lerp(Palette.STONE, 0.25 + tone * 0.30)
+		base = base.lerp(Palette.GRASS_DRY, clampf(tone * 1.7 - 0.38, 0.0, 0.58))
+	elif biome == Heightfield.B_WATER:
+		base = Palette.WATER.lerp(Palette.MUD, tone * 0.5)
+	elif biome == Heightfield.B_ROCK:
+		if hf._is_cliff_face(wx, wz):
+			base = Palette.STONE_DARK.lerp(Palette.STONE, tone)
+		else:
+			base = Palette.GRASS_DRY.lerp(Palette.STONE, 0.45 + tone * 0.3)
+	# Steep ground shows earth and rock instead of grass, exactly as color_at()
+	# does, and on the same three biomes it leaves alone.
+	if biome != Heightfield.B_WATER and biome != Heightfield.B_VILLAGE \
+			and biome != Heightfield.B_ROAD:
+		var steep: float = clampf(sqrt(gx * gx + gz * gz) * STEEP_GAIN - STEEP_BIAS, 0.0, 1.0)
+		if steep > 0.0:
+			base = base.lerp(Palette.DIRT.lerp(Palette.STONE_DARK, 0.45), steep * STEEP_MIX)
+	return base
 
 
 ## Border skirt. Each edge is walked so that (direction cross down) points away
@@ -484,6 +659,11 @@ func _spawn_batch(kind: int, list: Array, origin: Vector3, plevel: int) -> void:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	else:
 		mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# Distance fade, and a seat in the group the quality ladder walks. Applied
+	# here rather than afterwards so a tile that streams in while the ladder is
+	# already down is born at the right distance instead of at the default.
+	mmi.add_to_group(QualityGovernor.PROP_GROUP)
+	QualityGovernor.apply_to(mmi)
 	_props_root.add_child(mmi)
 
 
@@ -501,6 +681,8 @@ func _spawn_prop_node(inst: Scatter.Instance, origin: Vector3, plevel: int) -> v
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		else:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mi.add_to_group(QualityGovernor.PROP_GROUP)
+		QualityGovernor.apply_to(mi)
 		holder.add_child(mi)
 		_props_root.add_child(holder)
 	if Scatter.has_collision(inst.kind):

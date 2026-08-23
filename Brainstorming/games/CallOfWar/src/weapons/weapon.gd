@@ -266,17 +266,35 @@ func to_dict() -> Dictionary:
 
 
 func from_dict(data: Dictionary) -> void:
-	var loaded := int(data.get("id", WeaponDefs.NONE))
-	if not WeaponDefs.is_valid(loaded):
-		id = WeaponDefs.NONE
-		in_magazine = 0
-		reserve = 0
-		return
-	id = loaded
-	in_magazine = clampi(int(data.get("in_magazine", 0)), 0, WeaponDefs.magazine(id))
-	reserve = clampi(int(data.get("reserve", 0)), 0, WeaponDefs.reserve_max(id))
+	id = _read_id(data)
+	in_magazine = clampi(_read_int(data, "in_magazine"), 0, WeaponDefs.magazine(id))
+	reserve = clampi(_read_int(data, "reserve"), 0, WeaponDefs.reserve_max(id))
 	is_reloading = false
 	_rounds_pending = 0
 	_heat = 0.0
 	_last_shot_msec = -100000
 	_next_shot_time = -1.0
+
+
+## Weapon id of a saved record, always inside the id range of this build.
+##
+## A save can carry an id this build knows nothing about: a file written by
+## another version, a corrupted entry, or simply a missing key. Propagating it
+## would blow up on the first WeaponDefs.magazine() call, so anything outside
+## 0 .. COUNT - 1 falls back on the Garand, which every soldier can carry.
+func _read_id(data: Dictionary) -> int:
+	var loaded := _read_int(data, "id", WeaponDefs.NONE)
+	if loaded < 0 or loaded >= WeaponDefs.COUNT or not WeaponDefs.is_valid(loaded):
+		return WeaponDefs.M1_GARAND
+	return loaded
+
+
+## One integer field of a saved record. JSON reads every number back as a
+## float, so 4.0 has to be accepted as 4, and anything else as the fallback.
+func _read_int(data: Dictionary, key: String, fallback: int = 0) -> int:
+	var raw: Variant = data.get(key, fallback)
+	if raw is float:
+		return int(roundf(float(raw)))
+	if raw is int:
+		return int(raw)
+	return fallback

@@ -1,5 +1,11 @@
-## Procedural mesh library of CALL OF WAR. Zero binary assets: every shape in
-## the game is built here, once, and shared by every instance that needs it.
+## Procedural mesh library of CALL OF WAR. Every shape in the game is built
+## here, once, and shared by every instance that needs it.
+##
+## One exception, added after the fact and quarantined in `CharacterModels`:
+## when `assets/models` is installed, `soldier_body()` hands back an imported
+## rigged character instead of the box man below. The box man is not dead code,
+## it is the fallback the whole file is still written around: delete the folder
+## and the game runs unchanged, exactly as it does without `assets/textures`.
 ##
 ## Style rules the whole file follows:
 ##
@@ -41,6 +47,9 @@ const _W_MP40 := 4
 const _W_KAR98K := 5
 const _W_MG42 := 6
 const _W_GRENADE := 7
+# Added in v2. Appended, never renumbered: weapon ids are written into saves.
+const _W_LUGER := 8
+const _W_KAR98K_SCOPED := 9
 
 # --- Prop kind mirror (Scatter) --------------------------------------------
 
@@ -159,21 +168,33 @@ static func sphere(radius: float, material_key: String) -> Mesh:
 	return mesh
 
 
-## A humanoid body, built from boxes. `faction` is War.ALLIED / War.AXIS /
-## War.NEUTRAL. Returns a Node3D whose children are named exactly:
-## "Hips","Torso","Head","Helmet","ArmL","ArmR","LegL","LegR","Weapon".
+## A humanoid body. `faction` is War.ALLIED / War.AXIS / War.NEUTRAL.
 ##
-## The nine parts are DIRECT children of the returned node, each one a Node3D
-## sitting exactly on its own pivot (shoulder for the arms, hip for the legs,
-## neck for the head) with the geometry hanging off it. The AI therefore only
-## ever writes a local rotation, and both `get_node("ArmR")` and
-## `find_child("ArmR")` resolve. Feet rest on y = 0, the helmet tops out at
-## about 1.80 m.
-static func soldier_body(faction: int, variant: int) -> Node3D:
+## Two shapes can come back, and callers must cope with both:
+##
+## - When `assets/models` holds a model for `species`, this returns the imported
+##   rigged character from `CharacterModels`: a skeleton driven by an
+##   AnimationPlayer, with only "Weapon" reachable by name.
+## - Otherwise it returns the box soldier built below, whose children are named
+##   exactly "Hips","Torso","Head","Helmet","ArmL","ArmR","LegL","LegR","Weapon".
+##   Those nine parts are DIRECT children, each a Node3D sitting on its own pivot
+##   (shoulder for the arms, hip for the legs, neck for the head) with the
+##   geometry hanging off it, so the AI only ever writes a local rotation.
+##
+## What both guarantee, and what `Soldier` relies on: feet on y = 0, a total
+## height of about 1.80 m, facing -Z, and a "Weapon" node at the firing hand.
+## `Soldier` tells the two apart by asking `CharacterAnim.attach()` for a driver.
+static func soldier_body(faction: int, variant: int,
+		species: int = CharacterModels.SPECIES_SOLDIER) -> Node3D:
 	var f: int = faction
 	if f != _F_AXIS and f != _F_NEUTRAL:
 		f = _F_ALLIED
 	var v: int = absi(variant) % 3
+
+	var rigged := CharacterModels.build(species, f, v,
+			weapon_model(_default_weapon(f, v)))
+	if rigged != null:
+		return rigged
 
 	var root := Node3D.new()
 	root.name = "SoldierBody"
@@ -215,6 +236,9 @@ static func weapon_model(weapon_id: int) -> Mesh:
 			mesh = _rifle(0.45, 0.055, true, false)
 		_W_KAR98K:
 			mesh = _rifle(0.43, 0.052, false, false)
+		_W_KAR98K_SCOPED:
+			# Same rifle as above, scope flag on: one geometry, two weapons.
+			mesh = _rifle(0.43, 0.052, false, true)
 		_W_SPRINGFIELD:
 			mesh = _rifle(0.44, 0.052, false, true)
 		_W_THOMPSON:
@@ -225,6 +249,8 @@ static func weapon_model(weapon_id: int) -> Mesh:
 			mesh = _mg42()
 		_W_M1911:
 			mesh = _pistol()
+		_W_LUGER:
+			mesh = _luger()
 		_W_GRENADE:
 			mesh = _grenade()
 		_:
@@ -265,24 +291,30 @@ static func _oak(variant: int) -> ArrayMesh:
 	b.limb("bark", Vector3.ZERO, Vector3(0, trunk_h, 0) + lean, r0 * 1.05,
 			r0 * 0.56, 8, Color.WHITE)
 
-	var blobs: int = 4 + (variant % 2)
+	# Six masses instead of four, each one wider and pushed out less far. The old
+	# spread reached 1.6 m with a 1.35 m radius, so the outer blobs sat clear of
+	# their neighbours and the crown was a ring of separate balls with sky
+	# between them. Overlap is what makes a canopy read as one mass.
+	var blobs: int = 6 + (variant % 2)
 	var crown := Vector3(0, trunk_h, 0) + lean
 	for i in blobs:
-		var ang: float = TAU * float(i) / float(blobs) + rng.randf_range(-0.4, 0.4)
-		var spread: float = 0.35 + rng.randf_range(0.0, 1.25)
-		var lift: float = 0.55 + rng.randf_range(0.0, 1.9)
+		var ang: float = TAU * float(i) / float(blobs) + rng.randf_range(-0.3, 0.3)
+		var spread: float = 0.30 + rng.randf_range(0.0, 0.95)
+		var lift: float = 0.50 + rng.randf_range(0.0, 1.55)
 		var centre := crown + Vector3(cos(ang) * spread, lift, sin(ang) * spread)
 		# Limbs reaching the outer masses: what makes it read as an oak.
 		if spread > 0.7:
 			b.limb("bark", crown + Vector3(0, -0.25, 0),
 					centre + Vector3(0, -0.25, 0), 0.15, 0.07, 5, Color.WHITE)
-		var rw: float = 1.35 + rng.randf_range(-0.2, 0.65)
-		var rh: float = rw * rng.randf_range(0.52, 0.72)
-		b.ellipsoid("foliage", centre, Vector3(rw, rh, rw * 0.94), 4, 8,
+		var rw: float = 1.65 + rng.randf_range(-0.15, 0.55)
+		var rh: float = rw * rng.randf_range(0.58, 0.78)
+		# Six rings by ten segments: at four by eight the facets were coarse
+		# enough to read as folded paper rather than as a rounded crown.
+		b.ellipsoid("canopy", centre, Vector3(rw, rh, rw * 0.94), 6, 10,
 				_leaf_shade(rng))
 	# A low mass filling the fork so the canopy does not float.
-	b.ellipsoid("foliage", crown + Vector3(0, 0.5, 0), Vector3(1.5, 0.8, 1.5),
-			4, 7, _leaf_shade(rng))
+	b.ellipsoid("canopy", crown + Vector3(0, 0.55, 0), Vector3(1.95, 1.15, 1.95),
+			6, 10, _leaf_shade(rng))
 	return b.commit()
 
 
@@ -304,10 +336,10 @@ static func _pine(variant: int) -> ArrayMesh:
 		var radius: float = (2.15 - t * 1.55) * rng.randf_range(0.9, 1.08)
 		var skirt: float = span * 1.85
 		var off := Vector3(rng.randf_range(-0.08, 0.08), y, rng.randf_range(-0.08, 0.08))
-		b.tube("foliage", Transform3D(Basis.IDENTITY, off), radius, radius * 0.12,
+		b.tube("canopy", Transform3D(Basis.IDENTITY, off), radius, radius * 0.12,
 				skirt, 9, _leaf_shade(rng), true, false)
 	# Sharp top spire.
-	b.tube("foliage", Transform3D(Basis.IDENTITY, Vector3(0, height * 0.88, 0)),
+	b.tube("canopy", Transform3D(Basis.IDENTITY, Vector3(0, height * 0.88, 0)),
 			0.42, 0.0, height * 0.16, 8, _leaf_shade(rng), false, false)
 	return b.commit()
 
@@ -324,32 +356,32 @@ static func _apple(variant: int) -> ArrayMesh:
 			7, Color.WHITE)
 
 	var fork := Vector3(0, trunk_h, 0) + lean
-	var blobs: int = 3 + (variant % 2)
+	var blobs: int = 5 + (variant % 2)
 	for i in blobs:
-		var ang: float = TAU * float(i) / float(blobs) + rng.randf_range(-0.3, 0.3)
-		var spread: float = 0.55 + rng.randf_range(0.0, 0.55)
+		var ang: float = TAU * float(i) / float(blobs) + rng.randf_range(-0.25, 0.25)
+		var spread: float = 0.45 + rng.randf_range(0.0, 0.42)
 		var centre := fork + Vector3(cos(ang) * spread,
-				0.45 + rng.randf_range(0.0, 0.55), sin(ang) * spread)
+				0.40 + rng.randf_range(0.0, 0.42), sin(ang) * spread)
 		b.limb("bark", fork, centre + Vector3(0, -0.2, 0), 0.11, 0.055, 5, Color.WHITE)
-		var rw: float = 0.95 + rng.randf_range(-0.12, 0.35)
-		b.ellipsoid("foliage", centre, Vector3(rw, rw * 0.62, rw * 0.92), 4, 8,
+		var rw: float = 1.10 + rng.randf_range(-0.10, 0.30)
+		b.ellipsoid("canopy", centre, Vector3(rw, rw * 0.66, rw * 0.92), 6, 10,
 				_leaf_shade(rng))
-	b.ellipsoid("foliage", fork + Vector3(0, 0.42, 0), Vector3(1.05, 0.55, 1.0),
-			4, 8, _leaf_shade(rng))
+	b.ellipsoid("canopy", fork + Vector3(0, 0.42, 0), Vector3(1.35, 0.72, 1.30),
+			6, 10, _leaf_shade(rng))
 	return b.commit()
 
 
 static func _bush(variant: int) -> ArrayMesh:
 	var rng := _rng(401 + variant)
 	var b := _Build.new()
-	var blobs: int = 2 + (variant % 2)
+	var blobs: int = 4 + (variant % 2)
 	for i in blobs:
-		var ang: float = TAU * float(i) / float(blobs) + rng.randf_range(-0.5, 0.5)
-		var spread: float = 0.18 + rng.randf_range(0.0, 0.24)
-		var rw: float = 0.42 + rng.randf_range(-0.06, 0.18)
-		var centre := Vector3(cos(ang) * spread, rw * 0.72 + rng.randf_range(-0.05, 0.12),
+		var ang: float = TAU * float(i) / float(blobs) + rng.randf_range(-0.4, 0.4)
+		var spread: float = 0.14 + rng.randf_range(0.0, 0.20)
+		var rw: float = 0.52 + rng.randf_range(-0.05, 0.16)
+		var centre := Vector3(cos(ang) * spread, rw * 0.72 + rng.randf_range(-0.04, 0.10),
 				sin(ang) * spread)
-		b.ellipsoid("foliage", centre, Vector3(rw, rw * 0.80, rw * 0.95), 4, 8,
+		b.ellipsoid("canopy", centre, Vector3(rw, rw * 0.82, rw * 0.95), 6, 10,
 				_leaf_shade(rng))
 	# A hint of woody stems at the base.
 	b.tube("bark", Transform3D.IDENTITY, 0.07, 0.04, 0.22, 5, Color.WHITE, false, false)
@@ -419,7 +451,7 @@ static func _hedge(variant: int) -> ArrayMesh:
 			Vector3(half_len, top[last].y, top[last].z - top_half[last]),
 			Vector3(half_len, top[last].y, top[last].z + top_half[last]))
 	st.generate_normals()
-	st.set_material(MatLib.get_material("foliage"))
+	st.set_material(MatLib.get_material("canopy"))
 	st.commit(mesh)
 
 	# The earth bank underneath, vertex coloured like the surrounding dirt.
@@ -850,6 +882,15 @@ static func _rifle(wood_len: float, stock_h: float, garand: bool,
 				6, Color.WHITE)
 		b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0, -0.038, -0.06)),
 				Vector3(0.04, 0.045, 0.11), Color.WHITE)
+	elif scope:
+		# Turned down bolt handle: a straight one would foul the scope tube, and
+		# the bent one is what every sniper conversion of the era carries.
+		b.limb("gun_metal", Vector3(0.02, 0.028, 0.01), Vector3(0.072, 0.018, 0.02),
+				0.011, 0.010, 6, Color.WHITE)
+		b.limb("gun_metal", Vector3(0.072, 0.018, 0.02), Vector3(0.082, -0.028, 0.024),
+				0.010, 0.010, 6, Color.WHITE)
+		b.ellipsoid("gun_metal", Vector3(0.084, -0.038, 0.025),
+				Vector3(0.020, 0.020, 0.020), 4, 7, Color.WHITE)
 	else:
 		# Straight bolt handle sticking out to the right.
 		b.limb("gun_metal", Vector3(0.02, 0.028, 0.01), Vector3(0.10, 0.012, 0.03),
@@ -857,11 +898,29 @@ static func _rifle(wood_len: float, stock_h: float, garand: bool,
 		b.ellipsoid("gun_metal", Vector3(0.108, 0.010, 0.033),
 				Vector3(0.022, 0.022, 0.022), 4, 7, Color.WHITE)
 	if scope:
-		b.tube_z("gun_metal", 0.0, 0.085, 0.04, -0.24, 0.024, 0.020, 9, Color.WHITE)
-		for z in [-0.02, -0.16]:
-			b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0, 0.058, z)),
-					Vector3(0.022, 0.04, 0.026), Color.WHITE)
+		_scope(b)
 	return b.commit()
+
+
+## The x4 telescopic sight, shared by the Springfield and the scoped Kar98k.
+## Sits high enough over the receiver for daylight to show under the tube: that
+## gap, plus the bell of the objective, is what makes a sniper readable in
+## silhouette from the far end of a street.
+static func _scope(b: _Build) -> void:
+	var y: float = 0.088
+	# Main tube, ocular bell at the rear, wider objective bell at the front.
+	b.tube_z("gun_metal", 0.0, y, 0.040, -0.225, 0.0165, 0.0165, 10, Color.WHITE)
+	b.tube_z("gun_metal", 0.0, y, 0.055, 0.030, 0.0215, 0.0175, 10, Color.WHITE)
+	b.tube_z("gun_metal", 0.0, y, -0.212, -0.256, 0.0195, 0.0255, 10, Color.WHITE)
+	# Two rings, each a collar around the tube on a block bolted to the receiver.
+	for z: float in [-0.030, -0.155]:
+		b.tube_z("gun_metal", 0.0, y, z + 0.010, z - 0.010, 0.021, 0.021, 10,
+				Color.WHITE)
+		b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0.0, 0.064, z)),
+				Vector3(0.020, 0.030, 0.024), Color.WHITE)
+	# Elevation turret on top of the tube.
+	b.tube("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0.0, y + 0.008, -0.075)),
+			0.012, 0.010, 0.018, 8, Color.WHITE, false, true)
 
 
 static func _thompson() -> ArrayMesh:
@@ -966,6 +1025,61 @@ static func _pistol() -> ArrayMesh:
 			Vector3(0.022, 0.035, 0.045), Color.WHITE)
 	b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0, 0.048, -0.14)),
 			Vector3(0.009, 0.014, 0.014), Color.WHITE)
+	return b.commit()
+
+
+## Luger P08. Everything here exists to keep it from reading as the M1911,
+## which is a stubby rectangular slab: the barrel is thin and long, the toggle
+## action breaks upwards in a chevron over the breech instead of a flat slide,
+## and the grip is raked far back. About 0.22 m from muzzle to butt.
+static func _luger() -> ArrayMesh:
+	var b := _Build.new()
+	# Frame: the flat body carrying the trigger, below the action.
+	b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0, 0.008, 0.002)),
+			Vector3(0.030, 0.036, 0.100), Color.WHITE)
+	# Barrel extension: the squared block the toggle is hinged on.
+	b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0, 0.032, -0.018)),
+			Vector3(0.028, 0.040, 0.062), Color.WHITE)
+	# Slim tapered barrel. Half the M1911 slide in section, twice as elegant.
+	b.tube_z("gun_metal", 0.0, 0.032, -0.040, -0.135, 0.0105, 0.0080, 8, Color.WHITE)
+	b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0, 0.050, -0.127)),
+			Vector3(0.006, 0.016, 0.010), Color.WHITE)      # front sight blade
+	# The toggle action: two links breaking upwards into a knee, with the
+	# knurled knobs on the joint. This is the whole silhouette of the weapon.
+	b.box("gun_metal", Transform3D(Basis(Vector3(1, 0, 0), -0.683),
+			Vector3(0, 0.057, 0.000)), Vector3(0.024, 0.013, 0.045), Color.WHITE)
+	b.box("gun_metal", Transform3D(Basis(Vector3(1, 0, 0), 0.564),
+			Vector3(0, 0.058, 0.035)), Vector3(0.024, 0.013, 0.049), Color.WHITE)
+	b.tube("gun_metal", Transform3D(Basis(Vector3(0, 0, 1), -PI * 0.5),
+			Vector3(-0.014, 0.070, 0.016)), 0.012, 0.012, 0.028, 8, Color.WHITE,
+			true, true)
+	# Breech block closing the rear of the action, with the sight notch on top.
+	b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0, 0.042, 0.056)),
+			Vector3(0.026, 0.032, 0.030), Color.WHITE)
+	b.box("gun_metal", Transform3D(Basis.IDENTITY, Vector3(0, 0.061, 0.052)),
+			Vector3(0.016, 0.008, 0.012), Color.WHITE)      # rear sight
+	# Round trigger guard, drawn as an arc of rods.
+	var guard_c := Vector3(0.0, -0.012, -0.006)
+	var guard_r: float = 0.026
+	var prev: Vector3 = guard_c + Vector3(0.0, 0.0, guard_r)
+	for i in range(1, 7):
+		var t: float = PI * float(i) / 6.0
+		var p: Vector3 = guard_c + Vector3(0.0, -sin(t) * guard_r * 0.85,
+				cos(t) * guard_r)
+		b.limb("gun_metal", prev, p, 0.0042, 0.0042, 5, Color.WHITE)
+		prev = p
+	b.box("gun_metal", Transform3D(Basis(Vector3(1, 0, 0), -0.12),
+			Vector3(0, -0.024, -0.002)), Vector3(0.007, 0.024, 0.008), Color.WHITE)
+	# Grip, raked well back. The M1911 grip stands almost upright; this one
+	# leans about 32 degrees, which is what the eye actually picks up at range.
+	var grip := Transform3D(Basis(Vector3(1, 0, 0), -0.55), Vector3(0, -0.050, 0.036))
+	b.box("gun_metal", grip, Vector3(0.026, 0.092, 0.046), Color.WHITE)
+	for side in 2:
+		var x: float = -0.015 if side == 0 else 0.015
+		b.box("gun_wood", grip.translated_local(Vector3(x, -0.002, 0.0)),
+				Vector3(0.008, 0.080, 0.042), Color.WHITE)
+	b.box("gun_metal", grip.translated_local(Vector3(0.0, -0.048, 0.0)),
+			Vector3(0.030, 0.008, 0.050), Color.WHITE)      # magazine floorplate
 	return b.commit()
 
 

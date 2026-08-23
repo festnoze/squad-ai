@@ -34,7 +34,7 @@ const _FIELD_LEN := SIZE * SIZE
 const NAMES: PackedStringArray = [
 	"grass", "dirt", "road", "stone", "wheat", "sand", "water_normal",
 	"plaster", "wood", "roof_tile", "roof_slate", "concrete", "metal",
-	"bark", "leaves", "noise", "cloud",
+	"bark", "leaves", "canopy", "noise", "cloud",
 ]
 
 ## Photographic CC0 texture sets shipped under assets/textures. When a set is
@@ -515,6 +515,7 @@ static func _build(texture_name: String) -> Texture2D:
 		"metal": return _build_metal()
 		"bark": return _build_bark()
 		"leaves": return _build_leaves()
+		"canopy": return _build_canopy()
 		"noise": return _build_noise_map()
 		"cloud": return _build_cloud()
 	return null
@@ -1024,6 +1025,43 @@ static func _build_metal() -> ImageTexture:
 			if rivet_row and (x % 64) > 60:
 				pitting *= 1.25
 			_put3(data, i, r * pitting, g * pitting, b * pitting)
+	return _make_rgb(data)
+
+
+## Dense leaf mass, tileable and fully opaque.
+##
+## Distinct from "leaves", which is a CARD: that one punches its alpha to zero
+## outside a radius so it reads as a clump floating in its quad. Wrapped around
+## a solid canopy ellipsoid, whose UVs span the whole sphere, the same texture
+## erased most of the crown and the player saw sky through every tree. A canopy
+## is a volume, so it gets a volume texture: no alpha, no radial falloff, and
+## the variation carried entirely by tone.
+static func _build_canopy() -> ImageTexture:
+	var clump := _f_broad()
+	var detail := _f_mid2()
+	var speck := _f_speck()
+	var tone := _f_mid()
+	var data := _new_rgb_buffer()
+	var dr: float = Palette.LEAF_DARK.r
+	var dg: float = Palette.LEAF_DARK.g
+	var db: float = Palette.LEAF_DARK.b
+	var lr: float = Palette.LEAF_LIGHT.r
+	var lg: float = Palette.LEAF_LIGHT.g
+	var lb: float = Palette.LEAF_LIGHT.b
+	for y in SIZE:
+		var base: int = y * SIZE
+		for x in SIZE:
+			var i: int = base + x
+			var t: float = clampf(tone[i] * 0.6 + detail[i] * 0.4, 0.0, 1.0)
+			# Clumps of foliage catch the light, the gaps between them fall into
+			# the shade of the mass. Wide range: a flat crown reads as plastic.
+			var lum: float = 0.58 + clump[i] * 0.62 + detail[i] * 0.34
+			# Sparse bright specks, the individual leaves turning in the light.
+			lum += clampf((speck[i] - 0.86) * 6.0, 0.0, 1.0) * 0.30
+			_put3(data, i,
+					(dr + (lr - dr) * t) * lum,
+					(dg + (lg - dg) * t) * lum,
+					(db + (lb - db) * t) * lum)
 	return _make_rgb(data)
 
 

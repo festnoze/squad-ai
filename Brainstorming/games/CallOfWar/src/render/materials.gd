@@ -156,6 +156,7 @@ static func _build(key: String) -> Material:
 		"rust": return _build_rust()
 		"glass": return _build_glass()
 		"foliage": return _build_foliage()
+		"canopy": return _build_canopy()
 		"bark": return _build_bark()
 		"wheat": return _build_wheat()
 		"blade": return _build_grass_blade()
@@ -352,6 +353,39 @@ static func _build_foliage() -> Material:
 	# from turning into a black wall when the sun is on the far side.
 	mat.backlight_enabled = true
 	mat.backlight = Color(0.07, 0.11, 0.05)
+	mat.vertex_color_use_as_albedo = true
+	return mat
+
+
+## Tree crowns, bushes and hedges: a solid mass of leaves, not a cut out card.
+##
+## Kept apart from "foliage", which is the ALPHA_SCISSOR card material. Dressing
+## a canopy ellipsoid with the card cut most of the crown away, because the card
+## drops its alpha to zero outside a radius and the sphere's UVs span the whole
+## texture. Every tree in the pocket had holes straight through it.
+##
+## The tint runs above 1.0 for the reason `_build_grass_blade` documents: the
+## procedural leaf texture is band clamped like every other albedo, and the
+## chain that reaches the screen multiplies it twice more (the mesh vertex
+## colour from `_leaf_shade`, then the per instance colour the scatter pushes
+## through the MultiMesh). Left at unity every wood in Normandy was black.
+static func _build_canopy() -> Material:
+	var mat := StandardMaterial3D.new()
+	mat.albedo_texture = Tex.get_texture("canopy")
+	mat.albedo_color = Color(1.62, 1.74, 1.30, 1.0)
+	mat.texture_filter = FILTER_ANISO
+	# Opaque and back face culled: a crown is a closed volume, so there is
+	# nothing to see through and nothing to sort. Half the fill of the old
+	# cut out, and no alpha test at all.
+	mat.cull_mode = BaseMaterial3D.CULL_BACK
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_DISABLED
+	mat.roughness = 0.95
+	mat.metallic = 0.0
+	mat.metallic_specular = 0.12
+	# Leaves pass light through. Without this a crown with the sun behind it is
+	# a black cut out against the sky.
+	mat.backlight_enabled = true
+	mat.backlight = Color(0.13, 0.19, 0.09)
 	mat.vertex_color_use_as_albedo = true
 	return mat
 

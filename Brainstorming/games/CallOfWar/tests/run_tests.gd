@@ -23,9 +23,11 @@ const SUITES: PackedStringArray = [
 	"res://tests/test_mission_defs.gd",
 	"res://tests/test_sfx_lib.gd",
 	"res://tests/test_palette.gd",
+	"res://tests/test_weather.gd",
 	"res://tests/test_save_manager.gd",
 	"res://tests/test_senses.gd",
 	"res://tests/test_structures.gd",
+	"res://tests/test_character_models.gd",
 ]
 
 

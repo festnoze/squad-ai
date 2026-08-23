@@ -18,6 +18,13 @@
 ##  * Perception is spread over time (one sight test every 0.2 to 0.35 s with a
 ##    random initial offset) so sixty soldiers never raycast on the same frame.
 ##    Past 200 m from the player everything but locomotion is switched off.
+##  * Corpse discovery rides on that same budget instead of adding to it: its
+##    own 0.2 to 0.35 s tick, phase shifted from the sight tick, tests the line
+##    of sight to ONE nearby friendly body per call, taken round robin from a
+##    short list rebuilt about once a second. A body already reported carries a
+##    marker and is skipped for good, so a battlefield littered with old corpses
+##    costs nothing. Being past 200 m switches the whole thing off with the rest
+##    of the perception.
 class_name Soldier
 extends CharacterBody3D
 
@@ -89,6 +96,24 @@ const SUPPRESS_RADIUS := 1.5
 const SUPPRESS_DECAY := 0.38
 const SUPPRESS_TRIGGER := 0.75
 
+# Corpse discovery. A man lying flat in the grass is nothing like a man standing
+# up, so the base range is a fraction of the normal sight range; light and
+# weather still cut into it through Senses.sight_range().
+const CORPSE_SIGHT_RANGE := 38.0
+## Height above the body origin that is actually looked for. The ragdoll lies
+## down, so aiming at the chest of a standing man would probe thin air.
+const CORPSE_LOOK_HEIGHT := 0.45
+## Hard cap on the short list, so a massacre never turns into a long loop.
+const CORPSE_LIST_MAX := 6
+## Metadata written on a body once somebody has reported it.
+const CORPSE_MARK := "corpse_found"
+
+# Escort (order_follow). The dead band between "close enough" and "too far" is
+# what keeps a companion from shuffling around a player who is standing still.
+const FOLLOW_MIN_DISTANCE := 2.0
+const FOLLOW_STOP_FACTOR := 0.62
+const FOLLOW_RUN_FACTOR := 2.6
+
 # Contract members
 var faction: int = 1         # War.AXIS or War.ALLIED
 var rank: int = R_REGULAR
@@ -147,6 +172,24 @@ var _alert_cry_timer := 0.0
 var _shout_timer := 0.0
 var _player_hooked := false
 
+# Corpse discovery. `_corpses` stays untyped on purpose: it holds nodes that
+# free themselves on their own schedule, and an untyped Array lets every entry
+# be validated before anything casts it.
+var _corpses: Array = []
+var _corpse_timer := 0.0
+var _corpse_scan := 0.0
+var _corpse_index := 0
+
+# Stealth and intelligence
+var _silent_death := false
+var _home_site := -1
+
+# Escort
+var _follow_node: Node3D = null
+var _follow_distance := 4.0
+var _follow_angle := 0.0
+var _follow_moving := false
+
 # Combat
 var _weapon_id := -1
 var _weapon: Weapon = null
@@ -168,8 +211,17 @@ var _peek_timer := 0.0
 var _peeking := false
 var _blind_fire := false
 
+# Which creature this soldier wears. Purely cosmetic: a zombie fights with the
+# exact same brain, weapon and cover logic as a rifleman, it just looks like a
+# zombie. Set before `setup()`; see `CharacterModels`.
+var species: int = CharacterModels.SPECIES_SOLDIER
+
 # Body and animation
 var _body: Node3D = null
+# Non-null only when the body is an imported rigged model. While it is set the
+# per-limb block in `_tick_animation` is dead: those Node3D limbs do not exist
+# on a skeleton, and the clips drive the pose instead.
+var _anim: CharacterAnim = null
 var _shape: CollisionShape3D = null
 var _capsule: CapsuleShape3D = null
 var _hips: Node3D = null
@@ -187,6 +239,9 @@ var _body_y := 0.0
 var _dead_time := 0.0
 var _fall_angle := 0.0
 var _fall_axis := Vector3.RIGHT
+# True once a death clip has taken over the corpse, which means the tip-over in
+# `_tick_dead` must keep its hands off the visual basis.
+var _rig_death := false
 var _far := false
 var _far_timer := 0.0
 
@@ -235,6 +290,11 @@ func setup(game_world: GameWorld, faction_id: int, soldier_rank: int, home: Vect
 	_see_timer = _rng.randf() * 0.35
 	_scan_timer = _rng.randf() * 0.5
 	_env_timer = _rng.randf() * 1.5
+	# Deliberately shifted past the sight offset so a soldier never pays for a
+	# sight test and a corpse test on the same frame.
+	_corpse_timer = 0.35 + _rng.randf() * 0.35
+	_corpse_scan = _rng.randf() * 0.8
+	_follow_angle = _rng.randf_range(-0.7, 0.7)
 	_far_timer = _rng.randf()
 	_look_timer = _rng.randf_range(1.0, 3.0)
 	_face_dir = Vector3(_rng.randf_range(-1.0, 1.0), 0.0, _rng.randf_range(-1.0, 1.0)).normalized()
@@ -256,19 +316,27 @@ func _build_collision() -> void:
 
 
 func _build_body() -> void:
-	var variant := _rng.randi_range(0, 3)
-	_body = Meshes.soldier_body(faction, variant)
+	# `soldier_body` folds the variant with % 3, so asking for 0..2 keeps the
+	# three builds equally likely instead of handing build 0 a double share.
+	var variant := _rng.randi_range(0, 2)
+	_body = Meshes.soldier_body(faction, variant, species)
 	if _body == null:
 		_body = _fallback_body()
 	_body.name = "Visual"
 	add_child(_body)
-	_hips = _limb("Hips")
-	_torso = _limb("Torso")
-	_head = _limb("Head")
-	_arm_l = _limb("ArmL")
-	_arm_r = _limb("ArmR")
-	_leg_l = _limb("LegL")
-	_leg_r = _limb("LegR")
+	_anim = CharacterAnim.attach(_body, species)
+	# A rigged model has no limb nodes to rotate: its pose comes from the clips.
+	# Leaving these null is exactly what switches the procedural block off in
+	# `_tick_animation`, which already guards every one of them.
+	if _anim == null:
+		_hips = _limb("Hips")
+		_torso = _limb("Torso")
+		_head = _limb("Head")
+		_arm_l = _limb("ArmL")
+		_arm_r = _limb("ArmR")
+		_leg_l = _limb("LegL")
+		_leg_r = _limb("LegR")
+	# Both bodies carry a "Weapon": it is where the bullets leave from.
 	_weapon_node = _limb("Weapon")
 
 
@@ -425,12 +493,20 @@ func _preferred_range() -> Vector2:
 		R_MACHINE_GUNNER:
 			return Vector2(18.0, 90.0)
 		R_OFFICER:
+			# Officers carry a pistol on both sides now. A pistol duel at sixty
+			# metres is a pantomime, so he closes in with the men he leads.
+			if _is_pistol(_weapon_id):
+				return Vector2(8.0, 30.0)
 			return Vector2(22.0, 60.0)
 	if _weapon_id == WeaponDefs.MP40 or _weapon_id == WeaponDefs.THOMPSON:
 		return Vector2(6.0, 32.0)
-	if _weapon_id == WeaponDefs.M1911:
+	if _is_pistol(_weapon_id):
 		return Vector2(4.0, 18.0)
 	return Vector2(14.0, 75.0)
+
+
+func _is_pistol(id: int) -> bool:
+	return id == WeaponDefs.M1911 or id == WeaponDefs.LUGER
 
 
 func _pick_weapon() -> int:
@@ -445,14 +521,17 @@ func _pick_weapon() -> int:
 		R_VETERAN:
 			return WeaponDefs.MP40 if axis else WeaponDefs.THOMPSON
 		R_OFFICER:
-			# The weapon table has no Luger, so an axis officer holding the M1911
-			# put an American service pistol in a Wehrmacht officer's hand, in
-			# plain view of a player who can walk right up to the body and pick
-			# it up. An MP40 is both historically ordinary for a German officer
-			# and already in the table. Allied officers keep the M1911.
-			return WeaponDefs.MP40 if axis else WeaponDefs.M1911
+			# The table now carries the Luger, so the German officer finally
+			# gets the sidearm of his own army. The MP40 he was handed instead
+			# was only ever a stopgap for the missing entry, and it mattered
+			# because the player can walk up to the body and pick the weapon up.
+			# Allied officers keep the M1911.
+			return WeaponDefs.LUGER if axis else WeaponDefs.M1911
 		R_SNIPER:
-			return WeaponDefs.KAR98K if axis else WeaponDefs.SPRINGFIELD
+			# A German marksman without a scope was the same stopgap. The scoped
+			# Kar98k shares its ammunition with the plain one, so nothing about
+			# the loot economy changes.
+			return WeaponDefs.KAR98K_SCOPED if axis else WeaponDefs.SPRINGFIELD
 		R_MACHINE_GUNNER:
 			return WeaponDefs.MG42 if axis else WeaponDefs.THOMPSON
 	return WeaponDefs.KAR98K
@@ -496,9 +575,15 @@ func _tick_far(delta: float) -> void:
 	var player := _player_node()
 	if player == null:
 		_far = false
-		return
-	var d := global_position.distance_squared_to(player.global_position)
-	_far = d > FAR_DISTANCE * FAR_DISTANCE
+	else:
+		var d := global_position.distance_squared_to(player.global_position)
+		_far = d > FAR_DISTANCE * FAR_DISTANCE
+	# Sixty skeletons is what the imported models really cost. Past the cut-off
+	# the AnimationPlayer is switched off outright, not merely left unticked:
+	# unlike the procedural limbs it would otherwise keep posing itself. A
+	# corpse mid death clip is exempt, or it would freeze halfway down.
+	if _anim != null and not _rig_death:
+		_anim.set_active(not _far)
 
 
 func _tick_timers(delta: float) -> void:
@@ -539,6 +624,10 @@ func _tick_perception(delta: float) -> void:
 	if _env_timer <= 0.0:
 		_env_timer = 2.0 + _rng.randf()
 		_refresh_environment()
+	_corpse_timer -= delta
+	if _corpse_timer <= 0.0:
+		_corpse_timer = 0.2 + _rng.randf() * 0.15
+		_check_for_corpses()
 	_see_timer -= delta
 	if _see_timer > 0.0:
 		return
@@ -701,6 +790,151 @@ func _broadcast_contact(seen: Node3D) -> void:
 			friend.call("notice_enemy", seen)
 
 
+# ------------------------------------------------------- corpse discovery --
+
+## The counterweight to the silent takedown. Killing quietly costs nothing on
+## its own, so what makes infiltration a game is that the bodies stay where they
+## fell and somebody eventually walks past one.
+##
+## Cost control, because this runs on up to sixty soldiers: it is skipped
+## outright for anybody who already has something to shoot at, the candidate
+## list is rebuilt roughly once a second instead of every tick, and a single
+## line of sight is traced per call. Sixty soldiers with ten bodies on the map
+## therefore cost sixty rays every quarter of a second, not six hundred.
+func _check_for_corpses() -> void:
+	if not is_unaware():
+		return
+	if _time >= _corpse_scan:
+		_corpse_scan = _time + 0.9 + _rng.randf() * 0.5
+		_refresh_corpses()
+	if _corpses.is_empty():
+		return
+	_corpse_index = wrapi(_corpse_index + 1, 0, _corpses.size())
+	# The entry is read into a Variant and validated BEFORE anything casts it.
+	# These are nodes in the middle of freeing themselves, and casting an
+	# already freed object is itself the error: a check on the cast result would
+	# come far too late.
+	var entry: Variant = _corpses[_corpse_index]
+	if not is_instance_valid(entry):
+		_corpses.remove_at(_corpse_index)
+		return
+	var corpse := entry as Node3D
+	if corpse == null or corpse.has_meta(CORPSE_MARK):
+		_corpses.remove_at(_corpse_index)
+		return
+	if not _corpse_in_sight(corpse):
+		return
+	_report_corpse(corpse)
+
+
+## Rebuilds the short list of friendly bodies worth looking at. Bodies already
+## reported by anybody are dropped here, which is what keeps the cost flat as
+## the campaign piles up casualties.
+func _refresh_corpses() -> void:
+	_corpses.clear()
+	_corpse_index = 0
+	var tree := get_tree()
+	if tree == null:
+		return
+	var squared := CORPSE_SIGHT_RANGE * CORPSE_SIGHT_RANGE
+	for node in tree.get_nodes_in_group(_faction_group()):
+		# Validity is tested before the cast: casting an already freed object is
+		# itself the error, so a check on the cast result would come too late.
+		# A corpse frees itself half a minute after it falls, so this loop is
+		# exactly where a freed node shows up.
+		if not is_instance_valid(node):
+			continue
+		var body := node as Node3D
+		if body == null or body == self:
+			continue
+		if body.has_meta(CORPSE_MARK):
+			continue
+		if not body.has_method("is_alive") or bool(body.call("is_alive")):
+			continue
+		if global_position.distance_squared_to(body.global_position) > squared:
+			continue
+		_corpses.append(body)
+		if _corpses.size() >= CORPSE_LIST_MAX:
+			return
+
+
+## True line of sight to a body on the ground, not a plain distance test: a
+## corpse behind a wall is not seen.
+##
+## `Senses.can_see` cannot serve here. It deliberately refuses any target whose
+## `is_alive()` reads false, which is every corpse in the project. So the shared
+## rules are applied by hand instead: the range comes from
+## `Senses.sight_range()` so light and weather still count, the cone is the
+## shared `Senses.FOV_HALF`, and the occlusion is one ray on `Layers.SIGHT_MASK`.
+func _corpse_in_sight(corpse: Node3D) -> bool:
+	var eye := eye_position()
+	var point := corpse.global_position + Vector3(0.0, CORPSE_LOOK_HEIGHT, 0.0)
+	var to_body := point - eye
+	var distance := to_body.length()
+	if distance < 0.05:
+		return true
+	if distance > Senses.sight_range(CORPSE_SIGHT_RANGE, _light, _visibility):
+		return false
+	if distance > Senses.PERIPHERAL_RADIUS:
+		var facing := _facing()
+		if facing.length_squared() < 0.000001:
+			return false
+		if (to_body / distance).dot(facing.normalized()) < cos(Senses.FOV_HALF):
+			return false
+	var world := get_world_3d()
+	if world == null:
+		return false
+	var space := world.direct_space_state
+	if space == null:
+		return false
+	var query := PhysicsRayQueryParameters3D.create(eye, point, Layers.SIGHT_MASK)
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	var excluded: Array[RID] = [get_rid()]
+	var corpse_body := corpse as CollisionObject3D
+	if corpse_body != null:
+		excluded.append(corpse_body.get_rid())
+	query.exclude = excluded
+	return space.intersect_ray(query).is_empty()
+
+
+## Finding a body: shout, go and look, put everybody within earshot on the spot
+## where it lies, and push the campaign alert up a notch. The marker written on
+## the body makes this happen exactly once for that body, whoever walks past it
+## afterwards.
+##
+## The squad is warned with `alert_to` rather than `Squad.report_contact`:
+## `report_contact` wants a live enemy, it stores the node as the squad contact
+## and hands it to `notice_enemy`, which would lock the whole squad onto a
+## corpse as a target it can never see, never shoot and never let go of. What
+## the squad has to be told here is a position, and that is what `alert_to`
+## carries.
+func _report_corpse(corpse: Node3D) -> void:
+	corpse.set_meta(CORPSE_MARK, true)
+	var at := corpse.global_position
+	_last_known = at
+	_has_last_known = true
+	_search_timer = maxf(_search_timer, _rng.randf_range(SEARCH_MIN, SEARCH_MAX))
+	var to_body := at - global_position
+	to_body.y = 0.0
+	if to_body.length() > 0.2:
+		_face_dir = to_body.normalized()
+	if state == S_IDLE or state == S_PATROL:
+		_enter_state(S_ALERT)
+	if _alert_cry_timer <= 0.0:
+		_alert_cry_timer = 6.0
+		Sfx.play_at(_voice_sample("alert"), global_position, -3.0,
+				_rng.randf_range(0.94, 1.07))
+	for friend in _friends_near(SQUAD_VOICE_RANGE):
+		if friend.has_method("alert_to"):
+			friend.call("alert_to", at, 0.85)
+	# Only the German side owns the campaign alert level, exactly as in
+	# `alert_to` and `_on_fresh_contact`: a maquisard finding one of his own has
+	# no way of putting a garrison on edge.
+	if faction == War.AXIS:
+		War.raise_alert(War.ALERT_SEARCHING)
+
+
 # ------------------------------------------------------------ state machine --
 
 func _enter_state(new_state: int) -> void:
@@ -775,6 +1009,10 @@ func _tick_state(delta: float) -> void:
 
 
 func _state_idle(delta: float) -> void:
+	# Escorting comes first: a companion at rest keeps station on his man
+	# instead of standing on the anchor he was created with.
+	if _follow_node != null and _tick_follow(delta):
+		return
 	if _has_order:
 		_go_to(_order_pos, 1.2)
 		if global_position.distance_to(_order_pos) < 1.6:
@@ -1227,6 +1465,8 @@ func _try_fire(blind: bool) -> void:
 	if _burst_left <= 0:
 		_burst_pause = _burst_gap()
 		_shots_in_burst = 0
+	if _anim != null:
+		_anim.fire(Vector2(velocity.x, velocity.z).length())
 	Sfx.play_shot(WeaponDefs.fire_sample(_weapon_id), muzzle)
 	var vfx := _vfx()
 	if vfx != null:
@@ -1317,6 +1557,59 @@ func _go_to(pos: Vector3, tolerance: float) -> void:
 	_dest = Heightfield.clamp_to_bounds(_dest)
 	_dest_tolerance = tolerance
 	_has_dest = true
+
+
+## One escort step. Returns false when there is nobody left to follow, so the
+## caller falls back on the ordinary at rest behaviour.
+##
+## Two things make this read as an escort rather than as a magnet. The soldier
+## aims at a slot beside the man he follows, rotated by a small angle drawn once
+## at creation, so two companions do not end up in the same footprint. And the
+## band between "start walking" and "stop walking" is wide: he sets off only
+## past `_follow_distance`, and stops well inside it, which is what keeps him
+## from shuffling in circles around somebody standing still.
+func _tick_follow(delta: float) -> bool:
+	if not is_instance_valid(_follow_node):
+		_follow_node = null
+		_follow_moving = false
+		return false
+	var lead := _follow_node.global_position
+	var flat := _flat_distance(lead)
+	if _follow_moving:
+		if flat <= _follow_distance * FOLLOW_STOP_FACTOR:
+			_follow_moving = false
+	elif flat > _follow_distance:
+		_follow_moving = true
+
+	if not _follow_moving:
+		# Close enough. Stand still and watch the surroundings instead of
+		# treading on the heels of the man in front.
+		_run = false
+		_has_dest = false
+		_look_timer -= delta
+		if _look_timer <= 0.0:
+			_look_timer = _rng.randf_range(1.6, 3.4)
+			var angle := _rng.randf_range(-PI, PI)
+			_face_dir = Vector3(sin(angle), 0.0, cos(angle))
+		return true
+
+	var back := global_position - lead
+	back.y = 0.0
+	if back.length() < 0.5:
+		back = -_facing()
+		back.y = 0.0
+	if back.length() < 0.01:
+		back = Vector3.BACK
+	var slot := back.normalized().rotated(Vector3.UP, _follow_angle)
+	var goal := lead + slot * (_follow_distance * FOLLOW_STOP_FACTOR)
+	_crouched = false
+	_run = flat > _follow_distance * FOLLOW_RUN_FACTOR
+	_go_to(goal, maxf(1.0, _follow_distance * 0.3))
+	var to_goal := goal - global_position
+	to_goal.y = 0.0
+	if to_goal.length() > 0.2:
+		_face_dir = to_goal.normalized()
+	return true
 
 
 func _flat_distance(pos: Vector3) -> float:
@@ -1450,8 +1743,13 @@ func _tick_stuck(delta: float) -> void:
 
 func _teleport_home() -> void:
 	var pos := _home
+	# An escort's anchor is wherever the man he follows stands right now.
+	# Snapping a companion back to a village he left ten minutes ago would just
+	# lose him for good.
+	if _follow_node != null and is_instance_valid(_follow_node):
+		pos = _follow_node.global_position
 	if _world != null:
-		pos.y = _world.ground_y(_home.x, _home.z) + 0.1
+		pos.y = _world.ground_y(pos.x, pos.z) + 0.1
 	_place(Heightfield.clamp_to_bounds(pos))
 	velocity = Vector3.ZERO
 	_has_dest = false
@@ -1489,6 +1787,9 @@ func _tick_animation(delta: float) -> void:
 	if _body == null or not is_instance_valid(_body):
 		return
 	var horizontal := Vector2(velocity.x, velocity.z).length()
+	if _anim != null:
+		_tick_rig(horizontal, delta)
+		return
 	_anim_phase += delta * (2.4 + horizontal * 2.1)
 	var amplitude := clampf(horizontal / RUN_SPEED, 0.0, 1.0)
 	var swing := sin(_anim_phase) * 0.78 * amplitude
@@ -1541,6 +1842,23 @@ func _tick_animation(delta: float) -> void:
 	_body.position.y = _body_y
 
 
+## Imported model: the clips own the pose, so the only thing left to choose is
+## which clip, and to keep the crouch offset the capsule applies anyway.
+##
+## Known gap: neither rig ships a crouch pose. The body is sunk by the same
+## 0.42 m the box soldier used, which keeps the head near the crouched headshot
+## line, but the feet go under the ground and the legs stay straight. Fixing it
+## properly needs a crouch clip, not more code here.
+func _tick_rig(speed: float, delta: float) -> void:
+	var aiming := _target_visible and (state == S_COMBAT or state == S_COVER
+			or state == S_FLANK or state == S_RETREAT)
+	_anim.locomotion(speed, aiming or state == S_ALERT or state == S_SUPPRESSED,
+			delta)
+	var wanted_y := -0.42 if _crouched else 0.0
+	_body_y = lerpf(_body_y, wanted_y, 8.0 * delta)
+	_body.position.y = _body_y
+
+
 # ------------------------------------------------------------------ damage --
 
 ## Contract shared by every damageable in the project. See section 3.
@@ -1560,6 +1878,8 @@ func take_damage(amount: float, attacker: Node, hit_point: Vector3, headshot: bo
 	if health <= 0.0:
 		_die(attacker)
 		return
+	if _anim != null and not _far:
+		_anim.hit()
 	Sfx.play_at("hurt", global_position, -6.0, _rng.randf_range(0.9, 1.1))
 	# Being shot at from an unseen direction is the classic way of learning
 	# where the enemy is.
@@ -1603,15 +1923,33 @@ func _die(killer: Node) -> void:
 	collision_mask = Layers.TERRAIN
 	_dead_time = 0.0
 	_fall_angle = 0.0
+	_follow_node = null
+	_follow_moving = false
+	_corpses.clear()
 	var roll := _rng.randf_range(-0.5, 0.5)
 	_fall_axis = Vector3(1.0, 0.0, roll).normalized()
 	if _rng.randf() < 0.5:
 		_fall_axis = -_fall_axis
-	Sfx.play_at(_voice_sample("death"), global_position, -1.0,
-			_rng.randf_range(0.92, 1.06))
+	# A rig with a death clip plays it and keeps the last frame. One without,
+	# like the zombie, says so and leaves the tip-over below to do the job.
+	if _anim != null:
+		_anim.set_active(true)
+		_rig_death = _anim.die()
+	if _silent_death:
+		# A takedown from behind: barely a groan, twelve decibels down, so the
+		# kill still reads on screen without carrying past a couple of metres.
+		Sfx.play_at("hurt", global_position, -12.0, _rng.randf_range(0.88, 0.98))
+	else:
+		Sfx.play_at(_voice_sample("death"), global_position, -1.0,
+				_rng.randf_range(0.92, 1.06))
 	_drop_weapon()
 	if rank == R_OFFICER:
-		_panic_nearby()
+		_drop_intel()
+		# Morale only shatters over an officer somebody actually saw go down.
+		# A knife in the dark takes no spine out of anybody, which is the whole
+		# point of doing it in the dark.
+		if not _silent_death:
+			_panic_nearby()
 	died.emit(self)
 
 
@@ -1690,6 +2028,47 @@ func _drop_weapon() -> void:
 	pickup.set_deferred("rotation", Vector3(0.0, _rng.randf_range(-PI, PI), 0.0))
 
 
+## An officer carries his orders on him. The map case lands beside his weapon
+## and carries the id of the site he was posted to, which is what the player
+## cashes in to reveal that garrison. The site stays on the node rather than on
+## a lookup table so a body can outlive the squad that spawned it.
+func _drop_intel() -> void:
+	var pickup := Node3D.new()
+	pickup.name = "DocumentsOfficier"
+	pickup.add_to_group("pickup")
+	pickup.set_meta("intel_site", home_site())
+	pickup.set_meta("prompt", "Ramasser les documents [E]")
+	pickup.set_meta("surface", "wood")
+	var mesh := MeshInstance3D.new()
+	mesh.mesh = Meshes.box(Vector3(0.28, 0.07, 0.20), "cloth")
+	mesh.position = Vector3(0.0, 0.035, 0.0)
+	pickup.add_child(mesh)
+	var area := Area3D.new()
+	area.collision_layer = Layers.TRIGGER
+	area.collision_mask = Layers.PLAYER
+	var area_shape := CollisionShape3D.new()
+	var sphere := SphereShape3D.new()
+	sphere.radius = 0.8
+	area_shape.shape = sphere
+	area.add_child(area_shape)
+	pickup.add_child(area)
+	var host := get_parent()
+	var tree := get_tree()
+	if tree != null and tree.current_scene != null:
+		host = tree.current_scene
+	if host == null:
+		pickup.free()
+		return
+	# Beside the weapon, not under it, so both prompts stay reachable.
+	var angle := _rng.randf_range(-PI, PI)
+	var pos := global_position + Vector3(cos(angle), 0.0, sin(angle)) * 0.75
+	if _world != null:
+		pos.y = _world.ground_y(pos.x, pos.z) + 0.05
+	host.add_child.call_deferred(pickup)
+	pickup.set_deferred("global_position", pos)
+	pickup.set_deferred("rotation", Vector3(0.0, _rng.randf_range(-PI, PI), 0.0))
+
+
 ## Simplified ragdoll: the body tips over with a damped rotation, lies there for
 ## thirty seconds, then sinks into the ground and frees itself. A real ragdoll
 ## would need a joint skeleton and would explode on streamed collision.
@@ -1704,8 +2083,9 @@ func _tick_dead(delta: float) -> void:
 		velocity.z = move_toward(velocity.z, 0.0, 6.0 * delta)
 		move_and_slide()
 	if _body != null and is_instance_valid(_body):
-		_fall_angle = lerpf(_fall_angle, PI * 0.48, clampf(4.0 * delta, 0.0, 1.0))
-		_body.transform.basis = Basis(_fall_axis, _fall_angle)
+		if not _rig_death:
+			_fall_angle = lerpf(_fall_angle, PI * 0.48, clampf(4.0 * delta, 0.0, 1.0))
+			_body.transform.basis = Basis(_fall_axis, _fall_angle)
 		if _dead_time > CORPSE_SECONDS:
 			_body.position.y = _body_y - (_dead_time - CORPSE_SECONDS) * SINK_SPEED
 	if _dead_time > CORPSE_SECONDS + SINK_SECONDS:
@@ -1797,10 +2177,40 @@ func order_hold(pos: Vector3) -> void:
 	_hold_pos = pos
 	_home = pos
 	_has_order = false
+	# Holding a position is the explicit opposite of escorting somebody, and it
+	# is exactly what a companion is told when the player toggles his order.
+	# `order_move_to` on the other hand is only a detour: it leaves the escort
+	# standing, so a companion sent somewhere falls back in behind afterwards.
+	_follow_node = null
+	_follow_moving = false
 	_route = PackedVector3Array()
 	if state == S_IDLE or state == S_PATROL or state == S_ADVANCE or state == S_FLANK:
 		_enter_state(S_IDLE)
 		_go_to(pos, 1.2)
+
+
+## Follows a moving node instead of a fixed point. This is what makes a
+## resistance companion useful: nothing about the combat behaviour changes, only
+## the destination the soldier falls back on when nothing is happening. Pass
+## null to stop escorting; `order_hold` does the same explicitly.
+@warning_ignore("shadowed_variable")
+func order_follow(target: Node3D, distance: float) -> void:
+	if state == S_DEAD:
+		return
+	if target == null or not is_instance_valid(target) or target == self:
+		_follow_node = null
+		_follow_moving = false
+		return
+	_follow_node = target
+	_follow_distance = maxf(FOLLOW_MIN_DISTANCE, distance)
+	_follow_moving = false
+	_has_order = false
+	# A patrol route and an escort cannot both own the destination.
+	_route = PackedVector3Array()
+	_route_index = 0
+	_route_wait = 0.0
+	if state == S_PATROL or state == S_ADVANCE or state == S_FLANK:
+		_enter_state(S_IDLE)
 
 
 func alert_to(pos: Vector3, certainty: float) -> void:
@@ -1873,6 +2283,44 @@ func has_known_target() -> bool:
 func is_engaged() -> bool:
 	return state == S_COMBAT or state == S_COVER or state == S_ADVANCE \
 			or state == S_FLANK or state == S_SUPPRESSED
+
+
+# ---------------------------------------------------- stealth and intel --
+
+## True while this soldier has spotted nobody at all: standing guard, walking a
+## route, or poking at a noise with nothing in his sights. That window is the
+## only one in which a takedown from behind can stay quiet.
+##
+## Anybody in combat or behind cover is out, and so is anybody holding a target,
+## whatever his state says. A target reference left over from a body that has
+## since been freed does not count: it is nothing he can still see.
+func is_unaware() -> bool:
+	if state == S_DEAD:
+		return false
+	if target != null and is_instance_valid(target):
+		return false
+	return state == S_IDLE or state == S_PATROL or state == S_ALERT
+
+
+## Takes the cry and the noise out of this soldier's death. The player calls it
+## just BEFORE the killing blow of a takedown from behind, never after. Without
+## it the man screams and hands the garrison the position of the knife.
+##
+## No effect on a soldier who is already dead: the death has already been heard.
+func silence_death() -> void:
+	if state == S_DEAD:
+		return
+	_silent_death = true
+
+
+## Site this soldier belongs to, written by the Director when it spawns him.
+## Feeds the intelligence the player takes off an officer's body.
+func set_home_site(site_id: int) -> void:
+	_home_site = site_id
+
+
+func home_site() -> int:
+	return _home_site
 
 
 # ------------------------------------------------------------------ probes --

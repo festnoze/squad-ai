@@ -1,4 +1,4 @@
-[gd_scene load_steps=13 format=3]
+[gd_scene load_steps=17 format=3]
 
 [ext_resource type="Script" path="res://src/main.gd" id="s_main"]
 [ext_resource type="Script" path="res://src/world/world.gd" id="s_world"]
@@ -12,6 +12,10 @@
 [ext_resource type="Script" path="res://src/ui/map_ui.gd" id="s_map_ui"]
 [ext_resource type="Script" path="res://src/ui/objectives_ui.gd" id="s_objectives_ui"]
 [ext_resource type="Script" path="res://src/ui/pause_menu.gd" id="s_pause_menu"]
+[ext_resource type="Script" path="res://src/ai/companion.gd" id="s_companions"]
+[ext_resource type="Script" path="res://src/audio/music.gd" id="s_music"]
+[ext_resource type="Script" path="res://src/ui/debrief_ui.gd" id="s_debrief_ui"]
+[ext_resource type="Script" path="res://src/render/quality.gd" id="s_quality"]
 
 [node name="Main" type="Node3D"]
 script = ExtResource("s_main")
@@ -57,6 +61,15 @@ script = ExtResource("s_objectives")
 [node name="Director" type="Node" parent="."]
 script = ExtResource("s_director")
 
+[node name="Companions" type="Node" parent="."]
+script = ExtResource("s_companions")
+
+[node name="Music" type="Node" parent="."]
+script = ExtResource("s_music")
+
+[node name="Quality" type="Node" parent="."]
+script = ExtResource("s_quality")
+
 [node name="Hud" type="CanvasLayer" parent="."]
 script = ExtResource("s_hud")
 
@@ -80,3 +93,9 @@ anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 script = ExtResource("s_pause_menu")
+
+[node name="DebriefUi" type="Control" parent="Screens"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("s_debrief_ui")

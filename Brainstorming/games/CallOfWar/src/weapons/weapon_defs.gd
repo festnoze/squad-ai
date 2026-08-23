@@ -19,7 +19,9 @@ const MP40 := 4
 const KAR98K := 5
 const MG42 := 6
 const GRENADE := 7
-const COUNT := 8
+const LUGER := 8
+const KAR98K_SCOPED := 9
+const COUNT := 10
 
 # Slots
 const SLOT_PRIMARY := 0
@@ -29,8 +31,8 @@ const SLOT_THROWN := 2
 # Ammunition types. Weapons sharing one of these share their reserve pool.
 const AMMO_3006 := 0        # .30-06 Springfield  (Garand, Springfield)
 const AMMO_45ACP := 1       # .45 ACP             (Thompson, M1911)
-const AMMO_9MM := 2         # 9 mm Parabellum     (MP40)
-const AMMO_792 := 3         # 7.92x57 Mauser      (Kar98k, MG42)
+const AMMO_9MM := 2         # 9 mm Parabellum     (MP40, Luger P08)
+const AMMO_792 := 3         # 7.92x57 Mauser      (Kar98k, scoped Kar98k, MG42)
 const AMMO_GRENADE := 4     # thrown ordnance
 const AMMO_TYPE_COUNT := 5
 
@@ -149,6 +151,26 @@ const _DEFS: Dictionary = {
 		"pen": 0.00, "ammo": AMMO_GRENADE, "weight": 0.6, "axis": false,
 		"eff": 4.0, "far": 9.0, "floor": 0.35,
 	},
+	LUGER: {
+		"name": "Pistolet Luger P08", "slot": SLOT_SECONDARY,
+		"damage": 30.0, "hs": 2.0, "rpm": 380.0, "auto": false,
+		"mag": 8, "reserve": 40, "reload": 2.2, "per_round": false,
+		"sp_hip": 0.0360, "sp_aim": 0.0110, "rec_p": 0.0200, "rec_y": 0.0060,
+		"fov": 0.92, "scope": false, "vel": 350.0,
+		"fire_sfx": "pistol_1911", "load_sfx": "reload_in",
+		"pen": 0.28, "ammo": AMMO_9MM, "weight": 0.9, "axis": true,
+		"eff": 20.0, "far": 58.0, "floor": 0.40,
+	},
+	KAR98K_SCOPED: {
+		"name": "Fusil Mauser Kar98k à lunette", "slot": SLOT_PRIMARY,
+		"damage": 78.0, "hs": 3.0, "rpm": 45.0, "auto": false,
+		"mag": 5, "reserve": 45, "reload": 4.2, "per_round": true,
+		"sp_hip": 0.0620, "sp_aim": 0.0011, "rec_p": 0.0460, "rec_y": 0.0100,
+		"fov": 0.25, "scope": true, "vel": 760.0,
+		"fire_sfx": "rifle_kar98", "load_sfx": "bolt",
+		"pen": 0.82, "ammo": AMMO_792, "weight": 4.4, "axis": true,
+		"eff": 220.0, "far": 520.0, "floor": 0.88,
+	},
 }
 
 ## Returned instead of null for an unknown id, so every accessor stays total.
@@ -193,6 +215,7 @@ static func is_valid(id: int) -> bool:
 static func all_ids() -> PackedInt32Array:
 	return PackedInt32Array([
 		M1_GARAND, THOMPSON, SPRINGFIELD, M1911, MP40, KAR98K, MG42, GRENADE,
+		LUGER, KAR98K_SCOPED,
 	])
 
 ## Every weapon that belongs in the given slot.
@@ -258,9 +281,9 @@ static func fire_interval(id: int) -> float:
 		return 1.0
 	return 60.0 / rate
 
-## True for the two bolt actions, which need a visible cycling animation.
+## True for the bolt actions, which need a visible cycling animation.
 static func is_bolt_action(id: int) -> bool:
-	return id == SPRINGFIELD or id == KAR98K
+	return id == SPRINGFIELD or id == KAR98K or id == KAR98K_SCOPED
 
 # --- Ammunition ------------------------------------------------------------
 
@@ -370,5 +393,9 @@ static func short_name(id: int) -> String:
 			return "MG 42"
 		GRENADE:
 			return "Grenade"
+		LUGER:
+			return "Luger"
+		KAR98K_SCOPED:
+			return "Kar98k à lunette"
 		_:
 			return "Aucune"

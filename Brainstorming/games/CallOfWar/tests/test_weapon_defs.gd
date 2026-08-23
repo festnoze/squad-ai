@@ -106,6 +106,52 @@ func test_axis_weapons_are_flagged() -> void:
 	done()
 
 
+## v2 appended two weapons. The eight v1 ids are written into player save files,
+## so they must keep their exact numbering forever: renumbering them would make
+## every existing campaign load the wrong gun.
+func test_v1_weapon_ids_never_moved() -> void:
+	eq(WeaponDefs.M1_GARAND, 0, "l'identifiant du Garand a bouge")
+	eq(WeaponDefs.THOMPSON, 1, "l'identifiant de la Thompson a bouge")
+	eq(WeaponDefs.SPRINGFIELD, 2, "l'identifiant de la Springfield a bouge")
+	eq(WeaponDefs.M1911, 3, "l'identifiant du M1911 a bouge")
+	eq(WeaponDefs.MP40, 4, "l'identifiant de la MP40 a bouge")
+	eq(WeaponDefs.KAR98K, 5, "l'identifiant du Kar98k a bouge")
+	eq(WeaponDefs.MG42, 6, "l'identifiant de la MG42 a bouge")
+	eq(WeaponDefs.GRENADE, 7, "l'identifiant de la grenade a bouge")
+	done()
+
+
+func test_the_two_v2_weapons_are_coherent() -> void:
+	# The Luger exists so an axis officer stops carrying an American service
+	# pistol, and it shares the MP40 magazine so looting one feeds the other.
+	eq(WeaponDefs.slot_of(WeaponDefs.LUGER), WeaponDefs.SLOT_SECONDARY,
+			"le Luger est une arme de poing")
+	check(WeaponDefs.is_axis_weapon(WeaponDefs.LUGER), "le Luger est une arme de l'Axe")
+	eq(WeaponDefs.ammo_type(WeaponDefs.LUGER), WeaponDefs.ammo_type(WeaponDefs.MP40),
+			"le Luger partage le 9 mm de la MP40")
+	check(not WeaponDefs.has_scope(WeaponDefs.LUGER), "un pistolet n'a pas de lunette")
+
+	# The scoped Kar98k is what makes an axis sniper readable at range, and it
+	# pays for its optic by reloading one round at a time.
+	eq(WeaponDefs.slot_of(WeaponDefs.KAR98K_SCOPED), WeaponDefs.SLOT_PRIMARY,
+			"le Kar98k a lunette est une arme d'epaule")
+	check(WeaponDefs.has_scope(WeaponDefs.KAR98K_SCOPED),
+			"le Kar98k a lunette doit avoir une lunette")
+	check(WeaponDefs.reloads_per_round(WeaponDefs.KAR98K_SCOPED),
+			"la lunette empeche le chargeur lame : rechargement coup par coup")
+	check(not WeaponDefs.is_automatic(WeaponDefs.KAR98K_SCOPED),
+			"le Kar98k a lunette reste a verrou")
+	eq(WeaponDefs.ammo_type(WeaponDefs.KAR98K_SCOPED), WeaponDefs.ammo_type(WeaponDefs.KAR98K),
+			"les deux Kar98k partagent le 7.92")
+	check(WeaponDefs.aim_fov_scale(WeaponDefs.KAR98K_SCOPED)
+					< WeaponDefs.aim_fov_scale(WeaponDefs.KAR98K),
+			"la lunette doit zoomer plus que les organes de visee nus")
+	check(WeaponDefs.spread_aim(WeaponDefs.KAR98K_SCOPED)
+					<= WeaponDefs.spread_aim(WeaponDefs.KAR98K),
+			"la lunette doit resserrer la dispersion, pas l'ouvrir")
+	done()
+
+
 func test_slots_are_valid() -> void:
 	eq(WeaponDefs.slot_of(WeaponDefs.M1911), WeaponDefs.SLOT_SECONDARY,
 			"le M1911 est une arme de poing")

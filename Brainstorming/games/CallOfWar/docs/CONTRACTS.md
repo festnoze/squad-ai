@@ -13,8 +13,19 @@ parallèle du code qui appelle exactement cette signature.
 ## 0. Règles du projet
 
 - Godot **4.7.1**, GDScript **typé statiquement** partout où c'est possible.
-- **Maillages et sons entièrement générés par code** au démarrage. Aucun modèle
-  3D, aucun fichier audio dans le dépôt.
+- **Maillages et sons générés par code** au démarrage. Aucun fichier audio dans
+  le dépôt.
+- **Personnages : modèles glTF riggés avec repli procédural.** Seule exception à
+  la règle ci-dessus, ajoutée après coup et confinée à `CharacterModels` :
+  `assets/models` contient deux personnages riggés (`soldier.glb` sous CC0,
+  `zombie.glb` sous **CC-BY 3.0**, attribution obligatoire, voir
+  `assets/models/CREDITS.md`). La règle qui reste vraie et qui doit le rester :
+  `Meshes.soldier_body()` sait **toujours** construire le soldat en boîtes, et un
+  modèle absent n'est jamais une erreur, seulement un rendu plus grossier.
+  N'écris jamais de code qui suppose qu'un fichier de `assets/models` existe.
+  Les deux modèles sont modelés face à **+Z** alors que le projet suppose **-Z**,
+  et exportés avec une armature à l'échelle ~100 : les deux corrections vivent
+  dans le nœud `Rig` construit par `CharacterModels.build()`, nulle part ailleurs.
 - **Textures : photographies CC0 avec repli procédural.** Le projet a d'abord été
   écrit sans aucun asset binaire ; `assets/textures` a été ajouté ensuite pour la
   qualité visuelle. La règle qui reste vraie et qui doit le rester : `Tex` sait
@@ -649,13 +660,84 @@ static func prop_mesh(kind: int, variant: int = 0) -> Mesh
 static func box(size: Vector3, material_key: String) -> Mesh
 static func cylinder(radius: float, height: float, sides: int, material_key: String) -> Mesh
 static func sphere(radius: float, material_key: String) -> Mesh
-## A humanoid body, built from boxes. `faction` is War.ALLIED / War.AXIS / War.NEUTRAL.
-## Returns a Node3D whose children are named exactly:
-## "Hips","Torso","Head","Helmet","ArmL","ArmR","LegL","LegR","Weapon"
-static func soldier_body(faction: int, variant: int) -> Node3D
+## A humanoid body. `faction` is War.ALLIED / War.AXIS / War.NEUTRAL.
+## Two shapes come back and callers must cope with both:
+##  - model installed for `species`: the imported rigged character from
+##    CharacterModels, a Skeleton3D driven by an AnimationPlayer, of which only
+##    "Weapon" is reachable by name;
+##  - otherwise the box soldier, whose children are named exactly
+##    "Hips","Torso","Head","Helmet","ArmL","ArmR","LegL","LegR","Weapon".
+## Both guarantee: feet on y = 0, about 1.80 m tall, facing -Z, "Weapon" at the
+## firing hand. Soldier tells them apart via CharacterAnim.attach().
+static func soldier_body(faction: int, variant: int, species: int = CharacterModels.SPECIES_SOLDIER) -> Node3D
 ## Weapon world model (dropped or carried by AI), by weapon id from WeaponDefs.
 static func weapon_model(weapon_id: int) -> Mesh
 static func clear_cache() -> void
+```
+
+---
+
+### 2.14b `src/world/character_models.gd` - `class_name CharacterModels extends RefCounted`
+
+Chargeur des deux personnages glTF. **Seul endroit du projet qui met un maillage
+binaire à l'écran.** Même règle que `Tex` : un modèle absent n'est pas une
+erreur, `Meshes.soldier_body()` retombe sur le soldat en boîtes.
+
+```gdscript
+class_name CharacterModels
+extends RefCounted
+
+const MODEL_DIR := "res://assets/models"
+const SPECIES_SOLDIER := 0
+const SPECIES_ZOMBIE := 1
+const TARGET_HEIGHT := 1.80
+## Part des apparitions de l'Axe portant le modele zombie. 0.0 = aucune.
+const ZOMBIE_SHARE := 0.30
+
+## True quand cette espece a un modele installe. Cache, les echecs compris.
+static func available(species: int) -> bool
+## Espece portee par une apparition. Purement cosmetique : un zombie est un
+## soldat ordinaire avec le meme cerveau et le meme fusil. A appeler AVANT
+## Soldier.setup(), qui construit le corps.
+static func pick_species(faction: int, rng: RandomNumberGenerator) -> int
+## Construit un personnage rigge, ou null si le modele manque. Le noeud rendu
+## porte le meme contrat que le soldat en boites : "SoldierBody", pieds en y = 0,
+## 1.80 m, face -Z, un enfant "Weapon" a la main qui tire.
+static func build(species: int, faction: int, variant: int, weapon_mesh: Mesh) -> Node3D
+## Tables lues par CharacterAnim.
+static func clips(species: int) -> Dictionary
+static func clip_prefix(species: int) -> String
+static func reference_speeds(species: int) -> Vector2
+static func clear_cache() -> void
+```
+
+---
+
+### 2.14c `src/ai/character_anim.gd` - `class_name CharacterAnim extends RefCounted`
+
+Traduit l'état de l'IA en clips d'animation. Tolérant à un clip manquant : le
+zombie n'a ni mort ni impact, et `has()` permet à `Soldier` de retomber sur la
+chute procédurale.
+
+```gdscript
+class_name CharacterAnim
+extends RefCounted
+
+## Null quand le corps ne porte pas d'AnimationPlayer, ce qui signale a
+## l'appelant que c'est un soldat en boites et que l'ancien code par membre
+## s'applique encore.
+static func attach(body: Node3D, species: int) -> CharacterAnim
+
+func has(key: String) -> bool
+## Coupe le noeud d'animation, pour les soldats au dela de FAR_DISTANCE.
+func set_active(on: bool) -> void
+## Choisit le clip de deplacement. `speed` en m/s au sol.
+func locomotion(speed: float, aiming: bool, delta: float) -> void
+func fire(speed: float) -> void
+func hit() -> void
+## Joue la mort et verrouille. False quand ce rig n'a pas de clip de mort :
+## l'appelant doit alors faire basculer le corps lui-meme.
+func die() -> bool
 ```
 
 ---
@@ -1506,3 +1588,691 @@ autoloads du projet, donc tout fichier qui mentionne `Game`, `War` ou `Sfx`
 refuse de compiler dans ce contexte. Les suites unitaires doivent donc être
 chargées par `load()` **à l'exécution**, et tout test qui a besoin des autoloads
 passe par la sonde `--smoke`.
+
+---
+
+# 11. Contrat v2 « Maquis »
+
+Ajouts et modifications pour la version 2, spécifiés dans `docs/PRD.md`. Mêmes
+règles qu'en section 0 : **toute signature ci-dessous est obligatoire au
+caractère près**.
+
+## 11.0 Règles de compatibilité (non négociables)
+
+- **Aucun identifiant persisté ne change.** Les ids d'armes, de sites et
+  d'objectifs sont écrits dans les sauvegardes. On ajoute en fin de plage, on ne
+  renumérote jamais.
+- **Tout `from_dict` tolère une clé absente.** Une sauvegarde v1 doit se charger
+  en v2 sans perte et sans erreur.
+- **Budgets inchangés** : 60 soldats vivants, 14 escouades, 1800 instances par
+  tuile, pire frame sous 16 ms. Les compagnons et les contre-attaques puisent
+  dans ces budgets, ils ne s'y ajoutent pas.
+- **Zéro nouvelle dépendance, zéro nouvel asset binaire.** La musique est
+  synthétisée par code comme le reste.
+
+## 11.1 `src/weapons/weapon_defs.gd` - deux armes de plus
+
+```gdscript
+const LUGER := 8
+const KAR98K_SCOPED := 9
+const COUNT := 10
+```
+
+Les huit ids existants **ne bougent pas**. `all_ids()` renvoie les dix.
+
+| Arme | Slot | Calibre (`ammo_type`) | Chargeur | Auto | Dégâts | Lunette |
+|---|---|---|---|---|---|---|
+| `LUGER` | SECONDARY | 2 (9 mm, partagé MP40) | 8 | non | 30 | non |
+| `KAR98K_SCOPED` | PRIMARY | 3 (7.92, partagé Kar98k/MG42) | 5 | non | 78 | **oui, x4** |
+
+- `LUGER` : `rpm` environ 380, `reserve_max` environ 40, `is_axis_weapon` vrai,
+  `fire_sample` = `"pistol_1911"` (aucun échantillon dédié, c'est acceptable).
+- `KAR98K_SCOPED` : à verrou, `reloads_per_round` **vrai** (le chargeur-lame ne
+  passe pas sous la lunette), `has_scope` vrai, `aim_fov_scale` environ 0.25,
+  `spread_aim` plus serré que le Kar98k nu, `fire_sample` = `"rifle_kar98"`.
+
+`Weapon.from_dict` doit **borner l'id lu** : un id hors de `0 .. COUNT - 1`
+retombe sur `M1_GARAND` au lieu de propager une valeur invalide.
+
+## 11.2 `src/core/war_state.gd` - état de campagne étendu
+
+```gdscript
+signal sector_contested(sector_id: int)
+
+var silent_captures: int
+var intel_found: int
+
+## Un secteur repris par l'Axe après une contre-attaque. C'est un état SEPARE de
+## la capture : `capture_sector` reste idempotent et un secteur capturé le reste,
+## donc `war_won` ne peut jamais se rejouer à l'envers.
+func mark_contested(sector_id: int) -> void
+func clear_contested(sector_id: int) -> void
+func is_sector_contested(sector_id: int) -> bool
+func contested_ids() -> PackedInt32Array
+
+## Niveau d'alerte le plus haut atteint depuis la dernière capture de secteur.
+## C'est lui qui décide si une capture compte comme silencieuse.
+func peak_alert() -> int
+func reset_peak_alert() -> void
+
+func record_silent_capture() -> void
+func record_intel() -> void
+
+## Bilan par secteur pour l'écran de débriefing.
+## `sector_result` renvoie {} pour un secteur jamais pris.
+func record_sector_result(sector_id: int, seconds: float, silent: bool) -> void
+func sector_result(sector_id: int) -> Dictionary   # {"seconds": float, "silent": bool}
+```
+
+`peak_alert` se met à jour tout seul dans `raise_alert`. `to_dict`/`from_dict`
+transportent les nouveaux champs.
+
+## 11.3 `src/audio/music.gd` - `class_name Music extends Node`
+
+Nouveau module. Node `Music` de la scène principale. **Synthétise ses propres
+tampons**, il ne touche pas à `SfxLib.NAMES` (dont chaque entrée est contrainte
+par la suite de tests).
+
+```gdscript
+class_name Music
+extends Node
+
+const STATE_CALM := 0
+const STATE_SEARCH := 1
+const STATE_COMBAT := 2
+const STATE_VICTORY := 3
+
+signal state_changed(state: int)
+
+func setup() -> void
+## Transition douce vers un état. VICTORY est un motif court qui retombe seul.
+func set_state(new_state: int) -> void
+func state() -> int
+## Appelé chaque frame par Main.
+func tick(delta: float) -> void
+func stop_all() -> void
+static func state_name(state: int) -> String   # francais
+```
+
+Contraintes : volume piloté par `Game.music_volume` (le curseur du menu pause
+devient enfin vrai) ; à volume nul, **silence total et aucun lecteur actif** ;
+en `STATE_CALM` la musique doit être **absente la plupart du temps** (nappe rare,
+moins de 20 % du temps) ; fondu enchaîné de 2 à 4 s entre états ; pas de mélodie
+exposée, on reste sur nappes et percussions.
+
+## 11.4 `src/player/player.gd` - jumelles, infiltration
+
+```gdscript
+signal binoculars_changed(active: bool)
+## Émis quand un corps à corps tue. `silent` est vrai si personne n'a rien vu.
+signal melee_kill(victim: Node, silent: bool)
+
+## Jumelles actives. Le HUD le lit chaque frame, comme `prompt_text`.
+var is_scoping: bool
+## Distance du point visé aux jumelles, -1.0 quand rien n'est visé.
+var scope_distance: float
+## Nom du site le plus proche du point visé, "" si aucun.
+var scope_site_name: String
+
+func toggle_binoculars() -> void
+```
+
+Jumelles : zoom x8 (`Game.fov / 8.0`, borné à 10 degrés minimum), sensibilité
+souris divisée d'autant. **Exclusives** avec la visée, le rechargement, le
+pansement, la grenade dégoupillée et l'affût monté ; tirer, sprinter ou changer
+d'arme les ferme.
+
+Corps à corps silencieux : avant le coup mortel, si la cible expose
+`is_unaware()` et qu'il est vrai, et que le joueur frappe dans le dos, appeler
+`victim.silence_death()` **avant** `take_damage`, et émettre `melee_kill(victim,
+true)`. Sinon `silent` est faux.
+
+## 11.5 `src/ai/soldier.gd` - discrétion, découverte, butin
+
+```gdscript
+## Vrai tant que ce soldat n'a repéré aucun ennemi (IDLE, PATROL, ou ALERT sans
+## cible). C'est ce qui autorise un takedown silencieux.
+func is_unaware() -> bool
+
+## Supprime le cri de mort et le bruit de la mort de ce soldat. À appeler AVANT
+## le coup mortel. Sans effet si le soldat est déjà mort.
+func silence_death() -> void
+
+## Site d'origine, posé par le Director. Sert au butin de renseignement.
+func set_home_site(site_id: int) -> void
+func home_site() -> int          # -1 si inconnu
+
+## Suit un noeud mobile au lieu d'un point fixe. Utilisé par les compagnons.
+func order_follow(target: Node3D, distance: float) -> void
+```
+
+**Découverte des corps** : un soldat dont le cône de vision contient le cadavre
+d'un camarade passe en `S_ALERT`, prévient son escouade sur la position du corps
+et monte `War.raise_alert(War.ALERT_SEARCHING)`. Un corps ne déclenche cela
+**qu'une fois** (marqueur posé sur le noeud du cadavre). Contrôle étalé dans le
+temps comme la perception, jamais chaque frame.
+
+**Butin d'officier** : à la mort, un soldat de rang `R_OFFICER` laisse, en plus
+de son arme, un noeud du groupe `"pickup"` portant
+`set_meta("intel_site", home_site())`.
+
+`_pick_weapon` : officier de l'Axe → `WeaponDefs.LUGER` (annule le
+contournement MP40) ; sniper de l'Axe → `WeaponDefs.KAR98K_SCOPED`.
+
+## 11.6 `src/ai/companion.gd` - `class_name CompanionManager extends Node`
+
+Nouveau module. Node `Companions` de la scène principale.
+
+```gdscript
+class_name CompanionManager
+extends Node
+
+const MAX_COMPANIONS := 2
+
+signal recruited(companion: Soldier)
+signal companion_lost(companion: Soldier)
+signal order_changed(companion: Soldier, following: bool)
+
+func setup(game_world: GameWorld, player_node: Player) -> void
+func tick(delta: float) -> void
+## Ce noeud peut-il être recruté maintenant (résistant libre, plafond non atteint) ?
+func can_recruit(candidate: Node) -> bool
+func recruit(candidate: Node) -> bool
+## Bascule suivre / tenir la position sur un compagnon déjà recruté.
+func toggle_order(candidate: Node) -> void
+func is_companion(candidate: Node) -> bool
+func count() -> int
+func members() -> Array          # Array[Soldier]
+func dismiss_all() -> void
+## Replace les compagnons proches autour d'une nouvelle position (voyage rapide).
+## Ceux à plus de `max_distance` du joueur sont laissés sur place.
+func regroup_at(pos: Vector3, max_distance: float) -> int
+```
+
+Règles : deux compagnons au maximum ; mort définitive ; ils ne tirent pas tant
+que `War.alert_level` vaut `ALERT_CALM` sauf si le joueur a tiré le premier ;
+ils comptent dans le budget global de soldats.
+
+## 11.7 `src/mission/director.gd` - contre-attaques, isolement, caches
+
+```gdscript
+signal counter_attack_started(sector_id: int)
+signal counter_attack_resolved(sector_id: int, held: bool)
+
+## Coupe les renforts venant d'un site dont le mât radio est détruit.
+func isolate_site(site_id: int) -> void
+func is_site_isolated(site_id: int) -> bool
+
+## -1 quand aucune contre-attaque n'est en cours.
+func active_counter_attack() -> int
+## Déclenchement immédiat, pour les objectifs et la sonde de test.
+func force_counter_attack(sector_id: int) -> void
+```
+
+Contre-attaque : au plus **une** active, jamais sur le village de départ, jamais
+pendant qu'un objectif à limite de temps tourne, annoncée 90 s avant par
+`event_announced`. Vaincue → `counter_attack_resolved(id, true)`. Subie →
+`counter_attack_resolved(id, false)` puis `War.mark_contested(id)`.
+
+Caches : à chaque secteur libéré, une caisse interactive à la planque qui
+recharge munitions et grenades, avec un délai de réutilisation de 5 minutes de
+jeu. Elle expose `interact(player)` et appartient au groupe `"usable"`.
+
+## 11.8 `src/mission/objectives.gd` - style de capture, isolement
+
+- À la capture d'un secteur : si `War.peak_alert() <= War.ALERT_SEARCHING`,
+  appeler `War.record_silent_capture()` ; dans tous les cas appeler
+  `War.record_sector_result(id, secondes, silencieux)` puis
+  `War.reset_peak_alert()`.
+- Quand une cible `"radio"` est signalée détruite alors que l'alerte est au plus
+  `ALERT_SEARCHING`, appeler `Director.isolate_site(site_id)`.
+- Un objectif `O_RECON` accompli appelle `War.record_intel()`.
+
+## 11.9 `src/ui/map_ui.gd` - secteurs contestés, voyage rapide
+
+```gdscript
+## Émis quand le joueur demande à voyager vers un secteur libéré. Main décide.
+signal travel_requested(sector_id: int)
+```
+
+La carte distingue trois états de secteur : tenu par l'Axe, libéré, **contesté**
+(`War.is_sector_contested`). Cliquer un secteur libéré et non contesté propose
+le voyage par un bouton contextuel. Les sites dont le renseignement a été trouvé
+affichent leur garnison restante et leurs ancres d'objectif.
+
+## 11.10 `src/ui/debrief_ui.gd` - `class_name DebriefUi extends Control`
+
+Nouveau module. Écran de fin de campagne, style papier comme le reste.
+
+```gdscript
+class_name DebriefUi
+extends Control
+
+signal closed()
+signal restart_requested()
+
+func setup(game_world: GameWorld, tracker: ObjectiveTracker) -> void
+func open() -> void
+func close() -> void
+func is_open() -> bool
+```
+
+Contenu : durée, éliminations, précision, tirs à la tête, captures
+silencieuses, morts, renseignements trouvés, et par secteur son temps et son
+style (assaut ou silencieux) via `War.sector_result`. Deux boutons : « Continuer
+à explorer » (émet `closed`) et « Nouvelle campagne » (émet `restart_requested`,
+avec confirmation en trois secondes comme le menu pause).
+
+## 11.11 `src/ui/hud.gd` - jumelles et annonces
+
+Aucune signature nouvelle. Le HUD lit `player.is_scoping`, `player.scope_distance`
+et `player.scope_site_name` chaque frame, comme il lit déjà `prompt_text`, et
+dessine le masque binoculaire (deux cercles sécants, graduations de distance)
+quand les jumelles sont actives. Il affiche aussi la bannière « Secteur libéré en
+silence » et les annonces de contre-attaque.
+
+## 11.12 `src/world/terrain_chunk.gd` - coût de démarrage
+
+`build_data` doit calculer la couleur et la normale des sommets **à partir de la
+grille de hauteurs déjà échantillonnée** (différences finies) au lieu de rappeler
+`Heightfield.color_at` (71 us) et `normal_at` (61 us) par sommet. Cible : prime
+de spawn sous 1.5 s contre 2.3 à 3.2 s aujourd'hui.
+
+`Heightfield.color_at` et `normal_at` **ne changent pas** : ils restent la
+référence, et les valeurs calculées par grille doivent rester visuellement
+indiscernables. Attention aux **bords de tuile** : deux tuiles voisines doivent
+échantillonner les mêmes points, sinon une couture apparaît.
+
+## 11.13 Arbre de scène v2
+
+Trois noeuds s'ajoutent à `scenes/main.tscn`, l'ordre de `setup()` devient :
+`world` → `sky` → `weather` → `vfx` → `player` → `objectives` → `director` →
+`companions` → `music` → `hud` → écrans.
+
+```
+Main
+├─ ...(inchangé)
+├─ Companions            Node    src/ai/companion.gd       (CompanionManager)
+├─ Music                 Node    src/audio/music.gd        (Music)
+└─ Screens
+   ├─ ...(inchangé)
+   └─ DebriefUi          Control src/ui/debrief_ui.gd      (DebriefUi)
+```
+
+
+---
+
+## 12. Contrat v3 « Conditions atmosphériques »
+
+Météo locale : chaque lieu de la poche porte un ciel qui lui est propre, et le
+largage d'ouverture se fait sous la brume. Ajout de la neige comme sixième ciel.
+
+### 12.0 Règles non négociables
+
+- Les cinq identifiants de ciel v1 ne bougent pas. `SNOW` est ajouté en fin de
+  plage (5), `KIND_COUNT` passe de 5 à 6.
+- Aucune signature publique v1 de `Weather` n'est modifiée. `kind_name()` reste
+  une méthode d'instance sans argument ; la table est simplement doublée par une
+  statique `name_of(kind)`.
+- `Weather.roll(seed, hour)` garde exactement sa signature et sa distribution.
+  Elle ne rend **jamais** `SNOW` : la neige n'atteint le ciel que par un lieu.
+- Zéro nouvelle dépendance, zéro nouvel asset binaire. La texture de flocon est
+  générée par code, comme le reste.
+
+### 12.1 Ciels (`src/render/weather.gd`)
+
+```gdscript
+const CLEAR := 0        # inchangé
+const OVERCAST := 1     # inchangé
+const RAIN := 2         # inchangé
+const FOG := 3          # inchangé
+const STORM := 4        # inchangé
+const SNOW := 5         # v3
+const KIND_COUNT := 6
+
+static func name_of(kind: int) -> String     # v3, table adressable sans instance
+func kind_name() -> String                   # v1, délègue à name_of(kind)
+```
+
+La table d'humeurs gagne deux canaux : `_P_SNOW` (pilote l'émetteur de flocons)
+et `_P_COLD` (tire la couleur du brouillard vers une teinte froide, à luminance
+constante pour ne pas éclairer la nuit).
+
+### 12.2 Climat d'un lieu
+
+```gdscript
+## Biome dominant AUTOUR d'un site. Voter au centre ne sert à rien : tout site
+## est aplani et porte une route, les 22 lieux répondaient B_ROAD.
+static func site_biome(field: Heightfield, center: Vector2, radius: float) -> int
+
+## Ciel signature d'un lieu. Fonction pure, donc testable sans monde.
+static func climate_for(biome: int, ground: float, world_seed: int, site_id: int) -> int
+
+## Tirage horaire penché vers le climat local. climate = -1 en plein champ.
+static func roll_at(world_seed: int, hour: int, climate: int) -> int
+```
+
+Règles de `climate_for`, dans cet ordre (l'altitude prime sur le biome) :
+
+| Condition | Ciel |
+|---|---|
+| `ground >= SNOW_ALTITUDE` (30 m) | `SNOW`, ou `RAIN` si `ALLOW_SNOW` est faux |
+| biome marais ou eau | `FOG` |
+| biome roche | `SNOW`, ou `STORM` si `ALLOW_SNOW` est faux |
+| `ground <= LOW_GROUND` (10 m) | `FOG` (la brume stagne dans les fonds) |
+| biome forêt | `FOG` ou `OVERCAST` selon le hash |
+| `ground >= HIGH_GROUND` (26 m) | `STORM` ou `RAIN` |
+| sinon | `RAIN` / `OVERCAST` / `CLEAR` / `STORM` par hash |
+
+Mesuré sur huit graines : chaque campagne propose les six ciels, avec 2 à 5
+lieux de brouillard et 1 à 3 de neige sur 22.
+
+### 12.3 Pilotage
+
+```gdscript
+func set_climate(new_climate: int, transition: float = CLIMATE_TRANSITION) -> void
+func climate() -> int
+func begin_opening_fog() -> void
+```
+
+- `set_climate` applique le climat **immédiatement** (le joueur doit voir le
+  changement en entrant), puis `_tick_auto` penche le tirage horaire vers lui
+  via `roll_at`. Hors plage ou -1 rend le ciel au tirage de campagne.
+- Priorité : un `set_weather()` explicite tient `MANUAL_HOURS` heures et gagne
+  contre le climat local. Le climat est mémorisé pendant ce temps et s'applique
+  dès l'expiration du maintien.
+- `begin_opening_fog()` n'est appelé que sur une campagne neuve (aucune
+  sauvegarde valide), depuis `Main._ready` après `_load_campaign`.
+
+`Main` fournit la géographie et rien d'autre :
+
+```gdscript
+func _build_climates() -> void          # une fois, après world.setup
+func _drive_climate(delta: float) -> void   # sondé toutes les CLIMATE_POLL (0.5 s)
+func _climate_region(site: Layout.Site) -> float   # radius * 4, borné [190, 400] m
+```
+
+`Main._roll_weather()` est **supprimé**. Il doublonnait `Weather._tick_auto()` et
+ne faisait que le suspendre trois heures à chaque appel via le maintien manuel de
+`set_weather`. Il y a désormais un seul propriétaire du ciel.
+
+### 12.4 Neige
+
+Émetteur séparé de la pluie (`Snow`), jamais actif en même temps. Les deux
+diffèrent sur tout ce qui coûterait un redémarrage à changer : maillage, mode
+billboard, durée de vie, budget.
+
+- Émission dans une **colonne** de `SNOW_COLUMN` (12 m) de demi-hauteur centrée
+  à `SNOW_CENTRE` (3 m) au dessus du joueur, et non depuis un plan comme la
+  pluie : un flocon met dix secondes à traverser le champ de vision, assez pour
+  que l'œil voie le bord du plan d'émission comme un plafond de neige.
+- Chute à vitesse terminale : gravité faible contre amortissement fort, ce qui
+  se stabilise vers `g / damping`, soit 1,0 à 2,0 m/s selon le flocon.
+- Turbulence à grande échelle pour le balancement, sinon les flocons tombent sur
+  rails et lisent comme de la pluie blanche.
+- Texture de flocon générée par code : chute d'alpha douce sur tout le rayon,
+  contour légèrement irrégulier, pic d'opacité `FLAKE_PEAK_ALPHA` (0,85).
+  **L'alpha n'est porté que par la couleur de particule** : Godot multiplie
+  couleur de process, alpha d'albédo et alpha de texture, donc une valeur
+  inférieure à 1 dans plus d'un des trois fait disparaître la neige.
+- Fondu de proximité (0,6 m à 2,6 m) : la colonne d'émission contient la caméra,
+  et sans lui un flocon à trente centimètres remplit le quart de l'écran.
+
+### 12.5 Correctifs de réglage v1
+
+Deux défauts corrigés dans la table d'humeurs, tous deux invisibles en lecture :
+
+- L'opacité de brouillard de `FOG` valait 0,55 alors que `_apply` ne fait que
+  `maxf` avec ce que le ciel a déjà posé (0,42 dégagé à 0,78 couvert). Elle
+  était donc **totalement inerte** : un banc de brouillard rendait exactement
+  comme un après-midi couvert. Portée à 0,97, portée de brouillard à 0,12.
+  `RAIN`, `STORM`, `SNOW` et `OVERCAST` réalignés sur la même échelle.
+- `fog_depth_begin` était figé à 16 % de la portée. Il suit maintenant
+  l'intensité (16 % au calme, 4 % dans un orage) : le champ proche restait net
+  à l'intérieur d'un banc de brouillard, ce qui lisait comme une faible distance
+  d'affichage et non comme du brouillard.
+
+Le commentaire de `roll()` affirmait que les orages n'éclatent que l'après-midi.
+C'est faux : la règle 13h-20h les y favorise, mais la queue de distribution
+diurne peut en produire un le matin. Le commentaire est corrigé, le
+comportement livré est inchangé. La seule garantie dure est la bande de nuit
+(22h-3h), qui exclut orage **et** brouillard.
+
+### 12.6 Tests
+
+`tests/test_weather.gd` (24 méthodes) couvre la partie pure : identifiants figés,
+table d'humeurs complète et bornée, ordre des pénalités de visibilité,
+déterminisme du tirage, absence de neige dans le tirage de campagne, bandes
+horaires, et les règles de `climate_for`.
+
+Deux gardes de régression valent d'être signalés :
+
+- `test_the_biome_vote_never_returns_a_man_made_surface` échoue sur les 20 sites
+  concernés si `site_biome` revient à échantillonner au centre.
+- `test_a_climate_leans_the_roll_without_freezing_it` compte sur **toutes** les
+  graines et non graine par graine : 24 tirages à p = 0,62 varient assez pour
+  qu'une campagne passe légitimement sous la moitié.
+
+La phase 8 de `tests/smoke_probe.gd` couvre le câblage : carte des climats
+complète, `set_climate` qui déplace vraiment le ciel, refus d'un climat hors
+plage, priorité du maintien manuel (forcée dans les deux sens en écrivant
+`_manual_skip`), et exclusivité des deux émetteurs.
+
+
+---
+
+## 13. Contrat v4 « Lisibilite et fluidite »
+
+Canopee refaite, cap corrige, echelle de qualite adaptative, et une allure de
+marche pour les longues distances.
+
+### 13.0 Regles non negociables
+
+- Aucune signature publique v1 modifiee. `Hud.setup` garde ses cinq arguments ;
+  le gouverneur de qualite arrive par un `Hud.set_quality()` separe.
+- Le gouverneur ne touche **jamais** a `Game.view_distance` : c'est une
+  preference sauvegardee, et un regulateur qui reecrit le fichier de reglages
+  du joueur dans son dos est un defaut, pas une fonctionnalite.
+- Zero nouvelle dependance, zero nouvel asset binaire.
+
+### 13.1 Canopee (`textures.gd`, `materials.gd`, `meshes.gd`)
+
+Deux defauts qui se cumulaient, tous deux invisibles a la lecture :
+
+- **Le materiau `foliage` est une carte a decoupe alpha**, pas un volume.
+  `_build_leaves()` met son alpha a zero au dela de 45 % du rayon UV, pour que
+  la carte lise comme une touffe flottant dans son quad. Applique a un
+  ellipsoide de couronne, dont les UV couvrent toute la texture, il effacait
+  l'essentiel du feuillage : le joueur voyait le ciel a travers chaque arbre.
+- **L'albedo etait multiplie trois fois vers le noir.** La texture est bornee
+  comme tout albedo (plafond de bande), puis multipliee par la couleur de
+  sommet `_leaf_shade` (0,80 a 1,0) puis par la couleur d'instance du
+  MultiMesh. Les bois rendaient en eclats quasi noirs.
+
+Ajouts, rien renomme :
+
+```gdscript
+Tex.get_texture("canopy")     # masse de feuilles dense, opaque, sans decoupe
+MatLib.get_material("canopy") # opaque, CULL_BACK, teinte 1.62/1.74/1.30
+```
+
+La teinte au dessus de l'unite suit exactement la regle que
+`_build_grass_blade` documente deja. `meshes.gd` pointe ses cinq generateurs
+(chene, pin, pommier, buisson, haie) sur `"canopy"` ; `"foliage"` reste en
+place pour de vraies cartes de feuilles, qui n'existent pas encore.
+
+Geometrie : les masses de couronne passent de 4 a 6 (chene) et de 3 a 5
+(pommier), avec un ecartement reduit et un rayon augmente, en 6 anneaux par
+10 segments au lieu de 4 par 8. L'ancien ecartement atteignait 1,6 m pour un
+rayon de 1,35 m, donc les masses exterieures ne se touchaient pas.
+
+### 13.2 Cap des roses des vents (`hud.gd`, `map_ui.gd`)
+
+`Hud._player_heading_rad()` et `MapUi._draw_player()` lisaient le cap sur
+`Player.global_transform`. Le corps est un `CharacterBody3D` **qui ne tourne
+jamais** : `Player._move` fabrique sa propre base a partir de `rig.rotation.y`.
+La bande de compas, les arcs de degats et le cone de vue de la carte etaient
+donc figes plein nord pour toute la campagne. Les trois lisent maintenant le
+support de camera, qui porte le lacet et rien que le lacet (le tangage est sur
+un pivot enfant), donc le cap reste stable meme en visant le zenith.
+
+### 13.3 Echelle de qualite (`src/render/quality.gd`, nouveau)
+
+`QualityGovernor`, noeud `Quality` de `scenes/main.tscn`. Cinq echelons, un pas
+a la fois, avec hysteresis (1,2 s de pression pour descendre, 6 s de marge pour
+remonter, 2,5 s de repos entre deux changements).
+
+| echelon | echelle 3D | distance props | MSAA | filtre ombres | carte ombres |
+|---|---|---|---|---|---|
+| 0 | 1,00 | 520 m | 4x | 3 | 4096 |
+| 1 | 0,88 | 430 m | 4x | 2 | 4096 |
+| 2 | 0,78 | 340 m | 2x | 1 | 2048 |
+| 3 | 0,68 | 260 m | off | 0 | 2048 |
+| 4 | 0,58 | 190 m | off | 0 | 1024 |
+
+Le HUD reste en resolution native : seule l'image 3D est mise a l'echelle.
+
+Les props rejoignent le groupe `prop_batch` et recoivent
+`visibility_range_end` avec `VISIBILITY_RANGE_FADE_SELF`, donc la vegetation
+lointaine se dissout au lieu d'apparaitre d'un coup a la frontiere d'un anneau.
+`QualityGovernor.prop_draw_distance` est une statique lue par les tuiles a la
+creation, pour qu'une tuile chargee alors que l'echelle est deja descendue
+naisse a la bonne distance.
+
+Reglage `Game.adaptive_quality` (defaut vrai), persiste dans `settings.cfg`.
+
+### 13.4 Occlusion : mesuree et refusee
+
+`site_builder` sait fabriquer un `BoxOccluder3D` par structure posee, mesure
+depuis ses bornes reelles puis retreci (`_OCC_INSET` 0,78 sur les cotes,
+`_OCC_ROOF` 0,62 en hauteur) pour rester **strictement a l'interieur** du
+solide : un occludeur qui revendique plus que le batiment ne remplit fait
+disparaitre des objets pourtant visibles.
+
+Le resultat mesure ne justifie pas de l'activer. Trois passes dans le plus
+grand village de la carte, 1600x900, 400 images chacune :
+
+| occlusion | moyennes |
+|---|---|
+| activee | 16,88 / 19,30 / 14,91 ms |
+| desactivee | 13,16 / 15,08 / 17,08 ms |
+
+Soit ~17,0 ms contre ~15,1 ms, avec une dispersion telle que la seule lecture
+honnete est « aucun gain ici, peut-etre une perte ». Le monde est un bocage
+ouvert et le plus grand village n'a produit que quatorze boites : il n'y a pas
+assez a cacher pour payer une passe de rasterisation CPU par image.
+
+`rendering/occlusion_culling/use_occlusion_culling` reste donc a `false`, et
+`_spawn_occluders` teste ce reglage avant de creer quoi que ce soit. Le code
+est conserve et non supprime parce que la conclusion porte sur CE monde : une
+ville dense ou une distance d'affichage plus grande deplacerait l'equilibre.
+
+### 13.5 Allure de marche (`player.gd`)
+
+La poche fait 4 km et une garnison est couramment a 1500 m, soit trois minutes
+et demie de sprint en ligne droite. `MARCH_SPEED` (12,6 m/s) est atteinte apres
+`MARCH_RAMP` (4 s) de course propre, en lissage `smoothstep`, ce qui ramene la
+meme distance a environ une minute quarante.
+
+Annulee immediatement, et quatre fois plus vite qu'elle ne se gagne, par :
+visee, accroupissement, coup de crosse, pansement, rechargement, bruit de tir
+recent, ou une alerte au dessus de `ALERT_CALM`. Elle ne peut donc jamais
+accelerer un accrochage.
+
+### 13.6 Compteur d'images
+
+La premiere ligne de l'incrustation `F3` donne images par seconde, temps par
+image, **pire image de la derniere seconde**, echelon de qualite et echelle de
+rendu. Le compteur autonome `show_fps` de la v1 reste independant.
+
+### 13.7 Tests
+
+Phase 9 de `smoke_probe.gd` : quatre quarts de tour doivent donner quatre caps
+distincts, le lacet nul se lit plein nord et un quart de tour a droite plein
+est. Le garde-fou echoue bien sur l'ancien code, qui rendait exactement 0 aux
+quatre orientations.
+
+Piege du harnais : `CameraRig.yaw` est une simple variable, `rotation.y` n'est
+ecrit que par `_apply()`, appele une fois par image depuis `Player.tick`. Une
+sonde qui ecrit le lacet et lit la transformation dans la meme image mesure
+l'angle de l'image precedente et conclut a tort que rien n'a bouge. D'ou
+`_settle_rig()`.
+
+Piege de test instable corrige au passage : la verification de priorite du
+climat codait `STORM` en dur et echouait quand le tirage de campagne avait
+justement mis un orage. Elle choisit maintenant un ciel different de celui en
+cours.
+
+### 13.8 Reste ouvert
+
+**Le modele d'arme en vue subjective est trop gros.** Mesure : la boite
+englobante du M1 Garand couvre environ 340 x 425 px sur 1600x900, sa crosse
+arrivant a 27 cm de l'oeil, et elle barre le milieu de l'ecran. Prouve en
+masquant le seul noeud `Viewmodel/Rig/Model`, qui fait disparaitre le bloc.
+La transformation est pourtant la pose de hanche normale (`_hip_position`
+(0,26, -0,23, -0,46), echelle 0,46), donc le correctif est un reglage de
+ressenti sur des valeurs accordees a la main, pas un bug mecanique : laisse a
+la decision du joueur plutot que change unilateralement.
+
+
+---
+
+## 14. Correctif « Joueur gele »
+
+Un seul defaut, deux symptomes signales separement : plus aucune commande
+(souris et clavier), et un fusil enorme barrant le milieu de l'ecran.
+
+### 14.1 La cause
+
+`Main._ready()` fige `_spawn` sur la zone de largage, puis `_load_campaign()`
+restaure la position **sauvegardee** du joueur, qui peut etre a l'autre bout de
+la poche. `_release_player_when_ground_is_ready()` attendait le sol sous
+`_spawn`, alors que le streaming suit le **joueur** : la tuile attendue n'etait
+jamais construite. Mesure sur une vraie sauvegarde : joueur en
+(431, -112), `_spawn` en (-1282, -191), soit **1715 m d'ecart**, et
+`is_ground_ready(_spawn)` faux indefiniment.
+
+Le joueur restait donc en `PROCESS_MODE_DISABLED` pour toute la session. Un
+noeud desactive ne recoit ni `_process` ni `_unhandled_input`, d'ou la perte
+simultanee du clavier **et** de la souris.
+
+Le fusil geant vient de la meme racine : `Viewmodel.update()` est appele depuis
+`Player.tick`, donc un joueur gele laisse le support d'arme a l'origine (0,0,0)
+au lieu de sa pose de hanche (0.26, -0.23, -0.46). La camera se retrouve
+**a l'interieur de la crosse**, et on voit l'interieur du maillage comme une
+boite creuse occupant un tiers de l'ecran. Rien n'etait mal dimensionne.
+
+### 14.2 Le correctif
+
+- `_load_campaign()` recale `_spawn` sur la position restauree, juste apres
+  `player.from_dict()`. Le point d'attente suit le joueur.
+- `_release_player_when_ground_is_ready(delta)` prend un `delta` et porte un
+  **coupe-circuit** : passe `HOLD_LIMIT` (12 s), le joueur est libere quoi qu'il
+  arrive et repose sur la hauteur que donne le champ de relief. Tomber a travers
+  une tuile se rattrape, une partie injouable non.
+- `QualityGovernor.defer()` jette la pression accumulee sans bouger l'echelle.
+  Appele tant que le joueur est gele, puis pendant `SETTLE_LIMIT` (6 s) apres sa
+  liberation. Sans cela l'echelle lisait la phase de chargement comme une
+  machine incapable et tombait a son pire echelon (4/4, rendu a 0.58) avant la
+  premiere image jouable.
+
+### 14.3 Garde-fou
+
+Phase 10 de `smoke_probe.gd`, `_check_playable()` : joueur libere, `can_process()`
+vrai, point d'attente a moins de 220 m du joueur, sol present sous lui, et
+support d'arme hors de l'origine avec un z dans [-1.2, -0.2].
+
+Verifie en retirant la seule ligne `_spawn = player.global_position` : les six
+verifications tombent, dont « le point d'attente a derive loin du joueur
+(obtenu 1715.59) ».
+
+### 14.4 A retenir
+
+Ce defaut a survecu a une compilation propre, a 9052 verifications unitaires et
+a 660 verifications d'integration. Aucune de ces trois barrieres ne posait la
+question « le joueur peut-il jouer ? ». Une sonde d'integration qui ne verifie
+pas l'etat jouable ne verifie pas le jeu.
+
+Deuxieme lecon, sur le diagnostic : le symptome visible (un fusil trop gros)
+etait a deux causalites du defaut reel. Chercher la cause du fusil dans les
+constantes du modele d'arme, qui est ou j'ai commence, n'aurait jamais abouti.

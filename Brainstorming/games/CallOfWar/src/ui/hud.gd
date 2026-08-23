@@ -8,8 +8,12 @@
 ##
 ## Everything is drawn from code. Two full screen painters sandwich the widget
 ## layer: `_back` carries the vignette, the dynamic crosshair, the damage arcs
-## and the hitmarker, `_front` carries the scope mask and the death fade so
+## and the hitmarker, `_front` carries the scope masks and the death fade so
 ## they cover the labels.
+##
+## v2 adds the field glasses mask (two overlapping circles, distance graduations
+## and the measured range), and the campaign pressure readouts: a counter attack
+## in progress, and a liberated sector that fell back into Axis hands.
 class_name Hud
 extends CanvasLayer
 
@@ -33,6 +37,31 @@ const _HITMARKER_LIFE := 0.26
 const _BANNER_FADE := 0.45
 ## Compass half span in degrees.
 const _COMPASS_SPAN := 60.0
+
+## Radius of one field glass tube, as a fraction of the smaller screen side.
+const _BINO_RADIUS := 0.33
+## Half the distance between the two tube centres, as a fraction of the radius.
+## Below 1.0 the two discs overlap AND both contain the point halfway between
+## them, which is what makes the union star shaped and cheap to fill.
+const _BINO_GAP := 0.58
+## Outline resolution of the union of the two discs.
+const _BINO_SEGMENTS := 192
+## Seconds the mask takes to open or close.
+const _BINO_SPEED := 5.0
+## Above this the field glasses own the screen and the widget layer steps aside.
+const _BINO_HIDE_AT := 0.35
+
+## Seconds between two campaign situation polls: counter attack in progress,
+## contested sectors, intel found. All three move on a human timescale, none of
+## them is worth a per frame lookup in the busiest module of the project.
+const _SITUATION_PERIOD := 0.5
+
+## Geometry of the contested sector line, shared by its label and by the rubber
+## stamp frame the back painter draws around it.
+const _CONTESTED_TOP := 84.0
+const _CONTESTED_HEIGHT := 22.0
+const _CONTESTED_WIDTH := 314.0
+const _CONTESTED_RIGHT := 26.0
 
 const _CARDINALS: PackedStringArray = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"]
 const _BIOME_NAMES: PackedStringArray = [
@@ -58,6 +87,7 @@ var _player: Player = null
 var _tracker: ObjectiveTracker = null
 var _sky: SkyController = null
 var _weather: Weather = null
+var _quality: QualityGovernor = null
 var _world: GameWorld = null
 
 # --- Layers ------------------------------------------------------------------
@@ -83,6 +113,8 @@ var _reserve_label: Label = null
 var _grenade_label: Label = null
 var _health_label: Label = null
 var _alert_label: Label = null
+var _contested_label: Label = null
+var _counter_label: Label = null
 var _prompt_label: Label = null
 var _toast_box: VBoxContainer = null
 var _banner_box: VBoxContainer = null
@@ -109,6 +141,28 @@ var _is_aiming: bool = false
 var _has_scope: bool = false
 var _scope_t: float = 0.0
 
+# --- Field glasses (contract 11.11) ------------------------------------------
+
+var _bino_active: bool = false
+## Eased 0..1 opening of the binocular mask.
+var _bino_t: float = 0.0
+## Metres to whatever the glasses point at, -1.0 when nothing is aimed at.
+var _bino_distance: float = -1.0
+var _bino_site: String = ""
+
+# --- Campaign pressure -------------------------------------------------------
+
+## Sector under counter attack right now, -1 when none. Polled off the Director.
+var _counter_sector: int = -1
+## Seconds the current counter attack has been showing, drives the pulse.
+var _counter_t: float = 0.0
+## Ready made line about contested sectors, "" when the map is clean.
+var _contested_text: String = ""
+## Last seen `War.intel_found`, -1 before the first poll.
+var _intel_seen: int = -1
+var _director: Node = null
+var _situation_accum: float = 999.0
+
 var _hitmarker_t: float = 0.0
 var _hit_killed: bool = false
 var _hit_headshot: bool = false
@@ -122,8 +176,15 @@ var _banner_t: float = 0.0
 var _banner_life: float = 0.0
 
 var _prompt_override: String = ""
-var _prompt_probed: bool = false
-var _prompt_available: bool = false
+
+## Optional public fields of the player, probed once. The player module is
+## written alongside the HUD, so every read degrades to a neutral value when the
+## field is not there yet.
+var _player_probed: bool = false
+var _has_prompt: bool = false
+var _has_scoping: bool = false
+var _has_scope_distance: bool = false
+var _has_scope_site: bool = false
 
 ## Objective id -> seconds elapsed since it started, for the countdown.
 var _obj_elapsed: Dictionary = {}
@@ -151,12 +212,22 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_tick_timers(delta)
+	_refresh_binoculars(delta)
+	_tick_situation(delta)
+	_apply_visibility()
 	if not _paused:
-		_refresh_gameplay(delta)
+		if _observing():
+			# Behind the glasses the widget layer is hidden, but the vignette
+			# still paints from live health, so keep that one value fresh.
+			_refresh_health()
+		else:
+			_refresh_gameplay(delta)
+			_refresh_pressure(delta)
 	_refresh_overlay(delta)
 	_back.queue_redraw()
 	_front.queue_redraw()
-	_compass.queue_redraw()
+	if _compass.visible and _gameplay.visible:
+		_compass.queue_redraw()
 
 
 # =============================================================================
@@ -189,12 +260,25 @@ func setup(player_node: Player, tracker: ObjectiveTracker, sky_ctl: SkyControlle
 		_connect(_tracker, "campaign_completed", _on_campaign_completed)
 	_connect(War, "sector_captured", _on_sector_captured)
 	_connect(War, "alert_changed", _on_alert_changed)
+	_connect(War, "sector_contested", _on_sector_contested)
 	_connect(Game, "settings_changed", refresh_settings)
 
 	_dead = false
 	_death_t = 0.0
 	_death_box.visible = false
 	_death_hint.text = "Appuyez sur %s pour reprendre le combat." % _action_key_label("use")
+	# A campaign loaded from a save arrives with intel already in the bank: seed
+	# the counter so the load does not fire a burst of "renseignement" toasts.
+	_player_probed = false
+	_director = null
+	_intel_seen = -1
+	_bino_t = 0.0
+	_bino_active = false
+	_counter_sector = -1
+	_counter_t = 0.0
+	_contested_text = ""
+	_situation_accum = 999.0
+	_refresh_situation()
 	_touch_all()
 	refresh_settings()
 
@@ -248,8 +332,7 @@ func flash_hitmarker(killed: bool, headshot: bool) -> void:
 
 func set_paused(paused: bool) -> void:
 	_paused = paused
-	_gameplay.visible = not paused
-	_back.visible = not paused
+	_apply_visibility()
 
 
 ## "" hides the action prompt.
@@ -417,6 +500,37 @@ func _build_status() -> void:
 	_alert_label.offset_bottom = 80.0
 	_gameplay.add_child(_alert_label)
 
+	# Directly under the alert level, because losing a sector IS an alert state,
+	# just one that outlives the patrol that caused it. The wording says it in
+	# words, the stamp frame behind it says it as a shape: never colour alone.
+	_contested_label = Label.new()
+	_contested_label.name = "Contested"
+	_style_label(_contested_label, 13, _STAMP.lightened(0.25), 3)
+	_contested_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_contested_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_contested_label.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_contested_label.offset_left = -(_CONTESTED_WIDTH + _CONTESTED_RIGHT)
+	_contested_label.offset_top = _CONTESTED_TOP
+	_contested_label.offset_right = -_CONTESTED_RIGHT
+	_contested_label.offset_bottom = _CONTESTED_TOP + _CONTESTED_HEIGHT
+	_contested_label.visible = false
+	_gameplay.add_child(_contested_label)
+
+	# A counter attack is not an event that scrolls past, it is a state that
+	# lasts: centred under the compass, pulsing, impossible to lose track of.
+	_counter_label = Label.new()
+	_counter_label.name = "CounterAttack"
+	_style_label(_counter_label, 16, _STAMP.lightened(0.15), 5)
+	_counter_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_counter_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_counter_label.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	_counter_label.offset_left = -320.0
+	_counter_label.offset_top = 116.0
+	_counter_label.offset_right = 320.0
+	_counter_label.offset_bottom = 144.0
+	_counter_label.visible = false
+	_gameplay.add_child(_counter_label)
+
 
 func _build_prompt() -> void:
 	_prompt_label = Label.new()
@@ -440,7 +554,8 @@ func _build_overlay() -> void:
 	_toast_box.alignment = BoxContainer.ALIGNMENT_BEGIN
 	_toast_box.set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	_toast_box.offset_left = -440.0
-	_toast_box.offset_top = 86.0
+	# Pushed down in v2: the contested sector line now sits under the alert.
+	_toast_box.offset_top = 118.0
 	_toast_box.offset_right = -26.0
 	_toast_box.offset_bottom = 420.0
 	_toast_box.add_theme_constant_override("separation", 4)
@@ -678,6 +793,110 @@ func _refresh_prompt() -> void:
 	_prompt_label.text = text
 
 
+# --- Field glasses -----------------------------------------------------------
+
+## True once the mask is open enough to own the screen. The widget layer, the
+## crosshair and the compass step aside then: with the glasses up the player is
+## observing, not fighting, and nothing he could act on is one keypress away.
+func _observing() -> bool:
+	return _bino_t > _BINO_HIDE_AT
+
+
+## The HUD never decides what is visible in two places. Pause hides the widget
+## layer and the back painter, the field glasses hide the widget layer only:
+## the vignette and the damage arcs must survive, because taking fire while
+## observing is exactly the moment the player needs to be told.
+func _apply_visibility() -> void:
+	_gameplay.visible = not _paused and not _observing()
+	_back.visible = not _paused
+
+
+## Reads `is_scoping`, `scope_distance` and `scope_site_name` off the player the
+## same defensive way as `prompt_text`, and eases the mask open.
+func _refresh_binoculars(delta: float) -> void:
+	_bino_active = bool(_read_player_field("is_scoping", TYPE_BOOL, false))
+	var target := 0.0
+	if _bino_active:
+		target = 1.0
+	_bino_t = move_toward(_bino_t, target, delta * _BINO_SPEED)
+	if not _bino_active:
+		if _bino_t <= 0.0:
+			_bino_distance = -1.0
+			_bino_site = ""
+		return
+	# Glasses and rifle scope are exclusive by contract; close the scope mask
+	# rather than trusting the two eased values never to overlap.
+	_scope_t = move_toward(_scope_t, 0.0, delta * 8.0)
+	_bino_distance = float(_read_player_field("scope_distance", TYPE_FLOAT, -1.0))
+	_bino_site = String(_read_player_field("scope_site_name", TYPE_STRING, ""))
+
+
+# --- Campaign pressure -------------------------------------------------------
+
+## Counter attacks, contested sectors and intel all move on a human timescale,
+## so they are polled twice a second instead of every frame.
+func _tick_situation(delta: float) -> void:
+	_situation_accum += delta
+	if _situation_accum < _SITUATION_PERIOD:
+		return
+	_situation_accum = 0.0
+	_refresh_situation()
+
+
+func _refresh_situation() -> void:
+	var previous := _counter_sector
+	_counter_sector = _active_counter_attack()
+	if _counter_sector != previous:
+		_counter_t = 0.0
+		if _counter_sector >= 0:
+			_counter_label.text = ">>  CONTRE-ATTAQUE SUR %s  <<" % _site_name(_counter_sector).to_upper()
+
+	var contested := War.contested_ids()
+	var text := ""
+	if contested.size() == 1:
+		text = "REPRIS PAR L'AXE : %s" % _site_name(contested[0]).to_upper()
+	elif contested.size() > 1:
+		text = "%d SECTEURS REPRIS PAR L'AXE" % contested.size()
+	if text != _contested_text:
+		_contested_text = text
+		_contested_label.text = text
+
+	var intel := int(War.intel_found)
+	if _intel_seen >= 0 and intel > _intel_seen:
+		show_toast("Renseignement recueilli (%d au total)" % intel, 3.2)
+		_play("objective_done", -9.0, 1.35)
+	_intel_seen = intel
+
+
+## Per frame part of the pressure readouts: only the pulse, the wording is built
+## by the poll above.
+func _refresh_pressure(delta: float) -> void:
+	if _counter_sector >= 0:
+		_counter_t += delta
+		_counter_label.visible = true
+		# A slow two second throb. Fast enough to read as an alarm, slow enough
+		# not to fight the player for attention while he is being shot at.
+		_counter_label.modulate.a = 0.55 + 0.45 * sin(_counter_t * 3.2)
+	elif _counter_label.visible:
+		_counter_label.visible = false
+	var contested := not _contested_text.is_empty()
+	if _contested_label.visible != contested:
+		_contested_label.visible = contested
+
+
+## The Director is reached through its group and its method is checked, so the
+## HUD keeps working in a scene built without one (the test probes do that).
+func _active_counter_attack() -> int:
+	if _director == null or not is_instance_valid(_director):
+		_director = get_tree().get_first_node_in_group("director")
+	if _director == null or not _director.has_method("active_counter_attack"):
+		return -1
+	var value: Variant = _director.call("active_counter_attack")
+	if typeof(value) != TYPE_INT:
+		return -1
+	return int(value)
+
+
 func _refresh_overlay(delta: float) -> void:
 	_update_toasts(delta)
 	_update_banner(delta)
@@ -732,8 +951,22 @@ func _update_banner(delta: float) -> void:
 	_banner_box.modulate.a = minf(fade_in, fade_out)
 
 
+## Hands the HUD the quality governor, whose reading heads the F3 overlay.
+##
+## Separate from `setup` so the eight v1 setup arguments stay as the contract
+## lists them, and so a HUD with no governor still works: `_build_debug_text`
+## falls back to Engine's own counter.
+func set_quality(governor: QualityGovernor) -> void:
+	_quality = governor
+
+
 func _build_debug_text() -> String:
 	var lines: PackedStringArray = []
+	# Frame rate first: it is the reason the overlay gets opened.
+	if _quality != null and is_instance_valid(_quality):
+		lines.append(_quality.debug_line())
+	else:
+		lines.append("IMAGES  %d fps" % Engine.get_frames_per_second())
 	if _world != null:
 		lines.append(_world.debug_line())
 	if _player != null:
@@ -763,11 +996,73 @@ func _build_debug_text() -> String:
 func _draw_back(c: Control) -> void:
 	var rect := Rect2(Vector2.ZERO, c.size)
 	_draw_vignette(c, rect)
-	_draw_health_bar(c, rect)
+	var observing := _observing()
+	if not observing:
+		_draw_health_bar(c, rect)
+	# Damage arcs survive the field glasses: being shot at while observing must
+	# still tell the player where it came from.
 	_draw_damage_marks(c, rect)
+	if observing:
+		return
+	_draw_counter_pressure(c, rect)
+	_draw_contested_stamp(c, rect)
 	if _scope_t < 0.5 and not _is_aiming:
 		_draw_crosshair(c, rect)
 	_draw_hitmarker(c, rect)
+
+
+## Tension treatment of a counter attack in progress: a shallow red breathing
+## band along the screen borders. Kept well under the health vignette so the two
+## never compete, and outside the picture the player is aiming through.
+func _draw_counter_pressure(c: Control, rect: Rect2) -> void:
+	if _counter_sector < 0:
+		return
+	var pulse := 0.45 + 0.55 * (0.5 + 0.5 * sin(_counter_t * 3.2))
+	var rings := 7
+	var reach := minf(rect.size.x, rect.size.y) * 0.11
+	var step := reach / float(rings)
+	for i in rings:
+		var t := float(i) / float(rings - 1)
+		var inset := t * reach
+		var alpha := pulse * pow(1.0 - t, 2.2) * 0.16
+		if alpha <= 0.003:
+			continue
+		var band := Rect2(rect.position + Vector2(inset, inset),
+				rect.size - Vector2(inset * 2.0, inset * 2.0))
+		if band.size.x <= 2.0 or band.size.y <= 2.0:
+			break
+		c.draw_rect(band, Color(0.62, 0.09, 0.06, alpha), false, step + 1.0)
+
+
+## Rubber stamp frame around the contested sector line. The words already carry
+## the news; the tilted box is there so the warning also reads as a SHAPE, for
+## anyone who cannot rely on the red.
+func _draw_contested_stamp(c: Control, rect: Rect2) -> void:
+	if _contested_text.is_empty():
+		return
+	var font := _spaced_font(3)
+	if font == null:
+		font = ThemeDB.fallback_font
+	if font == null:
+		return
+	var width := font.get_string_size(_contested_text, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+	var right := rect.position.x + rect.size.x - _CONTESTED_RIGHT + 9.0
+	var top := rect.position.y + _CONTESTED_TOP - 4.0
+	var box := Rect2(Vector2(right - width - 18.0, top),
+			Vector2(width + 18.0, _CONTESTED_HEIGHT + 8.0))
+	var mid := box.position + box.size * 0.5
+	var corners: Array[Vector2] = [
+		box.position,
+		Vector2(box.end.x, box.position.y),
+		box.end,
+		Vector2(box.position.x, box.end.y),
+	]
+	var outline: PackedVector2Array = PackedVector2Array()
+	for corner in corners:
+		outline.append(mid + (corner - mid).rotated(-0.022))
+	outline.append(outline[0])
+	var pulse := 0.62 + 0.38 * (0.5 + 0.5 * sin(_time * 2.2))
+	c.draw_polyline(outline, Color(_STAMP.r, _STAMP.g, _STAMP.b, 0.85 * pulse), 2.0, true)
 
 
 ## Red vignette creeping in from the borders as health drops. The radial
@@ -887,7 +1182,11 @@ func _draw_hitmarker(c: Control, rect: Rect2) -> void:
 
 func _draw_front(c: Control) -> void:
 	var rect := Rect2(Vector2.ZERO, c.size)
-	if _scope_t > 0.01:
+	# One mask at a time. The glasses win: the player contract makes them
+	# exclusive with aiming, so a lingering scope mask under them is a leftover.
+	if _bino_t > 0.01:
+		_draw_binoculars(c, rect)
+	elif _scope_t > 0.01:
 		_draw_scope(c, rect)
 	if _dead:
 		_draw_death(c, rect)
@@ -935,6 +1234,144 @@ func _draw_scope(c: Control, rect: Rect2) -> void:
 	c.draw_line(center + Vector2(-radius, 0.0), center + Vector2(-radius * 0.42, 0.0), ink, post, true)
 	c.draw_line(center + Vector2(radius, 0.0), center + Vector2(radius * 0.42, 0.0), ink, post, true)
 	c.draw_line(center + Vector2(0.0, radius), center + Vector2(0.0, radius * 0.42), ink, post, true)
+
+
+## Full screen mask pierced by TWO overlapping circles: the silhouette of a pair
+## of field glasses, unmistakable at a glance against the single circle of the
+## Springfield scope, which is the whole point.
+##
+## The union of the two discs is star shaped around the point halfway between
+## their centres (that midpoint is inside both, since the gap is under one
+## radius), so a single radius per angle describes the entire outline and the
+## same fan of quads as the rifle scope can flood everything outside it.
+func _draw_binoculars(c: Control, rect: Rect2) -> void:
+	var center := rect.position + rect.size * 0.5
+	# Clamped on width too, otherwise the pair grows wider than a square window.
+	var radius := minf(minf(rect.size.x, rect.size.y) * _BINO_RADIUS, rect.size.x / 3.4)
+	var half_gap := radius * _BINO_GAP
+	var alpha := clampf(_bino_t, 0.0, 1.0)
+	var reach := rect.size.length()
+	var mask := Color(0.0, 0.0, 0.0, alpha)
+
+	var rim: PackedVector2Array = PackedVector2Array()
+	var dirs: PackedVector2Array = PackedVector2Array()
+	rim.resize(_BINO_SEGMENTS)
+	dirs.resize(_BINO_SEGMENTS)
+	for i in _BINO_SEGMENTS:
+		var a := TAU * float(i) / float(_BINO_SEGMENTS)
+		var u := Vector2(cos(a), sin(a))
+		dirs[i] = u
+		rim[i] = center + u * _binocular_reach(u, half_gap, radius)
+	for i in _BINO_SEGMENTS:
+		var j := (i + 1) % _BINO_SEGMENTS
+		c.draw_colored_polygon(PackedVector2Array([
+			rim[i], rim[j], center + dirs[j] * reach, center + dirs[i] * reach,
+		]), mask)
+
+	# Soft falloff towards the glass edge, from shrunken copies of the outline.
+	for k in 5:
+		var t := float(k) / 4.0
+		c.draw_polyline(_shrunk_ring(rim, center, 1.0 - t * 0.085),
+				Color(0.0, 0.0, 0.0, alpha * (1.0 - t) * 0.32), radius * 0.035, true)
+	var ink := Color(0.02, 0.02, 0.02, alpha)
+	c.draw_polyline(_shrunk_ring(rim, center, 1.0), ink, 3.0, true)
+	_draw_binocular_reticle(c, center, radius, alpha, ink)
+	_draw_binocular_readout(c, center, radius, alpha)
+
+
+## Range graduations across the horizontal axis, plus a deliberately thin cross
+## in the middle: these glasses are for counting a garrison, not for shooting.
+func _draw_binocular_reticle(c: Control, center: Vector2, radius: float, alpha: float,
+		ink: Color) -> void:
+	var faint := Color(ink.r, ink.g, ink.b, alpha * 0.55)
+	var span := radius * 1.40
+	c.draw_line(center - Vector2(span, 0.0), center + Vector2(span, 0.0), faint, 1.2, true)
+	var font := _spaced_font(2)
+	if font == null:
+		font = ThemeDB.fallback_font
+	var step := radius * 0.22
+	for i in range(1, 7):
+		var d := step * float(i)
+		var arm := 9.0 if i % 2 == 0 else 5.0
+		c.draw_line(center + Vector2(d, -arm), center + Vector2(d, arm), ink, 1.6, true)
+		c.draw_line(center + Vector2(-d, -arm), center + Vector2(-d, arm), ink, 1.6, true)
+		if i % 2 != 0 or font == null:
+			continue
+		# Mil graduations: the field measure a 1942 observer would read off.
+		var text := str(i * 5)
+		var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x
+		var color := Color(ink.r, ink.g, ink.b, alpha * 0.8)
+		c.draw_string(font, center + Vector2(d - width * 0.5, 24.0), text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color)
+		c.draw_string(font, center + Vector2(-d - width * 0.5, 24.0), text,
+				HORIZONTAL_ALIGNMENT_LEFT, -1, 11, color)
+	# Discreet centre cross, open in the middle so it never hides the target.
+	for d in [Vector2.UP, Vector2.DOWN, Vector2.LEFT, Vector2.RIGHT]:
+		var dir: Vector2 = d
+		c.draw_line(center + dir * 6.0, center + dir * 17.0,
+				Color(ink.r, ink.g, ink.b, alpha * 0.85), 1.3, true)
+	# Short vertical ladder under the cross, the height reference of the pair.
+	for i in range(1, 4):
+		var y := radius * 0.11 * float(i)
+		var arm := 6.0 if i % 2 == 0 else 3.5
+		c.draw_line(center + Vector2(-arm, y), center + Vector2(arm, y),
+				Color(ink.r, ink.g, ink.b, alpha * 0.7), 1.3, true)
+
+
+## The measured range and the site the glasses are pointed at, printed on the
+## opaque mask under the tubes where nothing competes with them.
+func _draw_binocular_readout(c: Control, center: Vector2, radius: float,
+		alpha: float) -> void:
+	_draw_masked_text(c, Vector2(center.x, center.y - radius - 26.0), "JUMELLES  x8", 15,
+			Color(_PAPER_DIM.r, _PAPER_DIM.g, _PAPER_DIM.b, alpha * 0.9), 5)
+	var range_text := "DISTANCE   - - - -"
+	if _bino_distance >= 0.0:
+		range_text = "DISTANCE   %d M" % int(round(_bino_distance))
+	_draw_masked_text(c, Vector2(center.x, center.y + radius + 48.0), range_text, 23,
+			Color(_PAPER.r, _PAPER.g, _PAPER.b, alpha), 4)
+	var site := _bino_site.strip_edges()
+	var tint := Color(_STAMP.r, _STAMP.g, _STAMP.b, alpha)
+	if site.is_empty():
+		site = "AUCUN SITE IDENTIFIÉ"
+		tint = Color(_KHAKI.r, _KHAKI.g, _KHAKI.b, alpha).lightened(0.35)
+		tint.a = alpha * 0.85
+	else:
+		site = site.to_upper()
+	_draw_masked_text(c, Vector2(center.x, center.y + radius + 78.0), site, 17, tint, 4)
+
+
+## Distance from the midpoint of the pair to the edge of the union of the two
+## discs, along `dir`. With the centres at (+/- half_gap, 0) relative to that
+## midpoint, both exit distances share the same square root and only the sign of
+## the projection differs, so the farther of the two is `|a| + root`.
+func _binocular_reach(dir: Vector2, half_gap: float, radius: float) -> float:
+	var a := dir.x * half_gap
+	return absf(a) + sqrt(maxf(0.0, radius * radius - half_gap * half_gap + a * a))
+
+
+## Closed polyline copy of a rim, pulled towards `center`. Cheaper than
+## resampling the outline, and it keeps the notch between the tubes in place.
+func _shrunk_ring(rim: PackedVector2Array, center: Vector2, scale: float) -> PackedVector2Array:
+	var out: PackedVector2Array = PackedVector2Array()
+	var count := rim.size()
+	out.resize(count + 1)
+	for i in count:
+		out[i] = center + (rim[i] - center) * scale
+	out[count] = out[0]
+	return out
+
+
+## Horizontally centred typewriter line, for the painters that have no Label.
+func _draw_masked_text(c: Control, at: Vector2, text: String, size: int, color: Color,
+		spacing: int) -> void:
+	var font := _spaced_font(spacing)
+	if font == null:
+		font = ThemeDB.fallback_font
+	if font == null:
+		return
+	var width := font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x
+	c.draw_string(font, at - Vector2(width * 0.5, 0.0), text, HORIZONTAL_ALIGNMENT_LEFT,
+			-1, size, color)
 
 
 func _draw_death(c: Control, rect: Rect2) -> void:
@@ -1082,7 +1519,11 @@ func _on_objective_completed(obj: MissionDefs.Objective) -> void:
 	if obj == null:
 		return
 	_obj_elapsed.erase(obj.id)
-	show_banner("OBJECTIF ACCOMPLI", obj.title, 3.0)
+	# No banner here. Main banners this one too, and its version carries the
+	# objective's reward line ("what this unlocks"), which is the half the player
+	# actually wants. Two calls in the same frame meant the poorer wording won
+	# whenever it landed second. The sound stays: nothing else plays it on the
+	# completion path.
 	_play("objective_done", -4.0, 1.0)
 
 
@@ -1091,23 +1532,28 @@ func _on_objective_failed(obj: MissionDefs.Objective) -> void:
 	if obj == null:
 		return
 	_obj_elapsed.erase(obj.id)
-	show_banner("OBJECTIF ÉCHOUÉ", obj.title, 3.0)
+	# Main banners the failure, same reasoning as above.
 
 
+## Deliberately silent. Winning opens the debriefing screen, which Main owns; a
+## banner fired here would have been drawn underneath the report the player is
+## meant to read, at the one moment the game has something long to say.
 func _on_campaign_completed() -> void:
-	show_banner("LA POCHE EST LIBÉRÉE", "Toute la Normandie est aux mains des Alliés.", 6.0)
+	pass
 
 
-func _on_sector_captured(sector_id: int) -> void:
-	var label := "Secteur %d" % sector_id
-	if _world != null:
-		var layout: Layout = _world.layout()
-		if layout != null:
-			var site: Layout.Site = layout.site_by_id(sector_id)
-			if site != null:
-				label = site.display_name
-	show_banner("SECTEUR LIBÉRÉ", label, 4.0)
-	_play("sector_captured", -3.0, 1.0)
+## No banner and no sound here any more. Main owns the capture announcement in
+## v2 because it is the only place holding both the site name and the campaign
+## tally, and it is the one that words a silent capture differently from an
+## ordinary one. Two banners on the same signal would just overwrite each other.
+func _on_sector_captured(_sector_id: int) -> void:
+	_situation_accum = _SITUATION_PERIOD
+
+
+func _on_sector_contested(_sector_id: int) -> void:
+	# Refresh on the next frame instead of waiting out the poll: losing a sector
+	# is the one campaign event the player must see acknowledged immediately.
+	_situation_accum = _SITUATION_PERIOD
 
 
 func _on_alert_changed(level: int) -> void:
@@ -1175,10 +1621,26 @@ func _grenade_count() -> int:
 
 
 ## Player heading in radians, 0 pointing north (world -Z), growing clockwise.
+## Direction the player is LOOKING in, in radians, N = 0 and E = +PI/2.
+##
+## Read off the camera rig, not off the player body. The body is a
+## CharacterBody3D that never rotates: `Player._move` builds its own basis from
+## `rig.rotation.y` instead of turning itself. Reading the body's basis returned
+## the same value forever, which froze the compass band pointing at world north
+## and made the damage arcs report every hit relative to north rather than to
+## where the player was facing.
+##
+## The rig carries yaw and only yaw; pitch lives on a child pivot. So this is a
+## pure yaw rotation and stays stable even when looking straight up or down,
+## where a forward vector that also carried pitch would collapse to zero on both
+## axes and make the heading jump.
 func _player_heading_rad() -> float:
 	if _player == null:
 		return 0.0
-	var forward := -_player.global_transform.basis.z
+	var pivot: Node3D = _player
+	if _player.rig != null and is_instance_valid(_player.rig):
+		pivot = _player.rig
+	var forward := -pivot.global_transform.basis.z
 	return atan2(forward.x, -forward.z)
 
 
@@ -1205,23 +1667,73 @@ func _clock(seconds: float) -> String:
 	return "%02d:%02d" % [total / 60, total % 60]
 
 
+## Display name of a sector, with a readable fallback at every step: the world
+## may not be streamed in, or the id may not be a site at all.
+func _site_name(sector_id: int) -> String:
+	if _world == null or not is_instance_valid(_world):
+		return "Secteur %d" % sector_id
+	var layout: Layout = _world.layout()
+	if layout == null:
+		return "Secteur %d" % sector_id
+	var site: Layout.Site = layout.site_by_id(sector_id)
+	if site == null or site.display_name.is_empty():
+		return "Secteur %d" % sector_id
+	return site.display_name
+
+
+## Which of the optional public player fields actually exist. Probed once, from
+## the property list, because the player module is written alongside this one
+## and a HUD that crashes on a missing field takes the whole screen with it.
+func _probe_player() -> void:
+	if _player_probed:
+		return
+	if _player == null or not is_instance_valid(_player):
+		return
+	_player_probed = true
+	for entry in _player.get_property_list():
+		var prop := String(entry.get("name", ""))
+		match prop:
+			"prompt_text":
+				_has_prompt = true
+			"is_scoping":
+				_has_scoping = true
+			"scope_distance":
+				_has_scope_distance = true
+			"scope_site_name":
+				_has_scope_site = true
+
+
+## One optional player field, with the type it is required to have. Anything
+## missing or of the wrong type degrades to `fallback` in silence.
+func _read_player_field(field: String, expected_type: int, fallback: Variant) -> Variant:
+	if _player == null or not is_instance_valid(_player):
+		return fallback
+	_probe_player()
+	if not _field_present(field):
+		return fallback
+	var value: Variant = _player.get(field)
+	if typeof(value) != expected_type:
+		return fallback
+	return value
+
+
+func _field_present(field: String) -> bool:
+	match field:
+		"prompt_text":
+			return _has_prompt
+		"is_scoping":
+			return _has_scoping
+		"scope_distance":
+			return _has_scope_distance
+		"scope_site_name":
+			return _has_scope_site
+	return false
+
+
 ## Reads `Player.prompt_text` when that public field exists, and stays silent
 ## when it does not: the field is optional in the player contract.
 func _read_player_prompt() -> String:
-	if _player == null or not is_instance_valid(_player):
-		return ""
-	if not _prompt_probed:
-		_prompt_probed = true
-		for entry in _player.get_property_list():
-			if String(entry.get("name", "")) == "prompt_text":
-				_prompt_available = true
-				break
-	if not _prompt_available:
-		return ""
-	var value: Variant = _player.get("prompt_text")
-	if typeof(value) != TYPE_STRING:
-		return ""
-	return String(value)
+	return String(_read_player_field("prompt_text", TYPE_STRING, ""))
 
 
 ## Human readable label of the first key bound to an action, for the hints.

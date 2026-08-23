@@ -18,6 +18,9 @@ signal footstep(surface: String)
 signal fired(weapon_id: int)
 signal used(target: Node)
 signal bandages_changed(count: int)
+signal binoculars_changed(active: bool)
+## Emitted when a melee blow kills. `silent` is true when nobody heard or saw it.
+signal melee_kill(victim: Node, silent: bool)
 
 const MAX_HEALTH := 100.0
 const STAND_HEIGHT := 1.80
@@ -35,6 +38,14 @@ const BODY_RADIUS := 0.38
 # Locomotion, metres per second.
 const WALK_SPEED := 4.4
 const SPRINT_SPEED := 7.2
+## Cross country pace, reached after `MARCH_RAMP` seconds of clean sprinting.
+## An abstraction, not a claim about how fast a man runs: it exists so that
+## crossing a quarter of the pocket takes about a minute and a half instead of
+## three and a half minutes of holding one key.
+const MARCH_SPEED := 12.6
+const MARCH_RAMP := 4.0
+## How much faster the pace is lost than gained.
+const MARCH_DECAY := 4.0
 const CROUCH_SPEED := 2.2
 const PRONE_SPEED := 1.0
 const AIM_SPEED := 2.6
@@ -72,6 +83,26 @@ const NOISE_WALK := 14.0
 const NOISE_CROUCH := 6.0
 const NOISE_PRONE := 3.0
 
+# Binoculars.
+## Magnification. The scoped field of view is Game.fov / SCOPE_ZOOM.
+const SCOPE_ZOOM := 8.0
+## Never narrower than this, in degrees, whatever the field of view setting is.
+const SCOPE_MIN_FOV := 10.0
+## How far the range finder looks, in metres.
+const SCOPE_RANGE := 900.0
+## Seconds between two range measurements. Ten a second is far more than a
+## distance readout needs, and a 900 m ray is not something to cast per frame.
+const SCOPE_PROBE_INTERVAL := 0.1
+## A site is named while the aimed point is within its radius plus this margin.
+const SCOPE_SITE_MARGIN := 90.0
+## Above this altitude a ray that still climbs has left the terrain for good.
+const SCOPE_SKY_CEILING := 220.0
+
+# Companion roles, as answered by the CompanionManager.
+const COMPANION_NONE := 0
+const COMPANION_RECRUIT := 1
+const COMPANION_MEMBER := 2
+
 const GRENADE_SCRIPT := "res://src/weapons/grenade.gd"
 const GRENADE_FUSE := 3.6
 const GRENADE_THROW_SPEED := 15.0
@@ -89,6 +120,14 @@ var stance: int = STANCE_STAND
 ## Action prompt for the HUD, in French. Empty when nothing is targeted.
 ## The HUD reads this every frame; the player never calls the HUD itself.
 var prompt_text: String = ""
+
+## Binoculars up. Read every frame by the HUD, exactly like `prompt_text`.
+var is_scoping: bool = false
+## Distance in metres to the point under the binocular reticle, -1.0 when the
+## line of sight meets nothing.
+var scope_distance: float = -1.0
+## Name of the site nearest the aimed point, "" when there is none in reach.
+var scope_site_name: String = ""
 
 var _world: GameWorld = null
 var _viewmodel: Viewmodel = null
@@ -130,10 +169,22 @@ var _step_distance := 0.0
 var _last_surface := "dirt"
 var _was_grounded := true
 var _fall_speed := 0.0
+## Seconds of uninterrupted travel, capped at MARCH_RAMP. Drives the pace.
+var _march := 0.0
 
 var _look_target: Node = null
 var _mounted: Node3D = null
 var _mount_cooldown := 0.0
+
+var _scope_probe := 0.0
+
+## The CompanionManager, found through the "companions" group. Cached because
+## the interaction ray asks about it several times per frame.
+var _companion_manager: Node = null
+var _companion_hooked := false
+## Last known order per companion, instance id -> following. Only used when the
+## manager does not expose an `is_following` of its own.
+var _companion_orders: Dictionary = {}
 
 
 func _ready() -> void:
@@ -267,6 +318,9 @@ func _physics_process(delta: float) -> void:
 	# whatever the player is doing, or the release event is lost. See the comment
 	# on _update_grenade.
 	_update_grenade(delta)
+	# Same discipline: the toggle is polled whatever the player is doing, so the
+	# single frame the press is true is never swallowed by an early return.
+	_update_binoculars(delta)
 	_update_health(delta)
 	_update_interaction()
 	_update_camera(delta)
@@ -327,7 +381,12 @@ func _read_intent() -> void:
 			_prone_toggled = false
 
 	var can_aim := not _bandaging and _melee_timer <= 0.0
-	is_aiming = can_aim and Input.is_action_pressed("aim") and current_weapon() != null \
+	# Raising the sights puts the binoculars away, and while they are up the
+	# aim button does nothing else: the two views are mutually exclusive.
+	if is_scoping and Input.is_action_just_pressed("aim"):
+		_set_scoping(false)
+	is_aiming = can_aim and not is_scoping and Input.is_action_pressed("aim") \
+			and current_weapon() != null \
 			and current_slot != WeaponDefs.SLOT_THROWN
 
 	var forward_input := Input.get_action_strength("move_forward") \
@@ -341,6 +400,7 @@ func _read_intent() -> void:
 			and is_on_floor()
 	if is_sprinting:
 		is_aiming = false
+		_set_scoping(false)
 
 
 func _set_stance(new_stance: int) -> void:
@@ -415,6 +475,7 @@ func _move(delta: float) -> void:
 	if wish.length_squared() > 1.0:
 		wish = wish.normalized()
 
+	_update_march(delta, wish)
 	var speed := _target_speed()
 	var goal := wish * speed
 	var rate := GROUND_ACCEL if grounded else AIR_ACCEL
@@ -438,6 +499,50 @@ func _move(delta: float) -> void:
 	_update_footsteps(delta, grounded)
 
 
+## Long distance travel on foot, and nothing else.
+##
+## The pocket is four kilometres across and a garrison is routinely 1500 m away.
+## At the sprint that is three and a half minutes of holding one key across
+## empty bocage, which is not gameplay, it is a loading screen the player has to
+## walk through. This ramps a sustained run up to a cross country pace once it
+## is clear the player is travelling rather than fighting.
+##
+## Every condition below cancels it at once, so it can never make a firefight
+## faster: it needs a full sprint, a standing stance, both hands off the weapon,
+## and a calm sector. Firing, aiming, being hit or an alarm going up all drop it
+## back to the ordinary sprint within a stride.
+func _update_march(delta: float, wish: Vector3) -> void:
+	if not _may_march(wish):
+		# Falls off much faster than it builds. Reaching a village at speed and
+		# taking three seconds to slow down would get the player shot.
+		_march = maxf(_march - delta * MARCH_DECAY, 0.0)
+		return
+	_march = minf(_march + delta, MARCH_RAMP)
+
+
+func _may_march(wish: Vector3) -> bool:
+	if not is_sprinting or stance != STANCE_STAND:
+		return false
+	if is_aiming or _bandaging or _melee_timer > 0.0:
+		return false
+	if wish.length_squared() < 0.9:
+		return false
+	# Only in open country. An alarm anywhere near means this is not a march.
+	if War != null and int(War.alert_level) > int(War.ALERT_CALM):
+		return false
+	if _shot_noise > 1.0:
+		return false
+	var weapon := current_weapon()
+	if weapon != null and weapon.is_reloading:
+		return false
+	return true
+
+
+## 0 at the ordinary sprint, 1 at the full cross country pace.
+func march_ratio() -> float:
+	return clampf(_march / MARCH_RAMP, 0.0, 1.0)
+
+
 func _target_speed() -> float:
 	var base := WALK_SPEED
 	match stance:
@@ -448,6 +553,11 @@ func _target_speed() -> float:
 		_:
 			if is_sprinting:
 				base = SPRINT_SPEED * _weight_factor()
+				# Eased rather than linear, so the pace picks up gently instead
+				# of stepping to a new speed at a fixed moment.
+				var t: float = march_ratio()
+				base = lerpf(base, MARCH_SPEED * _weight_factor(),
+						t * t * (3.0 - 2.0 * t))
 			elif is_aiming:
 				base = AIM_SPEED
 	if _bandaging:
@@ -552,6 +662,11 @@ func _update_trigger(weapon: Weapon) -> void:
 	var just := Input.is_action_just_pressed("fire")
 	if not held:
 		_trigger_ready = true
+		return
+	if is_scoping:
+		# Firing lowers the binoculars first, like coming out of a sprint. The
+		# shot costs one trigger pull, which is cheaper than firing blind.
+		_set_scoping(false)
 		return
 	if _bandaging or _melee_timer > 0.0 or _bolt_timer > 0.0 or weapon.is_reloading:
 		return
@@ -673,6 +788,7 @@ func _start_reload(weapon: Weapon) -> void:
 		return
 	_dry_attempts = 0
 	is_aiming = false
+	_set_scoping(false)
 	_viewmodel.play_reload(duration, WeaponDefs.reloads_per_round(weapon.id))
 	Sfx.play_at(WeaponDefs.reload_sample(weapon.id), global_position, -2.0)
 	_shot_noise = maxf(_shot_noise, 12.0)
@@ -749,6 +865,7 @@ func select_slot(slot: int) -> void:
 	_bolt_timer = 0.0
 	_dry_attempts = 0
 	is_aiming = false
+	_set_scoping(false)
 	var weapon := current_weapon()
 	_refresh_viewmodel()
 	weapon_changed.emit(weapon)
@@ -794,6 +911,7 @@ func _update_grenade(delta: float) -> void:
 			return
 		_cooking = true
 		_cook_time = 0.0
+		_set_scoping(false)
 		Sfx.play("grenade_pin", -2.0)
 		return
 	if not _cooking:
@@ -879,6 +997,170 @@ func _throw_grenade() -> void:
 	_shot_noise = maxf(_shot_noise, 20.0)
 
 
+# --- binoculars --------------------------------------------------------------
+
+
+## Called EVERY physics frame, mounted or not, exactly like [method
+## _update_grenade] and for the same reason: `is_action_just_pressed` is true
+## for a single physics frame, so any early return placed above the poll would
+## eat the press and the key would look dead again. The toggle is read first,
+## the state is judged afterwards.
+func _update_binoculars(delta: float) -> void:
+	if Input.is_action_just_pressed("binoculars"):
+		toggle_binoculars()
+	if not is_scoping:
+		return
+	if _binoculars_blocked():
+		_set_scoping(false)
+		return
+	_scope_probe -= delta
+	if _scope_probe <= 0.0:
+		_scope_probe = SCOPE_PROBE_INTERVAL
+		_measure_scope()
+
+
+## Raises or lowers the binoculars. Refuses to raise them in any state they are
+## exclusive with; lowering them always works.
+func toggle_binoculars() -> void:
+	if is_scoping:
+		_set_scoping(false)
+		return
+	if not _built or _binoculars_blocked():
+		return
+	_set_scoping(true)
+
+
+## Everything the binoculars are exclusive with: the sights, a reload, a
+## bandage, a pulled pin, a served emplacement, and death.
+func _binoculars_blocked() -> bool:
+	if not _alive or _mounted != null or _bandaging or _cooking:
+		return true
+	if is_aiming or is_sprinting:
+		return true
+	if _melee_timer > 0.0 or _melee_windup >= 0.0 or _bolt_timer > 0.0:
+		return true
+	var weapon := current_weapon()
+	return weapon != null and weapon.is_reloading
+
+
+func _set_scoping(active: bool) -> void:
+	if active == is_scoping:
+		return
+	is_scoping = active
+	scope_distance = -1.0
+	scope_site_name = ""
+	if active:
+		is_aiming = false
+		is_sprinting = false
+		_scope_probe = 0.0
+	if rig != null:
+		rig.set_scope(active, _scope_fov())
+	if _viewmodel != null:
+		# Both hands are on the optics: the weapon comes down out of the frame.
+		# Coming back goes through _refresh_viewmodel so an empty slot stays
+		# empty instead of showing the last model again.
+		if active:
+			_viewmodel.visible = false
+		else:
+			_refresh_viewmodel()
+	Sfx.play("ui_open" if active else "ui_close", -12.0)
+	binoculars_changed.emit(active)
+
+
+## Scoped field of view: eight times into the setting, never below the floor.
+func _scope_fov() -> float:
+	var base := 82.0
+	if Game != null:
+		base = Game.fov
+	return maxf(SCOPE_MIN_FOV, base / SCOPE_ZOOM)
+
+
+## Range finder. Ten measurements a second, not one per frame.
+func _measure_scope() -> void:
+	scope_distance = -1.0
+	scope_site_name = ""
+	var from := eye_position()
+	var direction := aim_direction()
+	if direction.length_squared() < 0.0001:
+		return
+
+	var point := from
+	var found := false
+	var space := get_world_3d().direct_space_state
+	if space != null:
+		var params := PhysicsRayQueryParameters3D.create(from, from + direction * SCOPE_RANGE)
+		params.collision_mask = Layers.BULLET_MASK
+		params.exclude = [get_rid()]
+		params.collide_with_areas = false
+		var hit := space.intersect_ray(params)
+		if not hit.is_empty():
+			point = hit.get("position", from)
+			found = true
+	if not found:
+		# Only the closest ring of tiles carries a collision shape, so past a
+		# hundred metres the physics ray flies over ground that exists visually
+		# but not physically. The height field is the same terrain without a
+		# body: walk it instead. This is the whole point of the binoculars.
+		var ground := _march_terrain(from, direction)
+		if ground.is_finite():
+			point = ground
+			found = true
+	if not found:
+		return
+	scope_distance = from.distance_to(point)
+	scope_site_name = _site_name_at(point)
+
+
+## Marches the aim ray against the height field until it goes under the ground,
+## then bisects. Returns Vector3.INF when the ray leaves the map or the sky.
+## The step grows with the distance: metres of precision at arm's length, tens
+## of metres at the far end, which is all a distance readout is worth.
+func _march_terrain(from: Vector3, direction: Vector3) -> Vector3:
+	if _world == null:
+		return Vector3.INF
+	var hf := _world.heightfield()
+	if hf == null:
+		return Vector3.INF
+	var travelled := 0.0
+	var previous := from
+	while travelled < SCOPE_RANGE:
+		travelled += clampf(travelled * 0.09, 3.0, 60.0)
+		var sample := from + direction * travelled
+		if not Heightfield.in_bounds(sample.x, sample.z):
+			return Vector3.INF
+		if sample.y > SCOPE_SKY_CEILING and direction.y > 0.0:
+			return Vector3.INF
+		if sample.y - hf.height_at(sample.x, sample.z) <= 0.0:
+			var low := previous
+			var high := sample
+			for _i in 6:
+				var mid := (low + high) * 0.5
+				if mid.y - hf.height_at(mid.x, mid.z) > 0.0:
+					low = mid
+				else:
+					high = mid
+			return (low + high) * 0.5
+		previous = sample
+	return Vector3.INF
+
+
+func _site_name_at(point: Vector3) -> String:
+	if _world == null:
+		return ""
+	var map := _world.layout()
+	if map == null:
+		return ""
+	var site := map.nearest_site(point.x, point.z)
+	if site == null or site.display_name.is_empty():
+		return ""
+	# nearest_site answers whatever the distance is, so bound it: a farm two
+	# kilometres away is not what the reticle is on.
+	var reach := site.radius + SCOPE_SITE_MARGIN
+	if Vector2(point.x, point.z).distance_squared_to(site.center) > reach * reach:
+		return ""
+	return site.display_name
+
+
 # --- melee -------------------------------------------------------------------
 
 
@@ -896,6 +1178,7 @@ func _update_melee(delta: float) -> void:
 	_melee_timer = MELEE_RECOVERY
 	_melee_windup = MELEE_WINDUP
 	is_aiming = false
+	_set_scoping(false)
 	_viewmodel.play_melee()
 
 
@@ -919,6 +1202,7 @@ func _swing() -> void:
 		Sfx.play_at("impact_wood", point, -3.0)
 		return
 	var damage := MELEE_DAMAGE
+	var from_behind := false
 	var body := node as Node3D
 	if body != null:
 		var facing := -body.global_transform.basis.z
@@ -929,9 +1213,29 @@ func _swing() -> void:
 			# The target is looking away: a rifle butt to the back of the neck.
 			if facing.dot(to_player) < -0.35:
 				damage *= MELEE_BACK_MULTIPLIER
+				from_behind = true
+
+	# A takedown from behind on a target that has seen nothing is silent, but
+	# ONLY if the victim is muted BEFORE it is hit: once take_damage has run the
+	# soldier has already screamed and the whole village knows.
+	# Every check goes through has_method: a rifle butt also lands on walls,
+	# trees and emplacements, none of which know anything about being unaware.
+	var silent := false
+	if from_behind and node.has_method("is_unaware") and node.has_method("silence_death") \
+			and bool(node.call("is_unaware")):
+		node.call("silence_death")
+		silent = true
+
 	node.call("take_damage", damage, self, point, false)
-	Sfx.play_at("impact_flesh", point, -1.0)
-	_shot_noise = maxf(_shot_noise, 22.0)
+
+	if silent:
+		Sfx.play_at("impact_flesh", point, -13.0)
+	else:
+		Sfx.play_at("impact_flesh", point, -1.0)
+		_shot_noise = maxf(_shot_noise, 22.0)
+
+	if node.has_method("is_alive") and not bool(node.call("is_alive")):
+		melee_kill.emit(node, silent)
 
 
 # --- health ------------------------------------------------------------------
@@ -998,6 +1302,7 @@ func revive(pos: Vector3) -> void:
 	_bolt_timer = 0.0
 	_shot_noise = 0.0
 	_regen_timer = REGEN_DELAY
+	_set_scoping(false)
 	_apply_stance_shape()
 	teleport(pos)
 	if _mounted != null:
@@ -1037,6 +1342,7 @@ func _die(_attacker: Node) -> void:
 	_cooking = false
 	_bandaging = false
 	prompt_text = ""
+	_set_scoping(false)
 	if _mounted != null:
 		_dismount()
 	if War != null:
@@ -1093,6 +1399,7 @@ func _start_bandage() -> void:
 	_bandage_timer = BANDAGE_TIME
 	is_aiming = false
 	is_sprinting = false
+	_set_scoping(false)
 	var weapon := current_weapon()
 	if weapon != null and weapon.is_reloading:
 		weapon.cancel_reload()
@@ -1143,6 +1450,10 @@ func _find_interactable(node: Node) -> Node:
 		if current.has_method("mount") or current.has_method("interact") \
 				or current.is_in_group("pickup"):
 			return current
+		# A resistance fighter is neither usable nor a pickup: the companion
+		# manager is the only one who can tell whether he is worth an E press.
+		if _companion_role(current) != COMPANION_NONE:
+			return current
 		current = current.get_parent()
 		depth += 1
 	return null
@@ -1151,7 +1462,15 @@ func _find_interactable(node: Node) -> Node:
 func _prompt_for(target: Node) -> String:
 	if target.has_meta("prompt"):
 		return str(target.get_meta("prompt"))
+	var role := _companion_role(target)
+	if role == COMPANION_RECRUIT:
+		return "Rejoindre le maquis [E]"
+	if role == COMPANION_MEMBER:
+		# The prompt names what the key is about to do, not the current order.
+		return "Tenir la position [E]" if _companion_follows(target) else "Suivre [E]"
 	if target.is_in_group("pickup"):
+		if target.has_meta("intel_site"):
+			return "Documents [E]"
 		if target.has_meta("weapon_id"):
 			var wid := int(target.get_meta("weapon_id"))
 			return "Ramasser " + WeaponDefs.display_name(wid) + " [E]"
@@ -1166,6 +1485,14 @@ func _prompt_for(target: Node) -> String:
 
 
 func _interact_with(target: Node) -> void:
+	var role := _companion_role(target)
+	if role != COMPANION_NONE:
+		_command_companion(target, role)
+		return
+	if target.is_in_group("pickup") and target.has_meta("intel_site"):
+		_pick_up_intel(target)
+		used.emit(target)
+		return
 	if target.is_in_group("pickup") and target.has_meta("weapon_id"):
 		_pick_up(target)
 		used.emit(target)
@@ -1178,6 +1505,7 @@ func _interact_with(target: Node) -> void:
 			velocity = Vector3.ZERO
 			is_aiming = false
 			is_sprinting = false
+			_set_scoping(false)
 			_prone_toggled = false
 			_set_stance(STANCE_STAND)
 			used.emit(target)
@@ -1196,6 +1524,15 @@ func _pick_up(target: Node) -> void:
 	if target.has_meta("bandages"):
 		give_bandage(int(target.get_meta("bandages")))
 	Sfx.play_at("ui_click", global_position, -4.0)
+	target.queue_free()
+
+
+## Papers off a dead officer. The site they came from travels on the node as
+## `intel_site`; the campaign state is what turns it into map knowledge.
+func _pick_up_intel(target: Node) -> void:
+	if War != null and War.has_method("record_intel"):
+		War.call("record_intel")
+	Sfx.play("objective_done", -5.0)
 	target.queue_free()
 
 
@@ -1224,6 +1561,90 @@ func _mounted_physics(_delta: float) -> void:
 	is_aiming = Input.is_action_pressed("aim")
 
 
+# --- companions --------------------------------------------------------------
+
+
+## The CompanionManager, found through its group exactly like the Vfx node.
+## Everything downstream goes through has_method: the module is optional, and
+## without it the player must stay perfectly playable.
+func _companions() -> Node:
+	if _companion_manager != null and is_instance_valid(_companion_manager):
+		return _companion_manager
+	_companion_manager = null
+	_companion_hooked = false
+	var tree := get_tree()
+	if tree == null:
+		return null
+	var nodes := tree.get_nodes_in_group("companions")
+	for node: Node in nodes:
+		if node != null and node.has_method("can_recruit"):
+			_companion_manager = node
+			break
+	if _companion_manager == null:
+		return null
+	if not _companion_hooked:
+		_companion_hooked = true
+		# Orders can also change without the player pressing anything (regroup
+		# after a fast travel), so follow the manager rather than guess.
+		if _companion_manager.has_signal("order_changed") \
+				and not _companion_manager.is_connected("order_changed", _on_companion_order_changed):
+			_companion_manager.connect("order_changed", _on_companion_order_changed)
+	return _companion_manager
+
+
+func _on_companion_order_changed(companion: Node, following: bool) -> void:
+	if companion == null:
+		return
+	_companion_orders[companion.get_instance_id()] = following
+
+
+## COMPANION_RECRUIT, COMPANION_MEMBER or COMPANION_NONE for any node.
+func _companion_role(node: Node) -> int:
+	if node == null or node == self:
+		return COMPANION_NONE
+	var manager := _companions()
+	if manager == null:
+		return COMPANION_NONE
+	if manager.has_method("is_companion") and bool(manager.call("is_companion", node)):
+		return COMPANION_MEMBER
+	if bool(manager.call("can_recruit", node)):
+		return COMPANION_RECRUIT
+	return COMPANION_NONE
+
+
+## Is that companion following, as opposed to holding his position? The manager
+## answers when it can, otherwise the last known order is used; a fresh recruit
+## follows.
+func _companion_follows(node: Node) -> bool:
+	var manager := _companions()
+	if manager != null and manager.has_method("is_following"):
+		return bool(manager.call("is_following", node))
+	return bool(_companion_orders.get(node.get_instance_id(), true))
+
+
+func _command_companion(target: Node, role: int) -> void:
+	var manager := _companions()
+	if manager == null:
+		return
+	if role == COMPANION_RECRUIT:
+		if not manager.has_method("recruit"):
+			return
+		if not bool(manager.call("recruit", target)):
+			return
+		_companion_orders[target.get_instance_id()] = true
+		Sfx.play("french_ok", -4.0)
+		used.emit(target)
+		return
+	if not manager.has_method("toggle_order"):
+		return
+	var was_following := _companion_follows(target)
+	manager.call("toggle_order", target)
+	if not manager.has_method("is_following"):
+		_companion_orders[target.get_instance_id()] = not was_following
+	Sfx.play("french_go", -4.0)
+	used.emit(target)
+
+
 # --- camera ------------------------------------------------------------------
 
 
@@ -1237,6 +1658,10 @@ func _update_camera(delta: float) -> void:
 	var eye := _height_of(stance) - EYE_OFFSET
 	if not _alive:
 		eye = PRONE_HEIGHT * 0.5
+	if is_scoping:
+		# The field of view setting can move under the binoculars, so the zoom
+		# is refreshed rather than captured once when they came up.
+		rig.set_scope(true, _scope_fov())
 	rig.update(delta, velocity, is_on_floor(), is_aiming, fov_scale, eye)
 	if _viewmodel == null:
 		return

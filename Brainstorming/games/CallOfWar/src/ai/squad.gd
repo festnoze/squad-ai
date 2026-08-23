@@ -94,6 +94,10 @@ func _spawn_member(member_rank: int, index: int, total: int) -> void:
 	var home := _spawn + Vector3(cos(angle) * radius, 0.0, sin(angle) * radius)
 	if _world != null:
 		home.y = _world.ground_y(home.x, home.z)
+	# Before setup(), which is what builds the body. Squads spawn most of the
+	# army, so this is the call that actually decides how many zombies are out
+	# there; the director only handles lone sentries.
+	soldier.species = CharacterModels.pick_species(faction, _rng)
 	soldier.setup(_world, faction, member_rank, home)
 	soldier.set_squad(self)
 	if not _patrol.is_empty() and member_rank != Soldier.R_SNIPER \
@@ -272,6 +276,25 @@ func center() -> Vector3:
 	if count == 0:
 		return _spawn
 	return total / float(count)
+
+
+## Hands one member over to somebody else, the companion manager in practice.
+## The squad forgets him for good: it stops ordering him around, stops listening
+## to him and, above all, never frees him when it is recycled. Returns false
+## when the soldier did not belong here.
+func release_member(soldier: Soldier) -> bool:
+	if soldier == null or not is_instance_valid(soldier):
+		return false
+	var index := members.find(soldier)
+	if index < 0:
+		return false
+	members.remove_at(index)
+	if soldier.died.is_connected(_on_member_died):
+		soldier.died.disconnect(_on_member_died)
+	if soldier.spotted_enemy.is_connected(_on_member_spotted):
+		soldier.spotted_enemy.disconnect(_on_member_spotted)
+	soldier.set_squad(null)
+	return true
 
 
 ## Frees every member. Safe to call twice.
