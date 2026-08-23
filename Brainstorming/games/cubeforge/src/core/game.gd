@@ -40,6 +40,9 @@ const DEFAULT_SFX_VOLUME := 0.8
 const DEFAULT_SHOW_DEBUG := false
 const DEFAULT_SHOW_FPS := false
 const DEFAULT_FLY_MODE := false
+const DEFAULT_REALISTIC := false
+const DEFAULT_FULLSCREEN := false
+const DEFAULT_WORLD_NAME := "monde"
 
 ## Suppression depth for `settings_changed`. Raised while a whole batch of
 ## settings is written (load, reset) so listeners get a single notification.
@@ -89,6 +92,18 @@ var world_seed: int = 0:
 		world_seed = value
 		_notify_changed()
 
+## Name of the world being played. Sanitized on write so it always maps to a
+## valid save folder; an unusable value falls back to the default world.
+var world_name: String = DEFAULT_WORLD_NAME:
+	set(value):
+		var v := WorldsUi.sanitize_world_name(value)
+		if v.is_empty():
+			v = DEFAULT_WORLD_NAME
+		if v == world_name:
+			return
+		world_name = v
+		_notify_changed()
+
 ## Creative mode: no block consumption, flight allowed.
 var creative: bool = DEFAULT_CREATIVE:
 	set(value):
@@ -122,12 +137,31 @@ var show_fps: bool = DEFAULT_SHOW_FPS:
 		show_fps = value
 		_notify_changed()
 
-## Persistent God-mode flight state, controlled by F or the settings menu.
+## Persistent God-mode state, controlled by F or the settings menu. It grants
+## flight and the full block and tool palettes, and is deliberately independent
+## of `creative`: a survival world keeps its monsters, its damage and its
+## resource costs while the player flies and picks any tool.
 var fly_mode: bool = DEFAULT_FLY_MODE:
 	set(value):
 		if value == fly_mode:
 			return
 		fly_mode = value
+		_notify_changed()
+
+## Enhanced filtered materials and rounded inhabitant models.
+var realistic: bool = DEFAULT_REALISTIC:
+	set(value):
+		if value == realistic:
+			return
+		realistic = value
+		_notify_changed()
+
+## Borderless fullscreen window. Applied by main at startup and on every change.
+var fullscreen: bool = DEFAULT_FULLSCREEN:
+	set(value):
+		if value == fullscreen:
+			return
+		fullscreen = value
 		_notify_changed()
 
 
@@ -163,6 +197,9 @@ func _install_input_map() -> void:
 		_add_key_action(StringName("hotbar_%d" % (i + 1)), [KEY_1 + i])
 
 	_add_key_action(&"inventory", [KEY_E])
+	_add_key_action(&"craft", [KEY_C])
+	_add_key_action(&"map", [KEY_M])
+	_add_key_action(&"fullscreen", [KEY_F11])
 	_add_key_action(&"debug_overlay", [KEY_F3])
 	_add_key_action(&"pause", [KEY_ESCAPE])
 	_add_key_action(&"screenshot", [KEY_F2])
@@ -204,11 +241,14 @@ func save_settings() -> void:
 	cfg.set_value(SETTINGS_SECTION, "fov", fov)
 	cfg.set_value(SETTINGS_SECTION, "render_distance", render_distance)
 	cfg.set_value(SETTINGS_SECTION, "world_seed", world_seed)
+	cfg.set_value(SETTINGS_SECTION, "world_name", world_name)
 	cfg.set_value(SETTINGS_SECTION, "creative", creative)
 	cfg.set_value(SETTINGS_SECTION, "sfx_volume", sfx_volume)
 	cfg.set_value(SETTINGS_SECTION, "show_debug", show_debug)
 	cfg.set_value(SETTINGS_SECTION, "show_fps", show_fps)
 	cfg.set_value(SETTINGS_SECTION, "fly_mode", fly_mode)
+	cfg.set_value(SETTINGS_SECTION, "realistic", realistic)
+	cfg.set_value(SETTINGS_SECTION, "fullscreen", fullscreen)
 	var err := cfg.save(SETTINGS_PATH)
 	if err != OK:
 		push_warning("Game: could not write %s (error %d)" % [SETTINGS_PATH, err])
@@ -230,13 +270,14 @@ func load_settings() -> void:
 		fov = _read_float(cfg, "fov", DEFAULT_FOV)
 		render_distance = _read_int(cfg, "render_distance", DEFAULT_RENDER_DISTANCE)
 		world_seed = _read_int(cfg, "world_seed", 0)
+		world_name = _read_string(cfg, "world_name", DEFAULT_WORLD_NAME)
 		creative = _read_bool(cfg, "creative", DEFAULT_CREATIVE)
 		sfx_volume = _read_float(cfg, "sfx_volume", DEFAULT_SFX_VOLUME)
 		show_debug = _read_bool(cfg, "show_debug", DEFAULT_SHOW_DEBUG)
 		show_fps = _read_bool(cfg, "show_fps", DEFAULT_SHOW_FPS)
 		fly_mode = _read_bool(cfg, "fly_mode", DEFAULT_FLY_MODE)
-		if not creative:
-			fly_mode = false
+		realistic = _read_bool(cfg, "realistic", DEFAULT_REALISTIC)
+		fullscreen = _read_bool(cfg, "fullscreen", DEFAULT_FULLSCREEN)
 	else:
 		_assign_defaults()
 
@@ -278,6 +319,9 @@ func _assign_defaults() -> void:
 	show_debug = DEFAULT_SHOW_DEBUG
 	show_fps = DEFAULT_SHOW_FPS
 	fly_mode = DEFAULT_FLY_MODE
+	realistic = DEFAULT_REALISTIC
+	fullscreen = DEFAULT_FULLSCREEN
+	world_name = DEFAULT_WORLD_NAME
 
 
 func _notify_changed() -> void:
@@ -311,6 +355,14 @@ func _read_int(cfg: ConfigFile, key: String, fallback: int) -> int:
 	if raw is float:
 		return int(roundf(float(raw)))
 	push_warning("Game: setting '%s' is not a number, using %d" % [key, fallback])
+	return fallback
+
+
+func _read_string(cfg: ConfigFile, key: String, fallback: String) -> String:
+	var raw: Variant = cfg.get_value(SETTINGS_SECTION, key, fallback)
+	if raw is String:
+		return raw
+	push_warning("Game: setting '%s' is not a string, using %s" % [key, fallback])
 	return fallback
 
 

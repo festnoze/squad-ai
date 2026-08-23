@@ -97,8 +97,8 @@ func slot_count(slot: int) -> int:
 func set_slot(slot: int, block_id: int, count: int) -> void:
 	if slot < 0 or slot >= TOTAL_SLOTS:
 		return
-	if block_id < 0 or block_id >= Blocks.COUNT:
-		push_warning("Inventory.set_slot: unknown block id %d" % block_id)
+	if block_id != Blocks.AIR and not Items.is_valid_id(block_id):
+		push_warning("Inventory.set_slot: unknown id %d" % block_id)
 		return
 	_write(slot, block_id, count)
 	changed.emit()
@@ -198,6 +198,36 @@ func count_of(block_id: int) -> int:
 	return total
 
 
+## Removes `amount` units of a block or item from anywhere in the inventory,
+## storage slots first so the hotbar keeps its stacks the longest. Returns
+## false without touching anything when the total stock is insufficient.
+## Always true in creative mode, where nothing is decremented.
+func take(block_id: int, amount: int) -> bool:
+	if creative:
+		return true
+	if amount <= 0:
+		return true
+	if not _is_real_block(block_id):
+		return false
+	var total := 0
+	for slot in TOTAL_SLOTS:
+		if _blocks[slot] == block_id:
+			total += _counts[slot]
+	if total < amount:
+		return false
+	var left := amount
+	for slot in range(TOTAL_SLOTS - 1, -1, -1):
+		if left <= 0:
+			break
+		if _blocks[slot] != block_id:
+			continue
+		var moved: int = mini(_counts[slot], left)
+		_write(slot, block_id, _counts[slot] - moved)
+		left -= moved
+	changed.emit()
+	return true
+
+
 ## True when at least one more unit of the block fits somewhere.
 func has_room_for(block_id: int) -> bool:
 	if not _is_real_block(block_id):
@@ -285,8 +315,8 @@ func from_dict(data: Dictionary) -> void:
 	for slot in TOTAL_SLOTS:
 		var id: int = blocks[slot]
 		var count: int = counts[slot]
-		if id < 0 or id >= Blocks.COUNT:
-			push_warning("Inventory.from_dict: unknown block id %d in slot %d" % [id, slot])
+		if id != Blocks.AIR and not Items.is_valid_id(id):
+			push_warning("Inventory.from_dict: unknown id %d in slot %d" % [id, slot])
 			return
 		if id == Blocks.AIR or count <= 0:
 			new_blocks[slot] = Blocks.AIR
@@ -323,8 +353,10 @@ func from_dict(data: Dictionary) -> void:
 # Internals
 # ---------------------------------------------------------------------------
 
+## True for any id a slot may hold besides AIR: a real block or a real item
+## (tool, weapon, crafting material).
 func _is_real_block(block_id: int) -> bool:
-	return block_id > Blocks.AIR and block_id < Blocks.COUNT
+	return Items.is_valid_id(block_id)
 
 
 ## Single write path, so the (id, count) agreement can never drift.

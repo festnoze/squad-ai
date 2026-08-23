@@ -162,7 +162,7 @@ static func material_family(block_id: int) -> String:
 		Blocks.IRON_ORE, Blocks.GOLD_ORE, Blocks.DIAMOND_ORE:
 			return "stone"
 		Blocks.OAK_LOG, Blocks.OAK_PLANKS, Blocks.BIRCH_LOG, Blocks.BIRCH_PLANKS, \
-		Blocks.BOOKSHELF, Blocks.PUMPKIN:
+		Blocks.BOOKSHELF, Blocks.PUMPKIN, Blocks.CRAFTING_TABLE, Blocks.CHEST:
 			return "wood"
 		Blocks.GLASS, Blocks.ICE:
 			return "glass"

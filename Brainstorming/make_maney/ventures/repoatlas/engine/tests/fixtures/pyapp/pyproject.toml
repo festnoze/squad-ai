@@ -1,0 +1,7 @@
+[project]
+name = "billingcore"
+version = "1.0.0"
+dependencies = [
+    "fastapi>=0.110",
+    "sqlalchemy>=2.0",
+]

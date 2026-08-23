@@ -14,6 +14,9 @@ signal entered_water()
 signal left_water()
 signal fly_mode_changed(active: bool)
 signal footstep(block_id: int)
+signal health_changed(current: int, maximum: int)
+signal damaged(amount: int)
+signal died()
 
 # --- Body dimensions -------------------------------------------------------
 
@@ -33,6 +36,7 @@ const GROUND_ACCEL := 12.0
 const AIR_CONTROL := 0.30
 ## Extra braking factor applied when the player releases the movement keys.
 const GROUND_BRAKE := 1.8
+const REALISTIC_STEP_HEIGHT := 1.001
 
 # --- Jump and fall ---------------------------------------------------------
 
@@ -94,12 +98,25 @@ const CAMERA_FAR := 512.0
 const SPRINT_FOV_BONUS := 6.0
 const FOV_SMOOTHING := 8.0
 const EYE_SMOOTHING := 12.0
+const STEP_VIEW_SMOOTHING := 10.0
 const BOB_AMPLITUDE := 0.045
 const BOB_SMOOTHING := 9.0
 
 # --- Footsteps -------------------------------------------------------------
 
 const STEP_DISTANCE := 0.9
+
+# --- Health ------------------------------------------------------------------
+
+const MAX_HEALTH := 20
+## Post-hit invulnerability, so a mob touching the player does not drain a
+## heart per physics frame.
+const HURT_COOLDOWN := 0.5
+## Seconds without damage before passive regeneration starts.
+const REGEN_DELAY := 6.0
+const REGEN_INTERVAL := 2.5
+const KNOCKBACK_SPEED := 7.0
+const KNOCKBACK_LIFT := 4.5
 
 var camera: Camera3D
 var head: Node3D
@@ -112,6 +129,13 @@ var body: VoxelBody
 ## that has not been generated yet.
 var frozen: bool = true
 
+## Hit points, survival only. Creative ignores damage entirely.
+var health: int = MAX_HEALTH
+
+var _hurt_timer: float = 0.0
+var _regen_wait: float = 0.0
+var _regen_tick: float = 0.0
+
 var _world: VoxelWorld = null
 ## Source of truth for the view angles. Never accumulate on rotation directly.
 var _yaw: float = 0.0
@@ -123,6 +147,7 @@ var _eye_height: float = STAND_EYE
 var _fov: float = DEFAULT_FOV
 var _bob_phase: float = 0.0
 var _bob_amount: float = 0.0
+var _step_view_offset: float = 0.0
 var _step_travel: float = 0.0
 ## Fraction of the body under a liquid, refreshed once per physics step.
 var _submersion: float = 0.0
@@ -158,7 +183,7 @@ func _ready() -> void:
 
 func setup(world: VoxelWorld) -> void:
 	_world = world
-	set_fly_mode(_setting_bool(&"fly_mode", false) and _creative())
+	set_fly_mode(_setting_bool(&"fly_mode", false))
 	frozen = true
 	velocity = Vector3.ZERO
 	_on_floor = false
@@ -172,6 +197,7 @@ func teleport(feet_position: Vector3) -> void:
 	velocity = Vector3.ZERO
 	_on_floor = false
 	_step_travel = 0.0
+	_step_view_offset = 0.0
 
 
 ## World position of the eye, bob included, which is where the view ray starts.
@@ -195,12 +221,71 @@ func on_floor() -> bool:
 	return _on_floor
 
 
-## Shared entry point for the F shortcut and the settings checkbox.
-func set_fly_mode(active: bool) -> void:
-	var next := active and _creative()
-	if fly_mode == next:
+# ---------------------------------------------------------------------------
+# Health
+# ---------------------------------------------------------------------------
+
+## Applies damage with knockback away from `source`. Ignored in creative mode,
+## while frozen, and during the short post-hit invulnerability window.
+func take_damage(amount: int, source: Vector3) -> void:
+	if _creative() or frozen or health <= 0:
 		return
-	fly_mode = next
+	if _hurt_timer > 0.0 or amount <= 0:
+		return
+	_hurt_timer = HURT_COOLDOWN
+	_regen_wait = REGEN_DELAY
+	health = maxi(health - amount, 0)
+
+	var away := global_position - source
+	away.y = 0.0
+	if away.length_squared() > 1e-6 and not fly_mode:
+		away = away.normalized()
+		velocity.x += away.x * KNOCKBACK_SPEED
+		velocity.z += away.z * KNOCKBACK_SPEED
+		velocity.y = maxf(velocity.y, KNOCKBACK_LIFT)
+		_on_floor = false
+
+	_play_sound("land")
+	damaged.emit(amount)
+	health_changed.emit(health, MAX_HEALTH)
+	if health <= 0:
+		died.emit()
+
+
+## Full heal plus teleport, used by main for the respawn. Refreezing lets the
+## regular unfreeze path drop the feet onto the spawn floor.
+func revive(at: Vector3) -> void:
+	health = MAX_HEALTH
+	_hurt_timer = 0.0
+	_regen_wait = 0.0
+	teleport(at)
+	frozen = true
+	health_changed.emit(health, MAX_HEALTH)
+
+
+func _update_health(delta: float) -> void:
+	if _hurt_timer > 0.0:
+		_hurt_timer -= delta
+	if _creative() or health <= 0 or health >= MAX_HEALTH:
+		return
+	if _regen_wait > 0.0:
+		_regen_wait -= delta
+		_regen_tick = 0.0
+		return
+	_regen_tick -= delta
+	if _regen_tick <= 0.0:
+		_regen_tick = REGEN_INTERVAL
+		health = mini(health + 1, MAX_HEALTH)
+		health_changed.emit(health, MAX_HEALTH)
+
+
+## Shared entry point for the F shortcut and the settings checkbox. Flight is
+## the God-mode privilege and no longer requires creative: a survival player
+## can fly while monsters, damage and resource costs stay in force.
+func set_fly_mode(active: bool) -> void:
+	if fly_mode == active:
+		return
+	fly_mode = active
 	velocity.y = 0.0
 	_crouching = false
 	_on_floor = false
@@ -253,16 +338,28 @@ func _physics_process(delta: float) -> void:
 	_update_fly_toggle()
 	_update_water(feet)
 	_update_crouch(feet)
+	_update_health(delta)
 
 	var wish := _wish_direction()
 	_sprinting = Input.is_action_pressed("sprint") and wish != Vector3.ZERO and not _crouching
 	_apply_horizontal(wish, delta)
 	_apply_vertical(delta)
 
-	var result: Dictionary = body.move(_world, feet, velocity * delta)
+	var motion := velocity * delta
+	var can_smooth_step := _realistic() and _on_floor and not fly_mode and not in_water \
+			and (not is_zero_approx(motion.x) or not is_zero_approx(motion.z))
+	var result: Dictionary
+	if can_smooth_step:
+		result = body.move_with_step(_world, feet, motion, REALISTIC_STEP_HEIGHT)
+	else:
+		result = body.move(_world, feet, motion)
 	var landed_speed := -velocity.y
 	var new_feet: Vector3 = result.get("position", feet)
 	var travel := new_feet - feet
+	if bool(result.get("stepped", false)) and travel.y > 0.0:
+		# The collision body steps immediately, while the camera eases through the
+		# same rise so walking uphill reads as a continuous slope.
+		_step_view_offset -= travel.y
 	global_position = new_feet
 
 	if bool(result.get("hit_x", false)):
@@ -310,18 +407,12 @@ func _try_unfreeze() -> void:
 
 
 func _update_fly_toggle() -> void:
-	var creative := _creative()
-	if Input.is_action_just_pressed("fly_toggle") and creative:
-		set_fly_mode(not fly_mode)
-		var game := _game_node()
-		if game != null:
-			game.set(&"fly_mode", fly_mode)
+	if not Input.is_action_just_pressed("fly_toggle"):
 		return
-	if fly_mode and not creative:
-		set_fly_mode(false)
-		var game := _game_node()
-		if game != null:
-			game.set(&"fly_mode", false)
+	set_fly_mode(not fly_mode)
+	var game := _game_node()
+	if game != null:
+		game.set(&"fly_mode", fly_mode)
 
 
 func _update_water(feet: Vector3) -> void:
@@ -466,6 +557,7 @@ func _ground_block() -> int:
 # ---------------------------------------------------------------------------
 
 func _update_view(delta: float) -> void:
+	_step_view_offset = lerpf(_step_view_offset, 0.0, _smooth(STEP_VIEW_SMOOTHING, delta))
 	var eye_target := CROUCH_EYE if _crouching else STAND_EYE
 	_eye_height = lerpf(_eye_height, eye_target, _smooth(EYE_SMOOTHING, delta))
 
@@ -478,7 +570,7 @@ func _update_view(delta: float) -> void:
 	var amp := BOB_AMPLITUDE * _bob_amount
 	head.position = Vector3(
 		cos(_bob_phase) * amp * 0.7,
-		_eye_height + absf(sin(_bob_phase)) * amp - amp * 0.5,
+		_eye_height + _step_view_offset + absf(sin(_bob_phase)) * amp - amp * 0.5,
 		0.0
 	)
 	head.rotation = Vector3(_pitch, 0.0, 0.0)
@@ -546,6 +638,10 @@ func _base_fov() -> float:
 
 func _creative() -> bool:
 	return _setting_bool(&"creative", true)
+
+
+func _realistic() -> bool:
+	return _setting_bool(&"realistic", false)
 
 
 func _play_sound(name: String) -> void:

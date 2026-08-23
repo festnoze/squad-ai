@@ -1,0 +1,82 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://src/main.gd" id="s_main"]
+[ext_resource type="Script" path="res://src/world/world.gd" id="s_world"]
+[ext_resource type="Script" path="res://src/player/player.gd" id="s_player"]
+[ext_resource type="Script" path="res://src/render/sky.gd" id="s_sky"]
+[ext_resource type="Script" path="res://src/render/weather.gd" id="s_weather"]
+[ext_resource type="Script" path="res://src/weapons/vfx.gd" id="s_vfx"]
+[ext_resource type="Script" path="res://src/mission/director.gd" id="s_director"]
+[ext_resource type="Script" path="res://src/mission/objectives.gd" id="s_objectives"]
+[ext_resource type="Script" path="res://src/ui/hud.gd" id="s_hud"]
+[ext_resource type="Script" path="res://src/ui/map_ui.gd" id="s_map_ui"]
+[ext_resource type="Script" path="res://src/ui/objectives_ui.gd" id="s_objectives_ui"]
+[ext_resource type="Script" path="res://src/ui/pause_menu.gd" id="s_pause_menu"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("s_main")
+
+[node name="World" type="Node3D" parent="."]
+script = ExtResource("s_world")
+
+[node name="Player" type="CharacterBody3D" parent="."]
+script = ExtResource("s_player")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 0.5, 0.866025, 0, -0.866025, 0.5, 0, 120, 0)
+light_energy = 1.0
+shadow_enabled = true
+directional_shadow_mode = 2
+directional_shadow_split_1 = 0.04
+directional_shadow_split_2 = 0.14
+directional_shadow_split_3 = 0.42
+directional_shadow_max_distance = 260.0
+directional_shadow_blend_splits = true
+directional_shadow_normal_bias = 1.2
+
+[node name="Moon" type="DirectionalLight3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, -0.5, -0.866025, 0, 0.866025, -0.5, 0, 120, 0)
+light_energy = 0.08
+light_color = Color(0.62, 0.7, 0.95, 1)
+shadow_enabled = false
+
+[node name="Sky" type="Node" parent="."]
+script = ExtResource("s_sky")
+
+[node name="Weather" type="Node3D" parent="."]
+script = ExtResource("s_weather")
+
+[node name="Vfx" type="Node3D" parent="."]
+script = ExtResource("s_vfx")
+
+[node name="Objectives" type="Node" parent="."]
+script = ExtResource("s_objectives")
+
+[node name="Director" type="Node" parent="."]
+script = ExtResource("s_director")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+script = ExtResource("s_hud")
+
+[node name="Screens" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="MapUi" type="Control" parent="Screens"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("s_map_ui")
+
+[node name="ObjectivesUi" type="Control" parent="Screens"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("s_objectives_ui")
+
+[node name="PauseMenu" type="Control" parent="Screens"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("s_pause_menu")

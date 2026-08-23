@@ -98,29 +98,45 @@ static func local_of(w: int) -> int:
 func setup(world_seed: int, world_name: String) -> void:
 	assert(ChunkData.SIZE_X == 16 and ChunkData.SIZE_Z == 16,
 		"chunk_of and local_of assume a 16 wide chunk footprint")
-	_seed = world_seed
 	_world_name = world_name
 
 	_atlas = VoxelAtlas.build()
 	_materials = VoxelMaterials.build(_atlas)
+
+	# The seed stored in the world meta wins over the seed passed in: an
+	# existing world must keep the terrain it was generated with even if the
+	# settings seed changed since. Only a world without a stored seed (fresh
+	# folder, or a save predating the seed field) adopts the caller's seed.
+	# JSON numbers come back as floats, hence the double type test.
 	_save = SaveManager.new(world_name)
-	_terrain_main = TerrainGen.new(world_seed)
+	var meta := _save.load_meta()
+	var stored_seed := 0
+	var raw_seed: Variant = meta.get("seed")
+	if raw_seed is int or raw_seed is float:
+		stored_seed = int(raw_seed)
+	_seed = stored_seed if stored_seed != 0 else world_seed
+
+	_terrain_main = TerrainGen.new(_seed)
 	_spawn = _terrain_main.spawn_point()
 
-	var meta := _save.load_meta()
-	if meta.has("spawn_x") and meta.has("spawn_y") and meta.has("spawn_z"):
+	# The player wakes up inside the timber house of the nearest village. The
+	# search is deterministic, so it beats any spawn stored by an older save;
+	# worlds without a reachable village fall back to the stored or open-air
+	# spawn point.
+	var home := _terrain_main.nearest_house(int(floor(_spawn.x)), int(floor(_spawn.z)))
+	if home != Vector4i.ZERO:
+		_spawn = Vector3(float(home.x) + 0.5, float(home.y) + 1.0, float(home.z) + 0.5)
+	elif meta.has("spawn_x") and meta.has("spawn_y") and meta.has("spawn_z"):
 		_spawn = Vector3(float(meta["spawn_x"]), float(meta["spawn_y"]), float(meta["spawn_z"]))
-	else:
-		_save.save_meta({
-			"seed": world_seed,
-			"spawn_x": _spawn.x,
-			"spawn_y": _spawn.y,
-			"spawn_z": _spawn.z,
-		})
+	meta["seed"] = _seed
+	meta["spawn_x"] = _spawn.x
+	meta["spawn_y"] = _spawn.y
+	meta["spawn_z"] = _spawn.z
+	_save.save_meta(meta)
 
 	var worker_count: int = clampi(OS.get_processor_count() - 2, 1, 4)
 	for i in worker_count:
-		_terrains.append(TerrainGen.new(world_seed))
+		_terrains.append(TerrainGen.new(_seed))
 	for i in worker_count:
 		var t := Thread.new()
 		t.start(_worker_loop.bind(i))
@@ -175,6 +191,23 @@ func atlas() -> Texture2DArray:
 
 func spawn_point() -> Vector3:
 	return _spawn
+
+
+## World metadata (JSON), used by main to persist player state alongside the
+## chunk saves. Returns an empty Dictionary when nothing is stored yet.
+func load_meta() -> Dictionary:
+	if _save == null:
+		return {}
+	return _save.load_meta()
+
+
+## Merges `extra` into the stored metadata and writes it back.
+func store_meta(extra: Dictionary) -> void:
+	if _save == null:
+		return
+	var meta := _save.load_meta()
+	meta.merge(extra, true)
+	_save.save_meta(meta)
 
 
 # ---------------------------------------------------------------------------

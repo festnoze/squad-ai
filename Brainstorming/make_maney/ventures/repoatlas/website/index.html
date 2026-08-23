@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>RepoAtlas - Take back control of your legacy codebase</title>
+<meta name="description" content="RepoAtlas maps, documents, and safeguards legacy systems, then evolves them to new requirements. Fixed prices, every claim verified against your code.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%23e14e1b' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e14e1b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#e14e1b" stroke-width="3"/><circle cx="16" cy="16" r="4" fill="#e14e1b"/></svg>
+      RepoAtlas
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="#path">The path</a>
+      <a href="offerings.html">Offerings</a>
+      <a href="method.html">Method</a>
+      <a href="#faq">FAQ</a>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Control%20Score">Get your Control Score</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<!-- ============ HERO ============ -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="eyebrow">Codebase recovery &middot; for teams of 10-200 engineers</span>
+      <h1>Take back control of the codebase nobody fully understands anymore.</h1>
+      <p class="lede">RepoAtlas maps your legacy system, documents it, makes it safe to change, and evolves it to new requirements. Fixed prices. Every claim machine-verified against your code. Senior human review on everything.</p>
+      <div class="hero-ctas">
+        <a class="btn btn-primary" href="offerings.html#score">Start with the Control Score</a>
+        <a class="btn btn-ghost" href="#path">See the recovery path</a>
+      </div>
+      <p class="hero-note">
+        <span>48-hour audit</span><span>evidence-verified</span><span>EU-based</span><span>your code is never retained</span>
+      </p>
+    </div>
+
+    <figure class="survey-card" aria-label="A survey map of a legacy codebase, with risk annotations per module">
+      <svg viewBox="0 0 520 400" role="img" aria-hidden="true">
+        <!-- graticule -->
+        <g class="graticule">
+          <line x1="104" y1="0" x2="104" y2="400"/><line x1="208" y1="0" x2="208" y2="400"/>
+          <line x1="312" y1="0" x2="312" y2="400"/><line x1="416" y1="0" x2="416" y2="400"/>
+          <line x1="0" y1="100" x2="520" y2="100"/><line x1="0" y1="200" x2="520" y2="200"/>
+          <line x1="0" y1="300" x2="520" y2="300"/>
+        </g>
+        <!-- cluster: billing -->
+        <path class="contour thick" d="M60,150 C85,85 195,60 250,105 C300,145 285,215 215,232 C140,250 38,212 60,150 Z"/>
+        <path class="contour" d="M92,152 C110,105 188,88 228,120 C264,148 252,198 202,210 C152,222 78,196 92,152 Z"/>
+        <path class="contour" d="M124,152 C136,124 182,113 206,133 C228,151 220,182 190,190 C158,198 114,180 124,152 Z"/>
+        <!-- cluster: auth -->
+        <path class="contour thick" d="M330,60 C368,32 452,38 478,84 C502,126 470,170 416,168 C356,166 296,96 330,60 Z"/>
+        <path class="contour" d="M352,74 C378,56 436,62 454,92 C470,120 448,148 412,146 C372,144 330,98 352,74 Z"/>
+        <!-- cluster: reports -->
+        <path class="contour thick" d="M250,268 C292,240 372,252 392,296 C412,340 366,376 308,370 C252,364 214,296 250,268 Z"/>
+        <path class="contour" d="M276,282 C304,264 356,272 370,302 C382,330 350,352 312,348 C276,344 252,300 276,282 Z"/>
+
+        <!-- route out of terra incognita -->
+        <path class="map-route" d="M78,352 C150,330 190,270 240,240 C300,204 330,206 372,186 C420,164 452,120 486,84"/>
+        <circle class="benchmark-ring" cx="78" cy="352" r="9"/>
+        <circle class="benchmark" cx="78" cy="352" r="3.4"/>
+        <path d="M486,84 l0,-16 l12,4 l-12,4" fill="#e14e1b"/>
+        <line x1="486" y1="68" x2="486" y2="84" stroke="#e14e1b" stroke-width="1.6"/>
+
+        <!-- labels -->
+        <text class="map-label" x="126" y="150">BILLING</text>
+        <text class="map-sub" x="126" y="164">bus factor: 1</text>
+        <text class="map-label" x="344" y="100">AUTH</text>
+        <text class="map-sub" x="344" y="114">last commit: 2019</text>
+        <text class="map-label" x="272" y="306">REPORTS</text>
+        <text class="map-sub" x="272" y="320">tests: none</text>
+        <text class="map-sub" x="52" y="376">you are here</text>
+        <text class="map-sub" x="446" y="58">control</text>
+      </svg>
+      <figcaption><span>SURVEY: your-monolith @ HEAD</span><span>SCALE 1:50k LOC</span></figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ============ SYMPTOMS ============ -->
+<section class="section section-alt" id="problem">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The problem</span>
+      <h2>You don't have a documentation problem. You have a control problem.</h2>
+      <p>The system still runs the business. But every decision about it has become a bet.</p>
+    </div>
+    <div class="symptoms">
+      <div class="symptom">
+        <h3>The one who knows is leaving</h3>
+        <p>Your billing module has a bus factor of one, and that person just gave notice. Their notice period is your window.</p>
+      </div>
+      <div class="symptom">
+        <h3>Every estimate is a guess</h3>
+        <p>Two-day tickets become three-week sagas, because no one can predict what a change will touch.</p>
+      </div>
+      <div class="symptom">
+        <h3>Upgrades feel like gambling</h3>
+        <p>The framework is four majors behind. Everyone agrees it should be upgraded. Nobody dares to, without a safety net.</p>
+      </div>
+      <div class="symptom">
+        <h3>Onboarding takes a quarter</h3>
+        <p>New engineers shadow someone for months, because the knowledge lives in people's heads, not in anything written.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ RECOVERY PATH ============ -->
+<section class="section" id="path">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The recovery path</span>
+      <h2>Control comes back in five stages. Each one pays for itself.</h2>
+      <p>You can stop at any stage and keep everything delivered. Each stage de-risks the next; none requires a rewrite.</p>
+    </div>
+    <ol class="path">
+      <li>
+        <span class="wp" aria-hidden="true"></span>
+        <div class="wp-block">
+          <h3>Measure</h3>
+          <p>Know exactly where you stand: risk, knowledge concentration, safety, and what it costs you.</p>
+          <span class="wp-products">Control Score</span>
+        </div>
+      </li>
+      <li>
+        <span class="wp" aria-hidden="true"></span>
+        <div class="wp-block">
+          <h3>Understand</h3>
+          <p>Documentation rebuilt from the code itself, and knowledge captured from the people who hold it.</p>
+          <span class="wp-products">Atlas Pack &middot; Capture</span>
+        </div>
+      </li>
+      <li>
+        <span class="wp" aria-hidden="true"></span>
+        <div class="wp-block">
+          <h3>Make safe</h3>
+          <p>Tests that pin down current behavior on your riskiest modules, so change stops being dangerous.</p>
+          <span class="wp-products">Shield</span>
+        </div>
+      </li>
+      <li>
+        <span class="wp" aria-hidden="true"></span>
+        <div class="wp-block">
+          <h3>Modernize &amp; evolve</h3>
+          <p>Upgrades, migrations, and new requirements delivered on the system itself, under protection.</p>
+          <span class="wp-products">Forge &middot; Evolve</span>
+        </div>
+      </li>
+      <li>
+        <span class="wp" aria-hidden="true"></span>
+        <div class="wp-block">
+          <h3>Stay in control</h3>
+          <p>Monthly re-measurement and drift alerts, so the system never slides back into the fog.</p>
+          <span class="wp-products">Tower</span>
+        </div>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ OFFERINGS LEGEND ============ -->
+<section class="section section-alt" id="offerings">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Offerings</span>
+      <h2>Seven fixed-price offerings. One map legend.</h2>
+      <p>Every engagement starts with the Control Score: a 48-hour audit whose 90-day plan quotes exactly which of the other offerings your system needs, and why.</p>
+    </div>
+
+    <div class="legend">
+      <a class="legend-row" href="offerings.html#score">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="14" fill="none" stroke="#17263f" stroke-width="2"/><circle cx="20" cy="20" r="4" fill="#e14e1b"/><line x1="20" y1="2" x2="20" y2="10" stroke="#17263f" stroke-width="2"/><line x1="20" y1="30" x2="20" y2="38" stroke="#17263f" stroke-width="2"/></svg></span>
+        <span class="legend-main">
+          <h3>Control Score</h3><span class="stage-chip">Measure</span>
+          <p>A scored audit of six control dimensions, computed from your repo and git history, with a priced 90-day recovery plan. Board-readable. Multi-repo estate? The Estate Survey triages the whole portfolio first.</p>
+        </span>
+        <span class="legend-price">1,900 EUR<small>one system &middot; estates: 2,900 + 90/repo</small></span>
+        <span class="legend-go">details &rarr;</span>
+      </a>
+
+      <a class="legend-row" href="offerings.html#pack">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="6" y="10" width="22" height="24" fill="none" stroke="#17263f" stroke-width="2"/><rect x="12" y="5" width="22" height="24" fill="#fff" stroke="#17263f" stroke-width="2"/><line x1="17" y1="13" x2="29" y2="13" stroke="#e14e1b" stroke-width="2"/><line x1="17" y1="19" x2="29" y2="19" stroke="#c6d2dc" stroke-width="2"/><line x1="17" y1="25" x2="25" y2="25" stroke="#c6d2dc" stroke-width="2"/></svg></span>
+        <span class="legend-main">
+          <h3>Atlas Pack</h3><span class="stage-chip">Understand</span>
+          <p>Complete documentation rebuilt from your code: architecture, modules, data, APIs, onboarding guide, debt register. Every path verified.</p>
+        </span>
+        <span class="legend-price">from 710 EUR<small>metered: per repo + volume</small></span>
+        <span class="legend-go">details &rarr;</span>
+      </a>
+
+      <a class="legend-row" href="offerings.html#capture">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8,8 h24 v18 h-14 l-6,7 v-7 h-4 z" fill="none" stroke="#17263f" stroke-width="2"/><circle cx="15" cy="17" r="2" fill="#e14e1b"/><circle cx="21" cy="17" r="2" fill="#e14e1b"/><circle cx="27" cy="17" r="2" fill="#e14e1b"/></svg></span>
+        <span class="legend-main">
+          <h3>Capture</h3><span class="stage-chip">Understand</span>
+          <p>Structured knowledge extraction from your departing or last remaining expert, verified against the code and written into the docs. Four hours of their time.</p>
+        </span>
+        <span class="legend-price">2,900 EUR<small>per expert &middot; 1-2 weeks</small></span>
+        <span class="legend-go">details &rarr;</span>
+      </a>
+
+      <a class="legend-row" href="offerings.html#shield">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20,4 L34,10 V20 C34,29 28,34 20,37 C12,34 6,29 6,20 V10 Z" fill="none" stroke="#17263f" stroke-width="2"/><path d="M13,20 l5,5 l9,-9" fill="none" stroke="#e14e1b" stroke-width="2.4"/></svg></span>
+        <span class="legend-main">
+          <h3>Shield</h3><span class="stage-chip">Make safe</span>
+          <p>Characterization tests that pin your riskiest modules' current behavior, wired into CI, and proven by mutation testing to actually catch changes.</p>
+        </span>
+        <span class="legend-price">6,000-15,000 EUR<small>by hotspot count</small></span>
+        <span class="legend-go">details &rarr;</span>
+      </a>
+
+      <a class="legend-row" href="offerings.html#forge">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6,26 h16 l-4,-5 m4,5 l-4,5" fill="none" stroke="#17263f" stroke-width="2"/><path d="M34,14 h-16 l4,-5 m-4,5 l4,5" fill="none" stroke="#e14e1b" stroke-width="2"/></svg></span>
+        <span class="legend-main">
+          <h3>Forge</h3><span class="stage-chip">Modernize</span>
+          <p>Fixed-price modernization moves: dependency majors, framework migrations, dead-code removal, module extraction. Only ever executed under a Shield.</p>
+        </span>
+        <span class="legend-price">10,000-40,000 EUR<small>per program</small></span>
+        <span class="legend-go">details &rarr;</span>
+      </a>
+
+      <a class="legend-row" href="offerings.html#evolve">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8,32 C16,32 16,10 26,10" fill="none" stroke="#17263f" stroke-width="2"/><path d="M8,32 C18,32 20,22 30,22" fill="none" stroke="#e14e1b" stroke-width="2"/><path d="M26,10 l6,0 m-2,-3 l3,3 l-3,3" stroke="#17263f" stroke-width="2" fill="none"/><path d="M30,22 l4,0 m-2,-3 l3,3 l-3,3" stroke="#e14e1b" stroke-width="2" fill="none"/></svg></span>
+        <span class="legend-main">
+          <h3>Evolve</h3><span class="stage-chip">Evolve</span>
+          <p>New requirements delivered on the legacy system, planned as behavior change tickets you sign before we start. You review behavior diffs, not code diffs.</p>
+        </span>
+        <span class="legend-price">1,500-6,000 EUR<small>per ticket &middot; retainers from 8,000 EUR/mo</small></span>
+        <span class="legend-go">details &rarr;</span>
+      </a>
+
+      <a class="legend-row" href="offerings.html#tower">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M16,34 L20,8 L24,34 Z" fill="none" stroke="#17263f" stroke-width="2"/><path d="M10,14 a12,12 0 0 1 4,-6 M30,14 a12,12 0 0 0 -4,-6" fill="none" stroke="#e14e1b" stroke-width="2"/><line x1="12" y1="34" x2="28" y2="34" stroke="#17263f" stroke-width="2"/></svg></span>
+        <span class="legend-main">
+          <h3>Tower</h3><span class="stage-chip">Stay in control</span>
+          <p>Monthly re-measurement, drift alerts, regenerated docs, dependency and CVE watch, and a quarterly report your management actually reads.</p>
+        </span>
+        <span class="legend-price">from 490 EUR/mo<small>+ 60 EUR per monitored repo</small></span>
+        <span class="legend-go">details &rarr;</span>
+      </a>
+    </div>
+
+    <p class="ladder-note"><strong>One rule protects every fixed price:</strong> no modernization or evolution without a Shield. We never change code we haven't first made safe to change - that discipline is why we can commit to prices, and why you can hold us to them.</p>
+  </div>
+</section>
+
+<!-- ============ PROOF ============ -->
+<section class="section night" id="proof">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Why you can trust the output</span>
+      <h2>Every claim carries its evidence.</h2>
+      <p>AI pipelines do the reading and writing. Deterministic checks and a senior engineer decide what ships. You can audit every statement we deliver.</p>
+    </div>
+    <div class="proof-grid">
+      <ul class="proof-list">
+        <li>
+          <h3>Machine-verified documentation</h3>
+          <p>Every file path and symbol in your docs is checked against your repository before delivery. The verification report ships inside the pack. If it fails, you don't pay.</p>
+        </li>
+        <li>
+          <h3>Mutation-proven test suites</h3>
+          <p>A Shield is only delivered after we mutate your code and watch the tests turn red. Tests that can't fail are theater; we prove ours can.</p>
+        </li>
+        <li>
+          <h3>No silent behavior change</h3>
+          <p>During Evolve, CI blocks any change to a pinned behavior that doesn't reference a ticket you signed. The line between "bug" and "change" becomes contractual.</p>
+        </li>
+        <li>
+          <h3>Scores you can reproduce</h3>
+          <p>Control Score numbers come from deterministic analysis of your repo and git history. Re-run it on the same commit, get the same numbers.</p>
+        </li>
+      </ul>
+      <div>
+        <div class="evidence" role="img" aria-label="Example of a verified behavior entry from a recovered specification">
+<span class="id">BHV-142</span>  when a payment fails 3 times within
+         3 days, the subscription is suspended<br>
+<span class="dim">evidence</span>   src/billing/payment_retry.py:88   <span class="ok">verified</span><br>
+<span class="dim">pinned by</span>  CT-217 characterization test      <span class="ok">green</span><br>
+<span class="dim">knowledge</span>  "the 3-day window mirrors the PSP's
+           own retry policy" - J. Martin, 2026<br>
+        </div>
+        <p class="evidence-caption">One entry from a recovered specification: the behavior, its evidence in your code, the test that pins it, and the tribal knowledge that explains it. Your whole system, described like this.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ AUDIENCES ============ -->
+<section class="section" id="who">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Who it's for</span>
+      <h2>Built for the people who answer for the system.</h2>
+    </div>
+    <div class="audiences">
+      <div class="audience">
+        <span class="eyebrow">CTO</span>
+        <h3>A map you can defend</h3>
+        <p>A scored, evidence-backed picture of the risk you inherited, and a priced plan to reduce it - the artifact you bring to the board instead of a feeling.</p>
+      </div>
+      <div class="audience">
+        <span class="eyebrow">Engineering lead</span>
+        <h3>Estimates that hold</h3>
+        <p>Hotspots named, behavior pinned by tests, docs that regenerate when code changes. Your team stops archaeologizing and starts shipping.</p>
+      </div>
+      <div class="audience">
+        <span class="eyebrow">CEO &middot; COO</span>
+        <h3>A number for the risk</h3>
+        <p>The Control Score includes an exit-cost estimate in euros: what key-person loss and onboarding actually cost you. Risk you can compare, budget, and reduce.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FAQ ============ -->
+<section class="section section-alt" id="faq">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">FAQ</span>
+      <h2>Fair questions.</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Is this AI-generated documentation?</summary>
+        <p>AI pipelines do the reading and the drafting - that's why the prices are fixed and the delivery is fast. But nothing ships on the model's word: every path and symbol is machine-checked against your repository, factual claims are spot-audited against the code, and a senior engineer reviews every deliverable. The verification report ships with the pack, so you can check us.</p>
+      </details>
+      <details>
+        <summary>What happens to our code?</summary>
+        <p>Your code is processed in an ephemeral workspace and never retained: we keep only extracted facts (module names, file paths, verified claims), not source. Processing is EU-based, we sign your NDA and DPA, and on request the pipeline runs inside your own CI instead of our infrastructure.</p>
+      </details>
+      <details>
+        <summary>How can you commit to fixed prices on legacy code?</summary>
+        <p>Two mechanisms. The Control Score sizes the terrain before anything is quoted, so we price from measurement, not hope. And nothing gets modernized or evolved without a Shield of characterization tests first - which converts "unknown risk" into "verified non-regression" and makes fixed prices survivable for both of us.</p>
+      </details>
+      <details>
+        <summary>We have millions of lines across dozens of repositories. Does any of this scale?</summary>
+        <p>Yes - because we don't treat an estate like a big repo. Prices are built from meters measured at intake (a base fee per repository, degressive per-1,000-line rates, per-hotspot and per-ticket meters), so a 30k-line repo and a 2M-line estate each pay for what they actually are. And estates are never quoted blind: the Estate Survey (2,900 EUR + 90 EUR per repo) triages the whole portfolio first, then deep work goes only where the risk actually lives. Documenting all 40 repos uniformly would be malpractice; prioritizing the 8 that matter is the job.</p>
+      </details>
+      <details>
+        <summary>We tried writing docs before. They rotted within a year.</summary>
+        <p>Hand-written docs rot because updating them is a chore nobody owns. Ours are generated from a fact graph extracted from your code, so they regenerate when the code changes - that's the Tower subscription. Documentation stops being a task and becomes a property of the system.</p>
+      </details>
+      <details>
+        <summary>What's a "behavior change ticket"?</summary>
+        <p>During Evolve, new requirements are expressed as edits to your system's recovered specification: behavior X becomes behavior Y, with acceptance criteria, a computed impact set, and a fixed price. You sign the ticket list before work starts, and CI guarantees nothing outside the tickets changes. You review what the system will <em>do differently</em>, not 4,000 lines of diff.</p>
+      </details>
+      <details>
+        <summary>Which stacks do you cover?</summary>
+        <p>Python and JavaScript/TypeScript are first-class today; other stacks are assessed at intake - the Control Score's feasibility check tells you (and us) honestly whether your codebase is a fit before any money changes hands.</p>
+      </details>
+      <details>
+        <summary>How do we start?</summary>
+        <p>Book a Control Score. You get read access set up in a day, the scored report and 90-day plan within 48 hours of intake, and a call to walk through it. If you stop there, you still own a complete, honest picture of where you stand.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ FINAL CTA ============ -->
+<section class="cta-final">
+  <div class="wrap">
+    <span class="eyebrow">1,900 EUR &middot; fixed &middot; 48 hours</span>
+    <h2>Know exactly where you stand by Thursday.</h2>
+    <p>The Control Score is the whole first stage: measured risk, named hotspots, and a priced plan.<br>Everything after it is your decision.</p>
+    <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Control%20Score">Get your Control Score</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span><strong>RepoAtlas</strong> - codebase recovery, EU</span>
+    <span><a href="mailto:hello@repoatlas.dev">hello@repoatlas.dev</a></span>
+    <span><a href="offerings.html">Offerings</a> &middot; <a href="method.html">Method</a></span>
+    <span class="mono">Prices excl. VAT &middot; NDA and DPA on request</span>
+  </div>
+</footer>
+
+</body>
+</html>

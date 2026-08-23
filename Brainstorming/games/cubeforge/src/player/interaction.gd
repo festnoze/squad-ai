@@ -17,6 +17,10 @@ signal target_changed(hit: Dictionary)
 signal dig_progress(ratio: float)
 signal block_broken(block_id: int, cell: Vector3i)
 signal block_placed(block_id: int, cell: Vector3i)
+## Right click on a placed crafting table (crouch to place a block instead).
+signal crafting_requested()
+## Right click on a placed chest (crouch to place a block instead).
+signal chest_requested(cell: Vector3i)
 
 ## Maximum interaction distance in blocks.
 const REACH := 6.0
@@ -35,6 +39,13 @@ const TIMER_EPSILON := 1e-5
 ## Particles per break burst and their lifetime, from the contract.
 const BURST_COUNT := 18
 const BURST_LIFETIME := 0.7
+
+## Melee swing reach and cadence. Reach is shorter than block REACH on purpose:
+## a monster inside arm's length takes the hit before the block behind it.
+const ATTACK_RANGE := 3.5
+const ATTACK_INTERVAL := 0.45
+const BOW_INTERVAL := 0.9
+const ARROW_SPEED := 26.0
 
 ## Averaged tile colour per block id. Scanning a 32x32 image costs nothing once
 ## but would show up in the profiler if done on every break, so it is cached for
@@ -67,6 +78,12 @@ var _dig_time: float = 0.0
 var _dig_active: bool = false
 var _reported_ratio: float = 0.0
 var _place_timer: float = 0.0
+var _attack_timer: float = 0.0
+var _bow_timer: float = 0.0
+
+## Combat lookup (the monster manager). Optional: without it the module works
+## exactly as before, blocks only.
+var _monsters: Node = null
 
 
 func _ready() -> void:
@@ -87,6 +104,12 @@ func setup(world: VoxelWorld, player: Player, inventory: Inventory) -> void:
 		_build_particles()
 	_clear_target()
 	set_process(true)
+
+
+## Wires the monster manager so left click can strike mobs and the bow can
+## spawn arrows. Called by main after both modules exist.
+func set_combat(monsters: Node) -> void:
+	_monsters = monsters
 
 
 ## Read-only view of the block currently under the crosshair, same shape as
@@ -252,6 +275,10 @@ func _process(delta: float) -> void:
 
 	if _place_timer > 0.0:
 		_place_timer = maxf(_place_timer - delta, 0.0)
+	if _attack_timer > 0.0:
+		_attack_timer = maxf(_attack_timer - delta, 0.0)
+	if _bow_timer > 0.0:
+		_bow_timer = maxf(_bow_timer - delta, 0.0)
 
 	# A visible mouse means a menu is open: no targeting, no editing.
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
@@ -264,7 +291,22 @@ func _process(delta: float) -> void:
 	_update_target(hit)
 
 	if Input.is_action_pressed("dig"):
-		_tick_dig(delta)
+		var held := Blocks.AIR
+		if _inventory != null:
+			held = _inventory.selected_block()
+		if Items.kind_of(held) == Items.Kind.BOW:
+			# The bow replaces digging entirely: click to shoot.
+			_stop_dig()
+			if Input.is_action_just_pressed("dig"):
+				_try_shoot()
+		else:
+			var mob := _mob_under_crosshair()
+			if mob != null:
+				_stop_dig()
+				if _attack_timer <= 0.0:
+					_attack(mob, held)
+			else:
+				_tick_dig(delta)
 	else:
 		_stop_dig()
 
@@ -319,6 +361,41 @@ func _clear_target() -> void:
 
 
 # ---------------------------------------------------------------------------
+# Combat
+# ---------------------------------------------------------------------------
+
+## Living monster crossed by the view ray, but only if it is closer than the
+## targeted block: a mob hiding behind a wall stays safe.
+func _mob_under_crosshair() -> Node:
+	if _monsters == null or not _monsters.has_method("ray_pick"):
+		return null
+	var reach := ATTACK_RANGE
+	if _has_target:
+		reach = minf(reach, float(_current["distance"]))
+	return _monsters.call("ray_pick", _player.eye_position(), _player.look_direction(), reach)
+
+
+func _attack(mob: Node, held_id: int) -> void:
+	_attack_timer = ATTACK_INTERVAL
+	if mob.has_method("take_damage"):
+		mob.call("take_damage", Items.melee_damage(held_id), _player.global_position)
+
+
+## Shoots one arrow with the bow. Survival consumes one ARROW item; creative
+## quivers are bottomless (Inventory.take always succeeds there).
+func _try_shoot() -> void:
+	if _bow_timer > 0.0 or _monsters == null or not _monsters.has_method("spawn_arrow"):
+		return
+	if _inventory == null or not _inventory.take(Items.ARROW, 1):
+		return
+	_bow_timer = BOW_INTERVAL
+	var direction := _player.look_direction()
+	var origin := _player.eye_position() + direction * 0.35
+	_monsters.call("spawn_arrow", origin, direction * ARROW_SPEED, true)
+	_sfx_call(&"play", ["pop", -2.0, 1.5])
+
+
+# ---------------------------------------------------------------------------
 # Breaking
 # ---------------------------------------------------------------------------
 
@@ -340,6 +417,9 @@ func _tick_dig(delta: float) -> void:
 	_dig_active = true
 	_dig_time += delta
 	var hard := Blocks.hardness(id)
+	# A pickaxe of the right family divides the dig time by its tier speed.
+	if _inventory != null:
+		hard /= Items.dig_multiplier(_inventory.selected_block(), id)
 	if hard <= 0.001:
 		_break_target(id)
 		return
@@ -366,7 +446,9 @@ func _break_target(id: int) -> void:
 		_stop_dig()
 		return
 
-	var drop := Blocks.drop_of(id)
+	# Ore blocks yield their material item (coal, ingots, diamond), the rest
+	# follows the plain block drop table.
+	var drop := Items.drop_for(id)
 	if drop != Blocks.AIR and _inventory != null:
 		_inventory.add(drop, 1)
 
@@ -401,7 +483,22 @@ func _report_ratio(ratio: float) -> void:
 func _try_place() -> void:
 	if not _has_target or _inventory == null:
 		return
+
+	# Interacting with a placed crafting table beats placing a block, unless
+	# the player crouches to build against it.
+	if _target_id == Blocks.CRAFTING_TABLE and not Input.is_action_pressed("crouch"):
+		_place_timer = PLACE_INTERVAL
+		crafting_requested.emit()
+		return
+
+	# Same rule for a placed chest: right click opens it, crouch builds against.
+	if _target_id == Blocks.CHEST and not Input.is_action_pressed("crouch"):
+		_place_timer = PLACE_INTERVAL
+		chest_requested.emit(_target_cell)
+		return
+
 	var block: int = _inventory.selected_block()
+	# Items (tools, materials) cannot be placed in the world.
 	if block <= Blocks.AIR or block >= Blocks.COUNT:
 		return
 

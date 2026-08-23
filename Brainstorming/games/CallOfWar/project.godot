@@ -1,0 +1,56 @@
+; CALL OF WAR - Normandie 1942
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="CALL OF WAR - Normandie 1942"
+config/description="FPS monde ouvert en Godot 4. France occupee, 1942. Aucun asset binaire."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.svg"
+
+[autoload]
+
+Game="*res://src/core/game.gd"
+War="*res://src/core/war_state.gd"
+Sfx="*res://src/audio/sfx_player.gd"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/stretch/mode="canvas_items"
+window/vsync/vsync_mode=1
+
+[layer_names]
+
+3d_physics/layer_1="terrain"
+3d_physics/layer_2="structure"
+3d_physics/layer_3="player"
+3d_physics/layer_4="enemy"
+3d_physics/layer_5="ally"
+3d_physics/layer_6="prop"
+3d_physics/layer_7="vehicle"
+3d_physics/layer_8="trigger"
+
+[physics]
+
+common/physics_ticks_per_second=60
+3d/default_gravity=19.6
+3d/default_gravity_vector=Vector3(0, -1, 0)
+
+[rendering]
+
+textures/default_filters/anisotropic_filtering_level=3
+anti_aliasing/quality/msaa_3d=2
+anti_aliasing/quality/screen_space_aa=1
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+occlusion_culling/use_occlusion_culling=false
+environment/defaults/default_clear_color=Color(0.36, 0.45, 0.55, 1)
+
+[debug]
+
+settings/stdout/verbose_stdout=false

@@ -12,6 +12,7 @@ extends Control
 signal resume_requested()
 signal quit_requested()
 signal save_requested()
+signal worlds_requested()
 
 const PANEL_BG := Color(0.06, 0.07, 0.09, 0.78)
 const PANEL_BORDER := Color(0.85, 0.88, 0.92, 0.25)
@@ -46,8 +47,10 @@ var _volume_slider: HSlider = null
 var _volume_value: Label = null
 var _invert_check: CheckBox = null
 var _creative_check: CheckBox = null
+var _fullscreen_check: CheckBox = null
 var _fps_check: CheckBox = null
 var _fly_check: CheckBox = null
+var _realistic_check: CheckBox = null
 
 ## Value label produced by the last _add_slider call, so the caller can keep a
 ## typed reference without walking the grid again.
@@ -225,6 +228,10 @@ func _build_main_page(parent: Control) -> void:
 	_settings_button.pressed.connect(_on_settings_pressed)
 	_main_page.add_child(_settings_button)
 
+	var worlds_button := _make_button("Mondes")
+	worlds_button.pressed.connect(_on_worlds_pressed)
+	_main_page.add_child(worlds_button)
+
 	var save_button := _make_button("Sauvegarder")
 	save_button.pressed.connect(_on_save_pressed)
 	_main_page.add_child(save_button)
@@ -287,6 +294,12 @@ func _build_settings_page(parent: Control) -> void:
 
 	_fly_check = _add_check(grid, "God mode")
 	_fly_check.toggled.connect(_on_fly_toggled)
+
+	_realistic_check = _add_check(grid, "Réaliste")
+	_realistic_check.toggled.connect(_on_realistic_toggled)
+
+	_fullscreen_check = _add_check(grid, "Plein écran (F11)")
+	_fullscreen_check.toggled.connect(_on_fullscreen_toggled)
 
 	var buttons := HBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 10)
@@ -424,7 +437,9 @@ func _sync_from_game() -> void:
 	_invert_check.button_pressed = game.invert_y
 	_creative_check.button_pressed = game.creative
 	_fps_check.button_pressed = game.show_fps
-	_fly_check.button_pressed = game.fly_mode and game.creative
+	_fly_check.button_pressed = game.fly_mode
+	_realistic_check.button_pressed = game.realistic
+	_fullscreen_check.button_pressed = game.fullscreen
 	_syncing = false
 	_update_sensitivity_label(_sensitivity_slider.value)
 	_update_fov_label(_fov_slider.value)
@@ -512,11 +527,10 @@ func _on_creative_toggled(pressed: bool) -> void:
 	var game := _game_ref()
 	if game == null:
 		return
+	# God mode survives a switch to survival on purpose: flying and picking any
+	# tool is orthogonal to whether the world spends resources and spawns
+	# monsters.
 	game.creative = pressed
-	if not pressed:
-		game.fly_mode = false
-		if _fly_check != null:
-			_fly_check.button_pressed = false
 	game.save_settings()
 
 
@@ -536,15 +550,29 @@ func _on_fly_toggled(pressed: bool) -> void:
 	var game := _game_ref()
 	if game == null:
 		return
-	# God mode includes creative privileges. Keeping this checkbox interactive
-	# avoids a disabled, nearly invisible control when the game is in survival.
-	if pressed and not game.creative:
-		game.creative = true
-		if _creative_check != null:
-			_syncing = true
-			_creative_check.button_pressed = true
-			_syncing = false
+	# God mode never forces creative: in survival it grants flight and the full
+	# palettes while monsters, damage and resource costs stay in force.
 	game.fly_mode = pressed
+	game.save_settings()
+
+
+func _on_realistic_toggled(pressed: bool) -> void:
+	if _syncing:
+		return
+	var game := _game_ref()
+	if game == null:
+		return
+	game.realistic = pressed
+	game.save_settings()
+
+
+func _on_fullscreen_toggled(pressed: bool) -> void:
+	if _syncing:
+		return
+	var game := _game_ref()
+	if game == null:
+		return
+	game.fullscreen = pressed
 	game.save_settings()
 
 
@@ -574,6 +602,11 @@ func _on_settings_pressed() -> void:
 func _on_save_pressed() -> void:
 	save_requested.emit()
 	_show_status("Monde sauvegardé")
+
+
+func _on_worlds_pressed() -> void:
+	# The worlds screen belongs to main.gd, which closes this menu first.
+	worlds_requested.emit()
 
 
 func _on_quit_pressed() -> void:

@@ -60,6 +60,56 @@ class Crosshair extends Control:
 		draw_rect(Rect2(centre.x - half, centre.y + gap, thick, span), col, true)
 
 
+## Survival health bar: ten pixel-art hearts, two hit points each. Painted with
+## draw_rect from a tiny bitmap so no font glyph or asset is involved.
+class Hearts extends Control:
+
+	const HEART_W := 7
+	const HEART_H := 6
+	const PIXEL := 3.0
+	const GAP := 6.0
+	const FULL := Color(0.86, 0.16, 0.18)
+	const EMPTY := Color(0.22, 0.10, 0.11)
+	const ROWS: PackedStringArray = [
+		".XX.XX.",
+		"XXXXXXX",
+		"XXXXXXX",
+		".XXXXX.",
+		"..XXX..",
+		"...X...",
+	]
+
+	var current: int = 20
+	var maximum: int = 20
+
+	func set_health(new_current: int, new_maximum: int) -> void:
+		if new_current == current and new_maximum == maximum:
+			return
+		current = new_current
+		maximum = maxi(new_maximum, 2)
+		queue_redraw()
+
+	func _draw() -> void:
+		var hearts := maximum / 2
+		for i in hearts:
+			var origin := Vector2(float(i) * (HEART_W * PIXEL + GAP), 0.0)
+			var points := current - i * 2
+			_heart(origin, EMPTY, HEART_W)
+			if points >= 2:
+				_heart(origin, FULL, HEART_W)
+			elif points == 1:
+				# Left half only: a readable half heart.
+				_heart(origin, FULL, 4)
+
+	func _heart(origin: Vector2, col: Color, max_x: int) -> void:
+		for r in ROWS.size():
+			var line: String = ROWS[r]
+			for c in mini(line.length(), max_x):
+				if line[c] != "X":
+					continue
+				draw_rect(Rect2(origin + Vector2(c * PIXEL, r * PIXEL), Vector2(PIXEL, PIXEL)), col, true)
+
+
 ## Dig progress ring drawn around the crosshair. Redrawn only when the ratio
 ## moved enough to be visible, never once per frame for nothing.
 class DigRing extends Control:
@@ -101,6 +151,9 @@ var _sky: SkyController
 
 var _root: Control
 var _veil: ColorRect
+var _hurt_veil: ColorRect
+var _hearts: Hearts
+var _hurt_flash: float = 0.0
 var _crosshair: Crosshair
 var _dig_ring: DigRing
 var _hotbar_panel: PanelContainer
@@ -204,6 +257,23 @@ func refresh_settings() -> void:
 	_fps_label.visible = wants_fps and (_debug == null or not _debug.visible)
 	if _fps_label.visible:
 		_update_fps()
+	# Hearts only matter in survival: creative ignores damage entirely.
+	if _hearts != null:
+		_hearts.visible = game != null and not bool(game.get("creative"))
+
+
+## Survival health display, wired to Player.health_changed by main.
+func set_health(current: int, maximum: int) -> void:
+	_build()
+	_hearts.set_health(current, maximum)
+
+
+## Short red flash over the whole view when the player takes a hit.
+func flash_damage() -> void:
+	_build()
+	_hurt_flash = 0.35
+	_hurt_veil.visible = true
+	_hurt_veil.modulate = Color(1.0, 1.0, 1.0, 1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -224,6 +294,13 @@ func _process(delta: float) -> void:
 		elif _toast_left < TOAST_FADE:
 			_toast_panel.modulate = Color(1.0, 1.0, 1.0, _toast_left / TOAST_FADE)
 
+	if _hurt_flash > 0.0:
+		_hurt_flash -= delta
+		if _hurt_flash <= 0.0:
+			_hurt_veil.visible = false
+		else:
+			_hurt_veil.modulate = Color(1.0, 1.0, 1.0, _hurt_flash / 0.35)
+
 	if _loading_active:
 		_loading_tick -= delta
 		if _loading_tick <= 0.0:
@@ -240,7 +317,7 @@ func _on_selection_changed(slot: int) -> void:
 	if _inventory != null:
 		var id := _inventory.selected_block()
 		if id != Blocks.AIR:
-			show_toast(Blocks.display_name(id), 1.6)
+			show_toast(Items.display_name_any(id), 1.6)
 
 
 func _on_inventory_changed() -> void:
@@ -298,11 +375,12 @@ func _update_selection(slot: int) -> void:
 		_cell_icons[i].modulate = Color(1.0, 1.0, 1.0, 1.0 if i == active else 0.82)
 
 
-## Block previews are expensive to paint, so each one is generated once.
+## Previews are expensive to paint, so each one is generated once. Items and
+## blocks both go through the Items dispatcher.
 func _preview_of(block_id: int) -> Texture2D:
 	if _preview_cache.has(block_id):
 		return _preview_cache[block_id] as Texture2D
-	var tex := VoxelAtlas.block_preview(block_id, PREVIEW_PX)
+	var tex := Items.preview_any(block_id, PREVIEW_PX)
 	_preview_cache[block_id] = tex
 	return tex
 
@@ -357,6 +435,7 @@ func _build() -> void:
 	_build_veil()
 	_build_crosshair()
 	_build_hotbar()
+	_build_hearts()
 	_build_toast()
 	_build_loading()
 	_build_fps()
@@ -390,6 +469,35 @@ func _build_veil() -> void:
 	_veil.visible = false
 	_full_rect(_veil)
 	_root.add_child(_veil)
+
+	_hurt_veil = ColorRect.new()
+	_hurt_veil.name = "HurtVeil"
+	_hurt_veil.color = Color(0.72, 0.08, 0.08, 0.30)
+	_hurt_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hurt_veil.visible = false
+	_full_rect(_hurt_veil)
+	_root.add_child(_hurt_veil)
+
+
+## Hearts sit just above the hotbar, aligned with its left edge.
+func _build_hearts() -> void:
+	var total_w := Inventory.HOTBAR_SLOTS * CELL_PX + (Inventory.HOTBAR_SLOTS - 1) * CELL_GAP + 2 * PANEL_PAD
+	var total_h := CELL_PX + 2 * PANEL_PAD
+	var hearts_w := 10.0 * (Hearts.HEART_W * Hearts.PIXEL + Hearts.GAP)
+	var hearts_h := Hearts.HEART_H * Hearts.PIXEL
+	_hearts = Hearts.new()
+	_hearts.name = "Hearts"
+	_hearts.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_hearts.anchor_left = 0.5
+	_hearts.anchor_right = 0.5
+	_hearts.anchor_top = 1.0
+	_hearts.anchor_bottom = 1.0
+	_hearts.offset_left = -total_w * 0.5 + PANEL_PAD
+	_hearts.offset_right = -total_w * 0.5 + PANEL_PAD + hearts_w
+	_hearts.offset_top = -float(HOTBAR_MARGIN + total_h) - hearts_h - 8.0
+	_hearts.offset_bottom = -float(HOTBAR_MARGIN + total_h) - 8.0
+	_hearts.visible = false
+	_root.add_child(_hearts)
 
 
 func _build_crosshair() -> void:

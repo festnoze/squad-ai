@@ -25,6 +25,7 @@ const SURFACE_SHADERS: PackedStringArray = [
 const UNIFORM_TILES := "tiles"
 const UNIFORM_WIND := "wind_strength"
 const UNIFORM_TIME := "time_of_day"
+const UNIFORM_REALISTIC := "realistic_mode"
 
 ## Declared uniform names of every shader this class has instantiated, keyed by
 ## the Shader resource itself. set_time() and set_wind() consult it so they never
@@ -73,6 +74,12 @@ static func set_wind(materials: Array[Material], strength: float) -> void:
 	_push_uniform(materials, UNIFORM_WIND, maxf(strength, 0.0))
 
 
+## Switches all voxel surfaces between the crisp classic look and the enhanced
+## filtered/PBR response. Geometry and collision are deliberately unaffected.
+static func set_realistic(materials: Array[Material], active: bool) -> void:
+	_push_uniform(materials, UNIFORM_REALISTIC, 1.0 if active else 0.0)
+
+
 # ---------------------------------------------------------------------------
 # Internals
 # ---------------------------------------------------------------------------
@@ -91,6 +98,8 @@ static func _build_surface(surface: int, atlas: Texture2DArray) -> Material:
 	var uniforms := _uniforms_of(shader)
 	if atlas != null and uniforms.has(UNIFORM_TILES):
 		mat.set_shader_parameter(UNIFORM_TILES, atlas)
+		if uniforms.has("tiles_smooth"):
+			mat.set_shader_parameter("tiles_smooth", atlas)
 	elif atlas == null:
 		push_warning("VoxelMaterials: no atlas given, %s will sample black" % file)
 

@@ -9,6 +9,8 @@ extends SceneTree
 
 const SUITES: PackedStringArray = [
 	"res://tests/test_blocks.gd",
+	"res://tests/test_items.gd",
+	"res://tests/test_recipes.gd",
 	"res://tests/test_chunk_data.gd",
 	"res://tests/test_atlas.gd",
 	"res://tests/test_terrain.gd",
@@ -17,6 +19,11 @@ const SUITES: PackedStringArray = [
 	"res://tests/test_inventory.gd",
 	"res://tests/test_sfx.gd",
 	"res://tests/test_world_coords.gd",
+	"res://tests/test_worlds_ui.gd",
+	"res://tests/test_map_ui.gd",
+	"res://tests/test_gravity.gd",
+	"res://tests/test_growth.gd",
+	"res://tests/test_chest_store.gd",
 ]
 
 
@@ -34,9 +41,12 @@ func _initialize() -> void:
 			skipped.append(path.get_file())
 			continue
 
+		# A script with a parse error still loads as a resource, but calling
+		# new() on it is a runtime error that would abort this whole method
+		# before quit(), leaving the process hanging forever. Report and move on.
 		var script: Script = load(path)
-		if script == null:
-			report.append("  ECHEC  %s : script illisible" % path.get_file())
+		if script == null or not script.can_instantiate():
+			report.append("  ECHEC  %s : script illisible ou invalide" % path.get_file())
 			total_failures += 1
 			continue
 

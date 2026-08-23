@@ -192,7 +192,7 @@ func test_material_family_spot_checks() -> void:
 
 	# Ores are embedded in rock, so they must sound like rock and not like their
 	# metal, which is the classic mistake here.
-	eq(sfx.material_family(Blocks.COAL_ORE), "iron", "le charbon sonne comme la pierre")
+	eq(sfx.material_family(Blocks.COAL_ORE), "stone", "le charbon sonne comme la pierre")
 	eq(sfx.material_family(Blocks.IRON_ORE), "stone", "le fer sonne comme la pierre")
 	eq(sfx.material_family(Blocks.DIAMOND_ORE), "stone", "le diamant sonne comme la pierre")
 	eq(sfx.material_family(Blocks.OAK_PLANKS), "wood", "les planches de chene sonnent comme le bois")

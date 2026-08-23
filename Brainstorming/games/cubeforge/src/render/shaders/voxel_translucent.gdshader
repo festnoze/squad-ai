@@ -7,6 +7,8 @@ shader_type spatial;
 render_mode cull_back, blend_mix, depth_draw_opaque;
 
 uniform sampler2DArray tiles : source_color, filter_nearest_mipmap_anisotropic, repeat_disable;
+uniform sampler2DArray tiles_smooth : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform float realistic_mode : hint_range(0.0, 1.0) = 0.0;
 // The atlas is authored in a bright palette for readability as 2D icons. Block
 // albedo is scaled down here so lit faces stay inside the linear part of the
 // tone curve instead of desaturating toward white in the shoulder.
@@ -20,13 +22,14 @@ void vertex() {
 }
 
 void fragment() {
-	vec4 tex = texture(tiles, vec3(UV, tile_layer));
+	vec4 tex = mix(texture(tiles, vec3(UV, tile_layer)),
+		texture(tiles_smooth, vec3(UV, tile_layer)), realistic_mode);
 	ALBEDO = tex.rgb * COLOR.rgb * albedo_scale;
 	ALPHA = tex.a * translucency;
 	EMISSION = tex.rgb * COLOR.a * 2.5;
 	// Slightly polished so ice catches a hint of the sun without going plastic.
-	ROUGHNESS = 0.18;
-	SPECULAR = 0.45;
+	ROUGHNESS = mix(0.18, 0.10, realistic_mode);
+	SPECULAR = mix(0.45, 0.72, realistic_mode);
 	METALLIC = 0.0;
 }
 

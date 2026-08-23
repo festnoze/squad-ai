@@ -592,3 +592,38 @@ func test_cross_block_makes_two_swaying_quads() -> void:
 	var lights: PackedVector3Array = out["lights"]
 	eq(lights.size(), 0, "une fougere n'emet pas de lumiere")
 	done()
+
+
+func test_realistic_corner_offsets_smooth_natural_steps_only() -> void:
+	var terrain := ChunkData.new()
+	for x in ChunkData.SIZE_X:
+		var y := 40 if x < 8 else 41
+		for z in ChunkData.SIZE_Z:
+			terrain.set_local(x, y, z, Blocks.GRASS)
+
+	var terrain_out := Mesher.build_mesh_data(_padded_of(terrain), _white_tints())
+	var opaque: Array = terrain_out["surfaces"][Blocks.Surface.OPAQUE]
+	var custom: PackedFloat32Array = opaque[Mesh.ARRAY_CUSTOM0]
+	var displaced := 0
+	var out_of_bounds := 0
+	for i in range(2, custom.size(), 4):
+		if absf(custom[i]) > 0.001:
+			displaced += 1
+		if absf(custom[i]) > 0.421:
+			out_of_bounds += 1
+	check(displaced > 0, "une marche de terrain naturel porte des coins lisses")
+	eq(out_of_bounds, 0, "le lissage reste un chanfrein borne sous un demi-bloc")
+
+	# An authored block uses the same vertex channel, but must keep it at zero so
+	# houses and barriers retain deliberate, closed silhouettes.
+	var structure := ChunkData.new()
+	structure.set_local(8, 40, 8, Blocks.OAK_PLANKS)
+	var structure_out := Mesher.build_mesh_data(_padded_of(structure), _white_tints())
+	var structure_surface: Array = structure_out["surfaces"][Blocks.Surface.OPAQUE]
+	var structure_custom: PackedFloat32Array = structure_surface[Mesh.ARRAY_CUSTOM0]
+	var structure_offsets := 0
+	for i in range(2, structure_custom.size(), 4):
+		if absf(structure_custom[i]) > 0.001:
+			structure_offsets += 1
+	eq(structure_offsets, 0, "les blocs construits restent cubiques")
+	done()

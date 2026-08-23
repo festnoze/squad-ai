@@ -2,10 +2,13 @@
 
 Bac à sable voxel façon Minecraft, écrit en GDScript pour **Godot 4.7**.
 Monde procédural infini, casse et pose de blocs, dix biomes, grottes, minerais,
-maisons habitées, cycle jour/nuit, inventaire et sauvegarde.
+maisons habitées, cycle jour/nuit, inventaire et sauvegarde. En survie :
+santé, outils (pioches, épées, arc), table de fabrication et monstres qui
+sortent la nuit.
 
-**Zéro asset binaire.** Les 53 textures et les 28 effets sonores sont générés
-par code au démarrage. Le seul fichier non-code du dépôt est `icon.svg`.
+**Zéro asset binaire.** Les 57 textures, les icônes d'objets et les 28 effets
+sonores sont générés par code au démarrage. Le seul fichier non-code du dépôt
+est `icon.svg`.
 
 ## Lancer le jeu
 
@@ -18,7 +21,11 @@ Ou ouvrir le dossier dans l'éditeur Godot et appuyer sur F5.
 
 Le premier démarrage tire une graine de monde au hasard et la conserve dans
 `user://settings.cfg`, donc le même monde revient au lancement suivant. Les
-chunks que vous modifiez sont écrits dans `user://saves/monde/`.
+chunks que vous modifiez sont écrits dans `user://saves/monde/`, l'inventaire
+et la santé dans le `meta.json` du même dossier.
+
+Le personnage apparaît **dans la maison en bois du village le plus proche**,
+qui sert aussi de point de réapparition après une mort.
 
 ## Commandes
 
@@ -30,20 +37,49 @@ chunks que vous modifiez sont écrits dans `user://saves/monde/`.
 | `Maj` | courir |
 | `Ctrl` | s'accroupir, descendre en vol |
 | `F` | basculer le vol (mode créatif) |
-| Clic gauche | casser un bloc (maintenir) |
-| Clic droit | poser un bloc |
+| Clic gauche | casser un bloc (maintenir), frapper un monstre, tirer à l'arc |
+| Clic droit | poser un bloc, ou utiliser la table de fabrication visée |
+| `Maj` + clic droit | construire contre une table de fabrication |
 | Clic molette | copier le bloc visé |
 | Molette / `1`-`9` | changer de case |
 | `E` | inventaire |
+| `C` | fabrication (recettes de base partout, tout près d'une table) |
+| `M` | carte du monde |
+| `F11` | plein écran |
 | `T` | avancer l'heure |
 | `F3` | infos de débogage |
 | `F2` | capture d'écran (dans `user://screenshots/`) |
 | `Échap` | pause et réglages |
 
-Le menu **Réglages** contient aussi une option « Afficher les FPS » qui ajoute
-un compteur compact dans le coin supérieur gauche, ainsi qu'une option « God
-mode » disponible en mode créatif. Le raccourci `F` reste utilisable et maintenir
-`Maj` en vol multiplie la vitesse par cinq.
+Le menu **Réglages** contient aussi « Afficher les FPS » (compteur compact dans
+le coin supérieur gauche) et « Plein écran », qui bascule aussi avec `F11`.
+
+L'option **God mode** est indépendante du mode créatif : elle donne le vol
+(raccourci `F`, `Maj` en vol multiplie la vitesse par cinq) et ouvre les
+palettes complètes de l'inventaire, outils et armes compris. Activée dans un
+monde en survie, elle laisse en place les monstres, les dégâts et le coût des
+ressources : on vole et on choisit son équipement, mais la nuit reste
+dangereuse.
+
+L'option « Realistic » remplace à la volée le rendu voxel net par des textures
+filtrées et enrichies, une réponse lumineuse plus naturelle et des silhouettes
+arrondies pour les habitants. Les coins du terrain naturel sont adoucis et les
+montées d'un bloc sont franchies avec une transition de caméra progressive, ce
+qui donne des pentes visuellement plus fines sans multiplier le poids du monde
+ni rendre les anciennes sauvegardes incompatibles. Les maisons et clôtures
+restent fermées et géométriquement stables.
+
+Le menu pause propose aussi **Mondes** : créer un nouveau monde depuis une
+graine (un nombre, ou n'importe quel texte haché en graine), lister les mondes
+sauvegardés avec leur graine, en charger un autre ou en supprimer un (le bouton
+demande une confirmation dans les trois secondes). Chaque monde garde sa propre
+graine dans son `meta.json`, donc changer la graine des réglages ne touche
+jamais un monde existant.
+
+La touche `M` ouvre la **carte du monde** : un relevé de 384 x 384 blocs autour
+du joueur, colorié par biome et relief, océans en dégradé de profondeur,
+villages et point d'apparition marqués, position et orientation du joueur au
+centre, graine du monde en en-tête.
 
 Les touches sont enregistrées par code physique, donc un clavier AZERTY se
 comporte comme un QWERTY : les touches de déplacement sont bien `ZQSD`.
@@ -65,18 +101,49 @@ buissons morts au désert, de l'herbe haute, des fougères, des coquelicots et
 des pissenlits. Les arbres débordent correctement d'un chunk à l'autre : un
 tronc posé près d'un bord dépose bien ses feuilles chez le voisin.
 
+Le sable et le gravier tombent quand leur support disparaît, avec un bloc
+visuel en chute et des effondrements en cascade. Une pousse d'arbre plantée
+devient un chêne après 20 à 40 secondes si quatre cellules libres la
+surplombent (les minuteries ne survivent pas à une fermeture du jeu). Les
+**coffres** (8 planches à l'établi) offrent 27 cases par coffre, persistées
+avec le monde ; casser un coffre reverse son contenu dans l'inventaire.
+
 Les zones sèches et peu pentues accueillent des villages procéduraux complets :
 maison en bois, atelier en pierre et briques, chemins et enclos fermé. Deux
 villageois et un chien vivent autour de chaque maison tandis que cochons et
 vaches restent dans l'enclos. Tous alternent marche et pause, suivent le relief
 et évitent l'eau, les murs et les chunks non chargés.
 
+## Survie
+
+Le mode survie (option « Mode créatif » décochée dans les réglages) active
+la santé (dix cœurs, régénération lente hors combat) et les monstres
+nocturnes : **zombies** au corps à corps, **squelettes** archers qui gardent
+leurs distances, **araignées** rapides qui franchissent deux blocs, et
+**rôdeurs** qui sifflent puis explosent en creusant le terrain. Ils
+apparaissent en anneau autour du joueur dès la tombée de la nuit et
+disparaissent à l'aube, ou dès que le mode créatif est réactivé. La mort
+ramène au point d'apparition, inventaire intact.
+
+Le premier réveil en survie offre un petit kit : pioche et épée en bois plus
+quelques torches. Les minerais donnent directement leurs matériaux (charbon,
+lingots, diamant) et alimentent la **table de fabrication** : planches,
+bâtons et table se façonnent à la main (`C`), le reste (pioches et épées en
+bois, pierre, fer et diamant, arc, flèches, briques de pierre, bibliothèque,
+lampes) demande de cliquer une table posée ou de rester à côté. La pioche
+accélère le minage de la famille pierre selon son niveau, l'épée frappe plus
+fort, l'arc consomme une flèche par tir. Les squelettes abattus rendent des
+flèches, parfois un arc.
+
 ## Architecture
 
 ```
 src/
   core/
-    blocks.gd        registre des 47 blocs, tables plates indexées par id
+    blocks.gd        registre des 48 blocs, tables plates indexées par id
+    items.gd         registre des objets (outils, armes, matériaux), icônes par code
+    recipes.gd       livre de recettes et transaction de fabrication
+    chest_store.gd   contenu des coffres par cellule, persisté avec le monde
     game.gd          autoload : InputMap et réglages persistants
   world/
     chunk_data.gd    stockage 16 x 96 x 16, RLE pour la sauvegarde
@@ -88,8 +155,13 @@ src/
   entities/
     settlement_manager.gd  streaming des habitants depuis les maisons
     settlement_mob.gd      modèles procéduraux et routines de marche
+    monster_manager.gd     apparitions nocturnes en survie, flèches, ciblage
+    monster_mob.gd         zombie, squelette, araignée, rôdeur explosif
+    projectile.gd          flèche balistique (joueur et squelettes)
+    gravity_manager.gd     chute du sable et du gravier, cascades
+    growth_manager.gd      pousses qui deviennent des chênes
   render/
-    atlas.gd         génération des 53 tuiles en Texture2DArray
+    atlas.gd         génération des 57 tuiles en Texture2DArray
     materials.gd     un ShaderMaterial par surface
     sky.gd           cycle jour/nuit, brouillard, ambiance
     shaders/         opaque, découpe, translucide, eau, ciel
@@ -99,9 +171,13 @@ src/
     interaction.gd   visée par parcours de grille, casse et pose
     inventory.gd     36 cases, barre d'action, palette créative
   ui/
-    hud.gd           réticule, barre d'action, progression de casse
+    hud.gd           réticule, barre d'action, cœurs, progression de casse
     debug_overlay.gd panneau F3
     inventory_ui.gd  écran d'inventaire avec glisser-déposer
+    crafting_ui.gd   livre de recettes et fabrication
+    chest_ui.gd      contenu d'un coffre, transfert par clic
+    worlds_ui.gd     mondes : création par graine, chargement, suppression
+    map_ui.gd        carte du monde relevée autour du joueur
     pause_menu.gd    pause et réglages
   main.gd            câblage de l'ensemble
 docs/CONTRACTS.md    spécification d'API entre modules

@@ -99,6 +99,8 @@ enum {
 	FLOWER_YELLOW,
 	SAPLING,
 	TORCH,
+	CRAFTING_TABLE,
+	CHEST,
 	COUNT,
 }
 
@@ -162,9 +164,13 @@ const TILE_NAMES: PackedStringArray = [
 	"flower_yellow",    # 50
 	"sapling",          # 51
 	"torch",            # 52
+	"crafting_table_top",   # 53
+	"crafting_table_side",  # 54
+	"chest_top",            # 55
+	"chest_side",           # 56
 ]
 
-const TILE_COUNT := 53
+const TILE_COUNT := 57
 
 ## Edge length in pixels of one atlas tile.
 const TILE_PIXELS := 32
@@ -237,6 +243,9 @@ const _TABLE: Array[Dictionary] = [
 	{"id": FLOWER_YELLOW, "name": "Pissenlit", "kind": Kind.CROSS, "side": "flower_yellow", "hard": 0.05},
 	{"id": SAPLING, "name": "Pousse d'arbre", "kind": Kind.CROSS, "side": "sapling", "hard": 0.05, "tint": BITS_ALL},
 	{"id": TORCH, "name": "Torche", "kind": Kind.CROSS, "side": "torch", "hard": 0.05, "emit": 0.9},
+
+	{"id": CRAFTING_TABLE, "name": "Table de fabrication", "kind": Kind.SOLID, "side": "crafting_table_side", "top": "crafting_table_top", "bot": "oak_planks", "hard": 1.0},
+	{"id": CHEST, "name": "Coffre", "kind": Kind.SOLID, "side": "chest_side", "top": "chest_top", "bot": "oak_planks", "hard": 1.0},
 ]
 
 ## Order of the creative block palette, page by page of nine.
@@ -246,6 +255,7 @@ const PALETTE: PackedByteArray = [
 	OAK_LOG, OAK_PLANKS, OAK_LEAVES, BIRCH_LOG, BIRCH_PLANKS, BIRCH_LEAVES, PINE_LEAVES, BOOKSHELF, CACTUS,
 	PUMPKIN, WOOL_WHITE, WOOL_RED, WOOL_YELLOW, WOOL_GREEN, WOOL_BLUE, COAL_ORE, IRON_ORE, GOLD_ORE,
 	DIAMOND_ORE, TORCH, GRASS_TUFT, FERN, FLOWER_RED, FLOWER_YELLOW, DEAD_BUSH, SAPLING, WATER,
+	CRAFTING_TABLE, CHEST,
 ]
 
 # ---------------------------------------------------------------------------

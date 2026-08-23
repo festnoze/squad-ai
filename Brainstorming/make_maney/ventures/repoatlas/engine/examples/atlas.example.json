@@ -1,0 +1,13 @@
+{
+  "name": "acme-estate",
+  "language": "en",
+  "out": "atlas_out/acme",
+  "llm": { "enabled": true, "model": null },
+  "max_modules": 20,
+  "exclude_dirs": ["legacy_archive"],
+  "repos": [
+    { "name": "billing-api", "path": "C:/clients/acme/billing-api" },
+    { "name": "admin-frontend", "path": "C:/clients/acme/admin-frontend", "stack": "angular" },
+    { "name": "dotnet-core-services", "path": "C:/clients/acme/services" }
+  ]
+}

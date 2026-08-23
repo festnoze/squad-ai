@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Offerings - RepoAtlas</title>
+<meta name="description" content="Seven fixed-price offerings to take back control of a legacy codebase: Control Score, Atlas Pack, Capture, Shield, Forge, Evolve, Tower.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%23e14e1b' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e14e1b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#e14e1b" stroke-width="3"/><circle cx="16" cy="16" r="4" fill="#e14e1b"/></svg>
+      RepoAtlas
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="index.html#path">The path</a>
+      <a href="offerings.html" aria-current="page">Offerings</a>
+      <a href="method.html">Method</a>
+      <a href="index.html#faq">FAQ</a>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Control%20Score">Get your Control Score</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<div class="wrap page-head">
+  <span class="eyebrow">Offerings</span>
+  <h1>Seven offerings, one rule: measure before we touch anything.</h1>
+  <p class="lede">Every engagement is fixed-price and starts from evidence. The Control Score sizes your system; its 90-day plan quotes exactly which offerings apply, in which order, and what each will cost.</p>
+  <p class="ladder-note" style="margin-top:28px"><strong>How prices scale:</strong> a 30,000-line repo and a 2-million-line estate across 40 repositories are not the same product at different sizes, so we don't price them that way. Every quote is built from meters we measure at intake and print on the quote: a base fee per repository (the fixed overhead is real), degressive per-1,000-lines rates (our pipelines process volume at falling cost, and you get that back), and per-hotspot or per-ticket meters for safety and change work. Above roughly 3 repos or 250k lines, the entry point is the <a href="#score">Estate Survey</a>: triage first, depth only where it matters.</p>
+</div>
+
+<!-- ============ SCORE ============ -->
+<section class="offer wrap" id="score">
+  <div class="offer-grid">
+    <div>
+      <div class="offer-head">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="14" fill="none" stroke="#17263f" stroke-width="2"/><circle cx="20" cy="20" r="4" fill="#e14e1b"/><line x1="20" y1="2" x2="20" y2="10" stroke="#17263f" stroke-width="2"/><line x1="20" y1="30" x2="20" y2="38" stroke="#17263f" stroke-width="2"/></svg></span>
+        <h2>Control Score</h2>
+      </div>
+      <p class="offer-for">FOR: CTOs AND ENGINEERING LEADERS WHO NEED THE HONEST PICTURE FIRST</p>
+      <p>A 48-hour audit that measures how much control you actually have over your codebase, computed deterministically from your repository and git history. No workshops, no questionnaires: the code and its history are the witnesses.</p>
+      <p><strong>Six scored dimensions:</strong></p>
+      <ul>
+        <li><strong>Knowledge risk</strong> - bus factor per module, weighted by how critical each module is. Named plainly: "4 of your 12 modules are effectively known by one person."</li>
+        <li><strong>Change risk</strong> - hotspots where high churn meets high complexity: the ten files most likely to hurt you.</li>
+        <li><strong>Safety</strong> - test coverage measured where change actually happens, not the vanity global number.</li>
+        <li><strong>Currency</strong> - dependency freshness, end-of-life runtimes, open CVEs.</li>
+        <li><strong>Legibility</strong> - documentation drift, dead code, naming consistency.</li>
+        <li><strong>Exit cost</strong> - a euro estimate of what key-person loss and onboarding cost you, with the formula shown.</li>
+      </ul>
+      <p>You receive a 15-page report your board can read, the raw metrics as JSON, and a 90-day recovery plan with priced next steps. Re-run the audit on the same commit and you get identical numbers - the analysis is reproducible, not vibes.</p>
+      <p><strong>Many repositories? Start with the Estate Survey.</strong> A Control Score goes deep on one system (up to 3 repos, 250k lines). If your code is an estate - dozens of repositories, millions of lines - deep-auditing everything up front would waste your money. The Estate Survey instead triages the whole portfolio: a mini-score per repository (activity, bus factor, size, coupling), a map of how the repos depend on each other, and a depth plan that says which repos deserve full treatment, which need docs only, and which are dormant and just need to stay inventoried. Deep work is then quoted repo by repo, on evidence.</p>
+    </div>
+    <aside class="price-card">
+      <div class="amount">1,900 EUR</div>
+      <ul class="terms">
+        <li>One system: up to 3 repos, 250k lines</li>
+        <li>Fixed price, 48-hour delivery</li>
+        <li>Scored report + raw metrics JSON</li>
+        <li>Priced 90-day recovery plan</li>
+        <li>Feasibility check before payment</li>
+      </ul>
+      <div class="amount" style="font-size:1.1rem; margin-top:6px">Estate Survey: 2,900 EUR + 90 EUR/repo</div>
+      <ul class="terms">
+        <li>Whole portfolio, any size</li>
+        <li>Example: 35 repos, 2.4M lines = 6,050 EUR</li>
+        <li>Depth plan: where deep work pays off</li>
+      </ul>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Control%20Score">Book a Score or Survey</a>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ PACK ============ -->
+<section class="offer wrap" id="pack">
+  <div class="offer-grid">
+    <div>
+      <div class="offer-head">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="6" y="10" width="22" height="24" fill="none" stroke="#17263f" stroke-width="2"/><rect x="12" y="5" width="22" height="24" fill="#fff" stroke="#17263f" stroke-width="2"/><line x1="17" y1="13" x2="29" y2="13" stroke="#e14e1b" stroke-width="2"/><line x1="17" y1="19" x2="29" y2="19" stroke="#c6d2dc" stroke-width="2"/><line x1="17" y1="25" x2="25" y2="25" stroke="#c6d2dc" stroke-width="2"/></svg></span>
+        <h2>Atlas Pack</h2>
+      </div>
+      <p class="offer-for">FOR: TEAMS INHERITING A SYSTEM, OR ONBOARDING INTO ONE</p>
+      <p>Complete documentation rebuilt from the code itself, in 3 to 10 days depending on size. Delivered as markdown plus a self-contained site your team can browse offline.</p>
+      <p><strong>What's in the pack:</strong></p>
+      <ul>
+        <li>System overview, tech stack, and entry points</li>
+        <li>Architecture with component and flow diagrams</li>
+        <li>One document per module: purpose, public API, data, risks, key files</li>
+        <li>Data model, API surface, and dependency map with version-risk notes</li>
+        <li>Onboarding guide: setup, first run, a code tour in reading order, and a suggested first safe change</li>
+        <li>Debt register: ranked risks, each with its evidence in the code</li>
+        <li><strong>The verification report</strong>: proof that every path and symbol we cite exists, shipped inside the pack</li>
+      </ul>
+      <p>Anything we couldn't verify is listed as an open question, never stated as fact. If the verification report fails our own gates, you don't pay.</p>
+    </div>
+    <aside class="price-card">
+      <div class="amount">290 EUR/repo + volume</div>
+      <ul class="terms">
+        <li>14 EUR per 1k lines (first 50k)</li>
+        <li>6 EUR per 1k lines (50k-250k)</li>
+        <li>2.50 EUR per 1k lines above 250k</li>
+        <li>15% off repos beyond the 5th</li>
+        <li>Lines counted by cloc at intake, vendored and generated code excluded - the count is shared before you commit</li>
+      </ul>
+      <div class="amount" style="font-size:1rem; margin-top:6px">Examples</div>
+      <ul class="terms">
+        <li>30k-line repo: 710 EUR, 3 days</li>
+        <li>200k-line repo: 1,890 EUR, 5 days</li>
+        <li>1M-line monorepo: ~4,000 EUR, 10 days</li>
+        <li>Refund if verification fails</li>
+      </ul>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Atlas%20Pack">Request an Atlas Pack</a>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ CAPTURE ============ -->
+<section class="offer wrap" id="capture">
+  <div class="offer-grid">
+    <div>
+      <div class="offer-head">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8,8 h24 v18 h-14 l-6,7 v-7 h-4 z" fill="none" stroke="#17263f" stroke-width="2"/><circle cx="15" cy="17" r="2" fill="#e14e1b"/><circle cx="21" cy="17" r="2" fill="#e14e1b"/><circle cx="27" cy="17" r="2" fill="#e14e1b"/></svg></span>
+        <h2>Capture</h2>
+      </div>
+      <p class="offer-for">FOR: THE MOMENT A KEY DEVELOPER RESIGNS. THEIR NOTICE PERIOD IS THE WINDOW.</p>
+      <p>When the person who knows the system leaves, most of what they know leaves with them - unless it's extracted deliberately, fast, and verifiably. Capture does exactly that, in one to two weeks, using about four hours of the expert's time.</p>
+      <p><strong>How it works:</strong></p>
+      <ul>
+        <li>We analyze the code first, then generate <strong>targeted questions</strong>, each anchored to something real: "in <span class="mono">payment_retry.py</span>, retries stop after 3 days and the constant is unexplained - why 3 days, and what breaks if it changes?" No "please describe the architecture."</li>
+        <li>Two interview sessions (or async written answers), transcribed.</li>
+        <li>Every answer is <strong>checked against the code</strong> where verifiable; the rest is recorded as testimony, attributed and dated.</li>
+        <li>The knowledge is written into your documentation where it belongs, next to the code it explains.</li>
+        <li>Questions that end up unanswered ship as a named risk list - knowing which nine questions now have no owner is worth money too.</li>
+      </ul>
+    </div>
+    <aside class="price-card">
+      <div class="amount">2,900 EUR</div>
+      <ul class="terms">
+        <li>Per expert, fixed</li>
+        <li>1-2 weeks elapsed</li>
+        <li>~4 hours of the expert's time</li>
+        <li>Answers verified against code</li>
+        <li>Unknowns shipped as a risk list</li>
+      </ul>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Capture">Book a Capture</a>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ SHIELD ============ -->
+<section class="offer wrap" id="shield">
+  <div class="offer-grid">
+    <div>
+      <div class="offer-head">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20,4 L34,10 V20 C34,29 28,34 20,37 C12,34 6,29 6,20 V10 Z" fill="none" stroke="#17263f" stroke-width="2"/><path d="M13,20 l5,5 l9,-9" fill="none" stroke="#e14e1b" stroke-width="2.4"/></svg></span>
+        <h2>Shield</h2>
+      </div>
+      <p class="offer-for">FOR: SYSTEMS WHERE EVERY DEPLOY IS A GAMBLE</p>
+      <p>A safety net of characterization tests on your riskiest modules: tests that pin down what the code does <em>today</em> - including behavior that looks like a bug - so that any future change that alters behavior gets caught in CI before it reaches production.</p>
+      <p><strong>What makes our shields real:</strong></p>
+      <ul>
+        <li>Targets are chosen by measurement: the hotspots from your Control Score with the least protection, approved by you with a per-target price.</li>
+        <li>Every suite is <strong>proven by mutation testing</strong>: we deliberately break your code in controlled ways and verify the tests turn red. A test that can't fail is theater; we prove ours can, and the mutation report is part of the delivery.</li>
+        <li>Contract tests guard the boundaries between modules, so teams stop breaking each other.</li>
+        <li>Everything ships as pull requests into your CI, in your test framework.</li>
+      </ul>
+      <p>The Shield is also the precondition for everything that follows: we don't modernize or evolve code we haven't made safe to change. That rule protects your system and our fixed prices equally.</p>
+    </div>
+    <aside class="price-card">
+      <div class="amount">6,000-15,000 EUR</div>
+      <ul class="terms">
+        <li>Priced per approved hotspot list</li>
+        <li>Mutation report included</li>
+        <li>Delivered as PRs into your CI</li>
+        <li>Your stack, your test framework</li>
+        <li>Requires a Control Score first</li>
+      </ul>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Shield">Discuss a Shield</a>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ FORGE ============ -->
+<section class="offer wrap" id="forge">
+  <div class="offer-grid">
+    <div>
+      <div class="offer-head">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6,26 h16 l-4,-5 m4,5 l-4,5" fill="none" stroke="#17263f" stroke-width="2"/><path d="M34,14 h-16 l4,-5 m-4,5 l4,5" fill="none" stroke="#e14e1b" stroke-width="2"/></svg></span>
+        <h2>Forge</h2>
+      </div>
+      <p class="offer-for">FOR: THE UPGRADE EVERYONE AGREES ON AND NOBODY DARES TO START</p>
+      <p>Modernization delivered as fixed-price "moves" from a rehearsed catalog - same behavior, better internals. Because every move runs under a Shield, "we hope nothing broke" becomes "the tests that pin current behavior are still green."</p>
+      <p><strong>The move catalog includes:</strong></p>
+      <ul>
+        <li>Dependency major upgrades and end-of-life runtime migrations</li>
+        <li>Framework migrations, in increments that ship weekly</li>
+        <li>Dead code removal, with usage evidence for every deletion</li>
+        <li>Module extraction (strangler fig) to carve serviceable pieces out of the monolith</li>
+        <li>Test framework consolidation</li>
+      </ul>
+      <p>Each move is quoted directly in your Control Score's 90-day plan, executed by our pipelines, reviewed by a senior engineer, and delivered as pull requests your team approves.</p>
+    </div>
+    <aside class="price-card">
+      <div class="amount">10,000-40,000 EUR</div>
+      <ul class="terms">
+        <li>Fixed price per move</li>
+        <li>Ships as reviewable PRs, weekly</li>
+        <li>Shield stays green throughout</li>
+        <li>Requires Score + Shield first</li>
+      </ul>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Forge">Discuss a Forge program</a>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ EVOLVE ============ -->
+<section class="offer wrap" id="evolve">
+  <div class="offer-grid">
+    <div>
+      <div class="offer-head">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M8,32 C16,32 16,10 26,10" fill="none" stroke="#17263f" stroke-width="2"/><path d="M8,32 C18,32 20,22 30,22" fill="none" stroke="#e14e1b" stroke-width="2"/><path d="M26,10 l6,0 m-2,-3 l3,3 l-3,3" stroke="#17263f" stroke-width="2" fill="none"/><path d="M30,22 l4,0 m-2,-3 l3,3 l-3,3" stroke="#e14e1b" stroke-width="2" fill="none"/></svg></span>
+        <h2>Evolve</h2>
+      </div>
+      <p class="offer-for">FOR: NEW REQUIREMENTS ON A SYSTEM YOU CAN'T AFFORD TO REWRITE</p>
+      <p>The destination of the whole path: your legacy system starts moving again. New features and intentional behavior changes, delivered on the system itself, without the rewrite.</p>
+      <p><strong>How it stays under control:</strong></p>
+      <ul>
+        <li>First, you receive the <strong>recovered specification</strong> of your system: a catalog of what it actually does, behavior by behavior, each entry backed by code evidence and pinned by a test. For most clients it's the first accurate spec they've had in years.</li>
+        <li>New requirements become <strong>behavior change tickets</strong>: behavior X becomes behavior Y, with acceptance criteria, a computed impact set, and a fixed price. You sign the list before work starts.</li>
+        <li>Every ticket starts with its acceptance test, written and failing, before any code changes.</li>
+        <li>CI blocks any change to a pinned behavior that no signed ticket covers. <strong>The difference between "bug" and "change" becomes contractual</strong>, and the arguments end.</li>
+        <li>After each ticket, the spec and docs regenerate. <strong>You review behavior diffs, not code diffs.</strong></li>
+      </ul>
+    </div>
+    <aside class="price-card">
+      <div class="amount">1,500-6,000 EUR</div>
+      <ul class="terms">
+        <li>Per ticket, by risk class</li>
+        <li>Capacity retainers 8,000-20,000 EUR/mo</li>
+        <li>Acceptance test first, always</li>
+        <li>Non-regression machine-verified</li>
+        <li>Requires Score + Shield first</li>
+      </ul>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Evolve">Discuss Evolve</a>
+    </aside>
+  </div>
+</section>
+
+<!-- ============ TOWER ============ -->
+<section class="offer wrap" id="tower">
+  <div class="offer-grid">
+    <div>
+      <div class="offer-head">
+        <span class="legend-glyph"><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M16,34 L20,8 L24,34 Z" fill="none" stroke="#17263f" stroke-width="2"/><path d="M10,14 a12,12 0 0 1 4,-6 M30,14 a12,12 0 0 0 -4,-6" fill="none" stroke="#e14e1b" stroke-width="2"/><line x1="12" y1="34" x2="28" y2="34" stroke="#17263f" stroke-width="2"/></svg></span>
+        <h2>Tower</h2>
+      </div>
+      <p class="offer-for">FOR: MAKING SURE CONTROL, ONCE REGAINED, IS NEVER LOST AGAIN</p>
+      <p>Control decays quietly: one prolific new hire concentrates knowledge, three new dependencies age, docs drift out of truth. Tower re-measures your system every month and tells you the moment anything starts sliding.</p>
+      <p><strong>Every month:</strong></p>
+      <ul>
+        <li>Fresh Control Score and drift report: "bus factor worsened in <span class="mono">billing</span> after 14 single-author PRs", "3 new dependencies, one already a major behind"</li>
+        <li>Documentation regenerated where the code changed, delivered as review PRs</li>
+        <li>Dependency and CVE watch with plain-language impact notes</li>
+      </ul>
+      <p><strong>Every quarter:</strong> a management report with the score trend, risks opened and closed, and the exit-cost trajectory - the chart that shows the investment working.</p>
+    </div>
+    <aside class="price-card">
+      <div class="amount">490 EUR<span style="font-size:0.9rem">/month</span> + 60 EUR/repo</div>
+      <ul class="terms">
+        <li>Base includes your first 3 repos</li>
+        <li>40 EUR/repo beyond 20 repos</li>
+        <li>Example: 35-repo estate = 2,110 EUR/mo</li>
+        <li>Monthly re-score + drift alerts</li>
+        <li>Docs regenerate as review PRs</li>
+        <li>Quarterly management report</li>
+        <li>Cancel anytime, keep everything</li>
+      </ul>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Tower">Discuss Tower</a>
+    </aside>
+  </div>
+</section>
+
+<section class="cta-final">
+  <div class="wrap">
+    <span class="eyebrow">Start where every engagement starts</span>
+    <h2>First, know where you stand.</h2>
+    <p>The Control Score sizes your system and prices everything else. 1,900 EUR, 48 hours, fixed.</p>
+    <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Control%20Score">Get your Control Score</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span><strong>RepoAtlas</strong> - codebase recovery, EU</span>
+    <span><a href="mailto:hello@repoatlas.dev">hello@repoatlas.dev</a></span>
+    <span><a href="index.html">Home</a> &middot; <a href="method.html">Method</a></span>
+    <span class="mono">Prices excl. VAT &middot; NDA and DPA on request</span>
+  </div>
+</footer>
+
+</body>
+</html>

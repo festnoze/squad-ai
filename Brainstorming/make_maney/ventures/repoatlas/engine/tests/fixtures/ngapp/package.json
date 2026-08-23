@@ -1,0 +1,9 @@
+{
+  "name": "billing-admin",
+  "version": "17.0.0",
+  "dependencies": {
+    "@angular/core": "^17.3.0",
+    "@angular/router": "^17.3.0",
+    "rxjs": "^7.8.0"
+  }
+}

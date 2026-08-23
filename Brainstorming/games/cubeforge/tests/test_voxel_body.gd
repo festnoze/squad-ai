@@ -353,21 +353,26 @@ func test_head_in_liquid_reads_the_eye_cell() -> void:
 	done()
 
 
-class _ProbeFake extends RefCounted:
-	const WORLD_HEIGHT := 96
-	func get_block(_x: int, _y: int, _z: int) -> int:
-		return 0
-	func is_solid(_x: int, _y: int, _z: int) -> bool:
-		return false
-	func has_chunk_at(_x: int, _z: int) -> bool:
-		return true
+func test_realistic_step_climbs_one_block_but_not_two() -> void:
+	var world := _air_world()
+	_fill_box(world, 5, 13, 10, 10, 6, 10, Blocks.STONE)
+	_fill_box(world, 9, 13, 11, 11, 6, 10, Blocks.STONE)
 
-
-func test_zzz_probe_fake_is_rejected() -> void:
 	var body := VoxelBody.new()
-	var fake := _ProbeFake.new()
-	print("PROBE before call")
-	var r = body.move(fake, Vector3(0, 5, 0), Vector3(0, -1, 0))
-	print("PROBE after call: ", r)
-	check(true, "probe")
+	var feet := Vector3(8.4, 11.001, 8.5)
+	var classic := body.move(world, feet, Vector3(1.2, -0.02, 0.0))
+	var stepped := body.move_with_step(world, feet, Vector3(1.2, -0.02, 0.0), 1.001)
+	check(classic["hit_x"], "la marche d'un bloc bloque le mouvement classique")
+	check(stepped["stepped"], "le deplacement realiste franchit une marche d'un bloc")
+	check(stepped["position"].x > classic["position"].x + 0.5,
+		"le pas assiste progresse reellement au-dela de l'obstacle")
+	near(stepped["position"].y, 12.001, 0.002,
+		"le joueur se pose exactement sur le bloc superieur")
+
+	_fill_box(world, 9, 13, 12, 12, 6, 10, Blocks.STONE)
+	var wall := body.move_with_step(world, feet, Vector3(1.2, -0.02, 0.0), 1.001)
+	check(not wall["stepped"], "un mur de deux blocs reste infranchissable")
+	check(wall["position"].x < 8.71, "le mur haut conserve la collision laterale")
+
+	world.free()
 	done()

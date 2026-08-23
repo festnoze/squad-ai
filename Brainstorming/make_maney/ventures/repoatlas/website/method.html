@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Method - RepoAtlas</title>
+<meta name="description" content="How RepoAtlas works: the codebase fact graph, machine-verified deliverables, mutation-proven tests, and a security posture built for cautious companies.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='13' fill='none' stroke='%23e14e1b' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4' fill='%23e14e1b'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700&family=Public+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav-inner">
+    <a class="brand" href="index.html">
+      <svg width="22" height="22" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="13" fill="none" stroke="#e14e1b" stroke-width="3"/><circle cx="16" cy="16" r="4" fill="#e14e1b"/></svg>
+      RepoAtlas
+    </a>
+    <nav class="nav-links" aria-label="Main">
+      <a href="index.html#path">The path</a>
+      <a href="offerings.html">Offerings</a>
+      <a href="method.html" aria-current="page">Method</a>
+      <a href="index.html#faq">FAQ</a>
+      <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Control%20Score">Get your Control Score</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<div class="wrap page-head">
+  <span class="eyebrow">Method</span>
+  <h1>AI does the reading. Deterministic checks and a senior engineer decide what ships.</h1>
+  <p class="lede">Everything we deliver rests on one asset and one discipline: a fact graph extracted from your code, and gates that refuse to ship anything the graph can't back up.</p>
+</div>
+
+<!-- ============ FACT GRAPH ============ -->
+<section class="section wrap" id="graph">
+  <div class="section-head">
+    <span class="eyebrow">The asset</span>
+    <h2>The codebase fact graph</h2>
+    <p>Every engagement builds and maintains a structured store of verified facts about your system - and every deliverable is a view over it.</p>
+  </div>
+  <div class="proof-grid" style="align-items:center">
+    <div>
+      <p style="color:var(--ink-soft); margin-bottom:16px">The graph holds your modules, files, symbols, endpoints, data entities, dependencies, tests, code owners, documented claims, and captured knowledge. Every fact carries its <strong>evidence</strong> (paths, line ranges, commits), its extraction date, and its verification status.</p>
+      <ul style="margin:0 0 16px 20px; color:var(--ink-soft)">
+        <li style="margin-bottom:8px">The <strong>Control Score</strong> is metrics computed over the graph.</li>
+        <li style="margin-bottom:8px">The <strong>Atlas Pack</strong> is documents rendered from it.</li>
+        <li style="margin-bottom:8px"><strong>Capture</strong> adds human knowledge to it, attributed and dated.</li>
+        <li style="margin-bottom:8px"><strong>Shield</strong> targets are graph queries: hotspots with no protection.</li>
+        <li style="margin-bottom:8px"><strong>Evolve</strong> plans changes from the graph's computed impact sets.</li>
+        <li><strong>Tower</strong> diffs graph snapshots over time - drift is a graph delta.</li>
+      </ul>
+      <p style="color:var(--ink-soft)">Because everything reads from the same verified source, your documentation, your tests, and your reports can never quietly disagree with each other - or with the code.</p>
+    </div>
+    <div>
+      <div class="evidence" role="img" aria-label="Example fact from a codebase fact graph">
+<span class="dim"># one fact among thousands</span><br>
+<span class="id">fact:</span>       module "billing" calls module "notifications"<br>
+<span class="dim">evidence:</span>   src/billing/invoice.py:214 -> notify_customer()<br>
+<span class="dim">extracted:</span>  2026-08-12, pipeline v1.4<br>
+<span class="dim">status:</span>     <span class="ok">verified</span> (symbol + path check passed)<br>
+      </div>
+      <p class="evidence-caption" style="color:var(--ink-soft)">Facts, not source code, are what we retain. Your code is processed ephemerally and never stored.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ GUARANTEES ============ -->
+<section class="section section-alt" id="guarantees">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">The discipline</span>
+      <h2>Six gates every deliverable must pass</h2>
+      <p>These run automatically, before human review. Failing any of them blocks delivery - and the first one is backed by a refund.</p>
+    </div>
+    <div class="guarantees">
+      <div class="guarantee">
+        <span class="mono-tag">GATE 01 &middot; EVIDENCE</span>
+        <h3>Every claim is checked against your code</h3>
+        <p>Every file path and symbol cited in a deliverable must exist in your repository; a sample of causal claims ("X calls Y", "X stores Y") is audited against the actual source. The verification report ships with the deliverable. If it fails, you don't pay.</p>
+      </div>
+      <div class="guarantee">
+        <span class="mono-tag">GATE 02 &middot; REPRODUCIBILITY</span>
+        <h3>Scores are deterministic</h3>
+        <p>Control Score numbers come from pure analysis of your repo and git history. Same commit in, same numbers out - anyone on your team can rerun and confirm them.</p>
+      </div>
+      <div class="guarantee">
+        <span class="mono-tag">GATE 03 &middot; MUTATION</span>
+        <h3>Tests must prove they can fail</h3>
+        <p>Before a Shield ships, we plant controlled mutations in your code and verify the new tests turn red. The mutation report is part of the delivery: you see the suite catching real changes.</p>
+      </div>
+      <div class="guarantee">
+        <span class="mono-tag">GATE 04 &middot; ATTRIBUTION</span>
+        <h3>Knowledge is attributed, never laundered</h3>
+        <p>Captured knowledge carries who said it and when, and whether the code corroborates it. Statements the code contradicts go back to the expert - never silently kept, never silently dropped.</p>
+      </div>
+      <div class="guarantee">
+        <span class="mono-tag">GATE 05 &middot; NO SILENT CHANGE</span>
+        <h3>Behavior changes only through signed tickets</h3>
+        <p>During Evolve, CI blocks any modification to a pinned behavior that doesn't reference a ticket you signed. Everything outside the tickets is machine-verified unchanged.</p>
+      </div>
+      <div class="guarantee">
+        <span class="mono-tag">GATE 06 &middot; ACCEPTANCE FIRST</span>
+        <h3>The test exists before the code changes</h3>
+        <p>Every behavior change starts with its acceptance test, written and recorded failing on the current system. Work is done when that test is green and everything else still is.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ENGAGEMENT FLOW ============ -->
+<section class="section wrap" id="engagement">
+  <div class="section-head">
+    <span class="eyebrow">Working together</span>
+    <h2>How an engagement runs</h2>
+  </div>
+  <ol class="method-flow">
+    <li>
+      <h3>Intake and feasibility</h3>
+      <p>A short call, NDA if you want one, read-only access set up your way. We run a feasibility check first - if your stack or repo isn't a good fit for our pipelines, we tell you before any money changes hands.</p>
+    </li>
+    <li>
+      <h3>Control Score in 48 hours</h3>
+      <p>The audit runs, the report lands, and we walk through it together. You now hold the measured picture and a priced 90-day plan. Many clients stop here; the report is yours either way.</p>
+    </li>
+    <li>
+      <h3>You choose the path</h3>
+      <p>Pick the offerings the plan recommends, in the order that matches your risk and budget. Fixed prices are committed in writing before each phase starts.</p>
+    </li>
+    <li>
+      <h3>Delivery in reviewable increments</h3>
+      <p>Everything arrives as documents and pull requests your team reviews - weekly, not as a big bang. Our pipelines do the volume; a senior engineer signs every delivery; the gates run on all of it.</p>
+    </li>
+    <li>
+      <h3>Control stays with you</h3>
+      <p>Deliverables, the fact graph, tests, and reports are yours, in your repositories, in standard formats. If we disappear tomorrow, everything keeps working. Tower is how control persists - not lock-in.</p>
+    </li>
+  </ol>
+</section>
+
+<!-- ============ SECURITY ============ -->
+<section class="section night" id="security">
+  <div class="wrap">
+    <div class="section-head">
+      <span class="eyebrow">Security &amp; data</span>
+      <h2>Built for companies that are careful with their code.</h2>
+    </div>
+    <div class="proof-grid">
+      <ul class="proof-list">
+        <li>
+          <h3>Your code is never retained</h3>
+          <p>Source is processed in an ephemeral workspace and deleted after each run. What persists is the fact graph: names, paths, verified claims - not code.</p>
+        </li>
+        <li>
+          <h3>Run it inside your walls</h3>
+          <p>On request, the pipelines execute in your CI or on your infrastructure, and nothing leaves your network at all.</p>
+        </li>
+      </ul>
+      <ul class="proof-list">
+        <li>
+          <h3>EU processing, EU contracts</h3>
+          <p>Processing on EU infrastructure, GDPR-aligned handling, NDA and DPA signed on request, and a full audit log of every access during the engagement.</p>
+        </li>
+        <li>
+          <h3>Least privilege by default</h3>
+          <p>Read-only access is all recovery work needs. Write access is scoped to pull requests only, on the repositories you designate, revocable by you at any moment.</p>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="cta-final">
+  <div class="wrap">
+    <span class="eyebrow">See the method applied to your system</span>
+    <h2>The first deliverable proves the approach.</h2>
+    <p>The Control Score is measurement, not opinion - and it comes with everything above attached.</p>
+    <a class="btn btn-primary" href="mailto:hello@repoatlas.dev?subject=Control%20Score">Get your Control Score</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <span><strong>RepoAtlas</strong> - codebase recovery, EU</span>
+    <span><a href="mailto:hello@repoatlas.dev">hello@repoatlas.dev</a></span>
+    <span><a href="index.html">Home</a> &middot; <a href="offerings.html">Offerings</a></span>
+    <span class="mono">Prices excl. VAT &middot; NDA and DPA on request</span>
+  </div>
+</footer>
+
+</body>
+</html>

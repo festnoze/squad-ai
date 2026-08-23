@@ -122,6 +122,7 @@ static var _lut_tile := PackedInt32Array()
 static var _lut_tint := PackedInt32Array()
 static var _lut_emission := PackedFloat32Array()
 static var _lut_wave := PackedFloat32Array()
+static var _lut_smooth := PackedByteArray()
 static var _lut_draws := PackedByteArray()
 static var _pow_falloff := PackedFloat32Array()
 
@@ -149,7 +150,9 @@ class SurfaceBuffer extends RefCounted:
 			p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3,
 			normal: Vector3,
 			c0: Color, c1: Color, c2: Color, c3: Color,
-			layer: float, wave_low: float, wave_high: float, flip: bool) -> void:
+			layer: float, wave_low: float, wave_high: float, flip: bool,
+			smooth0: float = 0.0, smooth1: float = 0.0,
+			smooth2: float = 0.0, smooth3: float = 0.0) -> void:
 		var base := verts.size()
 
 		verts.push_back(p0)
@@ -174,19 +177,19 @@ class SurfaceBuffer extends RefCounted:
 
 		custom.push_back(layer)
 		custom.push_back(wave_low)
-		custom.push_back(0.0)
+		custom.push_back(smooth0)
 		custom.push_back(0.0)
 		custom.push_back(layer)
 		custom.push_back(wave_low)
-		custom.push_back(0.0)
-		custom.push_back(0.0)
-		custom.push_back(layer)
-		custom.push_back(wave_high)
-		custom.push_back(0.0)
+		custom.push_back(smooth1)
 		custom.push_back(0.0)
 		custom.push_back(layer)
 		custom.push_back(wave_high)
+		custom.push_back(smooth2)
 		custom.push_back(0.0)
+		custom.push_back(layer)
+		custom.push_back(wave_high)
+		custom.push_back(smooth3)
 		custom.push_back(0.0)
 
 		# Corner loop order reversed, see the winding note at the top of the file.
@@ -468,6 +471,30 @@ static func build_mesh_data(padded: PackedByteArray, tints: PackedColorArray) ->
 					var o1: Vector3 = FACE_CORNERS[corner + 1]
 					var o2: Vector3 = FACE_CORNERS[corner + 2]
 					var o3: Vector3 = FACE_CORNERS[corner + 3]
+					var smooth0 := 0.0
+					var smooth1 := 0.0
+					var smooth2 := 0.0
+					var smooth3 := 0.0
+					# Natural top blocks carry an optional Realistic-mode corner
+					# displacement in CUSTOM0.z. The same grid corner calculation is
+					# used by both chunks at a border, so no seam can open.
+					var smooth_surface := _lut_smooth[id] == 1 and py == top_opaque[col] \
+							and top_h >= 0.999
+					if smooth_surface:
+						if face == Blocks.FACE_PY:
+							smooth0 = _smooth_corner_delta(padded, top_opaque, px, pz, py, o0)
+							smooth1 = _smooth_corner_delta(padded, top_opaque, px, pz, py, o1)
+							smooth2 = _smooth_corner_delta(padded, top_opaque, px, pz, py, o2)
+							smooth3 = _smooth_corner_delta(padded, top_opaque, px, pz, py, o3)
+						elif face in [Blocks.FACE_PX, Blocks.FACE_NX, Blocks.FACE_PZ, Blocks.FACE_NZ]:
+							if o0.y > 0.5:
+								smooth0 = _smooth_corner_delta(padded, top_opaque, px, pz, py, o0)
+							if o1.y > 0.5:
+								smooth1 = _smooth_corner_delta(padded, top_opaque, px, pz, py, o1)
+							if o2.y > 0.5:
+								smooth2 = _smooth_corner_delta(padded, top_opaque, px, pz, py, o2)
+							if o3.y > 0.5:
+								smooth3 = _smooth_corner_delta(padded, top_opaque, px, pz, py, o3)
 
 					buffer.quad(
 							Vector3(fx + o0.x, fy + (top_h if o0.y > 0.5 else 0.0), fz + o0.z),
@@ -480,7 +507,7 @@ static func build_mesh_data(padded: PackedByteArray, tints: PackedColorArray) ->
 							Color(cr * a2, cg * a2, cb * a2, emission),
 							Color(cr * a3, cg * a3, cb * a3, emission),
 							float(_lut_tile[tile_row + face]), wave, wave,
-							(a0 + a2) > (a1 + a3))
+							(a0 + a2) > (a1 + a3), smooth0, smooth1, smooth2, smooth3)
 
 	for s in Blocks.SURFACE_COUNT:
 		var buffer: SurfaceBuffer = buffers[s]
@@ -518,6 +545,27 @@ static func _sky_light(top_opaque: PackedInt32Array, side_min: PackedInt32Array,
 	elif e < 0.0:
 		e = 0.0
 	return SKY_AMBIENT + SKY_RANGE * e
+
+
+## Average of the natural surface columns sharing one grid corner. Non-terrain
+## tops (trees, houses, fences) contribute the current height, keeping authored
+## structures perfectly square. The clamp limits smoothing to a gentle bevel;
+## collision remains the conservative full voxel underneath.
+static func _smooth_corner_delta(padded: PackedByteArray, top_opaque: PackedInt32Array,
+		px: int, pz: int, py: int, corner: Vector3) -> float:
+	var x0 := px - 1 if corner.x < 0.5 else px
+	var z0 := pz - 1 if corner.z < 0.5 else pz
+	var total := 0.0
+	for qx in [x0, x0 + 1]:
+		for qz in [z0, z0 + 1]:
+			var top: int = top_opaque[qx * PD + qz]
+			if top < 1:
+				total += float(py)
+				continue
+			var top_id: int = padded[padded_index(qx, top, qz)]
+			total += float(top) if _lut_smooth[top_id] == 1 else float(py)
+	var target := total * 0.25
+	return clampf(target - float(py), -0.42, 0.42)
 
 
 ## Two diagonal quads for a plant. Both are emitted with a single winding: the
@@ -589,6 +637,8 @@ static func _build_tables() -> void:
 	emission.resize(count)
 	var wave := PackedFloat32Array()
 	wave.resize(count)
+	var smooth := PackedByteArray()
+	smooth.resize(count)
 
 	for id in count:
 		opaque[id] = 1 if Blocks.is_opaque(id) else 0
@@ -602,6 +652,10 @@ static func _build_tables() -> void:
 	wave[Blocks.OAK_LEAVES] = LEAF_WAVE
 	wave[Blocks.BIRCH_LEAVES] = LEAF_WAVE
 	wave[Blocks.PINE_LEAVES] = LEAF_WAVE
+
+	for id in [Blocks.STONE, Blocks.GRASS, Blocks.DIRT, Blocks.GRANITE, Blocks.MARBLE,
+			Blocks.SAND, Blocks.SANDSTONE, Blocks.GRAVEL, Blocks.CLAY, Blocks.SNOW_BLOCK]:
+		smooth[id] = 1
 
 	var draws := PackedByteArray()
 	draws.resize(count * count)
@@ -622,6 +676,7 @@ static func _build_tables() -> void:
 	_lut_tint = tint
 	_lut_emission = emission
 	_lut_wave = wave
+	_lut_smooth = smooth
 	_pow_falloff = falloff
 	# Assigned last: _ensure_tables uses it as the readiness flag.
 	_lut_draws = draws

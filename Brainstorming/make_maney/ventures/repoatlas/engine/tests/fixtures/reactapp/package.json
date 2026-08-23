@@ -1,0 +1,11 @@
+{
+  "name": "billing-dashboard",
+  "version": "0.3.0",
+  "scripts": { "dev": "vite", "build": "vite build" },
+  "dependencies": {
+    "react": "^18.3.0",
+    "react-dom": "^18.3.0",
+    "react-router-dom": "^6.22.0"
+  },
+  "devDependencies": { "vite": "^5.0.0", "typescript": "^5.4.0" }
+}

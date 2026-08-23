@@ -34,6 +34,7 @@ var _built: bool = false
 var _slots: Array = []
 var _palette_section: VBoxContainer = null
 var _palette_grid: GridContainer = null
+var _tool_grid: GridContainer = null
 var _hint_label: Label = null
 var _preview_cache: Dictionary = {}
 
@@ -129,11 +130,14 @@ func request_swap(from_slot: int, to_slot: int) -> void:
 	_refresh()
 
 
-## Creative palette click: put the block into the currently selected hotbar slot.
+## Palette click: put the entry into the currently selected hotbar slot. Tools
+## are handed out one at a time, everything else as a full stack so the pick is
+## also usable in a survival world under God mode.
 func assign_palette(block_id: int) -> void:
 	if _inventory == null:
 		return
-	_inventory.set_slot(_inventory.selected, block_id, 1)
+	var count: int = 1 if Items.is_gear(block_id) else Inventory.STACK_MAX
+	_inventory.set_slot(_inventory.selected, block_id, count)
 	_refresh()
 
 
@@ -218,7 +222,22 @@ func _ensure_built() -> void:
 	column.add_child(_palette_section)
 
 	_palette_section.add_child(_make_rule())
-	_palette_section.add_child(_make_title("Palette créative", 16))
+	_palette_section.add_child(_make_title("Outils et armes", 16))
+
+	# Tools come first: God mode exists to reach them without mining a whole
+	# tech tree, and the block palette below is the long scrolling one.
+	_tool_grid = _make_grid()
+	_tool_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_palette_section.add_child(_tool_grid)
+	for i in Items.PALETTE.size():
+		var item_id: int = int(Items.PALETTE[i])
+		var tool_entry := SlotView.new()
+		tool_entry.configure(self, PALETTE_SLOT_SIZE)
+		tool_entry.palette_id = item_id
+		tool_entry.set_content(item_id, 0, false, _preview(item_id, PALETTE_SLOT_SIZE - 10))
+		_tool_grid.add_child(tool_entry)
+
+	_palette_section.add_child(_make_title("Blocs", 16))
 
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
@@ -298,8 +317,10 @@ func _refresh() -> void:
 	if not _built or _inventory == null:
 		return
 	var creative: bool = _inventory.creative
+	# God mode opens the same palettes in a survival world: it is the switch
+	# that grants full access without turning off monsters or damage.
 	if _palette_section != null:
-		_palette_section.visible = creative
+		_palette_section.visible = creative or _god_mode()
 	var selected: int = _inventory.selected
 	for index in _slots.size():
 		var slot: SlotView = _slots[index]
@@ -321,7 +342,7 @@ func _preview(block_id: int, size: int) -> Texture2D:
 	var key: int = block_id * 4096 + size
 	if _preview_cache.has(key):
 		return _preview_cache[key] as Texture2D
-	var texture: Texture2D = VoxelAtlas.block_preview(block_id, size)
+	var texture: Texture2D = Items.preview_any(block_id, size)
 	_preview_cache[key] = texture
 	return texture
 
@@ -329,6 +350,16 @@ func _preview(block_id: int, size: int) -> Texture2D:
 # ---------------------------------------------------------------------------
 # Overlay cooperation
 # ---------------------------------------------------------------------------
+
+## God mode state, read through the tree so this file still compiles under
+## `--check-only`, which never registers the autoloads.
+func _god_mode() -> bool:
+	var game := get_node_or_null(^"/root/Game")
+	if game == null:
+		return false
+	var value: Variant = game.get("fly_mode")
+	return value is bool and value
+
 
 ## True when some other screen still holds the pointer. Keeps the mouse visible
 ## when this one closes underneath the pause menu.
@@ -413,7 +444,7 @@ class SlotView extends Panel:
 			_icon.texture = texture
 		if _count != null:
 			_count.text = str(count) if show_count else ""
-		tooltip_text = "" if block_id == Blocks.AIR else Blocks.display_name(block_id)
+		tooltip_text = "" if block_id == Blocks.AIR else Items.display_name_any(block_id)
 
 	func set_selected(value: bool) -> void:
 		if _selected == value:

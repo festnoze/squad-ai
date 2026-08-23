@@ -63,8 +63,8 @@ Registre statique. Ne le modifie pas. API disponible :
 Blocks.AIR, Blocks.STONE, Blocks.GRASS, ...          # ids (voir enum, Blocks.COUNT au total)
 Blocks.Kind.{EMPTY,SOLID,CUTOUT,CROSS,TRANSLUCENT,LIQUID}
 Blocks.Surface.{OPAQUE,CUTOUT,TRANSLUCENT,WATER}     # 0..3, Blocks.SURFACE_COUNT == 4
-Blocks.TILE_NAMES: PackedStringArray                 # 53 noms, ordre = layers de l'atlas
-Blocks.TILE_COUNT == 53
+Blocks.TILE_NAMES: PackedStringArray                 # 57 noms, ordre = layers de l'atlas
+Blocks.TILE_COUNT == 57
 Blocks.TILE_PIXELS == 32                             # côté d'une tuile en pixels
 Blocks.PALETTE: PackedByteArray                      # ordre de la palette créative
 
@@ -208,7 +208,7 @@ les actions ci-dessous, en n'écrasant pas une action déjà présente. Utilise
 
 ### 4.2 `src/render/atlas.gd` - `class_name VoxelAtlas`
 
-Génère les 53 tuiles de `Blocks.TILE_NAMES` **par code**, en pixel art
+Génère les 57 tuiles de `Blocks.TILE_NAMES` **par code**, en pixel art
 `32 x 32`, et les empile dans un `Texture2DArray`. L'index de layer doit être
 exactement l'index dans `Blocks.TILE_NAMES`.
 
@@ -877,7 +877,78 @@ non chargé. Utilise `has_chunk_at()` pour distinguer les deux cas.
 Le noeud racine instancie et relie tout : monde, joueur, interaction,
 inventaire, HUD, ciel. Il appelle `setup()` sur chacun dans le bon ordre.
 
-## 6. Tests
+## 6. Extensions survie (objets, fabrication, monstres)
+
+Ajouts postérieurs au premier chantier. Les ids d'objets vivent dans leur
+propre plage d'octets, au dessus des blocs, donc un octet identifie toujours
+n'importe quel contenu d'inventaire.
+
+### `src/core/items.gd` - `class_name Items`
+
+```gdscript
+Items.BASE == 200, Items.END                        # plage des ids d'objets
+Items.STICK, COAL, IRON_INGOT, GOLD_INGOT, DIAMOND
+Items.WOOD_PICKAXE .. DIAMOND_PICKAXE, WOOD_SWORD .. DIAMOND_SWORD, BOW, ARROW
+Items.Kind.{MATERIAL,PICKAXE,SWORD,BOW,ARROW}
+Items.is_item(id) -> bool
+Items.is_valid_id(id) -> bool                       # bloc réel ou objet réel
+Items.display_name_any(id) -> String                # sert blocs et objets
+Items.preview_any(id, size) -> Texture2D            # idem, icônes par code
+Items.drop_for(block_id) -> int                     # minerais -> matériaux
+Items.dig_multiplier(item_id, block_id) -> float    # pioche sur famille pierre
+Items.melee_damage(item_id) -> int
+```
+
+`Blocks` reste pur : le remap minerai vers objet vit ici, et l'interaction
+appelle `Items.drop_for()` au lieu de `Blocks.drop_of()`.
+
+### `src/core/recipes.gd` - `class_name Recipes`
+
+```gdscript
+Recipes.all() -> Array[Dictionary]   # {output, count, inputs: [[id, n]...], table: bool}
+Recipes.craftable(recipe, inv: Inventory) -> bool
+Recipes.craft(recipe, inv: Inventory) -> bool
+```
+
+Les recettes `table == false` couvrent la chaîne d'amorçage (rondin, planches,
+bâtons, table, torches). `Inventory` gagne `take(id, amount) -> bool` et
+accepte les ids d'objets partout où un id de bloc était accepté.
+
+### `src/entities/` - monstres et projectiles
+
+`MonsterManager extends Node3D` : `setup(world, player, sky)`, apparition
+nocturne uniquement quand `Game.creative` est faux, bannissement à l'aube.
+`ray_pick(origin, dir, max) -> MonsterMob` sert la mêlée,
+`spawn_arrow(start, velocity, from_player)` sert l'arc et les squelettes.
+Signal `loot_dropped(item_id, count)` remonté vers main.
+
+`MonsterMob extends Node3D` : kinds ZOMBIE, SKELETON, SPIDER, CREEPER, groupe
+`"monsters"`, `take_damage(amount, from)`, `aabb()`, `alive()`, `banish()`.
+Même locomotion voxel que `SettlementMob` (aucun corps physique).
+
+`Projectile extends Node3D` : flèche balistique, segment contre la grille via
+`Interaction.raycast` puis test AABB des acteurs.
+
+### Joueur, interface, monde
+
+`Player` : `MAX_HEALTH == 20`, `health`, `take_damage(amount, source)`,
+`revive(at)`, signaux `health_changed(current, maximum)`, `damaged(amount)`,
+`died()`. Créatif ignore les dégâts.
+
+`Interaction` : signal `crafting_requested()` (clic droit sur une table,
+`crouch` pour construire contre), `set_combat(monsters)`, mêlée sur clic
+gauche quand un monstre est sous le réticule, arc sur clic gauche quand l'arc
+est en main.
+
+`Hud` : `set_health(current, maximum)`, `flash_damage()`. `CraftingUi` :
+`setup(inventory)`, `open(near_table: bool)`, `close()`, `is_open()`, signal
+`closed()`. Action d'entrée supplémentaire : `craft` sur `KEY_C`.
+
+`VoxelWorld` : le spawn est l'intérieur de la maison en bois du village le
+plus proche (`TerrainGen.nearest_house`), `load_meta()` / `store_meta(extra)`
+persistent l'état joueur dans `meta.json`.
+
+## 7. Tests
 
 `tests/run_tests.gd` étend `SceneTree` et s'exécute par
 `godot --headless --path . --script res://tests/run_tests.gd`.

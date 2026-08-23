@@ -569,6 +569,14 @@ static func _draw_tile(tile_name: String, img: Image) -> void:
 			_t_sapling(img, rng, seed_i)
 		"torch":
 			_t_torch(img, seed_i)
+		"crafting_table_top":
+			_t_crafting_table_top(img, rng, seed_i)
+		"crafting_table_side":
+			_t_crafting_table_side(img, rng, seed_i)
+		"chest_top":
+			_t_chest_top(img, rng, seed_i)
+		"chest_side":
+			_t_chest_side(img, rng, seed_i)
 		_:
 			push_warning("VoxelAtlas: unknown tile '%s', painting the fallback" % tile_name)
 			_t_missing(img)
@@ -955,6 +963,135 @@ static func _t_bookshelf(img: Image, rng: RandomNumberGenerator, seed_i: int) ->
 			cursor += w + 1
 	_grain(img, _noise_field(S, S, seed_i + 127), 0.10)
 	_vignette(img, 0.12)
+
+
+## Work surface of the crafting table: oak planks framed by a darker border,
+## with a light sawtooth square in the middle reading as a cutting mat.
+static func _t_crafting_table_top(img: Image, rng: RandomNumberGenerator, seed_i: int) -> void:
+	_t_plank_tile(img, rng, seed_i, Color(0.52, 0.37, 0.21), Color(0.69, 0.52, 0.31), Color(0.33, 0.22, 0.12))
+	var frame := Color(0.30, 0.19, 0.10)
+	var frame_hi := Color(0.40, 0.27, 0.14)
+	for i in S:
+		for t in 2:
+			img.set_pixel(i, t, frame if t == 0 else frame_hi)
+			img.set_pixel(i, S - 1 - t, frame if t == 0 else frame_hi)
+			img.set_pixel(t, i, frame if t == 0 else frame_hi)
+			img.set_pixel(S - 1 - t, i, frame if t == 0 else frame_hi)
+	# Central working square with a lighter inlay and crossing guide lines.
+	var inlay := Color(0.76, 0.62, 0.40)
+	var line := Color(0.24, 0.15, 0.08)
+	for y in range(10, 22):
+		for x in range(10, 22):
+			var edge: bool = x == 10 or x == 21 or y == 10 or y == 21
+			img.set_pixel(x, y, line if edge else inlay)
+	for i in range(11, 21):
+		img.set_pixel(i, 15, line)
+		img.set_pixel(15, i, line)
+	_grain(img, _noise_field(S, S, seed_i + 271), 0.06)
+
+
+## Side of the crafting table: planks, a dark apron on top, and stamped tools
+## (a saw blade and a hammer) so the block reads at a glance.
+static func _t_crafting_table_side(img: Image, rng: RandomNumberGenerator, seed_i: int) -> void:
+	_t_plank_tile(img, rng, seed_i, Color(0.48, 0.34, 0.19), Color(0.64, 0.47, 0.28), Color(0.30, 0.20, 0.11))
+	var apron := Color(0.32, 0.21, 0.11)
+	for y in 5:
+		for x in S:
+			img.set_pixel(x, y, apron.lightened(0.10) if y == 4 else apron)
+	var steel := Color(0.80, 0.82, 0.86)
+	var steel_dark := Color(0.55, 0.57, 0.62)
+	var handle := Color(0.24, 0.15, 0.08)
+	# Saw: horizontal blade with teeth, wooden grip on the left.
+	_stamp(img, 4, 12, PackedStringArray([
+		"hh..............",
+		"hhbbbbbbbbbbbbbb",
+		"hhbbbbbbbbbbbbbb",
+		"..d.d.d.d.d.d.d.",
+	]), {"b": steel, "d": steel_dark, "h": handle})
+	# Hammer: vertical handle with a steel head, lower right.
+	_stamp(img, 20, 18, PackedStringArray([
+		"bbbbbb",
+		"bbbbbb",
+		"..hh..",
+		"..hh..",
+		"..hh..",
+		"..hh..",
+		"..hh..",
+	]), {"b": steel, "h": handle})
+	_vignette(img, 0.10)
+
+
+## Dark 2 px rim shared by both chest faces. Uniform on all four edges, so the
+## tile keeps wrapping: a dark edge always meets another dark edge.
+static func _chest_rim(img: Image) -> void:
+	var frame := Color(0.30, 0.19, 0.10)
+	var frame_hi := Color(0.40, 0.27, 0.14)
+	for i in S:
+		for t in 2:
+			img.set_pixel(i, t, frame if t == 0 else frame_hi)
+			img.set_pixel(i, S - 1 - t, frame if t == 0 else frame_hi)
+			img.set_pixel(t, i, frame if t == 0 else frame_hi)
+			img.set_pixel(S - 1 - t, i, frame if t == 0 else frame_hi)
+
+
+## Full width iron band with a lit top edge, a shaded bottom edge and rivets on
+## an 8 px grid, a divisor of the tile so the band still wraps horizontally.
+static func _chest_band(img: Image, y0: int, height: int, seed_i: int) -> void:
+	var iron := Color(0.62, 0.64, 0.68)
+	var iron_dark := Color(0.42, 0.44, 0.48)
+	var iron_light := Color(0.76, 0.78, 0.82)
+	for y in range(y0, y0 + height):
+		for x in S:
+			var c := iron
+			if y == y0:
+				c = iron_light
+			elif y == y0 + height - 1:
+				c = iron_dark
+			var f := 1.0 + (_lattice(x, y, seed_i + 359) - 0.5) * 0.10
+			img.set_pixel(x, posmod(y, S), Color(
+				clampf(c.r * f, 0.0, 1.0),
+				clampf(c.g * f, 0.0, 1.0),
+				clampf(c.b * f, 0.0, 1.0), 1.0))
+	# Rivets pinning the band to the wood.
+	var mid := y0 + height / 2
+	for x in range(4, S, 8):
+		_px(img, x, mid, iron_dark)
+		_px(img, x, mid - 1, iron_light)
+
+
+## Lid of the storage chest: oak planks under a dark rim, crossed in the middle
+## by the iron strap that also runs down the side face.
+static func _t_chest_top(img: Image, rng: RandomNumberGenerator, seed_i: int) -> void:
+	_t_plank_tile(img, rng, seed_i, Color(0.52, 0.37, 0.21), Color(0.69, 0.52, 0.31), Color(0.33, 0.22, 0.12))
+	_chest_rim(img)
+	_chest_band(img, 14, 4, seed_i)
+	_grain(img, _noise_field(S, S, seed_i + 271), 0.06)
+	_vignette(img, 0.08)
+
+
+## Side of the storage chest: planks, dark rim, the lid seam as an iron band at
+## 40 percent of the height, and a small iron latch overlapping the band.
+static func _t_chest_side(img: Image, rng: RandomNumberGenerator, seed_i: int) -> void:
+	_t_plank_tile(img, rng, seed_i, Color(0.48, 0.34, 0.19), Color(0.64, 0.47, 0.28), Color(0.30, 0.20, 0.11))
+	_chest_rim(img)
+	_chest_band(img, 12, 4, seed_i)
+	# Latch: a 4x5 iron plate centred on X, rising above the band like a clasp.
+	var iron := Color(0.62, 0.64, 0.68)
+	var iron_dark := Color(0.42, 0.44, 0.48)
+	var iron_light := Color(0.76, 0.78, 0.82)
+	for y in range(10, 15):
+		for x in range(14, 18):
+			var c := iron
+			if x == 14 or y == 10:
+				c = iron_light
+			elif x == 17 or y == 14:
+				c = iron_dark
+			img.set_pixel(x, y, c)
+	# Keyhole shadow in the plate centre.
+	img.set_pixel(15, 12, Color(0.18, 0.19, 0.22))
+	img.set_pixel(16, 12, Color(0.18, 0.19, 0.22))
+	_grain(img, _noise_field(S, S, seed_i + 277), 0.06)
+	_vignette(img, 0.10)
 
 
 # ---------------------------------------------------------------------------

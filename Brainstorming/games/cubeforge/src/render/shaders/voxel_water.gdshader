@@ -25,6 +25,8 @@ shader_type spatial;
 render_mode cull_disabled, blend_mix, depth_draw_opaque;
 
 uniform sampler2DArray tiles : source_color, filter_nearest_mipmap_anisotropic, repeat_disable;
+uniform sampler2DArray tiles_smooth : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
+uniform float realistic_mode : hint_range(0.0, 1.0) = 0.0;
 uniform float wind_strength : hint_range(0.0, 2.0) = 1.0;
 // 0 = midnight, 0.25 = dawn, 0.5 = noon, 0.75 = dusk. Pushed by
 // VoxelMaterials.set_time so the water body follows the sky mood.
@@ -63,7 +65,8 @@ void vertex() {
 }
 
 void fragment() {
-	vec4 tex = texture(tiles, vec3(UV, tile_layer));
+	vec4 tex = mix(texture(tiles, vec3(UV, tile_layer)),
+		texture(tiles_smooth, vec3(UV, tile_layer)), realistic_mode);
 
 	// Three crossing ripple trains, wavelengths of roughly 5 to 9 units. Both
 	// the height and its exact gradient come out of the same sines, so the
@@ -80,7 +83,7 @@ void fragment() {
 	float ph3 = dot(p, k3) + TIME * 1.83;
 	float ripple = a1 * sin(ph1) + a2 * sin(ph2) + a3 * sin(ph3);
 	vec2 slope = k1 * (a1 * cos(ph1)) + k2 * (a2 * cos(ph2)) + k3 * (a3 * cos(ph3));
-	slope *= 4.2 * ripple_strength * clamp(wind_strength, 0.0, 2.0);
+	slope *= mix(4.2, 5.4, realistic_mode) * ripple_strength * clamp(wind_strength, 0.0, 2.0);
 
 	// Only the horizontal faces get the ripple normal. The side quads of a water
 	// column must keep their own normal or the shading of a shoreline flips.
@@ -119,7 +122,7 @@ void fragment() {
 	// Clearly see-through at normal incidence, because the player swims in it,
 	// and closing up towards the horizon the way real water does.
 	ALPHA = clamp(base_alpha + refl * 0.30, 0.0, 0.94);
-	ROUGHNESS = 0.08;
-	SPECULAR = 0.72;
+	ROUGHNESS = mix(0.08, 0.045, realistic_mode);
+	SPECULAR = mix(0.72, 0.90, realistic_mode);
 	METALLIC = 0.0;
 }

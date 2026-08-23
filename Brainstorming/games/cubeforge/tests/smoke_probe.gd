@@ -77,6 +77,7 @@ func _run_assertions(elapsed: float) -> void:
 	var settlements: SettlementManager = _main.get_node_or_null("Settlements")
 	var sky: SkyController = _main.get_node_or_null("Sky")
 	var hud: Hud = _main.get_node_or_null("Hud")
+	var pause_menu: PauseMenu = _main.get_node_or_null("Screens/PauseMenu")
 
 	_check(world != null, "le noeud World doit exister")
 	_check(player != null, "le noeud Player doit exister")
@@ -84,6 +85,7 @@ func _run_assertions(elapsed: float) -> void:
 	_check(settlements != null, "le gestionnaire de villages doit exister")
 	_check(sky != null, "le noeud Sky doit exister")
 	_check(hud != null, "le noeud Hud doit exister")
+	_check(pause_menu != null, "le menu de reglages doit exister")
 	if world == null or player == null:
 		return
 
@@ -213,7 +215,8 @@ func _run_assertions(elapsed: float) -> void:
 	_check(player.body != null, "le corps de collision doit exister")
 	# Left alone on generated ground, the player must come to rest on it rather
 	# than sinking into a block or hovering.
-	_check(player.on_floor(), "le joueur doit finir pose sur le sol")
+	if not player.fly_mode:
+		_check(player.on_floor(), "hors vol, le joueur doit finir pose sur le sol")
 	if player.body != null:
 		_check(not player.body.overlaps_solid(world, pos),
 			"le joueur ne doit pas etre encastre dans un bloc")
@@ -226,7 +229,9 @@ func _run_assertions(elapsed: float) -> void:
 	var saved_floor := player._on_floor
 	var saved_submersion := player._submersion
 	var saved_boost := player._water_exit_boosted
+	var saved_water_test_fly := player.fly_mode
 	player.velocity = Vector3.ZERO
+	player.fly_mode = false
 	player.in_water = true
 	player._on_floor = false
 	player._submersion = Player.WATER_EXIT_RATIO
@@ -242,6 +247,7 @@ func _run_assertions(elapsed: float) -> void:
 	player._on_floor = saved_floor
 	player._submersion = saved_submersion
 	player._water_exit_boosted = saved_boost
+	player.fly_mode = saved_water_test_fly
 
 	# Settings-driven flight shares the same state as the F shortcut.
 	var saved_creative := Game.creative
@@ -291,7 +297,11 @@ func _run_assertions(elapsed: float) -> void:
 			"la normale d'un tir vertical doit pointer vers le haut")
 		_check(float(hit["distance"]) > 0.0, "la distance doit etre positive")
 
-	var up: Dictionary = Interaction.raycast(world, player.eye_position(), Vector3.UP, 3.0)
+	# The player now spawns inside a village house, so a ray from the eye can
+	# legitimately meet the ceiling lamp. Shoot from just under the world top,
+	# where nothing can exist, to verify that leaving the world reports a miss.
+	var sky_origin := Vector3(player.eye_position().x, float(VoxelWorld.WORLD_HEIGHT) - 1.5, player.eye_position().z)
+	var up: Dictionary = Interaction.raycast(world, sky_origin, Vector3.UP, 3.0)
 	_check(not bool(up.get("hit", false)), "un tir vers le ciel ne doit rien toucher")
 
 	# --- sky ------------------------------------------------------------------
@@ -312,8 +322,21 @@ func _run_assertions(elapsed: float) -> void:
 	var inventory: Inventory = _main.inventory
 	_check(inventory != null, "l'inventaire doit exister")
 	if inventory != null:
-		_check(inventory.selected_block() != Blocks.AIR,
-			"la case selectionnee doit contenir un bloc au demarrage")
+		# The hotbar content is restored from the world save, so the active slot
+		# may legitimately be empty (the player quit on an empty one). What must
+		# hold is that the bar is not entirely empty and every entry is a real
+		# block or item.
+		var filled := 0
+		for slot in Inventory.HOTBAR_SLOTS:
+			var id: int = inventory.slot_block(slot)
+			if id == Blocks.AIR:
+				continue
+			filled += 1
+			_check(Items.is_valid_id(id),
+				"la case %d contient un id invalide (%d)" % [slot, id])
+			_check(inventory.slot_count(slot) > 0,
+				"la case %d contient un id sans quantite" % slot)
+		_check(filled > 0, "la barre d'action ne doit pas etre entierement vide")
 		inventory.select(0)
 		inventory.cycle(1)
 		_check(inventory.selected == 1, "la molette doit changer de case")
@@ -335,6 +358,21 @@ func _run_assertions(elapsed: float) -> void:
 		"il doit y avoir %d materiaux" % Blocks.SURFACE_COUNT)
 	for i in mats.size():
 		_check(mats[i] != null, "le materiau %d ne doit pas etre nul" % i)
+
+	# --- realistic rendering -------------------------------------------------
+	var saved_realistic := Game.realistic
+	Game.realistic = true
+	var realistic_uniforms := true
+	for material in mats:
+		var shader_material := material as ShaderMaterial
+		if shader_material != null and not is_equal_approx(
+				float(shader_material.get_shader_parameter("realistic_mode")), 1.0):
+			realistic_uniforms = false
+	_check(realistic_uniforms, "Realistic doit activer les shaders ameliores")
+	if pause_menu != null:
+		_check(pause_menu._realistic_check != null and not pause_menu._realistic_check.disabled,
+			"Realistic doit avoir une case a cocher active dans les reglages")
+	Game.realistic = saved_realistic
 
 	world.shutdown()
 

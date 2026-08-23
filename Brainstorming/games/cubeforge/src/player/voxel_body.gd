@@ -156,6 +156,38 @@ func move(world: VoxelWorld, feet: Vector3, motion: Vector3) -> Dictionary:
 	return _report(pos, hit_x, hit_y, hit_z, on_floor, on_ceiling)
 
 
+## Realistic-mode traversal helper. It first performs the conservative classic
+## move, then retries a blocked horizontal move from up to one block higher and
+## settles back onto the floor. A two-block wall or low ceiling still blocks.
+func move_with_step(world: VoxelWorld, feet: Vector3, motion: Vector3,
+		step_height: float = 1.001) -> Dictionary:
+	var base := move(world, feet, motion)
+	base["stepped"] = false
+	if step_height <= 0.0 or (not bool(base["hit_x"]) and not bool(base["hit_z"])):
+		return base
+	if is_zero_approx(motion.x) and is_zero_approx(motion.z):
+		return base
+
+	var lifted := feet + Vector3.UP * step_height
+	if overlaps_solid(world, lifted):
+		return base
+	var across := move(world, lifted, Vector3(motion.x, 0.0, motion.z))
+	var settle := move(world, across["position"], Vector3(0.0, -step_height + motion.y - 0.01, 0.0))
+	if not bool(settle["on_floor"]):
+		return base
+
+	var base_pos: Vector3 = base["position"]
+	var step_pos: Vector3 = settle["position"]
+	var base_progress := Vector2(base_pos.x - feet.x, base_pos.z - feet.z).length_squared()
+	var step_progress := Vector2(step_pos.x - feet.x, step_pos.z - feet.z).length_squared()
+	if step_progress <= base_progress + 0.000001:
+		return base
+
+	var report := _report(step_pos, bool(across["hit_x"]), true, bool(across["hit_z"]), true, false)
+	report["stepped"] = true
+	return report
+
+
 ## True when a colliding block overlaps the box at this feet position.
 func overlaps_solid(world: VoxelWorld, feet: Vector3) -> bool:
 	if world == null:

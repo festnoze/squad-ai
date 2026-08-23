@@ -928,6 +928,37 @@ func houses_in_chunk(cx: int, cz: int) -> Array[Vector4i]:
 	return out
 
 
+## Nearest timber-house anchor to a world position, scanning village cells ring
+## by ring. Deterministic, so it makes a stable world spawn. Returns
+## Vector4i.ZERO when no village exists within `max_rings` cells. One extra
+## ring is scanned after the first hit because in-cell offsets can place a
+## nearer village in the following ring.
+func nearest_house(near_wx: int, near_wz: int, max_rings: int = 24) -> Vector4i:
+	var cell_x := _floor_div(near_wx, _VILLAGE_CELL)
+	var cell_z := _floor_div(near_wz, _VILLAGE_CELL)
+	var best := Vector4i.ZERO
+	var best_d := INF
+	var found_ring := -1
+	for ring in max_rings:
+		if found_ring >= 0 and ring > found_ring + 1:
+			break
+		for cx in range(cell_x - ring, cell_x + ring + 1):
+			for cz in range(cell_z - ring, cell_z + ring + 1):
+				if maxi(absi(cx - cell_x), absi(cz - cell_z)) != ring:
+					continue
+				var village := _village_for_cell(cx, cz)
+				if village == Vector4i.ZERO:
+					continue
+				var house := _village_houses(village)[0]
+				var d := Vector2(float(house.x - near_wx), float(house.z - near_wz)).length()
+				if d < best_d:
+					best_d = d
+					best = house
+		if best_d < INF and found_ring < 0:
+			found_ring = ring
+	return best
+
+
 ## Pen centres owned by a chunk, consumed by SettlementManager for livestock.
 func pens_in_chunk(cx: int, cz: int) -> Array[Vector4i]:
 	var out: Array[Vector4i] = []
