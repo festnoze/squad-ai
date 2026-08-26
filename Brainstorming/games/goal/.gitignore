@@ -1,0 +1,6 @@
+# Godot import cache and editor state. Regenerated on every open, never source.
+.godot/
+# Exported builds.
+build/
+*.exe
+*.pck

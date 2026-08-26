@@ -1,0 +1,65 @@
+[gd_scene load_steps=13 format=3]
+
+[ext_resource type="Script" path="res://src/main.gd" id="s_main"]
+[ext_resource type="Script" path="res://src/world/pitch.gd" id="s_pitch"]
+[ext_resource type="Script" path="res://src/world/stadium.gd" id="s_stadium"]
+[ext_resource type="Script" path="res://src/world/goal_frame.gd" id="s_goal_frame"]
+[ext_resource type="Script" path="res://src/ball/ball.gd" id="s_ball"]
+[ext_resource type="Script" path="res://src/keeper/keeper.gd" id="s_keeper"]
+[ext_resource type="Script" path="res://src/player/shooter.gd" id="s_shooter"]
+[ext_resource type="Script" path="res://src/player/camera_rig.gd" id="s_rig"]
+[ext_resource type="Script" path="res://src/render/sky.gd" id="s_sky"]
+[ext_resource type="Script" path="res://src/audio/crowd.gd" id="s_crowd"]
+[ext_resource type="Script" path="res://src/ui/hud.gd" id="s_hud"]
+[ext_resource type="Script" path="res://src/ui/scoreboard.gd" id="s_scoreboard"]
+[ext_resource type="Script" path="res://src/ui/menu.gd" id="s_menu"]
+
+[node name="Main" type="Node3D"]
+script = ExtResource("s_main")
+
+[node name="Pitch" type="Node3D" parent="."]
+script = ExtResource("s_pitch")
+
+[node name="Stadium" type="Node3D" parent="."]
+script = ExtResource("s_stadium")
+
+[node name="GoalFrame" type="Node3D" parent="."]
+script = ExtResource("s_goal_frame")
+
+[node name="Ball" type="Node3D" parent="."]
+script = ExtResource("s_ball")
+
+[node name="Keeper" type="Node3D" parent="."]
+script = ExtResource("s_keeper")
+
+[node name="Shooter" type="Node3D" parent="."]
+script = ExtResource("s_shooter")
+
+[node name="CameraRig" type="Node3D" parent="."]
+script = ExtResource("s_rig")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+
+[node name="Sky" type="Node" parent="."]
+script = ExtResource("s_sky")
+
+[node name="Crowd" type="Node" parent="."]
+script = ExtResource("s_crowd")
+
+[node name="Hud" type="CanvasLayer" parent="."]
+script = ExtResource("s_hud")
+
+[node name="Screens" type="CanvasLayer" parent="."]
+layer = 2
+
+[node name="Scoreboard" type="Control" parent="Screens"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("s_scoreboard")
+
+[node name="MenuUi" type="Control" parent="Screens"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+script = ExtResource("s_menu")
