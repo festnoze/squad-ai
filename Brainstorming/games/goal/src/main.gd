@@ -122,6 +122,36 @@ const RUN_UP_AIM := Vector2(0.67, 0.65)
 ## that reads as a man running rather than as a man standing at an angle.
 const RUN_UP_STILL := 0.55
 
+## Seed line walked for the CPU penalty the DUEL stills are taken on, and the
+## smallest lateral target that counts as a real dive. The seed is SEARCHED FOR
+## rather than typed in, for the same reason tests/smoke_probe.gd searches for
+## one: a scripted kept round is only worth photographing if the dive it shows is
+## a dive a player could really have made, and a penalty down the middle would
+## photograph a keeper standing still.
+const SHOT_DUEL_SEED_START := 7_000_003
+const SHOT_DUEL_SEED_STRIDE := 7919
+const SHOT_DUEL_SEED_TRIES := 240
+const SHOT_DUEL_MIN_SPREAD := 1.30
+## When the player keeper commits on the still, in seconds relative to contact.
+## Early enough to reach the corner, late enough that the envelope on the frame
+## before it has already visibly shrunk.
+const SHOT_DUEL_COMMIT := -0.30
+## Seconds still to run when the "engagement" still is taken. Waited on
+## `Shooter.time_to_contact` and not on a stopwatch: the beat is driven by the
+## frame clock, and encoding the previous PNG alone eats half a second of it.
+const SHOT_DUEL_ENGAGE_AT := 0.42
+
+## Distance the portrait lens is parked at, and the field of view that fills the
+## frame with a head and shoulders from there. Close enough that one texel of the
+## skin atlas is several pixels of the PNG, which is the whole point: a seam on a
+## temple is invisible at match range and unmistakable here.
+const PORTRAIT_RANGE := 1.05
+const PORTRAIT_FOV := 30.0
+## The DRAWN skull sits above the head JOINT, because both figures carry an
+## enlarged head scaled about its own jaw. Same correction the celebration poses
+## already make; see Keeper._pose_head_hold.
+const PORTRAIT_RISE := 0.10
+
 # --- Cinematics --------------------------------------------------------------
 
 ## Time scale applied at the strike, and on a hard impact during the flight.
@@ -143,6 +173,17 @@ const FRAME_CONTACT_INTERVAL := 0.08
 const NET_IMPULSE_INTERVAL := 0.06
 ## Where the clean contact window sits on the power bar for a scripted shot.
 const DEFAULT_SWEET_CENTRE := 0.72
+
+# --- The round the player KEEPS (mode DUEL) ----------------------------------
+
+## Where the dive reticle starts, on KeeperInput's own reticle. Chest high and
+## dead centre: it is a starting point, not a suggestion, and a reticle that
+## opened in a corner would be one.
+const DIVE_AIM_START := Vector2(0.0, 0.34)
+## The `t` handed to the reach envelope while the taker is still walking back and
+## nothing has begun. It is roughly a run up away from contact, which is what the
+## envelope should show: everything, because nothing has been given up yet.
+const LECTURE_LEAD := -1.20
 
 ## Real seconds the tree keeps ticking, mixer silent, before the process exits.
 ##
@@ -178,6 +219,12 @@ var boot_msec: int
 var last_verdict: int = Shootout.Verdict.DEHORS
 ## The last strike dictionary produced by ShotModel.resolve.
 var last_shot: Dictionary = {}
+
+## The plan TakerAi.choose produced for the round the player is keeping, and the
+## dive KeeperInput.commit produced from his own press. Both empty outside a
+## keeper side round, and both are what the probe reads to prove the mode ran.
+var last_taker: Dictionary = {}
+var last_dive: Dictionary = {}
 
 # --- Private state -----------------------------------------------------------
 
@@ -237,6 +284,33 @@ var _verdict_beat: int = BEAT_PLAYER
 var _rival_verdict: int = -1
 var _rival_shown: bool = false
 
+# The round the player KEEPS (mode DUEL).
+#
+# WHAT THIS FILE IS ALLOWED TO PASS ON, and it is the whole of the fairness rule
+# it owns: `_duel_plan` STAYS HERE until contact. What goes down to the HUD is
+# TakerAi.tells_at, which is lossy by construction; what goes down to
+# TakerAi.read_keeper is the keeper's `_line_x`, and never his dive target nor
+# whether he has committed. This is the only module that can see both sides of
+# the duel at once, so it is the only one that can leak, and therefore the only
+# one that has to be careful.
+var _keeping: bool = false
+var _duel_plan: Dictionary = {}
+var _duel_seed: int = 0
+## Where the player is standing on his line, and where his dive is aimed.
+var _line_x: float = 0.0
+var _dive_aim: Vector2 = DIVE_AIM_START
+## When the ball will reach the line, on the shot's clock. KeeperInput.NOMINAL_FLIGHT
+## until the strike, because until then nobody can know better; the ball's real
+## remaining flight afterwards, because from then on the player can SEE it.
+var _duel_arrival: float = KeeperInput.NOMINAL_FLIGHT
+## A scripted keeper round, set by fire_test_duel and empty whenever a human is
+## playing. Carries "plan", "seed", "aim", "commit_t" and "line_x".
+var _duel_script: Dictionary = {}
+## The dictionary fire_test_duel handed back. Dictionaries are references, so the
+## caller watches this one fill in as the round resolves rather than polling for
+## a second accessor.
+var _duel_result: Dictionary = {}
+
 # Input.
 var _mouse_delta: Vector2 = Vector2.ZERO
 var _paused: bool = false
@@ -250,6 +324,9 @@ var _test_shot_index: int = 0
 
 # --- Shutdown ----------------------------------------------------------------
 
+## The screenshot session's own lens, built on first use by `_portrait_look` and
+## never current outside a portrait beat.
+var _portrait_cam: Camera3D = null
 ## Exit code latched by quit_clean. Negative while the game is still running.
 var _quit_code: int = -1
 ## Real seconds elapsed since the mixer was silenced.
@@ -528,10 +605,15 @@ func _enter_phase(phase: int) -> void:
 		_enter_replay()
 	elif phase == Shootout.Phase.FIN:
 		_enter_fin()
+	elif phase == Shootout.Phase.PLACEMENT_GARDIEN:
+		_enter_placement_gardien()
+	elif phase == Shootout.Phase.LECTURE:
+		_enter_lecture()
 
 
 func _enter_accueil() -> void:
 	_set_mouse_captured(false)
+	_leave_keeper_side()
 	menu.open_home()
 	scoreboard.hide_result()
 	hud.set_dimmed(true)
@@ -548,6 +630,7 @@ func _enter_placement() -> void:
 	_verdict_beat = BEAT_PLAYER
 	_rival_verdict = -1
 	_rival_shown = false
+	_leave_keeper_side()
 	_set_mouse_captured(true)
 	menu.close()
 	scoreboard.hide_result()
@@ -582,9 +665,129 @@ func _enter_course() -> void:
 	hud.set_preview(PackedVector3Array())
 
 
+# --- The round the player KEEPS ----------------------------------------------
+#
+# Two phases replace PLACEMENT, VISEE and COURSE. VOL, VERDICT and REPLAY are
+# REUSED as they stand, and that is deliberate: a ball in flight, a verdict and a
+# replay are the same objects on both sides of the duel, and doubling them would
+# be the same code twice with an off by one in one of the copies.
+#
+# THE DIVE IS NOT A PHASE, and that is structural. A keeper who gambles pushes
+# off BEFORE contact, so his dive starts inside LECTURE and finishes inside VOL,
+# straddling the strike, exactly as Keeper.pose_log has recorded negative `t`
+# since the day it was written. Making it a phase would mean entering it twice or
+# forbidding the early commit, and the early commit is the entire mode.
+
+## The keeper takes his line, the taker walks back, the camera goes behind the
+## gloves. The player may already shuffle here, and that matters: where he is
+## standing when the run up begins is the one thing the taker gets to read.
+func _enter_placement_gardien() -> void:
+	_verdict_beat = BEAT_PLAYER
+	_rival_verdict = -1
+	_rival_shown = false
+	_keeping = true
+	_set_mouse_captured(true)
+	menu.close()
+	scoreboard.hide_result()
+	hud.set_dimmed(false)
+	hud.show_verdict(-1, "")
+	hud.set_preview(PackedVector3Array())
+	hud.set_charge(0.0, 0.0, DEFAULT_SWEET_CENTRE, false)
+	hud.set_keeper_side(true)
+
+	ball.place_on_spot()
+	keeper.reset_to_line()
+	keeper.level = Game.keeper_level
+	# The first of two calls. This one opens the line to the player; the one in
+	# _enter_lecture is where the pose log starts. See Keeper.set_player_driven.
+	keeper.set_player_driven(true)
+	shooter.reset_stance()
+	goal_frame.settle_net()
+
+	_reset_flight_state()
+	_reset_keeper_round()
+	keeper.set_line(_line_x)
+
+	rig.set_view(CameraRig.View.GARDIEN)
+	_refresh_camera_link()
+
+	hud.refresh_series()
+	scoreboard.refresh()
+	_update_tension(0.0)
+
+
+## The run up. The tells leak frame by frame, the reach envelope closes in front
+## of the player, and the commit is open from the first frame to the last.
+##
+## The taker's plan is chosen HERE and nowhere else, from the line position the
+## player has walked to: this is the taker's last look at him before he turns and
+## runs, and `keeper_x` is the only thing about the keeper he is ever told.
+func _enter_lecture() -> void:
+	_keeping = true
+	_set_mouse_captured(true)
+	crowd.hush()
+	hud.set_dimmed(false)
+	hud.set_preview(PackedVector3Array())
+	hud.set_keeper_side(true)
+
+	if _duel_plan.is_empty():
+		_duel_seed = Shootout.duel_taker_seed()
+		_duel_plan = Shootout.duel_taker_plan(_line_x)
+	last_taker = _duel_plan
+	_duel_arrival = KeeperInput.NOMINAL_FLIGHT
+
+	# The second call, and the one that starts the recording: from here the pose
+	# log covers the same window Ball.flight_log will.
+	keeper.set_player_driven(true)
+	keeper.set_line(_line_x)
+
+	rig.set_view(CameraRig.View.GARDIEN)
+	_refresh_camera_link()
+
+	hud.toast(Shootout.pressure_text(), 1.6)
+	shooter.run_cpu_penalty(_duel_plan, _duel_seed)
+
+
+## Puts the taking side's instruments back and gives the body to the brain again.
+func _leave_keeper_side() -> void:
+	_keeping = false
+	_duel_plan = {}
+	_duel_script = {}
+	keeper.set_player_driven(false)
+	hud.set_keeper_side(false)
+	hud.set_reach(PackedVector3Array(), 0.0, false)
+	hud.set_tells({})
+	hud.set_commit_prompt(false, 0.0)
+
+
+## Clears everything one kept round owns. A scripted round (fire_test_duel) puts
+## its own starting line, aim and plan back in, which is the only difference
+## between the probe's round and a played one.
+func _reset_keeper_round() -> void:
+	_duel_arrival = KeeperInput.NOMINAL_FLIGHT
+	_dive_aim = DIVE_AIM_START
+	_line_x = 0.0
+	_duel_plan = {}
+	_duel_seed = 0
+	last_dive = {}
+	last_taker = {}
+	if _duel_script.is_empty():
+		return
+	_line_x = clampf(
+		float(_duel_script.get("line_x", 0.0)), -KeeperInput.LINE_LIMIT, KeeperInput.LINE_LIMIT)
+	var scripted_aim: Variant = _duel_script.get("aim", DIVE_AIM_START)
+	if typeof(scripted_aim) == TYPE_VECTOR2:
+		_dive_aim = scripted_aim
+	_duel_plan = _duel_script.get("plan", {})
+	_duel_seed = int(_duel_script.get("seed", 0))
+
+
 func _enter_vol() -> void:
 	_reset_flight_state()
-	rig.set_view(CameraRig.View.DERRIERE)
+	# A kept round stays behind the gloves. Cutting to the shooting side framing
+	# on the frame the ball is struck would take the picture away from the player
+	# at the exact instant he is judging its line and its height.
+	rig.set_view(CameraRig.View.GARDIEN if _keeping else CameraRig.View.DERRIERE)
 	_refresh_camera_link()
 	hud.set_preview(PackedVector3Array())
 	hud.set_charge(0.0, 0.0, DEFAULT_SWEET_CENTRE, false)
@@ -615,6 +818,13 @@ func _enter_verdict() -> void:
 	# not then claim he is holding something that flew past him).
 	_last_save_caught = _saved and ball.held
 	keeper.celebrate(last_verdict)
+	if _keeping:
+		# The taker is the computer this round. He normally finds his own result out
+		# by watching his row of the scoreboard grow, and on a kept round it does
+		# not grow, so the reaction has to be handed to him.
+		shooter.react(last_verdict)
+		hud.set_reach(PackedVector3Array(), 0.0, true)
+		hud.set_commit_prompt(false, 1.0)
 
 	var detail: String = _verdict_detail(last_verdict, _verdict_point, _last_save_limb)
 	hud.show_verdict(last_verdict, detail)
@@ -626,15 +836,26 @@ func _enter_verdict() -> void:
 	scoreboard.refresh()
 	scoreboard.flash(2.0)
 
-	crowd.react(last_verdict)
-	stadium.react(last_verdict)
+	# THIS IS THE HOME CROWD. On a kept round it therefore reacts to the MIRROR of
+	# the verdict: the visitors scoring feels the way the player being saved feels,
+	# and the player denying them feels the way a goal feels. Exactly the rule
+	# _reveal_rival applies to a simulated rival kick.
+	var felt_as: int = last_verdict
+	if _keeping:
+		felt_as = Shootout.Verdict.ARRET if Shootout.is_goal(last_verdict) else Shootout.Verdict.BUT
+	crowd.react(felt_as)
+	stadium.react(felt_as)
 
-	if Shootout.is_goal(last_verdict):
+	if Shootout.is_goal(felt_as):
 		stadium.flash_burst(26)
 		rig.add_shake(_shake(0.45))
 		Sfx.play("whistle_short", -3.0)
-		rig.set_view(CameraRig.View.BUT)
-		_refresh_camera_link()
+		# The goal camera belongs to the taking side. On a kept round the picture
+		# worth holding is the keeper on the turf with the ball, not a view from
+		# inside the net of a goal he has just avoided.
+		if not _keeping:
+			rig.set_view(CameraRig.View.BUT)
+			_refresh_camera_link()
 		_update_tension(1.0)
 	else:
 		_update_tension(0.35)
@@ -709,7 +930,12 @@ func _reveal_rival() -> void:
 ## Hands the turn over to the rival, or goes straight on when he owes no kick
 ## (training, defi, or a series the player's own attempt has just settled).
 func _begin_rival_beat() -> void:
-	if not Shootout.rival_to_kick():
+	# On the keeper side there is no beat to WATCH, because the rival's turn is
+	# PLAYED. It is the next round, and the player spends it in the gloves. Asking
+	# Shootout rather than testing `_keeping` covers both halves of a duel with one
+	# line - the round the player took hands over to a kept round, and a kept round
+	# hands back - and it covers a training session, where every round is kept.
+	if Shootout.rival_kick_is_played() or not Shootout.rival_to_kick():
 		_next_attempt()
 		return
 	_verdict_beat = BEAT_RIVAL
@@ -735,6 +961,7 @@ func _enter_replay() -> void:
 
 func _enter_fin() -> void:
 	Engine.time_scale = 1.0
+	_leave_keeper_side()
 	_set_mouse_captured(false)
 	hud.set_dimmed(true)
 	hud.show_verdict(-1, "")
@@ -767,7 +994,14 @@ func _process(delta: float) -> void:
 		_update_visee(delta)
 	elif _current_phase == Shootout.Phase.COURSE:
 		shooter.advance_run_up(delta)
-		keeper.prepare(_phase_clock)
+		# Contact can happen INSIDE that call, and entering VOL restarts the phase
+		# clock. Ticking prepare() from it now would stamp the last pre strike
+		# sample with a zero, and that sample is the one Keeper rebases its whole
+		# run up against: the recording would come out with the approach still on
+		# the run up's clock and nothing before contact. Same guard, same reason,
+		# as the one in _update_lecture.
+		if _current_phase == Shootout.Phase.COURSE:
+			keeper.prepare(_phase_clock)
 	elif _current_phase == Shootout.Phase.PLACEMENT:
 		keeper.prepare(_phase_clock)
 		if _phase_clock >= PLACEMENT_SECONDS:
@@ -776,6 +1010,21 @@ func _process(delta: float) -> void:
 		_update_verdict()
 	elif _current_phase == Shootout.Phase.REPLAY:
 		_update_replay(real_delta)
+	elif _current_phase == Shootout.Phase.PLACEMENT_GARDIEN:
+		# The commit is shut: the taker has not started, so there is nothing to
+		# commit ON, and a dive launched here would simply be thrown away.
+		_drive_keeper_side(delta, LECTURE_LEAD, KeeperInput.NOMINAL_FLIGHT, false)
+		keeper.prepare(_phase_clock)
+		if _phase_clock >= PLACEMENT_SECONDS:
+			_go(Shootout.Phase.LECTURE)
+	elif _current_phase == Shootout.Phase.LECTURE:
+		_update_lecture(delta)
+
+	# The flight of a kept round. The dive itself is driven from the physics step
+	# (Keeper.track, through _step_segment), so what is left here is the picture:
+	# the envelope, the reticle and the camera following the line.
+	if _keeping and _current_phase == Shootout.Phase.VOL:
+		_drive_keeper_side(delta, _flight_elapsed, _duel_arrival, true)
 
 	_update_camera(delta)
 	_mouse_delta = Vector2.ZERO
@@ -844,6 +1093,107 @@ func _update_visee(delta: float) -> void:
 	else:
 		hud.set_preview(PackedVector3Array())
 	_update_tension(shooter.power)
+
+
+## The taker's run up, seen from the goal line.
+##
+## The body is ticked exactly as a human run up is ticked, through the same
+## advance_run_up: `run_cpu_penalty` only decided WHO is holding the controls.
+## `Shooter.time_to_contact` counts DOWN to the strike, and 2.12a's clock counts
+## UP to it, so the two are the same clock with opposite signs and this is where
+## they are reconciled. Nothing else in the mode has a clock of its own.
+func _update_lecture(delta: float) -> void:
+	shooter.advance_run_up(delta)
+	if _current_phase != Shootout.Phase.LECTURE:
+		# Contact happened inside that call. The rest of the frame belongs to the
+		# flight, which drives the same body from the physics step: running the
+		# pre strike pose on top of it would fight the dive for the same bones.
+		return
+	_drive_keeper_side(delta, -shooter.time_to_contact(), KeeperInput.NOMINAL_FLIGHT, true)
+	keeper.prepare(_phase_clock)
+
+
+## One frame of the keeper's own side: aim, line, envelope, tells, commit.
+##
+## `t` is seconds relative to contact, negative during the run up, and `arrival`
+## is when the ball reaches the line on that same clock. Everything drawn comes
+## from KeeperInput, which means the ring on screen IS the rule the dive is judged
+## by and cannot drift away from it.
+func _drive_keeper_side(delta: float, t: float, arrival: float, commit_open: bool) -> void:
+	var level: int = clampi(Game.keeper_level, 0, 3)
+	var committed: bool = keeper.committed()
+
+	# A scripted round holds its aim and its line exactly where it was asked for:
+	# the probe is measuring the mode, and an input it did not ask for would make
+	# two runs of one seed two different penalties.
+	if not committed and _duel_script.is_empty():
+		# No new action is declared for the mode (see Game, 2.8): the mouse moves
+		# the dive target instead of the aim reticle, and the two aim keys are the
+		# line dance. A mode that asked the player to learn four keys while
+		# watching a man run at him would not be one.
+		_dive_aim = KeeperInput.move_aim(_dive_aim, _mouse_delta, Game.mouse_sensitivity)
+		# +X is on the shooter's right and therefore on the KEEPER'S LEFT, and the
+		# GARDIEN camera looks down the pitch from behind him, so its screen right
+		# is -X. Pressing right has to walk him right on screen.
+		var axis: float = Input.get_axis("aim_left", "aim_right")
+		_line_x = KeeperInput.line_step(_line_x, -axis, delta)
+
+	keeper.set_line(_line_x)
+	rig.follow_line(_line_x, delta)
+
+	var target: Vector3 = KeeperInput.dive_target(_dive_aim)
+	var outline := PackedVector3Array()
+	var cover: float = 0.0
+	if not committed:
+		outline = KeeperInput.reach_outline(_line_x, t, arrival, level)
+		cover = KeeperInput.coverage(_line_x, t, arrival, level)
+	hud.set_reach(outline, cover, committed)
+	hud.set_dive_aim(target, KeeperInput.margin(target, _line_x, t, arrival, level))
+	hud.set_line_position(_line_x, KeeperInput.LINE_LIMIT)
+	# THE PLAN NEVER REACHES THE SCREEN. What goes down is TakerAi.tells_at, which
+	# is lossy by construction and arrives cue by cue as the taker gets closer;
+	# an empty dictionary before he has begun, because there is nothing to read.
+	var cues: Dictionary = {}
+	if not _duel_plan.is_empty():
+		cues = TakerAi.tells_at(_duel_plan, _taker_level(), _duel_seed, t)
+	hud.set_tells(cues)
+	# The prompt says WHEN, never where: how far the window has closed is exactly
+	# how much of the mouth the player has already given up.
+	hud.set_commit_prompt(commit_open and not committed, clampf(1.0 - cover, 0.0, 1.0))
+
+	if committed or not commit_open:
+		return
+	if _duel_script.is_empty():
+		if not menu.is_open() and Input.is_action_just_pressed("strike"):
+			_commit_player_dive(t, arrival, level)
+		return
+	# A scripted round commits on the instant it was asked for and not on the
+	# frame that noticed: the dive clock is absolute, so two runs of one seed give
+	# one verdict whatever the frame rate did in between.
+	var wanted: float = float(_duel_script.get("commit_t", 0.0))
+	if t >= wanted:
+		_commit_player_dive(wanted, arrival, level)
+
+
+## The dive the player just launched, handed to the same body the brain drives.
+func _commit_player_dive(t: float, arrival: float, level: int) -> void:
+	var dive: Dictionary = KeeperInput.commit(_dive_aim, _line_x, t, arrival, level)
+	if dive.is_empty():
+		push_warning("Main: KeeperInput.commit n'a rien rendu, plongeon ignore.")
+		return
+	keeper.commit_dive(dive)
+	last_dive = dive
+	if not _duel_result.is_empty():
+		_duel_result["dive"] = dive
+		_duel_result["coverage"] = float(dive.get("coverage", 0.0))
+	rig.add_shake(_shake(0.10))
+
+
+## The CPU taker's own level. It is the player's difficulty setting, the same one
+## that decides the keeper he faces when he is the one shooting: a duel against a
+## Legende is a duel where BOTH ends are a Legende.
+func _taker_level() -> int:
+	return clampi(int(_duel_plan.get("level", TakerAi.SEANCE_LEVEL)), 0, 3)
 
 
 ## The two beats of a shootout verdict, in order: the player's own result alone
@@ -1179,8 +1529,32 @@ func _commit_verdict() -> void:
 		"net_bulge": _net_bulge_peak,
 		"limb": _last_save_limb,
 	}
-	Shootout.record_shot(record)
+	if _keeping:
+		_close_kept_round()
+	else:
+		Shootout.record_shot(record)
 	_go(Shootout.Phase.VERDICT)
+
+
+## A round the player kept, entered into the series. `take_rival_kick_played` is
+## the ONLY way a kept verdict gets in, and like `take_rival_kick` it refuses a
+## kick the rules do not owe: nobody takes a penalty that cannot change the
+## result, on either side of the duel. Nothing here ever appends to a score array
+## itself, which is the rule that cost a whole broken scoreboard once.
+func _close_kept_round() -> void:
+	var recorded: int = Shootout.take_rival_kick_played(last_verdict)
+	# Outside a duel this is the normal answer and not a fault: fire_test_duel can
+	# play a kept round in free training, where there is no second side to record
+	# against. Inside one it means a round was played that the rules did not owe,
+	# which is worth saying out loud.
+	if recorded < 0 and Shootout.mode == Shootout.Mode.DUEL:
+		push_warning("Main: tour garde non enregistre, la seance ne devait plus de tir.")
+	if not _duel_result.is_empty():
+		_duel_result["verdict"] = last_verdict
+		_duel_result["saved"] = _saved
+		_duel_result["catch"] = _last_save_caught or (_saved and ball.held)
+	# The scripted round is over: the next one belongs to whoever asks for it.
+	_duel_script = {}
 
 
 func _verdict_seconds() -> float:
@@ -1220,7 +1594,15 @@ func _next_attempt() -> void:
 		_player_won = Shootout.player_goals() >= Shootout.rival_goals()
 		_go(Shootout.Phase.FIN)
 		return
-	_go(Shootout.Phase.PLACEMENT)
+	_go(_placement_phase())
+
+
+## Which end of the pitch the next round opens on. There is exactly one answer to
+## "whose turn is it" and it lives in Shootout: this only asks it.
+func _placement_phase() -> int:
+	if Shootout.player_keeps():
+		return Shootout.Phase.PLACEMENT_GARDIEN
+	return Shootout.Phase.PLACEMENT
 
 
 ## The line under the verdict banner. It is drawn on screen, so it is written in
@@ -1338,6 +1720,16 @@ func _on_charge_changed(power: float, marker: float) -> void:
 
 
 func _on_run_up_started() -> void:
+	# A KEPT ROUND IS ALREADY IN ITS RUN UP PHASE. LECTURE *is* the approach seen
+	# from the goal line, and it is entered before run_cpu_penalty is called, so
+	# the signal the CPU taker emits from inside it must not push the round on to
+	# the shooting side's phase. Doing so restarted the phase clock in the middle
+	# of the approach, ran _enter_course - which hands a player driven keeper an AI
+	# reading of the tells he is supposed to read himself - and replaced
+	# _update_lecture with the COURSE branch, which is the only place the dive
+	# window is open before the strike.
+	if _current_phase == Shootout.Phase.LECTURE:
+		return
 	_go(Shootout.Phase.COURSE)
 
 
@@ -1361,7 +1753,7 @@ func _on_mode_chosen(mode: int) -> void:
 	scoreboard.hide_result()
 	Sfx.play("whistle_long", -4.0)
 	_current_phase = -1
-	_go(Shootout.Phase.PLACEMENT)
+	_go(_placement_phase())
 
 
 func _on_resume_requested() -> void:
@@ -1374,7 +1766,7 @@ func _on_restart_requested() -> void:
 	Shootout.start_match(Shootout.mode)
 	scoreboard.hide_result()
 	_current_phase = -1
-	_go(Shootout.Phase.PLACEMENT)
+	_go(_placement_phase())
 
 
 func _on_quit_requested() -> void:
@@ -1428,7 +1820,10 @@ func _poll_actions() -> void:
 	if menu.is_open():
 		return
 
-	if Input.is_action_just_pressed("camera_cycle"):
+	# The GARDIEN framing belongs to a phase, not to a preference: a player who
+	# cycled out of it in the middle of a run up would lose the round, so the key
+	# is simply dead for the two or three seconds a kept round lasts.
+	if Input.is_action_just_pressed("camera_cycle") and not _keeper_round_live():
 		rig.cycle_view()
 		_refresh_camera_link()
 		Sfx.play("ui_move", -6.0)
@@ -1457,9 +1852,20 @@ func _poll_actions() -> void:
 
 func _can_pause() -> bool:
 	return _current_phase == Shootout.Phase.PLACEMENT \
+		or _current_phase == Shootout.Phase.PLACEMENT_GARDIEN \
 		or _current_phase == Shootout.Phase.VISEE \
 		or _current_phase == Shootout.Phase.VERDICT \
 		or _current_phase == Shootout.Phase.REPLAY
+
+
+## True while a kept round is live on screen: the keeper is taking his line, the
+## taker is running in, or the ball is on its way.
+func _keeper_round_live() -> bool:
+	if not _keeping:
+		return false
+	return _current_phase == Shootout.Phase.PLACEMENT_GARDIEN \
+		or _current_phase == Shootout.Phase.LECTURE \
+		or _current_phase == Shootout.Phase.VOL
 
 
 func _set_paused(paused: bool) -> void:
@@ -1521,6 +1927,19 @@ func _begin_flight(shot: Dictionary) -> void:
 		_resolve(Shootout.Verdict.DEHORS, Field.SPOT)
 		return
 
+	# WHEN THE BALL WILL ARRIVE, and why the player is allowed to know it. Before
+	# the strike nobody can, so the envelope is drawn against NOMINAL_FLIGHT. From
+	# the strike on, the player can SEE the ball, so handing him its real remaining
+	# flight is honest rather than generous: it is what makes the ring close far
+	# faster on a hard penalty than on a scuffed one, which is precisely the
+	# difference the mode asks him to read.
+	if _keeping:
+		_duel_arrival = KeeperInput.NOMINAL_FLIGHT
+		var cross: Dictionary = Aero.cross_plane(
+			ball.global_position, velocity, spin, Vector3.ZERO, 0.0, 3.0)
+		if bool(cross.get("crossed", false)):
+			_duel_arrival = maxf(float(cross.get("time", KeeperInput.NOMINAL_FLIGHT)), 0.02)
+
 	ball.strike(velocity, spin)
 	_last_point = ball.global_position
 	_log_cursor = 0
@@ -1558,6 +1977,51 @@ func fire_test_shot(aim: Vector2, power: float, side: float, lift: float) -> Dic
 	return shot
 
 
+## Forces a whole KEEPER SIDE round from code: the mirror of fire_test_shot.
+##
+## The CPU taker of `rng_seed` kicks, and the player keeper standing at `line_x`
+## commits at `commit_t` (seconds relative to contact, negative before it) to the
+## dive `aim` asks for. Nothing is re-implemented: it is the real TakerAi plan,
+## the real run up, the real ball, the real Keeper.attempt_save, so the probe
+## measures the mode and not a model of it.
+##
+## THE RETURNED DICTIONARY IS THE LIVE ONE. Godot dictionaries are references, and
+## the verdict of a penalty is not knowable until it has been played, so the
+## caller keeps this handle and reads it once the round has settled
+## (`_probe_shot_settled`). "verdict" is -1 until then, which is the same "no
+## verdict yet" the rest of this file uses.
+func fire_test_duel(rng_seed: int, aim: Vector2, commit_t: float, line_x: float) -> Dictionary:
+	var level: int = clampi(Game.keeper_level, 0, 3)
+	var bounded: float = clampf(line_x, -KeeperInput.LINE_LIMIT, KeeperInput.LINE_LIMIT)
+	# `pressure` is false rather than read off the series on purpose: a probe that
+	# fired the same seed twice would otherwise get two different penalties
+	# depending on the score at the time, and determinism per seed is the property
+	# it exists to check.
+	var plan: Dictionary = TakerAi.choose(rng_seed, level, false, bounded)
+
+	_duel_result = {
+		"verdict": -1,
+		"taker": plan,
+		"dive": {},
+		"saved": false,
+		"catch": false,
+		"coverage": KeeperInput.coverage(bounded, commit_t, KeeperInput.NOMINAL_FLIGHT, level),
+	}
+	_duel_script = {
+		"plan": plan, "seed": rng_seed,
+		"aim": aim, "commit_t": commit_t, "line_x": bounded,
+	}
+
+	# Straight through the placement: the probe wants the round, not the beat of
+	# presentation in front of it. Both entries still run in full, so what is
+	# played is what a player would have played.
+	_current_phase = -1
+	_go(Shootout.Phase.PLACEMENT_GARDIEN)
+	_current_phase = -1
+	_go(Shootout.Phase.LECTURE)
+	return _duel_result
+
+
 # =============================================================================
 # Probe support (private, used only by tests/smoke_probe.gd)
 # =============================================================================
@@ -1567,6 +2031,49 @@ func _probe_begin_training() -> void:
 	Shootout.start_match(Shootout.Mode.ENTRAINEMENT)
 	_current_phase = -1
 	_go(Shootout.Phase.PLACEMENT)
+
+
+func _probe_begin_duel() -> void:
+	Shootout.reset()
+	Shootout.start_match(Shootout.Mode.DUEL)
+	_current_phase = -1
+	_go(_placement_phase())
+
+
+## The keeper's free training. Note that this is the SAME two lines as the duel
+## above: the mode is the only difference, and `_placement_phase` works out on its
+## own that this one opens in the gloves.
+func _probe_begin_keeper_training() -> void:
+	Shootout.reset()
+	Shootout.start_match(Shootout.Mode.GARDIEN)
+	_current_phase = -1
+	_go(_placement_phase())
+
+
+## Whether the series is over. A training session must always answer false.
+func _probe_is_decided() -> bool:
+	return Shootout.is_decided()
+
+
+## True when the game is settled on the goal line waiting to keep a round, which
+## is the state fire_test_duel may safely be called from.
+func _probe_phase_is_keeper_placement() -> bool:
+	return _current_phase == Shootout.Phase.PLACEMENT_GARDIEN
+
+
+## The CPU team's row of the scoreboard. A kept round must grow it by exactly one.
+func _probe_rival_count() -> int:
+	return Shootout.rival_scores.size()
+
+
+## Verdicts of that row, so the probe can read what was actually recorded.
+func _probe_rival_scores() -> Array[int]:
+	return Shootout.rival_scores.duplicate()
+
+
+## True when the player is the goalkeeper for the round about to be played.
+func _probe_player_keeps() -> bool:
+	return Shootout.player_keeps()
 
 
 ## Set in memory only, never through Game.set_setting: a test harness must not
@@ -1604,6 +2111,49 @@ func _probe_ready_to_fire() -> bool:
 
 func _probe_shot_settled() -> bool:
 	return _resolved and _pending_delay < 0.0 and _current_phase == Shootout.Phase.VERDICT
+
+
+## How far the keeper's gloves reach INTO the ball he is holding, in metres.
+## Positive is a mitt inside the ball, which is the defect; zero or less is a hand
+## resting on it.
+##
+## Measured off the DRAWN SOLIDS and not off the pose. `Keeper.hold_point` anchors
+## the ball on the glove CENTRE, the point the arms are solved to, while
+## `CharacterModels._add_mitts` centres its padded ellipsoid behind that point and
+## runs it well past it: the two are different objects and only the mesh knows
+## where the second one really is. So this walks to the mitt nodes and asks them.
+##
+## The depth is radial: the surface point taken is the one on the line from the
+## ellipsoid's centre through the ball's. That understates a grazing contact
+## slightly and is exact for a head on one, which is the case that matters.
+##
+## Returns -INF when there is nothing to measure: no ball in the hands, or a
+## procedural body with no mitts to find.
+func _probe_mitt_reach_into_ball() -> float:
+	if keeper == null or ball == null or not keeper.holding():
+		return -INF
+	var centre: Vector3 = ball.global_position
+	var worst: float = -INF
+	for side in ["L", "R"]:
+		var mitt := keeper.find_child("MittMesh%s" % side, true, false) as MeshInstance3D
+		if mitt == null:
+			continue
+		var box: AABB = mitt.get_aabb()
+		var half: Vector3 = box.size * 0.5
+		if half.x < 0.0001 or half.y < 0.0001 or half.z < 0.0001:
+			continue
+		var to_local: Transform3D = mitt.global_transform.affine_inverse()
+		var local: Vector3 = to_local * centre - box.get_center()
+		var unit := Vector3(local.x / half.x, local.y / half.y, local.z / half.z)
+		if unit.length_squared() < 0.000001:
+			# Dead centre of the glove. Nothing sensible to project, and the ball is
+			# as far inside as it can get.
+			return Field.BALL_RADIUS
+		var n: Vector3 = unit.normalized()
+		var surface: Vector3 = mitt.global_transform \
+			* (box.get_center() + Vector3(n.x * half.x, n.y * half.y, n.z * half.z))
+		worst = maxf(worst, Field.BALL_RADIUS - centre.distance_to(surface))
+	return worst
 
 
 func _probe_net_bulge_peak() -> float:
@@ -1716,6 +2266,18 @@ func _run_shot_session() -> void:
 	await _wait(0.5)
 	await _capture(directory, 8, "arret")
 
+	# And the same save from a hand's breadth away. A catch is judged on whether
+	# the ball is IN the gloves, and at match range a two centimetre gap between
+	# the padding and the leather looks exactly like a grip.
+	if keeper.holding():
+		_portrait_look(ball.global_position, Vector3(0.55, 0.35, 1.0))
+		await _wait(0.2)
+		await _capture(directory, 9, "prise")
+		rig.camera().current = true
+		await _wait(0.3)
+	else:
+		push_warning("Main: l'arret n'a pas ete capte, pas de gros plan de prise.")
+
 	# The last still is the television view, and it deliberately lands inside the
 	# RIVAL'S BEAT: the previous attempt left the CPU owing a kick, so this frame
 	# carries the opponent's turn, his result and the two rows of the scoreboard
@@ -1729,9 +2291,162 @@ func _run_shot_session() -> void:
 	_refresh_camera_link()
 	await _wait_for_rival_result(12.0)
 	await _wait(0.4)
-	await _capture(directory, 9, "tele")
+	await _capture(directory, 10, "tele")
+
+	await _duel_beat(directory)
+	await _portrait_beat(directory)
 
 	quit_clean(0)
+
+
+## The keeper's half of the shootout, which this session had no picture of at
+## all: nine stills of a man taking penalties and none of the mode where he stops
+## them. Everything below goes through the entry points tests/smoke_probe.gd
+## already drives, so the stills describe the mode a player plays rather than a
+## mock of it standing in for it.
+func _duel_beat(directory: String) -> void:
+	var level: int = KeeperBrain.Level.PRO
+	_probe_set_keeper_level(level)
+	_probe_begin_duel()
+
+	# A duel OPENS on a round the player takes, and the kept round does not exist
+	# until that one has been played. It is aimed a metre outside the post so the
+	# series is still undecided when the round worth photographing arrives.
+	if not await _wait_until(func() -> bool: return _probe_ready_to_fire(),
+			10.0, "le duel n'a pas arme le tour du joueur"):
+		return
+	fire_test_shot(Vector2(1.30, 0.55), 0.85, 0.0, 0.0)
+	await _wait_until_settled(10.0)
+	if not await _wait_until(func() -> bool: return _probe_phase_is_keeper_placement(),
+			16.0, "le tour du gardien n'est jamais arrive"):
+		return
+	await _wait(0.8)
+	await _capture(directory, 11, "duel_placement")
+
+	var rng_seed: int = _shot_duel_seed(level)
+	var target: Vector3 = TakerAi.choose(rng_seed, level, false, 0.0).get("target", Vector3.ZERO)
+	fire_test_duel(rng_seed, TakerAi.reticle(target.x, target.y), SHOT_DUEL_COMMIT, 0.0)
+
+	# Early in the approach: the envelope still covers nearly everything and the
+	# prompt says to wait. This frame and the next one are a PAIR, and the whole
+	# read of the mode is the difference between them.
+	await _wait(0.30)
+	await _capture(directory, 12, "duel_lecture")
+	if not await _wait_until(func() -> bool: return shooter.time_to_contact() <= SHOT_DUEL_ENGAGE_AT,
+			8.0, "la course du tireur adverse n'est jamais arrivee a l'engagement"):
+		return
+	await _capture(directory, 13, "duel_engagement")
+
+	# The dive itself, caught while the ball is still in the air. The beat used to
+	# wait for the verdict and photograph whatever was left: by then the keeper has
+	# been back on his feet for most of a second (Keeper.GETUP_TIME), so the one
+	# frame the whole mode exists for was the one frame the session never had.
+	if await _wait_until(func() -> bool: return keeper.committed() and ball.flying,
+			8.0, "le plongeon du gardien n'a pas eu lieu"):
+		await _wait(0.12)
+		await _capture(directory, 14, "duel_plongeon")
+
+	# And the verdict beat, whatever it says. A CPU taker is allowed to miss, and a
+	# session that only ever showed the saves would be advertising rather than
+	# reporting.
+	await _wait_until_settled(10.0)
+	await _wait(0.6)
+	await _capture(directory, 15, "duel_verdict")
+
+
+## Two heads and a back of a skull, filling the frame. The character work is the
+## part of this build that is judged closest and photographed furthest away: at
+## match range a face is forty pixels tall, so nothing that goes wrong on one is
+## visible on any of the nine stills above.
+func _portrait_beat(directory: String) -> void:
+	# Both figures go back on their marks first: a portrait is meant to describe
+	# the body, not whatever the last dive left it lying in.
+	keeper.reset_to_line()
+	shooter.reset_stance()
+	hud.visible = false
+	scoreboard.visible = false
+	await _wait(0.6)
+
+	var head: Vector3 = _portrait_head(keeper)
+	_portrait_look(head, Vector3(0.34, 0.10, 1.0))
+	await _wait(0.2)
+	await _capture(directory, 16, "portrait_gardien")
+	# From behind, which is the angle a player actually spends the whole DUEL
+	# looking at and the one no still had ever covered.
+	_portrait_look(head, Vector3(-0.50, 0.14, -1.0))
+	await _wait(0.2)
+	await _capture(directory, 17, "portrait_gardien_dos")
+
+	head = _portrait_head(shooter)
+	_portrait_look(head, Vector3(0.30, 0.10, 1.0))
+	await _wait(0.2)
+	await _capture(directory, 18, "portrait_tireur")
+
+	hud.visible = true
+	scoreboard.visible = true
+
+
+## Walks the seed line for a CPU penalty aimed far enough off centre that keeping
+## it is a full dive. Falls back on the first seed rather than failing: a still
+## the session could not compose is worth less than a still of a penalty down the
+## middle, but not worth losing the six frames after it.
+func _shot_duel_seed(level: int) -> int:
+	var value: int = SHOT_DUEL_SEED_START
+	for _i in SHOT_DUEL_SEED_TRIES:
+		var target: Vector3 = TakerAi.choose(value, level, false, 0.0).get("target", Vector3.ZERO)
+		if target.is_finite() and Field.is_within_frame(target) \
+				and absf(target.x) > SHOT_DUEL_MIN_SPREAD:
+			return value
+		value += SHOT_DUEL_SEED_STRIDE
+	push_warning("Main: aucune graine de duel ne donne un penalty assez ecarte.")
+	return SHOT_DUEL_SEED_START
+
+
+## The point a portrait is aimed at: the head joint of a figure, lifted onto the
+## drawn skull. Found by NAME rather than handed over by the body, because both
+## bodies build that node and neither exposes it, and a screenshot session is not
+## a reason to widen either contract.
+func _portrait_head(figure: Node3D) -> Vector3:
+	if figure == null:
+		return Vector3.ZERO
+	var joint := figure.find_child("Head", true, false) as Node3D
+	if joint == null:
+		push_warning("Main: pas de noeud Head sur %s, portrait cadre a l'estime." % figure.name)
+		return figure.global_position + Vector3(0.0, 1.70, 0.0)
+	return joint.global_position + Vector3(0.0, PORTRAIT_RISE, 0.0)
+
+
+## Parks a lens of its own on `target`. The rig is left exactly as it was: this
+## camera simply becomes current, and nothing about the game's own framing is
+## disturbed by a beat that only exists to take a photograph.
+func _portrait_look(target: Vector3, direction: Vector3) -> void:
+	if _portrait_cam == null:
+		_portrait_cam = Camera3D.new()
+		_portrait_cam.name = "PortraitCam"
+		add_child(_portrait_cam)
+	var dir: Vector3 = direction
+	if dir.length_squared() < 0.000001:
+		dir = Vector3.BACK
+	dir = dir.normalized()
+	_portrait_cam.fov = PORTRAIT_FOV
+	_portrait_cam.near = 0.05
+	_portrait_cam.global_position = target + dir * PORTRAIT_RANGE
+	_portrait_cam.look_at(target, Vector3.UP)
+	_portrait_cam.current = true
+
+
+## Blocks the session until `condition` holds. Returns false, and says so, when
+## it never does: a beat that silently carried on would write the next four PNGs
+## of a state nobody asked for and call the session a success.
+func _wait_until(condition: Callable, timeout: float, complaint: String) -> bool:
+	var spent: float = 0.0
+	while spent < timeout:
+		if bool(condition.call()):
+			return true
+		await get_tree().process_frame
+		spent += maxf(get_process_delta_time(), 0.001)
+	push_warning("Main: %s." % complaint)
+	return false
 
 
 ## Plays the first half of a real run up and leaves the shooter in mid stride.

@@ -1,0 +1,47 @@
+{
+  "id": "trump-2024",
+  "question": "Will Donald Trump win the 2024 US presidential election?",
+  "category": "politics",
+  "source": "reconstructed",
+  "resolution": 1,
+  "resolved_date": "2024-11-05",
+  "notes": "A genuine toss-up in the polls that resolved on the night.",
+  "prices": [
+    {
+      "t": "2024-07-01",
+      "price": 60
+    },
+    {
+      "t": "2024-08-05",
+      "price": 44
+    },
+    {
+      "t": "2024-09-10",
+      "price": 48
+    },
+    {
+      "t": "2024-10-01",
+      "price": 52
+    },
+    {
+      "t": "2024-10-20",
+      "price": 58
+    },
+    {
+      "t": "2024-11-04",
+      "price": 55
+    },
+    {
+      "t": "2024-11-05T20:00",
+      "price": 60
+    },
+    {
+      "t": "2024-11-05T23:00",
+      "price": 82
+    },
+    {
+      "t": "2024-11-06T02:00",
+      "price": 95
+    }
+  ]
+}

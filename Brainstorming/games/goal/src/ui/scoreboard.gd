@@ -58,9 +58,27 @@ const REF_HEIGHT := 900.0
 const MODE_SEANCE := 0
 const MODE_ENTRAINEMENT := 1
 const MODE_DEFI := 2
+## Appended, never inserted: the three shipped values are persisted by number.
+const MODE_DUEL := 3
+const MODE_GARDIEN := 4
 const MODE_NAMES: PackedStringArray = [
-	"Séance de tirs au but", "Entraînement", "Défi",
+	"Séance de tirs au but", "Entraînement", "Défi", "Duel", "Entraînement gardien",
 ]
+
+## Row labels. A shootout has two SIDES, a duel has two ROLES, and they are not
+## the same table: in a duel both rows are the player, which is exactly the thing
+## a scoreboard has to say out loud or the series becomes unreadable. The second
+## row still holds `rival_scores` in both modes, because a round the player KEPT
+## is a round the CPU took.
+const ROW_TAKE := "VOUS"
+const ROW_RIVAL := "ADVERSAIRE"
+const ROW_DUEL_TAKE := "VOUS TIREUR"
+const ROW_DUEL_KEEP := "VOUS GARDIEN"
+## Role badges drawn beside those labels in a duel, so a glance tells the two
+## rows apart without reading them.
+const ROLE_NONE := 0
+const ROLE_BALL := 1
+const ROLE_GLOVE := 2
 const REGULATION_SLOTS := 5
 const MAX_SLOTS := 9
 
@@ -238,12 +256,18 @@ func _draw() -> void:
 # ----------------------------------------------------------------- sliding panel
 
 func _draw_panel(rect: Rect2, s: float) -> void:
-	var two_rows := _mode == MODE_SEANCE
+	var two_rows := _two_rows()
+	var duel := _mode == MODE_DUEL
 	var pip_r := 8.0 * s
 	var pip_gap := 7.0 * s
 	# The shootout label column carries "ADVERSAIRE" plus the turn caret, which is
-	# a good deal wider than the "VOUS" a single row mode needs.
+	# a good deal wider than the "VOUS" a single row mode needs. A duel carries a
+	# role badge on top of that.
 	var label_w := (134.0 if two_rows else 108.0) * s
+	# Both keeper side modes carry "VOUS GARDIEN" and a role badge in that column,
+	# and neither fits in the width a single "VOUS" needs.
+	if duel or _mode == MODE_GARDIEN:
+		label_w = 156.0 * s
 	var score_w := 52.0 * s
 	var head_h := 26.0 * s
 	var row_h := 36.0 * s
@@ -278,19 +302,30 @@ func _draw_panel(rect: Rect2, s: float) -> void:
 	var rival_turn := two_rows and _rival_to_kick and not _decided
 	var player_turn := two_rows and not _rival_to_kick and not _decided
 
+	# THE SINGLE ROW OF A TRAINING SESSION IS THE CPU'S KICKS. The player never
+	# takes one in that mode, so drawing `_player_marks` would draw an empty strip
+	# under a label saying "VOUS" while he was busy keeping penalties. What the row
+	# shows is still HIS work: one pip per penalty faced, and the figure beside it
+	# is SAVES rather than goals, which is the only number a keeper is judged on.
+	var keeping := _mode == MODE_GARDIEN
+	var solo_marks: Array[int] = _rival_marks if keeping else _player_marks
+	var solo_count: int = _count_saves(_rival_marks) if keeping else _player_goals
+	var solo_pip: float = _rival_pip_age if keeping else -1.0
+	var solo_role: int = ROLE_GLOVE if keeping else (ROLE_BALL if duel else ROLE_NONE)
 	var row_y := panel.position.y + head_h
 	_draw_row(Rect2(Vector2(panel.position.x + PAD * s, row_y),
-			Vector2(panel.size.x - PAD * 2.0 * s, row_h)), "VOUS", _player_marks,
-			_player_goals, slots, pip_r, pip_gap, label_w, score_w, ACCENT, alpha, -1.0, s,
-			player_turn, -1.0)
+			Vector2(panel.size.x - PAD * 2.0 * s, row_h)), _row_label(false), solo_marks,
+			solo_count, slots, pip_r, pip_gap, label_w, score_w,
+			RIVAL if keeping else ACCENT, alpha, -1.0, s,
+			player_turn, solo_pip, solo_role)
 	if two_rows:
 		var sep_y := row_y + row_h
 		draw_line(Vector2(panel.position.x + PAD * s, sep_y),
 				Vector2(panel.end.x - PAD * s, sep_y), _fade(BORDER, alpha), 1.0, true)
 		_draw_row(Rect2(Vector2(panel.position.x + PAD * s, sep_y),
-				Vector2(panel.size.x - PAD * 2.0 * s, row_h)), "ADVERSAIRE", _rival_marks,
+				Vector2(panel.size.x - PAD * 2.0 * s, row_h)), _row_label(true), _rival_marks,
 				_rival_goals, slots, pip_r, pip_gap, label_w, score_w, RIVAL, alpha, -1.0, s,
-				rival_turn, _rival_pip_age)
+				rival_turn, _rival_pip_age, ROLE_GLOVE if duel else ROLE_NONE)
 
 	if not _pressure.is_empty():
 		var small := _fs(T_SMALL, s)
@@ -312,7 +347,7 @@ func _draw_panel(rect: Rect2, s: float) -> void:
 func _draw_row(rect: Rect2, label: String, marks: Array[int], goals: int, slots: int,
 		pip_r: float, pip_gap: float, label_w: float, score_w: float, tone: Color,
 		alpha: float, pop: float, s: float, active: bool = false,
-		fresh: float = -1.0) -> void:
+		fresh: float = -1.0, role: int = ROLE_NONE) -> void:
 	var micro := _fs(T_MICRO, s)
 	var lead := _fs(T_LEAD, s)
 	var mid := rect.position.y + rect.size.y * 0.5
@@ -339,6 +374,9 @@ func _draw_row(rect: Rect2, label: String, marks: Array[int], goals: int, slots:
 				Vector2(label_x, mid + c)]),
 				PackedColorArray([_fade(tone, alpha), _fade(tone, alpha), _fade(tone, alpha)]))
 		label_x += c * 1.5 + 5.0 * s
+	if role != ROLE_NONE:
+		_role_badge(Vector2(label_x + 5.0 * s, mid), 5.4 * s, role, _fade(tone, alpha))
+		label_x += 15.0 * s
 	_tracked(Vector2(label_x, mid - micro * 0.62), label, micro,
 			_fade(tone if active else INK_SOFT, alpha), 1.4 * s)
 
@@ -418,6 +456,23 @@ func _pip(centre: Vector2, r: float, state: int, tone: Color, alpha: float, s: f
 			draw_arc(centre, r, 0.0, TAU, 26, _fade(INK_FAINT, alpha * 0.55), 1.6 * s, true)
 
 
+## The two roles of a duel as small pictograms: the ball is the round the player
+## TOOK, the glove the round he KEPT. A badge only has to be told apart in
+## silhouette, so neither is more than a handful of circles.
+func _role_badge(centre: Vector2, r: float, role: int, tone: Color) -> void:
+	match role:
+		ROLE_BALL:
+			draw_circle(centre, r, tone)
+			draw_circle(centre, r * 0.36, Color(0.02, 0.03, 0.05, tone.a * 0.85))
+		ROLE_GLOVE:
+			var w := r * 1.30
+			var h := r * 1.70
+			draw_rect(Rect2(centre - Vector2(w * 0.5, h * 0.5), Vector2(w, h)), tone, true)
+			draw_circle(centre - Vector2(0.0, h * 0.5), w * 0.5, tone)
+			# The thumb is what makes it a glove rather than a pill.
+			draw_circle(centre + Vector2(w * 0.60, h * 0.10), r * 0.44, tone)
+
+
 # -------------------------------------------------------------------- end panel
 
 func _draw_result(rect: Rect2, s: float) -> void:
@@ -427,7 +482,8 @@ func _draw_result(rect: Rect2, s: float) -> void:
 	_gradient(Rect2(Vector2.ZERO, Vector2(rect.size.x, rect.size.y * 0.35)),
 			Color(0.0, 0.0, 0.0, 0.35 * alpha), Color(0.0, 0.0, 0.0, 0.0))
 
-	var two_rows := _mode == MODE_SEANCE
+	var two_rows := _two_rows()
+	var duel := _mode == MODE_DUEL
 	var w := clampf(rect.size.x * 0.56, 460.0 * s, 860.0 * s)
 	var h := (348.0 if two_rows else 292.0) * s
 	var card := Rect2(Vector2(rect.size.x * 0.5 - w * 0.5,
@@ -456,20 +512,21 @@ func _draw_result(rect: Rect2, s: float) -> void:
 	var pip_gap := 8.0 * s
 	var slots := mini(maxi(REGULATION_SLOTS, maxi(_player_marks.size(),
 			_rival_marks.size())), MAX_SLOTS)
-	var label_w := 120.0 * s
+	var label_w := (146.0 if duel else 120.0) * s
 	var score_w := 56.0 * s
 	var row_h := 44.0 * s
 	var inner := Rect2(Vector2(card.position.x + PAD * 2.0 * s, y),
 			Vector2(card.size.x - PAD * 4.0 * s, row_h))
-	_draw_row(inner, "VOUS", _player_marks, _player_goals, slots, pip_r, pip_gap, label_w,
-			score_w, ACCENT, alpha, _result_age, s)
+	_draw_row(inner, _row_label(false), _player_marks, _player_goals, slots, pip_r, pip_gap,
+			label_w, score_w, ACCENT, alpha, _result_age, s, false, -1.0,
+			ROLE_BALL if duel else ROLE_NONE)
 	if two_rows:
 		var sep_y := inner.position.y + row_h
 		draw_line(Vector2(inner.position.x, sep_y), Vector2(inner.end.x, sep_y),
 				_fade(BORDER, alpha), 1.0, true)
-		_draw_row(Rect2(Vector2(inner.position.x, sep_y), inner.size), "ADVERSAIRE",
+		_draw_row(Rect2(Vector2(inner.position.x, sep_y), inner.size), _row_label(true),
 				_rival_marks, _rival_goals, slots, pip_r, pip_gap, label_w, score_w, RIVAL,
-				alpha, _result_age, s)
+				alpha, _result_age, s, false, -1.0, ROLE_GLOVE if duel else ROLE_NONE)
 		y = sep_y + row_h
 	else:
 		y = inner.position.y + row_h
@@ -501,6 +558,9 @@ func _result_subtitle() -> String:
 	if _mode == MODE_SEANCE:
 		var verb := "remportée" if _result_won else "perdue"
 		return "Séance %s %d - %d" % [verb, _player_goals, _rival_goals]
+	if _mode == MODE_DUEL:
+		var duel_verb := "remporté" if _result_won else "perdu"
+		return "Duel %s %d - %d" % [duel_verb, _player_goals, _rival_goals]
 	if _mode == MODE_DEFI:
 		return "%d points" % _defi_points
 	var attempts := _player_marks.size()
@@ -516,11 +576,50 @@ func _result_lines() -> PackedStringArray:
 	elif _player_marks.size() > 0:
 		var pct := int(round(100.0 * float(_player_goals) / float(_player_marks.size())))
 		lines.append("Réussite : %d %%" % pct)
+	# In a duel the second row is the player's OWN work as a keeper, so the panel
+	# reports it as such: how many of the CPU's penalties he actually stopped.
+	if _mode == MODE_DUEL and _rival_marks.size() > 0:
+		lines.append("Arrêts : %d sur %d" % [_count_saves(_rival_marks), _rival_marks.size()])
 	return lines
 
 
+## True when the series has two sides worth drawing. A duel has two rows for a
+## different reason than a shootout (two roles rather than two teams), but the
+## table is the same table.
+func _two_rows() -> bool:
+	return _mode == MODE_SEANCE or _mode == MODE_DUEL
+
+
+func _row_label(rival: bool) -> String:
+	# Training has one row and it is the keeping one, so it answers to the label a
+	# duel gives its second row even though it is being asked about its first.
+	if _mode == MODE_GARDIEN:
+		return ROW_DUEL_KEEP
+	if _mode == MODE_DUEL:
+		return ROW_DUEL_KEEP if rival else ROW_DUEL_TAKE
+	return ROW_RIVAL if rival else ROW_TAKE
+
+
+## Verdict.ARRET, mirrored rather than read: the scoreboard has to draw without
+## the autoload. Only used for the duel's saves line.
+const VERDICT_ARRET := 1
+
+
+func _count_saves(marks: Array[int]) -> int:
+	var total := 0
+	for m in marks:
+		if m == VERDICT_ARRET:
+			total += 1
+	return total
+
+
 func _round_tag() -> String:
-	if _mode != MODE_SEANCE:
+	# `round_index` counts the PLAYER'S OWN attempts, and in training he takes
+	# none of them: the count has to come off the row that is actually growing, or
+	# the header sits on "TIR 1" for the whole session.
+	if _mode == MODE_GARDIEN:
+		return "TIR %d" % (_rival_marks.size() + 1)
+	if not _two_rows():
 		return "TIR %d" % (_round + 1)
 	if _round >= REGULATION_SLOTS:
 		return "MORT SUBITE"

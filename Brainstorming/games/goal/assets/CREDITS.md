@@ -57,7 +57,7 @@ Le fichier lui-même n'est jamais réécrit et sa licence CC0 est inchangée.
 | `textures/kits/outfield_front_albedo.png` | devant du maillot bleu `NOVA`, sans numéro | variante générée spécialement pour GOAL avec OpenAI ImageGen |
 | `textures/kits/keeper_kit_albedo.png` | tenue de gardien orange/noire, sponsor fictif `ASTRA`, numéro 1 | généré spécialement pour GOAL avec OpenAI ImageGen |
 | `textures/kits/keeper_front_albedo.png` | devant du maillot orange `ASTRA`, sans numéro | variante générée spécialement pour GOAL avec OpenAI ImageGen |
-| `textures/characters/keeper_skin_albedo.png` | visage et peau d'un gardien adulte fictif | généré spécialement pour GOAL avec OpenAI ImageGen |
+| `textures/characters/keeper_skin_albedo.png` | visage et peau d'un gardien adulte fictif | généré spécialement pour GOAL avec OpenAI ImageGen, puis réparé par `tools/repair_skin_atlas.gd` (voir plus bas) |
 | `textures/crowd/stadium_spectators_atlas.png` | atlas transparent de 12 supporters adultes fictifs pour les tribunes | généré spécialement pour GOAL avec OpenAI ImageGen |
 | `textures/crowd/stadium_spectators_atlas_02.png` | second atlas transparent de 12 supporters adultes fictifs | généré spécialement pour GOAL avec OpenAI ImageGen |
 | `textures/seats/stadium_seat_albedo.png` | siège de stade bleu photoréaliste détouré | généré spécialement pour GOAL avec OpenAI ImageGen |
@@ -65,6 +65,35 @@ Le fichier lui-même n'est jamais réécrit et sa licence CC0 est inchangée.
 Ces images suivent la carte UV du modèle. Les tenues ne reproduisent aucun
 maillot, écusson ou sponsor réel, et le visage ne représente aucune personne
 réelle.
+
+#### Réparation de `keeper_skin_albedo.png`
+
+Le générateur avait posé ses îlots - le visage, les yeux, le menton, les narines -
+sur un **fond rouille uni qui occupait 95 % de la planche**. Deux défauts en
+découlaient, tous deux invisibles à distance de match et flagrants en portrait :
+
+- MakeHuman déplie tout le crâne et pas seulement la face, donc **l'arrière de la
+  tête et les deux tempes** échantillonnaient ce fond et rendaient une masse
+  rouille-mauve à côté d'un visage photographié ;
+- la rouille avait aussi **bavé dans l'îlot du visage** pendant la composition,
+  en traînées sur l'arcade, la tempe et la mâchoire.
+
+`tools/repair_skin_atlas.gd` répare les deux : le fond est retiré, la frange
+contaminée érodée de 4 px, les traînées repérées à la fois par la couleur et par
+leur excès de rouge, et le trou reconstruit par diffusion depuis les bords des
+îlots vers le teint moyen de la planche. Le script mesure avant d'écrire, dit ce
+qu'il a classé en fond, et se relance sans effet sur une planche déjà réparée.
+L'image n'a pas été repeinte à la main : elle reste l'image générée, moins son
+fond. La réparation est faite **sur place**, mais l'original rouille reste dans
+l'historique git (commit `01e9e879`), donc rien n'est perdu. Le script est écrit
+pour se relancer sur un atlas régénéré, et il **refuse** de retoucher une planche
+déjà réparée : la réparation n'est pas idempotente, une seconde passe éroderait
+4 px de plus sur chaque îlot et finirait par manger le visage. Le garde-fou est
+mesuré, pas supposé - le fond et le contenu sont à 0,088 l'un de l'autre sur la
+planche d'origine et à 0,028 une fois réparée.
+
+Godot ne réimporte pas tout seul un PNG réécrit hors éditeur. Après avoir lancé
+le script : `godot --headless --path . --import`.
 
 ### Poly Haven (https://polyhaven.com) - CC0 1.0
 

@@ -1,0 +1,43 @@
+{
+  "id": "btc-60k-2021",
+  "question": "Will Bitcoin trade above $60,000 at any point during 2021?",
+  "category": "crypto",
+  "source": "reconstructed",
+  "resolution": 1,
+  "resolved_date": "2021-04-14",
+  "notes": "Resolved YES in April 2021; the price climbed steadily as the bull run ran.",
+  "prices": [
+    {
+      "t": "2021-01-05",
+      "price": 30
+    },
+    {
+      "t": "2021-01-20",
+      "price": 38
+    },
+    {
+      "t": "2021-02-08",
+      "price": 52
+    },
+    {
+      "t": "2021-02-20",
+      "price": 66
+    },
+    {
+      "t": "2021-03-05",
+      "price": 60
+    },
+    {
+      "t": "2021-03-20",
+      "price": 72
+    },
+    {
+      "t": "2021-04-05",
+      "price": 85
+    },
+    {
+      "t": "2021-04-13",
+      "price": 93
+    }
+  ]
+}

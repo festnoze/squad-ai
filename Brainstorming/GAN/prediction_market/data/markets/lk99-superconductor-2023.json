@@ -1,0 +1,43 @@
+{
+  "id": "lk99-superconductor-2023",
+  "question": "Will LK-99 be confirmed as a room-temperature ambient-pressure superconductor?",
+  "category": "science",
+  "source": "reconstructed",
+  "resolution": 0,
+  "resolved_date": "2023-08-31",
+  "notes": "A viral July 2023 hype spike that replications quickly demolished. A textbook bubble.",
+  "prices": [
+    {
+      "t": "2023-07-26",
+      "price": 12
+    },
+    {
+      "t": "2023-07-28",
+      "price": 32
+    },
+    {
+      "t": "2023-07-30",
+      "price": 48
+    },
+    {
+      "t": "2023-08-01",
+      "price": 52
+    },
+    {
+      "t": "2023-08-03",
+      "price": 40
+    },
+    {
+      "t": "2023-08-06",
+      "price": 22
+    },
+    {
+      "t": "2023-08-10",
+      "price": 9
+    },
+    {
+      "t": "2023-08-20",
+      "price": 3
+    }
+  ]
+}

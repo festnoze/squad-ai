@@ -1,0 +1,47 @@
+; VIEWPOINT
+; Engine configuration file.
+
+config_version=5
+
+[application]
+
+config/name="VIEWPOINT"
+config/description="Puzzle FPS en Godot 4 : poser des photos qui se materialisent en objets 3D. Aucun asset binaire."
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Forward Plus")
+config/icon="res://icon.svg"
+
+[autoload]
+
+Game="*res://src/core/game_state.gd"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/stretch/mode="canvas_items"
+window/vsync/vsync_mode=1
+
+[layer_names]
+
+3d_physics/layer_1="world"
+3d_physics/layer_2="player"
+3d_physics/layer_3="interact"
+
+[physics]
+
+common/physics_ticks_per_second=60
+3d/default_gravity=14.0
+3d/default_gravity_vector=Vector3(0, -1, 0)
+
+[rendering]
+
+anti_aliasing/quality/msaa_3d=2
+anti_aliasing/quality/screen_space_aa=1
+lights_and_shadows/directional_shadow/size=4096
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=3
+environment/defaults/default_clear_color=Color(0.72, 0.82, 0.9, 1)
+
+[debug]
+
+settings/stdout/verbose_stdout=false

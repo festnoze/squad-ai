@@ -28,14 +28,44 @@ extends Node
 ## The rival is simulated rather than played, and simulated FOR REAL: see the
 ## block above _rival_verdict(). It is seeded from the campaign seed, so the same
 ## series replays identically.
+##
+## MODE DUEL: THE SAME TURN, PLAYED INSTEAD OF SIMULATED.
+##
+## Mode.DUEL is a shootout where the player changes ends every round. The odd
+## rounds are exactly what they have always been, the player takes the penalty.
+## The even rounds he KEEPS, and TakerAi kicks at him for real.
+##
+## Nothing about the turn structure moves for it, and that is the whole trick:
+## rival_to_kick() stays the single answer to "whose turn is it" in all four
+## modes, and player_keeps() is literally `mode == Mode.DUEL and rival_to_kick()`.
+## A duel round therefore cannot drift out of step with a seance round, because
+## there is only one rule and both read it. take_rival_kick() simulates the turn,
+## take_rival_kick_played() records the turn the game just played out; exactly one
+## of them is ever called, and neither the caller nor anybody else appends to a
+## score array. That last rule is the one that cost a whole broken scoreboard once
+## (see the paragraph above).
 
 signal phase_changed(previous: int, current: int)
 signal shot_recorded(record: Dictionary)
 signal series_changed()
 signal match_finished(player_won: bool)
 
-enum Mode { SEANCE, ENTRAINEMENT, DEFI }
-enum Phase { ACCUEIL, PLACEMENT, VISEE, COURSE, VOL, VERDICT, REPLAY, FIN }
+## DUEL and GARDIEN are APPENDED, never inserted: the shipped values are persisted
+## in user://settings.cfg and read back by number, so renumbering them would
+## silently restart somebody's campaign in another mode.
+##
+## GARDIEN is to DUEL what ENTRAINEMENT is to SEANCE: the same round, played over
+## and over, with nothing riding on it. The player keeps EVERY round, the CPU
+## takes every kick, and the series never ends because there is no series - only a
+## tally of how many he has stopped.
+enum Mode { SEANCE, ENTRAINEMENT, DEFI, DUEL, GARDIEN }
+## The two keeper side phases are APPENDED for the same reason. VOL, VERDICT and
+## REPLAY are REUSED by the keeper side rather than doubled: a ball in flight, a
+## verdict and a replay are the same objects on both sides of a duel.
+enum Phase { ACCUEIL, PLACEMENT, VISEE, COURSE, VOL, VERDICT, REPLAY, FIN,
+	PLACEMENT_GARDIEN, LECTURE }
+## Which side of a DUEL round the player is on.
+enum Turn { TIREUR, GARDIEN }
 enum Verdict { BUT, ARRET, POTEAU, BARRE, DEHORS }
 
 ## Regulation shots per side before sudden death.
@@ -120,11 +150,45 @@ static func is_goal(verdict: int) -> bool:
 	return verdict == Verdict.BUT
 
 
+## French label of a mode, for the home menu. Player facing, therefore accented.
+##
+## The parameter is named after the contract and shadows the `mode` member. That
+## is harmless here (a static method has no members to reach) and the warning is
+## silenced rather than the name changed, because another module calls this by
+## the signature written in the contract.
+@warning_ignore("shadowed_variable")
+static func mode_label(mode: int) -> String:
+	match mode:
+		Mode.SEANCE:
+			return "Séance"
+		Mode.ENTRAINEMENT:
+			return "Entraînement"
+		Mode.DEFI:
+			return "Défi"
+		Mode.DUEL:
+			return "Duel"
+		Mode.GARDIEN:
+			return "Entraînement gardien"
+	return "Séance"
+
+
 ## Goals inside a list of verdicts.
 static func _goals_in(scores: Array[int]) -> int:
 	var total := 0
 	for verdict in scores:
 		if verdict == Verdict.BUT:
+			total += 1
+	return total
+
+
+## Saves inside a list of verdicts, which is NOT "everything that was not a goal".
+## A penalty off the post or wide of the frame was missed by the taker and stopped
+## by nobody, and counting it as a save would flatter the keeper by whatever the
+## CPU sprayed. Only a glove on the ball counts.
+static func _saves_in(scores: Array[int]) -> int:
+	var total := 0
+	for verdict in scores:
+		if verdict == Verdict.ARRET:
 			total += 1
 	return total
 
@@ -210,73 +274,38 @@ const _RIVAL_LINE_BLEND := 0.16
 const _RIVAL_COMMIT_MARGIN := 0.03
 const _RIVAL_CONFIDENT_ERROR := 0.16
 
-## Where the CPU taker's clean contact window sits on its own power bar. Same
-## value Main uses for a scripted shot, so a rival kick and a probe kick are
-## struck by the same model.
-const _RIVAL_SWEET := 0.72
-
-## Inverse of ShotModel.aim_point, which is affine on each axis and therefore
-## invertible in closed form. Restated here rather than searched for by
-## bisection, and guarded by a round trip check in tests/test_match_state.gd: if
-## ShotModel ever remaps its reticle, that check fails instead of this file
-## quietly aiming the CPU somewhere else.
-const _RIVAL_AIM_SPAN_X := 4.40      # Field.GOAL_HALF + ShotModel's side margin
-const _RIVAL_AIM_BASE_Y := 0.11      # Field.BALL_RADIUS
-const _RIVAL_AIM_TOP_Y := 3.04       # Field.GOAL_HEIGHT + ShotModel's top margin
-
-## WHERE THE CPU TAKER SHOOTS, in metres on the goal line, and how badly he
-## misses. One row is [weight, mean |x|, sigma x, mean y, sigma y], the sign of x
-## drawn evenly so neither post is favoured. The sigma IS the error: there is no
-## second fudge factor anywhere.
+## THE CHOICE OF PENALTY HAS MOVED OUT, AND ONLY THE CHOICE.
 ##
-## This is the same table as balance_probe's AIM_CLUSTERS, deliberately: the
-## rival shoots the way the reference sample says people shoot, so the rate that
-## comes out of the simulation is comparable with the one the probe reports for
-## the player. Half the kicks are placed to a side at or below the waist, a fifth
-## are half hearted half side shots, a fifth are genuine attempts at the angle of
-## the bar, the rest go down the middle.
-const _RIVAL_AIM: Array = [
-	[0.30, 2.15, 0.52, 0.72, 0.34],
-	[0.20, 1.20, 0.45, 0.95, 0.42],
-	[0.16, 0.10, 0.52, 0.85, 0.45],
-	[0.22, 2.55, 0.50, 1.82, 0.42],
-	[0.12, 0.25, 0.85, 1.80, 0.38],
-]
-## The reticle stops here. Past it the kick is simply wide or over, which is a
-## legal and counted outcome.
-const _RIVAL_MAX_X := 4.10
-const _RIVAL_MIN_Y := 0.14
-const _RIVAL_MAX_Y := 2.90
-## Pace of a CPU penalty, as a power in [0, 1] on ShotModel's own bar.
-const _RIVAL_POWER_MEAN := 0.80
-const _RIVAL_POWER_SIGMA := 0.11
-const _RIVAL_POWER_MIN := 0.45
-## How often he mistimes the strike when nothing is at stake.
-const _RIVAL_MISCUE_CALM := 0.10
-
-## NERVES, AND WHY THEY ARE A REAL THING RATHER THAN A HIDDEN PERCENTAGE.
+## `_RIVAL_AIM`, `_RIVAL_POWER_*`, `_RIVAL_MISCUE_*`, `_RIVAL_NERVE`,
+## `_RIVAL_SWEET`, `_rival_plan` and `_rival_reticle` used to live here and were
+## only ever used to simulate a SEANCE rival. Mode DUEL needs the SAME taker,
+## played for real against a human keeper, so all of it is now `TakerAi` (2.12b)
+## and this file asks for it instead of owning it. There is exactly one CPU penalty
+## taker in this game.
 ##
-## A kick that must be scored to stay in the tie really is converted worse than a
-## kick to win, and the old model expressed that by quietly subtracting eleven
-## points from a goal chance the player could not see. It is expressed here as
-## what actually happens to a nervous penalty taker: his aim spreads (the sigmas
-## of the table above are multiplied by _RIVAL_NERVE) and he mistimes the strike
-## far more often (_RIVAL_MISCUE_TENSE instead of _RIVAL_MISCUE_CALM). Nothing
-## touches the goalkeeper, and nothing touches the arithmetic.
+## Two consequences worth writing down.
 ##
-## Measured over 900 kicks per level, the drop that comes out is about seven
-## points of conversion (Confirme 55.9 % -> 49.0 %, Pro 43.3 % -> 36.7 %), and
-## the SHAPE of the misses changes too: shots off the frame go from 2.2 % to
-## 11.7 %, because a taker under that much pressure balloons it rather than
-## picking out a corner. That is the version of the model a player can see
-## happening, which is why it replaced the invisible one.
+## 1. `TakerAi.choose(seed, TakerAi.SEANCE_LEVEL, pressure, 0.0)` is contractually
+##    the plan `_rival_plan` produced for that seed, draw for draw. The four rows
+##    of measured conversion in CONTRACTS 2.9 are a property of that draw order
+##    and of nothing else.
+## 2. The keeper's own shuffle used to be the NEXT number out of the same stream,
+##    drawn right after the plan. `TakerAi.choose` owns that stream now and does
+##    not hand it back, so `TakerAi.dance_phase` re-runs the plan on a throwaway
+##    generator and returns the draw that follows it. It exists for no other
+##    reason, and it is what keeps this simulation identical to the shipped one.
 ##
-## It fires on about one rival kick in five over a full campaign (18.2 %
-## measured over 20 000 simulated series), so it is a live branch, not decoration.
-## The situation is announced BEFORE the kick, by rival_must_score(): the
-## scoreboard and the HUD both say so.
-const _RIVAL_NERVE := 1.90
-const _RIVAL_MISCUE_TENSE := 0.28
+## `tests/test_match_state.gd` holds the shipped `_rival_plan` verbatim and pins
+## both of those claims to it, seed for seed. Nothing else in this file changed:
+## `TakerAi.strike` is the ShotModel.resolve call that was here, `TakerAi.cues` is
+## the ShotModel.tell_cues call that was here, and the flight loop below is
+## untouched. So 2.9 does NOT need remeasuring for this move, and the test is what
+## says so rather than a promise in a comment.
+##
+## The nerves are `TakerAi.NERVE` and `TakerAi.MISCUE_TENSE` now. They are still
+## the visible version of what used to be a hidden goal chance, they still fire on
+## about one rival kick in five over a campaign, and the situation is still
+## announced BEFORE the kick by rival_must_score().
 
 
 ## One simulated rival kick. Seeded, therefore reproducible.
@@ -284,60 +313,17 @@ const _RIVAL_MISCUE_TENSE := 0.28
 ## `keeper_level` is a KeeperBrain.Level, and it is the PLAYER'S setting: the
 ## rival kicks at the same goalkeeper the player does. `pressure` is the
 ## elimination kick described above.
+##
+## The taker kicks at TakerAi.SEANCE_LEVEL and against a keeper standing in the
+## middle of his line, which is the definition of "SEANCE did not move": a
+## simulated series has no line dance for him to read, only a played duel does.
 static func _rival_verdict(rng_seed: int, keeper_level: int, pressure: bool) -> int:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = rng_seed
 	var level := clampi(keeper_level, 0, 3)
-	var plan := _rival_plan(rng, pressure)
-	# The keeper has been shuffling on his line since the taker put the ball
-	# down. Where that shuffle has carried him is part of the penalty.
-	var dance: float = 0.30 + 0.70 * rng.randf()
+	var plan: Dictionary = TakerAi.choose(rng_seed, TakerAi.SEANCE_LEVEL, pressure, 0.0)
+	# The keeper has been shuffling on his line since the taker put the ball down.
+	# Where that shuffle has carried him is part of the penalty.
+	var dance: float = TakerAi.dance_phase(rng_seed, TakerAi.SEANCE_LEVEL, pressure)
 	return _rival_flight(plan, level, rng_seed, dance)
-
-
-## The CPU's intention: where he is aiming, how hard, and how well he strikes it.
-static func _rival_plan(rng: RandomNumberGenerator, pressure: bool) -> Dictionary:
-	var draw := rng.randf()
-	var chosen: Array = _RIVAL_AIM[_RIVAL_AIM.size() - 1]
-	var accumulated := 0.0
-	for entry in _RIVAL_AIM:
-		var cluster: Array = entry
-		accumulated += float(cluster[0])
-		if draw <= accumulated:
-			chosen = cluster
-			break
-
-	var nerve := _RIVAL_NERVE if pressure else 1.0
-	var side := 1.0 if rng.randf() < 0.5 else -1.0
-	var world_x := side * (float(chosen[1]) + rng.randfn(0.0, float(chosen[2]) * nerve))
-	var world_y := float(chosen[3]) + rng.randfn(0.0, float(chosen[4]) * nerve)
-	world_x = clampf(world_x, -_RIVAL_MAX_X, _RIVAL_MAX_X)
-	world_y = clampf(world_y, _RIVAL_MIN_Y, _RIVAL_MAX_Y)
-
-	var power := clampf(
-		rng.randfn(_RIVAL_POWER_MEAN, _RIVAL_POWER_SIGMA), _RIVAL_POWER_MIN, 1.0)
-
-	var miscue_chance := _RIVAL_MISCUE_TENSE if pressure else _RIVAL_MISCUE_CALM
-	var release := _RIVAL_SWEET
-	if rng.randf() < miscue_chance:
-		var offset: float = rng.randf_range(0.12, 0.26)
-		if rng.randf() < 0.5:
-			release = _RIVAL_SWEET - offset
-		else:
-			release = minf(_RIVAL_SWEET + offset, 1.0)
-
-	return {
-		"aim": _rival_reticle(world_x, world_y),
-		"power": power,
-		"release": release,
-	}
-
-
-## Normalized reticle for a point of the goal line. See _RIVAL_AIM_SPAN_X.
-static func _rival_reticle(world_x: float, world_y: float) -> Vector2:
-	return Vector2(
-		world_x / _RIVAL_AIM_SPAN_X,
-		(world_y - _RIVAL_AIM_BASE_Y) / (_RIVAL_AIM_TOP_Y - _RIVAL_AIM_BASE_Y))
 
 
 ## The kick itself: one whole penalty, resolved in the order Main resolves a
@@ -346,13 +332,8 @@ static func _rival_reticle(world_x: float, world_y: float) -> Vector2:
 ## enough that counting it as a post keeps this readable, and POTEAU already
 ## means "the frame sent it back out" everywhere else in the file.
 static func _rival_flight(plan: Dictionary, level: int, shot_seed: int, dance: float) -> int:
-	var aim: Vector2 = plan.get("aim", Vector2(0.0, 0.4))
-	var power := float(plan.get("power", _RIVAL_POWER_MEAN))
-	var release := float(plan.get("release", _RIVAL_SWEET))
-
-	var shot: Dictionary = ShotModel.resolve(
-		aim, power, 0.0, 0.0, release, _RIVAL_SWEET, shot_seed)
-	var cues: Dictionary = ShotModel.tell_cues(aim, power, 0.0, 0.0, 0, level)
+	var shot: Dictionary = TakerAi.strike(plan, shot_seed)
+	var cues: Dictionary = TakerAi.cues(plan, level)
 	var guess: Dictionary = KeeperBrain.read_cues(cues, level, shot_seed)
 
 	var line_x := clampf(KeeperBrain.line_dance(dance, level, shot_seed), -1.1, 1.1)
@@ -517,14 +498,17 @@ static func _defi_award(verdict: int, streak_before: int) -> int:
 
 func start_match(new_mode: int) -> void:
 	reset()
-	mode = clampi(new_mode, Mode.SEANCE, Mode.DEFI)
+	mode = clampi(new_mode, Mode.SEANCE, Mode.GARDIEN)
 	_draw_salt()
 	series_changed.emit()
 	set_phase(Phase.PLACEMENT)
 
 
 func set_phase(new_phase: int) -> void:
-	var wanted := clampi(new_phase, Phase.ACCUEIL, Phase.FIN)
+	# LECTURE and not FIN: the two keeper side phases are appended AFTER FIN, so
+	# the bound is the last value of the enum and not the last value of the taking
+	# side's own sequence.
+	var wanted := clampi(new_phase, Phase.ACCUEIL, Phase.LECTURE)
 	if wanted != new_phase:
 		push_warning("Shootout: phase invalide %d." % new_phase)
 	if wanted == phase:
@@ -573,17 +557,55 @@ func record_shot(record: Dictionary) -> void:
 ## player one kick ahead, and a tie that is still alive. This is the single
 ## answer to "whose turn is it", and the scoreboard draws it.
 func rival_to_kick() -> bool:
-	if mode != Mode.SEANCE:
+	# TRAINING: he owes the next one, always. The player never takes a kick in this
+	# mode, so the "one ahead" test below can never come true, and the answer has to
+	# be given before it is asked. Nothing decides the series either, so there is no
+	# state in which the CPU stops kicking: that IS the mode.
+	if mode == Mode.GARDIEN:
+		return true
+	# The two modes with a second side. DUEL differs from SEANCE only in HOW the
+	# turn happens (played instead of simulated), never in WHEN it is owed.
+	if mode != Mode.SEANCE and mode != Mode.DUEL:
 		return false
 	if is_decided():
 		return false
 	return rival_scores.size() < player_scores.size()
 
 
+## True when the player is the goalkeeper for the beat about to be played.
+##
+## It is `rival_to_kick()` and the mode, and NOTHING else. Written this way on
+## purpose: "whose turn is it" keeps exactly one answer, so a duel can never end
+## up half a round out of step with the rules a seance follows, and a training
+## session cannot end up half a round out of step with a duel.
+func player_keeps() -> bool:
+	if mode == Mode.GARDIEN:
+		return true
+	return mode == Mode.DUEL and rival_to_kick()
+
+
+## True when the rival's turn is PLAYED OUT by the game rather than simulated
+## behind a banner. Both of the keeper side modes, and it is the single answer to
+## "is there a rival beat to watch", so the orchestrator never lists them itself.
+func rival_kick_is_played() -> bool:
+	return mode == Mode.DUEL or mode == Mode.GARDIEN
+
+
+## Which side of the duel the player is on right now. Always Turn.TIREUR outside
+## DUEL, because outside DUEL he never holds the gloves.
+func turn() -> int:
+	return Turn.GARDIEN if player_keeps() else Turn.TIREUR
+
+
 ## True when the rival's NEXT kick has to be scored to keep the tie alive. Read
 ## by the HUD and the scoreboard, so the pressure the simulation applies is
 ## announced before it is applied rather than hidden inside a goal chance.
 func rival_must_score() -> bool:
+	# Nothing rides on a training kick, so nobody is under pressure taking it. The
+	# scoreboard colours a row and the HUD colours a line off this answer, and
+	# neither should be shouting about stakes a practice session does not have.
+	if mode == Mode.GARDIEN:
+		return false
 	if not rival_to_kick():
 		return false
 	return _rival_under_pressure(player_goals(), rival_scores.size(), rival_goals())
@@ -600,6 +622,29 @@ func take_rival_kick() -> int:
 	if not rival_to_kick():
 		return -1
 	var verdict := simulate_rival_shot(_rival_seed())
+	return _append_rival_verdict(verdict)
+
+
+## The rival's turn again, but with a verdict the GAME just played out instead of
+## one this file simulated. This is the DUEL path: a real TakerAi penalty, a real
+## flight, and a real player keeper who either got a glove to it or did not.
+##
+## Same bookkeeping, same signals, and the SAME "he owes no kick" rule as
+## take_rival_kick(): a decided series never records a dead round, whichever of
+## the two paths the caller is on. Returns the Verdict it recorded, or -1 when
+## nothing was recorded, and a value that is not a Verdict is refused rather than
+## stored: this array is read back by the scoreboard and by the football rules.
+func take_rival_kick_played(verdict: int) -> int:
+	if not rival_to_kick():
+		return -1
+	if verdict < Verdict.BUT or verdict > Verdict.DEHORS:
+		push_error("Shootout: take_rival_kick_played verdict invalide %d, tir ignore." % verdict)
+		return -1
+	return _append_rival_verdict(verdict)
+
+
+## The one place a rival verdict enters the series, whichever path produced it.
+func _append_rival_verdict(verdict: int) -> int:
 	rival_scores.append(verdict)
 	series_changed.emit()
 	if is_decided():
@@ -613,6 +658,13 @@ func player_goals() -> int:
 
 func rival_goals() -> int:
 	return _goals_in(rival_scores)
+
+
+## Penalties the player STOPPED, out of `rival_scores`. Every round he kept is a
+## round the CPU took, in both keeper side modes, so this reads the same row in a
+## duel and in a training session.
+func keeper_saves() -> int:
+	return _saves_in(rival_scores)
 
 
 ## Seed of the rival's next kick: stable for a given salt and round.
@@ -636,6 +688,36 @@ func simulate_rival_shot(rng_seed: int) -> int:
 	return _rival_verdict(rng_seed, _keeper_level(), pressure)
 
 
+## The CPU penalty of the round the player is about to KEEP.
+##
+## The orchestrator hands this one plan to three places at once: the taker's body,
+## the ball, and the lossy tells the player is allowed to read. It is the only
+## place that decides the seed, the level and the nerves of a duel kick, so the
+## run up the player watches and the penalty that arrives cannot be two different
+## penalties.
+##
+## `keeper_x` is where the player is standing on his line, and it is the ONLY
+## thing about him the taker is ever told (see 2.12b). Pure: it writes nothing,
+## and calling it twice for the same round and the same `keeper_x` gives the same
+## plan.
+##
+## The level is the player's own difficulty setting, exactly as the keeper's is:
+## a duel against a Legende is a duel where BOTH ends are a Legende, and what the
+## player demands of the opposing keeper he takes for himself.
+## The seed of the round the player is about to keep. The taker's body, his feints
+## and the tells the player reads all have to be drawn from the SAME number as the
+## plan, or the run up on screen would belong to a different penalty from the one
+## that arrives. Stable for a round, and it is the seed duel_taker_plan uses.
+func duel_taker_seed() -> int:
+	return _rival_seed()
+
+
+func duel_taker_plan(keeper_x: float) -> Dictionary:
+	var pressure := _rival_under_pressure(
+		player_goals(), rival_scores.size(), rival_goals())
+	return TakerAi.choose(_rival_seed(), _keeper_level(), pressure, keeper_x)
+
+
 ## The player's own keeper level, a KeeperBrain.Level. Read through the node path
 ## for the same reason _draw_salt does it: naming an autoload makes this file
 ## impossible to compile under `--script`, and it is worth keeping loadable from
@@ -652,7 +734,9 @@ func _keeper_level() -> int:
 ## True when neither side can catch up any more.
 func is_decided() -> bool:
 	match mode:
-		Mode.SEANCE:
+		Mode.SEANCE, Mode.DUEL:
+			# One rule, both modes. A duel is a shootout in which the player happens
+			# to keep every other round, not a different competition.
 			return _series_decided(player_scores.size(), player_goals(), rival_scores.size(), rival_goals())
 		Mode.DEFI:
 			return player_scores.size() >= DEFI_SHOTS
@@ -664,13 +748,23 @@ func is_decided() -> bool:
 func pressure_text() -> String:
 	if mode == Mode.ENTRAINEMENT:
 		return "Entraînement libre"
+	if mode == Mode.GARDIEN:
+		# The tally IS the line. Training has no situation to describe - no score to
+		# protect, no kick that must be scored - so the sentence carries the one
+		# thing a session like this is for: how many the player has stopped.
+		var faced := rival_scores.size()
+		if faced == 0:
+			return "Entraînement gardien"
+		return "Entraînement gardien : %d arrêt(s) sur %d" % [keeper_saves(), faced]
 	if mode == Mode.DEFI:
 		if is_decided():
 			return "Défi terminé : %d points" % defi_points
 		return "Défi : tir %d sur %d" % [player_scores.size() + 1, DEFI_SHOTS]
 
 	if is_decided():
-		return "Séance terminée" if player_goals() != rival_goals() else "Égalité"
+		if player_goals() == rival_goals():
+			return "Égalité"
+		return "Duel terminé" if mode == Mode.DUEL else "Séance terminée"
 
 	var taken := player_scores.size()
 	var mine := player_goals()
@@ -683,6 +777,18 @@ func pressure_text() -> String:
 	# loud is what makes the nerves the simulation applies to that kick visible
 	# instead of being a number nobody can see.
 	if rival_to_kick():
+		# In DUEL that turn is the player's own, on the other side of the ball, so
+		# the same three situations are said from HIS side of them. The rule read
+		# is identical; only the person the sentence is addressed to changes.
+		# The two halves swap over, and they have to: a rival who must score is a
+		# rival the player beats by SAVING, and a rival kicking to win is a penalty
+		# the player must stop to stay alive.
+		if mode == Mode.DUEL:
+			if rival_must_score():
+				return "Arrêtez pour gagner"
+			if theirs + 1 > mine + mine_left_after and taken >= REGULATION_SHOTS:
+				return "Arrêtez pour rester en vie"
+			return "À vous d'arrêter"
 		if rival_must_score():
 			return "L'adversaire doit marquer"
 		if theirs + 1 > mine + mine_left_after and taken >= REGULATION_SHOTS:
@@ -720,6 +826,8 @@ func summary() -> Dictionary:
 		"sudden_death": player_scores.size() >= REGULATION_SHOTS and rival_scores.size() >= REGULATION_SHOTS,
 		"rival_to_kick": rival_to_kick(),
 		"rival_must_score": rival_must_score(),
+		"player_keeps": player_keeps(),
+		"turn": turn(),
 		"decided": is_decided(),
 		"player_won": mine >= theirs,
 		"streak": streak,

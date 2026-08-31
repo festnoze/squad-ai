@@ -86,6 +86,8 @@ const PAGE_HOME := 0
 const PAGE_PAUSE := 1
 const PAGE_SETTINGS := 2
 const PAGE_CONTROLS := 3
+## Appended, and reached from PAGE_CONTROLS alone. See `_back`.
+const PAGE_KEEPER := 4
 
 const KIND_ACTION := 0
 const KIND_TOGGLE := 1
@@ -98,6 +100,9 @@ const KIND_INFO := 4
 const MODE_SEANCE := 0
 const MODE_ENTRAINEMENT := 1
 const MODE_DEFI := 2
+## Appended, never inserted: the three shipped values are persisted by number.
+const MODE_DUEL := 3
+const MODE_GARDIEN := 4
 
 ## Mirrors KeeperBrain.LEVEL_NAMES.
 const LEVEL_NAMES: PackedStringArray = ["Débutant", "Confirmé", "Pro", "Légende"]
@@ -127,12 +132,52 @@ const CONTROLS: Array = [
 	["Frapper", "Relâcher quand le curseur est dans le vert"],
 	["Effet gauche / droite", "A et E"],
 	["Feinte pendant la course", "Maj gauche"],
+	# The keeper side of a Duel used to list its three inputs HERE. They now live
+	# on KEEPER_HELP, which needs them anyway to explain the mode, and this page
+	# points at it instead.
+	#
+	# That is not tidiness, it is arithmetic: the page sizes itself from the number
+	# of rows, and at 900 px of reference the fifteen it already had were all it
+	# could take. Adding a sixteenth pushed "Retour" off the bottom edge and the
+	# key list off the screen entirely.
 	["Tir suivant", "Entrée"],
 	["Revoir le tir", "R"],
 	["Changer de caméra", "C"],
 	["Pause", "Échap"],
 	["Recommencer", "F5"],
 	["Plein écran", "F11"],
+]
+
+## The keeper's side of a Duel, explained rather than merely bound.
+##
+## THE KEYS WERE NEVER THE HARD PART. They are three, they are the taker's own,
+## and they are already in the list above. What a player arriving in a kept round
+## does not know is what the blue ring is, why it shrinks while he watches, and
+## that the mode is built so that WAITING UNTIL HE KNOWS IS LOSING. None of that
+## can be read off a keymap, and a player who has not been told it plays the round
+## as a reaction test, loses it, and concludes the keeper is broken.
+##
+## Written as the same two columns as CONTROLS so it needs no painter of its own:
+## the short phrase on the left is what the player SEES, the line on the right is
+## what it MEANS. Both are kept under the width the controls list already proves
+## fits, roughly 57 characters across the pair.
+##
+## The three numbers in it are the real ones and are not decoration:
+## KeeperInput.NOMINAL_FLIGHT, the reaction the brain pays in KeeperBrain, and a
+## full dive to the post. They do not fit inside one another, and that IS the mode.
+const KEEPER_HELP: Array = [
+	["Viser le plongeon", "Souris"],
+	["Bouger sur la ligne", "Flèches, 90 cm de chaque côté"],
+	["Plonger", "Clic gauche ou Espace, une seule fois"],
+	["L'anneau bleu", "Ce qu'un plongeon lancé maintenant atteint"],
+	["Couverture", "La part du but que cet anneau couvre"],
+	["Il rétrécit", "Attendre coûte du but, il faut partir avant"],
+	["L'arithmétique", "Vol 0,42 s, réflexe 0,2 s, plongeon 0,6 s"],
+	["Lecture et élan", "Le corps du tireur, jamais son intention"],
+	["Après la frappe", "L'anneau tombe à la vitesse du ballon"],
+	["Votre réflexe", "N'est pas facturé, le temps part du clic"],
+	["Votre place", "La seule chose que le tireur lit sur vous"],
+	["La difficulté", "Règle votre corps autant que le sien"],
 ]
 
 # ------------------------------------------------------------------------ state
@@ -283,6 +328,11 @@ func _compute_layout() -> Dictionary:
 	var card_w := clampf(rect.size.x * 0.46, 400.0 * s, 720.0 * s)
 	if _page == PAGE_CONTROLS:
 		card_w = clampf(rect.size.x * 0.60, 480.0 * s, 860.0 * s)
+	elif _page == PAGE_KEEPER:
+		# A shade wider than the key list: its right column carries sentences and
+		# not key names, and the two columns are right and left aligned against the
+		# card edges, so a card too narrow lets them meet in the middle.
+		card_w = clampf(rect.size.x * 0.66, 520.0 * s, 940.0 * s)
 	var card_h := list_h + PAD * 2.0 * s
 	# The footer is a plate docked under the card, not two lines adrift on the
 	# turf, so its height is measured from the two lines it actually carries and
@@ -340,6 +390,8 @@ func _current_items() -> Array[Dictionary]:
 			return _items_settings()
 		PAGE_CONTROLS:
 			return _items_controls()
+		PAGE_KEEPER:
+			return _items_keeper()
 		_:
 			return _items_home()
 
@@ -352,6 +404,14 @@ func _items_home() -> Array[Dictionary]:
 			"hint": "Tirez sans compter, le gardien reste en place."},
 		{"id": "mode_defi", "label": "Défi", "kind": KIND_ACTION,
 			"hint": "Enchaînez les buts, la série fait le score."},
+		# The one mode whose name does not announce what it does, so its hint has to.
+		{"id": "mode_duel", "label": "Duel", "kind": KIND_ACTION,
+			"hint": "Vous tirez, puis vous gardez : les rôles alternent."},
+		# Placed under Duel and not under Entraînement, because it is the DUEL it
+		# trains for. A player who has just been beaten five times in the gloves
+		# looks for the answer next to the mode that beat him.
+		{"id": "mode_gardien", "label": "Entraînement gardien", "kind": KIND_ACTION,
+			"hint": "Penalties à l'infini, vous gardez chaque tir."},
 		{"id": "settings", "label": "Réglages", "kind": KIND_ACTION, "hint": ""},
 		{"id": "controls", "label": "Commandes", "kind": KIND_ACTION, "hint": ""},
 		{"id": "quit", "label": "Quitter", "kind": KIND_ACTION, "hint": ""},
@@ -405,6 +465,21 @@ func _items_settings() -> Array[Dictionary]:
 func _items_controls() -> Array[Dictionary]:
 	var items: Array[Dictionary] = []
 	for entry in CONTROLS:
+		var pair: Array = entry
+		items.append({"id": "info", "label": String(pair[0]), "kind": KIND_INFO,
+			"value_text": String(pair[1]), "hint": ""})
+	# Named for what is BEHIND it and not for what it is about: the keeper's three
+	# inputs are no longer on this page, so a player hunting for them has to be
+	# able to see from here that this is where they went.
+	items.append({"id": "keeper_help", "label": "Duel, gardien : touches et règles",
+		"kind": KIND_ACTION, "hint": "Comment lire l'anneau, et quand plonger."})
+	items.append({"id": "back", "label": "Retour", "kind": KIND_ACTION, "hint": ""})
+	return items
+
+
+func _items_keeper() -> Array[Dictionary]:
+	var items: Array[Dictionary] = []
+	for entry in KEEPER_HELP:
 		var pair: Array = entry
 		items.append({"id": "info", "label": String(pair[0]), "kind": KIND_INFO,
 			"value_text": String(pair[1]), "hint": ""})
@@ -507,12 +582,18 @@ func _draw_title(rect: Rect2, layout: Dictionary, s: float, fade: float) -> void
 			5.0 * s)
 	draw_rect(Rect2(Vector2(centre - tw * 0.5, top + 12.0 * s + float(title) * 1.16),
 			Vector2(tw, 2.0 * s)), _fade(ACCENT, fade * 0.9), true)
+	var note := ""
 	if _page == PAGE_CONTROLS:
-		var micro := _fs(T_MICRO, s)
-		var note := "Clavier reconnu par position : ZQSD sur AZERTY, WASD sur QWERTY."
-		var nw := _text_width(note, micro)
-		_text(Vector2(centre - nw * 0.5, top + 12.0 * s + float(title) * 1.16 + 10.0 * s),
-				note, micro, _fade(INK_FAINT, fade))
+		note = "Clavier reconnu par position : ZQSD sur AZERTY, WASD sur QWERTY."
+	elif _page == PAGE_KEEPER:
+		# The one sentence to take away if the list below is never read.
+		note = "Un penalty arrive plus vite qu'un plongeon : partez avant de savoir."
+	if note.is_empty():
+		return
+	var micro := _fs(T_MICRO, s)
+	var nw := _text_width(note, micro)
+	_text(Vector2(centre - nw * 0.5, top + 12.0 * s + float(title) * 1.16 + 10.0 * s),
+			note, micro, _fade(INK_FAINT, fade))
 
 
 func _page_title() -> String:
@@ -523,6 +604,8 @@ func _page_title() -> String:
 			return "RÉGLAGES"
 		PAGE_CONTROLS:
 			return "COMMANDES"
+		PAGE_KEEPER:
+			return "GARDIEN"
 		_:
 			return "GOAL"
 
@@ -815,6 +898,14 @@ func _activate(index: int, at: Vector2) -> void:
 			_play("ui_select")
 			close()
 			mode_chosen.emit(MODE_DEFI)
+		"mode_duel":
+			_play("ui_select")
+			close()
+			mode_chosen.emit(MODE_DUEL)
+		"mode_gardien":
+			_play("ui_select")
+			close()
+			mode_chosen.emit(MODE_GARDIEN)
 		"settings":
 			_play("ui_select")
 			_return_page = _page
@@ -823,6 +914,12 @@ func _activate(index: int, at: Vector2) -> void:
 			_play("ui_select")
 			_return_page = _page
 			_open(PAGE_CONTROLS)
+		"keeper_help":
+			# `_return_page` is deliberately NOT touched. It still holds where the
+			# key list was opened from, and this page always goes back to that key
+			# list, so overwriting it here would strand the player on Commandes.
+			_play("ui_select")
+			_open(PAGE_KEEPER)
 		"resume":
 			_play("ui_back")
 			close()
@@ -849,6 +946,10 @@ func _activate(index: int, at: Vector2) -> void:
 
 func _back() -> void:
 	match _page:
+		PAGE_KEEPER:
+			# One entry point, so one way out, hardcoded rather than remembered.
+			_play("ui_back")
+			_open(PAGE_CONTROLS)
 		PAGE_SETTINGS, PAGE_CONTROLS:
 			_play("ui_back")
 			_open(_return_page)

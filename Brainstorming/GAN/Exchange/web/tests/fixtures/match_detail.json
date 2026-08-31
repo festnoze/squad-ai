@@ -1,0 +1,225 @@
+{
+  "match_id": "m-election-20260827-01",
+  "tournament_id": "T-apitest-0001",
+  "template_id": "election",
+  "template_version": "1.0.0",
+  "seed": 20260827,
+  "ticks_total": 48,
+  "n_markets": 5,
+  "n_agents": 6,
+  "journal_hash": "14be686342fc46b536dd6e16effafa22be42af62b76f91a7e8841b67e98827f6",
+  "held_out": false,
+  "finished": true,
+  "winner_agent_id": "A1",
+  "winner_harness_key": "fundamentalist@1.0.0+d02066bc",
+  "config": {
+    "action_version": "1.0",
+    "bankruptcy_equity_floor_cents": 0,
+    "bankruptcy_free_cash_floor_cents": 0,
+    "engine_version": "1.0.0",
+    "initial_cash_cents": 1000000,
+    "liquidity_profile_name": "standard",
+    "market_band_cents": 10,
+    "max_active_orders_per_market": 10,
+    "max_orders_per_action": 20,
+    "message_max_chars": 280,
+    "mm": {
+      "base_spread_cents": 6,
+      "enabled": true,
+      "inventory_max": 300,
+      "post_news_widen_ticks": 2,
+      "quote_qty": 25,
+      "skew_cents": 4,
+      "widen_multiplier": 2
+    },
+    "mm_initial_cash_cents": 10000000,
+    "n_agents": 6,
+    "n_markets": 5,
+    "obs_version": "1.0",
+    "ref_history_len": 12,
+    "seed": 20260827,
+    "taker_fee_bps": 0,
+    "talking_mode": false,
+    "ticks_total": 48
+  },
+  "mm_config": {
+    "base_spread_cents": 6,
+    "enabled": true,
+    "inventory_max": 300,
+    "post_news_widen_ticks": 2,
+    "quote_qty": 25,
+    "skew_cents": 4,
+    "widen_multiplier": 2
+  },
+  "markets": [
+    {
+      "market_id": "M1",
+      "question": "Will candidate ADLER win the presidency?",
+      "prior_price": 56,
+      "resolution_tick": 48,
+      "status": "resolved",
+      "outcome": "yes",
+      "correlated_with": [
+        "M2",
+        "M3"
+      ]
+    },
+    {
+      "market_id": "M2",
+      "question": "Will national turnout exceed 60 percent?",
+      "prior_price": 45,
+      "resolution_tick": 48,
+      "status": "resolved",
+      "outcome": "yes",
+      "correlated_with": [
+        "M1",
+        "M3"
+      ]
+    },
+    {
+      "market_id": "M3",
+      "question": "Will ADLER carry the Northern province?",
+      "prior_price": 62,
+      "resolution_tick": 48,
+      "status": "resolved",
+      "outcome": "yes",
+      "correlated_with": [
+        "M1",
+        "M2"
+      ]
+    },
+    {
+      "market_id": "M4",
+      "question": "Will BRAND concede before the final count?",
+      "prior_price": 37,
+      "resolution_tick": 48,
+      "status": "resolved",
+      "outcome": "yes",
+      "correlated_with": [
+        "M5"
+      ]
+    },
+    {
+      "market_id": "M5",
+      "question": "Will the ruling coalition keep its majority?",
+      "prior_price": 55,
+      "resolution_tick": 48,
+      "status": "resolved",
+      "outcome": "yes",
+      "correlated_with": [
+        "M4"
+      ]
+    }
+  ],
+  "agents": [
+    {
+      "agent_id": "A1",
+      "harness_key": "fundamentalist@1.0.0+d02066bc",
+      "kind": "scripted",
+      "display_name": "A1 fundamentalist",
+      "colour_index": 0,
+      "info_profile": "generalist",
+      "ranked": true
+    },
+    {
+      "agent_id": "A2",
+      "harness_key": "momentum@1.0.0+b0c8e992",
+      "kind": "scripted",
+      "display_name": "A2 momentum",
+      "colour_index": 1,
+      "info_profile": "specialist",
+      "ranked": true
+    },
+    {
+      "agent_id": "A3",
+      "harness_key": "noise@1.0.0+79d9167a",
+      "kind": "scripted",
+      "display_name": "A3 noise",
+      "colour_index": 2,
+      "info_profile": "delayed",
+      "ranked": true
+    },
+    {
+      "agent_id": "A4",
+      "harness_key": "zero_intelligence@1.0.0+27607b6d",
+      "kind": "scripted",
+      "display_name": "A4 zero_intelligence",
+      "colour_index": 3,
+      "info_profile": "generalist",
+      "ranked": true
+    },
+    {
+      "agent_id": "A5",
+      "harness_key": "bayesian@1.0.0+e1b145d9",
+      "kind": "scripted",
+      "display_name": "A5 bayesian",
+      "colour_index": 4,
+      "info_profile": "specialist",
+      "ranked": true
+    },
+    {
+      "agent_id": "A6",
+      "harness_key": "mute@1.0.0+ff70ae1c",
+      "kind": "scripted",
+      "display_name": "A6 mute",
+      "colour_index": 5,
+      "info_profile": "delayed",
+      "ranked": true
+    }
+  ],
+  "rankings": [
+    {
+      "rank": 1,
+      "agent_id": "A1",
+      "harness_key": "fundamentalist@1.0.0+d02066bc",
+      "pnl_cents": 10994,
+      "final_cash_cents": 1010994,
+      "pnl_pct_bps": 110
+    },
+    {
+      "rank": 2,
+      "agent_id": "A4",
+      "harness_key": "zero_intelligence@1.0.0+27607b6d",
+      "pnl_cents": 8878,
+      "final_cash_cents": 1008878,
+      "pnl_pct_bps": 89
+    },
+    {
+      "rank": 3,
+      "agent_id": "A5",
+      "harness_key": "bayesian@1.0.0+e1b145d9",
+      "pnl_cents": 7924,
+      "final_cash_cents": 1007924,
+      "pnl_pct_bps": 79
+    },
+    {
+      "rank": 4,
+      "agent_id": "A6",
+      "harness_key": "mute@1.0.0+ff70ae1c",
+      "pnl_cents": 0,
+      "final_cash_cents": 1000000,
+      "pnl_pct_bps": 0
+    },
+    {
+      "rank": 5,
+      "agent_id": "A2",
+      "harness_key": "momentum@1.0.0+b0c8e992",
+      "pnl_cents": -9962,
+      "final_cash_cents": 990038,
+      "pnl_pct_bps": -100
+    },
+    {
+      "rank": 6,
+      "agent_id": "A3",
+      "harness_key": "noise@1.0.0+79d9167a",
+      "pnl_cents": -15977,
+      "final_cash_cents": 984023,
+      "pnl_pct_bps": -160
+    }
+  ],
+  "mm_pnl_cents": -1857,
+  "fees_collected_cents": 0,
+  "event_count": 5438,
+  "liquidity_profile_name": "standard",
+  "talking_mode": false
+}

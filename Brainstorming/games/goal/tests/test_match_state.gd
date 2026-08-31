@@ -118,15 +118,42 @@ static func _rival_under_pressure(player_goals_count: int, rival_shots: int,
 	return rival_goals_count + left_after < player_goals_count
 
 
-## Copy of Shootout.rival_to_kick, on plain integers. `seance` is
-## `mode == Mode.SEANCE`, the only mode with a second side to play.
-static func _rival_owes_a_kick(seance: bool, player_shots: int, player_goals_count: int,
+## Copy of Shootout.rival_to_kick, on plain integers. `two_sided` is
+## `mode == Mode.SEANCE or mode == Mode.DUEL`: the two modes with a second side.
+## DUEL differs only in HOW the turn happens, never in WHEN it is owed, which is
+## the property the duel tests below exist to pin down.
+static func _rival_owes_a_kick(two_sided: bool, player_shots: int, player_goals_count: int,
 		rival_shots: int, rival_goals_count: int) -> bool:
-	if not seance:
+	if not two_sided:
 		return false
 	if _series_decided(player_shots, player_goals_count, rival_shots, rival_goals_count):
 		return false
 	return rival_shots < player_shots
+
+
+## Copy of Shootout.player_keeps. It is deliberately nothing but `rival_to_kick`
+## with the mode in front of it: one rule, one answer, and a duel that cannot
+## drift half a round out of step with a seance.
+static func _player_keeps(duel: bool, player_shots: int, player_goals_count: int,
+		rival_shots: int, rival_goals_count: int) -> bool:
+	if not duel:
+		return false
+	return _rival_owes_a_kick(true, player_shots, player_goals_count,
+		rival_shots, rival_goals_count)
+
+
+## Copy of Shootout.mode_label, without the autoload.
+static func _mode_label(mode_id: int) -> String:
+	match mode_id:
+		0:
+			return "Seance"
+		1:
+			return "Entrainement"
+		2:
+			return "Defi"
+		3:
+			return "Duel"
+	return "Seance"
 
 
 static func _rival_verdict(rng_seed: int, keeper_level: int, pressure: bool) -> int:
@@ -603,6 +630,154 @@ func test_the_pressure_branch_is_alive_over_a_whole_campaign() -> void:
 	var share := float(tense) / float(maxi(kicks, 1))
 	between(share, 0.05, 0.40,
 		"la pression doit etre une branche vivante, ni morte ni permanente (%.3f)" % share)
+	done()
+
+
+# --- Mode DUEL: the roles alternate, the rules do not ----------------------
+
+func test_the_four_modes_all_have_a_label() -> void:
+	var seen := PackedStringArray()
+	for mode_id in 4:
+		var label := _mode_label(mode_id)
+		check(label.length() > 3, "un mode doit avoir un libelle lisible")
+		check(not seen.has(label), "le libelle de mode '%s' est utilise deux fois" % label)
+		seen.append(label)
+	eq(_mode_label(3), "Duel", "le quatrieme mode est le duel")
+	# DUEL is APPENDED and must stay at 3: the mode is persisted in the settings
+	# file by NUMBER, so renumbering it restarts somebody's campaign elsewhere.
+	eq(_mode_label(99), "Seance", "un mode inconnu retombe sur la seance")
+	done()
+
+
+func test_a_duel_alternates_taker_and_keeper() -> void:
+	# The whole promise of the mode, on the rule itself rather than on a picture:
+	# odd rounds the player shoots, even rounds he keeps. Nothing here is a duel
+	# specific rule, and that is the point: it is rival_to_kick with the mode in
+	# front of it, so a duel cannot invent a turn a seance would not owe.
+	check(not _player_keeps(true, 0, 0, 0, 0), "au premier tour c'est le joueur qui tire")
+	check(_player_keeps(true, 1, 1, 0, 0), "apres son tir, le joueur passe dans les buts")
+	check(not _player_keeps(true, 1, 1, 1, 1), "et il ne garde pas deux tours de suite")
+	check(_player_keeps(true, 2, 1, 1, 1), "troisieme tir joue, quatrieme tour garde")
+	# The other three modes never hand him the gloves.
+	check(not _player_keeps(false, 1, 1, 0, 0), "hors duel le joueur ne garde jamais")
+	# And DUEL owes its kicks on exactly the same clock a SEANCE does.
+	for shots in 5:
+		eq(_player_keeps(true, shots + 1, shots, shots, shots),
+			_rival_owes_a_kick(true, shots + 1, shots, shots, shots),
+			"garder, c'est exactement le tour que le rival devait")
+	done()
+
+
+func test_a_decided_duel_never_plays_a_dead_round() -> void:
+	# take_rival_kick_played answers -1 on exactly the same condition
+	# take_rival_kick does, so a series already won is not followed by a penalty
+	# the player would be asked to save for nothing.
+	check(_series_decided(4, 4, 3, 0), "4-0 en quatre tirs contre trois : c'est plie")
+	check(not _player_keeps(true, 4, 4, 3, 0), "une seance gagnee ne donne pas un tour a garder")
+	check(not _player_keeps(true, 4, 0, 3, 4), "une seance perdue non plus")
+	# Sudden death: the answering kick is owed, and he keeps for exactly one.
+	check(_player_keeps(true, 6, 4, 5, 3), "en mort subite le joueur garde la reponse")
+	check(not _player_keeps(true, 6, 4, 6, 3), "et une seule fois")
+	done()
+
+
+func test_a_whole_duel_alternates_sides_and_terminates() -> void:
+	# The same regression this file already guards for a seance, played from both
+	# ends: one line of the scoreboard per beat, never two, and never a beat after
+	# the series is settled. The verdicts are the cheap stand in, because what is
+	# under test is the ORDER of the turns and which side owns each of them.
+	for run in 300:
+		var player: Array[int] = []
+		var rival: Array[int] = []
+		var beats := 0
+		var kept := 0
+		var taken := 0
+		var last_side_kept := true
+		while not _series_decided(player.size(), _goals_in(player), rival.size(), _goals_in(rival)):
+			beats += 1
+			if beats > 60:
+				break
+			var keeping := _player_keeps(true, player.size(), _goals_in(player),
+				rival.size(), _goals_in(rival))
+			# Strict alternation: the same side never plays two beats running.
+			check(keeping != last_side_kept, "les deux roles doivent alterner tour a tour")
+			last_side_kept = keeping
+			if keeping:
+				kept += 1
+				rival.append(_cheap_verdict(run * 977 + beats * 29 + 1))
+			else:
+				taken += 1
+				player.append(_cheap_verdict(run * 131 + beats * 17))
+			check(rival.size() <= player.size(), "le tireur adverse ne passe jamais devant")
+			check(player.size() - rival.size() <= 1, "le joueur ne prend pas deux tirs d'avance")
+		eq(kept, rival.size(), "chaque tour garde remplit exactement une case adverse")
+		eq(taken, player.size(), "chaque tour tire remplit exactement une case du joueur")
+		check(beats <= 60, "un duel doit se terminer en un nombre raisonnable de tours")
+		check(_series_decided(player.size(), _goals_in(player), rival.size(), _goals_in(rival)),
+			"la boucle ne s'arrete que sur une decision")
+		ne(_goals_in(player), _goals_in(rival), "un duel decide n'est jamais un match nul")
+	done()
+
+
+# --- The taker moved out, and moved out WITHOUT MOVING ---------------------
+
+func test_the_moved_taker_is_the_same_taker() -> void:
+	# THE ONE GUARD THAT MATTERS FOR THE MOVE. The choice of penalty left this
+	# file for TakerAi so that a duel and a seance kick with one taker. That is
+	# only free if the moved code draws the SAME numbers in the SAME order: the
+	# four measured rows of conversion in CONTRACTS 2.9 are a property of that
+	# order and of nothing else. `_rival_plan` below is the shipped body, kept
+	# here verbatim, and it is now the reference the production module is held to.
+	for i in 24:
+		var s := 880_003 + i * 7919
+		var pressure := i % 3 == 0
+		var rng := RandomNumberGenerator.new()
+		rng.seed = s
+		var mine := _rival_plan(rng, pressure)
+		# The very next draw after the plan: the keeper's shuffle used to come off
+		# this same stream, at this exact position.
+		var dance := 0.30 + 0.70 * rng.randf()
+
+		var theirs: Dictionary = TakerAi.choose(s, TakerAi.SEANCE_LEVEL, pressure, 0.0)
+		var wanted: Vector2 = mine["aim"]
+		var got: Vector2 = theirs.get("aim", Vector2(9.0, 9.0))
+		near(got.x, wanted.x, 0.000001, "la visee du tireur deplace a bouge en x")
+		near(got.y, wanted.y, 0.000001, "la visee du tireur deplace a bouge en y")
+		near(float(theirs.get("power", 9.0)), float(mine["power"]), 0.000001,
+			"la puissance du tireur deplace a bouge")
+		near(float(theirs.get("release", 9.0)), float(mine["release"]), 0.000001,
+			"la qualite de frappe du tireur deplace a bouge")
+		near(float(theirs.get("side", 9.0)), 0.0, 0.000001,
+			"le tireur d'une seance n'enroule pas")
+		near(float(theirs.get("lift", 9.0)), 0.0, 0.000001,
+			"le tireur d'une seance ne leve pas non plus")
+		near(float(theirs.get("sweet_centre", 9.0)), _RIVAL_SWEET, 0.000001,
+			"la fenetre de frappe propre a bouge")
+		near(TakerAi.dance_phase(s, TakerAi.SEANCE_LEVEL, pressure), dance, 0.000001,
+			"la danse du gardien ne sort plus au meme endroit du tirage")
+	done()
+
+
+func test_the_taker_only_ever_sees_the_keepers_x() -> void:
+	# The line dance is worth doing, and it is not worth everything. A shade is
+	# bounded and small against the width of the goal: a taker who always went to
+	# the opposite corner would make the dance all powerful, which is the mirror
+	# of the defect it exists to fix.
+	var middle: Dictionary = TakerAi.read_keeper(0.0, TakerAi.Level.PRO, 4_242_001)
+	near(float(middle.get("shift", 9.0)), 0.0, 0.000001,
+		"un gardien au milieu ne deplace aucune intention")
+	near(float(middle.get("rattle", 9.0)), 0.0, 0.000001,
+		"et il ne trouble personne non plus")
+	for level in 4:
+		for x: float in [-0.9, -0.4, 0.4, 0.9]:
+			var read: Dictionary = TakerAi.read_keeper(x, level, 4_242_001 + level)
+			var shift := float(read.get("shift", 99.0))
+			check(absf(shift) <= TakerAi.MAX_SHIFT + 0.000001,
+				"le decalage de visee doit rester borne (%.2f m)" % shift)
+			check(absf(shift) < Field.GOAL_HALF,
+				"un decalage plus large que le but rendrait la danse toute puissante")
+			between(float(read.get("rattle", 99.0)), 0.0, 1.0,
+				"le trouble du tireur est une fraction")
 	done()
 
 

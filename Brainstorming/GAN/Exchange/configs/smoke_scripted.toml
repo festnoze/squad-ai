@@ -1,0 +1,29 @@
+# The free smoke tournament: scripted agents only, no provider call, no cost.
+#
+# Five scripted harnesses at four seats gives C(5, 4) = 5 matchups on three
+# seeds, that is fifteen 24 tick matches. This is the preset to run when
+# verifying that a machine can chain matches unattended, and it is what the
+# orchestrator's own crash recovery test is shaped like.
+
+tournament_id = "T-smoke-0001"
+format = "round_robin"
+template_ids = ["election"]
+seeds = [101, 202, 303]
+agents_per_match = 4
+rounds = 1
+background_baselines = ["fundamentalist", "momentum", "noise", "zero_intelligence"]
+max_cost_usd = 0.0
+
+[match_defaults]
+ticks_total = 24
+n_agents = 4
+n_markets = 2
+liquidity_profile_name = "standard"
+
+[gateway]
+timeout_s = 30.0
+
+[[harnesses]]
+harness_id = "bayesian"
+version = "baseline-1"
+kind = "scripted"

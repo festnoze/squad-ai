@@ -19,6 +19,8 @@ const SUITES: PackedStringArray = [
 	"res://tests/test_pitch_geometry.gd",
 	"res://tests/test_aero.gd",
 	"res://tests/test_keeper_brain.gd",
+	"res://tests/test_keeper_input.gd",
+	"res://tests/test_taker_ai.gd",
 	"res://tests/test_match_state.gd",
 	"res://tests/test_meshes.gd",
 	"res://tests/test_character_models.gd",

@@ -1,0 +1,31 @@
+# An exhibition: one challenger against a fixed field (PRD section 8).
+#
+# The challenger always sits at A1 and the field is the background population, in
+# the order it is declared. Exhibition matches are never rated: a novelty match
+# against a curated field is not evidence about the field.
+
+tournament_id = "T-exhibition-0001"
+format = "exhibition"
+template_ids = ["league"]
+seeds = [777001, 777002, 777003]
+agents_per_match = 5
+rounds = 1
+background_baselines = ["fundamentalist", "momentum", "noise", "zero_intelligence"]
+max_cost_usd = 5.0
+
+[match_defaults]
+ticks_total = 48
+n_agents = 5
+n_markets = 4
+liquidity_profile_name = "illiquid"
+
+[gateway]
+timeout_s = 60.0
+max_budget_usd_per_tournament = 5.0
+
+[[harnesses]]
+harness_id = "sonnet5-challenger"
+version = "2.0.0"
+kind = "llm"
+model = "claude-sonnet-5"
+system_prompt = "You are the challenger. Beat the scripted field."

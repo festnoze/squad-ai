@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.py[cod]
+web/node_modules/
+web/.next/
+web/dist/
+web/.wrangler/
+.env
+*.log

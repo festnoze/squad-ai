@@ -1,0 +1,51 @@
+{
+  "id": "trump-2016",
+  "question": "Will Donald Trump win the 2016 US presidential election?",
+  "category": "politics",
+  "source": "reconstructed",
+  "resolution": 1,
+  "resolved_date": "2016-11-08",
+  "notes": "An underdog the whole race; the price only crossed 50 late on election night.",
+  "prices": [
+    {
+      "t": "2016-06-01",
+      "price": 25
+    },
+    {
+      "t": "2016-08-01",
+      "price": 22
+    },
+    {
+      "t": "2016-09-15",
+      "price": 30
+    },
+    {
+      "t": "2016-10-08",
+      "price": 16
+    },
+    {
+      "t": "2016-11-01",
+      "price": 35
+    },
+    {
+      "t": "2016-11-07",
+      "price": 34
+    },
+    {
+      "t": "2016-11-08T20:00",
+      "price": 30
+    },
+    {
+      "t": "2016-11-08T23:00",
+      "price": 62
+    },
+    {
+      "t": "2016-11-09T01:00",
+      "price": 88
+    },
+    {
+      "t": "2016-11-09T03:00",
+      "price": 97
+    }
+  ]
+}

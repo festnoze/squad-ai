@@ -1,0 +1,59 @@
+{
+  "id": "brexit-2016",
+  "question": "Will the UK vote to leave the EU in the June 2016 referendum?",
+  "category": "politics",
+  "source": "reconstructed",
+  "resolution": 1,
+  "resolved_date": "2016-06-24",
+  "notes": "The market priced Remain all spring; Leave was a genuine upset that only gapped in on the night.",
+  "prices": [
+    {
+      "t": "2016-02-01",
+      "price": 32
+    },
+    {
+      "t": "2016-03-15",
+      "price": 34
+    },
+    {
+      "t": "2016-04-15",
+      "price": 30
+    },
+    {
+      "t": "2016-05-15",
+      "price": 26
+    },
+    {
+      "t": "2016-06-10",
+      "price": 28
+    },
+    {
+      "t": "2016-06-20",
+      "price": 24
+    },
+    {
+      "t": "2016-06-23T20:00",
+      "price": 22
+    },
+    {
+      "t": "2016-06-23T23:00",
+      "price": 30
+    },
+    {
+      "t": "2016-06-24T01:00",
+      "price": 55
+    },
+    {
+      "t": "2016-06-24T03:00",
+      "price": 84
+    },
+    {
+      "t": "2016-06-24T06:00",
+      "price": 95
+    },
+    {
+      "t": "2016-06-24T08:00",
+      "price": 98
+    }
+  ]
+}

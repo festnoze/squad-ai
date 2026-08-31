@@ -1,0 +1,792 @@
+{
+  "match_id": "m-election-20260827-01",
+  "tick": 12,
+  "open_market_ids": [
+    "M1",
+    "M2",
+    "M3",
+    "M4",
+    "M5"
+  ],
+  "markets": [
+    {
+      "market_id": "M1",
+      "status": "open",
+      "ref_price": 65,
+      "ref_source": "mid",
+      "mid_price": 65,
+      "best_bid": 64,
+      "best_ask": 65,
+      "last_price": 69,
+      "bids": [
+        {
+          "price": 64,
+          "qty": 8
+        },
+        {
+          "price": 63,
+          "qty": 25
+        },
+        {
+          "price": 61,
+          "qty": 25
+        }
+      ],
+      "asks": [
+        {
+          "price": 65,
+          "qty": 80
+        },
+        {
+          "price": 67,
+          "qty": 43
+        },
+        {
+          "price": 69,
+          "qty": 40
+        }
+      ],
+      "bid_depth_qty": 729,
+      "ask_depth_qty": 326,
+      "tick_volume_qty": 0,
+      "mm_bid": 61,
+      "mm_ask": 73,
+      "mm_widened": true
+    },
+    {
+      "market_id": "M2",
+      "status": "open",
+      "ref_price": 46,
+      "ref_source": "mid",
+      "mid_price": 46,
+      "best_bid": 44,
+      "best_ask": 48,
+      "last_price": 42,
+      "bids": [
+        {
+          "price": 44,
+          "qty": 120
+        },
+        {
+          "price": 42,
+          "qty": 75
+        },
+        {
+          "price": 40,
+          "qty": 23
+        }
+      ],
+      "asks": [
+        {
+          "price": 48,
+          "qty": 25
+        }
+      ],
+      "bid_depth_qty": 355,
+      "ask_depth_qty": 25,
+      "tick_volume_qty": 0,
+      "mm_bid": 36,
+      "mm_ask": 48,
+      "mm_widened": true
+    },
+    {
+      "market_id": "M3",
+      "status": "open",
+      "ref_price": 61,
+      "ref_source": "mid",
+      "mid_price": 61,
+      "best_bid": 60,
+      "best_ask": 62,
+      "last_price": 60,
+      "bids": [
+        {
+          "price": 60,
+          "qty": 101
+        },
+        {
+          "price": 58,
+          "qty": 49
+        },
+        {
+          "price": 25,
+          "qty": 25
+        }
+      ],
+      "asks": [
+        {
+          "price": 62,
+          "qty": 90
+        },
+        {
+          "price": 64,
+          "qty": 41
+        },
+        {
+          "price": 66,
+          "qty": 151
+        }
+      ],
+      "bid_depth_qty": 194,
+      "ask_depth_qty": 751,
+      "tick_volume_qty": 129,
+      "mm_bid": 25,
+      "mm_ask": 37,
+      "mm_widened": true
+    },
+    {
+      "market_id": "M4",
+      "status": "open",
+      "ref_price": 43,
+      "ref_source": "mid",
+      "mid_price": 43,
+      "best_bid": 40,
+      "best_ask": 46,
+      "last_price": 41,
+      "bids": [
+        {
+          "price": 40,
+          "qty": 152
+        },
+        {
+          "price": 35,
+          "qty": 43
+        },
+        {
+          "price": 19,
+          "qty": 56
+        }
+      ],
+      "asks": [
+        {
+          "price": 46,
+          "qty": 65
+        },
+        {
+          "price": 47,
+          "qty": 121
+        },
+        {
+          "price": 52,
+          "qty": 15
+        }
+      ],
+      "bid_depth_qty": 354,
+      "ask_depth_qty": 1290,
+      "tick_volume_qty": 160,
+      "mm_bid": 40,
+      "mm_ask": 46,
+      "mm_widened": false
+    },
+    {
+      "market_id": "M5",
+      "status": "open",
+      "ref_price": 65,
+      "ref_source": "mid",
+      "mid_price": 65,
+      "best_bid": 64,
+      "best_ask": 66,
+      "last_price": 67,
+      "bids": [
+        {
+          "price": 64,
+          "qty": 180
+        },
+        {
+          "price": 62,
+          "qty": 25
+        },
+        {
+          "price": 60,
+          "qty": 90
+        }
+      ],
+      "asks": [
+        {
+          "price": 66,
+          "qty": 32
+        },
+        {
+          "price": 67,
+          "qty": 131
+        },
+        {
+          "price": 68,
+          "qty": 25
+        }
+      ],
+      "bid_depth_qty": 837,
+      "ask_depth_qty": 188,
+      "tick_volume_qty": 19,
+      "mm_bid": 62,
+      "mm_ask": 68,
+      "mm_widened": false
+    }
+  ],
+  "accounts": [
+    {
+      "account_id": "A1",
+      "cash_cents": 1029468,
+      "reserved_cents": 101206,
+      "free_cash_cents": 928262,
+      "equity_cents": 1013139,
+      "frozen": false,
+      "resting_order_count": 15,
+      "positions": [
+        {
+          "market_id": "M1",
+          "qty": -110,
+          "cost_basis_cents": -10295
+        },
+        {
+          "market_id": "M2",
+          "qty": -187,
+          "cost_basis_cents": -8082
+        },
+        {
+          "market_id": "M3",
+          "qty": -7,
+          "cost_basis_cents": -2166
+        },
+        {
+          "market_id": "M4",
+          "qty": -200,
+          "cost_basis_cents": -15575
+        },
+        {
+          "market_id": "M5",
+          "qty": 130,
+          "cost_basis_cents": 6650
+        }
+      ]
+    },
+    {
+      "account_id": "A2",
+      "cash_cents": 969332,
+      "reserved_cents": 59887,
+      "free_cash_cents": 909445,
+      "equity_cents": 980857,
+      "frozen": false,
+      "resting_order_count": 15,
+      "positions": [
+        {
+          "market_id": "M1",
+          "qty": 207,
+          "cost_basis_cents": 19233
+        },
+        {
+          "market_id": "M2",
+          "qty": -100,
+          "cost_basis_cents": -3516
+        },
+        {
+          "market_id": "M3",
+          "qty": -90,
+          "cost_basis_cents": -2383
+        },
+        {
+          "market_id": "M4",
+          "qty": 220,
+          "cost_basis_cents": 18325
+        },
+        {
+          "market_id": "M5",
+          "qty": -20,
+          "cost_basis_cents": -991
+        }
+      ]
+    },
+    {
+      "account_id": "A3",
+      "cash_cents": 1007236,
+      "reserved_cents": 33157,
+      "free_cash_cents": 974079,
+      "equity_cents": 1000077,
+      "frozen": false,
+      "resting_order_count": 12,
+      "positions": [
+        {
+          "market_id": "M1",
+          "qty": -45,
+          "cost_basis_cents": -3334
+        },
+        {
+          "market_id": "M2",
+          "qty": -32,
+          "cost_basis_cents": -1239
+        },
+        {
+          "market_id": "M3",
+          "qty": 23,
+          "cost_basis_cents": 1566
+        },
+        {
+          "market_id": "M4",
+          "qty": -50,
+          "cost_basis_cents": -2927
+        },
+        {
+          "market_id": "M5",
+          "qty": -31,
+          "cost_basis_cents": -1302
+        }
+      ]
+    },
+    {
+      "account_id": "A4",
+      "cash_cents": 987517,
+      "reserved_cents": 16346,
+      "free_cash_cents": 971171,
+      "equity_cents": 995807,
+      "frozen": false,
+      "resting_order_count": 10,
+      "positions": [
+        {
+          "market_id": "M1",
+          "qty": -45,
+          "cost_basis_cents": -2025
+        },
+        {
+          "market_id": "M2",
+          "qty": 114,
+          "cost_basis_cents": 5091
+        },
+        {
+          "market_id": "M3",
+          "qty": 115,
+          "cost_basis_cents": 7535
+        },
+        {
+          "market_id": "M4",
+          "qty": 77,
+          "cost_basis_cents": 5067
+        },
+        {
+          "market_id": "M5",
+          "qty": -67,
+          "cost_basis_cents": -3185
+        }
+      ]
+    },
+    {
+      "account_id": "A5",
+      "cash_cents": 998492,
+      "reserved_cents": 71631,
+      "free_cash_cents": 926861,
+      "equity_cents": 1011857,
+      "frozen": false,
+      "resting_order_count": 19,
+      "positions": [
+        {
+          "market_id": "M1",
+          "qty": 18,
+          "cost_basis_cents": -1804
+        },
+        {
+          "market_id": "M2",
+          "qty": 208,
+          "cost_basis_cents": 8157
+        },
+        {
+          "market_id": "M3",
+          "qty": 9,
+          "cost_basis_cents": -2277
+        },
+        {
+          "market_id": "M4",
+          "qty": -59,
+          "cost_basis_cents": -6206
+        },
+        {
+          "market_id": "M5",
+          "qty": 71,
+          "cost_basis_cents": 3638
+        }
+      ]
+    },
+    {
+      "account_id": "A6",
+      "cash_cents": 1000000,
+      "reserved_cents": 0,
+      "free_cash_cents": 1000000,
+      "equity_cents": 1000000,
+      "frozen": false,
+      "resting_order_count": 0,
+      "positions": []
+    },
+    {
+      "account_id": "MM",
+      "cash_cents": 10007955,
+      "reserved_cents": 25825,
+      "free_cash_cents": 9982130,
+      "equity_cents": 9998263,
+      "frozen": false,
+      "resting_order_count": 9,
+      "positions": [
+        {
+          "market_id": "M1",
+          "qty": -25,
+          "cost_basis_cents": -1775
+        },
+        {
+          "market_id": "M2",
+          "qty": -3,
+          "cost_basis_cents": -411
+        },
+        {
+          "market_id": "M3",
+          "qty": -50,
+          "cost_basis_cents": -2275
+        },
+        {
+          "market_id": "M4",
+          "qty": 12,
+          "cost_basis_cents": 1316
+        },
+        {
+          "market_id": "M5",
+          "qty": -83,
+          "cost_basis_cents": -4810
+        }
+      ]
+    },
+    {
+      "account_id": "FEES",
+      "cash_cents": 0,
+      "reserved_cents": 0,
+      "free_cash_cents": 0,
+      "equity_cents": 0,
+      "frozen": false,
+      "resting_order_count": 0,
+      "positions": []
+    }
+  ],
+  "news": [
+    {
+      "news_id": "n-012-00",
+      "market_ids": [
+        "M1",
+        "M2",
+        "M3"
+      ],
+      "headline": "Rowan Bureau on M1, M2, M3: reading at 47 percent",
+      "body": "Will candidate ADLER win the presidency? Published at tick 12 by Rowan Bureau. Latest public reading: 47 percent. Coverage: M1, M2, M3.",
+      "impact": "high",
+      "is_noise": false,
+      "origin": "info_engine"
+    },
+    {
+      "news_id": "n-012-01",
+      "market_ids": [
+        "M3"
+      ],
+      "headline": "Rowan Bureau on M3: reading at 86 percent",
+      "body": "Will ADLER carry the Northern province? Published at tick 12 by Rowan Bureau. Latest public reading: 86 percent. Coverage: M3.",
+      "impact": "low",
+      "is_noise": true,
+      "origin": "info_engine"
+    }
+  ],
+  "signals": [
+    {
+      "signal_id": "s-012-A1-00",
+      "agent_id": "A1",
+      "market_id": "M1",
+      "kind": "point_estimate",
+      "value_milli": 655,
+      "precision_ppm": 840336
+    },
+    {
+      "signal_id": "s-012-A1-01",
+      "agent_id": "A1",
+      "market_id": "M5",
+      "kind": "point_estimate",
+      "value_milli": 757,
+      "precision_ppm": 839630
+    },
+    {
+      "signal_id": "s-012-A2-00",
+      "agent_id": "A2",
+      "market_id": "M3",
+      "kind": "direction",
+      "value_milli": 1000,
+      "precision_ppm": 924214
+    },
+    {
+      "signal_id": "s-012-A3-00",
+      "agent_id": "A3",
+      "market_id": "M5",
+      "kind": "point_estimate",
+      "value_milli": 547,
+      "precision_ppm": 837520
+    },
+    {
+      "signal_id": "s-012-A5-00",
+      "agent_id": "A5",
+      "market_id": "M2",
+      "kind": "direction",
+      "value_milli": 1000,
+      "precision_ppm": 796812
+    },
+    {
+      "signal_id": "s-012-A6-00",
+      "agent_id": "A6",
+      "market_id": "M3",
+      "kind": "point_estimate",
+      "value_milli": 690,
+      "precision_ppm": 830564
+    }
+  ],
+  "trades": [
+    {
+      "trade_id": "t-000088",
+      "market_id": "M3",
+      "price": 37,
+      "qty": 25,
+      "maker_agent_id": "MM",
+      "taker_agent_id": "A5",
+      "taker_side": "buy"
+    },
+    {
+      "trade_id": "t-000089",
+      "market_id": "M3",
+      "price": 60,
+      "qty": 4,
+      "maker_agent_id": "A2",
+      "taker_agent_id": "A5",
+      "taker_side": "buy"
+    },
+    {
+      "trade_id": "t-000090",
+      "market_id": "M4",
+      "price": 46,
+      "qty": 60,
+      "maker_agent_id": "A2",
+      "taker_agent_id": "A5",
+      "taker_side": "buy"
+    },
+    {
+      "trade_id": "t-000091",
+      "market_id": "M5",
+      "price": 67,
+      "qty": 19,
+      "maker_agent_id": "A3",
+      "taker_agent_id": "A5",
+      "taker_side": "sell"
+    },
+    {
+      "trade_id": "t-000092",
+      "market_id": "M3",
+      "price": 60,
+      "qty": 100,
+      "maker_agent_id": "A5",
+      "taker_agent_id": "A2",
+      "taker_side": "sell"
+    },
+    {
+      "trade_id": "t-000093",
+      "market_id": "M4",
+      "price": 41,
+      "qty": 100,
+      "maker_agent_id": "A2",
+      "taker_agent_id": "A1",
+      "taker_side": "buy"
+    }
+  ],
+  "predictions": [
+    {
+      "agent_id": "A1",
+      "market_id": "M1",
+      "p_yes_ppm": 610426,
+      "carried": false
+    },
+    {
+      "agent_id": "A1",
+      "market_id": "M2",
+      "p_yes_ppm": 588777,
+      "carried": false
+    },
+    {
+      "agent_id": "A1",
+      "market_id": "M3",
+      "p_yes_ppm": 641266,
+      "carried": false
+    },
+    {
+      "agent_id": "A1",
+      "market_id": "M4",
+      "p_yes_ppm": 524643,
+      "carried": false
+    },
+    {
+      "agent_id": "A1",
+      "market_id": "M5",
+      "p_yes_ppm": 767875,
+      "carried": false
+    },
+    {
+      "agent_id": "A2",
+      "market_id": "M1",
+      "p_yes_ppm": 670000,
+      "carried": false
+    },
+    {
+      "agent_id": "A2",
+      "market_id": "M2",
+      "p_yes_ppm": 420000,
+      "carried": false
+    },
+    {
+      "agent_id": "A2",
+      "market_id": "M3",
+      "p_yes_ppm": 530000,
+      "carried": false
+    },
+    {
+      "agent_id": "A2",
+      "market_id": "M4",
+      "p_yes_ppm": 280000,
+      "carried": false
+    },
+    {
+      "agent_id": "A2",
+      "market_id": "M5",
+      "p_yes_ppm": 750000,
+      "carried": false
+    },
+    {
+      "agent_id": "A3",
+      "market_id": "M1",
+      "p_yes_ppm": 600607,
+      "carried": false
+    },
+    {
+      "agent_id": "A3",
+      "market_id": "M2",
+      "p_yes_ppm": 302474,
+      "carried": false
+    },
+    {
+      "agent_id": "A3",
+      "market_id": "M3",
+      "p_yes_ppm": 449122,
+      "carried": false
+    },
+    {
+      "agent_id": "A3",
+      "market_id": "M4",
+      "p_yes_ppm": 549525,
+      "carried": false
+    },
+    {
+      "agent_id": "A3",
+      "market_id": "M5",
+      "p_yes_ppm": 549380,
+      "carried": false
+    },
+    {
+      "agent_id": "A4",
+      "market_id": "M1",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "agent_id": "A4",
+      "market_id": "M2",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "agent_id": "A4",
+      "market_id": "M3",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "agent_id": "A4",
+      "market_id": "M4",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "agent_id": "A4",
+      "market_id": "M5",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "agent_id": "A5",
+      "market_id": "M1",
+      "p_yes_ppm": 679984,
+      "carried": false
+    },
+    {
+      "agent_id": "A5",
+      "market_id": "M2",
+      "p_yes_ppm": 446502,
+      "carried": false
+    },
+    {
+      "agent_id": "A5",
+      "market_id": "M3",
+      "p_yes_ppm": 645640,
+      "carried": false
+    },
+    {
+      "agent_id": "A5",
+      "market_id": "M4",
+      "p_yes_ppm": 479822,
+      "carried": false
+    },
+    {
+      "agent_id": "A5",
+      "market_id": "M5",
+      "p_yes_ppm": 597615,
+      "carried": false
+    },
+    {
+      "agent_id": "A6",
+      "market_id": "M1",
+      "p_yes_ppm": 670000,
+      "carried": false
+    },
+    {
+      "agent_id": "A6",
+      "market_id": "M2",
+      "p_yes_ppm": 420000,
+      "carried": false
+    },
+    {
+      "agent_id": "A6",
+      "market_id": "M3",
+      "p_yes_ppm": 590000,
+      "carried": false
+    },
+    {
+      "agent_id": "A6",
+      "market_id": "M4",
+      "p_yes_ppm": 440000,
+      "carried": false
+    },
+    {
+      "agent_id": "A6",
+      "market_id": "M5",
+      "p_yes_ppm": 640000,
+      "carried": false
+    }
+  ],
+  "messages": [],
+  "resolutions": [],
+  "highlights": [
+    {
+      "tick": 12,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 6000,
+      "label": "Big trade on M3: A2 took 100 contracts at 60 cents from A5, 6000 cents of notional."
+    }
+  ]
+}

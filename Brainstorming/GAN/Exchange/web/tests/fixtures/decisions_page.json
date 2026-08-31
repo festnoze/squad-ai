@@ -1,0 +1,3205 @@
+{
+  "items": [
+    {
+      "tick": 1,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 558662,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 398411,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 642843,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 358229,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 565718,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 0 orders",
+      "headline": "tick 1 | A1 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 1,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 560000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 620000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 0 orders",
+      "headline": "tick 1 | A2 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 1,
+      "agent_id": "A3",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 486776,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 485638,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 587468,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 268951,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 436262,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 57,
+          "qty": 13,
+          "order_id": "o-000016",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 65,
+          "qty": 12,
+          "order_id": "o-000017",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 2 orders",
+      "headline": "tick 1 | A3 | scripted | 2 place | 0 cancel | 5 predictions | markets M1,M3",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000004"
+      ]
+    },
+    {
+      "tick": 1,
+      "agent_id": "A4",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "sell",
+          "type": "limit",
+          "price": 38,
+          "qty": 43,
+          "order_id": "o-000011",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "buy",
+          "type": "limit",
+          "price": 42,
+          "qty": 43,
+          "order_id": "o-000012",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 88,
+          "qty": 57,
+          "order_id": "o-000013",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 96,
+          "qty": 37,
+          "order_id": "o-000014",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "sell",
+          "type": "limit",
+          "price": 30,
+          "qty": 27,
+          "order_id": "o-000015",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 5 orders",
+      "headline": "tick 1 | A4 | scripted | 5 place | 0 cancel | 5 predictions | markets M1,M2,M3,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000001",
+        "t-000002",
+        "t-000003",
+        "t-000004"
+      ]
+    },
+    {
+      "tick": 1,
+      "agent_id": "A5",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 591014,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 620000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 0 orders",
+      "headline": "tick 1 | A5 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 1,
+      "agent_id": "A6",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 560000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 620000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "headline": "tick 1 | A6 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 2,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 597945,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 388324,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 638944,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 378840,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 561770,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 38,
+          "qty": 100,
+          "order_id": "o-000031",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "sell",
+          "type": "limit",
+          "price": 42,
+          "qty": 60,
+          "order_id": "o-000032",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 88,
+          "qty": 100,
+          "order_id": "o-000033",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 30,
+          "qty": 100,
+          "order_id": "o-000034",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 4 orders",
+      "headline": "tick 2 | A1 | scripted | 4 place | 0 cancel | 5 predictions | markets M1,M2,M3,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000008",
+        "t-000009",
+        "t-000010",
+        "t-000011"
+      ]
+    },
+    {
+      "tick": 2,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 200000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 680000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 490000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 88,
+          "qty": 100,
+          "order_id": "o-000035",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 30,
+          "qty": 100,
+          "order_id": "o-000036",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 2 orders",
+      "headline": "tick 2 | A2 | scripted | 2 place | 0 cancel | 5 predictions | markets M3,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 2,
+      "agent_id": "A3",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 465053,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 365584,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 668177,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 465625,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 373338,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 60,
+          "qty": 36,
+          "order_id": "o-000037",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 35,
+          "qty": 43,
+          "order_id": "o-000038",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 2 orders",
+      "headline": "tick 2 | A3 | scripted | 2 place | 0 cancel | 5 predictions | markets M3,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000012"
+      ]
+    },
+    {
+      "tick": 2,
+      "agent_id": "A4",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 19,
+          "qty": 22,
+          "order_id": "o-000028",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 1,
+          "qty": 19,
+          "order_id": "o-000029",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 56,
+          "qty": 50,
+          "order_id": "o-000030",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 3 orders",
+      "headline": "tick 2 | A4 | scripted | 3 place | 0 cancel | 5 predictions | markets M1,M3,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000005",
+        "t-000006",
+        "t-000007",
+        "t-000008",
+        "t-000009",
+        "t-000011"
+      ]
+    },
+    {
+      "tick": 2,
+      "agent_id": "A5",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 585277,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 623000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 547000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 38,
+          "qty": 150,
+          "order_id": "o-000039",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 88,
+          "qty": 150,
+          "order_id": "o-000040",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 30,
+          "qty": 150,
+          "order_id": "o-000041",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 3 orders",
+      "headline": "tick 2 | A5 | scripted | 3 place | 0 cancel | 5 predictions | markets M1,M3,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 2,
+      "agent_id": "A6",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 380000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 650000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 520000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "headline": "tick 2 | A6 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 3,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 561302,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 350270,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 657161,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 336277,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 601529,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 41,
+          "qty": 100,
+          "order_id": "o-000055",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "sell",
+          "type": "limit",
+          "price": 42,
+          "qty": 100,
+          "order_id": "o-000056",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 60,
+          "qty": 100,
+          "order_id": "o-000057",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 3 orders",
+      "headline": "tick 3 | A1 | scripted | 3 place | 0 cancel | 5 predictions | markets M1,M2,M3",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000016",
+        "t-000017",
+        "t-000018",
+        "t-000019",
+        "t-000020",
+        "t-000021"
+      ]
+    },
+    {
+      "tick": 3,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 240000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 10000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 380000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "sell",
+          "type": "limit",
+          "price": 38,
+          "qty": 100,
+          "order_id": "o-000058",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 1 orders",
+      "headline": "tick 3 | A2 | scripted | 1 place | 0 cancel | 5 predictions | markets M1",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000019",
+        "t-000020"
+      ]
+    },
+    {
+      "tick": 3,
+      "agent_id": "A3",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 372402,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 557810,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 238617,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 350198,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 549248,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "buy",
+          "type": "limit",
+          "price": 45,
+          "qty": 16,
+          "order_id": "o-000061",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 38,
+          "qty": 48,
+          "order_id": "o-000062",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "sell",
+          "type": "limit",
+          "price": 50,
+          "qty": 40,
+          "order_id": "o-000063",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 3 orders",
+      "headline": "tick 3 | A3 | scripted | 3 place | 0 cancel | 5 predictions | markets M2,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000015",
+        "t-000018",
+        "t-000021",
+        "t-000022",
+        "t-000023",
+        "t-000024",
+        "t-000025"
+      ]
+    },
+    {
+      "tick": 3,
+      "agent_id": "A4",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "buy",
+          "type": "limit",
+          "price": 80,
+          "qty": 31,
+          "order_id": "o-000052",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 96,
+          "qty": 32,
+          "order_id": "o-000053",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 1,
+          "qty": 54,
+          "order_id": "o-000054",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 3 orders",
+      "headline": "tick 3 | A4 | scripted | 3 place | 0 cancel | 5 predictions | markets M2,M3,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000013",
+        "t-000014",
+        "t-000015",
+        "t-000017",
+        "t-000024"
+      ]
+    },
+    {
+      "tick": 3,
+      "agent_id": "A5",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 606149,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 589000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 473822,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 41,
+          "qty": 150,
+          "order_id": "o-000059",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 40,
+          "qty": 150,
+          "order_id": "o-000060",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 2 orders",
+      "headline": "tick 3 | A5 | scripted | 2 place | 0 cancel | 5 predictions | markets M1,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000023"
+      ]
+    },
+    {
+      "tick": 3,
+      "agent_id": "A6",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 400000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 310000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 380000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "headline": "tick 3 | A6 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 4,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 551702,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 416871,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 605453,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 398203,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 559590,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 0 orders",
+      "headline": "tick 4 | A1 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000026"
+      ]
+    },
+    {
+      "tick": 4,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 200000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 370000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 860000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 730000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "sell",
+          "type": "limit",
+          "price": 41,
+          "qty": 100,
+          "order_id": "o-000079",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "sell",
+          "type": "limit",
+          "price": 39,
+          "qty": 40,
+          "order_id": "o-000080",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 69,
+          "qty": 80,
+          "order_id": "o-000081",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 3 orders",
+      "headline": "tick 4 | A2 | scripted | 3 place | 0 cancel | 5 predictions | markets M1,M2,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000027",
+        "t-000028"
+      ]
+    },
+    {
+      "tick": 4,
+      "agent_id": "A3",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 473676,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 299364,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 760087,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 592284,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 490007,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 55,
+          "qty": 29,
+          "order_id": "o-000082",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "sell",
+          "type": "limit",
+          "price": 57,
+          "qty": 35,
+          "order_id": "o-000083",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 2 orders",
+      "headline": "tick 4 | A3 | scripted | 2 place | 0 cancel | 5 predictions | markets M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000029"
+      ]
+    },
+    {
+      "tick": 4,
+      "agent_id": "A4",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "sell",
+          "type": "limit",
+          "price": 72,
+          "qty": 27,
+          "order_id": "o-000075",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 75,
+          "qty": 12,
+          "order_id": "o-000076",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 69,
+          "qty": 52,
+          "order_id": "o-000077",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "sell",
+          "type": "limit",
+          "price": 50,
+          "qty": 44,
+          "order_id": "o-000078",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 4 orders",
+      "headline": "tick 4 | A4 | scripted | 4 place | 0 cancel | 5 predictions | markets M1,M3,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000029"
+      ]
+    },
+    {
+      "tick": 4,
+      "agent_id": "A5",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 623025,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 446000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 632000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 490822,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 588615,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "buy",
+          "type": "limit",
+          "price": 42,
+          "qty": 90,
+          "order_id": "o-000074",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 1 orders",
+      "headline": "tick 4 | A5 | scripted | 1 place | 0 cancel | 5 predictions | markets M2",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000026",
+        "t-000027",
+        "t-000028"
+      ]
+    },
+    {
+      "tick": 4,
+      "agent_id": "A6",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 380000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 410000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 740000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 550000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "headline": "tick 4 | A6 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 5,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 563701,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 370815,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 654465,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 333965,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 541181,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 44,
+          "qty": 100,
+          "order_id": "o-000094",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 75,
+          "qty": 100,
+          "order_id": "o-000095",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 69,
+          "qty": 100,
+          "order_id": "o-000096",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 50,
+          "qty": 80,
+          "order_id": "o-000097",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 4 orders",
+      "headline": "tick 5 | A1 | scripted | 4 place | 0 cancel | 5 predictions | markets M1,M3,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000030",
+        "t-000031",
+        "t-000032",
+        "t-000033",
+        "t-000034",
+        "t-000035",
+        "t-000036",
+        "t-000038",
+        "t-000039"
+      ]
+    },
+    {
+      "tick": 5,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 480000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 310000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 910000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 990000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 480000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 44,
+          "qty": 80,
+          "order_id": "o-000098",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "sell",
+          "type": "limit",
+          "price": 36,
+          "qty": 100,
+          "order_id": "o-000099",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 81,
+          "qty": 100,
+          "order_id": "o-000100",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 71,
+          "qty": 100,
+          "order_id": "o-000101",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "sell",
+          "type": "limit",
+          "price": 49,
+          "qty": 20,
+          "order_id": "o-000102",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 5 orders",
+      "headline": "tick 5 | A2 | scripted | 5 place | 0 cancel | 5 predictions | markets M1,M2,M3,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000034",
+        "t-000037",
+        "t-000038",
+        "t-000039",
+        "t-000040",
+        "t-000041",
+        "t-000042",
+        "t-000043",
+        "t-000044",
+        "t-000045"
+      ]
+    },
+    {
+      "tick": 5,
+      "agent_id": "A3",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 314832,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 233839,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 633922,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 798543,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 597163,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 0 orders",
+      "headline": "tick 5 | A3 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 5,
+      "agent_id": "A4",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 63,
+          "qty": 13,
+          "order_id": "o-000108",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 1 orders",
+      "headline": "tick 5 | A4 | scripted | 1 place | 0 cancel | 5 predictions | markets M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000031",
+        "t-000033",
+        "t-000036"
+      ]
+    },
+    {
+      "tick": 5,
+      "agent_id": "A5",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 628025,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 481461,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 636000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 505822,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 583615,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 44,
+          "qty": 150,
+          "order_id": "o-000103",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "buy",
+          "type": "limit",
+          "price": 39,
+          "qty": 150,
+          "order_id": "o-000104",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 75,
+          "qty": 150,
+          "order_id": "o-000105",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 69,
+          "qty": 150,
+          "order_id": "o-000106",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 50,
+          "qty": 150,
+          "order_id": "o-000107",
+          "outcome": "partial",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 5 orders",
+      "headline": "tick 5 | A5 | scripted | 5 place | 0 cancel | 5 predictions | markets M1,M2,M3,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000040",
+        "t-000041",
+        "t-000042",
+        "t-000043",
+        "t-000044",
+        "t-000045"
+      ]
+    },
+    {
+      "tick": 5,
+      "agent_id": "A6",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 430000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 380000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 780000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 700000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "headline": "tick 5 | A6 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 6,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 593745,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 371942,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 656500,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 377529,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 560579,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 63,
+          "qty": 100,
+          "order_id": "o-000121",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 1 orders",
+      "headline": "tick 6 | A1 | scripted | 1 place | 0 cancel | 5 predictions | markets M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000047",
+        "t-000050"
+      ]
+    },
+    {
+      "tick": 6,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 740000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 440000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 990000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 940000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 540000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 63,
+          "qty": 100,
+          "order_id": "o-000122",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 75,
+          "qty": 100,
+          "order_id": "o-000123",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 69,
+          "qty": 100,
+          "order_id": "o-000124",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 3 orders",
+      "headline": "tick 6 | A2 | scripted | 3 place | 0 cancel | 5 predictions | markets M1,M3,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000048",
+        "t-000049",
+        "t-000050",
+        "t-000051"
+      ]
+    },
+    {
+      "tick": 6,
+      "agent_id": "A3",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 444090,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 381029,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 565125,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 672712,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 405886,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 59,
+          "qty": 49,
+          "order_id": "o-000119",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "buy",
+          "type": "limit",
+          "price": 45,
+          "qty": 20,
+          "order_id": "o-000120",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 2 orders",
+      "headline": "tick 6 | A3 | scripted | 2 place | 0 cancel | 5 predictions | markets M1,M2",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000046",
+        "t-000052"
+      ]
+    },
+    {
+      "tick": 6,
+      "agent_id": "A4",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 0 orders",
+      "headline": "tick 6 | A4 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000047"
+      ]
+    },
+    {
+      "tick": 6,
+      "agent_id": "A5",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 643103,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 487461,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 626000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 501822,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 587615,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 63,
+          "qty": 150,
+          "order_id": "o-000125",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 57,
+          "qty": 60,
+          "order_id": "o-000126",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 2 orders",
+      "headline": "tick 6 | A5 | scripted | 2 place | 0 cancel | 5 predictions | markets M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000049",
+        "t-000052",
+        "t-000053"
+      ]
+    },
+    {
+      "tick": 6,
+      "agent_id": "A6",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 570000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 440000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 680000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 660000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 540000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "headline": "tick 6 | A6 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 7,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 525037,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 392367,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 618369,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 396686,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 776416,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "sell",
+          "type": "limit",
+          "price": 63,
+          "qty": 100,
+          "order_id": "o-000143",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 62,
+          "qty": 100,
+          "order_id": "o-000144",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 2 orders",
+      "headline": "tick 7 | A1 | scripted | 2 place | 0 cancel | 5 predictions | markets M1,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000059",
+        "t-000060",
+        "t-000061"
+      ]
+    },
+    {
+      "tick": 7,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 900000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 420000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 640000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 710000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 590000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 64,
+          "qty": 100,
+          "order_id": "o-000145",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 63,
+          "qty": 100,
+          "order_id": "o-000146",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 2 orders",
+      "headline": "tick 7 | A2 | scripted | 2 place | 0 cancel | 5 predictions | markets M1,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000060",
+        "t-000061"
+      ]
+    },
+    {
+      "tick": 7,
+      "agent_id": "A3",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 659409,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 513053,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 559871,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 736992,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 504951,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "sell",
+          "type": "limit",
+          "price": 42,
+          "qty": 53,
+          "order_id": "o-000139",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 64,
+          "qty": 59,
+          "order_id": "o-000140",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 61,
+          "qty": 27,
+          "order_id": "o-000141",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 52,
+          "qty": 31,
+          "order_id": "o-000142",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 4 orders",
+      "headline": "tick 7 | A3 | scripted | 4 place | 0 cancel | 5 predictions | markets M2,M3,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000057",
+        "t-000058"
+      ]
+    },
+    {
+      "tick": 7,
+      "agent_id": "A4",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "buy",
+          "type": "limit",
+          "price": 65,
+          "qty": 12,
+          "order_id": "o-000137",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "sell",
+          "type": "limit",
+          "price": 48,
+          "qty": 46,
+          "order_id": "o-000138",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 2 orders",
+      "headline": "tick 7 | A4 | scripted | 2 place | 0 cancel | 5 predictions | markets M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000054",
+        "t-000055",
+        "t-000056"
+      ]
+    },
+    {
+      "tick": 7,
+      "agent_id": "A5",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 650103,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 425765,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 627000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 498822,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 590615,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 62,
+          "qty": 150,
+          "order_id": "o-000147",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 1 orders",
+      "headline": "tick 7 | A5 | scripted | 1 place | 0 cancel | 5 predictions | markets M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000056"
+      ]
+    },
+    {
+      "tick": 7,
+      "agent_id": "A6",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 640000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 420000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 690000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 630000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 570000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "headline": "tick 7 | A6 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 8,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 549466,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 367249,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 636700,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 427107,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 739547,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "sell",
+          "type": "limit",
+          "price": 64,
+          "qty": 100,
+          "order_id": "o-000160",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 61,
+          "qty": 100,
+          "order_id": "o-000161",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 60,
+          "qty": 100,
+          "order_id": "o-000162",
+          "outcome": "partial",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 3 orders",
+      "headline": "tick 8 | A1 | scripted | 3 place | 0 cancel | 5 predictions | markets M1,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000064",
+        "t-000065",
+        "t-000066"
+      ]
+    },
+    {
+      "tick": 8,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 930000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 440000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 600000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 540000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 620000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 71,
+          "qty": 100,
+          "order_id": "o-000165",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "buy",
+          "type": "limit",
+          "price": 42,
+          "qty": 40,
+          "order_id": "o-000166",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 66,
+          "qty": 100,
+          "order_id": "o-000167",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 61,
+          "qty": 100,
+          "order_id": "o-000168",
+          "outcome": "cancelled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M5",
+          "side": "buy",
+          "type": "limit",
+          "price": 60,
+          "qty": 40,
+          "order_id": "o-000169",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 5 orders",
+      "headline": "tick 8 | A2 | scripted | 5 place | 0 cancel | 5 predictions | markets M1,M2,M3,M4,M5",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000065",
+        "t-000067",
+        "t-000068",
+        "t-000069",
+        "t-000070",
+        "t-000071"
+      ]
+    },
+    {
+      "tick": 8,
+      "agent_id": "A3",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 585030,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 381352,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 722501,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 768105,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 604244,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "sell",
+          "type": "limit",
+          "price": 66,
+          "qty": 58,
+          "order_id": "o-000163",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 60,
+          "qty": 34,
+          "order_id": "o-000164",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 2 orders",
+      "headline": "tick 8 | A3 | scripted | 2 place | 0 cancel | 5 predictions | markets M1,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000063",
+        "t-000067",
+        "t-000069"
+      ]
+    },
+    {
+      "tick": 8,
+      "agent_id": "A4",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "sell",
+          "type": "limit",
+          "price": 41,
+          "qty": 34,
+          "order_id": "o-000170",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "buy",
+          "type": "limit",
+          "price": 82,
+          "qty": 14,
+          "order_id": "o-000171",
+          "outcome": "filled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 2 orders",
+      "headline": "tick 8 | A4 | scripted | 2 place | 0 cancel | 5 predictions | markets M1,M3",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000070",
+        "t-000071",
+        "t-000072"
+      ]
+    },
+    {
+      "tick": 8,
+      "agent_id": "A5",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 659507,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 424765,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 627000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 497822,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 589615,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 66,
+          "qty": 90,
+          "order_id": "o-000158",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 61,
+          "qty": 150,
+          "order_id": "o-000159",
+          "outcome": "partial",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 2 orders",
+      "headline": "tick 8 | A5 | scripted | 2 place | 0 cancel | 5 predictions | markets M3,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000062",
+        "t-000063",
+        "t-000072"
+      ]
+    },
+    {
+      "tick": 8,
+      "agent_id": "A6",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 680000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 410000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 690000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 620000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 560000,
+          "carried": false
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "headline": "tick 8 | A6 | scripted | 0 place | 0 cancel | 5 predictions",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": []
+    },
+    {
+      "tick": 9,
+      "agent_id": "A1",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 629362,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 351762,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 621724,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 470683,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 710743,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M2",
+          "side": "sell",
+          "type": "limit",
+          "price": 42,
+          "qty": 100,
+          "order_id": "o-000187",
+          "outcome": "partial",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 59,
+          "qty": 100,
+          "order_id": "o-000188",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 2 orders",
+      "headline": "tick 9 | A1 | scripted | 2 place | 0 cancel | 5 predictions | markets M2,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000073",
+        "t-000077",
+        "t-000078"
+      ]
+    },
+    {
+      "tick": 9,
+      "agent_id": "A2",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 790000,
+          "carried": false
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 430000,
+          "carried": false
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 620000,
+          "carried": false
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 540000,
+          "carried": false
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 530000,
+          "carried": false
+        }
+      ],
+      "orders": [
+        {
+          "op": "place",
+          "market_id": "M1",
+          "side": "buy",
+          "type": "limit",
+          "price": 72,
+          "qty": 100,
+          "order_id": "o-000184",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M3",
+          "side": "sell",
+          "type": "limit",
+          "price": 64,
+          "qty": 40,
+          "order_id": "o-000185",
+          "outcome": "filled",
+          "reject_reason": null
+        },
+        {
+          "op": "place",
+          "market_id": "M4",
+          "side": "sell",
+          "type": "limit",
+          "price": 59,
+          "qty": 100,
+          "order_id": "o-000186",
+          "outcome": "cancelled",
+          "reject_reason": null
+        }
+      ],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 3 orders",
+      "headline": "tick 9 | A2 | scripted | 3 place | 0 cancel | 5 predictions | markets M1,M3,M4",
+      "timed_out": false,
+      "n_rejected": 0,
+      "trade_ids": [
+        "t-000075",
+        "t-000076",
+        "t-000077"
+      ]
+    }
+  ],
+  "total": 288,
+  "limit": 50,
+  "offset": 0
+}

@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "match_id": "m-election-20260827-01",
+      "tournament_id": "T-apitest-0001",
+      "template_id": "election",
+      "template_version": "1.0.0",
+      "seed": 20260827,
+      "ticks_total": 48,
+      "n_markets": 5,
+      "n_agents": 6,
+      "journal_hash": "14be686342fc46b536dd6e16effafa22be42af62b76f91a7e8841b67e98827f6",
+      "held_out": false,
+      "finished": true,
+      "winner_agent_id": "A1",
+      "winner_harness_key": "fundamentalist@1.0.0+d02066bc"
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}

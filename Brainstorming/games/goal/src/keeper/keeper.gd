@@ -156,6 +156,12 @@ const TWO_HAND_SPAN := 0.52
 ## position left where both of them touch it, and hold_point() then has to leave
 ## the ball sitting between two palms that are not quite on it.
 const CRADLE_HALF := HOLD_OFFSET * 0.90
+## How far a glove seated on a held ball is allowed to sink into it, metres.
+## A padded glove closing on a ball squashes both, and a hand drawn exactly
+## tangent reads as a ball balanced on a fingertip rather than as a ball gripped.
+## Kept small enough that tests/smoke_probe.gd still fails a real puncture: see
+## its MITT_SLACK, which is the ceiling this has to stay under.
+const GRIP_SINK := 0.004
 ## Impact speed, m/s, above which even a caught ball is announced with the hard
 ## glove slap rather than the soft gather. Purely audio.
 const CATCH_LOUD_SPEED := 22.0
@@ -296,6 +302,19 @@ var _saved_sent := false
 var _hold_limb := ""
 var _line_x := 0.0
 var _line_x_frozen := 0.0
+## --- when it is the PLAYER who holds this body (mode DUEL) --------------------
+## While `_player_driven` is set, track() decides nothing: the dive arrives
+## through commit_dive() and the line position through set_line(). EVERYTHING
+## below the decision is untouched, and that is the point of the mode: the pose,
+## the save envelope, the catch, the log and the replay are the same code on both
+## sides of the duel.
+var _player_driven := false
+## Where the caller wants this body to stand on its line. `_line_target_set` is
+## what makes prepare() follow it instead of KeeperBrain.line_dance, and it is
+## deliberately independent of `_player_driven`: the player picks his spot during
+## the placement, before the run up hands him the rest of the body.
+var _line_target := 0.0
+var _line_target_set := false
 ## Step cycle of the line dance, one full unit per two footfalls, and the prepare
 ## clock the last frame, which is how the phase is integrated from a caller that
 ## reports an absolute elapsed time rather than a delta.
@@ -497,6 +516,9 @@ func reset_to_line() -> void:
 	_hold_limb = ""
 	_line_x = 0.0
 	_line_x_frozen = 0.0
+	_player_driven = false
+	_line_target = 0.0
+	_line_target_set = false
 	_step_phase = 0.0
 	_prepare_t = 0.0
 	_idle_t = 0.0
@@ -525,9 +547,6 @@ func prepare(elapsed: float) -> void:
 	_relax_from = {}
 	_look_at = Vector3(0.0, 1.15, Field.SPOT_Z)
 	var t := maxf(elapsed, 0.0)
-	var dance: float = KeeperBrain.line_dance(t, level, _rng_seed)
-	var dance_back: float = KeeperBrain.line_dance(maxf(t - DANCE_DT, 0.0), level, _rng_seed)
-	var dance_speed: float = (dance - dance_back) / DANCE_DT
 	# The step phase is integrated from the DISTANCE actually covered, not from the
 	# clock: one cycle per STEP_LENGTH of line, so the feet never skate and never
 	# run on the spot. `elapsed` restarts at zero on every phase change (placement,
@@ -535,12 +554,40 @@ func prepare(elapsed: float) -> void:
 	# into a dt of zero rather than into a lurch.
 	var dt := clampf(t - _prepare_t, 0.0, 0.2)
 	_prepare_t = t
+
+	# THE PLAYER HAS ALREADY GONE. A keeper who gambles leaves BEFORE contact, so
+	# his dive starts here, in the middle of the taker's run up, and finishes in
+	# track() after the strike. It is the same dive_pose sampled on the same clock;
+	# only the moment it was decided is on this side of the ball.
+	if _player_driven and _committed:
+		_dive_t += dt
+		_apply_dive_pose()
+		_log_prepare(t)
+		return
+
+	var dance := 0.0
+	var dance_speed := 0.0
+	if _line_target_set:
+		# Somebody outside is holding the line. He has already been rate limited
+		# (KeeperInput.line_step), so this body does not limit him a second time:
+		# it simply walks the distance he asked for, and the footfalls below are
+		# integrated from that distance like any other.
+		dance = clampf(_line_target, -1.1, 1.1)
+		if dt > 0.0001:
+			dance_speed = (dance - _line_x) / dt
+	else:
+		dance = KeeperBrain.line_dance(t, level, _rng_seed)
+		var dance_back: float = KeeperBrain.line_dance(maxf(t - DANCE_DT, 0.0), level, _rng_seed)
+		dance_speed = (dance - dance_back) / DANCE_DT
 	_step_phase = fposmod(_step_phase + absf(dance_speed) * dt / STEP_LENGTH, 1.0)
 	var readiness := clampf(t / 1.1, 0.0, 1.0)
 	# A keeper who has already decided to gamble leans that way before the ball
 	# is even struck. The bias is small: it is a tell the shooter can read back.
+	# A player driven body never leans it: nothing has read anything for him, and
+	# a lean he did not choose would be a tell about a decision he has not made.
 	var bias := 0.0
-	if bool(_guess.get("commit", false)) and _num(_guess, "commit_time", 0.0) < 0.0:
+	if not _player_driven and bool(_guess.get("commit", false)) \
+			and _num(_guess, "commit_time", 0.0) < 0.0:
 		bias = float(_int_of(_guess, "side", 0)) * 0.24 * readiness
 	_line_x = clampf(dance + bias, -1.1, 1.1)
 	_line_x_frozen = _line_x
@@ -597,11 +644,18 @@ func prepare(elapsed: float) -> void:
 	bl.x += 0.05 * readiness - shift * 0.018
 	br.x += -0.05 * readiness - shift * 0.018
 	_apply_pose(_pose_dict(centre, gl, gr, bl, br, sway, 0.0))
-	# Only the run up is worth keeping: prepare() also runs during the placement
-	# and the aim, and nobody wants ten seconds of a keeper standing still.
-	if _log_active and not _log_rebased:
-		_log_strike_at = maxf(elapsed, 0.0)
-		_append_pose_log(_log_strike_at)
+	_log_prepare(t)
+
+
+## Records one pre strike frame, on the RUN UP's own clock. Only the run up is
+## worth keeping: prepare() also runs during the placement and the aim, and nobody
+## wants ten seconds of a keeper standing still, so the log is only ever active
+## between read_shooter()/set_player_driven() and the strike.
+func _log_prepare(t: float) -> void:
+	if not _log_active or _log_rebased:
+		return
+	_log_strike_at = maxf(t, 0.0)
+	_append_pose_log(_log_strike_at)
 
 
 ## Feeds the brain the shooter's tells. Called once, at the start of the run up,
@@ -643,6 +697,22 @@ func track(ball_position: Vector3, ball_velocity: Vector3, spin: Vector3, elapse
 	# finally be put on the shot's own clock and turn negative.
 	if not _log_rebased:
 		_rebase_pose_log()
+
+	# THE PLAYER DECIDES, OR HE HAS ALREADY DECIDED, OR HE NEVER WILL. Nothing in
+	# this branch reads the ball: a human keeper gets no free frame of hindsight
+	# just because the engine is happy to hand it to him. The dive clock is
+	# ABSOLUTE (`t` minus the instant he pressed, which is negative when he went
+	# early), so a dive that started in the run up carries straight through the
+	# strike without a seam and without drifting off the frames prepare() ran.
+	if _player_driven:
+		if _committed:
+			_dive_t = maxf(t - _commit_elapsed, 0.0)
+			_apply_dive_pose()
+		else:
+			_apply_pose(_set_pose(t))
+		_append_pose_log(t)
+		return false
+
 	var committed_now := false
 	if not _committed:
 		var lead := 0.0
@@ -780,7 +850,89 @@ func hold_point() -> Vector3:
 	var offset := cradle.lerp(away * HOLD_OFFSET, wide)
 	if offset.length_squared() < 0.000001:
 		offset = away * HOLD_OFFSET
-	return hand + offset.normalized() * HOLD_OFFSET
+	var wanted := hand + offset.normalized() * HOLD_OFFSET
+	return _seat_on_glove(wanted, hand)
+
+
+## Moves a wanted ball position onto the surface of the glove that is really
+## DRAWN, and returns it unchanged when there is no drawn glove to sit on.
+##
+## HOLD_OFFSET measures out of the point the ARMS ARE SOLVED TO. That point is not
+## the glove: on an imported figure the padded solid is centred behind it, runs
+## well past it, and `CharacterModels.pose` is allowed to fall short of it on an
+## over extended arm. The three add up. A close up of a clean catch showed the
+## ball hanging in space with the glove seven centimetres away from it, while
+## every distance this file computes was correct to the millimetre - they were
+## just distances to a point nothing was drawn at.
+##
+## So the ball is seated on the SOLID instead. The direction is still the one
+## chosen above, out of the body and towards the shooter or square between the two
+## hands; only the distance is re-read, off the glove that is actually on screen.
+## The glove is a flat PAD and its radius is read on all three of its axes. A
+## spheroid that folds the width of the palm and its thickness into one number
+## seats the ball on the thin side 33 mm off the leather, which is the gap this
+## function exists to close and not a rounding.
+func _seat_on_glove(wanted: Vector3, hand: Vector3) -> Vector3:
+	var solid := _hold_solid(hand)
+	if solid.is_empty():
+		return wanted
+	var centre: Vector3 = solid["centre"]
+	var out := wanted - centre
+	if out.length_squared() < 0.000001:
+		out = wanted - _vec(_pose, "centre", Field.KEEPER_HOME)
+	if out.length_squared() < 0.000001:
+		return wanted
+	# THE DIRECTION IS LEFT ALONE, and that was tried the other way round. Swinging
+	# it square to the fingers so the ball lands on the PALM is the anatomically
+	# right hold and it draws a worse picture: the seat that satisfies it on a
+	# clutch pose is up against the chest, so the ball rose into the jersey and sat
+	# on the upper edge of a glove pointing somewhere else. Putting the palm on the
+	# ball needs the WRIST to roll, and rolling the glove alone twists it off the
+	# arm it is attached to. Until the wrist can carry it, contact in the direction
+	# the body already wanted is the honest half of the fix.
+	var dir := out.normalized()
+	var radius := _glove_radius(solid, dir)
+	if radius <= 0.0:
+		return wanted
+	return centre + dir * maxf(radius + Field.BALL_RADIUS - GRIP_SINK, 0.001)
+
+
+## Distance from the centre of a glove solid to its surface, in direction `dir`.
+## The standard ellipsoid radius: the three axes are orthogonal, so the direction
+## cosines against them are all that is needed.
+func _glove_radius(solid: Dictionary, dir: Vector3) -> float:
+	var total: float = 0.0
+	for pair in [["axis", "along"], ["across", "half_across"], ["through", "half_through"]]:
+		var semi: float = float(solid.get(pair[1], 0.0))
+		if semi <= 0.0001:
+			return 0.0
+		var cosine: float = dir.dot(solid.get(pair[0], Vector3.ZERO))
+		total += (cosine / semi) * (cosine / semi)
+	if total <= 0.0:
+		return 0.0
+	return 1.0 / sqrt(total)
+
+
+## Whichever of the two drawn gloves is nearer the hand that took the ball.
+##
+## Nearer, rather than the matching side, on purpose: this file already swaps its
+## own gloves (`_gloves_swapped`) and the model has its own left and right, so a
+## name carried across the two is one more mapping to keep in step. The two gloves
+## are never close enough on a save for the nearest to be the wrong one.
+func _hold_solid(hand: Vector3) -> Dictionary:
+	if _model == null:
+		return {}
+	var best: Dictionary = {}
+	var best_gap: float = 1.0e9
+	for left in [true, false]:
+		var solid := CharacterModels.mitt_solid(_model, left)
+		if solid.is_empty():
+			continue
+		var gap: float = hand.distance_to(solid["centre"])
+		if gap < best_gap:
+			best_gap = gap
+			best = solid
+	return best
 
 
 ## The drawn position of one glove, or the pose's own value when the rig has not
@@ -798,6 +950,95 @@ func _drawn_glove(key: String, fallback: Vector3) -> Vector3:
 ## were placed from, and the exact data attempt_save() tests against.
 func pose() -> Dictionary:
 	return _pose.duplicate()
+
+
+# --- when it is the PLAYER who holds this body (mode DUEL) ---------------------
+#
+# Three calls and a query, and between them they change exactly one thing: WHO
+# picks the dive and WHEN. Everything under that decision is the code that was
+# already here. The pose is KeeperBrain.dive_pose, the save volume is the same
+# pose(), the catch is KeeperBrain.catch_quality, the log is the same log and the
+# replay reads it the same way. A duel is symmetric because there is only one
+# goalkeeper in this file and both sides borrow him.
+
+## Hands this body to the player, or takes it back.
+##
+## Called TWICE on the way into a kept round, and the second call is not
+## redundant: it is where the POSE LOG STARTS, exactly as read_shooter() starts it
+## on the AI side. The first call (on the placement) opens the line to the player
+## so he can pick his spot; the second (at the start of the run up) is the moment
+## worth replaying, and recording anything earlier would splice two different
+## clocks into one log and leave it out of order.
+func set_player_driven(keeping: bool) -> void:
+	_player_driven = keeping
+	if not keeping:
+		return
+	# A player driven body reads nothing, so it must not carry a stale hunch: the
+	# lean bias in prepare() and the fallback target in _commit_window both key on
+	# this, and a leftover would have him tipping his weight towards a corner
+	# nobody chose.
+	_guess = {}
+	_line_target_set = true
+	_clear_pose_log()
+	_log_active = true
+	_prepare_t = 0.0
+
+
+## Where this body stands on its line, in metres. It WALKS there, on the same
+## footfalls the AI line dance uses, because a keeper who slides sideways with
+## both boots welded to the turf looks worse than one who does nothing at all.
+##
+## Rate limiting belongs to the caller (KeeperInput.line_step): limiting it again
+## here would put the drawn body behind the position every other module believes
+## he occupies, and the reach envelope on screen would be drawn around a keeper
+## who is not there.
+func set_line(line_x: float) -> void:
+	_line_target = clampf(line_x, -1.1, 1.1)
+	_line_target_set = true
+
+
+## Launches the dive the player just committed to. `dive` is the dictionary
+## KeeperInput.commit returned, which carries the very keys KeeperBrain.choose_dive
+## returns, so `dive_started`, the pose log and the replay never learn where the
+## decision came from.
+##
+## A NO OP AFTER THE FIRST CALL OF AN ATTEMPT. A keeper commits once, on both
+## sides of the duel, and there is no correction in flight for either of them:
+## that is what keeps the top corner unreachable and it is not negotiable just
+## because a human is holding the button.
+##
+## `committed_at` is the instant of the press on the SHOT's clock, negative during
+## the run up, and it is stored as the dive's origin rather than "now": the dive
+## has to be `-committed_at` seconds old at contact, which is the entire reward
+## for going early.
+func commit_dive(dive: Dictionary) -> void:
+	if _committed or not _player_driven:
+		return
+	if typeof(dive) != TYPE_DICTIONARY or dive.is_empty():
+		push_warning("Keeper: commit_dive sans plongeon exploitable, appel ignore.")
+		return
+	_dive_side = clampi(_int_of(dive, "side", 0), -1, 1)
+	_dive_height = clampi(_int_of(dive, "height", 1), 0, 2)
+	_dive_target = _vec(dive, "target", HOME_TARGET)
+	var at := _num(dive, "committed_at", 0.0)
+	if not is_finite(at):
+		at = 0.0
+	_commit_elapsed = at
+	# "Gambled" means the same thing on both sides: decided before contact.
+	_dive_gambled = at <= 0.0
+	_dive_lead = 0.0
+	_dive_t = 0.0
+	_committed = true
+	diving = true
+	_was_airborne = false
+	_landed_sent = false
+	dive_started.emit(_dive_side, _dive_height, _dive_gambled)
+	_play_sfx("keeper_grunt", _vec(_pose, "centre", Field.KEEPER_HOME), -3.0, randf_range(1.0, 1.12))
+
+
+## True once this attempt's dive has been launched, whoever launched it.
+func committed() -> bool:
+	return _committed
 
 
 ## Reaction after the verdict. Procedural, short, and rebuilt every frame from

@@ -1,4 +1,4 @@
-## GOAL - the camera rig: four framings and one honest follow.
+## GOAL - the camera rig: five framings and one honest follow.
 ##
 ## Why this module is built the way it is.
 ##
@@ -30,7 +30,9 @@
 class_name CameraRig
 extends Node3D
 
-enum View { DERRIERE, BUT, TELE, REPLAY }
+## GARDIEN is APPENDED, and it is NOT part of the cycle: it belongs to the DUEL
+## phase where the player keeps, not to a comfort preference.
+enum View { DERRIERE, BUT, TELE, REPLAY, GARDIEN }
 
 # --- Tuning -----------------------------------------------------------------
 
@@ -75,10 +77,47 @@ const TELE_LOOK_X := 0.0
 ## frame and fills the bottom half with an empty green plane.
 const TELE_LOOK_Y := 2.60
 
+## The DUEL keeper framing, and every number in it is a measurement rather than a
+## taste. The lens stands BEHIND the keeper (so, behind the goal) and ABOVE him,
+## and three things had to be true at once:
+##
+##  - the whole mouth has to fit, posts included, at any sane aspect ratio. The
+##    posts sit 3.66 m either side of the middle, so at 7.2 m back they subject
+##    27 degrees of half angle, which a 40 degree vertical lens clears with room
+##    to spare even on a 4:3 window;
+##  - the ball's HEIGHT has to be readable. A ball coming straight at the lens is
+##    a disc that grows and nothing else, so the rig sits well above the eye line
+##    and the turf runs away underneath it as a ruler. Measured on this framing: a
+##    ball along the turf and a ball at 1.20 m project 11 % of the frame height
+##    apart at mid flight, which is a tenth of the screen and unmistakable;
+##  - the run up has to be WATCHABLE, because TakerAi's tells are things the taker
+##    does with his body. From here he is 14 % of the frame tall and his feet land
+##    a clear 9 % above the keeper's own head, so the two bodies never merge.
+const GARDIEN_BACK := 7.20            # metres behind the goal line
+const GARDIEN_HEIGHT := 3.90          # metres above the turf
+## The framing aims at the middle of the mouth, a shade under the bar height of a
+## man: that pitch drops the goal into the lower half and leaves the taker and his
+## run up in the upper half, on turf rather than on the goal.
+const GARDIEN_LOOK_Y := 1.35
+## Share of the keeper's line offset the rig actually travels, and the seconds of
+## lag it travels it over. Both are deliberately weak: a lens welded to the pelvis
+## slides the whole goal sideways under the dive reticle at every shuffle step,
+## and a goal that moves is a goal nobody can aim at.
+const GARDIEN_FOLLOW := 0.50
+const GARDIEN_FOLLOW_TAU := 0.34
+## How much of that travel the aim point follows. Near 1 the move is a pure dolly
+## with almost no yaw, which is what keeps the goal still on screen.
+const GARDIEN_LOOK_SHARE := 0.75
+## How much the flying ball is allowed to pull the aim. Tiny: the player is being
+## asked to judge the ball's line, and a frame that chases it takes the reference
+## away at the exact instant it is needed.
+const GARDIEN_BALL_SHARE := 0.14
+
 const FOV_DERRIERE := 30.0
 const FOV_BUT := 40.0
 const FOV_TELE := 21.0
 const FOV_REPLAY := 38.0
+const FOV_GARDIEN := 40.0
 
 # --- Contract state ---------------------------------------------------------
 
@@ -106,6 +145,11 @@ var _noise: PackedFloat32Array = PackedFloat32Array()
 var _p_derriere: Vector3 = Vector3.ZERO
 var _p_but: Vector3 = Vector3.ZERO
 var _p_tele: Vector3 = Vector3.ZERO
+
+## Where the player keeper last said he was standing, and where the lens has
+## actually got to. The second one lags the first on purpose, see GARDIEN_FOLLOW.
+var _line_x: float = 0.0
+var _line_cam: float = 0.0
 
 
 func _ready() -> void:
@@ -186,12 +230,16 @@ func camera() -> Camera3D:
 func set_view(new_view: int) -> void:
 	if not _built:
 		build()
-	if new_view < int(View.DERRIERE) or new_view > int(View.REPLAY):
+	if new_view < int(View.DERRIERE) or new_view > int(View.GARDIEN):
 		push_warning("CameraRig: unknown view %d, ignored." % new_view)
 		return
 	view = new_view
 	if _cam != null:
 		_cam.fov = _fov_for(view)
+	# Taking the keeper framing is a cut like any other, so the lag on the line
+	# starts settled rather than sliding in from wherever it was left.
+	if view == View.GARDIEN:
+		_line_cam = _line_x * GARDIEN_FOLLOW
 	# A view change is a cut, not a travelling shot: snap the spring.
 	_pos = _desired_position(_last_target, false)
 	_vel = Vector3.ZERO
@@ -201,8 +249,31 @@ func set_view(new_view: int) -> void:
 	_apply_transform()
 
 
+## Cycles the four shooting side framings. GARDIEN is not one of them, and the
+## cycle REFUSES to leave it: it is the only instrument the keeper side of a duel
+## has, and a player who cycled out of it in the middle of a run up would lose the
+## round to a key he pressed out of habit.
 func cycle_view() -> void:
+	if view == View.GARDIEN:
+		return
 	set_view((view + 1) % (int(View.REPLAY) + 1))
+
+
+## One frame of the keeper's line dance, damped. A no op in every other view: the
+## position is still recorded, so taking the GARDIEN framing later starts settled
+## on the right side of the goal instead of sliding across it.
+func follow_line(line_x: float, delta: float) -> void:
+	if not _built:
+		build()
+	_line_x = clampf(line_x, -3.0, 3.0)
+	if view != View.GARDIEN:
+		return
+	var dt: float = clampf(delta, 0.0, 0.10)
+	if dt <= 0.0:
+		return
+	var goal: float = _line_x * GARDIEN_FOLLOW
+	# Exponential, framerate independent, and slower than the shuffle it follows.
+	_line_cam += (goal - _line_cam) * (1.0 - exp(-dt / GARDIEN_FOLLOW_TAU))
 
 
 func _fov_for(v: int) -> float:
@@ -213,6 +284,8 @@ func _fov_for(v: int) -> float:
 			return FOV_TELE
 		View.REPLAY:
 			return FOV_REPLAY
+		View.GARDIEN:
+			return FOV_GARDIEN
 		_:
 			return FOV_DERRIERE
 
@@ -227,6 +300,12 @@ func _desired_position(_target: Vector3, flying: bool) -> Vector3:
 			return _p_tele + (Vector3(-0.6, -0.30, -1.2) if flying else Vector3.ZERO)
 		View.REPLAY:
 			return _pos
+		View.GARDIEN:
+			# Behind the keeper and above him, following his line at half pace. The
+			# creep forward during the flight is deliberately tiny: it gives the shot
+			# some life without moving the reference the player is judging against.
+			return Vector3(_line_cam, GARDIEN_HEIGHT, -GARDIEN_BACK) \
+					+ (Vector3(0.0, 0.04, 0.18) if flying else Vector3.ZERO)
 		_:
 			# Over the taker's right shoulder, goal filling the frame. When the
 			# ball goes, the rig rises and creeps forward rather than chasing.
@@ -234,6 +313,16 @@ func _desired_position(_target: Vector3, flying: bool) -> Vector3:
 
 
 func _desired_look(target: Vector3, flying: bool) -> Vector3:
+	if view == View.GARDIEN:
+		# The keeper framing never chases the ball, flying or not. It holds the
+		# mouth still and lets the ball cross it, which is the only way the height
+		# of a shot can be judged against the turf behind it.
+		var gx: float = _line_cam * GARDIEN_LOOK_SHARE
+		var gy: float = GARDIEN_LOOK_Y
+		if flying:
+			gx += clampf(target.x, -4.5, 4.5) * GARDIEN_BALL_SHARE
+			gy += clampf(target.y, 0.0, 3.0) * 0.08
+		return Vector3(gx, gy, 0.0)
 	if flying:
 		return target
 	# Idle framing. `target` is only a nudge here: the aim reticle may be well

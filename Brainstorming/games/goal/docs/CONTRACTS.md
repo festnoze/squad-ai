@@ -732,14 +732,70 @@ hors du cadre deviennent 11.7 %). La situation est **annoncée avant le tir** pa
 scores colore. La branche est vivante : 18.2 % des tirs adverses sur une
 campagne entière.
 
+#### Le mode DUEL : les rôles ALTERNENT
+
+`Mode.DUEL` (libellé joueur « Duel ») est une séance où le joueur change de côté
+à chaque tour. Les tours **impairs** sont exactement ce qu'ils sont aujourd'hui :
+le joueur tire. Les tours **pairs**, il **garde**, et c'est `TakerAi` (2.12b) qui
+tire contre lui. Cinq tirs chacun, puis mort subite, mêmes règles de football
+que SEANCE.
+
+Trois conséquences, et elles sont ce qui rend le mode presque gratuit :
+
+- **la structure du tour ne change pas.** `rival_to_kick()` reste **la seule
+  réponse à « à qui le tour »** dans les quatre modes. En DUEL, le tour que
+  `rival_to_kick()` annonce est simplement **joué** au lieu d'être simulé ;
+- **SEANCE ne bouge pas.** Son tir adverse reste simulé par
+  `simulate_rival_shot()`, avec les mêmes graines, le même ordre de tirages et
+  donc les mêmes tables mesurées ci dessus. Le seul changement dans son chemin
+  est que le choix du penalty vient maintenant de `TakerAi.choose` au lieu d'un
+  bloc privé, et 2.12b explique pourquoi c'est le même choix au tirage près ;
+- **une seule ligne du tableau grandit par tour**, comme aujourd'hui : un tour
+  gardé remplit `rival_scores` et rien d'autre, par `take_rival_kick_played()`.
+  Personne d'autre n'ajoute jamais dans un tableau de scores, et c'est la règle
+  qui a coûté cher une fois (voir plus haut).
+
+**Le niveau vaut pour les deux moitiés.** `Game.keeper_level` décide de la
+difficulté du gardien que le joueur affronte **et** du corps qu'il pilote quand
+c'est lui le gardien (2.12a). Le joueur s'impose donc ce qu'il exige de l'autre,
+et un duel contre une Legende est un duel où **les deux** gardiens sont des
+Legende. C'est aussi le niveau du **tireur** adverse d'un duel, que
+`duel_taker_plan` passe à `TakerAi.choose` : un seul curseur de difficulté, et il
+vaut pour les quatre rôles de la séance.
+
+#### Les tables ci dessus n'ont PAS été remesurées, et voici pourquoi
+
+Le déménagement du tireur vers `TakerAi` (2.12b) ne touche rien de ce que les
+quatre lignes mesurent, et ce n'est pas une promesse : `tests/test_match_state.gd`
+garde **la copie verbatim de l'ancien `_rival_plan`** et vérifie, graine par
+graine, que `TakerAi.choose(graine, SEANCE_LEVEL, pression, 0.0)` rend le même
+plan **au tirage près**, puis que `TakerAi.dance_phase` rend le tirage qui suit,
+à la position exacte où l'ancien code le prenait. Le reste du chemin est
+inchangé : `TakerAi.strike` est l'appel `ShotModel.resolve` qui était là,
+`TakerAi.cues` est l'appel `ShotModel.tell_cues` qui était là, et la boucle de vol
+n'a pas bougé d'une ligne. **Si ce test tombe un jour, ce sont ces tables qui sont
+fausses**, et il faut les refaire à 4000 tirs par niveau comme décrit plus haut,
+pas ajuster le test.
+
 ```gdscript
 signal phase_changed(previous: int, current: int)
 signal shot_recorded(record: Dictionary)
 signal series_changed()
 signal match_finished(player_won: bool)
 
-enum Mode { SEANCE, ENTRAINEMENT, DEFI }
-enum Phase { ACCUEIL, PLACEMENT, VISEE, COURSE, VOL, VERDICT, REPLAY, FIN }
+## DUEL and GARDIEN are APPENDED, never inserted: the shipped values are persisted
+## in user://settings.cfg and read back by number.
+## GARDIEN is to DUEL what ENTRAINEMENT is to SEANCE: the same round over and over
+## with nothing riding on it. The player keeps EVERY round, the CPU takes every
+## kick, and there is no series - only a tally of how many were stopped.
+enum Mode { SEANCE, ENTRAINEMENT, DEFI, DUEL, GARDIEN }
+## The two keeper side phases are APPENDED for the same reason. VOL, VERDICT and
+## REPLAY are REUSED by the keeper side rather than doubled: see 2.26 for what
+## each one is entered on and left on, and for why the dive is not a phase.
+enum Phase { ACCUEIL, PLACEMENT, VISEE, COURSE, VOL, VERDICT, REPLAY, FIN,
+	PLACEMENT_GARDIEN, LECTURE }
+## Which side of a DUEL round the player is on.
+enum Turn { TIREUR, GARDIEN }
 enum Verdict { BUT, ARRET, POTEAU, BARRE, DEHORS }
 
 ## Regulation shots per side before sudden death.
@@ -774,7 +830,14 @@ func rival_goals() -> int
 ## True when the rival still owes a kick right now: a shootout in progress, the
 ## player one kick ahead, and a tie that is still alive. The single answer to
 ## "whose turn is it", and what the scoreboard draws.
+## ALWAYS true in GARDIEN, where he is the only one who kicks: the player takes
+## none of his own, so the "one kick ahead" test can never come true and the
+## answer has to be given before it is asked.
 func rival_to_kick() -> bool
+## Number of penalties the player STOPPED, out of rival_scores. Every round he
+## kept is a round the CPU took, in both keeper side modes, so this reads the
+## same row in a duel and in a training session.
+func keeper_saves() -> int
 ## True when that next rival kick has to be scored to keep the tie alive. Read by
 ## the HUD and the scoreboard, so the nerves the simulation applies to the kick
 ## are announced BEFORE it rather than hidden inside a goal chance.
@@ -784,13 +847,60 @@ func rival_must_score() -> bool
 ## change the result, so a decided series never plays out a dead round.
 ## Appends to rival_scores, emits series_changed, then match_finished when this
 ## kick settled it. The caller never appends anything itself.
+## In DUEL this is not the path: the kick is PLAYED, see below.
 func take_rival_kick() -> int
 
+## --- Mode DUEL (voir plus haut) ----------------------------------------------
+
+## True when the player is the goalkeeper for the beat about to be played. It is
+## the mode and `rival_to_kick()` and NOTHING else, so "whose turn is it" still
+## has exactly one answer, DUEL cannot drift out of step with SEANCE, and GARDIEN
+## cannot drift out of step with DUEL. Always true in GARDIEN.
+func player_keeps() -> bool
+## True when the rival's turn is PLAYED OUT by the game rather than simulated
+## behind a banner: both keeper side modes. The single answer to "is there a rival
+## beat to watch", so Main never lists the modes itself.
+func rival_kick_is_played() -> bool
+## Which side of the duel the player is on right now, a Turn. Always
+## Turn.TIREUR outside DUEL.
+func turn() -> int
+## The rival's turn again, but with a verdict the GAME just played out instead of
+## one this file simulated: the DUEL path, where a real TakerAi penalty was
+## defended by a real player. Same bookkeeping, same signals and the same
+## "he owes no kick" rule as take_rival_kick(), and it returns the Verdict it
+## recorded or -1 when no kick was owed and nothing was recorded.
+## `verdict` is a Verdict. Anything else is refused with -1 rather than stored.
+func take_rival_kick_played(verdict: int) -> int
+## French label of a mode, for the menu: "Séance", "Entraînement", "Défi",
+## "Duel". Player facing, therefore accented.
+static func mode_label(mode: int) -> String
+
 ## Seeded simulation of one CPU attempt against the player's own keeper: a real
-## penalty through ShotModel, Aero, Field and KeeperBrain at Game.keeper_level.
-## Returns a Verdict. Deterministic for a given round and seed. Pure with respect
-## to the series: it reads the score and the settings, it writes nothing.
+## penalty through TakerAi, ShotModel, Aero, Field and KeeperBrain at
+## Game.keeper_level. Returns a Verdict. Deterministic for a given round and seed.
+## Pure with respect to the series: it reads the score and the settings, it writes
+## nothing. The SEANCE path, unchanged in behaviour by the arrival of DUEL: the
+## penalty it simulates is now chosen by TakerAi.choose at TakerAi.SEANCE_LEVEL
+## with the keeper in the middle of his line, which is the same choice, seed for
+## seed, that this file used to make itself (see 2.12b). The keeper's own pre
+## strike shuffle used to be the NEXT draw off that stream: it is now
+## `TakerAi.dance_phase`, which is the same draw at the same position, and that
+## is the whole reason that function is public.
 func simulate_rival_shot(rng_seed: int) -> int
+## The CPU penalty of the round the player is about to KEEP, so the orchestrator
+## can hand the same plan to the taker's body, to the ball and to the tells. It is
+## `TakerAi.choose` with this series' seed, the difficulty level and the pressure
+## flag already worked out, and it is the only place that decides them. Pure: it
+## writes nothing, and calling it twice for the same round gives the same plan.
+## The level is `Game.keeper_level`, the same setting the keeper is built from:
+## both ends of a duel are the same rung, see "Le niveau vaut pour les deux
+## moitiés" above.
+func duel_taker_plan(keeper_x: float) -> Dictionary
+## The seed that plan was drawn with. The taker's feints, his run up length and
+## the tells the player reads all have to come off the SAME number, or the run up
+## on screen would belong to a different penalty from the one that arrives.
+## Stable for a round, and it is what duel_taker_plan itself uses.
+func duel_taker_seed() -> int
 ## True when neither side can catch up any more.
 func is_decided() -> bool
 ## Free text of the situation, in French: "Marquez pour gagner", "Tir décisif",
@@ -799,9 +909,14 @@ func is_decided() -> bool
 ## "L'adversaire doit marquer", "L'adversaire tire pour gagner"): it is the
 ## situation the player is watching, and saying it out loud is what makes the
 ## pressure the simulation applies visible instead of arithmetic nobody can see.
+## In DUEL that same turn is the player's own, so the same situations are said
+## from his side of it ("À vous d'arrêter", "Arrêtez pour rester en vie",
+## "Arrêtez pour gagner"). The signature does not change and neither does the
+## rule it reads: only the person the sentence is addressed to.
 func pressure_text() -> String
 ## Everything the scoreboard needs, in one dictionary. Carries, among the rest,
-## "rival_to_kick" and "rival_must_score", both bool.
+## "rival_to_kick" and "rival_must_score", both bool, and for DUEL "player_keeps"
+## (bool), "turn" (a Turn) and "mode" (a Mode).
 func summary() -> Dictionary
 func reset() -> void
 ```
@@ -1193,6 +1308,434 @@ il finit sont l'affaire de 2.18 et 2.19.
 
 ---
 
+### 2.12a `src/keeper/keeper_input.gd` - `class_name KeeperInput`
+
+Le gardien quand c'est **le joueur** qui le tient, en logique pure. Aucun noeud,
+aucune dépendance hors `Field` et `KeeperBrain`. C'est le pendant de `ShotModel`
+pour l'autre camp du mode DUEL (2.9) : il traduit une visée à la souris, un
+instant d'engagement et une position sur la ligne en un plongeon, et il répond à
+la seule question que le joueur se pose pendant la course d'élan : **si je pars
+maintenant, qu'est ce que je couvre encore ?**
+
+#### L'arithmétique est celle du gardien de l'application, et elle est cruelle
+
+Un penalty met **0.42 s** à arriver, un réflexe humain **0.2 s**, et un plongeon
+au poteau **0.6 s**. Les trois chiffres ne rentrent pas les uns dans les autres,
+et c'est le sujet du mode : **on ne peut pas attendre de savoir**. Le joueur doit
+parier tôt, sur une lecture incomplète, exactement comme `KeeperBrain.read_cues`
+le fait depuis toujours. Plus il s'engage tôt, plus il couvre ; plus il attend,
+plus il en sait et moins il en couvre. Ce marché est déjà l'âme du jeu, et ce
+module existe pour que le joueur le sente **de l'autre côté**.
+
+Rien de neuf n'est modélisé pour cela. **L'enveloppe est une conséquence de
+`KeeperBrain.dive_time_needed`**, donc de `reach`, `dive_speed` et
+`extension_time` du niveau choisi : les deux camps du duel plongent avec le même
+corps, et une enveloppe qui divergerait de ces courbes serait un mensonge dessiné
+à l'écran.
+
+#### L'horloge, et ce qui est connu à chaque instant
+
+`t` est en secondes **relatives à la frappe**, négatif pendant la course d'élan.
+C'est l'horloge de `Keeper.pose_log` et celle de `read_cues.commit_time`, pas une
+troisième. Un engagement à `t = -0.18` est un gardien qui part deux dixièmes
+avant le contact, et il est parfaitement légal.
+
+`arrival` est l'instant, sur la même horloge, où le ballon franchira la ligne.
+Avant la frappe **personne ne le connaît**, et l'appelant passe donc
+`NOMINAL_FLIGHT`. Après la frappe le joueur **voit** le ballon, donc lui passer le
+temps de vol restant réel est honnête : c'est ce qui fait rétrécir l'enveloppe
+beaucoup plus vite sur une frappe sèche que sur une casserole, ce qui est
+précisément la différence que le joueur doit apprendre à lire.
+
+#### Ce qui n'entre PAS dans le budget, et pourquoi
+
+`KeeperBrain.reaction_time` **n'est pas retranché** du temps disponible. Le
+cerveau se l'applique parce qu'il décide à un instant où le corps ne bouge pas
+encore ; le joueur, lui, a déjà réagi quand il appuie, et il a payé son dixième de
+seconde avec ses propres nerfs. L'ajouter ici reviendrait à le lui facturer deux
+fois. C'est écrit parce que la prochaine personne qui lira ce fichier aura envie
+de l'ajouter au nom de la symétrie, et que ce serait la mauvaise symétrie.
+
+```gdscript
+class_name KeeperInput
+extends RefCounted
+
+## Seconds a penalty is assumed to take from contact to the goal line for as long
+## as nobody can know better, which is the whole of the run up. Not invented: it
+## is what the project's own model gives for a strike at TakerAi.POWER_MEAN over
+## the eleven metres.
+const NOMINAL_FLIGHT := 0.42
+
+## How far along his line the player may shuffle, metres either side of the
+## middle. The SAME bound KeeperBrain.line_dance lives under, so the AI keeper and
+## the player keeper occupy one strip of turf and not two.
+const LINE_LIMIT := 0.9
+## Metres per second that shuffle travels at.
+const LINE_SPEED := 1.35
+
+## World point on the goal plane a normalized reticle asks for. `aim.x` -1..1 and
+## `aim.y` 0..1 span the same bands ShotModel.aim_point reads, so the two ends of
+## a duel aim in one language.
+## Unlike the taker, the keeper is CLAMPED inside the frame: a dive aimed over the
+## bar is not a decision, it is a lost input.
+static func dive_target(aim: Vector2) -> Vector3
+
+## Moves the reticle by one frame of mouse travel and clamps it back into the
+## band above. `sensitivity` is Game.mouse_sensitivity.
+static func move_aim(aim: Vector2, mouse_delta: Vector2, sensitivity: float) -> Vector2
+
+## Seconds of dive left to a keeper who pushes off at `t` for a ball that reaches
+## the line at `arrival`. Never negative.
+static func time_available(t: float, arrival: float) -> float
+
+## Can a keeper standing at `line_x` still have a glove ON `target` if he pushes
+## off now? This is exactly
+## `KeeperBrain.dive_time_needed(target, line_x, level) <= time_available(t, arrival)`,
+## and it is the ONE rule everything else in this module is drawn from.
+static func reachable(target: Vector3, line_x: float, t: float, arrival: float, level: int) -> bool
+
+## Seconds to spare on that dive. Positive means reachable with room, negative is
+## how late the keeper would be. The HUD colours the dive reticle with it.
+static func margin(target: Vector3, line_x: float, t: float, arrival: float, level: int) -> float
+
+## The outline of everything still reachable, as a CLOSED ring of `samples` points
+## on the goal plane, for the HUD to stroke. Found by bisecting `margin` along
+## rays out of the keeper, so the drawn envelope IS the rule and cannot drift away
+## from it. Empty when nothing is reachable any more.
+static func reach_outline(line_x: float, t: float, arrival: float, level: int, samples: int = 48) -> PackedVector3Array
+
+## Fraction of the goal mouth still reachable, 0..1. One number, so the HUD can
+## shrink a ring with it and the tests can assert the property that matters: it
+## FALLS as `t` rises, at every level and from every line position.
+static func coverage(line_x: float, t: float, arrival: float, level: int) -> float
+
+## One frame of line dance. `input` is -1..1 from the keyboard or the mouse,
+## travelling at LINE_SPEED and bounded to LINE_LIMIT. Returns the new x.
+static func line_step(line_x: float, input: float, delta: float) -> float
+
+## The dive the player just launched. Called ONCE, the frame he commits.
+## Returns {"target": Vector3, "side": int, "height": int, "committed_at": float,
+##          "reachable": bool, "coverage": float, "margin": float}
+## `target` is the continuous point the pose is built from and the only one of the
+## three that changes it; `side` and `height` are its coarse reading, for the
+## body, the crowd, the audio and the replay, exactly as KeeperBrain.choose_dive
+## reports them. The dictionary is shaped so that `Keeper` can be driven from it
+## without knowing whether a brain or a human chose it.
+static func commit(aim: Vector2, line_x: float, t: float, arrival: float, level: int) -> Dictionary
+
+## Coarse reading of a continuous target, for the body and the audio. The same
+## thresholds KeeperBrain reads it with, kept in one place so a dive reported by
+## the two modules is reported the same way.
+static func coarse_side(target: Vector3) -> int
+static func coarse_height(target: Vector3) -> int
+
+## The mouth as the envelope sees it: the rectangle of ball CENTRES whose whole
+## body is still inside the frame, the same rule Field.is_inside_mouth applies.
+## Public because the HUD strokes the rectangle the coverage is counted on, and
+## two rectangles disagreeing by one ball radius would make the drawn ring look
+## wrong at the posts.
+static func mouth_half_x() -> float
+static func mouth_floor_y() -> float
+static func mouth_ceiling_y() -> float
+```
+
+#### Le dégradé mesuré, et la falaise qui le termine
+
+Relevé à `arrival = NOMINAL_FLIGHT`, depuis le milieu de la ligne. Ce sont des
+**mesures**, pas des consignes : si tu touches à `KeeperBrain.dive_time_needed`,
+à `reach` ou à `dive_speed`, elles bougent et il faut les refaire.
+
+| `t` | -0.42 | -0.20 | 0.00 | 0.10 | 0.21 | 0.23 |
+|---|---|---|---|---|---|---|
+| Debutant | 0.906 | 0.825 | 0.602 | 0.450 | 0.357 | 0.000 |
+| Confirme | 0.918 | 0.871 | 0.684 | 0.462 | 0.357 | 0.000 |
+| Pro | 0.942 | 0.883 | 0.684 | 0.462 | 0.357 | 0.000 |
+| Legende | 0.965 | 0.918 | 0.778 | 0.474 | 0.368 | 0.000 |
+
+Deux choses à ne pas redécouvrir comme des surprises :
+
+- **la falaise à 0.23 s n'est pas un bug.** Le balancé du bras coûte environ
+  **0.19 s** dans `dive_time_needed`, même pour un ballon suspendu devant la
+  poitrine. Un gardien qui n'est pas parti à cet instant là ne sauve plus rien, et
+  **le gardien de l'application vit sous exactement la même échéance** : c'est son
+  « dernier moment responsable ». L'anneau disparaît d'un coup parce que le
+  plongeon disparaît d'un coup ;
+- **les lucarnes basses ne sont pas des lucarnes.** Un ballon au ras du sol est
+  une parade franchement plus facile (l'échelle de déplacement de `KeeperBrain`
+  vaut 1.06 en bas contre 0.42 sous la barre). La promesse de la règle d'équité 2
+  porte sur les **lucarnes hautes**, et c'est ce que la suite vérifie.
+
+Le maximum relevé de `coverage` sur toute la bande légale, tous niveaux et toutes
+positions de ligne confondus, est **0.965**. C'est ce qui tient la règle 2, et ce
+sont les quatre coins hauts qui le tiennent.
+
+#### Les règles d'équité, et elles ne se négocient pas
+
+Elles sont le miroir de celles sous lesquelles vit le gardien de l'application, et
+le mode meurt sans elles.
+
+1. **Le joueur ne voit jamais la vérité.** Ni la visée, ni la puissance, ni
+   l'effet du tireur n'entrent dans quoi que ce soit que ce module rende. Les
+   indices passent par `TakerAi.tells` (2.12b) et sont **volontairement**
+   dégradés. Un chemin qui laisserait fuir la cible réelle ne rendrait pas le mode
+   plus facile, il le supprimerait.
+2. **Une lucarne bien frappée reste imprenable.** L'enveloppe est calculée sur les
+   courbes mêmes qui laissent 92 % des vraies lucarnes entrer contre une Legende
+   (2.12). Elle ne doit donc jamais couvrir le but entier, à aucun instant, à
+   aucun niveau : `coverage(...)` reste **strictement sous 1** pour tout
+   `t >= -NOMINAL_FLIGHT`, et `tests/test_keeper_input.gd` le balaye. Les
+   victoires du joueur doivent venir d'une lecture et d'un pari, jamais d'une
+   couverture totale.
+   La règle porte sur le budget d'avant frappe, `arrival = NOMINAL_FLIGHT` : c'est
+   le seul instant où personne ne sait rien et où le joueur pourrait donc être
+   tenté de tout couvrir. Après la frappe, une **casserole** qui met 0.8 s à
+   arriver laisse évidemment le temps d'aller partout, et c'est honnête plutôt
+   qu'un trou dans la règle : le joueur **voit** ce ballon lent, et c'est
+   exactement la différence qu'il doit apprendre à lire.
+   Ce qui tient la règle, ce sont les **coins hauts** : ils sont hors de portée
+   depuis le milieu de la ligne à tous les niveaux et à tout instant légal, et
+   surtout **les deux ne sont jamais couverts ensemble**, où que le gardien se
+   place. Danser sur sa ligne achète une lucarne et vend l'autre.
+3. **Les deux camps ont le même corps.** `reach`, `dive_speed`, `extension_time` et
+   `dive_time_needed` viennent de `KeeperBrain` au niveau choisi, jamais d'une
+   constante recopiée ici. Le niveau reste le réglage `Game.keeper_level`, et il
+   vaut pour **les deux moitiés** du duel : ce que le joueur exige du gardien
+   adverse, il se l'impose.
+4. **Le temps de réaction n'est pas facturé** (voir ci dessus).
+5. **L'enveloppe rétrécit, elle ne remonte jamais.** `coverage` est monotone
+   décroissante en `t` à `arrival` fixé. C'est ce qui rend le dessin lisible : un
+   cercle qui repousserait d'une image sur l'autre détruirait la seule information
+   que le joueur a le temps de lire.
+   C'est **gratuit par construction** et il faut le garder ainsi : `coverage`
+   compte une **grille fixe** de la bouche du but plutôt que d'intégrer l'aire de
+   l'anneau. La grille ne bouge pas, seul le budget de temps bouge, donc un point
+   sorti de l'enveloppe n'y rentre jamais. Une version qui intégrerait le contour
+   perdrait la propriété sur le bruit de la bissection.
+
+---
+
+### 2.12b `src/ai/taker_ai.gd` - `class_name TakerAi`
+
+Le tireur de l'ordinateur, en **logique pure**. Aucun noeud, dépendances `Field`,
+`ShotModel` et `Aero`. Tout est déterministe pour une graine donnée.
+
+**Ce module n'invente rien : il déménage.** Le choix de penalty qu'il porte vivait
+dans `src/core/match_state.gd`, sous les noms `_RIVAL_*`, `_rival_plan` et
+`_rival_reticle`, et ne servait qu'à simuler le tir adverse d'une SEANCE. DUEL a
+besoin du **même** tireur, cette fois joué pour de vrai contre un gardien humain.
+Il n'y a donc qu'un tireur d'ordinateur dans ce jeu et il est ici ; `Shootout`
+l'appelle au lieu de le refaire.
+
+**La contrainte de ce déménagement est absolue : SEANCE ne bouge pas d'un
+arrêt.** `TakerAi.choose(graine, SEANCE_LEVEL, pression, 0.0)` doit rendre
+exactement le plan que `_rival_plan` rendait pour la même graine, **tirage pour
+tirage**, y compris l'ORDRE dans lequel les nombres sortent du
+`RandomNumberGenerator` : les quatre lignes mesurées de 2.9 sont une propriété de
+cet ordre et de rien d'autre. `tests/test_taker_ai.gd` fige le plan de plusieurs
+graines connues. Si ces plans changent, 2.9 est faux et doit être **remesuré**
+(4000 tirs par niveau, la procédure est écrite en 2.9), pas rafistolé.
+
+#### Le tireur a un niveau, et SEANCE en occupe un barreau
+
+Le tireur expédié n'avait pas de niveau : il n'en avait pas besoin, personne ne le
+regardait. En DUEL le joueur le **lit**, donc il lui faut une échelle, et elle est
+faite de deux choses seulement, comme celle du gardien : la **qualité de la
+frappe** (la dispersion de la visée) et la **qualité du mensonge** (ce qui fuit
+dans le langage corporel). Un tireur fort ne frappe pas plus fort, il place mieux
+et il montre moins.
+
+`SEANCE_LEVEL` est le barreau sur lequel le tireur expédié tombe exactement :
+`spread(SEANCE_LEVEL)` vaut **1.0** et `feint_count` y rend **0**, ce qui est la
+définition du non changement ci dessus.
+
+```gdscript
+class_name TakerAi
+extends RefCounted
+
+enum Level { DEBUTANT = 0, CONFIRME = 1, PRO = 2, LEGENDE = 3 }
+const LEVEL_NAMES: PackedStringArray = ["Debutant", "Confirme", "Pro", "Legende"]
+## The rung SEANCE has always kicked at, and the one the tables of 2.9 were
+## measured on. `spread` is 1.0 here and `feint_count` is 0 here, by definition.
+const SEANCE_LEVEL := Level.CONFIRME
+
+## WHERE HE SHOOTS, in metres on the goal line, and how badly he misses. One row
+## is [weight, mean |x|, sigma x, mean y, sigma y], the sign of x drawn evenly so
+## neither post is favoured. The sigma IS the error: there is no second fudge
+## factor anywhere. Same table as balance_probe's AIM_CLUSTERS, deliberately, so
+## the rate the simulation reports is comparable with the probe's.
+const AIM_CLUSTERS: Array
+## The reticle stops here. Past it the kick is simply wide or over, which is a
+## legal and counted outcome.
+const MAX_X := 4.10
+const MIN_Y := 0.14
+const MAX_Y := 2.90
+## Pace of a CPU penalty, as a power in [0, 1] on ShotModel's own bar.
+const POWER_MEAN := 0.80
+const POWER_SIGMA := 0.11
+const POWER_MIN := 0.45
+## How often he mistimes the strike, calm and on an elimination kick.
+const MISCUE_CALM := 0.10
+const MISCUE_TENSE := 0.28
+## What nerves multiply the aim sigmas by. See 2.9: this is the visible version
+## of a hidden goal chance, and it is why it lives in a taker rather than in a
+## series.
+const NERVE := 1.90
+## Where his clean contact window sits on the power bar. The value Main uses for
+## a scripted shot, so a rival kick and a probe kick are struck by one model.
+const SWEET_CENTRE := 0.72
+
+## Inverse of ShotModel.aim_point, which is affine on each axis and therefore
+## invertible in closed form. Restated rather than searched for by bisection, and
+## guarded by a round trip check in tests/test_taker_ai.gd: if ShotModel ever
+## remaps its reticle, that check fails instead of this module quietly aiming
+## somewhere else.
+const AIM_SPAN_X := 4.40      # Field.GOAL_HALF plus ShotModel's side margin
+const AIM_BASE_Y := 0.11      # Field.BALL_RADIUS
+const AIM_TOP_Y := 3.04       # Field.GOAL_HEIGHT plus ShotModel's top margin
+static func reticle(world_x: float, world_y: float) -> Vector2
+
+## Hard ceiling on the shading of read_keeper, metres, whatever the level says.
+const MAX_SHIFT := 0.55
+## How far the keeper is allowed to stray, metres. KeeperInput.LINE_LIMIT and
+## KeeperBrain's own dance bound, restated because this module may not depend on
+## the keeper side: it is only ever handed the number.
+const KEEPER_LINE_LIMIT := 0.9
+
+## Multiplier ON the sigmas of AIM_CLUSTERS for this level. 1.0 at SEANCE_LEVEL.
+static func spread(level: int) -> float
+## How much of his real intention leaks into the tells, 0..1. The MIRROR of
+## KeeperBrain.read_skill: there it is the reader's talent, here the writer's
+## clumsiness. A hard taker leaks less and feints more, and that is the whole of
+## what makes him hard to keep against.
+static func leak(level: int) -> float
+## Feints thrown into the run up, at most two. Deterministic. 0 at SEANCE_LEVEL.
+static func feint_count(level: int, rng_seed: int) -> int
+## Seconds of run up before contact, so the keeper side has a clock to read the
+## tells against. Longer at a low level: an amateur telegraphs by dawdling.
+static func run_up_time(level: int, rng_seed: int) -> float
+
+## ONE CPU penalty, decided. Deterministic for `rng_seed`.
+## `pressure` is the elimination kick of 2.9. `keeper_x` is where the keeper is
+## standing on his line when the taker plants his foot, in metres, and it is the
+## ONLY thing about the keeper this module is ever given.
+## Returns {"aim": Vector2, "power": float, "side": float, "lift": float,
+##          "release": float, "sweet_centre": float, "target": Vector3,
+##          "shift": float, "rattle": float, "level": int, "pressure": bool}
+## `target` is the world point of `aim`, published so callers stop recomputing it.
+static func choose(rng_seed: int, level: int, pressure: bool, keeper_x: float) -> Dictionary
+
+## The `elapsed` a SEANCE feeds KeeperBrain.line_dance with, drawn from the SAME
+## stream and at the SAME position the shipped code drew it from: the very next
+## value after the plan. It exists so the simulated kick of 2.9 keeps its measured
+## tables to the save, and that is the only reason it is public. Nothing in DUEL
+## uses it: there the keeper is a player and dances with his own hands.
+##
+## Without it the move of 2.12b would have been silently lossy. The shipped
+## _rival_verdict drew the plan and then the dance from ONE generator, so a taker
+## that seeded its own would have left match_state unable to reach that next
+## value, the line dance of every simulated kick would have changed, and the four
+## rows of 2.9 with it. Nobody would have noticed until a rebalance.
+static func dance_phase(rng_seed: int, level: int, pressure: bool) -> float
+
+## The strike itself, through ShotModel.resolve, returned unchanged: a CPU
+## penalty and a player penalty are the same object everywhere downstream.
+static func strike(plan: Dictionary, rng_seed: int) -> Dictionary
+
+## What the AI KEEPER is allowed to read: ShotModel.tell_cues at the keeper's own
+## level, exactly as SEANCE has always asked for it. Behaviour unchanged, moved
+## here so both sides of a duel ask one module for the taker's body language.
+static func cues(plan: Dictionary, keeper_level: int) -> Dictionary
+
+## What the PLAYER keeper is allowed to read, which is a different question: the
+## lossiness comes from the TAKER's level (`leak`) and never from the reader's.
+## Returns the cue dictionary described in 2.12 read_cues, plus:
+##   "feints" int, "run_up" float (seconds), "confidence" float 0..1
+## Every hint in it is ALREADY degraded. Nothing in it is the truth, and a caller
+## that needs the truth is holding the plan.
+static func tells(plan: Dictionary, level: int, rng_seed: int) -> Dictionary
+
+## The same dictionary as `tells`, but as it stands `t` seconds from contact, `t`
+## negative during the run up: the cues arrive one by one as the taker gets
+## closer, so a keeper who commits early has genuinely seen less. This is what the
+## HUD draws frame by frame, and it is the entire reason waiting is worth
+## anything at all.
+static func tells_at(plan: Dictionary, level: int, rng_seed: int, t: float) -> Dictionary
+
+## How the taker answers a keeper who has left the middle of his line. Returns
+## {"shift": float, "rattle": float}: `shift` is metres of aim moved AWAY from the
+## keeper, `rattle` a fraction ADDED to the strike's own error. A weak taker is
+## rattled and does not shade, a strong one shades and is not rattled, which is
+## what makes the line dance worth doing against one and dangerous against the
+## other. `choose` already folds both in; it is exposed for the tests and the HUD.
+static func read_keeper(keeper_x: float, level: int, rng_seed: int) -> Dictionary
+```
+
+#### Les règles d'équité du tireur
+
+1. **Les indices mentent, et c'est le contrat.** `tells` ne rend jamais une
+   valeur dont la cible se déduise. L'angle de course, le pied d'appui,
+   l'ouverture des hanches et l'allure sont des fonctions **bruitées** du plan, et
+   l'amplitude du bruit est `1 - leak(level)`. Deux tirs identiques doivent
+   pouvoir se lire différemment, et un même indice doit pouvoir précéder deux
+   tirs opposés.
+2. **Le tireur ne voit du gardien que son x.** `read_keeper` ne prend rien
+   d'autre : ni l'engagement, ni la visée du plongeon, ni le niveau du joueur.
+   Autrement le duel devient un pierre feuille ciseaux où l'ordinateur joue en
+   second, et il gagne toujours.
+3. **Un beau penalty reste un but.** `shift` est borné et petit devant la largeur
+   du but. Il déplace une **intention**, il ne cherche pas le coin opposé à tous
+   les coups : un tireur qui viserait systématiquement là où le gardien n'est pas
+   rendrait la danse sur la ligne toute puissante, ce qui est exactement le défaut
+   inverse de celui qu'on corrige.
+4. **La graine décide tout.** Aucun `randf()` global, aucune horloge, aucun état
+   statique entre deux tirs. Deux exécutions de la même graine rendent le même
+   penalty, sinon le replay ment et 2.9 cesse d'être mesurable.
+
+#### Le tireur n'enroule jamais, et ce n'est pas un oubli
+
+`side` et `lift` valent **0 à tous les niveaux**, comme ils l'ont toujours valu
+pour le tir adverse. `ShotModel` résout la trajectoire **sans effet** vers la
+cible puis attache l'effet par dessus, donc un enroulé déplacerait le ballon hors
+du point même à partir duquel les indices sont fabriqués : le joueur lirait un
+langage corporel qui désigne un endroit où le ballon ne va pas. **Le placement du
+tireur est toute son intention.** Un niveau se lit dans sa dispersion et dans son
+mensonge, jamais dans un effet ajouté.
+
+#### Comment le non changement de SEANCE a été vérifié
+
+Le `_rival_plan` expédié et `TakerAi.choose` ont été exécutés **côte à côte sur
+3000 graines**, moitié sous pression, en comparant la visée, la puissance, le
+relâchement **et** le tirage de la danse qui suit. Écart absolu maximal :
+**exactement 0**. `tests/test_taker_ai.gd` fige ensuite cinq graines connues, calme
+et sous pression, avec ce tirage de danse, plus les deux propriétés qui
+*définissent* le barreau (`spread(SEANCE_LEVEL) == 1.0`, `feint_count` nul sur 200
+graines) : sans elles le gel ne serait qu'un accident de ces cinq graines.
+
+#### L'échelle, mesurée
+
+Toutes ces lignes sont des **mesures**, sur 1500 à 2000 penalties par case. Si tu
+touches aux tables du module, refais les.
+
+| niveau | `spread` | `leak` | feinte | % de tirs passé `abs(x) = 3.30` | indice de visée du mauvais côté |
+|---|---|---|---|---|---|
+| Debutant | 1.32 | 0.88 | jamais | 4.0 % | 4 % |
+| Confirme | 1.00 | 0.64 | jamais | 1.8 % | 18 % |
+| Pro | 0.84 | 0.42 | 36 % | 1.0 % | 37 % |
+| Legende | 0.68 | 0.22 | 59 % | 0.3 % | 44 % |
+
+Deux conséquences à ne pas perdre de vue :
+
+- **la pression est une vraie branche.** Au barreau de la SEANCE, un tir à ne pas
+  manquer passe de 8.8 % à 27.7 % de frappes mistimées et de 0.5 % à 4.8 % de
+  tirs hors du cadre. C'est la version visible du pourcentage caché d'autrefois ;
+- **la danse sur la ligne est un marché, pas une arme.** Contre une Legende campée
+  à 0.9 m, la visée bouge de **0.40 m en moyenne** et seul **un tir sur six**
+  finit passé `x = -2.5`. Contre un Debutant elle ne bouge pas du tout, mais le
+  tireur mistime bien plus souvent. Un tireur qui chercherait le coin opposé à
+  tous les coups rendrait la danse toute puissante, ce que la règle 3 interdit.
+
+---
+
 ### 2.13 `src/world/meshes.gd` - `class_name Meshes`
 
 Toute la géométrie du jeu, générée par code. Statique, mise en cache quand le
@@ -1387,6 +1930,35 @@ Corrections portées **ici et nulle part ailleurs** :
     C'est, comme la mise en forme, **une seule fonction de la position de
     référence appliquée aux sept surfaces**, donc la coque et la peau ne peuvent
     pas être en désaccord dessus.
+- **Cheveux.** Le fichier n'en porte aucun et l'atlas UV de MakeHuman n'offre
+  aucun moyen d'en peindre, donc une calotte est ajoutée ici : deux crânes chauves
+  identiques sont la seule façon dont ce modèle a l'air **pire** que les boîtes
+  qu'il remplace. Elle n'est plus une sphère aplatie posée sur le sommet, elle est
+  une **coque des triangles du crâne lui même**, poussés de `_HAIR_THICK` le long
+  de leurs propres normales. Trois raisons, et elles sont mesurées :
+  - la sphère était centrée **cinq centimètres derrière** le crâne qu'elle devait
+    couvrir (z = -0.008 pour une boîte crânienne centrée sur z = +0.044 dans le
+    repère de l'os de tête). Elle débordait donc de sept centimètres à l'arrière
+    et s'arrêtait à z = +0.087 quand le front court jusqu'à z = +0.148 : la bande
+    entre les deux **était** le ruban de cuir chevelu nu que l'audit a trouvé sur
+    les deux figures ;
+  - aucune sphère mise à l'échelle ne répare cela. Un ellipsoïde dont l'équateur
+    est assez haut pour être des cheveux courts est un ellipsoïde dont l'équateur
+    dépasse de trois centimètres d'un crâne qui se rétrécit vers le sommet : un
+    bord de chapeau. Une coque du crâne le suit **par construction**, à ce
+    ré-export comme au suivant, et ne peut déborder nulle part ;
+  - **le bord n'est plus un bord.** L'épaisseur descend jusqu'à `_HAIR_BITE` **sous**
+    la peau dessinée (`_SKIN_SHRINK`) à la naissance des cheveux, donc le rebord
+    de la calotte est enterré dans le cuir chevelu et la limite visible est la
+    **courbe d'intersection** des deux surfaces. Une frontière qui est une
+    intersection ne peut ni montrer une marche ni laisser un jour.
+  La hauteur est **divisée par deux**, ce qui était la demande : la calotte se
+  tient 11 mm au dessus du cuir chevelu dessiné là où la sphère se tenait 22 mm au
+  dessus du sommet, et le bas de la naissance des cheveux est passé de 0.23 à 0.56
+  de la hauteur du crâne. Elle est lue par **azimut** autour de la boîte crânienne
+  et non par hauteur (haute sur le front, basse à la tempe, un peu remontée à la
+  nuque) : une hauteur seule dessine un bonnet de bain. Tous les seuils sont des
+  **fractions de la hauteur de crâne mesurée**, jamais des centimètres.
 - **Visage et cou.** La tête est une surface à part de la peau du corps parce que
   l'atlas de MakeHuman range des morceaux de cou sur les texels du visage. Sur le
   gardien les deux surfaces ne diffèrent pas que par leurs UV : l'une échantillonne
@@ -1492,6 +2064,30 @@ static func build(role: int) -> Node3D
 ## The anchor of a figure is its HIP MIDPOINT, which is what
 ## KeeperBrain.dive_pose calls the body centre.
 static func metrics(role: int) -> Dictionary
+
+## The padded glove hung off each wrist, as the three SEMI AXES of the solid in
+## the role's drawn units. Keys "along" (down the fingers), "girth" (the larger
+## of the two across the palm), "back" (how far the CENTRE of the solid sits
+## BEHIND the hand centre the arms are solved to). Empty with no model.
+## This is the glove a role is BUILT with, and it is a FLAT PAD: on the keeper,
+## 105 mm along, 52 mm across, 19 mm through.
+static func mitt_shape(role: int) -> Dictionary
+
+## Where a BUILT figure's glove has actually ENDED UP, in WORLD space, once it has
+## been posed. Keys "centre" (Vector3), "axis" / "across" / "through" (unit
+## Vector3, orthogonal), "along" / "half_across" / "half_through" (floats).
+## Empty with no model, or before the figure is in the tree.
+##
+## THIS IS NOT `mitt_shape` AND THE DIFFERENCE IS LOAD BEARING. `Keeper` solves
+## its arms against `hand_reach`; `_add_mitts` draws the glove around a point of
+## its own; and `pose()` bounds how far an over extended arm may follow its
+## target at all. A caller that wants to put a ball IN the glove has to ask where
+## the glove is, not where the arm was aimed. Keeper.hold_point does exactly that.
+##
+## All THREE semi axes are published because the glove is flat. Folding the width
+## of the palm and its thickness into one radius and taking the larger seats a
+## ball 33 mm off the leather.
+static func mitt_solid(figure: Node3D, left: bool) -> Dictionary
 
 ## Poses a figure from world space joints. Every key is optional.
 ## Bases are FACING bases: +Y up, +Z the direction the figure looks. A caller
@@ -1985,6 +2581,14 @@ func holding() -> bool
 ## Where a caught ball sits right now, in world space, for the pose on screen.
 ## Anchored on the DRAWN hand, see the three points above. Ball.keeper_hold is
 ## wired to this. Returns the body centre when nothing is being held.
+##
+## The DIRECTION out of the hand is this file's own (the cradle and the one handed
+## hold below). The DISTANCE is read off `CharacterModels.mitt_solid`, so the ball
+## rests on the surface of the glove that is really drawn instead of at a fixed
+## offset from a point nothing is drawn at. Without that the ball hung up to 70 mm
+## clear of the leather on a clean catch while every distance in this file was
+## right to the millimetre. A body with no model keeps the fixed offset.
+## tests/smoke_probe.gd measures the contact on every catch (MITT_SLACK).
 func hold_point() -> Vector3
 ## Current pose dictionary, for the tests and the replay.
 func pose() -> Dictionary
@@ -1998,6 +2602,41 @@ func celebrate(verdict: int) -> void
 ## two bracketing samples of `pose_log` are INTERPOLATED, so the playback stays
 ## smooth at any speed, slow motion included. A no op when the log is empty.
 func seek_replay(t: float) -> void
+
+## --- Quand c'est le JOUEUR qui tient ce corps (mode DUEL, 2.9) ---------------
+## Hands this body to the player. While `keeping` is true, `track()` decides
+## nothing and returns false: the dive arrives through commit_dive() and the line
+## position through set_line(). Everything below the decision is unchanged, which
+## is the point: the pose, the save envelope, the catch, the log and the replay
+## are the same code on both sides of the duel. Cleared by reset_to_line().
+## CALLED TWICE ON THE WAY IN, and the second call is not redundant: it is where
+## the POSE LOG STARTS, exactly as read_shooter() starts it on the AI side. The
+## first call (on the placement) opens the line to the player so he can pick his
+## spot; the second (at the start of the run up) is the moment worth replaying,
+## and recording anything earlier would splice two different clocks into one log
+## and leave it out of order.
+func set_player_driven(keeping: bool) -> void
+## Where this body stands on its line, in metres, driven by KeeperInput.line_step.
+## It WALKS there, with the same steps the AI line dance uses (see STEP_LENGTH):
+## a player who slides with welded boots looks worse than one who does nothing.
+## The RATE LIMIT belongs to the caller (KeeperInput.LINE_SPEED) and is not
+## applied a second time here: a body drawn behind the position every other module
+## believes it occupies would put the reach envelope around a keeper who is not
+## there. It also works OUTSIDE `set_player_driven`, which is what lets the player
+## take his spot during the placement, before the run up hands him the rest.
+func set_line(line_x: float) -> void
+## Launches the dive the player committed to. `dive` is the KeeperInput.commit
+## dictionary, which carries the very keys KeeperBrain.choose_dive returns, so
+## `dive_started`, `pose_log` and the replay are untouched by where it came from.
+## A no op after the first call of an attempt: a keeper commits ONCE, on both
+## sides of the duel, and there is no correction in flight for either of them.
+## `committed_at` is read as the dive's ORIGIN on the shot's clock and not as
+## "now": a dive launched at -0.18 has to be 0.18 s old at contact, which is the
+## entire reward for going early, and it is also why the dive clock is absolute
+## and therefore identical whatever the frame rate did during the run up.
+func commit_dive(dive: Dictionary) -> void
+## True once this attempt's dive has been launched, whoever launched it.
+func committed() -> bool
 ```
 
 ---
@@ -2148,34 +2787,107 @@ func react(verdict: int) -> void
 ## gain and the difficulty multiplier of the attempt. One crossing of the bar is
 ## one phase unit.
 func marker_rate() -> float
+
+## --- Quand c'est l'ORDINATEUR qui tient ce corps (mode DUEL, 2.9) ------------
+## Hands this body to TakerAi. `plan` is the dictionary TakerAi.choose returned.
+## The run up plays out on its own clock (TakerAi.run_up_time) with its own
+## feints, `feinted` fires as it always did, and `struck` fires at contact
+## carrying TakerAi.strike's dictionary, so nothing downstream learns that a
+## human was not holding the controls. Player input is ignored until
+## reset_stance().
+## The plan NEVER reaches the screen through this body except as body language:
+## what the run up shows is what TakerAi.tells_at says it shows, and no more.
+func run_cpu_penalty(plan: Dictionary, rng_seed: int) -> void
+## Seconds from now until contact while a CPU run up is playing, negative once it
+## has struck, zero when no run up is playing. This is the clock 2.12a calls `t`,
+## and it is the only one: Main reads it and passes it on.
+func time_to_contact() -> float
 ```
 
 ---
 
 ### 2.21 `src/player/camera_rig.gd` - `class_name CameraRig` extends Node3D
 
-La caméra. Quatre cadrages, cyclés par `camera_cycle` : derrière le tireur, la
-caméra de but (derrière le filet, face au tireur), la caméra de télévision (haute
-et latérale), et l'orbite de replay.
+La caméra. Quatre cadrages côté tireur, cyclés par `camera_cycle` : derrière le
+tireur, la caméra de but (derrière le filet, face au tireur), la caméra de
+télévision (haute et latérale), et l'orbite de replay. Un cinquième cadrage
+appartient au mode DUEL et n'est **pas** dans le cycle (voir plus bas).
 
 Piège moteur connu : une caméra qui suit avec un ressort critique **sans borne de
 vitesse** décroche sur un ballon à 30 m/s et donne le mal de mer. La vitesse
 angulaire de suivi est plafonnée.
 
+#### `View.GARDIEN`, et ce qu'il doit rendre lisible
+
+Le cadrage du mode DUEL : **derrière le gardien et un peu au dessus**, regardant
+le terrain et le tireur qui arrive. Il n'est pas décoratif, c'est le seul
+instrument de lecture du mode, et il porte trois obligations :
+
+- **il suit la ligne.** Le gardien danse sur sa ligne, donc la caméra le suit en
+  x, et elle le suit **amortie** : une caméra collée au bassin donne un but qui
+  glisse latéralement à chaque pas, et un but qui bouge est un but qu'on ne peut
+  pas viser ;
+- **il donne la hauteur.** Un ballon qui arrive de face est, en projection, un
+  disque qui grossit et rien d'autre : la hauteur ne se lit que si la caméra est
+  **au dessus** de la ligne d'yeux, assez pour que la pelouse serve de règle sous
+  le ballon. C'est ce que « un peu au dessus » veut dire, et c'est mesurable :
+  depuis ce cadrage, un tir au ras du sol et un tir à mi hauteur ne doivent pas
+  se projeter au même endroit de l'écran à mi vol ;
+- **il ne cache pas la course d'élan.** Les indices de `TakerAi.tells` sont des
+  choses que le tireur **fait avec son corps** ; un cadrage où il n'est qu'une
+  silhouette de vingt pixels rend tout le module inutile.
+
+Il n'entre pas dans `cycle_view()` : c'est le cadrage d'une phase et non un choix
+de confort, et le joueur qui cyclerait hors de lui pendant une lecture perdrait
+le tour. `Main` le pose et le retire avec la phase, et `cycle_view()` **refuse de
+le quitter** plutôt que de sauter au cadrage suivant : la touche `camera_cycle`
+est un réflexe, et un réflexe ne doit pas pouvoir coûter un tour.
+
+**Les trois obligations ci dessus sont tenues par trois nombres, et ils sont
+mesurés.** Le cadrage est à **7.20 m derrière la ligne de but, 3.90 m de haut**,
+visant `(0, 1.35, 0)`, avec un objectif de **40 degrés** vertical. Ce qu'ils
+donnent, calculé sur ce cadrage :
+
+- les poteaux tiennent dans l'image avec de la marge, en 16:9 **comme en 4:3** ;
+- un ballon au ras du sol et un ballon à 1.20 m se projettent **11 % de la hauteur
+  d'image** l'un de l'autre à mi vol, soit une centaine de pixels en 900p : la
+  hauteur se lit ;
+- le tireur fait **14 % de la hauteur d'image** et ses pieds tombent **9 % au
+  dessus de la tête du gardien**, donc les deux corps ne se confondent jamais.
+
+Reculer, descendre ou élargir touche à ces trois chiffres à la fois : si tu
+déplaces ce cadrage, remesure les trois.
+
+La caméra regarde à travers le filet, et c'est **inévitable** : le but est une
+boîte fermée par l'arrière, donc tout objectif placé derrière le gardien voit le
+panneau arrière ou le toit. `View.BUT` vit avec depuis toujours. C'est pour cela
+que l'enveloppe est tracée avec un liseré sombre sous son trait clair.
+
 ```gdscript
 class_name CameraRig
 extends Node3D
 
-enum View { DERRIERE, BUT, TELE, REPLAY }
+## GARDIEN is APPENDED and is NOT part of the cycle: see above.
+enum View { DERRIERE, BUT, TELE, REPLAY, GARDIEN }
 
 var view: int
 var shake: float
 
 func build() -> void
 func set_view(new_view: int) -> void
+## Cycles the four shooting side views. GARDIEN is skipped: it belongs to a
+## phase, not to a preference, and it is set by Main. Called while GARDIEN is up
+## it does NOTHING, rather than cycling out of the only framing the keeper side
+## can be played from.
 func cycle_view() -> void
 ## Follows the ball, or holds the aim framing when it is not flying.
 func track(target: Vector3, flying: bool, delta: float) -> void
+## Where the player keeper is standing on his line, in metres, so the GARDIEN
+## framing follows the line dance. DAMPED, and deliberately slower than the
+## shuffle: a camera welded to the pelvis slides the whole goal sideways under the
+## dive reticle at every step, and a goal that moves is a goal nobody can aim at.
+## A no op in every other view.
+func follow_line(line_x: float, delta: float) -> void
 ## One off impulse, damped over time. `amount` 0..1.
 func add_shake(amount: float) -> void
 ## Slow orbit for the replay, `t` seconds into the replay.
@@ -2260,6 +2972,74 @@ que le joueur voit à l'instant qui compte :
   frappe descend à 0.55) et écrêté : un fondu piloté par lui n'avance presque pas
   sur une machine qui perd des images, et tout le HUD est derrière ce fondu.
 
+#### Le côté gardien : l'enveloppe est l'instrument principal
+
+Quand le joueur garde (mode DUEL, 2.9), le HUD change d'instrument. Quatre règles
+de plus, du même rang que les quatre ci dessus.
+
+- **L'ENVELOPPE A LE DROIT D'ÊTRE AU MILIEU DE L'IMAGE, et elle est la seule.**
+  La première règle ci dessus interdit le centre aux cartes de compte rendu parce
+  que le centre appartient à la bouche du but. L'enveloppe **est** la bouche du
+  but : c'est le dessin de ce que le corps du joueur couvre encore, projeté sur
+  le cadre lui même. La mettre ailleurs reviendrait à demander au joueur de
+  regarder deux endroits à la fois pendant les quatre dixièmes de seconde où il
+  n'a le temps d'en regarder qu'un.
+- **Elle RÉTRÉCIT, visiblement, et c'est tout le mode.** Elle est redessinée à
+  chaque image depuis `KeeperInput.reach_outline`, donc elle ne peut pas mentir
+  sur la règle. Le joueur doit **voir** le cercle se refermer pendant la course
+  d'élan et se refermer plus vite pendant le vol, parce que c'est cette image qui
+  lui apprend, sans une ligne de texte, qu'attendre coûte. C'est la chose la plus
+  importante de l'écran pendant `LECTURE` et rien n'a le droit de la recouvrir.
+- **Les indices sont des indices, jamais des chiffres.** `TakerAi.tells_at` rend
+  des valeurs bruitées, et le HUD les dessine **comme telles** : une inclinaison,
+  une flèche, une largeur, jamais « visée : 2.1 m ». Un nombre affiché est lu
+  comme une vérité, et ce module n'en a aucune à donner. Un indice faiblement
+  fiable se dessine **plus flou**, pas plus petit : le joueur doit distinguer
+  « je ne sais pas » de « il ne va pas là ».
+- **L'invite d'engagement dit QUAND, pas OÙ.** Elle annonce que la fenêtre est
+  ouverte et à quel point elle se ferme, et elle ne suggère jamais un côté.
+
+#### Comment ces quatre règles sont tenues à l'écran
+
+Quatre décisions de dessin en découlent. Elles sont ici parce qu'un autre module
+en dépend, pas pour décrire des pixels.
+
+- **Le fantôme de l'enveloppe.** Le trait vif est l'enveloppe **maintenant** ; un
+  trait pointillé pâle derrière lui est **la même enveloppe 0.40 s plus tôt**.
+  L'écart entre les deux est la vitesse à laquelle la fenêtre se ferme, et c'est
+  la seule partie du rétrécissement qui survive à une image **figée** : en
+  mouvement le joueur voit le cercle se refermer, sur une capture il voit de
+  combien. Il n'y a **que ces deux traits** : un troisième contour intérieur avait
+  l'air d'un instrument et rendait le trait vif indistinct.
+- **La couverture est GELÉE à l'engagement.** `set_reach` ignore le `coverage`
+  reçu tant que `committed` est vrai. Un gardien parti ne couvre pas une part
+  décroissante du but, il couvre **celle qu'il a choisie en partant** : c'est le
+  chiffre avec lequel il a décidé, et c'est celui qui vaut encore d'être lu
+  pendant que le ballon vole. L'orchestrateur peut donc envoyer ce qu'il veut
+  (`Main` envoie zéro et une enveloppe vide), l'anneau garde la vérité du pari.
+- **Les schémas du panneau d'indices sont en MIROIR.** Le gardien regarde vers
+  +Z, donc **+X est à sa gauche** et apparaît à **gauche de l'écran** (2.21). Le
+  plan de la course d'élan et la miniature de la bouche du but sont donc dessinés
+  x inversé. Un schéma non miroir décrirait un autre penalty que celui qui est à
+  l'écran.
+- **Ce que le HUD lit de `TakerAi.tells_at`, et ce qu'il refuse de lire.** Il ne
+  dessine que le **langage du corps** : `run_angle` (l'angle de la course, en
+  éventail dont l'ouverture est l'incertitude), `plant_offset` (le pied d'appui,
+  avec sa bavure latérale), `hip_yaw` (la barre des hanches), `approach_speed`
+  (les chevrons d'allure), `feints` (le seul indice qui soit un **compte**, donc
+  le seul écrit en toutes lettres) et `confidence`, qui ne se dessine pas : c'est
+  lui qui **élargit** tous les autres. `aim_hint`, `lift_hint` et `power_hint`
+  sont **délibérément ignorés** : ce sont des lectures déjà faites, et les
+  afficher reviendrait à jouer le mode à la place du joueur. Une clé **absente**
+  n'est pas dessinée, ce qui est exactement le bon message : le panneau se remplit
+  pendant la course d'élan, et le joueur voit l'information arriver.
+  Le seul endroit où le HUD **interprète** est la bande de tendance en haut du
+  panneau : une bavure large d'au moins 0.85 m sur une miniature du but à
+  l'échelle, pondérée `0.72` pied d'appui, `0.52` hanches, `0.44` course. C'est un
+  **pressentiment**, il a souvent tort, et il n'est jamais un chiffre.
+  Convention de signe, celle de `ShotModel.tell_cues` : un indice **positif** dit
+  « vers +X ».
+
 ```gdscript
 class_name Hud
 extends CanvasLayer
@@ -2284,6 +3064,36 @@ func refresh_series() -> void
 func set_dimmed(dimmed: bool) -> void
 ## Transient message, centred, in French.
 func toast(text: String, seconds: float = 2.0) -> void
+
+## --- Côté gardien, mode DUEL (voir plus haut) --------------------------------
+
+## Switches the whole HUD between the taking instruments (reticle, power, spin,
+## arc) and the keeping ones (envelope, tells, commit prompt, line strip). One
+## call, because the two sets are mutually exclusive and half of each is a mess.
+## Switching CLEARS the set that leaves, so no arc and no envelope can survive
+## into the other half of the duel. Only the change does anything: called every
+## frame it would wipe the envelope's ghost before every redraw.
+func set_keeper_side(keeping: bool) -> void
+## The reach envelope, in WORLD space: the closed ring KeeperInput.reach_outline
+## returned, plus how much of the mouth it still covers (0..1) and whether the
+## dive is already launched. An empty outline hides it. Called every frame: this
+## is the drawing that has to shrink in front of the player.
+## `coverage` is IGNORED while `committed`: see "la couverture est gelée" above.
+func set_reach(outline: PackedVector3Array, coverage: float, committed: bool) -> void
+## Where the player is aiming his dive and whether it is still inside the
+## envelope. `target` is the world point KeeperInput.dive_target gave, `margin`
+## the seconds to spare from KeeperInput.margin, which is what colours it.
+func set_dive_aim(target: Vector3, margin: float) -> void
+## The taker's body language as the player is ALLOWED to read it: the dictionary
+## TakerAi.tells_at returned, nothing else, never the plan. Empty hides the panel.
+func set_tells(cues: Dictionary) -> void
+## The commit prompt. `open` is whether pressing does anything at all, `urgency`
+## 0..1 how far the window has closed. Says when, never where.
+func set_commit_prompt(open: bool, urgency: float) -> void
+## Where the keeper stands on his line, in metres, and the bound he may travel to
+## (KeeperInput.LINE_LIMIT). Drawn as a strip under the goal, so the shuffle is
+## legible without moving the camera.
+func set_line_position(line_x: float, limit: float) -> void
 ```
 
 ---
@@ -2292,6 +3102,28 @@ func toast(text: String, seconds: float = 2.0) -> void
 
 Le tableau de la séance : les deux séries de pastilles, le score, la ligne de
 pression ("Marquez pour gagner"), et l'écran de fin. Dessiné en `_draw`.
+
+#### En DUEL, les deux rangées sont des RÔLES et non deux équipes
+
+Le tableau ne change pas de forme, il change de **légende**. `Mode.DUEL` ouvre les
+deux rangées comme `Mode.SEANCE`, et la seconde porte toujours `rival_scores` :
+un tour que le joueur a **gardé** est un tour que l'ordinateur a **tiré**, c'est
+la même case. Ce qui change est ce qui est écrit dessus, parce qu'en duel les
+deux rangées sont le joueur, et un tableau qui dirait « VOUS » et « ADVERSAIRE »
+mentirait sur la moitié de la séance :
+
+- rangée haute « **VOUS TIREUR** », badge ballon ;
+- rangée basse « **VOUS GARDIEN** », badge gant.
+
+Le reste est inchangé et suffit : `rival_to_kick()` reste la seule réponse à « à
+qui le tour », donc la rangée éclairée et le chevron désignent déjà le rôle du
+tour qui vient, et `pressure_text()` le dit en toutes lettres depuis le côté du
+joueur. La chronologie se lit sans numéroter quoi que ce soit, puisque les tours
+alternent : la n-ième pastille de chaque rangée est le n-ième tour de ce rôle.
+
+L'écran de fin ajoute une ligne que seul ce mode peut écrire : **« Arrêts : N sur
+M »**, comptés sur `Verdict.ARRET` dans `rival_scores`. C'est le travail du joueur
+comme gardien, et c'est la moitié du duel que le score seul ne raconte pas.
 
 ```gdscript
 class_name Scoreboard
@@ -2322,6 +3154,47 @@ Deux règles de mise en page :
 - **Pas de fondu d'ouverture.** Un écran affiché est un écran qu'on lit. En prime
   l'orchestrateur a le droit de redemander la page déjà ouverte : `open_home()`
   sur la page courante ne réinitialise donc **ni** le focus **ni** l'animation.
+
+L'accueil propose désormais **cinq** modes, `Shootout.Mode` au complet, libellés
+par `Shootout.mode_label`. `mode_chosen` ne change pas : elle porte déjà un entier
+et `Mode.DUEL` comme `Mode.GARDIEN` en sont. La ligne d'aide de la rangée « Duel »
+doit dire ce que le mode fait, parce qu'il est le seul dont le nom ne l'annonce
+pas : « Vous tirez, puis vous gardez : les rôles alternent. »
+
+« Entraînement gardien » se range **sous Duel** et non sous Entraînement, parce
+que c'est le Duel qu'il entraîne : un joueur qui vient de se faire battre cinq
+fois dans les gants cherche la réponse à côté du mode qui l'a battu.
+
+Le côté gardien ne déclare **aucune touche** nouvelle (2.26) : les trois entrées
+du tireur changent de métier. La page **Commandes** ne les liste pas pour autant.
+Elle porte à leur place une rangée d'action, **« Duel, gardien : touches et
+règles »**, qui ouvre une page à elle (`PAGE_KEEPER`, titre `GARDIEN`) où les
+trois entrées figurent en tête de l'explication.
+
+**La hauteur de la page est un budget, pas un détail.** Elle est mesurée depuis le
+nombre de rangées, et à 900 px de référence quinze rangées sont tout ce qu'elle
+peut prendre. Les trois lignes gardien plus la rangée d'action en faisaient
+seize : « Retour » sortait par le bas et la plaque de pied de page disparaissait
+entièrement de l'écran. Avant d'ajouter une rangée ici, la regarder.
+
+**Les touches n'ont jamais été la difficulté.** Elles sont trois, ce sont celles
+du tireur, et elles figurent déjà dans la liste au-dessus. Ce qu'un joueur qui
+arrive dans un tour gardé ignore, c'est ce qu'est l'anneau bleu, pourquoi il
+rétrécit sous ses yeux, et que le mode est construit pour qu'**attendre de savoir
+soit perdre**. Rien de tout cela ne se lit sur une liste de touches, et un joueur
+à qui on ne l'a pas dit joue le tour comme un test de réflexes, le perd, et en
+conclut que le gardien est cassé.
+
+La page réutilise les deux colonnes de `CONTROLS` et n'a donc **pas de peintre à
+elle** : à gauche ce que le joueur VOIT, à droite ce que ça VEUT DIRE. Sa carte
+est un peu plus large que celle des touches, parce que sa colonne de droite porte
+des phrases et non des noms de touches. Elle se rejoint depuis les Commandes et
+d'un seul endroit, donc `_back` y code son retour en dur au lieu de toucher à
+`_return_page`, qui retient encore d'où la liste des touches a été ouverte.
+
+Les trois nombres qu'elle cite sont les vrais et ne sont pas décoratifs :
+`KeeperInput.NOMINAL_FLIGHT`, le temps de réaction que `KeeperBrain` paie, et un
+plongeon complet jusqu'au poteau.
 
 ```gdscript
 class_name MenuUi
@@ -2373,6 +3246,12 @@ var last_verdict: int
 ## The last strike dictionary produced by ShotModel.resolve.
 var last_shot: Dictionary
 
+## The plan TakerAi.choose produced for the round the player is keeping, and the
+## dive KeeperInput.commit produced from his own press. Both empty outside a
+## keeper side round, and both are what the probe reads to prove the mode ran.
+var last_taker: Dictionary
+var last_dive: Dictionary
+
 ## Real seconds the tree keeps ticking, mixer silent, before the process exits.
 ## Voir `Sfx.silence_all` : une voix arretee reste enregistree dans le serveur
 ## audio pendant quelques images, et un `quit()` immediat la laisse derriere lui.
@@ -2383,6 +3262,22 @@ const AUDIO_DRAIN_SECONDS := 0.35
 ## Forces a whole shot from code, bypassing the input. The probe uses it to fire
 ## reproducible penalties. Returns the strike dictionary.
 func fire_test_shot(aim: Vector2, power: float, side: float, lift: float) -> Dictionary
+## Forces a whole KEEPER side round from code, the mirror of fire_test_shot: the
+## CPU taker of `rng_seed` kicks, and the player keeper standing at `line_x`
+## commits at `commit_t` (seconds relative to contact, negative before it) to the
+## dive `aim` asks for. Plays out the real flight against the real save test, so
+## the probe measures the mode rather than a re-implementation of it.
+## Returns {"verdict": int, "taker": Dictionary, "dive": Dictionary,
+##          "saved": bool, "catch": bool, "coverage": float}
+## THE DICTIONARY IS THE LIVE ONE. A penalty has no verdict until it has been
+## played, and playing it takes a second of real physics, so this call LAUNCHES
+## the round and hands back the dictionary it will fill in. Godot dictionaries are
+## references: the caller keeps the handle and reads it once the flight has
+## settled (`_probe_shot_settled`). "verdict" is -1 until then, the same "no
+## verdict yet" the rest of this file uses. `pressure` is deliberately false
+## rather than read off the series, so one seed is one penalty whatever the score
+## was at the time.
+func fire_test_duel(rng_seed: int, aim: Vector2, commit_t: float, line_x: float) -> Dictionary
 ## Jumps straight to a phase, for the probe.
 func force_phase(phase: int) -> void
 ## Fait taire le mixeur puis quitte une fois que le serveur audio a vraiment
@@ -2406,6 +3301,58 @@ Séquence d'une phase, gérée par `Main` :
 | `REPLAY` | orbite sur le vol **et** le plongeon enregistrés, depuis la course d'élan | fin du replay ou touche |
 | `FIN` | tableau de résultat | rejouer ou quitter |
 
+#### Le tour où le joueur garde (mode DUEL)
+
+Deux phases de plus, et **deux seulement**. Elles remplacent `PLACEMENT`, `VISEE`
+et `COURSE` ; `VOL`, `VERDICT` et `REPLAY` sont **repris tels quels**, et c'est
+voulu : un ballon en vol, un verdict et un replay sont les mêmes objets des deux
+côtés du duel, et les doubler serait deux fois le même code avec un bug de
+décalage dans l'un des deux.
+
+| Phase | Entrée | Sortie |
+|---|---|---|
+| `PLACEMENT_GARDIEN` | ballon sur le point, joueur au milieu de sa ligne, caméra GARDIEN, **la danse sur la ligne est déjà rendue au joueur** | 0.8 s écoulées |
+| `LECTURE` | le tireur CPU est choisi (`Shootout.duel_taker_plan`), la course d'élan se joue, les indices fuient image par image, la danse continue, l'engagement est autorisé | contact |
+| `VOL` | le ballon vole, le plongeon du joueur se déroule, le test d'arrêt est celui de `Keeper` | verdict atteint ou ballon au repos |
+| `VERDICT` | banderole, foule, score, `take_rival_kick_played` | 2.2 s écoulées |
+
+**Le plan est choisi à l'entrée de `LECTURE` et pas plus tôt**, et c'est ce qui
+donne des dents à la danse sur la ligne. `TakerAi.read_keeper` veut la position du
+gardien « quand le tireur pose son pied d'appui », mais la course d'élan elle même
+est dessinée à partir du plan : il faut donc le connaître avant de la lancer. Le
+seul instant qui satisfasse les deux est **le dernier regard du tireur avant de se
+retourner**, c'est à dire l'instant où la course commence. Le joueur passe donc
+`PLACEMENT_GARDIEN` à choisir son coin de ligne, le tireur le lit là, et pendant
+`LECTURE` le joueur peut encore bouger : cela ne change plus l'intention du tireur
+(elle est prise), seulement son **enveloppe** à lui, ce qui est le vrai marché.
+
+**Ce que le joueur a le droit de savoir sur l'arrivée du ballon.** Avant la
+frappe, `KeeperInput.NOMINAL_FLIGHT`, parce que personne ne peut savoir mieux.
+Après la frappe, le **vrai temps de vol restant**, calculé une fois par
+`Aero.cross_plane` sur la frappe réelle : le joueur voit le ballon, donc le lui
+donner est honnête, et c'est ce qui referme l'enveloppe bien plus vite sur une
+mine que sur une casserole.
+
+**Le plongeon n'est pas une phase, et c'est structurel.** Un gardien qui parie
+part **avant** le contact : son plongeon commence donc dans `LECTURE` et se
+termine dans `VOL`, à cheval sur la frappe, exactement comme `Keeper.pose_log`
+enregistre des `t` négatifs depuis toujours. En faire une phase obligerait à
+l'entrer deux fois, ou à interdire l'engagement anticipé, qui est le mécanisme
+central du mode.
+
+**Le clavier et la souris changent de rôle, pas de nom.** Aucune action nouvelle
+n'est déclarée dans `Game` (2.8) : `strike` engage le plongeon, la souris déplace
+la cible de plongeon au lieu du réticule de tir, `aim_left` / `aim_right` sont la
+danse sur la ligne. Un mode qui ajouterait quatre touches à apprendre pendant
+qu'on regarde un tireur courir n'en serait pas un.
+
+**Ce que `Main` a le droit de transmettre, et rien d'autre.** Le plan du tireur
+(`Shootout.duel_taker_plan`) reste **dans `Main`** jusqu'au contact. Ce qui
+descend vers `Hud` est `TakerAi.tells_at`, jamais le plan ; ce qui descend vers
+`TakerAi.read_keeper` est le `line_x` du gardien, jamais sa cible de plongeon ni
+son engagement. C'est l'orchestrateur qui tient les deux règles d'équité de 2.12a
+et 2.12b, parce que c'est le seul module qui voie les deux côtés à la fois.
+
 ---
 
 ## 3. Tests
@@ -2424,6 +3371,8 @@ elle ne compile pas sous `--script`.
 | `tests/test_pitch_geometry.gd` | `Field` : dedans/dehors, poteaux, balayage |
 | `tests/test_aero.gd` | `Aero` : conservation, traînée, Magnus, visée inverse |
 | `tests/test_keeper_brain.gd` | `KeeperBrain` : réaction, allonge, arrêts, déterminisme |
+| `tests/test_keeper_input.gd` | `KeeperInput` : enveloppe décroissante, jamais tout le but, danse bornée |
+| `tests/test_taker_ai.gd` | `TakerAi` : plans figés par graine, réticule inverse, indices bruités |
 | `tests/test_match_state.gd` | logique de séance **recopiée** dans la suite, pas l'autoload |
 | `tests/test_meshes.gd` | `Meshes` : normales, tangentes, comptes de sommets |
 | `tests/test_sfx_lib.gd` | `SfxLib` : tous les ids, fondu de sortie, boucle unique |
@@ -2438,6 +3387,13 @@ la lucarne à pleine puissance contre un débutant est un but, un tir au centre
 mou contre une légende est arrêté, la somme des verdicts est cohérente avec le
 score, le filet bouge quand le ballon entre, aucune trajectoire ne part à
 l'infini.
+
+Il couvre aussi le mode DUEL, par `Main.fire_test_duel`, et sur les invariants du
+mode plutôt que sur son décor : un plongeon engagé tôt dans le bon coin arrête un
+penalty placé, le même plongeon engagé trop tard ne l'arrête pas, une lucarne bien
+frappée passe quel que soit l'engagement, un tour gardé fait grandir
+`rival_scores` d'exactement une case, et deux exécutions de la même graine rendent
+le même verdict.
 
 `tests/balance_probe.gd` tourne lui aussi dans le vrai jeu :
 `godot --headless --path . -- --balance`. Il ne vérifie rien, il **mesure** :

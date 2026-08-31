@@ -229,6 +229,24 @@ var _tell_noise: float = 0.0
 var _plant_noise: float = 0.0
 var _cycle_phase: float = 0.0
 
+## --- When the COMPUTER is holding this body (DUEL, see CONTRACTS 2.20) --------
+##
+## The run up is ticked through the very same `advance_run_up` a human run up is
+## ticked through: what changes is only WHO decides. While `_cpu` is true the
+## player's keys are ignored, the approach lasts `_cpu_run_time` instead of
+## RUN_UP_TIME, the feints are scripted rather than pressed, and the strike comes
+## from `TakerAi.strike` rather than from the aim and power a human dialled in.
+## `reset_stance()` is the only thing that hands the body back.
+var _cpu: bool = false
+var _cpu_plan: Dictionary = {}
+var _cpu_seed: int = 0
+var _cpu_level: int = 1
+## Seconds the scripted approach lasts. Zero while a human is holding the body.
+var _cpu_run_time: float = 0.0
+## Progress values at which the scripted stutter steps fire, ascending.
+var _cpu_feints: PackedFloat32Array = PackedFloat32Array()
+var _cpu_feints_done: int = 0
+
 ## What he thinks of the result, and how long he has been thinking it. -1 is "the
 ## verdict is not in yet", which is also the state the whole run up is played in.
 var _react_verdict: int = -1
@@ -585,6 +603,15 @@ func reset_stance() -> void:
 	_plant_offset = 0.0
 	_hip_yaw_base = 0.0
 	_pv_valid = false
+	# The body goes back to the human. This is the ONLY place that clears it, as
+	# the contract promises, so a half played CPU run up can never leak into the
+	# next attempt.
+	_cpu = false
+	_cpu_plan = {}
+	_cpu_seed = 0
+	_cpu_run_time = 0.0
+	_cpu_feints = PackedFloat32Array()
+	_cpu_feints_done = 0
 	_pv_power = -1.0
 
 	_sweep_scale = _read_sweep_scale()
@@ -725,17 +752,108 @@ func _begin_run_up() -> void:
 func advance_run_up(delta: float) -> void:
 	if not _built or not running:
 		return
-	_read_feint()
+	# A scripted approach reads its stutter steps off the plan; a human reads his
+	# off the keyboard. Never both: while the computer holds this body the feint
+	# key belongs to nobody.
+	if _cpu:
+		_read_cpu_feint()
+	else:
+		_read_feint()
 
 	var speed: float = 1.0
 	if _feint_left > 0.0:
 		_feint_left = maxf(_feint_left - delta, 0.0)
 		speed = FEINT_SLOW
 	_travel += delta * speed
-	_run_progress = clampf(_travel / RUN_UP_TIME, 0.0, 1.0)
+	var span: float = _cpu_run_time if _cpu else RUN_UP_TIME
+	_run_progress = clampf(_travel / maxf(span, 0.0001), 0.0, 1.0)
 	if _run_progress >= 1.0 and not _contacted:
 		_do_contact()
 	_apply_pose()
+
+
+## Seconds from now until contact while a CPU run up is playing, negative once it
+## has struck, and zero when no scripted run up is playing at all. Main reconciles
+## this with the keeper's own clock, which counts the other way.
+func time_to_contact() -> float:
+	if not _cpu:
+		return 0.0
+	return _cpu_run_time - _travel
+
+
+## Hands this body to `TakerAi`. See CONTRACTS 2.20.
+##
+## The plan never reaches the screen through this body except as body language:
+## the approach shows what `TakerAi.tells_at` says it shows and no more, which is
+## what keeps the player guessing exactly as the AI keeper has to.
+func run_cpu_penalty(plan: Dictionary, rng_seed: int) -> void:
+	if not _built:
+		build()
+	if plan.is_empty():
+		push_warning("Shooter: run_cpu_penalty received an empty plan, the taker stands still.")
+		return
+
+	reset_stance()
+	_cpu = true
+	_cpu_plan = plan.duplicate(true)
+	_cpu_seed = rng_seed
+	_cpu_level = int(plan.get("level", TakerAi.SEANCE_LEVEL))
+	_cpu_run_time = maxf(TakerAi.run_up_time(_cpu_level, rng_seed), 0.05)
+
+	# Feints are decided up front and fired by progress, so the approach is the
+	# same every time this seed is replayed. Spread them across the window the
+	# human feint is allowed in, so a scripted stutter cannot happen after the
+	# point a human one would be refused.
+	var count: int = clampi(TakerAi.feint_count(_cpu_level, rng_seed), 0, FEINT_MAX)
+	_cpu_feints = PackedFloat32Array()
+	for i in count:
+		_cpu_feints.append(FEINT_LATEST * (float(i) + 1.0) / (float(count) + 1.0))
+	_cpu_feints_done = 0
+
+	# The tells at the top of the run up. `advance_run_up` refreshes them as the
+	# approach plays, so what leaks grows with what the taker has committed to.
+	_adopt_cpu_tells(0.0)
+
+	charging = false
+	running = true
+	_contacted = false
+	_travel = 0.0
+	_run_progress = 0.0
+	_follow_time = 0.0
+	_feint_left = 0.0
+	feints = 0
+	_release = float(plan.get("release", SWEET_CENTRE))
+	power = float(plan.get("power", 0.8))
+	_final_pos = Vector3(-0.26 + _plant_offset * 0.10, 0.0, Field.SPOT_Z + 0.46)
+	_run_bend = -0.28 - 0.34 * _run_angle
+	run_up_started.emit()
+
+
+## Copies the body language TakerAi is willing to show at this point of the run.
+func _adopt_cpu_tells(t: float) -> void:
+	var shown: Dictionary = TakerAi.tells_at(_cpu_plan, _cpu_level, _cpu_seed, t)
+	if shown.is_empty():
+		return
+	_run_angle = clampf(float(shown.get("run_angle", 0.0)), -1.0, 1.0)
+	_plant_offset = clampf(float(shown.get("plant_offset", 0.0)), -1.0, 1.0)
+	_hip_yaw_base = float(shown.get("hip_yaw", _run_angle * 0.12))
+
+
+## The scripted stutter step. Same visible effect as the human one, fired by
+## progress rather than by a key.
+func _read_cpu_feint() -> void:
+	_adopt_cpu_tells(_run_progress)
+	if _cpu_feints_done >= _cpu_feints.size():
+		return
+	if _feint_left > 0.0:
+		return
+	if _run_progress < _cpu_feints[_cpu_feints_done]:
+		return
+	_cpu_feints_done += 1
+	feints += 1
+	_feint_left = FEINT_WINDOW
+	_feint_dir = -signf(_run_angle) if not is_zero_approx(_run_angle) else 1.0
+	feinted.emit(feints)
 
 
 func _read_feint() -> void:
@@ -766,11 +884,15 @@ func _do_contact() -> void:
 	# contact effect has to land on the ball, not one frame behind it.
 	_apply_pose()
 
-	var shot: Dictionary = ShotModel.resolve(
-		aim, power, side_spin, lift_spin, _release, SWEET_CENTRE, _shot_seed()
-	)
+	# A scripted penalty resolves through TakerAi, which owns the plan and its
+	# seed. Resolving it from `aim` and `power` here would be resolving a shot the
+	# computer never chose, and the aim it would read is the human's leftover.
+	var shot: Dictionary = TakerAi.strike(_cpu_plan, _cpu_seed) if _cpu \
+		else ShotModel.resolve(
+			aim, power, side_spin, lift_spin, _release, SWEET_CENTRE, _shot_seed()
+		)
 	if shot.is_empty():
-		push_error("Shooter: ShotModel.resolve returned nothing, the strike is lost.")
+		push_error("Shooter: the strike resolved to nothing and is lost.")
 		return
 	struck.emit(shot)
 

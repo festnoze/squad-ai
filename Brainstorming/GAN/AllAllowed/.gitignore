@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+runs/
+*.egg-info/
+.coverage
+coverage.xml
+htmlcov/
+
+# web
+web/node_modules/
+web/dist/
+web/*.tsbuildinfo

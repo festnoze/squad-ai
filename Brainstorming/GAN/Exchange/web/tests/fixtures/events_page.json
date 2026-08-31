@@ -1,0 +1,911 @@
+{
+  "items": [
+    {
+      "seq": 1,
+      "type": "match_started",
+      "match_id": "m-election-20260827-01",
+      "tick": 0,
+      "seed": 20260827,
+      "engine_version": "1.0.0",
+      "obs_version": "1.0",
+      "action_version": "1.0",
+      "scenario_template_id": "election",
+      "scenario_template_version": "1.0.0",
+      "ticks_total": 48,
+      "initial_cash_cents": 1000000,
+      "config": {
+        "action_version": "1.0",
+        "bankruptcy_equity_floor_cents": 0,
+        "bankruptcy_free_cash_floor_cents": 0,
+        "engine_version": "1.0.0",
+        "initial_cash_cents": 1000000,
+        "liquidity_profile_name": "standard",
+        "market_band_cents": 10,
+        "max_active_orders_per_market": 10,
+        "max_orders_per_action": 20,
+        "message_max_chars": 280,
+        "mm": {
+          "base_spread_cents": 6,
+          "enabled": true,
+          "inventory_max": 300,
+          "post_news_widen_ticks": 2,
+          "quote_qty": 25,
+          "skew_cents": 4,
+          "widen_multiplier": 2
+        },
+        "mm_initial_cash_cents": 10000000,
+        "n_agents": 6,
+        "n_markets": 5,
+        "obs_version": "1.0",
+        "ref_history_len": 12,
+        "seed": 20260827,
+        "taker_fee_bps": 0,
+        "talking_mode": false,
+        "ticks_total": 48
+      },
+      "markets": [
+        {
+          "correlation_group": "g1",
+          "latent_key": "election.adler_strength",
+          "market_id": "M1",
+          "prior_price": 56,
+          "question": "Will candidate ADLER win the presidency?",
+          "resolution_tick": 48,
+          "tags": [
+            "election",
+            "headline"
+          ]
+        },
+        {
+          "correlation_group": "g1",
+          "latent_key": "election.turnout",
+          "market_id": "M2",
+          "prior_price": 45,
+          "question": "Will national turnout exceed 60 percent?",
+          "resolution_tick": 48,
+          "tags": [
+            "election",
+            "turnout"
+          ]
+        },
+        {
+          "correlation_group": "g1",
+          "latent_key": "election.adler_north",
+          "market_id": "M3",
+          "prior_price": 62,
+          "question": "Will ADLER carry the Northern province?",
+          "resolution_tick": 48,
+          "tags": [
+            "election",
+            "region"
+          ]
+        },
+        {
+          "correlation_group": "g2",
+          "latent_key": "election.brand_concedes",
+          "market_id": "M4",
+          "prior_price": 37,
+          "question": "Will BRAND concede before the final count?",
+          "resolution_tick": 48,
+          "tags": [
+            "election",
+            "reaction"
+          ]
+        },
+        {
+          "correlation_group": "g2",
+          "latent_key": "election.coalition_majority",
+          "market_id": "M5",
+          "prior_price": 55,
+          "question": "Will the ruling coalition keep its majority?",
+          "resolution_tick": 48,
+          "tags": [
+            "election",
+            "parliament"
+          ]
+        }
+      ],
+      "agents": [
+        {
+          "agent_id": "A1",
+          "config_hash": "d02066bc08af6c72",
+          "harness_id": "fundamentalist",
+          "harness_version": "1.0.0",
+          "info_profile_kind": "generalist",
+          "ranked": true
+        },
+        {
+          "agent_id": "A2",
+          "config_hash": "b0c8e9923ab73320",
+          "harness_id": "momentum",
+          "harness_version": "1.0.0",
+          "info_profile_kind": "specialist",
+          "ranked": true
+        },
+        {
+          "agent_id": "A3",
+          "config_hash": "79d9167a70d8876e",
+          "harness_id": "noise",
+          "harness_version": "1.0.0",
+          "info_profile_kind": "delayed",
+          "ranked": true
+        },
+        {
+          "agent_id": "A4",
+          "config_hash": "27607b6dcbc5c49d",
+          "harness_id": "zero_intelligence",
+          "harness_version": "1.0.0",
+          "info_profile_kind": "generalist",
+          "ranked": true
+        },
+        {
+          "agent_id": "A5",
+          "config_hash": "e1b145d950bb1898",
+          "harness_id": "bayesian",
+          "harness_version": "1.0.0",
+          "info_profile_kind": "specialist",
+          "ranked": true
+        },
+        {
+          "agent_id": "A6",
+          "config_hash": "ff70ae1c865ace1a",
+          "harness_id": "mute",
+          "harness_version": "1.0.0",
+          "info_profile_kind": "delayed",
+          "ranked": true
+        }
+      ],
+      "mm_config": {
+        "base_spread_cents": 6,
+        "enabled": true,
+        "inventory_max": 300,
+        "post_news_widen_ticks": 2,
+        "quote_qty": 25,
+        "skew_cents": 4,
+        "widen_multiplier": 2
+      }
+    },
+    {
+      "seq": 2,
+      "type": "tick_started",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "open_market_ids": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5"
+      ]
+    },
+    {
+      "seq": 3,
+      "type": "news_published",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "news_id": "n-001-00",
+      "market_ids": [
+        "M3"
+      ],
+      "headline": "Rowan Bureau on M3: reading at 93 percent",
+      "body": "Will ADLER carry the Northern province? Published at tick 1 by Rowan Bureau. Latest public reading: 93 percent. Coverage: M3.",
+      "impact": "low",
+      "is_noise": true,
+      "origin": "info_engine"
+    },
+    {
+      "seq": 4,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A1-00",
+      "agent_id": "A1",
+      "market_id": "M2",
+      "kind": "point_estimate",
+      "value_milli": 377,
+      "precision_ppm": 836120
+    },
+    {
+      "seq": 5,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A2-00",
+      "agent_id": "A2",
+      "market_id": "M4",
+      "kind": "point_estimate",
+      "value_milli": 432,
+      "precision_ppm": 789265
+    },
+    {
+      "seq": 6,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A2-01",
+      "agent_id": "A2",
+      "market_id": "M5",
+      "kind": "point_estimate",
+      "value_milli": 480,
+      "precision_ppm": 801282
+    },
+    {
+      "seq": 7,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A3-00",
+      "agent_id": "A3",
+      "market_id": "M4",
+      "kind": "threshold",
+      "value_milli": -500,
+      "precision_ppm": 830564
+    },
+    {
+      "seq": 8,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A4-00",
+      "agent_id": "A4",
+      "market_id": "M5",
+      "kind": "point_estimate",
+      "value_milli": 357,
+      "precision_ppm": 839630
+    },
+    {
+      "seq": 9,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A4-01",
+      "agent_id": "A4",
+      "market_id": "M2",
+      "kind": "point_estimate",
+      "value_milli": 540,
+      "precision_ppm": 836120
+    },
+    {
+      "seq": 10,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A5-00",
+      "agent_id": "A5",
+      "market_id": "M1",
+      "kind": "point_estimate",
+      "value_milli": 592,
+      "precision_ppm": 929368
+    },
+    {
+      "seq": 11,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A5-01",
+      "agent_id": "A5",
+      "market_id": "M1",
+      "kind": "point_estimate",
+      "value_milli": 634,
+      "precision_ppm": 929368
+    },
+    {
+      "seq": 12,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A6-00",
+      "agent_id": "A6",
+      "market_id": "M4",
+      "kind": "point_estimate",
+      "value_milli": 644,
+      "precision_ppm": 830564
+    },
+    {
+      "seq": 13,
+      "type": "signal_delivered",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "signal_id": "s-001-A6-01",
+      "agent_id": "A6",
+      "market_id": "M4",
+      "kind": "point_estimate",
+      "value_milli": 255,
+      "precision_ppm": 830564
+    },
+    {
+      "seq": 14,
+      "type": "observation_built",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A1",
+      "obs_version": "1.0",
+      "n_markets": 5,
+      "n_news": 1,
+      "n_signals": 1
+    },
+    {
+      "seq": 15,
+      "type": "observation_built",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A2",
+      "obs_version": "1.0",
+      "n_markets": 5,
+      "n_news": 1,
+      "n_signals": 2
+    },
+    {
+      "seq": 16,
+      "type": "observation_built",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A3",
+      "obs_version": "1.0",
+      "n_markets": 5,
+      "n_news": 1,
+      "n_signals": 1
+    },
+    {
+      "seq": 17,
+      "type": "observation_built",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A4",
+      "obs_version": "1.0",
+      "n_markets": 5,
+      "n_news": 1,
+      "n_signals": 2
+    },
+    {
+      "seq": 18,
+      "type": "observation_built",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A5",
+      "obs_version": "1.0",
+      "n_markets": 5,
+      "n_news": 1,
+      "n_signals": 2
+    },
+    {
+      "seq": 19,
+      "type": "observation_built",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A6",
+      "obs_version": "1.0",
+      "n_markets": 5,
+      "n_news": 1,
+      "n_signals": 2
+    },
+    {
+      "seq": 20,
+      "type": "agent_action_received",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A1",
+      "action_version": "1.0",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 558662
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 398411
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 642843
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 358229
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 565718
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "fundamentalist: 5 predictions, 0 orders",
+      "n_rejected": 0
+    },
+    {
+      "seq": 21,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A1",
+      "market_id": "M1",
+      "p_yes_ppm": 558662,
+      "carried": false
+    },
+    {
+      "seq": 22,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A1",
+      "market_id": "M2",
+      "p_yes_ppm": 398411,
+      "carried": false
+    },
+    {
+      "seq": 23,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A1",
+      "market_id": "M3",
+      "p_yes_ppm": 642843,
+      "carried": false
+    },
+    {
+      "seq": 24,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A1",
+      "market_id": "M4",
+      "p_yes_ppm": 358229,
+      "carried": false
+    },
+    {
+      "seq": 25,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A1",
+      "market_id": "M5",
+      "p_yes_ppm": 565718,
+      "carried": false
+    },
+    {
+      "seq": 26,
+      "type": "agent_action_received",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A2",
+      "action_version": "1.0",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 560000
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 620000
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "momentum: 5 predictions, 0 orders",
+      "n_rejected": 0
+    },
+    {
+      "seq": 27,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A2",
+      "market_id": "M1",
+      "p_yes_ppm": 560000,
+      "carried": false
+    },
+    {
+      "seq": 28,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A2",
+      "market_id": "M2",
+      "p_yes_ppm": 450000,
+      "carried": false
+    },
+    {
+      "seq": 29,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A2",
+      "market_id": "M3",
+      "p_yes_ppm": 620000,
+      "carried": false
+    },
+    {
+      "seq": 30,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A2",
+      "market_id": "M4",
+      "p_yes_ppm": 370000,
+      "carried": false
+    },
+    {
+      "seq": 31,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A2",
+      "market_id": "M5",
+      "p_yes_ppm": 550000,
+      "carried": false
+    },
+    {
+      "seq": 32,
+      "type": "agent_action_received",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A3",
+      "action_version": "1.0",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 486776
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 485638
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 587468
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 268951
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 436262
+        }
+      ],
+      "orders": [
+        {
+          "market_id": "M1",
+          "op": "place",
+          "order_id": null,
+          "price": 57,
+          "qty": 13,
+          "side": "buy",
+          "type": "limit"
+        },
+        {
+          "market_id": "M3",
+          "op": "place",
+          "order_id": null,
+          "price": 65,
+          "qty": 12,
+          "side": "buy",
+          "type": "limit"
+        }
+      ],
+      "message_public": null,
+      "rationale": "noise: 5 predictions, 2 orders",
+      "n_rejected": 0
+    },
+    {
+      "seq": 33,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A3",
+      "market_id": "M1",
+      "p_yes_ppm": 486776,
+      "carried": false
+    },
+    {
+      "seq": 34,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A3",
+      "market_id": "M2",
+      "p_yes_ppm": 485638,
+      "carried": false
+    },
+    {
+      "seq": 35,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A3",
+      "market_id": "M3",
+      "p_yes_ppm": 587468,
+      "carried": false
+    },
+    {
+      "seq": 36,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A3",
+      "market_id": "M4",
+      "p_yes_ppm": 268951,
+      "carried": false
+    },
+    {
+      "seq": 37,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A3",
+      "market_id": "M5",
+      "p_yes_ppm": 436262,
+      "carried": false
+    },
+    {
+      "seq": 38,
+      "type": "agent_action_received",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A4",
+      "action_version": "1.0",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 500000
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 500000
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 500000
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 500000
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 500000
+        }
+      ],
+      "orders": [
+        {
+          "market_id": "M1",
+          "op": "place",
+          "order_id": null,
+          "price": 38,
+          "qty": 43,
+          "side": "sell",
+          "type": "limit"
+        },
+        {
+          "market_id": "M2",
+          "op": "place",
+          "order_id": null,
+          "price": 42,
+          "qty": 43,
+          "side": "buy",
+          "type": "limit"
+        },
+        {
+          "market_id": "M3",
+          "op": "place",
+          "order_id": null,
+          "price": 88,
+          "qty": 57,
+          "side": "buy",
+          "type": "limit"
+        },
+        {
+          "market_id": "M4",
+          "op": "place",
+          "order_id": null,
+          "price": 96,
+          "qty": 37,
+          "side": "sell",
+          "type": "limit"
+        },
+        {
+          "market_id": "M5",
+          "op": "place",
+          "order_id": null,
+          "price": 30,
+          "qty": 27,
+          "side": "sell",
+          "type": "limit"
+        }
+      ],
+      "message_public": null,
+      "rationale": "zero_intelligence: 5 predictions, 5 orders",
+      "n_rejected": 0
+    },
+    {
+      "seq": 39,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A4",
+      "market_id": "M1",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "seq": 40,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A4",
+      "market_id": "M2",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "seq": 41,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A4",
+      "market_id": "M3",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "seq": 42,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A4",
+      "market_id": "M4",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "seq": 43,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A4",
+      "market_id": "M5",
+      "p_yes_ppm": 500000,
+      "carried": false
+    },
+    {
+      "seq": 44,
+      "type": "agent_action_received",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A5",
+      "action_version": "1.0",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 591014
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 620000
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "bayesian: 5 predictions, 0 orders",
+      "n_rejected": 0
+    },
+    {
+      "seq": 45,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A5",
+      "market_id": "M1",
+      "p_yes_ppm": 591014,
+      "carried": false
+    },
+    {
+      "seq": 46,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A5",
+      "market_id": "M2",
+      "p_yes_ppm": 450000,
+      "carried": false
+    },
+    {
+      "seq": 47,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A5",
+      "market_id": "M3",
+      "p_yes_ppm": 620000,
+      "carried": false
+    },
+    {
+      "seq": 48,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A5",
+      "market_id": "M4",
+      "p_yes_ppm": 370000,
+      "carried": false
+    },
+    {
+      "seq": 49,
+      "type": "prediction_recorded",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A5",
+      "market_id": "M5",
+      "p_yes_ppm": 550000,
+      "carried": false
+    },
+    {
+      "seq": 50,
+      "type": "agent_action_received",
+      "match_id": "m-election-20260827-01",
+      "tick": 1,
+      "agent_id": "A6",
+      "action_version": "1.0",
+      "source": "scripted",
+      "predictions": [
+        {
+          "market_id": "M1",
+          "p_yes_ppm": 560000
+        },
+        {
+          "market_id": "M2",
+          "p_yes_ppm": 450000
+        },
+        {
+          "market_id": "M3",
+          "p_yes_ppm": 620000
+        },
+        {
+          "market_id": "M4",
+          "p_yes_ppm": 370000
+        },
+        {
+          "market_id": "M5",
+          "p_yes_ppm": 550000
+        }
+      ],
+      "orders": [],
+      "message_public": null,
+      "rationale": "mute: 5 predictions, 0 orders",
+      "n_rejected": 0
+    }
+  ],
+  "total": 200,
+  "limit": 50,
+  "offset": 0
+}

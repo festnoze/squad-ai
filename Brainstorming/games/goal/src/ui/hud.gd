@@ -42,6 +42,14 @@ extends CanvasLayer
 ##          decoration. The gate keeps the lit body, the posts and the pointers
 ##          that made it findable at a glance, and it is labelled RELÂCHEZ ICI.
 ##
+##   4. When the player is the one in the goal (mode Duel), the whole set of
+##      instruments is swapped rather than added to: `set_keeper_side()` puts the
+##      reticle, the power module, the spin gauge and the trajectory arc away and
+##      brings out the reach envelope, the tells, the commit prompt and the line
+##      strip. The four rules that half lives under are written above the keeper
+##      side constants, and the first of them is that the envelope owns the middle
+##      of the frame.
+##
 ## Engine trap this file is built around: a `Control` never redraws on its own
 ## when a variable changes, `queue_redraw()` must be called. And a `CanvasLayer`
 ## cannot draw at all, hence the `Painter` child below.
@@ -179,11 +187,27 @@ const STATS_OUT := 0.6
 const MODE_SEANCE := 0
 const MODE_ENTRAINEMENT := 1
 const MODE_DEFI := 2
-const MODE_NAMES: PackedStringArray = ["Tirs au but", "Entraînement", "Défi"]
+## Appended, never inserted: the three shipped values are persisted by number.
+const MODE_DUEL := 3
+const MODE_GARDIEN := 4
+const MODE_NAMES: PackedStringArray = ["Tirs au but", "Entraînement", "Défi", "Duel",
+	"Entraînement gardien"]
 
 ## Row labels of the series chip. Short on purpose: the chip is a reminder, the
-## scoreboard panel is the one that spells "ADVERSAIRE" out in full.
+## scoreboard panel is the one that spells "ADVERSAIRE" out in full. A duel has
+## two ROLES rather than two teams, and both of them are the player, so it gets
+## its own pair: the second row is still the CPU's kicks, but they are the rounds
+## the player stood in the goal for.
 const ROW_LABELS: PackedStringArray = ["VOUS", "ADV."]
+const ROW_LABELS_DUEL: PackedStringArray = ["TIREUR", "GARDIEN"]
+
+## The line strip: the height above the turf it is projected from, how far it is
+## dropped down the screen afterwards, and the room anything stacked in the middle
+## of the frame leaves above it. Shared by the painter and by `_card_base`, which
+## has to know where the strip landed before it can stack anything clear of it.
+const STRIP_GROUND := 0.03
+const STRIP_DROP := 22.0
+const STRIP_CLEAR := 18.0
 
 ## Mirrors Shootout.REGULATION_SHOTS, used for layout only.
 const REGULATION_SLOTS := 5
@@ -197,6 +221,58 @@ const VERDICT_LABELS: PackedStringArray = [
 
 ## Mirrors KeeperBrain.LEVEL_NAMES, for the keeper tag.
 const LEVEL_NAMES: PackedStringArray = ["Débutant", "Confirmé", "Pro", "Légende"]
+
+# ------------------------------------------------------------------ keeper side
+#
+# What the player sees while he is the one in the goal (mode Duel). Four rules,
+# and the first of them is the mode:
+#
+#   1. THE ENVELOPE OWNS THE MIDDLE OF THE FRAME, and it is the only thing that
+#      may. The layout rule above keeps report cards off the goal mouth because
+#      the mouth is where the ball is saved; the envelope IS the mouth, drawn as
+#      the part of it this body can still reach. Anywhere else on screen and the
+#      player would have to look at two places at once during the four tenths of
+#      a second where he has time for one.
+#   2. IT SHRINKS, VISIBLY. It is restroked every frame from
+#      KeeperInput.reach_outline, so it cannot drift away from the rule it draws.
+#      A dashed GHOST of the same ring a moment ago is drawn behind it: the gap
+#      between the two is the rate the window is closing at, which is the single
+#      thing the player is deciding on, and it is legible on a frozen frame as
+#      well as in motion.
+#   3. THE TELLS ARE DRAWN AS TELLS, never as figures. A wedge, a foot mark, a
+#      tilted bar. An unreliable cue is drawn WIDER and softer, never smaller: the
+#      player has to be able to tell "I cannot read him" from "he is not going
+#      there", and those are opposite pieces of information.
+#   4. THE COMMIT PROMPT SAYS WHEN, NEVER WHERE. It carries the coverage left and
+#      how far the window has closed, and nothing about the taker.
+
+## Seconds between two envelope ghosts, on the HUD's own real time clock.
+const REACH_GHOST_PERIOD := 0.40
+## Coverage below which the envelope reads as amber, and below which it reads as
+## red. Nothing about the rule, only about the ink: the numbers themselves come
+## from KeeperInput.
+const REACH_TIGHT := 0.30
+const REACH_LOST := 0.14
+## Reference size of the two keeper cards.
+const TELLS_W := 280.0
+const TELLS_H := 178.0
+const COMMIT_W := 400.0
+const COMMIT_H := 86.0
+## Width of the coverage ring's own column inside the commit card. Sized off the
+## word under the ring rather than off the ring: the caption is the wider of the
+## two, and a column measured on the circle pushes the word out onto the turf.
+const COMMIT_RING_COL := 92.0
+## Half width of the mouth the tells card draws its miniature over, in metres.
+const TELL_MOUTH_HALF := 4.10
+## Seconds of real time after which an unfed dive reticle fades out. Longer than
+## the shooting reticle's on purpose: this one is the player's only mark of where
+## his own body is being sent, and a machine dropping to a frame a second must not
+## take it away from him.
+const DIVE_HOLD := 0.55
+const DIVE_FADE := 0.40
+## Seconds to spare above which a dive reads as comfortable, and below zero it is
+## simply late. Read off KeeperInput.margin, which is in seconds.
+const DIVE_SAFE := 0.055
 
 # ------------------------------------------------------------------------ state
 
@@ -261,6 +337,33 @@ var _pressure: String = ""
 var _streak: int = 0
 var _best_streak: int = 0
 var _defi_points: int = 0
+
+## --- Keeper side state (mode Duel) ------------------------------------------
+## True while the player is the one in the goal. The taking instruments and the
+## keeping ones are mutually exclusive, and this is the switch.
+var _keeping: bool = false
+## The reach envelope in WORLD space, exactly as KeeperInput.reach_outline gave
+## it, plus the same ring a moment ago and its age.
+var _reach: PackedVector3Array = PackedVector3Array()
+var _reach_ghost: PackedVector3Array = PackedVector3Array()
+var _ghost_age: float = 0.0
+var _coverage: float = 0.0
+## The eased copy the coverage ring is drawn from, so the ring never steps.
+var _cover_shown: float = 0.0
+var _committed: bool = false
+
+var _dive_target: Vector3 = Vector3.ZERO
+var _dive_margin: float = 0.0
+var _dive_age: float = 99.0
+
+## The last TakerAi.tells_at dictionary. Cues only, never a plan.
+var _tells: Dictionary = {}
+
+var _commit_open: bool = false
+var _commit_urgency: float = 0.0
+
+var _line_x: float = 0.0
+var _line_limit: float = 0.9
 
 var _plate_cache: Dictionary = {}
 
@@ -405,6 +508,97 @@ func toast(text: String, seconds: float = 2.0) -> void:
 	_redraw()
 
 
+# ----------------------------------------------------------- keeper side (Duel)
+
+## Switches the whole HUD between the taking instruments (reticle, power, spin,
+## arc) and the keeping ones (envelope, tells, commit prompt, line strip).
+##
+## One call, and it CLEARS the set that is leaving. Half of each is a mess, and a
+## stale trajectory arc hanging over a run up the player is trying to read, or a
+## stale envelope sitting on the goal while he lines up his own penalty, is
+## exactly what a switch like this exists to make impossible.
+## Only the CHANGE does anything. An orchestrator that called this every frame
+## would otherwise wipe the envelope's ghost before every redraw, and the ghost is
+## the whole of what makes the shrink readable on a still frame.
+func set_keeper_side(keeping: bool) -> void:
+	if _keeping == keeping:
+		return
+	_keeping = keeping
+	_preview = PackedVector3Array()
+	_bar_visible = false
+	_aim_age = 99.0
+	_reach = PackedVector3Array()
+	_reach_ghost = PackedVector3Array()
+	_ghost_age = 0.0
+	_coverage = 0.0
+	_cover_shown = 0.0
+	_committed = false
+	_tells = {}
+	_commit_open = false
+	_commit_urgency = 0.0
+	_dive_age = 99.0
+	_line_x = 0.0
+	_redraw()
+
+
+## The reach envelope, in world space. Called every frame: this is the drawing
+## that has to shrink in front of the player.
+func set_reach(outline: PackedVector3Array, coverage: float, committed: bool) -> void:
+	if outline.size() < 3:
+		_reach = PackedVector3Array()
+		_reach_ghost = PackedVector3Array()
+	else:
+		# The ghost is this same ring a fixed moment ago. Snapshotting it here, off
+		# the ring that was actually drawn, is what keeps the two honest: the gap
+		# between them is real loss of reach and not an animation.
+		if not committed and _ghost_age >= REACH_GHOST_PERIOD and _reach.size() >= 3:
+			_reach_ghost = _reach
+			_ghost_age = 0.0
+		_reach = outline
+	if committed:
+		# Once he has gone, the envelope is no longer a choice, so it stops
+		# advertising a trade he can no longer make.
+		_reach_ghost = PackedVector3Array()
+	else:
+		# The coverage is FROZEN on commit rather than followed down to zero. A
+		# keeper who has left his feet does not cover a shrinking share of the goal,
+		# he covers the share he chose to leave on: that number is what he decided
+		# with, and it is the one worth still reading while the ball is in the air.
+		_coverage = clampf(coverage, 0.0, 1.0)
+	_committed = committed
+	_redraw()
+
+
+## Where the player is aiming his dive, and the seconds to spare on it.
+func set_dive_aim(target: Vector3, margin: float) -> void:
+	_dive_target = target
+	_dive_margin = margin if is_finite(margin) else 0.0
+	_dive_age = 0.0
+	_redraw()
+
+
+## The taker's body language as the player is ALLOWED to read it. This is a
+## TakerAi.tells_at dictionary and nothing else: everything in it is already
+## degraded, and nothing in it is the truth.
+func set_tells(cues: Dictionary) -> void:
+	_tells = cues.duplicate()
+	_redraw()
+
+
+## The commit prompt. Says when, never where.
+func set_commit_prompt(open: bool, urgency: float) -> void:
+	_commit_open = open
+	_commit_urgency = clampf(urgency, 0.0, 1.0)
+	_redraw()
+
+
+## Where the keeper stands on his line, and how far he may travel.
+func set_line_position(line_x: float, limit: float) -> void:
+	_line_x = line_x if is_finite(line_x) else 0.0
+	_line_limit = maxf(limit, 0.05)
+	_redraw()
+
+
 # ------------------------------------------------------------------ frame loop
 
 ## The overlay runs on REAL seconds, never on the frame step it is handed.
@@ -434,6 +628,12 @@ func _process(_delta: float) -> void:
 	_real_ms = now
 	_clock += step
 	_aim_age += step
+	_dive_age += step
+	_ghost_age += step
+	# The coverage ring is eased and the envelope is not: the ring is a gauge and a
+	# gauge that steps reads as broken, while the envelope is the rule itself and
+	# smoothing THAT would be drawing a lie.
+	_cover_shown = _approach(_cover_shown, _coverage, step * 12.0)
 	_dim_amount = _approach(_dim_amount, 1.0 if _dimmed else 0.0, step * 7.0)
 	# Below a pixel of difference the ease is finished. Left to run on, it leaves a
 	# ghost of the interface sitting over the picture for ever.
@@ -474,10 +674,19 @@ func _paint(c: Control) -> void:
 	_paint_scrims(c, rect, s)
 	_paint_series(c, rect, s)
 	_paint_tags(c, rect, s)
-	_paint_preview(c, rect, s)
-	_paint_reticle(c, rect, s)
-	_paint_power(c, rect, s)
-	_paint_spin(c, rect, s)
+	if _keeping:
+		# Reading order on the picture: what is left of the goal, then where the
+		# body is, then where the dive is aimed, then the two cards at the bottom.
+		_paint_reach(c, rect, s)
+		_paint_line_strip(c, rect, s)
+		_paint_dive_aim(c, rect, s)
+		_paint_tells(c, rect, s)
+		_paint_commit(c, rect, s)
+	else:
+		_paint_preview(c, rect, s)
+		_paint_reticle(c, rect, s)
+		_paint_power(c, rect, s)
+		_paint_spin(c, rect, s)
 	_paint_toast(c, rect, s)
 	_paint_stats(c, rect, s)
 	_paint_verdict(c, rect, s)
@@ -509,15 +718,16 @@ func _paint_series(c: Control, rect: Rect2, s: float) -> void:
 	var pad := 10.0 * s
 	var pip_r := 4.5 * s
 	var pip_gap := 5.0 * s
-	var two_rows := _mode == MODE_SEANCE
+	var two_rows := _two_rows()
+	var labels := _row_labels()
 	var rows := 2.0 if two_rows else 1.0
 	var slots := mini(maxi(REGULATION_SLOTS, maxi(_player_marks.size(),
 			_rival_marks.size())), MAX_SLOTS)
 	var pips_w := float(slots) * pip_r * 2.0 + float(maxi(slots - 1, 0)) * pip_gap
 	# The label column is measured, never guessed: a fixed column runs the longer
 	# label straight into the markers as soon as the font changes.
-	var label_w := maxf(_tracked_width(ROW_LABELS[0], micro, 0.8 * s),
-			_tracked_width(ROW_LABELS[1], micro, 0.8 * s)) + 7.0 * s
+	var label_w := maxf(_tracked_width(labels[0], micro, 0.8 * s),
+			_tracked_width(labels[1], micro, 0.8 * s)) + 7.0 * s
 	var tag := _series_tag()
 	var score := _series_score()
 	var tag_w := _tracked_width(tag, micro, 1.3 * s)
@@ -539,11 +749,16 @@ func _paint_series(c: Control, rect: Rect2, s: float) -> void:
 	c.draw_line(Vector2(origin.x + pad, rule_y), Vector2(plate_rect.end.x - pad, rule_y),
 			_fade(Color(BORDER.r, BORDER.g, BORDER.b, 0.34), alpha), 1.0, true)
 
+	# The single row of a training session is the CPU'S KICKS, drawn in his colour:
+	# the player takes none of his own in that mode, so the row that means anything
+	# is the one he stood in front of. Same reasoning as the scoreboard panel.
+	var keeping := _mode == MODE_GARDIEN
 	var row_y := head_y + head_h
-	_paint_series_row(c, Vector2(origin.x + pad, row_y), ROW_LABELS[0], _player_marks,
-			slots, pip_r, pip_gap, label_w, row_h, ACCENT, alpha, s)
+	_paint_series_row(c, Vector2(origin.x + pad, row_y), labels[0],
+			_rival_marks if keeping else _player_marks,
+			slots, pip_r, pip_gap, label_w, row_h, RIVAL if keeping else ACCENT, alpha, s)
 	if two_rows:
-		_paint_series_row(c, Vector2(origin.x + pad, row_y + row_h), ROW_LABELS[1],
+		_paint_series_row(c, Vector2(origin.x + pad, row_y + row_h), labels[1],
 				_rival_marks, slots, pip_r, pip_gap, label_w, row_h, RIVAL, alpha, s)
 
 	# The pressure line belongs to the scoreboard. Only the Defi figures, which the
@@ -597,11 +812,29 @@ func _pip(c: Control, centre: Vector2, r: float, state: int, tone: Color, alpha:
 					INK_FAINT.b, 0.50), alpha), 1.3 * s, true)
 
 
+## True when the series has two sides worth a row of markers. A duel has two,
+## like a shootout, except that both of them are the player.
+func _two_rows() -> bool:
+	return _mode == MODE_SEANCE or _mode == MODE_DUEL
+
+
+func _row_labels() -> PackedStringArray:
+	# Training has one row and it is the keeping one, so it borrows the duel's
+	# second label for its first.
+	if _mode == MODE_GARDIEN:
+		return PackedStringArray([ROW_LABELS_DUEL[1], ROW_LABELS_DUEL[1]])
+	return ROW_LABELS_DUEL if _mode == MODE_DUEL else ROW_LABELS
+
+
 ## Left hand tag of the chip header: where the series stands.
 func _series_tag() -> String:
 	if _mode == MODE_DEFI:
 		return "SÉRIE %d" % _streak
-	if _mode == MODE_SEANCE:
+	# `round_index` counts the player's OWN attempts, and he takes none in a keeper
+	# session: the count comes off the row that is growing.
+	if _mode == MODE_GARDIEN:
+		return "TIR %d" % (_rival_marks.size() + 1)
+	if _two_rows():
 		if _round >= REGULATION_SLOTS:
 			return "MORT SUBITE"
 		return "TIR %d / %d" % [_round + 1, REGULATION_SLOTS]
@@ -612,7 +845,10 @@ func _series_tag() -> String:
 func _series_score() -> String:
 	if _mode == MODE_DEFI:
 		return "%d pts" % _defi_points
-	if _mode == MODE_SEANCE:
+	# Saves out of penalties faced. A keeper is not judged on goals.
+	if _mode == MODE_GARDIEN:
+		return "%d / %d" % [_count_saves(_rival_marks), _rival_marks.size()]
+	if _two_rows():
 		return "%d - %d" % [_player_goals, _rival_goals]
 	return "%d / %d" % [_player_goals, _player_marks.size()]
 
@@ -1144,7 +1380,33 @@ func _card_base(rect: Rect2, s: float) -> float:
 	if _bar_visible:
 		var card: Rect2 = _power_layout(rect, s)["card"]
 		return card.position.y - GAP * s
+	if _keeping:
+		# The commit prompt owns the bottom of the frame on the keeper side, exactly
+		# as the power module owns it on the taking side.
+		var base := rect.size.y - BAR_LIFT * s - COMMIT_H * s - GAP * s
+		# AND THE LINE STRIP IS NOT LAID OUT, IT IS PROJECTED. It is drawn in world
+		# space off the goal line, so it lands wherever the GARDIEN camera happens to
+		# put it - which is straight through this column - and the pressure line came
+		# out written across it, with the shot report half behind it underneath.
+		# Anything stacked in the middle of the frame therefore starts above the
+		# STRIP and not merely above the prompt.
+		var strip := _strip_screen_y(s)
+		if is_finite(strip):
+			base = minf(base, strip - STRIP_CLEAR * s)
+		# A camera that put the goal line high would otherwise push the stack off the
+		# top of the frame. Half the screen is as far up as it may go.
+		return maxf(base, rect.size.y * 0.5)
 	return rect.size.y - MARGIN * s
+
+
+## Screen y of the line strip, or INF when it cannot be projected. Read off the
+## same point `_paint_line_strip` draws its middle from, so the layout and the
+## drawing can never disagree about where the strip is.
+func _strip_screen_y(s: float) -> float:
+	var mid := _screen_of(Vector3(0.0, STRIP_GROUND, 0.04))
+	if not mid.is_finite():
+		return INF
+	return mid.y + STRIP_DROP * s
 
 
 ## Height the verdict card settles at, used to stack the toast above it.
@@ -1344,6 +1606,472 @@ func _paint_verdict(c: Control, rect: Rect2, s: float) -> void:
 				Color(INK_SOFT.r, INK_SOFT.g, INK_SOFT.b, alpha))
 
 
+# ---------------------------------------------------------- keeper side drawing
+
+## Projects a world point, or returns a NON FINITE vector when it cannot be drawn.
+## Every keeper side drawing is anchored in the world rather than on the screen,
+## because every one of them is a statement about the goal: the envelope is the
+## part of the mouth this body still covers, the strip is a piece of the goal
+## line, the reticle is a point on the frame. Screen space would put them
+## somewhere near those things instead of on them.
+func _screen_of(world: Vector3) -> Vector2:
+	if _camera == null or not is_instance_valid(_camera):
+		return Vector2(NAN, NAN)
+	if _camera.is_position_behind(world):
+		return Vector2(NAN, NAN)
+	var p := _camera.unproject_position(world)
+	if not p.is_finite() or absf(p.x) > 1.0e5 or absf(p.y) > 1.0e5:
+		return Vector2(NAN, NAN)
+	return p
+
+
+func _project_ring(ring: PackedVector3Array) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in ring.size():
+		var p := _screen_of(ring[i])
+		if p.is_finite():
+			out.append(p)
+	return out
+
+
+## Ink of the envelope, from how much of the mouth is left. Cyan while there is
+## still a real choice, amber once the goal is bigger than the body, red when
+## almost nothing is left. Green is not in this ramp on purpose: the picture
+## behind it is a sunlit pitch.
+func _reach_tone() -> Color:
+	if _coverage <= REACH_TIGHT:
+		var t := clampf((_coverage - REACH_LOST) / maxf(REACH_TIGHT - REACH_LOST, 0.01),
+				0.0, 1.0)
+		return BAD.lerp(WARN, t)
+	return WARN.lerp(ACCENT, clampf((_coverage - REACH_TIGHT) / 0.34, 0.0, 1.0))
+
+
+## THE reach envelope. Everything else on this half of the game is furniture
+## around it: it is the only drawing that answers the question the player is
+## actually being asked, which is "what do I still cover if I go now".
+func _paint_reach(c: Control, _rect: Rect2, s: float) -> void:
+	var alpha := _live()
+	if alpha <= 0.01:
+		return
+	var live := _project_ring(_reach)
+	if live.size() < 3:
+		return
+	var tone := _reach_tone()
+	var ink := tone
+	var body := 0.10
+	if _committed:
+		# Gone. Whatever the orchestrator still sends is drawn as a spent thing
+		# rather than as a live offer; it usually sends an empty ring, which hides
+		# it altogether, and that is right too.
+		ink = INK_FAINT
+		alpha *= 0.5
+		body = 0.05
+
+	# The same ring a moment ago, dashed. The gap between the two IS the rate the
+	# window is closing at, and it is the one part of the shrink that survives on a
+	# frozen frame.
+	var ghost := _project_ring(_reach_ghost)
+	if ghost.size() >= 3 and not _committed:
+		# Dark pass under it as well: at a third of a metre outside the live ring it
+		# lands on the same lit net the live one does, and a pale hairline there is
+		# a hairline nobody sees.
+		_stroke_dashed(c, ghost, Color(0.0, 0.0, 0.0, 0.40 * alpha), 4.0 * s)
+		_stroke_dashed(c, ghost, Color(INK.r, INK.g, INK.b, 0.50 * alpha), 2.0 * s)
+
+	c.draw_polygon(live, PackedColorArray([Color(ink.r, ink.g, ink.b, body * alpha)]))
+	# There is deliberately NO second contour inside this one. An inner rim looks
+	# good and reads as a second rule: with the ghost outside and a rim inside, the
+	# picture carries three concentric lines and the one that matters, the live
+	# edge, stops being obvious. Two lines, and they mean now and a moment ago.
+	# Dark pass first: this line crosses white posts, cord netting and lit turf in
+	# the same stroke, and it has to survive all three.
+	_stroke_closed(c, live, Color(0.0, 0.0, 0.0, 0.55 * alpha), 5.4 * s)
+	var pulse := 1.0 if _committed else 1.0 + 0.10 * sin(_clock * 6.0)
+	_stroke_closed(c, live, Color(ink.r, ink.g, ink.b, 0.95 * alpha), 2.8 * s * pulse)
+
+
+func _stroke_closed(c: Control, pts: PackedVector2Array, col: Color, width: float) -> void:
+	if pts.size() < 2:
+		return
+	var loop := pts.duplicate()
+	loop.append(pts[0])
+	c.draw_polyline(loop, col, width, true)
+
+
+## Every third segment left out. A dashed ring reads as a memory rather than as a
+## second rule, which is exactly what the ghost is.
+func _stroke_dashed(c: Control, pts: PackedVector2Array, col: Color, width: float) -> void:
+	var n := pts.size()
+	if n < 2:
+		return
+	for i in n:
+		if i % 3 == 2:
+			continue
+		c.draw_line(pts[i], pts[(i + 1) % n], col, width, true)
+
+
+## The strip of goal line the keeper may shuffle along, drawn UNDER the mouth so
+## the dance is legible without the camera having to move to show it.
+func _paint_line_strip(c: Control, _rect: Rect2, s: float) -> void:
+	var alpha := _live()
+	if alpha <= 0.01:
+		return
+	var a := _screen_of(Vector3(-_line_limit, STRIP_GROUND, 0.04))
+	var b := _screen_of(Vector3(_line_limit, STRIP_GROUND, 0.04))
+	var here := _screen_of(Vector3(clampf(_line_x, -_line_limit, _line_limit), STRIP_GROUND, 0.04))
+	var mid := _screen_of(Vector3(0.0, STRIP_GROUND, 0.04))
+	if not a.is_finite() or not b.is_finite() or not here.is_finite() or not mid.is_finite():
+		return
+	if a.distance_squared_to(b) < 4.0:
+		return
+	var drop := Vector2(0.0, STRIP_DROP * s)
+	a += drop
+	b += drop
+	here += drop
+	mid += drop
+	var perp := (b - a).normalized().orthogonal() * (7.0 * s)
+
+	c.draw_line(a, b, Color(0.0, 0.0, 0.0, 0.60 * alpha), 10.0 * s, true)
+	c.draw_line(a, b, Color(INK_FAINT.r, INK_FAINT.g, INK_FAINT.b, 0.55 * alpha), 4.0 * s, true)
+	# The two ends of the leash, and the middle of the line.
+	for stop: Vector2 in [a, b]:
+		c.draw_line(stop - perp, stop + perp, Color(INK.r, INK.g, INK.b, 0.70 * alpha),
+				2.0 * s, true)
+	c.draw_line(mid - perp * 0.5, mid + perp * 0.5,
+			Color(INK_FAINT.r, INK_FAINT.g, INK_FAINT.b, 0.55 * alpha), 1.4 * s, true)
+
+	var d := 7.0 * s
+	var diamond := PackedVector2Array([here + Vector2(0.0, -d), here + Vector2(d, 0.0),
+			here + Vector2(0.0, d), here + Vector2(-d, 0.0)])
+	c.draw_colored_polygon(_offset_poly(diamond, Vector2(0.0, 1.5 * s)),
+			Color(0.0, 0.0, 0.0, 0.55 * alpha))
+	c.draw_colored_polygon(diamond, _fade(ACCENT, alpha))
+
+
+func _offset_poly(pts: PackedVector2Array, by: Vector2) -> PackedVector2Array:
+	var out := PackedVector2Array()
+	for i in pts.size():
+		out.append(pts[i] + by)
+	return out
+
+
+## Where the dive is aimed, coloured by the seconds it has to spare. Deliberately
+## a different shape from the shooting reticle: four corner brackets, a thing that
+## closes on the ball, rather than the four arcs that mean "I am aiming here".
+func _paint_dive_aim(c: Control, _rect: Rect2, s: float) -> void:
+	var fade := 1.0 - clampf((_dive_age - DIVE_HOLD) / DIVE_FADE, 0.0, 1.0)
+	fade *= _live()
+	if fade <= 0.01:
+		return
+	var p := _screen_of(_dive_target)
+	if not p.is_finite():
+		return
+	var tone := BAD
+	if _dive_margin >= DIVE_SAFE:
+		tone = ACCENT
+	elif _dive_margin >= 0.0:
+		tone = WARN
+	if _committed:
+		tone = tone.lerp(INK, 0.35)
+		fade *= 0.85
+
+	if not _committed:
+		# A faint line from the body to the point being asked for. It says "this is
+		# the dive", and it disappears the moment the dive is no longer a question.
+		var chest := _screen_of(Vector3(clampf(_line_x, -_line_limit, _line_limit), 0.95, 0.05))
+		if chest.is_finite():
+			c.draw_line(chest, p, Color(tone.r, tone.g, tone.b, 0.18 * fade), 2.0 * s, true)
+
+	var r := 16.0 * s * (1.0 + 0.04 * sin(_clock * 5.5))
+	var arm := 7.0 * s
+	_bracket_shape(c, p + Vector2(1.5 * s, 1.5 * s), r, arm,
+			Color(0.0, 0.0, 0.0, 0.45 * fade), 3.4 * s)
+	_bracket_shape(c, p, r, arm, Color(tone.r, tone.g, tone.b, fade), 2.4 * s)
+	c.draw_circle(p, 2.6 * s, Color(tone.r, tone.g, tone.b, fade))
+
+
+func _bracket_shape(c: Control, p: Vector2, r: float, arm: float, col: Color,
+		width: float) -> void:
+	for i in 4:
+		var sx := 1.0 if (i % 2) == 0 else -1.0
+		var sy := 1.0 if i < 2 else -1.0
+		var corner := p + Vector2(r * sx, r * sy)
+		c.draw_line(corner, corner - Vector2(arm * sx, 0.0), col, width, true)
+		c.draw_line(corner, corner - Vector2(0.0, arm * sy), col, width, true)
+
+
+# --- The tells ---------------------------------------------------------------
+#
+# What the taker is doing with his body, and NOTHING else. Three drawing rules
+# that are the reason this panel is honest:
+#
+#   - it is MIRRORED. The keeper faces +Z, so world +X is on his LEFT, and every
+#     diagram here is laid out the way he sees it. A plan view that put +X on the
+#     right would be a diagram of a different penalty from the one on screen.
+#   - a MISSING cue is not drawn. TakerAi.tells_at leaks the run up one piece at a
+#     time, so an empty slot here means "he has not shown you that yet", which is
+#     a true and useful thing to see filling up.
+#   - an UNRELIABLE cue is drawn WIDER, never fainter and never smaller. The wedge
+#     opens, the smear spreads. "I cannot read him" and "he is not going there"
+#     have to look like different sentences.
+#
+# The one interpretation this panel allows itself is the tendency strip, and its
+# weights are written down here rather than hidden: the plant foot carries a real
+# penalty read, the hips less, the run up angle least. It is a HUNCH drawn as a
+# smear a metre and a half wide, it is often wrong, and it is never a figure.
+const TELL_W_PLANT := 0.72
+const TELL_W_HIP := 0.52
+const TELL_W_RUN := 0.44
+## Metres of smear the tendency carries even at full confidence, and how much more
+## it carries at none.
+const TELL_BLUR_MIN := 0.85
+const TELL_BLUR_MAX := 3.10
+
+
+func _paint_tells(c: Control, rect: Rect2, s: float) -> void:
+	var alpha := _live()
+	if alpha <= 0.01 or _tells.is_empty():
+		return
+	var pad := PAD * s
+	var w := TELLS_W * s
+	var h := TELLS_H * s
+	var box := Rect2(Vector2(MARGIN * s, rect.size.y - BAR_LIFT * s - h), Vector2(w, h))
+	_plate(c, box, R * s, _fade(CARD, alpha), _fade(CARD_EDGE, alpha), 10.0 * s)
+
+	var micro := _fs(T_MICRO, s)
+	var conf := clampf(_cue_f("confidence", 0.35), 0.0, 1.0)
+	_tracked(c, box.position + Vector2(pad, pad * 0.55), "LECTURE", micro,
+			_fade(INK_FAINT, alpha), 1.6 * s)
+
+	# Feints are the one cue that is a COUNT, so it is the one cue drawn as a word.
+	var feints := int(round(_cue_f("feints", 0.0)))
+	if feints > 0:
+		var chip_text := "FEINTE" if feints == 1 else "%d FEINTES" % feints
+		var cw := _tracked_width(chip_text, micro, 1.2 * s) + pad
+		var chip := Rect2(Vector2(box.end.x - pad - cw, box.position.y + pad * 0.35),
+				Vector2(cw, float(micro) + 7.0 * s))
+		_plate(c, chip, R_S * s, Color(WARN.r * 0.35, WARN.g * 0.28, 0.06, 0.85 * alpha),
+				_fade(Color(WARN.r, WARN.g, WARN.b, 0.5), alpha), 0.0)
+		_tracked(c, chip.position + Vector2(pad * 0.5, 3.5 * s), chip_text, micro,
+				_fade(WARN, alpha), 1.2 * s)
+
+	var strip := Rect2(Vector2(box.position.x + pad, box.position.y + pad * 0.55 + micro * 1.6),
+			Vector2(box.size.x - pad * 2.0, 26.0 * s))
+	_paint_tell_strip(c, strip, conf, alpha, s)
+
+	var plan := Rect2(Vector2(strip.position.x, strip.end.y + 9.0 * s),
+			Vector2(strip.size.x, box.end.y - pad * 0.7 - (strip.end.y + 9.0 * s)))
+	if plan.size.y > 20.0 * s:
+		_paint_tell_plan(c, plan, conf, alpha, s)
+
+
+## The tendency strip: a miniature of the mouth with a smear where the body
+## language points. It is the only place this panel interprets anything, so the
+## smear is never narrower than TELL_BLUR_MIN and the mouth behind it is drawn to
+## scale, which is what stops it reading as a target.
+func _paint_tell_strip(c: Control, strip: Rect2, conf: float, alpha: float, s: float) -> void:
+	_plate(c, strip, R_S * s, _fade(TRACK, alpha), Color(0.0, 0.0, 0.0, 0.0), 0.0)
+	var to_px := strip.size.x / (TELL_MOUTH_HALF * 2.0)
+	var mid_x := strip.get_center().x
+	# Mirrored: world +X is the keeper's left, so it is the strip's left.
+	var post_dx := Field.GOAL_HALF * to_px
+	for sign_x: float in [-1.0, 1.0]:
+		var x := mid_x + sign_x * post_dx
+		c.draw_line(Vector2(x, strip.position.y + 2.0 * s), Vector2(x, strip.end.y - 2.0 * s),
+				Color(INK_SOFT.r, INK_SOFT.g, INK_SOFT.b, 0.55 * alpha), 1.6 * s, true)
+	c.draw_line(Vector2(mid_x, strip.end.y - 4.0 * s), Vector2(mid_x, strip.end.y - 1.0 * s),
+			Color(INK_FAINT.r, INK_FAINT.g, INK_FAINT.b, 0.5 * alpha), 1.2 * s, true)
+
+	var has_body := _tells.has("plant_offset") or _tells.has("hip_yaw") \
+			or _tells.has("run_angle")
+	if not has_body:
+		return
+	var bias := TELL_W_PLANT * clampf(_cue_f("plant_offset", 0.0), -1.0, 1.0)
+	bias += TELL_W_HIP * clampf(sin(_cue_f("hip_yaw", 0.0)) / 0.55, -1.0, 1.0)
+	bias += TELL_W_RUN * clampf(_cue_f("run_angle", 0.0), -1.0, 1.0)
+	bias = clampf(bias / (TELL_W_PLANT + TELL_W_HIP + TELL_W_RUN), -1.0, 1.0)
+	var read_x := bias * Field.GOAL_HALF * 0.92
+	var blur := lerpf(TELL_BLUR_MAX, TELL_BLUR_MIN, conf)
+	# Drawn mirrored, and as a pair of gradients rather than as a box: a hard edge
+	# would read as a boundary the ball respects, and stacked slabs read as steps
+	# nobody meant.
+	var cx := mid_x - read_x * to_px
+	var cy := strip.get_center().y
+	var band_h := strip.size.y - 6.0 * s
+	var half := blur * to_px
+	var lit := Color(WARN.r, WARN.g, WARN.b, 0.42 * alpha)
+	var clear := Color(WARN.r, WARN.g, WARN.b, 0.0)
+	var top := cy - band_h * 0.5
+	var l0 := maxf(cx - half, strip.position.x + 1.0 * s)
+	var r0 := minf(cx + half, strip.end.x - 1.0 * s)
+	if cx > l0:
+		_gradient_h(c, Rect2(Vector2(l0, top), Vector2(cx - l0, band_h)), clear, lit)
+	if r0 > cx:
+		_gradient_h(c, Rect2(Vector2(cx, top), Vector2(r0 - cx, band_h)), lit, clear)
+	c.draw_line(Vector2(cx, cy - band_h * 0.5), Vector2(cx, cy + band_h * 0.5),
+			Color(WARN.r, WARN.g, WARN.b, 0.85 * alpha), 1.8 * s, true)
+
+
+## The run up seen from above, the way the keeper sees it: the goal line across
+## the bottom, the ball on its spot, the taker coming down at it.
+func _paint_tell_plan(c: Control, plan: Rect2, conf: float, alpha: float, s: float) -> void:
+	var micro := _fs(T_MICRO, s)
+	var ball := Vector2(plan.get_center().x, plan.end.y - 15.0 * s)
+	var line_y := plan.end.y - 3.0 * s
+	c.draw_line(Vector2(plan.position.x + 12.0 * s, line_y),
+			Vector2(plan.end.x - 12.0 * s, line_y),
+			Color(INK_SOFT.r, INK_SOFT.g, INK_SOFT.b, 0.40 * alpha), 2.0 * s, true)
+	_tracked(c, plan.position, "ÉLAN", micro, _fade(INK_FAINT, alpha * 0.8), 1.2 * s)
+
+	# The approach. A wedge for where it might be coming from, a line for the best
+	# guess, chevrons for how fast he is arriving.
+	if _tells.has("run_angle"):
+		var run := clampf(_cue_f("run_angle", 0.0), -1.0, 1.0)
+		# Mirrored: a run up from the +X side arrives on the keeper's left.
+		var axis := deg_to_rad(-run * 42.0) - PI * 0.5
+		var spread := deg_to_rad(9.0 + 27.0 * (1.0 - conf))
+		var reach := plan.size.y * 0.78
+		var wedge := PackedVector2Array([ball])
+		for i in 9:
+			var a := axis - spread + spread * 2.0 * float(i) / 8.0
+			wedge.append(ball + Vector2(cos(a), sin(a)) * reach)
+		c.draw_colored_polygon(wedge, Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.13 * alpha))
+		var tip := ball + Vector2(cos(axis), sin(axis)) * reach
+		c.draw_line(tip, ball, Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.85 * alpha), 2.0 * s, true)
+		if _tells.has("approach_speed"):
+			var pace := clampf(_cue_f("approach_speed", 0.5), 0.0, 1.0)
+			var marks := 1 + int(round(pace * 2.0))
+			var dir := (ball - tip).normalized()
+			var side := dir.orthogonal() * (5.0 * s)
+			for i in marks:
+				var t := 0.34 + 0.20 * float(i)
+				var p := tip.lerp(ball, t)
+				c.draw_line(p - side - dir * (5.0 * s), p,
+						Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.75 * alpha), 1.8 * s, true)
+				c.draw_line(p + side - dir * (5.0 * s), p,
+						Color(ACCENT.r, ACCENT.g, ACCENT.b, 0.75 * alpha), 1.8 * s, true)
+
+	# The hips, as a bar through the ball. Turned hips are the cue that arrives
+	# last and lies least, so it is drawn hard even when everything else is fuzzy.
+	if _tells.has("hip_yaw"):
+		var yaw := clampf(_cue_f("hip_yaw", 0.0), -1.2, 1.2)
+		var bar := Vector2(cos(-yaw), sin(-yaw)) * (17.0 * s)
+		c.draw_line(ball - bar, ball + bar, Color(INK.r, INK.g, INK.b, 0.75 * alpha),
+				2.6 * s, true)
+
+	# The plant foot, with its own uncertainty smeared sideways.
+	if _tells.has("plant_offset"):
+		var plant := clampf(_cue_f("plant_offset", 0.0), -1.0, 1.0)
+		var span := plan.size.x * 0.30
+		var fx := ball.x - plant * span
+		var fy := ball.y + 7.0 * s
+		var smear := span * 0.55 * (1.0 - conf) + 3.0 * s
+		c.draw_line(Vector2(fx - smear, fy), Vector2(fx + smear, fy),
+				Color(GOOD.r, GOOD.g, GOOD.b, 0.30 * alpha), 5.0 * s, true)
+		c.draw_rect(Rect2(Vector2(fx - 3.4 * s, fy - 5.0 * s), Vector2(6.8 * s, 10.0 * s)),
+				Color(GOOD.r, GOOD.g, GOOD.b, 0.90 * alpha), true)
+
+	# The ball last, so nothing is drawn over the thing everything else is about.
+	c.draw_circle(ball, 4.6 * s, Color(INK.r, INK.g, INK.b, 0.95 * alpha))
+
+
+## Reads one cue. A cue that has not leaked yet is simply absent, and the caller
+## checks for that: this only supplies the fallback for a cue that is there but
+## unusable.
+func _cue_f(key: String, fallback: float) -> float:
+	if not _tells.has(key):
+		return fallback
+	var v: Variant = _tells[key]
+	if typeof(v) != TYPE_FLOAT and typeof(v) != TYPE_INT:
+		return fallback
+	var f := float(v)
+	return f if is_finite(f) else fallback
+
+
+## The commit prompt: how much of the goal is still covered, and how much of the
+## window is left. It says WHEN, and there is deliberately nothing in it that
+## could be read as a side.
+func _paint_commit(c: Control, rect: Rect2, s: float) -> void:
+	var alpha := _live()
+	if alpha <= 0.01:
+		return
+	var pad := PAD * s
+	var w := COMMIT_W * s
+	var h := COMMIT_H * s
+	var box := Rect2(Vector2(rect.size.x * 0.5 - w * 0.5, rect.size.y - BAR_LIFT * s - h),
+			Vector2(w, h))
+	_plate(c, box, R * s, _fade(CARD, alpha), _fade(CARD_EDGE, alpha), 12.0 * s)
+
+	var micro := _fs(T_MICRO, s)
+	var small := _fs(T_SMALL, s)
+	var tone := _reach_tone()
+
+	# The coverage ring, in its own column so its caption cannot spill onto the
+	# turf. Same number as the envelope, in a shape that survives being glanced at
+	# rather than read.
+	var ring_r := 19.0 * s
+	var cap := "COUVERTURE"
+	var cap_w := _tracked_width(cap, micro, 1.0 * s)
+	var col1 := maxf(COMMIT_RING_COL * s, cap_w + 8.0 * s)
+	var block_h := ring_r * 2.0 + 4.0 * s + float(micro)
+	var ring_c := Vector2(box.position.x + 10.0 * s + col1 * 0.5,
+			box.position.y + (box.size.y - block_h) * 0.5 + ring_r)
+	c.draw_arc(ring_c, ring_r, 0.0, TAU, 40,
+			Color(INK_FAINT.r, INK_FAINT.g, INK_FAINT.b, 0.28 * alpha), 4.0 * s, true)
+	var span := TAU * clampf(_cover_shown, 0.0, 1.0)
+	if span > 0.001:
+		c.draw_arc(ring_c, ring_r, -PI * 0.5, -PI * 0.5 + span, 44,
+				Color(tone.r, tone.g, tone.b, 0.95 * alpha), 4.6 * s, true)
+	var pct := "%d %%" % int(round(_cover_shown * 100.0))
+	_text(c, ring_c - Vector2(_text_width(pct, micro) * 0.5, float(micro) * 0.62), pct, micro,
+			_fade(INK, alpha))
+	_tracked(c, Vector2(ring_c.x - cap_w * 0.5, ring_c.y + ring_r + 4.0 * s), cap, micro,
+			_fade(INK_FAINT, alpha), 1.0 * s)
+
+	var col_x := box.position.x + 10.0 * s + col1 + 10.0 * s
+	var col_w := box.end.x - pad * 0.9 - col_x
+	if col_w < 40.0 * s:
+		return
+
+	var prompt := "PATIENTEZ"
+	var prompt_tone := INK_FAINT
+	if _committed:
+		prompt = "ENGAGÉ"
+		prompt_tone = INK_SOFT
+	elif _commit_open:
+		prompt = "PLONGEZ  ·  CLIC OU ESPACE"
+		prompt_tone = ACCENT.lerp(BAD, clampf(_commit_urgency * 1.15, 0.0, 1.0))
+	var beat := 1.0
+	if _commit_open and not _committed:
+		# The nearer the window is to shut, the harder the prompt beats. Rate, not
+		# words: there is no room to read a sentence at this point in the round.
+		beat = 0.72 + 0.28 * sin(_clock * (7.0 + 9.0 * _commit_urgency))
+	# The column is centred in the card on its own measured height, so the three
+	# rows sit level with the ring beside them instead of drifting up the plate.
+	var col_h := float(small) * 1.15 + 6.0 * s + 9.0 * s + 5.0 * s + float(micro)
+	var col_y := box.position.y + (box.size.y - col_h) * 0.5
+	_text(c, Vector2(col_x, col_y), prompt, small,
+			Color(prompt_tone.r, prompt_tone.g, prompt_tone.b, alpha * beat))
+
+	# The window itself, emptying from the left.
+	var bar := Rect2(Vector2(col_x, col_y + float(small) * 1.15 + 6.0 * s),
+			Vector2(col_w, 9.0 * s))
+	_plate(c, bar, R_S * s, _fade(TRACK, alpha), Color(0.0, 0.0, 0.0, 0.0), 0.0)
+	var left := clampf(1.0 - _commit_urgency, 0.0, 1.0)
+	var bar_tone := ACCENT.lerp(BAD, clampf(_commit_urgency, 0.0, 1.0))
+	if _committed:
+		bar_tone = INK_FAINT
+	if left > 0.002:
+		c.draw_rect(Rect2(bar.position, Vector2(bar.size.x * left, bar.size.y)),
+				Color(bar_tone.r, bar_tone.g, bar_tone.b, 0.92 * alpha), true)
+	else:
+		c.draw_line(Vector2(bar.position.x, bar.get_center().y),
+				Vector2(bar.end.x, bar.get_center().y), _fade(BAD, alpha * 0.8), 1.6 * s, true)
+	var foot := "FENÊTRE D'ENGAGEMENT"
+	_tracked(c, Vector2(col_x, bar.end.y + 4.0 * s), foot, micro, _fade(INK_FAINT, alpha),
+			1.1 * s)
+
+
 # ------------------------------------------------------------------- primitives
 
 func _plate(c: Control, rect: Rect2, radius: float, fill: Color, border: Color,
@@ -1490,6 +2218,21 @@ func _count_goals(marks: Array[int]) -> int:
 	var total := 0
 	for m in marks:
 		if _is_goal(m):
+			total += 1
+	return total
+
+
+## Shootout.Verdict.ARRET, mirrored rather than read: this file has to draw with
+## no autoload in the tree. Only the keeper training figure uses it.
+const VERDICT_ARRET := 1
+
+
+## Saves, which is NOT "everything that was not a goal": a penalty off the post or
+## wide of the frame was missed by the taker and stopped by nobody.
+func _count_saves(marks: Array[int]) -> int:
+	var total := 0
+	for m in marks:
+		if m == VERDICT_ARRET:
 			total += 1
 	return total
 

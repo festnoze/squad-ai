@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Run artefacts: journals, traces, reports, databases
+runs/
+reports/
+*.jsonl
+*.parquet
+*.duckdb
+*.sqlite
+*.sqlite3
+*.db
+
+# Held-out scenario bank (sealed, never committed)
+heldout/
+
+# Front end (A24 owns web/, see CONTRACTS table 1)
+node_modules/
+web/dist/
+web/.vite/
+web/coverage/
+*.tsbuildinfo
+
+# Editors and OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Never ignore the golden fixtures used by the determinism tests
+!tests/golden/**/*.jsonl

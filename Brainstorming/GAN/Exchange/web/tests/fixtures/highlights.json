@@ -1,0 +1,411 @@
+{
+  "highlights": [
+    {
+      "tick": 5,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 4725,
+      "label": "Big trade on M3: A2 took 63 contracts at 75 cents from A1, 4725 cents of notional."
+    },
+    {
+      "tick": 5,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M4",
+      "magnitude_cents": 7100,
+      "label": "Big trade on M4: A5 took 100 contracts at 71 cents from A2, 7100 cents of notional."
+    },
+    {
+      "tick": 6,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 5625,
+      "label": "Big trade on M3: A2 took 75 contracts at 75 cents from A5, 5625 cents of notional."
+    },
+    {
+      "tick": 6,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M4",
+      "magnitude_cents": 5481,
+      "label": "Big trade on M4: A2 took 87 contracts at 63 cents from A1, 5481 cents of notional."
+    },
+    {
+      "tick": 7,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M1",
+      "magnitude_cents": 4725,
+      "label": "Big trade on M1: A1 took 75 contracts at 63 cents from A2, 4725 cents of notional."
+    },
+    {
+      "tick": 7,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M4",
+      "magnitude_cents": 6200,
+      "label": "Big trade on M4: A2 took 100 contracts at 62 cents from A1, 6200 cents of notional."
+    },
+    {
+      "tick": 8,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M1",
+      "magnitude_cents": 4800,
+      "label": "Big trade on M1: A1 took 75 contracts at 64 cents from A2, 4800 cents of notional."
+    },
+    {
+      "tick": 11,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 5580,
+      "label": "Big trade on M3: A5 took 90 contracts at 62 cents from A2, 5580 cents of notional."
+    },
+    {
+      "tick": 11,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 5760,
+      "label": "Big trade on M3: A2 took 96 contracts at 60 cents from A1, 5760 cents of notional."
+    },
+    {
+      "tick": 12,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 6000,
+      "label": "Big trade on M3: A2 took 100 contracts at 60 cents from A5, 6000 cents of notional."
+    },
+    {
+      "tick": 13,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M1",
+      "magnitude_cents": 5120,
+      "label": "Big trade on M1: A1 took 80 contracts at 64 cents from A2, 5120 cents of notional."
+    },
+    {
+      "tick": 13,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 4960,
+      "label": "Big trade on M3: A5 took 80 contracts at 62 cents from A1, 4960 cents of notional."
+    },
+    {
+      "tick": 13,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A5"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 4752,
+      "label": "Big trade on M5: A5 took 72 contracts at 66 cents from A1, 4752 cents of notional."
+    },
+    {
+      "tick": 14,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M1",
+      "magnitude_cents": 5670,
+      "label": "Big trade on M1: A5 took 90 contracts at 63 cents from A2, 5670 cents of notional."
+    },
+    {
+      "tick": 14,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M4",
+      "magnitude_cents": 4700,
+      "label": "Big trade on M4: A1 took 100 contracts at 47 cents from A2, 4700 cents of notional."
+    },
+    {
+      "tick": 14,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A5"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 4891,
+      "label": "Big trade on M5: A1 took 73 contracts at 67 cents from A5, 4891 cents of notional."
+    },
+    {
+      "tick": 14,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 6499,
+      "label": "Big trade on M5: A5 took 97 contracts at 67 cents from A2, 6499 cents of notional."
+    },
+    {
+      "tick": 15,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M1",
+      "magnitude_cents": 5040,
+      "label": "Big trade on M1: A2 took 80 contracts at 63 cents from A5, 5040 cents of notional."
+    },
+    {
+      "tick": 15,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A5"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 5590,
+      "label": "Big trade on M5: A1 took 86 contracts at 65 cents from A5, 5590 cents of notional."
+    },
+    {
+      "tick": 16,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A5"
+      ],
+      "market_id": "M2",
+      "magnitude_cents": 4655,
+      "label": "Big trade on M2: A5 took 95 contracts at 49 cents from A1, 4655 cents of notional."
+    },
+    {
+      "tick": 17,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 5940,
+      "label": "Big trade on M3: A5 took 99 contracts at 60 cents from A1, 5940 cents of notional."
+    },
+    {
+      "tick": 18,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M1",
+      "magnitude_cents": 5762,
+      "label": "Big trade on M1: A2 took 86 contracts at 67 cents from A1, 5762 cents of notional."
+    },
+    {
+      "tick": 19,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M4",
+      "magnitude_cents": 5400,
+      "label": "Big trade on M4: A1 took 100 contracts at 54 cents from A2, 5400 cents of notional."
+    },
+    {
+      "tick": 19,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M4",
+      "magnitude_cents": 5400,
+      "label": "Big trade on M4: A2 took 100 contracts at 54 cents from A5, 5400 cents of notional."
+    },
+    {
+      "tick": 24,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 5440,
+      "label": "Big trade on M3: A5 took 80 contracts at 68 cents from A2, 5440 cents of notional."
+    },
+    {
+      "tick": 25,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 4968,
+      "label": "Big trade on M3: A2 took 72 contracts at 69 cents from A5, 4968 cents of notional."
+    },
+    {
+      "tick": 26,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 7400,
+      "label": "Big trade on M3: A2 took 100 contracts at 74 cents from A5, 7400 cents of notional."
+    },
+    {
+      "tick": 27,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 4680,
+      "label": "Big trade on M5: A1 took 60 contracts at 78 cents from A2, 4680 cents of notional."
+    },
+    {
+      "tick": 27,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 8000,
+      "label": "Big trade on M5: A2 took 100 contracts at 80 cents from A1, 8000 cents of notional."
+    },
+    {
+      "tick": 29,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A4"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 4704,
+      "label": "Big trade on M5: A4 took 56 contracts at 84 cents from A2, 4704 cents of notional."
+    },
+    {
+      "tick": 29,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 4704,
+      "label": "Big trade on M5: A2 took 56 contracts at 84 cents from A1, 4704 cents of notional."
+    },
+    {
+      "tick": 37,
+      "kind": "integrity_alert",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 0,
+      "label": "Integrity alert i-0001: off_market_transfer (high) involving A2, A5, score 8094435 ppm."
+    },
+    {
+      "tick": 41,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 7800,
+      "label": "Big trade on M5: A2 took 100 contracts at 78 cents from A1, 7800 cents of notional."
+    },
+    {
+      "tick": 44,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 8100,
+      "label": "Big trade on M5: A2 took 100 contracts at 81 cents from A1, 8100 cents of notional."
+    },
+    {
+      "tick": 45,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A1",
+        "A2"
+      ],
+      "market_id": "M5",
+      "magnitude_cents": 4800,
+      "label": "Big trade on M5: A1 took 60 contracts at 80 cents from A2, 4800 cents of notional."
+    },
+    {
+      "tick": 46,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M3",
+      "magnitude_cents": 5520,
+      "label": "Big trade on M3: A2 took 80 contracts at 69 cents from A5, 5520 cents of notional."
+    },
+    {
+      "tick": 48,
+      "kind": "big_trade",
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_id": "M1",
+      "magnitude_cents": 5310,
+      "label": "Big trade on M1: A5 took 90 contracts at 59 cents from A2, 5310 cents of notional."
+    }
+  ]
+}

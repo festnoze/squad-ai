@@ -1,0 +1,72 @@
+# A large population tournament (PRD section 8, "systeme suisse").
+#
+# Twelve harnesses cannot be round robined at six seats (C(12, 6) = 924
+# matchups), so the format is Swiss: one round at a time, pairing by standing,
+# six rounds. Twelve is a multiple of six, so no harness ever sits out.
+
+tournament_id = "T-swiss-0001"
+format = "swiss"
+template_ids = ["election", "harvest"]
+seeds = [31337, 31338, 31339]
+agents_per_match = 6
+rounds = 6
+background_baselines = ["fundamentalist", "momentum", "noise", "zero_intelligence"]
+max_cost_usd = 120.0
+
+[match_defaults]
+ticks_total = 48
+n_agents = 6
+n_markets = 5
+liquidity_profile_name = "standard"
+
+[gateway]
+timeout_s = 60.0
+max_budget_usd_per_tournament = 120.0
+
+[[harnesses]]
+harness_id = "sonnet5-baseline"
+version = "1.0.0"
+kind = "llm"
+model = "claude-sonnet-5"
+
+[[harnesses]]
+harness_id = "sonnet5-baseline"
+version = "1.1.0"
+kind = "llm"
+model = "claude-sonnet-5"
+
+[[harnesses]]
+harness_id = "sonnet5-calibrated"
+version = "1.0.0"
+kind = "llm"
+model = "claude-sonnet-5"
+
+[[harnesses]]
+harness_id = "sonnet5-calibrated"
+version = "1.1.0"
+kind = "llm"
+model = "claude-sonnet-5"
+
+[[harnesses]]
+harness_id = "haiku45-fast"
+version = "1.0.0"
+kind = "llm"
+model = "claude-haiku-4-5"
+
+[[harnesses]]
+harness_id = "haiku45-fast"
+version = "1.1.0"
+kind = "llm"
+model = "claude-haiku-4-5"
+
+[[harnesses]]
+harness_id = "opus45-deliberate"
+version = "1.0.0"
+kind = "llm"
+model = "claude-opus-4-5"
+
+[[harnesses]]
+harness_id = "opus45-deliberate"
+version = "1.1.0"
+kind = "llm"
+model = "claude-opus-4-5"

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pxe.local/schemas/action.v1.json",
+  "title": "PxeAgentAction",
+  "description": "Agent to engine payload for one tick (PRD section 6.2). Declare a probability for EVERY open market, then optionally place or cancel orders. Prices are integer cents from 1 to 99, quantities are integer contracts. Every key listed in 'required' must be present; use null for fields that do not apply.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["action_version", "predictions", "orders", "message_public", "rationale"],
+  "properties": {
+    "action_version": {
+      "const": "1.0"
+    },
+    "predictions": {
+      "type": "array",
+      "maxItems": 8,
+      "description": "One entry per open market. A missing market keeps its previously declared value.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["market_id", "p_yes"],
+        "properties": {
+          "market_id": {
+            "type": "string",
+            "pattern": "^M[1-9][0-9]?$"
+          },
+          "p_yes": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Probability that the event resolves YES."
+          }
+        }
+      }
+    },
+    "orders": {
+      "type": "array",
+      "maxItems": 20,
+      "description": "Applied in array order. For op=place set market_id, side, type and qty, plus price when type is limit (null when type is market). For op=cancel set order_id only and leave the other fields null.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "market_id", "side", "type", "price", "qty", "order_id"],
+        "properties": {
+          "op": {
+            "enum": ["place", "cancel"]
+          },
+          "market_id": {
+            "type": ["string", "null"],
+            "pattern": "^M[1-9][0-9]?$"
+          },
+          "side": {
+            "enum": ["buy", "sell", null]
+          },
+          "type": {
+            "enum": ["limit", "market", null]
+          },
+          "price": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 99
+          },
+          "qty": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "order_id": {
+            "type": ["string", "null"],
+            "maxLength": 16
+          }
+        }
+      }
+    },
+    "message_public": {
+      "type": ["string", "null"],
+      "maxLength": 280,
+      "description": "Public message delivered to the other agents at the next tick. Null when you say nothing, and always null when talking mode is off."
+    },
+    "rationale": {
+      "type": ["string", "null"],
+      "maxLength": 600,
+      "description": "Optional short explanation kept for the human readable decision journal. Never read by the engine."
+    }
+  }
+}

@@ -1,0 +1,285 @@
+{
+  "tournament_id": "T-apitest-0001",
+  "format": "round_robin",
+  "n_matches": 1,
+  "n_harnesses": 6,
+  "seeds": [
+    20260827,
+    2,
+    3
+  ],
+  "total_cost_usd": 0.0,
+  "finished": false,
+  "leaderboard": [
+    {
+      "rank": 1,
+      "harness_key": "mute@1.0.0+ff70ae1c",
+      "mu": 30.0,
+      "sigma": 6.833,
+      "matches": 25,
+      "ci_low": 9.500999999999998,
+      "ci_high": 50.499
+    },
+    {
+      "rank": 2,
+      "harness_key": "bayesian@1.0.0+e1b145d9",
+      "mu": 29.0,
+      "sigma": 7.133,
+      "matches": 24,
+      "ci_low": 7.600999999999999,
+      "ci_high": 50.399
+    },
+    {
+      "rank": 3,
+      "harness_key": "zero_intelligence@1.0.0+27607b6d",
+      "mu": 28.0,
+      "sigma": 7.433,
+      "matches": 23,
+      "ci_low": 5.7010000000000005,
+      "ci_high": 50.299
+    },
+    {
+      "rank": 4,
+      "harness_key": "noise@1.0.0+79d9167a",
+      "mu": 27.0,
+      "sigma": 7.7330000000000005,
+      "matches": 22,
+      "ci_low": 3.8009999999999984,
+      "ci_high": 50.199
+    },
+    {
+      "rank": 5,
+      "harness_key": "momentum@1.0.0+b0c8e992",
+      "mu": 26.0,
+      "sigma": 8.033,
+      "matches": 21,
+      "ci_low": 1.9010000000000034,
+      "ci_high": 50.099
+    },
+    {
+      "rank": 6,
+      "harness_key": "fundamentalist@1.0.0+d02066bc",
+      "mu": 25.0,
+      "sigma": 8.333,
+      "matches": 20,
+      "ci_low": 0.0009999999999976694,
+      "ci_high": 49.999
+    }
+  ],
+  "progression": [
+    {
+      "harness_id": "bayesian",
+      "points": [
+        {
+          "harness_key": "bayesian@1.0.0+e1b145d9",
+          "version": "1.0.0",
+          "mu": 29.0,
+          "sigma": 7.133,
+          "matches": 24
+        }
+      ]
+    },
+    {
+      "harness_id": "fundamentalist",
+      "points": [
+        {
+          "harness_key": "fundamentalist@1.0.0+d02066bc",
+          "version": "1.0.0",
+          "mu": 25.0,
+          "sigma": 8.333,
+          "matches": 20
+        }
+      ]
+    },
+    {
+      "harness_id": "momentum",
+      "points": [
+        {
+          "harness_key": "momentum@1.0.0+b0c8e992",
+          "version": "1.0.0",
+          "mu": 26.0,
+          "sigma": 8.033,
+          "matches": 21
+        }
+      ]
+    },
+    {
+      "harness_id": "mute",
+      "points": [
+        {
+          "harness_key": "mute@1.0.0+ff70ae1c",
+          "version": "1.0.0",
+          "mu": 30.0,
+          "sigma": 6.833,
+          "matches": 25
+        }
+      ]
+    },
+    {
+      "harness_id": "noise",
+      "points": [
+        {
+          "harness_key": "noise@1.0.0+79d9167a",
+          "version": "1.0.0",
+          "mu": 27.0,
+          "sigma": 7.7330000000000005,
+          "matches": 22
+        }
+      ]
+    },
+    {
+      "harness_id": "zero_intelligence",
+      "points": [
+        {
+          "harness_key": "zero_intelligence@1.0.0+27607b6d",
+          "version": "1.0.0",
+          "mu": 28.0,
+          "sigma": 7.433,
+          "matches": 23
+        }
+      ]
+    }
+  ],
+  "elites": {
+    "axes": [
+      "maker_ratio_ppm",
+      "reaction_latency_milli",
+      "holding_horizon_milli"
+    ],
+    "bins": [
+      3,
+      2,
+      3
+    ],
+    "cells": [
+      {
+        "coords": [
+          0,
+          1,
+          2
+        ],
+        "harness_key": "fundamentalist@1.0.0+d02066bc",
+        "mu": 27.0,
+        "descriptors": [
+          500000,
+          1200,
+          3400
+        ]
+      },
+      {
+        "coords": [
+          2,
+          0,
+          1
+        ],
+        "harness_key": "momentum@1.0.0+b0c8e992",
+        "mu": 26.0,
+        "descriptors": [
+          300000,
+          900,
+          2100
+        ]
+      }
+    ]
+  },
+  "costs_usd": [
+    {
+      "harness_key": "bayesian@1.0.0+e1b145d9",
+      "cost_usd": 0.0
+    },
+    {
+      "harness_key": "fundamentalist@1.0.0+d02066bc",
+      "cost_usd": 0.0
+    },
+    {
+      "harness_key": "momentum@1.0.0+b0c8e992",
+      "cost_usd": 0.0
+    },
+    {
+      "harness_key": "mute@1.0.0+ff70ae1c",
+      "cost_usd": 0.0
+    },
+    {
+      "harness_key": "noise@1.0.0+79d9167a",
+      "cost_usd": 0.0
+    },
+    {
+      "harness_key": "zero_intelligence@1.0.0+27607b6d",
+      "cost_usd": 0.0
+    }
+  ],
+  "incidents": [
+    {
+      "incident_id": "i-0001",
+      "kind": "off_market_transfer",
+      "severity": "high",
+      "match_id": "m-election-20260827-01",
+      "tick": 37,
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_ids": [
+        "M3"
+      ],
+      "score_ppm": 8094435,
+      "detector_version": "off_market_transfer@1.0.0",
+      "detail": {
+        "dispersion_milli": 2965,
+        "max_deviation_cents": 24,
+        "off_market_trades": 5,
+        "threshold_ppm": 3000000,
+        "transferred_cents": 2646
+      }
+    }
+  ],
+  "liquidity_cost_cents": [
+    {
+      "profile": "standard",
+      "mm_pnl_cents": -1857
+    }
+  ],
+  "profile_balance": {
+    "exact": false,
+    "max_deviation": 0,
+    "seeds": 2,
+    "seats": 6
+  },
+  "kpis": [
+    {
+      "name": "cost_per_match_usd_milli",
+      "value_ppm": 0,
+      "unit": "milli_usd"
+    },
+    {
+      "name": "cost_per_tournament_usd_milli",
+      "value_ppm": 0,
+      "unit": "milli_usd"
+    },
+    {
+      "name": "matches_per_night",
+      "value_ppm": 1,
+      "unit": "count"
+    },
+    {
+      "name": "clean_completion_ppm",
+      "value_ppm": 1000000,
+      "unit": "ppm"
+    },
+    {
+      "name": "sigma_shrink_ppm",
+      "value_ppm": 927997,
+      "unit": "ppm"
+    },
+    {
+      "name": "heldout_gain_mu_milli",
+      "value_ppm": 0,
+      "unit": "milli"
+    },
+    {
+      "name": "liquidity_cost_cents_per_match",
+      "value_ppm": -1857,
+      "unit": "cents"
+    }
+  ]
+}

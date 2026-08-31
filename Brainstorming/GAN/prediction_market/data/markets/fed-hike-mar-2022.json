@@ -1,0 +1,39 @@
+{
+  "id": "fed-hike-mar-2022",
+  "question": "Will the US Federal Reserve raise rates at its March 2022 meeting?",
+  "category": "economics",
+  "source": "reconstructed",
+  "resolution": 1,
+  "resolved_date": "2022-03-16",
+  "notes": "Well telegraphed; the market was correctly confident throughout.",
+  "prices": [
+    {
+      "t": "2022-01-05",
+      "price": 55
+    },
+    {
+      "t": "2022-01-26",
+      "price": 65
+    },
+    {
+      "t": "2022-02-10",
+      "price": 78
+    },
+    {
+      "t": "2022-02-24",
+      "price": 72
+    },
+    {
+      "t": "2022-03-01",
+      "price": 85
+    },
+    {
+      "t": "2022-03-10",
+      "price": 94
+    },
+    {
+      "t": "2022-03-15",
+      "price": 97
+    }
+  ]
+}

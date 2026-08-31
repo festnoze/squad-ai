@@ -69,6 +69,64 @@ la lecture, la vitesse du plongeon et l'allonge.
 | Pro | réactions rapides, allonge sérieuse, paris bien choisis |
 | Légende | lit presque tout ce qui dépasse, et sort des arrêts réflexes |
 
+## Vous dans les gants (mode Duel)
+
+En **Duel**, les rôles alternent : vous tirez un tour, vous gardez le suivant. La
+caméra passe derrière le but, et le même corps que pilotait l'ordinateur passe
+entre vos mains - même allonge, même vitesse de plongeon, même volume de parade.
+
+### Les commandes
+
+Aucune touche nouvelle : les trois entrées du tireur changent de métier.
+
+| Entrée | Ce qu'elle fait côté gardien |
+|---|---|
+| Souris | déplace le **réticule de plongeon** dans la cage |
+| Flèches gauche / droite | vous déplace sur votre ligne, 90 cm de chaque côté |
+| Clic gauche ou `Espace` | **plonge**, une seule fois, définitivement |
+
+Le réticule est bridé à l'intérieur du cadre : un plongeon visé au-dessus de la
+barre n'est pas une décision, c'est une commande perdue.
+
+### L'anneau bleu, et pourquoi il rétrécit
+
+L'anneau dessiné dans la cage est votre **enveloppe de portée** : tout ce qu'un
+plongeon lancé *maintenant* atteint encore. Ce n'est pas une illustration, c'est
+la règle elle-même, tracée en cherchant à la dichotomie où votre marge s'annule.
+Le pourcentage **COUVERTURE** à côté est la part du but que cet anneau couvre.
+
+Il rétrécit pendant toute la course d'élan, et il ne repousse jamais. C'est
+l'arithmétique du gardien vue de l'autre côté : **0,42 s** de vol, **0,2 s** de
+réflexe, **0,6 s** de plongeon jusqu'au poteau. Ces trois nombres ne rentrent pas
+les uns dans les autres. Attendre de savoir, c'est déjà avoir perdu la lucarne.
+
+Tant que le tireur court, le jeu suppose un vol de 0,42 s, parce que personne ne
+peut savoir mieux. **Une fois la frappe partie, il utilise le temps de vol réel** :
+l'anneau s'effondre beaucoup plus vite sur une frappe sèche que sur un tir
+mou - et cette différence-là se lit à l'œil.
+
+Le réticule change de couleur avec la marge : il vous dit si *ce* plongeon-là est
+encore jouable, quand l'anneau vous dit ce qui l'est en général.
+
+### Ce que vous avez le droit de lire
+
+Le panneau **LECTURE / ÉLAN** en bas à gauche est le langage corporel du tireur,
+livré indice par indice à mesure qu'il approche. Il est dégradé par construction
+et **son intention n'atteint jamais l'écran** : le plan du tireur reste dans le
+moteur, vous n'en voyez que ce qu'un gardien verrait.
+
+### Deux règles qui vous surprendront
+
+- **Votre temps de réaction n'est pas facturé.** Le gardien de l'ordinateur le
+  paie parce qu'il décide à un instant où son corps n'a pas encore bougé ; vous,
+  vous avez déjà réagi quand vous cliquez. Le compte à rebours part du clic.
+- **Votre place sur la ligne est la seule chose que le tireur sait de vous.** Il
+  la regarde une fois, juste avant de se retourner et de courir, et il choisit sa
+  cible avec. Se décaler est une vraie arme, et un vrai risque.
+
+Enfin, le réglage de difficulté vaut pour **les deux bouts** : un duel contre une
+Légende est un duel où vous gardez avec un corps de Légende.
+
 ## Le ballon
 
 La trajectoire n'est pas une parabole. Le ballon subit une **traînée quadratique
@@ -91,6 +149,16 @@ vous lisez la courbe en vol.
   aussi, contre votre gardien.
 - **Entraînement** : tirs illimités, statistiques, aucun enjeu.
 - **Défi** : des cibles dans le but, des points, et une série à ne pas casser.
+- **Duel** : les rôles alternent, un tour vous tirez, un tour vous gardez. Voir
+  « Vous dans les gants » plus haut.
+- **Entraînement gardien** : le Duel sans le Duel. Vous gardez **chaque** tir, il
+  n'y a pas de série à perdre, et l'ordinateur enchaîne les penalties tant que
+  vous restez. Le bandeau compte vos arrêts sur le nombre de tirs affrontés.
+
+  C'est là qu'on apprend à lire l'anneau, parce qu'on peut se tromper vingt fois
+  de suite sans que ça coûte quoi que ce soit. La difficulté vaut toujours pour
+  les deux bouts : à *Légende*, vous gardez avec un corps de Légende contre un
+  tireur de Légende.
 
 ## Commandes
 
@@ -101,6 +169,9 @@ vous lisez la courbe en vol.
 | `A` / `E` | effet à gauche / à droite |
 | `Z` `S` / flèches haut bas | lift (rétro / lifté) |
 | `Maj` | feinte de frappe pendant la course |
+| Souris | *(Duel, gardien)* viser le plongeon |
+| Flèches gauche / droite | *(Duel, gardien)* se déplacer sur la ligne |
+| Clic gauche / `Espace` | *(Duel, gardien)* plonger |
 | `C` | changer de caméra |
 | `R` | revoir le tir |
 | `Entrée` | tir suivant |
@@ -123,9 +194,25 @@ godot --headless --path . -- --smoke
 # mesure de l'équilibrage du gardien (long : environ 25 minutes)
 godot --headless --path . -- --balance
 
-# captures automatiques
+# captures automatiques : 18 vues, du menu au portrait
 godot --path . -- --shot C:\out
+
+# réparation de l'atlas de peau (mesure seule sans --write)
+godot --headless --path . --script res://tools/repair_skin_atlas.gd -- --write
 ```
+
+`--shot` couvre les trois moitiés du jeu et pas seulement la première :
+
+| Vues | Ce qu'elles montrent |
+|---|---|
+| 1 à 10 | le tour où **vous tirez** : menu, visée, course, vol, but, arrêt, gros plan de la prise, ralenti, télévision |
+| 11 à 15 | le tour où **vous gardez** : placement, lecture, engagement, plongeon, verdict |
+| 16 à 18 | les **portraits**, objectif à un mètre du visage |
+
+Les portraits ne sont pas décoratifs. À distance de match un visage fait quarante
+pixels de haut, donc rien de ce qui va mal sur une texture de peau n'est visible
+sur les dix premières vues. C'est ainsi qu'un fond rouille sur la tempe et une
+nuque non peinte ont survécu à plusieurs relectures.
 
 `docs/CONTRACTS.md` est la **source de vérité** du projet : chaque module a été
 écrit indépendamment par un agent différent, contre les signatures figées dans ce
@@ -135,3 +222,12 @@ Rappel de piège : sous `--script`, Godot n'enregistre pas les autoloads
 (`Game`, `Shootout`, `Sfx`). Une suite de `tests/` ne doit donc jamais les
 nommer, sinon elle ne compile pas. Tout ce qui a besoin du jeu vivant passe par
 `tests/smoke_probe.gd`.
+
+Second piège, celui-là silencieux : **ni le jeu ni les portes ne réimportent une
+texture modifiée**. Godot ne reconstruit `.godot/imported/` qu'à l'ouverture de
+l'éditeur, donc un `--shot` lancé après avoir réécrit un PNG rend l'ancienne
+version sans rien dire. Après toute retouche d'un fichier de `assets/` :
+
+```bash
+godot --headless --path . --import
+```

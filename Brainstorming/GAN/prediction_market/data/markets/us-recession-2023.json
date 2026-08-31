@@ -1,0 +1,43 @@
+{
+  "id": "us-recession-2023",
+  "question": "Will the US enter a recession (two negative GDP quarters) in 2023?",
+  "category": "economics",
+  "source": "reconstructed",
+  "resolution": 0,
+  "resolved_date": "2023-12-31",
+  "notes": "The consensus expected a recession all year; growth stayed positive. The crowd was wrong.",
+  "prices": [
+    {
+      "t": "2023-01-10",
+      "price": 58
+    },
+    {
+      "t": "2023-02-15",
+      "price": 62
+    },
+    {
+      "t": "2023-03-20",
+      "price": 68
+    },
+    {
+      "t": "2023-05-01",
+      "price": 60
+    },
+    {
+      "t": "2023-06-15",
+      "price": 50
+    },
+    {
+      "t": "2023-08-01",
+      "price": 38
+    },
+    {
+      "t": "2023-10-01",
+      "price": 24
+    },
+    {
+      "t": "2023-12-01",
+      "price": 10
+    }
+  ]
+}

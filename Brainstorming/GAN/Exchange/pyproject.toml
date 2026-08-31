@@ -1,0 +1,188 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pxe"
+version = "1.0.0"
+description = "Prediction Exchange: a deterministic arena where LLM agents trade binary contracts on a shared CLOB"
+readme = "README.md"
+requires-python = ">=3.12"
+license = { text = "Proprietary" }
+authors = [{ name = "Prediction Exchange team" }]
+keywords = ["prediction-market", "clob", "llm", "benchmark", "simulation"]
+classifiers = [
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Private :: Do Not Upload",
+]
+dependencies = [
+    "pydantic>=2.7",
+    "jsonschema>=4.21",
+    "trueskill>=0.4.5",
+    "numpy>=1.26",
+    "scipy>=1.12",
+    "fastapi>=0.110",
+    "uvicorn>=0.29",
+    "sqlalchemy>=2.0",
+    "websockets>=12.0",
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Upper bounds are deliberate: CI is the T1.1 exit gate and a major bump of
+    # any of these turns a green gate red for reasons unrelated to the change
+    # under review. Raising a bound is a normal, separate commit.
+    "pytest>=8.1,<10",
+    "pytest-cov>=5.0,<8",
+    # Required, not optional: --strict-config makes the asyncio_mode line in
+    # [tool.pytest.ini_options] a collection error when this plugin is absent.
+    "pytest-asyncio>=0.23,<2",
+    "hypothesis>=6.100,<7",
+    "jsonschema>=4.21",
+    "pyyaml>=6.0",
+    "ruff>=0.4,<1",
+    "mypy>=1.10,<2",
+]
+
+[project.scripts]
+pxe = "pxe.cli:main"
+
+[project.urls]
+Contracts = "./docs/CONTRACTS.md"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["pxe*"]
+
+[tool.setuptools.package-data]
+pxe = ["py.typed"]
+
+# --------------------------------------------------------------------------
+# pytest
+# --------------------------------------------------------------------------
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+    "--import-mode=importlib",
+]
+markers = [
+    "slow: takes more than a second, excluded from the fast loop",
+    "statistical: needs many draws, tolerance based, may be flaky by design",
+    "property: hypothesis based property test",
+    "e2e: runs a whole match or tournament",
+    "llm: calls the real Claude Code CLI, costs money, opt in only",
+    "determinism: guards O1 and AC-P1, never skip in CI",
+]
+filterwarnings = ["error::DeprecationWarning:pxe.*"]
+# pytest-asyncio is a hard dev dependency (see [project.optional-dependencies]
+# dev) precisely because --strict-config turns these two lines into a collection
+# error when the plugin is absent. A13's async gateway tests need them; every
+# other test is synchronous and unaffected.
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+[tool.coverage.run]
+branch = true
+source = ["pxe"]
+omit = ["*/cli.py", "*/api/*"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING:", "raise NotImplementedError"]
+
+# --------------------------------------------------------------------------
+# ruff
+# --------------------------------------------------------------------------
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = [".venv", "runs", "web"]
+
+[tool.ruff.lint]
+select = [
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # pyflakes
+    "I",    # isort
+    "N",    # pep8-naming
+    "UP",   # pyupgrade
+    "B",    # bugbear
+    "C4",   # comprehensions
+    "SIM",  # simplify
+    "RUF",  # ruff specific
+    "D",    # pydocstyle
+    "ANN",  # annotations
+    "PL",   # pylint subset
+    "DTZ",  # forbids naive datetimes
+    "S",    # bandit subset
+]
+ignore = [
+    "D203",   # conflicts with D211
+    "D213",   # conflicts with D212
+    "D105",   # __eq__/__lt__/__repr__ of frozen carriers are self describing
+    "ANN401", # Any is allowed in journal payload helpers
+    "PLR0913",# engine entry points legitimately take many arguments
+    "PLR2004",# a literal inside a __post_init__ range check IS the specification
+    "RUF022", # __all__ is grouped by CONTRACTS section, not alphabetically
+    "RUF023", # __slots__ follows field declaration order for the same reason
+    "S311",   # random is the point here, determinism is enforced by pxe.rng
+    "UP047",  # section 7.3 spells the generics with an explicit TypeVar
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "ANN", "S101", "PLR2004", "PLC0415"]  # a lazy import is how a fixture skips
+"src/pxe/cli.py" = ["T201"]
+
+[tool.ruff.lint.pylint]
+max-returns = 10
+# A frozen config's __post_init__ is one `if` per documented range check, and
+# the range checks ARE the specification (CONTRACTS section 2.6 and 8.2).
+# Splitting MatchConfig's into helpers would scatter the specification across
+# private functions for no reader's benefit.
+max-branches = 18
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["pxe"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+# --------------------------------------------------------------------------
+# mypy
+# --------------------------------------------------------------------------
+[tool.mypy]
+python_version = "3.12"
+mypy_path = "src"
+packages = ["pxe"]
+strict = true
+warn_unreachable = true
+warn_return_any = true
+disallow_untyped_defs = true
+disallow_any_generics = true
+no_implicit_reexport = true
+show_error_codes = true
+pretty = true
+
+[[tool.mypy.overrides]]
+module = ["trueskill.*", "scipy.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+disallow_untyped_defs = false

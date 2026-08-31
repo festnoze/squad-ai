@@ -280,15 +280,72 @@ const _KIT_UV_MIN := Vector2(0.813577, 0.011485)
 const _KIT_UV_MAX := Vector2(0.875866, 0.068663)
 const _KIT_UV_MARGIN := 18.0 / 768.0
 
+## THE HAIR, and why it is a shell of the skull rather than a ball on top of it.
+##
 ## The figure ships no hair, and MakeHuman's UV atlas carries no way to paint any
-## on. A flattened cap on the crown is what the procedural body always used, and
-## two identical bald heads is the one way this model looks WORSE than the boxes
-## it replaces. Sizes are in the model's own units, measured off the skull: the
-## head joint sits at y = 1.636 and the crown at y = 1.800.
-const _HAIR_LIFT := 0.104
-const _HAIR_BACK := -0.008
-const _HAIR_RADIUS := 0.091
-const _HAIR_SQUASH := Vector3(1.04, 0.86, 1.04)
+## on, so a cap is added here: two identical bald heads is the one way this model
+## looks WORSE than the boxes it replaces.
+##
+## That cap used to be a squashed sphere hung off the head bone, and measuring the
+## skull says exactly why it read as a wig. In the head bone's own frame the crown
+## is 0.164 above the joint, the skull is widest (0.095) at 0.030, its back is at
+## z = -0.060 and its forehead at z = +0.148, so the cranium is centred near
+## z = +0.044. The sphere was centred at z = -0.008: five centimetres BEHIND the
+## skull it was supposed to cover. It therefore overhung the back of the head by
+## seven centimetres, its front stopped at z = +0.087 while the forehead runs out
+## to z = +0.148, and the band of scalp between the two was the bare strip an
+## audit found on both figures. Its widest ring also stood clear of the skull, so
+## where it did meet the head it met it as an edge rather than as a hairline.
+##
+## No scaled sphere fixes that. An ellipsoid whose equator is high enough to be
+## short hair is an ellipsoid whose equator stands three centimetres proud of a
+## skull that is narrowing towards the crown: a brim. So the cap is now the
+## SKULL'S OWN TRIANGLES, pushed out along their own normals, which follows the
+## head by construction at any re-export and cannot overhang it anywhere.
+##
+## Two numbers do all the work, and both are read off the shell rather than set on
+## it:
+##  - `_HAIR_THICK` is how far the hair stands above the scalp at the crown. The
+##    drawn skin sits `_SKIN_SHRINK` inside its own geometry, so the standoff the
+##    eye sees is `_HAIR_THICK - _SKIN_SHRINK` = 11 mm, against 22 mm for the old
+##    sphere: the height of the hair is exactly halved, which is what was asked
+##    for, and it now lies flat to the skull instead of perching on it.
+##  - the offset FALLS through the drawn skin at the hairline, `_HAIR_BITE` under
+##    it, so the rim of the cap is buried in the scalp and the visible hairline is
+##    the curve where the two surfaces cross. A boundary that is an intersection
+##    cannot show a hard edge, and it cannot leave a gap either.
+##
+## `_HAIR_BITE` is not a taste, it is arithmetic. The cranium of this mesh is a
+## hundred vertices, so a triangle edge across it is around 25 mm, and a flat
+## triangle strung across a skull of radius 90 mm sags about 0.9 mm below the
+## surface in its middle. A bite smaller than that sag lets the scalp come back
+## through the cap between two vertices, which draws the hairline as a row of
+## scallops. `_HAIR_FEATHER` is the other half of the same sum: the crossing can
+## only wander by the sag divided by the slope of the offset, so a short feather
+## is what keeps the hairline a line.
+##
+## The hairline itself is measured by AZIMUTH about the cranium, not by height:
+## high across the forehead, dropping round the temple, a little back up at the
+## nape, which is where a real one runs. All three drops are fractions of the
+## measured skull height, never centimetres, so a re-exported head keeps its own
+## hairline. Its lowest point sits at 0.56 of the skull height where the old
+## sphere reached 0.23, which is the vertical extent of the cap halved a second
+## time and the reason it no longer reads as a helmet from behind. Triangles below
+## the line are kept for `_HAIR_BURY` of skull height so the crossing curve always
+## falls inside geometry that exists.
+## Metres in the model's own units.
+const _HAIR_THICK := 0.007
+const _HAIR_BITE := 0.0025
+## Fractions of the skull height above the head joint.
+const _HAIR_FEATHER := 0.09
+const _HAIR_DROP_FRONT := 0.366
+const _HAIR_DROP_SIDE := 0.439
+const _HAIR_DROP_BACK := 0.415
+const _HAIR_BURY := 0.13
+## Height, as a fraction of the skull, above which the head is cranium rather than
+## jaw and nose. The z centre the hairline tilts about is measured there, so the
+## nose cannot drag it forwards.
+const _HAIR_CRANIUM := 0.35
 const _EYE_X := 0.035
 const _EYE_Y := 0.033
 const _EYE_Z := 0.126
@@ -311,17 +368,34 @@ const _EYE_Z := 0.126
 ## re-exported model is still covered by its own glove. Read as
 ## [half across the palm, half through the palm, half along the fingers], the first
 ## two in units of the measured hand radius and the third of its length.
-const _MITT_KEEPER := Vector3(0.64, 0.44, 0.48)
+##
+## THE KEEPER'S GLOVE IS A PAD AND NOT AN EGG, and the middle number is the whole
+## of that. It used to be 0.44, which on this hand is 42 mm of half thickness: a
+## solid 128 mm across, 85 mm thick and 200 mm long is very nearly an ellipsoid of
+## revolution, and a close up of a save showed exactly that, a smooth orange egg
+## floating beside the ball. A real glove is 100 mm across, 40 mm thick and
+## 210 mm long, which is what these fractions now give.
+##
+## The measured hand is SPLAYED - MakeHuman ships it with the fingers apart - so
+## `_hand_radius` is the reach out to a spread thumb, near 96 mm, and every
+## fraction here is read against that and not against a palm.
+const _MITT_KEEPER := Vector3(0.52, 0.20, 0.50)
 const _MITT_SHOOTER := Vector3(0.52, 0.46, 0.34)
 ## Where the solid is centred, as a fraction of the wrist to hand centre distance
 ## `hand_reach`. The keeper's glove reaches out past the knuckles; a closed fist
 ## sits back against the wrist.
 ##
+## The keeper's fraction is not a taste either: a glove `along` long whose centre
+## sits closer to the wrist than `along` starts BEHIND the wrist and swallows the
+## end of the forearm, which is what put a bare gap between the sleeve cuff and
+## the glove on that same close up. 0.82 of `hand_reach` is `along` out from the
+## wrist, so the heel of the glove lands on the wrist and the two meet.
+##
 ## `hand_reach` itself is NOT touched. It is what `Keeper` and `Shooter` solve
 ## their arms against and what decides where the drawn glove ends up, so moving it
 ## would move the reach the difficulty is tuned to. The solid is drawn around that
 ## point instead, and both fractions keep it well inside the mitt.
-const _MITT_REACH_KEEPER := 0.55
+const _MITT_REACH_KEEPER := 0.82
 const _MITT_REACH_SHOOTER := 0.42
 
 ## Every surface of the kit shell, as opposed to the body under it.
@@ -577,6 +651,9 @@ static var _rest_spans: Dictionary = {}
 ## The imported mesh with the garment seams re-cut. Built once, shared by both
 ## figures: the two roles differ only by the materials laid over it.
 static var _kit_mesh: ArrayMesh = null
+## The hair cap, cut from the skull of the mesh above. Built once, shared by both
+## figures for the same reason `_kit_mesh` is.
+static var _hair_cap: ArrayMesh = null
 ## The imported mesh with the burly shaping baked in, before the seams are re-cut.
 ## Kept apart from `_kit_mesh` so that a re-cut which gives up (a missing garment
 ## surface) still hands the caller a SHAPED body rather than the raw import.
@@ -688,7 +765,7 @@ static func build(role: int) -> Node3D:
 		push_warning("CharacterModels: the model carries no Skeleton3D, it will not pose.")
 	else:
 		rig.set_meta(&"skeleton", skeleton)
-		_add_hair(skeleton)
+		_add_hair(skeleton, mesh_instance.mesh)
 		_add_eyes(skeleton)
 		_add_mitts(skeleton, role)
 	rig.set_meta(&"scale", k)
@@ -744,6 +821,92 @@ static func metrics(role: int) -> Dictionary:
 			out[key] = value
 	out["scale"] = k
 	return out
+
+
+## The padded glove `_add_mitts` hangs off each wrist, in the DRAWN units of
+## `role`, so a caller that has to keep a held ball OFF it can measure the solid
+## instead of guessing at it.
+##
+##   "along"   semi axis down the fingers
+##   "girth"   the larger of the two semi axes across the palm, which is the one a
+##             ball resting against the SIDE of the glove meets
+##   "back"    how far the CENTRE of the solid sits behind the hand centre the arms
+##             are solved to, along the same axis
+##
+## That last number is the whole reason this function exists. `_add_mitts` centres
+## the glove at `_MITT_REACH_*` of `hand_reach` while the arm solve aims at the
+## full `hand_reach`, so the solid is centred BEHIND the point everything else
+## calls the glove and reaches `along - back` PAST it. A ball placed a fixed
+## distance from that point, in a direction with any component down the fingers,
+## is therefore pierced by them however generous the distance looks.
+##
+## Empty when no model is installed for the role: a procedural body measures its
+## own blob and has no business reading these.
+static func mitt_shape(role: int) -> Dictionary:
+	if _scene(role) == null or _hand_length <= 0.0 or _hand_radius <= 0.0:
+		return {}
+	var keeper: bool = role == ROLE_KEEPER
+	var shape: Vector3 = _MITT_KEEPER if keeper else _MITT_SHOOTER
+	var fraction: float = _MITT_REACH_KEEPER if keeper else _MITT_REACH_SHOOTER
+	var reach: float = float(_model_metrics.get("hand_reach", _hand_length * 0.5))
+	var k: float = _role_scale(role)
+	return {
+		"along": shape.z * _hand_length * k,
+		"girth": maxf(shape.x, shape.y) * _hand_radius * k,
+		"back": reach * (1.0 - fraction) * k,
+	}
+
+
+## The glove SOLID of a BUILT figure, in WORLD space, or an empty dictionary when
+## this body has none: a procedural fallback, or a figure not yet in the tree.
+##
+##   "centre"   Vector3, the middle of the padded ellipsoid
+##   "axis"     Vector3, unit, the direction the fingers run in
+##   "across"   Vector3, unit, the width of the palm
+##   "through"  Vector3, unit, the palm normal, the THIN direction
+##   "along" "half_across" "half_through"   float, the three semi axes
+##
+## All THREE are published, and the third one is not a detail. This glove is a
+## flat pad: 105 mm down the fingers, 52 mm across the palm and 19 mm through it.
+## A caller that folds the last two into one radius and takes the larger seats a
+## ball on the palm 33 mm off the leather, which is a visible gap and was one.
+##
+## `mitt_shape` says what glove a role is BUILT with. THIS says where a particular
+## figure's glove has ENDED UP once it has been posed, and only the second one is
+## any use to a caller trying to put a ball in it. They are different questions
+## because the arms are solved by `Keeper` against `hand_reach` while the glove is
+## drawn by `_add_mitts` around a point of its own, and because `pose()` bounds how
+## far an over extended arm may follow its target at all.
+static func mitt_solid(figure: Node3D, left: bool) -> Dictionary:
+	if figure == null:
+		return {}
+	var node := figure.find_child("MittMesh%s" % ("L" if left else "R"), true, false) as MeshInstance3D
+	if node == null or not node.is_inside_tree():
+		return {}
+	var box: AABB = node.get_aabb()
+	if box.size.x < 0.0001 or box.size.y < 0.0001 or box.size.z < 0.0001:
+		return {}
+	# The semi axes come off the BASIS and not off the AABB. `_add_mitts` builds a
+	# SphereMesh sized ACROSS the palm and stretches its z into the length of the
+	# fingers through the transform, so the box alone reports a round glove and the
+	# figure's own scale is not in it either.
+	var xform: Transform3D = node.global_transform
+	var half: Vector3 = box.size * 0.5
+	var along: Vector3 = xform.basis.z * half.z
+	var across: Vector3 = xform.basis.x * half.x
+	var through: Vector3 = xform.basis.y * half.y
+	if along.length_squared() < 0.000001 or across.length_squared() < 0.000001 \
+			or through.length_squared() < 0.000001:
+		return {}
+	return {
+		"centre": xform * box.get_center(),
+		"axis": along.normalized(),
+		"across": across.normalized(),
+		"through": through.normalized(),
+		"along": along.length(),
+		"half_across": across.length(),
+		"half_through": through.length(),
+	}
 
 
 ## Poses a figure built by `build()` from world space joint positions.
@@ -876,6 +1039,7 @@ static func clear_cache() -> void:
 	_rest_spans.clear()
 	_kit_mesh = null
 	_shaped_mesh = null
+	_hair_cap = null
 	_limbs.clear()
 	_arm_root = Vector3.ZERO
 	_arm_dir = Vector3.ZERO
@@ -2553,33 +2717,164 @@ static func _paint(mesh_instance: MeshInstance3D, role: int) -> void:
 		mesh_instance.set_surface_override_material(s, _kit_material(surface_name, keeper))
 
 
-## Hangs a flattened cap of hair off the head bone. See `_HAIR_LIFT`.
+## Hangs the cap of hair off the head bone. See `_HAIR_THICK`.
 ##
 ## A `BoneAttachment3D` follows the posed bone for free, so the cap stays on the
 ## crown through a full horizontal dive without a line of per frame code. It sits
 ## under the skeleton, so it inherits the rig's scale like everything else and
 ## needs no counter scale, unlike the weapon in the sibling CALL OF WAR project.
-static func _add_hair(skeleton: Skeleton3D) -> void:
+## It inherits the enlarged head's scale the same way, which is what keeps a cap
+## measured in the head bone's own units the right size on a doubled skull.
+static func _add_hair(skeleton: Skeleton3D, mesh: Mesh) -> void:
 	if skeleton.find_bone("head") < 0:
+		return
+	var cap := _hair_mesh(mesh, skeleton)
+	if cap == null:
 		return
 	var attach := BoneAttachment3D.new()
 	attach.name = "Hair"
 	attach.bone_name = "head"
 	skeleton.add_child(attach)
 
-	var cap := SphereMesh.new()
-	cap.radius = _HAIR_RADIUS
-	cap.height = _HAIR_RADIUS * 2.0
-	cap.radial_segments = 24
-	cap.rings = 12
 	var mesh_instance := MeshInstance3D.new()
 	mesh_instance.name = "HairMesh"
 	mesh_instance.mesh = cap
 	mesh_instance.material_override = _cloth(Palette.HAIR, 0.72, 0.30, 0.0, 0.0)
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	attach.add_child(mesh_instance)
-	mesh_instance.position = Vector3(0.0, _HAIR_LIFT, _HAIR_BACK)
-	mesh_instance.scale = _HAIR_SQUASH
+
+
+## The cap itself: the skull's own triangles above the hairline, expressed in the
+## head bone's frame and pushed out along their own normals. See `_HAIR_THICK` for
+## why it is built this way rather than parked on the crown as a primitive.
+##
+## The skull is taken as the geometry the SKIN and FACE surfaces put above the
+## hairline, not as the geometry the head bone owns: the cut is a height and the
+## height is measured on this very mesh, so a re-export moves the cap with it.
+## Rigid is legitimate here because every vertex this keeps belongs outright to
+## the head bone, which is the same test `_head_floor` makes.
+static func _hair_mesh(mesh: Mesh, skeleton: Skeleton3D) -> ArrayMesh:
+	if _hair_cap != null:
+		return _hair_cap
+	var head := skeleton.find_bone("head")
+	if mesh == null or head < 0:
+		return null
+	var to_local := skeleton.get_bone_global_rest(head).affine_inverse()
+
+	# Pass one: everything the two skin surfaces hold, in the head bone's frame.
+	var pieces: Array = []
+	var crown := -1.0e9
+	for s in mesh.get_surface_count():
+		var material := mesh.surface_get_material(s)
+		var surface_name := material.resource_name if material != null else ""
+		if surface_name != SURFACE_SKIN and surface_name != SURFACE_FACE:
+			continue
+		var arrays: Array = mesh.surface_get_arrays(s)
+		if arrays.size() <= Mesh.ARRAY_INDEX or arrays[Mesh.ARRAY_VERTEX] == null \
+				or arrays[Mesh.ARRAY_NORMAL] == null or arrays[Mesh.ARRAY_INDEX] == null:
+			continue
+		var verts := PackedVector3Array()
+		var norms := PackedVector3Array()
+		for v in arrays[Mesh.ARRAY_VERTEX] as PackedVector3Array:
+			var p := to_local * v
+			verts.append(p)
+			crown = maxf(crown, p.y)
+		for n in arrays[Mesh.ARRAY_NORMAL] as PackedVector3Array:
+			norms.append((to_local.basis * n).normalized())
+		pieces.append([verts, norms, arrays[Mesh.ARRAY_INDEX] as PackedInt32Array])
+	if pieces.is_empty() or crown <= 0.0:
+		push_warning("CharacterModels: no skull surface to cut the hair from, the figures stay bald.")
+		return null
+
+	# Pass two: the box the cranium occupies, so the hairline can be read as an
+	# azimuth about it instead of about a nose.
+	var z_low := 1.0e9
+	var z_high := -1.0e9
+	var x_half := 0.0
+	for piece in pieces:
+		for p in piece[0] as PackedVector3Array:
+			if p.y < crown * _HAIR_CRANIUM:
+				continue
+			z_low = minf(z_low, p.z)
+			z_high = maxf(z_high, p.z)
+			x_half = maxf(x_half, absf(p.x))
+	if z_low > z_high or x_half <= 0.0:
+		return null
+	var head_box := Vector3(x_half, (z_low + z_high) * 0.5, (z_high - z_low) * 0.5)
+	if head_box.z <= 0.0:
+		return null
+
+	# Pass three: keep every triangle the hairline crosses or stands above, and
+	# offset each of its vertices by however much hair there is at that height.
+	var out_v := PackedVector3Array()
+	var out_n := PackedVector3Array()
+	var out_i := PackedInt32Array()
+	var remap: Dictionary = {}
+	var keep_below := -crown * _HAIR_BURY
+	for slot in pieces.size():
+		var piece: Array = pieces[slot]
+		var verts: PackedVector3Array = piece[0]
+		var norms: PackedVector3Array = piece[1]
+		var indices: PackedInt32Array = piece[2]
+		for tri in int(indices.size() / 3):
+			var corner := PackedInt32Array([
+				indices[tri * 3], indices[tri * 3 + 1], indices[tri * 3 + 2]])
+			var top := -1.0e9
+			for i in corner:
+				top = maxf(top, _hair_above(verts[i], crown, head_box))
+			if top <= keep_below:
+				continue
+			for i in corner:
+				var key := slot * 1000000 + i
+				if not remap.has(key):
+					var p: Vector3 = verts[i]
+					var n: Vector3 = norms[i]
+					remap[key] = out_v.size()
+					out_v.append(p + n * _hair_offset(
+						_hair_above(p, crown, head_box), crown))
+					out_n.append(n)
+				out_i.append(int(remap[key]))
+	if out_i.is_empty():
+		push_warning("CharacterModels: the hairline cut nothing off the skull, the figures stay bald.")
+		return null
+
+	var cap_arrays: Array = []
+	cap_arrays.resize(Mesh.ARRAY_MAX)
+	cap_arrays[Mesh.ARRAY_VERTEX] = out_v
+	cap_arrays[Mesh.ARRAY_NORMAL] = out_n
+	cap_arrays[Mesh.ARRAY_INDEX] = out_i
+	var cap := ArrayMesh.new()
+	cap.resource_name = "hair"
+	cap.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, cap_arrays)
+	_hair_cap = cap
+	return cap
+
+
+## How far a skull point stands above the hairline, in the head bone's frame.
+## `box` carries the cranium's half width in x, its centre in z and its half depth
+## in z, in that order. The hairline is read off the AZIMUTH about that box: high
+## across the forehead, lowest round the temple, a little back up at the nape,
+## exactly as a real one runs. Height alone would draw a swimming cap.
+static func _hair_above(p: Vector3, crown: float, box: Vector3) -> float:
+	var forward := clampf((p.z - box.y) / box.z, -1.0, 1.0)
+	var sideways := clampf(absf(p.x) / box.x, 0.0, 1.0)
+	# 0 straight ahead, 1 out at the ear, 2 round the back.
+	var turn := atan2(sideways, forward) * 2.0 / PI
+	var drop := lerpf(_HAIR_DROP_FRONT, _HAIR_DROP_SIDE,
+			smoothstep(0.0, 1.0, turn)) if turn <= 1.0 \
+		else lerpf(_HAIR_DROP_SIDE, _HAIR_DROP_BACK,
+			smoothstep(0.0, 1.0, turn - 1.0))
+	return p.y - crown * (1.0 - drop)
+
+
+## Hair thickness at a point that far above the hairline. It reaches `_HAIR_THICK`
+## over the crown and it is `_HAIR_BITE` UNDER the drawn skin (`_SKIN_SHRINK`) at
+## the hairline itself, so the rim of the cap ends up inside the head and the
+## visible edge is the curve where the two surfaces cross. Smoothstepped rather
+## than linear: a kink in this profile is a crease across the temple.
+static func _hair_offset(above: float, crown: float) -> float:
+	var u := clampf(above / (crown * _HAIR_FEATHER), 0.0, 1.0)
+	return lerpf(_SKIN_SHRINK - _HAIR_BITE, _HAIR_THICK, smoothstep(0.0, 1.0, u))
 
 
 ## The MakeHuman body mesh carries eyelid shells but no eyeball geometry. A

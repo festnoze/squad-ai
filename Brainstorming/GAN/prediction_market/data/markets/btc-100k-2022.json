@@ -1,0 +1,43 @@
+{
+  "id": "btc-100k-2022",
+  "question": "Will Bitcoin reach $100,000 by the end of 2022?",
+  "category": "crypto",
+  "source": "reconstructed",
+  "resolution": 0,
+  "resolved_date": "2022-12-31",
+  "notes": "A popular call at the 2021 top; the market fell to ~16k instead. A bubble that deflated.",
+  "prices": [
+    {
+      "t": "2022-01-05",
+      "price": 35
+    },
+    {
+      "t": "2022-02-15",
+      "price": 30
+    },
+    {
+      "t": "2022-04-01",
+      "price": 26
+    },
+    {
+      "t": "2022-05-15",
+      "price": 14
+    },
+    {
+      "t": "2022-06-20",
+      "price": 6
+    },
+    {
+      "t": "2022-08-15",
+      "price": 8
+    },
+    {
+      "t": "2022-10-01",
+      "price": 4
+    },
+    {
+      "t": "2022-12-01",
+      "price": 2
+    }
+  ]
+}

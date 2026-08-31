@@ -1,0 +1,63 @@
+# The nightly rated tournament (PRD section 8, AC-P3).
+#
+# Round robin over the four competing LLM harnesses plus the four rated scripted
+# baselines of the background population (PRD section 8), on three world
+# templates and three seeds per matchup, which is the FR-5.3.2 and T3.3 floor.
+# C(8, 6) = 28 matchups x 3 templates x 3 seeds = 252 matches, comfortably over
+# the AC-P3 "at least 100" bar.
+#
+# The reference market maker is the fifth member of the background population and
+# is not listed: it is never a seat and never rated (FR-5.8.5), and every match
+# builds it from match_defaults.liquidity_profile_name.
+
+tournament_id = "T-nightly-0001"
+format = "round_robin"
+template_ids = ["election", "harvest", "league"]
+seeds = [20260827, 20260828, 20260829]
+agents_per_match = 6
+rounds = 1
+background_baselines = ["fundamentalist", "momentum", "noise", "zero_intelligence"]
+max_cost_usd = 50.0
+
+[match_defaults]
+ticks_total = 48
+n_agents = 6
+n_markets = 5
+liquidity_profile_name = "standard"
+talking_mode = false
+
+[gateway]
+timeout_s = 60.0
+retries = 2
+max_budget_usd_per_call = 0.10
+max_budget_usd_per_match = 5.0
+max_budget_usd_per_tournament = 50.0
+max_parallel_calls = 6
+
+[[harnesses]]
+harness_id = "sonnet5-baseline"
+version = "1.0.0"
+kind = "llm"
+model = "claude-sonnet-5"
+system_prompt = "You are a disciplined prediction market trader."
+
+[[harnesses]]
+harness_id = "sonnet5-calibrated"
+version = "1.0.0"
+kind = "llm"
+model = "claude-sonnet-5"
+system_prompt = "You are a Bayesian forecaster who trades only when price and belief disagree."
+
+[[harnesses]]
+harness_id = "haiku45-fast"
+version = "1.0.0"
+kind = "llm"
+model = "claude-haiku-4-5"
+system_prompt = "You are a fast, cautious prediction market trader."
+
+[[harnesses]]
+harness_id = "opus45-deliberate"
+version = "1.0.0"
+kind = "llm"
+model = "claude-opus-4-5"
+system_prompt = "You are a patient market maker of beliefs. Explain nothing you cannot price."

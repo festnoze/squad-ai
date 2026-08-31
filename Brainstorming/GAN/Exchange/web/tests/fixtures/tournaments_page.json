@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "tournament_id": "T-apitest-0001",
+      "format": "round_robin",
+      "n_matches": 1,
+      "n_harnesses": 6,
+      "seeds": [
+        20260827,
+        2,
+        3
+      ],
+      "total_cost_usd": 0.0,
+      "finished": false
+    }
+  ],
+  "total": 1,
+  "limit": 50,
+  "offset": 0
+}

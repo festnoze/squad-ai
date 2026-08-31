@@ -1,0 +1,131 @@
+{
+  "match_id": "m-election-20260827-01",
+  "tick": 49,
+  "open_market_ids": [],
+  "markets": [
+    {
+      "market_id": "M1",
+      "status": "resolved",
+      "ref_price": 61,
+      "ref_source": "mid",
+      "mid_price": null,
+      "best_bid": null,
+      "best_ask": null,
+      "last_price": null,
+      "bids": [],
+      "asks": [],
+      "bid_depth_qty": 0,
+      "ask_depth_qty": 0,
+      "tick_volume_qty": 0,
+      "mm_bid": null,
+      "mm_ask": null,
+      "mm_widened": false
+    },
+    {
+      "market_id": "M2",
+      "status": "resolved",
+      "ref_price": 45,
+      "ref_source": "mid",
+      "mid_price": null,
+      "best_bid": null,
+      "best_ask": null,
+      "last_price": null,
+      "bids": [],
+      "asks": [],
+      "bid_depth_qty": 0,
+      "ask_depth_qty": 0,
+      "tick_volume_qty": 0,
+      "mm_bid": null,
+      "mm_ask": null,
+      "mm_widened": false
+    },
+    {
+      "market_id": "M3",
+      "status": "resolved",
+      "ref_price": 66,
+      "ref_source": "mid",
+      "mid_price": null,
+      "best_bid": null,
+      "best_ask": null,
+      "last_price": null,
+      "bids": [],
+      "asks": [],
+      "bid_depth_qty": 0,
+      "ask_depth_qty": 0,
+      "tick_volume_qty": 0,
+      "mm_bid": null,
+      "mm_ask": null,
+      "mm_widened": false
+    },
+    {
+      "market_id": "M4",
+      "status": "resolved",
+      "ref_price": 48,
+      "ref_source": "mid",
+      "mid_price": null,
+      "best_bid": null,
+      "best_ask": null,
+      "last_price": null,
+      "bids": [],
+      "asks": [],
+      "bid_depth_qty": 0,
+      "ask_depth_qty": 0,
+      "tick_volume_qty": 0,
+      "mm_bid": null,
+      "mm_ask": null,
+      "mm_widened": false
+    },
+    {
+      "market_id": "M5",
+      "status": "resolved",
+      "ref_price": 75,
+      "ref_source": "mid",
+      "mid_price": null,
+      "best_bid": null,
+      "best_ask": null,
+      "last_price": null,
+      "bids": [],
+      "asks": [],
+      "bid_depth_qty": 0,
+      "ask_depth_qty": 0,
+      "tick_volume_qty": 0,
+      "mm_bid": null,
+      "mm_ask": null,
+      "mm_widened": false
+    }
+  ],
+  "accounts": [],
+  "news": [],
+  "signals": [],
+  "trades": [],
+  "predictions": [],
+  "messages": [],
+  "resolutions": [
+    {
+      "market_id": "M1",
+      "outcome": "yes",
+      "payout_cents": 100
+    },
+    {
+      "market_id": "M2",
+      "outcome": "yes",
+      "payout_cents": 100
+    },
+    {
+      "market_id": "M3",
+      "outcome": "yes",
+      "payout_cents": 100
+    },
+    {
+      "market_id": "M4",
+      "outcome": "yes",
+      "payout_cents": 100
+    },
+    {
+      "market_id": "M5",
+      "outcome": "yes",
+      "payout_cents": 100
+    }
+  ],
+  "highlights": []
+}

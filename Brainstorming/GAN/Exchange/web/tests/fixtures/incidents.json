@@ -1,0 +1,27 @@
+{
+  "incidents": [
+    {
+      "incident_id": "i-0001",
+      "kind": "off_market_transfer",
+      "severity": "high",
+      "match_id": "m-election-20260827-01",
+      "tick": 37,
+      "agent_ids": [
+        "A2",
+        "A5"
+      ],
+      "market_ids": [
+        "M3"
+      ],
+      "score_ppm": 8094435,
+      "detector_version": "off_market_transfer@1.0.0",
+      "detail": {
+        "dispersion_milli": 2965,
+        "max_deviation_cents": 24,
+        "off_market_trades": 5,
+        "threshold_ppm": 3000000,
+        "transferred_cents": 2646
+      }
+    }
+  ]
+}

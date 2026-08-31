@@ -1,0 +1,39 @@
+{
+  "id": "eth-merge-2022",
+  "question": "Will Ethereum complete the Merge to proof of stake in 2022?",
+  "category": "crypto",
+  "source": "reconstructed",
+  "resolution": 1,
+  "resolved_date": "2022-09-15",
+  "notes": "Slipped for years, then landed in September 2022; confidence rose as testnets merged.",
+  "prices": [
+    {
+      "t": "2022-04-01",
+      "price": 45
+    },
+    {
+      "t": "2022-05-15",
+      "price": 40
+    },
+    {
+      "t": "2022-06-08",
+      "price": 55
+    },
+    {
+      "t": "2022-07-01",
+      "price": 66
+    },
+    {
+      "t": "2022-08-11",
+      "price": 82
+    },
+    {
+      "t": "2022-09-06",
+      "price": 90
+    },
+    {
+      "t": "2022-09-14",
+      "price": 96
+    }
+  ]
+}
