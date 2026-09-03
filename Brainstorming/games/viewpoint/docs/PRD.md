@@ -22,8 +22,9 @@ clique.
 
 Périmètre volontairement réduit pour une v1 solide :
 
-- **5 niveaux courts** (2 à 4 minutes chacun), des îlots flottants dans un ciel
-  pastel.
+- **25 niveaux courts** (2 à 4 minutes chacun), des îlots flottants dans un ciel
+  pastel. La v1 en livrait 5 ; la v2 a porté le compte à 15, la v3 à 20 et la
+  v6 à 25 (section 10).
 - **Pas d'appareil photo** : le joueur ne prend pas de photo, il ne fait que
   poser des photos trouvées. L'architecture réserve explicitement la place de
   cette évolution (section 9).
@@ -46,7 +47,7 @@ Périmètre volontairement réduit pour une v1 solide :
    (remplacés par le contenu de la photo).
 4. Il ramasse les piles, les insère dans le téléporteur (E), puis se téléporte
    (E à nouveau) vers le niveau suivant.
-5. Après le niveau 5, écran de victoire.
+5. Après le niveau 25, écran de victoire.
 
 Une chute dans le vide est la seule façon de perdre, et elle coûte le niveau
 entier : passé le plan de rattrapage (`kill_y`), le niveau est **reconstruit
@@ -265,7 +266,11 @@ nouveau `carvable` : la photo suivante la perce.
 - Invariant vérifié par test : dans chaque niveau,
   piles du monde + piles contenues dans les photos du niveau >= piles requises.
 
-## 5. Les 5 niveaux
+## 5. Les 25 niveaux
+
+Les cinq premiers enseignent un geste chacun, et rien d'autre. Le détail des
+niveaux 6 à 25 est dans `docs/LEVELS_V2.md` (sections 4 et 4 bis) ; la donnée
+elle-même fait foi (`src/world/level_defs.gd`).
 
 | # | Nom | Ce qu'il enseigne | Piles requises | Photos |
 |---|-----|-------------------|----------------|--------|
@@ -274,6 +279,9 @@ nouveau `carvable` : la photo suivante la perce.
 | 3 | Prendre de la hauteur | La verticalité : la photo « Escalier » permet d'atteindre une pile en hauteur | 2 | escalier |
 | 4 | Effacement | Poser découpe : un mur effaçable bloque le couloir, la photo « Porte ouverte » y perce un passage et pose son propre mur | 2 | porte |
 | 5 | Belvédère | Combinaison libre des trois usages : franchir, monter, dupliquer | 3 | passerelle, escalier, pile |
+| 6 à 15 | v2 | Cages, rotation, photo dans la photo, sol pâle, double volée | 2 à 5 | catalogue complet |
+| 16 à 20 | v3 et v4 | L'appareil photo : la photo vide, la copie, la chute, les barreaux | 2 à 3 | pellicule |
+| 21 à 25 | v6 | Les trois refus : acier, plomb, gravité | 2 à 5 | pellicule et caisses |
 
 Chaque niveau est une **donnée déclarative** (`LevelDefs`) : plateformes,
 props décoratifs, objets effaçables, photos placées, piles, téléporteur
@@ -317,7 +325,7 @@ games/viewpoint/
   src/photo/photo_placer.gd  tenir, prévisualiser, effacer, matérialiser
   src/pickups/battery.gd   la pile ramassable
   src/world/teleporter.gd  socle, anneau, insertion, départ
-  src/world/level_defs.gd  les 5 niveaux en données
+  src/world/level_defs.gd  les 25 niveaux en données
   src/world/level_builder.gd  construit un niveau depuis sa définition
   src/player/player.gd     contrôleur FPS + visée d'interaction
   src/ui/hud.gd            réticule, compteur de piles, invites, bannière, fondu
@@ -403,7 +411,7 @@ Harnais identique aux autres jeux Godot du dépôt :
   - `test_photo_defs` : ids uniques, props aux genres connus, couleurs
     existantes dans la palette, positions devant la caméra (z < 0), comptage
     des piles par photo, vignette 256 x 256 non uniforme.
-  - `test_level_defs` : exactement 5 niveaux, spawn au dessus d'une
+  - `test_level_defs` : exactement 25 niveaux, spawn au dessus d'une
     plateforme, téléporteur présent, photos référencées existantes,
     **piles accessibles >= piles requises** pour chaque niveau, kill_y sous
     toutes les plateformes.
@@ -414,7 +422,7 @@ Harnais identique aux autres jeux Godot du dépôt :
 - **Sonde d'intégration** (`godot --headless --path . -- --smoke`) dans le vrai
   chemin de démarrage : niveau 1 construit, joueur au sol, ramassage d'une
   photo, pose, contenu matérialisé et effaçables effacés, pile ramassée,
-  insertion, téléportation, puis construction des 5 niveaux sans erreur.
+  insertion, téléportation, puis construction des 25 niveaux sans erreur.
 
 - **Audit de level design** (`godot --headless --path . --script res://tools/design_audit.gd`),
   ajouté en v6. Les suites répondent « cette donnée est-elle bien formée » ;

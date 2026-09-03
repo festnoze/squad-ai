@@ -32,10 +32,9 @@ const LIFT_ONE_CRATE := 2.80
 const LIFT_TWO_CRATES := 4.10
 const LIFT_CONSOLE := 2.67
 const LIFT_STAIRS := 6.12
-## Top of the painted ramp of a photo aimed steeply up. Its lower edge sits at
-## 5.4 m, so it is only boardable from a flight of stairs: this lift counts
-## only when the level hands out both.
-const LIFT_BACKDROP_RAMP := 10.1
+## Two flights: place one from the ground, climb it, place the second from its
+## landing. 4.62 twice, plus the jump.
+const LIFT_TWO_STAIRS := 10.75
 
 ## Horizontal reach, tool by tool.
 const REACH_JUMP := 4.6
@@ -210,22 +209,14 @@ func _max_lift(def: Dictionary) -> float:
 	# step, which is at least as good as one crate.
 	if not def.get("camera", {}).is_empty():
 		lift = maxf(lift, LIFT_ONE_CRATE)
-	# The sky ramp: the painted back of a photo aimed up is a slope, but it
-	# starts at 5.4 m, so it is worth nothing without stairs to board it.
-	if ids.has("escalier") and _has_painted_backdrop(def):
-		lift = maxf(lift, LIFT_BACKDROP_RAMP)
+	# A second flight placed from the landing of the first.
+	var flights := 0
+	for photo in def.get("photos", []):
+		if photo["id"] == "escalier":
+			flights += 1
+	if flights >= 2:
+		lift = maxf(lift, LIFT_TWO_STAIRS)
 	return lift
-
-
-## True when this level hands out something whose placement paints a backdrop
-## wall: a catalog photo with one, or a camera (every shot has a sky back).
-func _has_painted_backdrop(def: Dictionary) -> bool:
-	if not def.get("camera", {}).is_empty():
-		return true
-	for id in _photo_ids(def):
-		if not PhotoDefs.get_def(id).get("backdrop", {}).is_empty():
-			return true
-	return false
 
 
 func _max_reach(def: Dictionary) -> float:

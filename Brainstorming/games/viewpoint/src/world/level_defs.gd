@@ -332,27 +332,33 @@ const LEVELS := [
 		"teleporter": {"pos": Vector3(0, 0, -6), "required": 4},
 	},
 	{
-		"name": "La rampe celeste",
-		"subtitle": "Visez le ciel : le fond de la photo devient une rampe.",
+		"name": "L'escalier sur l'escalier",
+		"subtitle": "Une volee se pose aussi depuis une volee. Deux, et la tour est a vous.",
 		"spawn": Vector3(0, 1.2, 7),
 		"spawn_yaw": 0.0,
 		"kill_y": -12.0,
 		"platforms": [
 			{"pos": Vector3(0, -0.5, 2), "size": Vector3(16, 1, 12)},
-			{"pos": Vector3(0, 4.3, -12), "size": Vector3(3, 9.6, 3)},
+			# Tower top at 8.0. One flight tops out at 6.13 with the jump and
+			# misses; a second one placed from the landing of the first reaches
+			# 9.24, and the last metre is a step onto the tower face.
+			{"pos": Vector3(0, 3.5, -11.9), "size": Vector3(3, 9, 3)},
 		],
 		"decor": [
 			{"pos": Vector3(6, 0.5, 0), "size": Vector3(1, 1, 1), "color": "wood"},
-			{"pos": Vector3(0, -0.01, -3.2), "size": Vector3(1.4, 0.06, 1.4), "color": "accent"},
-			{"pos": Vector3(-2, -0.01, 2.6), "size": Vector3(1.4, 0.06, 1.4), "color": "teal"},
+			# THE first flight: foot at z = 1.8, landing at 4.62 around z = -5.2,
+			# which is where the second one is placed from.
+			{"pos": Vector3(0, -0.01, 3.0), "size": Vector3(1.4, 0.06, 1.4), "color": "accent"},
+			{"pos": Vector3(-4, -0.01, -1.0), "size": Vector3(1.4, 0.06, 1.4), "color": "teal"},
 		],
 		"erasables": [],
 		"photos": [
-			{"id": "pile", "pos": Vector3(0, 0.9, 5)},
+			{"id": "escalier", "pos": Vector3(0, 0.9, 5)},
 			{"id": "escalier", "pos": Vector3(-3, 0.9, 4)},
 			{"id": "caisse", "pos": Vector3(3, 0.9, 4)},
 		],
-		"batteries": [Vector3(0, 9.1, -12), Vector3(0.9, 9.1, -12)],
+		# Both on the tower: nothing is won without the second flight.
+		"batteries": [Vector3(0, 8.0, -11.9), Vector3(0.9, 8.0, -11.9)],
 		"teleporter": {"pos": Vector3(-5, 0, 4), "required": 2},
 	},
 	{

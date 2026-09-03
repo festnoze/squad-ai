@@ -1,0 +1,1623 @@
+{
+  "_comment": "Exported verbatim from games/viewpoint/src/world/level_defs.gd (design space: x right, y up, -z forward; see PRD section 4). Platform tops sit at y = 0 unless stated otherwise.",
+  "decor_islands": [
+    {
+      "pos": [-30, -9, -25],
+      "size": [7, 2, 6]
+    },
+    {
+      "pos": [26, -13, -12],
+      "size": [5, 1.6, 5]
+    },
+    {
+      "pos": [18, -7, -38],
+      "size": [9, 2.4, 7]
+    },
+    {
+      "pos": [-24, -15, 10],
+      "size": [4, 1.4, 4]
+    },
+    {
+      "pos": [32, -10, 22],
+      "size": [6, 2, 6]
+    },
+    {
+      "pos": [-14, -18, 34],
+      "size": [8, 2.2, 6]
+    }
+  ],
+  "levels": [
+    {
+      "name": "Premiers pas",
+      "subtitle": "Cadrez le vide et posez : la photo s'ajoute au monde.",
+      "spawn": [0, 1.2, 5],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 2],
+          "size": [10, 1, 10]
+        },
+        {
+          "pos": [0, -0.5, -14.9],
+          "size": [14, 1, 8]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-3.5, 0.5, 5.5],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [-3.5, 1.3, 5.2],
+          "size": [0.6, 0.6, 0.6],
+          "color": "wood_dark"
+        },
+        {
+          "pos": [0, -0.01, -2.85],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [],
+      "photos": [
+        {
+          "id": "passerelle",
+          "pos": [1.5, 0.9, 4]
+        }
+      ],
+      "batteries": [
+        [0, 0, -11.5]
+      ],
+      "teleporter": {
+        "pos": [0, 0, -16.5],
+        "required": 1
+      }
+    },
+    {
+      "name": "Copie conforme",
+      "subtitle": "Une photo de pile devient une vraie pile. Grise : une copie ne se recopie pas.",
+      "spawn": [0, 1.2, 5.5],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [14, 1, 14]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [5.5, 0.5, 3],
+          "size": [1.2, 1, 1.2],
+          "color": "wood"
+        },
+        {
+          "pos": [-4, -0.01, -1],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [-5, 0.6, 4],
+          "size": [1.2, 1.2, 1.2]
+        }
+      ],
+      "photos": [
+        {
+          "id": "pile",
+          "pos": [-4, 0.9, -3]
+        }
+      ],
+      "batteries": [
+        [5, 0, -5]
+      ],
+      "teleporter": {
+        "pos": [2, 0, 3],
+        "required": 2
+      }
+    },
+    {
+      "name": "Prendre de la hauteur",
+      "subtitle": "Un escalier pose la ou vous regardez. Son fond se saute.",
+      "spawn": [0, 1.2, 5],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [18, 1, 14]
+        },
+        {
+          "pos": [5, 2.0, -2],
+          "size": [4, 5, 4]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-7, 0.5, -5.5],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [5, -0.01, 6.4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [-4, 0.6, -5.5],
+          "size": [1.2, 1.2, 1.2]
+        }
+      ],
+      "photos": [
+        {
+          "id": "escalier",
+          "pos": [0, 0.9, 3]
+        }
+      ],
+      "batteries": [
+        [5, 4.5, -2],
+        [-6, 0, -5]
+      ],
+      "teleporter": {
+        "pos": [-6, 0, 4],
+        "required": 2
+      }
+    },
+    {
+      "name": "Effacement",
+      "subtitle": "Le lavande cede au cadre. Le sol gris, lui, ne bouge pas.",
+      "spawn": [0, 1.2, 12],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [10, 1, 28]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [4, 0.5, 10],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, 1.0],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [0, 1.75, -4],
+          "size": [10, 3.5, 0.6]
+        },
+        {
+          "pos": [-3.5, 0.6, 8],
+          "size": [1.2, 1.2, 1.2]
+        }
+      ],
+      "photos": [
+        {
+          "id": "porte",
+          "pos": [-3, 0.9, 5]
+        }
+      ],
+      "batteries": [
+        [3, 0, 6],
+        [0, 0, -9]
+      ],
+      "teleporter": {
+        "pos": [0, 0, -12],
+        "required": 2
+      }
+    },
+    {
+      "name": "Belvedere",
+      "subtitle": "Franchir, monter, dupliquer : a vous de composer.",
+      "spawn": [-4, 1.2, 4],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [12, 1, 12]
+        },
+        {
+          "pos": [0, 0.7, -16.5],
+          "size": [12, 1, 8]
+        },
+        {
+          "pos": [10, 1.5, 0],
+          "size": [6, 4, 6]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [4.5, 0.5, -4.5],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, 0.6, -5.2],
+          "size": [1.6, 1.2, 1.6],
+          "color": "stone"
+        },
+        {
+          "pos": [0, 1.21, -5.2],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [0.5, -0.01, 0],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [-4.5, 0.6, -4.5],
+          "size": [1.2, 1.2, 1.2]
+        }
+      ],
+      "photos": [
+        {
+          "id": "passerelle",
+          "pos": [3, 0.9, 2]
+        },
+        {
+          "id": "escalier",
+          "pos": [-3, 0.9, 2]
+        },
+        {
+          "id": "pile",
+          "pos": [2, 2.1, -15]
+        }
+      ],
+      "batteries": [
+        [0, 1.2, -13.5],
+        [8.6, 3.5, -2.0]
+      ],
+      "teleporter": {
+        "pos": [0, 0, 4],
+        "required": 3
+      }
+    },
+    {
+      "name": "La cage",
+      "subtitle": "Toute pose fauche une cage entiere. Meme une porte.",
+      "spawn": [0, 1.2, 5.5],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [16, 1, 14]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-6, 0.5, 2],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [1, -0.01, 0.2],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [],
+      "cages": [
+        {
+          "pos": [4, 0, -4],
+          "size": [2.5, 2.5, 2.5],
+          "erasable": true,
+          "roof": true
+        }
+      ],
+      "photos": [
+        {
+          "id": "porte",
+          "pos": [0, 0.9, 4]
+        },
+        {
+          "id": "caisse",
+          "pos": [-2, 0.9, 4]
+        }
+      ],
+      "batteries": [
+        [3.7, 0, -4],
+        [4.6, 0, -3.5]
+      ],
+      "teleporter": {
+        "pos": [-5, 0, 2],
+        "required": 2
+      }
+    },
+    {
+      "name": "Pivot",
+      "subtitle": "La molette tourne la photo : la dalle change de cote.",
+      "spawn": [0, 1.2, 6],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 3],
+          "size": [12, 1, 8]
+        },
+        {
+          "pos": [6.5, 0.6, -5.5],
+          "size": [3, 3.2, 3.5]
+        },
+        {
+          "pos": [-5.5, 1.1, -4.75],
+          "size": [3, 4.2, 3.5]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-3, 0.75, 1.5],
+          "size": [1.5, 1.5, 1.5],
+          "color": "stone"
+        },
+        {
+          "pos": [3.6, -0.01, -0.6],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal",
+          "photo": "corniche",
+          "aim": [6.5, 2.0, -5.5],
+          "roll": 0
+        },
+        {
+          "pos": [-3.2, -0.01, -0.6],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent",
+          "photo": "corniche",
+          "aim": [-5.5, 2.0, -4.75],
+          "roll": 2
+        }
+      ],
+      "erasables": [],
+      "photos": [
+        {
+          "id": "corniche",
+          "pos": [1, 0.9, 5]
+        },
+        {
+          "id": "corniche",
+          "pos": [-1, 0.9, 5]
+        }
+      ],
+      "batteries": [
+        [6.4, 2.2, -4.6],
+        [-6.4, 3.2, -4.6]
+      ],
+      "teleporter": {
+        "pos": [3, 0, 5],
+        "required": 2
+      }
+    },
+    {
+      "name": "Le coffret",
+      "subtitle": "Certaines photos contiennent d'autres photos.",
+      "spawn": [-3, 1.2, 4.5],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [14, 1, 12]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [5, 0.5, 3],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [-4, -0.01, -0.5],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [-5.5, 0.6, -3],
+          "size": [1.2, 1.2, 1.2]
+        }
+      ],
+      "photos": [
+        {
+          "id": "coffret",
+          "pos": [-4, 0.9, -2]
+        }
+      ],
+      "batteries": [
+        [5, 0, -4]
+      ],
+      "teleporter": {
+        "pos": [0, 0, 4],
+        "required": 2
+      }
+    },
+    {
+      "name": "L'enclos",
+      "subtitle": "Trois photos, trois serrures. Une pose peut en ouvrir deux.",
+      "spawn": [0, 1.2, 7],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [22, 1, 18]
+        },
+        {
+          "pos": [5.8, 1.75, -3.2],
+          "size": [4, 4.5, 4]
+        },
+        {
+          "pos": [-6, 1.4, -4],
+          "size": [2.5, 3.8, 2.5]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [8, 0.5, 5],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [2, -0.01, 4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [-6, -0.01, 0.8],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [],
+      "cages": [
+        {
+          "pos": [2, 0, -2],
+          "size": [3, 2.6, 3],
+          "erasable": false,
+          "roof": true
+        }
+      ],
+      "photos": [
+        {
+          "id": "escalier",
+          "pos": [0, 0.9, 4]
+        },
+        {
+          "id": "console",
+          "pos": [-3, 0.9, 4]
+        },
+        {
+          "id": "caisse",
+          "pos": [-1.5, 0.9, 5]
+        }
+      ],
+      "batteries": [
+        [2, 0, -2],
+        [-6, 3.3, -4],
+        [5.8, 4.0, -3.2]
+      ],
+      "teleporter": {
+        "pos": [6, 0, 5],
+        "required": 3
+      }
+    },
+    {
+      "name": "Plongeon",
+      "subtitle": "La rive est plus bas. Piquez la passerelle, ou franchissez et laissez-vous tomber.",
+      "spawn": [0, 1.2, 7],
+      "spawn_yaw": 0.0,
+      "kill_y": -12.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 4],
+          "size": [10, 1, 8]
+        },
+        {
+          "pos": [0, -5.5, -12],
+          "size": [12, 1, 8]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [3.5, 0.5, 6.5],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, 0.5],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [],
+      "photos": [
+        {
+          "id": "passerelle",
+          "pos": [0, 0.9, 6]
+        }
+      ],
+      "batteries": [
+        [3, 0, 5],
+        [-3, -5, -12]
+      ],
+      "teleporter": {
+        "pos": [4.5, -5, -14],
+        "required": 2
+      }
+    },
+    {
+      "name": "Sous le pont",
+      "subtitle": "Un sol pale se decoupe comme un mur. Traversez d'abord, percez ensuite.",
+      "spawn": [0, 1.2, 8.5],
+      "spawn_yaw": 0.0,
+      "kill_y": -12.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 6],
+          "size": [10, 1, 8]
+        },
+        {
+          "pos": [0, -0.5, -10],
+          "size": [12, 1, 8]
+        },
+        {
+          "pos": [4, 0.8, -11],
+          "size": [3, 2.6, 3]
+        },
+        {
+          "pos": [0, -4.5, -2],
+          "size": [2, 1, 6]
+        },
+        {
+          "pos": [0, -0.15, -2],
+          "size": [2, 0.3, 8.4],
+          "soft": true
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-4, 0.5, -8],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, -7],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [0, -4.01, -4.2],
+          "size": [1.0, 0.06, 1.0],
+          "color": "teal"
+        },
+        {
+          "pos": [4, -0.01, -6.4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal",
+          "photo": "console",
+          "aim": [4, 1.0, -9.5],
+          "roll": 0
+        }
+      ],
+      "erasables": [],
+      "photos": [
+        {
+          "id": "console",
+          "pos": [2, 0.9, 7]
+        },
+        {
+          "id": "console",
+          "pos": [-2, 0.9, 7]
+        },
+        {
+          "id": "escalier",
+          "pos": [0, -3.1, -2]
+        }
+      ],
+      "batteries": [
+        [4, 2.1, -11],
+        [0, -4, -3]
+      ],
+      "teleporter": {
+        "pos": [-4, 0, -10],
+        "required": 2
+      }
+    },
+    {
+      "name": "La vitrine",
+      "subtitle": "Chaque photo ouvre la voie vers la suivante. Toutes comptent.",
+      "spawn": [-1, 1.2, 6.5],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [20, 1, 16]
+        },
+        {
+          "pos": [7, 0.6, 5],
+          "size": [3, 3.2, 3]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [3.1, 1.0, -6.35],
+          "size": [0.4, 2, 1.1],
+          "color": "battery_tip"
+        },
+        {
+          "pos": [5.5, 1.0, -6.35],
+          "size": [0.4, 2, 1.1],
+          "color": "battery_tip"
+        },
+        {
+          "pos": [4.3, 2.05, -6.35],
+          "size": [2.8, 0.3, 1.1],
+          "color": "battery_tip"
+        },
+        {
+          "pos": [4.3, 1.0, -6.95],
+          "size": [2.8, 2, 0.2],
+          "color": "battery_tip"
+        },
+        {
+          "pos": [4.2, -0.01, 1.4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [-1.4, -0.01, 2],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [4.3, -0.01, -1.4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal",
+          "photo": "coffret",
+          "aim": [4.3, 1.0, -5.8],
+          "roll": 0
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [-6.5, 1.25, 0],
+          "size": [0.6, 3.5, 16]
+        },
+        {
+          "pos": [4.3, 1.0, -5.85],
+          "size": [2.4, 1.9, 0.15]
+        }
+      ],
+      "photos": [
+        {
+          "id": "corniche",
+          "pos": [2, 0.9, 6]
+        },
+        {
+          "id": "porte",
+          "pos": [7, 3.1, 5]
+        },
+        {
+          "id": "coffret",
+          "pos": [-8.2, 0.9, -3]
+        }
+      ],
+      "batteries": [
+        [7, 2.2, 5],
+        [-8.2, 0, 2],
+        [4.3, 0, -6.35],
+        [-8.2, 0, -5]
+      ],
+      "teleporter": {
+        "pos": [0, 0, -6],
+        "required": 4
+      }
+    },
+    {
+      "name": "L'escalier sur l'escalier",
+      "subtitle": "Une volee se pose aussi depuis une volee. Deux, et la tour est a vous.",
+      "spawn": [0, 1.2, 7],
+      "spawn_yaw": 0.0,
+      "kill_y": -12.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 2],
+          "size": [16, 1, 12]
+        },
+        {
+          "pos": [0, 3.5, -11.9],
+          "size": [3, 9, 3]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [6, 0.5, 0],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, 3.0],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [-4, -0.01, -1.0],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [],
+      "photos": [
+        {
+          "id": "escalier",
+          "pos": [0, 0.9, 5]
+        },
+        {
+          "id": "escalier",
+          "pos": [-3, 0.9, 4]
+        },
+        {
+          "id": "caisse",
+          "pos": [3, 0.9, 4]
+        }
+      ],
+      "batteries": [
+        [0, 8.0, -11.9],
+        [0.9, 8.0, -11.9]
+      ],
+      "teleporter": {
+        "pos": [-5, 0, 4],
+        "required": 2
+      }
+    },
+    {
+      "name": "La grande traversee",
+      "subtitle": "Pont, plancher, escalier : une seule route au dessus du vide.",
+      "spawn": [0, 1.2, 12],
+      "spawn_yaw": 0.0,
+      "kill_y": -13.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 10],
+          "size": [10, 1, 8]
+        },
+        {
+          "pos": [0, -0.5, -1],
+          "size": [12, 1, 6]
+        },
+        {
+          "pos": [0, -0.5, -15],
+          "size": [12, 1, 6]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-3.5, 0.5, 13],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, 7],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [0, -0.01, -3.4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [],
+      "photos": [
+        {
+          "id": "passerelle",
+          "pos": [0, 0.9, 11]
+        },
+        {
+          "id": "pile",
+          "pos": [2, 0.9, 12]
+        },
+        {
+          "id": "escalier",
+          "pos": [-2, 0.9, 12]
+        },
+        {
+          "id": "caisse",
+          "pos": [0, 0.9, 13.2]
+        }
+      ],
+      "batteries": [
+        [3, 0, 10],
+        [0, 0, -16]
+      ],
+      "teleporter": {
+        "pos": [3, 0, -16.5],
+        "required": 3
+      }
+    },
+    {
+      "name": "L'examen",
+      "subtitle": "Cinq piles. Tout ce que vous savez, dans l'ordre qu'il faut.",
+      "spawn": [-4, 1.2, 7],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [18, 1, 18]
+        },
+        {
+          "pos": [8, 0.6, 6],
+          "size": [2.5, 3.2, 2.5]
+        },
+        {
+          "pos": [0, 1.4, -6],
+          "size": [2.5, 3.8, 2.5]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [3.9, 1.0, -6.75],
+          "size": [0.4, 2, 1.1],
+          "color": "battery_tip"
+        },
+        {
+          "pos": [6.3, 1.0, -6.75],
+          "size": [0.4, 2, 1.1],
+          "color": "battery_tip"
+        },
+        {
+          "pos": [5.1, 2.05, -6.75],
+          "size": [2.8, 0.3, 1.1],
+          "color": "battery_tip"
+        },
+        {
+          "pos": [5.1, 1.0, -7.35],
+          "size": [2.8, 2, 0.2],
+          "color": "battery_tip"
+        },
+        {
+          "pos": [5, -0.01, 2.4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [-1.5, -0.01, 0],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [0, -0.01, -1.2],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal",
+          "photo": "console",
+          "aim": [0, 2.0, -4.5],
+          "roll": 2
+        },
+        {
+          "pos": [5.1, -0.01, -1.6],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent",
+          "photo": "coffret",
+          "aim": [5.1, 1.0, -6.0],
+          "roll": 0
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [-6.5, 1.25, 0],
+          "size": [0.6, 3.5, 18]
+        },
+        {
+          "pos": [5.1, 1.0, -6.25],
+          "size": [2.4, 1.9, 0.15]
+        }
+      ],
+      "photos": [
+        {
+          "id": "corniche",
+          "pos": [2, 0.9, 5]
+        },
+        {
+          "id": "porte",
+          "pos": [-3, 0.9, 4]
+        },
+        {
+          "id": "caisse",
+          "pos": [3, 0.9, -2]
+        },
+        {
+          "id": "console",
+          "pos": [1, 0.9, -2]
+        },
+        {
+          "id": "coffret",
+          "pos": [-8.2, 0.9, -3]
+        },
+        {
+          "id": "caisse",
+          "pos": [-4, 0.9, 3]
+        }
+      ],
+      "batteries": [
+        [8, 2.2, 6],
+        [-8.2, 0, 2],
+        [5.1, 0, -6.75],
+        [0, 3.3, -6]
+      ],
+      "teleporter": {
+        "pos": [0, 0, 7],
+        "required": 5
+      }
+    },
+    {
+      "name": "Le cliche",
+      "subtitle": "Cadrez le ciel : une photo de rien perce tout.",
+      "spawn": [0, 1.2, 4],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 2.5],
+          "size": [12, 1, 5]
+        },
+        {
+          "pos": [0, -0.5, -6],
+          "size": [8, 1, 6]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [4.5, 0.5, 3.5],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, -3.9],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [4, 0.15, 4],
+          "size": [4, 0.3, 2]
+        }
+      ],
+      "cages": [
+        {
+          "pos": [0, 0, -6.5],
+          "size": [3, 2.6, 3],
+          "erasable": false,
+          "roof": true
+        }
+      ],
+      "camera": {
+        "pos": [-2, 0, 3.5],
+        "films": 2
+      },
+      "photos": [],
+      "batteries": [
+        [3, 0, 3],
+        [0.8, 0, -7]
+      ],
+      "teleporter": {
+        "pos": [0, 0, -6.5],
+        "required": 2
+      }
+    },
+    {
+      "name": "Copie de travail",
+      "subtitle": "Photographier copie. Poser remplace. Ne melangez pas les deux.",
+      "spawn": [0, 1.2, 10],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 8],
+          "size": [8, 1, 8]
+        },
+        {
+          "pos": [0, -0.5, -4],
+          "size": [8, 1, 7]
+        },
+        {
+          "pos": [0, 1.5, -10.5],
+          "size": [8, 1, 5]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [3, 0.5, 9],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [3, -0.01, 7],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [0, -0.01, -4.5],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [0, -0.15, 2],
+          "size": [2, 0.3, 5]
+        }
+      ],
+      "camera": {
+        "pos": [2, 0, 9],
+        "films": 1
+      },
+      "photos": [],
+      "batteries": [
+        [2, 0, -5]
+      ],
+      "sealed_batteries": [
+        [0, 2.0, -11]
+      ],
+      "teleporter": {
+        "pos": [-2, 2.0, -12],
+        "required": 2
+      }
+    },
+    {
+      "name": "L'echafaudage",
+      "subtitle": "Ce qui se pose retombe. Faites-en une marche.",
+      "spawn": [0, 1.2, 6],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 5],
+          "size": [16, 1, 10]
+        },
+        {
+          "pos": [0, -2.9, -4],
+          "size": [16, 1, 8]
+        },
+        {
+          "pos": [0, -0.5, -11],
+          "size": [16, 1, 6]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [7, 0.5, 6],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [-3.4, -0.01, 3],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [0, -2.41, -4.6],
+          "size": [1.2, 0.06, 1.2],
+          "color": "accent"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [-5, 0.7, 3],
+          "size": [1.4, 1.4, 1.4]
+        },
+        {
+          "pos": [-6.6, 0.7, 1.8],
+          "size": [1.4, 1.4, 1.4]
+        }
+      ],
+      "camera": {
+        "pos": [0, 0, 5],
+        "films": 3
+      },
+      "photos": [],
+      "batteries": [],
+      "sealed_batteries": [
+        [5, 0, -11],
+        [3, -2.4, -3]
+      ],
+      "teleporter": {
+        "pos": [-5, 0, -11.5],
+        "required": 2
+      }
+    },
+    {
+      "name": "A travers les barreaux",
+      "subtitle": "Les barreaux n'arretent pas l'objectif. Le gouffre, si.",
+      "spawn": [0, 1.2, 6],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 2],
+          "size": [14, 1, 12]
+        },
+        {
+          "pos": [0, 1.0, -12],
+          "size": [6, 4, 6]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [6, 0.5, 6],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, -3.2],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [0, -0.01, 7],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [],
+      "cages": [
+        {
+          "pos": [0, 3.0, -12],
+          "size": [3, 2.2, 3],
+          "sealed": true,
+          "roof": true
+        }
+      ],
+      "camera": {
+        "pos": [0, 0, 4],
+        "films": 2
+      },
+      "photos": [],
+      "batteries": [
+        [-0.6, 3.0, -11.6],
+        [0.8, 3.0, -12.3],
+        [5, 0, 4]
+      ],
+      "teleporter": {
+        "pos": [-4, 0, 5],
+        "required": 3
+      }
+    },
+    {
+      "name": "Le studio",
+      "subtitle": "Tout l'atelier en un plateau : composez votre plan de tournage.",
+      "spawn": [-4, 1.2, 7],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [18, 1, 16]
+        },
+        {
+          "pos": [7, 0.6, 5],
+          "size": [2.5, 3.2, 2.5]
+        },
+        {
+          "pos": [0, -0.5, -13],
+          "size": [8, 1, 4]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-4, 0.5, -6],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [-1.6, -0.01, 0],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [4.6, -0.01, 1.6],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [3, -0.01, -1.8],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [0, -0.01, -7],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [
+        {
+          "pos": [-6.5, 1.25, 0],
+          "size": [0.6, 3.5, 16]
+        },
+        {
+          "pos": [5, 0.9, 2],
+          "size": [4, 1.8, 1.8]
+        }
+      ],
+      "cages": [
+        {
+          "pos": [3, 0, -5],
+          "size": [2.6, 2.2, 2.6],
+          "sealed": true,
+          "roof": true
+        }
+      ],
+      "camera": {
+        "pos": [0, 0, 6],
+        "films": 2
+      },
+      "photos": [
+        {
+          "id": "porte",
+          "pos": [-3, 0.9, 4]
+        },
+        {
+          "id": "corniche",
+          "pos": [2, 0.9, 5]
+        }
+      ],
+      "batteries": [
+        [3, 0, -5],
+        [0, 0, -13]
+      ],
+      "sealed_batteries": [
+        [7, 2.2, 5],
+        [-8, 0, 0]
+      ],
+      "teleporter": {
+        "pos": [2, 0, 7],
+        "required": 3
+      }
+    },
+    {
+      "name": "Acier",
+      "subtitle": "L'acier ne cede a aucune photo. L'objectif, lui, passe entre les barreaux.",
+      "spawn": [0, 1.2, 6],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [16, 1, 18]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-6, 0.5, 5],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, -2.6],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [-3.5, -0.01, 1.5],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [],
+      "cages": [
+        {
+          "pos": [0, 0, -6],
+          "size": [3, 2.6, 3],
+          "sealed": true,
+          "roof": true
+        }
+      ],
+      "camera": {
+        "pos": [2, 0, 5],
+        "films": 2
+      },
+      "photos": [],
+      "batteries": [
+        [-0.8, 0, -6],
+        [0.8, 0, -6]
+      ],
+      "teleporter": {
+        "pos": [-5, 0, 4],
+        "required": 2
+      }
+    },
+    {
+      "name": "Plomb",
+      "subtitle": "La pile de plomb ne s'imprime pas. Il faudra monter la chercher.",
+      "spawn": [0, 1.2, 7],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [16, 1, 20]
+        },
+        {
+          "pos": [0, 1.9, -7],
+          "size": [2.5, 3.8, 2.5]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [6, 0.5, 6],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [0, -0.01, 1.45],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [-4, -0.01, 3],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [],
+      "camera": {
+        "pos": [2, 0, 6],
+        "films": 2
+      },
+      "photos": [
+        {
+          "id": "escalier",
+          "pos": [-2, 0.9, 6]
+        }
+      ],
+      "batteries": [
+        [-5, 0, -4]
+      ],
+      "sealed_batteries": [
+        [0, 3.8, -7]
+      ],
+      "teleporter": {
+        "pos": [5, 0, -6],
+        "required": 4
+      }
+    },
+    {
+      "name": "L'aplomb",
+      "subtitle": "Une caisse posee a l'endroit tombe a vos pieds. A l'envers, elle tombe sur l'autre.",
+      "spawn": [0, 1.2, 6],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [18, 1, 16]
+        },
+        {
+          "pos": [0, 1.9, -4],
+          "size": [2.5, 3.8, 2.5]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-7.5, 0.5, 4],
+          "size": [1, 1, 1],
+          "color": "wood"
+        },
+        {
+          "pos": [-5, 0.65, 1],
+          "size": [1.3, 1.3, 1.3],
+          "color": "wood_dark"
+        },
+        {
+          "pos": [-5, -0.01, 4.4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [0, -0.01, 1.6],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        }
+      ],
+      "erasables": [],
+      "camera": {
+        "pos": [2, 0, 5],
+        "films": 3
+      },
+      "photos": [],
+      "batteries": [],
+      "sealed_batteries": [
+        [0, 3.8, -4],
+        [7, 0, 5]
+      ],
+      "teleporter": {
+        "pos": [-6, 0, 6],
+        "required": 2
+      }
+    },
+    {
+      "name": "La geole",
+      "subtitle": "La seule pile copiable est sous acier. La seule pile a portee est en plomb.",
+      "spawn": [-2, 1.2, 7],
+      "spawn_yaw": 0.0,
+      "kill_y": -10.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [18, 1, 18]
+        },
+        {
+          "pos": [5, 0.8, -5],
+          "size": [5, 2.6, 5]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-6, 1, 5],
+          "size": [2, 2, 2],
+          "color": "wood"
+        },
+        {
+          "pos": [4, -0.01, 2.6],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [7.5, -0.01, 0.5],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [-4, -0.01, 2],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [],
+      "cages": [
+        {
+          "pos": [5, 2.1, -5],
+          "size": [3, 2.2, 3],
+          "sealed": true,
+          "roof": true
+        }
+      ],
+      "camera": {
+        "pos": [0, 0, 6],
+        "films": 2
+      },
+      "photos": [
+        {
+          "id": "escalier",
+          "pos": [-3, 0.9, 5]
+        }
+      ],
+      "batteries": [
+        [5, 2.1, -5]
+      ],
+      "sealed_batteries": [
+        [3.4, 2.1, -3.2]
+      ],
+      "teleporter": {
+        "pos": [0, 0, 7],
+        "required": 3
+      }
+    },
+    {
+      "name": "Le verdict",
+      "subtitle": "Acier, plomb, gravite. Cinq piles, et rien de gratuit.",
+      "spawn": [0, 1.2, 8],
+      "spawn_yaw": 0.0,
+      "kill_y": -12.0,
+      "platforms": [
+        {
+          "pos": [0, -0.5, 0],
+          "size": [20, 1, 20]
+        },
+        {
+          "pos": [6, 1.4, -5],
+          "size": [5, 3.8, 5]
+        },
+        {
+          "pos": [-6, 0.95, -5],
+          "size": [2.2, 2.9, 2.2]
+        }
+      ],
+      "decor": [
+        {
+          "pos": [-4, 1, 7],
+          "size": [2, 2, 2],
+          "color": "wood"
+        },
+        {
+          "pos": [6, -0.01, 1.0],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [-6, -0.01, -0.4],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        },
+        {
+          "pos": [8.5, -0.01, 0.5],
+          "size": [1.4, 0.06, 1.4],
+          "color": "accent"
+        },
+        {
+          "pos": [-1, -0.01, -1.5],
+          "size": [1.4, 0.06, 1.4],
+          "color": "teal"
+        }
+      ],
+      "erasables": [],
+      "cages": [
+        {
+          "pos": [6, 3.3, -5],
+          "size": [3, 2.2, 3],
+          "sealed": true,
+          "roof": true
+        },
+        {
+          "pos": [-1, 0, -7],
+          "size": [2.4, 2.2, 2.4],
+          "erasable": true,
+          "roof": true
+        }
+      ],
+      "camera": {
+        "pos": [2, 0, 7],
+        "films": 3
+      },
+      "photos": [
+        {
+          "id": "caisse",
+          "pos": [-2, 0.9, 5.0]
+        },
+        {
+          "id": "caisse",
+          "pos": [-0.7, 0.9, 5.6]
+        },
+        {
+          "id": "caisse",
+          "pos": [0.6, 0.9, 5.0]
+        },
+        {
+          "id": "caisse",
+          "pos": [1.9, 0.9, 5.6]
+        }
+      ],
+      "batteries": [
+        [6, 3.3, -5],
+        [-1, 0, -7]
+      ],
+      "sealed_batteries": [
+        [4.0, 3.3, -3.0],
+        [-6, 2.4, -5]
+      ],
+      "teleporter": {
+        "pos": [-7, 0, 7],
+        "required": 5
+      }
+    }
+  ]
+}

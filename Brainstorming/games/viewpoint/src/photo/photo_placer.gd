@@ -132,4 +132,19 @@ func _clear_held() -> void:
 
 func _set_roll(steps: int) -> void:
 	roll_steps = steps
-	rotation = Vector3(0, 0, steps * PI * 0.5)
+	basis = roll_basis(steps)
+
+
+## THE ONE DIRECTION OF THE WHEEL. A step down turns the picture 90
+## degrees CLOCKWISE as the player sees it, and that has to be true of the
+## world as well as of the HUD, or the promise of the game is broken: what
+## you see raised is what you place.
+##
+## The sign is not a matter of taste. This node is a child of the camera,
+## which looks down its own -z, so local +z points BACK at the player. A
+## positive rotation about an axis aimed at the viewer reads
+## counter-clockwise, which is the opposite of what a Control does on the
+## HUD (2D y is down, so a positive rotation reads clockwise there). Hence
+## the minus: it is what makes the two agree.
+static func roll_basis(steps: int) -> Basis:
+	return Basis(Vector3(0, 0, 1), -steps * PI * 0.5)

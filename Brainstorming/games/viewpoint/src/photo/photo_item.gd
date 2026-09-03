@@ -82,6 +82,6 @@ func interact(player: Node) -> void:
 func prompt_text(player: Node) -> String:
 	var placer: PhotoPlacer = player.placer
 	if placer.held_id != "":
-		return "Mains pleines : posez (clic gauche) ou reposez (clic droit) votre photo"
+		return "Mains pleines : posez (clic gauche) ou reposez (F) votre photo"
 	var def := PhotoDefs.get_def(_def_id)
 	return "E : prendre la photo « %s »" % def.get("title", _def_id)

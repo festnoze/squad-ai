@@ -180,8 +180,12 @@ func _build_photo_item(prim: Dictionary) -> void:
 	add_child(item)
 
 
-## Invisible walkable ramp along the hypotenuse of the flight. The visual
-## steps' front-top edges lie exactly on this surface. A carvable block like
+## Invisible walkable ramp along the hypotenuse of the flight, from the foot
+## of the stairs to the top-back corner. It carries ALL the collision: the
+## eight visual steps have none, because a character controller cannot climb
+## eight small boxes. The ramp passes through the BACK-top corner of each
+## step, so the step lips stand proud of it (up to 0.575 m on the catalog
+## flight); that is invisible in play and is not a bug. A carvable block like
 ## everything else: carve_with_frustum samples in local space, so its
 ## rotation is handled.
 func _build_stairs_ramp(prop: Dictionary) -> void:

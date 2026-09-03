@@ -127,7 +127,7 @@ func show_victory() -> void:
 	_root.visible = true
 	_refresh_levels()
 	_title.text = "STUDIO FERME"
-	_subtitle.text = "Les vingt iles sont derriere vous.\nChaque photo posee est restee exactement la ou vous l'avez vue."
+	_subtitle.text = "Les vingt-cinq iles sont derriere vous.\nChaque photo posee est restee exactement la ou vous l'avez vue."
 	_hint.text = "Entree : rejouer"
 
 

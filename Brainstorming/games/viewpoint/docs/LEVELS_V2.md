@@ -60,11 +60,19 @@ Deja permis par l'ancre camera complete : viser vers le bas incline la
 passerelle en plan descendant, et le **backdrop d'une photo posee en regardant
 le sol devient un plancher** (quad perpendiculaire a la visee).
 
-> v6.1 : ce plancher est desormais a 24 m au lieu de 8, donc c'est une longue
-> rampe lointaine et non plus une marche sous les pieds. Vise a 80 degres il
-> tombe a 22 m sous le joueur, sous le kill_y de tous les niveaux ; vise a 15
-> degres il donne un plan a 4.5 m plus bas et 23 m devant. C'est un outil de
-> grande descente, plus un plancher local.
+> **v6.1 : LA RAMPE DE CIEL EST MORTE, et il faut le dire net.** Le fond peint
+> est perpendiculaire a la visee, donc sa pente vaut 90 degres moins l'angle de
+> visee : il faut viser a 45 degres AU MOINS pour qu'on puisse y marcher
+> (floor_max_angle vaut 45). Or son bord bas vaut
+> `1.62 + profondeur x (sin angle - tan25 x cos angle)`, soit 10.73 m a 45
+> degres avec un fond a 24 m, quand un escalier plus un saut plafonne a 6.13.
+> Fermer l'angle baisse la rampe mais la rend trop raide : les deux contraintes
+> se contredisent, il n'existe aucun angle qui marche.
+>
+> Le niveau 13 etait entierement bati dessus. Il a ete rebati sur la DOUBLE
+> VOLEE (section 2), qui n'exigeait aucun code nouveau et qu'aucun niveau
+> n'exploitait. Le plancher vise vers le bas, lui, existe toujours, mais a 24 m
+> il tombe sous le kill_y de tous les niveaux : ne comptez plus dessus.
 
 > Et une verite geometrique a ne pas oublier en concevant : **une pose piquee
 > porte MOINS loin qu'une pose a plat**, et tomber ne coute rien dans ce jeu.
@@ -263,7 +271,8 @@ rapport aux pieds du poseur :
 | Escalier | +4.62 | rampe 33 deg, franchit un mur de 3 m s'il est pris a 6 m ou plus |
 | Passerelle | 0 (8 m de portee) | piquee a -40 deg : ~6 m d'avancee pour ~5 m de descente |
 | Backdrop (pile) vise au sol | plancher a ~6.3 m sous les pieds | plan 7.4 x 7.4, pente residuelle ~7 deg (limite de tangage 83 deg) |
-| Backdrop (pile) vise vers le haut | rampe de la pente visee | v6.1, fond a 24 m : le bord bas vaut 1.62 + 24 x sin(angle - 25 deg). A 34 deg il est a 5.4 m, donc abordable depuis un escalier (4.62 + saut = 6.13), et le bord haut monte a 22 m. Plus l'angle est ferme, plus la rampe est basse et longue. |
+| ~~Backdrop vise vers le haut~~ | ~~rampe~~ | **Mort en v6.1** : marchable exige de viser a 45 deg ou plus, et le bord bas est alors a 10.7 m, hors d'atteinte. Voir section 1.4. |
+| Deux volees d'escalier | +10.75 | la seconde se pose depuis le palier de la premiere : 4.62 deux fois, plus le saut. Sujet du niveau 13. |
 | Porte (scelle) | mur 5.6 x 5.6 a 6 m, ouverture 1.6 x 2.6 | ne decoupe que jusqu'a 6.2 m ; le mur rebouche tout ce qui est decoupe |
 
 Regle d'or issue du tableau : **une console 180 seule ne se monte pas**. Tout
@@ -350,14 +359,23 @@ decoupent aussi), son fond a 6 m tombant au bord du plateau. Trois reperes
 guident les trois poses de la chaine ; gaspiller la corniche ou la porte
 ailleurs bloque (R).
 
-### 13. La rampe celeste (2 piles) - le fond devient une rampe
-Inchange dans son principe : le fond de la photo pile, vise a ~50 deg vers
-le haut depuis le repere corail au bord du plateau, se pose en rampe
-marchable (bord bas ~5.4, bord haut ~10.1). Escalier pose depuis le repere
-teal, caisse en marge, saut sur le bord bas, remontee, aiguille. v4 : la
-rampe est un bloc peint ordinaire, donc DECOUPABLE : ne posez rien d'autre
-en direction de l'aiguille. Pile 2 libre au sol pour limiter la frustration.
-Entre 46 et 52 deg de tangage tout fonctionne ; en dehors, R.
+### 13. L'escalier sur l'escalier (2 piles) - une volee depuis une volee
+> Ce niveau etait "La rampe celeste" et reposait entierement sur le fond
+> peint vise vers le haut. Cette rampe est morte en v6.1 (section 1.4) : il
+> n'existe aucun angle a la fois marchable et abordable. Le niveau a ete
+> rebati sur le seul outil du budget que personne n'exploitait.
+
+Une tour de 8.0 m au bout du plateau, deux piles a son sommet, et rien
+d'autre pour y monter que deux photos d'escalier. Une volee posee du sol
+plafonne a 4.62, soit 6.13 avec le saut : elle manque la tour de deux
+metres. La seconde volee se pose DEPUIS LE PALIER DE LA PREMIERE (repere
+corail au pied, palier autour de z = -5.2) et porte a 9.24 : le dernier
+metre est une marche sur la face de la tour. La caisse est une marge, pas
+une solution. La lecon : un point de pose est n'importe quel endroit ou
+l'on tient debout, y compris quelque chose qu'on vient de poser.
+Verrouille en moteur par la sonde (les deux volees sont posees et la
+hauteur atteinte est mesuree au rayon), parce qu'une affirmation de ce
+genre ne se demontre pas sur le papier.
 
 ### 14. La grande traversee (3 piles) - une route en quatre photos
 Trois rives : depart, rive mediane (12 m de large), arrivee (pile +
@@ -419,7 +437,7 @@ plan proche 0.5 m) en une **photo ordinaire** qui suit tout le pipeline
   l'originale, sinon la pose la remplace et coupe le retour. Une seule vue :
   zero droit a l'erreur (R sinon).
 - **18. L'echafaudage** (2 piles, 3 vues) : le niveau de la CHUTE. Une fosse
-  de 2.8 m coupe la route (une pile au fond) : on y descend, on n'en saute
+  de 2.4 m coupe la route (une pile plombee au fond) : on y descend, on n'en saute
   pas. Photographier une caisse lavande (1.4 m : "loose") depuis le repere
   teal, descendre, poser le cliche contre la paroi de sortie depuis le
   repere corail : la caisse copiee TOMBE au pied de la paroi et devient la

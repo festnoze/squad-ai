@@ -12,6 +12,7 @@ const SUITES: PackedStringArray = [
 	"res://tests/test_photo_math.gd",
 	"res://tests/test_photo_defs.gd",
 	"res://tests/test_photo_capture.gd",
+	"res://tests/test_photo_placer.gd",
 	"res://tests/test_level_defs.gd",
 	"res://tests/test_erasable_block.gd",
 	"res://tests/test_rewind.gd",

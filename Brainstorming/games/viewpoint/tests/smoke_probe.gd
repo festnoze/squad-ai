@@ -277,6 +277,33 @@ func _run() -> void:
 	if not slab_hit.is_empty():
 		_check(absf(slab_hit["position"].y - 2.42) < 0.3, "dalle a 180 degres a +2.37 des pieds (obtenu %.2f)" % slab_hit["position"].y)
 
+	# THE WHEEL TURNS ONE WAY, measured in the world. A quarter turn is the only
+	# roll that can tell the two conventions apart (a 180 looks the same either
+	# way, which is why the bug lived through twenty-five levels). The corniche
+	# slab starts low on the RIGHT at (1.6, -0.6); one step down on the wheel
+	# must take it low on the LEFT, at (-0.6, -1.6), where the raised picture
+	# shows it. Standing at z = 5 with the eye at 1.67, that is world
+	# (-0.6, 0.07, 1.8), a panel on edge whose top is at 0.97.
+	_check(player.placer.hold("corniche"), "photo Corniche en main pour le quart de tour")
+	player.placer.rotate_held(1)
+	_check(player.placer.roll_steps == 1, "un cran de molette")
+	player.global_position = Vector3(0, 0.05, 5)
+	player.rotation = Vector3.ZERO
+	player.camera.rotation = Vector3.ZERO
+	_check(player.placer.place(), "pose de la corniche au quart de tour acceptee")
+	await _frames_pass(5)
+	var cw_ray := PhysicsRayQueryParameters3D.create(Vector3(-0.6, 3.0, 1.8), Vector3(-0.6, 0.5, 1.8), 1)
+	var cw_hit := space.intersect_ray(cw_ray)
+	_check(not cw_hit.is_empty(), "la corniche tournee d'un cran est passee a GAUCHE, comme sur l'image")
+	if not cw_hit.is_empty():
+		_check(absf(cw_hit["position"].y - 0.97) < 0.35,
+			"sommet du panneau la ou l'image le montre (obtenu %.2f)" % cw_hit["position"].y)
+	# And nowhere else: the old counter-clockwise placer put it high on the
+	# right instead, at y = 3.27. Nothing may answer there.
+	var ccw_ray := PhysicsRayQueryParameters3D.create(Vector3(0.6, 4.6, 1.8), Vector3(0.6, 2.0, 1.8), 1)
+	_check(space.intersect_ray(ccw_ray).is_empty(),
+		"rien en haut a droite : le monde ne tourne plus a l'envers de l'image")
+
 	# Photo-in-photo: placing the coffret materializes a pickable pile photo.
 	var photos_before := _group("photo_item").size()
 	_check(player.placer.hold("coffret"), "photo Coffret en main")
@@ -731,6 +758,50 @@ func _run() -> void:
 				printed += 1
 		_check(printed == 0, "aucune pile plombee ne s'imprime sur la pellicule")
 		player.placer.drop()
+
+	# Level 13: A FLIGHT PLACED FROM THE LANDING OF A FLIGHT. This is the whole
+	# level, and it is the kind of claim that has to be measured rather than
+	# asserted: the sky ramp it used to be built on died when the painted back
+	# moved out to three times its old distance, and nothing but a run in the
+	# engine proves what replaced it actually carries the player.
+	_main._load_level(12)
+	await _frames_pass(10)
+	var tower_top := 8.0
+	player.global_position = Vector3(0, 0.05, 3.0)
+	player.rotation = Vector3.ZERO
+	player.camera.rotation = Vector3.ZERO
+	await _physics_frames_pass(4)
+	_check(player.placer.hold("escalier"), "premiere volee en main")
+	_check(player.placer.place(), "premiere volee posee depuis le sol")
+	await _physics_frames_pass(10)
+	# The invisible walkable ramp of a flight, sampled near its top.
+	var ramp_ray := PhysicsRayQueryParameters3D.create(Vector3(0, 7.0, -4.6), Vector3(0, 0.5, -4.6), 1)
+	var ramp_hit := space.intersect_ray(ramp_ray)
+	_check(not ramp_hit.is_empty(), "la premiere volee offre une surface ou marcher")
+	var landing := 0.0
+	if not ramp_hit.is_empty():
+		landing = ramp_hit["position"].y
+		_check_between(landing, 3.5, 5.2, "palier de la premiere volee a la hauteur prevue")
+
+	# Stand ON that landing and place the second flight from there.
+	player.global_position = Vector3(0, landing + 0.1, -4.6)
+	player.rotation = Vector3.ZERO
+	player.camera.rotation = Vector3.ZERO
+	await _physics_frames_pass(8)
+	_check(player.is_on_floor(), "le joueur tient debout sur la volee posee")
+	_check(player.placer.hold("escalier"), "seconde volee en main")
+	_check(player.placer.place(), "seconde volee posee depuis le palier de la premiere")
+	await _physics_frames_pass(10)
+	# Somewhere along the second flight there must be ground high enough that a
+	# jump reaches the tower. Sample it just in front of the tower face.
+	var high_ray := PhysicsRayQueryParameters3D.create(Vector3(0, 12.0, -9.8), Vector3(0, 4.0, -9.8), 1)
+	var high_hit := space.intersect_ray(high_ray)
+	_check(not high_hit.is_empty(), "la seconde volee monte bien au dessus de la premiere")
+	if not high_hit.is_empty():
+		var reached: float = high_hit["position"].y
+		_check(reached > landing + 1.0, "la seconde volee gagne de la hauteur sur la premiere (%.2f puis %.2f)" % [landing, reached])
+		_check(reached + 1.509 >= tower_top,
+			"depuis la seconde volee, un saut atteint le sommet de la tour (%.2f + 1.51 pour %.2f)" % [reached, tower_top])
 
 	# Every level must build without error and honor its own definition.
 	for i in LevelDefs.count():

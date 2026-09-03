@@ -6,7 +6,7 @@ monde et se materialisent en vrais objets 3D, exactement la ou la
 previsualisation les montrait. Aucun asset binaire : tout est construit par
 code.
 
-Vingt courts niveaux d'ilots flottants. Chaque niveau se quitte par un
+Vingt-cinq courts niveaux d'ilots flottants. Chaque niveau se quitte par un
 teleporteur qui exige des piles : on les trouve dans le decor, on les
 duplique en posant une photo qui en contient une, ou on les libere des cages.
 Certaines photos decoupent au passage les objets lavande pris dans leur
@@ -45,8 +45,8 @@ ou `run.bat` sous Windows (Godot 4.7+ dans le PATH).
 | Echap | Menu / reprendre |
 | Entree | Commencer au niveau 1 / rejouer |
 
-Le menu (titre, pause, victoire) propose une grille de selection des vingt
-niveaux : un niveau atteint reste debloque d'une session a l'autre
+Le menu (titre, pause, victoire) propose une grille de selection des
+vingt-cinq niveaux : un niveau atteint reste debloque d'une session a l'autre
 (progression dans `user://progress.cfg`).
 
 ## Tests
@@ -54,9 +54,12 @@ niveaux : un niveau atteint reste debloque d'une session a l'autre
 ```
 godot --headless --path games/viewpoint --script res://tests/run_tests.gd
 godot --headless --path games/viewpoint -- --smoke
+godot --headless --path games/viewpoint --script res://tools/design_audit.gd
 ```
 
 La premiere commande couvre les modules purs (geometrie du frustum, catalogue
 de photos, niveaux, palette, materiaux, progression). La seconde sonde le vrai
-jeu : ramasser, poser, dupliquer, effacer, teleporter, construire les cinq
-niveaux.
+jeu : ramasser, poser, dupliquer, effacer, photographier, rembobiner,
+teleporter, puis construire les vingt-cinq niveaux. La troisieme est l'audit
+de level design : elle ne demande pas si la donnee est bien formee mais si le
+niveau se termine avec les outils qu'il donne.
