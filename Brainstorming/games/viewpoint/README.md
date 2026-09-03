@@ -6,12 +6,14 @@ monde et se materialisent en vrais objets 3D, exactement la ou la
 previsualisation les montrait. Aucun asset binaire : tout est construit par
 code.
 
-Quinze courts niveaux d'ilots flottants. Chaque niveau se quitte par un
+Vingt courts niveaux d'ilots flottants. Chaque niveau se quitte par un
 teleporteur qui exige des piles : on les trouve dans le decor, on les
 duplique en posant une photo qui en contient une, ou on les libere des cages.
-Certaines photos effacent au passage les objets lavande pris dans leur cadre,
-la molette fait pivoter la photo tenue, et viser le sol transforme le fond
-d'une photo en plancher.
+Certaines photos decoupent au passage les objets lavande pris dans leur
+cadre, la molette fait pivoter la photo tenue, viser le sol transforme le
+fond d'une photo en plancher, et a partir du niveau 16 un appareil photo
+permet de photographier soi-meme le monde lavande (la capture est une copie,
+et les barreaux ne l'arretent pas).
 
 Le cadrage produit : `docs/PRD.md` (vision, mecanique detaillee, contrats de
 module, plan de test, evolutions reservees dont l'appareil photo) et
@@ -34,15 +36,16 @@ ou `run.bat` sous Windows (Godot 4.7+ dans le PATH).
 | Espace | Sauter |
 | Maj | Courir |
 | E | Interagir (photo, pile, teleporteur) |
-| Clic gauche | Poser la photo tenue |
+| Clic gauche | Poser la photo tenue (appareil a l'oeil : declencher) |
+| Clic droit | Lever / baisser la photo tenue (l'image en grand), ou l'appareil photo mains vides (cadre de visee) |
 | Molette | Pivoter la photo tenue (90 degres) |
-| Clic droit | Reposer la photo tenue |
-| R | Recommencer le niveau |
+| F | Reposer la photo tenue |
+| R (maintenu) | Rembobiner le temps (une chute dans le vide, elle, recommence le niveau) |
 | F11 | Plein ecran |
 | Echap | Menu / reprendre |
 | Entree | Commencer au niveau 1 / rejouer |
 
-Le menu (titre, pause, victoire) propose une grille de selection des quinze
+Le menu (titre, pause, victoire) propose une grille de selection des vingt
 niveaux : un niveau atteint reste debloque d'une session a l'autre
 (progression dans `user://progress.cfg`).
 

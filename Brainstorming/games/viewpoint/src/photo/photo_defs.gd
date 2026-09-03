@@ -1,7 +1,25 @@
 class_name PhotoDefs
 ## Declarative catalog of every photo in the game, plus the computed polaroid
 ## thumbnails. A photo is pure data: props expressed in camera space (x right,
-## y up, -z forward, origin at the player's eye) and an optional backdrop.
+## y up, -z forward, origin at the player's eye) and a MANDATORY backdrop:
+## every photo is the 2D picture of a 3D space, 3D props over a painted 2D
+## background.
+##
+## THE PAINTED BACKGROUND IS A DISTANT VIEW, NOT A LID (v6.1). It used to sit
+## exactly at erase_depth, which made it the seal of the carve, and that is
+## what ruined the feel: a walkway 8 m long planted a solid wall 9.5 m ahead,
+## so crossing a chasm meant walking into the sky. The background now stands
+## THREE TIMES further out, where it reads as the horizon of the picture
+## instead of a lid two steps away. Its size follows on its own, since
+## PhotoMath derives it from the depth.
+##
+## erase_depth is unchanged, and no longer equal to the backdrop depth. What
+## caps a carve is now the photo's own CONTENT where it has one (the door), and
+## nothing at all where it has none. Leaving it open is not a regression: it is
+## the piercing the empty sky photo already relies on, and it can only make a
+## wall easier to get through, never harder.
+## Box props may carry "loose": true, in which case they materialize as
+## falling rigid bodies instead of static blocks.
 ##
 ## The same expansion (expand_prop) feeds both the thumbnail projection and
 ## the 3D materialization, so what the picture shows is what gets built. Keeping
@@ -25,8 +43,8 @@ const DEFS := {
 		"props": [
 			{"kind": "bridge", "pos": Vector3(0, -1.72, -5.0), "size": Vector3(1.8, 0.24, 8.0), "color": "wood"},
 		],
-		"backdrop": {},
-		"erase_depth": 12.0,
+		"backdrop": {"depth": 28.5, "top": "sky_top", "bottom": "sky_horizon"},
+		"erase_depth": 9.5,
 	},
 	"pile": {
 		"title": "Pile",
@@ -35,7 +53,7 @@ const DEFS := {
 			{"kind": "box", "pos": Vector3(0, -1.5, -2.4), "size": Vector3(1.1, 0.6, 1.1), "color": "stone"},
 			{"kind": "battery", "pos": Vector3(0, -1.2, -2.4), "size": Vector3.ZERO, "color": "battery"},
 		],
-		"backdrop": {"depth": 8.0, "top": "backdrop_top", "bottom": "backdrop_bottom"},
+		"backdrop": {"depth": 24.0, "top": "backdrop_top", "bottom": "backdrop_bottom"},
 		"erase_depth": 8.0,
 	},
 	"escalier": {
@@ -44,8 +62,8 @@ const DEFS := {
 		"props": [
 			{"kind": "stairs", "pos": Vector3(0, -1.60, -1.2), "size": Vector3(2.2, 4.6, 7.0), "color": "stone"},
 		],
-		"backdrop": {},
-		"erase_depth": 12.0,
+		"backdrop": {"depth": 27.0, "top": "sky_top", "bottom": "sky_horizon"},
+		"erase_depth": 9.0,
 	},
 	"porte": {
 		"title": "Porte ouverte",
@@ -67,8 +85,17 @@ const DEFS := {
 			# The leaf, slid open in front of the left panel.
 			{"kind": "box", "pos": Vector3(-1.7, -0.32, -5.62), "size": Vector3(1.6, 2.6, 0.08), "color": "wood_dark"},
 		],
+		# NO painted backdrop, and that is the whole point of this photo: a
+		# backdrop is a SOLID wall filling the frame at its depth, so any
+		# backdrop behind the opening would plug the doorway (it did, at 6.2 m,
+		# 20 cm behind the opening: the door was impassable). Here the WALL is
+		# the flat background of the picture and the seal of the frame: it
+		# paves the whole cross-section at 6 m except the opening, which is
+		# exactly what test_porte_seal proves. The carve runs 1.4 m past the
+		# wall so the ground continues on the far side.
+		"seal": "content",
 		"backdrop": {},
-		"erase_depth": 6.2,
+		"erase_depth": 7.4,
 	},
 	"console": {
 		"title": "Console",
@@ -76,8 +103,8 @@ const DEFS := {
 		"props": [
 			{"kind": "box", "pos": Vector3(0, -0.6, -3.0), "size": Vector3(2.0, 0.3, 2.0), "color": "teal"},
 		],
-		"backdrop": {},
-		"erase_depth": 12.0,
+		"backdrop": {"depth": 18.0, "top": "sky_top", "bottom": "sky_horizon"},
+		"erase_depth": 6.0,
 	},
 	"corniche": {
 		"title": "Corniche",
@@ -85,17 +112,17 @@ const DEFS := {
 		"props": [
 			{"kind": "box", "pos": Vector3(1.6, -0.6, -3.2), "size": Vector3(1.8, 0.3, 1.8), "color": "accent"},
 		],
-		"backdrop": {},
-		"erase_depth": 12.0,
+		"backdrop": {"depth": 18.0, "top": "sky_top", "bottom": "sky_horizon"},
+		"erase_depth": 6.0,
 	},
 	"caisse": {
 		"title": "Caisse",
 		"hint": "Un cube d'un bon metre. Un appui simple, toujours utile.",
 		"props": [
-			{"kind": "box", "pos": Vector3(0, -0.97, -2.6), "size": Vector3(1.3, 1.3, 1.3), "color": "wood"},
+			{"kind": "box", "pos": Vector3(0, -0.97, -2.6), "size": Vector3(1.3, 1.3, 1.3), "color": "wood", "loose": true},
 		],
-		"backdrop": {},
-		"erase_depth": 12.0,
+		"backdrop": {"depth": 15.0, "top": "sky_top", "bottom": "sky_horizon"},
+		"erase_depth": 5.0,
 	},
 	"coffret": {
 		"title": "Coffret",
@@ -104,8 +131,8 @@ const DEFS := {
 			{"kind": "box", "pos": Vector3(0, -1.35, -2.6), "size": Vector3(1.0, 0.55, 1.0), "color": "stone"},
 			{"kind": "photo", "pos": Vector3(0, -0.55, -2.6), "size": Vector3.ZERO, "color": "frame", "id": "pile"},
 		],
-		"backdrop": {},
-		"erase_depth": 12.0,
+		"backdrop": {"depth": 18.0, "top": "backdrop_top", "bottom": "backdrop_bottom"},
+		"erase_depth": 6.0,
 	},
 }
 
@@ -115,7 +142,14 @@ const THUMB_INNER := Rect2i(24, 16, 208, 208)
 
 static var _thumb_cache: Dictionary = {}
 
+## Photos taken in game with the camera (PRD section 9, delivered): same
+## dictionary shape as the static catalog, registered under "cliche_N" ids.
+## They live for the current level only.
+static var _dynamic: Dictionary = {}
+static var _dynamic_counter := 0
 
+
+## Static catalog only: the level data and the tests enumerate these.
 static func all_ids() -> PackedStringArray:
 	var ids := PackedStringArray()
 	for id in DEFS.keys():
@@ -125,7 +159,22 @@ static func all_ids() -> PackedStringArray:
 
 
 static func get_def(id: String) -> Dictionary:
+	if _dynamic.has(id):
+		return _dynamic[id]
 	return DEFS.get(id, {})
+
+
+static func register_dynamic(def: Dictionary) -> String:
+	_dynamic_counter += 1
+	var id := "cliche_%d" % _dynamic_counter
+	_dynamic[id] = def
+	return id
+
+
+static func clear_dynamic() -> void:
+	for id in _dynamic.keys():
+		_thumb_cache.erase(id)
+	_dynamic.clear()
 
 
 ## How many real batteries materialize when this photo is placed.
@@ -158,7 +207,11 @@ static func expand_prop(prop: Dictionary) -> Array:
 	var color: String = prop.get("color", "stone")
 	match prop["kind"]:
 		"box", "cylinder":
-			return [{"kind": prop["kind"], "center": pos, "size": size, "color": color}]
+			var prim := {"kind": prop["kind"], "center": pos, "size": size, "color": color}
+			# The "loose" key of box props propagates to their primitives.
+			if prop["kind"] == "box" and prop.get("loose", false):
+				prim["loose"] = true
+			return [prim]
 		"battery":
 			return [{"kind": "battery", "center": pos + Vector3(0, 0.35, 0), "size": Vector3(0.36, 0.7, 0.36), "color": "battery"}]
 		"photo":

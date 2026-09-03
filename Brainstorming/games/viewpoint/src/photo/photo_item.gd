@@ -7,6 +7,8 @@ extends Node3D
 var _def_id := ""
 var _bob_phase := 0.0
 var _visual: Node3D
+var _picture_mat: StandardMaterial3D
+var _snap_timer := 0.0
 
 
 func setup(def_id: String) -> void:
@@ -28,9 +30,10 @@ func _ready() -> void:
 	frame.material_override = Materials.solid("frame")
 	_visual.add_child(frame)
 
-	var picture_mat := StandardMaterial3D.new()
-	picture_mat.albedo_texture = PhotoDefs.thumbnail(_def_id)
-	picture_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	_picture_mat = StandardMaterial3D.new()
+	_picture_mat.albedo_texture = PhotoSnaps.get_texture(_def_id)
+	_picture_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	var picture_mat := _picture_mat
 	for facing_sign in [1.0, -1.0]:
 		var picture := MeshInstance3D.new()
 		var quad := QuadMesh.new()
@@ -57,6 +60,13 @@ func _process(delta: float) -> void:
 	_bob_phase = fposmod(_bob_phase + delta * 1.6, TAU)
 	_visual.position.y = sin(_bob_phase) * 0.07
 	_visual.rotation.y += delta * 0.8
+	# The rendered picture may land after this item was built: adopt it.
+	_snap_timer += delta
+	if _snap_timer > 0.5:
+		_snap_timer = 0.0
+		var tex := PhotoSnaps.get_texture(_def_id)
+		if _picture_mat.albedo_texture != tex:
+			_picture_mat.albedo_texture = tex
 
 
 func def_id() -> String:
@@ -66,7 +76,7 @@ func def_id() -> String:
 func interact(player: Node) -> void:
 	var placer: PhotoPlacer = player.placer
 	if placer.hold(_def_id):
-		queue_free()
+		Rewind.retire(self)
 
 
 func prompt_text(player: Node) -> String:

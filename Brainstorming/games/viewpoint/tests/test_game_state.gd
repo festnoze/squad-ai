@@ -118,6 +118,75 @@ func test_progress_persistence() -> void:
 	done()
 
 
+func test_drop_battery() -> void:
+	# E without a target puts one carried battery back down (the player spawns
+	# the pickup). The count is floored at zero: no phantom battery.
+	var game := _fresh()
+	game.begin_level(0, 3)
+	eq(game.drop_battery(), "", "reposer les mains vides est refuse")
+	eq(game.carried_batteries, 0, "le compte reste a zero")
+	game.collect_battery()
+	game.collect_battery()
+	eq(game.drop_battery(), "normal", "reposer une pile portee est accepte")
+	eq(game.carried_batteries, 1, "une seule pile reposee a la fois")
+	eq(game.drop_battery(), "normal", "seconde repose acceptee")
+	eq(game.carried_batteries, 0, "plus rien en main")
+	eq(game.drop_battery(), "", "troisieme repose refusee")
+	eq(game.carried_batteries, 0, "le compte ne passe jamais sous zero")
+	# Dropping does not give the teleporter anything back.
+	eq(game.inserted_batteries, 0, "reposer ne remplit pas le teleporteur")
+	game.free()
+	done()
+
+
+func test_drop_battery_signal() -> void:
+	var game := _fresh()
+	var events: Array = []
+	game.begin_level(0, 2)
+	game.collect_battery()
+	game.batteries_changed.connect(func(c, i, r): events.append([c, i, r]))
+	eq(game.drop_battery(), "normal", "repose acceptee")
+	eq(events.size(), 1, "une emission de batteries_changed a la repose")
+	eq(events[0], [0, 0, 2], "etat emis : 0 portee, 0 inseree, 2 requises")
+	eq(game.drop_battery(), "", "repose a vide refusee")
+	eq(events.size(), 1, "une repose refusee n'emet rien")
+	game.free()
+	done()
+
+
+func test_sealed_batteries_stay_sealed() -> void:
+	# A leaden battery keeps its nature through the hands. Setting one down and
+	# photographing what comes back must not launder it into a copyable one, so
+	# what goes down first is always the lead.
+	var game := _fresh()
+	game.begin_level(0, 4)
+	eq(game.carried_sealed, 0, "on demarre sans plomb")
+	game.collect_battery()
+	game.collect_battery(true)
+	eq(game.carried_batteries, 2, "deux piles en main")
+	eq(game.carried_sealed, 1, "dont une plombee")
+	eq(game.drop_battery(), "sealed", "c'est le plomb qui redescend en premier")
+	eq(game.carried_sealed, 0, "le plomb n'est plus en main")
+	eq(game.drop_battery(), "normal", "la pile vive ensuite")
+	eq(game.carried_batteries, 0, "les mains sont vides")
+
+	# A teleporter does not care: lead is worth exactly one battery, and it is
+	# spent first so the copyable one stays available as long as possible.
+	game.begin_level(0, 2)
+	game.collect_battery(true)
+	game.collect_battery()
+	eq(game.insert_batteries(), 2, "les deux piles entrent dans le teleporteur")
+	eq(game.carried_sealed, 0, "plus de plomb en main apres insertion")
+	check(game.can_teleport(), "le plomb alimente le teleporteur comme le reste")
+
+	# Rewind restores the leaden count too, and can never claim more lead than
+	# there are batteries in hand.
+	game.restore_counters(1, 0, 2, 0, 5)
+	eq(game.carried_sealed, 1, "le compte de plomb est borne au nombre de piles portees")
+	game.free()
+	done()
+
+
 func test_signals() -> void:
 	var game := _fresh()
 	var events: Array = []

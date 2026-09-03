@@ -31,12 +31,70 @@ func test_props_valid() -> void:
 			check(pos.z < 0.0, "%s : prop devant la camera (z = %f)" % [id, pos.z])
 			if prop["kind"] == "photo":
 				check(not PhotoDefs.get_def(prop["id"]).is_empty(), "%s : photo imbriquee %s au catalogue" % [id, prop["id"]])
+	done()
+
+
+func test_backdrop_universal() -> void:
+	# v4: a photo is ALWAYS the 2D picture of a 3D space, so every def paints a
+	# backdrop, and it stands far behind the carve rather than capping it.
+	for id in PhotoDefs.all_ids():
+		var def := PhotoDefs.get_def(id)
 		var backdrop: Dictionary = def.get("backdrop", {})
-		if not backdrop.is_empty():
-			check(backdrop["depth"] > 0.0, "%s : backdrop a distance positive" % id)
-			check(Palette.has_color(backdrop.get("top", "sky_top")), "%s : couleur haute du backdrop connue" % id)
-			check(Palette.has_color(backdrop.get("bottom", "sky_horizon")), "%s : couleur basse du backdrop connue" % id)
-			near(def["erase_depth"], backdrop["depth"], 0.001, "%s : effacement aligne sur le backdrop" % id)
+		# One documented exception: a photo whose own geometry paves the frame
+		# is sealed by it. The door is the case, and it MUST be: a backdrop is
+		# a solid wall, so one behind the opening would plug the doorway.
+		if def.get("seal", "") == "content":
+			check(backdrop.is_empty(), "%s : scelle par son contenu, donc sans fond solide" % id)
+			continue
+		check(not backdrop.is_empty(), "%s : fond peint obligatoire" % id)
+		if backdrop.is_empty():
+			continue
+		check(backdrop["depth"] > 0.0, "%s : backdrop a distance positive" % id)
+		check(Palette.has_color(backdrop.get("top", "sky_top")), "%s : couleur haute du backdrop connue" % id)
+		check(Palette.has_color(backdrop.get("bottom", "sky_horizon")), "%s : couleur basse du backdrop connue" % id)
+		# v6.1 : le fond n'est plus le couvercle de la decoupe, c'est le
+		# lointain de l'image. Il se tient TRES loin derriere le plan
+		# d'effacement, sinon on retombe sur le defaut qui a motive le
+		# changement : traverser un gouffre en marchant dans un mur de ciel.
+		check(backdrop["depth"] > def["erase_depth"] * 2.5,
+			"%s : le fond peint est un lointain, pas un couvercle (%.1f m pour une decoupe de %.1f m)"
+				% [id, backdrop["depth"], def["erase_depth"]])
+	done()
+
+
+func test_no_photo_patches_the_ground() -> void:
+	# The ground language (PRD 3.6): grey ground is PERMANENT, a photo placed
+	# over it is added to it. So no photo carries a slab of grey ground: a
+	# bridge photo lays a bridge, it does not repave the floor. Patching would
+	# only stack a second floor on the first.
+	for id in PhotoDefs.all_ids():
+		for prop in PhotoDefs.get_def(id)["props"]:
+			ne(prop.get("color", ""), "platform", "%s : aucune photo ne rapiece le sol permanent" % id)
+	done()
+
+
+func test_loose_props() -> void:
+	# Loose box props materialize as falling rigid bodies. The other props hold
+	# exact positions the puzzles depend on and must stay static.
+	var crate: Dictionary = PhotoDefs.get_def("caisse")["props"][0]
+	eq(crate["kind"], "box", "la caisse est une boite")
+	check(crate.get("loose", false), "la caisse est un objet libre : elle tombe")
+	for id in ["pile", "coffret"]:
+		var base: Dictionary = PhotoDefs.get_def(id)["props"][0]
+		check(not base.get("loose", false), "%s : le socle reste statique" % id)
+	for id in ["console", "corniche"]:
+		var slab: Dictionary = PhotoDefs.get_def(id)["props"][0]
+		check(not slab.get("loose", false), "%s : la dalle reste statique" % id)
+
+	# The expansion carries the key over to the primitives actually built.
+	var prims := PhotoDefs.expand_prop(crate)
+	eq(prims.size(), 1, "la caisse s'etend en une primitive")
+	check(prims[0].get("loose", false), "l'expansion propage la cle loose")
+	var fixed := PhotoDefs.expand_prop({"kind": "box", "pos": Vector3(0, -1, -3), "size": Vector3(2, 0.3, 2), "color": "stone"})
+	check(not fixed[0].has("loose"), "une boite non libre n'herite d'aucune cle loose")
+	var stairs := PhotoDefs.expand_prop({"kind": "stairs", "pos": Vector3(0, -1.6, -1.2), "size": Vector3(2.2, 4.6, 7.0), "color": "stone", "loose": true})
+	for step in stairs:
+		check(not step.has("loose"), "seules les boites propagent loose, pas les marches")
 	done()
 
 
@@ -97,7 +155,11 @@ func test_porte_seal() -> void:
 	# slips through the gap (the reported "interstice" bug).
 	var def := PhotoDefs.get_def("porte")
 	var wall_depth := 6.0
-	check(def["erase_depth"] <= wall_depth + 0.25, "la porte ne decoupe pas au dela de son mur")
+	# The carve runs a little past the wall so the ground continues behind the
+	# doorway, but not so far that it eats what the wall does not cover.
+	between(def["erase_depth"], wall_depth, wall_depth + 1.6, "la porte decoupe juste ce qu'il faut derriere son mur")
+	check(def.get("seal", "") == "content", "la porte est scellee par son mur, pas par un fond solide")
+	check(def.get("backdrop", {}).is_empty(), "aucun fond solide ne bouche l'ouverture")
 	var half := PhotoMath.half_extent_at(wall_depth, PhotoMath.PHOTO_FOV_DEG)
 	between(half, 2.7, 2.8, "demi-trame du frustum a 6 m connue")
 

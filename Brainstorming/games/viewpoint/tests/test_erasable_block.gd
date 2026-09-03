@@ -14,6 +14,28 @@ func _volume(pieces: Array) -> float:
 	return total
 
 
+func test_create_keeps_identity() -> void:
+	# Fragments are rebuilt with the same color, emissive and extra groups, so
+	# a carved platform stays a platform and a lavender block stays lavender.
+	var plain := ErasableBlock.create(Vector3(2, 1, 3), "wood")
+	eq(plain.block_size, Vector3(2, 1, 3), "taille memorisee")
+	eq(plain.color_key, "wood", "couleur memorisee")
+	near(plain.block_emissive, 0.0, 0.001, "pas d'emission par defaut")
+	eq(plain.block_extra_groups.size(), 0, "aucun groupe supplementaire par defaut")
+	check(plain.show_mesh, "un bloc est visible par defaut")
+	plain.free()
+
+	var marked := ErasableBlock.create(Vector3(1, 1, 1), "erasable", 0.25, PackedStringArray(["erasable"]))
+	near(marked.block_emissive, 0.25, 0.001, "emission lavande memorisee")
+	eq(marked.block_extra_groups, PackedStringArray(["erasable"]), "groupe marqueur memorise")
+	marked.free()
+
+	var platform := ErasableBlock.create(Vector3(10, 1, 10), "platform", 0.0, PackedStringArray(["platform"]))
+	eq(platform.block_extra_groups, PackedStringArray(["platform"]), "la plateforme garde son groupe")
+	platform.free()
+	done()
+
+
 func test_center_hole_thin_wall() -> void:
 	# A door-sized hole through a thin wall, full height: only the two
 	# flanks survive.

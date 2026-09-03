@@ -109,7 +109,7 @@ func show_title() -> void:
 	_root.visible = true
 	_refresh_levels()
 	_title.text = "VIEWPOINT"
-	_subtitle.text = "Posez des photos. Elles deviennent le monde.\n\nZQSD/WASD bouger   Souris regarder   Espace sauter\nE interagir   Clic gauche poser la photo   Clic droit la reposer\nMolette pivoter la photo   R recommencer le niveau   F11 plein ecran"
+	_subtitle.text = "Posez des photos. Elles deviennent le monde.\n\nZQSD/WASD bouger   Souris regarder   Espace sauter   E interagir\nClic gauche poser la photo   Clic droit la lever (molette : la tourner)\nMains vides avec l'appareil : clic droit viser, clic gauche declencher\nR (maintenu) rembobiner   F11 plein ecran"
 	_hint.text = "Entree : commencer au niveau 1   ou cliquez un niveau ci-dessous"
 
 
@@ -126,8 +126,8 @@ func show_victory() -> void:
 	mode = Mode.VICTORY
 	_root.visible = true
 	_refresh_levels()
-	_title.text = "EXAMEN REUSSI"
-	_subtitle.text = "Les quinze iles sont derriere vous.\nChaque photo posee est restee exactement la ou vous l'avez vue."
+	_title.text = "STUDIO FERME"
+	_subtitle.text = "Les vingt iles sont derriere vous.\nChaque photo posee est restee exactement la ou vous l'avez vue."
 	_hint.text = "Entree : rejouer"
 
 

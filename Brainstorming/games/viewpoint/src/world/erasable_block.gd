@@ -1,14 +1,24 @@
 class_name ErasableBlock
 extends StaticBody3D
-## An erasable box that supports PARTIAL erasure: instead of vanishing whole,
-## the part of its volume caught in a placed photo's frustum is carved out and
-## the remainder survives as smaller ErasableBlocks (themselves carvable).
+## A box of the world that a photo may replace. Whether it actually can is the
+## GROUND LANGUAGE, readable at a glance and never spelled out to the player:
+##
+##   grey / solid colors = permanent. A photo placed over it is ADDED to it:
+##       the slab stays, the bridge lands on top. These blocks are in the
+##       "photographable" group only.
+##   pale and lavender   = ephemeral. The frame carves them. These are in
+##       "photographable" AND "carvable".
+##
+## Carving is PARTIAL: instead of vanishing whole, the part of the volume
+## caught in the frustum is cut out and the remainder survives as smaller
+## blocks, themselves carvable.
 ##
 ## The cut is box-minus-box: the hole is the axis-aligned bounding box (in
 ## this block's local space) of the sampled frustum intersection, and the
 ## remainder decomposes into at most 6 slabs. The AABB over-approximates the
 ## hole when the photo is placed at an angle, which errs on the generous side
-## for the player (the opening is at least as big as the frame).
+## for the player (the opening is at least as big as the frame). Sampling in
+## local space also handles rotated blocks (the stairs ramp).
 
 const SAMPLE_SPACING := 0.15
 const MAX_STEPS := 36
@@ -16,17 +26,34 @@ const MIN_FRAGMENT := 0.08
 
 var block_size := Vector3.ONE
 var color_key := "erasable"
+var block_emissive := 0.0
+var block_extra_groups := PackedStringArray()
+## When false the block keeps collision and carvability but renders no box
+## mesh (invisible stairs ramp). Fragments inherit it.
+var show_mesh := true
+## False for the permanent half of the ground language: the block is still
+## photographable, but no frame ever cuts it. Fragments inherit it.
+var carvable := true
 
 
-static func create(size: Vector3, color: String) -> ErasableBlock:
+static func create(size: Vector3, color: String, emissive := 0.0, extra_groups: PackedStringArray = PackedStringArray(), can_carve := true) -> ErasableBlock:
 	var block := ErasableBlock.new()
 	block.block_size = size
 	block.color_key = color
+	block.block_emissive = emissive
+	block.block_extra_groups = extra_groups
+	block.carvable = can_carve
 	return block
 
 
 func _ready() -> void:
-	add_to_group("erasable")
+	# Everything the eye sees can be photographed; only the ephemeral half of
+	# the language can be carved.
+	add_to_group("photographable")
+	if carvable:
+		add_to_group("carvable")
+	for group in block_extra_groups:
+		add_to_group(group)
 	collision_layer = Layers.WORLD
 	collision_mask = 0
 	var shape := CollisionShape3D.new()
@@ -34,12 +61,13 @@ func _ready() -> void:
 	box.size = block_size
 	shape.shape = box
 	add_child(shape)
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = block_size
-	mesh_instance.mesh = mesh
-	mesh_instance.material_override = Materials.solid(color_key, 0.25)
-	add_child(mesh_instance)
+	if show_mesh:
+		var mesh_instance := MeshInstance3D.new()
+		var mesh := BoxMesh.new()
+		mesh.size = block_size
+		mesh_instance.mesh = mesh
+		mesh_instance.material_override = Materials.solid(color_key, block_emissive)
+		add_child(mesh_instance)
 
 
 ## Carves the intersection with the photo frustum out of this block.
@@ -77,10 +105,12 @@ func carve_with_frustum(anchor: Transform3D, fov_deg: float, aspect: float, dept
 	var pieces := decompose(block_size, hole_min, hole_max)
 	var parent := get_parent()
 	for piece in pieces:
-		var fragment := ErasableBlock.create(piece["size"], color_key)
+		var fragment := ErasableBlock.create(piece["size"], color_key, block_emissive, block_extra_groups, carvable)
+		fragment.show_mesh = show_mesh
 		parent.add_child(fragment)
 		fragment.global_transform = global_transform.translated_local(piece["center"])
-	queue_free()
+		Rewind.notice_spawn(fragment)
+	Rewind.retire(self)
 	return true
 
 

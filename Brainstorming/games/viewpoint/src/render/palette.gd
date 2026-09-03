@@ -4,8 +4,21 @@ class_name Palette
 ## and level definitions only reference colors that exist.
 
 const COLORS := {
-	"platform": Color(0.93, 0.90, 0.84),
-	"platform_side": Color(0.72, 0.66, 0.56),
+	# GROUND LANGUAGE, read at a glance and never explained in words:
+	# grey stays, pale goes. A grey slab survives any photo placed over it
+	# (the photo is added to it); a pale slab is carved away by the frame,
+	# like the lavender walls and crates it belongs to.
+	"platform": Color(0.70, 0.71, 0.75),
+	"platform_side": Color(0.53, 0.54, 0.59),
+	"platform_soft": Color(0.93, 0.92, 0.97),
+	"platform_soft_side": Color(0.80, 0.78, 0.88),
+	# SEALED MATTER, the same language pushed one step further: this is grey
+	# that has gone to steel and lead. A steel cage no photo ever breaks, a
+	# leaden battery no film ever prints. Darker than the permanent ground, and
+	# with no life of its own (a sealed battery neither bobs nor turns).
+	"sealed": Color(0.58, 0.60, 0.66),
+	"sealed_dark": Color(0.40, 0.42, 0.48),
+	"battery_sealed": Color(0.50, 0.52, 0.57),
 	"accent": Color(0.91, 0.45, 0.35),
 	"accent_dark": Color(0.72, 0.32, 0.24),
 	"teal": Color(0.25, 0.65, 0.63),

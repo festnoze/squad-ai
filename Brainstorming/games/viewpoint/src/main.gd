@@ -9,6 +9,9 @@ extends Node3D
 @onready var hud: Hud = $Hud
 @onready var menu: Menu = $Menu
 
+## Time machine of the current level, built in _ready.
+var rewind: Rewind
+
 var _transitioning := false
 
 
@@ -37,7 +40,12 @@ func _setup_environment() -> void:
 
 func _ready() -> void:
 	_setup_environment()
+	add_child(PhotoSnaps.new())
+	rewind = Rewind.new()
+	add_child(rewind)
+	rewind.setup(player, level_root)
 	player.setup(level_root)
+	player.fell_out.connect(_on_player_fell)
 	menu.start_requested.connect(_start_game)
 	menu.resume_requested.connect(_resume)
 	menu.restart_requested.connect(_start_game)
@@ -66,19 +74,57 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("pause"):
 		_pause()
-	elif event.is_action_pressed("reset_level"):
-		# Photos are consumable, so a complex level can be spent into a dead
-		# end. R rebuilds the current level from its definition.
-		_load_level(Game.level_index)
+	# R is not a key press but a hold: see _drive_rewind.
+
+
+## Falling out is losing: the level restarts from scratch, placements and
+## carried batteries included. Deferred because freeing collision bodies from
+## inside a physics callback is not allowed.
+func _on_player_fell() -> void:
+	if _transitioning:
+		return
+	_restart_after_fall.call_deferred()
+
+
+func _restart_after_fall() -> void:
+	_load_level(Game.level_index)
+	player.control_enabled = menu.mode == Menu.Mode.HIDDEN
+	hud.show_toast("Chute : le niveau recommence a zero.")
+
+
+## Rewind is a hold, not a press: R keeps scrubbing the history backwards for
+## as long as it is down, and releasing it makes that moment the new present.
+func _drive_rewind(delta: float) -> void:
+	var wanted := Input.is_action_pressed("rewind") and menu.mode == Menu.Mode.HIDDEN and not _transitioning
+	if wanted and not rewind.is_rewinding():
+		rewind.start_rewind()
+		player.control_enabled = false
+	if wanted:
+		rewind.step_rewind(delta)
+	elif rewind.is_rewinding():
+		rewind.stop_rewind()
+		player.control_enabled = menu.mode == Menu.Mode.HIDDEN
+	hud.set_rewinding(rewind.is_rewinding(), rewind.available_seconds())
+
+
+## Playback rides the physics clock like the recording does, so a rewind
+## unwinds the same amount of history whatever the frame rate.
+func _physics_process(delta: float) -> void:
+	_drive_rewind(delta)
 
 
 func _process(_delta: float) -> void:
 	hud.visible = menu.mode == Menu.Mode.HIDDEN
 	if menu.mode == Menu.Mode.HIDDEN and not _transitioning:
 		hud.set_prompt(player.interact_prompt)
-		hud.set_held(player.placer.held_title())
+		var held_id := player.placer.held_id
+		hud.set_held(player.placer.held_title(), PhotoSnaps.get_texture(held_id) if held_id != "" else null, player.placer.raised)
+		hud.set_photo_view(PhotoSnaps.get_texture(held_id) if player.placer.raised else null, player.placer.roll_steps)
+		hud.set_viewfinder(player.viewfinder)
 	else:
 		hud.set_prompt("")
+		hud.set_photo_view(null)
+		hud.set_viewfinder(false)
 
 
 func _start_game() -> void:
@@ -110,7 +156,7 @@ func _pause() -> void:
 
 
 func _load_level(index: int) -> void:
-	# Immediate free, not queue_free: the old level's group members (erasable,
+	# Immediate free, not queue_free: the old level's group members (carvable,
 	# photo_item...) must be gone before the new level starts querying groups.
 	for child in level_root.get_children():
 		level_root.remove_child(child)
@@ -122,6 +168,9 @@ func _load_level(index: int) -> void:
 			level_root.remove_child(child)
 			child.free()
 
+	# Photos taken with the camera belong to their level, like placed content.
+	PhotoDefs.clear_dynamic()
+
 	var def := LevelDefs.get_def(index)
 	var teleporter := LevelBuilder.build(level_root, def)
 	teleporter.depart_requested.connect(_on_depart)
@@ -129,6 +178,8 @@ func _load_level(index: int) -> void:
 	Game.begin_level(index, def["teleporter"]["required"])
 	hud.show_banner("Niveau %d : %s" % [index + 1, def["name"]], def["subtitle"])
 	hud.fade_in()
+	# History belongs to a level: a fresh one starts from this exact state.
+	rewind.begin_level()
 
 
 func _on_depart() -> void:

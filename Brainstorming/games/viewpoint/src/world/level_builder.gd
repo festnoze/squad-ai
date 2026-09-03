@@ -4,6 +4,7 @@ class_name LevelBuilder
 ## root's children (placed photo contents included).
 
 const BatteryScript := preload("res://src/pickups/battery.gd")
+const CameraItemScript := preload("res://src/pickups/camera_item.gd")
 const PhotoItemScript := preload("res://src/photo/photo_item.gd")
 const TeleporterScript := preload("res://src/world/teleporter.gd")
 
@@ -20,11 +21,16 @@ const DECOR_ISLANDS := [
 
 static func build(root: Node3D, def: Dictionary) -> Teleporter:
 	for platform in def.get("platforms", []):
-		_add_platform(root, platform["pos"], platform["size"])
+		_add_platform(root, platform["pos"], platform["size"], platform.get("soft", false))
 	for decor in def.get("decor", []):
-		_add_block(root, decor["pos"], decor["size"], decor.get("color", "wood"))
+		# Decor is part of the fixed world: permanent, like the grey ground.
+		var decor_block := ErasableBlock.create(decor["size"], decor.get("color", "wood"), 0.0, PackedStringArray(), false)
+		root.add_child(decor_block)
+		decor_block.position = decor["pos"]
 	for erasable in def.get("erasables", []):
-		var block := ErasableBlock.create(erasable["size"], "erasable")
+		# The "erasable" group is now only a lavender marker (readability and
+		# tests): every block is carvable anyway.
+		var block := ErasableBlock.create(erasable["size"], "erasable", 0.25, PackedStringArray(["erasable"]))
 		root.add_child(block)
 		block.position = erasable["pos"]
 	for cage in def.get("cages", []):
@@ -36,8 +42,21 @@ static func build(root: Node3D, def: Dictionary) -> Teleporter:
 		item.position = photo["pos"]
 	for battery_pos in def.get("batteries", []):
 		var battery: Node3D = BatteryScript.new()
+		battery.setup(false)
 		root.add_child(battery)
 		battery.position = battery_pos
+	for sealed_pos in def.get("sealed_batteries", []):
+		# Same battery, same value to a teleporter, but no film prints it.
+		var sealed_battery: Node3D = BatteryScript.new()
+		sealed_battery.setup(true)
+		root.add_child(sealed_battery)
+		sealed_battery.position = sealed_pos
+	var camera_def: Dictionary = def.get("camera", {})
+	if not camera_def.is_empty():
+		var camera_item: Node3D = CameraItemScript.new()
+		camera_item.setup(camera_def["films"])
+		root.add_child(camera_item)
+		camera_item.position = camera_def["pos"]
 	for island in DECOR_ISLANDS:
 		_add_island(root, island["pos"], island["size"])
 
@@ -49,73 +68,58 @@ static func build(root: Node3D, def: Dictionary) -> Teleporter:
 	return teleporter
 
 
-static func _add_platform(root: Node3D, pos: Vector3, size: Vector3) -> void:
-	var body := StaticBody3D.new()
-	body.collision_layer = Layers.WORLD
-	body.collision_mask = 0
-	body.position = pos
-	body.add_to_group("platform")
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = size
-	shape.shape = box
-	body.add_child(shape)
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh_instance.mesh = mesh
-	mesh_instance.material_override = Materials.solid("platform")
-	body.add_child(mesh_instance)
-	root.add_child(body)
+## Ground. Grey by default and PERMANENT: a photo placed over it is added to
+## it, the slab stays. A "soft" platform is pale instead, and the frame carves
+## it like a lavender wall: that is the whole language, said in color.
+static func _add_platform(root: Node3D, pos: Vector3, size: Vector3, soft := false) -> void:
+	var groups := PackedStringArray(["platform"])
+	if soft:
+		groups.append("erasable")
+	var block := ErasableBlock.create(size, "platform_soft" if soft else "platform", 0.0, groups, soft)
+	root.add_child(block)
+	block.position = pos
 
 	# Sand-colored skirt hanging under the slab, so islands read as terrain.
+	# Child of the block: it vanishes with it (carved fragments have no skirt).
 	var skirt := MeshInstance3D.new()
 	var skirt_mesh := BoxMesh.new()
 	skirt_mesh.size = Vector3(size.x * 0.9, size.y * 1.6, size.z * 0.9)
 	skirt.mesh = skirt_mesh
-	skirt.material_override = Materials.solid("platform_side")
-	skirt.position = pos + Vector3(0, -size.y * 1.1, 0)
-	root.add_child(skirt)
-
-
-static func _add_block(root: Node3D, pos: Vector3, size: Vector3, color: String) -> void:
-	var body := StaticBody3D.new()
-	body.collision_layer = Layers.WORLD
-	body.collision_mask = 0
-	body.position = pos
-	var shape := CollisionShape3D.new()
-	var box := BoxShape3D.new()
-	box.size = size
-	shape.shape = box
-	body.add_child(shape)
-	var mesh_instance := MeshInstance3D.new()
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh_instance.mesh = mesh
-	mesh_instance.material_override = Materials.solid(color)
-	body.add_child(mesh_instance)
-	root.add_child(body)
+	skirt.material_override = Materials.solid("platform_soft_side" if soft else "platform_side")
+	skirt.position = Vector3(0, -size.y * 1.1, 0)
+	block.add_child(skirt)
 
 
 ## Barred cage. Visuals are bars with gaps (the loot inside stays visible),
 ## collision is four full thin walls plus an optional roof, so neither the
-## player nor the interaction ray gets through. One single body: erasing the
-## cage is erasing everything at once. pos is the center of the cage floor.
-## Color language: lavender emissive = erasable, dark = permanent.
+## player nor the interaction ray gets through. One single body: breaking the
+## cage removes everything at once. pos is the center of the cage floor.
+##
+## Two kinds, told apart by color the way the ground is:
+##   ordinary (lavender or dark) : any placement framing its center breaks it.
+##   "sealed": true, steel grey  : NO placement ever breaks it. The bars still
+##       do not stop the lens, so the way out of a steel cage is to photograph
+##       what is inside and materialize the copy somewhere reachable.
 static func _add_cage(root: Node3D, cage: Dictionary) -> void:
 	var pos: Vector3 = cage["pos"]
 	var size: Vector3 = cage["size"]
-	var erasable: bool = cage.get("erasable", true)
+	var sealed: bool = cage.get("sealed", false)
+	var erasable: bool = cage.get("erasable", true) and not sealed
 	var roof: bool = cage.get("roof", true)
-	var color := "erasable" if erasable else "battery_tip"
+	var color := "erasable" if erasable else ("sealed" if sealed else "battery_tip")
 	var material := Materials.solid(color, 0.25 if erasable else 0.0)
 
 	var body := StaticBody3D.new()
 	body.collision_layer = Layers.WORLD
 	body.collision_mask = 0
 	body.position = pos + Vector3(0, size.y * 0.5, 0)
-	if erasable:
-		body.add_to_group("erasable")
+	# "cage" is what the lens sees; "breakable" is what a placement may remove.
+	# A steel cage is in the first group only.
+	body.add_to_group("cage")
+	if not sealed:
+		body.add_to_group("breakable")
+	body.set_meta("cage_size", size)
+	body.set_meta("cage_color", color)
 
 	# The four walls: invisible full collision + visible bars and rails.
 	var faces := [

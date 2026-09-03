@@ -11,8 +11,10 @@ extends SceneTree
 const SUITES: PackedStringArray = [
 	"res://tests/test_photo_math.gd",
 	"res://tests/test_photo_defs.gd",
+	"res://tests/test_photo_capture.gd",
 	"res://tests/test_level_defs.gd",
 	"res://tests/test_erasable_block.gd",
+	"res://tests/test_rewind.gd",
 	"res://tests/test_palette.gd",
 	"res://tests/test_materials.gd",
 	"res://tests/test_game_state.gd",

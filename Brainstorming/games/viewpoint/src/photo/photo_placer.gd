@@ -3,23 +3,25 @@ extends Node3D
 ## Holds the photo the player carries and turns it into world geometry.
 ##
 ## This node is a child of the player camera with an identity local transform,
-## so its global transform IS the placement anchor. The ghost preview is built
-## as a direct child: it therefore occupies exactly the volume the solid
-## content will occupy at the moment of the click. That strict equality is the
-## whole optical illusion (PRD section 3.2), so nothing here ever offsets or
-## re-levels the anchor.
+## so its global transform IS the placement anchor. Since v4 there is NO 3D
+## ghost preview: the player raises the 2D picture (right click), rotates it
+## (wheel), and only discovers the 3D result at placement. Placing REPLACES
+## everything caught in the photo frustum (up to the backdrop depth) by the
+## photo content: an empty sky photo pierces the world.
 
 const PhotoItemScript := preload("res://src/photo/photo_item.gd")
 const PhotoContentScript := preload("res://src/photo/photo_content.gd")
 
 var held_id := ""
 ## Roll of the held photo around the view axis, in 90 degree steps. Applied to
-## this node itself, so the ghost AND the anchor rotate together and the
-## ghost = solid equality survives rotation untouched.
+## this node itself, so the anchor rotates with the picture shown on the HUD.
 var roll_steps := 0
+## True while the photo is raised to the eye (right click): the HUD shows the
+## picture, rotated by roll_steps, over the exact screen region the placement
+## frustum covers.
+var raised := false
 
 var _level_root: Node3D
-var _ghost: Node3D
 
 
 func setup(level_root: Node3D) -> void:
@@ -31,9 +33,6 @@ func hold(id: String) -> bool:
 		return false
 	held_id = id
 	_set_roll(0)
-	_ghost = PhotoContentScript.new()
-	_ghost.setup(PhotoDefs.get_def(id), true)
-	add_child(_ghost)
 	return true
 
 
@@ -44,35 +43,49 @@ func rotate_held(direction: int) -> void:
 	_set_roll(posmod(roll_steps + direction, 4))
 
 
-## Materializes the held photo at the current camera anchor: erases erasable
-## world objects caught in the photo frustum, then builds the solid content.
+## Raises or lowers the held photo (right click). Raised, the player sees the
+## PICTURE aligned on the frustum, rotated by the current roll.
+func raise_toggle() -> void:
+	if held_id == "":
+		return
+	raised = not raised
+
+
+## Materializes the held photo at the current camera anchor: REPLACES what the
+## photo frustum reaches, then builds the solid content.
 func place() -> bool:
 	if held_id == "":
 		return false
 	var def := PhotoDefs.get_def(held_id)
 	var anchor := global_transform
 
-	# Carvable blocks (walls, crates) lose only the part of their volume caught
-	# in the photo frustum and survive as fragments; objects without a carve
-	# (cages) still vanish whole when their center is framed. The group list is
-	# a snapshot, so fragments spawned during the loop are not re-visited.
+	# Replacement, two passes before instancing. Pass 1: every carvable block
+	# (platforms, decor, lavender, placed content, backdrops) loses the part of
+	# its volume caught in the frustum and survives as fragments. Pass 2: every
+	# breakable body (cages) whose center falls in the frustum vanishes whole.
+	# Never replaced: teleporter, batteries, photo items, camera, player.
+	# The group lists are snapshots, so fragments spawned during the loop are
+	# not re-visited.
 	var depth: float = def.get("erase_depth", PhotoMath.DEFAULT_ERASE_DEPTH)
 	var to_anchor := anchor.affine_inverse()
-	for node in get_tree().get_nodes_in_group("erasable"):
-		var erasable := node as Node3D
-		if erasable == null or not is_instance_valid(erasable):
+	for node in get_tree().get_nodes_in_group("carvable"):
+		var block := node as ErasableBlock
+		if block == null or not is_instance_valid(block) or block.is_queued_for_deletion():
 			continue
-		if erasable.has_method("carve_with_frustum"):
-			erasable.carve_with_frustum(anchor, PhotoMath.PHOTO_FOV_DEG, PhotoMath.PHOTO_ASPECT, depth)
+		block.carve_with_frustum(anchor, PhotoMath.PHOTO_FOV_DEG, PhotoMath.PHOTO_ASPECT, depth)
+	for node in get_tree().get_nodes_in_group("breakable"):
+		var body := node as Node3D
+		if body == null or not is_instance_valid(body) or body.is_queued_for_deletion():
 			continue
-		var local := to_anchor * erasable.global_position
+		var local := to_anchor * body.global_position
 		if PhotoMath.point_in_frustum(local, PhotoMath.PHOTO_FOV_DEG, PhotoMath.PHOTO_ASPECT, 0.0, depth):
-			erasable.queue_free()
+			Rewind.retire(body)
 
 	var content: Node3D = PhotoContentScript.new()
 	content.setup(def, false)
 	_level_root.add_child(content)
 	content.global_transform = anchor
+	Rewind.notice_spawn(content)
 
 	_clear_held()
 	return true
@@ -91,6 +104,7 @@ func drop() -> bool:
 	item.setup(held_id)
 	_level_root.add_child(item)
 	item.global_position = camera.global_position + flat_forward * 1.4 - Vector3(0, 0.4, 0)
+	Rewind.notice_spawn(item)
 	_clear_held()
 	return true
 
@@ -101,12 +115,19 @@ func held_title() -> String:
 	return PhotoDefs.get_def(held_id).get("title", held_id)
 
 
+## Puts the hand back where a rewind snapshot found it: a photo placed a
+## moment ago is in hand again, lowered.
+func restore_held(id: String, roll: int) -> void:
+	if held_id != id:
+		held_id = id
+		raised = false
+	_set_roll(roll)
+
+
 func _clear_held() -> void:
 	held_id = ""
+	raised = false
 	_set_roll(0)
-	if is_instance_valid(_ghost):
-		_ghost.queue_free()
-	_ghost = null
 
 
 func _set_roll(steps: int) -> void:
