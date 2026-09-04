@@ -30,6 +30,17 @@ namespace Viewpoint
 
         private static readonly Dictionary<string, Material> Cache = new Dictionary<string, Material>();
 
+        /// <summary>
+        /// Gradient textures, cached SEPARATELY from the materials and never
+        /// cleared. Two reasons, and the second is the one that bites: a live
+        /// material may still be sampling one, so destroying it on a cache clear
+        /// would turn a painted backdrop black; and without its own cache every
+        /// ClearCache followed by a Backdrop call allocated another 4 x 64
+        /// texture with no owner, which the unit suite does about a dozen times
+        /// a run.
+        /// </summary>
+        private static readonly Dictionary<string, Texture2D> Gradients = new Dictionary<string, Texture2D>();
+
         private static Shader _litShader;
         private static Shader _unlitShader;
 
@@ -40,7 +51,14 @@ namespace Viewpoint
         /// </summary>
         public static Material Solid(string key, float emissive = 0f)
         {
-            string cacheKey = "s:" + key + ":" + Round2(emissive);
+            // The key carries the emission EXACTLY, not rounded. Rounding it to
+            // two decimals put Solid(key, 0.001f) and Solid(key) on the same
+            // cache line while they take opposite branches below, so whichever
+            // was built first won and the other silently got the wrong
+            // material: a plain block that glows, or a glow that does not. No
+            // shipped value trips it, which is exactly why it would have
+            // survived until someone added one.
+            string cacheKey = "s:" + key + ":" + ExactKey(emissive);
             Material cached;
             if (Cache.TryGetValue(cacheKey, out cached) && cached != null)
             {
@@ -98,7 +116,7 @@ namespace Viewpoint
             Material material = new Material(UnlitShader());
             material.name = "Backdrop_" + top + "_" + bottom;
             material.SetColor(BaseColorId, Color.white);
-            material.SetTexture(BaseMapId, GradientTexture(Palette.Get(top), Palette.Get(bottom)));
+            material.SetTexture(BaseMapId, GradientTexture(top, bottom));
 
             Cache[cacheKey] = material;
             return material;
@@ -121,8 +139,18 @@ namespace Viewpoint
         /// bottom (v = 0) to top (v = 1). The Godot original filled row 0 with
         /// the TOP color because its images are y down.
         /// </summary>
-        private static Texture2D GradientTexture(Color top, Color bottom)
+        private static Texture2D GradientTexture(string topKey, string bottomKey)
         {
+            string gradientKey = topKey + ":" + bottomKey;
+            Texture2D existing;
+            if (Gradients.TryGetValue(gradientKey, out existing) && existing != null)
+            {
+                return existing;
+            }
+
+            Color top = Palette.Get(topKey);
+            Color bottom = Palette.Get(bottomKey);
+
             // linear: false, so the sRGB palette values are stored as authored
             // and the sampler converts them, exactly like a Color on a material.
             Texture2D texture = new Texture2D(GradientWidth, GradientHeight, TextureFormat.RGBA32, false, false);
@@ -143,6 +171,7 @@ namespace Viewpoint
             texture.SetPixels(pixels);
             // Keep it readable: the unit tests sample the ramp back out.
             texture.Apply(false, false);
+            Gradients[gradientKey] = texture;
             return texture;
         }
 
@@ -181,8 +210,18 @@ namespace Viewpoint
             return shader;
         }
 
-        // Invariant culture: a cache key must not change with the machine's
-        // decimal separator.
+        /// <summary>
+        /// A cache key for a float that distinguishes every distinct value.
+        /// "R" round-trips, so two floats compare equal if and only if their
+        /// keys do, which is the whole requirement. Invariant culture because a
+        /// cache key must not change with the machine's decimal separator.
+        /// </summary>
+        private static string ExactKey(float value)
+        {
+            return value.ToString("R", CultureInfo.InvariantCulture);
+        }
+
+        /// <summary>Readable two-decimal form, for material names only.</summary>
         private static string Round2(float value)
         {
             return value.ToString("F2", CultureInfo.InvariantCulture);

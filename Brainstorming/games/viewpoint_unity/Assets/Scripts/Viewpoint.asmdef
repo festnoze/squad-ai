@@ -3,8 +3,7 @@
     "rootNamespace": "Viewpoint",
     "references": [
         "Unity.InputSystem",
-        "Unity.TextMeshPro",
-        "Unity.Nuget.Newtonsoft-Json"
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

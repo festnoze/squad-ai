@@ -2,8 +2,7 @@
     "name": "Viewpoint.Editor",
     "rootNamespace": "Viewpoint.Editor",
     "references": [
-        "Viewpoint",
-        "Unity.Nuget.Newtonsoft-Json"
+        "Viewpoint"
     ],
     "includePlatforms": [
         "Editor"
