@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 
 namespace Viewpoint
@@ -33,12 +32,10 @@ namespace Viewpoint
         private const float CellStep = 0.24f;
         private const float LabelY = 3.2f;
         private const float LabelFontSize = 64f;
-        // Godot drove a Label3D at 0.006 world units per font pixel; TextMeshPro
-        // sizes its 3D mesh in world units, so the same ratio becomes a scale.
+        // Godot drove a Label3D at 0.006 world units per font pixel, and a
+        // TextMesh sizes its glyphs in font pixels too, so the same ratio
+        // carries over as a uniform scale on the label transform.
         private const float LabelPixelSize = 0.006f;
-        // Godot outline width 12 has no direct equivalent: TMP outlines are a
-        // fraction of the SDF spread. 0.2 matches the original by eye (PRD 12).
-        private const float LabelOutlineWidth = 0.2f;
         private const float TriggerRadius = 1.8f;
         private const float TriggerY = 1.2f;
 
@@ -50,7 +47,7 @@ namespace Viewpoint
         private Transform _ring;
         private Renderer _ringRenderer;
         private readonly List<Renderer> _cells = new List<Renderer>();
-        private TextMeshPro _label;
+        private TextMesh _label;
         private Transform _labelTransform;
         private Camera _billboardCamera;
         private float _spin;
@@ -229,31 +226,38 @@ namespace Viewpoint
 
             BuildPillar();
 
-            // TMP_Text drives a RectTransform. Building the object with one from
-            // the start avoids swapping its Transform out from under a cached
-            // reference, which is what AddComponent<RectTransform> would do.
-            GameObject labelGo = new GameObject("Label", typeof(RectTransform));
+            // A legacy TextMesh, which is the real analogue of the Godot
+            // Label3D this ports, and the only 3D text that needs no imported
+            // asset: it takes a Font and the font's own material.
+            //
+            // It replaces a TextMeshPro label that threw a NullReferenceException
+            // in a built player (TMP cannot start without its settings asset,
+            // see Fonts). That exception aborted the rest of this method, so the
+            // teleporter came up with NO INTERACTION TRIGGER and the level could
+            // not be finished. The trigger is built last, which is what made a
+            // text bug into an unplayable game.
+            GameObject labelGo = new GameObject("Label");
             _labelTransform = labelGo.transform;
             _labelTransform.SetParent(transform, false);
-            RectTransform labelRect = _labelTransform as RectTransform;
-            if (labelRect != null)
+
+            _label = labelGo.AddComponent<TextMesh>();
+            _label.fontSize = Mathf.RoundToInt(LabelFontSize);
+            _label.anchor = TextAnchor.MiddleCenter;
+            _label.alignment = TextAlignment.Center;
+            _label.color = Color.white;
+            Font font = Fonts.Default;
+            if (font != null)
             {
-                // The rect is measured in the same local units as the font size,
-                // BEFORE the 0.006 scale below: wide enough that the longest label
-                // ("<n> / <n> piles" at size 64) never wraps.
-                labelRect.sizeDelta = new Vector2(LabelFontSize * 12f, LabelFontSize * 2f);
+                _label.font = font;
+                // A TextMesh renders through its own MeshRenderer, and the font
+                // carries the material that knows how to draw its glyphs.
+                MeshRenderer labelRenderer = labelGo.GetComponent<MeshRenderer>();
+                if (labelRenderer != null)
+                {
+                    labelRenderer.sharedMaterial = font.material;
+                }
             }
-            _label = labelGo.AddComponent<TextMeshPro>();
-            _label.fontSize = LabelFontSize;
-            _label.alignment = TextAlignmentOptions.Center;
-            if (_label.font != null)
-            {
-                // Reading fontMaterial first forces TextMeshPro to clone the shared
-                // font material, so the outline never leaks onto every other label.
-                _ = _label.fontMaterial;
-                _label.outlineColor = new Color32(13, 15, 26, 255);
-                _label.outlineWidth = LabelOutlineWidth;
-            }
+
             _labelTransform.localPosition = new Vector3(0f, LabelY, 0f);
             _labelTransform.localScale = new Vector3(LabelPixelSize, LabelPixelSize, LabelPixelSize);
 

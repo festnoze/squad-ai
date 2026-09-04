@@ -1,5 +1,4 @@
 using System.Collections;
-using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -93,15 +92,15 @@ namespace Viewpoint
 
         Canvas _canvas;
         RectTransform _canvasRect;
-        TextMeshProUGUI _batteryLabel;
-        TextMeshProUGUI _filmLabel;
-        TextMeshProUGUI _promptLabel;
-        TextMeshProUGUI _toastLabel;
-        TextMeshProUGUI _rewindLabel;
-        TextMeshProUGUI _bannerTitle;
-        TextMeshProUGUI _bannerSubtitle;
-        TextMeshProUGUI _heldTitle;
-        TextMeshProUGUI _heldHint;
+        Text _batteryLabel;
+        Text _filmLabel;
+        Text _promptLabel;
+        Text _toastLabel;
+        Text _rewindLabel;
+        Text _bannerTitle;
+        Text _bannerSubtitle;
+        Text _heldTitle;
+        Text _heldHint;
 
         RawImage _photoView;
         RectTransform _photoViewRect;
@@ -445,11 +444,11 @@ namespace Viewpoint
         void BuildCounters(Transform root)
         {
             _batteryLabel = NewLabel("Batteries", root, BatterySizePx, Color.white,
-                TextAlignmentOptions.TopLeft, OutlineStrong);
+                TextAnchor.UpperLeft, OutlineStrong);
             AnchorTopLeft(_batteryLabel.rectTransform, BatteryOffset, new Vector2(900f, 34f));
 
             _filmLabel = NewLabel("Films", root, FilmSizePx, FilmColor,
-                TextAlignmentOptions.TopLeft, OutlineStrong);
+                TextAnchor.UpperLeft, OutlineStrong);
             AnchorTopLeft(_filmLabel.rectTransform, FilmOffset, new Vector2(900f, 30f));
             _filmLabel.gameObject.SetActive(false);
         }
@@ -506,7 +505,7 @@ namespace Viewpoint
         void BuildPrompt(Transform root)
         {
             _promptLabel = NewLabel("Prompt", root, PromptSizePx, Color.white,
-                TextAlignmentOptions.Center, OutlineStrong);
+                TextAnchor.MiddleCenter, OutlineStrong);
             RectTransform rect = _promptLabel.rectTransform;
             rect.anchorMin = new Vector2(0.5f, 0f);
             rect.anchorMax = new Vector2(0.5f, 0f);
@@ -553,9 +552,9 @@ namespace Viewpoint
             _heldCard.raycastTarget = false;
 
             _heldTitle = NewLabel("HeldTitle", panel, HeldTitleSizePx, Color.white,
-                TextAlignmentOptions.Right, OutlineSoft);
+                TextAnchor.MiddleRight, OutlineSoft);
             _heldHint = NewLabel("HeldHint", panel, HeldHintSizePx, HeldHintColor,
-                TextAlignmentOptions.Right, OutlineSoft);
+                TextAnchor.MiddleRight, OutlineSoft);
             _heldHint.text = "Clic gauche : poser   Clic droit : lever   Molette : pivoter   F : reposer";
 
             panel.gameObject.SetActive(false);
@@ -580,15 +579,15 @@ namespace Viewpoint
             layout.childForceExpandHeight = false;
 
             _bannerTitle = NewLabel("BannerTitle", banner, BannerTitleSizePx, Color.white,
-                TextAlignmentOptions.Center, OutlineSoft);
+                TextAnchor.MiddleCenter, OutlineSoft);
             _bannerSubtitle = NewLabel("BannerSubtitle", banner, BannerSubtitleSizePx,
-                BannerSubtitleColor, TextAlignmentOptions.Center, OutlineSoft);
+                BannerSubtitleColor, TextAnchor.MiddleCenter, OutlineSoft);
         }
 
         void BuildToast(Transform root)
         {
             _toastLabel = NewLabel("Toast", root, ToastSizePx, ToastColor,
-                TextAlignmentOptions.Center, OutlineStrong);
+                TextAnchor.MiddleCenter, OutlineStrong);
             RectTransform rect = _toastLabel.rectTransform;
             rect.anchorMin = new Vector2(0.5f, 0f);
             rect.anchorMax = new Vector2(0.5f, 0f);
@@ -606,7 +605,7 @@ namespace Viewpoint
             tint.gameObject.SetActive(false);
 
             _rewindLabel = NewLabel("RewindLabel", root, RewindSizePx, RewindColor,
-                TextAlignmentOptions.Center, OutlineStrong);
+                TextAnchor.MiddleCenter, OutlineStrong);
             RectTransform rect = _rewindLabel.rectTransform;
             rect.anchorMin = new Vector2(0.5f, 1f);
             rect.anchorMax = new Vector2(0.5f, 1f);
@@ -670,25 +669,17 @@ namespace Viewpoint
         }
 
         /// <summary>
-        /// A TextMeshPro line on the default font asset: no font file ships with
-        /// the project, and TMP_Text resolves TMP_Settings' default when it
-        /// awakes with none.
+        /// A label on the engine's builtin font. Everything about the font and
+        /// the outline lives in Fonts, which also records why this is uGUI Text
+        /// and not TextMeshPro: TMP cannot start in a player without an asset
+        /// this project deliberately does not ship.
         /// </summary>
-        static TextMeshProUGUI NewLabel(string name, Transform parent, float sizePx,
-            Color color, TextAlignmentOptions alignment, Color outlineColor)
+        static Text NewLabel(string name, Transform parent, float sizePx,
+            Color color, TextAnchor alignment, Color outlineColor)
         {
             RectTransform rect = NewRect(name, parent);
-            var label = rect.gameObject.AddComponent<TextMeshProUGUI>();
-            label.fontSize = sizePx;
-            label.color = color;
-            label.alignment = alignment;
-            label.raycastTarget = false;
-            label.richText = false;
-            label.text = string.Empty;
-            // Font first, outline second, and both through Fonts: the outline
-            // makes TMP instance the font's material, so on a label with no font
-            // asset it throws. No font at all is a legitimate headless case.
-            Fonts.Apply(label, outlineColor, OutlineWidth);
+            var label = rect.gameObject.AddComponent<Text>();
+            Fonts.Apply(label, Mathf.RoundToInt(sizePx), color, alignment, true, outlineColor);
             return label;
         }
     }

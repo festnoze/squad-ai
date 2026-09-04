@@ -20,7 +20,7 @@ namespace Viewpoint
     {
         /// <summary>Attached when "--smoke" or "--shot" is on the command line.</summary>
         const string SmokeProbeType = "Viewpoint.Tests.SmokeProbe";
-        const string ShotProbeType = "Viewpoint.Tests.ShotProbe";
+        const string ShotProbeType = "Viewpoint.ShotProbe";
 
         public Transform LevelRoot { get; private set; }
         public PlayerController Player { get; private set; }
@@ -36,20 +36,38 @@ namespace Viewpoint
             get { return GameState.Instance; }
         }
 
+        /// <summary>
+        /// Builds the game. Every step is wrapped, and that is not defensive
+        /// habit: an exception thrown inside one AddComponent aborts the REST
+        /// of Awake, so a single broken subsystem takes the whole game down
+        /// with it and leaves a window showing nothing but a default skybox.
+        /// That is precisely what happened when TextMeshPro threw while
+        /// building the HUD: the player, the level root and the rewind were
+        /// never created, and the symptom looked like "the levels are empty"
+        /// rather than "the text is broken". A subsystem that fails now says so
+        /// and the rest still comes up.
+        /// </summary>
         void Awake()
         {
             Application.targetFrameRate = -1;
 
-            SceneEnvironment.Apply(transform);
+            Step("environment", () => SceneEnvironment.Apply(transform));
 
-            var levelRoot = new GameObject("LevelRoot");
-            levelRoot.transform.SetParent(transform, false);
-            LevelRoot = levelRoot.transform;
+            Step("level root", () =>
+            {
+                var levelRoot = new GameObject("LevelRoot");
+                levelRoot.transform.SetParent(transform, false);
+                LevelRoot = levelRoot.transform;
+            });
 
             // One EventSystem for the whole game. Two log an error every frame,
             // which is why neither the HUD nor the Menu makes its own.
-            if (EventSystem.current == null)
+            Step("event system", () =>
             {
+                if (EventSystem.current != null)
+                {
+                    return;
+                }
                 var events = new GameObject("EventSystem");
                 events.transform.SetParent(transform, false);
                 events.AddComponent<EventSystem>();
@@ -58,27 +76,54 @@ namespace Viewpoint
                 // and the legacy module throws from UnityEngine.Input the first
                 // time the EventSystem ticks.
                 events.AddComponent<InputSystemUIInputModule>();
+            });
+
+            Step("player", () =>
+            {
+                var playerObject = new GameObject("Player");
+                playerObject.transform.SetParent(transform, false);
+                Player = playerObject.AddComponent<PlayerController>();
+            });
+
+            Step("hud", () =>
+            {
+                var hudObject = new GameObject("Hud");
+                hudObject.transform.SetParent(transform, false);
+                Hud = hudObject.AddComponent<Hud>();
+            });
+
+            Step("menu", () =>
+            {
+                var menuObject = new GameObject("Menu");
+                menuObject.transform.SetParent(transform, false);
+                Menu = menuObject.AddComponent<Menu>();
+            });
+
+            Step("photo studio", () =>
+            {
+                var snapsObject = new GameObject("PhotoSnaps");
+                snapsObject.transform.SetParent(transform, false);
+                snapsObject.AddComponent<PhotoSnaps>();
+            });
+
+            Step("rewind", () =>
+            {
+                var rewindObject = new GameObject("Rewind");
+                rewindObject.transform.SetParent(transform, false);
+                Rewind = rewindObject.AddComponent<Rewind>();
+            });
+        }
+
+        static void Step(string what, Action build)
+        {
+            try
+            {
+                build();
             }
-
-            var playerObject = new GameObject("Player");
-            playerObject.transform.SetParent(transform, false);
-            Player = playerObject.AddComponent<PlayerController>();
-
-            var hudObject = new GameObject("Hud");
-            hudObject.transform.SetParent(transform, false);
-            Hud = hudObject.AddComponent<Hud>();
-
-            var menuObject = new GameObject("Menu");
-            menuObject.transform.SetParent(transform, false);
-            Menu = menuObject.AddComponent<Menu>();
-
-            var snapsObject = new GameObject("PhotoSnaps");
-            snapsObject.transform.SetParent(transform, false);
-            snapsObject.AddComponent<PhotoSnaps>();
-
-            var rewindObject = new GameObject("Rewind");
-            rewindObject.transform.SetParent(transform, false);
-            Rewind = rewindObject.AddComponent<Rewind>();
+            catch (Exception e)
+            {
+                Debug.LogError("[Main] Could not build the " + what + ": " + e);
+            }
         }
 
         void Start()

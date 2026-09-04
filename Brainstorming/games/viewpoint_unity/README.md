@@ -63,11 +63,19 @@ niveau atteint reste debloque d'une session a l'autre.
 ./verify.sh compile      # les scripts compilent
 ./verify.sh edit         # suites unitaires (EditMode)
 ./verify.sh play         # sonde d'integration (PlayMode)
+./verify.sh player       # construit un player, le lance, lit ce qu'il rapporte
 ./verify.sh audit        # audit de level design
 ```
 
-Etat au 2026-09-04 : **101 tests EditMode, 29 tests PlayMode, 0 defaut de
-level design sur 25 niveaux.**
+Etat au 2026-09-04 : **101 tests EditMode, 29 tests PlayMode, player vert,
+0 defaut de level design sur 25 niveaux.**
+
+> **L'etape `player` n'est pas un supplement, c'est la lecon de ce portage.**
+> Les 130 tests ci-dessous tournent tous DANS L'EDITEUR, ou `Shader.Find`
+> resout tout et ou TextMeshPro tolere l'absence de son asset de reglages. Un
+> player ne pardonne ni l'un ni l'autre : une version qui passait les 130 tests
+> n'affichait qu'une ligne d'horizon (details plus bas). Un test vert dans
+> l'editeur ne dit rien de ce que le joueur voit.
 
 - Les **suites EditMode** couvrent les modules purs : geometrie du frustum,
   catalogue de photos, capture, decoupage (`Decompose`), progression,
@@ -109,10 +117,28 @@ Les pieges qui ont demande du travail, pour qui reprendra ce code :
 - **Rien n'est detruit pendant un niveau.** `Rewind.Retire` sort le noeud vers
   un cimetiere inactif : il quitte tous les groupes et la physique comme une
   liberation, mais reste entier, donc defaire c'est le remettre.
-- **Aucune police n'est livree**, donc aucun texte ne s'affichait. TextMeshPro
-  ne trouve une police que si quelqu'un a importe TMP Essential Resources, ce
-  qui depose un atlas binaire dans `Assets`. `Fonts.cs` en genere une au
-  demarrage a partir d'une police systeme, en atlas dynamique.
+- **Les shaders crees seulement par `Shader.Find` sont SUPPRIMES du build.**
+  Unity ne garde que les shaders qu'un ASSET reference, et ce jeu fabrique tous
+  ses materiaux au demarrage : dans le player, `URP/Lit`, `URP/Unlit` et
+  `Viewpoint/GradientSky` rendaient tous `null`. Chaque bloc recevait un
+  materiau sans shader (invisible) et le ciel retombait sur le skybox par
+  defaut, dont la seule ligne d'horizon etait tout ce que le joueur voyait. Les
+  trois shaders sont maintenant dans **Always Included Shaders**
+  (`ProjectSettings/GraphicsSettings.asset`).
+- **TextMeshPro ne demarre pas dans un player sans son asset de reglages.**
+  `TMP_Settings` n'existe que si quelqu'un a importe TMP Essential Resources,
+  ce qui depose un atlas binaire dans `Assets`. Sans lui,
+  `TextMeshProUGUI.Awake` leve une `NullReferenceException` des l'ajout du
+  composant : le HUD mourait, `Main.Awake` mourait avec lui, et donc ni joueur,
+  ni racine de niveau, ni rembobinage. Le symptome se lisait "les niveaux sont
+  vides". L'interface est donc en **uGUI `Text`** sur la police builtin du
+  moteur (`Fonts.cs`), et le label du teleporteur en `TextMesh` : zero asset,
+  et ca marche dans un build. Generer un asset TMP a l'execution depuis une
+  police systeme ne marche pas non plus (`Font.CreateDynamicFontFromOSFont`
+  refuse dans un player).
+- **Une exception dans `Awake` annule le reste de `Awake`.** C'est ce qui a
+  transforme un bug de texte en jeu vide : chaque etape de `Main.Awake` est
+  desormais isolee, donc un sous-systeme qui casse le dit et le reste demarre.
 - **Le carre du viseur et celui de l'image levee sont le meme**, derive de
   `PhotoMath.PhotoFovDeg` et `PlayerController.CameraFov`. Ecrire le 0,6077 qui
   en resulte laisserait les deux deriver l'un de l'autre, et c'est toute la

@@ -8,6 +8,7 @@
 #   ./verify.sh edit       EditMode suites
 #   ./verify.sh play       PlayMode smoke probe
 #   ./verify.sh audit      level design audit
+#   ./verify.sh player     build a player, run it, and read what it reports
 #
 # Two rules this script exists to enforce, both learned on this toolchain:
 #   - read the JUnit report, never the exit code alone: a run with zero tests
@@ -94,6 +95,21 @@ fi
 if [ "$WHAT" = all ] || [ "$WHAT" = play ]; then
   step "Sonde d'integration (PlayMode)"
   run_tests PlayMode
+fi
+
+# THE STEP THAT WAS MISSING, and whose absence cost a working build: every
+# suite above runs inside the EDITOR, where Shader.Find resolves everything and
+# TextMeshPro tolerates a missing settings asset. A player has neither, and a
+# game that passed all 130 tests showed nothing but a horizon line. Delegated to
+# PowerShell because that is where it is actually exercised on this machine.
+if [ "$WHAT" = all ] || [ "$WHAT" = player ]; then
+  step "Le jeu dans un player construit"
+  if powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$PROJECT/verify-player.ps1"; then
+    echo "  player vert"
+  else
+    echo "  ECHEC player"
+    FAILED=1
+  fi
 fi
 
 if [ "$WHAT" = all ] || [ "$WHAT" = audit ]; then

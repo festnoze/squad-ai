@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using TMPro;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -149,14 +148,14 @@ namespace Viewpoint
         public event Action<int> LevelSelected;
 
         GameObject _root;
-        TextMeshProUGUI _title;
-        TextMeshProUGUI _subtitle;
-        TextMeshProUGUI _hint;
-        TextMeshProUGUI _levelsLabel;
-        TextMeshProUGUI _tooltip;
+        Text _title;
+        Text _subtitle;
+        Text _hint;
+        Text _levelsLabel;
+        Text _tooltip;
 
         readonly List<Button> _levelButtons = new List<Button>();
-        readonly List<TextMeshProUGUI> _levelLabels = new List<TextMeshProUGUI>();
+        readonly List<Text> _levelLabels = new List<Text>();
 
         /// <summary>Text the hover line shows for each button, refreshed with the grid.</summary>
         readonly List<string> _levelTooltips = new List<string>();
@@ -437,11 +436,17 @@ namespace Viewpoint
                 exit.callback.AddListener(delegate { ClearTooltip(); });
                 hover.triggers.Add(exit);
 
-                TextMeshProUGUI label = NewLabel("Label", cell, ButtonTextSizePx, ButtonLabelUnlocked);
+                Text label = NewLabel("Label", cell, ButtonTextSizePx, ButtonLabelUnlocked);
                 Stretch(label.rectTransform);
-                // A name longer than the 180 px cell wraps to a second line,
-                // which 36 px holds at 14 px; the margin keeps it off the edges.
-                label.margin = new Vector4(6f, 2f, 6f, 2f);
+                // A name longer than the 180 px cell has to wrap to a second
+                // line, which 36 px holds at 14 px. uGUI has no margin, so the
+                // padding is an inset on the rect, and wrapping has to be asked
+                // for: Fonts.Apply leaves labels overflowing, which is right
+                // for a one line prompt and wrong for a level name.
+                label.rectTransform.offsetMin = new Vector2(6f, 2f);
+                label.rectTransform.offsetMax = new Vector2(-6f, -2f);
+                label.horizontalOverflow = HorizontalWrapMode.Wrap;
+                label.verticalOverflow = VerticalWrapMode.Truncate;
 
                 _levelButtons.Add(button);
                 _levelLabels.Add(label);
@@ -466,23 +471,17 @@ namespace Viewpoint
         }
 
         /// <summary>
-        /// A centred TextMeshPro line on its default font asset (no imported
-        /// font ships with the project: TMP_Text picks up TMP_Settings' default
-        /// when it awakes with none).
+        /// A centred label on the engine's builtin font. The menu sits on its
+        /// own dim panel, so it needs no outline to stay readable. See Fonts
+        /// for why this is uGUI Text and not TextMeshPro.
         /// </summary>
-        static TextMeshProUGUI NewLabel(string name, Transform parent, float sizePx, Color color)
+        static Text NewLabel(string name, Transform parent, float sizePx, Color color)
         {
             RectTransform rect = NewRect(name, parent);
-            TextMeshProUGUI label = rect.gameObject.AddComponent<TextMeshProUGUI>();
-            label.fontSize = sizePx;
-            label.color = color;
-            label.alignment = TextAlignmentOptions.Center;
-            // Labels never eat a click: the button under them must get it.
-            label.raycastTarget = false;
-            label.text = string.Empty;
-            // No font asset ships with the project (no binary assets), so one is
-            // generated at run time. Without this the menu draws nothing at all.
-            Fonts.Apply(label, Color.clear, 0f);
+            Text label = rect.gameObject.AddComponent<Text>();
+            // Labels never eat a click: the button under them must get it, and
+            // Fonts.Apply clears raycastTarget for exactly that reason.
+            Fonts.Apply(label, Mathf.RoundToInt(sizePx), color, TextAnchor.MiddleCenter, false, Color.clear);
             return label;
         }
 
