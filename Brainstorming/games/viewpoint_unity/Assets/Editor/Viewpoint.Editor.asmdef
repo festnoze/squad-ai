@@ -1,0 +1,19 @@
+{
+    "name": "Viewpoint.Editor",
+    "rootNamespace": "Viewpoint.Editor",
+    "references": [
+        "Viewpoint",
+        "Unity.Nuget.Newtonsoft-Json"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -24,7 +24,13 @@ namespace Viewpoint
         /// Pitch clamp of the original, in radians (PRD section 8).
         public const float MaxPitch = 1.45f;
 
-        private const float CameraFov = 75f;
+        /// <summary>
+        /// Vertical fov of the player camera. Public because the HUD derives the
+        /// raised-picture and viewfinder square from it together with
+        /// PhotoMath.PhotoFovDeg (PRD 12.2); a second literal 75 in the UI is
+        /// exactly the drift that would break the illusion silently.
+        /// </summary>
+        public const float CameraFov = 75f;
         private const float CameraNear = 0.05f;
         private const float CameraFar = 400f;
 
