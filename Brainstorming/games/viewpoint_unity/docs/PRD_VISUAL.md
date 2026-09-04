@@ -1,6 +1,10 @@
 # PRD - VIEWPOINT Visual Upgrade
 
-Product requirements document. Version 1.0, 2026-09-04.
+Product requirements document. Version 1.1, 2026-09-04.
+
+**Status: approved, no open decision.** The asset policy of section 3.2 was
+decided by the owner on 2026-09-04: one UI font file is allowed as the single
+documented exception; everything else stays procedural. Every tier can start.
 
 This document specifies how to take the Unity port of VIEWPOINT from a
 faithful but flat-shaded prototype to a game that looks professionally made,
@@ -31,7 +35,7 @@ an honest look at those screenshots. Section 1 is that look.
 
 Priorities: **P0** transforms the look for almost no effort, do it first.
 **P1** is what makes the game read as professional. **P2** is polish that a
-player notices without naming. **P3** is optional and gated on a decision.
+player notices without naming. **P3** is optional, done last if at all.
 Effort: **S** under half a day, **M** one to two days, **L** three days or
 more, for one engineer who knows URP.
 
@@ -182,33 +186,34 @@ Rules for every material and post-processing change:
   permanent (mid grey), pale (light), steel (darker), and the three must be
   tellable from lavender by the shimmer. Section 6.3 makes this a check.
 
-### 3.2 Asset policy: a decision this document needs
+### 3.2 Asset policy (decided 2026-09-04)
 
 The original ships **no binary asset**: every mesh, texture, picture and now
 font is generated. The Unity port kept that promise, and it has real value
 here: the whole game is reviewable as text, there is no import pipeline, and
 the data files stay the only source of truth.
 
-Most of what section 4 asks for is achievable without breaking it, because
-Shader Graph can generate grain, wear, stratification and paper in the shader,
-and every mesh in the game is simple enough to generate with bevels and
-displacement in code. That is the **recommended path**, and the catalog is
-written for it.
+**The decision: procedural everywhere, with exactly one exception, a UI
+font.**
 
-Two places where an asset would pay for itself:
+- **Allowed: one font file.** An OFL-licensed geometric sans (Inter is the
+  default choice; Manrope or Outfit are acceptable), regular and semibold
+  weights, as TTF files of 100 to 300 KB each under `Assets/Fonts/`, with the
+  OFL licence text beside them. The engine's builtin font is legible and looks
+  like a placeholder; this one file changes how the entire interface reads,
+  which is why it is worth the exception. `Fonts.Default` loads it and falls
+  back to the builtin font if the file is missing, so a checkout without it
+  still runs. The README names it as the one binary asset in the project and
+  says why.
+- **Not allowed: everything else.** No surface textures (CC0 or otherwise),
+  no imported meshes, no sprites, no icon files, no audio files. Grain, wear,
+  stratification, paper, brushed metal and clouds are authored in Shader Graph
+  from noise; every mesh is generated with bevels and displacement in code;
+  every HUD glyph and panel is drawn in code. Where an item below would be
+  quicker with a texture, the procedural route is the route, and the item's
+  acceptance criterion is what it must reach.
 
-1. **A UI font.** The engine's builtin font is legible and looks like a
-   placeholder. One OFL-licensed geometric sans (Inter, Manrope, Outfit; a
-   TTF of 100 to 300 KB) changes how the entire interface reads. This is the
-   single highest-value asset in the whole document. **Recommendation:
-   allow it**, as the one exception, documented as such.
-2. **Surface textures** (a CC0 concrete, a wood, a brushed metal, from
-   ambientCG). Faster to a rich look than authoring noise in Shader Graph, and
-   a different look: more literal, less "made". **Recommendation: do not,
-   unless the procedural result of Tier 2 disappoints.** Kept as Tier 6.
-
-Decision required from the owner before Tier 5: font yes or no. Everything
-before Tier 5 is procedural and needs no decision.
+This closes the question. No tier waits on a decision.
 
 ### 3.3 Performance budget
 
@@ -761,14 +766,15 @@ Technique: constants in `PhotoSnaps`; the RenderTexture gets `antiAliasing =
 ### 4.11 HUD
 
 **V-HUD-01 Typeface.** Engine builtin font. Target: a geometric sans with
-real weights. Technique: **gated on the section 3.2 decision.** If allowed:
-Inter (OFL), regular and semibold, as a TTF in `Assets/Fonts/`, loaded by
-`Fonts.Default` in place of the builtin, with `Outline` replaced by a
-`Shadow` component (1 px, 60 percent) for a cleaner look. If not allowed: keep
-the builtin and compensate with size, spacing and panels (the rest of 4.11
-assumes either). **P1 / S.** Acceptance: every string of gameplay PRD 12
-renders at the sizes it specifies; the French plural rules and accents-free
-text are unchanged.
+real weights. Technique: Inter (OFL), regular and semibold, as TTF files in
+`Assets/Fonts/` with the licence beside them (the one asset allowed by
+section 3.2), loaded by `Fonts.Default` in place of the builtin with a
+fallback to the builtin when the file is absent; the `Outline` component is
+replaced by a `Shadow` (1 px, 60 percent) for a cleaner look, and the
+teleporter's `TextMesh` uses the same font. **P1 / S.** Acceptance: every
+string of gameplay PRD 12 renders at the sizes it specifies; the French
+plural rules and accents-free text are unchanged; a checkout with the font
+removed still boots and draws text.
 
 **V-HUD-02 Counters as a panel.** Bare text top left. Target: a single
 rounded panel (generated 9-slice from a rounded-rect texture drawn in code)
@@ -872,8 +878,8 @@ one is reviewed on screen by a person.
 | **2. Materials** | the Surface shader graph and its styles | V-MAT-01..07, V-GEO-01 | 4 days | Every surface reads as a material; every edge catches light; lavender breathes. This is where "professional" happens. |
 | **3. Geometry and props** | generated meshes | V-GEO-02..05, V-PROP-01, 02, 04, 05, 06, V-MAT-08, V-SNAP-03 | 5 days | Islands become terrain, props become objects, markers become paint. |
 | **4. Feedback** | VFX and animation | V-VFX-01..07, V-ANIM-01, 03, 04, V-POST-04, 05, 06, V-HUD-06 | 5 days | The game's moments become events. Placement, carve, break, pickup, charge, capture, rewind and fall each look like something. |
-| **5. Interface** | HUD and menus; needs the 3.2 decision first | V-HUD-01..05, 07, V-MENU-01..04, V-PROP-03 | 4 days | The interface looks designed; the title screen sells the game; levels have faces. |
-| **6. Optional** | gated | V-DRESS-01..04, V-VFX-08, V-ANIM-02, V-SKY-05, CC0 textures if Tier 2 disappoints | as wanted | Life and richness at the margins. |
+| **5. Interface** | HUD and menus, with the font of section 3.2 | V-HUD-01..05, 07, V-MENU-01..04, V-PROP-03 | 4 days | The interface looks designed; the title screen sells the game; levels have faces. |
+| **6. Optional** | after a person has reviewed tiers 0 to 5 on screen | V-DRESS-01..04, V-VFX-08, V-ANIM-02, V-SKY-05 | as wanted | Life and richness at the margins. All procedural: section 3.2 rules out textures here too. |
 
 Total for tiers 0 to 5: about **three weeks** for one engineer comfortable
 with URP and Shader Graph, with review time. Tier 0 alone, one day, should be
@@ -949,7 +955,8 @@ picture still IS the world after every lighting and material change.
 | Shader Graph output is stripped from a build like the first shaders were | Every new shader goes into Always Included Shaders in the same change that adds it; `verify-player.ps1` asserts each by name |
 | Performance on the Mobile tier | Each item states its Mobile degradation; the perf capture runs on both RP assets |
 | The look becomes busy | Tiers are reviewed on frames by a person before the next starts; Tier 6 is gated on that review |
-| A font is added and the "no binary asset" story weakens | Section 3.2 names it as the one documented exception, with the licence file beside it |
+| The font weakens the "no binary asset" story | Section 3.2 names it as the one documented exception, with the licence beside it and a builtin fallback so the game runs without it; the README says the same. Nothing else may join it |
+| A procedural material fails to reach its acceptance criterion and a texture looks like the easy way out | It is not on the table (3.2). Raise the noise octaves, revisit the amplitude within the 3.1 bound, or accept a plainer surface; the look was chosen to be "a well-made model of the thing", which a plainer surface still is |
 
 ---
 
