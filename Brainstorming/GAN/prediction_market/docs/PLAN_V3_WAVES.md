@@ -18,6 +18,11 @@ ruff and mypy strict on its own files).
 
 ## Part 3 : the sequence after the review of 2026-09-08 (supersedes the wave order below)
 
+> Amended by **part 4** at the end of this file (decisions D-S1 to D-S10 of
+> `docs/REVIEW_2026-09-09_SCALE_TAGS.md`: scale stated in cohorts, the window ceiling, the showcase
+> quarantine, the tag taxonomy). Part 4 adds package DS2 and widens DS1, U1, U2, R2d, S2 and the gates;
+> it does not change the order fixed below.
+
 `docs/REVIEW_2026-09-08.md` records the decisions D-R1 to D-R14. They change the **order** of the
 remaining work (measure inefficiencies before building agents), add one data package, and extend
 amendment C1c. Package texts below stay valid; this section says what runs when.
@@ -568,3 +573,115 @@ G4) because the robustness gap and the claims are defined on its objects; waves 
 - Nothing in `src/pmx/analysis/` writes to a journal or reads a sealed test fold.
 - `src/pmx/engine/liquidity.py` is the only place a fill price is computed, and every implementation
   passes the envelope check function it exports.
+
+---
+
+## Part 4 : scale, recency and the tag taxonomy (amends part 3, decisions D-S1 to D-S14)
+
+`docs/REVIEW_2026-09-09_SCALE_TAGS.md` records the decisions D-S1 to D-S10 and the three new acceptance
+criteria AC-32, AC-33 and AC-34. They do not change the **order** part 3 fixed (measure before agents);
+they add one package, widen four, and give amendment C1c more normative text to write. Lot 4c, already
+running when this was written, is unaffected.
+
+The measurement that drives this part: the interface shows twelve markets because it reads the v1 demo
+pack, the sealed research dataset holds 287, `tags` holds 201 distinct values over those 287 (the most
+frequent being Kalshi series tickers and provider defaults, with 58 markets whose tag merely repeats
+their category), and only **2 of 31** cells of `category x horizon` reach thirty markets. Comparative
+analysis needs same-shape questions grouped in usable numbers, so the build target moves from a market
+count to a **cohort** count and the market count follows.
+
+A prototype tagger was then run over those 287 markets before writing any normative text, and its numbers
+corrected the targets (section G of the review, decisions D-S11 to D-S14): a deterministic tagger reaches
+80 percent subject and 88 percent structure coverage on Kalshi but only 64 and 49 on Manifold, **no cohort
+reaches thirty markets today and only six reach ten**, all on Kalshi and **all six confined to a single
+fold**, and 40 usable Kalshi cohorts imply on the order of **7 000 markets** rather than 2 000. So: the
+cohort target is 40 on Kalshi and 8 on Manifold, whose role is restated as breadth and tape depth; the
+market floor follows the cohort target with a fallback order decided in advance (widen the window toward
+the 730-day ceiling, then relax `min_trades` with the count stated per filter, and only last lower the
+cohort target); **DS1's fold fix must land before DS2 measures any cohort**, because a cohort inside one
+fold carries neither a paired bound nor a replication; the coverage threshold is per venue at 90 percent;
+and the shipped vocabulary starts from the measured rules, including a `platform-meta` subject that names
+Manifold's self-referential markets and keeps them out of forecast cohorts.
+
+### Lot 5a : amendment C1c also writes the taxonomy and the quarantine
+
+On top of what part 3 already assigns to C1c (section 18 for sensors, rules, minute grids and workflow
+genomes, plus the review decisions D-R1 to D-R14), the amendment writes, as normative text amended in
+place with a ruling each:
+
+- **5.6, the window**: `window_days` explicit, 365 by default, refused above 730, with the two reasons
+  stated in the text (a resolution older than a model's knowledge cutoff is recall, not forecast; a
+  regime three years old is not the regime being traded). The manifest records `window_days` and the true
+  resolution span (D-S3).
+- **5.6, 7.1 and 12.7, the quarantine**: `purpose: "research" | "showcase"` on the dataset, replacing the
+  ad hoc `Dataset.is_demo_pack`. A showcase dataset seals and replays like any other, is exempt from the
+  window rule, and is refused with a named error by the optimizer, the rule tester and the claims ledger.
+  No silent skip (D-S4).
+- **7.2 and a new 7.14, the taxonomy**: `tags` restricted to a shipped controlled vocabulary and the raw
+  provider strings moved to a new `provider_labels` field; the three facets `subject` (one or more),
+  `structure` (exactly one) and `horizon` (exactly one, derived from the market's life); the deterministic
+  tagger with its provider mapping, its keyword rules and its `other` counter; the coverage thresholds and
+  the `taxonomy: "weak"` label (D-S6, D-S8, D-S9).
+- **12.3, 12.6, 12.7 and 18, the cohort**: `Cohort` as a first-class object with its per-fold counts and
+  its usable size of `n_train >= 30`; a rule's `scope` gains `cohorts`; leaderboards and claims gain
+  per-cohort rows with their own intervals and their own candidate count; a cohort claim below the usable
+  size is refused (D-S7).
+- **7.4 and 12.7, the target**: the build target stated in cohorts (at least 40 usable per venue), the
+  2 000 markets per venue of decision D-R7 restated as a floor, and **AC-11 of
+  `docs/PRD_V3_TRADING_OPTIMIZER.md` corrected in place** so it no longer asks for 1 000 and says nothing
+  about cohorts (D-S1).
+- The `market_listed` journal event and `market.v2.json` widened for `provider_labels` and the facets.
+
+The critic's lens gains: can a tag leak? (it cannot, a tag is known before the first bar, but the
+amendment must say so); can a showcase market reach a fitness value through any path, including the hive,
+the rule ledger or a cross-asset sensor?; does a cohort ever cross a fold, which decisions D-R1 and D-R2
+forbid?
+
+### Lot 5b : one new package, four widened
+
+**DS2 taxonomy, cohorts and the showcase pack** (new, Opus). **Starts after DS1's rebuild** (D-S13: a
+cohort measured on the inverted folds is meaningless). Owns
+`src/pmx/data/taxonomy.py`, `src/pmx/cohorts.py`, `src/pmx/lexicons/tags.v1.json`,
+`src/pmx/lexicons/kalshi_series_facets.v1.json`, `src/pmx/data/showcase.py`, and their tests.
+Done when: the vocabulary is shipped and the builder refuses a tag outside it; the tagger is
+deterministic and proved byte-identical across two runs; every market of a rebuild carries its three
+facets or lands in a counted `other`; `Cohort` is listed into the manifest and the dataset with per-fold
+counts; a cohort never crosses a fold and the loader refuses one that does; the manifest reports per-facet
+coverage, the cohort size distribution, the usable-cohort count and the `taxonomy` label; the taxonomy
+audit file of 50 random taggings is written; the showcase pack is built with `purpose: "showcase"`,
+sealed, holding a few dozen landmark markets with the same depth of bars, trades and news as a research
+market, and documenting what could not be sourced; the optimizer, the rule tester and the claims ledger
+each refuse it with a named error under test.
+
+**DS1** additionally: `window_days` with its ceiling and its manifest fields; `purpose` on every build;
+the cohort floor as a build outcome, so a build that reaches the market floor and not the cohort floor
+reports failure; and the rebuilds sized by the cohort target rather than by a market cap.
+
+**U1 and U2** additionally: the API serves the sealed research dataset by default and never the demo pack;
+the market index is server-side paged and filtered on category, each facet, provider, fold, hardness tag
+and outcome, sortable on resolution date, life, volume and final price; a dataset selector labels a
+showcase dataset as such; the cohort view exists (D-S2, D-S10).
+
+**R2d comparative** additionally: the detector runs **per cohort** rather than per category, and reports
+per-cohort intervals and nulls with the cohort size beside every number.
+
+**S2 rules** additionally: `scope` accepts a cohort, and the pre-registered hypothesis families of
+decision D-R8 may be keyed on a cohort, whose candidate count is journaled like any other family.
+
+**Gate G3** additionally: AC-32, AC-33 and AC-34; the taxonomy audit of 50 taggings alongside the linker
+audit of decision D-R4; and the cohort table recorded in `docs/BUILD_STATE.md` with the usable count per
+venue, so that the next lot's agent roster is chosen against real cohorts.
+
+### Lot 6 : agents and claims become cohort-aware
+
+The per-category `calibrator` family becomes **per cohort**, which is the point of the taxonomy: the
+discovery that a class of question is systematically mispriced is a cohort-level statement. O4's claims
+gain per-cohort rows with their own deflation count and refuse a cohort below the usable size. O1 and O2
+refuse a `purpose: "showcase"` dataset. Everything else in lot 6 stands as part 3 states it.
+
+### Lot 7 : surfaces
+
+**U3** gains per-cohort leaderboard rows and per-cohort calibration, each carrying its interval and its
+cohort size, and honours the `taxonomy: "weak"` label the way it honours `news_links: "weak"`. **U5**
+gains a tour chapter on the cohort view. **U4**'s README states the window rule, the showcase quarantine
+and what a cohort is.
