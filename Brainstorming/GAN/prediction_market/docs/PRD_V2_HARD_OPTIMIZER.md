@@ -544,6 +544,40 @@ agents and a result the product treats as first-class.
 - **Live shadow book** (section 8): open markets, today's forecasts sealed with their hash, pending
   resolutions, realised score so far.
 
+### 7.1b Guided tour and contextual help (first launch)
+
+The interface is dense (market replay, portfolio, leaderboards with intervals, calibration, evolution
+grid, hive, claims, dataset, opportunities, rule ledger, live book). A first-time user gets a **guided
+tour** on first launch, in the spirit of a product-tour service, built in the repository with no external
+service and no account:
+
+- **Tour engine** (`web/src/tour/`): an overlay with a spotlight on the anchored element, a popover with
+  title, text and progress, keyboard navigation (arrows, Escape), "skip" and "replay from the Help menu".
+  The engine is hand-rolled (about three hundred lines) so it handles the SVG charts and the canvas
+  fallback without library quirks; a library such as driver.js stays an allowed substitute if the gate
+  prefers it, MIT licensed and loaded from `npm`, never from a CDN.
+- **Anchors and copy belong to the views**: every component owner adds `data-tour="<view>.<element>"`
+  attributes and exports its chapter (an ordered list of steps: anchor, title, text) next to the
+  component. The tour is the concatenation of the chapters of the tabs that exist, so a view that ships
+  later (opportunities, clusters, rule ledger, live) ships its chapter in the same package, and a tab
+  without a chapter fails a test.
+- **Two modes with one content source**: the linear **tour** (chapter by chapter, following the tabs),
+  and **contextual help** (a "?" toggle after which hovering or clicking any anchored element shows its
+  explanation). Each step also explains the *why* in one sentence (for example: "skill is the market's
+  Brier minus the agent's, so zero is the market itself; positive is the only thing worth claiming").
+- **First launch and persistence**: the tour starts once per browser (a `localStorage` flag with the
+  tour version, so a new version replays the changed chapters only), never blocks the page, and can be
+  replayed from Help at any time.
+- **Languages**: copy in English and French in one structured file per chapter, default from the
+  browser language, switchable in Help.
+- **Verification**: a unit test enumerates the tabs and asserts one chapter per tab and one existing
+  anchor per step; the end-to-end check of gate G5 drives a headless Chrome through the whole tour
+  (every step's anchor is found and visible) and takes one screenshot per step into
+  `docs/tour/` for the README.
+
+AC-31: on a fresh browser profile the tour starts, covers every tab, every step finds its anchor,
+Escape and Help replay work, and the contextual help shows the same text on hover.
+
 ### 7.2 API v2 (FastAPI, port 8175)
 
 Read: datasets, markets with bars and trades and news, runs, journals, results, generations, hive,

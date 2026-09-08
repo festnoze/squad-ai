@@ -177,6 +177,13 @@ minute event study (AC-28, the data half of E2E-5a).
   their hashes.
 - Wave 7 (surfaces U3, U4, gate G5): U3 adds the rule ledger view, the sensor ablation view and the
   "where it fires" overlay; U4's README documents sensors, rules and grids.
+  **U5 guided tour and contextual help** joins wave 7 (PRD v2 section 7.1b): owns `web/src/tour/*`
+  (engine, overlay, popover, Help menu, chapter registry, en and fr copy loader), `tests/test_tour.py`
+  (chapter per tab, anchor per step, copy in both languages) and the headless-Chrome tour walk of gate
+  G5 with one screenshot per step into `docs/tour/`. Every view package (U2, U3 and, later, the
+  opportunities, clusters, rule ledger and live views) owns its own `data-tour` anchors and its chapter
+  file next to the component; a tab without a chapter fails `tests/test_tour.py`. Gate G5 verifies
+  AC-31. No external service, no CDN: the engine is hand-rolled or an MIT library from npm.
 - Wave 8 (realism at scale): unchanged, plus the minute datasets for the liquid crypto pairs and the
   Kalshi series with 1-minute candlesticks.
 - Wave 9 (detectors): every detector emits rules into the ledger; the minute event study at 1, 5, 10,
