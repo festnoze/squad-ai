@@ -252,8 +252,14 @@ the Workflow tool and its `scriptPath`, no arguments needed:
 
 | Script | Agents | What it does |
 |---|---|---|
-| `...\scratchpad\lot4d_gate_g2_alone.js` | **1** | gate G2 alone, on Fable, reading the three diagnostics and the two reconciliation reports already on disk. Handles the case where a reconciliation report is missing by doing that work itself. |
+| `...\scratchpad\lot4c2_redesign_finish.js` | **1** | verifies all **30 cross-package mismatches** against the code as it stands, finishes what is unresolved, and checks nothing was patched at the symptom. Carries the five that are redesigns rather than patches: collapsing the runner's two-path journal emission (42 of the 68 failures came from it), reducing `applies_at` from three implementations to one and architecture rule 11 from two to one, deleting the ten fallback journal dataclasses and the bridge machinery, passing the calendar the runner never passed (a silent wrong-observation bug on continuous instruments) with an assertion to guard it, and regenerating the contract journal fixture from a run of the fixed runner rather than trimming its failing lines. It owns the engine files and the tests, and must **report** rather than edit the six items that touch other packages' files. |
+| `...\scratchpad\lot4d_gate_g2_alone.js` | **1** | gate G2 alone, on Fable, reading the three diagnostics, the redesign report and the two reconciliation reports already on disk. Handles the case where a reconciliation report is missing by doing that work itself. Its section 5 is the checklist for the 30 mismatches, including the six the diagnostic assigned to the gate: the four duplicated protocols to consolidate, `RunConfig.horizons_bars` not resolving its default (which moves `run_id`), ruling R182's sealed-market allow-list, the pre-gate event pins in C0's and D7's test files, the committed demo manifest, and the CLI dispatch that stays open by design. |
 | `...\scratchpad\lot4e_audit_g2.js` | **2, plus 1 conditional** | two adversarial auditors with distinct lenses (test integrity and honesty of the claims; contract coherence, ownership and completeness), then a fix pass only if a blocker or a major is confirmed. |
+
+**The chain, three small lots in sequence**: `lot4c2` (redesign verified and finished) then `lot4d`
+(the gate) then `lot4e` (the audit). Each is one or two agents, which is what survives a session quota;
+the 39-agent and 9-agent runs both died whole. Do not run `lot4c2` while the original run's
+reconciliation agent is still alive: they own the same files.
 
 The scratchpad directory in full is
 `C:\Users\E6FB4~1.MIL\AppData\Local\Temp\claude\c--Dev-squad-ai-Brainstorming\d4f591f7-af6d-4365-8066-f97d28622148\scratchpad`.
