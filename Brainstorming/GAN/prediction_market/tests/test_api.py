@@ -6,7 +6,7 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 
-from pmx.api.app import create_app
+from pmx.v1.api.app import create_app
 
 
 def test_markets_and_backtest(seeded_data: Path) -> None:

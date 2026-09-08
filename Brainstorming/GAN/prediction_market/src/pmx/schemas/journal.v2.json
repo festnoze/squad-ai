@@ -1,0 +1,834 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/journal.v2.json",
+  "title": "pmx journal event v2",
+  "description": "One line of runs/<run_id>/journal.jsonl: the five-field envelope plus the payload of exactly one event of the catalogue. Integers only: no float, no wall clock, no provider cost. CONTRACTS_V2 section 9. Amendment C1b (section 17) adds cash_event_applied, instrument_closed and forecast_resolved, widens the id, provider, origin, reason, price_source and phase enums, admits ticks where a binary carried bp and milli-units where it carried contracts, and declares the instrument fields of market_listed and the horizons of forecast_recorded as optional until gate G2 promotes them with decided_at_ms (rulings R148, R152, R157, R160, R164, R165). The three new events are declared under $defs and enter oneOf, and the settle phase enters the phase enum of order_placed, filled and fee_charged, in the gate G2 commit that gives pmx.journal their dataclasses and PHASES (ruling R164, the discipline of R129): pmx.journal pins oneOf and the phase enums to its classes, so a schema ahead of the classes would refuse the journals the engine wave must write.",
+  "oneOf": [
+    { "$ref": "#/$defs/run_started" },
+    { "$ref": "#/$defs/sealed_test_opened" },
+    { "$ref": "#/$defs/bar_opened" },
+    { "$ref": "#/$defs/market_listed" },
+    { "$ref": "#/$defs/market_priced" },
+    { "$ref": "#/$defs/order_expired" },
+    { "$ref": "#/$defs/observation_built" },
+    { "$ref": "#/$defs/reply_received" },
+    { "$ref": "#/$defs/action_received" },
+    { "$ref": "#/$defs/action_rejected" },
+    { "$ref": "#/$defs/forecast_recorded" },
+    { "$ref": "#/$defs/research_spent" },
+    { "$ref": "#/$defs/memory_written" },
+    { "$ref": "#/$defs/order_placed" },
+    { "$ref": "#/$defs/order_rejected" },
+    { "$ref": "#/$defs/filled" },
+    { "$ref": "#/$defs/fee_charged" },
+    { "$ref": "#/$defs/settled" },
+    { "$ref": "#/$defs/settlement_applied" },
+    { "$ref": "#/$defs/hive_written" },
+    { "$ref": "#/$defs/equity_marked" },
+    { "$ref": "#/$defs/agent_ruined" },
+    { "$ref": "#/$defs/bar_closed" },
+    { "$ref": "#/$defs/run_ended" },
+    { "$ref": "#/$defs/evolution_started" },
+    { "$ref": "#/$defs/generation_started" },
+    { "$ref": "#/$defs/candidate_scored" },
+    { "$ref": "#/$defs/generation_closed" },
+    { "$ref": "#/$defs/evolution_ended" }
+  ],
+  "$defs": {
+    "int": { "type": "integer" },
+    "nonNegInt": { "type": "integer", "minimum": 0 },
+    "posInt": { "type": "integer", "minimum": 1 },
+    "ms": { "type": "integer", "minimum": 0 },
+    "ppm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "priceBp": { "type": "integer", "minimum": 1, "maximum": 9999 },
+    "priceTicks": { "description": "A price in the instrument's ticks (CONTRACTS_V2 17.1, ruling R148): bp on a binary, whose 1..9999 bound the loader and the runner enforce, ticks up to PRICE_TICKS_MAX otherwise.", "type": "integer", "minimum": 1, "maximum": 1000000000000 },
+    "kind": { "enum": ["binary", "spot_crypto", "perp", "fx", "equity", "future"] },
+    "vendor": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "yahoo", "frankfurter", "ecb"] },
+    "cashEventId": { "type": "string", "pattern": "^ce-[0-9a-f]{16}$" },
+    "quantiles": { "oneOf": [ { "type": "null" }, { "type": "array", "minItems": 5, "maxItems": 5, "items": { "$ref": "#/$defs/priceTicks" } } ] },
+    "horizonForecast": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["horizon_bars", "up_probability_ppm", "quantiles_ticks"],
+      "properties": {
+        "horizon_bars": { "type": "integer", "minimum": 1, "maximum": 99999 },
+        "up_probability_ppm": { "$ref": "#/$defs/ppm" },
+        "quantiles_ticks": { "$ref": "#/$defs/quantiles" }
+      }
+    },
+    "payoutBp": { "enum": [0, 10000] },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "marketId": { "type": "string", "pattern": "^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$" },
+    "agentId": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}(-[0-9a-f]{8})?$" },
+    "orderId": { "type": "string", "pattern": "^o-[0-9]{8}$" },
+    "hiveId": { "type": "string", "pattern": "^h-[0-9]{8}$" },
+    "runId": { "type": "string", "pattern": "^[re]-[0-9a-f]{8}-[0-9]{1,19}-[0-9a-f]{8}$" },
+    "idList": { "type": "array", "items": { "type": "string" } },
+    "marketIdList": { "type": "array", "items": { "$ref": "#/$defs/marketId" } },
+    "agentIdList": { "type": "array", "items": { "$ref": "#/$defs/agentId" } },
+    "object": { "type": "object" },
+    "phase": { "enum": ["pre", "open", "observe", "decide", "execute", "settle", "learn", "hive", "close", "post", "generation"] },
+    "envelope": {
+      "type": "object",
+      "required": ["seq", "type", "run_id", "bar_ms", "phase"],
+      "properties": {
+        "seq": { "$ref": "#/$defs/posInt" },
+        "type": { "type": "string" },
+        "run_id": { "$ref": "#/$defs/runId" },
+        "bar_ms": { "$ref": "#/$defs/ms" },
+        "phase": { "$ref": "#/$defs/phase" }
+      }
+    },
+    "genome": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["family", "genes", "inner", "members", "prompt"],
+      "properties": {
+        "family": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,23}$" },
+        "genes": { "type": "object", "additionalProperties": { "type": "integer" } },
+        "inner": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/genome" } ] },
+        "members": { "type": "array", "maxItems": 16, "items": { "$ref": "#/$defs/genome" } },
+        "prompt": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["frame_version", "dials"],
+              "properties": {
+                "frame_version": { "type": "string" },
+                "dials": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 4 } }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "rosterEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agent_id", "family", "kind", "genome_hash", "genome", "model", "knowledge_cutoff_ms"],
+      "properties": {
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "family": { "type": "string" },
+        "kind": { "enum": ["scripted", "llm"] },
+        "genome_hash": { "$ref": "#/$defs/sha256" },
+        "genome": { "$ref": "#/$defs/genome" },
+        "model": { "type": ["string", "null"] },
+        "knowledge_cutoff_ms": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "intent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["market_id", "prob_ppm", "kind", "target_position", "side", "price_bp", "size", "ttl_bars"],
+      "properties": {
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "prob_ppm": { "$ref": "#/$defs/ppm" },
+        "kind": { "enum": ["hold", "target", "limit", "abstain"] },
+        "target_position": { "type": ["integer", "null"] },
+        "side": { "enum": ["buy", "sell", null] },
+        "price_bp": { "type": ["integer", "null"], "minimum": 1, "maximum": 1000000000000 },
+        "size": { "type": ["integer", "null"], "minimum": 1 },
+        "ttl_bars": { "type": ["integer", "null"], "minimum": 1, "maximum": 90 }
+      }
+    },
+
+    "run_started": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["seed", "engine_version", "contract_version", "rng_algorithm_version", "dataset_name", "dataset_hash", "interval_min", "t0_ms", "t1_ms", "market_ids", "config", "config_hash", "folds", "memory_from_run_id", "memory_hash", "memory_from_run_t1_ms", "contamination_hash", "roster"],
+      "properties": {
+        "type": { "const": "run_started" },
+        "phase": { "const": "pre" },
+        "seed": { "$ref": "#/$defs/nonNegInt" },
+        "engine_version": { "type": "string" },
+        "contract_version": { "type": "string" },
+        "rng_algorithm_version": { "type": "string" },
+        "dataset_name": { "type": "string" },
+        "dataset_hash": { "$ref": "#/$defs/sha256" },
+        "interval_min": { "enum": [60, 1440] },
+        "t0_ms": { "$ref": "#/$defs/ms" },
+        "t1_ms": { "$ref": "#/$defs/ms" },
+        "market_ids": { "$ref": "#/$defs/marketIdList" },
+        "config": { "$ref": "#/$defs/object" },
+        "config_hash": { "$ref": "#/$defs/sha256" },
+        "folds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["train_end_ms", "validation_end_ms"],
+          "properties": {
+            "train_end_ms": { "$ref": "#/$defs/ms" },
+            "validation_end_ms": { "$ref": "#/$defs/ms" }
+          }
+        },
+        "memory_from_run_id": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/runId" } ] },
+        "memory_hash": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/sha256" } ] },
+        "memory_from_run_t1_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "contamination_hash": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/sha256" } ] },
+        "roster": { "type": "array", "items": { "$ref": "#/$defs/rosterEntry" } }
+      }
+    },
+    "sealed_test_opened": {
+      "description": "open_sealed_test read the sealed fold for a named claim. It is written before any market id is returned, so an aborted claim still leaves the peek on the record (CONTRACTS_V2 section 12.7).",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["claim_id", "dataset_hash", "genome_hash", "provider", "n_markets", "market_ids"],
+      "properties": {
+        "type": { "const": "sealed_test_opened" },
+        "phase": { "const": "pre" },
+        "claim_id": { "description": "c-<hash8>-<kind>-<provider>-h<horizon_bars>-<genome16> since amendment C1b (17.8, ruling R162); the v2 form c-<hash8>-<provider>-<genome16> still validates so a journal written before the amendment reads, and is never written again.", "type": "string", "pattern": "^c-[0-9a-f]{8}-((binary|spot_crypto|perp|fx|equity|future)-(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-h[0-9]{1,5}|(kalshi|manifold|polymarket|metaculus|demo))-[0-9a-f]{16}$" },
+        "dataset_hash": { "$ref": "#/$defs/sha256" },
+        "genome_hash": { "$ref": "#/$defs/sha256" },
+        "provider": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "xnys", "xnas", "arcx", "xcme", "xnym", "xcec", "xcbt", "otcfx"] },
+        "kind": { "$ref": "#/$defs/kind" },
+        "horizon_bars": { "$ref": "#/$defs/nonNegInt" },
+        "n_markets": { "$ref": "#/$defs/nonNegInt" },
+        "market_ids": { "$ref": "#/$defs/marketIdList" }
+      }
+    },
+    "market_listed": {
+      "description": "A market's leak-free metadata, recorded once per run at the bar it is first listed. An observed input, not a derived number: without it the projection cannot rebuild the horizon buckets, the block keys or the per-category and per-fold rows from the journal alone (CONTRACTS_V2 sections 9.2 and 9.5).",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["market_id", "provider", "category", "tags", "event_key", "created_at_ms", "close_at_ms", "interval_min", "fee_schedule_id", "hardness_tags", "fold"],
+      "properties": {
+        "type": { "const": "market_listed" },
+        "phase": { "const": "open" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "provider": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "xnys", "xnas", "arcx", "xcme", "xnym", "xcec", "xcbt", "otcfx"] },
+        "kind": { "description": "Amendment C1b (17.3, ruling R164): the instrument fields, declared and not yet required; a journal without them is a binary journal and the projection reads binary, the provider, 100, 1_000_000, continuous, null, null.", "$ref": "#/$defs/kind" },
+        "vendor": { "$ref": "#/$defs/vendor" },
+        "symbol": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "tick_size_micro": { "type": "integer", "minimum": 1, "maximum": 1000000000 },
+        "point_value_micro": { "type": "integer", "minimum": 1, "maximum": 1000000000000 },
+        "session_calendar_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+        "borrow_schedule_id": { "type": ["string", "null"], "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" },
+        "carry_schedule_id": { "type": ["string", "null"], "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" },
+        "category": { "enum": ["politics", "economics", "finance", "crypto", "sports", "science", "tech", "entertainment", "weather", "health", "world", "other"] },
+        "tags": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" } },
+        "event_key": { "type": ["string", "null"], "maxLength": 128 },
+        "created_at_ms": { "$ref": "#/$defs/ms" },
+        "close_at_ms": { "$ref": "#/$defs/ms" },
+        "interval_min": { "enum": [60, 1440] },
+        "fee_schedule_id": { "type": "string", "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" },
+        "hardness_tags": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "enum": ["trivial", "upset", "whipsaw", "illiquid"] } },
+        "fold": { "enum": ["train", "validation", "sealed", "all"] }
+      }
+    },
+    "market_priced": {
+      "description": "The prices of one open market at one bar: close_bp is the close of the bar itself (the mark_price_bp of CONTRACTS_V2 section 8.7) and last_close_bp the close of the last completed bar at the bar's open, which is the market's own forecast on that bar and first_price_bp when no bar is completed yet.",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["market_id", "close_bp", "last_close_bp", "vwap_bp", "volume_milli"],
+      "properties": {
+        "type": { "const": "market_priced" },
+        "phase": { "const": "open" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "close_bp": { "$ref": "#/$defs/priceTicks" },
+        "last_close_bp": { "$ref": "#/$defs/priceTicks" },
+        "vwap_bp": { "$ref": "#/$defs/priceTicks" },
+        "volume_milli": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "bar_opened": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["open_market_ids", "tradable_market_ids", "settling_market_ids", "listed_market_ids"],
+      "properties": {
+        "type": { "const": "bar_opened" },
+        "phase": { "const": "open" },
+        "open_market_ids": { "$ref": "#/$defs/marketIdList" },
+        "tradable_market_ids": { "$ref": "#/$defs/marketIdList" },
+        "settling_market_ids": { "$ref": "#/$defs/marketIdList" },
+        "listed_market_ids": { "$ref": "#/$defs/marketIdList" }
+      }
+    },
+    "order_expired": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["order_id", "agent_id", "market_id", "remaining_size", "released_cents", "reason"],
+      "properties": {
+        "type": { "const": "order_expired" },
+        "phase": { "enum": ["open", "settle", "close"] },
+        "order_id": { "$ref": "#/$defs/orderId" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "remaining_size": { "$ref": "#/$defs/nonNegInt" },
+        "released_cents": { "$ref": "#/$defs/nonNegInt" },
+        "reason": { "enum": ["ttl", "not_tradable", "settled", "ruined", "corporate_action", "roll", "delisted"] }
+      }
+    },
+    "observation_built": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "n_markets", "n_news", "n_hive", "n_bars_max", "research_remaining", "bytes", "obs_sha256"],
+      "properties": {
+        "type": { "const": "observation_built" },
+        "phase": { "const": "observe" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "n_markets": { "$ref": "#/$defs/nonNegInt" },
+        "n_news": { "$ref": "#/$defs/nonNegInt" },
+        "n_hive": { "$ref": "#/$defs/nonNegInt" },
+        "n_bars_max": { "$ref": "#/$defs/nonNegInt" },
+        "research_remaining": { "$ref": "#/$defs/nonNegInt" },
+        "bytes": { "$ref": "#/$defs/nonNegInt" },
+        "obs_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "reply_received": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "source", "error", "schema_valid", "n_lessons"],
+      "properties": {
+        "type": { "const": "reply_received" },
+        "phase": { "const": "decide" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "source": { "enum": ["llm", "fallback"] },
+        "error": { "type": ["string", "null"] },
+        "schema_valid": { "type": "boolean" },
+        "n_lessons": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "action_received": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "source", "intents", "research", "notes", "n_lessons", "n_rejected"],
+      "properties": {
+        "type": { "const": "action_received" },
+        "phase": { "const": "decide" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "source": { "enum": ["scripted", "llm", "fallback"] },
+        "intents": { "type": "array", "items": { "$ref": "#/$defs/intent" } },
+        "research": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "market_id"],
+              "properties": {
+                "kind": { "enum": ["news", "history", "wiki_asof"] },
+                "market_id": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/marketId" } ] }
+              }
+            }
+          ]
+        },
+        "notes": { "type": "string", "maxLength": 500 },
+        "n_lessons": { "$ref": "#/$defs/nonNegInt" },
+        "n_rejected": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "action_rejected": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "market_id", "scope", "item_index", "reason", "detail"],
+      "properties": {
+        "type": { "const": "action_rejected" },
+        "phase": { "const": "decide" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/marketId" } ] },
+        "scope": { "enum": ["market", "research", "notes", "lessons", "actions"] },
+        "item_index": { "$ref": "#/$defs/nonNegInt" },
+        "reason": { "type": "string" },
+        "detail": { "type": "string" }
+      }
+    },
+    "forecast_recorded": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "market_id", "prob_ppm", "carried"],
+      "properties": {
+        "type": { "const": "forecast_recorded" },
+        "phase": { "const": "decide" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "prob_ppm": { "$ref": "#/$defs/ppm" },
+        "carried": { "type": "boolean" },
+        "price_ref_ticks": { "description": "Amendment C1b (17.5, ruling R157): present on a continuous instrument with horizons, absent on a binary.", "$ref": "#/$defs/priceTicks" },
+        "horizons": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/horizonForecast" } }
+      }
+    },
+    "research_spent": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "kind", "market_id", "units", "remaining", "granted"],
+      "properties": {
+        "type": { "const": "research_spent" },
+        "phase": { "const": "decide" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "kind": { "enum": ["news", "history", "wiki_asof"] },
+        "market_id": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/marketId" } ] },
+        "units": { "$ref": "#/$defs/nonNegInt" },
+        "remaining": { "$ref": "#/$defs/nonNegInt" },
+        "granted": { "type": "boolean" }
+      }
+    },
+    "memory_written": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "kind", "key", "payload", "bytes_after"],
+      "properties": {
+        "type": { "const": "memory_written" },
+        "phase": { "enum": ["decide", "learn"] },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "kind": { "enum": ["calibration", "prior", "feature", "lesson", "note"] },
+        "key": { "type": "string" },
+        "payload": { "$ref": "#/$defs/object" },
+        "bytes_after": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "order_placed": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["order_id", "agent_id", "market_id", "kind", "side", "price_bp", "size", "ttl_bars", "expires_at_ms", "reserved_cents", "origin"],
+      "properties": {
+        "type": { "const": "order_placed" },
+        "phase": { "description": "execute today; gate G2 widens it to execute or settle for an event fill of a roll or the forced flat together with OrderPlaced.PHASES (CONTRACTS_V2 17.3, rulings R152 and R164).", "const": "execute" },
+        "order_id": { "$ref": "#/$defs/orderId" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "kind": { "enum": ["market", "limit"] },
+        "side": { "enum": ["buy", "sell"] },
+        "price_bp": { "type": ["integer", "null"], "minimum": 1, "maximum": 1000000000000 },
+        "size": { "$ref": "#/$defs/posInt" },
+        "ttl_bars": { "type": ["integer", "null"], "minimum": 1, "maximum": 90 },
+        "expires_at_ms": { "type": ["integer", "null"], "minimum": 0 },
+        "reserved_cents": { "$ref": "#/$defs/nonNegInt" },
+        "origin": { "enum": ["target", "limit", "abstain", "roll", "forced_flat"] },
+        "decided_at_ms": {
+          "description": "The bar the intent was decided at, one interval before this event's bar (CONTRACTS_V2 16.2). item_index indexes that bar's action_received, so without it a rejection cannot be traced to its intent. It is optional here and becomes required in the commit that gives pmx.journal's event dataclasses the field and rebuilds the backtest fixture as a post-latency journal (ruling R129).",
+          "$ref": "#/$defs/ms"
+        }
+      }
+    },
+    "order_rejected": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "market_id", "item_index", "reason", "detail"],
+      "properties": {
+        "type": { "const": "order_rejected" },
+        "phase": { "const": "execute" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "item_index": { "$ref": "#/$defs/nonNegInt" },
+        "reason": { "type": "string" },
+        "detail": { "type": "string" },
+        "decided_at_ms": {
+          "description": "The bar the rejected intent was decided at (CONTRACTS_V2 16.2, ruling R129). reason is a free string, so not_tradable, ruined and no_liquidity need no enum widening here.",
+          "$ref": "#/$defs/ms"
+        }
+      }
+    },
+    "filled": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["order_id", "agent_id", "market_id", "side", "kind", "requested_size", "filled_size", "unfilled_size", "unfilled_reason", "base_price_bp", "slippage_bp", "fill_price_bp", "price_source", "close_size", "open_size", "cash_delta_cents", "released_cents", "position_before", "position_after", "avg_cost_bp_after"],
+      "properties": {
+        "type": { "const": "filled" },
+        "phase": { "description": "execute today; settle for an event fill at gate G2 with Filled.PHASES (rulings R152, R164).", "const": "execute" },
+        "order_id": { "$ref": "#/$defs/orderId" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "side": { "enum": ["buy", "sell"] },
+        "kind": { "enum": ["market", "limit"] },
+        "requested_size": { "$ref": "#/$defs/posInt" },
+        "filled_size": { "$ref": "#/$defs/nonNegInt" },
+        "unfilled_size": { "$ref": "#/$defs/nonNegInt" },
+        "unfilled_reason": { "enum": ["none", "volume_cap", "cash", "zero_volume", "no_cross", "no_liquidity"] },
+        "base_price_bp": { "$ref": "#/$defs/priceTicks" },
+        "slippage_bp": { "$ref": "#/$defs/nonNegInt" },
+        "fill_price_bp": { "$ref": "#/$defs/priceTicks" },
+        "price_source": {
+          "description": "CONTRACTS_V2 16.1: open, quote, limit, impact or mm. vwap is the pre-amendment spelling of the fallback base and still validates so an older journal reads, but no LiquidityModel may return it (ruling R138). event is amendment C1b's (17.3, ruling R152): an engine fill at a printed price, from liquidity.event_fill only, the one case whose phase is settle.",
+          "enum": ["vwap", "quote", "limit", "open", "impact", "mm", "event"]
+        },
+        "close_size": { "$ref": "#/$defs/nonNegInt" },
+        "open_size": { "$ref": "#/$defs/nonNegInt" },
+        "cash_delta_cents": { "$ref": "#/$defs/int" },
+        "released_cents": { "$ref": "#/$defs/nonNegInt" },
+        "position_before": { "$ref": "#/$defs/int" },
+        "position_after": { "$ref": "#/$defs/int" },
+        "avg_cost_bp_after": { "type": "integer", "minimum": 0, "maximum": 1000000000000 }
+      }
+    },
+    "fee_charged": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["order_id", "agent_id", "market_id", "fee_cents", "schedule_id", "role"],
+      "properties": {
+        "type": { "const": "fee_charged" },
+        "phase": { "description": "execute today; settle for an event fill at gate G2 with FeeCharged.PHASES (rulings R152, R164).", "const": "execute" },
+        "order_id": { "$ref": "#/$defs/orderId" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "fee_cents": { "$ref": "#/$defs/nonNegInt" },
+        "schedule_id": { "type": "string" },
+        "role": { "enum": ["taker", "maker"] }
+      }
+    },
+    "settled": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["market_id", "outcome", "payout_bp", "resolved_at_ms", "n_bars", "market_brier_tw_micro", "life_mean_price_bp"],
+      "properties": {
+        "type": { "const": "settled" },
+        "phase": { "const": "settle" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "outcome": { "enum": [0, 1] },
+        "payout_bp": { "$ref": "#/$defs/payoutBp" },
+        "resolved_at_ms": { "$ref": "#/$defs/ms" },
+        "n_bars": { "$ref": "#/$defs/posInt" },
+        "market_brier_tw_micro": { "$ref": "#/$defs/ppm" },
+        "life_mean_price_bp": { "$ref": "#/$defs/priceBp" }
+      }
+    },
+    "settlement_applied": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "market_id", "position", "cash_delta_cents", "cash_after_cents", "realised_pnl_cents", "agent_brier_tw_micro", "n_forecast_bars"],
+      "properties": {
+        "type": { "const": "settlement_applied" },
+        "phase": { "const": "settle" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "position": { "$ref": "#/$defs/int" },
+        "cash_delta_cents": { "$ref": "#/$defs/nonNegInt" },
+        "cash_after_cents": { "$ref": "#/$defs/nonNegInt" },
+        "realised_pnl_cents": { "$ref": "#/$defs/int" },
+        "agent_brier_tw_micro": { "$ref": "#/$defs/ppm" },
+        "n_forecast_bars": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "hive_written": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["entry_id", "kind", "author_id", "market_id", "visible_from_ms", "payload"],
+      "properties": {
+        "type": { "const": "hive_written" },
+        "phase": { "const": "hive" },
+        "entry_id": { "$ref": "#/$defs/hiveId" },
+        "kind": { "enum": ["forecast", "resolution", "lesson", "reputation"] },
+        "author_id": { "type": "string" },
+        "market_id": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/marketId" } ] },
+        "visible_from_ms": { "$ref": "#/$defs/ms" },
+        "payload": { "$ref": "#/$defs/object" }
+      }
+    },
+    "equity_marked": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "cash_cents", "reserved_cents", "positions_value_cents", "equity_cents", "fees_paid_cents", "peak_equity_cents", "drawdown_bp", "n_open_positions", "n_open_orders"],
+      "properties": {
+        "type": { "const": "equity_marked" },
+        "phase": { "const": "close" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "cash_cents": { "$ref": "#/$defs/nonNegInt" },
+        "reserved_cents": { "$ref": "#/$defs/nonNegInt" },
+        "positions_value_cents": { "description": "Signed since amendment C1b (ruling R154): a short on a continuous instrument is a liability.", "$ref": "#/$defs/int" },
+        "equity_cents": { "$ref": "#/$defs/nonNegInt" },
+        "fees_paid_cents": { "$ref": "#/$defs/nonNegInt" },
+        "peak_equity_cents": { "$ref": "#/$defs/nonNegInt" },
+        "drawdown_bp": { "type": "integer", "minimum": -10000, "maximum": 0 },
+        "n_open_positions": { "$ref": "#/$defs/nonNegInt" },
+        "n_open_orders": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "agent_ruined": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "equity_cents", "cancelled_order_ids"],
+      "properties": {
+        "type": { "const": "agent_ruined" },
+        "phase": { "const": "close" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "equity_cents": { "$ref": "#/$defs/nonNegInt" },
+        "cancelled_order_ids": { "type": "array", "items": { "$ref": "#/$defs/orderId" } }
+      }
+    },
+    "bar_closed": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["n_events"],
+      "properties": {
+        "type": { "const": "bar_closed" },
+        "phase": { "const": "close" },
+        "n_events": { "$ref": "#/$defs/posInt" }
+      }
+    },
+    "run_ended": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["reason", "final_bar_ms", "n_bars", "event_count", "ruined_agent_ids"],
+      "properties": {
+        "type": { "const": "run_ended" },
+        "phase": { "const": "post" },
+        "reason": { "enum": ["completed", "aborted"] },
+        "final_bar_ms": { "$ref": "#/$defs/ms" },
+        "n_bars": { "$ref": "#/$defs/nonNegInt" },
+        "event_count": { "$ref": "#/$defs/posInt" },
+        "ruined_agent_ids": { "$ref": "#/$defs/agentIdList" }
+      }
+    },
+    "cash_event_applied": {
+      "description": "One CashEvent of CONTRACTS_V2 17.3 applied to one agent in the settle phase (ruling R151): funding, dividend, split, roll, borrow_fee or forced_flat. cash_delta_cents is the one money-moving field for funding, dividend and borrow_fee and is 0 for split, roll and forced_flat, whose money moves in the filled and fee_charged events named in order_ids. Declared here and admitted to oneOf at gate G2 with its pmx.journal dataclass (ruling R164).",
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "market_id", "cash_event_id", "kind", "origin", "position_before", "position_after", "avg_cost_ticks_before", "avg_cost_ticks_after", "cash_delta_cents", "order_ids", "detail"],
+      "properties": {
+        "type": { "const": "cash_event_applied" },
+        "phase": { "const": "settle" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "cash_event_id": { "$ref": "#/$defs/cashEventId" },
+        "kind": { "enum": ["funding", "dividend", "split", "roll", "borrow_fee", "forced_flat"] },
+        "origin": { "enum": ["data", "engine"] },
+        "position_before": { "$ref": "#/$defs/int" },
+        "position_after": { "$ref": "#/$defs/int" },
+        "avg_cost_ticks_before": { "$ref": "#/$defs/nonNegInt" },
+        "avg_cost_ticks_after": { "$ref": "#/$defs/nonNegInt" },
+        "cash_delta_cents": { "$ref": "#/$defs/int" },
+        "order_ids": { "type": "array", "maxItems": 2, "items": { "$ref": "#/$defs/orderId" } },
+        "detail": { "type": "object", "additionalProperties": { "type": ["integer", "string"] } }
+      },
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "description": "A split, a roll and a forced flat move no cash here; the other three do and place no fill.",
+          "if": { "properties": { "kind": { "enum": ["split", "roll", "forced_flat"] } }, "required": ["kind"] },
+          "then": { "properties": { "cash_delta_cents": { "const": 0 } } },
+          "else": { "properties": { "order_ids": { "maxItems": 0 } } }
+        }
+      ]
+    },
+    "instrument_closed": {
+      "description": "A continuous instrument's last bar in the run (CONTRACTS_V2 17.3, ruling R150): every position has been flattened by force_flat and the runner records what the instrument was.",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["market_id", "kind", "reason", "last_price_ticks", "n_bars", "n_forecasts_unresolved"],
+      "properties": {
+        "type": { "const": "instrument_closed" },
+        "phase": { "const": "settle" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "kind": { "enum": ["spot_crypto", "perp", "fx", "equity", "future"] },
+        "reason": { "enum": ["window_end", "delisted"] },
+        "last_price_ticks": { "$ref": "#/$defs/priceTicks" },
+        "n_bars": { "$ref": "#/$defs/posInt" },
+        "n_forecasts_unresolved": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "forecast_resolved": {
+      "description": "One horizon of one continuous forecast scored at the bar its realisation became public (CONTRACTS_V2 17.5, ruling R160). The baseline directional Brier is the constant 250_000 and is not a field; the baseline pinball depends on the realisation and is.",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "market_id", "forecast_bar_ms", "horizon_bars", "up_probability_ppm", "quantiles_ticks", "price_ref_ticks", "price_realised_ticks", "realised_sign", "directional_brier_micro", "pinball_micro", "baseline_pinball_micro", "carried"],
+      "properties": {
+        "type": { "const": "forecast_resolved" },
+        "phase": { "const": "settle" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "market_id": { "$ref": "#/$defs/marketId" },
+        "forecast_bar_ms": { "$ref": "#/$defs/ms" },
+        "horizon_bars": { "type": "integer", "minimum": 1, "maximum": 99999 },
+        "up_probability_ppm": { "$ref": "#/$defs/ppm" },
+        "quantiles_ticks": { "$ref": "#/$defs/quantiles" },
+        "price_ref_ticks": { "$ref": "#/$defs/priceTicks" },
+        "price_realised_ticks": { "$ref": "#/$defs/priceTicks" },
+        "realised_sign": { "enum": [-1, 0, 1] },
+        "directional_brier_micro": { "$ref": "#/$defs/ppm" },
+        "pinball_micro": { "type": ["integer", "null"], "minimum": 0 },
+        "baseline_pinball_micro": { "$ref": "#/$defs/nonNegInt" },
+        "carried": { "type": "boolean" }
+      }
+    },
+
+    "evolution_started": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["seed", "engine_version", "contract_version", "dataset_hash", "config", "config_hash", "population_size", "max_generations", "folds", "initial_population"],
+      "properties": {
+        "type": { "const": "evolution_started" },
+        "phase": { "const": "pre" },
+        "seed": { "$ref": "#/$defs/nonNegInt" },
+        "engine_version": { "type": "string" },
+        "contract_version": { "type": "string" },
+        "dataset_hash": { "$ref": "#/$defs/sha256" },
+        "config": { "$ref": "#/$defs/object" },
+        "config_hash": { "$ref": "#/$defs/sha256" },
+        "population_size": { "$ref": "#/$defs/posInt" },
+        "max_generations": { "$ref": "#/$defs/posInt" },
+        "folds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["train_end_ms", "validation_end_ms", "n_train", "n_validation", "n_sealed"],
+          "properties": {
+            "train_end_ms": { "$ref": "#/$defs/ms" },
+            "validation_end_ms": { "$ref": "#/$defs/ms" },
+            "n_train": { "$ref": "#/$defs/nonNegInt" },
+            "n_validation": { "$ref": "#/$defs/nonNegInt" },
+            "n_sealed": { "$ref": "#/$defs/nonNegInt" }
+          }
+        },
+        "initial_population": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["agent_id", "family", "genome_hash", "genome"],
+            "properties": {
+              "agent_id": { "$ref": "#/$defs/agentId" },
+              "family": { "type": "string" },
+              "genome_hash": { "$ref": "#/$defs/sha256" },
+              "genome": { "$ref": "#/$defs/genome" }
+            }
+          }
+        }
+      }
+    },
+    "generation_started": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["generation", "run_seed", "train_run_id", "validation_run_id", "population"],
+      "properties": {
+        "type": { "const": "generation_started" },
+        "phase": { "const": "generation" },
+        "generation": { "$ref": "#/$defs/nonNegInt" },
+        "run_seed": { "$ref": "#/$defs/nonNegInt" },
+        "train_run_id": { "$ref": "#/$defs/runId" },
+        "validation_run_id": { "$ref": "#/$defs/runId" },
+        "population": { "$ref": "#/$defs/agentIdList" }
+      }
+    },
+    "candidate_scored": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["generation", "agent_id", "genome_hash", "fold", "n_markets", "skill_point_micro", "skill_lb_micro", "pnl_point_cents", "pnl_lb_cents", "brier_tw_micro", "ruined", "research_units_spent", "descriptors"],
+      "properties": {
+        "type": { "const": "candidate_scored" },
+        "phase": { "const": "generation" },
+        "generation": { "$ref": "#/$defs/nonNegInt" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "genome_hash": { "$ref": "#/$defs/sha256" },
+        "fold": { "enum": ["train", "validation"] },
+        "n_markets": { "$ref": "#/$defs/nonNegInt" },
+        "skill_point_micro": { "$ref": "#/$defs/int" },
+        "skill_lb_micro": { "$ref": "#/$defs/int" },
+        "pnl_point_cents": { "$ref": "#/$defs/int" },
+        "pnl_lb_cents": { "$ref": "#/$defs/int" },
+        "brier_tw_micro": { "$ref": "#/$defs/ppm" },
+        "ruined": { "type": "boolean" },
+        "research_units_spent": { "$ref": "#/$defs/nonNegInt" },
+        "descriptors": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["turnover_ppm", "contrarian_bp", "abstention_ppm", "holding_horizon_bars", "category_coverage_ppm"],
+          "properties": {
+            "turnover_ppm": { "$ref": "#/$defs/nonNegInt" },
+            "contrarian_bp": { "$ref": "#/$defs/int" },
+            "abstention_ppm": { "$ref": "#/$defs/ppm" },
+            "holding_horizon_bars": { "$ref": "#/$defs/nonNegInt" },
+            "category_coverage_ppm": { "$ref": "#/$defs/ppm" }
+          }
+        }
+      }
+    },
+    "generation_closed": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["generation", "ranked", "culled", "elites", "children", "archive", "archive_filled", "archive_cells", "hall_of_fame", "candidates_evaluated_cum", "best_validation_lb_micro", "patience_left", "research_budget_next"],
+      "properties": {
+        "type": { "const": "generation_closed" },
+        "phase": { "const": "generation" },
+        "generation": { "$ref": "#/$defs/nonNegInt" },
+        "ranked": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["agent_id", "genome_hash", "skill_lb_micro", "pnl_lb_cents", "rank"],
+            "properties": {
+              "agent_id": { "$ref": "#/$defs/agentId" },
+              "genome_hash": { "$ref": "#/$defs/sha256" },
+              "skill_lb_micro": { "$ref": "#/$defs/int" },
+              "pnl_lb_cents": { "$ref": "#/$defs/int" },
+              "rank": { "$ref": "#/$defs/posInt" }
+            }
+          }
+        },
+        "culled": { "$ref": "#/$defs/agentIdList" },
+        "elites": { "$ref": "#/$defs/agentIdList" },
+        "children": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["agent_id", "genome_hash", "genome", "op", "parents"],
+            "properties": {
+              "agent_id": { "$ref": "#/$defs/agentId" },
+              "genome_hash": { "$ref": "#/$defs/sha256" },
+              "genome": { "$ref": "#/$defs/genome" },
+              "op": { "enum": ["mutation", "crossover", "structural", "immigrant", "prompt_mutation"] },
+              "parents": { "$ref": "#/$defs/agentIdList" }
+            }
+          }
+        },
+        "archive": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["cell_key", "agent_id", "genome_hash", "skill_lb_micro"],
+            "properties": {
+              "cell_key": { "type": "string", "pattern": "^t[0-3]-c[0-3]-a[0-2]$" },
+              "agent_id": { "$ref": "#/$defs/agentId" },
+              "genome_hash": { "$ref": "#/$defs/sha256" },
+              "skill_lb_micro": { "$ref": "#/$defs/int" }
+            }
+          }
+        },
+        "archive_filled": { "$ref": "#/$defs/nonNegInt" },
+        "archive_cells": { "const": 48 },
+        "hall_of_fame": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["family", "genome_hash", "genome", "skill_lb_micro", "run_id"],
+            "properties": {
+              "family": { "type": "string" },
+              "genome_hash": { "$ref": "#/$defs/sha256" },
+              "genome": { "$ref": "#/$defs/genome" },
+              "skill_lb_micro": { "$ref": "#/$defs/int" },
+              "run_id": { "$ref": "#/$defs/runId" }
+            }
+          }
+        },
+        "candidates_evaluated_cum": { "$ref": "#/$defs/nonNegInt" },
+        "best_validation_lb_micro": { "$ref": "#/$defs/int" },
+        "patience_left": { "$ref": "#/$defs/nonNegInt" },
+        "research_budget_next": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+      }
+    },
+    "evolution_ended": {
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["reason", "generations_run", "candidates_evaluated_cum", "champion"],
+      "properties": {
+        "type": { "const": "evolution_ended" },
+        "phase": { "const": "post" },
+        "reason": { "enum": ["max_generations", "patience", "aborted"] },
+        "generations_run": { "$ref": "#/$defs/nonNegInt" },
+        "candidates_evaluated_cum": { "$ref": "#/$defs/nonNegInt" },
+        "champion": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["agent_id", "genome_hash", "genome", "validation_skill_lb_micro"],
+          "properties": {
+            "agent_id": { "$ref": "#/$defs/agentId" },
+            "genome_hash": { "$ref": "#/$defs/sha256" },
+            "genome": { "$ref": "#/$defs/genome" },
+            "validation_skill_lb_micro": { "$ref": "#/$defs/int" }
+          }
+        }
+      }
+    }
+  }
+}

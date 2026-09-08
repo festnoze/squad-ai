@@ -124,6 +124,17 @@ src/pmx/
 web/                  React 19 + Vite + TypeScript on port 5510
 ```
 
+## What comes next: v2
+
+The review of this version and the full proposal for the next one (real full tapes from Kalshi and
+Manifold over the last twelve months, dated news of the time, a calendar engine with real fees and
+bankrolls, learning agents with a shared memory, evolution with a sealed test and confidence intervals,
+LLM agents with a contamination defence, and a live paper shadow book) are in
+`docs/PRD_V2_HARD_OPTIMIZER.md`. The build plan, split into waves of parallel work packages with file
+ownership and gates, is in `docs/PLAN_V2_WAVES.md`. Note for this machine: Polymarket's API is blocked in
+France by the ANJ (its hostnames resolve to the regulator's block page), which is why v2 makes Kalshi and
+Manifold the primary sources.
+
 ## Honest caveats
 
 Real markets are near-efficient, so a positive result is the hard case, and proving an apparent edge is

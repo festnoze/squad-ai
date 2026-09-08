@@ -1,0 +1,112 @@
+{
+ "base_url": "https://api.manifold.markets",
+ "files": [
+  {
+   "derivation": "the six markets of SEARCH_IDS kept from two recorded pages, descending resolutionTime: two YES/NO keepers, two CANCEL, one MKT, one YES below the window used by the window test",
+   "file": "search_markets.json",
+   "url": "/v0/search-markets?term=&filter=resolved&sort=resolve-date&contractType=BINARY&limit=20&offset={0,20}"
+  },
+  {
+   "derivation": "verbatim",
+   "file": "market_g52tSltgqh.json",
+   "url": "/v0/market/g52tSltgqh"
+  },
+  {
+   "derivation": "verbatim, newest first",
+   "file": "bets_g52tSltgqh.json",
+   "url": "/v0/bets?contractId=g52tSltgqh&limit=1000"
+  },
+  {
+   "derivation": "verbatim, newest first",
+   "file": "comments_g52tSltgqh.json",
+   "url": "/v0/comments?contractId=g52tSltgqh&limit=1000"
+  },
+  {
+   "derivation": "verbatim",
+   "file": "market_hZh0pEPsnn.json",
+   "url": "/v0/market/hZh0pEPsnn"
+  },
+  {
+   "derivation": "verbatim, newest first",
+   "file": "bets_hZh0pEPsnn.json",
+   "url": "/v0/bets?contractId=hZh0pEPsnn&limit=1000"
+  },
+  {
+   "derivation": "verbatim, newest first",
+   "file": "comments_hZh0pEPsnn.json",
+   "url": "/v0/comments?contractId=hZh0pEPsnn&limit=1000"
+  },
+  {
+   "derivation": "three copies of the recorded g52tSltgqh lite market with one field group changed each: token CASH (cashOnlyTest1), closeTime five days after resolutionTime (zZearly00001), createdTime one second before resolutionTime (tooShortTest1)",
+   "file": "search_markets_edge.json",
+   "url": "derived"
+  },
+  {
+   "derivation": "market_g52tSltgqh.json with id, slug, createdTime and closeTime of the edge row",
+   "file": "market_zZearly00001.json",
+   "url": "derived"
+  },
+  {
+   "derivation": "the twenty newest bets of bets_g52tSltgqh.json with contractId rewritten",
+   "file": "bets_zZearly00001.json",
+   "url": "derived"
+  },
+  {
+   "derivation": "empty",
+   "file": "comments_zZearly00001.json",
+   "url": "derived"
+  },
+  {
+   "derivation": "no market, bets or comments file: the market is refused on its lite payload alone, and the test asserts the importer asked for none of the three",
+   "file": "(none) tooShortTest1",
+   "url": "derived"
+  },
+  {
+   "derivation": "the first four rows of the recorded page, ascending closeTime: three with a tape and one (p9n92gQlPy) with no bet at all, which is the open-market no-tape path",
+   "file": "search_open_markets.json",
+   "url": "/v0/search-markets?term=&filter=open&sort=close-date&contractType=BINARY&limit=20"
+  },
+  {
+   "derivation": "verbatim",
+   "file": "market_8qcRzthOO8.json",
+   "url": "/v0/market/8qcRzthOO8"
+  },
+  {
+   "derivation": "verbatim, newest first",
+   "file": "bets_8qcRzthOO8.json",
+   "url": "/v0/bets?contractId=8qcRzthOO8&limit=1000"
+  },
+  {
+   "derivation": "verbatim",
+   "file": "market_PUySSCQEcu.json",
+   "url": "/v0/market/PUySSCQEcu"
+  },
+  {
+   "derivation": "verbatim, newest first",
+   "file": "bets_PUySSCQEcu.json",
+   "url": "/v0/bets?contractId=PUySSCQEcu&limit=1000"
+  },
+  {
+   "derivation": "verbatim",
+   "file": "market_2RulS0zPUO.json",
+   "url": "/v0/market/2RulS0zPUO"
+  },
+  {
+   "derivation": "verbatim, newest first",
+   "file": "bets_2RulS0zPUO.json",
+   "url": "/v0/bets?contractId=2RulS0zPUO&limit=1000"
+  },
+  {
+   "derivation": "verbatim",
+   "file": "market_p9n92gQlPy.json",
+   "url": "/v0/market/p9n92gQlPy"
+  },
+  {
+   "derivation": "verbatim, newest first",
+   "file": "bets_p9n92gQlPy.json",
+   "url": "/v0/bets?contractId=p9n92gQlPy&limit=1000"
+  }
+ ],
+ "note": "Verbatim response bodies, re-indented and key-sorted, with the em-dash character replaced by a hyphen (house rule: no U+2014 in produced content). Times are the venue's own epoch ms.",
+ "recorded_on": "2026-09-07"
+}

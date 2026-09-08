@@ -9,12 +9,12 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from pmx.agents import AGENT_IDS
-from pmx.data.bundled import seed_dataset
-from pmx.data.loader import load_market, load_markets
-from pmx.engine import run_backtest
-from pmx.metrics import LeaderRow
-from pmx.tournament import run_tournament, walk_forward
+from pmx.v1.agents import AGENT_IDS
+from pmx.v1.data.bundled import seed_dataset
+from pmx.v1.data.loader import load_market, load_markets
+from pmx.v1.engine import run_backtest
+from pmx.v1.metrics import LeaderRow
+from pmx.v1.tournament import run_tournament, walk_forward
 
 DEFAULT_DATA = "data/markets"
 
@@ -98,7 +98,7 @@ def _cmd_walkforward(args: argparse.Namespace) -> int:
 
 
 def _cmd_import(args: argparse.Namespace) -> int:
-    from pmx.data.importer import ImportError_, import_polymarket
+    from pmx.v1.data.importer import ImportError_, import_polymarket
 
     try:
         path = import_polymarket(args.slug, Path(args.out))
@@ -113,7 +113,7 @@ def _cmd_api_serve(args: argparse.Namespace) -> int:
     try:
         import uvicorn
 
-        from pmx.api.app import create_app
+        from pmx.v1.api.app import create_app
     except ImportError as exc:
         print(f"api dependencies missing: {exc}")
         return 1

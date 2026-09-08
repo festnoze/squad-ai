@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/forecast.v1.json",
+  "title": "pmx forecast record v1",
+  "description": "One forecast of one agent on one instrument at one bar, across kinds (CONTRACTS_V2 17.5, ruling R157): on a binary the resolution probability prob_ppm and no horizons; on a continuous instrument one entry per declared horizon with the probability that the price at the horizon exceeds the reference price and, optionally, five price quantiles at QUANTILE_LEVELS_PPM. prob_ppm on a continuous instrument is the up-probability of the shortest horizon, so every consumer of prob_ppm works with no second code path. This is the shape of the hive's forecast payload, of live/forecasts.jsonl and of the horizons field of forecast_recorded.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "agent_id", "market_id", "kind", "bar_ms", "price_ref_ticks", "prob_ppm", "horizons", "genome_hash"],
+  "properties": {
+    "schema_version": { "const": "forecast.v1" },
+    "agent_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}(-[0-9a-f]{8})?$" },
+    "market_id": {
+      "type": "string",
+      "pattern": "^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$"
+    },
+    "kind": { "enum": ["binary", "spot_crypto", "perp", "fx", "equity", "future"] },
+    "bar_ms": { "$ref": "#/$defs/ms" },
+    "price_ref_ticks": {
+      "description": "The reference price: the close of the last completed bar at bar_ms (5.4), in ticks; bp on a binary.",
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 1000000000000
+    },
+    "prob_ppm": { "$ref": "#/$defs/ppm" },
+    "horizons": {
+      "type": "array",
+      "maxItems": 16,
+      "items": { "$ref": "#/$defs/horizon_forecast" }
+    },
+    "genome_hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "allOf": [
+    {
+      "description": "A binary forecast has no horizon and its reference is a bp price; a continuous one has at least one horizon.",
+      "if": { "properties": { "kind": { "const": "binary" } }, "required": ["kind"] },
+      "then": { "properties": { "horizons": { "maxItems": 0 }, "price_ref_ticks": { "maximum": 9999 } } },
+      "else": { "properties": { "horizons": { "minItems": 1 } } }
+    }
+  ],
+  "$defs": {
+    "ms": { "type": "integer", "minimum": 0 },
+    "ppm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "priceTicks": { "type": "integer", "minimum": 1, "maximum": 1000000000000 },
+    "horizon_forecast": {
+      "description": "One horizon of a continuous forecast. quantiles_ticks carries exactly five prices at QUANTILE_LEVELS_PPM = (100_000, 250_000, 500_000, 750_000, 900_000), non-decreasing, or null when the agent states direction only. The random-walk baseline is up_probability_ppm 500_000 and every quantile equal to price_ref_ticks (ruling R158).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["horizon_bars", "up_probability_ppm", "quantiles_ticks"],
+      "properties": {
+        "horizon_bars": { "type": "integer", "minimum": 1, "maximum": 99999 },
+        "up_probability_ppm": { "$ref": "#/$defs/ppm" },
+        "quantiles_ticks": {
+          "oneOf": [
+            { "type": "null" },
+            { "type": "array", "minItems": 5, "maxItems": 5, "items": { "$ref": "#/$defs/priceTicks" } }
+          ]
+        }
+      }
+    }
+  }
+}

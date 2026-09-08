@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from pmx.data.bundled import seed_dataset
-from pmx.types import Market, PricePoint
+from pmx.v1.data.bundled import seed_dataset
+from pmx.v1.types import Market, PricePoint
 
 
 @pytest.fixture

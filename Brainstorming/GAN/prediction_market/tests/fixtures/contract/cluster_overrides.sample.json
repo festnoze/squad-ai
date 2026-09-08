@@ -1,0 +1,1 @@
+{"dataset_name":"c1fixture","forbid":[{"market_ids":["kalshi-KXSENATEGA-26-D","manifold-will-georgia-legalise-sports-betting"],"note":"Same state and same month, different question: the matcher scored the subject overlap too high."}],"force":[],"schema_version":"cluster.v1.overrides","written_at_day":"2026-09-08"}

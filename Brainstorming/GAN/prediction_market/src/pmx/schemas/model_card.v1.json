@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/model_card.v1.json",
+  "title": "pmx model card v1",
+  "description": "The card of an exported learned policy: the weights digest, the feature layout it was trained against, the training fold and seeds, the validation numbers and the inference path that decides whether a rerun is byte-identical. The card is the genome of a torch_policy agent (Genome.card), so genome_hash covers the weights hash and a claim names the model it was made with. Integers only: no float, no wall clock, no provider cost. CONTRACTS_V2 section 16.5.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "model_id", "weights_sha256", "weights_bytes", "architecture", "n_parameters",
+    "inference_kind", "features_version", "features_hash", "train", "validation", "created_by", "notes"
+  ],
+  "properties": {
+    "schema_version": { "const": "model_card.v1" },
+    "model_id": { "type": "string", "pattern": "^mc-[0-9a-f]{16}$" },
+    "weights_sha256": { "$ref": "#/$defs/sha256" },
+    "weights_bytes": { "type": "integer", "minimum": 1 },
+    "architecture": { "enum": ["logistic", "gbdt", "mlp", "gru", "transformer", "qlora"] },
+    "n_parameters": { "type": "integer", "minimum": 1 },
+    "inference_kind": {
+      "description": "integer_table replays and reruns byte-identically anywhere; cpu_float32 replays from its journal anywhere and reruns identically only on the same float path (CONTRACTS_V2 16.5, ruling R120).",
+      "enum": ["integer_table", "cpu_float32"]
+    },
+    "features_version": { "type": "string", "pattern": "^features\\.v[0-9]+$" },
+    "features_hash": { "$ref": "#/$defs/sha256" },
+    "train": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_name", "dataset_hash", "fold", "t0_ms", "t1_ms", "n_markets", "algorithm", "steps",
+        "seeds", "framework", "framework_version", "device"
+      ],
+      "properties": {
+        "dataset_name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
+        "dataset_hash": { "$ref": "#/$defs/sha256" },
+        "fold": {
+          "description": "A card trained on anything but the training fold is a contaminated card; the sealed fold is unreachable outside pmx.optimizer.claims (CONTRACTS_V2 12.7).",
+          "const": "train"
+        },
+        "t0_ms": { "$ref": "#/$defs/ms" },
+        "t1_ms": { "$ref": "#/$defs/ms" },
+        "n_markets": { "type": "integer", "minimum": 1 },
+        "algorithm": { "enum": ["logistic", "gbdt", "ppo", "es", "cma_es", "qlora"] },
+        "steps": { "type": "integer", "minimum": 1 },
+        "seeds": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 },
+          "propertyNames": { "pattern": "^[a-z][a-z0-9_.]{0,47}$" }
+        },
+        "framework": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "framework_version": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "device": { "enum": ["cpu", "cuda"] }
+      }
+    },
+    "validation": {
+      "description": "Walk-forward numbers on the validation fold, in the units of CONTRACTS_V2 section 1. The floor a policy must beat is the supervised model of PRD v3 5.3, whose own card carries the same block.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fold", "n_markets", "brier_tw_micro", "skill_point_micro", "skill_lb_micro", "pnl_point_cents",
+        "pnl_lb_cents", "turnover_ppm", "n_blocks", "resamples"
+      ],
+      "properties": {
+        "fold": { "const": "validation" },
+        "n_markets": { "type": "integer", "minimum": 1 },
+        "brier_tw_micro": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+        "skill_point_micro": { "type": "integer" },
+        "skill_lb_micro": { "type": "integer" },
+        "pnl_point_cents": { "type": "integer" },
+        "pnl_lb_cents": { "type": "integer" },
+        "turnover_ppm": { "type": "integer", "minimum": 0 },
+        "n_blocks": { "type": "integer", "minimum": 0 },
+        "resamples": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "created_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pmx_version", "contract_version"],
+      "properties": {
+        "pmx_version": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "contract_version": { "type": "string", "minLength": 1, "maxLength": 32 }
+      }
+    },
+    "notes": { "type": "string", "maxLength": 1000 }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "ms": { "type": "integer", "minimum": 0 }
+  },
+  "allOf": [
+    {
+      "description": "A QLoRA fine-tune is the one architecture that may declare a parameter count above the 5 M ceiling of PRD v3 5.4, because its trained parameters are the adapter (PRD v3 section 7).",
+      "if": { "properties": { "architecture": { "enum": ["mlp", "gru", "transformer"] } }, "required": ["architecture"] },
+      "then": { "properties": { "n_parameters": { "maximum": 5000000 } } }
+    }
+  ]
+}

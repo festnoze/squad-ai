@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/news.v1.json",
+  "title": "pmx news item v1",
+  "description": "One dated item of the news of the time: a Wikipedia Current events bullet, a point-in-time background article, a Wayback front page, a GDELT article or a Manifold comment. visible_from_ms is published_at_ms plus the dataset's safety lag and is the only field the observation builder reads for as-of. CONTRACTS_V2 section 7.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "news_id", "source", "kind", "published_at_ms", "visible_from_ms", "fetched_at_ms", "url",
+    "headline", "text", "section", "wiki_links", "source_urls", "match_ids", "match_scores_permille", "lang",
+    "author_key", "revid", "asof_day"
+  ],
+  "properties": {
+    "schema_version": { "const": "news.v1" },
+    "news_id": { "type": "string", "pattern": "^(wce|wasof|wb|gd|mfc)-[0-9]{8}-[0-9]{4}$" },
+    "source": { "enum": ["wikipedia_current_events", "wikipedia_asof", "wayback", "gdelt", "manifold_comment"] },
+    "kind": { "enum": ["headline", "background", "frontpage", "article", "comment"] },
+    "published_at_ms": { "type": "integer", "minimum": 0 },
+    "visible_from_ms": { "type": "integer", "minimum": 0 },
+    "fetched_at_ms": { "type": "integer", "minimum": 0 },
+    "url": { "type": "string", "maxLength": 1024 },
+    "headline": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "text": { "type": "string", "maxLength": 4000 },
+    "section": { "type": ["string", "null"], "pattern": "^[a-z0-9_]{1,48}$" },
+    "wiki_links": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+    "source_urls": { "type": "array", "maxItems": 16, "items": { "type": "string", "maxLength": 1024 } },
+    "match_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^(kalshi|manifold|polymarket|metaculus|demo)-[A-Za-z0-9._-]{1,96}$" }
+    },
+    "match_scores_permille": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 1000 } },
+    "lang": { "const": "en" },
+    "author_key": { "type": ["string", "null"], "pattern": "^[0-9a-f]{16}$" },
+    "revid": { "type": ["integer", "null"], "minimum": 1 },
+    "asof_day": { "type": ["string", "null"], "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+  },
+  "allOf": [
+    {
+      "description": "the source fixes the kind",
+      "oneOf": [
+        { "properties": { "source": { "const": "wikipedia_current_events" }, "kind": { "const": "headline" } } },
+        { "properties": { "source": { "const": "wikipedia_asof" }, "kind": { "const": "background" } } },
+        { "properties": { "source": { "const": "wayback" }, "kind": { "const": "frontpage" } } },
+        { "properties": { "source": { "const": "gdelt" }, "kind": { "const": "article" } } },
+        { "properties": { "source": { "const": "manifold_comment" }, "kind": { "const": "comment" } } }
+      ]
+    },
+    {
+      "description": "A point-in-time background article names the revision it came from and the day it was asked for, so the snapshot is auditable against the MediaWiki API and a current revision stamped with an early date is detectable (CONTRACTS_V2 section 7.1). Every other source carries null in both.",
+      "if": { "properties": { "source": { "const": "wikipedia_asof" } }, "required": ["source"] },
+      "then": {
+        "properties": {
+          "revid": { "type": "integer", "minimum": 1 },
+          "asof_day": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+        },
+        "required": ["revid", "asof_day"]
+      },
+      "else": { "properties": { "revid": { "type": "null" }, "asof_day": { "type": "null" } } }
+    }
+  ]
+}

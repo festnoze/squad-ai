@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/market.v2.json",
+  "title": "pmx market v2",
+  "description": "One resolved binary market with its full tape: metadata, regular bars on a fixed grid, raw trades. Prices are basis points of one currency unit in [1, 9999]; times are UTC epoch milliseconds; no float anywhere. CONTRACTS_V2 section 7.2.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "id", "provider", "provider_id", "url", "question", "description", "category", "tags",
+    "currency", "source", "created_at_ms", "close_at_ms", "resolved_at_ms", "resolution", "resolution_source",
+    "event_key", "interval_min", "bars", "trades", "first_price_bp", "final_price_bp", "hardness_tags", "quality",
+    "fee_schedule_id", "notes", "wiki_subjects"
+  ],
+  "properties": {
+    "schema_version": { "const": "market.v2" },
+    "id": { "$ref": "#/$defs/marketId" },
+    "provider": { "$ref": "#/$defs/provider" },
+    "provider_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+    "url": { "type": "string", "maxLength": 512 },
+    "question": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "description": { "type": "string", "maxLength": 4000 },
+    "category": { "$ref": "#/$defs/category" },
+    "tags": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" }
+    },
+    "wiki_subjects": {
+      "description": "The market's Wikipedia subject page titles, verbatim: capitals, spaces, colons and parentheses kept, because that is what the linker of CONTRACTS_V2 section 7.6 compares an item's wiki_links against. Sorted, unique.",
+      "type": "array",
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1, "maxLength": 256 }
+    },
+    "wiki_subject_provenance": {
+      "description": "One flag per entry of wiki_subjects, in the same order: stated for a subject the provider published (a Wikipedia link in a description, a curated series map entry), derived for one computed here from the question or the title. A parallel list for the reason match_scores_permille is one beside match_ids: a subject is compared verbatim against an item's wiki_links (CONTRACTS_V2 7.6) and must stay exactly the article title. An empty list beside a non-empty wiki_subjects reads as every subject stated.",
+      "type": "array",
+      "maxItems": 8,
+      "items": { "enum": ["stated", "derived"] }
+    },
+    "currency": { "enum": ["usd", "mana"] },
+    "source": { "enum": ["imported", "reconstructed"] },
+    "created_at_ms": { "$ref": "#/$defs/ms" },
+    "close_at_ms": { "$ref": "#/$defs/ms" },
+    "resolved_at_ms": { "$ref": "#/$defs/ms" },
+    "resolution": { "enum": [0, 1] },
+    "resolution_source": { "type": "string", "maxLength": 500 },
+    "event_key": { "type": ["string", "null"], "maxLength": 128 },
+    "interval_min": { "enum": [60, 1440] },
+    "bars": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/bar" } },
+    "trades": { "type": "array", "items": { "$ref": "#/$defs/trade" } },
+    "first_price_bp": { "$ref": "#/$defs/priceBp" },
+    "final_price_bp": { "$ref": "#/$defs/priceBp" },
+    "hardness_tags": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 4,
+      "items": { "enum": ["trivial", "upset", "whipsaw", "illiquid"] }
+    },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n_trades", "unique_bettors", "life_days", "volume_milli_total", "traded_bars"],
+      "properties": {
+        "n_trades": { "$ref": "#/$defs/nonNegInt" },
+        "unique_bettors": { "type": ["integer", "null"], "minimum": 0 },
+        "life_days": { "$ref": "#/$defs/nonNegInt" },
+        "volume_milli_total": { "$ref": "#/$defs/nonNegInt" },
+        "traded_bars": { "$ref": "#/$defs/nonNegInt" },
+        "tape_kind": {
+          "description": "What the tape is made of: prints, a per-trade tape, or bars_only, a tape whose size arrives per bar and nowhere else. A bars_only market has n_trades = 0 however much it traded, because its venue publishes no settled print tape, so the min_trades filter of CONTRACTS_V2 7.4 reads traded_bars for it instead. Absent means prints, which is what every market written before the flag existed meant.",
+          "enum": ["prints", "bars_only"]
+        }
+      }
+    },
+    "fee_schedule_id": { "type": "string", "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" },
+    "notes": { "type": "string", "maxLength": 2000 }
+  },
+  "$defs": {
+    "marketId": { "type": "string", "pattern": "^(kalshi|manifold|polymarket|metaculus|demo)-[A-Za-z0-9._-]{1,96}$" },
+    "provider": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo"] },
+    "category": {
+      "enum": ["politics", "economics", "finance", "crypto", "sports", "science", "tech", "entertainment", "weather", "health", "world", "other"]
+    },
+    "ms": { "type": "integer", "minimum": 0 },
+    "nonNegInt": { "type": "integer", "minimum": 0 },
+    "priceBp": { "type": "integer", "minimum": 1, "maximum": 9999 },
+    "nullablePriceBp": { "type": ["integer", "null"], "minimum": 1, "maximum": 9999 },
+    "bar": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["t_ms", "open_bp", "high_bp", "low_bp", "close_bp", "vwap_bp", "volume_milli", "n_trades", "yes_bid_bp", "yes_ask_bp", "open_interest"],
+      "properties": {
+        "t_ms": { "$ref": "#/$defs/ms" },
+        "open_bp": { "$ref": "#/$defs/priceBp" },
+        "high_bp": { "$ref": "#/$defs/priceBp" },
+        "low_bp": { "$ref": "#/$defs/priceBp" },
+        "close_bp": { "$ref": "#/$defs/priceBp" },
+        "vwap_bp": { "$ref": "#/$defs/priceBp" },
+        "volume_milli": { "$ref": "#/$defs/nonNegInt" },
+        "n_trades": { "$ref": "#/$defs/nonNegInt" },
+        "yes_bid_bp": { "$ref": "#/$defs/nullablePriceBp" },
+        "yes_ask_bp": { "$ref": "#/$defs/nullablePriceBp" },
+        "open_interest": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "trade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["t_ms", "price_bp", "size_milli", "side"],
+      "properties": {
+        "t_ms": { "$ref": "#/$defs/ms" },
+        "price_bp": { "$ref": "#/$defs/priceBp" },
+        "size_milli": { "type": "integer", "minimum": 1 },
+        "side": { "enum": ["yes", "no", "unknown"] }
+      }
+    }
+  }
+}

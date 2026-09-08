@@ -1,0 +1,286 @@
+{
+ "closeTime": 1788782340000,
+ "coverImageUrl": "https://firebasestorage.googleapis.com/v0/b/mantic-markets.appspot.com/o/user-images%2Fdefault%2Fh9ZCIpcqRU.jpeg?alt=media&token=beedd9f4-477a-412e-a7dd-73614836fa7a",
+ "createdTime": 1785670487062,
+ "creatorAvatarUrl": "https://firebasestorage.googleapis.com/v0/b/mantic-markets.appspot.com/o/user-images%2FWeb3ICP%2F8cshqQ592A.jpeg?alt=media&token=5c7bff51-cf0a-4e1b-96da-8c5f1a7f7f7b",
+ "creatorId": "LclNrpxEnQdOUryNMHaRxUTMFqJ2",
+ "creatorName": "Web3ICP",
+ "creatorUsername": "Web3ICP",
+ "description": {
+  "content": [
+   {
+    "attrs": {
+     "level": 4
+    },
+    "content": [
+     {
+      "text": "Resolution criteria",
+      "type": "text"
+     }
+    ],
+    "type": "heading"
+   },
+   {
+    "content": [
+     {
+      "text": "This market will resolve to ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "YES",
+      "type": "text"
+     },
+     {
+      "text": " if the ocean water temperature recorded at the Santa Monica Pier, CA, reaches ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "69.0°F (approx. 20.56°C) or higher",
+      "type": "text"
+     },
+     {
+      "text": " at any point on Labor Day, ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "September 7, 2026",
+      "type": "text"
+     },
+     {
+      "text": " (between 12:00 AM and 11:59 PM PDT). Otherwise, this market will resolve to ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "NO",
+      "type": "text"
+     },
+     {
+      "text": ".",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "text": "The primary sources of truth are:",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "marks": [
+           {
+            "type": "bold"
+           }
+          ],
+          "text": "NOAA Tides & Currents (Station ID: 9410840):",
+          "type": "text"
+         },
+         {
+          "text": " ",
+          "type": "text"
+         },
+         {
+          "marks": [
+           {
+            "attrs": {
+             "class": null,
+             "href": "https://tidesandcurrents.noaa.gov/physocean.html?id=9410840",
+             "target": "_blank"
+            },
+            "type": "link"
+           }
+          ],
+          "text": "Physical Oceanography Page",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     },
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "marks": [
+           {
+            "type": "bold"
+           }
+          ],
+          "text": "NOAA National Data Buoy Center (Station ID: ICAC1):",
+          "type": "text"
+         },
+         {
+          "text": " ",
+          "type": "text"
+         },
+         {
+          "marks": [
+           {
+            "attrs": {
+             "class": null,
+             "href": "https://www.ndbc.noaa.gov/station_page.php?station=icac1",
+             "target": "_blank"
+            },
+            "type": "link"
+           }
+          ],
+          "text": "NDBC Station ICAC1 Page",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     }
+    ],
+    "type": "bulletList"
+   },
+   {
+    "content": [
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "Resolution Details & Fallbacks:",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "text": "If the primary station (9410840 / ICAC1) is offline or fails to report data for the entirety of September 7, 2026, the market will resolve using data from the nearby ",
+          "type": "text"
+         },
+         {
+          "marks": [
+           {
+            "attrs": {
+             "class": null,
+             "href": "https://www.ndbc.noaa.gov/station_page.php?station=46221",
+             "target": "_blank"
+            },
+            "type": "link"
+           }
+          ],
+          "text": "NOAA Station 46221 (Santa Monica Bay)",
+          "type": "text"
+         },
+         {
+          "text": ". If both sources are completely offline and no reliable backup data from other reputable agencies is available, the market will resolve to N/A.",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     }
+    ],
+    "type": "bulletList"
+   },
+   {
+    "attrs": {
+     "level": 4
+    },
+    "content": [
+     {
+      "text": "Background",
+      "type": "text"
+     }
+    ],
+    "type": "heading"
+   },
+   {
+    "content": [
+     {
+      "text": "Ocean water temperatures at the Santa Monica Pier typically peak in late summer (August and September). While historical averages for early September hover in the mid-to-high 60s, local meteorological factors, El Niño/La Niña cycles, and coastal upwelling can cause significant daily and annual variations. Real-time readings from NOAA’s National Water Level Observation Network (NWLON) station, located directly on the pier, provide continuous observations.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "marks": [
+       {
+        "type": "italic"
+       }
+      ],
+      "text": "This description was generated by AI. Review and verify everything here yourself. You can edit, replace, or delete any part of this description, including the resolution criteria. You do not need to trust the AI output.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   }
+  ],
+  "type": "doc"
+ },
+ "id": "8qcRzthOO8",
+ "isResolved": false,
+ "lastBetTime": 1788591182722,
+ "lastCommentTime": 1788591197776,
+ "lastUpdatedTime": 1788591197813,
+ "mechanism": "cpmm-1",
+ "outcomeType": "BINARY",
+ "p": 0.4999999999999997,
+ "pool": {
+  "NO": 185.3567451474547,
+  "YES": 53.950019418202515
+ },
+ "probability": 0.7745570647945449,
+ "question": "Will the ocean water temperature at Santa Monica Pier reach 69.0°F or higher on Labor Day 2026? (9/7/26)",
+ "slug": "will-the-ocean-water-temperature-at",
+ "textDescription": "Resolution criteria\n\nThis market will resolve to YES if the ocean water temperature recorded at the Santa Monica Pier, CA, reaches 69.0°F (approx. 20.56°C) or higher at any point on Labor Day, September 7, 2026 (between 12:00 AM and 11:59 PM PDT). Otherwise, this market will resolve to NO.\n\nThe primary sources of truth are:\n\nNOAA Tides & Currents (Station ID: 9410840): Physical Oceanography Page\n\nNOAA National Data Buoy Center (Station ID: ICAC1): NDBC Station ICAC1 Page\n\nResolution Details & Fallbacks:\n\nIf the primary station (9410840 / ICAC1) is offline or fails to report data for the entirety of September 7, 2026, the market will resolve using data from the nearby NOAA Station 46221 (Santa Monica Bay). If both sources are completely offline and no reliable backup data from other reputable agencies is available, the market will resolve to N/A.\n\nBackground\n\nOcean water temperatures at the Santa Monica Pier typically peak in late summer (August and September). While historical averages for early September hover in the mid-to-high 60s, local meteorological factors, El Niño/La Niña cycles, and coastal upwelling can cause significant daily and annual variations. Real-time readings from NOAA’s National Water Level Observation Network (NWLON) station, located directly on the pier, provide continuous observations.\n\nThis description was generated by AI. Review and verify everything here yourself. You can edit, replace, or delete any part of this description, including the resolution criteria. You do not need to trust the AI output.",
+ "token": "MANA",
+ "totalLiquidity": 100,
+ "uniqueBettorCount": 11,
+ "url": "https://manifold.markets/Web3ICP/will-the-ocean-water-temperature-at",
+ "volume": 194.11889385033584,
+ "volume24Hours": 0
+}

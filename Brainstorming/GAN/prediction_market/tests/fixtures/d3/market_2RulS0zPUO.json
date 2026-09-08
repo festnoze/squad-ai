@@ -1,0 +1,145 @@
+{
+ "closeTime": 1788794400000,
+ "createdTime": 1788189732694,
+ "creatorAvatarUrl": "https://lh3.googleusercontent.com/a/ACg8ocJZmUL-1xmMrFSU-ekuZHCKFpvBUPEn639hjtN9HNCfQljX8A=s96-c",
+ "creatorId": "9HwaLhKtEJOVqDKuvgTcfFTtztl1",
+ "creatorName": "jaen",
+ "creatorUsername": "jaen",
+ "description": {
+  "content": [
+   {
+    "content": [
+     {
+      "text": "( it is wheeled and I am back tilting ) ",
+      "type": "text"
+     },
+     {
+      "type": "hardBreak"
+     },
+     {
+      "text": "I have a good track record of tipping my chairs back in school, now I'm just trying to get back my full vibe.",
+      "type": "text"
+     },
+     {
+      "type": "hardBreak"
+     },
+     {
+      "text": "Few more details :  ",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "text": "I'll try to keep up with it on half of my 7 work hours each day of this week.",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     }
+    ],
+    "type": "bulletList"
+   },
+   {
+    "content": [
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "text": "If my bosses decide to halt this I won't be able to keep the schedule as I am in an open space with a clear line of sight from their desks.",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     }
+    ],
+    "type": "bulletList"
+   },
+   {
+    "content": [
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "text": "The office ground is carpeted.",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     },
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "text": "Coworkers are aware of the bet.",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     }
+    ],
+    "type": "bulletList"
+   },
+   {
+    "content": [
+     {
+      "type": "hardBreak"
+     },
+     {
+      "text": "PS : rip second f ;'(",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   }
+  ],
+  "type": "doc"
+ },
+ "groupSlugs": [
+  "personal",
+  "extremely-serious-and-important-que"
+ ],
+ "id": "2RulS0zPUO",
+ "isResolved": false,
+ "lastBetTime": 1788418530206,
+ "lastCommentTime": 1788271323052,
+ "lastUpdatedTime": 1788418530206,
+ "mechanism": "cpmm-1",
+ "outcomeType": "BINARY",
+ "p": 0.5000000000000001,
+ "pool": {
+  "NO": 104.08329997330667,
+  "YES": 96.07689228305232
+ },
+ "probability": 0.5200000000000001,
+ "question": "Will I fall of my office chair ?",
+ "slug": "will-i-fall-of-my-office-chair",
+ "textDescription": "( it is wheeled and I am back tilting ) \nI have a good track record of tipping my chairs back in school, now I'm just trying to get back my full vibe.\nFew more details :  \n\nI'll try to keep up with it on half of my 7 work hours each day of this week.\n\nIf my bosses decide to halt this I won't be able to keep the schedule as I am in an open space with a clear line of sight from their desks.\n\nThe office ground is carpeted.\n\nCoworkers are aware of the bet.\n\n\nPS : rip second f ;'(",
+ "token": "MANA",
+ "totalLiquidity": 100,
+ "uniqueBettorCount": 22,
+ "url": "https://manifold.markets/jaen/will-i-fall-of-my-office-chair",
+ "volume": 246.2758211064525,
+ "volume24Hours": 0
+}

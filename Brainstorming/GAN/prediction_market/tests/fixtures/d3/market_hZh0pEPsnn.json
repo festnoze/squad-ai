@@ -1,0 +1,138 @@
+{
+ "closeTime": 1788220740000,
+ "createdTime": 1782730622835,
+ "creatorAvatarUrl": "https://firebasestorage.googleapis.com/v0/b/mantic-markets.appspot.com/o/user-images%2FAIBear%2FNXI_JdzQGK.png?alt=media&token=281a8185-e906-42c9-9d2c-0437a118bfc3",
+ "creatorId": "P6S5rDrKA9d5tWUdvS7yATJeyEJ3",
+ "creatorName": "Limerick Ostrich",
+ "creatorUsername": "AIBear",
+ "description": {
+  "content": [
+   {
+    "content": [
+     {
+      "text": "Resolves based on the \"Russian Net Monthly Advance\" report of Black Bird group (positive values resolve NO, negative resolve YES) - typically published at their X account (",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "attrs": {
+         "class": "break-anywhere hover:underline hover:decoration-primary-400 hover:decoration-2 active:underline active:decoration-primary-400",
+         "href": "http://xcancel.com/Black_BirdGroup",
+         "target": "_blank"
+        },
+        "type": "link"
+       }
+      ],
+      "text": "xcancel.com/Black_BirdGroup",
+      "type": "text"
+     },
+     {
+      "text": "). Here is their assessment as of May 2026 (from ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "attrs": {
+         "class": "break-anywhere hover:underline hover:decoration-primary-400 hover:decoration-2 active:underline active:decoration-primary-400",
+         "href": "https://xcancel.com/Black_BirdGroup/status/2062585511340916856",
+         "target": "_blank"
+        },
+        "type": "link"
+       }
+      ],
+      "text": "https://xcancel.com/Black_BirdGroup/status/2062585511340916856",
+      "type": "text"
+     },
+     {
+      "text": "):",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "attrs": {
+     "alt": null,
+     "src": "https://firebasestorage.googleapis.com/v0/b/mantic-markets.appspot.com/o/user-images%2Fdefault%2FspgPO0S25t.png?alt=media&token=8b024c6a-f88b-43b8-b576-aa0109aec2e9",
+     "title": null
+    },
+    "type": "image"
+   },
+   {
+    "content": [
+     {
+      "text": "For context some analysts like Mike Kofman (e.g. in ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "attrs": {
+         "class": "break-anywhere hover:underline hover:decoration-primary-400 hover:decoration-2 active:underline active:decoration-primary-400",
+         "href": "https://podcasts.apple.com/us/podcast/the-long-game-with-jake-sullivan-and-jon-finer/id1850526014?i=1000771130026",
+         "target": "_blank"
+        },
+        "type": "link"
+       }
+      ],
+      "text": "https://podcasts.apple.com/us/podcast/the-long-game-with-jake-sullivan-and-jon-finer/id1850526014?i=1000771130026",
+      "type": "text"
+     },
+     {
+      "text": ") believe that Ukraine has gained initiative on the battlefield and is likely to keep it for the next few months.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "text": "If the group does not publish a new assessment following the same methodology by October 1st, this resolves NA.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   }
+  ],
+  "type": "doc"
+ },
+ "groupSlugs": [
+  "world-default",
+  "russia",
+  "wars",
+  "ukrainerussia-war",
+  "ukraine"
+ ],
+ "id": "hZh0pEPsnn",
+ "isResolved": true,
+ "lastBetTime": 1787868962120,
+ "lastCommentTime": 1788724186677,
+ "lastUpdatedTime": 1788724186728,
+ "mechanism": "cpmm-1",
+ "outcomeType": "BINARY",
+ "p": 0.5000000000000009,
+ "pool": {
+  "NO": 48.56088909701639,
+  "YES": 205.92703687985784
+ },
+ "probability": 0.19081804730268165,
+ "question": "Will Ukraine capture more territory than it loses to Russia in August 2026?",
+ "resolution": "NO",
+ "resolutionProbability": 0.19081804730268165,
+ "resolutionTime": 1788724159182,
+ "resolverId": "P6S5rDrKA9d5tWUdvS7yATJeyEJ3",
+ "slug": "will-ukraine-capture-more-territory-lEqEsPOzyq",
+ "textDescription": "Resolves based on the \"Russian Net Monthly Advance\" report of Black Bird group (positive values resolve NO, negative resolve YES) - typically published at their X account (xcancel.com/Black_BirdGroup). Here is their assessment as of May 2026 (from https://xcancel.com/Black_BirdGroup/status/2062585511340916856):\n\n[image]For context some analysts like Mike Kofman (e.g. in https://podcasts.apple.com/us/podcast/the-long-game-with-jake-sullivan-and-jon-finer/id1850526014?i=1000771130026) believe that Ukraine has gained initiative on the battlefield and is likely to keep it for the next few months.\n\nIf the group does not publish a new assessment following the same methodology by October 1st, this resolves NA.",
+ "token": "MANA",
+ "totalLiquidity": 100,
+ "uniqueBettorCount": 34,
+ "url": "https://manifold.markets/AIBear/will-ukraine-capture-more-territory-lEqEsPOzyq",
+ "volume": 1770.9768470222843,
+ "volume24Hours": 0
+}

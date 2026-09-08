@@ -1,0 +1,70 @@
+[
+  {
+    "id": "530118",
+    "question": "Will Atlas FC win the 2026 Continental Cup?",
+    "conditionId": "0xb28d4c8fae1f5b3c9d2e7f6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c",
+    "slug": "will-atlas-fc-win-the-2026-continental-cup",
+    "resolutionSource": "",
+    "endDate": "2026-06-14T20:00:00Z",
+    "startDate": "2026-05-10T16:00:00Z",
+    "createdAt": "2026-05-10T16:00:00Z",
+    "closedTime": "2026-06-14T23:30:00Z",
+    "description": "Resolves YES if Atlas FC lifts the 2026 Continental Cup, NO otherwise.",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0\", \"1\"]",
+    "clobTokenIds": "[\"10029384756019283746501928374650192837465019283746501928374650192837465019283\", \"88827364501928374650192837465019283746501928374650192837465019283746501928374\"]",
+    "volume": "402117.8",
+    "active": false,
+    "closed": true,
+    "category": "Sports",
+    "tags": [
+      {
+        "slug": "soccer",
+        "label": "Soccer"
+      }
+    ],
+    "events": [
+      {
+        "id": "19100",
+        "slug": "2026-continental-cup",
+        "title": "2026 Continental Cup",
+        "category": "Sports"
+      }
+    ]
+  },
+  {
+    "id": "551444",
+    "question": "Will the Federal Reserve cut the target rate by at least 50 bps at its July 2026 meeting?",
+    "slug": "will-the-federal-reserve-cut-the-target-rate-by-at-least-fifty-basis-points-at-its-july-2026-meeting-according-to-the-fomc-statement",
+    "resolutionSource": "https://www.federalreserve.gov/newsevents/pressreleases.htm",
+    "endDate": "2026-07-29T18:00:00Z",
+    "startDate": "2026-07-01T00:00:00Z",
+    "createdAt": "2026-07-01T13:22:00Z",
+    "closedTime": "2026-07-29T18:42:00Z",
+    "description": "Resolves YES if the FOMC statement of the July 2026 meeting cuts the target range by 50 bps or more.",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0\", \"1\"]",
+    "clobTokenIds": "[\"40128374650192837465019283746501928374650192837465019283746501928374650192837\", \"40928374650192837465019283746501928374650192837465019283746501928374650192838\"]",
+    "volume": "2210004.4",
+    "active": false,
+    "closed": true,
+    "category": "Fed Rates",
+    "tags": [
+      {
+        "slug": "fed-rates",
+        "label": "Fed Rates"
+      },
+      {
+        "slug": "economy",
+        "label": "Economy"
+      }
+    ],
+    "events": [
+      {
+        "id": "20011",
+        "slug": "fed-decision-july-2026",
+        "category": "Economics"
+      }
+    ]
+  }
+]

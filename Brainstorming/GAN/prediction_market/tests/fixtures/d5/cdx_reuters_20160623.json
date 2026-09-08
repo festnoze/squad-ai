@@ -1,0 +1,20 @@
+[
+ [
+  "urlkey",
+  "timestamp",
+  "original",
+  "mimetype",
+  "statuscode",
+  "digest",
+  "length"
+ ],
+ [
+  "com,reuters)/",
+  "20160623000840",
+  "http://www.reuters.com/",
+  "text/html",
+  "200",
+  "4E3ZXOFNRNUAMFPOI6MOCBW6G5QVGCXJ",
+  "26547"
+ ]
+]

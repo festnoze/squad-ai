@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/features.v1.json",
+  "title": "pmx feature vector layout v1",
+  "description": "The declaration document of the integer feature vector: one entry per named field, in vector order, with its unit, its clamp bounds and the scale that produces the float view. features_hash is sha256(canonical_json(features)) and enters the run manifest and every model card, so a policy trained on one layout cannot be evaluated against another. A single vector validates against #/$defs/feature_vector. CONTRACTS_V2 section 16.5.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "features_version", "features_hash", "n_features", "float_view", "quantise",
+    "embedding", "features"
+  ],
+  "properties": {
+    "schema_version": { "const": "features.v1" },
+    "features_version": { "type": "string", "pattern": "^features\\.v[0-9]+$" },
+    "features_hash": { "$ref": "#/$defs/sha256" },
+    "n_features": { "type": "integer", "minimum": 1, "maximum": 4096 },
+    "float_view": {
+      "description": "The one conversion torch is allowed to see: clamp to [lo, hi], then divide by scale. It is one way; no float ever returns through it (CONTRACTS_V2 16.5).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dtype", "clamp", "divide_by_scale"],
+      "properties": {
+        "dtype": { "enum": ["float32"] },
+        "clamp": { "const": true },
+        "divide_by_scale": { "const": true }
+      }
+    },
+    "quantise": {
+      "description": "How a policy's raw outputs become integers before anything is journaled: a probability becomes ppm, a position becomes whole contracts, both rounded half up and clamped.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prob_scale", "rounding", "position_unit", "clamp_lo_ppm", "clamp_hi_ppm"],
+      "properties": {
+        "prob_scale": { "const": 1000000 },
+        "rounding": { "const": "half_up" },
+        "position_unit": { "const": 1 },
+        "clamp_lo_ppm": { "const": 0 },
+        "clamp_hi_ppm": { "const": 1000000 }
+      }
+    },
+    "embedding": {
+      "description": "The as-of text embedding block, computed at build time and stored per NewsItem, never part of the scalar vector. null when the dataset carries none.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["model_id", "dim", "scale", "stored", "trained_before_ms"],
+          "properties": {
+            "model_id": { "type": "string", "minLength": 1, "maxLength": 128 },
+            "dim": { "type": "integer", "minimum": 1, "maximum": 4096 },
+            "scale": { "type": "integer", "minimum": 1 },
+            "stored": { "const": "per_news_item" },
+            "trained_before_ms": { "type": "integer", "minimum": 0 }
+          }
+        }
+      ]
+    },
+    "features": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/feature_spec" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "feature_spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["index", "name", "unit", "lo", "hi", "scale", "source", "asof_only", "description"],
+      "properties": {
+        "index": { "type": "integer", "minimum": 0, "maximum": 4095 },
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,47}$" },
+        "unit": { "enum": ["bp", "ppm", "milli", "permille", "cents", "count", "index", "ms"] },
+        "lo": { "type": "integer" },
+        "hi": { "type": "integer" },
+        "scale": { "type": "integer", "minimum": 1 },
+        "source": {
+          "enum": ["market_view", "bars", "calendar", "category", "news", "cluster", "constraint", "portfolio"]
+        },
+        "asof_only": { "type": "boolean" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 300 }
+      },
+      "allOf": [
+        {
+          "description": "A cluster or constraint field may be computed only over an as-of cluster (CONTRACTS_V2 16.3, ruling R116), so it declares asof_only: true and every other field declares false.",
+          "if": {
+            "properties": { "source": { "enum": ["cluster", "constraint"] } },
+            "required": ["source"]
+          },
+          "then": { "properties": { "asof_only": { "const": true } } },
+          "else": { "properties": { "asof_only": { "const": false } } }
+        }
+      ]
+    },
+    "feature_vector": {
+      "description": "One built vector: the values in layout order, stamped with the layout hash that produced them and with the bar it is as of.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["features_hash", "agent_id", "market_id", "bar_ms", "values"],
+      "properties": {
+        "features_hash": { "$ref": "#/$defs/sha256" },
+        "agent_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}(-[0-9a-f]{8})?$" },
+        "market_id": {
+          "type": "string",
+          "pattern": "^(kalshi|manifold|polymarket|metaculus|demo)-[A-Za-z0-9._-]{1,96}$"
+        },
+        "bar_ms": { "type": "integer", "minimum": 0 },
+        "values": { "type": "array", "minItems": 1, "items": { "type": "integer" } }
+      }
+    }
+  }
+}

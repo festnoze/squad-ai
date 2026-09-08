@@ -1,0 +1,8 @@
+{
+ "error": {
+  "code": "missingtitle",
+  "docref": "See https://en.wikipedia.org/w/api.php for API usage.",
+  "info": "The page you specified doesn't exist."
+ },
+ "servedby": "mw-api-ext.eqiad.main-0000000000-00000"
+}

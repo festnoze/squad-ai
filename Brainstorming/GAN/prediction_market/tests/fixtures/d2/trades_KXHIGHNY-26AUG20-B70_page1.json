@@ -1,0 +1,23 @@
+{
+  "trades": [
+    {
+      "trade_id": "h-0001",
+      "ticker": "KXHIGHNY-26AUG20-B70",
+      "count_fp": "4.0000",
+      "yes_price_dollars": "0.32",
+      "no_price_dollars": "0.68",
+      "created_time": "2026-08-20T13:20:00Z",
+      "taker_side": "yes"
+    },
+    {
+      "trade_id": "h-0002",
+      "ticker": "KXHIGHNY-26AUG20-B70",
+      "count_fp": "6.0000",
+      "yes_price_dollars": "0.93",
+      "no_price_dollars": "0.07",
+      "created_time": "2026-08-20T22:41:00Z",
+      "taker_side": "yes"
+    }
+  ],
+  "cursor": ""
+}

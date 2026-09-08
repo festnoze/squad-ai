@@ -1,0 +1,38 @@
+{
+  "_what": "The ANJ block, recorded from this machine (France) on 2026-09-07 against the three Polymarket API hosts.",
+  "recorded_on": "2026-09-07",
+  "recorded_with": "curl 8.x with -k for the body, httpx 0.28.1 on CPython 3.12.1 for the TLS failure, ssl.getpeercert(binary_form=True) for the certificate names",
+  "url": "https://gamma-api.polymarket.com/markets?slug=will-bitcoin-reach-100000-in-2024",
+  "status": 200,
+  "headers": {
+    "content-length": "14547",
+    "content-type": "text/html"
+  },
+  "body_file": "anj_block_page.html",
+  "body_sha256": "2f0b088f9c945ccf1a182f1a7e7d01f70b193bbb44b23d8d4011df70e52f635c",
+  "resolved_ip": "145.239.225.117",
+  "hosts_blocked": [
+    "gamma-api.polymarket.com",
+    "clob.polymarket.com",
+    "data-api.polymarket.com"
+  ],
+  "certificate": {
+    "dns_names": ["*.anj.fr", "anj.fr"],
+    "der_sha256_prefix": "be39d46f692e542642c1216448c36604",
+    "note": "One certificate for all three hosts: they answer on the same address and none of them serves a Polymarket certificate."
+  },
+  "tls_error": {
+    "type": "httpx.ConnectError",
+    "message": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'gamma-api.polymarket.com'. (_ssl.c:1000)",
+    "chain": [
+      "httpx.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'gamma-api.polymarket.com'. (_ssl.c:1000)",
+      "httpcore.ConnectError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'gamma-api.polymarket.com'. (_ssl.c:1000)",
+      "ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Hostname mismatch, certificate is not valid for 'gamma-api.polymarket.com'. (_ssl.c:1000)"
+    ],
+    "note": "CPython 3.12 states the host it asked for and not the names the certificate carries, so the mismatch itself is the signature; older stacks spell out '*.anj.fr' and the detector reads that too (fixture anj_certificate_error.json)."
+  },
+  "curl_without_k": {
+    "exit_code": 60,
+    "meaning": "SSL peer certificate or SSH remote key was not OK"
+  }
+}

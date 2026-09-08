@@ -1,0 +1,132 @@
+{
+ "closeTime": 1789164372361,
+ "coverImageUrl": "https://firebasestorage.googleapis.com/v0/b/mantic-markets.appspot.com/o/user-images%2Fdefault%2F6Sl5uS206h.png?alt=media&token=069b721e-7175-4ef7-9972-c547f8adf69b",
+ "createdTime": 1786879850973,
+ "creatorAvatarUrl": "https://firebasestorage.googleapis.com/v0/b/mantic-markets.appspot.com/o/user-images%2FTantalost%2F0L89I92An9.png?alt=media&token=46655dbd-e54c-4f4d-a7b2-f32e9ed4fe6d",
+ "creatorId": "6Cou8rRDpMSLmeU7P6Fe1MiB8CT2",
+ "creatorName": "Tantalost",
+ "creatorUsername": "Tantalost",
+ "description": {
+  "content": [
+   {
+    "content": [
+     {
+      "text": "This market resolves ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "YES",
+      "type": "text"
+     },
+     {
+      "text": " if Bündnis Sahra Wagenknecht – Vernunft und Gerechtigkeit (BSW) receives at least ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "5.00% of the valid Zweitstimmen (secondary votes)",
+      "type": "text"
+     },
+     {
+      "text": " in the 2026 Saxony-Anhalt state election, thereby clearing the 5% threshold for representation in the Landtag.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "type": "hardBreak"
+     },
+     {
+      "text": "It resolves ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "NO",
+      "type": "text"
+     },
+     {
+      "text": " if BSW receives less than ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "5.00%",
+      "type": "text"
+     },
+     {
+      "text": " and therefore fails to clear the 5% threshold.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "type": "hardBreak"
+     },
+     {
+      "text": "Resolution will be based on the official final election result.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   }
+  ],
+  "type": "doc"
+ },
+ "groupSlugs": [
+  "elections",
+  "politics-default",
+  "bsw",
+  "germany",
+  "german-politics"
+ ],
+ "id": "zZearly00001",
+ "isResolved": true,
+ "lastBetTime": 1788731320874,
+ "lastCommentTime": 1788733303509,
+ "lastUpdatedTime": 1788733303548,
+ "mechanism": "cpmm-1",
+ "outcomeType": "BINARY",
+ "p": 0.5000000000000012,
+ "pool": {
+  "NO": 6847.745781579529,
+  "YES": 146.03345858574545
+ },
+ "probability": 0.9791195212815591,
+ "question": "BSW receives at least 5% and enters the Saxony-Anhalt Landtag",
+ "resolution": "YES",
+ "resolutionProbability": 0.9791195212815591,
+ "resolutionTime": 1788732372361,
+ "resolverId": "6Cou8rRDpMSLmeU7P6Fe1MiB8CT2",
+ "slug": "early-resolution-test",
+ "textDescription": "This market resolves YES if Bündnis Sahra Wagenknecht – Vernunft und Gerechtigkeit (BSW) receives at least 5.00% of the valid Zweitstimmen (secondary votes) in the 2026 Saxony-Anhalt state election, thereby clearing the 5% threshold for representation in the Landtag.\n\n\nIt resolves NO if BSW receives less than 5.00% and therefore fails to clear the 5% threshold.\n\n\nResolution will be based on the official final election result.",
+ "token": "MANA",
+ "totalLiquidity": 1000,
+ "uniqueBettorCount": 29,
+ "url": "https://manifold.markets/Tantalost/bsw-receives-at-least-5-and-enters",
+ "volume": 15999.04600247696,
+ "volume24Hours": 13976.992404184251
+}

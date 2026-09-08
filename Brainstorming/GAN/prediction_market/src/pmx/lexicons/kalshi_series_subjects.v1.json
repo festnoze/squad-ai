@@ -1,0 +1,2909 @@
+{
+ "schema": "kalshi_series_subjects.v1",
+ "notes": "Kalshi series ticker to the English Wikipedia article titles that are the market's subject, verbatim as the linker of CONTRACTS_V2 section 7.6 compares them against a news item's wiki_links. These are stated subjects: a human named them from the series title, so a market of the series carries them with provenance stated and the wikipedia_asof schedule keys on them before any title-derived candidate. A series absent from this map still gets the candidates its own title yields, at provenance derived. Assigned from the series titles in the build cache of data/datasets/y2026 on 2026-09-08; a title nobody could name with confidence is left out rather than guessed at.",
+ "series": {
+  "538APPROVE": [
+   "Donald Trump",
+   "United States presidential approval rating"
+  ],
+  "AAAGASD": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "AAAGASM": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "AAAGASW": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "APRPOTUS": [
+   "Donald Trump",
+   "United States presidential approval rating"
+  ],
+  "ARINFLATIONM": [
+   "Argentina",
+   "Inflation"
+  ],
+  "ASYLUMCASES": [
+   "Illegal immigration to the United States",
+   "U.S. Customs and Border Protection"
+  ],
+  "AVGTEMP": [
+   "Climate of the United States",
+   "Weather forecasting"
+  ],
+  "BANKRUPTS": [
+   "Bankruptcy in the United States",
+   "Chapter 11, Title 11, United States Code"
+  ],
+  "BOOSTER": [
+   "COVID-19 vaccine",
+   "COVID-19 pandemic"
+  ],
+  "BOOSTERM": [
+   "COVID-19 vaccine",
+   "COVID-19 pandemic"
+  ],
+  "BTC": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "BTCD": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "BTCD-B": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "BTCMAXM": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "CASE7DCN": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "CASED": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "CASEM": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "CASEW": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "CASEWCN": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "CASEWDE": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "CASEWFR": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "CASEWIT": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "CNY": [
+   "Renminbi",
+   "United States dollar"
+  ],
+  "CO2": [
+   "Carbon dioxide",
+   "Greenhouse gas emissions"
+  ],
+  "CPI": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CPIAPPAREL": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CPICORE": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CPICOREYOY": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CPIFOOD": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CPIGAS": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CPISHELTER": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CPIUSEDCAR": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CPIYOY": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "CRED": [
+   "Credit card debt",
+   "Consumer debt"
+  ],
+  "DIESEL": [
+   "Diesel fuel",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "DIESELM": [
+   "Diesel fuel",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "ERCOTX": [
+   "Electric Reliability Council of Texas",
+   "Electricity"
+  ],
+  "ETH": [
+   "Ethereum",
+   "Cryptocurrency"
+  ],
+  "ETHD": [
+   "Ethereum",
+   "Cryptocurrency"
+  ],
+  "EURO": [
+   "Euro",
+   "United States dollar"
+  ],
+  "EUROIMF": [
+   "Euro",
+   "United States dollar"
+  ],
+  "EURUSD": [
+   "Euro",
+   "United States dollar"
+  ],
+  "EURUSDH": [
+   "Euro",
+   "United States dollar"
+  ],
+  "EVMKT": [
+   "Electric vehicle",
+   "Plug-in electric vehicle"
+  ],
+  "FLIGHTJFK": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "FLIGHTLAX": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "FLIGHTORD": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "FRM": [
+   "Mortgage loan",
+   "Interest rate"
+  ],
+  "FXEURO": [
+   "Euro",
+   "United States dollar"
+  ],
+  "FXPESO": [
+   "Mexican peso",
+   "United States dollar"
+  ],
+  "GAS": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "GAS-MONTH": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "GASM": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "GBP": [
+   "Pound sterling",
+   "United States dollar"
+  ],
+  "GOLD": [
+   "Gold as an investment",
+   "Gold"
+  ],
+  "HAPPIER": [
+   "Billie Eilish",
+   "Happier Than Ever"
+  ],
+  "HIGHAUS": [
+   "Austin, Texas",
+   "Weather forecasting"
+  ],
+  "HIGHCHI": [
+   "Chicago",
+   "Weather forecasting"
+  ],
+  "HIGHMIA": [
+   "Miami",
+   "Weather forecasting"
+  ],
+  "HIGHNY": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "HIGHNY0": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "HIGHUS": [
+   "Climate of the United States",
+   "Weather forecasting"
+  ],
+  "HMONTH": [
+   "Climate of the United States",
+   "Weather forecasting"
+  ],
+  "HOME": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "HOMEUS": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "HOUSELENGTH": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "HOUSESTART": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "HPI": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "INX": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "INXAB": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "INXM": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "INXU": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "INXW": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "INXZ": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "JOBLESS": [
+   "Unemployment benefits",
+   "Unemployment in the United States"
+  ],
+  "JPY": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "KX10YUSTSRY": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KX30YMORTW": [
+   "Mortgage loan",
+   "Interest rate"
+  ],
+  "KX30YUSTW": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KX538APPROVE": [
+   "Donald Trump",
+   "United States presidential approval rating"
+  ],
+  "KXA100W": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXAAAEVM": [
+   "Electricity pricing",
+   "Electricity"
+  ],
+  "KXAAAGASD": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDCA": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDFL": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDGA": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDIL": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDNC": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDNJ": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDNY": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDOH": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDPA": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDTX": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASDWA": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASM": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASMAXM": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASMINM": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASW": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAAAGASWNJ": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXAIADOPTION": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAIFINANCE": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAIFOOD": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAIHEALTH": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAIJOBLOSS": [
+   "Layoff",
+   "Unemployment in the United States"
+  ],
+  "KXAIMANU": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAIRFARECPI": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXAISPEND1": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAISPEND10": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAITECH": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAMSAVO": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXANTHADOPT": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXAPRPOTUS": [
+   "Donald Trump",
+   "United States presidential approval rating"
+  ],
+  "KXARINFLATIONM": [
+   "Argentina",
+   "Inflation"
+  ],
+  "KXARMOMINF": [
+   "Argentina",
+   "Inflation"
+  ],
+  "KXARNAULTNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXASPSNOWM": [
+   "Aspen, Colorado",
+   "Weather forecasting"
+  ],
+  "KXASYLUMCASES": [
+   "Illegal immigration to the United States",
+   "U.S. Customs and Border Protection"
+  ],
+  "KXAUDUSDAD": [
+   "Australian dollar",
+   "United States dollar"
+  ],
+  "KXAUDUSDAW": [
+   "Australian dollar",
+   "United States dollar"
+  ],
+  "KXAUDUSDW": [
+   "Australian dollar",
+   "United States dollar"
+  ],
+  "KXAUNABCONF": [
+   "Australia",
+   "Economy of Australia"
+  ],
+  "KXAUSSNOWM": [
+   "Austin, Texas",
+   "Weather forecasting"
+  ],
+  "KXAUTRADEBAL": [
+   "Australia",
+   "Economy of Australia"
+  ],
+  "KXAUWPCC": [
+   "Australia",
+   "Economy of Australia"
+  ],
+  "KXAVAX": [
+   "Avalanche (blockchain platform)",
+   "Cryptocurrency"
+  ],
+  "KXAVAXD": [
+   "Avalanche (blockchain platform)",
+   "Cryptocurrency"
+  ],
+  "KXAVGTATL": [
+   "Atlanta",
+   "Weather forecasting"
+  ],
+  "KXAVGTEMP": [
+   "Climate of the United States",
+   "Weather forecasting"
+  ],
+  "KXAVGTKAUS": [
+   "Austin, Texas",
+   "Weather forecasting"
+  ],
+  "KXAVGTKDEN": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXAVGTKDFW": [
+   "Dallas",
+   "Weather forecasting"
+  ],
+  "KXAVGTKIAH": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "KXAVGTKLAS": [
+   "Phoenix, Arizona",
+   "Weather forecasting"
+  ],
+  "KXAVGTKMSY": [
+   "New Orleans",
+   "Weather forecasting"
+  ],
+  "KXAVGTKOKC": [
+   "Oklahoma City",
+   "Weather forecasting"
+  ],
+  "KXAVGTKPHX": [
+   "Phoenix, Arizona",
+   "Weather forecasting"
+  ],
+  "KXAVGTKSAN": [
+   "San Diego",
+   "Weather forecasting"
+  ],
+  "KXAVGTKSAT": [
+   "San Antonio",
+   "Weather forecasting"
+  ],
+  "KXB200AVGTEST": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXB200MON": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXB200MS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXB200W": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXB200WS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXBALLMERNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXBANKRUPTS": [
+   "Bankruptcy in the United States",
+   "Chapter 11, Title 11, United States Code"
+  ],
+  "KXBCH": [
+   "Bitcoin Cash",
+   "Cryptocurrency"
+  ],
+  "KXBCHD": [
+   "Bitcoin Cash",
+   "Cryptocurrency"
+  ],
+  "KXBEZOSNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXBIGGESTQUAKE": [
+   "Earthquake",
+   "Richter scale"
+  ],
+  "KXBILLSCOUNT": [
+   "United States Congress",
+   "Act of Congress"
+  ],
+  "KXBILLSCOUNTWEEKLY": [
+   "United States Congress",
+   "Act of Congress"
+  ],
+  "KXBKNUGGETS": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXBNBMAXMON": [
+   "Binance",
+   "Cryptocurrency"
+  ],
+  "KXBNBMINMON": [
+   "Binance",
+   "Cryptocurrency"
+  ],
+  "KXBOOSTER": [
+   "COVID-19 vaccine",
+   "COVID-19 pandemic"
+  ],
+  "KXBOOSTERM": [
+   "COVID-19 vaccine",
+   "COVID-19 pandemic"
+  ],
+  "KXBOSSNOWM": [
+   "Boston",
+   "Weather forecasting"
+  ],
+  "KXBRENTD": [
+   "Brent Crude",
+   "Price of oil"
+  ],
+  "KXBRENTMON": [
+   "Brent Crude",
+   "Price of oil"
+  ],
+  "KXBRENTW": [
+   "Brent Crude",
+   "Price of oil"
+  ],
+  "KXBRINNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXBTCMAXD": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "KXBTCMAXM": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "KXBTCMAXMON": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "KXBTCMAXW": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "KXBTCMINMON": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "KXBTCVSETH": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "KXBTCVSHYPE": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "KXBTCVSSOL": [
+   "Bitcoin",
+   "Cryptocurrency"
+  ],
+  "KXBUFFETTNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXCACPIYOY": [
+   "Canada",
+   "Inflation"
+  ],
+  "KXCAIVEYPMI": [
+   "Canada",
+   "Inflation"
+  ],
+  "KXCASE7DCN": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "KXCASED": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "KXCASEM": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "KXCASEW": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "KXCASEWCN": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "KXCASEWDE": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "KXCASEWFR": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "KXCASEWIT": [
+   "COVID-19 pandemic in the United States",
+   "COVID-19"
+  ],
+  "KXCFACHICKSAND": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXCH11": [
+   "Bankruptcy in the United States",
+   "Chapter 11, Title 11, United States Code"
+  ],
+  "KXCHAICUTS": [
+   "Layoff",
+   "Unemployment in the United States"
+  ],
+  "KXCHCPIYOY": [
+   "China",
+   "Economy of China"
+  ],
+  "KXCHCUTS": [
+   "Layoff",
+   "Unemployment in the United States"
+  ],
+  "KXCHEXPORTS": [
+   "China",
+   "Economy of China"
+  ],
+  "KXCHIMPORTS": [
+   "China",
+   "Economy of China"
+  ],
+  "KXCHINAOILINV": [
+   "Petroleum",
+   "Price of oil"
+  ],
+  "KXCHIPBURRITO": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXCHIPYOY": [
+   "China",
+   "Economy of China"
+  ],
+  "KXCHISNOWM": [
+   "Chicago",
+   "Weather forecasting"
+  ],
+  "KXCHNBSPMI": [
+   "China",
+   "Economy of China"
+  ],
+  "KXCHRETAIL": [
+   "China",
+   "Economy of China"
+  ],
+  "KXCHTRADEBAL": [
+   "China",
+   "Economy of China"
+  ],
+  "KXCITIESWEATHER": [
+   "Weather forecasting",
+   "United States"
+  ],
+  "KXCNY": [
+   "Renminbi",
+   "United States dollar"
+  ],
+  "KXCO2": [
+   "Carbon dioxide",
+   "Greenhouse gas emissions"
+  ],
+  "KXCOBALTMON": [
+   "Cobalt"
+  ],
+  "KXCOBALTW": [
+   "Cobalt"
+  ],
+  "KXCOCOAMON": [
+   "Cocoa bean"
+  ],
+  "KXCOCOAW": [
+   "Cocoa bean"
+  ],
+  "KXCOFFEEMON": [
+   "Coffee"
+  ],
+  "KXCOFFEEW": [
+   "Coffee"
+  ],
+  "KXCONTCLAIMS": [
+   "Unemployment benefits",
+   "Unemployment in the United States"
+  ],
+  "KXCOPPERD": [
+   "Copper"
+  ],
+  "KXCOPPERMON": [
+   "Copper"
+  ],
+  "KXCOPPERW": [
+   "Copper"
+  ],
+  "KXCORNMON": [
+   "Maize"
+  ],
+  "KXCORNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXCPI": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPIAPPAREL": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPICOMBO": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPICORE": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPICOREHEAD": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPICOREYOY": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPIFOOD": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPIGAS": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPINDEX": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPISHELTER": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPIUSEDCAR": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCPIYOY": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXCRED": [
+   "Credit card debt",
+   "Consumer debt"
+  ],
+  "KXDALSNOWM": [
+   "Dallas",
+   "Weather forecasting"
+  ],
+  "KXDATACENTCON": [
+   "Data center",
+   "Construction"
+  ],
+  "KXDCSNOWM": [
+   "Washington, D.C.",
+   "Weather forecasting"
+  ],
+  "KXDDCOLDBREW": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXDDR5EMS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXDDR5EWS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXDDR5MS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXDDR5WS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXDECPIPREL": [
+   "Germany",
+   "Inflation"
+  ],
+  "KXDEEPADOPT": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXDEGFK": [
+   "Germany",
+   "Inflation"
+  ],
+  "KXDEIFO": [
+   "Germany",
+   "Inflation"
+  ],
+  "KXDELLNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXDENHIGH": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXDENSNOWM": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXDENSNOWMB": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXDETRADEBAL": [
+   "Germany",
+   "Inflation"
+  ],
+  "KXDETSNOWM": [
+   "Detroit",
+   "Weather forecasting"
+  ],
+  "KXDEZEW": [
+   "Germany",
+   "Inflation"
+  ],
+  "KXDIESEL": [
+   "Diesel fuel",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXDIESELM": [
+   "Diesel fuel",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXDOGEMAXM": [
+   "Dogecoin",
+   "Cryptocurrency"
+  ],
+  "KXDOGEMAXMON": [
+   "Dogecoin",
+   "Cryptocurrency"
+  ],
+  "KXDOGEMAXW": [
+   "Dogecoin",
+   "Cryptocurrency"
+  ],
+  "KXDOGEMINMON": [
+   "Dogecoin",
+   "Cryptocurrency"
+  ],
+  "KXDOT": [
+   "Polkadot (cryptocurrency)",
+   "Cryptocurrency"
+  ],
+  "KXDOTD": [
+   "Polkadot (cryptocurrency)",
+   "Cryptocurrency"
+  ],
+  "KXDVHIGH": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXEIACRUDEW": [
+   "Petroleum",
+   "Price of oil"
+  ],
+  "KXELLISONNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXELONTWEETS": [
+   "Elon Musk",
+   "Twitter"
+  ],
+  "KXEMPLOYMENTCOMBO": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "KXEOWEEK": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXEPSTEIN": [
+   "Jeffrey Epstein",
+   "Donald Trump"
+  ],
+  "KXERCOTX": [
+   "Electric Reliability Council of Texas",
+   "Electricity"
+  ],
+  "KXETHMAXMON": [
+   "Ethereum",
+   "Cryptocurrency"
+  ],
+  "KXETHMINMON": [
+   "Ethereum",
+   "Cryptocurrency"
+  ],
+  "KXEURO": [
+   "Euro",
+   "United States dollar"
+  ],
+  "KXEUROIMF": [
+   "Euro",
+   "United States dollar"
+  ],
+  "KXEURUSD": [
+   "Euro",
+   "United States dollar"
+  ],
+  "KXEURUSDAD": [
+   "Euro",
+   "United States dollar"
+  ],
+  "KXEURUSDD": [
+   "Euro",
+   "United States dollar"
+  ],
+  "KXEURUSDW": [
+   "Euro",
+   "United States dollar"
+  ],
+  "KXEVMKT": [
+   "Electric vehicle",
+   "Plug-in electric vehicle"
+  ],
+  "KXEZCPIYOYF": [
+   "Eurozone",
+   "Inflation"
+  ],
+  "KXFAOFPI": [
+   "Food prices",
+   "Food and Agriculture Organization"
+  ],
+  "KXFEDCOMBO": [
+   "Federal Reserve",
+   "Federal funds rate"
+  ],
+  "KXFEDTWEETS": [
+   "Federal Reserve",
+   "Federal funds rate"
+  ],
+  "KXFISHMEAL": [
+   "Fish meal"
+  ],
+  "KXFLIGHTJFK": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "KXFLIGHTLAX": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "KXFLIGHTORD": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "KXFRCPIPREL": [
+   "France",
+   "Inflation"
+  ],
+  "KXFRM": [
+   "Mortgage loan",
+   "Interest rate"
+  ],
+  "KXFULLLID8PM": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXFULLLIDBEFORE630PM": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXFULLLIDBEFORE8PM": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXFXEURO": [
+   "Euro",
+   "United States dollar"
+  ],
+  "KXFXPESO": [
+   "Mexican peso",
+   "United States dollar"
+  ],
+  "KXFXUSDIRRMON": [
+   "Iranian rial",
+   "United States dollar"
+  ],
+  "KXGAS": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXGAS-MONTH": [
+   "Gasoline",
+   "Gasoline and diesel usage and pricing"
+  ],
+  "KXGBP": [
+   "Pound sterling",
+   "United States dollar"
+  ],
+  "KXGBPUSDAD": [
+   "Pound sterling",
+   "United States dollar"
+  ],
+  "KXGBPUSDAW": [
+   "Pound sterling",
+   "United States dollar"
+  ],
+  "KXGBPUSDD": [
+   "Pound sterling",
+   "United States dollar"
+  ],
+  "KXGOLD": [
+   "Gold as an investment",
+   "Gold"
+  ],
+  "KXGOLDD": [
+   "Gold as an investment",
+   "Gold"
+  ],
+  "KXGOLDMON": [
+   "Gold as an investment",
+   "Gold"
+  ],
+  "KXGOLDW": [
+   "Gold as an investment",
+   "Gold"
+  ],
+  "KXGPUSDW": [
+   "Pound sterling",
+   "United States dollar"
+  ],
+  "KXH100MON": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXH100W": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXH200MON": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXH200W": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXH200WS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXHAPPIER": [
+   "Billie Eilish",
+   "Happier Than Ever"
+  ],
+  "KXHEATAPHX": [
+   "Phoenix, Arizona",
+   "Weather forecasting"
+  ],
+  "KXHICP": [
+   "Eurozone",
+   "Inflation"
+  ],
+  "KXHIGHAUS": [
+   "Austin, Texas",
+   "Weather forecasting"
+  ],
+  "KXHIGHCHI": [
+   "Chicago",
+   "Weather forecasting"
+  ],
+  "KXHIGHDEN": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXHIGHHOU": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "KXHIGHLAX": [
+   "Los Angeles",
+   "Weather forecasting"
+  ],
+  "KXHIGHMIA": [
+   "Miami",
+   "Weather forecasting"
+  ],
+  "KXHIGHNY": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXHIGHNY0": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXHIGHOU": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "KXHIGHPHIL": [
+   "Philadelphia",
+   "Weather forecasting"
+  ],
+  "KXHIGHTATL": [
+   "Atlanta",
+   "Weather forecasting"
+  ],
+  "KXHIGHTBOS": [
+   "Boston",
+   "Weather forecasting"
+  ],
+  "KXHIGHTCYYZ": [
+   "Toronto",
+   "Weather forecasting"
+  ],
+  "KXHIGHTDAL": [
+   "Dallas",
+   "Weather forecasting"
+  ],
+  "KXHIGHTDC": [
+   "Washington, D.C.",
+   "Weather forecasting"
+  ],
+  "KXHIGHTEBBR": [
+   "Brussels",
+   "Weather forecasting"
+  ],
+  "KXHIGHTEDDB": [
+   "Berlin",
+   "Weather forecasting"
+  ],
+  "KXHIGHTEDDF": [
+   "Frankfurt",
+   "Weather forecasting"
+  ],
+  "KXHIGHTEGLL": [
+   "London",
+   "Weather forecasting"
+  ],
+  "KXHIGHTEHAM": [
+   "Amsterdam",
+   "Weather forecasting"
+  ],
+  "KXHIGHTEWR": [
+   "Newark, New Jersey",
+   "Weather forecasting"
+  ],
+  "KXHIGHTHOU": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "KXHIGHTKSAN": [
+   "San Diego",
+   "Weather forecasting"
+  ],
+  "KXHIGHTLFPG": [
+   "Paris",
+   "Weather forecasting"
+  ],
+  "KXHIGHTLSGG": [
+   "Geneva",
+   "Weather forecasting"
+  ],
+  "KXHIGHTLTFM": [
+   "Istanbul",
+   "Weather forecasting"
+  ],
+  "KXHIGHTLV": [
+   "Las Vegas",
+   "Weather forecasting"
+  ],
+  "KXHIGHTMIN": [
+   "Minneapolis",
+   "Weather forecasting"
+  ],
+  "KXHIGHTMMMX": [
+   "Mexico City",
+   "Weather forecasting"
+  ],
+  "KXHIGHTNOLA": [
+   "New Orleans",
+   "Weather forecasting"
+  ],
+  "KXHIGHTOKC": [
+   "Oklahoma City",
+   "Weather forecasting"
+  ],
+  "KXHIGHTOMDB": [
+   "Dubai",
+   "Weather forecasting"
+  ],
+  "KXHIGHTPHX": [
+   "Phoenix, Arizona",
+   "Weather forecasting"
+  ],
+  "KXHIGHTRJTT": [
+   "Tokyo",
+   "Weather forecasting"
+  ],
+  "KXHIGHTRKSI": [
+   "Seoul",
+   "Weather forecasting"
+  ],
+  "KXHIGHTSAN": [
+   "San Diego",
+   "Weather forecasting"
+  ],
+  "KXHIGHTSATX": [
+   "San Antonio",
+   "Weather forecasting"
+  ],
+  "KXHIGHTSBGR": [
+   "Sao Paulo",
+   "Weather forecasting"
+  ],
+  "KXHIGHTSDF": [
+   "Louisville, Kentucky",
+   "Weather forecasting"
+  ],
+  "KXHIGHTSEA": [
+   "Seattle",
+   "Weather forecasting"
+  ],
+  "KXHIGHTSFO": [
+   "San Francisco",
+   "Weather forecasting"
+  ],
+  "KXHIGHTTTN": [
+   "Trenton, New Jersey",
+   "Weather forecasting"
+  ],
+  "KXHIGHTVABB": [
+   "Mumbai",
+   "Weather forecasting"
+  ],
+  "KXHIGHTVHHH": [
+   "Hong Kong",
+   "Weather forecasting"
+  ],
+  "KXHIGHTWSSS": [
+   "Singapore",
+   "Weather forecasting"
+  ],
+  "KXHIGHTYSSY": [
+   "Sydney",
+   "Weather forecasting"
+  ],
+  "KXHIGHTZBAA": [
+   "Beijing",
+   "Weather forecasting"
+  ],
+  "KXHIGHTZSPD": [
+   "Shanghai",
+   "Weather forecasting"
+  ],
+  "KXHIGHUS": [
+   "Climate of the United States",
+   "Weather forecasting"
+  ],
+  "KXHMONTH": [
+   "Climate of the United States",
+   "Weather forecasting"
+  ],
+  "KXHOILMON": [
+   "Heating oil"
+  ],
+  "KXHOILW": [
+   "Heating oil"
+  ],
+  "KXHOME": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "KXHOMEUS": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "KXHOUHIGH": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "KXHOUSELENGTH": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "KXHOUSESTART": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "KXHOUSNOWM": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "KXHPI": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "KXHUANGNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXHYPEMAXMON": [
+   "Cryptocurrency"
+  ],
+  "KXHYPEMINMON": [
+   "Cryptocurrency"
+  ],
+  "KXIMFTWEETS": [
+   "International Monetary Fund"
+  ],
+  "KXINCOMERATE": [
+   "United States Congress",
+   "Act of Congress"
+  ],
+  "KXINX": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXAB": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXDUD": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXM": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXMAXMM": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXMAXMON": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXMINMON": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXVSNDQ100": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXW": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXWUD": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXINXZ": [
+   "S&P 500",
+   "Stock market index"
+  ],
+  "KXIRANCPI": [
+   "Iran",
+   "Inflation"
+  ],
+  "KXIRANCRUDE": [
+   "Petroleum",
+   "Price of oil"
+  ],
+  "KXITCPIPREL": [
+   "Italy",
+   "Inflation"
+  ],
+  "KXJACWSNOWM": [
+   "Jackson, Wyoming",
+   "Weather forecasting"
+  ],
+  "KXJETFUEL": [
+   "Jet fuel"
+  ],
+  "KXJOBLESS": [
+   "Unemployment benefits",
+   "Unemployment in the United States"
+  ],
+  "KXJOBLESSCLAIMS": [
+   "Unemployment benefits",
+   "Unemployment in the United States"
+  ],
+  "KXJOLTSOPEN": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "KXJPCONCONF": [
+   "Japan",
+   "Inflation"
+  ],
+  "KXJPCPIYOY": [
+   "Japan",
+   "Inflation"
+  ],
+  "KXJPMOMINF": [
+   "Japan",
+   "Inflation"
+  ],
+  "KXJPTRADEBAL": [
+   "Japan",
+   "Inflation"
+  ],
+  "KXJPY": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "KXJUDGECOUNT": [
+   "United States Congress",
+   "Act of Congress"
+  ],
+  "KXLAGODAYS": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXLAXSNOWM": [
+   "Los Angeles",
+   "Weather forecasting"
+  ],
+  "KXLCATTLEMON": [
+   "Cattle"
+  ],
+  "KXLCATTLEW": [
+   "Cattle"
+  ],
+  "KXLEADERCOMBOOUT": [
+   "Head of government"
+  ],
+  "KXLINK": [
+   "Chainlink (blockchain oracle)",
+   "Cryptocurrency"
+  ],
+  "KXLINKD": [
+   "Chainlink (blockchain oracle)",
+   "Cryptocurrency"
+  ],
+  "KXLITHIUMMON": [
+   "Lithium"
+  ],
+  "KXLITHIUMW": [
+   "Lithium"
+  ],
+  "KXLOWAUS": [
+   "Austin, Texas",
+   "Weather forecasting"
+  ],
+  "KXLOWCHI": [
+   "Chicago",
+   "Weather forecasting"
+  ],
+  "KXLOWDEN": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXLOWLAX": [
+   "Los Angeles",
+   "Weather forecasting"
+  ],
+  "KXLOWMIA": [
+   "Miami",
+   "Weather forecasting"
+  ],
+  "KXLOWNY": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXLOWNYC": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXLOWPHIL": [
+   "Philadelphia",
+   "Weather forecasting"
+  ],
+  "KXLOWTATL": [
+   "Atlanta",
+   "Weather forecasting"
+  ],
+  "KXLOWTAUS": [
+   "Austin, Texas",
+   "Weather forecasting"
+  ],
+  "KXLOWTBOS": [
+   "Boston",
+   "Weather forecasting"
+  ],
+  "KXLOWTCHI": [
+   "Chicago",
+   "Weather forecasting"
+  ],
+  "KXLOWTCYYZ": [
+   "Toronto",
+   "Weather forecasting"
+  ],
+  "KXLOWTDAL": [
+   "Dallas",
+   "Weather forecasting"
+  ],
+  "KXLOWTDC": [
+   "Washington, D.C.",
+   "Weather forecasting"
+  ],
+  "KXLOWTDEN": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXLOWTEBBR": [
+   "Brussels",
+   "Weather forecasting"
+  ],
+  "KXLOWTEDDB": [
+   "Berlin",
+   "Weather forecasting"
+  ],
+  "KXLOWTEDDF": [
+   "Frankfurt",
+   "Weather forecasting"
+  ],
+  "KXLOWTEGLL": [
+   "London",
+   "Weather forecasting"
+  ],
+  "KXLOWTEHAM": [
+   "Amsterdam",
+   "Weather forecasting"
+  ],
+  "KXLOWTEWR": [
+   "Newark, New Jersey",
+   "Weather forecasting"
+  ],
+  "KXLOWTHOU": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "KXLOWTKSAN": [
+   "San Diego",
+   "Weather forecasting"
+  ],
+  "KXLOWTLAX": [
+   "Los Angeles",
+   "Weather forecasting"
+  ],
+  "KXLOWTLFPG": [
+   "Paris",
+   "Weather forecasting"
+  ],
+  "KXLOWTLSGG": [
+   "Geneva",
+   "Weather forecasting"
+  ],
+  "KXLOWTLSSG": [
+   "Geneva",
+   "Weather forecasting"
+  ],
+  "KXLOWTLTFM": [
+   "Istanbul",
+   "Weather forecasting"
+  ],
+  "KXLOWTLV": [
+   "Las Vegas",
+   "Weather forecasting"
+  ],
+  "KXLOWTMIA": [
+   "Miami",
+   "Weather forecasting"
+  ],
+  "KXLOWTMIN": [
+   "Minneapolis",
+   "Weather forecasting"
+  ],
+  "KXLOWTMMMX": [
+   "Mexico City",
+   "Weather forecasting"
+  ],
+  "KXLOWTNOLA": [
+   "New Orleans",
+   "Weather forecasting"
+  ],
+  "KXLOWTNYC": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXLOWTOKC": [
+   "Oklahoma City",
+   "Weather forecasting"
+  ],
+  "KXLOWTOMDB": [
+   "Dubai",
+   "Weather forecasting"
+  ],
+  "KXLOWTPHIL": [
+   "Philadelphia",
+   "Weather forecasting"
+  ],
+  "KXLOWTPHX": [
+   "Phoenix, Arizona",
+   "Weather forecasting"
+  ],
+  "KXLOWTRJTT": [
+   "Tokyo",
+   "Weather forecasting"
+  ],
+  "KXLOWTRKSI": [
+   "Seoul",
+   "Weather forecasting"
+  ],
+  "KXLOWTSAN": [
+   "San Diego",
+   "Weather forecasting"
+  ],
+  "KXLOWTSATX": [
+   "San Antonio",
+   "Weather forecasting"
+  ],
+  "KXLOWTSBGR": [
+   "Sao Paulo",
+   "Weather forecasting"
+  ],
+  "KXLOWTSDF": [
+   "Louisville, Kentucky",
+   "Weather forecasting"
+  ],
+  "KXLOWTSEA": [
+   "Seattle",
+   "Weather forecasting"
+  ],
+  "KXLOWTSFO": [
+   "San Francisco",
+   "Weather forecasting"
+  ],
+  "KXLOWTTTN": [
+   "Trenton, New Jersey",
+   "Weather forecasting"
+  ],
+  "KXLOWTVABB": [
+   "Mumbai",
+   "Weather forecasting"
+  ],
+  "KXLOWTVHHH": [
+   "Hong Kong",
+   "Weather forecasting"
+  ],
+  "KXLOWTWSSS": [
+   "Singapore",
+   "Weather forecasting"
+  ],
+  "KXLOWTYSSY": [
+   "Sydney",
+   "Weather forecasting"
+  ],
+  "KXLOWTZBAA": [
+   "Beijing",
+   "Weather forecasting"
+  ],
+  "KXLOWTZSPD": [
+   "Shanghai",
+   "Weather forecasting"
+  ],
+  "KXLTC": [
+   "Litecoin",
+   "Cryptocurrency"
+  ],
+  "KXLTCD": [
+   "Litecoin",
+   "Cryptocurrency"
+  ],
+  "KXLVL4WARNING": [
+   "United States Department of State",
+   "Travel warning"
+  ],
+  "KXMANHATTANRENT": [
+   "Renting",
+   "Real estate economics"
+  ],
+  "KXMEAD": [
+   "Lake Mead",
+   "Drought"
+  ],
+  "KXMICHTEMP": [
+   "Lake Michigan"
+  ],
+  "KXMINNYC": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXMUSKNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXNASDAQ100": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNASDAQ100M": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNASDAQ100MAXMON": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNASDAQ100MINMON": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNASDAQ100W": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNASDAQ100Z": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNASDAQDUD": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNASDAQWUD": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNATGASD": [
+   "Natural gas",
+   "Natural gas prices"
+  ],
+  "KXNATGASMON": [
+   "Natural gas",
+   "Natural gas prices"
+  ],
+  "KXNATGASW": [
+   "Natural gas",
+   "Natural gas prices"
+  ],
+  "KXNDQDUD": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "KXNEARMAXMON": [
+   "Cryptocurrency"
+  ],
+  "KXNEARMINMON": [
+   "Cryptocurrency"
+  ],
+  "KXNEARW": [
+   "Cryptocurrency"
+  ],
+  "KXNEWTARIFFS": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXNGAS": [
+   "Natural gas",
+   "Natural gas prices"
+  ],
+  "KXNGASW": [
+   "Natural gas",
+   "Natural gas prices"
+  ],
+  "KXNICKELMON": [
+   "Nickel"
+  ],
+  "KXNICKELW": [
+   "Nickel"
+  ],
+  "KXNOTE10": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXNOTE10M": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXNOTE10W": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXNOTE30": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXNOTE30W": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXNYCHOT": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXNYCORP": [
+   "New York City",
+   "Business"
+  ],
+  "KXNYCRENTSM": [
+   "Renting",
+   "Real estate economics"
+  ],
+  "KXNYCSNOWM": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXNYTFULLWIDTH": [
+   "The New York Times"
+  ],
+  "KXNYTHEAD": [
+   "The New York Times"
+  ],
+  "KXNZDUSD": [
+   "New Zealand dollar",
+   "United States dollar"
+  ],
+  "KXNZDUSDAD": [
+   "New Zealand dollar",
+   "United States dollar"
+  ],
+  "KXNZDUSDAW": [
+   "New Zealand dollar",
+   "United States dollar"
+  ],
+  "KXOER": [
+   "Renting",
+   "Real estate economics"
+  ],
+  "KXOIL": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ],
+  "KXOILW": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ],
+  "KXONRRP": [
+   "Federal Reserve",
+   "Interest rate"
+  ],
+  "KXOPENADOPT": [
+   "Artificial intelligence",
+   "Large language model"
+  ],
+  "KXPAGENW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXPARDONANYONE": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXPARDONSTRUMP": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXPAYROLLS": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "KXPAYROLLSREV": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "KXPCECORE": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXPCEHEAD": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXPESO": [
+   "Mexican peso",
+   "United States dollar"
+  ],
+  "KXPHARMARACEM": [
+   "Clinical trial",
+   "ClinicalTrials.gov"
+  ],
+  "KXPHILSNOWM": [
+   "Philadelphia",
+   "Weather forecasting"
+  ],
+  "KXPMLA": [
+   "Air pollution",
+   "Los Angeles"
+  ],
+  "KXPOPCHICKSAND": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXPOTUSTWEETS": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXPOWERKWH": [
+   "Electricity pricing",
+   "Electricity"
+  ],
+  "KXPPISEMI": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXPROLLS": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "KXRAIN": [
+   "Rain",
+   "Weather forecasting"
+  ],
+  "KXRAINCHIM": [
+   "Chicago",
+   "Weather forecasting"
+  ],
+  "KXRAIND": [
+   "Rain",
+   "Weather forecasting"
+  ],
+  "KXRAINDC": [
+   "Rain",
+   "Weather forecasting"
+  ],
+  "KXRAINDENM": [
+   "Denver",
+   "Weather forecasting"
+  ],
+  "KXRAINDNYC": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXRAINHOU": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "KXRAINNO": [
+   "New Orleans",
+   "Weather forecasting"
+  ],
+  "KXRAINNY": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXRAINNYC": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXRAINNYCM": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXRAINSEA": [
+   "Seattle",
+   "Weather forecasting"
+  ],
+  "KXRAINSTPM": [
+   "St. Petersburg, Florida",
+   "Weather forecasting"
+  ],
+  "KXRAINWKND": [
+   "West Palm Beach, Florida",
+   "Weather forecasting"
+  ],
+  "KXRENTNYCM": [
+   "Renting",
+   "Real estate economics"
+  ],
+  "KXRETAIL": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXRIPPLED": [
+   "Ripple Labs",
+   "Cryptocurrency"
+  ],
+  "KXROCKET": [
+   "Spaceflight",
+   "Rocket launch"
+  ],
+  "KXRTX5090MS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXRTX5090W": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXRTX5090WS": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXRTXPRO6000W": [
+   "Nvidia",
+   "Graphics processing unit"
+  ],
+  "KXRUBLE": [
+   "Russian ruble",
+   "United States dollar"
+  ],
+  "KXSAMOMINF": [
+   "South Africa",
+   "Inflation"
+  ],
+  "KXSARETAIL": [
+   "South Africa",
+   "Inflation"
+  ],
+  "KXSATRADEBAL": [
+   "South Africa",
+   "Inflation"
+  ],
+  "KXSBUXSAR": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXSEAICE": [
+   "Arctic sea ice decline",
+   "Sea ice"
+  ],
+  "KXSEASNOWM": [
+   "Seattle",
+   "Weather forecasting"
+  ],
+  "KXSFOSNOWM": [
+   "San Francisco",
+   "Weather forecasting"
+  ],
+  "KXSHELTERCPI": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXSHIBA": [
+   "Shiba Inu (cryptocurrency)",
+   "Cryptocurrency"
+  ],
+  "KXSHIBAD": [
+   "Shiba Inu (cryptocurrency)",
+   "Cryptocurrency"
+  ],
+  "KXSILVERD": [
+   "Silver as an investment",
+   "Silver"
+  ],
+  "KXSILVERMON": [
+   "Silver as an investment",
+   "Silver"
+  ],
+  "KXSILVERW": [
+   "Silver as an investment",
+   "Silver"
+  ],
+  "KXSJCLOWT": [
+   "San Diego",
+   "Weather forecasting"
+  ],
+  "KXSKEXPYOY": [
+   "South Korea",
+   "Economy of South Korea"
+  ],
+  "KXSLCSNOWM": [
+   "Salt Lake City",
+   "Weather forecasting"
+  ],
+  "KXSNOWNYM": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "KXSOFR": [
+   "Federal Reserve",
+   "Interest rate"
+  ],
+  "KXSOFRD": [
+   "Federal Reserve",
+   "Interest rate"
+  ],
+  "KXSOLDATHOLDINGS": [
+   "Solana (blockchain platform)",
+   "Cryptocurrency"
+  ],
+  "KXSOLMAXM": [
+   "Solana (blockchain platform)",
+   "Cryptocurrency"
+  ],
+  "KXSOLMAXMON": [
+   "Solana (blockchain platform)",
+   "Cryptocurrency"
+  ],
+  "KXSOLMINMON": [
+   "Solana (blockchain platform)",
+   "Cryptocurrency"
+  ],
+  "KXSOYBEANMON": [
+   "Soybean"
+  ],
+  "KXSOYBEANW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXSTEELMON": [
+   "Steel"
+  ],
+  "KXSTEELW": [
+   "Steel"
+  ],
+  "KXSUGARMON": [
+   "Sugar"
+  ],
+  "KXSUGARW": [
+   "Sugar"
+  ],
+  "KXSWENCOUNTERS": [
+   "Illegal immigration to the United States",
+   "U.S. Customs and Border Protection"
+  ],
+  "KXTBCRUNCHWRAP": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXTECHLAYOFF": [
+   "Layoff",
+   "Unemployment in the United States"
+  ],
+  "KXTEMPHELP": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "KXTEMPMON": [
+   "Climate of the United States",
+   "Weather forecasting"
+  ],
+  "KXTNOTED": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXTNOTEW": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXTOBACCPI": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXTONMAXMON": [
+   "Cryptocurrency"
+  ],
+  "KXTONMINMON": [
+   "Cryptocurrency"
+  ],
+  "KXTONW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "KXTOPMODEL": [
+   "Large language model",
+   "Artificial intelligence"
+  ],
+  "KXTORNADO": [
+   "Tornado",
+   "Weather forecasting"
+  ],
+  "KXTORYMPJOINREFORM": [
+   "Reform UK",
+   "Conservative Party (UK)"
+  ],
+  "KXTRDDEFCN": [
+   "Balance of trade",
+   "China-United States trade war"
+  ],
+  "KXTRUFAIDP": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUFBFST": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUFBPPI": [
+   "Cryptocurrency",
+   "Bitcoin"
+  ],
+  "KXTRUFCCI": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUFCMC": [
+   "Cryptocurrency",
+   "Bitcoin"
+  ],
+  "KXTRUFCPI": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUFDEAD": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUFEGGS": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUFGAS": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUFHOUCPI": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUFPDEBT": [
+   "National debt of the United States"
+  ],
+  "KXTRUFTSA": [
+   "Inflation",
+   "Consumer price index"
+  ],
+  "KXTRUMPACT": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXTRUMPFAV": [
+   "Donald Trump",
+   "United States presidential approval rating"
+  ],
+  "KXTRUMPMEET": [
+   "Donald Trump",
+   "Zohran Mamdani"
+  ],
+  "KXTRUMPVISITGREENLAND": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXTRUMPVISITWEEK": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXTRUTHSOCIAL": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "KXTSAW": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "KXTXERCOTPEAKD": [
+   "Electric Reliability Council of Texas",
+   "Electricity"
+  ],
+  "KXU3": [
+   "Unemployment",
+   "Unemployment in the United States"
+  ],
+  "KXUE": [
+   "Unemployment",
+   "Unemployment in the United States"
+  ],
+  "KXUKCPIYOY": [
+   "United Kingdom",
+   "Inflation"
+  ],
+  "KXUKGDPMOM": [
+   "United Kingdom",
+   "Inflation"
+  ],
+  "KXUKRETAIL": [
+   "United Kingdom",
+   "Inflation"
+  ],
+  "KXUKUNRATE": [
+   "Unemployment",
+   "Unemployment in the United States"
+  ],
+  "KXUSDBRLAD": [
+   "Brazilian real",
+   "United States dollar"
+  ],
+  "KXUSDBRLAW": [
+   "Brazilian real",
+   "United States dollar"
+  ],
+  "KXUSDBRLMAXM": [
+   "Brazilian real",
+   "United States dollar"
+  ],
+  "KXUSDCADAD": [
+   "Canadian dollar",
+   "United States dollar"
+  ],
+  "KXUSDCADAW": [
+   "Canadian dollar",
+   "United States dollar"
+  ],
+  "KXUSDCADW": [
+   "Canadian dollar",
+   "United States dollar"
+  ],
+  "KXUSDCHFAD": [
+   "Swiss franc",
+   "United States dollar"
+  ],
+  "KXUSDCHFAW": [
+   "Swiss franc",
+   "United States dollar"
+  ],
+  "KXUSDEBTMON": [
+   "National debt of the United States"
+  ],
+  "KXUSDINRAD": [
+   "Indian rupee",
+   "United States dollar"
+  ],
+  "KXUSDINRAW": [
+   "Indian rupee",
+   "United States dollar"
+  ],
+  "KXUSDJPY": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "KXUSDJPYAD": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "KXUSDJPYAH": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "KXUSDJPYAW": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "KXUSDJPYD": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "KXUSDJPYW": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "KXUSDMXNAW": [
+   "Mexican peso",
+   "United States dollar"
+  ],
+  "KXUSDNOKAD": [
+   "Norwegian krone",
+   "United States dollar"
+  ],
+  "KXUSDNOKAW": [
+   "Norwegian krone",
+   "United States dollar"
+  ],
+  "KXUSDRESERVE": [
+   "Foreign exchange reserves",
+   "United States dollar"
+  ],
+  "KXUSDSEK": [
+   "Swedish krona",
+   "United States dollar"
+  ],
+  "KXUSDSEKAW": [
+   "Swedish krona",
+   "United States dollar"
+  ],
+  "KXUSDURABLE": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXUSEDCAR": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXUSEDCARCPI": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXUSFLYCAN": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "KXUSGASCPI": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "KXUSGBEEF": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXUSIPMOM": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXUSISMSERV": [
+   "ISM report on business",
+   "Economy of the United States"
+  ],
+  "KXUSMICHCSP": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXUSNFP": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "KXUSPINCOME": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXUSPPI": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXUSPPIYOY": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXUSPSPEND": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXUSRETAIL": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "KXUST10": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST10A": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST10M": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST2": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST2A": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST30": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST30A": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST30M": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST5A": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST5M": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUST7A": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUSTM": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "KXUSUNSCVETO": [
+   "United Nations Security Council veto power",
+   "United Nations Security Council"
+  ],
+  "KXVAXX": [
+   "COVID-19 vaccine",
+   "COVID-19 pandemic"
+  ],
+  "KXVAXXDEP": [
+   "COVID-19 vaccine",
+   "COVID-19 pandemic"
+  ],
+  "KXVENEZCRUDE": [
+   "Petroleum",
+   "Price of oil"
+  ],
+  "KXVOTEHUBTRUMPUPDOWN": [
+   "Donald Trump",
+   "United States presidential approval rating"
+  ],
+  "KXWEFTWEETS": [
+   "World Economic Forum"
+  ],
+  "KXWEIGHTDRUGS": [
+   "Anti-obesity medication",
+   "Obesity"
+  ],
+  "KXWENBACONATOR": [
+   "Food prices",
+   "Inflation in the United States"
+  ],
+  "KXWHEAT": [
+   "Wheat"
+  ],
+  "KXWHEATMON": [
+   "Wheat"
+  ],
+  "KXWHEATW": [
+   "Wheat"
+  ],
+  "KXWTI": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ],
+  "KXWTIMONTHLY": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ],
+  "KXWTIW": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ],
+  "KXXLM": [
+   "Stellar (payment network)",
+   "Cryptocurrency"
+  ],
+  "KXXLMD": [
+   "Stellar (payment network)",
+   "Cryptocurrency"
+  ],
+  "KXXRPMAXMON": [
+   "Ripple Labs",
+   "Cryptocurrency"
+  ],
+  "KXXRPMINMON": [
+   "Ripple Labs",
+   "Cryptocurrency"
+  ],
+  "KXZECHW": [
+   "Zcash",
+   "Cryptocurrency"
+  ],
+  "KXZECMAXMON": [
+   "Zcash",
+   "Cryptocurrency"
+  ],
+  "KXZECMINMON": [
+   "Zcash",
+   "Cryptocurrency"
+  ],
+  "KXZUCKERBERGNW": [
+   "Billionaire",
+   "The World's Billionaires"
+  ],
+  "MEAD": [
+   "Lake Mead",
+   "Drought"
+  ],
+  "MICHTEMP": [
+   "Lake Michigan"
+  ],
+  "MINNYC": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "NASDAQ100": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "NASDAQ100M": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "NASDAQ100U": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "NASDAQ100W": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "NASDAQ100Z": [
+   "Nasdaq-100",
+   "Stock market index"
+  ],
+  "NGAS": [
+   "Natural gas",
+   "Natural gas prices"
+  ],
+  "NGASW": [
+   "Natural gas",
+   "Natural gas prices"
+  ],
+  "NYCRENTS": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "NYCRENTSM": [
+   "Renting",
+   "Real estate economics"
+  ],
+  "OIL": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ],
+  "OILW": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ],
+  "ONRRP": [
+   "Federal Reserve",
+   "Interest rate"
+  ],
+  "PAYROLLS": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "PCECORE": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "PESO": [
+   "Mexican peso",
+   "United States dollar"
+  ],
+  "PMLA": [
+   "Air pollution",
+   "Los Angeles"
+  ],
+  "PPISEMI": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "PRESINDEXD": [
+   "Donald Trump",
+   "President of the United States"
+  ],
+  "PROLLS": [
+   "Nonfarm payrolls",
+   "Employment"
+  ],
+  "RAINHOU": [
+   "Houston",
+   "Weather forecasting"
+  ],
+  "RAINNO": [
+   "New Orleans",
+   "Weather forecasting"
+  ],
+  "RAINNY": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "RAINNYC": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "RAINNYCM": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "RAINSEA": [
+   "Seattle",
+   "Weather forecasting"
+  ],
+  "RENTNYC": [
+   "United States housing bubble",
+   "Real estate economics"
+  ],
+  "RENTNYCM": [
+   "Renting",
+   "Real estate economics"
+  ],
+  "RETAIL": [
+   "Economy of the United States",
+   "Inflation in the United States"
+  ],
+  "ROCKET": [
+   "Spaceflight",
+   "Rocket launch"
+  ],
+  "RUBLE": [
+   "Russian ruble",
+   "United States dollar"
+  ],
+  "SEAICE": [
+   "Arctic sea ice decline",
+   "Sea ice"
+  ],
+  "SNOWNYM": [
+   "New York City",
+   "Weather forecasting"
+  ],
+  "SOFR": [
+   "Federal Reserve",
+   "Interest rate"
+  ],
+  "TBILL": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "TECHLAYOFF": [
+   "Layoff",
+   "Unemployment in the United States"
+  ],
+  "TEMPMON": [
+   "Climate of the United States",
+   "Weather forecasting"
+  ],
+  "TNOTE": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "TNOTED": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "TNOTEW": [
+   "United States Treasury security",
+   "Yield curve"
+  ],
+  "TORNADO": [
+   "Tornado",
+   "Weather forecasting"
+  ],
+  "TRDDEFCN": [
+   "Balance of trade",
+   "China-United States trade war"
+  ],
+  "TSAW": [
+   "Transportation Security Administration",
+   "Air travel"
+  ],
+  "U3": [
+   "Unemployment",
+   "Unemployment in the United States"
+  ],
+  "USDJPY": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "USDJPYH": [
+   "Japanese yen",
+   "United States dollar"
+  ],
+  "USEDCAR": [
+   "Consumer price index",
+   "Inflation in the United States"
+  ],
+  "VAXX": [
+   "COVID-19 vaccine",
+   "COVID-19 pandemic"
+  ],
+  "VAXXDEP": [
+   "COVID-19 vaccine",
+   "COVID-19 pandemic"
+  ],
+  "WEIGHTDRUGS": [
+   "Anti-obesity medication",
+   "Obesity"
+  ],
+  "WHEAT": [
+   "Wheat"
+  ],
+  "WTI": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ],
+  "WTIW": [
+   "West Texas Intermediate",
+   "Price of oil"
+  ]
+ }
+}

@@ -1,0 +1,128 @@
+[
+  {
+    "id": "512901",
+    "question": "Will ETH close above $4,000 on March 31, 2026?",
+    "conditionId": "0xa17c3b7f9d0e4a2b8c1d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b",
+    "slug": "will-eth-close-above-4000-on-2026-03-31",
+    "resolutionSource": "https://www.coingecko.com/en/coins/ethereum",
+    "endDate": "2026-03-31T12:00:00Z",
+    "startDate": "2026-03-01T00:00:00Z",
+    "createdAt": "2026-02-25T09:14:02.517Z",
+    "closedTime": "2026-03-31 18:05:00+00",
+    "description": "This market will resolve to YES if the closing price of Ethereum (ETH) on March 31, 2026 at 16:00 ET is strictly above 4,000 USD according to CoinGecko. Otherwise it resolves to NO.",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"1\", \"0\"]",
+    "clobTokenIds": "[\"71321045791924030957857892716647252735936265513806565428493516898920342568943\", \"52114049108734907358107108988147936371806295847283726194537260894418340114627\"]",
+    "volume": "1843922.51",
+    "volumeNum": 1843922.51,
+    "liquidity": "88214.09",
+    "active": false,
+    "closed": true,
+    "umaResolutionStatus": "resolved",
+    "category": "Crypto",
+    "tags": [
+      {
+        "id": "21",
+        "label": "Crypto",
+        "slug": "crypto"
+      },
+      {
+        "id": "44",
+        "label": "Ethereum",
+        "slug": "ethereum"
+      }
+    ],
+    "events": [
+      {
+        "id": "18422",
+        "slug": "eth-price-on-march-31-2026",
+        "title": "ETH price on March 31, 2026",
+        "category": "Crypto",
+        "tags": [
+          {
+            "slug": "crypto-prices"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "id": "544000",
+    "question": "Will the mission launch before 2027?",
+    "slug": "will-the-mission-launch-before-2027",
+    "endDate": "2026-12-31T23:59:00Z",
+    "createdAt": "2026-01-02T10:00:00Z",
+    "description": "An open market: it has not closed and cannot be imported.",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.62\", \"0.38\"]",
+    "clobTokenIds": "[\"1\", \"2\"]",
+    "volume": "12000",
+    "active": true,
+    "closed": false,
+    "category": "Science"
+  },
+  {
+    "id": "544100",
+    "question": "Who will be the 2026 nominee?",
+    "slug": "who-will-be-the-2026-nominee",
+    "endDate": "2026-04-02T00:00:00Z",
+    "closedTime": "2026-04-02T04:00:00Z",
+    "createdAt": "2025-11-01T00:00:00Z",
+    "description": "A three-way market: not a binary leg.",
+    "outcomes": "[\"Candidate A\", \"Candidate B\", \"Other\"]",
+    "outcomePrices": "[\"1\", \"0\", \"0\"]",
+    "clobTokenIds": "[\"3\", \"4\", \"5\"]",
+    "volume": "900000",
+    "active": false,
+    "closed": true,
+    "category": "Politics"
+  },
+  {
+    "id": "544200",
+    "question": "Will the treaty be signed in 2026?",
+    "slug": "will-the-treaty-be-signed-in-2026",
+    "endDate": "2026-05-02T00:00:00Z",
+    "closedTime": "2026-05-02T06:00:00Z",
+    "createdAt": "2025-12-01T00:00:00Z",
+    "description": "Closed but voided: both legs still quote, so there is no outcome to score.",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0.5\", \"0.5\"]",
+    "clobTokenIds": "[\"6\", \"7\"]",
+    "volume": "150000",
+    "active": false,
+    "closed": true,
+    "category": "World"
+  },
+  {
+    "id": "544300",
+    "question": "Will the index close above 7,000 on September 18, 2026?",
+    "slug": "will-the-index-close-above-7000-on-2026-09-18",
+    "endDate": "2026-09-18T20:00:00Z",
+    "closedTime": "2026-09-18T22:10:00Z",
+    "createdAt": "2026-07-01T00:00:00Z",
+    "description": "Resolved after the freeze: it may not enter a dataset built on 2026-09-07.",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"1\", \"0\"]",
+    "clobTokenIds": "[\"8\", \"9\"]",
+    "volume": "77000",
+    "active": false,
+    "closed": true,
+    "category": "Finance"
+  },
+  {
+    "id": "412300",
+    "question": "Will the 2024 season end before March 2024?",
+    "slug": "will-the-2024-season-end-before-march-2024",
+    "endDate": "2024-03-01T20:00:00Z",
+    "closedTime": "2024-03-02T02:00:00Z",
+    "createdAt": "2023-11-01T00:00:00Z",
+    "description": "Resolved two years before the window opens.",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"0\", \"1\"]",
+    "clobTokenIds": "[\"10\", \"11\"]",
+    "volume": "50000",
+    "active": false,
+    "closed": true,
+    "category": "Sports"
+  }
+]

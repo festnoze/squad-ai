@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from pmx.agents import AGENT_IDS
-from pmx.engine import run_backtest
-from pmx.scoring import brier_micro, price_to_ppm
-from pmx.types import Market
+from pmx.v1.agents import AGENT_IDS
+from pmx.v1.engine import run_backtest
+from pmx.v1.scoring import brier_micro, price_to_ppm
+from pmx.v1.types import Market
 
 
 def test_backtest_is_deterministic(yes_market: Market) -> None:

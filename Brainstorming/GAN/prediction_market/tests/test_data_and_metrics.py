@@ -8,9 +8,9 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from pmx.agents import AGENT_IDS
-from pmx.data.loader import load_market, load_markets
-from pmx.tournament import run_tournament, walk_forward
+from pmx.v1.agents import AGENT_IDS
+from pmx.v1.data.loader import load_market, load_markets
+from pmx.v1.tournament import run_tournament, walk_forward
 
 
 def test_bundled_dataset_loads_and_is_labelled(seeded_data: Path) -> None:

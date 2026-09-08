@@ -1,0 +1,43 @@
+{
+  "_what": "Where every D4 fixture comes from, so a reader can tell recorded evidence from a written-by-hand payload shape.",
+  "package": "D4 (src/pmx/data/importers/polymarket.py)",
+  "recorded": {
+    "anj_block_page.html": {
+      "how": "curl -sk 'https://gamma-api.polymarket.com/markets?slug=will-bitcoin-reach-100000-in-2024'",
+      "when": "2026-09-07",
+      "from": "France (the machine this repository is built on)",
+      "what": "The block page of the Autorite Nationale des Jeux, served verbatim with status 200 and content-type text/html in place of the Gamma JSON. 14547 bytes, UTF-8, unmodified.",
+      "why_it_matters": "Nothing at the HTTP level says the request failed, so only the body identifies the block. This file is what the detector is tested against."
+    },
+    "anj_block_response.json": {
+      "how": "The same curl for the status and the headers, httpx 0.28.1 on CPython 3.12.1 for the TLS failure and its cause chain, ssl.getpeercert(binary_form=True) plus socket.gethostbyname for the certificate names and the address",
+      "when": "2026-09-07",
+      "what": "The response envelope, the resolved address shared by the three Polymarket API hosts, the certificate's DNS names (*.anj.fr, anj.fr) and the exact exception chain httpx raises without -k.",
+      "why_it_matters": "The certificate path and the body path are two different signatures of one block, and CPython 3.12 does not name the certificate in its message: the test needs the real strings to pin the detector against."
+    }
+  },
+  "written_by_hand": {
+    "files": [
+      "gamma_markets_page1.json",
+      "gamma_markets_page2.json",
+      "gamma_market_slug_512901.json",
+      "clob_prices_history_512901.json",
+      "clob_prices_history_530118.json",
+      "clob_prices_history_544300.json",
+      "clob_prices_history_551444.json"
+    ],
+    "why": "Gamma and the CLOB cannot be recorded from this machine at all: every request to gamma-api.polymarket.com, clob.polymarket.com and data-api.polymarket.com is answered by the ANJ block above, so there is no real payload to capture. Recording them would take a run from another jurisdiction or through PMX_HTTP_PROXY, which the live test behind PMX_LIVE=1 is there to do.",
+    "shapes": "Fields and spellings are the ones the provider documents and uses: Gamma sends outcomes, outcomePrices and clobTokenIds as JSON strings, spells its instants three ways in one payload (2026-03-31T12:00:00Z, 2026-03-31 18:05:00+00, 2026-02-25T09:14:02.517Z), nests events[] with its own slug, category and tags, and answers /markets with a bare array. The CLOB answers /prices-history with {\"history\": [{\"t\": <unix seconds>, \"p\": <decimal in [0, 1]>}]}.",
+    "rows": {
+      "512901": "Eligible, resolves YES, crypto. Carries the multi-point bar (three prints inside 2026-03-10) and the two date spellings.",
+      "530118": "Eligible, resolves NO through outcomePrices [\"0\", \"1\"], sports, empty resolutionSource so the default 'venue' is exercised.",
+      "551444": "Eligible, resolves NO, and its slug is 132 characters: it is the row that exercises the shortening of an over-long slug into a legal market id.",
+      "544000": "Skipped: closed is false (still open).",
+      "544100": "Skipped: three outcomes, not a binary yes/no pair.",
+      "544200": "Skipped: closed but both legs still quote at 0.5, so there is no outcome.",
+      "544300": "Skipped by the freeze: it resolved on 2026-09-18, after the 2026-09-07 freeze. Its tape exists so that the test can widen the freeze and prove it is the window that excludes it, not a missing fixture.",
+      "412300": "Skipped: it resolved in March 2024, before the window opens."
+    },
+    "prices": "Every price is a JSON number and is parsed with json.loads(..., parse_float=Decimal): the importer never lets a float reach a mapper, and one test asserts that a float that does is refused."
+  }
+}

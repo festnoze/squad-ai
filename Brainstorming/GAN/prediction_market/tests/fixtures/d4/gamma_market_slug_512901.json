@@ -1,0 +1,49 @@
+[
+  {
+    "id": "512901",
+    "question": "Will ETH close above $4,000 on March 31, 2026?",
+    "conditionId": "0xa17c3b7f9d0e4a2b8c1d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b",
+    "slug": "will-eth-close-above-4000-on-2026-03-31",
+    "resolutionSource": "https://www.coingecko.com/en/coins/ethereum",
+    "endDate": "2026-03-31T12:00:00Z",
+    "startDate": "2026-03-01T00:00:00Z",
+    "createdAt": "2026-02-25T09:14:02.517Z",
+    "closedTime": "2026-03-31 18:05:00+00",
+    "description": "This market will resolve to YES if the closing price of Ethereum (ETH) on March 31, 2026 at 16:00 ET is strictly above 4,000 USD according to CoinGecko. Otherwise it resolves to NO.",
+    "outcomes": "[\"Yes\", \"No\"]",
+    "outcomePrices": "[\"1\", \"0\"]",
+    "clobTokenIds": "[\"71321045791924030957857892716647252735936265513806565428493516898920342568943\", \"52114049108734907358107108988147936371806295847283726194537260894418340114627\"]",
+    "volume": "1843922.51",
+    "volumeNum": 1843922.51,
+    "liquidity": "88214.09",
+    "active": false,
+    "closed": true,
+    "umaResolutionStatus": "resolved",
+    "category": "Crypto",
+    "tags": [
+      {
+        "id": "21",
+        "label": "Crypto",
+        "slug": "crypto"
+      },
+      {
+        "id": "44",
+        "label": "Ethereum",
+        "slug": "ethereum"
+      }
+    ],
+    "events": [
+      {
+        "id": "18422",
+        "slug": "eth-price-on-march-31-2026",
+        "title": "ETH price on March 31, 2026",
+        "category": "Crypto",
+        "tags": [
+          {
+            "slug": "crypto-prices"
+          }
+        ]
+      }
+    ]
+  }
+]

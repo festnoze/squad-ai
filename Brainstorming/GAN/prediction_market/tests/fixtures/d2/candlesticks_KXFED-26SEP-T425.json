@@ -1,0 +1,105 @@
+{
+  "ticker": "KXFED-26SEP-T425",
+  "candlesticks": [
+    {
+      "end_period_ts": 1788307200,
+      "yes_bid": {
+        "open": 60,
+        "low": 60,
+        "high": 60,
+        "close": 60
+      },
+      "yes_ask": {
+        "open": 62,
+        "low": 62,
+        "high": 62,
+        "close": 62
+      },
+      "price": {
+        "open": "0.60",
+        "low": "0.59",
+        "high": "0.62",
+        "close": "0.61",
+        "mean": "0.60",
+        "previous": null
+      },
+      "volume": 700,
+      "open_interest": 300
+    },
+    {
+      "end_period_ts": 1788393600,
+      "yes_bid": {
+        "open": 62,
+        "low": 62,
+        "high": 62,
+        "close": 62
+      },
+      "yes_ask": {
+        "open": 64,
+        "low": 64,
+        "high": 64,
+        "close": 64
+      },
+      "price": {
+        "open": "0.61",
+        "low": "0.60",
+        "high": "0.64",
+        "close": "0.63",
+        "mean": "0.62",
+        "previous": null
+      },
+      "volume": 850,
+      "open_interest": 380
+    },
+    {
+      "end_period_ts": 1788480000,
+      "yes_bid": {
+        "open": 62,
+        "low": 62,
+        "high": 62,
+        "close": 62
+      },
+      "yes_ask": {
+        "open": 64,
+        "low": 64,
+        "high": 64,
+        "close": 64
+      },
+      "price": {
+        "open": null,
+        "low": null,
+        "high": null,
+        "close": null,
+        "mean": null,
+        "previous": null
+      },
+      "volume": 0,
+      "open_interest": 380
+    },
+    {
+      "end_period_ts": 1788566400,
+      "yes_bid": {
+        "open": 64,
+        "low": 64,
+        "high": 64,
+        "close": 64
+      },
+      "yes_ask": {
+        "open": 66,
+        "low": 66,
+        "high": 66,
+        "close": 66
+      },
+      "price": {
+        "open": "0.63",
+        "low": "0.62",
+        "high": "0.66",
+        "close": "0.65",
+        "mean": "0.64",
+        "previous": null
+      },
+      "volume": 1250,
+      "open_interest": 460
+    }
+  ]
+}

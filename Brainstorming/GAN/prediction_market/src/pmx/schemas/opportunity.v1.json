@@ -1,0 +1,155 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/opportunity.v1.json",
+  "title": "pmx detector output and opportunity events v1",
+  "description": "The document analysis/<dataset>/<detector_id>.json written by pmx analyze: the detector's parameters, its block-bootstrap summary with the permutation null, and one OpportunityEvent per measured inefficiency with its evidence, its ex-post payoff and its currency label. A detector is analysis, never an agent: nothing here is journaled and nothing here ever reaches an observation. CONTRACTS_V2 section 16.4.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "dataset_name", "dataset_hash", "detector_id", "detector_version", "params",
+    "params_sha256", "n_detectors_run", "n_events", "currency", "summary", "events"
+  ],
+  "properties": {
+    "schema_version": { "const": "opportunity.v1" },
+    "dataset_name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
+    "dataset_hash": { "$ref": "#/$defs/sha256" },
+    "detector_id": { "$ref": "#/$defs/detectorId" },
+    "detector_version": { "type": "string", "pattern": "^[a-z_]{1,32}\\.v[0-9]+$" },
+    "params": {
+      "description": "The detector's own dials, integers and strings only, canonical-json-able. params_sha256 is sha256(canonical_json(params)) and is what a claim cites.",
+      "type": "object",
+      "additionalProperties": { "type": ["integer", "boolean", "string"] }
+    },
+    "params_sha256": { "$ref": "#/$defs/sha256" },
+    "n_detectors_run": {
+      "description": "How many detectors the opportunity map ran, so a reader can deflate for multiple testing (PRD v3 section 11).",
+      "type": "integer",
+      "minimum": 1
+    },
+    "n_events": { "$ref": "#/$defs/nonNegInt" },
+    "currency": { "enum": ["usd", "mana", "mixed"] },
+    "summary": { "$ref": "#/$defs/summary" },
+    "events": { "type": "array", "items": { "$ref": "#/$defs/opportunity_event" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "int": { "type": "integer" },
+    "nonNegInt": { "type": "integer", "minimum": 0 },
+    "ms": { "type": "integer", "minimum": 0 },
+    "ppm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+    "detectorId": { "enum": ["news_lead", "divergence", "logic", "comparative"] },
+    "marketId": {
+      "type": "string",
+      "pattern": "^(kalshi|manifold|polymarket|metaculus|demo)-[A-Za-z0-9._-]{1,96}$"
+    },
+    "summary": {
+      "description": "The detector's headline number as a lower bound, with the interval and the permutation null of CONTRACTS_V2 12.4. A headline is never the point estimate.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "payoff_point_cents", "payoff_lb_cents", "payoff_upper_cents", "null_lb_cents", "p_value_ppm",
+        "n", "n_blocks", "resamples", "permutations"
+      ],
+      "properties": {
+        "payoff_point_cents": { "$ref": "#/$defs/int" },
+        "payoff_lb_cents": { "$ref": "#/$defs/int" },
+        "payoff_upper_cents": { "$ref": "#/$defs/int" },
+        "null_lb_cents": { "$ref": "#/$defs/int" },
+        "p_value_ppm": { "$ref": "#/$defs/ppm" },
+        "n": { "$ref": "#/$defs/nonNegInt" },
+        "n_blocks": { "$ref": "#/$defs/nonNegInt" },
+        "resamples": { "$ref": "#/$defs/nonNegInt" },
+        "permutations": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "evidence": {
+      "description": "One integer fact behind an event, in the unit it names. A detector states its case in numbers a reader can recompute from the dataset.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "ref", "t_ms", "value", "unit"],
+      "properties": {
+        "kind": { "enum": ["price", "news", "constraint", "cluster", "stat"] },
+        "ref": { "type": "string", "minLength": 1, "maxLength": 128 },
+        "t_ms": { "$ref": "#/$defs/ms" },
+        "value": { "$ref": "#/$defs/int" },
+        "unit": { "enum": ["ppm", "bp", "cents", "ms", "milli", "count", "micro", "permille"] }
+      }
+    },
+    "opportunity_event": {
+      "description": "One measured inefficiency: where it was, how big, how long, what a paper book would have made under the decision latency rule of 16.2, and in whose currency.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "opportunity_id", "detector_id", "market_ids", "cluster_id", "constraint_id", "window",
+        "duration_bars", "size_ppm", "size_net_bp", "payoff_cents", "currency", "tradable_for_money",
+        "evidence"
+      ],
+      "properties": {
+        "opportunity_id": {
+          "type": "string",
+          "pattern": "^op-(news_lead|divergence|logic|comparative)-[0-9a-f]{16}$"
+        },
+        "detector_id": { "$ref": "#/$defs/detectorId" },
+        "market_ids": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/marketId" }
+        },
+        "cluster_id": {
+          "oneOf": [{ "type": "null" }, { "type": "string", "pattern": "^ec-[0-9a-f]{16}$" }]
+        },
+        "constraint_id": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "string",
+              "pattern": "^cn-(sum_to_one|implies|monotone_ladder|complement)-[0-9a-f]{12}$"
+            }
+          ]
+        },
+        "window": {
+          "description": "First and last bar open the inefficiency was observed at, inclusive.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start_ms", "end_ms"],
+          "properties": { "start_ms": { "$ref": "#/$defs/ms" }, "end_ms": { "$ref": "#/$defs/ms" } }
+        },
+        "duration_bars": { "type": "integer", "minimum": 1 },
+        "size_ppm": { "$ref": "#/$defs/ppm" },
+        "size_net_bp": {
+          "description": "The size net of both venues' fees and of the spread envelope; negative when the round trip does not pay.",
+          "$ref": "#/$defs/int"
+        },
+        "payoff_cents": { "$ref": "#/$defs/int" },
+        "currency": { "enum": ["usd", "mana", "mixed"] },
+        "tradable_for_money": { "type": "boolean" },
+        "evidence": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/evidence" } }
+      },
+      "allOf": [
+        {
+          "description": "A play-money leg makes the whole event untradable for money, whatever its size (PRD v3 4.2).",
+          "if": {
+            "properties": { "currency": { "enum": ["mana", "mixed"] } },
+            "required": ["currency"]
+          },
+          "then": { "properties": { "tradable_for_money": { "const": false } } }
+        },
+        {
+          "description": "A divergence event lives on a cluster and a logic event on a constraint; neither is a free-floating claim.",
+          "if": { "properties": { "detector_id": { "const": "divergence" } }, "required": ["detector_id"] },
+          "then": {
+            "properties": {
+              "cluster_id": { "type": "string" },
+              "market_ids": { "minItems": 2 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "detector_id": { "const": "logic" } }, "required": ["detector_id"] },
+          "then": { "properties": { "constraint_id": { "type": "string" } } }
+        }
+      ]
+    }
+  }
+}

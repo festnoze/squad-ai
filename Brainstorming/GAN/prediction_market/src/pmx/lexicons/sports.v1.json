@@ -1,0 +1,242 @@
+{
+  "against": [
+    {
+      "token": "abandons",
+      "weight_permille": 800
+    },
+    {
+      "token": "blocked",
+      "weight_permille": 800
+    },
+    {
+      "token": "blocks",
+      "weight_permille": 700
+    },
+    {
+      "token": "cancelled",
+      "weight_permille": 900
+    },
+    {
+      "token": "cancels",
+      "weight_permille": 900
+    },
+    {
+      "token": "collapses",
+      "weight_permille": 800
+    },
+    {
+      "token": "concussion",
+      "weight_permille": 500
+    },
+    {
+      "token": "defeat",
+      "weight_permille": 700
+    },
+    {
+      "token": "delayed",
+      "weight_permille": 700
+    },
+    {
+      "token": "delays",
+      "weight_permille": 700
+    },
+    {
+      "token": "denied",
+      "weight_permille": 800
+    },
+    {
+      "token": "denies",
+      "weight_permille": 800
+    },
+    {
+      "token": "disqualified",
+      "weight_permille": 800
+    },
+    {
+      "token": "eliminated",
+      "weight_permille": 900
+    },
+    {
+      "token": "fails",
+      "weight_permille": 800
+    },
+    {
+      "token": "forfeits",
+      "weight_permille": 800
+    },
+    {
+      "token": "halted",
+      "weight_permille": 700
+    },
+    {
+      "token": "halts",
+      "weight_permille": 700
+    },
+    {
+      "token": "injured",
+      "weight_permille": 600
+    },
+    {
+      "token": "postponed",
+      "weight_permille": 800
+    },
+    {
+      "token": "refuses",
+      "weight_permille": 700
+    },
+    {
+      "token": "rejected",
+      "weight_permille": 800
+    },
+    {
+      "token": "rejects",
+      "weight_permille": 800
+    },
+    {
+      "token": "relegated",
+      "weight_permille": 800
+    },
+    {
+      "token": "sidelined",
+      "weight_permille": 600
+    },
+    {
+      "token": "suspended",
+      "weight_permille": 700
+    },
+    {
+      "token": "suspension",
+      "weight_permille": 600
+    },
+    {
+      "token": "unlikely",
+      "weight_permille": 600
+    },
+    {
+      "token": "vetoes",
+      "weight_permille": 800
+    },
+    {
+      "token": "withdraws",
+      "weight_permille": 700
+    },
+    {
+      "token": "withdrew",
+      "weight_permille": 700
+    }
+  ],
+  "category": "sports",
+  "for": [
+    {
+      "token": "achieves",
+      "weight_permille": 500
+    },
+    {
+      "token": "advances",
+      "weight_permille": 800
+    },
+    {
+      "token": "agrees",
+      "weight_permille": 600
+    },
+    {
+      "token": "announces",
+      "weight_permille": 500
+    },
+    {
+      "token": "approves",
+      "weight_permille": 800
+    },
+    {
+      "token": "champion",
+      "weight_permille": 800
+    },
+    {
+      "token": "clinches",
+      "weight_permille": 900
+    },
+    {
+      "token": "completes",
+      "weight_permille": 700
+    },
+    {
+      "token": "confirmed",
+      "weight_permille": 900
+    },
+    {
+      "token": "confirms",
+      "weight_permille": 900
+    },
+    {
+      "token": "hattrick",
+      "weight_permille": 500
+    },
+    {
+      "token": "official",
+      "weight_permille": 600
+    },
+    {
+      "token": "officially",
+      "weight_permille": 600
+    },
+    {
+      "token": "passes",
+      "weight_permille": 700
+    },
+    {
+      "token": "playoff",
+      "weight_permille": 400
+    },
+    {
+      "token": "promoted",
+      "weight_permille": 700
+    },
+    {
+      "token": "qualifies",
+      "weight_permille": 800
+    },
+    {
+      "token": "ratifies",
+      "weight_permille": 800
+    },
+    {
+      "token": "reaches",
+      "weight_permille": 500
+    },
+    {
+      "token": "secures",
+      "weight_permille": 600
+    },
+    {
+      "token": "shutout",
+      "weight_permille": 500
+    },
+    {
+      "token": "signs",
+      "weight_permille": 700
+    },
+    {
+      "token": "succeeds",
+      "weight_permille": 700
+    },
+    {
+      "token": "surpasses",
+      "weight_permille": 700
+    },
+    {
+      "token": "unbeaten",
+      "weight_permille": 600
+    },
+    {
+      "token": "wildcard",
+      "weight_permille": 400
+    },
+    {
+      "token": "wins",
+      "weight_permille": 800
+    }
+  ],
+  "lexicon_id": "sports.v1",
+  "notes": "One occurrence of a token contributes +weight_permille (for) or -weight_permille (against) permille of one newsbayes hit, so a family sums the signed permille of every match and applies (sum_signed_permille * weight_per_hit_milli) // 1000 to the integer logit (CONTRACTS_V2 10.5). Tokens are lowercase ASCII letters of length 4 to 24, which is the tokenisation of section 7.6, so one tokeniser serves the linker and the lexicons.",
+  "schema_version": "lexicon.v1"
+}

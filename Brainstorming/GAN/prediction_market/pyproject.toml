@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pmx"
-version = "1.0.0"
-description = "A deterministic backtest arena for prediction markets: replay real resolved markets and score agents by Brier and PnL against the truth."
+version = "2.0.0-dev"
+description = "A deterministic backtest arena and hard optimizer for prediction-market forecasting agents: real resolved tapes, as-of news, memory, a hive, evolution, and sealed held-out claims. Reality is the referee."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "Proprietary" }
@@ -14,6 +14,8 @@ dependencies = [
     "fastapi>=0.110",
     "uvicorn>=0.29",
     "httpx>=0.27",
+    "numpy>=1.26",
+    "jsonschema>=4.21",
 ]
 
 [project.optional-dependencies]
@@ -21,6 +23,7 @@ dev = [
     "pytest>=8.1,<10",
     "ruff>=0.4,<1",
     "mypy>=1.10,<2",
+    "hypothesis>=6.100,<7",
 ]
 
 [project.scripts]
@@ -32,6 +35,13 @@ package-dir = { "" = "src" }
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["pmx*"]
+
+# Ruling R80 (and R94, which moved the lexicons inside the package for the same reason as R29 moved the
+# schemas): every one of these files is read at run time, so a wheel without them cannot validate a
+# payload, build a dataset or score a news item. ``py.typed`` makes the package's annotations visible to
+# a type checker outside ``src`` (ruling R99), which is what lets the test files be checked at all.
+[tool.setuptools.package-data]
+pmx = ["py.typed", "schemas/*.json", "lexicons/*.json", "llm/prompts/*.md"]
 
 [tool.ruff]
 line-length = 118
@@ -45,6 +55,10 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 files = ["src/pmx"]
 python_version = "3.12"
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["jsonschema", "jsonschema.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

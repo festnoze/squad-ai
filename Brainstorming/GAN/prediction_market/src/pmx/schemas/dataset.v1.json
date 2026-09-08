@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/dataset.v1.json",
+  "title": "pmx dataset manifest v1",
+  "description": "The manifest of a dataset directory: window, filters and what they removed, counts, news sources, the chronological split, the file digests and the dataset hash. Sealed datasets carry sealed: true and are immutable. CONTRACTS_V2 sections 7.7 and 7.8.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "name", "freeze_date", "freeze_ms", "window", "interval_min", "providers", "safety_lag_ms",
+    "filters", "counts", "news", "split", "files", "dataset_hash", "built_by", "sealed", "notes"
+  ],
+  "properties": {
+    "schema_version": { "const": "dataset.v1" },
+    "name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
+    "freeze_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+    "freeze_ms": { "$ref": "#/$defs/ms" },
+    "window": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start_ms", "end_ms"],
+      "properties": { "start_ms": { "$ref": "#/$defs/ms" }, "end_ms": { "$ref": "#/$defs/ms" } }
+    },
+    "interval_min": { "enum": [60, 1440] },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo"] }
+    },
+    "safety_lag_ms": { "$ref": "#/$defs/ms" },
+    "filters": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["config", "removed"],
+      "properties": {
+        "config": {
+          "description": "BuildConfig.to_dict() of CONTRACTS_V2 section 7.4, verbatim.",
+          "type": "object",
+          "additionalProperties": { "type": ["integer", "boolean", "string", "array"] }
+        },
+        "removed": {
+          "description": "Exactly the ten filter keys of CONTRACTS_V2 section 7.4, every one always present and 0 when the filter removed nothing, so the dataset panel and the gate's shortfall report read a fixed shape.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["window", "opened_early", "binary", "min_trades", "min_life", "density", "self_resolved", "kalshi_shards", "resolution", "no_leak"],
+          "properties": {
+            "window": { "$ref": "#/$defs/nonNegInt" },
+            "opened_early": { "$ref": "#/$defs/nonNegInt" },
+            "binary": { "$ref": "#/$defs/nonNegInt" },
+            "min_trades": { "$ref": "#/$defs/nonNegInt" },
+            "min_life": { "$ref": "#/$defs/nonNegInt" },
+            "density": { "$ref": "#/$defs/nonNegInt" },
+            "self_resolved": { "$ref": "#/$defs/nonNegInt" },
+            "kalshi_shards": { "$ref": "#/$defs/nonNegInt" },
+            "resolution": { "$ref": "#/$defs/nonNegInt" },
+            "no_leak": { "$ref": "#/$defs/nonNegInt" }
+          }
+        }
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["markets", "per_provider", "per_category", "resolution_yes", "resolution_no", "hardness_tags"],
+      "properties": {
+        "markets": { "$ref": "#/$defs/nonNegInt" },
+        "per_provider": { "$ref": "#/$defs/countMap" },
+        "per_category": { "$ref": "#/$defs/countMap" },
+        "resolution_yes": { "$ref": "#/$defs/nonNegInt" },
+        "resolution_no": { "$ref": "#/$defs/nonNegInt" },
+        "hardness_tags": { "$ref": "#/$defs/countMap" },
+        "illiquid_boundary_milli": {
+          "description": "The bottom-decile boundary of median daily volume per provider slice, in milli-contracts (CONTRACTS_V2 7.5, ruling R98). A provider whose slice was too small for a tenth percentile is absent.",
+          "$ref": "#/$defs/countMap"
+        },
+        "n_bars_only": {
+          "description": "Kept markets whose tape is bars_only (market.v2 quality.tape_kind): the only path through the min_trades filter of CONTRACTS_V2 7.4 that a provider with no settled print tape has. Zero means every market of this dataset came in on prints.",
+          "$ref": "#/$defs/nonNegInt"
+        },
+        "n_category_fallback": {
+          "description": "Kept markets whose category is the other fallback because nothing named a better one: a provider whose listing rows carry no category and whose series is absent from the series-to-category map. Reported because a flat other slice is a measurement failure, not a fact about the markets.",
+          "$ref": "#/$defs/nonNegInt"
+        },
+        "precap_per_provider_month": {
+          "description": "Per provider, the twelve month buckets of the window (CONTRACTS_V2 7.7) counted after every filter of 7.4 and before limit_per_provider was applied. The dataset shows what was sampled; this shows what there was to sample from, which is what makes the cap auditable.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 12,
+            "maxItems": 12,
+            "items": { "$ref": "#/$defs/nonNegInt" }
+          }
+        }
+      }
+    },
+    "news": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sources", "n_items", "n_linked"],
+      "properties": {
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["source", "n_items", "fetched_at_ms_min", "fetched_at_ms_max"],
+            "properties": {
+              "source": { "enum": ["wikipedia_current_events", "wikipedia_asof", "wayback", "gdelt", "manifold_comment"] },
+              "n_items": { "$ref": "#/$defs/nonNegInt" },
+              "fetched_at_ms_min": { "$ref": "#/$defs/ms" },
+              "fetched_at_ms_max": { "$ref": "#/$defs/ms" }
+            }
+          }
+        },
+        "n_items": { "$ref": "#/$defs/nonNegInt" },
+        "n_linked": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "split": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["month_edges_ms", "train_end_ms", "validation_end_ms", "n_train", "n_validation", "n_sealed"],
+      "properties": {
+        "month_edges_ms": { "type": "array", "minItems": 13, "maxItems": 13, "items": { "$ref": "#/$defs/ms" } },
+        "train_end_ms": { "$ref": "#/$defs/ms" },
+        "validation_end_ms": { "$ref": "#/$defs/ms" },
+        "n_train": { "$ref": "#/$defs/nonNegInt" },
+        "n_validation": { "$ref": "#/$defs/nonNegInt" },
+        "n_sealed": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "sha256", "bytes"],
+        "properties": {
+          "path": { "type": "string", "pattern": "^(markets|news|wiki_asof|clusters)/[A-Za-z0-9._/-]+$" },
+          "sha256": { "$ref": "#/$defs/sha256" },
+          "bytes": { "$ref": "#/$defs/nonNegInt" }
+        }
+      }
+    },
+    "dataset_hash": { "$ref": "#/$defs/sha256" },
+    "built_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pmx_version", "contract_version", "rng_algorithm_version"],
+      "properties": {
+        "pmx_version": { "type": "string" },
+        "contract_version": { "type": "string" },
+        "rng_algorithm_version": { "type": "string" }
+      }
+    },
+    "sealed": { "type": "boolean" },
+    "notes": { "type": "string", "maxLength": 4000 },
+    "clusters": {
+      "description": "CONTRACTS_V2 16.3 (ruling R117): the summary of clusters/clusters.json, absent from a dataset built with no cluster matcher. clusters.json carries no dataset_hash of its own, because its bytes are inside that hash (ruling R128); overrides_sha256 is what pins the hand-written review.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "matcher_version", "min_score_permille", "resolution_tolerance_ms", "overrides_sha256",
+        "n_clusters", "n_clusters_asof", "n_cross_venue", "n_constraints", "per_kind",
+        "n_markets_clustered"
+      ],
+      "properties": {
+        "matcher_version": { "type": "string", "pattern": "^clusters\\.v[0-9]+$" },
+        "min_score_permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+        "resolution_tolerance_ms": { "$ref": "#/$defs/ms" },
+        "overrides_sha256": { "$ref": "#/$defs/sha256" },
+        "n_clusters": { "$ref": "#/$defs/nonNegInt" },
+        "n_clusters_asof": { "$ref": "#/$defs/nonNegInt" },
+        "n_cross_venue": { "$ref": "#/$defs/nonNegInt" },
+        "n_constraints": { "$ref": "#/$defs/nonNegInt" },
+        "per_kind": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sum_to_one", "implies", "monotone_ladder", "complement"],
+          "properties": {
+            "sum_to_one": { "$ref": "#/$defs/nonNegInt" },
+            "implies": { "$ref": "#/$defs/nonNegInt" },
+            "monotone_ladder": { "$ref": "#/$defs/nonNegInt" },
+            "complement": { "$ref": "#/$defs/nonNegInt" }
+          }
+        },
+        "n_markets_clustered": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "impact": {
+      "description": "CONTRACTS_V2 16.1 (ruling R135): the impact coefficients the calibrated_impact liquidity model reads, one per liquidity decile, regressed by pmx.data.impact on the TRAINING fold only. fit_fold is train and fit_t1_ms is the last resolution the regression saw, so pmx claim can refuse a calibrated run whose calibration ran past the claim's t0_ms. liquidity_decile is ranked over the same fold.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fit_fold", "fit_t1_ms", "params_sha256", "impact_bp_per_pct_by_decile", "n_markets_fit"],
+      "properties": {
+        "fit_fold": { "const": "train" },
+        "fit_t1_ms": { "$ref": "#/$defs/ms" },
+        "params_sha256": { "$ref": "#/$defs/sha256" },
+        "impact_bp_per_pct_by_decile": {
+          "type": "array",
+          "minItems": 10,
+          "maxItems": 10,
+          "items": { "$ref": "#/$defs/nonNegInt" }
+        },
+        "n_markets_fit": { "$ref": "#/$defs/nonNegInt" }
+      }
+    }
+  },
+  "$defs": {
+    "ms": { "type": "integer", "minimum": 0 },
+    "nonNegInt": { "type": "integer", "minimum": 0 },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "countMap": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+  }
+}

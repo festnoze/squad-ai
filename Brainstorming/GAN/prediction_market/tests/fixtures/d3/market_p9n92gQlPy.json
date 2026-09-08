@@ -1,0 +1,358 @@
+{
+ "closeTime": 1788800820000,
+ "coverImageUrl": "https://firebasestorage.googleapis.com/v0/b/mantic-markets.appspot.com/o/user-images%2Fdefault%2F9LgpgCLNLR.jpeg?alt=media&token=7f141310-ec60-4ffd-b48f-8a50a7b1dc5a",
+ "createdTime": 1787893466138,
+ "creatorAvatarUrl": "https://firebasestorage.googleapis.com/v0/b/mantic-markets.appspot.com/o/user-images%2FWeb3ICP%2F8cshqQ592A.jpeg?alt=media&token=5c7bff51-cf0a-4e1b-96da-8c5f1a7f7f7b",
+ "creatorId": "LclNrpxEnQdOUryNMHaRxUTMFqJ2",
+ "creatorName": "Web3ICP",
+ "creatorUsername": "Web3ICP",
+ "description": {
+  "content": [
+   {
+    "content": [
+     {
+      "text": "See previous similar propositions. ",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "attrs": {
+     "level": 4
+    },
+    "content": [
+     {
+      "text": "Resolution criteria",
+      "type": "text"
+     }
+    ],
+    "type": "heading"
+   },
+   {
+    "content": [
+     {
+      "text": "This market will resolve to ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "YES",
+      "type": "text"
+     },
+     {
+      "text": " if either of the following conditions is met for the 3-game regular season series between the New York Mets and the Miami Marlins scheduled for September 7–9, 2026:",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "attrs": {
+     "start": 1
+    },
+    "content": [
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "marks": [
+           {
+            "type": "bold"
+           }
+          ],
+          "text": "Mets Sweep:",
+          "type": "text"
+         },
+         {
+          "text": " The New York Mets win all three games of the series.",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     },
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "marks": [
+           {
+            "type": "bold"
+           }
+          ],
+          "text": "High-Scoring Series:",
+          "type": "text"
+         },
+         {
+          "text": " The total combined runs scored by both teams across all three games in the series is ",
+          "type": "text"
+         },
+         {
+          "marks": [
+           {
+            "type": "bold"
+           }
+          ],
+          "text": "24 or more",
+          "type": "text"
+         },
+         {
+          "text": " (i.e., Game 1 runs + Game 2 runs + Game 3 runs $\\ge$ 24).",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     }
+    ],
+    "type": "orderedList"
+   },
+   {
+    "content": [
+     {
+      "text": "If neither of these conditions is met, the market will resolve to ",
+      "type": "text"
+     },
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "NO",
+      "type": "text"
+     },
+     {
+      "text": ".",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "marks": [
+       {
+        "type": "bold"
+       }
+      ],
+      "text": "Postponements and Edge Cases:",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "text": "All games must be completed on or before September 10, 2026 (accounting for potential doubleheaders or makeups of postponed games from the series) to count toward the \"sweep\" or \"24 runs\" totals.",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     },
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "text": "If any scheduled game is postponed beyond September 10, 2026, or canceled:",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       },
+       {
+        "content": [
+         {
+          "content": [
+           {
+            "content": [
+             {
+              "text": "The market will resolve to ",
+              "type": "text"
+             },
+             {
+              "marks": [
+               {
+                "type": "bold"
+               }
+              ],
+              "text": "YES",
+              "type": "text"
+             },
+             {
+              "text": " if the cumulative total runs from the completed games of the series is already 24 or more.",
+              "type": "text"
+             }
+            ],
+            "type": "paragraph"
+           }
+          ],
+          "type": "listItem"
+         },
+         {
+          "content": [
+           {
+            "content": [
+             {
+              "text": "If the cumulative total runs from the completed games is under 24 and the series is not fully completed by September 10, 2026, the market will resolve to ",
+              "type": "text"
+             },
+             {
+              "marks": [
+               {
+                "type": "bold"
+               }
+              ],
+              "text": "NO",
+              "type": "text"
+             },
+             {
+              "text": " (as a sweep is not achieved and the run threshold was not reached).",
+              "type": "text"
+             }
+            ],
+            "type": "paragraph"
+           }
+          ],
+          "type": "listItem"
+         }
+        ],
+        "type": "bulletList"
+       }
+      ],
+      "type": "listItem"
+     },
+     {
+      "content": [
+       {
+        "content": [
+         {
+          "text": "Game data and results will be verified using official box scores from the ",
+          "type": "text"
+         },
+         {
+          "marks": [
+           {
+            "attrs": {
+             "class": null,
+             "href": "https://www.mlb.com/mets/schedule",
+             "target": "_blank"
+            },
+            "type": "link"
+           }
+          ],
+          "text": "MLB Schedule",
+          "type": "text"
+         },
+         {
+          "text": ".",
+          "type": "text"
+         }
+        ],
+        "type": "paragraph"
+       }
+      ],
+      "type": "listItem"
+     }
+    ],
+    "type": "bulletList"
+   },
+   {
+    "attrs": {
+     "level": 4
+    },
+    "content": [
+     {
+      "text": "Background",
+      "type": "text"
+     }
+    ],
+    "type": "heading"
+   },
+   {
+    "content": [
+     {
+      "text": "The New York Mets and the Miami Marlins are divisional rivals in the NL East. They are scheduled to face off in a three-game series at loanDepot Park in Miami from Monday, September 7, to Wednesday, September 9, 2026.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "text": "This market focuses on two potential outcomes: either a dominant showing by the Mets (a 3-game sweep) or a high-scoring series between the teams (averaging 8 runs per game across the three matches to reach 24 total runs). If either condition is met, the market resolves positively.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   },
+   {
+    "type": "paragraph"
+   },
+   {
+    "content": [
+     {
+      "marks": [
+       {
+        "type": "italic"
+       }
+      ],
+      "text": "This description was generated by AI. Review and verify everything here yourself. You can edit, replace, or delete any part of this description, including the resolution criteria. You do not need to trust the AI output.",
+      "type": "text"
+     }
+    ],
+    "type": "paragraph"
+   }
+  ],
+  "type": "doc"
+ },
+ "groupSlugs": [
+  "new-york-mets",
+  "mlb",
+  "baseball",
+  "miami-marlins",
+  "rbi"
+ ],
+ "id": "p9n92gQlPy",
+ "isResolved": false,
+ "lastUpdatedTime": 1788409707121,
+ "mechanism": "cpmm-1",
+ "outcomeType": "BINARY",
+ "p": 0.5,
+ "pool": {
+  "NO": 100,
+  "YES": 100
+ },
+ "probability": 0.5,
+ "question": "MLB: Will the New York Mets sweep the Miami Marlins OR will the 3-game series total 24 or more runs?",
+ "slug": "mlb-will-the-new-york-mets-sweep-th-lIlh6ptdCd",
+ "textDescription": "See previous similar propositions. \n\nResolution criteria\n\nThis market will resolve to YES if either of the following conditions is met for the 3-game regular season series between the New York Mets and the Miami Marlins scheduled for September 7–9, 2026:\n\nMets Sweep: The New York Mets win all three games of the series.\n\nHigh-Scoring Series: The total combined runs scored by both teams across all three games in the series is 24 or more (i.e., Game 1 runs + Game 2 runs + Game 3 runs $\\ge$ 24).\n\nIf neither of these conditions is met, the market will resolve to NO.\n\nPostponements and Edge Cases:\n\nAll games must be completed on or before September 10, 2026 (accounting for potential doubleheaders or makeups of postponed games from the series) to count toward the \"sweep\" or \"24 runs\" totals.\n\nIf any scheduled game is postponed beyond September 10, 2026, or canceled:\n\nThe market will resolve to YES if the cumulative total runs from the completed games of the series is already 24 or more.\n\nIf the cumulative total runs from the completed games is under 24 and the series is not fully completed by September 10, 2026, the market will resolve to NO (as a sweep is not achieved and the run threshold was not reached).\n\nGame data and results will be verified using official box scores from the MLB Schedule.\n\nBackground\n\nThe New York Mets and the Miami Marlins are divisional rivals in the NL East. They are scheduled to face off in a three-game series at loanDepot Park in Miami from Monday, September 7, to Wednesday, September 9, 2026.\n\nThis market focuses on two potential outcomes: either a dominant showing by the Mets (a 3-game sweep) or a high-scoring series between the teams (averaging 8 runs per game across the three matches to reach 24 total runs). If either condition is met, the market resolves positively.\n\nThis description was generated by AI. Review and verify everything here yourself. You can edit, replace, or delete any part of this description, including the resolution criteria. You do not need to trust the AI output.",
+ "token": "MANA",
+ "totalLiquidity": 100,
+ "uniqueBettorCount": 0,
+ "url": "https://manifold.markets/Web3ICP/mlb-will-the-new-york-mets-sweep-th-lIlh6ptdCd",
+ "volume": 0,
+ "volume24Hours": 0
+}

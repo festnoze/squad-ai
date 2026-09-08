@@ -1,0 +1,190 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/cluster.v1.json",
+  "title": "pmx event clusters and constraints v1",
+  "description": "The document data/datasets/<name>/clusters/clusters.json: the cross-venue EventCluster records and the intra-venue Constraint records computed at build time and sealed with the dataset. The hand-written override file validates against #/$defs/override_file. Every cluster records why it matched, and a cluster whose match needed resolved_at_ms or a human carries asof: false and never reaches an agent. This document carries no dataset_hash: its own bytes are an input to that hash (CONTRACTS_V2 4.3 walks clusters/), so a field holding it could never be filled (ruling R128). CONTRACTS_V2 section 16.3.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "dataset_name", "matcher_version", "min_score_permille",
+    "resolution_tolerance_ms", "overrides_sha256", "clusters", "constraints"
+  ],
+  "properties": {
+    "schema_version": { "const": "cluster.v1" },
+    "dataset_name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
+    "matcher_version": { "type": "string", "pattern": "^clusters\\.v[0-9]+$" },
+    "min_score_permille": { "$ref": "#/$defs/permille" },
+    "resolution_tolerance_ms": {
+      "description": "The tolerance the matcher applies to resolution dates. It is on the analysis path only: a grouping whose formation consulted resolved_at_ms in any way, as a stored reason or as a filter, stores a resolution_date reason and therefore carries asof: false (CONTRACTS_V2 16.3, ruling R132).",
+      "$ref": "#/$defs/ms"
+    },
+    "overrides_sha256": { "$ref": "#/$defs/sha256" },
+    "clusters": { "type": "array", "items": { "$ref": "#/$defs/event_cluster" } },
+    "constraints": { "type": "array", "items": { "$ref": "#/$defs/constraint" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "ms": { "type": "integer", "minimum": 0 },
+    "ms_or_none": { "type": "integer", "minimum": -1 },
+    "permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+    "marketId": {
+      "type": "string",
+      "pattern": "^(kalshi|manifold|polymarket|metaculus|demo)-[A-Za-z0-9._-]{1,96}$"
+    },
+    "clusterId": { "type": "string", "pattern": "^ec-[0-9a-f]{16}$" },
+    "constraintId": {
+      "type": "string",
+      "pattern": "^cn-(sum_to_one|implies|monotone_ladder|complement)-[0-9a-f]{12}$"
+    },
+    "marketIds": {
+      "type": "array",
+      "minItems": 2,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/marketId" }
+    },
+    "match_reason": {
+      "description": "One stored reason a match was made, with the score it contributed. asof is false for a reason a live agent could not have computed at now_ms (a resolution date, a human override); a cluster is asof only when every one of its reasons is.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "asof", "detail", "score_permille"],
+      "properties": {
+        "kind": {
+          "enum": [
+            "wiki_subject",
+            "question_similarity",
+            "event_ticker",
+            "venue_duplicate",
+            "venue_complement",
+            "resolution_date",
+            "manual"
+          ]
+        },
+        "asof": { "type": "boolean" },
+        "detail": { "type": "string", "minLength": 1, "maxLength": 500 },
+        "score_permille": { "$ref": "#/$defs/permille" }
+      },
+      "allOf": [
+        {
+          "description": "A resolution date proximity and a human override are hindsight by construction (CONTRACTS_V2 7.9 forbids resolved_at_ms in a view), so neither may claim to be as-of.",
+          "if": {
+            "properties": { "kind": { "enum": ["resolution_date", "manual"] } },
+            "required": ["kind"]
+          },
+          "then": { "properties": { "asof": { "const": false } } }
+        }
+      ]
+    },
+    "event_cluster": {
+      "description": "Markets on one real-world event, grouped by the deterministic conservative matcher of CONTRACTS_V2 16.3. Never a label to an agent.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cluster_id", "market_ids", "providers", "currencies", "asof", "score_permille",
+        "resolution_span_ms", "source", "reasons"
+      ],
+      "properties": {
+        "cluster_id": { "$ref": "#/$defs/clusterId" },
+        "market_ids": { "$ref": "#/$defs/marketIds" },
+        "providers": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo"] }
+        },
+        "currencies": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "enum": ["usd", "mana"] }
+        },
+        "asof": { "type": "boolean" },
+        "score_permille": { "$ref": "#/$defs/permille" },
+        "resolution_span_ms": {
+          "description": "max(resolved_at_ms) - min(resolved_at_ms) over the members, and -1 on an as-of cluster, whose formation never read a resolution date (ruling R132). Analysis recomputes the span from the dataset when it wants it.",
+          "$ref": "#/$defs/ms_or_none"
+        },
+        "source": { "enum": ["matcher", "manual"] },
+        "reasons": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/match_reason" } }
+      },
+      "allOf": [
+        {
+          "description": "A hand-forced cluster is never as-of and always carries its manual reason.",
+          "if": { "properties": { "source": { "const": "manual" } }, "required": ["source"] },
+          "then": { "properties": { "asof": { "const": false } } }
+        },
+        {
+          "description": "An as-of cluster is matched by content only, so it never read a resolution date and cannot report a span (CONTRACTS_V2 16.3, ruling R132).",
+          "if": { "properties": { "asof": { "const": true } }, "required": ["asof"] },
+          "then": { "properties": { "resolution_span_ms": { "const": -1 } } },
+          "else": { "properties": { "resolution_span_ms": { "$ref": "#/$defs/ms" } } }
+        }
+      ]
+    },
+    "constraint": {
+      "description": "A logical relation between the prices of two or more markets, from a Kalshi event ticker, a threshold ladder, a venue-declared duplicate or complement, or a manual override. market_ids is ordered by the relation's own semantics: (antecedent, consequent) for implies, ascending threshold for monotone_ladder, canonical market order otherwise.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "constraint_id", "kind", "market_ids", "direction", "cluster_id", "asof", "score_permille",
+        "source", "reasons"
+      ],
+      "properties": {
+        "constraint_id": { "$ref": "#/$defs/constraintId" },
+        "kind": { "enum": ["sum_to_one", "implies", "monotone_ladder", "complement"] },
+        "market_ids": { "$ref": "#/$defs/marketIds" },
+        "direction": { "enum": ["non_increasing", "non_decreasing", "none"] },
+        "cluster_id": {
+          "description": "The cluster this relation lives inside, or null when it stands alone. When it is not null every id of market_ids is a member of that cluster: the matcher extends the cluster rather than filing a constraint against a partial one (CONTRACTS_V2 16.3, ruling R143). The check is across records, so tests/test_contract_schemas.py asserts it.",
+          "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/clusterId" }]
+        },
+        "asof": { "type": "boolean" },
+        "score_permille": { "$ref": "#/$defs/permille" },
+        "source": { "enum": ["event_ticker", "venue_duplicate", "venue_complement", "manual"] },
+        "reasons": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/match_reason" } }
+      },
+      "allOf": [
+        {
+          "description": "implies and complement are binary relations; a third member would make the residual of 16.3 undefined.",
+          "if": {
+            "properties": { "kind": { "enum": ["implies", "complement"] } },
+            "required": ["kind"]
+          },
+          "then": { "properties": { "market_ids": { "maxItems": 2 } } }
+        },
+        {
+          "description": "Only a ladder has a direction; the other three residuals are sums and differences.",
+          "if": { "properties": { "kind": { "const": "monotone_ladder" } }, "required": ["kind"] },
+          "then": { "properties": { "direction": { "enum": ["non_increasing", "non_decreasing"] } } },
+          "else": { "properties": { "direction": { "const": "none" } } }
+        },
+        {
+          "description": "A hand-written constraint is never as-of.",
+          "if": { "properties": { "source": { "const": "manual" } }, "required": ["source"] },
+          "then": { "properties": { "asof": { "const": false } } }
+        }
+      ]
+    },
+    "override_file": {
+      "description": "data/datasets/<name>/clusters/overrides.json: the hand-written review, sealed with the dataset and hashed into overrides_sha256. force adds a grouping the matcher missed, forbid removes a false positive it made. Both are hindsight, so every cluster they touch carries asof: false.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "dataset_name", "written_at_day", "force", "forbid"],
+      "properties": {
+        "schema_version": { "const": "cluster.v1.overrides" },
+        "dataset_name": { "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,31}$" },
+        "written_at_day": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "force": { "type": "array", "items": { "$ref": "#/$defs/override_entry" } },
+        "forbid": { "type": "array", "items": { "$ref": "#/$defs/override_entry" } }
+      }
+    },
+    "override_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["market_ids", "note"],
+      "properties": {
+        "market_ids": { "$ref": "#/$defs/marketIds" },
+        "note": { "type": "string", "minLength": 1, "maxLength": 500 }
+      }
+    }
+  }
+}

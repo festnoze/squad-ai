@@ -4,6 +4,17 @@ __pycache__/
 .pytest_cache/
 .ruff_cache/
 .mypy_cache/
+.hypothesis/
 web/node_modules/
 web/dist/
 web/*.tsbuildinfo
+# generated artefacts: keep the directories, ignore their content
+runs/*
+!runs/.gitkeep
+# claims/ is generated but TRACKED: the ledger is the evidence a claim happened, and a check that a
+# claim exists cannot be defeated by deleting a local directory (CONTRACTS_V2 section 12.7)
+claims/*.tmp
+live/*
+!live/.gitkeep
+data/datasets/*
+!data/datasets/.gitkeep

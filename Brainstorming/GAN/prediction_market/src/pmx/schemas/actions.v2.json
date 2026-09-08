@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/actions.v2.json",
+  "title": "pmx actions v2",
+  "description": "What an agent returns for one bar: a probability for every open market it addresses, at most one order intent per market, an optional research request, notes, lessons (LLM only) and a rationale that goes to the trace and never to the journal. This exact file is handed to the Claude Code CLI through --json-schema, so it is flat and strict: every property of an item is required, with null for the ones that do not apply. Semantics (kind versus fields, market open, cash) live in the runner, CONTRACTS_V2 section 8.4. One item per market: a second item on the same market_id in one bar is action_rejected(duplicate) whatever its kind, and the first occurrence in submission order wins, including its prob_ppm. JSON Schema cannot express uniqueness on a property of an array item, so the runner enforces it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actions_version", "markets", "research", "notes", "lessons", "rationale"],
+  "properties": {
+    "actions_version": { "const": "actions.v2" },
+    "markets": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["market_id", "prob_ppm", "kind", "target_position", "side", "price_bp", "size", "ttl_bars"],
+        "properties": {
+          "market_id": { "type": "string", "pattern": "^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$" },
+          "prob_ppm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "kind": { "enum": ["hold", "target", "limit", "abstain"] },
+          "target_position": { "description": "Contracts on a binary, milli-units on a continuous instrument (CONTRACTS_V2 17.1, ruling R148); the runner enforces the per-kind bound.", "type": ["integer", "null"], "minimum": -1000000000000, "maximum": 1000000000000 },
+          "side": { "enum": ["buy", "sell", null] },
+          "price_bp": { "description": "bp on a binary (1..9999, enforced by the runner), ticks on a continuous instrument.", "type": ["integer", "null"], "minimum": 1, "maximum": 1000000000000 },
+          "size": { "type": ["integer", "null"], "minimum": 1, "maximum": 1000000000000 },
+          "ttl_bars": { "type": ["integer", "null"], "minimum": 1, "maximum": 90 }
+        }
+      }
+    },
+    "research": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["kind", "market_id"],
+      "properties": {
+        "kind": { "enum": ["news", "history", "wiki_asof"] },
+        "market_id": { "type": ["string", "null"], "pattern": "^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$" }
+      }
+    },
+    "notes": { "type": "string", "maxLength": 500 },
+    "lessons": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text", "market_ids"],
+        "properties": {
+          "text": { "type": "string", "minLength": 1, "maxLength": 300 },
+          "market_ids": {
+            "type": "array",
+            "maxItems": 8,
+            "items": { "type": "string", "pattern": "^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$" }
+          }
+        }
+      }
+    },
+    "rationale": { "type": ["string", "null"], "maxLength": 2000 },
+    "horizon_forecasts": {
+      "description": "Amendment C1b (CONTRACTS_V2 17.5, ruling R157): one entry per (market_id, horizon_bars) of the run's horizons for the open continuous instruments; optional, a binary-only agent omits it. A missing pair is carried (the previous statement, else the random walk); a duplicate pair is action_rejected(duplicate) with the first occurrence winning; a horizon outside the config is bad_horizon; a quantile tuple that is not five non-decreasing prices is bad_quantiles. prob_ppm of the same market's item must equal the shortest horizon's up_probability_ppm.",
+      "type": "array",
+      "maxItems": 3200,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["market_id", "horizon_bars", "up_probability_ppm", "quantiles_ticks"],
+        "properties": {
+          "market_id": { "type": "string", "pattern": "^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$" },
+          "horizon_bars": { "type": "integer", "minimum": 1, "maximum": 99999 },
+          "up_probability_ppm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+          "quantiles_ticks": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "array", "minItems": 5, "maxItems": 5, "items": { "type": "integer", "minimum": 1, "maximum": 1000000000000 } }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

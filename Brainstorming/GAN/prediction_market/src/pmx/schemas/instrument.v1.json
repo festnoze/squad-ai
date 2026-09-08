@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/instrument.v1.json",
+  "title": "pmx continuous instrument v1",
+  "description": "One file data/datasets/<name>/instruments/<id>.json: a spot_crypto, perp, fx, equity or future instrument with its integer price scales, its session calendar, its schedules, its bars in ticks, its trades and the dated cash events that came from data. A binary contract is never stored here: it is market.v2.json, and the base fields it shares with this record are read through Market.instrument (CONTRACTS_V2 17.1, ruling R144). Integers only: no float, no wall clock.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version", "id", "provider", "vendor", "symbol", "kind", "currency", "tick_size_micro",
+    "point_value_micro", "session_calendar_id", "fee_schedule_id", "borrow_schedule_id", "carry_schedule_id",
+    "listed_at_ms", "delisted_at_ms", "short_allowed", "interval_min", "url", "description", "category",
+    "tags", "twins", "underlying_id", "roll_source", "first_price_ticks", "bars", "trades", "quality",
+    "cash_events", "source", "notes"
+  ],
+  "properties": {
+    "schema_version": { "const": "instrument.v1" },
+    "id": { "$ref": "#/$defs/instrumentId" },
+    "provider": { "$ref": "#/$defs/provider" },
+    "vendor": { "$ref": "#/$defs/vendor" },
+    "symbol": { "type": "string", "minLength": 1, "maxLength": 64 },
+    "kind": {
+      "description": "One of the five continuous kinds of INSTRUMENT_KINDS. binary is refused here on purpose: a binary record is market.v2.json and there is exactly one file shape per record (ruling R144).",
+      "enum": ["spot_crypto", "perp", "fx", "equity", "future"]
+    },
+    "currency": { "type": "string", "pattern": "^[a-z]{3,5}$" },
+    "tick_size_micro": { "type": "integer", "minimum": 1, "maximum": 1000000000 },
+    "point_value_micro": { "type": "integer", "minimum": 1, "maximum": 1000000000000 },
+    "session_calendar_id": { "$ref": "#/$defs/calendarId" },
+    "fee_schedule_id": { "$ref": "#/$defs/scheduleId" },
+    "borrow_schedule_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/scheduleId" }] },
+    "carry_schedule_id": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/scheduleId" }] },
+    "listed_at_ms": { "$ref": "#/$defs/ms" },
+    "delisted_at_ms": { "type": ["integer", "null"], "minimum": 0 },
+    "short_allowed": { "type": "boolean" },
+    "interval_min": { "enum": [60, 1440] },
+    "url": { "type": "string", "maxLength": 512 },
+    "description": { "type": "string", "maxLength": 4000 },
+    "category": { "enum": ["crypto", "finance", "economics", "other"] },
+    "tags": {
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" }
+    },
+    "twins": {
+      "description": "Instrument ids of the same underlying on other venues, declared by symbol mapping at import and sorted: the cross-venue cluster hint of F1 (CONTRACTS_V2 17.1).",
+      "type": "array",
+      "maxItems": 16,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/instrumentId" }
+    },
+    "underlying_id": {
+      "description": "A perp names its spot twin; every other kind carries null.",
+      "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/instrumentId" }]
+    },
+    "roll_source": {
+      "description": "future only: venue when the rolls come from the exchange's contract calendar, vendor when they were detected on a vendor's continuous series (Yahoo). null on every other kind.",
+      "enum": ["venue", "vendor", null]
+    },
+    "first_price_ticks": { "$ref": "#/$defs/priceTicks" },
+    "bars": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/bar" } },
+    "trades": { "type": "array", "items": { "$ref": "#/$defs/trade" } },
+    "quality": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["n_trades", "life_days", "volume_milli_total", "traded_bars", "tape_kind"],
+      "properties": {
+        "n_trades": { "$ref": "#/$defs/nonNegInt" },
+        "life_days": { "$ref": "#/$defs/nonNegInt" },
+        "volume_milli_total": { "$ref": "#/$defs/nonNegInt" },
+        "traded_bars": { "$ref": "#/$defs/nonNegInt" },
+        "tape_kind": { "enum": ["prints", "bars_only"] }
+      }
+    },
+    "cash_events": {
+      "description": "The dated records of CONTRACTS_V2 17.3 that come from data (funding, dividend, split, roll), sorted by (t_ms, kind, cash_event_id). borrow_fee and forced_flat are the engine's and never appear here. Each record is cash_event.v1.json with origin data.",
+      "type": "array",
+      "items": { "$ref": "#/$defs/data_cash_event" }
+    },
+    "source": { "const": "imported" },
+    "notes": { "type": "string", "maxLength": 2000 }
+  },
+  "allOf": [
+    {
+      "description": "spot_crypto has no short side: the short is the perp twin (kind table of 17.1).",
+      "if": { "properties": { "kind": { "const": "spot_crypto" } }, "required": ["kind"] },
+      "then": { "properties": { "short_allowed": { "const": false }, "borrow_schedule_id": { "type": "null" } } }
+    },
+    {
+      "description": "perp, fx and future are natively shortable and carry no borrow schedule.",
+      "if": { "properties": { "kind": { "enum": ["perp", "fx", "future"] } }, "required": ["kind"] },
+      "then": { "properties": { "short_allowed": { "const": true }, "borrow_schedule_id": { "type": "null" } } }
+    },
+    {
+      "description": "An equity is shortable iff it names a borrow schedule (ruling R154).",
+      "if": { "properties": { "kind": { "const": "equity" } }, "required": ["kind"] },
+      "then": {
+        "if": { "properties": { "borrow_schedule_id": { "type": "null" } } },
+        "then": { "properties": { "short_allowed": { "const": false } } },
+        "else": { "properties": { "short_allowed": { "const": true } } }
+      }
+    },
+    {
+      "description": "Only a perp names an underlying.",
+      "if": { "properties": { "kind": { "const": "perp" } }, "required": ["kind"] },
+      "then": { "properties": { "underlying_id": { "$ref": "#/$defs/instrumentId" } } },
+      "else": { "properties": { "underlying_id": { "type": "null" } } }
+    },
+    {
+      "description": "Only a future has a roll source, and it always has one.",
+      "if": { "properties": { "kind": { "const": "future" } }, "required": ["kind"] },
+      "then": { "properties": { "roll_source": { "enum": ["venue", "vendor"] } } },
+      "else": { "properties": { "roll_source": { "type": "null" } } }
+    },
+    {
+      "description": "Only an fx instrument may name a carry schedule, and by default it does not (17.4).",
+      "if": { "properties": { "kind": { "const": "fx" } }, "required": ["kind"] },
+      "else": { "properties": { "carry_schedule_id": { "type": "null" } } }
+    }
+  ],
+  "$defs": {
+    "ms": { "type": "integer", "minimum": 0 },
+    "nonNegInt": { "type": "integer", "minimum": 0 },
+    "posInt": { "type": "integer", "minimum": 1 },
+    "int": { "type": "integer" },
+    "priceTicks": { "type": "integer", "minimum": 1, "maximum": 1000000000000 },
+    "instrumentId": {
+      "type": "string",
+      "pattern": "^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$"
+    },
+    "provider": {
+      "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "xnys", "xnas", "arcx", "xcme", "xnym", "xcec", "xcbt", "otcfx"]
+    },
+    "vendor": {
+      "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "yahoo", "frankfurter", "ecb"]
+    },
+    "calendarId": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },
+    "scheduleId": { "type": "string", "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" },
+    "cashEventId": { "type": "string", "pattern": "^ce-[0-9a-f]{16}$" },
+    "bar": {
+      "description": "Bar of 7.2 with _ticks in place of _bp and no payout bound. Dense on the instrument's session calendar (17.2).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["t_ms", "open_ticks", "high_ticks", "low_ticks", "close_ticks", "vwap_ticks", "volume_milli", "n_trades", "bid_ticks", "ask_ticks", "open_interest_milli"],
+      "properties": {
+        "t_ms": { "$ref": "#/$defs/ms" },
+        "open_ticks": { "$ref": "#/$defs/priceTicks" },
+        "high_ticks": { "$ref": "#/$defs/priceTicks" },
+        "low_ticks": { "$ref": "#/$defs/priceTicks" },
+        "close_ticks": { "$ref": "#/$defs/priceTicks" },
+        "vwap_ticks": { "$ref": "#/$defs/priceTicks" },
+        "volume_milli": { "$ref": "#/$defs/nonNegInt" },
+        "n_trades": { "$ref": "#/$defs/nonNegInt" },
+        "bid_ticks": { "type": ["integer", "null"], "minimum": 1 },
+        "ask_ticks": { "type": ["integer", "null"], "minimum": 1 },
+        "open_interest_milli": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "trade": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["t_ms", "price_ticks", "size_milli", "side"],
+      "properties": {
+        "t_ms": { "$ref": "#/$defs/ms" },
+        "price_ticks": { "$ref": "#/$defs/priceTicks" },
+        "size_milli": { "$ref": "#/$defs/posInt" },
+        "side": { "enum": ["buy", "sell", "unknown"] }
+      }
+    },
+    "data_cash_event": {
+      "description": "cash_event.v1.json restricted to the four data kinds; tests/test_contract_schemas.py asserts the two definitions agree field by field.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema_version", "cash_event_id", "market_id", "kind", "t_ms", "origin", "source_url", "detail"],
+      "properties": {
+        "schema_version": { "const": "cash_event.v1" },
+        "cash_event_id": { "$ref": "#/$defs/cashEventId" },
+        "market_id": { "$ref": "#/$defs/instrumentId" },
+        "kind": { "enum": ["funding", "dividend", "split", "roll"] },
+        "t_ms": { "$ref": "#/$defs/ms" },
+        "origin": { "const": "data" },
+        "source_url": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "detail": { "type": "object", "additionalProperties": { "type": ["integer", "string"] } }
+      }
+    }
+  }
+}
