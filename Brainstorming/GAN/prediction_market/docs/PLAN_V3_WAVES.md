@@ -685,3 +685,111 @@ refuse a `purpose: "showcase"` dataset. Everything else in lot 6 stands as part 
 cohort size, and honours the `taxonomy: "weak"` label the way it honours `news_links: "weak"`. **U5**
 gains a tour chapter on the cohort view. **U4**'s README states the window rule, the showcase quarantine
 and what a cohort is.
+
+---
+
+## Part 5 : the last lot, Polymarket read from the chain (deferred, blocked on an indexer credential)
+
+This lot runs **after everything else**: after lot 7's surfaces, after the ladder rungs of lots 8 and
+after, and after the acceptance audit. It is placed last on purpose, and it does not start until the
+user supplies the credential named below and says go. It is written down now so the measurement that
+motivates it is not lost.
+
+### Why it is worth a lot at all
+
+Polymarket on-chain would be the project's **only real-money venue with a complete print tape that never
+expires**. The two venues in hand both fall short exactly there: Kalshi publishes no settled print tape
+for older markets, so 99 of the 220 Kalshi markets in `data/datasets/y2026` carry no print at all and are
+in the dataset only through the bars-only branch of ruling R167; and Manifold has a full bet tape but it
+is play money, which ruling and decision D-R12 keep separated from every headline number. A chain does
+not have a retention window: every fill Polymarket ever matched is still there, with its size, its two
+counterparties and its block timestamp. That is the single heaviest data weakness in the project, and
+this is the only source that fixes it.
+
+### What was measured on 2026-09-09, from this machine, in France, with no VPN
+
+| Probe | Result |
+|---|---|
+| `polymarket.com`, `www`, `gamma-api`, `clob`, `data-api` | all resolve to 145.239.225.117 and fail certificate verification (curl exit 60). The ANJ sinkhole covers the **whole zone**, not just the website |
+| `polygon.drpc.org`, `1rpc.io/matic` | reachable, latest block about 93.47 million |
+| Conditional Tokens Framework `0x4D97DCd97eC945f40cF65F87097ACe5EA0476045` | deployed, 15 007 bytes of code |
+| CTF Exchange `0x4bFb41d5B3570DeFd03C39a9A4D8dE6Bd8B8982E` | deployed, 17 208 bytes |
+| NegRisk Exchange `0xC5d563A36AE78145C45a50134d48A1215220f80a` | deployed, 17 274 bytes |
+| UMA CTF adapters `0x2F5e3684...aA9d`, `0xCB182285...5130`, `0x6A9D2226...4F74` | deployed, 16.2 KB, 13.3 KB, 14.1 KB |
+| protocol still live | ERC-1155 position transfers land in the last 50 blocks |
+| Goldsky's four public Polymarket subgraphs | paused and deprecated after Polymarket's migration to V2, pointing at a paid Edge Data API (HTTP 402, x402 scheme) |
+| `eth_getLogs` range cap on the free public RPCs | **50 blocks** on 1rpc; drpc refuses beyond its free plan; six other public RPCs require a key |
+| cost of a year of history at that cap | about 15.7 million blocks, so about **315 000 requests**: impractical |
+| cost with a 10 000-block window | about **1 570 requests**: minutes |
+| Envio HyperSync `polygon.hypersync.xyz` | reachable, height read back; needs a free API token |
+
+### The blocking precondition
+
+**An indexer credential.** The lot cannot start without one, and the numbers above are why: the work is
+minutes with a window of ten thousand blocks and impractical at fifty. Either a free Envio HyperSync API
+token or a Dune API key. The user is asked at the time; nothing here is attempted on the free 50-block
+path.
+
+### The rule that makes the legal posture a property of the code
+
+**No code path in this lot may resolve or contact a `polymarket.com` host.** The importer fails closed
+with a named error if one is configured, and a test asserts it, because the sinkhole covers the whole
+zone and reaching past it would be circumventing the block rather than reading a public source. Every
+byte this lot reads comes from the Polygon network or from an indexer of it. This is a testable
+invariant, not a comment.
+
+### Packages
+
+- **PM1 chain reader.** The indexer client: windowed log extraction, an on-disk cache keyed by
+  `(address, topic0, from_block, to_block)` with no wall clock in the key, resumable by block, and a
+  recorded credential provenance in the manifest (`vendor: "envio"` or `"dune"`, as PRD v4 section 2
+  requires of every unofficial tape). Deterministic: two runs over the same block range produce byte
+  identical output.
+- **PM2 decoding and market assembly.** Decode the Conditional Tokens Framework
+  (`ConditionPreparation`, `ConditionResolution`, `PositionSplit`, `PositionsMerge`,
+  `PayoutRedemption`), both exchanges (`OrderFilled`, `OrdersMatched`) and the three UMA adapters
+  (`QuestionInitialized` and its `ancillaryData`, which is where the question title and description are
+  expected to live). Recover question text, map `conditionId` to its token ids and to a market, and
+  handle the V2 migration boundary explicitly: measure where recent activity actually sits before
+  committing to a window, and record the boundary block in the manifest.
+- **PM3 tape to bars, in integers.** A fill carries a maker amount and a taker amount, both in six
+  decimal units, so a Polymarket price is a **ratio** and not a quoted number. That needs a decision on
+  where the single rounding happens, under the same law as every other price in this project (one
+  rounding, at the end, against the agent for a cash movement; half up for a score). Resample to the
+  hourly grid of decision D-R5, and prove the accounting invariant on a sample of markets against
+  on-chain balances rather than against the importer's own arithmetic.
+- **PM4 dataset, taxonomy and cohorts.** Run the existing builder, the taxonomy of decisions D-S6 and
+  D-S8 and the cohort machinery of decision D-S7 over the Polymarket markets, and report the cohort
+  table per venue. Polymarket is real money, so it may be pooled with Kalshi **only** once its fee and
+  liquidity models are calibrated for it; until then it stays provider separated exactly as Manifold is,
+  with its own leaderboard rows.
+- **Gate GP.** Checks: the reachability probe rerun and recorded; the fail-closed test on any
+  `polymarket.com` host; the **question-text recovery rate** stated as a number, since the text being
+  readable at all is expected and was **not** proved from here; tape completeness against a market whose
+  outcome and volume are independently known; the cohort table; and a rerun of every acceptance
+  criterion the new provider touches, since this lot lands after the acceptance audit and would
+  otherwise escape it.
+
+### Open unknowns, stated rather than assumed
+
+1. **The question text is unverified.** It is expected in the UMA adapters' `ancillaryData`, but no
+   adapter event could be captured inside the free 50-block window, so nobody has read one from here.
+   PM2's first task is to prove or disprove it, and gate GP reports the recovery rate.
+2. **The V2 migration.** The public subgraphs call their own data stale and incorrect after it. Whether
+   recent activity still flows through the V1 contracts, and where the boundary is, must be measured
+   before the window is chosen.
+3. **The price is a ratio.** The integer model needs one explicit decision on the rounding point, and it
+   is a contract decision, not an importer's.
+4. **Ruling R105** currently states that Polymarket markets never enter a built dataset until a
+   size-carrying tape is reachable. This lot's amendment is what changes that premise, with the
+   measurement above as its evidence, or records that the premise still holds.
+
+### New acceptance criteria
+
+* **AC-35 Polymarket reachability and posture**: the importer builds a dataset with no request to any
+  `polymarket.com` host, proved by a test that fails the build if one is configured; the manifest names
+  the indexer vendor and the block range; two runs over the same range produce an identical hash.
+* **AC-36 Polymarket tape and text**: the dataset carries a real print tape with sizes for every market,
+  the question-text recovery rate is reported as a number, the accounting invariant is checked against
+  on-chain balances on a sample, and the cohort table is reported per venue with Polymarket kept
+  separate from Kalshi until its fee and liquidity models are calibrated.
