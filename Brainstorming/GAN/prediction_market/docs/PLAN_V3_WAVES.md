@@ -13,6 +13,82 @@ wave, no weakened test. Two additions from v3:
 Every package keeps the conventions of part 1 (Owns, Needs, Done when, contract issues, own tests only,
 ruff and mypy strict on its own files).
 
+
+---
+
+## Part 3 : the sequence after the review of 2026-09-08 (supersedes the wave order below)
+
+`docs/REVIEW_2026-09-08.md` records the decisions D-R1 to D-R14. They change the **order** of the
+remaining work (measure inefficiencies before building agents), add one data package, and extend
+amendment C1c. Package texts below stay valid; this section says what runs when.
+
+### Lot 4c : gate G2 alone
+
+Closes the engine wave from the five package reports, applies the 17.9 deferrals and the E1 sensor hook
+(observation assembled from a per-agent sensor set), and leaves the tree green. Nothing else runs with it.
+
+### Lot 5a : amendment C1c, extended by the review
+
+C1c (section 18: sensors, rules, minute grids, workflow genomes) also records, as rulings with in-place
+text changes: D-R1 folds by count quantiles 60/20/20; D-R2 cluster-aware folds refused otherwise;
+D-R3 per-bullet Wikipedia timestamps; D-R5 the hourly grid as the headline Kalshi grid; D-R6 the coarse
+label of the contamination audit and the live-replication rule for LLM claims; D-R8 pre-registered
+hypothesis families with Benjamini-Hochberg control and out-of-time replication as the promotion
+criterion; D-R9 two-tier fitness with the rule that no claim rests on proxy fitness; D-R10 the capacity
+metric; D-R13 the documented universe rule. One critic, one arbiter.
+
+### Lot 5b : wave 5, measure first (Opus packages, Fable gates)
+
+Fourteen packages in parallel, then gates G3 and G3b:
+
+- **DS1 data at scale and the review fixes** (new): owns `src/pmx/data/builder.py`, `loader.py`,
+  `universe.py`, `src/pmx/data/news/wikipedia_current_events.py` (per-bullet timestamps), `linker.py`
+  (audit tooling), `src/pmx/cli_data.py`, their tests. Does: count-quantile folds (D-R1), cluster-aware
+  folds and the verify check (D-R2), per-bullet revision timestamps (D-R3), the linker audit file and
+  the `news_links` label (D-R4), the hourly Kalshi build `y2026h` and the minute fixture grids (D-R5),
+  the documented universe rule with the cap lifted (D-R7, D-R13), and the rebuilds: `y2026` daily
+  corrected, `y2026h` hourly with the 2 000 plus 2 000 target or the documented shortfall.
+- **S1 sensors**, **S2 rules** (tester with hypothesis families and Benjamini-Hochberg, miner, ledger,
+  `pmx rules`), as written above.
+- **R2a news lead** (at daily, hourly and minute horizons), **R2b divergence**, **R2c logic**,
+  **R2d comparative**, **R2e report, CLI and UI card**: the detectors of wave 8, pulled forward, every
+  finding emitted as a rule into the ledger and tested by S2.
+- **F1..F5 finance data** as written above (crypto venues with the minute path, Yahoo and ECB, EDGAR
+  and ALFRED, sessions and universe, Hacker News and timestamped sources).
+- **U1 API v2** and **U2 market and portfolio views**.
+- **Gate G3**: reconcile, four checks, the linker precision audit of 50 links (D-R4), AC-26, AC-27, the
+  opportunity map on `y2026` and `y2026h` (AC-14) recorded with intervals and nulls in
+  `docs/BUILD_STATE.md`, `tests/e2e/test_e2e_2_detectors.py`. **Gate G3b**: E2E-1b multi-asset, the first
+  hourly finance dataset (AC-21), the minute fixture with the minute event study (AC-28).
+
+### Lot 6 : wave 6, agents for measured edges, optimizer, live
+
+- **A1..A6** as written above, with the roster ordered by the opportunity map: `rule_follower`,
+  arbitrage and logic followers, per-category `calibrator`, the minute news-lead agent on crypto first;
+  generic `trend` and `revert` kept as baselines. **A3** hive with insights.
+- **O1 folds and tournament**, **O2 evolution** with two-tier fitness (D-R9), diet descriptors, author
+  bonus and sensor allowance, **O4 claims** with capacity (D-R10) and the rules used; **O3 prompt
+  mutation deferred** (D-R11) until the live book holds 100 resolutions.
+- `pmx/features/matrix.py` (precomputed integer feature matrices, pulled forward from rung 3) owned by
+  O2's neighbour package **FM1**.
+- **L1 live jobs**, running the miner and tester daily.
+- **Gate G4**: AC-3 on `y2026h`, AC-5 with the sensor ablation, AC-6, AC-7 with capacity, E2E-0.
+
+### Lot 7 : wave 7, surfaces
+
+**U3** (leaderboards with intervals and the Manifold separation check D-R12, calibration, evolution,
+hive, claims, dataset, opportunities, rule ledger, sensor ablation, live), **U4** (CLI, run.bat, README
+with the honesty section and the review decisions), **U5** (guided tour and contextual help, AC-31).
+**Gate G5**: end to end with the headless-Chrome tour walk.
+
+### Lots 8 and after : the ladder
+
+Rung 1 realism at scale (R1a..R1d, now mostly the impact model and clusters since the universe and
+grids are done), rung 3 learning (R3a..R3e, on the feature matrices and the promoted rules), rung 4
+adversary (R4a..R4d), rungs 5 and 6 portfolio and live extension (R5a..R6b), each with its amendment,
+its gate and its end-to-end test, then the acceptance audit (AC-1..AC-31) with fix agents and re-audit.
+
+
 ---
 
 ## Wave 2 amendment (before the engine wave of part 1 starts)
