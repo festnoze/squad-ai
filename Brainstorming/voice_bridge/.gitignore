@@ -9,3 +9,6 @@ samples/
 
 # Local overrides
 config.json
+
+# Venv PyTorch de Pocket TTS (~3 Go)
+.venv-pocket/

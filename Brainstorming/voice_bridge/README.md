@@ -32,9 +32,13 @@ est dans le payload. Claude Code fournit le même champ, plus `prompt_id` et
 
 ```powershell
 cd voice_bridge
-.\install.ps1 -WireHooks     # outils + voix française + branchement des agents
-.\voice.ps1 on               # active la lecture des réponses
+.\install.ps1 -WithPocket -WireHooks   # moteurs + voix française + branchement
+.\voice.ps1 on                         # active la lecture des réponses
 ```
+
+`-WithPocket` installe Kyutai Pocket TTS dans `.venv-pocket` (PyTorch CPU,
+environ 1 Go) et télécharge les poids français. Sans ce drapeau, seul Piper est
+installé, et sa voix est nettement plus mécanique.
 
 `install.ps1` sauvegarde `~/.claude/settings.json` et `~/.codex/hooks.json`
 avant de les modifier, et n'ajoute que ses propres entrées. `.\install.ps1 -Unwire`
@@ -62,16 +66,42 @@ morceaux enchaînés pour que le son démarre tout de suite. Un raccourci global
 function vox { $input | & "C:\Dev\squad-ai\Brainstorming\voice_bridge\vox.ps1" @args }
 ```
 
-## Utilisation
+## Activer / couper depuis Claude Code
+
+La commande `/voix` bascule la lecture sans quitter la session :
+
+| Frappe | Effet |
+| --- | --- |
+| `/voix` | bascule (activé <-> coupé) |
+| `/voix on` | active |
+| `/voix off` | coupe, et arrête la lecture en cours |
+| `/voix status` | état du basculement, du moteur et des démons |
+
+Elle vit dans `~/.claude/skills/voix/SKILL.md`. Le basculement s'exécute avant
+même que le modèle ne réponde, donc il prend effet immédiatement, y compris sur
+la réponse en cours.
+
+Les raccourcis clavier de Claude Code ne peuvent pas servir ici : ils ne mappent
+que des actions internes de l'interface, jamais une commande externe.
+
+L'état est un simple fichier, `%LOCALAPPDATA%\voice_bridge\enabled`, donc il
+survit aux redémarrages. Les démons de synthèse, eux, ne survivent pas : après un
+redémarrage, lance `.\voice.ps1 start`, ou laisse Piper se relancer tout seul à
+la première lecture.
+
+## Utilisation en ligne de commande
 
 | Commande | Effet |
 | --- | --- |
-| `.\voice.ps1 on` / `off` | lecture automatique des réponses |
+| `.\voice.ps1 on` / `off` / `toggle` | lecture automatique des réponses |
+| `.\voice.ps1 voices` | lister les 26 voix de Pocket TTS |
+| `.\voice.ps1 demo` | écouter les voix candidates à la suite |
+| `.\voice.ps1 use <moteur> [voix]` | figer le moteur et la voix |
 | `.\voice.ps1 last` | relire la dernière réponse de ce dossier, à la demande |
 | `.\voice.ps1 say "texte"` | dire une phrase |
 | `.\voice.ps1 shut` | couper la lecture en cours |
-| `.\voice.ps1 status` | état du démon et du basculement |
-| `.\voice.ps1 start` / `stop` | démon Piper seul |
+| `.\voice.ps1 status` | état du moteur, des démons et du basculement |
+| `.\voice.ps1 start` / `stop` | démons de synthèse seuls |
 
 Pour un vrai bouton, associer `voice.ps1 last` à un raccourci global
 (AutoHotkey, ou une tâche du terminal) :
@@ -94,18 +124,53 @@ Le hook `UserPromptSubmit` apprend la convention `<voix>` à l'agent, mais
 uniquement quand la voix est active : hors mode vocal, rien n'est injecté et
 les réponses écrites ne changent pas.
 
+### Régler ce que l'agent dit
+
+Le texte de cette consigne vit dans **`consigne_vocale.md`**, à éditer
+librement : ton, longueur, ce qu'il faut mentionner ou taire. Elle est relue à
+chaque question, donc aucun redémarrage n'est nécessaire, et la modification
+prend effet dès le message suivant.
+
+Le hook renvoie la consigne via `[System.IO.File]::ReadAllText`, pas
+`Get-Content -Raw` : ce dernier décore la chaîne de propriétés PowerShell
+(`PSPath`, `PSProvider`…) que `ConvertTo-Json` sérialise en objet, alors que
+`additionalContext` doit être une chaîne.
+
 ## Moteurs
 
-| Backend | Où | Coût | Latence mesurée | Voix française |
+| Backend | Où | Coût | Premier son | Qualité française |
 | --- | --- | --- | --- | --- |
-| `piper` (défaut) | 100 % local, CPU | gratuit | **470 ms** pour 4,3 s d'audio | siwis / tom / upmc |
-| `edge` | cloud Microsoft, sans clé | gratuit | ~1,8 s | Denise, Henri, Vivienne |
-| `sapi` | Windows, hors-ligne | gratuit | ~0,3 s | Julie, Paul, Hortense |
+| `pocket` (défaut) | 100 % local, CPU | gratuit | **430 ms** | Kyutai Pocket TTS, 24 kHz, la meilleure |
+| `piper` | 100 % local, CPU | gratuit | 290 ms | VITS 2022 à 22 kHz, mécanique |
+| `edge` | cloud Microsoft, sans clé | gratuit | ~1,8 s | voix neurales Edge, très bonne |
+| `sapi` | Windows, hors-ligne | gratuit | ~0,3 s | robotique |
 
-Mesures sur i7-13700H, phrase de 76 caractères. Piper passe par le démon
-résident : sans lui, le CLI recharge le modèle de 63 Mo et coûte ~6 s par appel.
+Mesures sur i7-13700H, phrase de 76 caractères produisant 4,3 s d'audio.
 
-Changer de moteur ou de voix : créer `config.json` à côté de `speak.py`.
+Pocket génère à RTF 0,8, donc attendre le fichier complet coûterait 3,5 s de
+silence. Le démon renvoie le PCM au fur et à mesure et `speak.py` le pousse
+directement dans le lecteur : le premier son sort en 430 ms, et comme la
+génération va plus vite que la lecture, elle ne décroche jamais.
+
+Piper reste le plus rapide et le plus léger, utile si le CPU est déjà saturé.
+Il passe par son démon résident : sans lui, le CLI recharge le modèle de 63 Mo
+et coûte ~6 s par appel.
+
+### Choisir sa voix
+
+```powershell
+.\voice.ps1 demo                          # écoute les 8 candidates à la suite
+.\voice.ps1 use pocket estelle            # fige le choix
+.\voice.ps1 use edge fr-FR-HenriNeural
+.\voice.ps1 use piper fr_FR-tom-medium
+```
+
+`use` écrit `config.json` à côté de `speak.py` et redémarre le démon du moteur
+concerné sur la nouvelle voix. Un démon ne tient qu'un modèle : il répond `409` si on lui
+demande une autre voix, ce qui renvoie vers le CLI plutôt que de parler dans la
+mauvaise voix sans le dire. `GET /health` annonce la voix chargée.
+
+Le fichier se modifie aussi à la main :
 
 ```json
 {
@@ -115,6 +180,26 @@ Changer de moteur ou de voix : créer `config.json` à côté de `speak.py`.
   "max_chars": 260
 }
 ```
+
+### Les voix de Pocket TTS
+
+`.\voice.ps1 voices` liste les **26 voix** livrées avec le modèle français,
+13 féminines et 13 masculines. Ce sont des embeddings pré-calculés par Kyutai
+pour `french_24l`, donc elles parlent toutes français, mais l'origine du
+locuteur prédit l'accent : seule `estelle` vient d'une source française, les
+`VCTK` sont des voix britanniques, `lola` est espagnole.
+
+Le clonage depuis un `.wav` quelconque existe, mais il exige l'autre jeu de
+poids, celui du dépôt `kyutai/pocket-tts`, qui est **sous accès contrôlé** :
+accepter les conditions sur la page du modèle, puis définir `HF_TOKEN`. Sans
+ça, `get_state_for_audio_prompt` échoue sur « could not download the weights
+for the model with voice cloning ». Une fois débloqué, les 35 locuteurs
+français du corpus CML-TTS (CC-BY) deviennent utilisables.
+
+Voix Piper françaises disponibles au téléchargement : `siwis`, `tom`, `upmc`
+(qualité `medium`), `gilles`, `mls`, `mls_1840` (qualité `low`). Voix Edge :
+`Denise`, `Henri`, `Eloise`, `Vivienne` et `Remy` (ces deux dernières
+multilingues).
 
 ## Pièges rencontrés
 
@@ -145,6 +230,7 @@ Changer de moteur ou de voix : créer `config.json` à côté de `speak.py`.
 ## Fichiers
 
 - `speak.py` - extraction du texte à dire, synthèse, lecture, `--tee`, `--stop`
+- `pocket_server.py` - démon Kyutai Pocket TTS, avec `/stream` en PCM continu
 - `piper_server.py` - démon qui garde la voix Piper en mémoire
 - `voice.ps1` - pilote (on/off/last/say/status)
 - `vox.ps1` - filtre pipeline pour les modèles sans hook

@@ -4,7 +4,8 @@ Reads text from --text, a file, or stdin. Strips markdown, extracts the part
 worth hearing, synthesizes it with the selected backend and plays it.
 
 Backends:
-    piper  - fully local (ONNX, CPU). Free, private, RTF ~0.1. Default.
+    pocket - fully local (Kyutai Pocket TTS, 24 kHz). Best French, RTF ~0.8.
+    piper  - fully local (ONNX, CPU). Fastest, RTF ~0.1, but robotic French.
     edge   - Microsoft Edge neural voices. Free, no API key, best French prosody.
     sapi   - Windows built-in voices. Zero install, instant, robotic.
 
@@ -41,6 +42,8 @@ DEFAULTS = {
     "backend": "piper",
     "piper_voice": "fr_FR-siwis-medium",
     "piper_port": 5111,
+    "pocket_voice": "estelle",
+    "pocket_port": 5112,
     "edge_voice": "fr-FR-DeniseNeural",
     "edge_rate": "+15%",
     "sapi_voice": "Microsoft Julie",
@@ -223,7 +226,14 @@ def synth_piper_daemon(text: str, cfg: dict) -> Path | None:
     import urllib.request
 
     url = f"http://127.0.0.1:{cfg['piper_port']}/"
-    request = urllib.request.Request(url, data=text.encode("utf-8"), method="POST")
+    request = urllib.request.Request(
+        url,
+        data=text.encode("utf-8"),
+        method="POST",
+        # The daemon answers 409 if it holds a different voice, which sends us
+        # to the CLI instead of quietly speaking in the wrong one.
+        headers={"X-Voice": cfg["piper_voice"]},
+    )
     try:
         with urllib.request.urlopen(request, timeout=30) as response:
             audio = response.read()
@@ -234,13 +244,42 @@ def synth_piper_daemon(text: str, cfg: dict) -> Path | None:
     return out
 
 
+def start_daemon_detached(cfg: dict) -> None:
+    """Bring the daemon back after a reboot, without making anyone wait for it.
+
+    The toggle survives restarts but the resident process does not, so the first
+    answer after booting would otherwise fall back to the slow CLI forever.
+    """
+    server = ROOT / "piper_server.py"
+    python = Path(os.environ.get("APPDATA", "")) / "uv/tools/piper-tts/Scripts/python.exe"
+    if not python.exists() or not server.exists():
+        return
+    try:
+        subprocess.Popen(
+            [
+                str(python), str(server),
+                "--port", str(cfg["piper_port"]),
+                # Without this the daemon would come back holding the default
+                # voice and 409 every request, pinning us to the slow CLI.
+                "--model", str(ROOT / "voices" / f"{cfg['piper_voice']}.onnx"),
+            ],
+            cwd=str(ROOT),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "DETACHED_PROCESS", 0),
+        )
+    except OSError:
+        pass  # the CLI fallback below still speaks
+
+
 def synth_piper(text: str, cfg: dict) -> Path:
     from_daemon = synth_piper_daemon(text, cfg)
     if from_daemon is not None:
         return from_daemon
 
-    # Fallback: the CLI reloads the 63 MB model every time, so it costs ~6 s.
-    # Fine as a safety net, not as the normal path - keep the daemon alive.
+    # The daemon is down: relaunch it for next time, and serve this one from
+    # the CLI, which reloads the 63 MB model and so costs ~6 s.
+    start_daemon_detached(cfg)
     model = ROOT / "voices" / f"{cfg['piper_voice']}.onnx"
     if not model.exists():
         raise FileNotFoundError(
@@ -254,6 +293,62 @@ def synth_piper(text: str, cfg: dict) -> Path:
         check=True,
     )
     return out
+
+
+def speak_pocket(text: str, cfg: dict) -> None:
+    """Kyutai Pocket TTS: 24 kHz, far more natural in French than Piper.
+
+    Generation is only ~1.2x faster than real time, so we play the PCM as it
+    arrives instead of waiting for a finished file. This process stays alive
+    while it pumps, and records its pid so --stop can cut it.
+    """
+    import urllib.error
+    import urllib.request
+
+    url = f"http://127.0.0.1:{cfg['pocket_port']}/stream"
+    request = urllib.request.Request(
+        url,
+        data=text.encode("utf-8"),
+        method="POST",
+        headers={"X-Voice": cfg["pocket_voice"]},
+    )
+    try:
+        response = urllib.request.urlopen(request, timeout=120)
+    except (urllib.error.URLError, OSError, TimeoutError) as exc:
+        raise RuntimeError(
+            f"demon pocket injoignable sur le port {cfg['pocket_port']}."
+            " Lance: .\\voice.ps1 start"
+        ) from exc
+
+    rate = response.headers.get("X-Sample-Rate", "24000")
+
+    stop_playing()
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    player = subprocess.Popen(
+        [
+            find_tool("ffplay"),
+            "-f", "s16le", "-ar", rate, "-ac", "1",
+            "-nodisp", "-autoexit", "-loglevel", "quiet", "-i", "-",
+        ],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    assert player.stdin is not None
+    PID_FILE.write_text(str(player.pid), encoding="utf-8")
+    SEQ_FILE.write_text(str(os.getpid()), encoding="utf-8")
+    try:
+        while True:
+            block = response.read(8192)
+            if not block:
+                break
+            player.stdin.write(block)
+        player.stdin.close()
+        player.wait()
+    except (BrokenPipeError, OSError):
+        pass  # --stop killed the player mid-sentence
+    finally:
+        SEQ_FILE.unlink(missing_ok=True)
 
 
 def synth_edge(text: str, cfg: dict) -> Path:
@@ -305,6 +400,9 @@ def speak(text: str, cfg: dict) -> None:
     if backend == "sapi":
         speak_sapi(text, cfg)
         return
+    if backend == "pocket":
+        speak_pocket(text, cfg)
+        return
     if backend not in BACKENDS:
         raise ValueError(f"Backend inconnu: {backend}")
     play(BACKENDS[backend](text, cfg))
@@ -351,6 +449,11 @@ def speak_sequence(text: str, cfg: dict) -> None:
         if backend == "sapi":
             speak_sapi(text, cfg)
             return
+        if backend == "pocket":
+            # Pocket streams and handles arbitrarily long text on its own,
+            # so cutting it into chunks would only add seams.
+            speak_pocket(text, cfg)
+            return
         for chunk in chunk_text(text):
             play(BACKENDS[backend](chunk, cfg), keep_sequencer=True, wait=True)
     finally:
@@ -377,7 +480,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--text", help="Text to speak. Defaults to stdin.")
     parser.add_argument("--file", type=Path, help="Read the text from this file.")
-    parser.add_argument("--backend", choices=["piper", "edge", "sapi"])
+    parser.add_argument("--backend", choices=["piper", "pocket", "edge", "sapi"])
     parser.add_argument("--voice", help="Override the backend voice.")
     parser.add_argument("--max-chars", type=int)
     parser.add_argument("--raw", action="store_true", help="Skip extraction, speak it all.")

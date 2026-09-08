@@ -22,6 +22,7 @@ from pathlib import Path
 from piper import PiperVoice
 
 VOICE: PiperVoice | None = None
+VOICE_NAME = ""
 VERBOSE = False
 MAX_BODY = 64 * 1024
 
@@ -95,11 +96,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         if self.path == "/health":
-            self._send(200, b"ok", "text/plain")
+            self._send(200, VOICE_NAME.encode("utf-8"), "text/plain")
         else:
             self._send(404, b"not found", "text/plain")
 
     def do_POST(self) -> None:
+        # One daemon holds exactly one voice. A caller asking for another one
+        # must be told so, not silently served this one.
+        wanted = self.headers.get("X-Voice")
+        if wanted and wanted != VOICE_NAME:
+            self._send(409, VOICE_NAME.encode("utf-8"), "text/plain")
+            return
+
         length = int(self.headers.get("Content-Length") or 0)
         if length <= 0 or length > MAX_BODY:
             self._send(400, b"bad length", "text/plain")
@@ -135,8 +143,9 @@ def main() -> int:
     parser.add_argument("--verbose", action="store_true", help="Log per-request timings.")
     args = parser.parse_args()
 
-    global VOICE, VERBOSE
+    global VOICE, VOICE_NAME, VERBOSE
     VERBOSE = args.verbose
+    VOICE_NAME = args.model.stem
     opt_out_of_power_throttling()
     print(f"chargement de {args.model.name}...", flush=True)
     VOICE = PiperVoice.load(str(args.model))
@@ -145,7 +154,7 @@ def main() -> int:
     warm_ms = (time.perf_counter() - started) * 1000
     print(
         f"piper_server pret sur http://127.0.0.1:{args.port}"
-        f" (prechauffage {warm_ms:.0f} ms)",
+        f" | voix {VOICE_NAME} | prechauffage {warm_ms:.0f} ms",
         flush=True,
     )
 

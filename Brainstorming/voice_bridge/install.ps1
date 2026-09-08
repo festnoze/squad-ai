@@ -8,6 +8,7 @@
 [CmdletBinding()]
 param(
     [switch]$WireHooks,
+    [switch]$WithPocket,
     [switch]$Unwire
 )
 
@@ -52,6 +53,30 @@ function Install-Voice {
     Write-Host "telechargement de $Name (~63 Mo)..."
     Invoke-WebRequest -Uri "$base.onnx" -OutFile $model
     Invoke-WebRequest -Uri "$base.onnx.json" -OutFile "$model.json"
+}
+
+function Install-Pocket {
+    # Pocket TTS tire PyTorch, donc il vit dans son propre venv plutot que
+    # dans l'outil uv de Piper. Le build CPU suffit et pese dix fois moins
+    # que le build CUDA.
+    $venv = Join-Path $root '.venv-pocket'
+    if (Test-Path (Join-Path $venv 'Scripts\python.exe')) {
+        Write-Host 'pocket-tts deja installe'
+        return
+    }
+    Write-Host 'installation de pocket-tts (~1 Go, quelques minutes)...'
+    uv venv --python 3.12 $venv 2>&1 | Select-Object -Last 1
+    uv pip install --python (Join-Path $venv 'Scripts\python.exe') pocket-tts `
+        --extra-index-url https://download.pytorch.org/whl/cpu 2>&1 | Select-Object -Last 1
+
+    # Les poids se telechargent au premier chargement : autant payer maintenant.
+    Write-Host 'telechargement des poids francais...'
+    & (Join-Path $venv 'Scripts\python.exe') -c @'
+from pocket_tts import TTSModel
+m = TTSModel.load_model(language="french_24l")
+m.get_state_for_audio_prompt("estelle")
+print("poids prets")
+'@
 }
 
 # ---------------------------------------------------------------- hooks
@@ -168,6 +193,7 @@ if ($Unwire) {
 
 Install-Tools
 Install-Voice
+if ($WithPocket) { Install-Pocket }
 if ($WireHooks) { Set-AgentHooks }
 
 Write-Host ''
