@@ -244,6 +244,28 @@ so only the unfinished phases re-run) or rebuild the remaining phases from the s
    do not attempt the free 50-block path: a year of Polygon is about 315 000 requests that way against
    about 1 570 with a 10 000-block window.
 
+### Small-lot fallback scripts, ready to run (written 2026-09-09 00:55)
+
+The session limit killed a 39-agent run and a 9-agent run before, and gate G2 twice. So the tail of lot
+4c exists as two standalone, ready-to-run scripts in the scratchpad, each a small lot. Launch either with
+the Workflow tool and its `scriptPath`, no arguments needed:
+
+| Script | Agents | What it does |
+|---|---|---|
+| `...\scratchpad\lot4d_gate_g2_alone.js` | **1** | gate G2 alone, on Fable, reading the three diagnostics and the two reconciliation reports already on disk. Handles the case where a reconciliation report is missing by doing that work itself. |
+| `...\scratchpad\lot4e_audit_g2.js` | **2, plus 1 conditional** | two adversarial auditors with distinct lenses (test integrity and honesty of the claims; contract coherence, ownership and completeness), then a fix pass only if a blocker or a major is confirmed. |
+
+The scratchpad directory in full is
+`C:\Users\E6FB4~1.MIL\AppData\Local\Temp\claude\c--Dev-squad-ai-Brainstorming\d4f591f7-af6d-4365-8066-f97d28622148\scratchpad`.
+Both scripts carry the six build rules in their prompts, so they are safe to run cold. If lot 4c
+completed its own gate and audit, these two are simply not needed: check for
+`lot4c_gate_g2.json` or `lot4d_gate_g2.json` in the scratchpad before launching anything.
+
+**Order of preference on resume**: if lot 4c's run is still alive, let it finish. If it died after the
+reconciliation, run `lot4d` then `lot4e`. If it died before the reconciliation, resume the original run
+with `resumeFromRunId: "wf_71f2fa90-5fe"` so the three cached diagnostics come back instantly, or read
+their JSON from the scratchpad and run the fixers by hand.
+
 ### The one open question for the user
 
 The indexer credential above. Everything else in the sequence is decided and written down.
