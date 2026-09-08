@@ -342,3 +342,216 @@ Carried into G2 as decisions, not as work:
 4. A series-ticker to category mapping for Kalshi, without which every Kalshi market is `other` (5.5).
 
 Later waves are untouched: wave 3 (A1 to A6), wave 4 (O1 to O4), wave 5 (U1 to U4), wave 6 (L1, L2).
+---
+
+## 7. The Kalshi data finish, 2026-09-08 (`data/datasets/y2026`, hash `83fbf211...`)
+
+Rulings R167 to R170 were implemented on the morning of 2026-09-08 and the dataset was rebuilt at 08:59.
+That rebuild produced 67 Manifold markets in three populated folds and **still 0 Kalshi markets**, with
+`counts.n_bars_only` absent from the manifest. This section is the diagnosis of that zero, the fix, the
+rebuild that followed and its real numbers.
+
+### 7.1 Why the 08:59 rebuild had no Kalshi market
+
+The bars-only branch of `min_trades` (R167) was implemented and reached: of the 400 staged Kalshi markets
+305 carried `quality.tape_kind == "bars_only"` (the other 95 had prints, so the field stayed at its
+default and is not written) and every one carried a positive `quality.volume_milli_total`. What the branch
+reads was structurally zero:
+
+| Measured on `staging/markets/kalshi.jsonl` of the 08:59 build | Value |
+|---|---|
+| staged Kalshi markets | 400 |
+| markets with `quality.traded_bars >= min_traded_bars` (20) | 0 |
+| markets with `quality.traded_bars > 0` | 0 |
+| bars written over the 400 markets | 3 399 |
+| bars carrying `volume_milli > 0` | 0 |
+| markets whose whole bar path is one repeated close | 400 |
+| median bars per market | 3 |
+| markets with `life_days == 1` | 252 |
+
+So `min_trades` removed the whole provider again (`removed min_trades=643`, of which 400 Kalshi and 243
+Manifold), and `counts.n_bars_only` was absent because it was `0`: a zero is omitted from the manifest on
+purpose (`DatasetCounts.to_dict`, guarded by `test_a_build_with_no_bars_only_market_says_nothing_about_it`)
+so that adding the field moved no existing manifest's bytes. The absence was a symptom, not a second
+defect.
+
+**The cause was the bar grid, not the filter.** `_candle_of` keyed a candlestick period by
+`end_period_ts - interval`. Kalshi's daily periods end at midnight New York, not at midnight UTC: over 200
+candlestick answers sampled from the build cache, 553 sampled periods end at 04:00 UTC (EDT) and 102 at
+05:00 UTC (EST), none at 00:00 UTC. `end - 1 day` is therefore never a multiple of a day and never a bar
+of the grid of section 5.2, so `_bars` looked up each bar of the market's UTC grid, found no candle for any
+of them, and wrote every bar as the carry-forward bar of 5.2: `open == high == low == close == vwap`,
+`volume_milli = 0`, `n_trades = 0`. Every Kalshi market came out with a flat price path and
+`traded_bars = 0`, whatever it had traded. The misalignment hid two smaller defects behind it: the last
+period of a market ends after its last bar, so a range that stopped one interval past the last bar lost
+the settling bar; and the live candlestick path (`/series/{series}/markets/{ticker}/candlesticks`, the only
+path for a market settled after the historical cutoff) answers `volume_fp`, `open_interest_fp` and
+`price.close_dollars`, none of which the historical spelling reads.
+
+A second, independent cause capped what the fix could recover: the fetch budget bought tapes the filters
+were certain to remove. 88 per cent of the settled rows the narrowed listing offers inside the window live
+under a week, the budget took the head of each stride of the walk, and 252 of the 400 markets it bought
+lived one day, which is three daily bars and cannot reach `min_traded_bars = 20` however well the candles
+are keyed.
+
+Two things the 08:59 build did **not** get wrong, checked before touching them: the walk already spanned
+the window (staged settlements ran from 2025-09 to 2026-09, 12 to 56 per month, so R168's stratified cap
+had every month to draw from), and the cap was not binding on either provider.
+
+### 7.2 The fix, and the mutation that proves each part of it
+
+The candle-grid, slack, live-field, walk-floor, life-floor and fetch-budget edits landed in
+`src/pmx/data/importers/kalshi.py` during the interrupted lot 3c and were unverified (`docs/HANDOFF.md`).
+They were checked here by reproducing one series from the HTTP cache and by mutating each part back to its
+old behaviour:
+
+| Mutation of `src/pmx/data/importers/kalshi.py` | Tests that fail |
+|---|---|
+| `t_ms=bar_of(end_ms - step_ms, ...)` back to `t_ms=end_ms - step_ms` | 3 (the Eastern grid, the settling bar, the live path) |
+| `_fetch_budget` back to the head of each stride, and the `min_life_days` floor removed | 3 |
+| the descending stop of `_list_rows` removed | 2 (both new, below) |
+| `floor_ms` raised from `window_start_ms - KALSHI_SETTLEMENT_SLACK_MS` to `window_start_ms` | 1 (new) |
+
+The descending walk floor of ruling R100 had **no** test: removing it left the suite green, while its real
+effect is that the historical listing follows its cursor to `KALSHI_MARKETS_MAX_PAGES` and raises
+`MalformedResponseError`, which loses the whole provider rather than one market. Two tests were added to
+`tests/test_import_kalshi.py`, driven through `import_kalshi` against a listing that never runs out of
+pages:
+
+```
+test_the_settled_walk_stops_at_the_window_floor_instead_of_reaching_the_page_cap
+test_a_page_inside_the_settlement_slack_does_not_end_the_walk
+```
+
+The second one pins the floor to the window start **minus** the settlement slack, because a Kalshi market
+can close before it settles and a page closing inside that band still holds markets that settled in the
+window.
+
+The reproduction, before the rebuild: `pmx data import kalshi --kalshi-series KXCPIYOY --limit 12
+--min-life-days 7` against `data/datasets/y2026/cache/` staged 12 markets with `traded_bars` from 21 to 74
+(median 37), `tape_kind` `bars_only` on 9 of them and `prints` on 3; an offline build of that staging kept
+all 12 (`removed` all zero, `bars_only 9`).
+
+### 7.3 The rebuild
+
+```
+PMX_USER_AGENT_CONTACT=etienne.millerioux@studi.fr
+.venv\Scripts\python.exe -m pmx.cli_data build ^
+  --provider kalshi,manifold --freeze 2026-09-07 --window-days 365 --interval-min 1440 ^
+  --keep-self-resolved --kalshi-series <the 731 tickers of data/datasets/y2026/kalshi_series.txt> ^
+  --limit-per-provider 400 --min-interval-ms 350 ^
+  --out data/datasets/y2026 --name y2026 --force --seal --notes "..."
+```
+
+The cache of the earlier builds covers the listing walk of all 731 series, so the fetch half finished in
+about a minute and the whole build in four; the cache now holds 7 485 entries. `pmx data verify --dataset
+data/datasets/y2026` prints `verified data\datasets\y2026 83fbf21166899712...` and exits `0`.
+
+The build ran twice (the first run's log was overwritten when the second reused the log path). Both runs
+produced the same 287 markets with identical per-provider, per-category, per-fold, per-month and
+per-filter counts; only the `dataset_hash` differs (`da1ca326...` then `83fbf211...`), because every
+`NewsItem` carries the `fetched_at_ms` of the run that fetched it while the HTTP cache stores a response
+body without its read time. **A rebuild is therefore reproducible in its markets and not in its hash**,
+which matters to any claim keyed on `dataset_hash`. It is recorded here as an open item, not fixed.
+
+### 7.4 What the rebuild produced
+
+```
+sealed     true
+freeze     2026-09-07   interval 1440 min
+window     2025-09-07 .. 2026-09-06
+markets    287   yes 115   no 172
+provider   kalshi=220   manifold=67
+category   crypto=38 economics=57 entertainment=2 finance=59 other=20 politics=40
+           science=1 sports=5 tech=27 weather=30 world=8
+hardness   illiquid=53  trivial=12  upset=58  whipsaw=39
+tape       bars_only 99   category fallback 19
+removed    binary=0 density=26 kalshi_shards=0 min_life=24 min_trades=459 no_leak=0
+           opened_early=1 resolution=0 self_resolved=0 window=0
+split      train 111   validation 46   sealed 130
+news       9049 items, 1805 linked (wikipedia_current_events 7391, manifold_comment 1658)
+files      682        (287 market files + 395 news day files, 24.7 MB)
+hash       83fbf21166899712e86ed7ac1cab13cfa9a9ce25201a9de6844ad4703209f554
+notes      illiquid decile boundary: kalshi=0 milli, manifold=0 milli
+```
+
+Per provider, counted off the written files and off the staged payloads:
+
+| Quantity | kalshi | manifold |
+|---|---|---|
+| markets kept | 220 | 67 |
+| of which `tape_kind == "bars_only"` | 99 | 0 |
+| of which `tape_kind == "prints"` | 121 | 67 |
+| markets with at least one `wiki_subject` | 220 | 60 |
+| train / validation / sealed | 69 / 32 / 119 | 42 / 14 / 11 |
+| kept per window month (the 12 buckets of 7.7) | 3 4 6 6 8 10 13 19 19 13 56 63 | 2 8 1 3 3 8 10 7 10 4 6 5 |
+| staged before the filters | 400 | 397 |
+| removed by `min_trades` | 170 | 289 |
+| removed by `density` | 9 | 17 |
+| removed by `min_life` | 0 | 24 |
+| removed by `opened_early` | 1 | 0 |
+| `traded_bars` min / median / max | 1 / 13 / 231 | not read (prints) |
+| markets with `traded_bars >= 20` | 156 | not read |
+
+`counts.precap_per_provider_month` equals the kept counts above for both providers: 220 and 67 are under
+the cap of 400, so R168's stratified sampling had nothing to draw down and every one of the twelve months
+is populated on both sides. The 220 Kalshi markets pass `min_trades` through two of its three branches:
+156 on the bars-only branch of R167 (`traded_bars >= 20`) and 121 on prints, because the print tape does
+answer for a market that settled recently enough (the retention probe of 5.2 holds for a market settled
+months ago, not for every settled market). 99 markets carry no print at all and are in the dataset only
+because of R167.
+
+Other quantities off the files:
+
+| Quantity | Value |
+|---|---|
+| bars | 9 643 |
+| trades | 183 789 |
+| market life in days (min / median / max) | 7 / 29 / 203 |
+| `resolved_at` span of the 287 markets | 2025-09-11 to 2026-09-04 |
+| news day files | 395, covering 2025-06-12 to 2026-09-07 |
+| news items on disk | 9 049 (7 391 Wikipedia Current events, 1 658 Manifold comments) |
+| linked news items | 1 805: **792 Wikipedia items** and 1 013 comments |
+| links counted per market side | kalshi 4 461, manifold 2 025 |
+
+The Wikipedia number is the one R169 was taken for: the same archive linked to **no** market at all in
+every build before this one (5.4). It links now because the renormalised weights let a market with no
+`wiki_subjects` score on keyword overlap alone, and because every provider now derives subjects: 220 of
+220 Kalshi markets and 60 of 67 Manifold markets carry at least one.
+
+`counts.n_category_fallback = 19` is composed of the 19 Manifold markets the provider itself categorises as
+`other`. Every one of the 220 Kalshi markets has a category from the sealed series map of R170, and the
+single Kalshi `other` comes from an explicit `other` entry in that map rather than from a fallback. The
+count therefore measures "landed on `other` with nothing better named" across providers rather than
+Kalshi's fallback alone, which is what `DatasetCounts.n_category_fallback` documents.
+
+### 7.5 Against AC-1, and what is still open
+
+AC-1 asks for at least 300 markets per provider or a document saying why fewer. This dataset has 220
+Kalshi and 67 Manifold, so both halves still fall short, but the reasons are now single filters rather
+than a dead provider:
+
+* Kalshi: 170 of the 400 staged markets are removed by `min_trades` (a bars-only tape with fewer than 20
+  traded bars) and 9 by `density`. A larger budget is the only way to more Kalshi markets: the narrowed
+  listing offers about 15 000 in-window rows that live a week or more, and 400 buys 2.6 per cent of them;
+* Manifold: 289 of 397 are removed by `min_trades` (`n_trades < 50` and `unique_bettors < 30`) and 24 by
+  `min_life`.
+
+The rest of AC-1 holds: the dataset is sealed, carries bars, trades, news with as-of stamps, hardness tags
+and a manifest hash, and `verify` passes.
+
+What the four carried decisions of section 6 now read as:
+
+1. `min_trades` versus a provider with no print tape: **settled by R167 and closed.** Both folds the
+   optimizer may read are populated on both providers (train 111, validation 46), so AC-3 has something to
+   train on.
+2. The per-provider cap and the walk order: **settled by R168**, and not binding at 400.
+3. `wiki_subjects` and the linker: **settled by R169**, measured above.
+4. The Kalshi series-to-category map: **settled by R170**; one Kalshi market in 220 is `other`.
+
+Newly open, from this section: the `dataset_hash` moves between two rebuilds of the same data because
+`NewsItem.fetched_at_ms` is a wall clock (7.3). Either that field leaves the hashed files, or a claim names
+the build rather than the hash.
+
+Checked after the rebuild: `pytest` 662 passed, 4 skipped (the legal `PMX_LIVE` skips); `ruff check src
+tests` clean; `mypy --strict` clean over the 49 source files of `src/pmx`.

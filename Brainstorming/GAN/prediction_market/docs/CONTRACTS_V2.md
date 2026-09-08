@@ -253,11 +253,12 @@ in `pmx.types` (`sorted_market_ids`, `sorted_agent_ids`) and are the only spelli
 
 | Collection | Order | Helper |
 |---|---|---|
-| Markets of a dataset or a run | `(resolved_at_ms, id)` ascending | `sort_markets(markets)` |
+| Markets of a dataset or a run (every kind) | `(resolved_at_ms, id)` ascending, where a continuous instrument's `resolved_at_ms` is its `MarketMeta` value of 7.2 (`delisted_at_ms`, else the dataset's window end; amendment C1b, ruling R186) | `sort_markets(markets)`, `sort_market_metas(metas)` |
 | Markets inside an observation, an action set, a settlement loop | `id` ascending by code point | `sorted_market_ids` |
 | Agents (roster, replies, settlement, equity marking, culling) | `agent_id` ascending by code point | `sorted_agent_ids` |
 | Bars of a market | `t_ms` ascending, dense on the grid | by construction (the loader refuses a gap) |
 | Trades of a market | `(t_ms, price_bp, size_milli, side)` ascending | the importer sorts; the loader refuses disorder |
+| Cash events of one instrument applied at one bar | `(kind order in CASH_EVENT_KINDS, t_ms, cash_event_id)` ascending (amendment C1b, ruling R193); an instrument file stores its events chronologically by `(t_ms, kind order, cash_event_id)` and execution regroups them per application bar | execution; the loader refuses disorder in the file |
 | News items in a digest | `(-match_score_permille, published_at_ms, news_id)`: best link first, then oldest, then id | `rank_news` |
 | News items in a dataset file | `(published_at_ms, news_id)` ascending | the builder |
 | Hive entries in a view | `(visible_from_ms, entry_id)` ascending; lessons additionally ranked by section 10.4 | the hive |
@@ -443,7 +444,11 @@ t < last_bar(i)`, where `last_bar(i)` is the last bar of the run at which the in
 section 17.3 (ruling R150); `actionable(i, t)` reads `t + interval_ms` as the instrument's **next bar**,
 which after a Friday session is Monday's first bar. Ruling R9 stands for every kind: a fill lands only on a
 bar the instrument is tradable at, and never on `last_bar(i)`, whose only fill is the engine's forced
-flat.
+flat. In an observation `MarketView.tradable` on a continuous instrument carries `open(i, t)` and not
+`tradable(i, t)`, because `t < last_bar(i)` would announce the instrument's last bar one bar ahead
+(ruling R181); the engine still refuses every agent fill at `last_bar(i)`. `BarSlice.closing_ids` carries the
+instruments with `closes(i, t)` and `Calendar.last_bar`, `next_bar` and `prev_bar` (8.3) are the one
+implementation of the three lookups this table needs (ruling R187).
 
 ### 5.4 As-of: what an agent may know at bar `t`
 
@@ -460,7 +465,8 @@ it applies them by filtering, never by trusting the agent:
 | a hive entry | `entry.visible_from_ms <= now_ms`. A `forecast` or `resolution` entry of market `m` is stamped `bar_of(resolved_at_ms) + interval_ms`, so it is released at the **first bar strictly after** the settling bar and no agent ever reads another agent's forecast on a market that is still open (section 10.4) |
 | a research result | granted at the previous bar (section 8.6), so its content is as of `now_ms - interval_ms` and is filtered by the same rules |
 | memory | the agent's own memory, filtered to records with `written_at_ms <= now_ms`; every record carries that stamp (section 10.3), including a memory snapshot loaded from an earlier run |
-| `close_at_ms` | always (public on every venue) |
+| `close_at_ms` | always on a binary (public on every venue); `0` in the `MarketView` of a continuous instrument, whose `delisted_at_ms` is future information (amendment C1b, ruling R181) |
+| an applied `CashEvent` of a continuous instrument | its application bar has completed: `applies_at(e) + interval_ms <= now_ms` (section 17.3); carried in `MarketView.cash_events` (amendment C1b, ruling R183). An event whose application bar has not completed is never visible, however far in the past the venue announced it |
 
 The agent decides at bar `t` on completed information and its market orders fill at the **open of bar
 `t + interval_ms`**, which it has not seen and cannot see until that bar has completed (amendment C1,
@@ -645,6 +651,17 @@ ask` when both present), `open_interest: int|null`.
 `Trade`: `t_ms, price_bp in [1, 9999], size_milli >= 1, side in {"yes", "no", "unknown"}` (the taker's
 side; Manifold `outcome`, Kalshi `taker_side`).
 
+**`Bar` and `Trade` are the one in-memory shape for every kind** (amendment C1b, ruling R173). A continuous
+instrument's file stores `_ticks` fields (`instrument.v1.json`, section 17.1) and the loader maps them onto
+`Bar` and `Trade` field by field (`open_bp <- open_ticks`, `high_bp <- high_ticks`, `low_bp <- low_ticks`,
+`close_bp <- close_ticks`, `vwap_bp <- vwap_ticks`, `yes_bid_bp <- bid_ticks`, `yes_ask_bp <- ask_ticks`,
+`open_interest <- open_interest_milli`, `price_bp <- price_ticks`), so `MarketView.bars`, `quote_bar`,
+`bar_at`, `bars_before` and `half_spread_ticks` take one type whose `_bp` fields carry the instrument's
+ticks, exactly as R148 keeps one event shape per name. `Trade.side` is `yes`, `no` or `unknown` on a binary
+and `buy`, `sell` or `unknown` on a continuous instrument; `TRADE_SIDES` carries the five and the loader
+enforces the pair per kind. The `[1, 9999]` bounds above are the binary bounds, enforced by the loader on a
+binary and widened to `1..PRICE_TICKS_MAX` on a continuous instrument (ruling R148).
+
 `final_price_bp` is the one field of this table whose name changed after the adversarial review:
 `MarketView.last_price_bp` (section 8.3) is the **as-of** price of the bar being decided, and a `Market`
 field of the same name made `MarketView(last_price_bp=market.last_price_bp)` a leak that no named test
@@ -666,7 +683,8 @@ Kalshi `category` comes from the sealed series-ticker map `src/pmx/lexicons/kals
 with `other` as the fallback, counted in the manifest (ruling R170). `quality.tape_kind` and
 `wiki_subject_provenance` are in `market.v2.json` already, landed by the data package in the same pass.
 
-Two methods of `Market` are part of the contract because the engine calls them by name (D1 owns both):
+Two methods of the `Instrument` base, and so of `Market` and `ContinuousInstrument` alike (ruling R173), are
+part of the contract because the engine calls them by name (D1 owns both):
 
 ```python
 def bar_at(self, t_ms: int) -> Bar | None: ...            # the bar whose t_ms == bar_of(t_ms, self.interval_min)
@@ -684,6 +702,11 @@ class MarketMeta:
     created_at_ms: int; close_at_ms: int; resolved_at_ms: int; resolution: int
     interval_min: int; n_bars: int; hardness_tags: tuple[str, ...]; fee_schedule_id: str; fold: str
     kind: str = "binary"                # amendment C1b, ruling R144: one of INSTRUMENT_KINDS
+    # On a continuous instrument (ruling R186): created_at_ms = listed_at_ms; resolved_at_ms = delisted_at_ms
+    # when set, else the dataset's window end_ms; close_at_ms = resolved_at_ms; resolution = -1;
+    # event_key = None; hardness_tags = (); fold = "all"; n_bars = the number of bars of the file. The
+    # canonical order of section 3, block_key of 12.4 and Folds of 12.7 read these values and nothing else,
+    # so every package that iterates instruments "in canonical order" iterates the same sequence.
 ```
 
 `Dataset` (D1, the return type of `load_dataset`) is what `run_backtest` receives:
@@ -694,15 +717,26 @@ class Dataset:
     manifest: DatasetManifest
     metas: tuple[MarketMeta, ...]                          # canonical order, section 3
     path: Path
-    def market(self, market_id: str) -> Market: ...        # loaded and validated on demand
+    def market(self, market_id: str) -> Instrument: ...    # loaded and validated on demand; a continuous
+        # instrument comes back CLIPPED at manifest.split.validation_end_ms (bars, trades, cash_events) so
+        # no consumer outside the claim path ever holds the sealed months of a price path (ruling R182)
+    def sealed_market(self, market_id: str) -> Instrument: ...   # the unclipped record; named only in
+        # optimizer/folds.py and optimizer/claims.py (architecture rule 3 scans for it, ruling R182)
     def news_for(self, market_id: str, now_ms: int) -> tuple[NewsItem, ...]: ...   # visible_from_ms <= now_ms
     def news_global(self, now_ms: int) -> tuple[NewsItem, ...]: ...
-    def calendar(self, calendar_id: str) -> SessionCalendar: ...   # amendment C1b, section 17.2 (sealed)
+    def calendar(self, calendar_id: str) -> SessionCalendar: ...   # amendment C1b, section 17.2 (sealed);
+        # "continuous" is synthesised (one session [0, INT63_MAX)) and never read from a file (ruling R185)
 ```
 
 `market(market_id)` returns a `Market` for a binary and a `ContinuousInstrument` for every other kind;
 both satisfy `Instrument` (section 17.1) and `metas` carries one `MarketMeta` per instrument of every
-kind, with `kind` on it.
+kind, with `kind` on it. A continuous instrument returned by `market` carries no bar, trade or cash event
+with `t_ms >= validation_end_ms` (ruling R182): a binary's sealed guarantee is structural, because a sealed
+id is never handed out, and a continuous instrument belongs to every fold (17.6), so its guarantee is the
+clip. `sealed_market` returns the whole record and joins `open_sealed_test` and `_sealed_ids` in the scan
+of architecture rule 3, so the sealed months of a price path are reachable from `claims.py` and nowhere
+else. `quality` stays a whole-window build statistic (the filters of 7.4 need the whole life, as they do on
+a binary whose life ends in the sealed fold) and is never shown to an agent (7.9).
 
 Kalshi fields map: `yes_bid`/`yes_ask` in cents become bp times 100; candlestick `price.close` and
 friends likewise; `volume` contracts become `volume_milli = volume * 1000`. Manifold arrives as JSON
@@ -845,7 +879,9 @@ validation_end_ms = month_edges_ms[10]    # months 9..10
 ```
 
 A market belongs to exactly one fold by `resolved_at_ms`. The manifest stores the thirteen edges and the
-three counts.
+three counts. A continuous instrument belongs to every fold whose months intersect
+`[created_at_ms, resolved_at_ms)` of its `MarketMeta` (amendment C1b, rulings R162 and R186; 17.6): the
+test needs no bar and no sealed file, and a run on a fold clips its `t0_ms` and `t1_ms` to the fold's months.
 
 ### 7.8 Manifest, seal and verify (`dataset.v1.json`)
 
@@ -902,17 +938,23 @@ Amendment C1 extends the list by every cluster-derived and detector-derived name
 normative **here**, not only in the amendment (ruling R116): `cluster_id`, `constraint_id`, any
 `MatchReason` (its `kind`, `asof`, `detail` and `score_permille`), a cluster's or a constraint's
 `score_permille`, `asof`, `source` and `resolution_span_ms`, any entry of `clusters/overrides.json`, and
-any field of an `OpportunityEvent` of section 16.4. Amendment C1b extends it again (section 17.3, ruling
-R151): `delisted_at_ms`, any `CashEvent` record and every field of one (`cash_event_id`, `rate_ppm`,
-`dividend_micro`, `numerator`, `denominator`, `gap_ticks`, `from_price_ticks`, `to_price_ticks`, every
-`detail` key), `last_price_ticks`, `n_forecasts_unresolved`, and a `price_realised_ticks` or a
-`realised_sign` of a horizon that has not resolved at `now_ms`. A venue's **fixed** schedule (funding
+any field of an `OpportunityEvent` of section 16.4. Amendment C1b extends it again (section 17.3, rulings
+R151, R181 and R183): `delisted_at_ms`, `last_bar(i)` and anything derived from it (the bars remaining, a
+fold's edge), any `CashEvent` whose application bar has not completed at `now_ms` and every field of one
+(`cash_event_id`, `rate_ppm`, `dividend_micro`, `numerator`, `denominator`, `gap_ticks`,
+`from_price_ticks`, `to_price_ticks`, every `detail` key), `last_price_ticks`, `n_forecasts_unresolved`,
+and a `price_realised_ticks` or a `realised_sign` of a horizon that has not resolved at `now_ms`. An
+**applied** `CashEvent` (its application bar completed, `applies_at(e) + interval_ms <= now_ms`) is the
+venue's published past and is visible through `MarketView.cash_events` exactly as a completed bar is
+(ruling R183); `Dataset.sealed_market` is never called on the observation path (ruling R182). A venue's **fixed** schedule (funding
 every eight hours, the sealed session calendar) is not on this list, because it is the venue's rule and
 not a datum about the future. A cluster peer's **prices** are not on this list and
 are visible exactly as any other market's are (section 16.3); what is forbidden is the grouping itself.
 
-The poisoned-future test (E1) injects one of each (including a memory record stamped after `now_ms` and one
-of each cluster-derived name) and asserts by content match that none surfaces.
+The poisoned-future test (E1) injects one of each (including a memory record stamped after `now_ms`, one
+of each cluster-derived name, a `CashEvent` whose application bar has not completed, a `delisted_at_ms` and
+a `last_bar` value) and asserts by content match that none surfaces, and that a `CashEvent` applied before
+`now_ms` does.
 
 ### 7.10 v1 migration identities (D1, `migrate_v1`)
 
@@ -1131,11 +1173,11 @@ For every bar `t` of the calendar, in this order, with this purity:
 
 | # | Phase | What happens | Pure? | Events |
 |---|---|---|---|---|
-| 1 | `open` | list newly listed markets; compute open, tradable and settling sets; record each market's metadata once and each open market's bar prices; expire limit orders whose `expires_at_ms <= t` or whose market is no longer tradable | yes | `bar_opened`, `market_listed`, `market_priced`, `order_expired` |
+| 1 | `open` | list newly listed markets; compute the open, tradable, settling and closing sets; record each market's metadata once and each open market's bar prices; expire limit orders whose `expires_at_ms <= t` or whose market is no longer tradable | yes | `bar_opened`, `market_listed`, `market_priced`, `order_expired` |
 | 2 | `observe` | build one `Observation` per non-ruined agent with the as-of filter (section 5.4); grant research requested at `t - interval` | yes | `observation_built` |
 | 3 | `decide` | scripted agents: `observe(obs)` then `decide()`; LLM agents: one gateway call per agent covering every open market, reply handed to the agent, then `decide()`; validate every `Actions`; record a forecast for every open market (carried when missing); write LLM lessons to memory; hand every order-producing action to `Execution.place` (section 8.6), which **queues** it for the next bar and reserves nothing | **impure for LLM agents only** (the gateway) | `reply_received`, `action_received`, `action_rejected`, `forecast_recorded`, `research_spent`, `memory_written` (lessons) |
-| 4 | `execute` | drain the queue `place` accepted at `t - interval_ms`, agents in `agent_id` order, intents in submission order: place orders, fill market orders at bar `t`'s open through the run's `LiquidityModel` (section 16.1), try resting limit orders against bar `t`'s range, charge fees, reserve and release cash | yes | `order_placed`, `order_rejected`, `filled`, `fee_charged` |
-| 5 | `settle` | for each market with `settles(m, t)`, in market order: `Execution.settle` pays every position and cancels every resting order on it and returns the per-agent cash deltas; the runner, which holds the forecast history and `pmx.scoring`, emits the two scored events. Then, for each continuous instrument in canonical order (amendment C1b, section 17.3): `Execution.apply_cash_events` applies the cash events dated in bar `t` and, at `last_bar(i)`, `Execution.force_flat` closes every position at the bar's close; the runner emits `forecast_resolved` for every horizon that resolves at `t` and `instrument_closed` at `last_bar(i)` | yes | `settled`, `settlement_applied` (both from the runner), `order_expired` (reason `settled`, from execution); `cash_event_applied`, event-fill `order_placed`, `filled`, `fee_charged`, `order_expired` (reasons `corporate_action`, `roll`, `delisted`, from execution); `forecast_resolved`, `instrument_closed` (from the runner) |
+| 4 | `execute` | drain the queue `place` accepted at the instrument's previous bar (`t - interval_ms` on a `continuous` calendar, Friday's last bar on a Monday, section 17.2, ruling R192), agents in `agent_id` order, intents in submission order: place orders, fill market orders at bar `t`'s open through the run's `LiquidityModel` (section 16.1), try resting limit orders against bar `t`'s range, charge fees, reserve and release cash | yes | `order_placed`, `order_rejected`, `filled`, `fee_charged` |
+| 5 | `settle` | for each market with `settles(m, t)`, in market order: `Execution.settle` pays every position and cancels every resting order on it and returns the per-agent cash deltas; the runner, which holds the forecast history and `pmx.scoring`, emits the two scored events. Then, for each continuous instrument in canonical order (amendment C1b, section 17.3): `Execution.apply_cash_events` applies the cash events whose application bar is `t` (section 17.3, ruling R175) and, at `last_bar(i)`, `Execution.force_flat` closes every position at the bar's close; the runner emits `forecast_resolved` for every horizon that resolves at `t` and `instrument_closed` at `last_bar(i)` | yes | `settled`, `settlement_applied` (both from the runner), `order_expired` (reason `settled`, from execution); `cash_event_applied`, event-fill `order_placed`, `filled`, `fee_charged`, `order_expired` (reasons `corporate_action`, `roll`, `delisted`, from execution); `forecast_resolved`, `instrument_closed` (from the runner) |
 | 6 | `learn` | for each settled market and each agent that forecast or held it, in agent order: `agent.learn(ResolutionEvent)`; memory writes journaled | yes | `memory_written` |
 | 7 | `hive` | in this order: one `forecast` entry per `forecast_recorded` of this bar in agent order (stamped `bar_of(resolved_at_ms) + interval_ms`, so the index releases it after settlement without a second write), then one `resolution` entry per market that settled this bar in market order, then a `reputation` entry per affected `(agent, category)` in agent then category order, then a `lesson` entry per lesson and note written this bar (visible from `t + interval_ms`) | yes | `hive_written` |
 | 8 | `close` | mark every agent at `mark_price_bp`, the close of bar `t` itself (section 8.7; `mark_value_cents` of 17.1, signed, on a continuous instrument), update peak and drawdown, freeze ruined agents and expire their resting orders | yes | `equity_marked`, `agent_ruined`, `order_expired` (reason `ruined`), `bar_closed` |
@@ -1152,8 +1194,9 @@ leak section 5.4 exists to prevent. An agent therefore learns of its fill in the
 stated rather than defaulted away: `target` is the safe idiom under latency, because a target repeated
 while a fill is in flight is a no-op once the fill lands, whereas a `limit` repeated on consecutive bars
 rests **twice**; and an action decided on the run's last bar (`t + interval_ms == t1_ms`) has no execute
-phase to drain it, so it is dropped, which E5's test states as "no `order_placed` carries
-`decided_at_ms == t1_ms - interval_ms`".
+phase to drain it, so it is dropped, which E5's test states as "no `order_placed` carries a
+`decided_at_ms` equal to its instrument's last actionable bar or later" (`t1_ms - interval_ms` on a
+`continuous` calendar, ruling R192).
 
 **A ruined agent is skipped in `observe` and `decide` but never in the forecast record.** The runner
 still emits `forecast_recorded(carried=true)` for every open market at every bar of the rest of the run,
@@ -1191,8 +1234,10 @@ class Observation:
 class MarketView:
     market_id: str; provider: str; url: str; question: str; description: str   # description <= 1000 chars
     category: str; tags: tuple[str, ...]; currency: str
-    created_at_ms: int; close_at_ms: int; tradable: bool
-    bars: tuple[Bar, ...]                  # completed bars, oldest first, <= bars_window; () on the first bar
+    created_at_ms: int; close_at_ms: int; tradable: bool   # close_at_ms is 0 and tradable is open(i, t) on a
+                                           # continuous instrument (ruling R181)
+    bars: tuple[Bar, ...]                  # completed bars, oldest first, <= bars_window; () on the first bar;
+                                           # one Bar type for every kind, _bp fields in ticks (ruling R173)
     first_price_bp: int                    # the market's opening quote; public from the first bar
     last_price_bp: int                     # close of the last completed bar, else first_price_bp (section 5.4)
     best_bid_bp: int | None; best_ask_bp: int | None    # from the last completed bar, else None
@@ -1201,6 +1246,28 @@ class MarketView:
     news: tuple[NewsView, ...]             # items linked to this market, <= news_per_market, ranked
     position: PositionView
     fee_schedule_id: str
+    # Amendment C1b, ruling R188: eight defaulted fields, D1's (gate G2), filled by E1. to_dict() renders
+    # them always, so a binary observation gains eight keys at their defaults; no run of 2026-09-08 exists
+    # whose bytes that could move.
+    kind: str = "binary"                   # one of INSTRUMENT_KINDS
+    tick_size_micro: int = 100
+    point_value_micro: int = 1_000_000
+    session_calendar_id: str = "continuous"
+    hours_to_next_bar: int = 0             # (next_bar(i, now_ms) - now_ms) // MS_PER_HOUR from the sealed
+                                           # calendar (public, the venue's rule); 0 on a binary
+    underlying_id: str | None = None       # a perp's spot twin when the run carries it (17.7 basis)
+    twins: tuple[str, ...] = ()            # the instrument's twins the run carries (17.7 pairs)
+    cash_events: tuple[CashEventView, ...] = ()   # APPLIED data events, oldest first, <= CASH_EVENTS_VIEW_MAX
+                                           # (ruling R183); () on a binary
+
+CASH_EVENTS_VIEW_MAX = 30
+
+@dataclass(frozen=True, slots=True)
+class CashEventView:                       # amendment C1b, ruling R183: one applied data cash event
+    kind: str                              # funding | dividend | split | roll (never an engine kind)
+    t_ms: int                              # the record's t_ms
+    applied_at_ms: int                     # applies_at(e) of 17.3; a completed bar at now_ms
+    detail: Mapping[str, int | str]        # the record's detail verbatim
 
 @dataclass(frozen=True, slots=True)
 class NewsView:
@@ -1210,7 +1277,8 @@ class NewsView:
 
 @dataclass(frozen=True, slots=True)
 class PositionView:
-    position: int                          # signed contracts, negative = NO held
+    position: int                          # signed contracts, negative = NO held; on a continuous instrument
+                                           # signed milli-units, negative = short (rulings R148, R154)
     avg_cost_bp: int                       # volume-weighted entry price of the open leg, 0 when flat
     unrealised_cents: int                  # marked to last_price_bp
     open_orders: tuple[OpenOrderView, ...] # order_id, side, price_bp, remaining_size, expires_at_ms
@@ -1218,12 +1286,17 @@ class PositionView:
 @dataclass(frozen=True, slots=True)
 class PortfolioView:
     cash_cents: int; reserved_cents: int; equity_cents: int; fees_paid_cents: int
+    # cash_cents is SIGNED (a debit cash event may leave a debit balance, ruling R179) and so is equity_cents
+    # (a short is a liability, ruling R154); drawdown_bp has no floor once equity can be negative (R180)
     peak_equity_cents: int; drawdown_bp: int; n_open_positions: int; n_open_orders: int
     research_units_remaining: int
 
 @dataclass(frozen=True, slots=True)
 class MemoryView:                          # section 10.3; a snapshot, never the live object
-    calibration: tuple[CalibrationBinView, ...]      # (category, horizon_bucket, bin, n, n_yes)
+    calibration: tuple[CalibrationBinView, ...]      # (category, horizon_bucket, bin, n, n_yes, n_yes_x2 = 0)
+                                                     # n_yes_x2 is 2 * n_yes on a binary slice; on a continuous
+                                                     # slice n_yes = n_yes_x2 // 2 and every ratio reads n_yes_x2
+                                                     # over 2 * n (17.5, ruling R194)
     priors: tuple[PriorView, ...]                    # (category or "tag:<tag>", n, n_yes)
     features: tuple[FeatureStatView, ...]            # (family, key, n, sum_milli, sum_sq_milli)
     lessons: tuple[LessonView, ...]                  # (written_at_ms, text, market_ids)
@@ -1265,8 +1338,9 @@ scored, they are simply not addressable this bar. The rule is deterministic, so 
 actions cap is never reachable.
 
 **Never in an observation**: any field of section 7.9, a bar count, a bar index relative to the end,
-`resolved_at_ms`, the run's `t1_ms`, the number of bars remaining, other agents' forecasts on open markets
-(unless `live_coop`, and then only the previous bar's).
+`resolved_at_ms`, `delisted_at_ms`, `last_bar(i)`, the run's `t1_ms`, the number of bars remaining, a
+`CashEvent` whose application bar has not completed, other agents' forecasts on open markets (unless
+`live_coop`, and then only the previous bar's).
 
 **The clock test (E1) is structural, not an integer scan.** A scan cannot pass on legal data: section 7.2
 allows `close_at_ms == resolved_at_ms` (the Manifold and Kalshi normal case, and the demo pack's own
@@ -1276,7 +1350,7 @@ therefore, literally:
 
 1. the recursive **key set** of `Observation.to_dict()` contains none of `resolved_at_ms`, `n_bars`,
    `bars_remaining`, `bar_index`, `t1_ms`, `resolution`, `resolution_source`, `hardness_tags`, `quality`,
-   `fold`, `final_price_bp`;
+   `fold`, `final_price_bp`, `delisted_at_ms`, `last_bar`;
 2. for a market whose total bar count is deliberately `bars_window` and again `bars_window + 7`,
    `len(view.bars) == min(bars_window, completed bars so far)`, so a length that leaked the end differs;
 3. `view.last_price_bp == market.bars[k].close_bp` for the last completed bar `k`, and
@@ -1292,6 +1366,7 @@ class BarSlice:
     t_ms: int
     open_ids: tuple[str, ...]; tradable_ids: tuple[str, ...]
     settling_ids: tuple[str, ...]; listed_ids: tuple[str, ...]   # listed_ids: newly listed this bar
+    closing_ids: tuple[str, ...] = ()      # amendment C1b, ruling R187: the instruments with closes(i, t)
 
 class Calendar:
     def __init__(self, dataset: Dataset, config: RunConfig) -> None: ...
@@ -1299,7 +1374,13 @@ class Calendar:
     def t0_ms(self) -> int: ...
     @property
     def t1_ms(self) -> int: ...
-    def bars(self) -> Iterator[BarSlice]: ...            # ascending, dense on config.interval_min
+    def bars(self) -> Iterator[BarSlice]: ...            # ascending, the union of the run's instruments' bars
+                                                         # (17.2, ruling R187); every grid point on a binary run
+    def last_bar(self, market_id: str) -> int: ...       # last_bar(i) of 17.2, inside [t0_ms, t1_ms)
+    def next_bar(self, market_id: str, t_ms: int) -> int | None: ...   # the instrument's next bar after t_ms
+    def prev_bar(self, market_id: str, t_ms: int) -> int | None: ...   # its last bar before t_ms, in the run
+        # The three lookups are E1's one implementation (ruling R187): the queue drain of 17.2, decided_at_ms
+        # (R192), applies_at (R175) and the forced flat read them and compute nothing of their own.
 
 def build_observation(*, agent_id: str, now_ms: int, config: RunConfig, markets: Sequence[Market],
                       positions: Mapping[str, PositionView], portfolio: PortfolioView,
@@ -1346,8 +1427,12 @@ class Actions:
 `horizon_forecasts` (ruling R157) carries one `HorizonForecast(market_id, horizon_bars,
 up_probability_ppm, quantiles_ticks)` per `(market_id, horizon_bars)` of the run's `horizons_bars` for
 the open continuous instruments; a missing pair is carried (the previous statement, else the random
-walk), and `prob_ppm` of a continuous `MarketAction` is the up-probability at the shortest declared
-horizon. `actions.v2.json` carries the optional top-level array.
+walk), **except the shortest horizon of a market the agent addressed** (ruling R184): when
+`horizon_forecasts` has no pair for `(market_id, shortest horizon)` and a `MarketAction` on that market
+exists, the runner synthesises the pair from `MarketAction.prob_ppm` with `quantiles_ticks = None`, so a
+family that states only `prob_ppm` states a direction. `prob_ppm` of a continuous `MarketAction` is the
+up-probability at the shortest declared horizon, and a pair that **is** present for the shortest horizon
+must equal it, else `action_rejected(bad_prob)`. `actions.v2.json` carries the optional top-level array.
 
 Semantics:
 
@@ -1376,7 +1461,9 @@ Validation reasons (`pmx.types.RejectReason`, a `StrEnum`): `unknown_market`, `d
 `lesson_too_long`, `bad_research`, `schema_invalid`, `not_tradable`, `insufficient_cash`, `zero_size`,
 `ruined`, `budget_exceeded`, `agent_timeout`, `provider_error`, `malformed_response`, and amendment C1b's
 `bad_horizon` (a horizon outside `config.horizons_bars`) and `bad_quantiles` (a non-monotone or
-wrong-length quantile tuple), plus `bad_size` for a notional over `NOTIONAL_CENTS_MAX` (17.1). A structurally
+wrong-length quantile tuple). The notional cap of 17.1 is checked by `Execution` at the execute phase,
+where the price is known, and refused as `order_rejected(bad_size)` there and nowhere else (ruling R196). A
+structurally
 invalid payload (schema failure) becomes a single `action_rejected(scope="actions", schema_invalid)`
 plus carried forecasts and `hold` everywhere; a partially invalid payload keeps its valid items
 (truncation, never a crash).
@@ -1390,8 +1477,9 @@ An order is expressed on YES (`buy` or `sell`). Netting is mechanical:
   `proceeds_cents(c, 10_000 - p)`; then **opens** `s - c` YES, paying `cost_cents(s - c, p)`.
 - `sell s` with `position = q`: first closes `c = min(s, max(0, q))` YES, receiving
   `proceeds_cents(c, p)`; then opens `s - c` NO, paying `cost_cents(s - c, 10_000 - p)`.
-- Cash never goes negative: the opening part is truncated to `floor(free_cash / unit_cost)` contracts
-  (`unfilled_reason = "cash"`). `free_cash = cash - reserved`.
+- A fill never takes cash below zero: the opening part is truncated to `floor(free_cash / unit_cost)`
+  contracts (`unfilled_reason = "cash"`). `free_cash = max(0, cash - reserved)`. Only a debit cash event of
+  section 17.3 can leave `cash < 0` (a debit balance, ruling R179), and while it does `free_cash` is `0`.
 - A resting limit order reserves the worst-case opening cost of its full size at its limit price
   (`cost_cents(size, p)` for `buy`, `cost_cents(size, 10_000 - p)` for `sell`); the reservation is
   released on fill, expiry or cancellation and re-computed to the remainder on a partial fill.
@@ -1409,8 +1497,8 @@ keeps the NO leg exactly as above: a NO contract is a long in the complement and
 
 ### 8.6 Fills
 
-A market order of `s` contracts **accepted by `place` at bar `t - interval_ms` and drained by
-`execute_bar` at bar `t`** on market `m` (amendment C1, section 16.2: `place` queues and reserves
+A market order of `s` contracts **accepted by `place` at the instrument's previous bar (`t - interval_ms`
+on a `continuous` calendar, ruling R192) and drained by `execute_bar` at bar `t`** on market `m` (amendment C1, section 16.2: `place` queues and reserves
 nothing, `execute_bar` is where every execute-phase event and every cent comes from):
 
 0. If `not tradable(m, t)` (section 5.3), nothing is placed: `order_rejected(not_tradable)` carrying
@@ -1431,7 +1519,8 @@ nothing, `execute_bar` is where every execute-phase event and every cent comes f
    at most one milli-contract per order, goes to the largest fractional parts, ties broken by
    `(-size_milli, side, kind, limit_price_bp)` and then by the canonical order of section 3. Two orders
    that tie on all four keys are the same order in every respect the tape can see, so which of them takes
-   the extra milli-contract changes no aggregate, and `Execution` truncates to whole contracts anyway. If
+   the extra milli-contract changes no aggregate, and `Execution` truncates to whole contracts on a binary
+   anyway. If
    `requested <= cap_milli` nothing is rationed. An order allocated `0` reports
    `unfilled_reason = "volume_cap"`. `allocate_cap` (section 16.1) is the one implementation.
 3. `base = bar.yes_ask_bp` for buys / `bar.yes_bid_bp` for sells when the bar carries quotes
@@ -1440,8 +1529,14 @@ nothing, `execute_bar` is where every execute-phase event and every cent comes f
    (amendment C1b, ruling R156; `hs` is `0` on every pair of flat bars, so on the demo pack the base is
    the open exactly as before), clamped into the bar's range, `price_source = "open"`.
 4. `taken_pct = (filled_milli * 100) // max(1, bar.volume_milli)`;
-   `slippage_bp = slippage_bp_per_pct * taken_pct`; `fill_price_bp = clamp_price_bp(base + slippage_bp)`
-   for buys, `clamp_price_bp(base - slippage_bp)` for sells. The slippage is a function of the order's
+   `slippage_bp = slippage_ticks(base, config=config, taken_pct=taken_pct, view=market_view)`, which is
+   `slippage_bp_per_pct * taken_pct` on a binary (an absolute number of basis points of the payout, the v2
+   rule unchanged) and `round_half_up(base * slippage_bp_per_pct * taken_pct, BP_ONE)` on a continuous kind
+   (the same number of basis points, relative to the price, in ticks; ruling R173);
+   `fill_price_bp = clamp_price(base + slippage_bp, view=market_view)` for buys,
+   `clamp_price(base - slippage_bp, view=market_view)` for sells, where `clamp_price` is `clamp_price_bp` on
+   a binary and `max(1, min(PRICE_TICKS_MAX, x))` otherwise (a `clamp_price_bp` left on a continuous path
+   would print 6 341 257 ticks as 9 999 and E2's continuous envelope test fails it). The slippage is a function of the order's
    **own allocated** size, which pro-rata rationing makes independent of the arrival order, so the multiset
    of fills over a (market, bar) is invariant under permutation and envelope rule 4 of section 16.1 holds
    exactly (ruling R127). Under the first-come-first-served rule this step used to carry, it did not: two
@@ -1495,9 +1590,13 @@ at `last_bar(i)`'s close. They are priced by `pmx.engine.liquidity.event_fill` (
 `LiquidityModel`), carry `price_source = "event"`, `slippage_bp = 0`, the taker fee, `origin = "roll"`
 or `"forced_flat"` on their `order_placed`, and are the only `order_placed`, `filled` and `fee_charged`
 events written in the **settle** phase. A `forced_flat` cover that cash cannot pay goes through
-`truncate_for_cash` like any buy and reports the residual (ruling R154). Before pricing any order,
-`Execution` checks `notional_micro(...) <= NOTIONAL_CENTS_MAX * NOTIONAL_DENOMINATOR` and rejects
-`order_rejected(bad_size)` otherwise (ruling R147). On a continuous instrument the cap of step 2, the
+`truncate_for_cash` like any buy and reports the residual (ruling R154); the reopening leg of a `roll` goes
+through the same truncation and the short-notional rule of 17.3, and its residual is in the leg's
+`unfilled_size` and `unfilled_reason` and in the event's `position_after` (ruling R198). Before pricing any
+agent order, `Execution` checks `notional_micro(size_milli, p, tick, point) <= NOTIONAL_CENTS_MAX *
+NOTIONAL_DENOMINATOR`, with `p` the limit price of a limit order and `bar.high_bp`, the largest price the
+envelope can print (16.1 rule 3), for a market order, and rejects `order_rejected(bad_size)` otherwise
+(rulings R147 and R196: this is the one place the cap is checked, and 8.4 lists no `bad_size` for it). On a continuous instrument the cap of step 2, the
 slippage of step 4 and the limit rule read `_ticks` where they read `_bp`, `bar.volume_milli` is in
 milli-units of the instrument, and a bar with no quote takes the half-spread floor of section 17.4 as its
 base (ruling R156).
@@ -1508,19 +1607,26 @@ E2's surface is literal, so E5 can call it blind in the same wave:
 class Execution:
     def __init__(self, *, journal: Journal, config: RunConfig,
                  schedules: Mapping[str, FeeSchedule],
-                 liquidity: LiquidityModel) -> None: ...          # section 16.1; keyword-only, required
+                 liquidity: LiquidityModel,                       # section 16.1; keyword-only, required
+                 calendars: Mapping[str, SessionCalendar] | None = None) -> None: ...
+        # `calendars` is amendment C1b's (ruling R174): the sealed session calendars by id, which the
+        # per-instrument queue of 17.2, borrow_fee and carry (one event per session, days since the previous
+        # session close) read. None means the synthesised `continuous` calendar for every instrument, which
+        # is what a binary run passes; the runner passes {id: dataset.calendar(id)} over the run's kinds.
     def place(self, *, agent_id: str, market: Market, action: MarketAction, item_index: int,
               t_ms: int) -> None: ...
         # Called in the DECIDE phase of bar t_ms. It validates and queues; it emits no event, moves no
         # cent and reserves nothing (amendment C1, section 16.2, ruling R110).
     def pending_market_ids(self, *, t_ms: int) -> tuple[str, ...]: ...
-        # The markets holding an item place accepted at t_ms - interval_ms, in canonical market order.
+        # The markets holding an item place accepted at the instrument's previous bar (t_ms - interval_ms on
+        # a `continuous` calendar, ruling R192), in canonical market order.
         # The runner drives execute_bar over exactly this tuple (amendment C1, section 16.2, ruling
         # R131). It is NOT a subset of bar t's tradable set: a market that closed or settled at
         # t - interval_ms is in it and is owed the order_rejected(not_tradable) of step 0, and the
         # runner resolves the Market from the dataset rather than from the bar slice.
     def execute_bar(self, *, t_ms: int, market: Market) -> None: ...
-        # Called in the EXECUTE phase of bar t_ms. It drains what place accepted at t_ms - interval_ms,
+        # Called in the EXECUTE phase of bar t_ms. It drains what place accepted at the instrument's previous
+        # bar (t_ms - interval_ms on a `continuous` calendar, ruling R192),
         # in agent_id order then submission order, prices the whole market's batch through one
         # model.quote_bar call, and emits every execute-phase event of section 9.2.
     def settle(self, *, market: Market) -> Mapping[str, int]: ...
@@ -1532,7 +1638,8 @@ class Execution:
     def position(self, agent_id: str, market_id: str) -> PositionView: ...
     def apply_cash_events(self, *, t_ms: int, market: Instrument) -> None: ...
         # Amendment C1b, section 17.3 (ruling R151). Called in the SETTLE phase for each continuous
-        # instrument in canonical order: applies every CashEvent with bar_of(t_ms) == t_ms, emits
+        # instrument in canonical order: applies every CashEvent whose application bar (applies_at of 17.3,
+        # ruling R175) is t_ms, in (kind order, t_ms, cash_event_id) order (ruling R193), emits
         # cash_event_applied and the event fills of a roll, expires resting orders a split or a roll
         # invalidates. Nothing for an agent whose position is 0 before and after.
     def force_flat(self, *, t_ms: int, market: Instrument) -> None: ...
@@ -1581,8 +1688,10 @@ short, so `positions_value_cents` is **signed** and `equity = cash + positions_v
 zero on a short that has run away; ruin is then 8.7's rule unchanged. At `last_bar(i)` every position is
 closed by the engine at the bar's close through an event fill (`force_flat`), which pays the taker fee
 and is journaled as a fill and never as a mark, and the runner emits `instrument_closed`; a cover that cash
-cannot pay is truncated and the residual liability stays in `equity_marked` to the end of the run. A
-`settled` or `settlement_applied` event is never written for a continuous instrument.
+cannot pay is truncated and the residual liability stays in `equity_marked` to the end of the run, marked
+at `instrument_closed.last_price_ticks` on every later bar because the instrument has no more bars (ruling
+R198). A debit cash event (17.3, ruling R179) lowers cash and equity cent for cent and ruin stays this
+rule on equity. A `settled` or `settlement_applied` event is never written for a continuous instrument.
 
 ### 8.8 Fee schedules as data (E2, `pmx.engine.fees`)
 
@@ -1646,14 +1755,19 @@ cash_cents(a)     == bankroll_cents + sum(filled.cash_delta_cents where agent_id
                                     - sum(fee_charged.fee_cents where agent_id == a)
                                     + sum(settlement_applied.cash_delta_cents where agent_id == a)
                                     + sum(cash_event_applied.cash_delta_cents where agent_id == a)     (amendment C1b, 17.3)
-cash_cents(a)     >= 0
+cash_cents(a)     >= 0 unless the last event that moved it is a cash_event_applied DEBIT (funding, dividend,
+                     borrow_fee or carry with cash_delta_cents < 0): a fill never takes cash below zero, a debit
+                     may, and the debit balance is repaid by the next credit (ruling R179)
 reserved_cents(a) == sum(order_placed.reserved_cents) - sum(filled.released_cents) - sum(order_expired.released_cents)   (all for a)
-reserved_cents(a) <= cash_cents(a)
+reserved_cents(a) <= max(0, cash_cents(a));  reserved_cents(a) == 0 while cash_cents(a) < 0 (the event that took
+                     cash below zero expired every resting order of the agent with reason "debit")
 reserved_cents(a) == 0 at run end (every market of the run has settled or been closed)
 position(a, i)    == the last position_after written for (a, i) by a filled or a cash_event_applied, where every
                      filled satisfies position_after - position_before == its signed filled size and every
-                     cash_event_applied satisfies position_after == position_before except kind == "split", where
-                     position_after == split_position_milli(position_before, numerator, denominator)
+                     cash_event_applied satisfies position_after == position_before for funding, dividend,
+                     borrow_fee and carry; == split_position_milli(position_before, numerator, denominator) for
+                     split; == the position_after of the last filled named in order_ids for roll and forced_flat,
+                     whose position_before is the position before the first event fill (ruling R178)
 position(a, i)    == 0 after settlement (binary) and after instrument_closed (continuous), unless the forced flat
                      reports unfilled_reason == "cash", in which case equity_marked carries the liability to the end
 positions_value_cents(a) == sum of 8.7's YES and NO values over binaries plus sum of mark_value_cents over
@@ -1665,7 +1779,9 @@ binary the first block is the v2 invariant to the letter (`sum(cash_event_applie
 position line reduces to the signed sum of fills); section 17.3 restates it kind by kind and names the
 lines each kind can move. E2's hypothesis tests generate 1 000 fill sequences per kind (random sizes,
 sides, prices, quotes, volumes, including zero-volume bars, a funding sign flip, a reverse split on a
-short, a roll with a negative gap, a dividend on a short and a forced flat that cash cannot pay) and
+short, a roll with a negative gap, a roll with a positive gap on an agent with no free cash, a dividend on
+a short, a dividend debit that takes cash below zero, a buy at an ex-date open that receives no dividend, a
+buy at a split's effective open that is not multiplied, and a forced flat that cash cannot pay) and
 assert every line above; E5 asserts it on the whole demo pack for 50 seeds (AC-3) and E2E-1b on the
 mixed fixture (AC-22).
 
@@ -1710,7 +1826,7 @@ canonical-json-able mappings whose keys are listed.
 | `market_listed` | open | market, once per run, at the first bar where `open(m, t)` holds | `market_id`, `provider: str`, `category: str`, `tags: list[str]`, `event_key: str|null`, `created_at_ms: int`, `close_at_ms: int`, `interval_min: int`, `fee_schedule_id: str`, `hardness_tags: list[str]`, `fold: str`; amendment C1b adds `kind: str`, `vendor: str`, `symbol: str`, `tick_size_micro: int`, `point_value_micro: int`, `session_calendar_id: str`, `borrow_schedule_id: str|null`, `carry_schedule_id: str|null`, declared and not yet required (ruling R164; the projection reads `binary`, the provider, `100`, `1_000_000`, `"continuous"`, `null`, `null` when absent); on a continuous instrument `close_at_ms` is `delisted_at_ms` or `0` when unset |
 | `market_priced` | open | (bar, open market) | `market_id`, `close_bp: int` (the close of bar `t` itself, the `mark_price_bp` of section 8.7), `last_close_bp: int` (the close of the last completed bar at `t`, else `first_price_bp`: the market's own forecast on this bar), `vwap_bp: int`, `volume_milli: int` |
 | `bar_opened` | open | bar | `open_market_ids: list[str]`, `tradable_market_ids: list[str]`, `settling_market_ids: list[str]`, `listed_market_ids: list[str]` (newly listed this bar) |
-| `order_expired` | open, settle, close | order | `order_id`, `agent_id`, `market_id`, `remaining_size: int`, `released_cents: int`, `reason: "ttl"|"not_tradable"|"settled"|"ruined"|"corporate_action"|"roll"|"delisted"` (the last three are amendment C1b's, section 17.3) |
+| `order_expired` | open, settle, close | order | `order_id`, `agent_id`, `market_id`, `remaining_size: int`, `released_cents: int`, `reason: "ttl"|"not_tradable"|"settled"|"ruined"|"corporate_action"|"roll"|"delisted"|"debit"` (the last four are amendment C1b's, section 17.3; `debit` is ruling R179's: a cash-event debit took the agent's cash below zero and every resting order of the agent is expired) |
 | `observation_built` | observe | agent | `agent_id`, `n_markets: int`, `n_news: int`, `n_hive: int`, `n_bars_max: int`, `research_remaining: int`, `bytes: int`, `obs_sha256: str` |
 | `reply_received` | decide | LLM agent | `agent_id`, `source: "llm"|"fallback"`, `error: str|null` (a `RejectReason`), `schema_valid: bool`, `n_lessons: int` |
 | `action_received` | decide | agent | `agent_id`, `source: "scripted"|"llm"|"fallback"`, `intents: list[object]` (validated `MarketAction`s as dicts, sorted by `market_id`), `research: object|null`, `notes: str`, `n_lessons: int`, `n_rejected: int` |
@@ -1718,17 +1834,17 @@ canonical-json-able mappings whose keys are listed.
 | `forecast_recorded` | decide | (agent, open market) | `agent_id`, `market_id`, `prob_ppm: int`, `carried: bool`; on a continuous instrument also `price_ref_ticks: int` and `horizons: list[object]` each `{horizon_bars, up_probability_ppm, quantiles_ticks: list[int]|null}` (amendment C1b, section 17.5, ruling R157; absent on a binary) |
 | `research_spent` | decide | request | `agent_id`, `kind: str`, `market_id: str|null`, `units: int`, `remaining: int`, `granted: bool` |
 | `memory_written` | decide (LLM lessons), learn | write | `agent_id`, `kind: "calibration"|"prior"|"feature"|"lesson"|"note"`, `key: str`, `payload: object`, `bytes_after: int` |
-| `order_placed` | execute | order | `order_id`, `agent_id`, `market_id`, `kind: "market"|"limit"`, `side: "buy"|"sell"`, `price_bp: int|null`, `size: int`, `ttl_bars: int|null`, `expires_at_ms: int|null`, `reserved_cents: int`, `origin: "target"|"limit"|"abstain"|"roll"|"forced_flat"`, `decided_at_ms: int` (the bar the intent was decided at, `bar_ms - interval_ms` under section 16.2; the bar itself for an event fill, whose phase is `settle`, section 17.3) |
+| `order_placed` | execute | order | `order_id`, `agent_id`, `market_id`, `kind: "market"|"limit"`, `side: "buy"|"sell"`, `price_bp: int|null`, `size: int`, `ttl_bars: int|null`, `expires_at_ms: int|null`, `reserved_cents: int`, `origin: "target"|"limit"|"abstain"|"roll"|"forced_flat"`, `decided_at_ms: int` (the bar the intent was decided at: the instrument's previous bar, which is `bar_ms - interval_ms` on a `continuous` calendar and Friday's last bar for a Monday fill on a session calendar, section 16.2 and ruling R192; the bar itself for an event fill, whose phase is `settle`, section 17.3) |
 | `order_rejected` | execute | intent | `agent_id`, `market_id`, `item_index: int`, `reason: str` (`not_tradable`, `ruined`, `no_liquidity` and the validation reasons; a free string, not an enum), `detail: str`, `decided_at_ms: int` |
 | `filled` | execute | fill | `order_id`, `agent_id`, `market_id`, `side`, `kind`, `requested_size: int`, `filled_size: int`, `unfilled_size: int`, `unfilled_reason: "none"|"volume_cap"|"cash"|"zero_volume"|"no_cross"|"no_liquidity"`, `base_price_bp: int`, `slippage_bp: int`, `fill_price_bp: int`, `price_source: "open"|"quote"|"limit"|"impact"|"mm"` (plus `"event"` for an event fill of section 17.3, ruling R152, the one case whose phase is `settle`), `close_size: int`, `open_size: int`, `cash_delta_cents: int`, `released_cents: int`, `position_before: int`, `position_after: int`, `avg_cost_bp_after: int` |
 | `fee_charged` | execute | fill | `order_id`, `agent_id`, `market_id`, `fee_cents: int`, `schedule_id: str`, `role: "taker"|"maker"` |
 | `settled` | settle | market | `market_id`, `outcome: int`, `payout_bp: int`, `resolved_at_ms: int`, `n_bars: int`, `market_brier_tw_micro: int`, `life_mean_price_bp: int` (section 8.7 defines the last two) |
 | `settlement_applied` | settle | (agent, market) with a position or a forecast | `agent_id`, `market_id`, `position: int`, `cash_delta_cents: int`, `cash_after_cents: int`, `realised_pnl_cents: int` (fills + settlement - fees on this market), `agent_brier_tw_micro: int`, `n_forecast_bars: int` |
 | `hive_written` | hive | entry | `entry_id`, `kind: "forecast"|"resolution"|"lesson"|"reputation"`, `author_id: str` (`"engine"` for resolution and reputation), `market_id: str|null`, `visible_from_ms: int`, `payload: object` |
-| `equity_marked` | close | agent | `agent_id`, `cash_cents`, `reserved_cents`, `positions_value_cents` (signed since amendment C1b: a short on a continuous instrument is a liability, ruling R154), `equity_cents`, `fees_paid_cents`, `peak_equity_cents`, `drawdown_bp`, `n_open_positions: int`, `n_open_orders: int` |
-| `agent_ruined` | close | ruined agent | `agent_id`, `equity_cents: int`, `cancelled_order_ids: list[str]` |
+| `equity_marked` | close | agent | `agent_id`, `cash_cents` (signed since ruling R179: a debit cash event may leave a debit balance), `reserved_cents`, `positions_value_cents` (signed since amendment C1b: a short on a continuous instrument is a liability, ruling R154), `equity_cents` (signed, rulings R154 and R180), `fees_paid_cents`, `peak_equity_cents`, `drawdown_bp` (`<= 0`, below `-10_000` when equity is negative, ruling R180), `n_open_positions: int`, `n_open_orders: int` |
+| `agent_ruined` | close | ruined agent | `agent_id`, `equity_cents: int` (signed, ruling R180), `cancelled_order_ids: list[str]` |
 | `bar_closed` | close | bar | `n_events: int` (events of this bar including itself) |
-| `cash_event_applied` | settle | (agent, continuous instrument, cash event) with a non-zero position before or after | `agent_id`, `market_id`, `cash_event_id: str`, `kind: "funding"|"dividend"|"split"|"roll"|"borrow_fee"|"forced_flat"`, `origin: "data"|"engine"`, `position_before: int`, `position_after: int`, `avg_cost_ticks_before: int`, `avg_cost_ticks_after: int`, `cash_delta_cents: int` (`0` for `split`, `roll` and `forced_flat`, whose money moves in their `filled` and `fee_charged`), `order_ids: list[str]`, `detail: object` (amendment C1b, section 17.3) |
+| `cash_event_applied` | settle | (agent, continuous instrument, cash event) with a non-zero position before or after | `agent_id`, `market_id`, `cash_event_id: str`, `kind: "funding"|"dividend"|"split"|"roll"|"borrow_fee"|"carry"|"forced_flat"`, `origin: "data"|"engine"`, `position_before: int`, `position_after: int` (for `roll` and `forced_flat` the position before the first and after the last event fill named in `order_ids`, ruling R178), `avg_cost_ticks_before: int`, `avg_cost_ticks_after: int`, `cash_delta_cents: int` (`0` for `split`, `roll` and `forced_flat`, whose money moves in their `filled` and `fee_charged`; signed for the other four and may take cash below zero, ruling R179), `order_ids: list[str]`, `detail: object` (amendment C1b, section 17.3) |
 | `instrument_closed` | settle | continuous instrument, once, at `last_bar(i)` | `market_id`, `kind: str`, `reason: "window_end"|"delisted"`, `last_price_ticks: int`, `n_bars: int`, `n_forecasts_unresolved: int` (section 17.3) |
 | `forecast_resolved` | settle | (agent, continuous instrument, forecast bar, horizon) at the bar the realisation became public | `agent_id`, `market_id`, `forecast_bar_ms: int`, `horizon_bars: int`, `up_probability_ppm: int`, `quantiles_ticks: list[int]|null`, `price_ref_ticks: int`, `price_realised_ticks: int`, `realised_sign: int` (`-1`, `0`, `1`), `directional_brier_micro: int`, `pinball_micro: int|null`, `baseline_pinball_micro: int`, `carried: bool` (section 17.5, ruling R160) |
 | `run_ended` | post | run | `reason: "completed"|"aborted"`, `final_bar_ms: int`, `n_bars: int`, `event_count: int`, `ruined_agent_ids: list[str]` |
@@ -1863,7 +1979,8 @@ The two live files are one canonical JSON object per line (section 4.2):
 ```
 live/forecasts.jsonl    {"forecast_id": "lf-<yyyymmdd>-<agent_id>-<market_id>", "agent_id", "market_id",
                          "provider", "prob_ppm", "forecast_at_ms", "genome_hash", "run_id", "dataset_hash",
-                         "model": str|null, "forecast_hash"}          forecast_hash per section 4.3
+                         "model": str|null, "forecast_hash",         forecast_hash per section 4.3
+                         "kind", "bar_ms", "price_ref_ticks", "horizons"}   the forecast.v1.json core (ruling R195)
 live/resolutions.jsonl  {"market_id", "provider", "outcome", "resolved_at_ms", "life_mean_price_bp",
                          "observed_at_ms", "source_url"}
 ```
@@ -1990,6 +2107,9 @@ LESSONS_MAX = 50
 NOTES_MAX = 200
 CALIBRATION_BINS = 10                # ppm deciles: bin = min(9, prob_ppm // 100_000)
 HORIZON_BUCKETS = ("30d", "7d", "2d", "0d")   # days to close_at: >= 30 -> 30d; [7, 30) -> 7d; [2, 7) -> 2d; < 2 -> 0d
+RE_HORIZON_BUCKET = re.compile(r"^(30d|7d|2d|0d|h[0-9]{1,5})$")   # a bucket string: the four above or h<bars>
+# HORIZON_BUCKETS stays these four (ruling R188): horizons are per-run config and this is a module constant,
+# so a continuous bucket is validated by RE_HORIZON_BUCKET and never looked up in the tuple.
 # Amendment C1b (17.5, ruling R161): a continuous ledger is keyed (kind, f"h{horizon_bars}", bin) through the
 # same CalibrationBin, with `category = kind` and a horizon string "h<n>" per declared horizon; n_yes is
 # kept as n_yes_x2 (an up adds 2, a flat realisation adds 1) so a tie is half a yes and nothing is dropped.
@@ -2424,6 +2544,9 @@ are empty for `market_follower` on a single market). Time-weighting is not appli
 count forecasts), which is stated so nobody "fixes" it. On a continuous kind the same table bins
 `up_probability_ppm` per `(kind, horizon)` slice with `n_yes_x2` counting an up as `2` and a flat
 realisation as `1` (amendment C1b, section 17.5, ruling R161); nothing is pooled across kinds or horizons.
+`CalibrationBinView` carries `n_yes_x2` as a defaulted field (`2 * n_yes` on a binary slice) and every
+consumer computes `yes_rate_ppm` from it over `2 * n`, one spelling in `pmx.metrics.calibration` (ruling
+R194), so a tie is never dropped and no ratio is off by two.
 
 ### 12.3 Trading metrics (E5, `pmx.metrics.performance`)
 
@@ -2464,7 +2587,8 @@ PERMUTATION_INNER_RESAMPLES = 200
 ALPHA_PPM = 50_000                          # one-sided 95 percent lower bounds
 
 def block_key(market: MarketMeta, *, cluster_id: str | None = None) -> str
-    # cluster_id if not None, else market.event_key if not None, else f"w{iso_year}-{iso_week:02d}" of resolved_at_ms
+    # cluster_id if not None, else market.event_key if not None, else f"w{iso_year}-{iso_week:02d}" of resolved_at_ms;
+    # on a continuous (instrument, week) row the week is the cell's own (17.6, ruling R186), not the meta's
     # MarketMeta is section 7.2's leak-free projection; the projection carries block_key per (agent, market).
     # The keyword-only cluster_id is amendment C1's (ruling R118, applied here rather than deferred): two
     # venues' markets on one event are one block, not two independent draws. E4 ships the argument in wave 2
@@ -2484,11 +2608,18 @@ def deflated_lower_bound(interval: Interval, *, candidates: int) -> int
     # The undeflated bound is the empirical quantile; the deflated one is the normal approximation because
     # an empirical quantile at alpha / K needs B >= 20 K / alpha resamples, which is out of reach for K in the thousands.
 def permutation_null(forecasts: Mapping[str, Sequence[tuple[int, int]]], market_prices: ..., outcomes: Sequence[int], weights: ...,
-                     blocks, *, rng, permutations: int = PERMUTATIONS, inner: int = PERMUTATION_INNER_RESAMPLES) -> NullResult
+                     blocks, *, rng, permutations: int = PERMUTATIONS, inner: int = PERMUTATION_INNER_RESAMPLES,
+                     realised_signs: Mapping[str, Sequence[int]] | None = None,
+                     bar_keys: Mapping[str, Sequence[str]] | None = None) -> NullResult
     # NullResult(null_lb_micro: int, p_value_ppm: int, permutations: int)
     # for each permutation: shuffle outcomes across markets, recompute skill per market (forecasts and prices fixed),
     # take the block-bootstrap lower bound with `inner` resamples; null_lb_micro = 95th percentile of those lower bounds;
     # p_value_ppm = share of permutations whose mean skill >= the observed mean skill
+    # Amendment C1b (17.6, ruling R190), keyword-only: on a continuous kind `outcomes` is empty, `realised_signs`
+    # carries one realised_sign per forecast of each (instrument, week) cell and `bar_keys` the f"{t}/{h}" key of
+    # each forecast; a permutation shuffles realised_sign among the forecasts of the same week that share a key
+    # (same forecast bar, same horizon, different instruments), leaves unmatched forecasts in place and
+    # recomputes the per-cell directional skill. price_realised_ticks is never shuffled.
 ```
 
 E4's tests: a synthetic agent with known skill gets an interval containing it; the shuffled null centres on
@@ -2589,7 +2720,9 @@ reports a strictly larger `K`.
 ```python
 @dataclass(frozen=True, slots=True)
 class Folds:
-    train_ids: tuple[str, ...]             # resolved_at_ms < train_end_ms, canonical order
+    train_ids: tuple[str, ...]             # resolved_at_ms < train_end_ms, canonical order; a continuous
+                                           # instrument is in every list whose months intersect its MarketMeta
+                                           # life [created_at_ms, resolved_at_ms) (17.6, ruling R186)
     validation_ids: tuple[str, ...]        # train_end_ms <= resolved_at_ms < validation_end_ms
     rolling: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...]   # (train 1..k, validate month k+1) for k in 4..9
     train_end_ms: int; validation_end_ms: int; sealed_count: int
@@ -2694,7 +2827,7 @@ declared here:
 ```python
 @dataclass(frozen=True, slots=True)
 class HorizonBucket:                   # section 12.1
-    bucket: str                        # one of HORIZON_BUCKETS, including the "h<n>" strings of 17.5
+    bucket: str                        # matches RE_HORIZON_BUCKET: one of HORIZON_BUCKETS or an "h<n>" string of 17.5 (R188)
     n_bars: int; brier_tw_micro: int; market_brier_tw_micro: int; skill_micro: int
 
 @dataclass(frozen=True, slots=True)
@@ -2758,7 +2891,7 @@ class RunProjection:
     liquidity: str; liquidity_params_hash: str                   # section 16.1, read from run_started.config
     agents: tuple[AgentResult, ...]                              # sorted by agent_id
     markets: tuple[MarketResult, ...]                            # canonical market order
-    per_market: tuple[PerMarket, ...]                            # sorted by (agent_id, market_id)
+    per_market: tuple[PerMarket, ...]                            # sorted by (agent_id, market_id, horizon_bars, unit_key) (R199)
     ruined_agent_ids: tuple[str, ...]
     def to_dict(self) -> dict[str, object]: ...
 
@@ -2957,8 +3090,12 @@ prediction_market/
     data/clusters.py                              R1b  (EventCluster, Constraint, residuals, section 16.3)
     data/impact.py                                R1c  (the impact calibration projection, section 16.1)
     data/embeddings.py                            R3b  (as-of text embeddings at build time, section 16.5)
-    data/sessions.py                              F4   (SessionCalendar, in_session, next_bar_ms; section 17.2)
-    data/calendars/*.json                         F4   (the static session calendars; releases.v1.json is F3's)
+    data/sessions.py                              D1   (in_session, next_bar_ms, load_calendar, the synthesised
+                                                       continuous calendar and the generator; section 17.2, ruling
+                                                       R174: gate G2 applies it because E1, E2 and the loader
+                                                       call it in wave 2; SessionCalendar itself is in types.py)
+    data/calendars/*.json                         F4   (the static session calendars generated through
+                                                       pmx.data.sessions; releases.v1.json is F3's)
     data/calendars/releases.v1.json               F3   (the FOMC, CPI and payrolls release calendar)
     data/universe_finance.py                      F4   (the dated finance universe of PRD v4 2.2)
     data/importers/__init__.py                    C0
@@ -3193,7 +3330,7 @@ only to build a fallback reply.
 | `JournalError` | `Journal`, `verify_journal` | seq gap, foreign run id, phase order breach, append after close |
 | `ObservationTooLargeError` | observation builder | canonical size over `OBSERVATION_MAX_BYTES` |
 | `FrozenMemoryError`, `MemoryFullError` | memory | write refused |
-| `ClaimRefusedError` | claims | a second claim on the same `(dataset_hash, genome_hash)` |
+| `ClaimRefusedError` | claims | a second claim on the same `(dataset_hash, kind, provider, horizon_bars, genome_hash)`, or an `access.jsonl` line for it without a completed file (12.8, ruling R199) |
 | `ProviderBlockedError` | importers | the ANJ block page (or any non-provider certificate) was served |
 | `ProviderError`, `MalformedResponseError`, `BudgetExceededError`, `GatewayError` | gateway, importers | the impure edge failed; mapped to `RejectReason` at the gateway boundary |
 | `InvalidConfigError` | every config `__post_init__` | a config value outside its cap |
@@ -3221,17 +3358,17 @@ journal whose `engine_version` differs from the running engine (exit code 2, mes
 | Plan package | Sections of this contract it implements | Contract names it must produce |
 |---|---|---|
 | C0 | all; 13; 15 | this document, the five schemas, `tests/test_architecture.py`, `tests/test_contract_schemas.py` |
-| D1 | 1, 2, 4.1 (consumer), 7.2, 7.3, 7.8, 7.10, 7.13, 13.1, 13.2 | `pmx.types` (every constant and dataclass named here, plus `AgentReply`, the `Gateway` protocol, `MarketMeta`, `Dataset`, `MarketQuality`, `RESEARCH_UNIT_COST`, `PHASE_ORDER`, `market_set_hash`, `CATEGORIES`, `LEXICON_COUNT`, `Descriptors`), `pmx.errors`, `pmx.data.schema` (`SCHEMA_DIR`, `load_schema`, `schema_path`), `pmx.data.loader` (`load_dataset`, `load_market`, `seal_dataset`, `verify_dataset`), `pmx.data.migrate_v1.migrate_v1`, `data/demo_v1/` |
+| D1 | 1, 2, 4.1 (consumer), 7.2, 7.3, 7.8, 7.10, 7.13, 13.1, 13.2, 17.2 (`pmx.data.sessions`: `in_session`, `next_bar_ms`, `load_calendar`, the synthesised `continuous` calendar, ruling R174, applied by gate G2 with the `pmx.types` names of 17.9) | `pmx.types` (every constant and dataclass named here, plus `AgentReply`, the `Gateway` protocol, `MarketMeta`, `Dataset`, `MarketQuality`, `RESEARCH_UNIT_COST`, `PHASE_ORDER`, `market_set_hash`, `CATEGORIES`, `LEXICON_COUNT`, `Descriptors`), `pmx.errors`, `pmx.data.schema` (`SCHEMA_DIR`, `load_schema`, `schema_path`), `pmx.data.loader` (`load_dataset`, `load_market`, `seal_dataset`, `verify_dataset`), `pmx.data.migrate_v1.migrate_v1`, `data/demo_v1/` |
 | D2 | 7.2 (Kalshi mapping), 7.4 (shard exclusion), 7.11, 7.12, 8.8 (fee ids) | `pmx.data.importers._http.HttpClient` (7.11 verbatim), `pmx.data.importers.kalshi.import_kalshi`, `list_open_kalshi`, `KALSHI_EXCLUDED_SERIES` |
 | D3 | 7.2 (Manifold mapping), 7.3 (comments), 7.12 | `import_manifold`, `list_open_manifold`, `pmx.data.news.manifold_comments.fetch_comments` |
 | D4 | 7.2, 13.1 (`ProviderBlockedError`) | `import_polymarket`, `PMX_HTTP_PROXY` |
 | D5 | 5.5, 7.1 (asof rule), 7.3, 7.6, 7.12, 10.5 (lexicons) | the four fetchers of 7.12, `pmx.data.news.linker.link_items`, `src/pmx/lexicons/stopwords.v1.json`, `src/pmx/lexicons/paraphrases.v1.json` (`{"paraphrases": [str, str, str]}`), the 12 `src/pmx/lexicons/<category>.v1.json` |
 | D6 | 5.2, 7.1, 7.4, 7.5, 7.7, 7.8 | `pmx.data.resample.bars_from_trades`, `pmx.data.builder.build_dataset`, `BuildConfig`, `pmx.cli_data` |
 | D7 | 4, 6, 9.1 | `pmx.rng` (all names of 6.1), `pmx.journal` (`canonical_json`, `Journal`, `read_journal`, `write_journal`, `verify_journal`, `iter_bars`, `filter_events`, `journal_hash`, `JOURNAL_ENCODING`, `JOURNAL_NEWLINE`), the event dataclasses of 9.2 and 9.4 as `pmx.journal.events.*` |
-| E1 | 5.3, 5.4, 7.9, 8.3, 16.3 (the leak list of 7.9 gains every cluster-derived name of 16.3, and the poisoned-future test gains one of each), 17.2 (the run calendar as the union of the instruments' bars, `open`/`tradable`/`last_bar` for a continuous instrument, `MarketView.kind` and its scale fields, `hours_to_next_bar`; the poisoned-future test gains a `CashEvent` field and an unresolved `price_realised_ticks`) | `pmx.engine.calendar.Calendar` and `BarSlice`, `pmx.engine.observation.build_observation`, `render_observation_json` (the three signatures of 8.3, literal) |
-| E2 | 8.5 to 8.9, 16.1, 16.2, 17.1, 17.3, 17.4 (the generalised netting and the liability model, `apply_cash_events`, `force_flat`, `event_fill`, the half-spread floor, the `bad_size` check, every fee model and `CARRY_SCHEDULES`, the per-kind accounting property tests) | `pmx.engine.liquidity` (the `LiquidityModel` protocol, `Fill`, `LiquidityOrder`, `LiquidityMarketView`, `ObservedFlow`, `ENVELOPE_BREACHES`, `check_envelope`, `finalise_fill`, `truncate_for_cash`, `cap_milli`, `allocate_cap`, `envelope_bounds`, `MILLI`, `LIQUIDITY_MODELS`, `make_liquidity`, and the `historical` implementation, all literal in 16.1), `pmx.engine.execution.Execution` (`place`, `pending_market_ids`, `execute_bar`, `settle`, `mark`, `portfolio`, `position`, the constructor of 8.6), `pmx.engine.fees.FEE_SCHEDULES`, `fee_cents`. It emits no `settled` and no `settlement_applied` (section 9.3) and needs nothing from `pmx.scoring` |
-| E3 | 1.3, 12.1, 12.2, 17.5 | `pmx.scoring` (`brier_micro`, `brier_tw_micro`, `horizon_briers`, `skill_micro`, `neg_ln_micronats`, `log_score_tw_micronats`, `pmv_bp`, `logit_milli`, `unlogit_ppm`, and amendment C1b's `directional_brier_micro`, `pinball_micro`, `directional_skill_micro`, `pinball_skill_micro`, `default_horizons_bars`, the per-instrument-and-horizon aggregation), `pmx.metrics.calibration.calibration_table` (per `(kind, horizon)` slice, `n_yes_x2`); asserts the random-walk zero-skill identity and the tie rule |
-| E4 | 12.4, 16.3 | every name of 12.4, with `block_key(market, *, cluster_id: str | None = None)` (ruling R118): the keyword-only argument ships in wave 2 and R1b fills it in wave 7, so no signature is widened later |
+| E1 | 5.3, 5.4, 7.9, 8.3, 16.3 (the leak list of 7.9 gains every cluster-derived name of 16.3, and the poisoned-future test gains one of each), 17.2 (the run calendar as the union of the instruments' bars, `open`/`tradable`/`last_bar` for a continuous instrument, `MarketView.kind` and its scale fields, `hours_to_next_bar`, `underlying_id`, `twins` and `cash_events` filled on D1's defaulted fields (ruling R188), `MarketView.close_at_ms = 0` and `tradable = open(i, t)` on a continuous instrument (ruling R181), `BarSlice.closing_ids`, `Calendar.last_bar`, `next_bar` and `prev_bar` (ruling R187); the poisoned-future test gains a `CashEvent` whose application bar has not completed, an applied one that must surface, a `delisted_at_ms`, a `last_bar` and an unresolved `price_realised_ticks`) | `pmx.engine.calendar.Calendar` and `BarSlice`, `pmx.engine.observation.build_observation`, `render_observation_json` (the three signatures of 8.3, literal) |
+| E2 | 8.5 to 8.9, 16.1, 16.2, 17.1, 17.3, 17.4 (the generalised netting and the liability model, `apply_cash_events`, `force_flat`, `event_fill`, the half-spread floor, the `bad_size` check, every fee model and `CARRY_SCHEDULES`, the `calendars` argument and the per-instrument queue of ruling R174, `applies_at` and the entitlement rule of ruling R175, the engine events' `t_ms` of ruling R176, the `carry` event of ruling R177, the debit balance of ruling R179, `slippage_ticks`, `clamp_price` and the continuous `check_envelope` case of ruling R173, the per-kind accounting property tests) | `pmx.engine.liquidity` (the `LiquidityModel` protocol, `Fill`, `LiquidityOrder`, `LiquidityMarketView`, `ObservedFlow`, `ENVELOPE_BREACHES`, `check_envelope`, `finalise_fill`, `truncate_for_cash`, `cap_milli`, `allocate_cap`, `envelope_bounds`, `MILLI`, `LIQUIDITY_MODELS`, `make_liquidity`, and the `historical` implementation, all literal in 16.1), `pmx.engine.execution.Execution` (`place`, `pending_market_ids`, `execute_bar`, `settle`, `mark`, `portfolio`, `position`, the constructor of 8.6), `pmx.engine.fees.FEE_SCHEDULES`, `fee_cents`. It emits no `settled` and no `settlement_applied` (section 9.3) and needs nothing from `pmx.scoring` |
+| E3 | 1.3, 12.1, 12.2, 17.5 | `pmx.scoring` (`brier_micro`, `brier_tw_micro`, `horizon_briers`, `skill_micro`, `neg_ln_micronats`, `log_score_tw_micronats`, `pmv_bp`, `logit_milli`, `unlogit_ppm`, and amendment C1b's `directional_brier_micro`, `pinball_micro`, `directional_skill_micro`, `pinball_skill_micro`, the per-instrument-and-horizon plain-mean aggregation of ruling R191; `default_horizons_bars` is `pmx.types`', ruling R188), `pmx.metrics.calibration.calibration_table` (per `(kind, horizon)` slice, `n_yes_x2` and `CalibrationBinView.n_yes_x2`, ruling R194); asserts the random-walk zero-skill identity and the tie rule |
+| E4 | 12.4, 16.3, 17.6 | every name of 12.4, with `block_key(market, *, cluster_id: str | None = None)` (ruling R118): the keyword-only argument ships in wave 2 and R1b fills it in wave 7, so no signature is widened later; `permutation_null(..., realised_signs=None, bar_keys=None)`, the within-week permutation of `realised_sign` (ruling R190) |
 | E5 | 8.2, 9.2, 9.3, 9.5, 12.3, 12.5, 12.10, 12.11, 16.1, 16.2, 17.3, 17.5, 17.6 (the settle-phase drive of `apply_cash_events` and `force_flat`, `forecast_resolved` and `instrument_closed`, the reference and realisation lookups, the carried horizon statements, the per-horizon hive writes, `kind`/`horizon_bars`/`unit_key` on every row, `exposure_by_kind`, the `(instrument, week)` units) | `pmx.engine.runner.run_backtest` and `replay` (12.11, literal, including the **required** keyword-only `liquidity`, ruling R139), the decision-latency plumbing of 16.2 (`place` in `decide`, `execute_bar` driven over `pending_market_ids(t_ms)` and draining the previous bar's queue, `decided_at_ms` in the two execute-phase events), `pmx.metrics.projection.project` with `RunProjection`, `PerMarket`, `AgentResult`, `MarketResult`, `RunHandle`, `performance`, `behavioral.descriptors`, `leaderboard.build`, `pmx.store`, `pmx.cli_run` |
 | A1 | 10.1, 10.2, 10.5, 16.5, 17.7 (the `random_walk` baseline and the `carry`, `basis`, `pairs`, `vol_regime` and `calendar` families; the one-line tick generalisation of `trend`, `revert`, `breakout` and `volume`) | `pmx.agents.protocol` (`Agent`, `Genome` with the fifth component `card: ModelCard | None` of ruling R119, always rendered by `to_dict()` and `null` for every family but `torch_policy`, `GeneSpec`, `FamilySpec`, `ResolutionEvent`, `Explanation`), `pmx.agents.registry` (`FAMILIES`, `DEFAULT_ROSTER`, `genome_from_dict`, `make_agent`, `mutate`, `crossover`, `structural_mutate`, `random_genome`), the eleven family modules of 10.5 except `stacker` |
 | A2 | 10.3 | `pmx.agents.memory.AgentMemory` (the constructor of 10.3, literal) |
@@ -3251,7 +3388,7 @@ journal whose `engine_version` differs from the running engine (exit code 2, mes
 | F1 | 17.1, 17.3 (funding events), 17.7 | `pmx.data.importers.binance.import_binance`, `kraken.import_kraken`, `coinbase.import_coinbase`, `bybit.import_bybit` (the keyword-only shape of 17.7), `twins` by symbol mapping, the funding history as `CashEvent`s |
 | F2 | 17.1, 17.3 (dividend, split, roll events), 17.7 | `pmx.data.importers.yahoo.import_yahoo` (vendor `yahoo`, throttle, cache, `CashEvent`s from the chart `events`, roll detection with `roll_source = "vendor"`), `frankfurter.import_frankfurter`, `ecb.import_ecb` |
 | F3 | 7.3 (the three new sources and two kinds), 17.7 | `pmx.data.news.edgar.fetch_edgar`, `fred.fetch_fred` (ALFRED vintages), `release_calendar.load_releases`, `cboe.fetch_vix`, `src/pmx/data/calendars/releases.v1.json`, the four `src/pmx/lexicons/fin_<topic>.v1.json` |
-| F4 | 17.2, 7.4 (`kinds`) | `pmx.data.sessions` (`SessionCalendar`, `in_session`, `next_bar_ms`, `load_calendar`), `src/pmx/data/calendars/*.json`, `pmx.data.universe_finance` (the dated universe), the `--kinds` option through the hook D6 exposes |
+| F4 | 17.2 (the static exchange calendars), 7.4 (`kinds`) | `src/pmx/data/calendars/*.json` (`xnys`, `xnas`, `arcx`, `cme_globex`, `fx_weekly`, generated for the window through D1's `pmx.data.sessions`, ruling R174; `continuous` is never a file, ruling R185), `pmx.data.universe_finance` (the dated universe), the `--kinds` option through the hook D6 exposes |
 | G3b | 17 (all), PRD v4 section 7 | `tests/e2e/test_e2e_1b_multi_asset.py`; the first multi-asset dataset at an hourly grid (AC-21) with its numbers in `docs/BUILD_STATE.md` |
 | R2f | 16.4, 17.6 | `pmx.analysis.cross_domain` (binary versus underlying, funding and basis, cross-venue crypto, macro releases with ALFRED clocks, post-filing drift), `tests/e2e/test_e2e_2b_cross_domain.py` through gate G8 |
 | C1 | 16 (all), 13, 14, 15.8 | this amendment: `src/pmx/schemas/cluster.v1.json`, `opportunity.v1.json`, `features.v1.json`, `model_card.v1.json`, the section 16 interfaces, the module map rows above, rules 7 to 9 of `tests/test_architecture.py`, the fixtures under `tests/fixtures/contract/` |
@@ -3518,7 +3655,10 @@ C1b writes section 17 before the engine wave starts, so that E2, E3 and E5 are b
 sections 16 and 17 together. R144 to R166 are the instrument model; R167 to R170 record the four data
 decisions gate G1 carried into G2 (`docs/BUILD_STATE.md` sections 5.2 to 5.5), which the data package is
 implementing in its own files at the time of writing and which the contract must state in the same words;
-R171 and R172 are the ownership and the architecture rules. **No ruling here moves a journal byte of an
+R171 and R172 are the ownership and the architecture rules. **R173 to R199 are the arbitration pass**, which
+answers twenty-seven findings raised against the first pass (two blockers, sixteen majors, nine minors);
+three findings were resolved against the fix they proposed, and each says why (R173 on the binary slippage
+identity, R180 on the fixture, R190 on permuting skill values). **No ruling here moves a journal byte of an
 existing run: no run exists, `ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"`.** Every
 normative passage the amendment changes lives in a file C1b owns and is amended in place (ruling R136
 applies to this amendment as it did to C1); what is left is code or a schema in another package's file,
@@ -3527,7 +3667,7 @@ listed in section 17.9 with the gate that applies it.
 | # | Ruling | Sections |
 |---|---|---|
 | R144 | **The six kinds are one closed enumeration and `Market` is the binary instrument.** `INSTRUMENT_KINDS = ("binary", "spot_crypto", "perp", "fx", "equity", "future")` in `pmx.types`; `Instrument` is the common base (`provider`, `vendor`, `symbol`, `kind`, `currency`, `tick_size_micro`, `point_value_micro`, `session_calendar_id`, `fee_schedule_id`, `borrow_schedule_id`, `carry_schedule_id`, `listed_at_ms`, `delisted_at_ms`, `short_allowed`, `interval_min`); `Market` keeps its name and every v2 field in code, schema and disk and satisfies the base through the view `Market.instrument`, so nothing moves out of it; a continuous instrument is a `ContinuousInstrument` under `instrument.v1.json`, which refuses `kind == "binary"` because there is one file shape per record. The id field stays `market_id` in every event, view and signature for every kind: it is the id namespace, not a claim about the kind. `MarketMeta.kind`, `Dataset.calendar`, `BuildConfig.kinds` and `RunConfig.kinds` are declared | 1.1, 7.2, 7.4, 8.1, 17.1 |
-| R145 | **A binary is `tick_size_micro = 100`, `point_value_micro = 1_000_000`, not the PRD's `10_000`.** Ten thousand millionths of a quote unit is one cent, so PRD v4 1.2's row would price 6 327 ticks at 63.27 USD and forty contracts at 2 530.80 USD against section 1.4's 25.31 USD; one basis point of a one-unit payout is 100 micro. With `100` the identity `cost_cents(size, p) == cash_out_cents(size * MILLI, p, 100, 1_000_000)` holds for every legal `size` and `p` (E2 asserts it over the full range), `price_ticks == price_bp`, and no bp price already written changes value, which is the property the PRD's sentence was written to secure. The PRD's BTCUSDT, ES and EURUSD rows are right and are kept verbatim; the PRD defers the formulas to this amendment and is not amended | 1.1, 17.1 |
+| R145 | **A binary is `tick_size_micro = 100`, `point_value_micro = 1_000_000`, not the PRD's `10_000`.** Ten thousand millionths of a quote unit is one cent, so PRD v4 1.2's row would price 6 327 ticks at 63.27 USD and forty contracts at 2 530.80 USD against section 1.4's 25.31 USD; one basis point of a one-unit payout is 100 micro. With `100` the identity `cost_cents(size, p) == cash_out_cents(size * MILLI, p, 100, 1_000_000)` holds for every legal `size` and `p` (E2 asserts it over the full range), `price_ticks == price_bp`, and no bp price already written changes value, which is the property the PRD's sentence was written to secure. The PRD's BTCUSDT, ES and EURUSD rows are right and are kept verbatim; the PRD defers the formulas to this amendment, and its binary row is corrected by the contract issue of ruling R189 | 1.1, 17.1 |
 | R146 | **One rounding, at the end, against the agent.** `cash_out_cents` rounds up and `cash_in_cents` rounds down, exactly as `cost_cents` and `proceeds_cents` do; a mark is `floor` for a long and `-ceil` for a short. PRD v4 1.2's "round half up, once, at the end" is read as "once, at the end": a half-up on a cash movement would round for the agent half of the time, create cents by rounding and break `proceeds <= cost`, which section 1.2 forbids and the worked examples pin. `round_half_up` is for a score, a quantile and a split ratio, never for a cash movement. No intermediate is rounded: the four-factor product is exact and divided once | 1.2, 17.1 |
 | R147 | **Overflow is bounded on what is stored, not on what is computed.** Every journaled, manifested or indexed integer fits `INT63_MAX`; the four-factor `notional_micro` reaches `10**45` at the caps, is computed in Python's exact integers and is never written. The caps that make the stored side hold are `PRICE_TICKS_MAX = 10**12`, `SIZE_MILLI_MAX = 10**12`, `TICK_SIZE_MICRO_MAX = 10**9`, `POINT_VALUE_MICRO_MAX = 10**12` and the per-fill check `notional_micro <= NOTIONAL_CENTS_MAX * NOTIONAL_DENOMINATOR` (`NOTIONAL_CENTS_MAX = 10**15`), which `Execution` applies before pricing and refuses as `order_rejected(bad_size)`. A port to fixed-width arithmetic must widen and never reorder the division | 8.4, 8.6, 17.1 |
 | R148 | **`size_milli` and `price_ticks` are the two units, and the v2 field names carry them.** A continuous instrument's `size`, `target_position` and `position` fields are milli-units and its `_bp` price fields are ticks, so `filled`, `market_priced`, `order_placed`, `MarketAction` and `PositionView` stay one event and one shape per name; a binary keeps whole contracts and bp everywhere it has them, becomes `size * MILLI` at the liquidity boundary as 16.1 already does, and is truncated to whole contracts there as before. `actions.v2.json` and `journal.v2.json` widen the bounds to `SIZE_MILLI_MAX` and `PRICE_TICKS_MAX`; the loader and the runner enforce `1..9_999` and whole contracts on a binary, where the schema used to. `MILLI` is declared in `pmx.types` and re-exported by `pmx.engine.liquidity` (R86's rule) | 1.1, 8.4, 8.5, 9.2, 17.1, `actions.v2.json`, `journal.v2.json` |
@@ -3536,16 +3676,16 @@ listed in section 17.9 with the gate that applies it.
 | R151 | **Every cash flow that is not a fill is a dated `CashEvent`, applied by execution in the settle phase and journaled once.** `CASH_EVENT_KINDS = ("funding", "dividend", "split", "roll", "borrow_fee", "forced_flat")`; the first four come from data (`origin = "data"`), the last two are the engine's. `Execution.apply_cash_events` applies the events with `bar_of(t_ms) == t` in `(t_ms, kind order, cash_event_id)` order, agents in agent order, after the binary settlements; one `cash_event_applied` per (agent, instrument, event) with a non-zero position before or after. One event per money movement is kept: a cent moves in exactly one of `filled`, `fee_charged`, `settlement_applied` or `cash_event_applied`, and a `roll` or a `forced_flat` carries `0` there because its money moves in its event fills. A `CashEvent` record never reaches an observation, a prompt or a research result (a dated future event is future information; hiding an announced dividend is the price of one rule), and 7.9's list is extended by its fields; a venue's fixed schedule is not on the list | 7.9, 8.2, 8.6, 8.9, 9.2, 9.3, 17.3 |
 | R152 | **A roll is two event fills at the two contracts' prices, priced by `pmx.engine.liquidity.event_fill`.** A position held across a roll is closed at `from_price_ticks` and reopened at `to_price_ticks`, each leg a `filled` with its taker `fee_charged` and an `order_placed(origin="roll")`, the gap recorded in `detail.gap_ticks` and never traded through. The forced flat is the same mechanism with one leg at the bar's close. `event_fill` lives in E2's `liquidity.py` so architecture rule 9 holds, emits `price_source = "event"`, which no `LiquidityModel` may return, and is not driven by `check_envelope` because it is not a model: its price is a printed price of the tape. These are the only `order_placed`, `filled` and `fee_charged` events written in the `settle` phase; `journal.v2.json` and the classes' `PHASES` admit it together at gate G2 (R164) | 8.6, 9.2, 16.1, 17.3, `journal.v2.json` |
 | R153 | **A split multiplies the position half-up away from zero and divides the average cost.** `position_after = sign(q) * round_half_up(abs(q) * numerator, denominator)`, `avg_cost_ticks_after = round_half_up(avg_cost_ticks * denominator, numerator)`, `cash_delta_cents = 0` (cash in lieu is not modelled; the rounding is at most half a milli-unit and is stated so nobody "fixes" it), every resting order on the instrument is expired with `reason = "corporate_action"` because its price is in the old scale, and a split on the same bar as a dividend applies after it. Equities are stored raw; the adjusted view for features multiplies earlier prices by `denominator / numerator` and never touches execution | 9.2, 17.3 |
-| R154 | **A short on a continuous instrument is a liability, guarded by free cash, and never by an invented margin account.** Opening a short receives `cash_in_cents`, covering pays `cash_out_cents`, the position is marked `-ceil` of its notional, `positions_value_cents` and therefore `equity_marked.positions_value_cents` are signed, and equity may fall below zero while cash never does. The opening notional of a short may not exceed the agent's free cash at the fill, so a cover up to a doubling is always affordable; beyond that the cover is truncated by `truncate_for_cash`, the residual is carried, the forced flat reports it as `position_after != 0` and 8.7's ruin freezes the agent. `short_allowed` is per instrument from the kind table (`spot_crypto` never, `equity` only with a borrow schedule) and the loader refuses a value the table forbids. A binary's NO leg keeps 8.5 exactly | 8.5, 8.7, 8.9, 9.2, 17.3 |
+| R154 | **A short on a continuous instrument is a liability, guarded by free cash, and never by an invented margin account.** Opening a short receives `cash_in_cents`, covering pays `cash_out_cents`, the position is marked `-ceil` of its notional, `positions_value_cents` and therefore `equity_marked.positions_value_cents` are signed, and equity may fall below zero while a fill never takes cash below zero (a debit cash event may, ruling R179). The opening notional of a short may not exceed the agent's free cash at the fill, so a cover up to a doubling is always affordable; beyond that the cover is truncated by `truncate_for_cash`, the residual is carried, the forced flat reports it as `position_after != 0` and 8.7's ruin freezes the agent. `short_allowed` is per instrument from the kind table (`spot_crypto` never, `equity` only with a borrow schedule) and the loader refuses a value the table forbids. A binary's NO leg keeps 8.5 exactly | 8.5, 8.7, 8.9, 9.2, 17.3 |
 | R155 | **Fee, borrow and carry schedules are data with a source URL and a date, and `FeeSchedule` gains `kind` and `model`.** `FEE_MODELS = ("pq_permille", "notional_bp", "per_contract", "zero")`; `pq_permille` is 8.8's binary rule to the letter, the other three are 17.4's bodies, reached through keyword-only defaults on `fee_cents` (preamble rule 2) so the five binary schedules and every 8.8 worked value are unchanged. Every fee rounds up once and envelope rule 5 holds over the fill the journal writes. `CarrySchedule` (`role: "borrow" | "carry"`, `rate_ppm_per_day`) is the same record family; one borrow schedule ships, no carry schedule does, and an `fx` instrument's swap is off by default | 8.8, 17.4 |
 | R156 | **When no quote is known the envelope's rule 1 is the Corwin and Schultz half-spread, floored by the schedule.** `half_spread_ticks(bar_prev, bar, schedule=schedule)` computes the estimator on two consecutive bars' highs and lows in `Decimal` at precision 40 (the one legal non-integer arithmetic of section 1.3, correctly rounded and therefore platform-identical), rounds half up to ticks, clamps a negative or undefined estimate to `0` and applies `schedule.min_half_spread_ticks`; a buy's base is `open + hs` and a sell's `open - hs`, both inside rule 3's range. On every binary schedule the floor is `0` and two identical flat bars estimate `0`, so 8.6 step 3's fallback to the open is unchanged on the demo pack. The worked value `14_619` ticks is pinned by the schema test | 16.1, 17.4 |
 | R157 | **A continuous forecast is per declared horizon, and `prob_ppm` is the shortest horizon's up-probability.** `RunConfig.horizons_bars` (empty meaning `default_horizons_bars(interval_min)`: one bar, one day, one week, in bars of the instrument's own sequence, duplicates removed) names the horizons; `Actions.horizon_forecasts` carries one `HorizonForecast(market_id, horizon_bars, up_probability_ppm, quantiles_ticks)` per pair, with `duplicate`, `bad_horizon` and `bad_quantiles` rejections and carried statements for missing pairs; `MarketAction.prob_ppm` on a continuous instrument **is** the up-probability at the shortest horizon, so the hive, `calibrator`, the stacker and the memory ledger work with no second code path. `forecast_recorded` gains the optional `horizons` and `price_ref_ticks` payload, `actions.v2.json` the optional top-level array | 8.1, 8.4, 9.2, 17.5, `actions.v2.json`, `journal.v2.json` |
 | R158 | **The random walk is the baseline and its skill is zero by construction.** `up_probability_ppm = 500_000` and every quantile equal to the reference price; the `random_walk` family states exactly that and trades nothing; skill is the baseline's loss minus the agent's, so the baseline's skill is `0` identically, as `market_follower`'s is on a binary (decision D-12). A flat return scores `(brier(p, 1) + brier(p, 0)) // 2`, so the baseline scores `RANDOM_WALK_BRIER_MICRO = 250_000` on every outcome including a tie and a directional forecast is not rewarded for a price that did not move (AC-23) | 12.1, 17.5 |
 | R159 | **The pinball loss is over five fixed levels, relative to the reference price.** `QUANTILE_LEVELS_PPM = (100_000, 250_000, 500_000, 750_000, 900_000)`; `pinball_micro = round_half_up(sum over levels of level * max(0, realised - q) + (PPM_ONE - level) * max(0, q - realised), 5 * price_ref_ticks)`, in micro-units of the reference price so that ES and EURUSD pool as relative errors; the baseline's pinball is the same formula with every `q` equal to the reference, and `pinball_skill_micro` is baseline minus agent. An agent that states no quantiles is scored on direction only and its row says so | 12.1, 17.5 |
 | R160 | **A horizon resolves at the first bar where its realisation is public, and the hive releases it one bar later.** The reference is `last_price_bp` at the forecast bar (the close of the last completed bar), the realisation the close of the `h`-th completed bar after it, public at the open of bar `t_h`; the runner emits `forecast_resolved` in the settle phase of `t_h`, and the `forecast` hive entry of that horizon carries `visible_from_ms = t_h + interval_ms` in the instrument's own sequence, mirroring R12's "first bar strictly after". A horizon beyond the run's last bar of the instrument never resolves, is counted in `instrument_closed.n_forecasts_unresolved` and is not scored. `Hive.write_forecast` gains four keyword-only arguments and there is no `resolution` entry for a continuous instrument: the realised price is the tape | 9.2, 9.3, 10.4, 17.5 |
-| R161 | **Calibration ledgers are per kind and horizon, and a tie is half a yes.** The memory's table and `calibration_table` bin `up_probability_ppm` into the ten deciles keyed `(kind, f"h{horizon_bars}", bin)` through the existing `CalibrationBin` with `category = kind`; `n_yes_x2` counts an up as `2` and a flat realisation as `1`, `yes_rate_ppm = round_half_up(PPM_ONE * n_yes_x2, 2 * n)`; `HORIZON_BUCKETS` gains the `h<n>` strings and `HorizonBucket.bucket` carries them; `ece_ppm` and `sharpness_ppm` are per slice and nothing is pooled across kinds or horizons | 10.3, 12.1, 12.2, 17.5 |
+| R161 | **Calibration ledgers are per kind and horizon, and a tie is half a yes.** The memory's table and `calibration_table` bin `up_probability_ppm` into the ten deciles keyed `(kind, f"h{horizon_bars}", bin)` through the existing `CalibrationBin` with `category = kind`; `n_yes_x2` counts an up as `2` and a flat realisation as `1`, `yes_rate_ppm = round_half_up(PPM_ONE * n_yes_x2, 2 * n)`; `HorizonBucket.bucket` carries the `h<n>` strings, validated by `RE_HORIZON_BUCKET` while `HORIZON_BUCKETS` stays the four binary buckets (ruling R188); `ece_ppm` and `sharpness_ppm` are per slice and nothing is pooled across kinds or horizons | 10.3, 12.1, 12.2, 17.5 |
 | R162 | **A claim is per `(kind, provider, horizon)` and its unit on a continuous kind is an `(instrument, week)` cell.** `claim_id = c-<dataset_hash[:8]>-<kind>-<provider>-h<horizon_bars>-<genome_hash[:16]>` (`h0` on a binary; the v2 form is still accepted by `journal.v2.json` and never written again); `open_sealed_test(..., kind="binary")` returns the ids of that kind and provider; `sealed_test_opened`, `claims/access.jsonl` and the claim record gain `kind` and `horizon_bars`; part 1 pairs the per-cell directional skill against the random walk (whose per-cell skill is `0`), `block_key` is the ISO week or the cluster, `n_markets >= CLAIM_MIN_MARKETS` counts cells, `K` counts candidates against `(dataset_hash, kind)`, and the permutation shuffles realised returns across instruments within a week (PRD v4 section 3). Folds keep their thirteen edges: a continuous instrument belongs to every fold whose months it has bars in, the run is clipped to those months and the forced flat closes it at the edge. The honest expectation, `no_demonstrated_edge` on most continuous claims, is recorded in the claim's note and reported as such (AC-25) | 2, 12.6, 12.7, 12.8, 17.6, 17.8, `journal.v2.json` |
-| R163 | **Every leaderboard row, claim, `PerMarket`, `MarketResult` and `AgentResult` carries the asset class.** The row key becomes `(agent_id, kind, provider, horizon_bars, fold, category, hardness_tag)`; `LeaderboardRow` gains `kind`, `horizon_bars`, `vendor`, `n_units`, `n_quantile_forecasts`, `pinball_skill`; `PerMarket` gains `kind`, `horizon_bars`, `unit_key`, the two continuous losses, `baseline_pinball_micro`, `n_resolved`, `n_cash_events`; `MarketResult` gains `kind`, `vendor`, `last_price_ticks` with `outcome = -1` on a continuous instrument; `AgentResult` gains `pinball_skill`, `exposure_by_kind`, `n_cash_events`; `pnl_cents` includes every cash event and every event fill's fee; the two leaderboard and claims routes gain `?kind=&horizon_bars=`. Every addition is a defaulted field, so the binary projection of a v2 journal is byte-identical | 12.3, 12.10, 12.11, 12.12, 17.6 |
+| R163 | **Every leaderboard row, claim, `PerMarket`, `MarketResult` and `AgentResult` carries the asset class.** The row key becomes `(agent_id, kind, provider, horizon_bars, fold, category, hardness_tag)`; `LeaderboardRow` gains `kind`, `horizon_bars`, `vendor`, `n_units`, `n_quantile_forecasts`, `pinball_skill`; `PerMarket` gains `kind`, `horizon_bars`, `unit_key`, the two continuous losses, `baseline_pinball_micro`, `n_resolved`, `n_cash_events`; `MarketResult` gains `kind`, `vendor`, `last_price_ticks` with `outcome = -1` on a continuous instrument; `AgentResult` gains `pinball_skill`, `exposure_by_kind`, `n_cash_events`; `pnl_cents` includes every cash event and every event fill's fee; the two leaderboard and claims routes gain `?kind=&horizon_bars=`. Every addition is a defaulted field; `to_dict()` renders them, so the `results.json` of a v2 journal gains keys at their defaults, which moves no byte that exists because no run exists (ruling R199) | 12.3, 12.10, 12.11, 12.12, 17.6 |
 | R164 | **What `pmx.journal` pins is declared now and promoted at gate G2, with the dataclasses.** D7's tests assert that the schema's `oneOf` equals `EVENT_TYPES` and that every event's phase enum equals its class's `PHASES`, so a schema ahead of the classes would fail the suite and refuse the journals the engine wave must write. Therefore: `cash_event_applied`, `instrument_closed` and `forecast_resolved` are declared under `$defs` and enter `oneOf` in the gate G2 commit that adds their three dataclasses; the `settle` phase of `order_placed`, `filled` and `fee_charged` enters the phase enum and the classes' `PHASES` in the same commit; `market_listed`'s `kind`, `vendor`, `symbol`, `tick_size_micro`, `point_value_micro`, `session_calendar_id`, `borrow_schedule_id`, `carry_schedule_id` and `forecast_recorded`'s `price_ref_ticks` and `horizons` are optional until then and the projection defaults them (`binary`, the provider, the id's slug, `100`, `1_000_000`, `"continuous"`, `null`, `null`), which is exactly what a v2 journal means. Every enum, pattern and bound widening that no class pins is applied now. `tests/test_contract_schemas.py` names the three pending events and fails the day one enters `oneOf` without its class or is dropped from `$defs` | 9.2, 17.3, 17.9, `journal.v2.json` |
 | R165 | **The id and enum patterns of the two schemas C1b owns are widened here; those of the three it does not are contract issues.** `journal.v2.json` and `actions.v2.json` accept the seventeen providers of 17.8 in `marketId`, the widened `provider` enums, the claim id in both forms, `horizon_forecasts`, the new events, the widened `origin`, `reason`, `price_source` and `phase` enums and the tick and milli bounds; `market.v2.json` (`id`, `provider`, `currency`), `dataset.v1.json` (the instrument blocks of 7.8 and `files.path`) and `news.v1.json` (sources `edgar`, `fred`, `cboe`, kinds `filing`, `release`, codes `edg`, `fred`, `cboe`) are listed in 17.9 with their gates. The provider list uses ISO 10383 MIC codes for the equity and futures venues and `otcfx` for the FX book, so an instrument id says where a fee schedule comes from | 2, 7.3, 17.8, 17.9, `journal.v2.json`, `actions.v2.json` |
 | R166 | **Every wave 3b file has one owner and the map says so.** F1 `binance.py`, `kraken.py`, `coinbase.py`, `bybit.py`; F2 `yahoo.py`, `frankfurter.py`, `ecb.py`; F3 `edgar.py`, `fred.py`, `release_calendar.py`, `cboe.py`, `data/calendars/releases.v1.json` and the four `fin_<topic>` lexicons; F4 `data/sessions.py`, `data/calendars/*.json`, `data/universe_finance.py`; D2 the two sealed Kalshi maps; A1 the six new families; R2f `analysis/cross_domain.py`; gate G3b `tests/e2e/test_e2e_1b_multi_asset.py` and gate G8 `test_e2e_2b_cross_domain.py`; C1b its four schemas. Section 14 gains the rows and amends E1, E2, E3, E5 and A1. The widening of `opportunity.v1.json` (`cross_domain`, `kinds`, `providers`, the currency list) is declared in 17.6 and applied by amendment C2, which opens the detector wave, so that C1's schema is edited by the amendment that owns the detectors | 13, 14, 17.6, 17.7 |
@@ -3555,6 +3695,33 @@ listed in section 17.9 with the gate that applies it.
 | R170 | **A Kalshi category comes from a sealed series-ticker map, with `other` as the fallback, counted.** Not one of the 227 381 settled rows in the build cache carries a `category` field, so every Kalshi market landed in `other` and the per-category leaderboard, the `specialist` family and memory's category priors were flat for the provider (`docs/BUILD_STATE.md` 5.5). `src/pmx/lexicons/kalshi_series_categories.v1.json` (D2) maps a **series ticker** (the part of a market ticker before the first dash) to one of the twelve categories of section 2, a series absent from the map is `other`, and the manifest counts how many kept markets fell back in `counts.n_category_fallback` | 2, 7.2, 7.4, 7.8, 13, `dataset.v1.json` (17.9) |
 | R171 | **What C1b does not own is listed with its gate and nothing is lost.** Section 17.9 names every name of `pmx.types`, every widening of `market.v2.json`, `dataset.v1.json` and `news.v1.json`, the loader's walk, D7's event dataclasses, E2's `event_fill`, A3's `write_forecast` arguments, O1's and O4's claim changes, E4's within-week permutation, C1's `opportunity.v1.json` and the `.gitignore` and `pyproject.toml` lines, each with the gate or amendment that applies it. A section of this document is never a contract issue (R136), so no normative passage is deferred | 17.9 |
 | R172 | **Two architecture rules join the nine.** Rule 10: nothing under `src/pmx/data/` imports `pmx.engine`, `pmx.agents`, `pmx.metrics` or `pmx.optimizer` (a seal that depended on the engine version would move with it). Rule 11: `in_session` is bound only in `src/pmx/data/sessions.py`, so "a bar outside its calendar does not exist" has one implementation. Both are green on the tree of 2026-09-08 and bind on the first commit that adds a file they cover | 17.7, `tests/test_architecture.py` |
+| R173 | **One bar type and one price arithmetic for every kind.** 17.1 declared `InstrumentBar` with `_ticks` fields beside 7.2's `Bar`, while `MarketView.bars`, `quote_bar`, `envelope_bounds`, `historical` and `half_spread_ticks` were typed on `Bar` and 17.4's own body read `high_ticks`: every bar read in E1, E2 and E5 needed two code paths or an undeclared cast. The `_ticks` spelling is now the **file** shape only (`instrument.v1.json#/$defs/bar` and `trade`); the loader maps it onto `pmx.types.Bar` and `pmx.types.Trade` field by field (`open_bp <- open_ticks`, `yes_bid_bp <- bid_ticks`, `yes_ask_bp <- ask_ticks`, `open_interest <- open_interest_milli`, `price_bp <- price_ticks`), exactly as R148 keeps one event shape per name; `ContinuousInstrument.bars` is `tuple[Bar, ...]`, `bar_at` and `bars_before` sit on the `Instrument` base and `TRADE_SIDES` gains `buy` and `sell`. The binary-only arithmetic 17.9 claimed was amended in 16.1 and 8.6 and was not is amended now: `clamp_price(x, view)` (`clamp_price_bp` on a binary, `1..PRICE_TICKS_MAX` otherwise) replaces `clamp_price_bp` in step 4, rule 3 and `envelope_bounds`; `slippage_ticks` is `slippage_bp_per_pct * taken_pct` on a binary and `round_half_up(base * slippage_bp_per_pct * taken_pct, BP_ONE)` on a continuous kind; `size_milli = size * MILLI` and `filled // MILLI` hold on a binary only; rule 5 calls `fee_cents` with the milli size, `side`, `tick_size_micro` and `point_value_micro` on a continuous kind; `finalise_fill` and `truncate_for_cash` gain keyword-only `market_view`; `Fill.price_bp` loses `1..9_999`; `check_envelope` is exercised on a continuous view by E2. **Against the finding's remedy in one point**: the finding said a relative slippage equals the bp rule on a binary; it does not, because a binary's bp is a share of the payout and not of the price (10 bp at 6 327 would become 6), so the binary keeps the absolute rule and only the continuous kinds take the relative one | 7.2, 8.3, 8.6, 16.1, 17.1, 17.4, 17.9 |
+| R174 | **`pmx.data.sessions` is D1's and exists at gate G2; `Execution` receives the run's calendars.** `SessionCalendar` and `in_session` had two owners (`pmx.types` in 17.9, F4 in 17.7 and 14) and F4 lands in wave 3b, after the wave whose `Calendar` (`open = listed and in_session`), `borrow_fee` (one event per session, days since the previous close) and loader (refuse a bar outside its calendar) need them, while rule 11 forbade E1 a copy. `src/pmx/data/sessions.py` (`in_session`, `next_bar_ms`, `load_calendar`, the synthesised `continuous` calendar and the exchange-calendar generator) moves to D1, applied by gate G2; `SessionCalendar` stays the `pmx.types` dataclass; F4 keeps `data/calendars/*.json` and `universe_finance.py`; sections 13, 14 and 17.7 say so and `docs/PLAN_V3_WAVES.md`'s F4 row is a contract issue in 17.9. `Execution.__init__` gains keyword-only `calendars: Mapping[str, SessionCalendar] | None = None` (preamble rule 2), `None` meaning the `continuous` calendar for every instrument, which is what a binary run passes | 8.6, 13, 14, 17.2, 17.7, 17.9 |
+| R175 | **A corporate event applies at the last bar priced in the old regime.** `t_ms` of a `dividend`, `split` or `roll` is the first instant of the new regime (ex-date open, split effective open, first new-contract bar) and the tape already reflects it from `bar_of(t_ms)`'s open, so applying the event at that bar's settle phase paid a dividend to the buyer of the ex-date open, multiplied a position bought at the post-split open and netted a roll against new-contract fills; the 8.9 identity held and the economics were gameable by anyone with a corporate calendar. `applies_at(e)` (`pmx.engine.execution`) is `Calendar.prev_bar(i, bar_of(t_ms))` for those three kinds, the cum-date close, and `bar_of(t_ms)` for `funding`, `borrow_fee`, `carry` and `forced_flat`; an event whose application bar is outside the run is not applied. E2's cases gain a buy at an ex-date open that receives nothing and a buy at a split's effective open that is not multiplied | 3, 8.2, 8.6, 17.3 |
+| R176 | **An engine event's `t_ms` is the last instant of the bar it applies at.** `forced_flat` was "the only event whose `t_ms` is the bar's own close", and `bar_of(t + interval_ms)` is the next grid point, not `last_bar(i)`; `borrow_fee` had no `t_ms` at all, and a session close on the grid (XNYS 20:00Z, hourly) would have made `bar_of(close_ms)` a bar that never exists, so no borrow fee was ever applied. `forced_flat.t_ms = last_bar(i) + interval_ms - 1`, `borrow_fee.t_ms` and `carry.t_ms` are the session's last bar `+ interval_ms - 1`, `bar_of(t_ms)` is then the applying bar, and `cash_event_id`, which hashes `t_ms`, is pinned on both in the contract fixture | 17.3, `cash_events.sample.json` |
+| R177 | **The fx carry is a seventh, engine-origin kind.** 17.4 applied the swap "as a `funding` cash event named `carry` in `detail.role`", but `funding` is a data kind whose schema pins `origin: data` and a non-empty `source_url`, and a data-generated one would need the importer to read `CARRY_SCHEDULES` from `pmx.engine.fees`, which rule 10 forbids. `CASH_EVENT_KINDS` is `(funding, dividend, split, roll, borrow_fee, carry, forced_flat)`; `carry` carries `rate_ppm_per_day, days, mark_ticks`, is computed from the named `CarrySchedule` at the last bar of every session exactly as `borrow_fee` is, is signed (a long receives a positive rate and pays a negative one), and enters the schema's engine branch, the 17.3 tables, the fx row of the invariant table, `journal.v2.json`'s `cash_event_applied` enum and the fixture | 17.3, 17.4, 17.8, `cash_event.v1.json`, `journal.v2.json` |
+| R178 | **`position_before` and `position_after` are defined for the fill-carrying kinds.** 17.3 said every event but `split` satisfies `position_after == position_before` and, three rows above, that a `forced_flat`'s residual "is journaled as `position_after != 0`" after a fill that closed the position; E2 could not write the property test. For `roll` and `forced_flat`, `position_before` is the position before the first event fill and `position_after` the position after the last one named in `order_ids`; the invariant reads `== position_before` for `funding`, `dividend`, `borrow_fee` and `carry`, `== split_position_milli(...)` for `split`, and `== the position_after of the last fill in order_ids` for the other two, in 8.9, 17.3, 9.2 and the schema description | 8.9, 9.2, 17.3, `journal.v2.json` |
+| R179 | **A debit cash event may take cash below zero, and a debit balance funds nothing.** `funding`, `dividend`, `borrow_fee` and `carry` subtract cash with no truncation rule while the invariant kept `cash >= 0`: an agent that spent the proceeds of a short elsewhere and then met an ex-date left E2 two contradictory lines. A fill never takes cash below zero; a debit may. While `cash < 0` the agent carries a debit balance: `free_cash = max(0, cash - reserved)` is `0` so no opening fill lands, the event that took cash below zero expires every resting order of the agent with `order_expired.reason = "debit"` (a new enum value of `journal.v2.json`) so `reserved == 0`, closing fills and credits repay it, and ruin stays 8.7's rule on equity. `equity_marked.cash_cents` and `PortfolioView.cash_cents` are signed; no liability field is added because `equity = cash + positions_value` already carries the shortfall. The alternative, forcing ruin whenever cash dips below zero, was not taken: an agent long elsewhere with equity well above the floor is not ruined by a two-cent funding payment | 8.5, 8.7, 8.9, 9.2, 17.3, `journal.v2.json` |
+| R180 | **The journal schema and the views are signed where the contract says the number can be negative.** R154 let equity fall below zero and the residual liability stay in `equity_marked` while `journal.v2.json` typed `equity_marked.equity_cents` and `agent_ruined.equity_cents` as non-negative and floored `drawdown_bp` at `-10000`, which `bp_ratio(equity - peak, peak)` passes with a negative equity. Both fields and `equity_marked.cash_cents` (R179) become signed integers, `drawdown_bp` keeps `<= 0` and loses its floor, `PortfolioView.cash_cents` and `equity_cents` are signed. **Against the finding's remedy**: no negative-equity row is added to `journal.backtest.jsonl`, which is a complete binary journal whose accounting invariant the suite asserts per agent and which no legal binary sequence can drive negative; the negative case is a document the schema test builds and validates instead | 8.3, 9.2, `journal.v2.json`, tests |
+| R181 | **A continuous instrument's `MarketView` shows neither its delisting nor its last bar.** 9.2 put `delisted_at_ms` in `market_listed.close_at_ms`, 8.3 kept `close_at_ms` required in every view and 5.4 called it always visible, while 7.9 forbade `delisted_at_ms`; `tradable` at `last_bar(i)` (false while the instrument is open) announced the end one bar ahead. `MarketView.close_at_ms = 0` and `MarketView.tradable = open(i, t)` on a continuous instrument (the engine still refuses every agent fill at `last_bar(i)`), `last_bar(i)` joins 7.9's list and the clock test's key set, and E1's poisoned-future test injects a `delisted_at_ms` and a `last_bar`. The journal's `market_listed.close_at_ms` keeps `delisted_at_ms`: a journal is not an observation | 5.3, 5.4, 7.9, 8.3, 14, 17.2 |
+| R182 | **The sealed months of a continuous price path are reachable from `claims.py` and nowhere else.** A binary's sealed guarantee is structural (a sealed id is never handed out) and rule 3 scans for the one accessor; a continuous instrument belongs to every fold, so `Dataset.market` handed the whole tape, sealed months included, to every consumer and rule 3 was vacuous. `Dataset.market` returns a continuous instrument clipped at `manifest.split.validation_end_ms` (bars, trades, cash events); `Dataset.sealed_market` returns the whole record and its name joins `open_sealed_test` and `_sealed_ids` in architecture rule 3's regex, so only `optimizer/folds.py` and `optimizer/claims.py` may spell it and the test binds today. `quality` stays a whole-window build statistic, because 7.4's filters need the whole life as they do on a binary, and is never shown to an agent | 7.2, 7.9, 17.2, 17.9, `tests/test_architecture.py` |
+| R183 | **An applied cash event is visible; an unapplied one never is.** 17.7's `carry` family read "the last funding rates from the agent's own portfolio history" while 17.3 and 7.9 banned every `CashEvent` field without exception and no view carried one, so A1 could not implement it. R151's blanket ban is replaced by the as-of rule every other datum obeys: an event whose application bar has completed (`applies_at(e) + interval_ms <= now_ms`) is the venue's published past and appears in `MarketView.cash_events` (`CashEventView(kind, t_ms, applied_at_ms, detail)`, the last `CASH_EVENTS_VIEW_MAX = 30` data events of the instrument, D1's defaulted field); one whose application bar has not completed never appears, so an announced dividend is hidden until the cum-date close. 7.9 and E1's poisoned-future test carry both halves | 5.4, 7.9, 8.3, 17.3, 17.7 |
+| R184 | **`prob_ppm` synthesises the shortest horizon when no pair states it.** 17.5 carried a missing pair as the random walk and refused a `prob_ppm` that disagreed with the shortest horizon, so every family that emits `prob_ppm` and `horizon_forecasts = ()` (`trend`, `revert`, `breakout`, `volume`) was `action_rejected(bad_prob)` on every bar of every continuous instrument. When `horizon_forecasts` has no pair for `(market_id, shortest horizon)` and a `MarketAction` on the market exists, the runner builds the pair from `prob_ppm` with `quantiles_ticks = None`; only a pair that is present must agree with `prob_ppm`, else `bad_prob`; 8.4, 17.5 and the `horizon_forecasts` description say so | 8.4, 17.5, `actions.v2.json` |
+| R185 | **The session rule binds a `ContinuousInstrument` only, and `continuous` is synthesised, never a file.** 17.2 made every binary carry `session_calendar_id = "continuous"`, defined that calendar as the resolution window as one session and refused a bar with `in_session == false`, which rejected the ninety `opened_early_days` of every existing binary dataset; and no dataset had a `calendars/continuous.json` for `Dataset.calendar` to return. A binary keeps 7.2 verbatim and its file is never checked against a calendar; the loader synthesises `continuous` as one session `[0, INT63_MAX)`, refuses a `calendars/continuous.json` (`session_calendar.v1.json` refuses the id), and a calendar file's `window` must cover every bar of every instrument naming it | 5.2, 7.2, 17.2, 17.8, `session_calendar.v1.json` |
+| R186 | **`MarketMeta` and the canonical order are defined for a continuous instrument.** R144 added only `MarketMeta.kind` while `sort_markets`, `block_key`, `DatasetSplit.fold_of` and `Folds.train_ids` read `resolved_at_ms`, `MarketResult.outcome = -1` was declared and `MarketMeta.resolution` was not, so E1, E2, E5 and O1 would each have invented a value and broken byte determinism across packages. On a continuous instrument `created_at_ms = listed_at_ms`, `resolved_at_ms = delisted_at_ms` when set else the dataset's window end, `close_at_ms = resolved_at_ms`, `resolution = -1`, `event_key = None`, `hardness_tags = ()`, `fold = "all"`, `n_bars` the file's bar count; section 3's `(resolved_at_ms, id)` order stands unchanged over those values, `block_key` on a continuous row is the cell's week, and `Folds` lists a continuous id in every fold whose months intersect `[created_at_ms, resolved_at_ms)` | 3, 7.2, 7.7, 12.4, 12.7 |
+| R187 | **E1 exposes `closing_ids`, `last_bar`, `next_bar` and `prev_bar`.** 8.2 had the runner call `force_flat` and emit `instrument_closed` "at `last_bar(i)`" while `BarSlice` carried four tuples and `Calendar` three members, none of which said where the closing set came from, and `bars()` was still commented "dense on config.interval_min" against 17.2's union calendar. `BarSlice.closing_ids: tuple[str, ...] = ()` (the instruments with `closes(i, t)`), `Calendar.last_bar(market_id) -> int`, `Calendar.next_bar(market_id, t_ms) -> int | None` and `Calendar.prev_bar(market_id, t_ms) -> int | None` are E1's one implementation, which the queue drain, `decided_at_ms`, `applies_at` and the forced flat read; the `bars()` comment reads the union | 5.3, 8.3, 17.2 |
+| R188 | **Every name the engine and agent waves import is declared once, in one file.** `MarketView.kind` and its scales were E1's in 17.5 and D1's in 17.9 while 8.3's listing showed none of them; `basis` and `pairs` needed `underlying_id` and `twins` no view carried; `default_horizons_bars` was E3's in 17.5 and D1's in 17.9; `BuildConfig.__post_init__` refuses a provider outside `PROVIDERS` and a source outside `NEWS_SOURCES`, neither of which 17.9 widened, so every F1 and F3 build would have failed `InvalidConfigError`; `HORIZON_BUCKETS` "gained" per-run strings although it is a module constant. 8.3's `MarketView` gains eight defaulted fields (`kind`, `tick_size_micro`, `point_value_micro`, `session_calendar_id`, `hours_to_next_bar`, `underlying_id`, `twins`, `cash_events`), D1's and filled by E1; `default_horizons_bars` is `pmx.types`'; the 17.9 row names `PROVIDERS`, `VENDORS`, `CURRENCIES`, `NEWS_SOURCES`, `NEWS_KINDS`, `NEWS_KIND_BY_SOURCE`, `NEWS_CODE_BY_SOURCE`, `RE_NEWS_ID`, `RE_LIVE_FORECAST_ID`, `TRADE_SIDES`, `DATA_CASH_EVENT_KINDS`, `INT63_MAX`; `RE_HORIZON_BUCKET = ^(30d|7d|2d|0d|h[0-9]{1,5})$` validates a bucket string and `HORIZON_BUCKETS` stays the four binary buckets | 8.3, 10.3, 12.11, 17.5, 17.8, 17.9 |
+| R189 | **PRD v4 1.2 is corrected by a contract issue, and R145 no longer says the PRD is not amended.** R145 set `BINARY_TICK_SIZE_MICRO = 100` against the PRD's `10_000` and R146 read its rounding sentence, so the PRD asserted a false identity while the preamble says the PRD wins on a functional point. The PRD defers "the conversion formulas, the rounding rule and the overflow bounds" to this amendment, so the value is this document's to decide and the preamble's rule is not engaged; its 1.2 row is nonetheless wrong on its face and is corrected (binary row `100`; "one rounding, at the end, against the agent for a cash movement; round half up for a score or a quantile"; revision 1.1 citing R145, R146, R189) as a contract issue for gate G2 in 17.9, because `docs/PRD_V4_MULTI_ASSET.md` is not a file this amendment owns | 15.9, 17.9 |
+| R190 | **The continuous permutation null permutes `realised_sign` among the forecasts that share a bar and a horizon within a week.** 17.6 permuted "the `realised_sign` and `price_realised_ticks` of the cells of one week across the instruments of that week", but a cell aggregates many forecast bars, instruments in one week have different bar counts (7 XNYS bars a day, 24 crypto bars, 5 FX days), so no one-to-one reassignment existed, and a pinball loss over prices in different units is meaningless; 12.4's `permutation_null` was binary-shaped. For each permutation the `realised_sign` values of the forecasts made at the same bar `t` for the same horizon `h` are permuted across the week's instruments that carry a forecast at `(t, h)`, unmatched forecasts stay, the per-cell directional skill is recomputed, `price_realised_ticks` is never shuffled and `pinball_skill` has no permutation part; `permutation_null` gains keyword-only `realised_signs` and `bar_keys`. **Against the finding's first remedy**: permuting per-cell skill values across instruments is not a null of no skill, because the exchangeable object under the random-walk hypothesis is the realisation, not the score | 12.4, 17.6, 17.9 |
+| R191 | **The per-instrument score is the plain mean, stated as a rule.** 17.5 derived the plain mean from 12.1's time weighting ("equally spaced on its sequence"), which is false on a session instrument: a Friday-to-Monday `w_i` is sixty hours and 12.1's weighted mean differs from the plain one. The plain mean is the rule (forecast bars weigh equally; the session gap is the tape's) and the appeal to 12.1 is deleted | 17.5 |
+| R192 | **`decided_at_ms` is the instrument's previous bar.** 9.2 spelled it `bar_ms - interval_ms`, 8.2 drained "the queue accepted at `t - interval_ms`" and 8.6 the same, all three wrong for a session instrument under 17.2's "the instrument's next bar" (a Friday decision fills on Monday). The three read "the instrument's previous bar (`bar_ms - interval_ms` on a `continuous` calendar)", 16.2 says every `t + interval_ms` of the subsection is read that way, and E5's last-bar test reads "no `order_placed` carries a `decided_at_ms` equal to its instrument's last actionable bar or later" | 8.2, 8.6, 9.2, 16.2, 17.2 |
+| R193 | **The events of one bar apply kind first.** `(t_ms, kind order, cash_event_id)` made "a split on the same bar as a dividend applies after it" hold only when both carried one `t_ms`; a dividend stamped 13:30Z and a split stamped 09:00Z applied split first and the dividend was paid per post-split share against a pre-split `dividend_micro`. The order inside a bar is `(kind order in CASH_EVENT_KINDS, t_ms, cash_event_id)`, so the stamp never decides the order of two events of one bar; an instrument file stays chronological by `(t_ms, kind order, cash_event_id)` and execution regroups per application bar; section 3 carries the row | 3, 8.6, 17.3 |
+| R194 | **`CalibrationBinView` carries `n_yes_x2`.** 17.5 stored `n_yes_x2` in the ledger and carried it "in the existing `CalibrationBinView`" whose fields are `(category, horizon_bucket, bin, n, n_yes)`, so a consumer computing `n_yes / n` on a continuous slice was off by two or lost the tie. The view gains `n_yes_x2: int = 0` (`2 * n_yes` on a binary slice; `n_yes = n_yes_x2 // 2` on a continuous one), and every ratio reads `n_yes_x2` over `2 * n` through one spelling in `pmx.metrics.calibration` | 8.3, 12.2, 17.5 |
+| R195 | **`forecast.v1.json` is the common core of the three forecast shapes, and the live line carries it.** The schema said it was "the shape of the hive's forecast payload, of `live/forecasts.jsonl` and of the horizons field of `forecast_recorded`" while none of the three matched it. Its description names what it is: the record `tests/test_contract_schemas.py` validates, whose `horizons` items are `forecast_recorded.horizons` items and, with `price_ref_ticks`, the hive payload of 17.5, and whose `kind`, `bar_ms`, `price_ref_ticks` and `horizons` fields `live/forecasts.jsonl` gains beside its own (9.5) when L1 generalises the line at gate G6 | 9.5, 17.5, `forecast.v1.json` |
+| R196 | **The notional cap is checked once, at the execute phase.** 8.4 listed `bad_size` for a notional over `NOTIONAL_CENTS_MAX` among the decide-phase reasons while 17.1 and 8.6 had `Execution` refuse it as `order_rejected(bad_size)`, so the projection's rejection counts differed by phase. The execute phase keeps it, because the price is known there: `p` is the limit price of a limit order and `bar.high_bp`, the largest price the envelope can print, for a market order; 8.4's clause is deleted | 8.4, 8.6, 17.1 |
+| R197 | **A schedule row names one provider.** `usequity-zero-2026-09` listed `xnys, xnas, arcx` while `FeeSchedule.provider` is one provider, the id pattern carries one and an instrument's `provider` names "the venue whose fee schedule applies"; the borrow schedule `usequity-borrowgc-2026-09` had the same shape. Three fee rows (`xnys-zero-2026-09`, `xnas-zero-2026-09`, `arcx-zero-2026-09`) and three borrow rows (`xnys-borrowgc-2026-09`, `xnas-borrowgc-2026-09`, `arcx-borrowgc-2026-09`) ship with the same numbers, and the AAPL fixture names the `xnas` pair | 17.4, `instrument.xnas-aapl.json` |
+| R198 | **A roll's reopening leg is truncated like any fill, and a residual after `instrument_closed` is marked at the last price.** 17.3 said a position "never earns or loses the gap, it pays two fills" without saying what happens when cash cannot pay the second one, and the residual short after `instrument_closed` had no mark price for an instrument with no more bars. The reopening leg goes through `truncate_for_cash` and the short-notional rule, its residual is in the leg's `unfilled_size` and `unfilled_reason` and in `cash_event_applied.position_after`, a residual position after `instrument_closed` is marked at `instrument_closed.last_price_ticks` until run end, and E2's cases gain a roll with a positive gap on an agent with no free cash | 8.6, 8.7, 17.3 |
+| R199 | **Three binary-only sentences are corrected.** `ClaimRefusedError` (13.1) keys on `(dataset_hash, kind, provider, horizon_bars, genome_hash)` as 12.8 does; `RunProjection.per_market` is sorted by `(agent_id, market_id, horizon_bars, unit_key)`, a total order once a continuous `(agent, instrument, week, horizon)` has its own row; and R163's "byte-identical" claim is replaced by what is true, that `to_dict()` renders the defaulted fields, so a v2 journal's `results.json` gains keys at their defaults and no byte that exists moves because no run exists | 12.11, 13.1, 15.9 |
 
 ---
 
@@ -3595,13 +3762,13 @@ class LiquidityMarketView:                   # everything a model may see of a m
 class LiquidityOrder:                        # one drained intent, carrying no identity at all (R114)
     side: str                                # "buy" | "sell"
     kind: str                                # "market" | "limit"
-    size_milli: int                          # > 0, the requested size * MILLI
+    size_milli: int                          # > 0; size * MILLI on a binary, size on a continuous instrument (R148, R173)
     limit_price_bp: int | None               # the resting price L, None for a market order
     resting_since_ms: int | None             # the bar the limit order was drained at, None otherwise
 
 @dataclass(frozen=True, slots=True)
 class Fill:
-    price_bp: int                            # 1..9_999 and inside the envelope below
+    price_bp: int                            # in the instrument's ticks (1..9_999 on a binary), inside the envelope below
     base_price_bp: int                       # the price before impact; == price_bp for a limit fill
     slippage_bp: int                         # >= 0; price_bp - base_price_bp on a buy, the reverse on a sell
     filled_milli: int                        # >= 0
@@ -3609,7 +3776,7 @@ class Fill:
     unfilled_reason: str                     # "none"|"volume_cap"|"cash"|"zero_volume"|"no_cross"|"no_liquidity"
     price_source: str                        # "open"|"quote"|"limit"|"impact"|"mm"|"event" (event only from event_fill, 17.3)
     role: str                                # "taker" for a market order, "maker" for a resting limit fill
-    fee_cents: int                           # >= 0, exactly fees.fee_cents(schedule, size, price_bp, role)
+    fee_cents: int                           # >= 0, exactly rule 5 below (the per-kind fee_cents call, R173)
 
 @dataclass(frozen=True, slots=True)
 class ObservedFlow:                          # the one channel a model carries state through
@@ -3626,13 +3793,18 @@ class LiquidityModel(Protocol):
 
 def cap_milli(bar: Bar, *, config: RunConfig, source: str) -> int: ...
 def allocate_cap(orders: Sequence[LiquidityOrder], *, cap_milli: int) -> tuple[int, ...]: ...
-def envelope_bounds(bar: Bar) -> tuple[int, int]: ...          # (low_bp, high_bp) after clamp_price_bp
+def envelope_bounds(bar: Bar, *, kind: str = "binary") -> tuple[int, int]: ...   # (low, high) after clamp_price (R173)
+def clamp_price(x: int, *, view: LiquidityMarketView) -> int: ...     # clamp_price_bp on a binary, 1..PRICE_TICKS_MAX otherwise
+def slippage_ticks(base: int, *, config: RunConfig, taken_pct: int, view: LiquidityMarketView) -> int: ...  # 8.6 step 4 (R173)
 def finalise_fill(*, quoted_bp: int, base_bp: int, order: LiquidityOrder, bar: Bar, filled_milli: int,
-                  unfilled_reason: str, price_source: str, schedule: FeeSchedule) -> Fill: ...
-def truncate_for_cash(fill: Fill, *, max_filled_milli: int, schedule: FeeSchedule) -> Fill: ...
+                  unfilled_reason: str, price_source: str, schedule: FeeSchedule,
+                  market_view: LiquidityMarketView | None = None) -> Fill: ...   # None reads as a binary view (R173)
+def truncate_for_cash(fill: Fill, *, max_filled_milli: int, schedule: FeeSchedule,
+                      market_view: LiquidityMarketView | None = None) -> Fill: ...
 def make_liquidity(config: RunConfig, *, params: Mapping[str, object] | None = None) -> LiquidityModel: ...
 def event_fill(order: LiquidityOrder, *, price_ticks: int, schedule: FeeSchedule) -> Fill: ...   # 17.3, ruling R152
-def half_spread_ticks(bar_prev: Bar, bar: Bar, *, schedule: FeeSchedule) -> int: ...             # 17.4, ruling R156
+def half_spread_ticks(bar_prev: Bar, bar: Bar, *, schedule: FeeSchedule) -> int: ...             # 17.4, ruling R156;
+                                                          # Bar is 7.2's one bar type, its _bp fields in ticks (R173)
 
 ENVELOPE_BREACHES = ("quote_inside_spread", "outside_range", "over_cap", "order_dependent",
                      "not_deterministic", "negative_fill", "size_not_conserved", "bad_reason", "bad_fee")
@@ -3643,14 +3815,16 @@ def check_envelope(model: LiquidityModel, *, market_view: LiquidityMarketView, b
 
 **How it is called.** `quote_bar` is called **once per (market, bar)** in the execute phase, with every
 order drained on that market at that bar in one sequence, built in the canonical order of section 3
-(agents by `agent_id`, then submission order), each with `size_milli = size * MILLI`, and with
-`now_ms = t_ms` of the **execution** bar and the market's resolved `FeeSchedule`. It returns one `Fill`
+(agents by `agent_id`, then submission order), each with `size_milli = size * MILLI` on a binary and
+`size_milli = size` on a continuous instrument, whose sizes are already milli-units (rulings R148 and R173),
+and with `now_ms = t_ms` of the **execution** bar and the market's resolved `FeeSchedule`. It returns one `Fill`
 per order, in the same positions. The batch shape is not a convenience: under the decision latency rule
 every one of those orders was queued a bar earlier and arrives at the same open, so a model that priced
 them one at a time would be inventing an arrival sequence the tape never had, and rationing a scarce cap
-fairly is impossible without seeing the whole batch (ruling R126). `Execution` takes
+fairly is impossible without seeing the whole batch (ruling R126). On a binary `Execution` takes
 `filled = fill.filled_milli // MILLI` whole contracts and counts the remainder as unfilled: money is
-integral, so a partial contract is not a fill. `on_bar_end` is called once per (market, bar) after
+integral, so a partial contract is not a fill; on a continuous instrument `filled = fill.filled_milli` and
+nothing is truncated, because a milli-coin is a fill (rulings R148 and R173). `on_bar_end` is called once per (market, bar) after
 `quote_bar` returns, in canonical market order, with the aggregate of what actually filled. Between those
 calls a model may keep state; it may not read a clock, a `random.random` or a `uuid4` (preamble rule 4
 applies to it as engine code), and it may not read the dataset.
@@ -3676,7 +3850,8 @@ applies to it as engine code), and it may not read the dataset.
    to it, `taken_pct = 0` and `slippage_bp = 0`. Inventing a volume the source never had would invent a
    cap and a slippage with it, and the demo pack, the only committed dataset, would fill nothing.
 3. **Never fill outside the bar.** `bar.low_bp <= price_bp <= bar.high_bp`, and `price_bp` is a legal
-   price (`1..9_999`, `clamp_price_bp`). A model may widen a spread; it may not print a price the tape
+   price under `clamp_price` (`1..9_999` through `clamp_price_bp` on a binary, `1..PRICE_TICKS_MAX` on a
+   continuous instrument, ruling R173). A model may widen a spread; it may not print a price the tape
    never showed.
 4. **Never let arrival order matter.** A model's price schedule for one (market, bar) is fixed by what it
    knew at that bar's open: the market view, the bar, its own state from earlier bars, and the batch it is
@@ -3688,8 +3863,12 @@ applies to it as engine code), and it may not read the dataset.
    come first served **fails** this rule, which is why `historical` rations pro rata (8.6 step 2, rulings
    R127 and R141): under arrival rationing, two buys of 80 and 40 against a cap of 100 fill 80 and 20 in
    one sequence and 60 and 40 in the other, and both the multiset and the aggregate notional move.
-5. **Never invent a fee.** `fill.fee_cents == fees.fee_cents(schedule, size=fill.filled_milli // MILLI,
-   price_bp=fill.price_bp, role=fill.role)` exactly, with `fill.role == "taker"` when `order.kind` is
+5. **Never invent a fee.** `fill.fee_cents == fees.fee_cents(schedule, size=fill.filled_milli // MILLI if
+   market_view.kind == "binary" else fill.filled_milli, price_bp=fill.price_bp, role=fill.role,
+   side=order.side, tick_size_micro=market_view.tick_size_micro,
+   point_value_micro=market_view.point_value_micro)` exactly (ruling R173: on a binary the call is 8.8's to
+   the letter, on a continuous instrument the size is the milli size and a `// MILLI` would turn a one
+   milli-coin fill into a fee on nothing), with `fill.role == "taker"` when `order.kind` is
    `market` and `"maker"` for a resting `limit` fill. The equality is stated over **the fill the journal
    writes**, not over an intermediate the journal never sees: `finalise_fill` establishes it and
    `truncate_for_cash` re-establishes it after 8.6 step 5 shrinks a fill against cash (ruling R130). Fees
@@ -3706,7 +3885,10 @@ of fills, `not_deterministic` when the same driving twice differs, `negative_fil
 `"none"` with a non-zero `unfilled_milli`, `bad_fee` on rule 5 including a `role` that contradicts
 `order.kind`. Each of the three implementations passes it as a hypothesis property test in its own test
 file: E2 in `tests/test_execution.py`, R1c in `tests/test_liquidity.py`,
-R4a in `tests/test_adversary_mm.py`. Realism is a constraint, not a parameter, and this function is where
+R4a in `tests/test_adversary_mm.py`. E2's test drives it on a binary view **and** on a continuous view
+(`kind = "spot_crypto"`, `tick_size_micro = 10_000`, `point_value_micro = 1_000_000`, bars around
+`6_341_257` ticks, milli sizes down to `1`), so a `clamp_price_bp`, a `// MILLI` or an absolute bp slippage
+left on a continuous path fails as `outside_range` or `bad_fee` (ruling R173). Realism is a constraint, not a parameter, and this function is where
 that sentence is executable.
 
 **The three implementations.**
@@ -3754,7 +3936,10 @@ G2 applies the two lines):
 ### 16.2 The decision latency rule
 
 **An action decided on bar `t` executes at the open of bar `t + interval_ms`.** There is no fill inside
-the bar the agent has just observed. `DECISION_LATENCY_BARS = 1` is a constant of `pmx.types`, not a
+the bar the agent has just observed. On a session calendar every `t + interval_ms` of this subsection reads
+as **the instrument's next bar** and every `t - interval_ms` as its previous bar (section 17.2, ruling
+R192): a decision on Friday's last bar fills at Monday's first bar and its `order_placed.decided_at_ms` is
+Friday's bar. `DECISION_LATENCY_BARS = 1` is a constant of `pmx.types`, not a
 `RunConfig` field (ruling R107): a run that could switch the latency off would be a run whose fills the
 tape never had to honour, and every claim made under it would be worth less than the paper it is written
 on.
@@ -3811,7 +3996,7 @@ netting and the cash truncation, is unchanged and still `Execution`'s.
 | The action executes | `order_placed` at bar `t + interval_ms`, phase `execute`, carrying `decided_at_ms = t` (ruling R111), then `filled` and `fee_charged` as today. `decided_at_ms` is not decoration: `item_index` indexes the **previous** bar's `action_received`, and without it a rejection cannot be traced to the intent that caused it |
 | The action expires | `order_rejected` at bar `t + interval_ms`, phase `execute`, `reason = "not_tradable"`, `decided_at_ms = t`, and no `order_placed`. This covers the market that closed, the market that settled, and the action decided on the last tradable bar. The settled market is in none of `BarSlice`'s four tuples at `t + interval_ms`, which is why the drain is driven by `pending_market_ids` (ruling R131) |
 | The agent was ruined between deciding and executing | `order_rejected(reason="ruined", decided_at_ms=t)` at the execution bar. The ruin itself is `agent_ruined` at the close phase of bar `t`, as today |
-| The action was decided on the run's last bar | Nothing beyond `action_received`. There is no execute phase after `t1_ms - interval_ms` to drain it, so it is dropped; E5's test states the rule as "no `order_placed` carries `decided_at_ms == t1_ms - interval_ms`" |
+| The action was decided on the run's last bar | Nothing beyond `action_received`. There is no execute phase after `t1_ms - interval_ms` to drain it, so it is dropped; E5's test states the rule as "no `order_placed` carries a `decided_at_ms` equal to its instrument's last actionable bar or later" (`t1_ms - interval_ms` on a `continuous` calendar, ruling R192) |
 
 Two consequences are stated rather than defaulted away. `target` is the safe idiom under latency, because
 it names an absolute position and a target repeated while a fill is in flight becomes a no-op once the
@@ -4213,16 +4398,27 @@ The remaining fields of `instrument.v1.json` are the continuous instrument's own
 `tags`, `twins` (instrument ids of the same underlying on other venues, declared by symbol mapping and
 sorted; the cross-venue cluster hint of F1), `underlying_id` (a `perp` names its spot twin, a `future`
 names nothing), `roll_source` (`"venue"` or `"vendor"`, `future` only, PRD v4 1.4), `first_price_ticks`,
-`bars` (`InstrumentBar`), `trades` (`InstrumentTrade`), `quality` (`n_trades`, `life_days`,
+`bars` (the `_ticks` bar record below), `trades` (the trade record below), `quality` (`n_trades`, `life_days`,
 `volume_milli_total`, `traded_bars`, `tape_kind`, ruling R167), `cash_events` (the dated records of 17.3
 that come from data), `source: "imported"` and `notes`.
 
-`InstrumentBar` is `Bar` with `_ticks` in place of `_bp` and no payout bound: `t_ms, open_ticks,
-high_ticks, low_ticks, close_ticks, vwap_ticks` (all `1..PRICE_TICKS_MAX`, `low <= open, close, vwap <=
-high`), `volume_milli >= 0`, `n_trades >= 0`, `bid_ticks: int|null`, `ask_ticks: int|null` (`bid <= ask`
-when both present), `open_interest_milli: int|null`. `InstrumentTrade` is `t_ms, price_ticks, size_milli
->= 1, side in {"buy", "sell", "unknown"}` (the taker's side). Bars are dense **on the instrument's
-session calendar** (17.2), which for `continuous` is the same rule as 7.2.
+The **file** shape of a bar (`instrument.v1.json#/$defs/bar`) is `Bar` with `_ticks` in place of `_bp` and
+no payout bound: `t_ms, open_ticks, high_ticks, low_ticks, close_ticks, vwap_ticks` (all
+`1..PRICE_TICKS_MAX`, `low <= open, close, vwap <= high`), `volume_milli >= 0`, `n_trades >= 0`,
+`bid_ticks: int|null`, `ask_ticks: int|null` (`bid <= ask` when both present), `open_interest_milli:
+int|null`; the file shape of a trade is `t_ms, price_ticks, size_milli >= 1, side in {"buy", "sell",
+"unknown"}` (the taker's side). **In memory there is one bar type and one trade type for every kind**
+(ruling R173): the loader maps the file's `_ticks` fields onto `pmx.types.Bar` and `pmx.types.Trade` field
+by field (`open_bp <- open_ticks`, `high_bp <- high_ticks`, `low_bp <- low_ticks`, `close_bp <-
+close_ticks`, `vwap_bp <- vwap_ticks`, `yes_bid_bp <- bid_ticks`, `yes_ask_bp <- ask_ticks`, `open_interest
+<- open_interest_milli`, `price_bp <- price_ticks`, `side` kept), exactly as R148 keeps one event shape per
+name, so `ContinuousInstrument.bars` is `tuple[Bar, ...]`, `ContinuousInstrument.trades` is
+`tuple[Trade, ...]`, and `MarketView.bars`, `quote_bar`, `envelope_bounds`, `half_spread_ticks`, `bar_at`
+and `bars_before` take a `Bar` whose `_bp` fields carry ticks; `bar_at` and `bars_before` are declared on
+the `Instrument` base. There is no `InstrumentBar` and no `InstrumentTrade` Python type: the schema's `bar`
+and `trade` definitions are the only place the `_ticks` spelling exists, and E1, E2 and E5 have one code
+path per bar read. Bars are dense **on the instrument's session calendar** (17.2); a binary keeps 7.2's
+dense grid verbatim (ruling R185).
 
 **Prices, sizes and cash are three integers and one exact product.** For every kind:
 
@@ -4295,7 +4491,8 @@ def price_micro(price_ticks: int, tick_size_micro: int) -> int:                 
   not and are not, because Python integers are exact and the product is never written. The caps that
   make the stored side hold: `price_ticks <= PRICE_TICKS_MAX`, `size_milli <= SIZE_MILLI_MAX`, and per
   fill or cash event `notional_micro(...) <= NOTIONAL_CENTS_MAX * NOTIONAL_DENOMINATOR`, which
-  `Execution` checks before pricing and refuses as `order_rejected(bad_size)`; `INT63_MAX` is more than
+  `Execution` checks before pricing, with the limit price or the bar's high (8.6, ruling R196), and refuses
+  as `order_rejected(bad_size)`; `INT63_MAX` is more than
   nine thousand times `NOTIONAL_CENTS_MAX`, so a run of any length whose fills all pass the check cannot
   overflow a cash, an equity or a PnL column at the bankrolls section 8.1 allows. At the caps the raw
   product reaches `10**45`, which is why the contract says "exact" and not "64-bit": a port to a
@@ -4329,7 +4526,8 @@ the dataset** at `data/datasets/<name>/calendars/<calendar_id>.json`, inside the
 schema_version "session_calendar.v1", calendar_id, description, source_url, as_of_date,
 window {start_ms, end_ms},
 sessions [{open_ms, close_ms}]        sorted by open_ms, open_ms < close_ms, non-overlapping, every one
-                                      inside the window; the whole window as one session for "continuous"
+                                      inside the window; the window covers every bar of every instrument
+                                      that names the calendar (the loader refuses a bar outside it)
 holidays [yyyy-mm-dd]                 informative; the sessions list is the normative object
 ```
 
@@ -4340,37 +4538,53 @@ b.t_ms < s.close_ms and b.t_ms + interval_ms > s.open_ms`. An instrument file th
 `in_session == false`, or that lacks a bar at a grid point where `in_session` holds between
 `bar_of(listed_at_ms)` and `bar_of(delisted_at_ms)` (or the window end), fails the loader
 (`SchemaError`, naming the bar), exactly as 7.2 refuses a gap or a duplicate on a binary; extended hours
-are excluded by default and a venue's pre-market bar is therefore a load error, not a feature. The
-`continuous` calendar has one session covering the window, so for crypto and for every binary the rule
-reduces to 7.2's dense grid and no binary file changes.
+are excluded by default and a venue's pre-market bar is therefore a load error, not a feature. **The rule
+binds a `ContinuousInstrument` only** (ruling R185): a binary keeps 7.2 verbatim, its file is never checked
+against a calendar, and the ninety days of `opened_early_days` before the resolution window stay legal on
+it as they always were. The `continuous` calendar is **reserved and synthesised by the loader, never a
+file**: one session `[0, INT63_MAX)`, so `Dataset.calendar("continuous")` answers on a dataset with no
+`calendars/` directory (the demo pack and the 2026-09-08 build), a crypto instrument's bars are dense from
+`bar_of(listed_at_ms)` on, and a binary names it through `Market.instrument` without reading it. A
+`calendars/continuous.json` file fails the loader (`SchemaError`) and `session_calendar.v1.json` refuses
+the id; `pmx.data.sessions` generates the exchange calendars for a window and the loader reads them.
 
 **The run calendar is the union of the instruments' bar timestamps** (5.3 as generalised, ruling R149).
 `Calendar.bars()` (E1) yields every `t` in `[t0_ms, t1_ms)` on the grid at which at least one instrument
 of the run has a bar, ascending; a `t` where no instrument has a bar (a weekend of an equity-only run) is
 not a bar of the run and produces no event. On a run that carries a binary, every grid point is a bar,
-as today. The four predicates of 5.3 read, for an instrument `i` at a bar `t` of the run:
+as today. `BarSlice.closing_ids` carries the instruments with `closes(i, t)`, and `Calendar.last_bar`,
+`Calendar.next_bar` and `Calendar.prev_bar` (8.3) are the one implementation of the three lookups the table
+below and 17.3 need, so E5 and `Execution` read them from E1 and compute none of their own (ruling R187).
+The four predicates of 5.3 read, for an instrument `i` at a bar `t` of the run:
 
 | Predicate | Binary (unchanged, 5.3) | Continuous |
 |---|---|---|
 | `listed(i, t)` | `bar_of(created_at_ms) <= t <= bar_of(resolved_at_ms)` | `bar_of(listed_at_ms) <= t` and (`delisted_at_ms is None` or `t < bar_of(delisted_at_ms)`) |
 | `open(i, t)` (in observations) | `listed and not settled before t` | `listed(i, t) and in_session(i, t)` |
-| `tradable(i, t)` (a fill may land) | `listed and t + interval_ms <= close_at_ms and not settles(i, t)` | `open(i, t) and t < last_bar(i)`, where `last_bar(i)` is the last bar of the run at which `open(i, t)` holds |
+| `tradable(i, t)` (a fill may land) | `listed and t + interval_ms <= close_at_ms and not settles(i, t)` | `open(i, t) and t < last_bar(i)`, where `last_bar(i)` is the last bar of the run at which `open(i, t)` holds; `MarketView.tradable` carries `open(i, t)`, not this predicate, and `MarketView.close_at_ms` is `0`, because both would announce `last_bar(i)` (ruling R181) |
 | `actionable(i, t)` (16.2) | `tradable(i, t + interval_ms)` | `tradable(i, t + interval_ms)` where `t + interval_ms` is read as **the next bar of `i`**, not the next grid point |
 | `settles(i, t)` | `bar_of(resolved_at_ms) == t` | never; `closes(i, t) = (t == last_bar(i))`, the bar of the forced flat (17.3) |
 
 The latency rule of 16.2 is unchanged: an action decided at `t` executes at the open of the instrument's
 next bar, which for a session instrument decided on a Friday afternoon bar is Monday's first bar, and
 that gap is the tape's, not the engine's. `pending_market_ids(t_ms)` (8.6) therefore holds an item until
-the instrument's next bar arrives, and `Execution` drains it at that bar; the queue is keyed by
-instrument, and an item whose instrument never has another bar in the run is `order_rejected(not_tradable)`
-at the run's last bar. An instrument with no bar at `t` is simply not open at `t`: no observation entry,
+the instrument's next bar arrives, and `Execution` drains it at that bar with `decided_at_ms` naming the
+bar it was decided at, the instrument's previous bar (ruling R192: `bar_ms - interval_ms` is the
+`continuous` spelling of the same rule); the queue is keyed by instrument, reads `Calendar.next_bar`, and
+an item whose instrument never has another bar in the run is `order_rejected(not_tradable)` at the run's
+last bar. An instrument with no bar at `t` is simply not open at `t`: no observation entry,
 no `forecast_recorded`, no `market_priced`. A ruined agent's carried forecasts (8.2) are recorded on the
 bars the instrument is open at and no others.
 
 The `Dataset` of 7.2 gains the continuous instruments behind the same names: `metas` carries one
 `MarketMeta` per instrument of every kind with `kind` on it (`MarketMeta.kind`, ruling R144),
-`market(market_id)` returns a `Market` or a `ContinuousInstrument` (both satisfy `Instrument`), and
-`Dataset.calendar(calendar_id)` returns the sealed `SessionCalendar`. `BuildConfig.kinds` (7.4) selects
+`market(market_id)` returns a `Market` or a `ContinuousInstrument` (both satisfy `Instrument`; a continuous
+one clipped at `validation_end_ms`, ruling R182), and `Dataset.calendar(calendar_id)` returns the sealed
+`SessionCalendar`, or the synthesised `continuous` one. `SessionCalendar` is a `pmx.types` dataclass (D1)
+and `in_session`, `next_bar_ms` and `load_calendar` live in `pmx.data.sessions`, **D1's file, applied by
+gate G2** (ruling R174), so E1's `Calendar`, E2's `Execution` (which receives the run's calendars through
+its `calendars` argument, 8.6) and the loader import one implementation in wave 2 rather than waiting for
+wave 3b. `BuildConfig.kinds` (7.4) selects
 which kinds a build imports, and `RunConfig.kinds` (8.1) which kinds a run carries, empty meaning every
 kind the dataset has.
 
@@ -4380,35 +4594,63 @@ kind the dataset has.
 `CashEvent` is `pmx.types.CashEvent`, serialised by `src/pmx/schemas/cash_event.v1.json`:
 
 ```python
-CASH_EVENT_KINDS = ("funding", "dividend", "split", "roll", "borrow_fee", "forced_flat")
-DATA_CASH_EVENT_KINDS = CASH_EVENT_KINDS[:4]       # what an instrument file may carry; the other two are the engine's
+CASH_EVENT_KINDS = ("funding", "dividend", "split", "roll", "borrow_fee", "carry", "forced_flat")
+DATA_CASH_EVENT_KINDS = CASH_EVENT_KINDS[:4]       # what an instrument file may carry; the other three are the engine's (R177)
 
 @dataclass(frozen=True, slots=True)
 class CashEvent:
     cash_event_id: str        # "ce-" + sha256(canonical_json([market_id, kind, t_ms, detail]))[:16]
     market_id: str            # the instrument
     kind: str                 # one of CASH_EVENT_KINDS
-    t_ms: int                 # the venue's instant; applied at the settle phase of bar_of(t_ms)
-    origin: str               # "data" for the first four kinds, "engine" for borrow_fee and forced_flat
+    t_ms: int                 # the venue's instant: the OPEN of the first bar priced in the new regime for
+                              # dividend, split and roll (R175); the last instant of the applying bar for an
+                              # engine event (R176); the funding time for funding
+    origin: str               # "data" for the first four kinds, "engine" for borrow_fee, carry and forced_flat
     source_url: str           # "" for an engine event
     detail: Mapping[str, int | str]    # the kind's fields below, integers and strings only
+
+# pmx.engine.execution (E2), ruling R175: the bar at whose settle phase execution applies the event.
+def applies_at(event: CashEvent, instrument: Instrument, calendar: Calendar) -> int | None:
+    bar = bar_of(event.t_ms, instrument.interval_min)
+    if event.kind in ("dividend", "split", "roll"):
+        return calendar.prev_bar(instrument.id, bar)   # the last bar priced in the OLD regime; None: not applied
+    return bar                                          # funding, borrow_fee, carry, forced_flat
 ```
 
 | Kind | Applies to | `detail` | What execution does for an agent with `position_milli = q != 0` (nothing for `q == 0`) |
 |---|---|---|---|
 | `funding` | `perp` | `rate_ppm: int` (signed; the venue's published rate for that funding time), `mark_ticks: int` (the venue's mark at the funding time, else the bar's close) | `paid_micro = notional_micro(abs(q), mark_ticks, tick, point) * rate_ppm`; a long pays when `rate_ppm > 0` and a short receives: `cash_delta_cents = -cash_out(...)` when the agent pays (`-((-abs(paid_micro)) // (NOTIONAL_DENOMINATOR * PPM_ONE))`) and `+cash_in(...)` when it receives (`abs(paid_micro) // (NOTIONAL_DENOMINATOR * PPM_ONE)`); position unchanged |
-| `dividend` | `equity` | `dividend_micro: int` (per unit, in millionths of the quote currency, on the ex-date) | a long receives `q * dividend_micro // (MILLI * MICRO // CENTS_PER_UNIT)`, a short pays the ceiling of the same magnitude; position unchanged |
-| `split` | `equity` | `numerator: int >= 1`, `denominator: int >= 1` (a 4-for-1 split is `4, 1`; a 1-for-10 reverse split is `1, 10`) | `position_after = split_position_milli(q, numerator, denominator) = sign(q) * round_half_up(abs(q) * numerator, denominator)`; `avg_cost_ticks_after = round_half_up(avg_cost_ticks * denominator, numerator)`; `cash_delta_cents = 0` (cash in lieu is not modelled; the rounding is at most half a milli-unit and is stated so nobody "fixes" it); every resting order on the instrument is expired with `reason = "corporate_action"` because its price is in the old scale (ruling R153) |
-| `roll` | `future` | `from_symbol`, `to_symbol`, `from_price_ticks`, `to_price_ticks`, `gap_ticks = to - from` | two **event fills** (ruling R152): a `filled` that closes `q` at `from_price_ticks` and a `filled` that reopens `q` at `to_price_ticks`, each with its taker `fee_charged`, each with `order_placed(origin="roll")`, all in the settle phase; `avg_cost_ticks_after = to_price_ticks`; resting orders expire with `reason = "roll"`. The gap is recorded in `detail` and in the raw series and is **never traded through**: a position never earns or loses the gap, it pays two fills |
-| `borrow_fee` | `equity` with `q < 0` | `rate_ppm_per_day: int` (from the borrow schedule of 17.4), `days: int` (calendar days since the previous session close, so a weekend is charged on Monday), `mark_ticks` | pays `-((-(notional_micro(abs(q), mark_ticks, tick, point) * rate_ppm_per_day * days)) // (NOTIONAL_DENOMINATOR * PPM_ONE))` at the settle phase of the last bar of every session; the engine generates one event per (instrument, session) and it exists only for agents who are short |
-| `forced_flat` | every continuous kind | `reason: "window_end" \| "delisted"`, `price_ticks` (the close of `last_bar(i)`) | one **event fill** (ruling R150) that closes `q` at `price_ticks`, taker fee, `order_placed(origin="forced_flat")`, `filled(price_source="event")`; a cover that cash cannot pay is truncated by `truncate_for_cash` like any buy and the residual is journaled as `position_after != 0` (ruling R154) |
+| `dividend` | `equity` | `dividend_micro: int` (per unit, in millionths of the quote currency); `t_ms` is the first instant of the ex-date and the event applies at the cum-date close, the bar before `bar_of(t_ms)` (ruling R175) | a long receives `q * dividend_micro // (MILLI * MICRO // CENTS_PER_UNIT)`, a short pays the ceiling of the same magnitude; position unchanged |
+| `split` | `equity` | `numerator: int >= 1`, `denominator: int >= 1` (a 4-for-1 split is `4, 1`; a 1-for-10 reverse split is `1, 10`) | `position_after = split_position_milli(q, numerator, denominator) = sign(q) * round_half_up(abs(q) * numerator, denominator)`; `avg_cost_ticks_after = round_half_up(avg_cost_ticks * denominator, numerator)`; `cash_delta_cents = 0` (cash in lieu is not modelled; the rounding is at most half a milli-unit and is stated so nobody "fixes" it); every resting order on the instrument is expired with `reason = "corporate_action"` because its price is in the old scale (ruling R153); `t_ms` is the first instant of the effective date and the event applies at the last pre-split bar (ruling R175) |
+| `roll` | `future` | `from_symbol`, `to_symbol`, `from_price_ticks`, `to_price_ticks`, `gap_ticks = to - from` | two **event fills** (ruling R152): a `filled` that closes `q` at `from_price_ticks` and a `filled` that reopens `q` at `to_price_ticks`, each with its taker `fee_charged`, each with `order_placed(origin="roll")`, all in the settle phase; `avg_cost_ticks_after = to_price_ticks`; resting orders expire with `reason = "roll"`. The gap is recorded in `detail` and in the raw series and is **never traded through**: a position never earns or loses the gap, it pays two fills. `t_ms` is the first instant of the first new-contract bar and the event applies at the last old-contract bar (ruling R175); the reopening leg goes through `truncate_for_cash` and the short-notional rule below, so a position can shrink across a roll, and the residual is in that leg's `unfilled_size` and `unfilled_reason` and in `position_after` (ruling R198) |
+| `borrow_fee` | `equity` with `q < 0` | `rate_ppm_per_day: int` (from the borrow schedule of 17.4), `days: int` (calendar days since the previous session close, so a weekend is charged on Monday), `mark_ticks` | pays `-((-(notional_micro(abs(q), mark_ticks, tick, point) * rate_ppm_per_day * days)) // (NOTIONAL_DENOMINATOR * PPM_ONE))` at the settle phase of the last bar of every session, with `t_ms = that bar + interval_ms - 1`, the bar's last instant, so `bar_of(t_ms)` is the applying bar (ruling R176); the engine generates one event per (instrument, session) from the `calendars` it was constructed with (8.6, ruling R174) and it exists only for agents who are short |
+| `carry` | `fx` with a `carry_schedule_id`, `q != 0` | `rate_ppm_per_day: int` (signed, the carry schedule's rate of 17.4), `days: int` (calendar days since the previous session close), `mark_ticks` (the bar's close) | `paid_micro = notional_micro(abs(q), mark_ticks, tick, point) * rate_ppm_per_day * days`; a long **receives** when `rate_ppm_per_day > 0` and pays when it is negative, a short the reverse, each side rounded against the agent exactly as `funding` is; at the settle phase of the last bar of every session with `t_ms = that bar + interval_ms - 1`; `origin = "engine"`, one event per (instrument, session), only for agents with a position (ruling R177: an engine-generated event cannot be a data kind, and the importer may not read `pmx.engine.fees`) |
+| `forced_flat` | every continuous kind | `reason: "window_end" \| "delisted"`, `price_ticks` (the close of `last_bar(i)`); `t_ms = last_bar(i) + interval_ms - 1`, the bar's last instant, so `bar_of(t_ms) == last_bar(i)` and the id hashes that instant (ruling R176) | one **event fill** (ruling R150) that closes `q` at `price_ticks`, taker fee, `order_placed(origin="forced_flat")`, `filled(price_source="event")`; a cover that cash cannot pay is truncated by `truncate_for_cash` like any buy and the residual is journaled as `position_after != 0` (ruling R154) |
+
+**Entitlement follows the regime of the prices** (ruling R175). A `dividend`, a `split` and a `roll` are
+applied to the position held at the close of the last bar whose prices are in the old regime: the cum-date
+close, the last pre-split bar, the last old-contract bar, which is `prev_bar(i, bar_of(t_ms))` above. The
+raw tape reflects the event from the open of `bar_of(t_ms)` (the ex-date open is lower by the dividend, the
+effective-date open is in the new scale, the first new-contract bar prints the new contract), so an order
+decided the bar before fills at those prices in the execute phase and must be owed nothing at the settle
+phase: a buy at the ex-date open receives no dividend, a buy at the split's effective open is not
+multiplied, and a roll nets nothing against fills made at new-contract prices. The importer stamps the
+**open of the first bar priced in the new regime** (a grid point of the instrument: the ex-date bar, the
+effective-date bar, the first bar whose prints are the new contract's), never an intraday instant, and the
+engine derives the application bar from it; the schema test asserts the three fixture events sit on a bar
+open. `funding`, `borrow_fee`, `carry` and `forced_flat` are charges on, or the
+close of, the position held through an instant and apply at `bar_of(t_ms)`. An event whose application bar
+is not a bar of the run (a roll dated on the run's first bar of the instrument, whose previous bar lies
+outside it) is not applied, because no position can exist before the run's first bar. E2's tests carry the
+two buy cases.
 
 Ordering inside the settle phase of bar `t`: binary settlements first (8.2 step 5, unchanged), then for
-each continuous instrument in canonical order, its cash events with `bar_of(t_ms) == t` in `(t_ms, kind
-order as in CASH_EVENT_KINDS, cash_event_id)` order, and for each event the agents in `agent_id` order.
-`forced_flat` is last by construction: it is the only event whose `t_ms` is the bar's own close. A
-`split` on the same bar as a `dividend` applies after it (the ex-date dividend is per pre-split share,
-which is how venues publish it).
+each continuous instrument in canonical order, its cash events with `applies_at(e) == t` in `(kind order as
+in CASH_EVENT_KINDS, t_ms, cash_event_id)` order (ruling R193: kind first, so two events of one bar apply in
+kind order whatever their stamps, and a funding event never applies after a roll of the same bar), and for each event the agents in
+`agent_id` order. `forced_flat` is last in `CASH_EVENT_KINDS` and therefore last on its bar. A `split` on
+the same bar as a `dividend` applies after it (the ex-date dividend is per pre-split share, which is how
+venues publish it).
 
 **Event fills are execution's, priced by `pmx.engine.liquidity.event_fill`** (ruling R152), so
 architecture rule 9 holds: `event_fill(order: LiquidityOrder, *, price_ticks: int, schedule: FeeSchedule)
@@ -4429,8 +4671,19 @@ covers `min(s, -q)` **paying** `cash_out_cents`, then opens long. The opening no
 exceed the agent's free cash at the fill (`short_notional <= free_cash`, `unfilled_reason = "cash"`
 beyond it), so that a cover up to a doubling of the price is always affordable; beyond that the cover is
 truncated for cash, the residual short is carried and marked as a liability, equity falls below the ruin
-floor and 8.7 freezes the agent. Cash never goes negative; equity can. A binary's NO leg keeps 8.5
-exactly, because a NO contract is a long in the complement and pays `cost_cents(s, 10_000 - p)` up front.
+floor and 8.7 freezes the agent. A fill never takes cash below zero; a debit cash event can (below); equity
+can. A binary's NO leg keeps 8.5 exactly, because a NO contract is a long in the complement and pays
+`cost_cents(s, 10_000 - p)` up front.
+
+**A debit balance** (ruling R179). `funding`, `dividend`, `borrow_fee` and `carry` subtract
+`cash_delta_cents` from an agent who may have spent the cash a short brought in on other instruments, and
+no truncation applies to a charge the venue would have collected: cash may fall below zero. While
+`cash_cents(a) < 0` the agent carries a debit balance: `free_cash` is `0`, so no opening fill lands
+(`unfilled_reason = "cash"`); the event that took cash below zero expires every resting order of the agent
+with `reason = "debit"`, so `reserved_cents(a) == 0`; closing fills and credits repay it; and ruin stays
+8.7's rule on equity, which the debit lowers cent for cent. The shortfall is not a separate liability field:
+`equity_marked.cash_cents` and `PortfolioView.cash_cents` are signed and `equity = cash + positions_value`
+holds unchanged. E2's cases include a dividend debit on a short whose cash was spent elsewhere.
 
 **The forced flat at the window end** (ruling R150). At the settle phase of `last_bar(i)` (the
 instrument's last bar in the run: the bar before `bar_of(delisted_at_ms)`, or the run's last bar at
@@ -4449,13 +4702,16 @@ every bar close and at run end, over the journal alone:
 cash_cents(a)     == bankroll_cents + sum(filled.cash_delta_cents)  - sum(fee_charged.fee_cents)
                                     + sum(settlement_applied.cash_delta_cents)
                                     + sum(cash_event_applied.cash_delta_cents)                   (all for a)
-cash_cents(a)     >= 0
+cash_cents(a)     >= 0 unless the last event that moved it is a cash_event_applied debit (ruling R179)
 reserved_cents(a) == sum(order_placed.reserved_cents) - sum(filled.released_cents) - sum(order_expired.released_cents)
-reserved_cents(a) <= cash_cents(a);  reserved_cents(a) == 0 at run end
+reserved_cents(a) <= max(0, cash_cents(a));  reserved_cents(a) == 0 while cash_cents(a) < 0 and at run end
 position(a, i)    == the last position_after written for (a, i) by a filled or a cash_event_applied, where
-                     every filled satisfies position_after - position_before == its signed filled size, every
+                     every filled satisfies position_after - position_before == its signed filled size,
                      cash_event_applied(kind="split") satisfies position_after == split_position_milli(position_before, ...),
-                     and every other cash_event_applied satisfies position_after == position_before
+                     cash_event_applied(kind in roll, forced_flat) satisfies position_after == the position_after of
+                     the last filled in its order_ids (position_before is the position before the first), and
+                     cash_event_applied(kind in funding, dividend, borrow_fee, carry) satisfies
+                     position_after == position_before (ruling R178)
 position(a, i)    == 0 after settlement (binary) and after instrument_closed (continuous) unless the forced flat
                      reports unfilled_reason == "cash", in which case equity_marked carries the liability
 positions_value_cents(a) == sum over open positions of mark_value_cents(position, close_ticks of bar t, tick, point)
@@ -4468,13 +4724,15 @@ equity_cents(a)   == cash_cents(a) + positions_value_cents(a)
 | `binary` | `settlement_applied.cash_delta_cents`; positions flat after settlement |
 | `spot_crypto` | `forced_flat` fill and fee at `last_bar` |
 | `perp` | `cash_event_applied(funding)` at every funding time; `forced_flat` |
-| `fx` | `cash_event_applied(funding)` under the name `carry` only when the instrument names a carry schedule (17.4; off by default); `forced_flat` |
+| `fx` | `cash_event_applied(carry)` at every session close, only when the instrument names a carry schedule (17.4; off by default, ruling R177); `forced_flat` |
 | `equity` | `dividend`, `split` (position only), `borrow_fee` (shorts only); `forced_flat` |
 | `future` | `roll`: two fills and two fees per roll; `forced_flat` |
 
 E2's hypothesis tests generate 1 000 sequences per kind, including a funding sign flip, a reverse split
-on a short, a roll with a negative gap, a dividend on a short and a forced flat that cash cannot pay, and
-assert every line; E2E-1b (PRD v4 section 7) asserts them on the mixed fixture and replays it to an
+on a short, a roll with a negative gap, a roll with a positive gap on an agent with no free cash (R198), a
+dividend on a short, a dividend debit that takes cash below zero (R179), a buy at an ex-date open that
+receives no dividend and a buy at a split's effective open that is not multiplied (R175), a carry on a long
+at a negative rate (R177), and a forced flat that cash cannot pay, and assert every line; E2E-1b (PRD v4 section 7) asserts them on the mixed fixture and replays it to an
 identical hash (AC-22).
 
 **What the journal records** (9.2 as generalised; the rows are in the catalogue, the widenings in
@@ -4482,7 +4740,7 @@ identical hash (AC-22).
 
 | Event | Phase | Per | Payload |
 |---|---|---|---|
-| `cash_event_applied` | settle | (agent, instrument, cash event) with `position != 0` before or after | `agent_id`, `market_id`, `cash_event_id`, `kind`, `origin`, `position_before`, `position_after`, `avg_cost_ticks_before`, `avg_cost_ticks_after`, `cash_delta_cents: int` (`0` for `split`, `roll` and `forced_flat`, whose money moves in their `filled` and `fee_charged` events), `order_ids: list[str]` (the event fills, else `[]`), `detail: object` (the kind's fields) |
+| `cash_event_applied` | settle | (agent, instrument, cash event) with `position != 0` before or after | `agent_id`, `market_id`, `cash_event_id`, `kind`, `origin`, `position_before`, `position_after` (before the first and after the last event fill for `roll` and `forced_flat`, ruling R178), `avg_cost_ticks_before`, `avg_cost_ticks_after`, `cash_delta_cents: int` (`0` for `split`, `roll` and `forced_flat`, whose money moves in their `filled` and `fee_charged` events), `order_ids: list[str]` (the event fills, else `[]`), `detail: object` (the kind's fields) |
 | `instrument_closed` | settle | continuous instrument, once, at `last_bar(i)` | `market_id`, `kind`, `reason: "window_end"\|"delisted"`, `last_price_ticks`, `n_bars` (bars of the instrument inside the run), `n_forecasts_unresolved` (horizon forecasts whose horizon lies beyond the run) |
 
 `market_listed` gains `kind`, `vendor`, `symbol`, `tick_size_micro`, `point_value_micro`,
@@ -4499,13 +4757,19 @@ instrument; `realised_pnl_cents` for a continuous (agent, instrument) is `sum(fi
 sum(fee_charged.fee_cents) + sum(cash_event_applied.cash_delta_cents)` over it, and is what
 `PerMarket.realised_pnl_cents` (12.11) carries for every kind.
 
-**Visibility.** A `CashEvent` record never appears in an observation, a prompt or a research result: a
-dated future event is future information, and hiding an announced dividend is the price of one rule with
-no exceptions (ruling R151). Its effects reach the agent as any fill does, in the portfolio of the next
-bar. A feature may read the **venue's fixed schedule** (funding every eight hours, the exchange's session
-calendar) because that is the venue's rule and not a datum about the future; R3a's `hours_to_funding`
-and `session_minute` are legal and any field of a `CashEvent` is not, and 7.9's list is extended by
-`cash_event_id`, `rate_ppm`, `dividend_micro`, `gap_ticks` and every `detail` key.
+**Visibility** (ruling R183, which replaces R151's blanket ban by the as-of rule every other datum obeys).
+A `CashEvent` is visible exactly as a bar is: once its application bar has completed (`applies_at(e) +
+interval_ms <= now_ms`) it is the venue's published past and appears in `MarketView.cash_events` as a
+`CashEventView(kind, t_ms, applied_at_ms, detail)`, the last `CASH_EVENTS_VIEW_MAX = 30` **data** events of
+the instrument (engine events are the agent's own and reach it through its portfolio); before that it never
+appears in an observation, a prompt or a research result, so an announced dividend is hidden until the
+cum-date close and a funding time until it is paid. Its cash effect reaches the agent as any fill does, in
+the portfolio of the next bar. A feature may read the **venue's fixed schedule** (funding every eight hours,
+the exchange's session calendar) because that is the venue's rule and not a datum about the future; R3a's
+`hours_to_funding` and `session_minute` are legal. 7.9's list carries the unapplied events with
+`cash_event_id`, `rate_ppm`, `dividend_micro`, `gap_ticks` and every `detail` key, and E1's poisoned-future
+test injects one event whose application bar has not completed and asserts it does not surface, and one
+that has and asserts it does. Without this rule the `carry` family of 17.7 had no rate to read.
 
 ### 17.4 Fee, borrow and carry schedules as data, and the half-spread floor
 
@@ -4547,7 +4811,7 @@ F2 may add a venue's tier by adding a row, never by changing a formula):
 | `bybit-perp-2026-09` | bybit | perp | notional_bp | taker `5`, maker `2` | `https://www.bybit.com/en/help-center/article/Trading-Fee-Structure` | `2026-09-08` |
 | `kraken-spot-2026-09` | kraken | spot_crypto | notional_bp | taker `26`, maker `16` | `https://www.kraken.com/features/fee-schedule` | `2026-09-08` |
 | `coinbase-spot-2026-09` | coinbase | spot_crypto | notional_bp | taker `60`, maker `40` | `https://www.coinbase.com/advanced-fees` | `2026-09-08` |
-| `usequity-zero-2026-09` | xnys, xnas, arcx | equity | notional_bp | taker `0`, maker `0`, sale `0` (the SEC section 31 rate is published per fiscal year and E2 reads it into `sale_bp`), `min_half_spread_ticks = 1` | `https://www.sec.gov/divisions/marketreg/mrfreqreq.shtml` | `2026-09-08` |
+| `xnys-zero-2026-09`, `xnas-zero-2026-09`, `arcx-zero-2026-09` | xnys, xnas, arcx: one `FeeSchedule` row per provider with the same numbers, because `FeeSchedule.provider` is one provider and an instrument's `provider` names the venue whose schedule applies (ruling R197) | equity | notional_bp | taker `0`, maker `0`, sale `0` (the SEC section 31 rate is published per fiscal year and E2 reads it into `sale_bp`), `min_half_spread_ticks = 1` | `https://www.sec.gov/divisions/marketreg/mrfreqreq.shtml` | `2026-09-08` |
 | `cme-es-2026-09` | xcme | future | per_contract | `per_contract_cents = 125`, `exchange_cents = 128` (round turn halved per side) | `https://www.cmegroup.com/company/clearing-fees.html` | `2026-09-08` |
 | `otcfx-spread-2026-09` | otcfx | fx | zero | `min_half_spread_ticks = 5` (half a pip at a tenth-of-a-pip tick, the retail floor) | `https://www.bis.org/statistics/rpfx22.htm` | `2026-09-08` |
 
@@ -4565,12 +4829,15 @@ class CarrySchedule:                  # pmx.engine.fees.CARRY_SCHEDULES (E2); na
     source_url: str; as_of_date: str; note: str
 ```
 
-`usequity-borrowgc-2026-09` (`borrow`, `rate_ppm_per_day = 8`, about 0.3 percent a year, the
-general-collateral floor; a hard-to-borrow list is a later row) is the one borrow schedule shipped, and no
-carry schedule ships: an `fx` instrument's `carry_schedule_id` is `null` unless a dataset declares the
-rate-differential approximation of PRD v4 1.1, which is **off by default** and, when on, is applied as a
-`funding` cash event named `carry` in `detail.role` at every session close. The kind table of 17.1 and
-the manifest's `schedules` block (17.9) say which schedules a dataset used.
+`xnys-borrowgc-2026-09`, `xnas-borrowgc-2026-09` and `arcx-borrowgc-2026-09` (`borrow`, `rate_ppm_per_day
+= 8`, about 0.3 percent a year, the general-collateral floor, one row per provider for R197's reason; a
+hard-to-borrow list is a later row) are the borrow schedules shipped, and no carry schedule ships: an `fx`
+instrument's `carry_schedule_id` is `null` unless a dataset declares the rate-differential approximation of
+PRD v4 1.1, which is **off by default** and, when on, is applied as the engine-origin `carry` cash event of
+17.3 at the last bar of every session (ruling R177), computed from the named `CarrySchedule` exactly as
+`borrow_fee` is from its borrow schedule and signed: a long receives a positive `rate_ppm_per_day` and pays
+a negative one. The kind table of 17.1 and the manifest's `schedules` block (17.9) say which schedules a
+dataset used.
 
 **The half-spread floor when no quote is known** (16.1 rule 1 generalised, ruling R156). A crypto or
 Yahoo bar carries no bid and no ask. Rule 1 of the envelope is then not "unconstrained": the base of a
@@ -4578,11 +4845,13 @@ market order is `open_ticks + half_spread_ticks` for a buy and `open_ticks - hal
 sell, with
 
 ```python
-def half_spread_ticks(bar_prev: InstrumentBar, bar: InstrumentBar, *, schedule: FeeSchedule) -> int:
-    """Corwin and Schultz (2012) on two consecutive bars' highs and lows, then the schedule's floor."""
+def half_spread_ticks(bar_prev: Bar, bar: Bar, *, schedule: FeeSchedule) -> int:
+    """Corwin and Schultz (2012) on two consecutive bars' highs and lows, then the schedule's floor.
+
+    Bar is 7.2's one in-memory bar (ruling R173); its _bp fields carry ticks on a continuous instrument."""
     with localcontext() as ctx:
         ctx.prec = 40
-        h1, l1, h2, l2 = (Decimal(x) for x in (bar_prev.high_ticks, bar_prev.low_ticks, bar.high_ticks, bar.low_ticks))
+        h1, l1, h2, l2 = (Decimal(x) for x in (bar_prev.high_bp, bar_prev.low_bp, bar.high_bp, bar.low_bp))
         beta = (h1 / l1).ln() ** 2 + (h2 / l2).ln() ** 2
         gamma = (max(h1, h2) / min(l1, l2)).ln() ** 2
         k = Decimal(3) - Decimal(2) * Decimal(2).sqrt()
@@ -4590,7 +4859,7 @@ def half_spread_ticks(bar_prev: InstrumentBar, bar: InstrumentBar, *, schedule: 
         estimate = 0
         if alpha > 0:
             spread = Decimal(2) * (alpha.exp() - 1) / (1 + alpha.exp())          # relative spread
-            estimate = int((spread * Decimal(bar.open_ticks) / 2).to_integral_value(rounding=ROUND_HALF_UP))
+            estimate = int((spread * Decimal(bar.open_bp) / 2).to_integral_value(rounding=ROUND_HALF_UP))
     return max(estimate, schedule.min_half_spread_ticks)
 ```
 
@@ -4637,10 +4906,14 @@ top-level array; a scripted binary family sends `()`); one per `(market_id, hori
 is `action_rejected(duplicate)` with the first occurrence winning, a horizon outside the config is
 `action_rejected(bad_horizon)`, a non-monotone quantile tuple is `action_rejected(bad_quantiles)`. A
 missing pair is **carried**: the agent's previous statement on that pair, or the random walk below when
-none exists. `MarketAction.prob_ppm` on a continuous instrument **is** `up_probability_ppm` at the
-shortest declared horizon, so every consumer of `prob_ppm` (the hive, `calibrator`, the stacker, the
-memory ledger) works on a continuous instrument with no second code path; the runner sets it from the
-shortest horizon and refuses a `prob_ppm` that disagrees with it (`action_rejected(bad_prob)`).
+none exists, with one exception (ruling R184): when the agent sent a `MarketAction` on the instrument and
+no pair for `(market_id, shortest horizon)`, the runner **synthesises** that pair from
+`MarketAction.prob_ppm` with `quantiles_ticks = None`, so `trend`, `revert`, `breakout`, `volume` and every
+family that states only `prob_ppm` states a direction instead of being rejected on every bar.
+`MarketAction.prob_ppm` on a continuous instrument **is** `up_probability_ppm` at the shortest declared
+horizon, so every consumer of `prob_ppm` (the hive, `calibrator`, the stacker, the memory ledger) works on
+a continuous instrument with no second code path; a pair that **is** present for the shortest horizon must
+equal `prob_ppm`, else `action_rejected(bad_prob)`.
 
 **The reference and the realisation.** The reference price of a forecast made at bar `t` is
 `price_ref_ticks = MarketView.last_price_bp` at `t`, the close of the last completed bar (5.4), and the
@@ -4693,9 +4966,11 @@ down move and `290_000` on a flat return.
 
 **Time weighting and the per-instrument score.** For an agent on a continuous instrument at horizon `h`,
 over the forecast bars `t_1 < ... < t_n` whose horizon resolved inside the run:
-`dir_brier_micro(a, i, h) = round_half_up(sum(directional_brier_micro_k), n)` (bars are one instrument's
-own bars, equally spaced on its sequence, so the plain mean is the time-weighted mean by 12.1's
-argument), likewise `pinball_micro(a, i, h)`; `skill_micro(a, i, h) = RANDOM_WALK_BRIER_MICRO -
+`dir_brier_micro(a, i, h) = round_half_up(sum(directional_brier_micro_k), n)`, the **plain mean**: forecast
+bars are weighted equally and the session gap (a Friday-to-Monday `w_i` of sixty hours under 12.1's
+weights) is the tape's, not a weight on the forecast (ruling R191: the rule is stated as a rule, and 12.1's
+weighted mean is not invoked because on a session instrument it would not coincide with it), likewise
+`pinball_micro(a, i, h)`; `skill_micro(a, i, h) = RANDOM_WALK_BRIER_MICRO -
 dir_brier_micro(a, i, h)`; the horizon buckets of 12.1 are replaced by the declared horizons themselves
 (`HorizonBucket.bucket` carries `f"h{h}"`, ruling R161); the log score is not defined for a continuous
 kind and its column reads `0` with `n: 0`. PMV at horizon `h` (12.1) is `sign(up_ppm - 500_000) *
@@ -4734,19 +5009,26 @@ calibration table and `pmx.metrics.calibration.calibration_table` bin `up_probab
 deciles of `CALIBRATION_BINS` with `n_yes` counting `realised_sign > 0` (a tie counts half: the ledger
 stores `n_yes_x2`, twice the count, so that a tie adds `1` and an up adds `2`, and `yes_rate_ppm =
 round_half_up(PPM_ONE * n_yes_x2, 2 * n)`); the ledger key is `(kind, f"h{h}", bin)`, carried in the
-existing `CalibrationBinView` with `category = kind` and `horizon_bucket = f"h{h}"` (`HORIZON_BUCKETS`
-gains the `h<n>` strings of the declared horizons). A binary ledger is unchanged. `ece_ppm` and
+existing `CalibrationBinView` with `category = kind`, `horizon_bucket = f"h{h}"` (a string matching
+`RE_HORIZON_BUCKET`; `HORIZON_BUCKETS` stays the four binary buckets, because horizons are per-run config
+and it is a module constant, ruling R188) and `n_yes_x2` as a defaulted field beside `n_yes` (`n_yes =
+n_yes_x2 // 2`; every ratio a consumer computes reads `n_yes_x2` over `2 * n`, one spelling in
+`pmx.metrics.calibration`, ruling R194: a consumer computing `n_yes / n` on a continuous slice would
+otherwise be off by two or lose the tie). A binary ledger is unchanged. `ece_ppm` and
 `sharpness_ppm` are computed per `(kind, horizon)` slice and reported per slice; nothing is pooled across
 kinds.
 
 **Who owns what.** E3 (`pmx.scoring`, `pmx.metrics.calibration`) owns `directional_brier_micro`,
-`pinball_micro`, the two skills, `default_horizons_bars`, the per-instrument aggregation and the per-kind
-ledgers, and asserts the random-walk identity and the tie rule; E5 (`pmx.engine.runner`,
+`pinball_micro`, the two skills, the per-instrument aggregation and the per-kind ledgers, and asserts the
+random-walk identity and the tie rule (`default_horizons_bars` is `pmx.types`', D1's, because `RunConfig`
+resolves it before hashing, ruling R188); E5 (`pmx.engine.runner`,
 `pmx.metrics.projection`) owns the reference and realisation lookups, the `forecast_resolved` and
 `instrument_closed` events, the carried horizon statements, the hive writes and the rows that carry
-`kind` and `horizon_bars`; A1 owns the `random_walk` family and the four finance families of 17.7; E1
-owns `MarketView.kind`, `tick_size_micro`, `point_value_micro`, `session_calendar_id` and
-`hours_to_next_bar` (the gap to the instrument's next bar, public from the calendar).
+`kind` and `horizon_bars`; A1 owns the `random_walk` family and the five finance families of 17.7; E1
+**fills** `MarketView.kind`, `tick_size_micro`, `point_value_micro`, `session_calendar_id`,
+`hours_to_next_bar` (the gap to the instrument's next bar, public from the calendar), `underlying_id`,
+`twins` and `cash_events`, which are D1's defaulted fields of 8.3 (ruling R188), so A1 reads them from one
+declared shape.
 
 ### 17.6 Claims, leaderboards and folds per kind and provider
 
@@ -4769,10 +5051,14 @@ more than across providers, and:
   CLAIM_MIN_MARKETS` counts cells (`n_units` in the claim, `n_markets` kept as the field name);
 - part 1 pairs against the random walk per unit (the baseline's per-unit skill is `0`, so the paired
   bootstrap of 12.4 is the plain one); part 2 is unchanged in form; part 3's `K` counts candidates
-  scored against `(dataset_hash, kind)`; part 4's permutation shuffles **realised returns across
-  instruments within a week** (PRD v4 section 3): for each permutation the `realised_sign` and
-  `price_realised_ticks` of the cells of one week are permuted across the instruments of that week, the
-  forecasts held fixed, and the skill recomputed;
+  scored against `(dataset_hash, kind)`; part 4's permutation shuffles **realised directions across
+  instruments within a week** (PRD v4 section 3, ruling R190): for each permutation, the per-forecast
+  `realised_sign` values of the forecasts made at the same bar `t` for the same horizon `h` are permuted
+  across the instruments of that ISO week that carry a forecast at `(t, h)`, the forecasts held fixed,
+  unmatched forecasts left in place, and the per-cell directional skill recomputed
+  (`permutation_null(..., realised_signs=, bar_keys=)`, 12.4); `price_realised_ticks` is not shuffled,
+  because instruments are quoted in different units and a permuted pinball loss is meaningless, so part 4
+  tests direction and `pinball_skill` carries no permutation part;
 - the honest expectation is recorded in the claim's `note`: on a continuous kind most agents will not
   clear the bar, and `no_demonstrated_edge` is the expected verdict, reported as such (PRD v4 section 3,
   AC-25: a claim is produced per asset class for the champion whatever its sign).
@@ -4819,7 +5105,8 @@ Section 13 carries one owner per new file (ruling R166):
 | `src/pmx/data/importers/yahoo.py`, `frankfurter.py`, `ecb.py` | F2 | Yahoo chart v8 (equities, ETFs, continuous futures, FX) with the `yahoo` vendor label, throttle and cache, splits and dividends from the chart `events` into `CashEvent`s, roll detection into `roll` events with `roll_source = "vendor"`; Frankfurter and ECB daily reference rates as `fx` instruments on the daily grid (the official anchor) |
 | `src/pmx/data/news/edgar.py`, `fred.py`, `release_calendar.py`, `cboe.py` | F3 | SEC submissions into `NewsItem(source="edgar", kind="filing")` with the acceptance time as `published_at_ms`; ALFRED vintages into `NewsItem(source="fred", kind="release")` visible from the vintage date; the static FOMC, CPI and payrolls calendar (`src/pmx/data/calendars/releases.v1.json`, also F3's); VIX history as a daily `NewsItem(source="cboe", kind="release")`. `news.v1.json` gains the three sources and the two kinds (C1b widens the schema, see 17.9) |
 | `src/pmx/lexicons/fin_<topic>.v1.json` | F3 | the finance lexicons for `newsbayes` (`fin_rates`, `fin_earnings`, `fin_crypto`, `fin_macro`), indexed by `newsbayes.lexicon_id` values `12..15` (`LEXICON_COUNT` stays `12` for the categories; `FINANCE_LEXICONS` is a second tuple) |
-| `src/pmx/data/sessions.py`, `src/pmx/data/calendars/*.json` | F4 | `SessionCalendar`, `in_session`, `next_bar_ms`, the static calendars (`continuous`, `fx_weekly`, `xnys`, `cme_globex`) generated for the window and copied into the dataset by the builder |
+| `src/pmx/data/sessions.py` | D1 (ruling R174; applied by gate G2, because E1's `Calendar`, E2's `Execution` and the loader call it in wave 2 and architecture rule 11 forbids them a copy) | `in_session`, `next_bar_ms`, `load_calendar`, the synthesised `continuous` calendar and the generator the static calendars are built with; `SessionCalendar` itself is a `pmx.types` dataclass |
+| `src/pmx/data/calendars/*.json` | F4 | the static calendars (`fx_weekly`, `xnys`, `xnas`, `arcx`, `cme_globex`) generated for the window through `pmx.data.sessions` and copied into the dataset by the builder; `continuous` is never a file (ruling R185) |
 | `src/pmx/data/universe_finance.py` | F4 | the universe of PRD v4 2.2 chosen at the window start from a dated list (`universe_finance.v1.json` beside it, F4's), reproducible from that input |
 | `src/pmx/lexicons/kalshi_series_subjects.v1.json`, `kalshi_series_categories.v1.json` | D2 | the sealed Kalshi series-to-subjects and series-prefix-to-category maps of rulings R169 and R170 |
 | `src/pmx/agents/families/carry.py`, `basis.py`, `pairs.py`, `vol_regime.py`, `calendar.py`, `random_walk.py` | A1 | the five finance families and the baseline, below |
@@ -4835,7 +5122,7 @@ Section 13 carries one owner per new file (ruling R166):
 | Family | Role | Genes `name: lo..hi (step) [default]` | Rule |
 |---|---|---|---|
 | `random_walk` | belief, baseline | none (`evolvable: False`) | `up_probability_ppm = 500_000` and every quantile `= price_ref_ticks` on every continuous instrument and horizon; `ppm_from_bp(last_price_bp)` on a binary; trades nothing. Zero skill by construction (17.5) |
-| `carry` | belief | `lookback_events: 1..30 (1) [8]`, `lean_permille: 0..2000 (50) [500]`, `min_rate_ppm: 0..5000 (50) [100]` | on a `perp`, the mean of the last `lookback_events` funding rates read from the agent's own portfolio history (a funding event is visible once applied, 17.3) leans `up_probability_ppm` against the payer: `500_000 - sign(mean_rate) * min(abs(mean_rate), 5_000) * lean_permille // 10` when `abs(mean_rate) >= min_rate_ppm`, else the random walk; on `fx` with a carry schedule the same on the schedule's rate |
+| `carry` | belief | `lookback_events: 1..30 (1) [8]`, `lean_permille: 0..2000 (50) [500]`, `min_rate_ppm: 0..5000 (50) [100]` | on a `perp`, the mean `rate_ppm` of the last `lookback_events` applied `funding` events in `MarketView.cash_events` (visible once their application bar has completed, 17.3, ruling R183) leans `up_probability_ppm` against the payer: `500_000 - sign(mean_rate) * min(abs(mean_rate), 5_000) * lean_permille // 10` when `abs(mean_rate) >= min_rate_ppm`, else the random walk; on `fx` with a carry schedule the same on the schedule's rate |
 | `basis` | belief | `basis_window_bars: 2..168 (2) [24]`, `threshold_bp: 0..500 (10) [50]`, `lean_permille: 0..2000 (50) [500]` | on a `perp` whose `underlying_id` is in the run, `basis_bp = bp_ratio(perp_last - spot_last, spot_last)`; leans the perp down and the spot up by `ppm_from_bp(basis_bp) * lean_permille // 1_000` when `abs(basis_bp)` exceeds `threshold_bp` over the window's mean, else the random walk |
 | `pairs` | belief | `spread_window_bars: 5..168 (5) [48]`, `entry_z_milli: 500..4000 (100) [2000]`, `lean_permille: 0..2000 (50) [500]` | on two `twins` (17.1) both in the run, the integer z-score (milli) of the log-free ratio `bp_ratio(a_last - b_last, b_last)` against its window mean and `isqrt` deviation; leans the rich leg down and the cheap one up when `abs(z) >= entry_z_milli`, else the random walk |
 | `vol_regime` | overlay | `vol_window_bars: 5..168 (5) [24]`, `gate_permille: 0..1000 (50) [700]` | scales the inner family's lean toward the random walk by `gate_permille` when the realised volatility (integer standard deviation of bar-to-bar `bp_ratio` returns over the window) is in the top decile of the instrument's own history to date, or when the `cboe` VIX item visible at `now_ms` exceeds the agent's memory of its median; a gate, never a signal |
@@ -4856,7 +5143,8 @@ of 10.5 is unchanged; `random_walk` joins every population as a fixed member bes
     `pmx.agents`, `pmx.metrics` or `pmx.optimizer`. An importer, a calendar or the builder that reached
     into execution would make the seal depend on the engine version.
 11. **Session membership is decided in one place.** `in_session` is bound only in
-    `src/pmx/data/sessions.py`; `pmx.engine.calendar` and the loader call it and never redefine it, so
+    `src/pmx/data/sessions.py` (D1's file since ruling R174, so it exists at gate G2); `pmx.engine.calendar`,
+    `pmx.engine.execution` and the loader call it and never redefine it, so
     "a bar outside its calendar does not exist" has one implementation and one test.
 
 ### 17.8 v4 identifier formats
@@ -4871,14 +5159,14 @@ of `market.v2.json` and `dataset.v1.json` are contract issues (17.9).
 | Provider | one of seventeen | `^(kalshi\|manifold\|polymarket\|metaculus\|demo\|binance\|kraken\|coinbase\|bybit\|xnys\|xnas\|arcx\|xcme\|xnym\|xcec\|xcbt\|otcfx)$` | this contract; the equity and futures venues are ISO 10383 MIC codes in lower case, `otcfx` is the over-the-counter FX book |
 | Vendor | one of twelve | `^(kalshi\|manifold\|polymarket\|metaculus\|demo\|binance\|kraken\|coinbase\|bybit\|yahoo\|frankfurter\|ecb)$` | the importer; a binary's vendor is its provider |
 | Kind | one of six | `^(binary\|spot_crypto\|perp\|fx\|equity\|future)$` | this contract, `INSTRUMENT_KINDS` |
-| Session calendar | lowercase slug | `^[a-z][a-z0-9_]{0,31}$` | F4; `continuous` is reserved and is the calendar of every binary and every crypto instrument |
+| Session calendar | lowercase slug | `^[a-z][a-z0-9_]{0,31}$` | F4 for a file; `continuous` is reserved, synthesised by the loader and never a file (ruling R185), and is the calendar of every binary and every crypto instrument |
 | Cash event | `ce-<sha256(canonical_json([market_id, kind, t_ms, detail]))[:16]>` | `^ce-[0-9a-f]{16}$` | the importer (data events) or `pmx.engine.execution` (engine events), both through `pmx.types.cash_event_id` |
-| Cash event kind | one of six | `^(funding\|dividend\|split\|roll\|borrow_fee\|forced_flat)$` | this contract, `CASH_EVENT_KINDS` |
+| Cash event kind | one of seven | `^(funding\|dividend\|split\|roll\|borrow_fee\|carry\|forced_flat)$` | this contract, `CASH_EVENT_KINDS` (`carry` is ruling R177's) |
 | Fee model | one of four | `^(pq_permille\|notional_bp\|per_contract\|zero)$` | this contract, `FEE_MODELS` |
 | Claim | `c-<dataset_hash[:8]>-<kind>-<provider>-h<horizon_bars>-<genome_hash[:16]>` | `^c-[0-9a-f]{8}-(binary\|spot_crypto\|perp\|fx\|equity\|future)-(<provider>)-h[0-9]{1,5}-[0-9a-f]{16}$` | `pmx claim`; one per `(dataset_hash, kind, provider, horizon_bars, genome_hash)`. The v2 form `c-<hash8>-<provider>-<genome16>` is still accepted by `journal.v2.json` so a journal written before this amendment validates, and is never written again |
 | Live forecast | `lf-<yyyymmdd>-<agent_id>-<market_id>` | the regex of section 2 with the widened provider group | L1 |
 | News item | `<source_code>-<yyyymmdd>-<idx:04d>` | `^(wce\|wasof\|wb\|gd\|mfc\|edg\|fred\|cboe)-[0-9]{8}-[0-9]{4}$` | F3; `edg` SEC EDGAR, `fred` ALFRED vintage, `cboe` VIX |
-| Horizon | bars | `^h[0-9]{1,5}$` | `HORIZON_BUCKETS` gains one per declared horizon |
+| Horizon bucket | a binary bucket or `h<bars>` | `RE_HORIZON_BUCKET = ^(30d\|7d\|2d\|0d\|h[0-9]{1,5})$` | `pmx.types` (ruling R188); `HORIZON_BUCKETS` stays the four binary strings |
 
 ### 17.9 What amendment C1b does not own
 
@@ -4886,20 +5174,22 @@ C1b owns `docs/CONTRACTS_V2.md` (this section, 15.9, and every in-place amendmen
 four new schemas, `journal.v2.json` and `actions.v2.json` (widened here), `tests/test_contract_schemas.py`,
 `tests/test_architecture.py` and the fixtures under `tests/fixtures/contract/`. **A section of this
 document is never a contract issue** (ruling R136), so every normative passage this amendment changes is
-amended in place: sections 1, 5.2, 5.3, 7.2, 7.4, 7.6, 7.8, 7.9, 8.1, 8.2, 8.4 to 8.9, 9.2, 9.3, 10.3,
-10.4, 12.1 to 12.3, 12.6 to 12.8, 12.10, 12.11, 13, 14 and 16.1. What is left is code or a schema in a
+amended in place: sections 1, 3, 5.2 to 5.4, 7.2, 7.4, 7.6 to 7.9, 8.1, 8.2, 8.4 to 8.9, 9.2, 9.3, 9.5,
+10.3, 10.4, 12.1 to 12.4, 12.6 to 12.8, 12.10, 12.11, 13, 13.1, 14, 16.1 and 16.2. What is left is code or a schema in a
 file another package owns, listed with the gate that applies it (ruling R171):
 
 | Issue | File and owner | Applied by |
 |---|---|---|
-| R144, R145, R147, R148: `INSTRUMENT_KINDS`, `CONTINUOUS_KINDS`, `MICRO`, `MILLI`, `NOTIONAL_DENOMINATOR`, `BINARY_TICK_SIZE_MICRO`, `BINARY_POINT_VALUE_MICRO`, the five caps, `notional_micro`, `cash_out_cents`, `cash_in_cents`, `mark_value_cents`, `price_micro`, `Instrument`, `ContinuousInstrument`, `InstrumentBar`, `InstrumentTrade`, `SessionCalendar`, `CashEvent`, `CASH_EVENT_KINDS`, `cash_event_id`, `split_position_milli`, `HorizonForecast`, `QUANTILE_LEVELS_PPM`, `RANDOM_WALK_UP_PPM`, `RANDOM_WALK_BRIER_MICRO`, `default_horizons_bars`, `Market.instrument`, `MarketMeta.kind`, `Dataset.calendar`, `RunConfig.horizons_bars` and `RunConfig.kinds`, `BuildConfig.kinds` and `BuildConfig.min_traded_bars`, `Actions.horizon_forecasts`, `MarketView.kind` and its three scale fields, `MarketQuality.tape_kind`, the `RejectReason` values `bad_horizon`, `bad_quantiles`, and the widened `RE_MARKET_ID`, `RE_PROVIDER`, `RE_CLAIM_ID` | `src/pmx/types.py` (D1) | gate G2 (the engine wave needs every name) |
+| R144, R145, R147, R148: `INSTRUMENT_KINDS`, `CONTINUOUS_KINDS`, `MICRO`, `MILLI`, `NOTIONAL_DENOMINATOR`, `BINARY_TICK_SIZE_MICRO`, `BINARY_POINT_VALUE_MICRO`, the five caps, `notional_micro`, `cash_out_cents`, `cash_in_cents`, `mark_value_cents`, `price_micro`, `Instrument` (with `bar_at` and `bars_before` on the base, R173), `ContinuousInstrument` (`bars: tuple[Bar, ...]`, `trades: tuple[Trade, ...]`, R173), `SessionCalendar`, `CashEvent`, `CASH_EVENT_KINDS` (seven, R177), `DATA_CASH_EVENT_KINDS`, `cash_event_id`, `split_position_milli`, `HorizonForecast`, `QUANTILE_LEVELS_PPM`, `RANDOM_WALK_UP_PPM`, `RANDOM_WALK_BRIER_MICRO`, `default_horizons_bars` (R188), `Market.instrument`, `MarketMeta.kind` and the continuous `MarketMeta` values of 7.2 through `meta_of` (R186), `Dataset.calendar`, `Dataset.sealed_market` (R182), `RunConfig.horizons_bars` and `RunConfig.kinds`, `BuildConfig.kinds` and `BuildConfig.min_traded_bars`, `Actions.horizon_forecasts`, the eight defaulted `MarketView` fields of 8.3 with `CashEventView` and `CASH_EVENTS_VIEW_MAX` (R181, R183, R188), `CalibrationBinView.n_yes_x2` (R194), the signed `PortfolioView.cash_cents` and `equity_cents` (R179, R180), `MarketQuality.tape_kind`, the `RejectReason` values `bad_horizon`, `bad_quantiles`, `RE_HORIZON_BUCKET` (R188), `INT63_MAX`, `TRADE_SIDES` gaining `buy` and `sell` (R173), `VENDORS`, and the widened `PROVIDERS`, `CURRENCIES` (17.1's quote currencies), `NEWS_SOURCES`, `NEWS_KINDS`, `NEWS_KIND_BY_SOURCE`, `NEWS_CODE_BY_SOURCE`, `RE_NEWS_ID`, `RE_LIVE_FORECAST_ID`, `RE_MARKET_ID`, `RE_PROVIDER`, `RE_CLAIM_ID` (without the last group `BuildConfig.__post_init__` refuses every F1 and F3 build as `InvalidConfigError`, R188) | `src/pmx/types.py` (D1) | gate G2 (the engine wave needs every name) |
 | R165: the widened `id`, `provider` and `currency` patterns (`quality.tape_kind` and `wiki_subject_provenance` of rulings R167 and R169 are in the schema already, landed by the data package) | `src/pmx/schemas/market.v2.json` (C0's, edited by the data package now working in it) | gate G2 |
 | R149, R168, R170: the walk gains `instruments/` and `calendars/`; the manifest gains `kinds`, `instruments {per_kind, per_provider, per_vendor, n_cash_events {per_kind}, n_calendars}`, `schedules {fee: [ids], borrow: [ids], carry: [ids]}`, `split.n_instruments_train`, `n_instruments_validation`, `n_instruments_sealed`; `files.path` accepts `instruments/` and `calendars/`; `providers` and `news.sources[].source` widen (`counts.precap_per_provider_month`, `n_bars_only` and `n_category_fallback` of rulings R168 and R170 are in the schema already) | `src/pmx/schemas/dataset.v1.json` (C0's, same package) | gate G2 |
-| R149: `seal_dataset`, `verify_dataset` and `load_dataset` walk `instruments/` and `calendars/`, validate `instrument.v1.json` and `session_calendar.v1.json`, refuse a bar outside its calendar; `SCHEMA_FILES` gains the four names and `pmx/__init__.py` the four `*_SCHEMA` constants of 13.2 | `src/pmx/data/loader.py`, `src/pmx/data/schema.py` (D1), `src/pmx/__init__.py` (C0) | gate G2 |
+| R149, R173, R182, R185: `seal_dataset`, `verify_dataset` and `load_dataset` walk `instruments/` and `calendars/`, validate `instrument.v1.json` and `session_calendar.v1.json`, refuse a bar of a `ContinuousInstrument` outside its calendar and never check a binary against one, map the file's `_ticks` fields onto `Bar` and `Trade`, clip a continuous instrument at `validation_end_ms` behind `Dataset.market` and expose the whole record through `Dataset.sealed_market`, synthesise the `continuous` calendar and refuse a `calendars/continuous.json`; `SCHEMA_FILES` gains the four names and `pmx/__init__.py` the four `*_SCHEMA` constants of 13.2 | `src/pmx/data/loader.py`, `src/pmx/data/schema.py` (D1), `src/pmx/__init__.py` (C0) | gate G2 |
+| R174: `pmx.data.sessions` (`in_session`, `next_bar_ms`, `load_calendar`, the synthesised `continuous` calendar, the exchange-calendar generator) moves from F4 to D1 so that it exists when E1, E2 and the loader need it; `docs/PLAN_V3_WAVES.md`'s F4 row still lists the file and is a contract issue for the gate (the contract wins for code, preamble); F4 keeps `data/calendars/*.json` and `universe_finance.py` | `src/pmx/data/sessions.py` (D1), `docs/PLAN_V3_WAVES.md` (the plan's author) | gate G2 |
+| R189: PRD v4 1.2's binary row (`tick_size_micro = 10_000`) and its rounding sentence contradict rulings R145 and R146 and the PRD's own invariant ("nothing written for prediction markets changes value", which `100` keeps and `10_000` breaks by a factor of one hundred); the PRD's 1.2 binary row reads `tick_size_micro = 100`, its rounding sentence reads "one rounding, at the end, against the agent for a cash movement; round half up for a score or a quantile", and its revision history gains a 1.1 entry citing R145, R146 and R189. The PRD defers the formulas to this amendment, so the point is this document's to decide and the preamble's PRD-wins rule is not engaged; the correction is recorded here rather than made because the PRD is not a file this amendment owns | `docs/PRD_V4_MULTI_ASSET.md` (the PRD's author) | gate G2, in the commit that lands the `pmx.types` constants |
 | R165: `news.v1.json` gains sources `edgar`, `fred`, `cboe` and kinds `filing`, `release`, and the three news id codes | `src/pmx/schemas/news.v1.json` (C0's) | gate G3b |
 | R129 and R164: `pmx.journal` gains `CashEventApplied`, `InstrumentClosed` and `ForecastResolved` (registered in `EVENT_TYPES` and `EVENT_CLASSES`), `OrderPlaced`, `Filled` and `FeeCharged` gain `"settle"` in `PHASES`, and the existing classes gain the optional `market_listed` and `forecast_recorded` fields; `journal.v2.json` admits the three events to `oneOf`, widens the three phase enums and promotes the new fields with `decided_at_ms` to `required` in the same commit that rebuilds the backtest fixture | `pmx.journal` (D7); the `oneOf`, the phase enums, the `required` lists and the fixture (C1b) | gate G2 |
-| R152: `event_fill` in `pmx.engine.liquidity`; `historical` reads the half-spread floor of 17.4 | `src/pmx/engine/liquidity.py` (E2) | wave 2 (E2 builds against this section) |
+| R152, R173: `event_fill`, `slippage_ticks`, `clamp_price`, `envelope_bounds(bar, *, kind)`, the `market_view` keyword of `finalise_fill` and `truncate_for_cash` in `pmx.engine.liquidity`; `historical` reads the half-spread floor of 17.4; `applies_at` and the `calendars` argument in `pmx.engine.execution` (R174, R175) | `src/pmx/engine/liquidity.py`, `src/pmx/engine/execution.py` (E2) | wave 2 (E2 builds against this section) |
 | R160: `Hive.write_forecast`'s four keyword-only arguments | `src/pmx/agents/hive.py` (A3) | gate G3 |
-| R162: `open_sealed_test(..., kind="binary")`, the claim id, the `(instrument, week)` units and the within-week permutation | `src/pmx/optimizer/folds.py` (O1), `claims.py` (O4), `pmx.metrics.stats` (E4) | gate G2 (E4), gate G4 (O1, O4) |
+| R162, R190: `open_sealed_test(..., kind="binary")`, the claim id, the `(instrument, week)` units and the within-week permutation of `realised_sign` (`permutation_null(..., realised_signs=None, bar_keys=None)`); `claims.py` is the one caller of `Dataset.sealed_market` (R182) | `src/pmx/optimizer/folds.py` (O1), `claims.py` (O4), `pmx.metrics.stats` (E4) | gate G2 (E4), gate G4 (O1, O4) |
 | R166: `opportunity.v1.json` gains `cross_domain`, `kinds`, `providers` and the currency widening | `src/pmx/schemas/opportunity.v1.json` (C1's) | amendment C2 |
 | R166: `.gitignore` and `pyproject.toml` package-data gain `data/calendars/*.json` and `lexicons/*.json` (already) | `.gitignore` (C0), `pyproject.toml` (U4) | gate G3b |

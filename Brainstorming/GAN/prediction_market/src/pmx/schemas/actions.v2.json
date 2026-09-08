@@ -56,7 +56,7 @@
     },
     "rationale": { "type": ["string", "null"], "maxLength": 2000 },
     "horizon_forecasts": {
-      "description": "Amendment C1b (CONTRACTS_V2 17.5, ruling R157): one entry per (market_id, horizon_bars) of the run's horizons for the open continuous instruments; optional, a binary-only agent omits it. A missing pair is carried (the previous statement, else the random walk); a duplicate pair is action_rejected(duplicate) with the first occurrence winning; a horizon outside the config is bad_horizon; a quantile tuple that is not five non-decreasing prices is bad_quantiles. prob_ppm of the same market's item must equal the shortest horizon's up_probability_ppm.",
+      "description": "Amendment C1b (CONTRACTS_V2 17.5, rulings R157 and R184): one entry per (market_id, horizon_bars) of the run's horizons for the open continuous instruments; optional, a binary-only agent omits it. A missing pair is carried (the previous statement, else the random walk), except the shortest horizon of a market the agent addressed: when no pair states it, the runner synthesises it from that market's prob_ppm with quantiles_ticks null, so a family that sends only prob_ppm states a direction. A pair that is present for the shortest horizon must equal the market's prob_ppm, else action_rejected(bad_prob); a duplicate pair is action_rejected(duplicate) with the first occurrence winning; a horizon outside the config is bad_horizon; a quantile tuple that is not five non-decreasing prices is bad_quantiles.",
       "type": "array",
       "maxItems": 3200,
       "items": {

@@ -59,6 +59,8 @@ from pmx.data.importers.kalshi import (
     KALSHI_BASE_URL,
     KALSHI_EXCLUDED_SERIES,
     KALSHI_FEE_SCHEDULE_ID,
+    KALSHI_MARKETS_MAX_PAGES,
+    KALSHI_SETTLEMENT_SLACK_MS,
     WIKI_SUBJECTS_MAX,
     historical_cutoff_ms,
     import_kalshi,
@@ -1582,3 +1584,119 @@ def test_the_fetch_budget_takes_the_busiest_row_of_each_stride() -> None:
     ]
     assert kalshi_module._fetch_budget((), 4) == ()
     assert kalshi_module._fetch_budget(rows, 3) == kalshi_module._fetch_budget(rows, 3)
+
+
+# --------------------------------------------------------------------------------------------------
+# The descending walk floor of ruling R100
+# --------------------------------------------------------------------------------------------------
+#: Older than every floor of the window, so a page of these ends the walk.
+ANCIENT_TICKER: Final = "KXFLOOR-24JAN02-T1"
+#: Closed before the window but inside the settlement slack, so its page may not end the walk.
+SLACK_TICKER: Final = "KXFLOOR-25AUG20-T1"
+#: The one row of the window, on the page after the floor page.
+FLOOR_WINDOW_TICKER: Final = "KXFLOOR-25SEP20-T1"
+FLOOR_SERIES: Final = "KXFLOOR"
+
+
+def _floor_row(ticker: str, *, opened: str, settled: str) -> dict[str, object]:
+    row = _eastern_row(ticker, opened=opened, settled=settled, volume_fp="500.00")
+    row["series_ticker"] = FLOOR_SERIES
+    row["event_ticker"] = ticker.rsplit("-", 1)[0]
+    return row
+
+
+class _FloorTransport(httpx.BaseTransport):
+    """A settled listing that answers in descending close order and never runs out of pages.
+
+    This is the shape ruling R100 measured: ``/historical/markets`` ignores ``min_close_ts`` and
+    ``max_close_ts``, so the only bound on its walk is the client's own. Every page carries a cursor,
+    so a walk that does not stop itself follows the cursor to the page cap and raises rather than
+    reaching the window.
+    """
+
+    def __init__(self, pages: Sequence[Sequence[dict[str, object]]]) -> None:
+        self.pages = list(pages)
+        self.listing_calls = 0
+        self.candlestick_calls = 0
+
+    def handle_request(self, request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        params = {key: value for key, value in request.url.params.multi_items()}
+        payload: dict[str, object]
+        if path.endswith("/historical/cutoff"):
+            payload = {"market_settled_ts": CUTOFF_MS // 1_000}
+        elif path.endswith("/markets/trades"):
+            payload = {"trades": [], "cursor": ""}
+        elif path.endswith("/candlesticks"):
+            self.candlestick_calls += 1
+            payload = {"candlesticks": []}
+        elif path.endswith("/historical/markets") or path.endswith("/markets"):
+            self.listing_calls += 1
+            cursor = params.get("cursor", "")
+            index = int(cursor[1:]) if cursor.startswith("p") else 0
+            markets = list(self.pages[index]) if index < len(self.pages) else []
+            # Never an empty cursor: the provider always claims one more page.
+            payload = {"markets": markets, "cursor": f"p{index + 1}"}
+        else:  # pragma: no cover - a route this transport is not asked for
+            return httpx.Response(404, json={"error": {"message": path}})
+        return httpx.Response(200, json=payload, headers={"content-type": "application/json"})
+
+
+def _import_floor(
+    tmp_path: Path, pages: Sequence[Sequence[dict[str, object]]]
+) -> tuple[tuple[Market, ...], _FloorTransport]:
+    transport = _FloorTransport(pages)
+    client = _client(tmp_path, transport)
+    try:
+        markets = import_kalshi(
+            client=client,
+            window_start_ms=WINDOW_START_MS,
+            window_end_ms=WINDOW_END_MS,
+            freeze_ms=FREEZE_MS,
+            series_allow_list=(FLOOR_SERIES,),
+        )
+    finally:
+        client.close()
+    return markets, transport
+
+
+def test_the_settled_walk_stops_at_the_window_floor_instead_of_reaching_the_page_cap(
+    tmp_path: Path,
+) -> None:
+    """A page entirely older than the floor ends the walk (ruling R100).
+
+    Both settled listings answer in descending close order and the historical one honours neither time
+    filter, so a page whose newest row already closed before the floor means every later page is older
+    still. Without the stop the walk follows the cursor to ``KALSHI_MARKETS_MAX_PAGES`` and raises
+    ``MalformedResponseError``, which killed the whole Kalshi provider rather than one market.
+    """
+    ancient = [_floor_row(ANCIENT_TICKER, opened="2023-12-01T12:00:00Z", settled="2024-01-02T18:00:00Z")]
+    markets, transport = _import_floor(tmp_path, [ancient, ancient, ancient])
+    assert markets == ()
+    # One page per listing: the historical one and the live settled one, each stopped on its first page.
+    assert transport.listing_calls == 2
+    assert transport.listing_calls < KALSHI_MARKETS_MAX_PAGES
+    assert transport.candlestick_calls == 0, "no tape is bought for a row outside the window"
+
+
+def test_a_page_inside_the_settlement_slack_does_not_end_the_walk(tmp_path: Path) -> None:
+    """The floor is the window start minus the settlement slack, not the window start itself.
+
+    A Kalshi market can close before it settles, so a row that closed just before the window can still
+    have settled inside it. The floor therefore sits ``KALSHI_SETTLEMENT_SLACK_MS`` below the window
+    start, and a page whose newest close falls in that band must be walked past, or the first weeks of
+    the window are unreachable.
+    """
+    slack_close_ms = ms("2025-08-20T18:00:00+00:00")
+    assert WINDOW_START_MS - KALSHI_SETTLEMENT_SLACK_MS < slack_close_ms < WINDOW_START_MS, (
+        "the row closed before the window and inside the settlement slack"
+    )
+    slack_page = [_floor_row(SLACK_TICKER, opened="2025-08-01T12:00:00Z", settled="2025-08-20T18:00:00Z")]
+    window_page = [
+        _floor_row(FLOOR_WINDOW_TICKER, opened="2025-09-08T12:00:00Z", settled="2025-09-20T18:00:00Z")
+    ]
+    ancient = [_floor_row(ANCIENT_TICKER, opened="2023-12-01T12:00:00Z", settled="2024-01-02T18:00:00Z")]
+    markets, transport = _import_floor(tmp_path, [slack_page, window_page, ancient])
+    assert [market.provider_id for market in markets] == [FLOOR_WINDOW_TICKER]
+    # Three pages of the historical listing (the third ends it) and three of the settled one.
+    assert transport.listing_calls == 6

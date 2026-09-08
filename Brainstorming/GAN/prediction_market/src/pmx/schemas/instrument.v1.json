@@ -73,7 +73,7 @@
       }
     },
     "cash_events": {
-      "description": "The dated records of CONTRACTS_V2 17.3 that come from data (funding, dividend, split, roll), sorted by (t_ms, kind, cash_event_id). borrow_fee and forced_flat are the engine's and never appear here. Each record is cash_event.v1.json with origin data.",
+      "description": "The dated records of CONTRACTS_V2 17.3 that come from data (funding, dividend, split, roll), sorted chronologically by (t_ms, kind order, cash_event_id); execution regroups them per application bar in (kind order, t_ms, cash_event_id) order (ruling R193). borrow_fee, carry and forced_flat are the engine's and never appear here. Each record is cash_event.v1.json with origin data; a dividend, split or roll is stamped with the open of the first bar priced in the new regime (ruling R175).",
       "type": "array",
       "items": { "$ref": "#/$defs/data_cash_event" }
     },
@@ -138,7 +138,7 @@
     "scheduleId": { "type": "string", "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" },
     "cashEventId": { "type": "string", "pattern": "^ce-[0-9a-f]{16}$" },
     "bar": {
-      "description": "Bar of 7.2 with _ticks in place of _bp and no payout bound. Dense on the instrument's session calendar (17.2).",
+      "description": "The FILE shape of a bar: 7.2's Bar with _ticks in place of _bp and no payout bound, dense on the instrument's session calendar (17.2). The loader maps it onto pmx.types.Bar field by field (open_bp <- open_ticks, ..., yes_bid_bp <- bid_ticks, yes_ask_bp <- ask_ticks, open_interest <- open_interest_milli), so there is one in-memory bar type for every kind (ruling R173).",
       "type": "object",
       "additionalProperties": false,
       "required": ["t_ms", "open_ticks", "high_ticks", "low_ticks", "close_ticks", "vwap_ticks", "volume_milli", "n_trades", "bid_ticks", "ask_ticks", "open_interest_milli"],
@@ -157,6 +157,7 @@
       }
     },
     "trade": {
+      "description": "The FILE shape of a trade; the loader maps it onto pmx.types.Trade (price_bp <- price_ticks, side kept: buy, sell or unknown on a continuous instrument), ruling R173.",
       "type": "object",
       "additionalProperties": false,
       "required": ["t_ms", "price_ticks", "size_milli", "side"],

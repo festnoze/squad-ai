@@ -944,7 +944,12 @@ def test_the_liquidity_protocol_and_its_envelope_are_literal() -> None:
         "def check_envelope(model: LiquidityModel, *, market_view: LiquidityMarketView, bar: Bar,",
         "orders: Sequence[LiquidityOrder], config: RunConfig,",
         "def allocate_cap(orders: Sequence[LiquidityOrder], *, cap_milli: int) -> tuple[int, ...]: ...",
-        "def truncate_for_cash(fill: Fill, *, max_filled_milli: int, schedule: FeeSchedule) -> Fill: ...",
+        # Ruling R173: the two functions that establish rule 5 receive the view whose kind and scales the
+        # fee call needs, as a keyword-only default (preamble rule 2).
+        "def truncate_for_cash(fill: Fill, *, max_filled_milli: int, schedule: FeeSchedule,",
+        "market_view: LiquidityMarketView | None = None) -> Fill: ...",
+        "def slippage_ticks(base: int, *, config: RunConfig, taken_pct: int, view: LiquidityMarketView) -> int: ...",
+        "def clamp_price(x: int, *, view: LiquidityMarketView) -> int: ...",
         "class LiquidityOrder:",
         "limit_price_bp: int | None",
         "resting_since_ms: int | None",
@@ -1214,7 +1219,10 @@ def test_cluster_features_are_computed_over_the_peers_listed_at_now_ms() -> None
 # --------------------------------------------------------------------------------------------------
 #: The six kinds of 17.1, in the order of ``INSTRUMENT_KINDS``.
 INSTRUMENT_KINDS = ("binary", "spot_crypto", "perp", "fx", "equity", "future")
-CASH_EVENT_KINDS = ("funding", "dividend", "split", "roll", "borrow_fee", "forced_flat")
+CASH_EVENT_KINDS = ("funding", "dividend", "split", "roll", "borrow_fee", "carry", "forced_flat")
+#: The grid of each fixture instrument, so an engine event's ``t_ms`` can be checked against ruling R176.
+FIXTURE_INTERVAL_MS = {"binance-BTCUSDT.PERP": 3_600_000, "xnas-AAPL": MS_PER_DAY, "otcfx-EURUSD": MS_PER_DAY,
+                       "xcme-ES": MS_PER_DAY}
 QUANTILE_LEVELS_PPM = (100_000, 250_000, 500_000, 750_000, 900_000)
 MILLI = 1_000
 NOTIONAL_DENOMINATOR = 10**13
@@ -1239,7 +1247,8 @@ C1B_MAP_PATHS = (
     "e2e/test_e2e_1b_multi_asset.py", "e2e/test_e2e_2b_cross_domain.py",
     "lexicons/kalshi_series_subjects.v1.json", "lexicons/kalshi_series_categories.v1.json",
 )
-C1B_KNOWN_OWNERS = {"C1b", "F1", "F2", "F3", "F4", "D2", "A1", "R2f", "G3b", "G8"}
+#: D1 owns ``data/sessions.py`` since ruling R174 (it must exist at gate G2, before wave 3b).
+C1B_KNOWN_OWNERS = {"C1b", "F1", "F2", "F3", "F4", "D1", "D2", "A1", "R2f", "G3b", "G8"}
 
 
 def _notional_micro(size_milli: int, price_ticks: int, tick: int, point: int) -> int:
@@ -1409,6 +1418,7 @@ def test_cash_event_ids_origins_and_details_are_the_derivations_of_section_17_3(
         "split": {"numerator", "denominator"},
         "roll": {"from_symbol", "to_symbol", "from_price_ticks", "to_price_ticks", "gap_ticks"},
         "borrow_fee": {"rate_ppm_per_day", "days", "mark_ticks"}, "forced_flat": {"reason", "price_ticks"},
+        "carry": {"rate_ppm_per_day", "days", "mark_ticks"},
     }
     for event in _cash_events():
         payload = [event["market_id"], event["kind"], event["t_ms"], event["detail"]]
@@ -1419,6 +1429,21 @@ def test_cash_event_ids_origins_and_details_are_the_derivations_of_section_17_3(
         if event["kind"] == "roll":
             detail = event["detail"]
             assert detail["gap_ticks"] == detail["to_price_ticks"] - detail["from_price_ticks"]
+        if event["origin"] == "engine":
+            # Ruling R176: an engine event is stamped with the last instant of the bar it applies at, so
+            # bar_of(t_ms) is that bar and never the next grid point.
+            interval_ms = FIXTURE_INTERVAL_MS[event["market_id"]]
+            assert event["t_ms"] % interval_ms == interval_ms - 1, event["kind"]
+    # Ruling R175: a dividend, split or roll is stamped with the first instant of the new regime, a bar open.
+    for event in _cash_events():
+        if event["kind"] in ("dividend", "split", "roll"):
+            assert event["t_ms"] % FIXTURE_INTERVAL_MS[event["market_id"]] == 0, event["kind"]
+    aapl = _fixture("instrument.xnas-aapl.json")
+    ex_date_bar = aapl["bars"][-1]
+    assert all(e["t_ms"] == ex_date_bar["t_ms"] for e in aapl["cash_events"])
+    assert ex_date_bar["open_ticks"] < aapl["bars"][-2]["close_ticks"] // 3  # the ex-date bar is in the new scale
+    carry = next(e for e in _cash_events() if e["kind"] == "carry")
+    assert carry["market_id"].startswith("otcfx-") and carry["detail"]["rate_ppm_per_day"] < 0
     # the instrument files carry data events only, in (t_ms, kind, id) order
     for name in ("instrument.binance-btcusdt-perp.json", "instrument.xnas-aapl.json"):
         events = _fixture(name)["cash_events"]
@@ -1437,9 +1462,12 @@ def test_cash_event_ids_origins_and_details_are_the_derivations_of_section_17_3(
         ("dividend", lambda e: e["detail"].update(dividend_micro=0), "a zero dividend"),
         ("forced_flat", lambda e: e.update(source_url="https://example.invalid"), "an engine event with a source"),
         ("forced_flat", lambda e: e["detail"].update(reason="expired"), "an unknown flat reason"),
-        ("funding", lambda e: e.update(kind="carry"), "a kind outside the six"),
+        ("funding", lambda e: e.update(kind="swap"), "a kind outside the seven"),
         ("borrow_fee", lambda e: e["detail"].update(days=0), "a borrow fee over zero days"),
         ("funding", lambda e: e["detail"].update(rate_ppm=0.5), "a float rate"),
+        ("carry", lambda e: e.update(origin="data", source_url="https://example.invalid"),
+         "a carry claimed by data (ruling R177: the importer may not read the carry schedules)"),
+        ("carry", lambda e: e["detail"].pop("days"), "a carry without its day count"),
     ],
 )
 def test_the_cash_event_schema_refuses_what_section_17_3_forbids(kind: str, mutate: Any, why: str) -> None:
@@ -1476,6 +1504,7 @@ def test_the_session_calendar_is_dated_and_the_equity_bars_sit_inside_it() -> No
         (lambda d: d.update(as_of_date="2026-9-8"), "a malformed date"),
         (lambda d: d.pop("window"), "a calendar without its window"),
         (lambda d: d.update(calendar_id="XNYS"), "an id outside the slug shape"),
+        (lambda d: d.update(calendar_id="continuous"), "the reserved id: synthesised, never a file (ruling R185)"),
     ):
         doc = copy.deepcopy(calendar)
         mutate(doc)
@@ -1534,8 +1563,11 @@ def test_the_journal_schema_accepts_the_c1b_events_and_widenings() -> None:
     assert _errors(cash_events, roll) == []
     assert _errors(cash_events, {**split, "cash_delta_cents": 5}) != []       # a split moves no cash here
     assert _errors(cash_events, {**applied, "order_ids": ["o-00000001"]}) != []  # funding places no fill
-    assert _errors(cash_events, {**applied, "kind": "carry"}) != []
+    assert _errors(cash_events, {**applied, "kind": "swap"}) != []
     assert _errors(cash_events, {**applied, "phase": "execute"}) != []
+    carry = {**applied, "kind": "carry", "origin": "engine", "market_id": "otcfx-EURUSD", "cash_delta_cents": -6,
+             "detail": {"rate_ppm_per_day": -55, "days": 1, "mark_ticks": 108_325}}
+    assert _errors(cash_events, carry) == []  # ruling R177: the fx carry is an engine kind of its own
     closed = {**_envelope(11, "instrument_closed", "settle", bar), "market_id": perp, "kind": "perp",
               "reason": "window_end", "last_price_ticks": 6_338_800, "n_bars": 3, "n_forecasts_unresolved": 2}
     assert _errors(pending["instrument_closed"], closed) == []
@@ -1564,6 +1596,17 @@ def test_the_journal_schema_accepts_the_c1b_events_and_widenings() -> None:
     assert _errors(validator, {**event_fill, "phase": "settle"}) != []
     marked = copy.deepcopy(_of_type(_events("journal.backtest.jsonl"), "equity_marked")[0])
     assert _errors(validator, {**marked, "positions_value_cents": -1_250}) == []
+    # Rulings R179 and R180: a debit balance and a negative equity are journal states, not schema failures.
+    negative = {**marked, "cash_cents": -100, "positions_value_cents": -1_150, "equity_cents": -1_250,
+                "drawdown_bp": -10_125}
+    assert _errors(validator, negative) == []
+    ruined = {**_envelope(13, "agent_ruined", "close", bar), "agent_id": "carry_a", "equity_cents": -1_250,
+              "cancelled_order_ids": []}
+    assert _errors(validator, ruined) == []
+    expired = {**_envelope(14, "order_expired", "settle", bar), "order_id": "o-00000007", "agent_id": "carry_a",
+               "market_id": perp, "remaining_size": 2_500, "released_cents": 1_585, "reason": "debit"}
+    assert _errors(validator, expired) == []
+    assert _errors(validator, {**expired, "reason": "margin_call"}) != []
     listed = copy.deepcopy(_of_type(_events("journal.backtest.jsonl"), "market_listed")[0])
     listed.update(kind="perp", vendor="binance", symbol="BTCUSDT", tick_size_micro=10_000,
                   point_value_micro=1_000_000, session_calendar_id="continuous",
@@ -1624,8 +1667,9 @@ def test_section_17_declares_every_interface_the_engine_wave_is_built_against() 
         assert heading in text, heading
     assert "17. Instruments across kinds" in text[: text.index("## 1. Units")]
     section = _contract_section("### 15.9 Amendment C1b", "\n---\n")
-    rulings = set(re.findall(r"^\| (R1[4-7][0-9]) \|", section, re.MULTILINE))
-    assert rulings == {f"R{n}" for n in range(144, 173)}
+    rulings = set(re.findall(r"^\| (R1[4-9][0-9]) \|", section, re.MULTILINE))
+    # R144..R172 are C1b's first pass; R173..R199 are its arbitration pass over the findings against it.
+    assert rulings == {f"R{n}" for n in range(144, 200)}
     # the C1 rulings are untouched: 15.8 still ends where it did
     c1 = _contract_section("### 15.8 Amendment C1", "\n---\n")
     assert set(re.findall(r"^\| (R1[0-4][0-9]) \|", c1, re.MULTILINE)) == {f"R{n}" for n in range(107, 144)}
@@ -1636,7 +1680,7 @@ def test_section_17_declares_every_interface_the_engine_wave_is_built_against() 
     assert "def cash_out_cents" in kinds and "def cash_in_cents" in kinds and "def mark_value_cents" in kinds
     assert "INT63_MAX = 2**63 - 1" in kinds
     events = _contract_section("### 17.3 `CashEvent`", "### 17.4 Fee, borrow")
-    assert 'CASH_EVENT_KINDS = ("funding", "dividend", "split", "roll", "borrow_fee", "forced_flat")' in events
+    assert "CASH_EVENT_KINDS = (" + ", ".join(f'"{k}"' for k in CASH_EVENT_KINDS) + ")" in events
     for kind in CASH_EVENT_KINDS:
         assert f"`{kind}`" in events, kind
     assert "def apply_cash_events(self, *, t_ms: int, market: Instrument) -> None: ..." in text
@@ -1743,6 +1787,98 @@ def test_every_module_map_row_of_amendment_c1b_has_exactly_one_owner_from_the_pl
                                   ("| E1 |", "17.2")):
         row = next(line for line in waves.splitlines() if line.startswith(row_start))
         assert must_carry in row, (row_start, must_carry)
+
+
+def test_the_arbitration_pass_of_c1b_is_applied_in_place() -> None:
+    """Rulings R173 to R199: every finding against the first pass is resolved in the text, not deferred."""
+    text = CONTRACT.read_text(encoding="utf-8")
+    assert "InstrumentBar` is `Bar` with" not in text  # R173: one in-memory bar type
+    kinds = _flat(_contract_section("### 17.1 The six kinds", "### 17.2 Session calendars"))
+    assert "one bar type and one trade type for every kind" in kinds and "open_bp <- open_ticks" in kinds
+    liquidity = _flat(_contract_section("### 16.1 The `LiquidityModel`", "### 16.2 The decision latency"))
+    for phrase in ("size_milli = size` on a continuous instrument", "`clamp_price`",
+                   "point_value_micro=market_view.point_value_micro", "on a continuous view"):
+        assert phrase in liquidity, phrase
+    assert "price (`1..9_999`, `clamp_price_bp`)" not in liquidity
+    fills = _flat(_contract_section("### 8.6 Fills", "### 8.7 Settlement"))
+    for phrase in ("slippage_ticks(base, config=config, taken_pct=taken_pct, view=market_view)",
+                   "calendars: Mapping[str, SessionCalendar] | None = None", "bar.high_bp`, the largest price",
+                   "the instrument's previous bar"):
+        assert phrase in fills, phrase
+    module_map = _contract_section("## 13. Module map and file ownership", "### 13.1 The error taxonomy")
+    sessions = next(line for line in module_map.splitlines() if "data/sessions.py" in line)
+    assert re.search(r"\s+D1\s+\(", sessions), sessions  # R174
+    events = _flat(_contract_section("### 17.3 `CashEvent`", "### 17.4 Fee, borrow"))
+    for phrase in ("def applies_at(event: CashEvent, instrument: Instrument, calendar: Calendar) -> int | None:",
+                   "Entitlement follows the regime of the prices", "t_ms = last_bar(i) + interval_ms - 1",
+                   "| `carry` | `fx` with a `carry_schedule_id`", "A debit balance", 'reason = "debit"',
+                   "(kind order as in CASH_EVENT_KINDS, t_ms, cash_event_id)",
+                   "before the first and after the last event fill", "MarketView.cash_events"):
+        assert phrase in events, phrase
+    assert "the only event whose `t_ms` is the bar's own close" not in events
+    assert "A `CashEvent` record never appears in an observation" not in events
+    invariant = _contract_section("### 8.9 The accounting invariant", "## 9. Journal v2")
+    assert "unless the last event that moved it is a cash_event_applied DEBIT" in invariant
+    assert "reserved_cents(a) <= max(0, cash_cents(a))" in invariant
+    views = _contract_section("### 8.3 `Observation`", "### 8.4 `Actions`")
+    for field in ("kind: str = \"binary\"", "hours_to_next_bar: int = 0", "underlying_id: str | None = None",
+                  "twins: tuple[str, ...] = ()", "cash_events: tuple[CashEventView, ...] = ()",
+                  "class CashEventView:",
+                  "closing_ids: tuple[str, ...] = ()", "def last_bar(self, market_id: str) -> int: ...",
+                  "def next_bar(self, market_id: str, t_ms: int) -> int | None: ...",
+                  "def prev_bar(self, market_id: str, t_ms: int) -> int | None: ...", "n_yes_x2 = 0"):
+        assert field in views, field
+    assert "close_at_ms is 0 and tradable is open(i, t)" in views  # R181
+    market = _flat(_contract_section("### 7.2 Market", "### 7.3 NewsItem"))
+    for phrase in ("def sealed_market(self, market_id: str) -> Instrument: ...",
+                   "CLIPPED at manifest.split.validation_end_ms", "resolved_at_ms = delisted_at_ms",
+                   "resolution = -1", "TRADE_SIDES"):
+        assert phrase in market, phrase
+    actions = _flat(_contract_section("### 8.4 `Actions`", "### 8.5 Positions and cash"))
+    assert "synthesises the pair from `MarketAction.prob_ppm`" in actions
+    assert "bad_size` for a notional" not in actions
+    calendar = _flat(_contract_section("### 17.2 Session calendars", "### 17.3 `CashEvent`"))
+    for phrase in ("binds a `ContinuousInstrument` only", "reserved and synthesised by the loader, never a file",
+                   "D1's file, applied by gate G2"):
+        assert phrase in calendar, phrase
+    schedules = _contract_section("### 17.4 Fee, borrow and carry schedules", "### 17.5 The forecast record")
+    for phrase in ("`xnys-zero-2026-09`, `xnas-zero-2026-09`, `arcx-zero-2026-09`", "xnas-borrowgc-2026-09",
+                   "def half_spread_ticks(bar_prev: Bar, bar: Bar, *, schedule: FeeSchedule) -> int:",
+                   "bar_prev.high_bp"):
+        assert phrase in schedules, phrase
+    assert "usequity-" not in schedules and "detail.role" not in schedules
+    forecasts = _flat(_contract_section("### 17.5 The forecast record", "### 17.6 Claims, leaderboards"))
+    assert "the **plain mean**" in forecasts and "12.1's argument" not in forecasts
+    assert "`RE_HORIZON_BUCKET`" in forecasts and "HORIZON_BUCKETS` gains" not in forecasts
+    claims = _flat(_contract_section("### 17.6 Claims, leaderboards", "### 17.7 The wave 3b module map"))
+    assert "`price_realised_ticks` is not shuffled" in claims and "realised_signs=" in claims
+    stats = _contract_section("### 12.4 Statistics", "### 12.5 Behavioural descriptors")
+    assert "realised_signs: Mapping[str, Sequence[int]] | None = None" in stats
+    structures = _contract_section("### 12.11 The structures", "### 12.12 The HTTP surface")
+    assert "sorted by (agent_id, market_id, horizon_bars, unit_key)" in structures
+    errors = _contract_section("### 13.1 The error taxonomy", "### 13.2 Version constants")
+    assert "(dataset_hash, kind, provider, horizon_bars, genome_hash)" in errors
+    ids = _contract_section("### 17.8 v4 identifier formats", "### 17.9 What amendment C1b does not own")
+    assert "carry\\|forced_flat" in ids and "RE_HORIZON_BUCKET" in ids and "one of seven" in ids
+    owned = _flat(text.split("### 17.9 What amendment C1b does not own")[1])
+    for phrase in ("R189", "docs/PRD_V4_MULTI_ASSET.md", "docs/PLAN_V3_WAVES.md", "Dataset.sealed_market",
+                   "RE_HORIZON_BUCKET", "NEWS_KIND_BY_SOURCE", "applies_at"):
+        assert phrase in owned, phrase
+    assert "InstrumentBar" not in owned
+    for ruling in ("R145", "R163"):
+        row = next(line for line in text.splitlines() if line.startswith(f"| {ruling} |"))
+        assert "is not amended" not in row and "byte-identical" not in row
+    schema = _schema("journal.v2.json")["$defs"]
+    assert schema["equity_marked"]["properties"]["equity_cents"]["$ref"] == "#/$defs/int"
+    assert schema["equity_marked"]["properties"]["cash_cents"]["$ref"] == "#/$defs/int"
+    assert schema["agent_ruined"]["properties"]["equity_cents"]["$ref"] == "#/$defs/int"
+    assert "minimum" not in schema["equity_marked"]["properties"]["drawdown_bp"]
+    assert "carry" in schema["cash_event_applied"]["properties"]["kind"]["enum"]
+    assert "debit" in schema["order_expired"]["properties"]["reason"]["enum"]
+    assert _schema("session_calendar.v1.json")["properties"]["calendar_id"]["not"] == {"const": "continuous"}
+    horizon_forecasts = _schema("actions.v2.json")["properties"]["horizon_forecasts"]
+    assert "synthesises it from that market's prob_ppm" in horizon_forecasts["description"]
+    assert _fixture("instrument.xnas-aapl.json")["fee_schedule_id"] == "xnas-zero-2026-09"
 
 
 def test_the_four_data_rulings_say_what_the_data_files_do() -> None:

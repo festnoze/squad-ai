@@ -256,7 +256,7 @@
         "market_id": { "$ref": "#/$defs/marketId" },
         "remaining_size": { "$ref": "#/$defs/nonNegInt" },
         "released_cents": { "$ref": "#/$defs/nonNegInt" },
-        "reason": { "enum": ["ttl", "not_tradable", "settled", "ruined", "corporate_action", "roll", "delisted"] }
+        "reason": { "description": "corporate_action, roll and delisted are amendment C1b's (17.3); debit is ruling R179's: a cash-event debit took the agent's cash below zero and every resting order of the agent is expired by that event.", "enum": ["ttl", "not_tradable", "settled", "ruined", "corporate_action", "roll", "delisted", "debit"] }
       }
     },
     "observation_built": {
@@ -523,13 +523,13 @@
         "type": { "const": "equity_marked" },
         "phase": { "const": "close" },
         "agent_id": { "$ref": "#/$defs/agentId" },
-        "cash_cents": { "$ref": "#/$defs/nonNegInt" },
+        "cash_cents": { "description": "Signed since ruling R179: a debit cash event (funding, dividend, borrow_fee, carry) may leave a debit balance that the next credit repays; a fill never takes cash below zero.", "$ref": "#/$defs/int" },
         "reserved_cents": { "$ref": "#/$defs/nonNegInt" },
         "positions_value_cents": { "description": "Signed since amendment C1b (ruling R154): a short on a continuous instrument is a liability.", "$ref": "#/$defs/int" },
-        "equity_cents": { "$ref": "#/$defs/nonNegInt" },
+        "equity_cents": { "description": "Signed since rulings R154 and R180: a short on a continuous instrument is a liability and equity may fall below zero while the run continues.", "$ref": "#/$defs/int" },
         "fees_paid_cents": { "$ref": "#/$defs/nonNegInt" },
         "peak_equity_cents": { "$ref": "#/$defs/nonNegInt" },
-        "drawdown_bp": { "type": "integer", "minimum": -10000, "maximum": 0 },
+        "drawdown_bp": { "description": "bp_ratio(equity - peak, peak), at most 0; below -10000 once equity is negative (ruling R180), so no floor.", "type": "integer", "maximum": 0 },
         "n_open_positions": { "$ref": "#/$defs/nonNegInt" },
         "n_open_orders": { "$ref": "#/$defs/nonNegInt" }
       }
@@ -542,7 +542,7 @@
         "type": { "const": "agent_ruined" },
         "phase": { "const": "close" },
         "agent_id": { "$ref": "#/$defs/agentId" },
-        "equity_cents": { "$ref": "#/$defs/nonNegInt" },
+        "equity_cents": { "description": "Signed (ruling R180): ruin at a negative equity is the ordinary case on a runaway short.", "$ref": "#/$defs/int" },
         "cancelled_order_ids": { "type": "array", "items": { "$ref": "#/$defs/orderId" } }
       }
     },
@@ -571,7 +571,7 @@
       }
     },
     "cash_event_applied": {
-      "description": "One CashEvent of CONTRACTS_V2 17.3 applied to one agent in the settle phase (ruling R151): funding, dividend, split, roll, borrow_fee or forced_flat. cash_delta_cents is the one money-moving field for funding, dividend and borrow_fee and is 0 for split, roll and forced_flat, whose money moves in the filled and fee_charged events named in order_ids. Declared here and admitted to oneOf at gate G2 with its pmx.journal dataclass (ruling R164).",
+      "description": "One CashEvent of CONTRACTS_V2 17.3 applied to one agent in the settle phase (ruling R151): funding, dividend, split, roll, borrow_fee, carry or forced_flat. cash_delta_cents is the one money-moving field for funding, dividend, borrow_fee and carry (signed; a debit may take the agent's cash below zero, ruling R179) and is 0 for split, roll and forced_flat, whose money moves in the filled and fee_charged events named in order_ids. position_before and position_after are the position before the first and after the last of those event fills for roll and forced_flat, equal for funding, dividend, borrow_fee and carry, and related by split_position_milli for split (ruling R178). Declared here and admitted to oneOf at gate G2 with its pmx.journal dataclass (ruling R164).",
       "unevaluatedProperties": false,
       "required": ["agent_id", "market_id", "cash_event_id", "kind", "origin", "position_before", "position_after", "avg_cost_ticks_before", "avg_cost_ticks_after", "cash_delta_cents", "order_ids", "detail"],
       "properties": {
@@ -580,7 +580,7 @@
         "agent_id": { "$ref": "#/$defs/agentId" },
         "market_id": { "$ref": "#/$defs/marketId" },
         "cash_event_id": { "$ref": "#/$defs/cashEventId" },
-        "kind": { "enum": ["funding", "dividend", "split", "roll", "borrow_fee", "forced_flat"] },
+        "kind": { "enum": ["funding", "dividend", "split", "roll", "borrow_fee", "carry", "forced_flat"] },
         "origin": { "enum": ["data", "engine"] },
         "position_before": { "$ref": "#/$defs/int" },
         "position_after": { "$ref": "#/$defs/int" },
@@ -593,7 +593,7 @@
       "allOf": [
         { "$ref": "#/$defs/envelope" },
         {
-          "description": "A split, a roll and a forced flat move no cash here; the other three do and place no fill.",
+          "description": "A split, a roll and a forced flat move no cash here; funding, dividend, borrow_fee and carry do and place no fill.",
           "if": { "properties": { "kind": { "enum": ["split", "roll", "forced_flat"] } }, "required": ["kind"] },
           "then": { "properties": { "cash_delta_cents": { "const": 0 } } },
           "else": { "properties": { "order_ids": { "maxItems": 0 } } }

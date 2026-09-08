@@ -17,7 +17,7 @@ Checked right after stopping every agent and process:
 | `ruff check src tests` | clean |
 | `mypy --strict` | clean, 49 source files |
 | em-dash sweep | clean (tested by `tests/test_architecture.py`) |
-| git | nothing committed since `1af4a5a8`; the whole v2 tree is uncommitted (v1 moved to `src/pmx/v1/`, all v2 files untracked). **Commit first when resuming.** |
+| git | checkpoint commit `03a52dcd` made on 2026-09-08 at the resume (197 files, the whole v2 tree up to the C1b amendment and the data fixes). Later lots build on top of it. |
 
 Documents: `docs/PRD_V2_HARD_OPTIMIZER.md`, `docs/PRD_V3_TRADING_OPTIMIZER.md`, `docs/PRD_V4_MULTI_ASSET.md`
 (every market: six instrument kinds), `docs/PLAN_V2_WAVES.md` (part 1, waves 0 to 6),

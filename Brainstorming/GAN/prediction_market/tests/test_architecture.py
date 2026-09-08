@@ -10,6 +10,8 @@ to break one does not get an exemption here, it gets a contract issue. The rules
    construction, not by discipline;
 3. nothing outside ``pmx.optimizer.claims`` reads the sealed test fold: the one accessor is
    ``open_sealed_test`` in ``pmx.optimizer.folds`` and its one caller is ``claims.py`` (CONTRACTS_V2 12.6);
+   since amendment C1b's ruling R182 the same scan covers ``Dataset.sealed_market``, the one accessor of a
+   continuous instrument's sealed months (``Dataset.market`` returns it clipped at ``validation_end_ms``);
 4. nothing outside ``pmx.metrics.stats`` imports numpy: integers everywhere else;
 5. nothing in ``pmx`` outside ``gateway``, ``llm``, ``live`` and ``data/importers`` opens a socket: the news
    fetchers go through the shared client in ``data/importers/_http.py``;
@@ -36,8 +38,9 @@ Amendment C1b (CONTRACTS_V2 section 17.7, ruling R172) adds two more:
 
 10. nothing under ``pmx.data`` imports ``pmx.engine``, ``pmx.agents``, ``pmx.metrics`` or
     ``pmx.optimizer``: a seal that depended on the engine version would move with it;
-11. ``in_session`` is bound only in ``pmx.data.sessions``: "a bar outside its calendar does not exist" has
-    one implementation, which the loader and ``pmx.engine.calendar`` call and never redefine.
+11. ``in_session`` is bound only in ``pmx.data.sessions`` (D1's file since ruling R174, so it exists at gate
+    G2): "a bar outside its calendar does not exist" has one implementation, which the loader,
+    ``pmx.engine.calendar`` and ``pmx.engine.execution`` call and never redefine.
 
 Two house rules ride along because the same scan pays for them: no em-dash character anywhere in produced
 content, and every v2 package ``__init__.py`` is a docstring and nothing else (CONTRACTS_V2 section 13).
@@ -89,6 +92,7 @@ ENGINE_FILES = (
     "data/builder.py",
     "data/migrate_v1.py",
     "data/news/linker.py",
+    "data/sessions.py",
 )
 
 #: Banned wall-clock and identity sources inside the engine.
@@ -99,8 +103,9 @@ MODULE_RANDOM_RE = re.compile(
     r"getrandbits|sample)\("
 )
 
-#: The sealed test fold has exactly one accessor and exactly one caller (CONTRACTS_V2 12.6).
-SEALED_RE = re.compile(r"\bopen_sealed_test\b|\b_sealed_ids\b")
+#: The sealed test fold has exactly one accessor and exactly one caller (CONTRACTS_V2 12.6); the sealed months
+#: of a continuous instrument have exactly one accessor too, ``Dataset.sealed_market`` (17.2, ruling R182).
+SEALED_RE = re.compile(r"\bopen_sealed_test\b|\b_sealed_ids\b|\bsealed_market\b")
 SEALED_ALLOWED = ("optimizer/folds.py", "optimizer/claims.py")
 
 #: Training libraries. Importing one means the module cannot run where a backtest must (CONTRACTS_V2 16.5).
