@@ -85,6 +85,34 @@ if [ "$WHAT" = all ] || [ "$WHAT" = compile ]; then
     grep -E "error CS|Compilation failed" "$RESULTS/compile.log" | sort -u | head -40
     FAILED=1
   fi
+
+  # LES SHADERS NE SONT PAS DES SCRIPTS, et cette etape manquait.
+  #
+  # CompileCheck ne rapporte que des erreurs C#. Un .shader casse ne fait
+  # echouer NI la compilation NI le build : Unity ecrit l'erreur dans son
+  # journal et continue. Le palier 2 a produit exactement ca - un
+  # "les scripts compilent" bien vert pendant que Viewpoint/Surface, qui
+  # dessine TOUTES les surfaces du jeu, ne compilait pas ("undeclared
+  # identifier 'Luminance'"). Le player se serait construit, lance, et
+  # verify-player.ps1 l'aurait declare vert.
+  #
+  # Le journal de l'editeur est le seul endroit ou ca se lit. Unity le
+  # tronque a chaque session, donc le fichier entier appartient a la session
+  # qu'on vient de lancer et aucun decalage n'est necessaire.
+  step "Erreurs de shader"
+  EDITOR_LOG="${LOCALAPPDATA}/Unity/Editor/Editor.log"
+  if [ -f "$EDITOR_LOG" ]; then
+    SHADER_ERRORS=$(grep -E "Shader error|error in shader|Shader compilation failed" "$EDITOR_LOG" | sort -u)
+    if [ -n "$SHADER_ERRORS" ]; then
+      echo "  ECHEC $(printf '%s\n' "$SHADER_ERRORS" | wc -l) erreur(s) de shader :"
+      printf '%s\n' "$SHADER_ERRORS" | head -20 | sed 's/^/    /'
+      FAILED=1
+    else
+      echo "  aucune erreur de shader"
+    fi
+  else
+    echo "  pas de journal editeur a $EDITOR_LOG"
+  fi
 fi
 
 if [ "$WHAT" = all ] || [ "$WHAT" = edit ]; then

@@ -94,9 +94,39 @@ if (-not (Test-Path $diag)) {
     foreach ($needle in @("shader URP/Lit    : Universal Render Pipeline/Lit",
                           "shader URP/Unlit  : Universal Render Pipeline/Unlit",
                           "shader GradientSky: Viewpoint/GradientSky",
+                          "shader Surface    : Viewpoint/Surface",
+                          "shader Backdrop   : Viewpoint/Backdrop",
                           "RenderSettings.skybox: Viewpoint/GradientSky")) {
         if ($text.Contains($needle)) { Write-Host "  OK  $needle" }
         else { Fail "shader ou ciel absent : $needle" }
+    }
+
+    # Les textures CC0 doivent avoir ATTEINT le player. Un materiau dont le
+    # _BaseMap revient nul dessine quand meme : il dessine la couleur plate
+    # d'avant ce palier, donc l'echec se lit "les textures n'ont rien donne"
+    # alors que la cause est un asset absent du build. C'est exactement le
+    # genre de panne silencieuse pour laquelle ce script existe.
+    $surfaceLines = @($text -split "`n" | Where-Object { $_ -match "^platform surface:" })
+    if ($surfaceLines.Count -eq 0) {
+        Fail "la sonde ne dit rien du materiau de plateforme"
+    }
+    foreach ($line in $surfaceLines) {
+        if ($line -match "_Style=ABSENT") {
+            Fail "le materiau de plateforme n'est pas sur Viewpoint/Surface : $($line.Trim())"
+        } else {
+            Write-Host "  OK  le materiau de plateforme porte un style"
+        }
+        foreach ($map in @("_BaseMap", "_NormalMap")) {
+            if ($line -match "$map=(ABSENT|NULL)") {
+                Fail "$map absent du materiau de plateforme : la texture n'a pas atteint le player"
+            } elseif ($line -match "$map=(\S+) (\d+)x(\d+)" -and [int]$Matches[2] -ge 256) {
+                Write-Host "  OK  $map = $($Matches[1]) $($Matches[2])x$($Matches[3])"
+            } else {
+                # Une texture 1 x 1 se resout, s'echantillonne et rend exactement
+                # la couleur plate qu'elle etait censee remplacer.
+                Fail "$map illisible ou trop petit : $($line.Trim())"
+            }
+        }
     }
 
     if ($text -match "Fonts.Default: NULL") { Fail "aucune police : l'interface ne dessinera aucun texte" }
@@ -116,6 +146,52 @@ if (-not (Test-Path $diag)) {
     }
     Write-Host "  OK  tous les renderers ont un materiau"
 
+    # V-PROP-06 cache la dalle physique du marqueur et dessine un decal a sa
+    # place. La Decal Renderer Feature vit dans PC_Renderer.asset en YAML texte,
+    # et une feature dont le m_Script ne se resout pas est LACHEE par Unity sans
+    # un mot : pas d'exception, pas d'avertissement, tous les tests verts, et
+    # l'audit trouve toujours ses marqueurs puisqu'il lit la donnee de niveau.
+    # Il ne reste alors plus rien la ou le joueur doit se placer, et un niveau
+    # qui ne dit plus ou aller n'est plus jouable. Les deux nombres cote a cote
+    # sont la seule chose qui rende cette panne visible.
+    $markerLines = @($text -split "`n" | Where-Object { $_ -match "^markers: " })
+    if ($markerLines.Count -eq 0) {
+        Fail "la sonde ne dit rien des marqueurs"
+    }
+    foreach ($line in $markerLines) {
+        if ($line -match "slabs=(\d+) hidden=(\d+) decals=(\d+) halos=(\d+)") {
+            $slabs = [int]$Matches[1]
+            $hiddenSlabs = [int]$Matches[2]
+            $decals = [int]$Matches[3]
+            $halos = [int]$Matches[4]
+            # The predicate is "this level has marker slabs and NOT ONE of them
+            # is painted", and never "a slab is hidden with no decal". The
+            # second one is dead code: LevelBuilder hides a slab only AFTER its
+            # projector exists and has validated itself, so hidden > 0 already
+            # implies decals > 0 and the test could never fire. Worse, the
+            # failure it was written for does not hide anything at all - a
+            # dropped Decal Renderer Feature (or "Shader Graphs/Decal" stripped
+            # from the player) makes LevelBuilder KEEP every marker mesh, which
+            # reads slabs>0 hidden=0 decals=0 and used to print OK.
+            #
+            # Halos are subtracted because the pickup contact shadows of
+            # V-VFX-07 are decals too, so a level whose only projectors are
+            # halos has no painted marker at all. Both counts stay in the OK
+            # line: they are the detail that says WHICH of the two is missing.
+            $painted = $decals - $halos
+            if ($slabs -gt 0 -and $painted -le 0) {
+                Fail ("$slabs dalles de marqueur et aucun decal peint ($decals decals dont" +
+                      " $halos halos de pickup) : rien n'est dessine la ou le joueur doit se" +
+                      " placer, le niveau est injouable")
+            } else {
+                Write-Host ("  OK  marqueurs : $slabs dalles dont $hiddenSlabs cachees," +
+                            " $decals decals dont $halos halos")
+            }
+        } else {
+            Fail "recensement des marqueurs illisible : $($line.Trim())"
+        }
+    }
+
     # The eye height is what every placement is anchored to.
     foreach ($line in ($text -split "`n" | Where-Object { $_ -match "eye above ground=" })) {
         if ($line -match "eye above ground=([\d,\.]+)") {
@@ -125,9 +201,108 @@ if (-not (Test-Path $diag)) {
     }
     Write-Host "  OK  l'oeil est a 1.62 m du sol"
 
+    # --- Palier 4, "Feedback" -------------------------------------------------
+    #
+    # Tout ce palier n'est que des ANIMATIONS, et une animation qui ne tourne
+    # jamais ressemble exactement a une animation pas encore ecrite : aucune
+    # capture ne les distingue, et un test qui demande seulement si l'objet de
+    # l'effet existe ne les distingue pas non plus. Ces controles portent donc
+    # sur l'ETAT des systemes et jamais sur leur apparence.
+
+    # V-VFX-08 pose la poussiere ambiante sous la racine de niveau, et les
+    # effets de ce palier (motes du teleporteur, souffle d'une decoupe, etincelles
+    # d'une pile) sont des ParticleSystem au meme endroit. Zero systeme = rien de
+    # tout cela ne tourne, et le jeu reste exactement aussi silencieux qu'avant
+    # ce palier tout en verifiant vert.
+    $particleLines = @($text -split "`n" | Where-Object { $_ -match "^particles: systems=" })
+    if ($particleLines.Count -eq 0) {
+        Fail "la sonde ne dit rien des systemes de particules"
+    }
+    # Dedoublonne AVANT de tester, et cela ne perd rien : deux lignes identiques
+    # echouent ou passent a l'identique, et la sonde en emet une par niveau plus
+    # une par moment de feedback.
+    foreach ($line in ($particleLines | ForEach-Object { $_.Trim() } | Select-Object -Unique)) {
+        if ($line -match "systems=(\d+) playing=(\d+) emitting=(\d+) alive=(\d+)") {
+            if ([int]$Matches[1] -eq 0) {
+                Fail ("aucun ParticleSystem sous la racine de niveau : ni la poussiere" +
+                      " ambiante ni aucun effet de ce palier ne tourne dans le player")
+            } else {
+                Write-Host ("  OK  particules : $($Matches[1]) systemes dont $($Matches[2]) en" +
+                            " marche, $($Matches[4]) particules vivantes")
+            }
+        } else {
+            Fail "recensement des particules illisible : $($line.Trim())"
+        }
+    }
+
+    # Les volumes se RAPPORTENT sans jamais faire echouer : leur nombre depend de
+    # l'etat (le studio photo pose le sien), donc aucun seuil n'a de sens ici.
+    # Ce qui compte est de pouvoir LIRE les priorites le jour ou le
+    # post-traitement ne ressemble pas a ce que les profils disent : l'annexe C.5
+    # raconte une passe entiere perdue parce qu'un second profil par defaut
+    # ecrasait le premier, sans une erreur et avec les bons nombres a l'ecran
+    # dans l'inspecteur.
+    $volumeLines = @($text -split "`n" |
+        Where-Object { $_ -match "^volumes: \d+" -or $_ -match "^\s+volume\[" } |
+        ForEach-Object { $_.Trim() } | Select-Object -Unique)
+    if ($volumeLines.Count -eq 0) {
+        Write-Host "  --  la sonde ne dit rien des volumes"
+    } else {
+        Write-Host "  --  volumes vus par la sonde :"
+        $volumeLines | ForEach-Object { "      $_" }
+    }
+    $postLines = @($text -split "`n" | Where-Object { $_ -match "^post " } |
+        ForEach-Object { $_.Trim() } | Select-Object -Unique)
+    $postLines | ForEach-Object { "      $_" }
+
+    # L'ANCRE DE POSE. Le placer est un enfant de la camera a transform local
+    # identite, et c'est cela seul qui fait que la pose de la camera EST l'ancre
+    # de placement (PRD 6.4). V-ANIM-01 ajoute du bob, un plongeon a
+    # l'atterrissage et un FOV de course sur cette meme camera : c'est correct et
+    # voulu, le bob entre dans l'ancre comme il entre deja dans le viseur. Mais
+    # la premiere facon tentante d'ecrire n'importe laquelle de ces trois choses
+    # est de decaler l'ENFANT, et cela casserait l'illusion centrale du jeu (ce
+    # qu'on cadre n'est plus ce qu'on pose) sans lever une exception, sans
+    # noircir une image et sans faire echouer un test qui ne regarde pas.
+    #
+    # Le roll n'est pas une derive : PhotoPlacer applique les quarts de tour de
+    # la molette a cet objet meme, expres, pour que l'ancre tourne avec l'image
+    # affichee. La sonde compare donc la rotation locale a
+    # PhotoPlacer.RollRotation(RollSteps) et publie l'ecart sous "drift".
+    $placerLines = @($text -split "`n" | Where-Object { $_ -match "^placer anchor:" })
+    if ($placerLines.Count -eq 0) {
+        Fail "la sonde ne dit rien de l'ancre de pose"
+    }
+    $placerOk = 0
+    foreach ($line in $placerLines) {
+        if ($line -match "offset ([\d\.]+) m roll=(\d+) local rot \([^)]*\) drift ([\d\.]+) deg") {
+            $offset = [double]$Matches[1]
+            $drift = [double]$Matches[3]
+            if ($offset -gt 0.001) {
+                Fail ("l'ancre de pose a derive : le placer est a $offset m de l'origine de la" +
+                      " camera au lieu d'y etre pose, donc ce qu'on cadre n'est plus ce qu'on pose")
+            } elseif ($drift -gt 0.05) {
+                Fail ("l'ancre de pose a derive : la rotation locale du placer s'ecarte de $drift" +
+                      " degres du roll demande, donc ce qu'on cadre n'est plus ce qu'on pose")
+            } else {
+                $placerOk++
+            }
+        } else {
+            Fail "ancre de pose illisible : $($line.Trim())"
+        }
+    }
+    if ($placerOk -gt 0) {
+        Write-Host "  OK  l'ancre de pose est a l'identite sous la camera ($placerOk releves)"
+    }
+
     # A frame of nothing is dark or uniform; a frame of the game is not.
+    #
+    # Le plancher est passe de 4 a 9 avec les trois moments que le palier 4 ajoute
+    # a la liste de 6.1 (image levee, viseur, rembobinage en cours) : un moment
+    # qu'on n'atteint plus est un moment qu'on ne photographie plus, et c'est la
+    # seule chose qui le dise.
     $shotLines = @($text -split "`n" | Where-Object { $_ -match "^shot .*mean rgb" })
-    if ($shotLines.Count -lt 4) { Fail "seulement $($shotLines.Count) captures" }
+    if ($shotLines.Count -lt 9) { Fail "seulement $($shotLines.Count) captures" }
     foreach ($line in $shotLines) {
         if ($line -match "mean rgb (\d+),(\d+),(\d+)") {
             $sum = [int]$Matches[1] + [int]$Matches[2] + [int]$Matches[3]

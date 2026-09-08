@@ -108,3 +108,36 @@ InitTestScene*.unity*
 # VIEWPOINT: verification artifacts and player builds are reproducible output.
 /TestResults/
 /Build/
+
+# UNITY .meta FILES MUST BE VERSIONED, and they were not.
+#
+# The repository root above this project ignores "*.meta" globally
+# (Brainstorming/.gitignore line 86), which swept up every Unity meta file in
+# this project: "git ls-files '*.meta'" returned ZERO. That is not a tidiness
+# problem, it is a project that cannot be cloned.
+#
+# A .meta file is where Unity stores an asset's GUID, and GUIDs are how every
+# tracked settings file points at an asset:
+#   ProjectSettings/GraphicsSettings.asset -> the four shaders in
+#       m_AlwaysIncludedShaders, by guid;
+#   Assets/Settings/PC_RPAsset.asset -> its renderer, by guid;
+#   Assets/Settings/PC_Renderer.asset -> the SSAO feature's shader, by guid;
+#   the RP assets -> their volume profile, by guid.
+# On a fresh checkout with no meta files, Unity generates NEW GUIDs for
+# everything, so all of those references resolve to nothing. The shaders would
+# be stripped from the build and the world would render invisible - exactly the
+# failure the README's "Ce que le portage a coute" section documents, except
+# arriving on someone else's machine instead of this one.
+#
+# It is also what makes PRD_VISUAL Appendix A's instruction possible at all:
+# "Every new .shader goes into Always Included Shaders in the same commit."
+# A guid cannot be committed if the file that holds it is ignored.
+#
+# So: un-ignore meta files, then re-ignore the handful that really are
+# generated. Order matters, the later rule wins.
+!*.meta
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+*.blend1.meta
+*.unitypackage.meta

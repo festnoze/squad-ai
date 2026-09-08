@@ -25,9 +25,42 @@ namespace Viewpoint
     /// Everything authored is DESIGN space (x right, y up, -z forward), so
     /// every center goes through DesignSpace.ToUnity on its way to a local
     /// position, and nowhere else.
+    ///
+    /// Since Tier 4 (V-VFX-01) the solid content also DISSOLVES into place: the
+    /// geometry, the colliders, the rigid bodies and the groups are all final on
+    /// the frame Setup runs, exactly as before, and only the shader's _Reveal
+    /// lags behind for 0.4 s. Nothing about WHEN anything happens moved; see
+    /// <see cref="BeginReveal"/> for what that costs and what it must never do.
     /// </summary>
     public sealed class PhotoContent : MonoBehaviour
     {
+        /// <summary>
+        /// V-VFX-01's dissolve, in seconds. The PRD's number, and the whole of
+        /// this effect: content that used to appear instantly now resolves from
+        /// a lavender-white edge glow (Viewpoint/Surface adds that band on the
+        /// clip threshold) to its final material over this window.
+        /// </summary>
+        private const float RevealSeconds = 0.4f;
+
+        /// <summary>
+        /// The value written on the frame the content is BUILT, before the first
+        /// tick of the animation. It is not zero on purpose: the shader clips
+        /// every fragment whose reveal field falls below 1 - _Reveal, so a zero
+        /// would leave the placement frame showing nothing at all where the
+        /// content is, and the frame after it showing a scatter of glow. 0.15
+        /// keeps only the peaks of the noise, and since the edge band is 0.16
+        /// wide in the same units every surviving pixel is INSIDE the band: the
+        /// first frame is the edge glow the item asks for, and no frame of the
+        /// effect is empty.
+        /// </summary>
+        private const float RevealStart = 0.15f;
+
+        /// <summary>
+        /// Viewpoint/Surface's dissolve float. ErasableBlock owns its own copy
+        /// of this id because it pushes the property itself (see below); a
+        /// renderer that belongs to no block is written from here.
+        /// </summary>
+
         /// Thickness of the invisible stairs ramp (PRD 6.6).
         private const float RampThickness = 0.4f;
 
@@ -66,6 +99,24 @@ namespace Viewpoint
         private bool _solid;
         private bool _grouped;
 
+        /// True once Setup has run, which is what tells a LATER OnEnable apart
+        /// from the one AddComponent already fired: the later one is a rewind
+        /// revive, and a revive must not replay the dissolve.
+        private bool _setupDone;
+
+        /// The blocks and the plain renderers of this content, collected ONCE at
+        /// the end of Setup. Two lists because a block must be written through
+        /// its own door (ErasableBlock.SetReveal) and a plain renderer directly.
+        private ErasableBlock[] _revealBlocks;
+        private Renderer[] _revealRenderers;
+
+        /// Reused, so a dissolve does not allocate a block per renderer per
+        /// frame.
+        private MaterialPropertyBlock _revealProperties;
+
+        private float _revealElapsed;
+        private bool _revealing;
+
         /// <summary>
         /// Builds the content. Call once, right after the component is added.
         /// </summary>
@@ -81,6 +132,7 @@ namespace Viewpoint
             }
             if (def == null)
             {
+                _setupDone = true;
                 return;
             }
             List<PhotoProp> props = def.Props;
@@ -95,11 +147,26 @@ namespace Viewpoint
             {
                 BuildBackdrop(def.Backdrop);
             }
+            _setupDone = true;
+            // LAST, and after every collider and every group already exists:
+            // the dissolve is the only thing in this file that is allowed to
+            // land later than the frame of the placement, and it lands only on
+            // material state.
+            BeginReveal();
         }
 
         private void OnEnable()
         {
             JoinPlacedContent();
+            // A rewind revive re-enables this node, and Update resumes with it.
+            // Undoing a placement must not replay the placement: an object the
+            // player is putting BACK is already resolved, so the dissolve is
+            // finished here rather than continued. _setupDone is what separates
+            // a revive from the OnEnable that AddComponent fired before Setup.
+            if (_setupDone && _revealing)
+            {
+                FinishReveal();
+            }
         }
 
         private void OnDisable()
@@ -127,6 +194,194 @@ namespace Viewpoint
             }
             Groups.Remove(this, Groups.PlacedContent);
             _grouped = false;
+        }
+
+        /// <summary>
+        /// Arms V-VFX-01's dissolve. THE RULE THIS OBEYS: a visual event never
+        /// changes when something happens, only what it looks like. Everything
+        /// Setup built above is already final (colliders, rigid bodies, groups,
+        /// Rewind's spawn event, the placer's HeldId), and this touches nothing
+        /// but a per-renderer shader float, so the PlayMode probe stages that
+        /// raycast placed content one physics step after Place (Stage03, 06, 10,
+        /// 22) measure exactly the world they measured before this tier.
+        ///
+        /// DISPLAY MODE NEVER DISSOLVES, and that is not a preference: the
+        /// picture studio photographs a display content one or two frames after
+        /// building it (PhotoSnaps.RenderOne), so a dissolving one would give a
+        /// DIFFERENT polaroid every time a photo was taken, and the polaroid IS
+        /// the view the content produces (PRD 6.9). The guarantee is structural
+        /// rather than a comparison somewhere in the animation: display mode
+        /// leaves this function on its first line, collects no renderer,
+        /// allocates no property block and writes _Reveal nowhere, so the
+        /// materials keep the shader's own default of 1 (fully resolved) and
+        /// there is no state an animation could pick up later.
+        ///
+        /// The renderers are collected ONCE. A renderer a child component builds
+        /// in its own Start (the frame of a photo in photo, PhotoItem.TryBuild)
+        /// is therefore not in the list and stays resolved: it has already been
+        /// drawn whole by the time any Update of ours could reach it, and
+        /// clipping it BACKWARDS a frame later is worse than not dissolving it.
+        ///
+        /// One deliberate divergence from V-VFX-01's wording. The item says the
+        /// dissolve is "seeded from the content root", and NO seed is written
+        /// here: _Seed is the same float that drives V-MAT-03's colour jitter,
+        /// so writing a root seed over a block's own would repaint every placed
+        /// block at the moment it lands and keep it repainted for good. It is
+        /// not needed either, because Viewpoint/Surface's reveal field is a
+        /// function of WORLD POSITION with the seed as a mere offset: two pieces
+        /// of one content already dissolve in different patterns, and the same
+        /// photo placed twice in the same spot still dissolves identically.
+        /// </summary>
+        private void BeginReveal()
+        {
+            if (!_solid)
+            {
+                return;
+            }
+
+            ErasableBlock[] blocks = GetComponentsInChildren<ErasableBlock>(true);
+            Renderer[] renderers = GetComponentsInChildren<Renderer>(true);
+            List<Renderer> plain = new List<Renderer>(renderers.Length);
+            for (int i = 0; i < renderers.Length; i++)
+            {
+                Renderer target = renderers[i];
+                if (target == null)
+                {
+                    continue;
+                }
+                // A block's renderer is written through the block, never here:
+                // SetPropertyBlock replaces the block WHOLE, so a second block
+                // carrying only _Reveal would erase the _Seed a block pushes
+                // (its colour jitter, V-MAT-03) and the _CutGlow of a carve with
+                // it. ErasableBlock.SetReveal exists for exactly this.
+                if (target.GetComponentInParent<ErasableBlock>(true) != null)
+                {
+                    continue;
+                }
+                Material material = target.sharedMaterial;
+                // Anything that does not declare _Reveal is left alone, and the
+                // check is worth more than it looks: it also means a build where
+                // Viewpoint/Surface got stripped (the failure this project has
+                // shipped once) shows its content INSTANTLY instead of clipping
+                // it away forever on a property nothing reads. The painted
+                // backdrop panel falls out here too, because Viewpoint/Backdrop
+                // has no _Reveal.
+                if (material == null || !material.HasFloat(Materials.RevealId))
+                {
+                    continue;
+                }
+                plain.Add(target);
+            }
+
+            if (blocks.Length == 0 && plain.Count == 0)
+            {
+                return;
+            }
+
+            _revealBlocks = blocks;
+            _revealRenderers = plain.ToArray();
+            _revealProperties = new MaterialPropertyBlock();
+            _revealElapsed = 0f;
+            _revealing = true;
+            // On the BUILD frame, so the first image of the content is the edge
+            // glow and not the finished material: writing the first value from
+            // Update instead would draw one frame fully resolved and then clip
+            // it back, which is a flicker rather than an effect.
+            PushReveal(RevealStart);
+        }
+
+        /// <summary>
+        /// Runs the dissolve. Unscaled, like Hud.Fade and ErasableBlock's carve
+        /// flash and for the same reason: this is presentation, and a stopped or
+        /// slowed clock must not leave placed content frozen half clipped, which
+        /// would read as missing geometry rather than as an effect in progress.
+        ///
+        /// Costs one early return per placed content per frame once settled,
+        /// which a scene of under a hundred renderers (PRD_VISUAL 3.3) can pay.
+        /// </summary>
+        private void Update()
+        {
+            if (!_revealing)
+            {
+                return;
+            }
+
+            _revealElapsed += Time.unscaledDeltaTime;
+            float t = _revealElapsed / RevealSeconds;
+            if (t >= 1f)
+            {
+                FinishReveal();
+                return;
+            }
+
+            // Ease OUT, not a smoothstep: the visible fraction tracks _Reveal
+            // almost linearly, so a slow start would hold the content at a few
+            // sparks for the first tenth of a second and read as a hitch. Fast
+            // emergence and a gentle settle is what "resolves into place" looks
+            // like.
+            float eased = 1f - (1f - t) * (1f - t);
+            PushReveal(Mathf.Lerp(RevealStart, 1f, eased));
+        }
+
+        /// <summary>
+        /// Ends the dissolve at 1, which is the shader's complete no op: the
+        /// reveal branch is not entered at all and the content pays nothing for
+        /// having dissolved. The write is not optional, because 1 is also what
+        /// takes a half clipped block back to whole.
+        /// </summary>
+        private void FinishReveal()
+        {
+            _revealing = false;
+            PushReveal(1f);
+        }
+
+        /// <summary>
+        /// Writes one value of _Reveal across the whole content. The renderers
+        /// keep sharing the materials Materials.Solid cached, which the picture
+        /// studio depends on (PRD_VISUAL 3.4), so this goes through property
+        /// blocks throughout and touches no material.
+        /// </summary>
+        private void PushReveal(float value)
+        {
+            if (_revealBlocks != null)
+            {
+                for (int i = 0; i < _revealBlocks.Length; i++)
+                {
+                    ErasableBlock block = _revealBlocks[i];
+                    if (block == null)
+                    {
+                        continue;
+                    }
+                    block.SetReveal(value);
+                }
+            }
+
+            if (_revealRenderers == null || _revealProperties == null)
+            {
+                return;
+            }
+            for (int i = 0; i < _revealRenderers.Length; i++)
+            {
+                Renderer target = _revealRenderers[i];
+                // A carve can retire a piece of this content mid dissolve, and
+                // a level teardown destroys the lot: a destroyed renderer
+                // answers null here and is simply skipped.
+                if (target == null)
+                {
+                    continue;
+                }
+                // Read the renderer's own block back before adding to it. These
+                // renderers carry none today, so this is belt and braces, but it
+                // is the cheap kind: it means a component that starts pushing a
+                // property of its own on a battery or a crate does not silently
+                // lose it for the 0.4 s this animation runs. The Clear is
+                // required and not decorative, because the same block instance
+                // serves every renderer of the loop.
+                _revealProperties.Clear();
+                target.GetPropertyBlock(_revealProperties);
+                _revealProperties.SetFloat(Materials.RevealId, value);
+                target.SetPropertyBlock(_revealProperties);
+            }
         }
 
         private void BuildProp(PhotoProp prop)

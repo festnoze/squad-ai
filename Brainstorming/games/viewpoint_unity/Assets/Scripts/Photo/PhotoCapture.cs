@@ -270,6 +270,12 @@ namespace Viewpoint
         /// Scene glue: collects the photographable objects and assembles a
         /// definition. ALWAYS returns a valid def: props possibly empty, always
         /// a sky backdrop.
+        /// <para>
+        /// It also fires the shutter presentation on its way out (see
+        /// <see cref="AnnounceShutter"/>), because being reached is the exact
+        /// definition of "a shot was taken". That call changes nothing about
+        /// WHEN anything happens, only what the frame looks like.
+        /// </para>
         /// </summary>
         /// <param name="anchorInverse">World to anchor matrix (Unity space).</param>
         public static PhotoDef Capture(Matrix4x4 anchorInverse)
@@ -343,7 +349,68 @@ namespace Viewpoint
             backdrop.Bottom = "sky_horizon";
             def.Backdrop = backdrop;
             def.EraseDepth = CaptureDepth;
+
+            // The shutter becomes legible as an EVENT (PRD_VISUAL 4.8
+            // V-VFX-06), and this single line is the whole of its trigger. It
+            // sits at the end of the scene glue because this method is reached
+            // if and only if a shot is really taken: PlayerController refuses a
+            // shutter pressed with a full hand, with no film left or outside
+            // the viewfinder BEFORE it ever calls in, so a refused trigger
+            // never flashes (stage 17 of the probe checks that refusal, and it
+            // would be a lie on screen to answer it with a flash).
+            //
+            // Nothing here waits on the animation, and nothing may. The caller
+            // clears the viewfinder, spends the film, registers the definition,
+            // fills the hand and raises the picture in the same frame, exactly
+            // as it did before this line existed: the two leaves, the white
+            // flash frame and the polaroid slide are PRESENTATION and lag
+            // nothing but themselves. Stage 18 measures the resulting picture
+            // against the world to the centimetre on the very frame of the
+            // shot, so a capture that waited for its own animation would not be
+            // late, it would be wrong.
+            AnnounceShutter();
             return def;
+        }
+
+        /// <summary>
+        /// Starts the HUD's shutter presentation for a shot that has just been
+        /// taken (PRD_VISUAL 4.8 V-VFX-06: the leaves closing, a white flash
+        /// frame, then the new polaroid sliding up into the raised position).
+        /// <para>
+        /// The overlay is looked up rather than injected. <see cref="Main"/>
+        /// owns exactly one HUD for the life of the game, a shutter press is a
+        /// handful of events per level, so the lookup costs nothing measurable
+        /// while a cached reference would only be one more thing to invalidate
+        /// across a level load or a domain reload. A null answer is the normal
+        /// case for the EditMode tests, which call <see cref="Capture"/> with
+        /// no game around it, and for a headless probe.
+        /// </para>
+        /// <para>
+        /// Wrapped, and deliberately so. This is the last thing a capture does,
+        /// but it still runs INSIDE the caller: an exception thrown by the
+        /// presentation would abandon <c>PlayerController.CapturePhoto</c>
+        /// before it consumed the film or put the photo in hand, turning a
+        /// cosmetic bug into a game that eats a shutter press. That is the
+        /// failure mode the README records for an exception in <c>Awake</c>,
+        /// and the answer is the one <c>Main.Step</c> gives it: the broken
+        /// subsystem says so out loud and the game keeps working.
+        /// </para>
+        /// </summary>
+        private static void AnnounceShutter()
+        {
+            Hud hud = UnityEngine.Object.FindAnyObjectByType<Hud>();
+            if (hud == null)
+            {
+                return;
+            }
+            try
+            {
+                hud.PlayShutter();
+            }
+            catch (System.Exception e)
+            {
+                Debug.LogError("[PhotoCapture] The shutter presentation failed: " + e);
+            }
         }
 
         /// <summary>

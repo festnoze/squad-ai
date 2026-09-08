@@ -29,11 +29,17 @@ the exemption (section 7.1).
 from __future__ import annotations
 
 import json
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from pmx.data.schema import manifest_from_payload, market_from_payload, news_item_from_payload
+from pmx.data.schema import (
+    instrument_from_payload,
+    manifest_from_payload,
+    market_from_payload,
+    news_item_from_payload,
+)
+from pmx.data.sessions import in_session, load_calendar, session_bars
 from pmx.errors import (
     DatasetHashMismatchError,
     LeakError,
@@ -42,15 +48,27 @@ from pmx.errors import (
     SealError,
 )
 from pmx.types import (
+    CASH_EVENT_KINDS,
+    CONTINUOUS_CALENDAR_ID,
+    CONTINUOUS_TRADE_SIDES,
+    DATA_CASH_EVENT_KINDS,
     JOURNAL_ENCODING,
     JOURNAL_NEWLINE,
     MS_PER_DAY,
+    NEWS_CODE_BY_SOURCE,
+    NEWS_KIND_BY_SOURCE,
+    PRICE_TICKS_MAX,
+    ContinuousInstrument,
     Dataset,
     DatasetFile,
     DatasetManifest,
     Market,
+    MarketMeta,
     NewsItem,
+    SessionCalendar,
     bar_of,
+    cash_event_id,
+    continuous_calendar,
     day_key,
     day_start_ms,
     interval_ms,
@@ -65,10 +83,15 @@ MANIFEST_NAME = "manifest.json"
 MARKETS_DIR = "markets"
 NEWS_DIR = "news"
 WIKI_ASOF_DIR = "wiki_asof"
-#: The three directories the dataset hash covers, in the order the hash walks them. ``cache/`` and
-#: ``contamination.json`` are deliberately outside it: one is disposable, the other is per-model and
-#: changes without the data changing (sections 7.1 and 11.5).
-HASHED_DIRS = (MARKETS_DIR, NEWS_DIR, WIKI_ASOF_DIR)
+CLUSTERS_DIR = "clusters"
+INSTRUMENTS_DIR = "instruments"
+CALENDARS_DIR = "calendars"
+#: The directories the dataset hash covers (section 4.3 as amended by rulings R117 and R149): the three of
+#: v2, amendment C1's ``clusters/`` and amendment C1b's ``instruments/`` and ``calendars/``. The walk of
+#: an absent directory adds no line, so no hash of 2026-09-08 moves. ``cache/``, ``staging/`` and
+#: ``contamination.json`` are deliberately outside it: disposable, or per-model and changing without the
+#: data changing (sections 7.1 and 11.5).
+HASHED_DIRS = (MARKETS_DIR, NEWS_DIR, WIKI_ASOF_DIR, CLUSTERS_DIR, INSTRUMENTS_DIR, CALENDARS_DIR)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -357,6 +380,224 @@ def load_market_file(path: Path, *, manifest: DatasetManifest | None = None) -> 
 
 
 # --------------------------------------------------------------------------------------------------
+# 17.1 and 17.2 One continuous instrument file, and one sealed calendar
+# --------------------------------------------------------------------------------------------------
+def check_instrument_structure(
+    instrument: ContinuousInstrument, *, manifest: DatasetManifest | None, calendar: SessionCalendar
+) -> None:
+    """Everything about a continuous instrument the JSON schema cannot say (17.1 to 17.3).
+
+    Bars are dense **on the instrument's session calendar** (ruling R149): a bar outside every session,
+    or a grid point inside one with no bar, between ``bar_of(listed_at_ms)`` and ``bar_of(delisted_at_ms)``
+    (or the window end) is a ``SchemaError`` naming the bar, exactly as 7.2 refuses a gap or a duplicate on
+    a binary. The rule binds a ``ContinuousInstrument`` only (ruling R185): a binary is never checked here.
+    """
+    if manifest is not None and instrument.interval_min != manifest.interval_min:
+        raise SchemaError(
+            "instrument grid differs from the dataset grid",
+            market_id=instrument.id,
+            instrument_interval_min=instrument.interval_min,
+            dataset_interval_min=manifest.interval_min,
+        )
+    if not instrument.id.startswith(instrument.provider + "-"):
+        raise SchemaError("instrument id does not start with its provider", market_id=instrument.id)
+    if instrument.session_calendar_id != calendar.calendar_id:
+        raise SchemaError(
+            "the calendar handed to the check is not the instrument's",
+            market_id=instrument.id,
+            session_calendar_id=instrument.session_calendar_id,
+            calendar_id=calendar.calendar_id,
+        )
+    if instrument.delisted_at_ms is not None and instrument.delisted_at_ms <= instrument.listed_at_ms:
+        raise SchemaError("delisted_at_ms must be after listed_at_ms", market_id=instrument.id)
+    if tuple(sorted(set(instrument.tags))) != instrument.tags:
+        raise SchemaError("tags must be sorted and unique", market_id=instrument.id, tags=list(instrument.tags))
+    if tuple(sorted(set(instrument.twins))) != instrument.twins or instrument.id in instrument.twins:
+        raise SchemaError("twins must be sorted, unique and not the instrument itself", market_id=instrument.id)
+    _check_instrument_bars(instrument, calendar=calendar, manifest=manifest)
+    _check_instrument_trades(instrument)
+    _check_instrument_cash_events(instrument)
+    if manifest is not None:
+        _check_instrument_window(instrument, manifest=manifest, calendar=calendar)
+
+
+def _instrument_end_ms(instrument: ContinuousInstrument, manifest: DatasetManifest | None) -> int:
+    """The first instant after which no bar exists: the delisting, else the window end, else the last bar."""
+    if instrument.delisted_at_ms is not None:
+        return instrument.delisted_at_ms
+    if manifest is not None:
+        return manifest.window.end_ms
+    return instrument.bars[-1].t_ms + interval_ms(instrument.interval_min)
+
+
+def _check_instrument_bars(
+    instrument: ContinuousInstrument, *, calendar: SessionCalendar, manifest: DatasetManifest | None
+) -> None:
+    step = interval_ms(instrument.interval_min)
+    bars = instrument.bars
+    first_ms = bar_of(instrument.listed_at_ms, instrument.interval_min)
+    end_ms = _instrument_end_ms(instrument, manifest)
+    # ``listed(i, t)`` is ``t < bar_of(delisted_at_ms)`` (17.2): the bar containing the delisting instant
+    # is not a bar of the instrument.
+    last_exclusive = bar_of(end_ms, instrument.interval_min) if end_ms % step != 0 else end_ms
+    if instrument.delisted_at_ms is not None:
+        last_exclusive = bar_of(instrument.delisted_at_ms, instrument.interval_min)
+    expected = session_bars(calendar, start_ms=first_ms, end_ms=last_exclusive, interval_min=instrument.interval_min)
+    actual = tuple(bar.t_ms for bar in bars)
+    if actual != expected:
+        missing = sorted(set(expected) - set(actual))
+        extra = sorted(set(actual) - set(expected))
+        raise SchemaError(
+            "bars must be dense on the instrument's session calendar, no gap and no duplicate (17.2)",
+            market_id=instrument.id,
+            calendar_id=calendar.calendar_id,
+            first_missing_ms=missing[0] if missing else None,
+            first_extra_ms=extra[0] if extra else None,
+            n_expected=len(expected),
+            n_actual=len(actual),
+        )
+    for bar in bars:
+        if bar.t_ms % step != 0:
+            raise SchemaError("bar is off the grid", market_id=instrument.id, t_ms=bar.t_ms, step=step)
+        if not in_session(calendar, bar.t_ms, interval_min=instrument.interval_min):
+            raise SchemaError(
+                "bar lies outside every session of its calendar", market_id=instrument.id, t_ms=bar.t_ms
+            )
+        if bar.low_bp > min(bar.open_bp, bar.close_bp, bar.vwap_bp) or bar.high_bp < max(
+            bar.open_bp, bar.close_bp, bar.vwap_bp
+        ):
+            raise SchemaError("bar range does not contain its own prices", market_id=instrument.id, t_ms=bar.t_ms)
+        if bar.high_bp > PRICE_TICKS_MAX or bar.low_bp < 1:
+            raise SchemaError("bar price outside 1..PRICE_TICKS_MAX", market_id=instrument.id, t_ms=bar.t_ms)
+        if bar.yes_bid_bp is not None and bar.yes_ask_bp is not None and bar.yes_bid_bp > bar.yes_ask_bp:
+            raise SchemaError("bid above ask", market_id=instrument.id, t_ms=bar.t_ms)
+        if bar.volume_milli == 0 and bar.n_trades != 0:
+            raise SchemaError("a zero-volume bar has no trades", market_id=instrument.id, t_ms=bar.t_ms)
+
+
+def _check_instrument_trades(instrument: ContinuousInstrument) -> None:
+    keyed = [(trade.t_ms, trade.price_bp, trade.size_milli, trade.side) for trade in instrument.trades]
+    if keyed != sorted(keyed):
+        raise SchemaError("trades are out of canonical order", market_id=instrument.id, n_trades=len(keyed))
+    bad = [trade.side for trade in instrument.trades if trade.side not in CONTINUOUS_TRADE_SIDES]
+    if bad:
+        raise SchemaError(
+            "a continuous instrument's trade side is buy, sell or unknown (ruling R173)",
+            market_id=instrument.id,
+            side=bad[0],
+        )
+
+
+def _check_instrument_cash_events(instrument: ContinuousInstrument) -> None:
+    """The data events of 17.3: data kinds only, chronological, ids the contract's, corporate stamps on a
+    bar open (ruling R175)."""
+    step = interval_ms(instrument.interval_min)
+    keyed: list[tuple[int, int, str]] = []
+    for event in instrument.cash_events:
+        if event.market_id != instrument.id:
+            raise SchemaError(
+                "cash event names another instrument", market_id=instrument.id, event=event.cash_event_id
+            )
+        if event.kind not in DATA_CASH_EVENT_KINDS or event.origin != "data":
+            raise SchemaError(
+                "an instrument file carries data cash events only (ruling R177)",
+                market_id=instrument.id,
+                kind=event.kind,
+                origin=event.origin,
+            )
+        expected_id = cash_event_id(event.market_id, event.kind, event.t_ms, event.detail)
+        if event.cash_event_id != expected_id:
+            raise SchemaError(
+                "cash_event_id is not the hash of [market_id, kind, t_ms, detail]",
+                market_id=instrument.id,
+                cash_event_id=event.cash_event_id,
+                expected=expected_id,
+            )
+        if event.kind in ("dividend", "split", "roll") and event.t_ms % step != 0:
+            raise SchemaError(
+                "a corporate event is stamped with the open of the first bar in the new regime (R175)",
+                market_id=instrument.id,
+                cash_event_id=event.cash_event_id,
+                t_ms=event.t_ms,
+            )
+        keyed.append((event.t_ms, CASH_EVENT_KINDS.index(event.kind), event.cash_event_id))
+    if keyed != sorted(keyed):
+        raise SchemaError("cash events are out of chronological order (ruling R193)", market_id=instrument.id)
+    if len({key[2] for key in keyed}) != len(keyed):
+        raise SchemaError("duplicate cash event id", market_id=instrument.id)
+
+
+def _check_instrument_window(
+    instrument: ContinuousInstrument, *, manifest: DatasetManifest, calendar: SessionCalendar
+) -> None:
+    """A continuous instrument lives inside the dataset window and its calendar's window (17.2)."""
+    if instrument.listed_at_ms >= manifest.window.end_ms:
+        raise SchemaError("instrument is listed after the dataset window", market_id=instrument.id)
+    delisted = instrument.delisted_at_ms
+    if delisted is not None and delisted >= manifest.freeze_ms and not manifest.is_demo_pack:
+        raise LeakError("instrument is delisted at or after the freeze", market_id=instrument.id)
+    for bar in instrument.bars:
+        if bar.t_ms >= manifest.freeze_ms and not manifest.is_demo_pack:
+            raise LeakError("instrument carries a bar at or after the freeze", market_id=instrument.id, t_ms=bar.t_ms)
+    covered = calendar.is_continuous or not instrument.bars or (
+        calendar.window.start_ms <= instrument.bars[0].t_ms and instrument.bars[-1].t_ms < calendar.window.end_ms
+    )
+    if not covered:
+        raise SchemaError(
+            "the calendar window does not cover every bar of the instrument",
+            market_id=instrument.id,
+            calendar_id=calendar.calendar_id,
+        )
+
+
+def load_instrument_file(
+    path: Path, *, manifest: DatasetManifest | None = None, calendars: Mapping[str, SessionCalendar] | None = None
+) -> ContinuousInstrument:
+    """Load, validate and structurally check one ``instruments/<id>.json``.
+
+    ``calendars`` holds the sealed calendars of the dataset by id; ``continuous`` is synthesised here and
+    never read from one (ruling R185). An instrument naming a calendar the dataset does not carry fails.
+    """
+    instrument = instrument_from_payload(read_json_file(path), where=path.name)
+    if path.stem != instrument.id:
+        raise SchemaError("instrument file name does not match its id", path=path.name, market_id=instrument.id)
+    calendar = _calendar_for(instrument.session_calendar_id, calendars, market_id=instrument.id)
+    check_instrument_structure(instrument, manifest=manifest, calendar=calendar)
+    return instrument
+
+
+def _calendar_for(
+    calendar_id: str, calendars: Mapping[str, SessionCalendar] | None, *, market_id: str
+) -> SessionCalendar:
+    if calendar_id == CONTINUOUS_CALENDAR_ID:
+        return continuous_calendar()
+    if calendars is None or calendar_id not in calendars:
+        raise SchemaError(
+            "instrument names a session calendar the dataset does not carry",
+            market_id=market_id,
+            calendar_id=calendar_id,
+        )
+    return calendars[calendar_id]
+
+
+def load_calendars(path: Path, *, manifest: DatasetManifest | None = None) -> dict[str, SessionCalendar]:
+    """Every sealed calendar under ``calendars/``, by id. ``continuous.json`` is refused (ruling R185)."""
+    root = path / CALENDARS_DIR
+    if not root.is_dir():
+        return {}
+    calendars: dict[str, SessionCalendar] = {}
+    for candidate in sorted(root.glob("*.json")):
+        if candidate.stem == CONTINUOUS_CALENDAR_ID:
+            raise SchemaError("the continuous calendar is synthesised, never a file", path=candidate.name)
+        # Coverage of the instruments' bars is checked per instrument (17.2: "the window covers every bar
+        # of every instrument that names the calendar"); a calendar narrower than the dataset window is
+        # legal on its own, because an instrument may be listed inside it.
+        calendar = load_calendar(candidate)
+        calendars[calendar.calendar_id] = calendar
+    return calendars
+
+
+# --------------------------------------------------------------------------------------------------
 # 7.3 One news file
 # --------------------------------------------------------------------------------------------------
 def check_news_item(item: NewsItem, *, manifest: DatasetManifest) -> None:
@@ -377,15 +618,15 @@ def check_news_item(item: NewsItem, *, manifest: DatasetManifest) -> None:
             published_at_ms=item.published_at_ms,
             freeze_ms=manifest.freeze_ms,
         )
-    if item.kind != _KIND_BY_SOURCE[item.source]:
+    if item.kind != NEWS_KIND_BY_SOURCE[item.source]:
         raise SchemaError(
             "kind contradicts source",
             news_id=item.news_id,
             source=item.source,
             kind=item.kind,
-            expected=_KIND_BY_SOURCE[item.source],
+            expected=NEWS_KIND_BY_SOURCE[item.source],
         )
-    if not item.news_id.startswith(_CODE_BY_SOURCE[item.source] + "-"):
+    if not item.news_id.startswith(NEWS_CODE_BY_SOURCE[item.source] + "-"):
         raise SchemaError("news id prefix contradicts source", news_id=item.news_id, source=item.source)
     if len(item.match_ids) != len(item.match_scores_permille):
         raise SchemaError(
@@ -412,22 +653,6 @@ def check_news_item(item: NewsItem, *, manifest: DatasetManifest) -> None:
             )
     elif item.revid is not None or item.asof_day is not None:
         raise SchemaError("only a background snapshot carries revid and asof_day", news_id=item.news_id)
-
-
-_KIND_BY_SOURCE = {
-    "wikipedia_current_events": "headline",
-    "wikipedia_asof": "background",
-    "wayback": "frontpage",
-    "gdelt": "article",
-    "manifold_comment": "comment",
-}
-_CODE_BY_SOURCE = {
-    "wikipedia_current_events": "wce",
-    "wikipedia_asof": "wasof",
-    "wayback": "wb",
-    "gdelt": "gd",
-    "manifold_comment": "mfc",
-}
 
 
 def load_news_file(path: Path, *, manifest: DatasetManifest) -> tuple[NewsItem, ...]:
@@ -580,10 +805,12 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
     if verify:
         verify_dataset(path, manifest=manifest)
     markets_dir = path / MARKETS_DIR
-    if not markets_dir.is_dir():
-        raise SchemaError("dataset has no markets directory", path=str(path))
-    metas = []
-    for candidate in sorted(markets_dir.glob("*.json")):
+    instruments_dir = path / INSTRUMENTS_DIR
+    if not markets_dir.is_dir() and not instruments_dir.is_dir():
+        raise SchemaError("dataset has no markets and no instruments directory", path=str(path))
+    calendars = load_calendars(path, manifest=manifest)
+    metas: list[MarketMeta] = []
+    for candidate in sorted(markets_dir.glob("*.json")) if markets_dir.is_dir() else ():
         market = load_market_file(candidate, manifest=manifest)
         if market.provider not in manifest.providers:
             raise SchemaError(
@@ -593,23 +820,59 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
                 providers=list(manifest.providers),
             )
         metas.append(meta_of(market, fold=manifest.split.fold_of(market.resolved_at_ms)))
-    if not metas:
-        raise SchemaError("dataset holds no market", path=str(path))
     if len(metas) != manifest.counts.markets:
         raise SchemaError(
             "the manifest's market count is not the number of market files",
             counted=len(metas),
             manifest_count=manifest.counts.markets,
         )
+    # Amendment C1b (17.2, ruling R149): the continuous instruments, one meta each with ``kind`` on it and
+    # ``fold = "all"`` (ruling R186), checked against the calendar they name.
+    n_instruments = 0
+    for candidate in sorted(instruments_dir.glob("*.json")) if instruments_dir.is_dir() else ():
+        instrument = load_instrument_file(candidate, manifest=manifest, calendars=calendars)
+        if instrument.provider not in manifest.providers:
+            raise SchemaError(
+                "instrument provider is not one of the dataset's",
+                market_id=instrument.id,
+                provider=instrument.provider,
+                providers=list(manifest.providers),
+            )
+        metas.append(meta_of(instrument, fold="all", window_end_ms=manifest.window.end_ms))
+        n_instruments += 1
+    if manifest.instruments is not None:
+        per_kind = manifest.instruments.get("per_kind")
+        declared = sum(per_kind.values()) if isinstance(per_kind, Mapping) else 0
+        if declared != n_instruments:
+            raise SchemaError(
+                "the manifest's instrument count is not the number of instrument files",
+                counted=n_instruments,
+                manifest_count=declared,
+            )
+    elif n_instruments:
+        raise SchemaError("a dataset with instruments declares the instruments block of 7.8", n=n_instruments)
+    if not metas:
+        raise SchemaError("dataset holds no market", path=str(path))
+    if len({meta.id for meta in metas}) != len(metas):
+        raise SchemaError("an id is both a market and an instrument", path=str(path))
+
+    def load_record(market_id: str) -> Market | ContinuousInstrument:
+        instrument_path = path / INSTRUMENTS_DIR / f"{market_id}.json"
+        if instrument_path.is_file():
+            return load_instrument_file(instrument_path, manifest=manifest, calendars=calendars)
+        return load_market_file(path / MARKETS_DIR / f"{market_id}.json", manifest=manifest)
+
+    def load_calendar_by_id(calendar_id: str) -> SessionCalendar:
+        return _calendar_for(calendar_id, calendars, market_id="")
+
     return Dataset(
         manifest=manifest,
         metas=sort_market_metas(metas),
         path=path,
-        market_loader=lambda market_id: load_market_file(
-            path / MARKETS_DIR / f"{market_id}.json", manifest=manifest
-        ),
+        market_loader=load_record,
         news_loader=lambda: load_news(path, manifest=manifest),
         background_loader=lambda market_id: load_background(path, manifest=manifest, market_id=market_id),
+        calendar_loader=load_calendar_by_id,
     )
 
 
@@ -671,7 +934,9 @@ def seal_dataset(path: Path) -> DatasetManifest:
     """
     dataset = load_dataset(path)
     reconstructed = sorted(
-        meta.id for meta in dataset.metas if dataset.market(meta.id).source == "reconstructed"
+        meta.id
+        for meta in dataset.metas
+        if meta.kind == "binary" and dataset.market(meta.id).source == "reconstructed"
     )
     if reconstructed:
         raise SealError(
@@ -700,6 +965,11 @@ def seal_dataset(path: Path) -> DatasetManifest:
         built_by=manifest.built_by,
         sealed=True,
         notes=manifest.notes,
+        kinds=manifest.kinds,
+        instruments=manifest.instruments,
+        schedules=manifest.schedules,
+        clusters=manifest.clusters,
+        impact=manifest.impact,
     )
     write_manifest(path, sealed)
     return sealed
@@ -737,4 +1007,9 @@ def reseal_hash(path: Path, manifest: DatasetManifest) -> DatasetManifest:
         built_by=manifest.built_by,
         sealed=manifest.sealed,
         notes=manifest.notes,
+        kinds=manifest.kinds,
+        instruments=manifest.instruments,
+        schedules=manifest.schedules,
+        clusters=manifest.clusters,
+        impact=manifest.impact,
     )

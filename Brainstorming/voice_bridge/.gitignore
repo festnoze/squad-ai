@@ -1,0 +1,11 @@
+# Voice models are 60-70 MB each and re-downloadable via install.ps1
+voices/*.onnx
+voices/*.onnx.json
+
+# Generated audio
+samples/
+*.wav
+*.mp3
+
+# Local overrides
+config.json

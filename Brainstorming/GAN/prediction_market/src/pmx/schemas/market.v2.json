@@ -39,7 +39,7 @@
       "maxItems": 8,
       "items": { "enum": ["stated", "derived"] }
     },
-    "currency": { "enum": ["usd", "mana"] },
+    "currency": { "description": "The quote currencies of CONTRACTS_V2 17.1 (ruling R165): usd or mana on a binary; usdt, eur and jpy are the ones amendment C1b adds.", "enum": ["usd", "mana", "usdt", "eur", "jpy"] },
     "source": { "enum": ["imported", "reconstructed"] },
     "created_at_ms": { "$ref": "#/$defs/ms" },
     "close_at_ms": { "$ref": "#/$defs/ms" },
@@ -78,8 +78,8 @@
     "notes": { "type": "string", "maxLength": 2000 }
   },
   "$defs": {
-    "marketId": { "type": "string", "pattern": "^(kalshi|manifold|polymarket|metaculus|demo)-[A-Za-z0-9._-]{1,96}$" },
-    "provider": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo"] },
+    "marketId": { "description": "The seventeen providers of CONTRACTS_V2 17.8 (ruling R165, applied by gate G2).", "type": "string", "pattern": "^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$" },
+    "provider": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "xnys", "xnas", "arcx", "xcme", "xnym", "xcec", "xcbt", "otcfx"] },
     "category": {
       "enum": ["politics", "economics", "finance", "crypto", "sports", "science", "tech", "entertainment", "weather", "health", "world", "other"]
     },

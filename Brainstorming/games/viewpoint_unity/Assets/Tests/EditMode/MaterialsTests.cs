@@ -23,6 +23,32 @@ namespace Viewpoint.Tests
         const string LitShaderName = "Universal Render Pipeline/Lit";
         const string UnlitShaderName = "Universal Render Pipeline/Unlit";
 
+        /// <summary>
+        /// What a solid is drawn with since PRD_VISUAL 4.5 (see its appendix C.3,
+        /// which records that this suite is exactly what section 4.5 got wrong
+        /// when it claimed the shader swap kept the tests green). The name is
+        /// still pinned on purpose: it is what says a solid is LIT rather than
+        /// unlit, and a typo in the factory's Shader.Find would otherwise reach
+        /// the player as an invisible world.
+        ///
+        /// URP Lit and Unlit are still asserted below even though the factory now
+        /// names neither of them: they are the sign that the URP package resolved
+        /// at all. A missing package must fail here, in words, and not as a
+        /// magenta screenshot much later (Viewpoint/Surface and Viewpoint/Backdrop
+        /// both compile URP's own HLSL, so they would go with them).
+        /// </summary>
+        const string SurfaceShaderName = "Viewpoint/Surface";
+
+        /// <summary>
+        /// What the painted backdrop is drawn with since PRD_VISUAL 4.5's
+        /// V-MAT-08: an UNLIT shader still, but this game's own, which adds the
+        /// paper grain, the edge vignette and the border band that separate a
+        /// placed panel from the real sky. The name is pinned for the same
+        /// reason the surface one is: the factory finds it by name, and a typo
+        /// reaches a player as a backdrop that draws nothing at all.
+        /// </summary>
+        const string BackdropShaderName = "Viewpoint/Backdrop";
+
         [SetUp]
         public void SetUp()
         {
@@ -31,6 +57,8 @@ namespace Viewpoint.Tests
             // rather than surfacing as a null shader deep inside the factory.
             Assert.IsNotNull(Shader.Find(LitShaderName), "le shader URP Lit est disponible");
             Assert.IsNotNull(Shader.Find(UnlitShaderName), "le shader URP Unlit est disponible");
+            Assert.IsNotNull(Shader.Find(SurfaceShaderName), "le shader Viewpoint/Surface est disponible");
+            Assert.IsNotNull(Shader.Find(BackdropShaderName), "le shader Viewpoint/Backdrop est disponible");
             Materials.ClearCache();
         }
 
@@ -159,7 +187,12 @@ namespace Viewpoint.Tests
             // A metallic solid goes black in the shadow of these levels.
             Assert.AreEqual(0.15f, a.GetFloat("_Smoothness"), 0.001f, "rugosite 0.85 : lissage 0.15");
             Assert.AreEqual(0f, a.GetFloat("_Metallic"), 0.001f, "aucun solide n'est metallique");
-            Assert.AreEqual(LitShaderName, a.shader.name, "un solide est eclaire");
+            // PRD_VISUAL 4.5: a solid is no longer drawn by URP Lit but by
+            // Viewpoint/Surface, which is lit all the same (it carries the same
+            // property names and a real lighting pass). The claim being made is
+            // unchanged - a solid receives light, a backdrop does not - so the
+            // message stays the one it always was.
+            Assert.AreEqual(SurfaceShaderName, a.shader.name, "un solide est eclaire");
 
             // The lavender of what disappears, and the grey of what stays, must
             // not come out of the factory as the same material.
@@ -179,7 +212,13 @@ namespace Viewpoint.Tests
 
             Texture texture = m.GetTexture("_BaseMap");
             Assert.IsNotNull(texture, "backdrop texture en degrade");
-            Assert.AreEqual(UnlitShaderName, m.shader.name, "backdrop non ombre");
+            // PRD_VISUAL 4.5 V-MAT-08: the backdrop moved off URP Unlit onto
+            // Viewpoint/Backdrop. The claim is the one it always was - a
+            // backdrop takes no light, which is what keeps a photographed sky
+            // from being shaded by the level it is placed in - so the message
+            // stays verbatim. Only the name of the unlit shader changed, the
+            // same way appendix C.3 records for the solids.
+            Assert.AreEqual(BackdropShaderName, m.shader.name, "backdrop non ombre");
 
             // White base color, or the ramp would be tinted twice.
             Color tint = m.GetColor("_BaseColor");

@@ -1,4 +1,4 @@
-# make_maney - an evolutionary money race
+# make_money - an evolutionary money race
 
 A selection harness where a population of agents competes to make money in a
 simulated economy. Money is not a proxy for fitness, it IS fitness:
@@ -18,7 +18,7 @@ deterministic from a seed.
 ## Quickstart
 
 ```bash
-cd make_maney
+cd make_money
 python -m unittest              # run the test suite
 python run_evolution.py         # default: 80 generations, population 32
 ```

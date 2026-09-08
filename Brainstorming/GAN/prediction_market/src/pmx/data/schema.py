@@ -32,8 +32,11 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from pmx.errors import SchemaError
 from pmx.types import (
     JOURNAL_ENCODING,
+    PRICE_TICKS_MAX,
     Bar,
     BuiltBy,
+    CashEvent,
+    ContinuousInstrument,
     DatasetCounts,
     DatasetFile,
     DatasetFilters,
@@ -45,6 +48,8 @@ from pmx.types import (
     MarketQuality,
     NewsItem,
     NewsSourceCount,
+    Session,
+    SessionCalendar,
     Trade,
 )
 
@@ -56,12 +61,57 @@ SCHEMA_FILES = (
     "dataset.v1.json",
     "actions.v2.json",
     "journal.v2.json",
+    # Amendment C1b's four (section 17.9, applied by gate G2).
+    "instrument.v1.json",
+    "cash_event.v1.json",
+    "session_calendar.v1.json",
+    "forecast.v1.json",
 )
 
 PriceBp = Annotated[int, Field(ge=1, le=9_999)]
 NullablePriceBp = Annotated[int, Field(ge=1, le=9_999)] | None
+PriceTicks = Annotated[int, Field(ge=1, le=PRICE_TICKS_MAX)]
+NullablePriceTicks = Annotated[int, Field(ge=1, le=PRICE_TICKS_MAX)] | None
 Ms = Annotated[int, Field(ge=0)]
 NonNegInt = Annotated[int, Field(ge=0)]
+ProviderLiteral = Literal[
+    "kalshi",
+    "manifold",
+    "polymarket",
+    "metaculus",
+    "demo",
+    "binance",
+    "kraken",
+    "coinbase",
+    "bybit",
+    "xnys",
+    "xnas",
+    "arcx",
+    "xcme",
+    "xnym",
+    "xcec",
+    "xcbt",
+    "otcfx",
+]
+VendorLiteral = Literal[
+    "kalshi",
+    "manifold",
+    "polymarket",
+    "metaculus",
+    "demo",
+    "binance",
+    "kraken",
+    "coinbase",
+    "bybit",
+    "yahoo",
+    "frankfurter",
+    "ecb",
+]
+INSTRUMENT_ID_PATTERN = (
+    r"^(kalshi|manifold|polymarket|metaculus|demo|binance|kraken|coinbase|bybit|xnys|xnas|arcx|xcme|xnym|"
+    r"xcec|xcbt|otcfx)-[A-Za-z0-9._-]{1,96}$"
+)
+SCHEDULE_ID_PATTERN = r"^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$"
 
 
 def schema_path(name: str) -> Path:
@@ -193,8 +243,8 @@ class MarketModel(_Strict):
     here because pydantic is the pass that refuses a float."""
 
     schema_version: Literal["market.v2"]
-    id: str = Field(pattern=r"^(kalshi|manifold|polymarket|metaculus|demo)-[A-Za-z0-9._-]{1,96}$")
-    provider: Literal["kalshi", "manifold", "polymarket", "metaculus", "demo"]
+    id: str = Field(pattern=INSTRUMENT_ID_PATTERN)
+    provider: ProviderLiteral
     provider_id: str = Field(min_length=1, max_length=128)
     url: str = Field(max_length=512)
     question: str = Field(min_length=1, max_length=500)
@@ -205,7 +255,7 @@ class MarketModel(_Strict):
     #: One flag per subject, in the same order. An empty list beside a non-empty ``wiki_subjects`` means
     #: every subject is stated, which is what a market file written before the flag existed meant.
     wiki_subject_provenance: list[Literal["stated", "derived"]] = Field(default_factory=list, max_length=8)
-    currency: Literal["usd", "mana"]
+    currency: Literal["usd", "mana", "usdt", "eur", "jpy"]
     source: Literal["imported", "reconstructed"]
     created_at_ms: Ms
     close_at_ms: Ms
@@ -342,6 +392,9 @@ class NewsSourceModel(_Strict):
         "wayback",
         "gdelt",
         "manifold_comment",
+        "edgar",
+        "fred",
+        "cboe",
     ]
     n_items: NonNegInt
     fetched_at_ms_min: Ms
@@ -361,10 +414,32 @@ class SplitModel(_Strict):
     n_train: NonNegInt
     n_validation: NonNegInt
     n_sealed: NonNegInt
+    #: Amendment C1b (17.6): instruments counted per fold, optional so a binary manifest still parses.
+    n_instruments_train: NonNegInt = 0
+    n_instruments_validation: NonNegInt = 0
+    n_instruments_sealed: NonNegInt = 0
+
+
+class InstrumentsBlockModel(_Strict):
+    """The ``instruments`` block of 7.8 (amendment C1b): counts of what ``instruments/`` and ``calendars/`` hold."""
+
+    per_kind: dict[str, NonNegInt]
+    per_provider: dict[str, NonNegInt]
+    per_vendor: dict[str, NonNegInt]
+    n_cash_events: dict[str, dict[str, NonNegInt]]
+    n_calendars: NonNegInt
+
+
+class SchedulesBlockModel(_Strict):
+    """The ``schedules`` block of 7.8 (amendment C1b): the schedule ids the dataset's instruments name."""
+
+    fee: list[str]
+    borrow: list[str]
+    carry: list[str]
 
 
 class FileModel(_Strict):
-    path: str = Field(pattern=r"^(markets|news|wiki_asof)/[A-Za-z0-9._/-]+$")
+    path: str = Field(pattern=r"^(markets|news|wiki_asof|clusters|instruments|calendars)/[A-Za-z0-9._/-]+$")
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     bytes: NonNegInt
 
@@ -384,7 +459,7 @@ class DatasetManifestModel(_Strict):
     freeze_ms: Ms
     window: WindowModel
     interval_min: Literal[60, 1440]
-    providers: list[Literal["kalshi", "manifold", "polymarket", "metaculus", "demo"]] = Field(min_length=1)
+    providers: list[ProviderLiteral] = Field(min_length=1)
     safety_lag_ms: Ms
     filters: FiltersModel
     counts: CountsModel
@@ -395,6 +470,13 @@ class DatasetManifestModel(_Strict):
     built_by: BuiltByModel
     sealed: bool
     notes: str = Field(max_length=4_000)
+    #: The optional blocks of 7.8: amendment C1's ``clusters`` and ``impact`` are read as opaque mappings
+    #: (their consumers land in waves 7 and 8); amendment C1b's three are typed here (gate G2).
+    clusters: dict[str, object] | None = None
+    impact: dict[str, object] | None = None
+    kinds: list[Literal["binary", "spot_crypto", "perp", "fx", "equity", "future"]] = Field(default_factory=list)
+    instruments: InstrumentsBlockModel | None = None
+    schedules: SchedulesBlockModel | None = None
 
     def to_manifest(self) -> DatasetManifest:
         return DatasetManifest(
@@ -444,6 +526,9 @@ class DatasetManifestModel(_Strict):
                 n_train=self.split.n_train,
                 n_validation=self.split.n_validation,
                 n_sealed=self.split.n_sealed,
+                n_instruments_train=self.split.n_instruments_train,
+                n_instruments_validation=self.split.n_instruments_validation,
+                n_instruments_sealed=self.split.n_instruments_sealed,
             ),
             files=tuple(
                 DatasetFile(path=entry.path, sha256=entry.sha256, bytes=entry.bytes) for entry in self.files
@@ -456,6 +541,25 @@ class DatasetManifestModel(_Strict):
             ),
             sealed=self.sealed,
             notes=self.notes,
+            clusters=None if self.clusters is None else dict(self.clusters),
+            impact=None if self.impact is None else dict(self.impact),
+            kinds=tuple(self.kinds),
+            instruments=None
+            if self.instruments is None
+            else {
+                "per_kind": dict(self.instruments.per_kind),
+                "per_provider": dict(self.instruments.per_provider),
+                "per_vendor": dict(self.instruments.per_vendor),
+                "n_cash_events": {"per_kind": dict(self.instruments.n_cash_events.get("per_kind", {}))},
+                "n_calendars": self.instruments.n_calendars,
+            },
+            schedules=None
+            if self.schedules is None
+            else {
+                "fee": tuple(self.schedules.fee),
+                "borrow": tuple(self.schedules.borrow),
+                "carry": tuple(self.schedules.carry),
+            },
         )
 
 
@@ -497,3 +601,209 @@ def _validated[ModelT: BaseModel](model: type[ModelT], payload: object, *, where
             detail=first["msg"],
             n_errors=exc.error_count(),
         ) from exc
+
+
+# --------------------------------------------------------------------------------------------------
+# Amendment C1b's three file shapes (sections 17.1 to 17.3; landed by gate G2)
+# --------------------------------------------------------------------------------------------------
+class SessionModel(_Strict):
+    open_ms: Ms
+    close_ms: Ms
+
+
+class SessionCalendarModel(_Strict):
+    """``session_calendar.v1.json`` as a strict model (section 17.2)."""
+
+    schema_version: Literal["session_calendar.v1"]
+    calendar_id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")
+    description: str = Field(max_length=500)
+    source_url: str = Field(max_length=512)
+    as_of_date: str = Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+    window: WindowModel
+    sessions: list[SessionModel] = Field(min_length=1)
+    holidays: list[str]
+
+    def to_calendar(self) -> SessionCalendar:
+        return SessionCalendar(
+            calendar_id=self.calendar_id,
+            description=self.description,
+            source_url=self.source_url,
+            as_of_date=self.as_of_date,
+            window=DatasetWindow(start_ms=self.window.start_ms, end_ms=self.window.end_ms),
+            sessions=tuple(Session(open_ms=s.open_ms, close_ms=s.close_ms) for s in self.sessions),
+            holidays=tuple(self.holidays),
+        )
+
+
+class CashEventModel(_Strict):
+    """``cash_event.v1.json`` as a strict model (section 17.3). ``detail`` is integers and strings only."""
+
+    schema_version: Literal["cash_event.v1"]
+    cash_event_id: str = Field(pattern=r"^ce-[0-9a-f]{16}$")
+    market_id: str = Field(pattern=INSTRUMENT_ID_PATTERN)
+    kind: Literal["funding", "dividend", "split", "roll", "borrow_fee", "carry", "forced_flat"]
+    t_ms: Ms
+    origin: Literal["data", "engine"]
+    source_url: str = Field(max_length=512)
+    detail: dict[str, int | str]
+
+    def to_cash_event(self) -> CashEvent:
+        return CashEvent(
+            cash_event_id=self.cash_event_id,
+            market_id=self.market_id,
+            kind=self.kind,
+            t_ms=self.t_ms,
+            origin=self.origin,
+            source_url=self.source_url,
+            detail=dict(self.detail),
+        )
+
+
+class InstrumentBarModel(_Strict):
+    """The **file** shape of a bar (``instrument.v1.json#/$defs/bar``, ruling R173): ``_ticks`` fields,
+    mapped onto the one in-memory ``Bar`` field by field."""
+
+    t_ms: Ms
+    open_ticks: PriceTicks
+    high_ticks: PriceTicks
+    low_ticks: PriceTicks
+    close_ticks: PriceTicks
+    vwap_ticks: PriceTicks
+    volume_milli: NonNegInt
+    n_trades: NonNegInt
+    bid_ticks: NullablePriceTicks
+    ask_ticks: NullablePriceTicks
+    open_interest_milli: NonNegInt | None
+
+    def to_bar(self) -> Bar:
+        return Bar(
+            t_ms=self.t_ms,
+            open_bp=self.open_ticks,
+            high_bp=self.high_ticks,
+            low_bp=self.low_ticks,
+            close_bp=self.close_ticks,
+            vwap_bp=self.vwap_ticks,
+            volume_milli=self.volume_milli,
+            n_trades=self.n_trades,
+            yes_bid_bp=self.bid_ticks,
+            yes_ask_bp=self.ask_ticks,
+            open_interest=self.open_interest_milli,
+        )
+
+
+class InstrumentTradeModel(_Strict):
+    t_ms: Ms
+    price_ticks: PriceTicks
+    size_milli: Annotated[int, Field(ge=1)]
+    side: Literal["buy", "sell", "unknown"]
+
+    def to_trade(self) -> Trade:
+        return Trade(t_ms=self.t_ms, price_bp=self.price_ticks, size_milli=self.size_milli, side=self.side)
+
+
+class InstrumentQualityModel(_Strict):
+    n_trades: NonNegInt
+    life_days: NonNegInt
+    volume_milli_total: NonNegInt
+    traded_bars: NonNegInt
+    tape_kind: Literal["prints", "bars_only"]
+
+    def to_quality(self) -> MarketQuality:
+        return MarketQuality(
+            n_trades=self.n_trades,
+            unique_bettors=None,
+            life_days=self.life_days,
+            volume_milli_total=self.volume_milli_total,
+            traded_bars=self.traded_bars,
+            tape_kind=self.tape_kind,
+        )
+
+
+class InstrumentModel(_Strict):
+    """``instrument.v1.json`` as a strict model (section 17.1). The kind table's cross-field rules are
+    the schema's ``allOf`` and ``ContinuousInstrument.__post_init__``'s; this pass refuses the floats."""
+
+    schema_version: Literal["instrument.v1"]
+    id: str = Field(pattern=INSTRUMENT_ID_PATTERN)
+    provider: ProviderLiteral
+    vendor: VendorLiteral
+    symbol: str = Field(min_length=1, max_length=64)
+    kind: Literal["spot_crypto", "perp", "fx", "equity", "future"]
+    currency: str = Field(pattern=r"^[a-z]{3,5}$")
+    tick_size_micro: Annotated[int, Field(ge=1, le=10**9)]
+    point_value_micro: Annotated[int, Field(ge=1, le=10**12)]
+    session_calendar_id: str = Field(pattern=r"^[a-z][a-z0-9_]{0,31}$")
+    fee_schedule_id: str = Field(pattern=SCHEDULE_ID_PATTERN)
+    borrow_schedule_id: str | None = Field(default=None, pattern=SCHEDULE_ID_PATTERN)
+    carry_schedule_id: str | None = Field(default=None, pattern=SCHEDULE_ID_PATTERN)
+    listed_at_ms: Ms
+    delisted_at_ms: NonNegInt | None
+    short_allowed: bool
+    interval_min: Literal[60, 1440]
+    url: str = Field(max_length=512)
+    description: str = Field(max_length=4_000)
+    category: Literal["crypto", "finance", "economics", "other"]
+    tags: list[str] = Field(max_length=16)
+    twins: list[str] = Field(max_length=16)
+    underlying_id: str | None = Field(default=None, pattern=INSTRUMENT_ID_PATTERN)
+    roll_source: Literal["venue", "vendor"] | None
+    first_price_ticks: PriceTicks
+    bars: list[InstrumentBarModel] = Field(min_length=1)
+    trades: list[InstrumentTradeModel]
+    quality: InstrumentQualityModel
+    cash_events: list[CashEventModel]
+    source: Literal["imported"]
+    notes: str = Field(max_length=2_000)
+
+    def to_instrument(self) -> ContinuousInstrument:
+        return ContinuousInstrument(
+            id=self.id,
+            provider=self.provider,
+            vendor=self.vendor,
+            symbol=self.symbol,
+            kind=self.kind,
+            currency=self.currency,
+            tick_size_micro=self.tick_size_micro,
+            point_value_micro=self.point_value_micro,
+            session_calendar_id=self.session_calendar_id,
+            fee_schedule_id=self.fee_schedule_id,
+            borrow_schedule_id=self.borrow_schedule_id,
+            carry_schedule_id=self.carry_schedule_id,
+            listed_at_ms=self.listed_at_ms,
+            delisted_at_ms=self.delisted_at_ms,
+            short_allowed=self.short_allowed,
+            interval_min=self.interval_min,
+            bars=tuple(bar.to_bar() for bar in self.bars),
+            trades=tuple(trade.to_trade() for trade in self.trades),
+            schema_version=self.schema_version,
+            url=self.url,
+            description=self.description,
+            category=self.category,
+            tags=tuple(self.tags),
+            twins=tuple(self.twins),
+            underlying_id=self.underlying_id,
+            roll_source=self.roll_source,
+            first_price_ticks=self.first_price_ticks,
+            quality=self.quality.to_quality(),
+            cash_events=tuple(event.to_cash_event() for event in self.cash_events),
+            source=self.source,
+            notes=self.notes,
+        )
+
+
+def instrument_from_payload(payload: object, *, where: str = "") -> ContinuousInstrument:
+    """The one door into a ``ContinuousInstrument`` from JSON (schema, strict model, dataclass)."""
+    validate_against_schema("instrument.v1.json", payload, where=where)
+    return _validated(InstrumentModel, payload, where=where).to_instrument()
+
+
+def session_calendar_from_payload(payload: object, *, where: str = "") -> SessionCalendar:
+    """The one door into a ``SessionCalendar`` from JSON."""
+    validate_against_schema("session_calendar.v1.json", payload, where=where)
+    return _validated(SessionCalendarModel, payload, where=where).to_calendar()
+
+
+def cash_event_from_payload(payload: object, *, where: str = "") -> CashEvent:
+    """The one door into a standalone ``CashEvent`` record from JSON (``cash_event.v1.json``)."""
+    validate_against_schema("cash_event.v1.json", payload, where=where)
+    return _validated(CashEventModel, payload, where=where).to_cash_event()

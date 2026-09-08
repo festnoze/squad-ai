@@ -1,0 +1,97 @@
+VIEWPOINT shot probe
+graphics device: Direct3D12
+screen: 1280x720
+
+--- render ---
+shader URP/Lit    : Universal Render Pipeline/Lit
+shader URP/Unlit  : Universal Render Pipeline/Unlit
+shader GradientSky: Viewpoint/GradientSky
+shader Surface    : Viewpoint/Surface
+Materials.Solid(platform): Solid_platform shader=Viewpoint/Surface
+platform surface: _Style=0 _Seed=0 _BaseMap=Concrete034_Color 1024x512 _NormalMap=Concrete034_Normal 1024x512
+Materials.Solid(battery,0.8): Solid_battery_e0.80 shader=Viewpoint/Surface
+RenderSettings.skybox: Viewpoint/GradientSky
+ambientMode: Trilight fog: True
+cube mesh: Cube
+--- font ---
+Fonts.Default: LegacyRuntime
+  dynamic: True material: Font Material
+builtin LegacyRuntime.ttf: LegacyRuntime
+OS fonts installed: 459
+shot 01_title: mean rgb 76,84,90
+--- menu labels ---
+Text under Menu: 30
+  [Title] font=LegacyRuntime size=72 chars=9 visible=True alpha=1,00 text="VIEWPOINT"
+  [Subtitle] font=LegacyRuntime size=22 chars=295 visible=True alpha=0,85 text="Posez des photos. Elles deviennent le monde.\n\nZQSD/WASD bo..."
+  [Hint] font=LegacyRuntime size=24 chars=64 visible=True alpha=1,00 text="Entree : commencer au niveau 1   ou cliquez un niveau ci-des..."
+  [LevelsLabel] font=LegacyRuntime size=18 chars=36 visible=True alpha=0,70 text="Choisir un niveau (16 / 25 atteints)"
+  [Label] font=LegacyRuntime size=14 chars=15 visible=True alpha=1,00 text="1. Premiers pas"
+  [Label] font=LegacyRuntime size=14 chars=17 visible=True alpha=1,00 text="2. Copie conforme"
+  [Label] font=LegacyRuntime size=14 chars=24 visible=True alpha=1,00 text="3. Prendre de la hauteur"
+  [Label] font=LegacyRuntime size=14 chars=13 visible=True alpha=1,00 text="4. Effacement"
+  [Label] font=LegacyRuntime size=14 chars=12 visible=True alpha=1,00 text="5. Belvedere"
+  [Label] font=LegacyRuntime size=14 chars=10 visible=True alpha=1,00 text="6. La cage"
+
+--- level 1 ---
+groups: platform=2 carvable=0 photographable=5 photo_item=1 battery=1 teleporter=1
+renderers: 29 enabled=29 nullMaterial=0 nullMesh=1
+world bounds: (0.74, -7.94, 2.26) size (68.83, 22.32, 78.83)
+  photo passerelle at (1.50, 0.90, -4.00) renderers=3 drawn=3 extent=1,11 offscreen (viewport 1,05,0,01,1,0)
+  battery at (0.00, 0.00, 11.50) renderers=2 drawn=2 extent=0,89 ON SCREEN at 0,50,0,43
+camera pos (0.00, 1.65, -5.00) forward (0.00, 0.00, 1.00) fov 75 mask 0xFFFFFDFF clear Skybox enabled True depth 0
+player pos (0.00, 0.03, -5.00)
+standing on Platform top y=0,000 feet y=0,030 eye above ground=1,650 (expected 1,62)
+cameras alive: 1
+  cam[Camera] depth=0 mask=0xFFFFFDFF target=screen
+ray forward: nothing within 100 m
+ray down   : Platform at 1,65 m
+shot 02_level1: mean rgb 163,176,185
+shot 03_level1_looking_down: mean rgb 165,166,169
+
+--- level 4 ---
+groups: platform=1 carvable=2 photographable=5 photo_item=1 battery=2 teleporter=1
+renderers: 31 enabled=31 nullMaterial=0 nullMesh=1
+world bounds: (0.74, -7.80, 2.26) size (68.83, 22.60, 78.83)
+  photo porte at (-3.00, 0.90, -5.00) renderers=3 drawn=3 extent=1,11 ON SCREEN at 0,34,0,43
+  battery at (3.00, 0.00, -6.00) renderers=2 drawn=2 extent=0,96 ON SCREEN at 0,68,0,32
+  battery at (0.00, 0.00, 9.00) renderers=2 drawn=2 extent=0,89 ON SCREEN at 0,50,0,45
+camera pos (0.00, 1.65, -12.00) forward (0.00, 0.00, 1.00) fov 75 mask 0xFFFFFDFF clear Skybox enabled True depth 0
+player pos (0.00, 0.03, -12.00)
+standing on Platform top y=0,000 feet y=0,030 eye above ground=1,650 (expected 1,62)
+cameras alive: 1
+  cam[Camera] depth=0 mask=0xFFFFFDFF target=screen
+ray forward: Erasable at 15,70 m
+ray down   : Platform at 1,65 m
+shot 04_level4: mean rgb 161,172,183
+
+--- level 6 ---
+groups: platform=1 carvable=0 photographable=3 photo_item=2 battery=2 teleporter=1
+renderers: 65 enabled=65 nullMaterial=0 nullMesh=1
+world bounds: (0.74, -7.94, 2.26) size (68.83, 22.32, 78.83)
+  photo porte at (0.00, 0.90, -4.00) renderers=3 drawn=3 extent=1,11 ON SCREEN at 0,50,0,17
+  photo caisse at (-2.00, 0.90, -4.00) renderers=3 drawn=3 extent=1,11 ON SCREEN at 0,01,0,17
+  battery at (3.70, 0.00, 4.00) renderers=2 drawn=2 extent=0,92 ON SCREEN at 0,64,0,39
+  battery at (4.60, 0.00, 3.50) renderers=2 drawn=2 extent=0,93 ON SCREEN at 0,69,0,38
+camera pos (0.00, 1.65, -5.50) forward (0.00, 0.00, 1.00) fov 75 mask 0xFFFFFDFF clear Skybox enabled True depth 0
+player pos (0.00, 0.03, -5.50)
+standing on Platform top y=0,000 feet y=0,030 eye above ground=1,650 (expected 1,62)
+cameras alive: 1
+  cam[Camera] depth=0 mask=0xFFFFFDFF target=screen
+ray forward: nothing within 100 m
+ray down   : Platform at 1,65 m
+shot 04_level6: mean rgb 159,171,180
+
+--- level 16 ---
+groups: platform=2 carvable=1 photographable=5 photo_item=0 battery=2 teleporter=1
+renderers: 69 enabled=69 nullMaterial=0 nullMesh=1
+world bounds: (0.74, -7.94, 2.26) size (68.83, 22.32, 78.83)
+  battery at (3.00, 0.00, -3.00) renderers=2 drawn=2 extent=0,98 offscreen (viewport 1,60,-0,58,1,0)
+  battery at (0.80, 0.00, 7.00) renderers=2 drawn=2 extent=0,98 ON SCREEN at 0,53,0,40
+camera pos (0.00, 1.65, -4.00) forward (0.00, 0.00, 1.00) fov 75 mask 0xFFFFFDFF clear Skybox enabled True depth 0
+player pos (0.00, 0.03, -4.00)
+standing on Platform top y=0,000 feet y=0,030 eye above ground=1,650 (expected 1,62)
+cameras alive: 1
+  cam[Camera] depth=0 mask=0xFFFFFDFF target=screen
+ray forward: Cage at 9,00 m
+ray down   : Platform at 1,65 m
+shot 04_level16: mean rgb 160,173,182

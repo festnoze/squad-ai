@@ -1025,3 +1025,334 @@ camera sits inside) overriding Vignette intensity to 0.
   atmosphere do for pure geometry.
 - "The Art of The Witness" (Luis Antonio): color discipline as a gameplay
   tool.
+
+---
+
+## Appendix C. Amendments found during implementation
+
+Written while implementing Tier 0 and Tier 1 (2026-09-06). Each entry is a
+place where this document turned out to be wrong, self-contradictory, or
+impossible as written, and what was done instead. The rule followed throughout:
+honour the INTENT of the item, and say so here rather than silently diverging.
+
+### C.1 Section 1.2's SSAO audit reads the enum backwards
+
+The audit table says the renderer runs SSAO at "samples Low, blur Low", and
+V-PIPE-03 asks to raise both to Medium. URP declares the opposite order:
+
+    internal enum AOSampleOption      { High = 0, Medium = 1, Low = 2 }
+    internal enum BlurQualityOptions  { High = 0, Medium = 1, Low = 2 }
+
+So the shipped `Samples: 1` was already Medium and `BlurQuality: 0` was already
+High. Taking V-PIPE-03 literally would have DOWNGRADED the blur from Bilateral
+to Gaussian, and a first pass did exactly that: the resulting frames showed
+visible speckle on the ground at grazing angles, which reads as a rendering bug
+the way section 1.1's shadow banding did. Resolved by honouring the intent
+(raise AO quality) rather than the letter: `Samples: 0` (High, 12 taps) and
+`BlurQuality: 0` (High, bilateral). Section 3.3's budget is generous and these
+scenes are tiny.
+
+### C.2 V-SKY-01's halo cannot bloom and satisfy 6.3 at once
+
+V-SKY-01's acceptance says the sun's "halo blooms (V-POST-01)". Check 6.3
+thresholds the frame at 0.98 and requires every surviving pixel to lie inside an
+emissive object's bounds "plus the sun disc" - a blooming halo is by definition
+a survivor outside that whitelist, so it FAILS 6.3. The two clauses contradict.
+
+Resolved in favour of 6.3, which is the automated, testable one: the shader caps
+the halo below the threshold and only the disc (authored at 3.0 linear) crosses
+it. Visually nothing is lost, because the disc's own bloom already spreads
+across the halo region. **V-SKY-01's acceptance should read "the sun DISC
+blooms".**
+
+### C.3 Section 4.5 is wrong that a shader swap keeps the tests green
+
+Section 4.5 states that keeping the property names means "`Materials.cs` changes
+one `Shader.Find` string and the tests stay green". It does not:
+`Assets/Tests/EditMode/MaterialsTests.cs` pins the shader NAME, both in `SetUp`
+and in `Le_solide_prend_sa_couleur_dans_la_palette`, which asserts
+`Assert.AreEqual(LitShaderName, a.shader.name, "un solide est eclaire")`.
+That one assertion has to change with the swap. Its MEANING (a solid is lit, not
+unlit) and its French message are preserved. No other assertion moves.
+
+### C.4 V-MAT-01's smoothness cannot live on the material
+
+V-MAT-01 asks for "smoothness base 0.22". Gameplay PRD 14.2 pins Godot roughness
+0.85, i.e. URP smoothness 0.15, and MaterialsTests asserts
+`GetFloat("_Smoothness") == 0.15` to a tolerance of 0.001. Section 3.5 forbids
+changing a number the gameplay PRD pins, so the two cannot both be satisfied on
+the material. Resolved: `Materials.cs` keeps writing 0.15, and every per-style
+smoothness in 4.5 is the SHADER's working value, derived from `_Smoothness`
+inside the style branch. The material property stays the port-fidelity value.
+
+### C.5 Section 4.2 names only half the profiles that apply
+
+Section 4.2 says the post-processing values go in `DefaultVolumeProfile.asset`
+because "URP applies it globally". There is a SECOND default profile and it wins:
+`PC_RPAsset` and `Mobile_RPAsset` both name `SampleSceneProfile.asset` in their
+`m_VolumeProfile` field, and URP's `VolumeManager.Initialize` applies the global
+default FIRST and the pipeline asset's quality default SECOND.
+
+`SampleSceneProfile` (a URP template leftover) overrode Bloom threshold,
+intensity and scatter, and Vignette intensity. So V-POST-01 and V-POST-02 were
+authored correctly and overwritten on every frame, with no error and the right
+numbers visible in the inspector. Those four override flags are now cleared so
+the global profile is the only home for these values. **Before authoring any
+post-processing value, check both files.**
+
+### C.6 Nothing renders post-processing unless the camera opts in
+
+Not a document error, but the single most expensive discovery of Tier 0.
+`UniversalAdditionalCameraData.renderPostProcessing` defaults to FALSE, and
+URP gates both the uber-post pass and the colour-grading LUT on it. The player
+camera is built from code, so it had no such component and no such flag: bloom,
+vignette, colour adjustments, tonemapping, HDR grading AND the SMAA of V-PIPE-01
+were all inert on screen while every asset value was correct.
+
+Nothing in the harness could see it. The game built, ran, threw no exception,
+resolved every shader and photographed itself. `PlayerController` now sets the
+flag, and the failure path is deliberately left loud (see the comment there).
+
+### C.7 V-SKY-04's two thresholds cannot both hold
+
+The item asks that the far decor islands (30 to 40 m) lose at least 25 percent
+of their contrast while a platform at 15 m loses under 8. With distance-only
+exponential fog those are incompatible: the pinned density 0.018 gives
+`exp(-0.018 * 35) = 0.53` at the islands (47 percent lost, criterion met) but
+`exp(-0.018 * 15) = 0.76` at 15 m (24 percent lost, against a budget of 8).
+8 percent at 15 m needs density 0.0056, which then costs the islands only 18.
+
+The pinned density is kept and the far-island clause is the half it buys. The
+near-field clause needs the height-aware fog the item itself names as its second
+stage (P2 / M), which is not built yet. **V-SKY-04 is not complete.**
+
+### C.8 Section 3.2's font is no longer distributed at the size it allows
+
+The policy allows one OFL geometric sans of 100 to 300 KB, naming Inter as the
+default and Manrope or Outfit as acceptable. Inter is now published only as a
+variable font of 876 KB, over this document's own budget by a factor of three.
+Manrope's variable file is 165 KB, inside the budget, and explicitly on the
+allowed list, so it is the font.
+
+It lives in `Assets/Resources/Fonts/` rather than `Assets/Fonts/`. This game
+references no asset from a scene (one scene, one object, everything built in
+code), and Unity strips any asset nothing references, so `Resources` is the only
+directory a font can be loaded from in a built player. The project already uses
+`Assets/Resources/Data/` for the same reason. The OFL text sits beside it.
+
+### C.9 The Surface shader is hand-written HLSL, not a Shader Graph
+
+Section 4.5 and Appendix A assume `Viewpoint/Surface` is a Shader Graph. A
+`.shadergraph` is version-specific JSON that cannot be hand-authored reliably
+without the Editor GUI and fails silently when it is malformed. Section 3.2's
+own stated value is that the whole game stays reviewable as text, and
+`Assets/Shaders/GradientSky.shader` already sets the precedent for hand-written
+URP HLSL here. Every acceptance criterion in 4.5 is about what the surface
+LOOKS like, so none of them is weakened by the change of authoring tool.
+
+### C.10 The runtime assembly could not reach URP at all
+
+`Assets/Scripts/Viewpoint.asmdef` referenced only `Unity.InputSystem` and
+`Unity.TextMeshPro`, so no runtime code could touch `Volume`, `VolumeProfile`,
+`UniversalAdditionalCameraData`, `DecalProjector` or `LensFlareComponentSRP` -
+required by V-PIPE-01, V-POST-04, V-POST-05, V-SNAP-01, V-PROP-06 and V-SKY-05.
+It now also references `Unity.RenderPipelines.Core.Runtime` and
+`Unity.RenderPipelines.Universal.Runtime`. Every tier depends on this.
+
+### C.11 The asset policy was reversed by the owner on 2026-09-07
+
+Section 3.2 allowed exactly one binary asset (a UI font) and ruled out every
+texture. The owner has revised that decision and asked for real material detail
+on every object, naming the ground and the teleporter in particular.
+
+**Section 3.2 no longer holds.** Ten CC0 PBR sets from ambientCG now live under
+`Assets/Resources/Textures/`, listed with their purpose and their licence in
+`Assets/Resources/Textures/LICENSE.md`. `Assets/Editor/TextureImportRules.cs`
+gives them correct import settings on a fresh checkout, because Unity's defaults
+are wrong for three maps out of four in ways that produce a plausible picture
+rather than an error (a normal map read as colour, and roughness gamma decoded).
+
+They sit under `Resources/` and not in a plain `Assets/Textures/` because this
+game references no asset from a scene, and Unity strips whatever nothing
+references. `Resources.Load` is the only runtime path that survives a build,
+which is why the level data and the font are already there. A texture outside
+`Resources/` imports perfectly, looks right in the editor, and is absent from
+the player: the same class of failure as the stripped shaders in the README.
+
+What did NOT change: everything else is still generated. Meshes, the sky, the
+polaroid pictures, the level thumbnails and every HUD glyph are still code.
+
+### C.12 The realism target was raised, and what still constrains it
+
+Section 2.1 asked for "stylized realism-lite, nothing photoreal", and section
+3.1 bounded every albedo variation to plus or minus 0.04 luminance and 4 degrees
+of hue. The owner has asked to push realism as far as it goes and has accepted
+that colours may drift, so **the 3.1 AMPLITUDE bounds are lifted**.
+
+What is NOT lifted is the readability those bounds existed to protect. The game
+teaches every rule in colour and never in words (gameplay PRD 5.1): grey is
+permanent, pale is carvable, lavender is ephemeral, steel is sealed, lead takes
+no film. A player who cannot separate those at a glance cannot play, whatever
+the screenshot looks like.
+
+The two goals turn out not to conflict, because of the technique the Surface
+shader is required to use. A texture cannot simply multiply the palette colour:
+an ambientCG concrete averages about 0.5, so the whole game would render at half
+value and go muddy. Instead the shader divides each albedo sample by the
+texture's OWN mean (the 1x1 mip IS that mean, so it costs one extra fetch) to
+get a modulation centred on 1.0, and applies that to the palette colour:
+
+    float3 mean   = SAMPLE_TEXTURE2D_LOD(_BaseMap, s, float2(0.5, 0.5), 12).rgb;
+    float3 detail = texColor.rgb / max(mean, 1e-3);
+    float3 albedo = _BaseColor.rgb * lerp(1.0, detail, _TextureStrength);
+
+Full grain, veins and wear at strength 0.9, and the MEAN albedo of any face is
+still exactly its palette colour. So the palette relation tests keep describing
+what is on screen, and the grayscale separation check of 6.3 stays meaningful.
+Realism was bought without spending the colour language.
+
+### C.13 Atmosphere, requested 2026-09-07
+
+The owner also asked for light fog and floating particles. Most of that is
+already specified and merely scheduled late, and it is being pulled forward:
+V-SKY-04's second stage (height-aware fog, thick over the abyss and thin at
+platform height), V-VFX-08 (a sparse field of drifting dust motes and the
+heat shimmer over the teleporter pad), V-VFX-05 (the rising indigo motes inside
+a charged ring) and V-DRESS-03 (slow floating shards under the islands).
+
+### C.14 A broken shader does not fail anything in this harness
+
+Found while landing Tier 2, and it is the most dangerous gap the verification
+had. `Builder.CompileCheck` reports **C# errors only**. A `.shader` that does not
+compile fails NOTHING: Unity writes the error to its editor log and carries on,
+the build succeeds, the player runs, and `verify-player.ps1` reports green
+because the game starts, throws no exception and photographs itself.
+
+That is exactly what happened. `Viewpoint/Surface`, which draws every surface in
+the game, had `undeclared identifier 'Luminance'` at line 812 while the harness
+printed "les scripts compilent". The cause was subtle and worth recording:
+`Core.hlsl` does not include `Color.hlsl`, so `Luminance()` was visible in the
+forward pass (which pulls `Lighting.hlsl` further down) and undeclared in the
+shared `HLSLINCLUDE` block and in the ShadowCaster, DepthOnly and DepthNormals
+passes.
+
+Shader errors are only readable in Unity's editor log, which Unity TRUNCATES at
+every session start, so the whole file belongs to the run that just finished and
+no byte offset is needed. `verify.sh` now has an "Erreurs de shader" step that
+greps it after the compile step and fails on a hit.
+
+The same truncation is why the design audit's report has to be read straight
+after its own run: a later `unity` invocation (the player build in particular)
+wipes it. An earlier attempt to isolate "this run's tail" by seeking to a saved
+byte offset always came up empty, because the offset came from the previous,
+longer log and landed past the end of the fresh one - and a silent empty report
+looks exactly like a pass, which is the failure mode `verify.sh`'s own header
+warns about.
+
+### C.15 Two shader bugs that only exist because URP compiles each pass separately
+
+Both errors that stopped `Viewpoint/Surface` compiling were legal HLSL that a
+reader (or a review agent that cannot compile) would pass without blinking. Both
+came from the same mechanism: **each pass compiles only the code it reaches**, so
+a symbol that resolves in the forward pass can be missing in another.
+
+1. `undeclared identifier 'Luminance'`. `Core.hlsl` does not include
+   `Color.hlsl`. The forward pass sees `Luminance()` only because it includes
+   `Lighting.hlsl` further down, which pulls it in transitively. The shared
+   `HLSLINCLUDE` block, and the ShadowCaster / DepthOnly / DepthNormals passes,
+   saw nothing. Fixed by including `Color.hlsl` explicitly in the shared block.
+
+2. `Unrecognized sampler 'sampler_basemap' - does not match any texture`. The
+   shader shared one `sampler_BaseMap` across all six maps, which saves sampler
+   slots and is normal practice. It compiled in the forward pass and failed in
+   the depth-normals one, because that pass needs the NORMAL map and nothing
+   else: with the albedo unreferenced there, `_BaseMap` is stripped and the
+   sampler named after it points at a texture that no longer exists in that
+   pass. Fixed by giving every map its own sampler, so the name always matches a
+   texture that is live wherever it is used.
+   An inline sampler state would also have fixed it and was rejected: inline
+   states cannot express anisotropy, and `TextureImportRules.cs` sets aniso 8
+   precisely because almost every textured surface here is a large flat plane
+   seen at a grazing angle.
+
+The rule for anything added to this shader later: **a symbol is only as available
+as the least-included pass that uses it.** Check all four, not just the one whose
+output you are looking at.
+
+### C.16 Le slab du marqueur ne peut jamais disparaitre sans preuve que le decal dessine
+
+V-PROP-06 dit "les marqueurs deviennent des decals". Ecrit naivement, cela cache
+le slab et cree un DecalProjector. Trois facons dont le decal ne dessine rien,
+toutes silencieuses, et toutes laissant un niveau ou RIEN n'indique ou se placer :
+
+1. la Decal Renderer Feature absente ou desactivee dans le renderer actif ;
+2. `technique: 1` (DBuffer) sur un peripherique GL ou sans MRT4 :
+   `GetTechnique` repond `Invalid`, `AddRenderPasses` sort sur `if (!isValid)`,
+   et pas une seule passe decal n'est enfilee pour tout le run ;
+3. `DecalProjector.defaultMaterial` vaut **null dans un player** - URP ne
+   l'assigne que sous `#if UNITY_EDITOR`.
+
+Aucune de ces trois n'est visible pour les 130 tests ni pour l'audit, parce que
+le slab reste dans les DONNEES : seul son mesh disparait. Le gate
+`DecalObstacle()` teste donc les conditions publiques une par une et **echoue en
+gardant le mesh**. Un marqueur qui z-fight est le moindre mal ; un marqueur
+invisible est un niveau injouable qui verifie vert.
+
+### C.17 m_RendererFeatureMap est du little-endian concatene, et une erreur y est muette
+
+Ajouter une feature a un `.asset` de renderer demande trois choses coherentes :
+un document `--- !u!114 &<fileID>`, une entree dans `m_RendererFeatures`, et le
+fileID encode dans `m_RendererFeatureMap`. Ce dernier est un `List<long>` ecrit
+en hexa **little-endian**, 16 caracteres par entree, concatenes dans l'ordre de
+la liste. Verifie ici : `LE(7833122117494664109)` = `ad6b866f10d7b46c` (le SSAO
+deja present, ce qui valide la methode) et `LE(4859213077340516294)` =
+`c66fd0728c646f43`. Si `Count` ne correspond pas, `ValidateRendererFeatures`
+invalide la map et Unity **laisse tomber la feature sans un mot**.
+
+Le guid de `m_Script` ne s'invente jamais : il se lit dans le `.meta` du package
+(`DecalRendererFeature.cs.meta` -> `a1614fc811f8f184697d9bee70ab9fe5`).
+
+### C.18 Un Shader Graph dans Always Included Shaders ne porte pas fileID 4800000
+
+`4800000` est le fileID d'un `.shader` ecrit a la main. `Shaders/Decal.shadergraph`
+est un Shader Graph : son sous-objet porte un fileID propre et negatif
+(`-6465566751694194690`, lu dans le `Decal.mat` du package). Avec `4800000` la
+reference ne resout rien, l'entree **a l'air configuree**, et le shader est
+strippe du player exactement comme s'il etait absent.
+
+### C.19 La profondeur d'une jupe se cale sur le petit cote, pas sur le grand
+
+V-GEO-02 calait `depth` sur `span * 0.55` avec `span = max(x, z)`. Sur la passerelle
+du niveau 11 (`size [2, 0.3, 8.4]`) cela donne 4,62 m de masse sous une dalle de
+2 m de large : la jupe **engloutissait la pile et le polaroid "escalier"** dans
+de la geometrie opaque, et traversait la passerelle inferieure. L'audit ne peut
+pas le voir (il lit les donnees, pas l'occupation de l'espace).
+
+`depth = clamp(min(span * 0.55, min(x, z)), 1.5, 9)` : le grand cote continue de
+donner l'allure, le petit cote la borne. Cela ne touche que 8 des 57 plateformes
+et aucune de celles qui etaient au plafond de 9 m, donc le resultat de V-GEO-02
+deja valide a l'oeil est conserve. Verifie : zero objet dans une jupe sur les 25
+niveaux, avec 0,6 m de marge.
+
+### C.20 URP/Unlit jette la couleur de vertex, donc l'alpha des particules
+
+`Atmosphere` retombe sur `Universal Render Pipeline/Unlit` quand le shader de
+particules est absent du player. Or `UnlitForwardPass.hlsl` ne declare pas
+`COLOR` dans ses `Attributes` : la couleur de vertex, donc `startColor` et le
+`colorOverLifetime`, est **jetee**. Les 2 % d'alpha des poussieres devenaient
+jusqu'a 100 %.
+
+Le correctif ne pre-multiplie pas l'alpha dans la texture (`0.02 * 255 = 5.1`,
+soit six paliers, ce qui rendrait visible le bord du disque que la chute au carre
+existe pour effacer) : il le met sur `_BaseColor.a`, la seule entree que **les
+deux** chemins multiplient dans l'alpha.
+
+### C.21 Deux nombres lus sur le meme arbre, sinon le test se trompe
+
+Le controle "des dalles de marqueur et aucun decal peint" compare
+`decals - halos` a `slabs`. `decals` venait de `GetComponentsInChildren(true)`
+(inclut les inactifs) et `halos` de `Groups.Snapshot` (uniquement les actifs, et
+sans `CameraItem`). Les deux ecarts **gonflent** `painted`, donc le test
+repondait OK precisement sur les builds qu'il existe pour attraper : un rewind
+qui retire un pickup au cimetiere suffisait. Les deux nombres se lisent
+desormais sur le meme arbre.

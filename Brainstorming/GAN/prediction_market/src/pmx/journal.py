@@ -62,8 +62,10 @@ from typing import (
     get_type_hints,
 )
 
-from pmx.data.schema import validate_against_schema
-from pmx.errors import JournalError, NonCanonicalValueError
+from jsonschema import Draft202012Validator
+
+from pmx.data.schema import load_schema, validate_against_schema
+from pmx.errors import JournalError, NonCanonicalValueError, SchemaError
 from pmx.types import JOURNAL_ENCODING as JOURNAL_ENCODING
 from pmx.types import JOURNAL_NEWLINE as JOURNAL_NEWLINE
 from pmx.types import PHASE_ORDER
@@ -546,6 +548,18 @@ class MarketListed(JournalEvent):
     fee_schedule_id: str
     hardness_tags: tuple[str, ...]
     fold: str
+    #: Amendment C1b's eight instrument fields (17.3, ruling R164), required since gate G2 rebuilt the
+    #: backtest fixture. On a binary they carry the mapping of 17.1 (``binary``, the provider, the
+    #: ``provider_id``, ``100``, ``1_000_000``, ``continuous``, ``None``, ``None``); on a continuous
+    #: instrument ``close_at_ms`` is ``delisted_at_ms`` or ``0`` when unset (a journal is not an observation).
+    kind: str
+    vendor: str
+    symbol: str
+    tick_size_micro: int
+    point_value_micro: int
+    session_calendar_id: str
+    borrow_schedule_id: str | None
+    carry_schedule_id: str | None
 
     TYPE: ClassVar[str] = "market_listed"
     PHASES: ClassVar[tuple[str, ...]] = ("open",)
@@ -663,6 +677,12 @@ class ForecastRecorded(JournalEvent):
     market_id: str
     prob_ppm: int
     carried: bool
+    #: Amendment C1b's continuous payload (17.5, ruling R157): the reference price in ticks and one
+    #: ``{horizon_bars, up_probability_ppm, quantiles_ticks}`` mapping per horizon of the run. ``None`` on
+    #: a binary (ruling R164 as applied by gate G2: one event shape per name, null where the kind has no
+    #: value, exactly as ``event_key`` and ``market_id`` are nullable elsewhere in the catalogue).
+    price_ref_ticks: int | None
+    horizons: tuple[Mapping[str, object], ...] | None
 
     TYPE: ClassVar[str] = "forecast_recorded"
     PHASES: ClassVar[tuple[str, ...]] = ("decide",)
@@ -712,9 +732,12 @@ class OrderPlaced(JournalEvent):
     expires_at_ms: int | None
     reserved_cents: int
     origin: str
+    #: The bar the intent was decided at: the instrument's previous bar (section 16.2, rulings R111, R129
+    #: and R192), or the bar itself for an event fill, whose phase is ``settle`` (17.3, ruling R152).
+    decided_at_ms: int
 
     TYPE: ClassVar[str] = "order_placed"
-    PHASES: ClassVar[tuple[str, ...]] = ("execute",)
+    PHASES: ClassVar[tuple[str, ...]] = ("execute", "settle")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -726,6 +749,9 @@ class OrderRejected(JournalEvent):
     item_index: int
     reason: str
     detail: str
+    #: The bar the rejected intent was decided at (16.2, ruling R129): without it ``item_index``, which
+    #: indexes the previous bar's ``action_received``, could not be traced to its intent.
+    decided_at_ms: int
 
     TYPE: ClassVar[str] = "order_rejected"
     PHASES: ClassVar[tuple[str, ...]] = ("execute",)
@@ -762,7 +788,8 @@ class Filled(JournalEvent):
     avg_cost_bp_after: int
 
     TYPE: ClassVar[str] = "filled"
-    PHASES: ClassVar[tuple[str, ...]] = ("execute",)
+    #: ``settle`` for an event fill of a roll or the forced flat (17.3, rulings R152 and R164).
+    PHASES: ClassVar[tuple[str, ...]] = ("execute", "settle")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -777,7 +804,8 @@ class FeeCharged(JournalEvent):
     role: str
 
     TYPE: ClassVar[str] = "fee_charged"
-    PHASES: ClassVar[tuple[str, ...]] = ("execute",)
+    #: ``settle`` for the taker fee of an event fill (17.3, rulings R152 and R164).
+    PHASES: ClassVar[tuple[str, ...]] = ("execute", "settle")
 
 
 @dataclass(frozen=True, slots=True, kw_only=True)
@@ -810,6 +838,83 @@ class SettlementApplied(JournalEvent):
     n_forecast_bars: int
 
     TYPE: ClassVar[str] = "settlement_applied"
+    PHASES: ClassVar[tuple[str, ...]] = ("settle",)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class CashEventApplied(JournalEvent):
+    """One ``CashEvent`` of section 17.3 applied to one agent in the settle phase (ruling R151).
+
+    ``cash_delta_cents`` is the one money-moving field for ``funding``, ``dividend``, ``borrow_fee`` and
+    ``carry`` (signed: a debit may take cash below zero, ruling R179) and is ``0`` for ``split``, ``roll``
+    and ``forced_flat``, whose money moves in the ``filled`` and ``fee_charged`` events named in
+    ``order_ids``. ``position_before`` and ``position_after`` are the position before the first and after
+    the last of those event fills for ``roll`` and ``forced_flat``, equal for the four charges, and related
+    by ``split_position_milli`` for a split (ruling R178). Emitted by ``pmx.engine.execution`` only (9.3).
+    """
+
+    agent_id: str
+    market_id: str
+    cash_event_id: str
+    kind: str
+    origin: str
+    position_before: int
+    position_after: int
+    avg_cost_ticks_before: int
+    avg_cost_ticks_after: int
+    cash_delta_cents: int
+    order_ids: tuple[str, ...]
+    detail: Mapping[str, object]
+
+    TYPE: ClassVar[str] = "cash_event_applied"
+    PHASES: ClassVar[tuple[str, ...]] = ("settle",)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class InstrumentClosed(JournalEvent):
+    """A continuous instrument's last bar in the run (17.3, ruling R150): every position has been
+    flattened by ``Execution.force_flat`` and the runner records what the instrument was.
+
+    ``n_bars`` counts the instrument's bars inside the run and ``n_forecasts_unresolved`` the horizon
+    forecasts whose horizon lies beyond it, which are never scored (ruling R160).
+    """
+
+    market_id: str
+    kind: str
+    reason: str
+    last_price_ticks: int
+    n_bars: int
+    n_forecasts_unresolved: int
+
+    TYPE: ClassVar[str] = "instrument_closed"
+    PHASES: ClassVar[tuple[str, ...]] = ("settle",)
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class ForecastResolved(JournalEvent):
+    """One horizon of one continuous forecast, scored at the bar its realisation became public (17.5,
+    ruling R160).
+
+    The baseline directional Brier is the constant ``RANDOM_WALK_BRIER_MICRO`` and is not a field; the
+    baseline pinball depends on the realisation and is. ``pinball_micro`` is ``None`` for an agent that
+    stated no quantiles, which is scored on direction only and says so.
+    """
+
+    agent_id: str
+    market_id: str
+    forecast_bar_ms: int
+    horizon_bars: int
+    up_probability_ppm: int
+    quantiles_ticks: tuple[int, ...] | None
+    price_ref_ticks: int
+    price_realised_ticks: int
+    realised_sign: int
+    directional_brier_micro: int
+    pinball_micro: int | None
+    baseline_pinball_micro: int
+    carried: bool
+
+    TYPE: ClassVar[str] = "forecast_resolved"
     PHASES: ClassVar[tuple[str, ...]] = ("settle",)
 
 
@@ -1017,6 +1122,9 @@ _EVENT_CLASS_TUPLE: tuple[type[JournalEvent], ...] = (
     FeeCharged,
     Settled,
     SettlementApplied,
+    CashEventApplied,
+    InstrumentClosed,
+    ForecastResolved,
     HiveWritten,
     EquityMarked,
     AgentRuined,
@@ -1203,7 +1311,52 @@ def validate_event_dict(payload: Mapping[str, object]) -> None:
         SchemaError: If the mapping does not validate, naming the failing path and the event.
     """
     where = f"journal event seq={payload.get('seq')} type={payload.get('type')}"
+    raw_type = payload.get("type")
+    if isinstance(raw_type, str) and raw_type in EVENT_CLASSES:
+        # Dispatch on ``type`` (gate G2 ruling, answering E5's report): the schema's ``oneOf`` with
+        # ``unevaluatedProperties: false`` made the validator try every one of thirty-two branches per
+        # event, about 27 ms each, so a whole-pack journal took seven minutes to validate and the real
+        # dataset's would have taken hours. The per-type sub-schema is the same ``$defs`` entry the
+        # ``oneOf`` would have selected; an unknown type still goes through the whole schema so the
+        # failure it reports is the ``oneOf`` one.
+        errors = sorted(
+            _validator_for_type(raw_type).iter_errors(dict(payload)),
+            key=lambda e: (list(e.absolute_path), e.message),
+        )
+        if not errors:
+            return
+        first = errors[0]
+        raise SchemaError(
+            "payload fails its JSON schema",
+            schema=JOURNAL_SCHEMA,
+            where=where,
+            at="/".join(str(part) for part in first.absolute_path),
+            detail=first.message,
+            n_errors=len(errors),
+        )
     validate_against_schema(JOURNAL_SCHEMA, dict(payload), where=where)
+
+
+_TYPE_VALIDATORS: dict[str, Draft202012Validator] = {}
+
+
+def _validator_for_type(event_type: str) -> Draft202012Validator:
+    """The compiled validator of one event type's ``$defs`` entry, built once per process."""
+    cached = _TYPE_VALIDATORS.get(event_type)
+    if cached is None:
+        schema = load_schema(JOURNAL_SCHEMA)
+        defs = schema["$defs"]
+        if not isinstance(defs, dict):  # pragma: no cover - the schema file is C1b's and carries $defs
+            raise SchemaError("journal schema carries no $defs", schema=JOURNAL_SCHEMA)
+        sub: dict[str, object] = {
+            "$schema": schema.get("$schema", "https://json-schema.org/draft/2020-12/schema"),
+            "$ref": f"#/$defs/{event_type}",
+            "$defs": defs,
+        }
+        Draft202012Validator.check_schema(sub)
+        cached = Draft202012Validator(sub)
+        _TYPE_VALIDATORS[event_type] = cached
+    return cached
 
 
 # --------------------------------------------------------------------------------------------------

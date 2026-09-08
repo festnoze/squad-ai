@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
@@ -22,14 +23,51 @@ namespace Viewpoint
         const string SmokeProbeType = "Viewpoint.Tests.SmokeProbe";
         const string ShotProbeType = "Viewpoint.ShotProbe";
 
+        /// <summary>
+        /// Below this downward speed nothing is a fall (PRD_VISUAL V-POST-06).
+        /// It is there to keep a body that is merely settling on a platform out
+        /// of a division: a walk off a kerb passes it, but the blur still needs
+        /// the kill plane within a third of a second to show at all.
+        /// </summary>
+        const float FallSpeedFloor = 4f;
+
+        /// <summary>
+        /// The white a depart fades to (PRD_VISUAL V-POST-06: "leaving a level
+        /// fades to white"). A paper white rather than 1,1,1 so the HUD's banner
+        /// stays readable against it while the quad closes.
+        /// </summary>
+        static readonly Color DepartWhite = new Color(0.97f, 0.97f, 0.99f);
+
         public Transform LevelRoot { get; private set; }
         public PlayerController Player { get; private set; }
         public Hud Hud { get; private set; }
         public Menu Menu { get; private set; }
         public Rewind Rewind { get; private set; }
 
+        /// <summary>
+        /// The state-driven post-processing of PRD_VISUAL 4.2 (V-POST-04 to
+        /// V-POST-06). Null when its boot step failed, and every call site here
+        /// tolerates that: a missing render pipeline costs the transitions, never
+        /// the game.
+        /// </summary>
+        public PostFx PostFx { get; private set; }
+
         bool _transitioning;
         Teleporter _teleporter;
+
+        /// <summary>
+        /// The kill plane of the level in play, kept because PostFx measures the
+        /// fall against it. Read-only here: the plane the game ENFORCES is the
+        /// one handed to the player controller in LoadLevel, and this is a copy
+        /// of the same number for the look of the last third of a second.
+        /// </summary>
+        float _killY = -10f;
+
+        /// <summary>
+        /// Hud's colour-taking fade, bound by reflection ONCE. See FadeOutTo.
+        /// </summary>
+        MethodInfo _colourFade;
+        bool _colourFadeResolved;
 
         static GameState State
         {
@@ -112,6 +150,17 @@ namespace Viewpoint
                 rewindObject.transform.SetParent(transform, false);
                 Rewind = rewindObject.AddComponent<Rewind>();
             });
+
+            // Last, and isolated like the rest: PostFx builds four runtime
+            // Volumes, and a project whose active pipeline is not URP has no use
+            // for any of them. It wires nothing at boot (Update and the
+            // transitions drive it), so nothing above depends on it existing.
+            Step("post effects", () =>
+            {
+                var postObject = new GameObject("PostFx");
+                postObject.transform.SetParent(transform, false);
+                PostFx = postObject.AddComponent<PostFx>();
+            });
         }
 
         static void Step(string what, Action build)
@@ -133,6 +182,13 @@ namespace Viewpoint
             Player.FellOut += OnPlayerFell;
 
             Rewind.Setup(Player, LevelRoot);
+
+            // After Player.Setup, because that is what builds the rig: the
+            // camera the volume stack has to read does not exist before it.
+            if (PostFx != null)
+            {
+                PostFx.Bind(Player.Camera);
+            }
 
             Menu.StartRequested += StartGame;
             Menu.ResumeRequested += Resume;
@@ -194,13 +250,59 @@ namespace Viewpoint
                 Hud.SetHeld(placer.HeldTitle(), picture, placer.Raised);
                 Hud.SetPhotoView(placer.Raised ? picture : null, placer.RollSteps);
                 Hud.SetViewfinder(Player.Viewfinder);
+                DrivePostFx(true, placer.Raised);
             }
             else
             {
                 Hud.SetPrompt(string.Empty);
                 Hud.SetPhotoView(null);
                 Hud.SetViewfinder(false);
+                // A menu, a fade or a title screen releases every state
+                // treatment: none of them describes a world the player is in.
+                DrivePostFx(false, false);
             }
+        }
+
+        /// <summary>
+        /// Hands the frame's state to the post-processing of PRD_VISUAL 4.2
+        /// (V-POST-04 and V-POST-05, and the fall half of V-POST-06). It reads
+        /// only what this Update already holds, so there is no second source of
+        /// truth to drift and nothing new is polled for a look.
+        ///
+        /// The rewind flag comes from Rewind and not from the R key: FixedUpdate
+        /// owns that decision, and asking the key here would light the treatment
+        /// on a frame where the rewind had already refused to start (no history
+        /// left, for one). Reading the subsystem's own state cannot disagree with
+        /// what the world is doing.
+        /// </summary>
+        void DrivePostFx(bool playing, bool photoRaised)
+        {
+            if (PostFx == null)
+            {
+                return;
+            }
+            bool rewinding = playing && Rewind != null && Rewind.IsRewinding;
+            float fallSeconds = playing ? FallSecondsLeft() : float.PositiveInfinity;
+            PostFx.Drive(rewinding, photoRaised, fallSeconds);
+        }
+
+        /// <summary>
+        /// Seconds of fall left before the kill plane, at the speed the body is
+        /// falling right now, and positive infinity when it is not falling toward
+        /// it. Both numbers are ones the player controller already publishes and
+        /// neither is written: this decides how a frame LOOKS in the last third
+        /// of a second of a fall (V-POST-06) and it must not be able to change
+        /// when the fall ends, which is the controller's business alone.
+        /// </summary>
+        float FallSecondsLeft()
+        {
+            float speed = -Player.Velocity.y;
+            if (speed < FallSpeedFloor)
+            {
+                return float.PositiveInfinity;
+            }
+            float drop = Player.transform.position.y - _killY;
+            return drop <= 0f ? 0f : drop / speed;
         }
 
         /// <summary>
@@ -287,6 +389,24 @@ namespace Viewpoint
             }
 
             Player.SetSpawn(def.Spawn, def.SpawnYaw, def.KillY);
+
+            // The kill plane travels with the level, like the spawn does, and so
+            // does the blur that anticipates it.
+            _killY = def.KillY;
+            if (PostFx != null)
+            {
+                // SetSpawn has just teleported the body. URP's camera motion blur
+                // reads the change in the view-projection matrix between two
+                // frames, so a fall blur still on its way down would smear the
+                // new level's first frame across the screen from wherever the
+                // player died: it is cut here rather than released.
+                PostFx.CutFallBlur();
+                // Re-pointed at the camera the rig holds now. Cheap, and it is
+                // the only place that would notice a camera rebuilt mid run,
+                // which is exactly why the teleporter is re-subscribed here too.
+                PostFx.Bind(Player.Camera);
+            }
+
             State.BeginLevel(index, def.Teleporter != null ? def.Teleporter.Required : 0);
             Hud.ShowBanner("Niveau " + (index + 1) + " : " + def.Name, def.Subtitle);
             Hud.FadeIn();
@@ -339,7 +459,15 @@ namespace Viewpoint
         {
             _transitioning = true;
             Player.ControlEnabled = false;
-            yield return Hud.FadeOut();
+            // Before the fade and not with it: the bloom-up can only be SEEN
+            // while the quad is still translucent (PRD_VISUAL V-POST-06). It
+            // sets no duration of its own, so a depart still takes the 0.6 s the
+            // gameplay PRD pins.
+            if (PostFx != null)
+            {
+                PostFx.BeginDepart();
+            }
+            yield return FadeOutTo(DepartWhite);
 
             if (State.HasNextLevel())
             {
@@ -353,7 +481,91 @@ namespace Viewpoint
                 Menu.ShowVictory();
                 Hud.FadeIn();
             }
+            // Released once the next level (or the victory screen) is up, so the
+            // glow drains away under the fade coming back in.
+            if (PostFx != null)
+            {
+                PostFx.EndDepart();
+            }
             _transitioning = false;
+        }
+
+        /// <summary>
+        /// The fade out of a departure, in the colour V-POST-06 asks for. Falls
+        /// back to the plain fade when the HUD has no colour-taking form of it,
+        /// in which case a depart is still told apart from a fall by the bloom-up
+        /// PostFx puts under it.
+        ///
+        /// Bound BY REFLECTION, for the same reason AttachProbes below binds the
+        /// probes by name: Main must not fail to compile over a method that is
+        /// not there. Hud owns the fade quad and its colour (this file must not
+        /// touch Hud.cs), the two files land in the same compile, and a direct
+        /// call to an API that arrives a round later does not degrade to "no
+        /// white fade", it degrades to "no build". One lookup, cached, on the
+        /// first departure of a run.
+        /// </summary>
+        IEnumerator FadeOutTo(Color color)
+        {
+            MethodInfo fade = ColourFade();
+            if (fade == null)
+            {
+                yield return Hud.FadeOut();
+                yield break;
+            }
+            yield return (IEnumerator)fade.Invoke(Hud, new object[] { color });
+        }
+
+        /// <summary>
+        /// Hud's public coroutine that fades to a given colour, or null when it
+        /// has none. "FadeOut(Color)" is preferred by name; any other public
+        /// Fade* coroutine taking a single Color is accepted, so a HUD that calls
+        /// it FadeTo still gets used.
+        /// </summary>
+        MethodInfo ColourFade()
+        {
+            if (_colourFadeResolved)
+            {
+                return _colourFade;
+            }
+            if (Hud == null)
+            {
+                // Not resolved: ask again when there is a HUD to ask about.
+                return null;
+            }
+            _colourFadeResolved = true;
+
+            MethodInfo[] methods = Hud.GetType().GetMethods(BindingFlags.Public | BindingFlags.Instance);
+            for (var i = 0; i < methods.Length; i++)
+            {
+                if (!TakesOneColour(methods[i]))
+                {
+                    continue;
+                }
+                if (methods[i].Name == "FadeOut")
+                {
+                    _colourFade = methods[i];
+                    break;
+                }
+                if (_colourFade == null && methods[i].Name.StartsWith("Fade", StringComparison.Ordinal))
+                {
+                    _colourFade = methods[i];
+                }
+            }
+
+            Debug.Log("[Main] Depart fade: " + (_colourFade != null
+                ? "Hud." + _colourFade.Name + "(Color)"
+                : "Hud has no colour fade, falling back to FadeOut()"));
+            return _colourFade;
+        }
+
+        static bool TakesOneColour(MethodInfo method)
+        {
+            if (method.ReturnType != typeof(IEnumerator))
+            {
+                return false;
+            }
+            ParameterInfo[] parameters = method.GetParameters();
+            return parameters.Length == 1 && parameters[0].ParameterType == typeof(Color);
         }
 
         /// <summary>

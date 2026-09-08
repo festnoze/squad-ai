@@ -23,6 +23,9 @@
     { "$ref": "#/$defs/fee_charged" },
     { "$ref": "#/$defs/settled" },
     { "$ref": "#/$defs/settlement_applied" },
+    { "$ref": "#/$defs/cash_event_applied" },
+    { "$ref": "#/$defs/instrument_closed" },
+    { "$ref": "#/$defs/forecast_resolved" },
     { "$ref": "#/$defs/hive_written" },
     { "$ref": "#/$defs/equity_marked" },
     { "$ref": "#/$defs/agent_ruined" },
@@ -191,13 +194,13 @@
       "description": "A market's leak-free metadata, recorded once per run at the bar it is first listed. An observed input, not a derived number: without it the projection cannot rebuild the horizon buckets, the block keys or the per-category and per-fold rows from the journal alone (CONTRACTS_V2 sections 9.2 and 9.5).",
       "allOf": [ { "$ref": "#/$defs/envelope" } ],
       "unevaluatedProperties": false,
-      "required": ["market_id", "provider", "category", "tags", "event_key", "created_at_ms", "close_at_ms", "interval_min", "fee_schedule_id", "hardness_tags", "fold"],
+      "required": ["market_id", "provider", "category", "tags", "event_key", "created_at_ms", "close_at_ms", "interval_min", "fee_schedule_id", "hardness_tags", "fold", "kind", "vendor", "symbol", "tick_size_micro", "point_value_micro", "session_calendar_id", "borrow_schedule_id", "carry_schedule_id"],
       "properties": {
         "type": { "const": "market_listed" },
         "phase": { "const": "open" },
         "market_id": { "$ref": "#/$defs/marketId" },
         "provider": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "xnys", "xnas", "arcx", "xcme", "xnym", "xcec", "xcbt", "otcfx"] },
-        "kind": { "description": "Amendment C1b (17.3, ruling R164): the instrument fields, declared and not yet required; a journal without them is a binary journal and the projection reads binary, the provider, 100, 1_000_000, continuous, null, null.", "$ref": "#/$defs/kind" },
+        "kind": { "description": "Amendment C1b (17.3, ruling R164): the eight instrument fields, required since gate G2 landed pmx.journal's dataclasses and rebuilt the backtest fixture. On a binary they carry the mapping of 17.1: binary, the provider, provider_id, 100, 1_000_000, continuous, null, null.", "$ref": "#/$defs/kind" },
         "vendor": { "$ref": "#/$defs/vendor" },
         "symbol": { "type": "string", "minLength": 1, "maxLength": 64 },
         "tick_size_micro": { "type": "integer", "minimum": 1, "maximum": 1000000000 },
@@ -337,7 +340,7 @@
     "forecast_recorded": {
       "allOf": [ { "$ref": "#/$defs/envelope" } ],
       "unevaluatedProperties": false,
-      "required": ["agent_id", "market_id", "prob_ppm", "carried"],
+      "required": ["agent_id", "market_id", "prob_ppm", "carried", "price_ref_ticks", "horizons"],
       "properties": {
         "type": { "const": "forecast_recorded" },
         "phase": { "const": "decide" },
@@ -345,8 +348,8 @@
         "market_id": { "$ref": "#/$defs/marketId" },
         "prob_ppm": { "$ref": "#/$defs/ppm" },
         "carried": { "type": "boolean" },
-        "price_ref_ticks": { "description": "Amendment C1b (17.5, ruling R157): present on a continuous instrument with horizons, absent on a binary.", "$ref": "#/$defs/priceTicks" },
-        "horizons": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/horizonForecast" } }
+        "price_ref_ticks": { "description": "Amendment C1b (17.5, ruling R157): the reference price in ticks on a continuous instrument with horizons; null on a binary. Required since gate G2 (ruling R164): one event shape per name, null where the kind has no value.", "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/priceTicks" } ] },
+        "horizons": { "description": "One entry per horizon of the run on a continuous instrument; null on a binary.", "oneOf": [ { "type": "null" }, { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/horizonForecast" } } ] }
       }
     },
     "research_spent": {
@@ -381,10 +384,10 @@
     "order_placed": {
       "allOf": [ { "$ref": "#/$defs/envelope" } ],
       "unevaluatedProperties": false,
-      "required": ["order_id", "agent_id", "market_id", "kind", "side", "price_bp", "size", "ttl_bars", "expires_at_ms", "reserved_cents", "origin"],
+      "required": ["order_id", "agent_id", "market_id", "kind", "side", "price_bp", "size", "ttl_bars", "expires_at_ms", "reserved_cents", "origin", "decided_at_ms"],
       "properties": {
         "type": { "const": "order_placed" },
-        "phase": { "description": "execute today; gate G2 widens it to execute or settle for an event fill of a roll or the forced flat together with OrderPlaced.PHASES (CONTRACTS_V2 17.3, rulings R152 and R164).", "const": "execute" },
+        "phase": { "description": "execute for an agent's order; settle for an event fill of a roll or the forced flat, landed by gate G2 together with OrderPlaced.PHASES (CONTRACTS_V2 17.3, rulings R152 and R164).", "enum": ["execute", "settle"] },
         "order_id": { "$ref": "#/$defs/orderId" },
         "agent_id": { "$ref": "#/$defs/agentId" },
         "market_id": { "$ref": "#/$defs/marketId" },
@@ -405,7 +408,7 @@
     "order_rejected": {
       "allOf": [ { "$ref": "#/$defs/envelope" } ],
       "unevaluatedProperties": false,
-      "required": ["agent_id", "market_id", "item_index", "reason", "detail"],
+      "required": ["agent_id", "market_id", "item_index", "reason", "detail", "decided_at_ms"],
       "properties": {
         "type": { "const": "order_rejected" },
         "phase": { "const": "execute" },
@@ -426,7 +429,7 @@
       "required": ["order_id", "agent_id", "market_id", "side", "kind", "requested_size", "filled_size", "unfilled_size", "unfilled_reason", "base_price_bp", "slippage_bp", "fill_price_bp", "price_source", "close_size", "open_size", "cash_delta_cents", "released_cents", "position_before", "position_after", "avg_cost_bp_after"],
       "properties": {
         "type": { "const": "filled" },
-        "phase": { "description": "execute today; settle for an event fill at gate G2 with Filled.PHASES (rulings R152, R164).", "const": "execute" },
+        "phase": { "description": "execute for an agent's fill; settle for an event fill, landed by gate G2 with Filled.PHASES (rulings R152, R164).", "enum": ["execute", "settle"] },
         "order_id": { "$ref": "#/$defs/orderId" },
         "agent_id": { "$ref": "#/$defs/agentId" },
         "market_id": { "$ref": "#/$defs/marketId" },
@@ -458,7 +461,7 @@
       "required": ["order_id", "agent_id", "market_id", "fee_cents", "schedule_id", "role"],
       "properties": {
         "type": { "const": "fee_charged" },
-        "phase": { "description": "execute today; settle for an event fill at gate G2 with FeeCharged.PHASES (rulings R152, R164).", "const": "execute" },
+        "phase": { "description": "execute for an agent's fill; settle for an event fill, landed by gate G2 with FeeCharged.PHASES (rulings R152, R164).", "enum": ["execute", "settle"] },
         "order_id": { "$ref": "#/$defs/orderId" },
         "agent_id": { "$ref": "#/$defs/agentId" },
         "market_id": { "$ref": "#/$defs/marketId" },

@@ -12,8 +12,19 @@ de photographier soi-meme le monde. Les trois dernieres lecons du jeu sont des
 refus : l'acier qu'aucune pose n'ouvre, le plomb qu'aucune pellicule n'imprime,
 et la gravite qui fait tomber une caisse posee.
 
-Aucun asset binaire : geometrie, materiaux, textures, ciel, police et vignettes
-sont generes par code.
+Geometrie, ciel, vignettes et glyphes d'interface sont generes par code. Deux
+exceptions, toutes deux documentees : une police OFL (`Assets/Resources/Fonts/`)
+et dix jeux de textures PBR CC0 (`Assets/Resources/Textures/`, licence et liste
+dans le `LICENSE.md` du dossier). Le projet n'a longtemps porte aucun asset
+binaire ; le proprietaire a leve cette regle le 2026-09-07 pour obtenir un rendu
+de matiere realiste. `docs/PRD_VISUAL.md` annexe C.11 dit pourquoi.
+
+Ces fichiers sont sous `Assets/Resources/` et pas ailleurs, et ce n'est pas un
+choix de rangement : ce jeu ne reference aucun asset depuis une scene, or Unity
+SUPPRIME du build tout asset que rien ne reference. `Resources.Load` est le seul
+chemin qui survive a un player. Une texture posee dans un `Assets/Textures/`
+ordinaire s'importe bien, s'affiche bien dans l'editeur, et manque dans le jeu
+construit : exactement la panne qui a coute les shaders (voir plus bas).
 
 - `docs/PRD.md` : le contrat. Extrait du code Godot et de ses tests, pas des
   anciens documents. C'est lui qui fait foi, section par section.

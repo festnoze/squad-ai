@@ -25,7 +25,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo"] }
+      "items": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "xnys", "xnas", "arcx", "xcme", "xnym", "xcec", "xcbt", "otcfx"] }
     },
     "safety_lag_ms": { "$ref": "#/$defs/ms" },
     "filters": {
@@ -105,7 +105,7 @@
             "additionalProperties": false,
             "required": ["source", "n_items", "fetched_at_ms_min", "fetched_at_ms_max"],
             "properties": {
-              "source": { "enum": ["wikipedia_current_events", "wikipedia_asof", "wayback", "gdelt", "manifold_comment"] },
+              "source": { "enum": ["wikipedia_current_events", "wikipedia_asof", "wayback", "gdelt", "manifold_comment", "edgar", "fred", "cboe"] },
               "n_items": { "$ref": "#/$defs/nonNegInt" },
               "fetched_at_ms_min": { "$ref": "#/$defs/ms" },
               "fetched_at_ms_max": { "$ref": "#/$defs/ms" }
@@ -126,7 +126,10 @@
         "validation_end_ms": { "$ref": "#/$defs/ms" },
         "n_train": { "$ref": "#/$defs/nonNegInt" },
         "n_validation": { "$ref": "#/$defs/nonNegInt" },
-        "n_sealed": { "$ref": "#/$defs/nonNegInt" }
+        "n_sealed": { "$ref": "#/$defs/nonNegInt" },
+        "n_instruments_train": { "description": "Amendment C1b (17.6, 17.9): a continuous instrument belongs to every fold whose months it has bars in, so the three count instruments per fold and do not partition them. Absent from a binary-only manifest.", "$ref": "#/$defs/nonNegInt" },
+        "n_instruments_validation": { "$ref": "#/$defs/nonNegInt" },
+        "n_instruments_sealed": { "$ref": "#/$defs/nonNegInt" }
       }
     },
     "files": {
@@ -136,7 +139,7 @@
         "additionalProperties": false,
         "required": ["path", "sha256", "bytes"],
         "properties": {
-          "path": { "type": "string", "pattern": "^(markets|news|wiki_asof|clusters)/[A-Za-z0-9._/-]+$" },
+          "path": { "type": "string", "pattern": "^(markets|news|wiki_asof|clusters|instruments|calendars)/[A-Za-z0-9._/-]+$" },
           "sha256": { "$ref": "#/$defs/sha256" },
           "bytes": { "$ref": "#/$defs/nonNegInt" }
         }
@@ -155,6 +158,37 @@
     },
     "sealed": { "type": "boolean" },
     "notes": { "type": "string", "maxLength": 4000 },
+    "kinds": {
+      "description": "Amendment C1b (CONTRACTS_V2 7.8, 17.9, ruling R149; applied by gate G2): the instrument kinds the dataset carries. Absent from a manifest written before the amendment, which is a binary-only dataset.",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "enum": ["binary", "spot_crypto", "perp", "fx", "equity", "future"] }
+    },
+    "instruments": {
+      "description": "Amendment C1b (7.8, 17.9): the counts of the continuous instruments under instruments/ and of the calendars under calendars/. Absent from a binary-only dataset.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["per_kind", "per_provider", "per_vendor", "n_cash_events", "n_calendars"],
+      "properties": {
+        "per_kind": { "type": "object", "additionalProperties": { "$ref": "#/$defs/nonNegInt" } },
+        "per_provider": { "type": "object", "additionalProperties": { "$ref": "#/$defs/nonNegInt" } },
+        "per_vendor": { "type": "object", "additionalProperties": { "$ref": "#/$defs/nonNegInt" } },
+        "n_cash_events": { "type": "object", "additionalProperties": false, "required": ["per_kind"], "properties": { "per_kind": { "type": "object", "additionalProperties": { "$ref": "#/$defs/nonNegInt" } } } },
+        "n_calendars": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "schedules": {
+      "description": "Amendment C1b (7.8, 17.4, 17.9): the fee, borrow and carry schedule ids the dataset's instruments name. Absent from a binary-only dataset.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["fee", "borrow", "carry"],
+      "properties": {
+        "fee": { "$ref": "#/$defs/scheduleIdList" },
+        "borrow": { "$ref": "#/$defs/scheduleIdList" },
+        "carry": { "$ref": "#/$defs/scheduleIdList" }
+      }
+    },
     "clusters": {
       "description": "CONTRACTS_V2 16.3 (ruling R117): the summary of clusters/clusters.json, absent from a dataset built with no cluster matcher. clusters.json carries no dataset_hash of its own, because its bytes are inside that hash (ruling R128); overrides_sha256 is what pins the hand-written review.",
       "type": "object",
@@ -207,6 +241,7 @@
     }
   },
   "$defs": {
+    "scheduleIdList": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" } },
     "ms": { "type": "integer", "minimum": 0 },
     "nonNegInt": { "type": "integer", "minimum": 0 },
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
