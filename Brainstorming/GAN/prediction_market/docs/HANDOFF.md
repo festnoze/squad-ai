@@ -169,3 +169,81 @@ Scripts under `C:\Users\e.millerioux\.claude\projects\C--Dev-squad-ai-Brainstorm
 | `wf_7555466c-a60` | G1 finish, C1, critic, arbiter | all 4 done |
 | `wf_a85d5408-539` | C1b, data fixes, critic | C1b done; data agent stalled; critic OAuth failure |
 | `wf_f8780559-b13` | C1b critic, arbiter, data finish | stopped by the user mid-way |
+
+
+---
+
+## 6. Update 2026-09-09 00:50 : durable resume point (written before an unattended overnight run)
+
+A one-shot timer is set for 03:45 with the prompt "continue l'implementation dans l'ordre, a partir de
+la derniere tache en cours lors de l'interuption". That timer lives in the Claude session's memory only,
+so this section exists to make the same resume possible from the repository alone if the session or the
+timer is gone.
+
+### Commits since the engine wave
+
+| Commit | Content |
+|---|---|
+| `1055a19a` | waves 3c to 4b: the engine packages E1..E5 on disk (they are committed, unlike what section 1 implies) |
+| `4863e232` | PRD v5 (sensors, rules, minute grids, workflow agents), amendment C1c and the revised waves |
+| `084a5ab3` | guided tour and contextual help (PRD v2 7.1b, package U5, AC-31) |
+| `f64a25bb` | review of 2026-09-08 (decisions D-R1..D-R14) folded into plan part 3 |
+| `54edb33c` | review of 2026-09-09 (decisions D-S1..D-S14: scale in cohorts, window ceiling, showcase quarantine, tag taxonomy) and plan part 4 |
+| `b0a97d78` | Polymarket read from the chain scheduled as the last lot (plan part 5), blocked on an indexer credential |
+
+### Lot 4c, in flight at the time of writing
+
+Run `wf_71f2fa90-5fe`, nine agents in four phases: three read-only diagnostics on Opus, then
+`fix:green` and `fix:sensor-hook` on Opus, then gate G2 on Fable, then two adversarial auditors on Fable
+and one fix pass. Script at
+`C:\Users\e.millerioux\.claude\projects\C--Dev-squad-ai-Brainstorming-GAN-prediction-market\d4f591f7-af6d-4365-8066-f97d28622148\workflows\scripts\pmx-lot4c-gate-g2-wf_71f2fa90-5fe.js`.
+
+Phase 1 results at 00:50, both written to the scratchpad and to the run journal:
+
+* **the 17.9 deferral audit** (`lot4c_diag_deferrals.json`): 13 rows, of which 3 are applied, 5 partial,
+  1 outright missing (the R189 corrections in `docs/PRD_V4_MULTI_ASSET.md` section 1.2) and 4 belong to
+  a later gate. Its `left_for_g2` list holds 14 actionable items, the heaviest being: the contract
+  journal fixture has **6 of 40 lines that no longer validate**, `tests/test_rng_journal.py` has **22
+  failures and 4 errors**, `tests/test_observation.py` does not collect at all (ImportError on
+  `bar_intersects_sessions`), `tests/test_runner.py` carries a C1b workaround block at lines 1499-1515
+  whose two premises are now false, and a long list of landed behaviour with **no test at all** (the
+  loader's `instruments/` and `calendars/` walk, the whole of `src/pmx/data/sessions.py`, the widened
+  `market.v2.json` ids and currencies, the `BINARY_TICK_SIZE_MICRO == 100` identity, `price_micro`);
+* **the contract-issue harvest** (`lot4c_diag_issues.json`): **69 issues raised by the five packages, 56
+  after merging duplicates**, each classified and with a proposed resolution;
+* **the tree diagnostic** (`lot4c_diag_tree.json`) was still running: the exhaustive walk of every symbol
+  crossing a package boundary.
+
+Known state of the tree before the fixers ran: `ruff check src tests` clean; `mypy --strict` 6 errors in
+3 files, all of them a consumer importing a domain name from an intermediate module rather than from its
+owner; the suite does not collect because of the one ImportError, which hides the 22 journal failures.
+
+### If the run is dead on resume
+
+Read `<run>/journal.jsonl` under
+`C:\Users\e.millerioux\.claude\projects\c--Dev-squad-ai-Brainstorming\d4f591f7-af6d-4365-8066-f97d28622148\subagents\workflows\wf_71f2fa90-5fe\` first: it records each agent's real return value.
+Then either relaunch with `resumeFromRunId: "wf_71f2fa90-5fe"` (completed agents return cached results,
+so only the unfinished phases re-run) or rebuild the remaining phases from the script.
+
+### The order after lot 4c (this supersedes section 3 of this file)
+
+1. **Lot 5a**: amendment C1c writes contract section 18 (sensors, rules, minute grids, workflow genomes)
+   **and** the normative text of both reviews: decisions D-R1..D-R14 of `docs/REVIEW_2026-09-08.md` and
+   D-S1..D-S14 of `docs/REVIEW_2026-09-09_SCALE_TAGS.md`. One critic, one arbiter, on Fable. Plan parts 3
+   and 4 list exactly what it must write.
+2. **Lot 5b**, measure before building agents: DS1 (folds, clusters, per-bullet Wikipedia timestamps,
+   linker audit, hourly grid, universe rule, rebuilds), then **DS2** (taxonomy, cohorts, showcase pack,
+   new in part 4, and it **must start after DS1's rebuild**, decision D-S13), S1 sensors, S2 rules,
+   detectors R2a..R2e, finance data F1..F5, U1 API, U2 market and cohort views; gates G3 and G3b.
+3. **Lot 6**: agents for the edges the opportunity map measured, the calibrator family now per cohort,
+   the optimizer with two-tier fitness, capacity in the claims, live; gate G4. O3 stays deferred.
+4. **Lot 7**: surfaces U3, U4 and U5; gate G5.
+5. **Lots 8 and after**: the ladder rungs, then the acceptance audit over AC-1..AC-34.
+6. **Last lot**: Polymarket read from the chain, plan part 5. **Blocked on the user supplying an indexer
+   credential** (a free Envio HyperSync API token or a Dune API key). Do not start it without that, and
+   do not attempt the free 50-block path: a year of Polygon is about 315 000 requests that way against
+   about 1 570 with a 10 000-block window.
+
+### The one open question for the user
+
+The indexer credential above. Everything else in the sequence is decided and written down.
