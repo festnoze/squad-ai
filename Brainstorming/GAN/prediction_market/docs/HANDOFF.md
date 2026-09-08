@@ -105,7 +105,19 @@ two tasks:
   counts (per provider, per fold, per category, per month, removed per filter, `n_bars_only`,
   `n_category_fallback`, linked news), append a dated section to `docs/BUILD_STATE.md`.
 
-### Step 2: lot 4, the engine wave
+### Update 2026-09-08 evening: lot 4 outcome and the v5 revision
+
+Lot 4b finished the four engine packages (E1 80 tests, E2 88, E3 63, E5 39; E4 46 from lot 4) with 60
+contract issues between them; gate G2 died on the session limit after creating `src/pmx/data/sessions.py`.
+The engine files are uncommitted on top of `2659b1d9`. The user then challenged the product and validated
+PRD v5 (`docs/PRD_V5_DISCOVERY.md`: sensor gene, hypothesis layer with tested rules, minute grids with
+timestamped sources, workflow agents). The plan (`docs/PLAN_V3_WAVES.md`) now carries amendment C1c and
+the revised wave 5 and later waves. **Next launch order**: (1) gate G2 alone, reading the E4 report in the
+scratchpad and the four finish reports in the `wf_49cf644e-c62` journal, and applying the E1 hook (the
+observation builder takes a per-agent sensor set); (2) amendment C1c with one critic and an arbiter;
+(3) the revised wave 5 (A1..A6, S1, S2, F1..F5, U1, U2) then gates G3 and G3b.
+
+### Step 2: lot 4, the engine wave (done except gate G2, see the update above)
 
 E1..E5 on Opus in parallel, then gate G2 on Fable. Build against sections 16 **and** 17. The previous
 engine script (`pmx-v2-wave2-wf_4922d436-84f.js` in the same scripts directory) has the five package

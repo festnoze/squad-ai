@@ -37,6 +37,157 @@ and the runner applying the latency rule.
 
 ---
 
+---
+
+## Amendment C1c : discovery (v5), after gate G2 and before the agents wave
+
+### C1c sensors, rules, minute grids, workflow genomes
+
+- **Owns**: `docs/CONTRACTS_V2.md` (new section 18 "discovery: sensors, rules, workflows"; the rows of
+  sections 13 and 14 it touches; rulings in a new section 15.10; in-place amendments of 8.3
+  (observation assembled from a sensor set), 8.4 (the `propose_rule` action), 9.2 (`RuleProposed`,
+  `RuleTested`, `RulePromoted`, `RuleDemoted`, `WorkflowStepExecuted`), 10.1 (`Genome.sensors`,
+  `Genome.workflow`), 10.4 (`Insight` hive entries), 12.5 (diet descriptors), 12.6 (author bonus,
+  rule-adjusted claims), 5.2 (the minute grid) and 7.3 (timestamped sources)), new schemas
+  `src/pmx/schemas/rule.v1.json`, `sensor.v1.json`, `workflow.v1.json`, `tests/test_contract_schemas.py`
+  and `tests/test_architecture.py` (extend), fixtures under `tests/fixtures/contract/`.
+- **Does**: declares the sensor catalogue of PRD v5 section 1 with costs, versions and as-of lags, the
+  `SensorBlock` integer feature format, the per-agent hook of the observation builder
+  (`build_observation(..., sensors=genome.sensors)`), the sensor budget and its penalty rule; the `Rule`
+  record and its closed vocabulary of predicates, the rule tester's procedure (train, validation,
+  deflation, promotion, live record, demotion), the `Insight` hive entry and its visibility; the minute
+  grid and the rule that a dataset never carries a source coarser than its grid; the workflow genome as
+  a bounded DAG over a closed step catalogue with `WorkflowStepExecuted` journaling and the size cap; the
+  knowledge-transfer re-test and the sensor ablation; module map rows for `src/pmx/sensors/*`,
+  `src/pmx/rules/*`, `src/pmx/agents/workflow.py`, `src/pmx/data/importers/binance.py` (minute path),
+  `src/pmx/data/news/hn.py`, `src/pmx/data/news/timestamped.py`, `src/pmx/cli_rules.py` with one owner each.
+- **Review**: one critic (leaks through sensors and rules, multiple testing, replay of workflows,
+  feasibility for A1, A3 and E1's hook), then the author resolves and records rulings.
+- **Done when**: the three schemas validate their fixtures, the extended tests are green, every new file
+  has one owner, and gate G2 has applied the E1 hook (the observation builder takes a sensor set) so that
+  the agents wave starts against a working engine.
+
+
+---
+
+## Wave 5 (revised by v5) : agents, sensors, rules, finance data, API and market view
+
+Runs after gate G2 and amendment C1c. Fourteen packages in parallel on Opus, two gates on Fable.
+
+### A1 agent protocol, workflow genome, scripted families
+
+- **Owns**: `src/pmx/agents/protocol.py`, `registry.py`, `workflow.py`, `src/pmx/agents/families/*.py`
+  except `stacker.py`, `tests/test_agents_families.py`, `tests/test_workflow.py`.
+- **Does**: `Agent`, `Genome` with integer genes, `sensors` and `workflow` (a bounded DAG over the closed
+  step catalogue of section 18; the linear composition of v2 is its degenerate case), the families
+  `follower`, `trend`, `revert`, `timedecay`, `volume`, `breakout`, `newsbayes`, `calibrator`,
+  `specialist`, `kelly`, `rule_follower`, and for v4 `carry`, `basis`, `pairs`, `vol_regime`,
+  `calendar`, `random_walk`; the `propose_rule` step for scripted families (a family emits a rule from
+  its own parameters when its memory shows a stable effect); structure and parameter mutation; genome
+  (de)serialisation; the default roster reproducing the eight v1 archetypes.
+- **Done when**: every family decides on every demo market, `follower(1000, 0)` ties the market,
+  `random_walk` has zero skill on a continuous fixture, a structure mutation changes the journal hash,
+  and `WorkflowStepExecuted` events replay.
+
+### A2 per-agent memory
+
+Unchanged from part 1, plus the track record an agent keeps on its own rules.
+
+### A3 the hive with insights
+
+- **Owns**: `src/pmx/agents/hive.py`, `tests/test_hive.py`.
+- **Does**: part 1's hive plus `Insight` entries (promoted rules with test and live records), visibility
+  one bar after promotion, demotion, the reputation bonus for authors of surviving rules, the poisoning
+  test extended to a false rule from a low-reputation author.
+
+### A4 stacker and ensembles
+
+Unchanged.
+
+### A5 gateway and LLM forecaster
+
+Unchanged, plus the `llm_belief` step type and rule proposals written in the rule vocabulary.
+
+### A6 contamination audit
+
+Unchanged.
+
+### S1 sensors
+
+- **Owns**: `src/pmx/sensors/*.py` (one module per sensor of the catalogue plus `catalogue.py`),
+  `tests/test_sensors.py`.
+- **Does**: every sensor as a pure function from the as-of dataset views to a `SensorBlock`, its cost
+  and lag, the catalogue, the poisoned-future test per sensor (AC-26).
+
+### S2 rules: vocabulary, tester, symbolic miner
+
+- **Owns**: `src/pmx/rules/vocabulary.py`, `rule.py`, `tester.py`, `miner.py`, `src/pmx/cli_rules.py`,
+  `tests/test_rules.py`, `tests/fixtures/s2/`.
+- **Does**: the closed predicate vocabulary over sensor blocks, rule evaluation on any bar, the tester
+  (train, validation, deflation, promotion, live record, demotion, knowledge-transfer re-test) built on
+  E4's statistics, the beam-search miner with its candidate budget, `pmx rules mine|test|ledger`; the
+  planted-effect fixture and its shuffled twin (AC-27).
+
+### F1 crypto importers
+
+Part 2 wave 3b text, plus the Binance 1-minute path and funding and liquidation times.
+
+### F2 Yahoo, Frankfurter and ECB importers
+
+Unchanged.
+
+### F3 finance news and macro as-of
+
+Unchanged.
+
+### F4 sessions, calendars, finance universe
+
+Unchanged, plus the minute grid in the builder hook.
+
+### F5 Hacker News and timestamped sources
+
+- **Owns**: `src/pmx/data/news/hn.py`, `src/pmx/data/news/timestamped.py` (the rule that a dataset never
+  carries a source coarser than its grid), `tests/test_hn.py`, `tests/fixtures/f5/`.
+- **Does**: Algolia `search_by_date` with `numericFilters=created_at_i` windows and `hitsPerPage`
+  pagination, stories and comments, points and comment counts, subject matching through the linker;
+  GDELT recent through D5's module for the minute and hourly grids; the coarser-than-grid refusal.
+
+### U1 API v2
+
+Unchanged, plus routes for the rule ledger and the sensor ablation.
+
+### U2 web market and portfolio views
+
+Unchanged, plus rule firings and per-sensor news markers on the chart.
+
+### Gates G3 and G3b
+
+G3 (agents, sensors, rules, API, market view): reconcile, four checks, AC-5 (amnesic and no-hive) plus
+the sensor ablation, AC-26, AC-27, AC-29, LLM smoke offline. G3b (finance data): E2E-1b multi-asset, the
+first hourly finance dataset (AC-21), and a minute fixture dataset from Binance and Hacker News with the
+minute event study (AC-28, the data half of E2E-5a).
+
+---
+
+## Later waves, as revised by v5
+
+- Wave 6 (optimizer O1..O4, live L1, gate G4): O2 adds the diet descriptors to the MAP-Elites archive,
+  the author bonus and the sensor allowance to selection; O4's claims list the rules used and their live
+  records; L1 runs the miner and the tester daily on open markets and publishes promoted rules with
+  their hashes.
+- Wave 7 (surfaces U3, U4, gate G5): U3 adds the rule ledger view, the sensor ablation view and the
+  "where it fires" overlay; U4's README documents sensors, rules and grids.
+- Wave 8 (realism at scale): unchanged, plus the minute datasets for the liquid crypto pairs and the
+  Kalshi series with 1-minute candlesticks.
+- Wave 9 (detectors): every detector emits rules into the ledger; the minute event study at 1, 5, 10,
+  30 and 60 minutes per source and story feature (AC-28 on real data); the cross-domain detectors of v4.
+- Wave 10 (learning): promoted rules and sensor blocks are the feature vector; the supervised floor is
+  trained per sensor set; policies inherit the sensor gene.
+- Wave 11 (adversary): the adversarial market maker may not read rules or sensors (it sees flow only);
+  stress scenarios add sensor dropout.
+- Wave 12 (portfolio, live extension): the allocator weights sub-strategies by their rules' live
+  records; E2E-5a closes the discovery rung.
+
 ## Wave 7 : market realism at scale (rung 1), after gate G4 of part 1
 
 ### R1a universe and statistics
@@ -246,7 +397,7 @@ random-walk baseline; E5 emits the horizon resolution events.
 
 ---
 
-## Wave 3b : finance data (runs in parallel with wave 3 of part 1, after gate G2)
+## Wave 3b : finance data (superseded: folded into the revised wave 5 above; kept for the package texts F1..F4)
 
 ### F1 crypto importers
 
@@ -322,7 +473,7 @@ multi-asset dataset from the network at an hourly grid (AC-21) and records the n
 | 10 adversary | C4, R4a R4b R4c R4d | 4 | AC-17, E2E-4 |
 | 11 portfolio and live | C5, R5a R5b R5c R6a R6b | 5 | E2E-5, E2E-6 |
 
-Twenty-eight packages and five amendments on top of part 1's twenty-seven, plus amendment C1b and the four finance data packages F1..F4 (wave 3b) of PRD v4. The order of waves 7 to 11
+Twenty-eight packages and five amendments on top of part 1's twenty-seven, plus amendments C1b (v4) and C1c (v5), the finance data packages F1..F5 and the discovery packages S1 and S2 of the revised wave 5. The order of waves 7 to 11
 is fixed by the ladder; inside a wave everything is parallel. Wave 7 needs part 1's optimizer (gate
 G4) because the robustness gap and the claims are defined on its objects; waves 8 and 9 need only wave
 7; wave 10 needs 9 (the learned maker) and wave 11 needs 10.
