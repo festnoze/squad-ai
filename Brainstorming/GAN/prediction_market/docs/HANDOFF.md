@@ -284,6 +284,22 @@ pass with the limits stated there; AC-4 partial (the twelve tests
 pass, `pmx audit leaks` is A6's and does not exist). Suite: EXIT 0; ruff
 and mypy --strict clean; no em-dash. Report: `<scratchpad>/lot4d_gate_g2.json`.
 
+### Independent check of gate G2's numbers, and where the commit is
+
+The gate's four checks were re-run by the parent session, from
+`c:/Dev/squad-ai/Brainstorming/GAN/prediction_market` with `.venv/Scripts/python.exe`, and they agree
+with what BUILD_STATE section 8.2 records: **1 027 tests collected, exit code 0**, 4 legal `PMX_LIVE`
+skips; `ruff check src tests` clean; `mypy --strict` clean over **65** source files; an em-dash sweep
+over 124 source, test and document files with **0 hits**. The AC-3 driver log was read directly:
+`50/50 seeds pass in 3184s`, every line carrying `events=94803 det=True replay=0 inv=True`.
+
+The gate's work is committed, but **not under a message that records it**: it landed in commit
+`f5cae47b` ("Grokbot copy analysis + prediction market until gate G2"), made outside the build
+session and bundled with unrelated `grokbot_oss` documents. Nothing is lost, because BUILD_STATE
+section 8 and contract section 15.3 carry the substance, but a reader of `git log` alone will not see
+what gate G2 decided. The rulings, the AC-3 limits and the AC-4 partial verdict are in those two
+documents.
+
 **The order from here** (this supersedes "The order after lot 4c" above):
 
 1. **Lot 5a**: amendment C1c writes contract section 18 (sensors, rules, minute grids, workflow genomes)
