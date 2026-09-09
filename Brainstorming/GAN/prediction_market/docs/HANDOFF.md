@@ -275,3 +275,83 @@ their JSON from the scratchpad and run the fixers by hand.
 ### The one open question for the user
 
 The indexer credential above. Everything else in the sequence is decided and written down.
+
+---
+
+## 7. Lot 4c outcome, 2026-09-09 01:40 : the session limit stopped it at the gate
+
+Run `wf_71f2fa90-5fe` finished with **5 of 8 agents done and 3 killed by the session limit**, which
+resets at 03:20 Europe/Paris. The three that died are exactly the tail: `gate:G2`, `audit:tests` and
+`audit:contract`. 1.76 M subagent tokens, 685 tool calls, 2 h 19 of wall clock.
+
+A one-shot timer is set for 03:45, after the reset, with the prompt "continue l'implementation dans
+l'ordre, a partir de la derniere tache en cours lors de l'interuption". That timer is session-memory
+only, so this section is the resume point that does not depend on it.
+
+### What the five finished agents produced
+
+The three diagnostics (all cached in the run, all written to the scratchpad):
+
+* `lot4c_diag_tree.json`: 908 tests collected, 1 file failing to import, 6 mypy errors, ruff clean, and
+  **30 cross-package mismatches**, of which one caused **42 of the 68 test failures**. The agent copied
+  the source and tests into a throwaway directory to measure each candidate fix's cascade before
+  recommending it, and each entry names which side is wrong on the contract's terms.
+* `lot4c_diag_deferrals.json`: contract section 17.9 row by row, 3 applied, 5 partial, 1 missing
+  (the R189 corrections in `docs/PRD_V4_MULTI_ASSET.md` section 1.2), 4 for a later gate, plus a
+  `left_for_g2` list of 14 actionable items.
+* `lot4c_diag_issues.json`: **69 contract issues raised, 56 after merging duplicates**. Severity: 12
+  blocker, 33 major, 11 minor. Class: 23 gap, 13 ownership, 7 ambiguity, 5 contradiction, 4 concreted by
+  a package, 4 plan or PRD error.
+
+The two reconciliation agents:
+
+* **`fix:green`, status partial**: 1 003 tests passing, 4 legal `PMX_LIVE` skips, ruff clean, mypy
+  --strict clean, no em-dash. It cleared the collection error (the test imported a name the contract
+  declares nowhere, whose four assertions are exactly the call shape of the one binding architecture
+  rule 11 allows), the 6 mypy errors (five were a consumer importing a domain constant from an
+  intermediate module instead of from `pmx.types`, one was `_RunState.market()` annotated `Market` while
+  `Dataset.market` answers `Market | ContinuousInstrument` per R182), and the 42-failure cause (the
+  runner emitting a binary `market_listed` without amendment C1b's eight instrument fields). **One
+  failure is left on purpose**: the committed demo pack's manifest no longer matches what the migration
+  produces, because `BuildConfig` now serialises `kinds`; its owner is the dataset build, not the engine
+  wave. It reported **13 contract issues**, and two of them matter for the gate's honesty:
+  **the contract journal fixture was completed by hand rather than regenerated from a run of the fixed
+  runner**, and **ruling R175 is still spelled twice on purpose** (`engine/execution.applies_at` and
+  `engine/observation.cash_event_applies_at`) with the stated reason that the leak boundary may not
+  import the module that moves money. The gate must accept or overrule both.
+* **`fix:sensor-hook`, status done**: 1 018 tests, all checks clean. `build_observation` gained a
+  keyword-only `sensors` set where `None` means every sensor and returns **the same object it always
+  was**, so the default is byte-identical; a narrowed set is applied **by subtraction** over what the
+  as-of filters produced, so it can only narrow, never widen; an unbought field is absent from the view
+  and from the payload rather than zeroed; and the size cap and the leak guard run on the narrowed
+  payload. It reported **10 contract issues**, including that the observation does not yet record which
+  sensors produced it (PRD v5 section 1.1 requires that for replay, and it needs D1 and E5), and that
+  nothing forbids a genome whose sensor set omits the price tape.
+
+### Verified independently at 01:40, not taken from a report
+
+`ruff check src tests` clean. `mypy --strict` **clean, 65 source files** (the 6 errors are gone). Full
+suite: **1 023 tests collected, exit code 0**, 4 legal PMX_LIVE skips (measured twice, the second time after the demo-pack fix).
+
+**The one deliberate failure is now fixed, by the parent session and not by an agent**, because the
+agent quota was exhausted and the fix is one command whose result is checkable in one line:
+`pmx data migrate-v1` regenerated `data/demo_v1/manifest.json`, whose whole diff is the single key
+`kinds: ["binary"]` that `BuildConfig.to_dict()` now emits. The `dataset_hash` is byte identical on
+both sides, so no fixture `run_id` moves and nothing downstream is affected. Row 23 of the tree
+diagnostic and the demo-pack row of the 17.9 `left_for_g2` list are therefore **done**, and the gate
+should verify rather than redo them. Everything is committed as `8c38cb8d`.
+
+### The next three lots, in order, each one or two agents
+
+1. **`lot4c2_redesign_finish.js`**: verify all 30 cross-package mismatches against the code as it stands
+   and finish what is unresolved. `fix:green`'s own report already flags two shortcuts to undo (the
+   hand-completed fixture, the duplicated rule), so this lot has real work even though the suite is
+   nearly green.
+2. **`lot4d_gate_g2_alone.js`**: gate G2 alone. Its section 5 is the checklist for the 30, and it must
+   rule on the 56 merged contract issues plus the 23 the two fixers raised, apply the 17.9 rows, and
+   check AC-3 and AC-4 for real on `data/datasets/y2026`.
+3. **`lot4e_audit_g2.js`**: the two adversarial auditors, then a fix pass. The first auditor's job
+   includes mutating the source to prove every touched test still bites, which is the guard against the
+   fixers' many test edits.
+
+Then lot 5a, the amendment, as section 6 of this file states.
