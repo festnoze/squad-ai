@@ -37,9 +37,9 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, ClassVar, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
-from pmx import journal as _journal
+from pmx.data.sessions import days_since_previous_close, in_session, next_bar_ms, prev_bar_ms
 from pmx.engine import fees
 from pmx.engine.fees import (
     BINARY_POINT_VALUE_MICRO,
@@ -68,31 +68,31 @@ from pmx.engine.liquidity import (
 )
 from pmx.errors import InvalidConfigError
 from pmx.journal import (
+    CashEventApplied,
     FeeCharged,
     Filled,
     Journal,
-    JournalEvent,
     OrderExpired,
     OrderPlaced,
     OrderRejected,
-    canonical_sha256,
-    payload_field_names,
 )
 from pmx.types import (
     BP_ONE,
     CENTS_PER_UNIT,
-    MS_PER_DAY,
+    CONTINUOUS_CALENDAR_ID,
     PPM_ONE,
     Bar,
+    CashEvent,
     MarketAction,
     OpenOrderView,
     PortfolioView,
     PositionView,
     RunConfig,
+    Session,
+    SessionCalendar,
     bar_of,
     bp_ratio,
     cost_cents,
-    day_start_ms,
     interval_ms,
     proceeds_cents,
     round_half_up,
@@ -105,7 +105,6 @@ if TYPE_CHECKING:  # pragma: no cover - import-time typing only
 
 __all__ = [
     "CashEventLike",
-    "EngineCashEvent",
     "Execution",
     "InstrumentLike",
     "InstrumentSpec",
@@ -188,39 +187,6 @@ class BarCalendar(Protocol):
     def next_bar(self, market_id: str, t_ms: int) -> int | None: ...
 
     def prev_bar(self, market_id: str, t_ms: int) -> int | None: ...
-
-
-@dataclass(frozen=True, slots=True)
-class EngineCashEvent:
-    """A cash event the engine generates: ``borrow_fee``, ``carry`` or ``forced_flat`` (ruling R177).
-
-    ``pmx.types.CashEvent`` is the record gate G2 lands (17.9) and is field for field this shape; the
-    engine needs a constructor in wave 2 because these three kinds are its own and no importer may write
-    them (rule 10 forbids the data layer from reading ``pmx.engine.fees``). ``cash_event_id`` is the
-    contract's: ``"ce-" + sha256(canonical_json([market_id, kind, t_ms, detail]))[:16]``.
-    """
-
-    cash_event_id: str
-    market_id: str
-    kind: str
-    t_ms: int
-    origin: str
-    detail: Mapping[str, int | str]
-    source_url: str = ""
-
-    @classmethod
-    def build(cls, *, market_id: str, kind: str, t_ms: int,
-              detail: Mapping[str, int | str]) -> EngineCashEvent:
-        """Build an engine event with the contract's id, which hashes the instant it applies at (R176)."""
-        payload = [market_id, kind, t_ms, dict(detail)]
-        return cls(
-            cash_event_id="ce-" + canonical_sha256(payload)[:16],
-            market_id=market_id,
-            kind=kind,
-            t_ms=t_ms,
-            origin="engine",
-            detail=dict(detail),
-        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -321,7 +287,7 @@ def instrument_spec(instrument: InstrumentLike) -> InstrumentSpec:
         source=instrument.source,
         tick_size_micro=_int_attr(base, "tick_size_micro", BINARY_TICK_SIZE_MICRO),
         point_value_micro=_int_attr(base, "point_value_micro", BINARY_POINT_VALUE_MICRO),
-        session_calendar_id=_str_attr(base, "session_calendar_id", "continuous"),
+        session_calendar_id=_str_attr(base, "session_calendar_id", CONTINUOUS_CALENDAR_ID),
         fee_schedule_id=instrument.fee_schedule_id,
         borrow_schedule_id=_opt_str_attr(base, "borrow_schedule_id"),
         carry_schedule_id=_opt_str_attr(base, "carry_schedule_id"),
@@ -357,99 +323,6 @@ def applies_at(event: CashEventLike, instrument: InstrumentLike, calendar: BarCa
     if event.kind in _OLD_REGIME_KINDS:
         return calendar.prev_bar(instrument.id, bar)
     return bar
-
-
-# --------------------------------------------------------------------------------------------------
-# The journal classes ruling R164 gives ``pmx.journal`` at gate G2, bridged until it carries them
-# --------------------------------------------------------------------------------------------------
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _OrderPlacedC1(OrderPlaced):
-    """``order_placed`` with ``decided_at_ms`` (R111) and the settle phase of an event fill (R152)."""
-
-    decided_at_ms: int
-
-    PHASES: ClassVar[tuple[str, ...]] = ("execute", "settle")
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _OrderRejectedC1(OrderRejected):
-    """``order_rejected`` with ``decided_at_ms``: without it a rejection cannot be traced to its intent."""
-
-    decided_at_ms: int
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _FilledC1b(Filled):
-    """``filled``, which an event fill of 17.3 writes in the settle phase (ruling R152)."""
-
-    PHASES: ClassVar[tuple[str, ...]] = ("execute", "settle")
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _FeeChargedC1b(FeeCharged):
-    """``fee_charged``, which an event fill of 17.3 writes in the settle phase (ruling R152)."""
-
-    PHASES: ClassVar[tuple[str, ...]] = ("execute", "settle")
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _CashEventAppliedC1b(JournalEvent):
-    """``cash_event_applied`` (9.2 and 17.3): one event per (agent, instrument, cash event).
-
-    ``cash_delta_cents`` is ``0`` for ``split``, ``roll`` and ``forced_flat``, whose money moves in their
-    fills, and signed for the other four, where it may take cash below zero (ruling R179).
-    """
-
-    agent_id: str
-    market_id: str
-    cash_event_id: str
-    kind: str
-    origin: str
-    position_before: int
-    position_after: int
-    avg_cost_ticks_before: int
-    avg_cost_ticks_after: int
-    cash_delta_cents: int
-    order_ids: tuple[str, ...]
-    detail: Mapping[str, int | str]
-
-    TYPE: ClassVar[str] = "cash_event_applied"
-    PHASES: ClassVar[tuple[str, ...]] = ("settle",)
-
-
-def _resolve_event(name: str, *, needs: tuple[str, ...], phases: tuple[str, ...],
-                   fallback: type[JournalEvent]) -> type[JournalEvent]:
-    """``pmx.journal``'s class of that name when it carries what the contract asks, else the bridge.
-
-    Ruling R164 gives D7 ``CashEventApplied``, the ``settle`` phase of the three execute-phase events and
-    ``decided_at_ms``, applied by gate G2. Resolving by name and by capability means the engine uses D7's
-    class the moment it lands, and never silently writes an event missing a contracted field.
-    """
-    candidate = getattr(_journal, name, None)
-    if isinstance(candidate, type) and issubclass(candidate, JournalEvent):
-        carried = set(payload_field_names(candidate))
-        if set(needs) <= carried and set(phases) <= set(candidate.PHASES):
-            return candidate
-    return fallback
-
-
-_ORDER_PLACED = _resolve_event(
-    "OrderPlaced", needs=("decided_at_ms",), phases=("execute", "settle"), fallback=_OrderPlacedC1
-)
-_ORDER_REJECTED = _resolve_event(
-    "OrderRejected", needs=("decided_at_ms",), phases=("execute",), fallback=_OrderRejectedC1
-)
-_FILLED = _resolve_event("Filled", needs=(), phases=("execute", "settle"), fallback=_FilledC1b)
-_FEE_CHARGED = _resolve_event("FeeCharged", needs=(), phases=("execute", "settle"), fallback=_FeeChargedC1b)
-_ORDER_EXPIRED = _resolve_event(
-    "OrderExpired", needs=(), phases=("open", "settle", "close"), fallback=OrderExpired
-)
-_CASH_EVENT_APPLIED = _resolve_event(
-    "CashEventApplied",
-    needs=("cash_event_id", "position_before", "position_after", "cash_delta_cents", "order_ids"),
-    phases=("settle",),
-    fallback=_CashEventAppliedC1b,
-)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -567,7 +440,7 @@ class Execution:
         config: RunConfig,
         schedules: Mapping[str, FeeSchedule],
         liquidity: LiquidityModel,
-        calendars: Mapping[str, object] | None = None,
+        calendars: Mapping[str, SessionCalendar] | None = None,
         carry_schedules: Mapping[str, CarrySchedule] | None = None,
     ) -> None:
         self._journal = journal
@@ -1002,7 +875,7 @@ class Execution:
         state.cash_cents += cash_delta - truncated.fee_cents
         state.fees_paid_cents += truncated.fee_cents
         self._journal.emit(
-            _FILLED,
+            Filled,
             bar_ms=t_ms,
             phase=phase,
             order_id=entry.order_id,
@@ -1027,7 +900,7 @@ class Execution:
             avg_cost_bp_after=avg_after,
         )
         self._journal.emit(
-            _FEE_CHARGED,
+            FeeCharged,
             bar_ms=t_ms,
             phase=phase,
             order_id=entry.order_id,
@@ -1117,7 +990,7 @@ class Execution:
             "reason": "delisted" if delisting else "window_end",
             "price_ticks": bar.close_bp,
         }
-        event = EngineCashEvent.build(
+        event = CashEvent.build(
             market_id=spec.id, kind="forced_flat", t_ms=t_ms + spec.interval_ms - 1, detail=detail
         )
         self._apply_one_event(event=event, spec=spec, bar=bar, t_ms=t_ms)
@@ -1203,7 +1076,7 @@ class Execution:
                 continue
             rate = fees.carry_schedule(schedule_id, schedules=self._carry_schedules).rate_ppm_per_day
             built.append(
-                EngineCashEvent.build(
+                CashEvent.build(
                     market_id=spec.id,
                     kind=kind,
                     t_ms=stamp,
@@ -1268,7 +1141,7 @@ class Execution:
                 if state.reserved_cents > max(0, state.cash_cents):
                     self._expire_all(state, reason="debit", t_ms=t_ms, phase="settle")
             self._journal.emit(
-                _CASH_EVENT_APPLIED,
+                CashEventApplied,
                 bar_ms=t_ms,
                 phase="settle",
                 agent_id=agent_id,
@@ -1518,7 +1391,7 @@ class Execution:
                      reserved_cents: int, origin: str, decided_at_ms: int, t_ms: int, phase: str) -> None:
         """Write one ``order_placed``, carrying the bar its intent was decided at (16.2, ruling R111)."""
         self._journal.emit(
-            _ORDER_PLACED,
+            OrderPlaced,
             bar_ms=t_ms,
             phase=phase,
             order_id=order_id,
@@ -1538,7 +1411,7 @@ class Execution:
     def _reject(self, item: _Pending, reason: str, detail: str) -> None:
         """Write one ``order_rejected`` for a drained intent that never becomes an order (8.6 step 0)."""
         self._journal.emit(
-            _ORDER_REJECTED,
+            OrderRejected,
             bar_ms=item.drain_at_ms,
             phase="execute",
             agent_id=item.agent_id,
@@ -1558,7 +1431,7 @@ class Execution:
         row.reserved_cents = 0
         del state.resting[row.order_id]
         self._journal.emit(
-            _ORDER_EXPIRED,
+            OrderExpired,
             bar_ms=t_ms,
             phase=phase,
             order_id=row.order_id,
@@ -1724,18 +1597,23 @@ class _SessionGrid:
 
     E1's ``Calendar`` is the run's implementation of ``last_bar``, ``next_bar`` and ``prev_bar`` (ruling
     R187), and ``Execution`` is given ``calendars`` rather than a ``Calendar`` (8.6, ruling R174), so this
-    class answers the same three questions from the calendars plus the config's window. The session
-    predicate is the contract's (``t < close_ms and t + interval > open_ms``); gate G2 lands
-    ``pmx.data.sessions`` and architecture rule 11 then makes that module the one implementation, which
-    is reported as a contract issue.
+    class answers the same three questions from the calendars plus the config's window.
+
+    Session membership itself is **not** computed here: every predicate below delegates to
+    ``pmx.data.sessions``, the one implementation architecture rule 11 allows (ruling R174), which gate
+    G2 landed. What stays here is the run's own clamping, which is the part a calendar cannot answer: a
+    bar outside the run's window is not a bar of the run however open the venue was, and that is the
+    distinction ``Calendar.next_bar`` and ``Calendar.session_next_bar`` draw on E1's side.
     """
 
     __slots__ = ("_config", "_sessions", "_specs")
 
-    def __init__(self, *, config: RunConfig, calendars: Mapping[str, object]) -> None:
+    def __init__(self, *, config: RunConfig, calendars: Mapping[str, SessionCalendar]) -> None:
         self._config = config
         self._specs: dict[str, InstrumentSpec] = {}
-        self._sessions = {calendar_id: _sessions_of(calendar) for calendar_id, calendar in calendars.items()}
+        self._sessions: dict[str, tuple[Session, ...]] = {
+            calendar_id: calendar.sessions for calendar_id, calendar in calendars.items()
+        }
 
     def register(self, spec: InstrumentSpec) -> None:
         """Remember an instrument's calendar, interval and window, the first time execution sees it."""
@@ -1750,11 +1628,10 @@ class _SessionGrid:
         spec = self._specs.get(market_id)
         if spec is None:
             return True
-        windows = self._sessions.get(spec.session_calendar_id, ())
-        if not windows:
+        sessions = self._sessions.get(spec.session_calendar_id, ())
+        if not sessions:
             return True
-        end = t_ms + spec.interval_ms
-        return any(t_ms < close_ms and end > open_ms for open_ms, close_ms in windows)
+        return in_session(sessions, t_ms, interval_min=spec.interval_min)
 
     def next_bar(self, market_id: str, t_ms: int) -> int | None:
         """The instrument's next bar after ``t_ms``, which after a Friday session is Monday's first bar.
@@ -1767,12 +1644,14 @@ class _SessionGrid:
         if spec is None:
             return t_ms + interval_ms(self._config.interval_min)
         limit = self._run_limit()
-        candidate = t_ms + spec.interval_ms
-        while candidate < limit:
-            if self.covers(market_id, candidate):
-                return candidate
-            candidate += spec.interval_ms
-        return None
+        sessions = self._sessions.get(spec.session_calendar_id, ())
+        if not sessions:
+            candidate: int | None = bar_of(t_ms, spec.interval_min) + spec.interval_ms
+        else:
+            candidate = next_bar_ms(sessions, t_ms, interval_min=spec.interval_min)
+        if candidate is None or candidate >= limit:
+            return None
+        return candidate
 
     def prev_bar(self, market_id: str, t_ms: int) -> int | None:
         """The instrument's last bar before ``t_ms``, or ``None`` when that lies outside the run.
@@ -1785,12 +1664,14 @@ class _SessionGrid:
         if spec is None:
             return None
         floor_ms = max(bar_of(spec.listed_at_ms, spec.interval_min), self._t0(spec))
-        candidate = t_ms - spec.interval_ms
-        while candidate >= floor_ms:
-            if self.covers(market_id, candidate):
-                return candidate
-            candidate -= spec.interval_ms
-        return None
+        sessions = self._sessions.get(spec.session_calendar_id, ())
+        if not sessions:
+            candidate: int | None = bar_of(t_ms, spec.interval_min) - spec.interval_ms
+        else:
+            candidate = prev_bar_ms(sessions, t_ms, interval_min=spec.interval_min)
+        if candidate is None or candidate < floor_ms:
+            return None
+        return candidate
 
     def last_bar(self, market_id: str) -> int:
         """``last_bar(i)``: the last bar of the run at which the instrument is open (17.2)."""
@@ -1821,20 +1702,10 @@ class _SessionGrid:
         spec = self._specs.get(market_id)
         if spec is None:
             return None
-        windows = self._sessions.get(spec.session_calendar_id, ())
-        if not windows:
+        sessions = self._sessions.get(spec.session_calendar_id, ())
+        if not sessions:
             return None
-        step = spec.interval_ms
-        for index, (open_ms, close_ms) in enumerate(windows):
-            if not (t_ms < close_ms and t_ms + step > open_ms):
-                continue
-            if t_ms + step < close_ms and self.covers(market_id, t_ms + step):
-                return None
-            if index == 0:
-                return 1
-            previous_close = windows[index - 1][1]
-            return max(1, (day_start_ms(close_ms) - day_start_ms(previous_close)) // MS_PER_DAY)
-        return None
+        return days_since_previous_close(sessions, t_ms, interval_min=spec.interval_min)
 
     def _t0(self, spec: InstrumentSpec) -> int:
         t0 = self._config.t0_ms
@@ -1851,30 +1722,3 @@ class _SessionGrid:
 _NO_LIMIT: int = 1 << 62
 
 
-def _sessions_of(calendar: object) -> tuple[tuple[int, int], ...]:
-    """The ``(open_ms, close_ms)`` pairs of a session calendar, whatever shape it arrives in.
-
-    ``SessionCalendar`` is a ``pmx.types`` dataclass gate G2 lands (17.9); a mapping read straight from
-    ``session_calendar.v1.json`` is the other shape a caller can hold in wave 2, and both are read here.
-    """
-    sessions: object = getattr(calendar, "sessions", None)
-    if sessions is None and isinstance(calendar, Mapping):
-        sessions = calendar.get("sessions")
-    if not isinstance(sessions, tuple | list):
-        return ()
-    pairs: list[tuple[int, int]] = []
-    for session in sessions:
-        open_ms = _session_field(session, "open_ms")
-        close_ms = _session_field(session, "close_ms")
-        if open_ms is None or close_ms is None or close_ms <= open_ms:
-            continue
-        pairs.append((open_ms, close_ms))
-    return tuple(sorted(pairs))
-
-
-def _session_field(session: object, name: str) -> int | None:
-    """One instant of a session, read off an attribute or a mapping key."""
-    value: object = getattr(session, name, None)
-    if value is None and isinstance(session, Mapping):
-        value = session.get(name)
-    return value if isinstance(value, int) and not isinstance(value, bool) else None

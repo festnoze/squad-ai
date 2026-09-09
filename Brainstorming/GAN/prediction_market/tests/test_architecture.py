@@ -107,6 +107,11 @@ MODULE_RANDOM_RE = re.compile(
 #: of a continuous instrument have exactly one accessor too, ``Dataset.sealed_market`` (17.2, ruling R182).
 SEALED_RE = re.compile(r"\bopen_sealed_test\b|\b_sealed_ids\b|\bsealed_market\b")
 SEALED_ALLOWED = ("optimizer/folds.py", "optimizer/claims.py")
+#: The **declaration** of ``Dataset.sealed_market`` is a spelling too, and it is in D1's file, which
+#: ruling R182's allow-list does not name (reported as a contract issue: an accessor has to be declared
+#: somewhere). ``types.py`` is therefore allowed exactly this one line and nothing else, so the rule
+#: still binds on the file that declares the accessor.
+SEALED_DECLARATION = "def sealed_market(self, market_id: str) -> Market | ContinuousInstrument:"
 
 #: Training libraries. Importing one means the module cannot run where a backtest must (CONTRACTS_V2 16.5).
 LEARN_MODULES = ("torch", "sklearn", "sentence_transformers", "transformers", "peft")
@@ -133,6 +138,14 @@ DATA_BANNED_IMPORTS = ("pmx.engine", "pmx.agents", "pmx.metrics", "pmx.optimizer
 #: CONTRACTS_V2 17.7 rule 11: session membership has one implementation.
 IN_SESSION_NAME = "in_session"
 IN_SESSION_ALLOWED = ("data/sessions.py",)
+#: Rule 11 is about the **predicate**, not about the identifier: a second implementation spelled
+#: ``covers`` passes a scan for the name ``in_session`` and shipped once already (the session grid of
+#: ``pmx.engine.execution``, which now delegates). A session's two instants are therefore read in
+#: ``pmx.data.sessions`` and in the two places that build or validate a calendar record, and nowhere
+#: else: a file that compares a bar against ``open_ms`` and ``close_ms`` is deciding membership itself.
+#: ``data/schema.py`` maps the file shape onto ``Session``; ``engine/calendar.py`` keeps the closes of a
+#: sealed calendar to answer 8.3's ``hours_to_next_bar``, which is a lookup and not a predicate.
+SESSION_INSTANT_ALLOWED = ("data/sessions.py", "data/schema.py", "types.py", "engine/calendar.py")
 
 
 def _v2_python_files() -> Iterator[Path]:
@@ -193,14 +206,20 @@ def test_rule_2_calibration_never_imports_execution() -> None:
 
 def test_rule_3_only_claims_reads_the_sealed_test_fold() -> None:
     offenders: list[str] = []
+    declarations: list[str] = []
     for path in _v2_python_files():
         rel = _rel(path)
         if rel in SEALED_ALLOWED:
             continue
         for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
-            if SEALED_RE.search(line):
-                offenders.append(f"{rel}:{lineno}: {line.strip()}")
+            if not SEALED_RE.search(line):
+                continue
+            if rel == "types.py" and line.strip() == SEALED_DECLARATION:
+                declarations.append(f"{rel}:{lineno}")
+                continue
+            offenders.append(f"{rel}:{lineno}: {line.strip()}")
     assert offenders == [], offenders
+    assert len(declarations) == 1, declarations
 
 
 def test_rule_4_only_stats_imports_numpy() -> None:
@@ -347,6 +366,18 @@ def test_rule_11_only_sessions_decides_session_membership() -> None:
             if name == IN_SESSION_NAME:
                 offenders.append(f"{rel}:{lineno}: binds {name}")
     assert offenders == [], offenders
+    # And the predicate itself, under whatever name: a file outside the allow-list that reads a
+    # session's open and close in one line is answering "is this bar in session" on its own.
+    formula: list[str] = []
+    for path in _v2_python_files():
+        rel = _rel(path)
+        if rel in SESSION_INSTANT_ALLOWED:
+            continue
+        for lineno, line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+            code = line.split("#", 1)[0]
+            if "close_ms" in code and "open_ms" in code:
+                formula.append(f"{rel}:{lineno}: {line.strip()}")
+    assert formula == [], formula
 
 
 # --------------------------------------------------------------------------------------------------

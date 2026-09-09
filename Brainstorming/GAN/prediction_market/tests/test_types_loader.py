@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import shutil
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -54,12 +55,26 @@ from pmx.data.migrate_v1 import (
 from pmx.data.schema import (
     SCHEMA_DIR,
     SCHEMA_FILES,
+    instrument_from_payload,
     load_schema,
     manifest_from_payload,
     market_from_payload,
     news_item_from_payload,
     schema_path,
     validate_against_schema,
+)
+from pmx.data.sessions import (
+    SessionRule,
+    calendar_from_payload,
+    check_calendar,
+    days_since_previous_close,
+    generate_calendar,
+    in_session,
+    is_session_close,
+    next_bar_ms,
+    prev_bar_ms,
+    session_bars,
+    session_index,
 )
 from pmx.errors import (
     DatasetHashMismatchError,
@@ -72,9 +87,12 @@ from pmx.errors import (
 )
 from pmx.journal import canonical_json
 from pmx.types import (
+    BINARY_POINT_VALUE_MICRO,
+    BINARY_TICK_SIZE_MICRO,
     BP_ONE,
     CATEGORIES,
     HORIZON_BUCKETS,
+    INSTRUMENT_KINDS,
     LEXICON_COUNT,
     MS_PER_DAY,
     PHASE_ORDER,
@@ -91,6 +109,7 @@ from pmx.types import (
     Bar,
     BuildConfig,
     BuiltBy,
+    ContinuousInstrument,
     DatasetCounts,
     DatasetFilters,
     DatasetManifest,
@@ -101,18 +120,24 @@ from pmx.types import (
     MarketQuality,
     NewsItem,
     NewsView,
+    PortfolioView,
     RunConfig,
+    Session,
+    SessionCalendar,
     Trade,
     bar_of,
     bp_from_ppm,
     bp_from_v1_cents,
     bp_ratio,
     brier_micro,
+    cash_out_cents,
     clamp_ppm,
     clamp_price_bp,
+    continuous_calendar,
     cost_cents,
     day_key,
     day_start_ms,
+    default_horizons_bars,
     hardness_tags_of,
     interval_ms,
     iso_date_from_ms,
@@ -123,6 +148,7 @@ from pmx.types import (
     ms_from_iso_date,
     neg_ln_micronats,
     ppm_from_bp,
+    price_micro,
     proceeds_cents,
     rank_news,
     round_half_up,
@@ -923,14 +949,22 @@ def test_a_dataset_whose_market_count_or_provider_disagrees_is_refused(tmp_path:
 
 
 def test_a_dataset_with_no_manifest_or_no_market_is_refused(tmp_path: Path) -> None:
+    """A dataset with nothing to run on is refused, and the refusal names what is missing.
+
+    A manifest that counts one market over an empty ``markets/`` directory is refused by the count
+    check of 7.2, which is read before the walk and says which two numbers disagree; the bare "dataset
+    holds no market" refusal stands behind it, for a manifest that counts none.
+    """
     empty = tmp_path / "empty"
     empty.mkdir()
     with pytest.raises(SchemaError, match="manifest"):
         load_dataset(empty)
     root = _synthetic_dataset(tmp_path / "nomarkets")
     (root / "markets" / "kalshi-KXTEST.json").unlink()
-    with pytest.raises(SchemaError, match="no market"):
+    with pytest.raises(SchemaError, match="market count is not the number of market files") as error:
         load_dataset(root)
+    assert error.value.context["counted"] == 0
+    assert error.value.context["manifest_count"] == 1
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1291,3 +1325,428 @@ def test_the_synthetic_dataset_helper_builds_something_the_loader_accepts(tmp_pa
     assert verify_dataset(root).ok
     item = news_item_from_payload(_fixture("news.wce-20160623-0007.json"))
     assert isinstance(item, NewsItem)
+
+
+# --------------------------------------------------------------------------------------------------
+# 17.2 pmx.data.sessions: the one implementation of session membership (ruling R174)
+#
+# The module was landed by gate G2 with no test of its own. Every predicate below is the one the
+# engine's calendar, the loader's density check and the borrow charge of 17.3 read, so a formula that
+# drifts here moves a fill, a bar set and a cash event at once.
+# --------------------------------------------------------------------------------------------------
+XNYS_OPEN_MINUTE = 13 * 60 + 30
+XNYS_CLOSE_MINUTE = 20 * 60
+#: A Monday 00:00Z and the Friday of that week.
+SESSION_MONDAY = ms_from_iso_date("2026-03-02")
+SESSION_FRIDAY = SESSION_MONDAY + 4 * MS_PER_DAY
+MS_PER_HOUR_LOCAL = 3_600_000
+
+
+def _weekday_calendar(*, holidays: Sequence[str] = ()) -> SessionCalendar:
+    """Two weeks of 13:30Z to 20:00Z weekday sessions, generated from the rule of an exchange."""
+    return generate_calendar(
+        calendar_id="xnys",
+        description="A weekday venue, 13:30Z to 20:00Z, for D1's session tests.",
+        source_url="https://www.nyse.com/markets/hours-calendars",
+        as_of_date="2026-09-08",
+        window_start_ms=SESSION_MONDAY,
+        window_end_ms=SESSION_MONDAY + 14 * MS_PER_DAY,
+        rules=(
+            SessionRule(
+                from_date="2026-03-02",
+                to_date="2026-03-16",
+                weekdays=(0, 1, 2, 3, 4),
+                open_minute=XNYS_OPEN_MINUTE,
+                close_minute=XNYS_CLOSE_MINUTE,
+            ),
+        ),
+        holidays=holidays,
+    )
+
+
+def test_generate_calendar_emits_one_session_per_weekday_and_drops_a_holiday() -> None:
+    """17.2: a dated rule plus its holidays, sorted, non-overlapping and inside its own window."""
+    calendar = _weekday_calendar()
+    assert calendar.calendar_id == "xnys" and calendar.is_continuous is False
+    assert len(calendar.sessions) == 10, "ten weekdays in a fortnight"
+    assert [session.open_ms - day_start_ms(session.open_ms) for session in calendar.sessions] == [
+        XNYS_OPEN_MINUTE * 60_000
+    ] * 10
+    assert all(
+        session.close_ms - session.open_ms == (XNYS_CLOSE_MINUTE - XNYS_OPEN_MINUTE) * 60_000
+        for session in calendar.sessions
+    )
+    opens = [session.open_ms for session in calendar.sessions]
+    assert opens == sorted(opens)
+    assert day_start_ms(SESSION_MONDAY + 5 * MS_PER_DAY) not in [day_start_ms(value) for value in opens]
+    with_holiday = _weekday_calendar(holidays=("2026-03-04",))
+    assert len(with_holiday.sessions) == 9
+    assert with_holiday.holidays == ("2026-03-04",)
+    assert day_start_ms(SESSION_MONDAY + 2 * MS_PER_DAY) not in [
+        day_start_ms(session.open_ms) for session in with_holiday.sessions
+    ]
+
+
+def test_generate_calendar_refuses_two_rules_that_overlap() -> None:
+    """An overlapping schedule is a data error and is never merged silently (17.2)."""
+    with pytest.raises(SchemaError, match="overlap"):
+        generate_calendar(
+            calendar_id="xnys",
+            description="Two rules that cover the same afternoon.",
+            source_url="https://example.invalid/rules",
+            as_of_date="2026-09-08",
+            window_start_ms=SESSION_MONDAY,
+            window_end_ms=SESSION_MONDAY + 7 * MS_PER_DAY,
+            rules=(
+                SessionRule(
+                    from_date="2026-03-02",
+                    to_date="2026-03-09",
+                    weekdays=(0,),
+                    open_minute=XNYS_OPEN_MINUTE,
+                    close_minute=XNYS_CLOSE_MINUTE,
+                ),
+                SessionRule(
+                    from_date="2026-03-02",
+                    to_date="2026-03-09",
+                    weekdays=(0,),
+                    open_minute=XNYS_OPEN_MINUTE + 60,
+                    close_minute=XNYS_CLOSE_MINUTE + 60,
+                ),
+            ),
+        )
+
+
+def test_in_session_is_the_intersection_of_the_bar_and_the_session_never_the_containment() -> None:
+    """17.2: ``t < close_ms and t + interval_ms > open_ms``, which a daily bar satisfies."""
+    open_ms = SESSION_MONDAY + 13 * MS_PER_HOUR_LOCAL
+    close_ms = SESSION_MONDAY + 20 * MS_PER_HOUR_LOCAL
+    sessions = (Session(open_ms=open_ms, close_ms=close_ms),)
+    assert in_session(sessions, SESSION_MONDAY, interval_min=1_440) is True
+    assert in_session(sessions, SESSION_MONDAY + MS_PER_DAY, interval_min=1_440) is False
+    assert in_session(sessions, SESSION_MONDAY + 12 * MS_PER_HOUR_LOCAL, interval_min=60) is False
+    assert in_session(sessions, SESSION_MONDAY + 13 * MS_PER_HOUR_LOCAL, interval_min=60) is True
+    assert in_session(sessions, SESSION_MONDAY + 19 * MS_PER_HOUR_LOCAL, interval_min=60) is True
+    assert in_session(sessions, close_ms, interval_min=60) is False, "the close is exclusive"
+    assert session_index(sessions, SESSION_MONDAY, interval_min=1_440) == 0
+    assert session_index((), SESSION_MONDAY, interval_min=1_440) is None
+    assert in_session(continuous_calendar(), 0, interval_min=60) is True, "ruling R185"
+
+
+def test_the_next_bar_after_friday_is_monday_and_the_previous_one_is_friday() -> None:
+    """17.2 and ruling R187: the latency rule of 16.2 waits for the venue's next bar, not the grid's."""
+    calendar = _weekday_calendar()
+    assert next_bar_ms(calendar, SESSION_MONDAY, interval_min=1_440) == SESSION_MONDAY + MS_PER_DAY
+    assert next_bar_ms(calendar, SESSION_FRIDAY, interval_min=1_440) == SESSION_MONDAY + 7 * MS_PER_DAY
+    assert prev_bar_ms(calendar, SESSION_MONDAY + 7 * MS_PER_DAY, interval_min=1_440) == SESSION_FRIDAY
+    assert prev_bar_ms(calendar, SESSION_MONDAY, interval_min=1_440) is None
+    last_bar = SESSION_MONDAY + 11 * MS_PER_DAY
+    assert next_bar_ms(calendar, last_bar, interval_min=1_440) is None, "the calendar has no session left"
+    assert next_bar_ms((), SESSION_MONDAY, interval_min=1_440) is None
+    assert prev_bar_ms((), SESSION_MONDAY, interval_min=1_440) is None
+
+
+def test_session_bars_is_the_grid_inside_the_sessions_and_refuses_an_off_grid_start() -> None:
+    """Ruling R149: the bars of a session instrument are the grid points its calendar covers."""
+    calendar = _weekday_calendar()
+    bars = session_bars(
+        calendar, start_ms=SESSION_MONDAY, end_ms=SESSION_MONDAY + 14 * MS_PER_DAY, interval_min=1_440
+    )
+    assert len(bars) == 10
+    assert bars[0] == SESSION_MONDAY and bars[4] == SESSION_FRIDAY
+    assert bars[5] == SESSION_MONDAY + 7 * MS_PER_DAY, "no weekend bar"
+    assert bars == tuple(sorted(set(bars)))
+    hourly = session_bars(
+        calendar, start_ms=SESSION_MONDAY, end_ms=SESSION_MONDAY + MS_PER_DAY, interval_min=60
+    )
+    assert hourly == tuple(SESSION_MONDAY + hour * MS_PER_HOUR_LOCAL for hour in range(13, 20))
+    with pytest.raises(SchemaError, match="not on the grid"):
+        session_bars(
+            calendar, start_ms=SESSION_MONDAY + 1, end_ms=SESSION_MONDAY + MS_PER_DAY, interval_min=1_440
+        )
+
+
+def test_a_session_close_is_charged_once_and_a_weekend_is_charged_on_monday() -> None:
+    """17.3: ``borrow_fee`` and ``carry`` are per session, with the days since the previous close."""
+    calendar = _weekday_calendar()
+    assert is_session_close(calendar, SESSION_MONDAY, interval_min=1_440) is True
+    assert is_session_close(calendar, SESSION_MONDAY + 5 * MS_PER_DAY, interval_min=1_440) is False
+    assert days_since_previous_close(calendar, SESSION_MONDAY, interval_min=1_440) == 1, "the first session"
+    assert days_since_previous_close(calendar, SESSION_MONDAY + MS_PER_DAY, interval_min=1_440) == 1
+    assert days_since_previous_close(calendar, SESSION_MONDAY + 7 * MS_PER_DAY, interval_min=1_440) == 3
+    assert days_since_previous_close(calendar, SESSION_MONDAY + 5 * MS_PER_DAY, interval_min=1_440) is None
+    assert is_session_close(calendar, SESSION_MONDAY + 19 * MS_PER_HOUR_LOCAL, interval_min=60) is True
+    assert is_session_close(calendar, SESSION_MONDAY + 18 * MS_PER_HOUR_LOCAL, interval_min=60) is False
+    assert is_session_close(continuous_calendar(), SESSION_MONDAY, interval_min=1_440) is False
+
+
+def test_a_calendar_read_from_a_file_is_checked_and_continuous_is_never_one() -> None:
+    """Ruling R185: the one calendar that is synthesised cannot arrive through the file door."""
+    calendar = calendar_from_payload(_fixture("session_calendar.xnys.json"))
+    assert calendar.calendar_id == "xnys"
+    assert calendar.sessions == tuple(sorted(calendar.sessions, key=lambda session: session.open_ms))
+    assert calendar.window.start_ms <= calendar.sessions[0].open_ms
+    assert calendar.sessions[-1].close_ms <= calendar.window.end_ms
+    payload = _fixture("session_calendar.xnys.json")
+    payload["calendar_id"] = "continuous"
+    # The schema refuses the id before the model is built, which is the outer of the two doors; the
+    # loader refuses the file name too (see the continuous walk below), so neither spelling gets in.
+    with pytest.raises(SchemaError, match="continuous"):
+        calendar_from_payload(payload)
+    with pytest.raises(SchemaError, match="outside the calendar window"):
+        check_calendar(
+            SessionCalendar(
+                calendar_id="xnys",
+                description="A session that starts before its own window.",
+                source_url="https://example.invalid",
+                as_of_date="2026-09-08",
+                window=DatasetWindow(start_ms=SESSION_MONDAY + 2, end_ms=SESSION_MONDAY + MS_PER_DAY),
+                sessions=(Session(open_ms=SESSION_MONDAY + 1, close_ms=SESSION_MONDAY + 3),),
+            )
+        )
+
+
+# --------------------------------------------------------------------------------------------------
+# 17.2 The loader's continuous walk: instruments/, calendars/, the clip and the _ticks mapping
+#
+# Gate G2 landed the walk with no test over it: nothing built a dataset carrying an ``instruments/``
+# or a ``calendars/`` directory. The helper below is the smallest such dataset, built from the
+# contract's own instrument and calendar fixtures so that the file shapes under test are the shipped
+# ones, with a window that a real build could have produced.
+# --------------------------------------------------------------------------------------------------
+#: The contract fixture's own window: three XNYS session days from 2026-02-28, freeze after them.
+WALK_FREEZE_DATE = "2026-09-07"
+
+
+def _instrument_dataset(root: Path, *, with_calendar: bool = True) -> Path:
+    """A dataset of one equity instrument and one sealed calendar, and nothing else.
+
+    ``counts.markets`` is zero and ``instruments.per_kind`` is one, which is what a dataset of a single
+    continuous instrument is: 17.2 walks ``markets/`` and ``instruments/`` separately and cross-checks
+    each against its own count.
+    """
+    instrument = instrument_from_payload(_fixture("instrument.xnas-aapl.json"))
+    calendar = calendar_from_payload(_fixture("session_calendar.xnys.json"))
+    freeze_ms = ms_from_iso_date(WALK_FREEZE_DATE)
+    window = DatasetWindow(
+        start_ms=calendar.window.start_ms, end_ms=instrument.bars[-1].t_ms + MS_PER_DAY
+    )
+    edges = month_edges_for(window.start_ms)
+    manifest = DatasetManifest(
+        schema_version="dataset.v1",
+        name="instruments_v1",
+        freeze_date=WALK_FREEZE_DATE,
+        freeze_ms=freeze_ms,
+        window=window,
+        interval_min=1_440,
+        providers=("xnas",),
+        safety_lag_ms=SAFETY_LAG_MS_DEFAULT,
+        filters=DatasetFilters(
+            config=BuildConfig(
+                freeze_date=WALK_FREEZE_DATE, providers=("xnas",), kinds=("equity",)
+            ).to_dict(),
+            removed=dict.fromkeys(REMOVED_FILTER_KEYS, 0),
+        ),
+        counts=DatasetCounts(
+            markets=0,
+            per_provider={},
+            per_category={},
+            resolution_yes=0,
+            resolution_no=0,
+            hardness_tags={},
+        ),
+        news=DatasetNews(sources=(), n_items=0, n_linked=0),
+        split=DatasetSplit(
+            month_edges_ms=edges,
+            train_end_ms=edges[8],
+            validation_end_ms=edges[10],
+            n_train=0,
+            n_validation=0,
+            n_sealed=0,
+            n_instruments_train=0,
+            n_instruments_validation=0,
+            n_instruments_sealed=0,
+        ),
+        files=(),
+        dataset_hash="0" * 64,
+        built_by=BuiltBy(
+            pmx_version=pmx.__version__,
+            contract_version=pmx.CONTRACT_VERSION,
+            rng_algorithm_version=RNG_ALGORITHM_VERSION,
+        ),
+        sealed=False,
+        notes="One continuous instrument, for D1's walk tests.",
+        kinds=("equity",),
+        instruments={
+            "per_kind": {"equity": 1},
+            "per_provider": {"xnas": 1},
+            "per_vendor": {"yahoo": 1},
+            "n_cash_events": {"per_kind": {"equity": len(instrument.cash_events)}},
+            "n_calendars": 1 if with_calendar else 0,
+        },
+        schedules={
+            "fee": (instrument.fee_schedule_id,),
+            "borrow": (instrument.borrow_schedule_id,) if instrument.borrow_schedule_id else (),
+            "carry": (),
+        },
+    )
+    root.mkdir(parents=True, exist_ok=True)
+    write_canonical_json(root / "instruments" / f"{instrument.id}.json", instrument.to_dict())
+    if with_calendar:
+        write_canonical_json(root / "calendars" / f"{calendar.calendar_id}.json", calendar.to_dict())
+    write_manifest(root, loader_module.reseal_hash(root, manifest))
+    return root
+
+
+def test_the_loader_walks_an_instruments_directory_and_seals_it_with_its_calendars(tmp_path: Path) -> None:
+    """Rulings R149 and R186: one meta per instrument, ``kind`` on it, fold ``all``, hashed files."""
+    root = _instrument_dataset(tmp_path / "walk")
+    dataset = load_dataset(root, verify=True)
+    assert [meta.id for meta in dataset.metas] == ["xnas-AAPL"]
+    meta = dataset.metas[0]
+    assert meta.kind == "equity" and meta.fold == "all"
+    assert meta.resolution == -1 and meta.event_key is None and meta.hardness_tags == ()
+    assert meta.created_at_ms == ms_from_iso_date("2026-03-02"), "listed_at_ms under the binary name"
+    assert meta.close_at_ms == meta.resolved_at_ms == dataset.manifest.window.end_ms
+    assert meta.n_bars == 3
+    paths = sorted(entry.path for entry in dataset.manifest.files)
+    assert paths == ["calendars/xnys.json", "instruments/xnas-AAPL.json"]
+    assert verify_dataset(root).ok
+    assert dataset.calendar_ids() == ("continuous", "xnys")
+    assert dataset.calendar("xnys").calendar_id == "xnys"
+    assert dataset.calendar("continuous").is_continuous, "ruling R185: synthesised, never a file"
+
+
+def test_the_ticks_fields_of_an_instrument_file_map_onto_one_bar_and_one_trade() -> None:
+    """Ruling R173: ``_bp`` carries ticks, so ``open_ticks`` is ``open_bp`` and there is one Bar."""
+    payload = _fixture("instrument.xnas-aapl.json")
+    first = payload["bars"][0]
+    first["bid_ticks"] = 18_860_000
+    first["ask_ticks"] = 18_864_000
+    first["open_interest_milli"] = 5_000
+    payload["trades"] = [
+        {"t_ms": first["t_ms"] + 1, "price_ticks": 18_900_000, "size_milli": 2_000, "side": "buy"}
+    ]
+    instrument = instrument_from_payload(payload)
+    bar = instrument.bars[0]
+    assert bar.open_bp == first["open_ticks"]
+    assert bar.high_bp == first["high_ticks"] and bar.low_bp == first["low_ticks"]
+    assert bar.close_bp == first["close_ticks"] and bar.vwap_bp == first["vwap_ticks"]
+    assert bar.yes_bid_bp == 18_860_000 and bar.yes_ask_bp == 18_864_000
+    assert bar.open_interest == 5_000
+    trade = instrument.trades[0]
+    assert trade.price_bp == 18_900_000 and trade.size_milli == 2_000 and trade.side == "buy"
+    assert instrument.first_price_bp == instrument.first_price_ticks
+    assert instrument.created_at_ms == instrument.listed_at_ms
+    assert instrument.bar_at(bar.t_ms) is bar
+    assert instrument.bars_before(bar.t_ms, 1) == ()
+    assert instrument.bars_before(bar.t_ms + MS_PER_DAY, 1) == (bar,)
+    assert instrument.instrument is instrument, "the base view of an instrument is the instrument"
+
+
+def test_an_instrument_naming_a_calendar_the_dataset_does_not_carry_is_refused(tmp_path: Path) -> None:
+    """Ruling R185: only ``continuous`` is synthesised; every other calendar is a file of the dataset."""
+    root = _instrument_dataset(tmp_path / "nocal", with_calendar=False)
+    with pytest.raises(SchemaError, match="session calendar the dataset does not carry"):
+        load_dataset(root)
+
+
+def test_a_calendars_directory_never_carries_the_continuous_calendar(tmp_path: Path) -> None:
+    """Ruling R185, at the file door this time: ``calendars/continuous.json`` is refused by name."""
+    root = _instrument_dataset(tmp_path / "cont")
+    calendar = calendar_from_payload(_fixture("session_calendar.xnys.json"))
+    payload = calendar.to_dict()
+    payload["calendar_id"] = "xnys"
+    write_canonical_json(root / "calendars" / "continuous.json", payload)
+    with pytest.raises(SchemaError, match="synthesised, never a file"):
+        loader_module.load_calendars(root, manifest=load_manifest(root))
+
+
+def test_a_bar_outside_every_session_of_its_calendar_is_refused(tmp_path: Path) -> None:
+    """Ruling R149: bars are dense **on the calendar**, so a weekend bar is a structural error."""
+    calendar = calendar_from_payload(_fixture("session_calendar.xnys.json"))
+    payload = _fixture("instrument.xnas-aapl.json")
+    weekend = next(
+        day_start_ms(payload["bars"][-1]["t_ms"]) + days * MS_PER_DAY
+        for days in range(1, 8)
+        if not in_session(calendar, day_start_ms(payload["bars"][-1]["t_ms"]) + days * MS_PER_DAY,
+                          interval_min=1_440)
+    )
+    extra = dict(payload["bars"][-1])
+    extra["t_ms"] = weekend
+    payload["bars"] = [*payload["bars"], extra]
+    instrument = instrument_from_payload(payload)
+    with pytest.raises(SchemaError, match="dense on the instrument"):
+        loader_module.check_instrument_structure(instrument, manifest=None, calendar=calendar)
+
+
+def test_dataset_market_clips_a_continuous_instrument_and_sealed_market_does_not(tmp_path: Path) -> None:
+    """Ruling R182: the clip is at ``split.validation_end_ms`` and only the claim path sees past it."""
+    root = _instrument_dataset(tmp_path / "clip")
+    dataset = load_dataset(root)
+    whole = dataset.sealed_market("xnas-AAPL")
+    assert isinstance(whole, ContinuousInstrument)
+    assert len(whole.bars) == 3
+    cut = whole.bars[1].t_ms
+    clipped = whole.clipped(cut)
+    assert [bar.t_ms for bar in clipped.bars] == [whole.bars[0].t_ms]
+    assert all(event.t_ms < cut for event in clipped.cash_events)
+    assert clipped.quality == whole.quality, "quality stays the whole-window statistic"
+    narrow = replace(
+        dataset,
+        manifest=replace(dataset.manifest, split=replace(dataset.manifest.split, validation_end_ms=cut)),
+        market_loader=dataset.market_loader,
+    )
+    served = narrow.market("xnas-AAPL")
+    assert isinstance(served, ContinuousInstrument)
+    assert [bar.t_ms for bar in served.bars] == [whole.bars[0].t_ms]
+    assert len(narrow.sealed_market("xnas-AAPL").bars) == 3, "the claim path holds the whole path"
+
+
+# --------------------------------------------------------------------------------------------------
+# The pmx.types names of amendment C1b that no other test reads
+# --------------------------------------------------------------------------------------------------
+def test_the_binary_scale_constants_are_the_numbers_ruling_R145_fixed() -> None:
+    """R145 against the PRD's ``10_000``: a binary tick is ``100`` micro-units of a one-unit payout."""
+    assert BINARY_TICK_SIZE_MICRO == 100
+    assert BINARY_POINT_VALUE_MICRO == 1_000_000
+    assert INSTRUMENT_KINDS[0] == "binary"
+    # The identity that makes the one price model of 17.1 answer for a binary too (R145).
+    for size, price_bp in ((1, 1), (3, 6_327), (100, 9_999)):
+        assert cost_cents(size, price_bp) == cash_out_cents(
+            size * 1_000, price_bp, BINARY_TICK_SIZE_MICRO, BINARY_POINT_VALUE_MICRO
+        )
+    assert price_micro(6_327, BINARY_TICK_SIZE_MICRO) == 632_700
+    assert price_micro(1, BINARY_TICK_SIZE_MICRO) == 100
+
+
+def test_default_horizons_bars_is_one_bar_one_day_and_one_week() -> None:
+    """17.5 and ruling R188: ``(1, 7)`` on a daily grid, ``(1, 24, 168)`` on an hourly one."""
+    assert default_horizons_bars(1_440) == (1, 7)
+    assert default_horizons_bars(60) == (1, 24, 168)
+    # A config that spells the default and one that omits it are one run (ruling R188).
+    omitted = RunConfig(seed=1, interval_min=1_440)
+    spelled = RunConfig(seed=1, interval_min=1_440, horizons_bars=(1, 7))
+    assert omitted.horizons_bars == spelled.horizons_bars == (1, 7)
+    assert omitted.to_dict() == spelled.to_dict()
+    assert canonical_json(omitted.to_dict()) == canonical_json(spelled.to_dict())
+    hourly = RunConfig(seed=1, interval_min=60)
+    assert hourly.horizons_bars == (1, 24, 168)
+
+
+def test_a_portfolio_view_carries_a_debit_balance_and_a_negative_equity() -> None:
+    """Rulings R179 and R180: both are journal states of a short, not values to clamp at zero."""
+    view = PortfolioView(
+        cash_cents=-2_500,
+        reserved_cents=0,
+        equity_cents=-1_250,
+        fees_paid_cents=10,
+        peak_equity_cents=100_000,
+        drawdown_bp=-10_125,
+        n_open_positions=1,
+        n_open_orders=0,
+        research_units_remaining=0,
+    )
+    assert view.cash_cents == -2_500 and view.equity_cents == -1_250
+    assert view.drawdown_bp <= 0, "a drawdown has no floor and is never positive (R180)"
+    assert view.to_dict()["cash_cents"] == -2_500
+    assert view.to_dict()["equity_cents"] == -1_250

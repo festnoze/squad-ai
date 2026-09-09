@@ -22,31 +22,34 @@ structural, so the moment D1 lands the real types these tests bind to them inste
 
 from __future__ import annotations
 
+import itertools
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
+from dataclasses import fields as dataclass_fields
 from pathlib import Path
 from typing import cast
 
 import pytest
 
 from pmx.data.loader import load_dataset, load_manifest
-from pmx.engine.calendar import (
-    BarSlice,
-    Calendar,
-    bar_intersects_sessions,
-    meta_kind,
-)
+from pmx.data.sessions import in_session
+from pmx.engine.calendar import BarSlice, Calendar, meta_kind
+from pmx.engine.execution import applies_at as execution_applies_at
 from pmx.engine.observation import (
     CASH_EVENTS_VIEW_MAX,
     DESCRIPTION_VIEW_CHARS,
     FORBIDDEN_OBSERVATION_KEYS,
+    GATED_MARKET_VIEW_FIELDS,
+    GATED_OBSERVATION_FIELDS,
     NEWS_VIEW_TEXT_CHARS,
-    AppliedCashEvent,
+    SENSOR_NAMES,
+    SENSOR_VIEW_FIELDS,
     ResearchLedger,
     assert_no_leak,
     build_grant,
     build_observation,
+    cash_event_applies_at,
     completed_bars,
     filter_grant,
     filter_hive_view,
@@ -58,7 +61,9 @@ from pmx.engine.observation import (
     observation_bytes,
     observation_key_set,
     render_observation_json,
+    resolve_sensor_set,
     tape_stats_at,
+    unsensed_view_fields,
     visible_cash_events,
 )
 from pmx.errors import (
@@ -67,13 +72,18 @@ from pmx.errors import (
     ObservationTooLargeError,
     SchemaError,
 )
+from pmx.journal import canonical_json
 from pmx.types import (
+    CASH_EVENT_KINDS,
+    DATA_CASH_EVENT_KINDS,
     MS_PER_DAY,
     MS_PER_HOUR,
     OBSERVATION_MAX_BYTES,
     Bar,
+    CashEventView,
     Dataset,
     DatasetManifest,
+    DatasetWindow,
     ForecastView,
     HiveLessonView,
     HiveView,
@@ -82,6 +92,7 @@ from pmx.types import (
     Market,
     MarketMeta,
     MarketQuality,
+    MarketView,
     MemoryView,
     NewsItem,
     NewsView,
@@ -93,6 +104,8 @@ from pmx.types import (
     ResearchRequest,
     ResolutionView,
     RunConfig,
+    Session,
+    SessionCalendar,
     Trade,
     bar_of,
 )
@@ -314,20 +327,6 @@ def a_portfolio(*, research_units_remaining: int = 10) -> PortfolioView:
 # Test doubles for the names amendment C1b declares and gate G2 has not landed
 # --------------------------------------------------------------------------------------------------
 @dataclass(frozen=True, slots=True)
-class FakeSession:
-    open_ms: int
-    close_ms: int
-
-
-@dataclass(frozen=True, slots=True)
-class FakeCalendarRecord:
-    """``pmx.types.SessionCalendar`` (section 17.2): the sealed, dated session record."""
-
-    calendar_id: str
-    sessions: tuple[FakeSession, ...]
-
-
-@dataclass(frozen=True, slots=True)
 class FakeCashEvent:
     """``pmx.types.CashEvent`` (section 17.3)."""
 
@@ -370,6 +369,11 @@ class FakeContinuous:
     bars: tuple[Bar, ...] = ()
     trades: tuple[Trade, ...] = ()
     cash_events: tuple[FakeCashEvent, ...] = ()
+
+    @property
+    def instrument(self) -> FakeContinuous:
+        """``pmx.types.Instrument.instrument``: the base view of an instrument is the instrument."""
+        return self
 
     def bar_at(self, t_ms: int) -> Bar | None:
         target = bar_of(t_ms, self.interval_min)
@@ -462,15 +466,22 @@ class FakeHive:
 # xnys-like sessions: 13:30Z to 20:00Z on every weekday of the nine weeks that start at MONDAY. A sealed
 # calendar covers the whole dataset window and not one run's window (17.2), which is what lets a test tell
 # the venue's next bar apart from the run's (``hours_to_next_bar`` reads the first, ruling R181).
-WEEKDAY_SESSIONS: tuple[FakeSession, ...] = tuple(
-    FakeSession(
+WEEKDAY_SESSIONS: tuple[Session, ...] = tuple(
+    Session(
         open_ms=MONDAY + day * DAY + 13 * MS_PER_HOUR + 30 * 60_000,
         close_ms=MONDAY + day * DAY + 20 * MS_PER_HOUR,
     )
     for day in range(63)
     if day % 7 not in (5, 6)
 )
-XNYS = FakeCalendarRecord(calendar_id="xnys", sessions=WEEKDAY_SESSIONS)
+XNYS = SessionCalendar(
+    calendar_id="xnys",
+    description="A weekday venue, 13:30Z to 20:00Z, for the session half of amendment C1b.",
+    source_url="https://example.invalid/xnys",
+    as_of_date="2026-02-28",
+    window=DatasetWindow(start_ms=MONDAY, end_ms=MONDAY + 63 * DAY),
+    sessions=WEEKDAY_SESSIONS,
+)
 
 
 def continuous_setup(
@@ -682,11 +693,11 @@ def test_the_demo_pack_builds_a_calendar_over_its_real_markets() -> None:
 # The calendar: session instruments (amendment C1b)
 # --------------------------------------------------------------------------------------------------
 def test_session_membership_is_the_intersection_and_not_the_containment() -> None:
-    sessions = (FakeSession(open_ms=MONDAY + 13 * MS_PER_HOUR, close_ms=MONDAY + 20 * MS_PER_HOUR),)
-    assert bar_intersects_sessions(sessions, MONDAY, interval_min=1_440)  # the daily bar holds the session
-    assert not bar_intersects_sessions(sessions, MONDAY + DAY, interval_min=1_440)
-    assert bar_intersects_sessions(sessions, MONDAY + 12 * MS_PER_HOUR, interval_min=60) is False
-    assert bar_intersects_sessions(sessions, MONDAY + 13 * MS_PER_HOUR, interval_min=60) is True
+    sessions = (Session(open_ms=MONDAY + 13 * MS_PER_HOUR, close_ms=MONDAY + 20 * MS_PER_HOUR),)
+    assert in_session(sessions, MONDAY, interval_min=1_440)  # the daily bar holds the session
+    assert not in_session(sessions, MONDAY + DAY, interval_min=1_440)
+    assert in_session(sessions, MONDAY + 12 * MS_PER_HOUR, interval_min=60) is False
+    assert in_session(sessions, MONDAY + 13 * MS_PER_HOUR, interval_min=60) is True
 
 
 def test_a_weekend_is_not_a_bar_of_a_session_run() -> None:
@@ -812,6 +823,7 @@ def one_observation(
     hive: FakeHive | None = None,
     calendar: Calendar | None = None,
     agent_id: str = "follower",
+    sensors: Sequence[str] | None = None,
 ) -> Observation:
     return build_observation(
         agent_id=agent_id,
@@ -825,6 +837,7 @@ def one_observation(
         news=news,
         grants=grants,
         calendar=calendar,
+        sensors=sensors,
     )
 
 
@@ -1436,7 +1449,7 @@ def test_a_cash_event_is_visible_once_its_application_bar_has_completed() -> Non
     assert visible_cash_events(instrument, now_ms=MONDAY + DAY, calendar=calendar) == ()
     applied = visible_cash_events(instrument, now_ms=MONDAY + 2 * DAY, calendar=calendar)
     assert applied == (
-        AppliedCashEvent(
+        CashEventView(
             kind="dividend", t_ms=MONDAY + 2 * DAY, applied_at_ms=MONDAY + DAY, detail={"dividend_micro": 260_000}
         ),
     )
@@ -1582,7 +1595,9 @@ def test_the_poisoned_future_test_on_a_continuous_instrument() -> None:
     assert str(delisted) not in rendered
     assert str(calendar.last_bar("xnas-AAPL")) not in rendered
     assert "314159" not in rendered
-    assert observation_key_set(obs.to_dict()) & frozenset(FORBIDDEN_OBSERVATION_KEYS) == frozenset()
+    scanned = leak_scan_payload(obs.to_dict())
+    assert observation_key_set(scanned) & frozenset(FORBIDDEN_OBSERVATION_KEYS) == frozenset()
+    assert_no_leak(obs.to_dict(), agent_id="a", now_ms=now)  # the guard the builder itself runs
     applied = visible_cash_events(instrument, now_ms=now, calendar=calendar)
     assert [event.detail["dividend_micro"] for event in applied] == [260_000]
     view_fields = market_view_fields(
@@ -1871,3 +1886,390 @@ def test_an_observation_over_the_cap_is_refused_rather_than_truncated() -> None:
     )
     with pytest.raises(ObservationTooLargeError):
         one_observation([market], now_ms=150 * DAY, config=config, news=fat_news, grants=[huge])
+
+
+def test_the_two_spellings_of_ruling_r175_agree_on_every_kind() -> None:
+    """Ruling R175 is computed twice in the engine, so the two answers are pinned against each other.
+
+    ``pmx.engine.execution.applies_at`` is the declared home (R175) and
+    ``pmx.engine.observation.cash_event_applies_at`` is the leak boundary's own spelling, because the
+    observation may not import the module that moves money. A divergence between them would show an
+    agent a dividend at a bar the engine paid it at another, which is exactly the asymmetry R183 exists
+    to close, so this test is the guard until the gate says which file owns the rule.
+    """
+    instrument = FakeContinuous(id="xnas-AAPL", bars=daily_bars(MONDAY, 12))
+    _, calendar = continuous_setup(instrument, window_end_ms=MONDAY + 12 * DAY)
+    for kind in CASH_EVENT_KINDS:
+        for day in (0, 1, 5, 9):
+            event = FakeCashEvent(
+                cash_event_id="ce-0123456789abcdef",
+                market_id=instrument.id,
+                kind=kind,
+                t_ms=MONDAY + day * DAY,
+                origin="data" if kind in DATA_CASH_EVENT_KINDS else "engine",
+                source_url="",
+                detail={},
+            )
+            mine = cash_event_applies_at(event, interval_min=instrument.interval_min, calendar=calendar)
+            theirs = execution_applies_at(event, instrument, calendar)
+            assert mine == theirs, (kind, day)
+    # Without a calendar the corporate kinds have no application bar and stay hidden, which is the one
+    # deliberate difference: execution always holds a calendar and the runner always passes one.
+    dividend = FakeCashEvent(
+        cash_event_id="ce-0123456789abcdef",
+        market_id=instrument.id,
+        kind="dividend",
+        t_ms=MONDAY + 5 * DAY,
+        origin="data",
+        source_url="",
+        detail={},
+    )
+    assert cash_event_applies_at(dividend, interval_min=1_440, calendar=None) is None
+    assert visible_cash_events(instrument, now_ms=MONDAY + 6 * DAY, calendar=None) == ()
+
+
+# --------------------------------------------------------------------------------------------------
+# The sensor gene's hook (PRD v5 section 1): an observation assembled from a per-agent sensor set
+#
+# The hook gates view fields by subtraction, so the tests below are about two things and nothing else:
+# that the default set is the builder that predates it, byte for byte, and that a narrowed set removes
+# exactly what it says and can never add anything, the poisoned future included.
+# --------------------------------------------------------------------------------------------------
+SENSOR_NOW = 4 * DAY
+
+
+def a_sensor_world() -> dict[str, object]:
+    """A world in which **every** field this hook gates carries something an agent could act on.
+
+    That matters more than it looks: on a market with no quotes, no prints and no linked news, half the
+    gated fields are already empty, and every "the key is gone" assertion below would pass for the wrong
+    reason. Here the quotes are quoted, the prints are granted, the digest is linked and the memory has a
+    note, so a dropped field is a dropped value. The two cross-asset fields are the exception and cannot
+    be furnished by a binary market (it has no underlying and no twin), so the ``cross_asset`` row is
+    checked by key and never by value.
+    """
+    trades = tuple(
+        Trade(t_ms=index * DAY + 3, price_bp=5_000 + index, size_milli=1_000, side="yes") for index in range(4)
+    )
+    market = a_market("demo-alpha", created_day=0, n_bars=9, quotes=True, trades=trades)
+    news = [
+        a_news_item(
+            "wce-20160101-0001",
+            published_day=1,
+            market_ids=("demo-alpha",),
+            scores=(700,),
+            headline="A-VISIBLE-HEADLINE",
+        )
+    ]
+    memory = FakeMemory(
+        MemoryView(notes=(NoteView(written_at_ms=DAY, market_id="demo-alpha", text="A-VISIBLE-NOTE"),))
+    )
+    grant = build_grant(
+        request=ResearchRequest(kind="history", market_id="demo-alpha"),
+        granted_at_ms=SENSOR_NOW - DAY,
+        config=a_config(),
+        trades=trades,
+    )
+    return {"markets": [market], "news": news, "memory": memory, "grants": [grant]}
+
+
+def an_observation_with(sensors: Sequence[str] | None) -> Observation:
+    """The same world at the same bar, seen through one sensor set."""
+    world = a_sensor_world()
+    return one_observation(
+        cast(Sequence[object], world["markets"]),
+        now_ms=SENSOR_NOW,
+        news=cast(Sequence[NewsItem], world["news"]),
+        grants=cast(Sequence[ResearchGrant], world["grants"]),
+        memory=cast(FakeMemory, world["memory"]),
+        sensors=sensors,
+    )
+
+
+def test_the_default_sensor_set_is_todays_behaviour_byte_for_byte() -> None:
+    """Point 1 of the hook: ``None`` means every sensor, and the full diet spelled out is the same bytes.
+
+    Both build a **plain** ``MarketView`` and a plain ``Observation`` and not a narrowed one, which is
+    what makes the whole existing suite the proof that the default changed nothing.
+    """
+    default = an_observation_with(None)
+    explicit = an_observation_with(list(SENSOR_NAMES))
+    assert render_observation_json(default) == render_observation_json(explicit)
+    assert observation_bytes(default) == observation_bytes(explicit)
+    assert type(default) is Observation
+    assert type(explicit) is Observation
+    assert {type(view) for view in default.markets} == {MarketView}
+    assert {type(view) for view in explicit.markets} == {MarketView}
+    assert resolve_sensor_set(SENSOR_NAMES) is None
+    # The world really is furnished, so the assertions of the next tests bite.
+    view = default.markets[0]
+    assert view.bars and view.trades and view.news
+    assert (view.underlying_id, view.twins) == (None, ())  # a binary has neither
+    assert view.best_bid_bp is not None and view.best_ask_bp is not None
+    assert view.volume_milli_to_date > 0 and view.n_trades_to_date > 0
+    assert default.news and default.memory.notes
+
+
+@pytest.mark.parametrize("dropped", SENSOR_NAMES)
+def test_dropping_one_sensor_omits_exactly_that_sensors_fields(dropped: str) -> None:
+    """Point 2: a narrowed set omits exactly the gated fields and nothing else, at both levels."""
+    full = an_observation_with(None).to_dict()
+    narrowed = an_observation_with([name for name in SENSOR_NAMES if name != dropped]).to_dict()
+    gated = SENSOR_VIEW_FIELDS[dropped]
+    assert set(full) - set(narrowed) == set(gated.observation)
+    for key in set(narrowed) - {"markets"}:
+        assert narrowed[key] == full[key], key
+    before_views = cast(list[dict[str, object]], full["markets"])
+    after_views = cast(list[dict[str, object]], narrowed["markets"])
+    for before, after in zip(before_views, after_views, strict=True):
+        assert set(before) - set(after) == set(gated.market)
+        for key in after:
+            assert after[key] == before[key], key
+
+
+def test_an_unknown_sensor_is_refused_and_never_silently_ignored() -> None:
+    """Point 5: a genome that names a sensor this build does not have dies at the boundary.
+
+    Every name PRD v5 lists whose data no built dataset carries yet is refused too, one by one, so a
+    caller cannot buy a promise: those rows are C1c's and S1's to add.
+    """
+    with pytest.raises(InvalidConfigError) as caught:
+        an_observation_with(["tape", "hn"])
+    assert caught.value.context["sensors"] == ["hn"]
+    assert caught.value.context["known"] == list(SENSOR_NAMES)
+    for future in (
+        "hn",
+        "gdelt_recent",
+        "filings",
+        "macro_releases",
+        "comments",
+        "wiki_asof",
+        "hive_insights",
+        "hive_reputation",
+        "",
+        "TAPE",
+    ):
+        with pytest.raises(InvalidConfigError):
+            resolve_sensor_set([future])
+
+
+def test_absence_cannot_be_mistaken_for_zero_or_for_empty() -> None:
+    """Point 2 again, the part that matters: an unsensed field is absent and not a value.
+
+    The contrast is the test. On a market's very first bar the volume fields are legitimately ``0`` and
+    the quotes legitimately ``None``, and those values are **present**. With the sensor dropped the keys
+    are gone, reading the attribute raises, and even ``hasattr`` raises, so nothing can turn the absence
+    into a default and no agent can tell itself the market was quiet.
+    """
+    first_bar = one_observation(
+        [a_market("demo-alpha", created_day=0, n_bars=6, quotes=True)], now_ms=0
+    ).markets[0].to_dict()
+    assert first_bar["volume_milli_to_date"] == 0
+    assert first_bar["n_trades_to_date"] == 0
+    assert first_bar["best_bid_bp"] is None
+    assert first_bar["trades"] == []
+
+    blind = [name for name in SENSOR_NAMES if name not in ("volume_profile", "microstructure")]
+    view = an_observation_with(blind).markets[0]
+    payload = view.to_dict()
+    assert isinstance(view, MarketView)
+    for gone in (
+        "volume_milli_7d",
+        "volume_milli_to_date",
+        "n_trades_to_date",
+        "best_bid_bp",
+        "best_ask_bp",
+        "trades",
+    ):
+        assert gone not in payload, gone
+        with pytest.raises(SchemaError) as caught:
+            getattr(view, gone)
+        assert caught.value.context["field"] == gone
+        with pytest.raises(SchemaError):
+            hasattr(view, gone)
+    expected = SENSOR_VIEW_FIELDS["volume_profile"].market | SENSOR_VIEW_FIELDS["microstructure"].market
+    assert view.unsensed_fields == expected
+    # The ungated fields still read, and the sensed ones still carry their values.
+    assert view.market_id == "demo-alpha"
+    assert view.tradable is True
+    assert view.last_price_bp == 5_000 + 300
+    assert repr(view).startswith("SensedMarketView(")
+    # And the absence survives the round trip through the dataclasses and the canonical JSON alike.
+    assert json.loads(render_observation_json(an_observation_with(blind)))["markets"][0] == payload
+
+
+def test_an_observation_level_sensor_is_absent_at_the_top_level() -> None:
+    """``wiki_daily`` and ``memory`` gate a field of the ``Observation`` itself, not of a market view."""
+    obs = an_observation_with(["tape"])
+    payload = json.loads(render_observation_json(obs))
+    assert isinstance(obs, Observation)
+    assert obs.unsensed_fields == frozenset({"memory", "news"})
+    for gone in ("memory", "news"):
+        assert gone not in payload
+        with pytest.raises(SchemaError) as caught:
+            getattr(obs, gone)
+        assert caught.value.context["field"] == gone
+    assert "news" not in payload["markets"][0]
+    assert "A-VISIBLE-NOTE" not in render_observation_json(obs)
+    assert "A-VISIBLE-HEADLINE" not in render_observation_json(obs)
+    # What is left is the tape and the ungated fields, at their full value.
+    assert obs.agent_id == "follower"
+    assert obs.portfolio.cash_cents == 100_000
+    assert [bar.t_ms for bar in obs.markets[0].bars] == [index * DAY for index in range(4)]
+    assert repr(obs).startswith("SensedObservation(")
+
+
+def test_the_as_of_law_holds_for_every_sensor_set() -> None:
+    """Point 4: a sensor set narrows and never widens, over all 128 of them.
+
+    The poisoned-future world of PRD 6.3 is rebuilt here and every subset of the catalogue is asked for
+    it. Three properties are asserted for each: no poisoned datum surfaces, no forbidden key appears, and
+    every byte the set kept is the byte the default set carried (so no set can alter a field either).
+    Exhaustive rather than random on purpose: 128 builds are cheaper than one flaky seed.
+    """
+    now = SENSOR_NOW
+    poisoned_bar = a_bar(now, 7_777, volume_milli=987_654_321, n_trades=424_242)
+    market = a_market("demo-alpha", created_day=0, n_bars=4, quotes=True, extra_bars=(poisoned_bar,))
+    poisoned_news = a_news_item(
+        "wce-20160105-0001",
+        published_day=5,
+        market_ids=("demo-alpha",),
+        scores=(999,),
+        headline="POISON-NEWS-HEADLINE",
+        text="POISON-NEWS-BODY",
+        visible_from_ms=(5 * DAY) + 6 * MS_PER_HOUR,
+    )
+    visible_news = a_news_item(
+        "wce-20160101-0002", published_day=1, market_ids=("demo-alpha",), scores=(500,), headline="A-HEADLINE"
+    )
+    memory = FakeMemory(
+        MemoryView(
+            lessons=(LessonView(written_at_ms=now + DAY, text="POISON-MEMORY-LESSON", market_ids=()),),
+            notes=(NoteView(written_at_ms=now + DAY, market_id="demo-alpha", text="POISON-MEMORY-NOTE"),),
+        )
+    )
+    hive = FakeHive(
+        HiveView(
+            lessons=(HiveLessonView("h-00000009", "future", 9_999, "POISON-HIVE-LESSON", (), now + DAY),),
+            forecasts=(ForecastView(agent_id="other", market_id="demo-alpha", bar_ms=now - DAY, prob_ppm=987_654),),
+            resolutions=(
+                ResolutionView(market_id="demo-alpha", outcome=1, life_mean_price_bp=6_543, resolved_at_ms=now),
+            ),
+        )
+    )
+    grant = build_grant(
+        request=ResearchRequest(kind="history", market_id="demo-alpha"),
+        granted_at_ms=now - DAY,
+        config=a_config(),
+        trades=(Trade(t_ms=now + 1, price_bp=8_888, size_milli=1_000, side="yes"),),
+    )
+
+    def build(sensors: Sequence[str] | None) -> dict[str, object]:
+        return one_observation(
+            [market],
+            now_ms=now,
+            news=[visible_news, poisoned_news],
+            memory=memory,
+            hive=hive,
+            grants=[grant],
+            sensors=sensors,
+        ).to_dict()
+
+    poisons = (
+        "7777",
+        "987654321",
+        "424242",
+        "8888",
+        "POISON-NEWS-HEADLINE",
+        "POISON-NEWS-BODY",
+        "POISON-MEMORY-LESSON",
+        "POISON-MEMORY-NOTE",
+        "POISON-HIVE-LESSON",
+        "987654",
+        "6543",
+    )
+    default = build(None)
+    all_sets = [
+        combination
+        for size in range(len(SENSOR_NAMES) + 1)
+        for combination in itertools.combinations(SENSOR_NAMES, size)
+    ]
+    assert len(all_sets) == 2 ** len(SENSOR_NAMES)
+    for sensors in all_sets:
+        payload = build(list(sensors))
+        rendered = canonical_json(payload)
+        for poison in poisons:
+            assert poison not in rendered, (poison, sensors)
+        assert observation_key_set(leak_scan_payload(payload)) & frozenset(FORBIDDEN_OBSERVATION_KEYS) == frozenset()
+        assert_no_leak(payload, agent_id="follower", now_ms=now)
+        assert set(payload) <= set(default)
+        for key in set(payload) - {"markets"}:
+            assert payload[key] == default[key], (key, sensors)
+        views = cast(list[dict[str, object]], payload["markets"])
+        default_views = cast(list[dict[str, object]], default["markets"])
+        for view, before in zip(views, default_views, strict=True):
+            assert set(view) <= set(before)
+            for key in view:
+                assert view[key] == before[key], (key, sensors)
+            for bar in cast(list[dict[str, object]], view.get("bars", [])):
+                assert cast(int, bar["t_ms"]) + DAY <= now
+            for trade in cast(list[dict[str, object]], view.get("trades", [])):
+                assert cast(int, trade["t_ms"]) < now
+            for item in cast(list[dict[str, object]], view.get("news", [])):
+                assert cast(int, item["published_at_ms"]) <= now
+        for item in cast(list[dict[str, object]], payload.get("news", [])):
+            assert cast(int, item["published_at_ms"]) <= now
+
+
+def test_every_gated_name_is_a_field_of_the_view_it_gates() -> None:
+    """The extension point C1c writes into: a row naming a field no view has would gate nothing at all.
+
+    It would also fail silently, because dropping a name that is not in the payload removes nothing, so
+    this is the test that makes a mistyped row in ``SENSOR_VIEW_FIELDS`` a red test rather than a sensor
+    an agent pays for and still sees.
+    """
+    market_fields = {field.name for field in dataclass_fields(MarketView)}
+    observation_fields = {field.name for field in dataclass_fields(Observation)}
+    assert market_fields >= GATED_MARKET_VIEW_FIELDS
+    assert observation_fields >= GATED_OBSERVATION_FIELDS
+    for name, gated in SENSOR_VIEW_FIELDS.items():
+        assert gated.market or gated.observation, name
+        assert gated.market <= market_fields, name
+        assert gated.observation <= observation_fields, name
+    # The identity fields, the agent's own book and the caps it is judged under are ungated on purpose.
+    assert GATED_MARKET_VIEW_FIELDS & {"market_id", "question", "tradable", "position", "kind"} == set()
+    assert GATED_OBSERVATION_FIELDS & {"markets", "portfolio", "hive", "research", "limits"} == set()
+
+
+def test_a_sensor_set_is_a_set_difference_and_a_duplicate_changes_nothing() -> None:
+    """A field is present as soon as any sensor that gates it was bought, and a set is a set."""
+    assert unsensed_view_fields(None) == (frozenset(), frozenset())
+    market, observation = unsensed_view_fields(frozenset({"tape"}))
+    assert market == GATED_MARKET_VIEW_FIELDS - SENSOR_VIEW_FIELDS["tape"].market
+    assert observation == GATED_OBSERVATION_FIELDS
+    assert resolve_sensor_set(["tape", "tape"]) == frozenset({"tape"})
+    twice = render_observation_json(an_observation_with(["tape", "tape"]))
+    assert twice == render_observation_json(an_observation_with(["tape"]))
+    # ``wiki_daily`` is the one sensor that gates a field of both views, and it gates both or neither.
+    both = an_observation_with(["wiki_daily"]).to_dict()
+    assert "news" in both
+    assert "news" in cast(list[dict[str, object]], both["markets"])[0]
+    without = an_observation_with([name for name in SENSOR_NAMES if name != "wiki_daily"]).to_dict()
+    assert "news" not in without
+    assert "news" not in cast(list[dict[str, object]], without["markets"])[0]
+
+
+def test_a_narrowed_observation_is_still_guarded_deterministic_and_smaller() -> None:
+    """A narrowed observation is journalable in exactly the way a full one is: the guards run on it."""
+    obs = an_observation_with(["calendar"])
+    payload = obs.to_dict()
+    assert_no_leak(payload, agent_id="follower", now_ms=SENSOR_NOW)
+    assert json.loads(render_observation_json(obs)) == payload
+    assert observation_bytes(obs) < observation_bytes(an_observation_with(None))
+    again = an_observation_with(["calendar"])
+    assert render_observation_json(again) == render_observation_json(obs)
+    assert again == obs
+    assert hash(again) == hash(obs)
+    assert again.markets[0] == obs.markets[0]
+    assert obs != an_observation_with(None)
+    assert obs.markets[0] != an_observation_with(None).markets[0]

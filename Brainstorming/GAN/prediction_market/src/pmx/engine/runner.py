@@ -42,16 +42,13 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
-from typing import ClassVar, Protocol
+from typing import Protocol
 
 from pmx import CONTRACT_VERSION, ENGINE_VERSION
-from pmx import journal as _journal
 from pmx.data.loader import read_json_file
 from pmx.engine.calendar import KIND_BINARY, BarSlice, Calendar
 from pmx.engine.execution import Execution
 from pmx.engine.fees import (
-    BINARY_POINT_VALUE_MICRO,
-    BINARY_TICK_SIZE_MICRO,
     FEE_SCHEDULES,
     FeeSchedule,
 )
@@ -74,6 +71,8 @@ from pmx.journal import (
     FeeCharged,
     Filled,
     ForecastRecorded,
+    ForecastResolved,
+    InstrumentClosed,
     Journal,
     JournalEvent,
     MarketListed,
@@ -88,15 +87,12 @@ from pmx.journal import (
     canonical_json,
     canonical_sha256,
     journal_hash_of_file,
-    payload_field_names,
     read_journal,
     verify_journal,
 )
 from pmx.metrics.projection import RunHandle, RunProjection, project
 from pmx.rng import RNG_ALGORITHM_VERSION, RngTree
 from pmx.scoring import (
-    QUANTILE_LEVELS_PPM,
-    RANDOM_WALK_UP_PPM,
     ForecastBar,
     HorizonResolution,
     baseline_quantiles_ticks,
@@ -111,16 +107,19 @@ from pmx.types import (
     JOURNAL_NEWLINE,
     LESSON_MAX_CHARS,
     LESSONS_PER_BAR_MAX,
-    MS_PER_DAY,
     NOTES_MAX_CHARS,
     PPM_ONE,
     PRICE_MAX_BP,
     PRICE_MIN_BP,
+    QUANTILE_LEVELS_PPM,
+    RANDOM_WALK_UP_PPM,
+    REPUTATION_WINDOW_MARKETS,
     RESEARCH_KINDS,
     SETTLE_NO_BP,
     SETTLE_YES_BP,
     TTL_BARS_MAX,
     Actions,
+    ContinuousInstrument,
     Dataset,
     HiveView,
     Lesson,
@@ -146,164 +145,23 @@ from pmx.types import (
 
 __all__ = ("Agent", "ResolutionEvent", "RunHandle", "replay", "run_backtest")
 
-#: Section 10.4's reputation window. ``REPUTATION_WINDOW_MARKETS`` is declared there as a constant of
-#: ``pmx.agents.hive`` (A3, wave 3), which does not exist while the engine wave is being built, so the
-#: number is restated here beside its one use. Reported as a contract issue: it belongs in ``pmx.types``
-#: like every other number a test can pin.
-REPUTATION_WINDOW_MARKETS = 50
-
 #: The default probability of a market an agent has never stated one for (section 8.4).
 CARRIED_DEFAULT_PPM = PPM_ONE // 2
 
-#: Amendment C1b's two ``RejectReason`` values (section 8.4, ruling R157). ``pmx.types.RejectReason`` is
-#: D1's and gains them at gate G2 (17.9); until then the two strings live here, beside their one use, and
-#: they are legal in the journal because ``action_rejected.reason`` is a free string and not an enum.
-REASON_BAD_HORIZON = "bad_horizon"
-REASON_BAD_QUANTILES = "bad_quantiles"
-
-
-def default_horizons_bars(interval_min: int) -> tuple[int, ...]:
-    """Section 17.5's default horizons in bars: one bar, one day, one week, duplicates removed.
-
-    ``pmx.types.default_horizons_bars`` is the declared home (ruling R188, gate G2) because
-    ``RunConfig`` resolves the empty tuple before hashing. D1 has not landed it, so the arithmetic is
-    restated here beside its one caller and reported as a contract issue; the day the name exists this
-    function becomes a re-export.
-    """
-    span = interval_ms(interval_min)
-    return tuple(sorted({1, max(1, MS_PER_DAY // span), max(1, 7 * MS_PER_DAY // span)}))
+#: Section 10.4's reputation window and amendment C1b's two ``RejectReason`` values (8.4, ruling R157)
+#: are ``pmx.types``' since gate G2 (17.9), so they are imported above and not restated here: a window
+#: or a reason string with two spellings is a number a test can pin in one place and the product can
+#: change in the other.
 
 
 def run_horizons_bars(config: RunConfig) -> tuple[int, ...]:
-    """``config.horizons_bars``, resolved to the defaults when empty (section 8.1, ruling R157).
+    """The horizons a run scores, in bars (section 8.1, rulings R157 and R188).
 
-    ``RunConfig.horizons_bars`` is amendment C1b's field and D1 lands it at gate G2, so it is read
-    defensively: a config written before the field exists means "the defaults", which is exactly what an
-    empty tuple means in the declared dataclass.
+    ``RunConfig`` resolves an empty ``horizons_bars`` to ``pmx.types.default_horizons_bars`` in its own
+    ``__post_init__``, before ``to_dict`` and therefore before the config hash, so there is nothing left
+    to resolve here and no second arithmetic for the default: this reads the field.
     """
-    declared = getattr(config, "horizons_bars", ())
-    if isinstance(declared, tuple) and declared:
-        return tuple(sorted({int(value) for value in declared}))
-    return default_horizons_bars(config.interval_min)
-
-
-# --------------------------------------------------------------------------------------------------
-# The journal classes ruling R164 gives ``pmx.journal`` at gate G2, bridged until it carries them
-#
-# ``forecast_resolved`` and ``instrument_closed`` are the runner's two amendment C1b events (section
-# 9.3) and D7's dataclasses land with the schema's ``oneOf`` in the same gate G2 commit. Resolving the
-# class by name and by capability means the runner writes D7's event the moment it exists and never
-# silently drops a contracted field; the two bridges below are what it writes until then, exactly as
-# ``pmx.engine.execution`` bridges ``cash_event_applied``. Reported as a contract issue: while the
-# bridge is in use a journal that carries one of the three events is refused by ``read_journal`` and by
-# ``journal.v2.json``, so a continuous run cannot be replayed until gate G2 lands them.
-# --------------------------------------------------------------------------------------------------
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _MarketListedC1b(MarketListed):
-    """``market_listed`` with the eight instrument fields of amendment C1b (ruling R164).
-
-    Written for a continuous instrument only: on a binary every one of the eight carries the default
-    the projection reads when the field is absent, so a binary journal keeps the bytes it has today.
-    """
-
-    kind: str
-    vendor: str
-    symbol: str
-    tick_size_micro: int
-    point_value_micro: int
-    session_calendar_id: str
-    borrow_schedule_id: str | None
-    carry_schedule_id: str | None
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _ForecastRecordedC1b(ForecastRecorded):
-    """``forecast_recorded`` with the continuous payload of section 17.5 (ruling R157).
-
-    ``horizons`` items are ``{horizon_bars, up_probability_ppm, quantiles_ticks}`` mappings, which is
-    the shape ``forecast.v1.json`` validates and the shape the projection reads back.
-    """
-
-    price_ref_ticks: int
-    horizons: tuple[Mapping[str, object], ...]
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _ForecastResolvedC1b(JournalEvent):
-    """``forecast_resolved`` (9.2 and 17.5): one resolved horizon of one ``(agent, instrument)``.
-
-    Emitted at the settle phase of ``t_h``, the bar at which the realisation became public.
-    """
-
-    agent_id: str
-    market_id: str
-    forecast_bar_ms: int
-    horizon_bars: int
-    up_probability_ppm: int
-    quantiles_ticks: tuple[int, ...] | None
-    price_ref_ticks: int
-    price_realised_ticks: int
-    realised_sign: int
-    directional_brier_micro: int
-    pinball_micro: int | None
-    baseline_pinball_micro: int
-    carried: bool
-
-    TYPE: ClassVar[str] = "forecast_resolved"
-    PHASES: ClassVar[tuple[str, ...]] = ("settle",)
-
-
-@dataclass(frozen=True, slots=True, kw_only=True)
-class _InstrumentClosedC1b(JournalEvent):
-    """``instrument_closed`` (9.2 and 17.3): one continuous instrument, once, at ``last_bar(i)``."""
-
-    market_id: str
-    kind: str
-    reason: str
-    last_price_ticks: int
-    n_bars: int
-    n_forecasts_unresolved: int
-
-    TYPE: ClassVar[str] = "instrument_closed"
-    PHASES: ClassVar[tuple[str, ...]] = ("settle",)
-
-
-def _bridged(
-    name: str, *, needs: tuple[str, ...], phases: tuple[str, ...], fallback: type[JournalEvent]
-) -> type[JournalEvent]:
-    """``pmx.journal``'s class of that name when it carries what the contract asks, else the bridge."""
-    candidate = getattr(_journal, name, None)
-    if isinstance(candidate, type) and issubclass(candidate, JournalEvent):
-        carried = set(payload_field_names(candidate))
-        if set(needs) <= carried and set(phases) <= set(candidate.PHASES):
-            return candidate
-    return fallback
-
-
-_MARKET_LISTED_C1B = _bridged(
-    "MarketListed",
-    needs=("kind", "vendor", "symbol", "tick_size_micro", "point_value_micro"),
-    phases=("open",),
-    fallback=_MarketListedC1b,
-)
-_FORECAST_RECORDED_C1B = _bridged(
-    "ForecastRecorded",
-    needs=("price_ref_ticks", "horizons"),
-    phases=("decide",),
-    fallback=_ForecastRecordedC1b,
-)
-_FORECAST_RESOLVED = _bridged(
-    "ForecastResolved",
-    needs=("forecast_bar_ms", "horizon_bars", "directional_brier_micro"),
-    phases=("settle",),
-    fallback=_ForecastResolvedC1b,
-)
-_INSTRUMENT_CLOSED = _bridged(
-    "InstrumentClosed",
-    needs=("last_price_ticks", "n_forecasts_unresolved"),
-    phases=("settle",),
-    fallback=_InstrumentClosedC1b,
-)
+    return config.horizons_bars
 
 
 # --------------------------------------------------------------------------------------------------
@@ -689,23 +547,25 @@ def _validate_horizons(
 ) -> tuple[_HorizonPair, ...]:
     """The ``horizon_forecasts`` half of section 17.5's validation (ruling R157).
 
-    ``Actions.horizon_forecasts`` is amendment C1b's field and D1 lands it at gate G2, so it is read
-    defensively: an ``Actions`` written before the field exists states no pair and every horizon is
-    carried. ``item_index`` indexes the ``horizon_forecasts`` array, and ``detail`` names the horizon,
-    so a refusal is traceable to the pair that caused it even though the scope is ``market``.
+    ``Actions.horizon_forecasts`` is ``pmx.types``' field (17.5, ruling R157) and each item is a
+    ``HorizonForecast``, so every field below is read off the declared record and a typo is a type
+    error rather than a silent default. What is **not** guaranteed by the type is the content: the
+    horizon, the probability and the quantile tuple still arrive from an agent, and every rule of 17.5
+    is checked here. ``item_index`` indexes the ``horizon_forecasts`` array, and ``detail`` names the
+    horizon, so a refusal is traceable to the pair that caused it even though the scope is ``market``.
     """
-    declared = getattr(actions, "horizon_forecasts", ())
-    if not isinstance(declared, tuple) or not declared:
+    declared = actions.horizon_forecasts
+    if not declared:
         return ()
     allowed = frozenset(horizons)
     shortest = horizons[0] if horizons else 0
     seen: set[tuple[str, int]] = set()
     pairs: list[_HorizonPair] = []
     for index, item in enumerate(declared):
-        market_id = str(getattr(item, "market_id", ""))
-        horizon_bars = int(getattr(item, "horizon_bars", 0))
-        up_ppm = int(getattr(item, "up_probability_ppm", 0))
-        quantiles = getattr(item, "quantiles_ticks", None)
+        market_id = item.market_id
+        horizon_bars = item.horizon_bars
+        up_ppm = item.up_probability_ppm
+        quantiles = item.quantiles_ticks
         key = (market_id, horizon_bars)
         failure: tuple[str, str] | None = None
         if market_id not in continuous_ids:
@@ -713,11 +573,11 @@ def _validate_horizons(
         elif key in seen:
             failure = (RejectReason.DUPLICATE.value, f"{market_id} h{horizon_bars}")
         elif horizon_bars not in allowed:
-            failure = (REASON_BAD_HORIZON, f"h{horizon_bars}")
+            failure = (RejectReason.BAD_HORIZON.value, f"h{horizon_bars}")
         elif not 0 <= up_ppm <= PPM_ONE:
             failure = (RejectReason.BAD_PROB.value, f"up_probability_ppm {up_ppm}")
         elif quantiles is not None and not _monotone_quantiles(quantiles):
-            failure = (REASON_BAD_QUANTILES, f"h{horizon_bars}")
+            failure = (RejectReason.BAD_QUANTILES.value, f"h{horizon_bars}")
         elif (
             horizon_bars == shortest
             and market_id in stated_probs
@@ -860,8 +720,8 @@ def _check_roster(roster: Sequence[Agent]) -> tuple[Agent, ...]:
 
 def _check_liquidity(config: RunConfig, liquidity: LiquidityModel) -> None:
     """A journal may not claim a liquidity it did not run under (section 16.1, ruling R112)."""
-    declared = str(getattr(config, "liquidity", "historical"))
-    declared_hash = str(getattr(config, "liquidity_params_hash", ""))
+    declared = config.liquidity
+    declared_hash = config.liquidity_params_hash
     if liquidity.model_id != declared:
         raise InvalidConfigError(
             "the liquidity model disagrees with the config",
@@ -948,12 +808,6 @@ class _TailJournal(Journal):
         return tail
 
 
-def _optional_id(base: object, name: str) -> str | None:
-    """A schedule id read off an instrument record, ``None`` when absent or empty (section 17.1)."""
-    value = getattr(base, name, None)
-    return value if isinstance(value, str) and value != "" else None
-
-
 def _write_text(path: Path, payload: str) -> None:
     """Write one artefact, LF and UTF-8 without a BOM (section 4.2)."""
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -1032,8 +886,19 @@ def run_backtest(
 
     journal = _TailJournal(run_id, journal_path)
     schedules = _schedules_for(dataset, market_ids)
+    # E1's ``Calendar`` and E2's session grid are built from one set of sessions (ruling R174): without
+    # the mapping, execution believes every instrument trades at every grid point and its ``next_bar``
+    # answers Saturday where the run's calendar answers Monday, so the latency queue of 16.2 would drain
+    # an intent at a bar the run does not have.
+    calendars = {
+        calendar_id: dataset.calendar(calendar_id) for calendar_id in dataset.calendar_ids()
+    }
     execution = Execution(
-        journal=journal, config=config, schedules=schedules, liquidity=liquidity
+        journal=journal,
+        config=config,
+        schedules=schedules,
+        liquidity=liquidity,
+        calendars=calendars,
     )
     research = ResearchLedger(config, agent_ids)
 
@@ -1196,8 +1061,30 @@ class _RunState:
     bar_lessons: list[tuple[str, str, tuple[str, ...]]] = field(default_factory=list)
 
     # ---- helpers --------------------------------------------------------------------------------
-    def market(self, market_id: str) -> Market:
+    def market(self, market_id: str) -> Market | ContinuousInstrument:
+        """The instrument's record, of whichever kind the dataset holds (ruling R182).
+
+        ``Dataset.market`` answers a ``Market`` for a binary and a clipped ``ContinuousInstrument`` for
+        every other kind, so the union is what a run of both kinds holds and every phase that reads a
+        binary-only field goes through :meth:`binary` instead of narrowing by hand.
+        """
         return self.dataset.market(market_id)
+
+    def binary(self, market_id: str) -> Market:
+        """The record of an instrument that settles, which is a binary by ruling R150.
+
+        ``settles(i, t)`` never holds on a continuous instrument, so the settle and learn phases hold a
+        ``Market``. The check is here rather than assumed: a continuous record reaching a resolution, a
+        payout or a ``resolved_at_ms`` would be a defect of the calendar, not a case to interpret.
+        """
+        record = self.market(market_id)
+        if not isinstance(record, Market):
+            raise JournalError(
+                "an instrument that settles is not a binary market",
+                market_id=market_id,
+                kind=record.kind,
+            )
+        return record
 
     def record(self, market_id: str) -> _MarketRecord:
         found = self.markets.get(market_id)
@@ -1245,7 +1132,7 @@ class _RunState:
         self.phase_hive(bar, settled)
         self.phase_close(bar, open_markets, first_seq)
 
-    def phase_open(self, bar: BarSlice, open_markets: Sequence[Market]) -> None:
+    def phase_open(self, bar: BarSlice, open_markets: Sequence[Market | ContinuousInstrument]) -> None:
         """List, price and expire (phase 1). Every event here is an observed input, never a derived one."""
         t_ms = bar.t_ms
         self.journal.emit(
@@ -1288,37 +1175,30 @@ class _RunState:
         self.execution.expire_orders(t_ms=t_ms, markets=open_markets)
 
     def _emit_listed(self, market_id: str, t_ms: int) -> None:
-        """``market_listed`` once per instrument, with amendment C1b's eight fields when it has them.
+        """``market_listed`` once per instrument, in one shape for every kind (ruling R164).
 
-        A binary emits exactly the eleven fields of the v2 catalogue, so no byte of a binary journal
-        moves; a continuous instrument emits the eight of ruling R164 as well, read off its own record,
-        and its ``close_at_ms`` is ``delisted_at_ms`` (``0`` when unset), which is what section 9.2 says
-        and what 8.3 forbids an observation from carrying (ruling R181).
+        The eight instrument fields amendment C1b adds are read off ``record.instrument``, the base view
+        of section 17.1 (ruling R144): on a binary that view is the table R164 spells (``binary``, the
+        provider as the vendor, the ``provider_id`` as the symbol, ``BINARY_TICK_SIZE_MICRO``,
+        ``BINARY_POINT_VALUE_MICRO``, the ``continuous`` calendar, no borrow and no carry schedule), and
+        on a continuous instrument it is the record itself. There is therefore no per-kind branch here at
+        all, which is the point of the view: a journal carries one shape per event name, with the value
+        the kind has.
+
+        ``close_at_ms`` is the one field the kinds answer differently, because it is the meta's on a
+        binary and ``delisted_at_ms`` (``0`` when unset) on a continuous instrument, which is what
+        section 9.2 says and what 8.3 forbids an observation from carrying (ruling R181).
         """
         meta = self.dataset.meta(market_id)
         kind = self.kind_of(market_id)
-        if kind == KIND_BINARY:
-            self.journal.emit(
-                MarketListed,
-                bar_ms=t_ms,
-                market_id=market_id,
-                provider=meta.provider,
-                category=meta.category,
-                tags=meta.tags,
-                event_key=meta.event_key,
-                created_at_ms=meta.created_at_ms,
-                close_at_ms=meta.close_at_ms,
-                interval_min=meta.interval_min,
-                fee_schedule_id=meta.fee_schedule_id,
-                hardness_tags=meta.hardness_tags,
-                fold=meta.fold,
-            )
-            return
-        instrument = self.market(market_id)
-        base: object = getattr(instrument, "instrument", instrument)
-        delisted = getattr(instrument, "delisted_at_ms", None)
+        base = self.market(market_id).instrument
+        close_at_ms = (
+            meta.close_at_ms
+            if kind == KIND_BINARY
+            else (base.delisted_at_ms if base.delisted_at_ms is not None else 0)
+        )
         self.journal.emit(
-            _MARKET_LISTED_C1B,
+            MarketListed,
             bar_ms=t_ms,
             market_id=market_id,
             provider=meta.provider,
@@ -1326,19 +1206,19 @@ class _RunState:
             tags=meta.tags,
             event_key=meta.event_key,
             created_at_ms=meta.created_at_ms,
-            close_at_ms=int(delisted) if isinstance(delisted, int) else 0,
+            close_at_ms=close_at_ms,
             interval_min=meta.interval_min,
             fee_schedule_id=meta.fee_schedule_id,
             hardness_tags=meta.hardness_tags,
             fold=meta.fold,
             kind=kind,
-            vendor=str(getattr(base, "vendor", meta.provider)),
-            symbol=str(getattr(base, "symbol", market_id)),
-            tick_size_micro=int(getattr(base, "tick_size_micro", BINARY_TICK_SIZE_MICRO)),
-            point_value_micro=int(getattr(base, "point_value_micro", BINARY_POINT_VALUE_MICRO)),
-            session_calendar_id=str(getattr(base, "session_calendar_id", "continuous")),
-            borrow_schedule_id=_optional_id(base, "borrow_schedule_id"),
-            carry_schedule_id=_optional_id(base, "carry_schedule_id"),
+            vendor=base.vendor,
+            symbol=base.symbol,
+            tick_size_micro=base.tick_size_micro,
+            point_value_micro=base.point_value_micro,
+            session_calendar_id=base.session_calendar_id,
+            borrow_schedule_id=base.borrow_schedule_id,
+            carry_schedule_id=base.carry_schedule_id,
         )
 
     def phase_observe(self, bar: BarSlice) -> dict[str, Observation]:
@@ -1365,6 +1245,7 @@ class _RunState:
                 hive=self.hive,
                 news=news,
                 grants=grants,
+                calendar=self.calendar,
             )
             observations[agent_id] = observation
             payload = render_observation_json(observation)
@@ -1537,6 +1418,8 @@ class _RunState:
                 ForecastBar(t_ms=bar.t_ms, prob_ppm=prob_ppm, market_price_bp=price_bp)
             )
             if self.kind_of(market_id) == KIND_BINARY:
+                # One event shape per name (ruling R164 as gate G2 applied it): a binary has no reference
+                # price and no horizons, and null is what the schema declares for the two fields.
                 self.journal.emit(
                     ForecastRecorded,
                     bar_ms=bar.t_ms,
@@ -1544,6 +1427,8 @@ class _RunState:
                     market_id=market_id,
                     prob_ppm=prob_ppm,
                     carried=carried,
+                    price_ref_ticks=None,
+                    horizons=None,
                 )
                 continue
             statements = self._horizon_statements(
@@ -1556,7 +1441,7 @@ class _RunState:
             )
             self.bar_horizons[key] = statements
             self.journal.emit(
-                _FORECAST_RECORDED_C1B,
+                ForecastRecorded,
                 bar_ms=bar.t_ms,
                 agent_id=agent_id,
                 market_id=market_id,
@@ -1718,7 +1603,7 @@ class _RunState:
         t_ms = bar.t_ms
         settled: list[tuple[str, int]] = []
         for market_id in sorted_market_ids(bar.settling_ids):
-            market = self.market(market_id)
+            market = self.binary(market_id)
             positions_before = {
                 agent_id: self.execution.position(agent_id, market_id).position
                 for agent_id in self.agent_ids
@@ -1836,7 +1721,7 @@ class _RunState:
                 carried=statement.carried,
             )
             self.journal.emit(
-                _FORECAST_RESOLVED,
+                ForecastResolved,
                 bar_ms=t_ms,
                 agent_id=item.agent_id,
                 market_id=item.market_id,
@@ -1856,13 +1741,12 @@ class _RunState:
     def _close_instrument(self, market_id: str, t_ms: int) -> None:
         """``instrument_closed`` once, at ``last_bar(i)``, after the forced flat (section 17.3)."""
         record = self.record(market_id)
-        instrument = self.market(market_id)
-        delisted = getattr(instrument, "delisted_at_ms", None)
+        delisted = self.market(market_id).instrument.delisted_at_ms
         reason = "window_end"
-        if isinstance(delisted, int) and bar_of(delisted, self.config.interval_min) - self.span == t_ms:
+        if delisted is not None and bar_of(delisted, self.config.interval_min) - self.span == t_ms:
             reason = "delisted"
         self.journal.emit(
-            _INSTRUMENT_CLOSED,
+            InstrumentClosed,
             bar_ms=t_ms,
             market_id=market_id,
             kind=self.kind_of(market_id),
@@ -1888,7 +1772,7 @@ class _RunState:
     def phase_learn(self, settled: Sequence[tuple[str, int]]) -> None:
         """``agent.learn`` for every agent that forecast or held a settled market (phase 6)."""
         for market_id, outcome in settled:
-            market = self.market(market_id)
+            market = self.binary(market_id)
             record = self.record(market_id)
             market_brier = market_brier_tw_micro(record.bars, outcome=outcome, interval_ms=self.span)
             for agent_id in self.agent_ids:
@@ -1996,7 +1880,9 @@ class _RunState:
                 interval_min=interval_min,
             )
 
-    def phase_close(self, bar: BarSlice, open_markets: Sequence[Market], first_seq: int) -> None:
+    def phase_close(
+        self, bar: BarSlice, open_markets: Sequence[Market | ContinuousInstrument], first_seq: int
+    ) -> None:
         """Mark, freeze the ruined, and close the bar (phase 8, section 8.7)."""
         t_ms = bar.t_ms
         views = self.execution.mark(t_ms=t_ms, markets=open_markets, agent_ids=self.agent_ids)

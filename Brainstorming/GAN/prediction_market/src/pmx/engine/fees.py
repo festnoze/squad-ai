@@ -5,12 +5,12 @@ tuned until a backtest looked good. Every row below carries the page it was read
 read, so a claim can be re-derived from the same numbers, and a row is never a formula: the four models of
 :data:`FEE_MODELS` are the whole arithmetic and a new venue tier is a new row.
 
-Why the integer price model lives here: sections 17.1's ``notional_micro``, ``cash_out_cents``,
+Why the integer price model lives here: section 17.1's ``notional_micro``, ``cash_out_cents``,
 ``cash_in_cents``, ``mark_value_cents``, ``price_micro`` and ``split_position_milli``, the six caps and
-:data:`INSTRUMENT_KINDS` are declared in ``pmx.types`` (section 17.9, landed by gate G2) and re-exported here,
-so every fee body below is written in the contract's own names.
-contract prints, and every scalar constant is read from ``pmx.types`` the moment that file carries it, so
-the two can never disagree once the gate lands. This is reported as a contract issue rather than hidden.
+:data:`INSTRUMENT_KINDS` are declared in ``pmx.types`` (section 17.9, landed by gate G2) and re-exported
+here explicitly, so every fee body below is written in the contract's own names and E2's tests read one
+spelling of each. Every schedule row is a contract print and every scalar constant is read from
+``pmx.types``, so the two cannot disagree.
 
 One rounding, at the end, against the agent (ruling R146): ``cash_out_cents`` rounds up, ``cash_in_cents``
 rounds down, a mark is ``floor`` for a long and ``-ceil`` for a short, and every fee rounds up. The engine
@@ -59,7 +59,9 @@ __all__ = [
     "CASH_EVENT_KINDS",
     "CONTINUOUS_KINDS",
     "DATA_CASH_EVENT_KINDS",
+    "CARRY_ROLES",
     "FEE_MODELS",
+    "FEE_ROLES",
     "FEE_SCHEDULES",
     "INSTRUMENT_KINDS",
     "INT63_MAX",

@@ -42,7 +42,6 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import Protocol
 
 from pmx.data.sessions import next_bar_ms, session_bars
 from pmx.errors import InvalidConfigError, SchemaError
@@ -50,11 +49,8 @@ from pmx.types import (
     CONTINUOUS_CALENDAR_ID,
     DECISION_LATENCY_BARS,
     INSTRUMENT_KINDS,
-    CashEvent,
-    ContinuousInstrument,
     Dataset,
     Instrument,
-    Market,
     MarketMeta,
     RunConfig,
     Session,
@@ -66,6 +62,25 @@ from pmx.types import (
 
 #: ``INSTRUMENT_KINDS[0]``: the one kind with a resolution (section 17.1).
 KIND_BINARY = INSTRUMENT_KINDS[0]
+
+
+def meta_kind(meta: MarketMeta) -> str:
+    """The kind of one instrument as the run's calendar reads it (ruling R144, section 17.1).
+
+    ``MarketMeta.kind`` is ``pmx.types``' field and defaults to ``binary``, so a meta written before
+    amendment C1b names the one kind that has a resolution. The value is checked here as well as in
+    ``MarketMeta`` itself, because this is the reader every phase of the bar loop goes through and a kind
+    outside ``INSTRUMENT_KINDS`` would otherwise pick a code path by falling off the binary branch.
+
+    Reported as a contract issue (section 13.1's error taxonomy): ``pmx.types.MarketMeta`` refuses the
+    same value as an ``InvalidConfigError`` while a record whose kind is not one of the six is a
+    ``SchemaError`` on the engine's side of the boundary, which is what the dataset it came from failed
+    to be. The gate should pick one of the two for the condition.
+    """
+    kind = str(getattr(meta, "kind", KIND_BINARY))
+    if kind not in INSTRUMENT_KINDS:
+        raise SchemaError("unknown instrument kind", market_id=meta.id, kind=kind)
+    return kind
 
 # --------------------------------------------------------------------------------------------------
 # The slice of one bar
@@ -383,7 +398,7 @@ class Calendar:
         return entry
 
     def _entry_of(self, meta: MarketMeta, calendars: Mapping[str, SessionCalendar] | None) -> _Entry:
-        kind = meta.kind
+        kind = meta_kind(meta)
         span = self._interval_ms
         first_ms = max(bar_of(meta.created_at_ms, meta.interval_min), self._t0_ms)
         if kind == KIND_BINARY:
@@ -551,49 +566,3 @@ def _run_window(config: RunConfig, metas: Sequence[MarketMeta]) -> tuple[int, in
     if t1_ms <= t0_ms:
         raise InvalidConfigError("the run has no bar", t0_ms=t0_ms, t1_ms=t1_ms)
     return t0_ms, t1_ms
-
-
-# --------------------------------------------------------------------------------------------------
-# The application bar of a cash event (17.3, ruling R175)
-# --------------------------------------------------------------------------------------------------
-class BarLookups(Protocol):
-    """The three bar lookups of 8.3 (ruling R187) that ``applies_at`` reads.
-
-    :class:`Calendar` is the run's implementation; ``pmx.engine.execution`` builds an equivalent over the
-    session calendars it was handed (8.6, ruling R174), and both satisfy this shape.
-    """
-
-    def last_bar(self, market_id: str) -> int: ...
-
-    def next_bar(self, market_id: str, t_ms: int) -> int | None: ...
-
-    def prev_bar(self, market_id: str, t_ms: int) -> int | None: ...
-
-
-#: The three corporate kinds, whose entitlement follows the regime of the prices (ruling R175).
-OLD_REGIME_KINDS: tuple[str, ...] = ("dividend", "split", "roll")
-
-
-def applies_at(
-    event: CashEvent, instrument: Instrument | Market | ContinuousInstrument, calendar: BarLookups
-) -> int | None:
-    """The bar at whose settle phase execution applies ``event`` (17.3, ruling R175).
-
-    A ``dividend``, a ``split`` and a ``roll`` are stamped with the first instant of the **new** regime
-    (the ex-date open, the split's effective open, the first new-contract bar) and the raw tape already
-    reflects them from that bar's open, so they apply one bar earlier, at the last close priced in the
-    old regime: without that shift a buy at the ex-date open collects a dividend the tape had already
-    taken out of the price. ``funding``, ``borrow_fee``, ``carry`` and ``forced_flat`` are charges on, or
-    the close of, a position held through an instant, and apply at ``bar_of(t_ms)``.
-
-    Section 17.3 declares this function in ``pmx.engine.execution``; it lives here (gate G2 ruling) because
-    the observation path applies ruling R183's visibility rule with it and the engine's two halves may not
-    each hold a copy. ``pmx.engine.execution.applies_at`` is this function, re-exported.
-
-    Returns:
-        The application bar, or ``None`` when it lies outside the run and no position can exist there.
-    """
-    bar = bar_of(event.t_ms, instrument.interval_min)
-    if event.kind in OLD_REGIME_KINDS:
-        return calendar.prev_bar(instrument.id, bar)
-    return bar

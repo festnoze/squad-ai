@@ -43,18 +43,21 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, fields
-from typing import Final, Protocol, cast
+from types import MappingProxyType
+from typing import Final, NoReturn, Protocol, cast
 
 from pmx import OBS_VERSION
-from pmx.engine.calendar import (
-    CONTINUOUS_CALENDAR_ID,
-    INSTRUMENT_KINDS,
-    KIND_BINARY,
-    Calendar,
-)
+from pmx.engine.calendar import KIND_BINARY, Calendar
 from pmx.errors import InvalidConfigError, LeakError, ObservationTooLargeError, SchemaError
 from pmx.journal import canonical_json
 from pmx.types import (
+    BINARY_POINT_VALUE_MICRO,
+    BINARY_TICK_SIZE_MICRO,
+    CASH_EVENT_KINDS,
+    CASH_EVENTS_VIEW_MAX,
+    CONTINUOUS_CALENDAR_ID,
+    DATA_CASH_EVENT_KINDS,
+    INSTRUMENT_KINDS,
     MS_PER_DAY,
     MS_PER_HOUR,
     NEWS_PER_MARKET_MAX,
@@ -62,6 +65,7 @@ from pmx.types import (
     RESEARCH_KINDS,
     RESEARCH_UNIT_COST,
     Bar,
+    CashEventView,
     HiveView,
     Limits,
     MarketView,
@@ -85,8 +89,13 @@ from pmx.types import (
 )
 
 # --------------------------------------------------------------------------------------------------
-# Caps the contract states in prose or in a field comment and that ``pmx.types`` does not carry yet.
-# Each is reported as a contract issue so that D1 can hold the one spelling (gate G2).
+# Caps the contract states in prose or in a field comment and that ``pmx.types`` does not carry.
+#
+# ``CASH_EVENT_KINDS``, ``DATA_CASH_EVENT_KINDS`` and ``CASH_EVENTS_VIEW_MAX`` are no longer here: they
+# are ``pmx.types``' (section 13, 17.9's R177 and R183 rows) and are imported above, so the kind order
+# ruling R193 makes normative has one spelling and the view cannot sort by an order the engine did not
+# apply in. The five below are still stated in prose only and each remains a reported contract issue,
+# so that D1 can hold the one spelling.
 # --------------------------------------------------------------------------------------------------
 #: ``NewsView.text`` is 600 characters of body, never the 4 000 the dataset keeps (section 8.3).
 NEWS_VIEW_TEXT_CHARS: Final = 600
@@ -98,14 +107,6 @@ HIVE_RESOLUTIONS_VIEW_MAX: Final = 200
 MEMORY_NOTES_VIEW_MAX: Final = 20
 #: A granted ``news`` research request is a deeper digest: three times the caps (section 8.4).
 RESEARCH_NEWS_MULTIPLIER: Final = 3
-#: ``pmx.types.CASH_EVENTS_VIEW_MAX`` (section 8.3, ruling R183).
-CASH_EVENTS_VIEW_MAX: Final = 30
-#: ``pmx.types.CASH_EVENT_KINDS`` (section 17.3, ruling R177). The order is normative: events of one bar
-#: apply kind first (ruling R193), so a view sorted by it is the order the engine applied them in.
-CASH_EVENT_KINDS: Final = ("funding", "dividend", "split", "roll", "borrow_fee", "carry", "forced_flat")
-#: ``pmx.types.DATA_CASH_EVENT_KINDS``: what an instrument file may carry. The other three are the
-#: engine's own and reach the agent through its portfolio, never through a market view (ruling R183).
-DATA_CASH_EVENT_KINDS: Final = CASH_EVENT_KINDS[:4]
 #: The kinds whose application bar is the last bar priced in the OLD regime (ruling R175).
 _OLD_REGIME_KINDS: Final = ("dividend", "split", "roll")
 
@@ -179,7 +180,6 @@ FORBIDDEN_OBSERVATION_KEYS: Final = (
 )
 
 _FLAT_POSITION: Final = PositionView(position=0, avg_cost_bp=0, unrealised_cents=0, open_orders=())
-_MARKET_VIEW_FIELDS: Final = frozenset(item.name for item in fields(MarketView))
 #: A bounded memo of the per-instrument prefix sums of :func:`_tape_stats`. It is a memo of a pure
 #: function of the tape (keyed by the tape's identity), so it can move no number and no journal byte; it
 #: exists because ``volume_milli_to_date`` is a cumulative sum and a run asks for it once per agent per
@@ -285,30 +285,6 @@ class HiveLike(Protocol):
     ) -> HiveView: ...
 
 
-@dataclass(frozen=True, slots=True)
-class AppliedCashEvent:
-    """One **applied** data cash event, as an agent may see it (``CashEventView``, ruling R183).
-
-    Field for field ``pmx.types.CashEventView`` of section 8.3, which D1 has not landed yet (gate G2):
-    when it exists, this class is deleted and :func:`visible_cash_events` returns the declared type. The
-    name is deliberately different, so that no package imports the placeholder believing it is the
-    contract's type.
-    """
-
-    kind: str
-    t_ms: int
-    applied_at_ms: int
-    detail: Mapping[str, int | str]
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "kind": self.kind,
-            "t_ms": self.t_ms,
-            "applied_at_ms": self.applied_at_ms,
-            "detail": dict(self.detail),
-        }
-
-
 # --------------------------------------------------------------------------------------------------
 # Per-kind accessors: one spelling per name the two record shapes disagree about (amendment C1b)
 # --------------------------------------------------------------------------------------------------
@@ -350,12 +326,12 @@ def question_of(instrument: InstrumentLike) -> str:
 
 def tick_size_micro_of(instrument: InstrumentLike) -> int:
     """``Instrument.tick_size_micro``; a binary is ``BINARY_TICK_SIZE_MICRO = 100`` (ruling R145)."""
-    return int(cast(int, getattr(instrument, "tick_size_micro", 100)))
+    return int(cast(int, getattr(instrument, "tick_size_micro", BINARY_TICK_SIZE_MICRO)))
 
 
 def point_value_micro_of(instrument: InstrumentLike) -> int:
     """``Instrument.point_value_micro``; a binary is ``BINARY_POINT_VALUE_MICRO = 1_000_000``."""
-    return int(cast(int, getattr(instrument, "point_value_micro", 1_000_000)))
+    return int(cast(int, getattr(instrument, "point_value_micro", BINARY_POINT_VALUE_MICRO)))
 
 
 def session_calendar_id_of(instrument: InstrumentLike) -> str:
@@ -394,10 +370,16 @@ def cash_event_applies_at(
     charge on a position held through an instant and applies at ``bar_of(t_ms)``.
 
     ``None`` means the event has no application bar in this run and is therefore not applied, and so is
-    never visible. The declared home of this function is ``pmx.engine.execution.applies_at`` (E2, ruling
-    R175); it does not exist yet and the visibility rule of R183 cannot be applied without it, so E1
-    spells it here and reports it. Without a ``calendar`` the three old-regime kinds have no ``prev_bar``
-    to read and are treated as not applied, which is the conservative side of a leak boundary.
+    never visible. Without a ``calendar`` the three old-regime kinds have no ``prev_bar`` to read and are
+    treated as not applied, which is the conservative side of a leak boundary: an event whose application
+    bar cannot be computed stays hidden rather than being shown at a guessed bar.
+
+    Ruling R175 declares the rule as ``pmx.engine.execution.applies_at``, and this is a second spelling
+    of it, because the leak boundary may not import the module that moves money to answer a question
+    about visibility. That the two agree is not left to inspection: ``tests/test_observation.py`` pins
+    them against each other on every kind, the ``None`` case included. Reported as a contract issue: the
+    gate should say which file owns the rule once the structural protocols of the engine wave have a
+    home, so that one of the two spellings can become an import.
     """
     bar = bar_of(event.t_ms, interval_min)
     if event.kind in _OLD_REGIME_KINDS:
@@ -409,7 +391,7 @@ def cash_event_applies_at(
 
 def visible_cash_events(
     instrument: InstrumentLike, *, now_ms: int, calendar: Calendar | None = None
-) -> tuple[AppliedCashEvent, ...]:
+) -> tuple[CashEventView, ...]:
     """The instrument's applied **data** cash events, oldest first, at most ``CASH_EVENTS_VIEW_MAX``.
 
     An event is visible exactly as a bar is (ruling R183): once its application bar has completed
@@ -421,7 +403,7 @@ def visible_cash_events(
     are the agent's own charges and reach it through its portfolio (ruling R183).
     """
     span = interval_ms(instrument.interval_min)
-    applied: list[tuple[tuple[int, int, int, str], AppliedCashEvent]] = []
+    applied: list[tuple[tuple[int, int, int, str], CashEventView]] = []
     for event in cash_events_of(instrument):
         if event.kind not in DATA_CASH_EVENT_KINDS or event.origin != "data":
             continue
@@ -432,7 +414,7 @@ def visible_cash_events(
         applied.append(
             (
                 order,
-                AppliedCashEvent(
+                CashEventView(
                     kind=event.kind,
                     t_ms=event.t_ms,
                     applied_at_ms=at_ms,
@@ -791,15 +773,15 @@ def market_view_fields(
 
 
 def _market_view(view_fields: Mapping[str, object]) -> MarketView:
-    """``MarketView(**view_fields)``, minus the names the dataclass does not carry yet (gate G2).
+    """``MarketView(**view_fields)``.
 
-    When D1 lands the eight defaulted fields of ruling R188 the filter is a no-op and this function is
-    one call. Until then a continuous observation is short of the eight names, which is reported rather
-    than worked around: E1 cannot add a field to another package's dataclass.
+    Nothing is filtered out: ``MarketView`` carries the eight defaulted fields of ruling R188 since gate
+    G2, so every name :func:`market_view_fields` produces is a field of the dataclass. A name that
+    diverges is a ``TypeError`` here rather than a value silently dropped from an observation, which is
+    the whole reason the filter is gone.
     """
-    kwargs = {name: value for name, value in view_fields.items() if name in _MARKET_VIEW_FIELDS}
     factory = cast(Callable[..., MarketView], MarketView)
-    return factory(**kwargs)
+    return factory(**view_fields)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -914,6 +896,278 @@ def filter_grant(grant: ResearchGrant, *, now_ms: int) -> ResearchGrant:
 
 
 # --------------------------------------------------------------------------------------------------
+# The sensor gene's hook (PRD v5 section 1; amendment C1c will write the catalogue as section 18)
+#
+# PRD v5 makes **which information an agent consumes part of its genome**: a sensor set, priced per bar,
+# so that evolution can discover that reading the news beats reading the tape, or that a cheap diet beats
+# an expensive one. The structural half of that is here and nothing else is: this module gates the view
+# fields whose data a built dataset already carries, and it gates them by **subtraction**.
+#
+# Subtraction is the whole safety argument. An observation is assembled exactly as it was before, by the
+# same filters, and the sensor set is then applied by dropping names from what those filters produced. A
+# sensor set can therefore only ever narrow an observation: there is no second assembly path a new
+# sensor could widen, so no sensor set can expose a byte the as-of rules of section 5.4 forbid, and the
+# default set (nothing dropped) is byte-identical to the builder that predates the hook. It costs a
+# computed and discarded field per gated sensor, which is the price of one code path instead of two.
+#
+# What is **not** here, and what amendment C1c and package S1 must add, is written at
+# :data:`SENSOR_VIEW_FIELDS`.
+# --------------------------------------------------------------------------------------------------
+@dataclass(frozen=True, slots=True)
+class SensorFields:
+    """The view fields one sensor gates: ``MarketView`` field names, then ``Observation`` field names.
+
+    A field may be gated by more than one sensor, and then it is present as soon as **any** of its
+    sensors is bought (:func:`unsensed_view_fields` is a set difference over the union of what was
+    bought). A field named by no sensor at all is ungated and is always present.
+    """
+
+    market: frozenset[str] = frozenset()
+    observation: frozenset[str] = frozenset()
+
+
+#: The one place a sensor's reach is declared, so that C1c extends it in one place (PRD v5 section 1).
+#:
+#: Every name here is a sensor of the PRD's catalogue **whose data a built dataset already carries and
+#: whose fields the view builders above already produce**, spelled as the fields are spelled in this file
+#: today. Nothing else is wired, because a sensor whose data does not exist would gate nothing and would
+#: read as a promise: ``comments``, ``hn``, ``gdelt_recent``, ``filings``, ``macro_releases``,
+#: ``wiki_asof`` and the two hive sensors (``hive_insights``, ``hive_reputation``) are therefore absent
+#: from this mapping and unknown to :func:`resolve_sensor_set`.
+#:
+#: What C1c and S1 must add, each as a row of this mapping plus the fields the row gates:
+#:
+#: * the sensors whose data F1 to F5 import (``filings``, ``macro_releases``, ``hn``, ``gdelt_recent``,
+#:   ``comments``) and the deeper ``wiki_asof``, which today is a **research kind** and not a sensor: the
+#:   research budget of section 8.1 and the sensor budget of PRD v5 section 1.2 are the same allowance
+#:   read twice, and C1c has to say which one prices a grant;
+#: * the two hive sensors. ``Observation.hive`` is deliberately ungated here: ``hive_insights`` is the
+#:   promoted rules of PRD v5 section 2, which do not exist, and splitting ``HiveView`` between
+#:   ``hive_reputation`` (its ``reputations``) and ``hive_insights`` (the rest) is a sub-structure gate,
+#:   which is the next item;
+#: * **sub-structure gating**. A sensor here gates a whole view field. ``volume_profile`` should also
+#:   gate ``Bar.volume_milli``, ``Bar.n_trades`` and ``Bar.open_interest`` inside ``bars``, and
+#:   ``microstructure`` should gate ``Bar.yes_bid_bp`` and ``Bar.yes_ask_bp``, which cannot be done from
+#:   this module: ``Bar.to_dict`` is D1's, so a partial bar is a ``pmx.types`` change and a contract row;
+#: * ``cash_events`` (a market view's applied dividends, splits, rolls and funding times, ruling R183) is
+#:   ungated because the PRD's catalogue names no sensor for it: ``volume_profile`` says "funding" while
+#:   a dividend is not microstructure at all, so C1c has to place it rather than this hook guessing;
+#: * a sensor's **cost, version hash and as-of lag**, the ``SensorBlock`` integer feature format and the
+#:   budget rule. None of that is here: this hook only decides what an observation carries.
+#:
+#: The identity and contract fields of a market view (``market_id``, ``provider``, ``url``, ``question``,
+#: ``description``, ``category``, ``tags``, ``currency``, ``created_at_ms``, ``tradable``,
+#: ``fee_schedule_id``, ``kind``, ``tick_size_micro``, ``point_value_micro``), the agent's own book
+#: (``position``, ``portfolio``) and what it is judged under (``limits``, ``research``, ``obs_version``,
+#: ``agent_id``, ``now_ms``, ``interval_min``, ``markets``) are ungated on purpose: an agent that cannot
+#: name the instrument it trades or read its own cash cannot act at all, and a diet is about information
+#: about the world.
+SENSOR_VIEW_FIELDS: Final[Mapping[str, SensorFields]] = MappingProxyType(
+    {
+        # The instrument's own bars and the as-of price they carry (cost 0 in the PRD: always on).
+        "tape": SensorFields(market=frozenset({"bars", "first_price_bp", "last_price_bp"})),
+        # Last prints, bid and ask where the venue published them.
+        "microstructure": SensorFields(market=frozenset({"best_bid_bp", "best_ask_bp", "trades"})),
+        "volume_profile": SensorFields(
+            market=frozenset({"volume_milli_7d", "volume_milli_to_date", "n_trades_to_date"})
+        ),
+        # The cluster's other instruments, as far as an observation names them today (17.7's families).
+        "cross_asset": SensorFields(market=frozenset({"underlying_id", "twins"})),
+        # The venue's published schedule: hours to close, hours to the next bar, which calendar.
+        "calendar": SensorFields(
+            market=frozenset({"close_at_ms", "session_calendar_id", "hours_to_next_bar"})
+        ),
+        # Wikipedia Current events, linked and global: the per-market digest and the global one.
+        "wiki_daily": SensorFields(market=frozenset({"news"}), observation=frozenset({"news"})),
+        "memory": SensorFields(observation=frozenset({"memory"})),
+    }
+)
+
+#: Every sensor name this hook knows, sorted, so a caller can name the full diet explicitly.
+SENSOR_NAMES: Final = tuple(sorted(SENSOR_VIEW_FIELDS))
+
+#: The ``MarketView`` and ``Observation`` fields some sensor gates. A field outside these is always
+#: present, whatever the sensor set, which is what makes the ungated list above a checkable claim.
+GATED_MARKET_VIEW_FIELDS: Final = frozenset(
+    name for gated in SENSOR_VIEW_FIELDS.values() for name in gated.market
+)
+GATED_OBSERVATION_FIELDS: Final = frozenset(
+    name for gated in SENSOR_VIEW_FIELDS.values() for name in gated.observation
+)
+
+
+def resolve_sensor_set(sensors: Iterable[str] | None) -> frozenset[str] | None:
+    """The sensor set as the builder uses it: ``None`` means "every sensor", so nothing is gated.
+
+    ``None`` is the default and the value every caller that predates the hook passes implicitly, and the
+    full set resolves back to it, so ``sensors=SENSOR_NAMES`` and ``sensors=None`` are the same bytes and
+    not merely the same fields.
+
+    An unknown name is **refused** rather than ignored: a genome that names a sensor this build does not
+    have would otherwise silently get a diet it did not ask for, and a mutation that misspells a sensor
+    would read as a free one. The error is ``InvalidConfigError``, exactly as an unknown research kind is
+    (:func:`research_cost`), because a sensor name comes from a genome and a genome is configuration.
+    """
+    if sensors is None:
+        return None
+    named = frozenset(sensors)
+    unknown = sorted(named - frozenset(SENSOR_VIEW_FIELDS))
+    if unknown:
+        raise InvalidConfigError("unknown sensor", sensors=unknown, known=list(SENSOR_NAMES))
+    return None if named == frozenset(SENSOR_VIEW_FIELDS) else named
+
+
+def unsensed_view_fields(sensors: frozenset[str] | None) -> tuple[frozenset[str], frozenset[str]]:
+    """``(market fields, observation fields)`` a resolved sensor set did not buy, and therefore drops.
+
+    A gated field is kept when **any** of the sensors that gate it was bought, so adding a sensor can
+    only add fields: the result is a set difference and never a rebuild.
+    """
+    if sensors is None:
+        return frozenset(), frozenset()
+    bought_market = frozenset(name for sensor in sensors for name in SENSOR_VIEW_FIELDS[sensor].market)
+    bought_observation = frozenset(
+        name for sensor in sensors for name in SENSOR_VIEW_FIELDS[sensor].observation
+    )
+    return GATED_MARKET_VIEW_FIELDS - bought_market, GATED_OBSERVATION_FIELDS - bought_observation
+
+
+def _unsensed_attribute(view: object, name: str) -> NoReturn:
+    """Refuse the read of a field the agent's sensors did not buy, and say which field it was.
+
+    ``SchemaError`` is the taxonomy's nearest fit ("a structural rule of the contract that the schema
+    cannot express") and is reported as a contract issue: section 13.1 should carry a
+    ``SensorAbsentError`` of its own, because this is a distinct failure and ``errors.py`` is D1's file.
+    """
+    unsensed = cast(frozenset[str], object.__getattribute__(view, "unsensed_fields"))
+    if name in unsensed:
+        raise SchemaError(
+            "field was not sensed",
+            field=name,
+            unsensed=sorted(unsensed),
+            view=type(view).__name__,
+        )
+    raise AttributeError(name)
+
+
+class SensedMarketView(MarketView):
+    """A market view a narrowed sensor set assembled: an unsensed field is **absent**, never zeroed.
+
+    Absence is represented twice over, and both spellings say the same thing:
+
+    * the slot is **not set**. ``MarketView`` is a ``slots=True`` dataclass, so an unset field has no
+      value at all in the object: there is no zero to mistake for a price, no ``None`` to mistake for an
+      unknown quote and no empty tuple to mistake for a market with no prints. Reading it raises
+      (:func:`_unsensed_attribute`), and so does ``hasattr``, so an agent cannot probe the absence into
+      a default either;
+    * the key is **omitted** from :meth:`to_dict`, which is what an LLM agent reads and what is hashed.
+
+    That is the representation ruling of this hook, and the alternative was a sentinel value in the slot.
+    A sentinel would have to be typed into every field of ``MarketView`` (``int | Unsensed``), which is
+    D1's file, and it would widen the type of every field for every consumer of a full observation, so a
+    scripted agent would carry a narrowing branch on a field it always has. An unset slot needs no type
+    change anywhere and fails closed.
+
+    ``to_dict`` is the **full** renderer's output minus the unsensed keys, and not a second renderer:
+    :func:`sensed_market_view` builds a plain ``MarketView`` from the same fields, renders it with D1's
+    own ``to_dict`` and drops the dropped names, so a field D1 adds to the dataclass cannot go missing
+    from a narrowed observation while nothing fails.
+
+    Equality and hashing read the rendered payload and the unsensed set, because the dataclass' own read
+    every field and would raise on an unsensed one.
+    """
+
+    __slots__ = ("_payload", "unsensed_fields")
+
+    _payload: dict[str, object]
+    #: The ``MarketView`` field names this agent's sensors did not buy.
+    unsensed_fields: frozenset[str]
+
+    def to_dict(self) -> dict[str, object]:
+        return dict(self._payload)
+
+    def __getattr__(self, name: str) -> NoReturn:
+        _unsensed_attribute(self, name)
+
+    def __repr__(self) -> str:
+        return (
+            f"SensedMarketView(market_id={self._payload.get('market_id')!r}, "
+            f"unsensed={sorted(self.unsensed_fields)})"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SensedMarketView):
+            return False
+        return self.unsensed_fields == other.unsensed_fields and self._payload == other._payload
+
+    def __hash__(self) -> int:
+        return hash((self.unsensed_fields, canonical_json(self._payload)))
+
+
+class SensedObservation(Observation):
+    """An observation a narrowed sensor set assembled. Absence is exactly :class:`SensedMarketView`'s."""
+
+    __slots__ = ("_payload", "unsensed_fields")
+
+    _payload: dict[str, object]
+    #: The ``Observation`` field names this agent's sensors did not buy.
+    unsensed_fields: frozenset[str]
+
+    def to_dict(self) -> dict[str, object]:
+        return dict(self._payload)
+
+    def __getattr__(self, name: str) -> NoReturn:
+        _unsensed_attribute(self, name)
+
+    def __repr__(self) -> str:
+        return (
+            f"SensedObservation(agent_id={self._payload.get('agent_id')!r}, "
+            f"now_ms={self._payload.get('now_ms')!r}, unsensed={sorted(self.unsensed_fields)})"
+        )
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, SensedObservation):
+            return False
+        return self.unsensed_fields == other.unsensed_fields and self._payload == other._payload
+
+    def __hash__(self) -> int:
+        return hash((self.unsensed_fields, canonical_json(self._payload)))
+
+
+def sensed_market_view(view_fields: Mapping[str, object], *, unsensed: frozenset[str]) -> MarketView:
+    """A market view over ``view_fields`` with ``unsensed`` dropped, or the plain view when none is.
+
+    The empty case returns exactly what :func:`_market_view` returns, so the default sensor set is not a
+    special case of this function: it is the same object it always was.
+    """
+    full = _market_view(view_fields)
+    if not unsensed:
+        return full
+    payload = {name: value for name, value in full.to_dict().items() if name not in unsensed}
+    view = object.__new__(SensedMarketView)
+    object.__setattr__(view, "unsensed_fields", unsensed)
+    object.__setattr__(view, "_payload", payload)
+    for name, value in view_fields.items():
+        if name not in unsensed:
+            object.__setattr__(view, name, value)
+    return view
+
+
+def sensed_observation(observation: Observation, *, unsensed: frozenset[str]) -> Observation:
+    """``observation`` with its ``unsensed`` top-level fields dropped, or ``observation`` itself."""
+    if not unsensed:
+        return observation
+    payload = {name: value for name, value in observation.to_dict().items() if name not in unsensed}
+    narrowed = object.__new__(SensedObservation)
+    object.__setattr__(narrowed, "unsensed_fields", unsensed)
+    object.__setattr__(narrowed, "_payload", payload)
+    for field in fields(Observation):
+        if field.name not in unsensed:
+            object.__setattr__(narrowed, field.name, getattr(observation, field.name))
+    return narrowed
+
+
+# --------------------------------------------------------------------------------------------------
 # The builder
 # --------------------------------------------------------------------------------------------------
 def build_observation(
@@ -929,6 +1183,7 @@ def build_observation(
     news: Sequence[NewsItem],
     grants: Sequence[ResearchGrant],
     calendar: Calendar | None = None,
+    sensors: Iterable[str] | None = None,
 ) -> Observation:
     """One agent's whole world at one bar, filtered (sections 5.4, 7.9 and 8.3).
 
@@ -943,7 +1198,17 @@ def build_observation(
     ``markets_per_obs_max`` by ``market_id`` **among the tradable ones**, then by ``market_id`` among the
     rest (section 8.3). The rule is deterministic, so E1, E5 and A5 agree about which markets are
     addressable; the ones that did not fit are still forecast-carried by the runner and still scored.
+
+    ``sensors`` is the agent's **sensor set** (PRD v5 section 1, the hook above): keyword-only, and
+    ``None`` means every sensor, which is what every caller that predates the hook passes and which is
+    byte-identical to the builder without it. A narrowed set is applied by **subtraction** over what the
+    as-of filters produced, so it can only ever narrow this observation: a field the set did not buy is
+    absent from the view and its key is absent from the payload, and nothing about the filtering above
+    depends on the set. The size cap and the leak guard then run on the narrowed payload, which is what
+    the agent actually reads.
     """
+    sensor_set = resolve_sensor_set(sensors)
+    unsensed_market, unsensed_observation = unsensed_view_fields(sensor_set)
     span = interval_ms(config.interval_min)
     if now_ms % span != 0:
         raise InvalidConfigError("now_ms must be a bar open", now_ms=now_ms, interval_min=config.interval_min)
@@ -975,7 +1240,7 @@ def build_observation(
             trade for trade in history_by_market.get(instrument.id, ()) if trade.t_ms < now_ms
         )
         views.append(
-            _market_view(
+            sensed_market_view(
                 market_view_fields(
                     instrument,
                     now_ms=now_ms,
@@ -985,7 +1250,8 @@ def build_observation(
                     news=[news_view_of(item, market_id=instrument.id) for item in linked],
                     trades=prints[-config.trades_window :] if config.trades_window > 0 else (),
                     calendar=calendar,
-                )
+                ),
+                unsensed=unsensed_market,
             )
         )
 
@@ -1031,6 +1297,7 @@ def build_observation(
         ),
         limits=limits,
     )
+    observation = sensed_observation(observation, unsensed=unsensed_observation)
     payload = observation.to_dict()
     rendered = canonical_json(payload)
     check_observation_size(rendered, agent_id=agent_id, now_ms=now_ms)

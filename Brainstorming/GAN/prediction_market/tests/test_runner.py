@@ -16,9 +16,8 @@ contract ships, and it is used in the two ways it can honestly be used:
   payload**, event by event, over every event type both journals can carry, so a single differing
   price, tradable set, intent, probability or category fails it.
 
-Five things in the shipped fixture cannot be reproduced by a run of 2026-09-08, and each is a fact of
-the contract rather than of this test (they are reported as contract issues, and the fixture is C1b's to
-rebuild at gate G2 per section 17.9):
+Six things in the shipped fixture cannot be reproduced by a run of 2026-09-09, and each is a fact of
+the contract rather than of this test (each is reported as a contract issue):
 
 1. its ``dataset_hash`` is ``f60463ae...`` while the committed ``data/demo_v1`` hashes to
    ``9f91a13f...``, so its ``run_id`` names a dataset that no longer exists byte for byte;
@@ -30,13 +29,21 @@ rebuild at gate G2 per section 17.9):
 4. it carries ``hive_written`` and ``memory_written``, which A2 and A3 emit in wave 3; a wave-2 run
    passes ``memory=None`` and ``hive=None`` and emits neither (sections 10.3 and 12.11 say that is
    exactly what the gate run produces);
-5. its ``observation_built.obs_sha256`` and ``bytes`` predate E1's observation shape.
+5. its ``observation_built.obs_sha256`` and ``bytes`` predate E1's observation shape;
+6. its ``run_started.config`` payload predates amendment C1b's ``RunConfig`` fields, so its
+   ``config_hash`` and therefore its ``run_id`` name a config shape that no longer exists;
+   ``RUN_CONFIG_HASH`` is what the same run hashes to today (rulings R157 and R188).
+
+Its ``market_listed``, ``forecast_recorded`` and ``order_placed`` payloads were completed at gate G2
+with the fields ruling R164 promoted to required (the eight instrument fields of 17.1 on a binary, the
+two nulls of a binary forecast, and ``decided_at_ms``, which in this pre-latency journal is the bar the
+order filled on). Nothing else in the bytes moved.
 
 The second half of the file is amendment C1b's: one continuous instrument driven through the whole bar
 loop (the listing, the fill, the cash event, the forced flat, the horizon resolution, the hive entries
-and the projection's ``(instrument, week, horizon)`` cells). No dataset can carry one yet, so the
-fixture subclasses ``Market``, ``MarketMeta`` and ``Actions`` with the fields amendment C1b adds to
-them, which is the shape E1 and E2 already read defensively and the shape gate G2 will land.
+and the projection's ``(instrument, week, horizon)`` cells). It is built on the declared records of
+``pmx.types`` (``ContinuousInstrument``, ``MarketMeta.kind``, ``CashEvent``, ``HorizonForecast``), so
+the continuous half runs over the real types and not over a stand-in for them.
 """
 
 from __future__ import annotations
@@ -102,10 +109,12 @@ from pmx.types import (
     PPM_ONE,
     Actions,
     Bar,
+    CashEvent,
+    ContinuousInstrument,
     Dataset,
     HiveView,
+    HorizonForecast,
     Lesson,
-    Market,
     MarketAction,
     MarketMeta,
     MarketQuality,
@@ -128,7 +137,14 @@ T1_MS = 1_466_812_800_000
 SEED = 7
 
 #: What the shipped fixture pins, and what a run of the same window must reproduce (section 12.1).
+#: ``FIXTURE_CONFIG_HASH`` is the fixture's **own** recorded hash, over the pre-amendment ``RunConfig``
+#: whose payload the fixture carries; ``RUN_CONFIG_HASH`` is what the same run hashes to today, because
+#: ``RunConfig`` gained amendment C1b's ``horizons_bars`` and ``kinds`` and resolves the first to
+#: ``default_horizons_bars`` before hashing (rulings R157 and R188). That is the sixth item of this
+#: module's docstring list: the identity of a run moved with the dataclass, and both values are pinned
+#: exactly rather than one of them being dropped.
 FIXTURE_CONFIG_HASH = "f119e64ee0c29537a33765970f71212c01ada3f34b22609993efc9143272cd03"
+RUN_CONFIG_HASH = "705b9c611c460b31f638275d4ca3ae1f5758951d54d7ae473b104d118e710a68"
 FIXTURE_MARKET_IDS_HASH = "066120f77f7495af7498e0214cec29ee681c5cdd419372b6a13224cb5e293b25"
 FIXTURE_GENOME_HASHES = {
     "contrarian": "504d43f154e28de7780cb4c70ba2a45dd85e6e7fe622c7d9f1bb6899c1a1c0d4",
@@ -669,8 +685,8 @@ def test_run_reproduces_the_contract_fixture(demo: Dataset, tmp_path: Path) -> N
     filling at the deciding one) and the absent memory and hive events.
     """
     handle = _run(demo, tmp_path)
-    assert handle.config_hash == FIXTURE_CONFIG_HASH
-    assert handle.run_id == f"r-{demo.manifest.dataset_hash[:8]}-{SEED}-{FIXTURE_CONFIG_HASH[:8]}"
+    assert handle.config_hash == RUN_CONFIG_HASH
+    assert handle.run_id == f"r-{demo.manifest.dataset_hash[:8]}-{SEED}-{RUN_CONFIG_HASH[:8]}"
     assert handle.n_bars == 2
     events = _read(handle.journal_path)
     assert len(events) == handle.n_events
@@ -1085,7 +1101,7 @@ def test_the_manifest_carries_what_section_9_5_asks_for(demo: Dataset, tmp_path:
     assert manifest["memory_snapshots"] == {}
     assert manifest["hive_snapshot"] is None
     assert sorted(manifest["agent_snapshots"]) == ["contrarian", "market_follower"]
-    assert manifest["config_hash"] == FIXTURE_CONFIG_HASH
+    assert manifest["config_hash"] == RUN_CONFIG_HASH
     dumped = sorted(path.name for path in (run_dir / "observations").iterdir())
     assert dumped == [
         f"{T0_MS}-contrarian.json",
@@ -1499,69 +1515,23 @@ def test_the_projection_of_a_partial_window_scores_only_what_settled(
 # --------------------------------------------------------------------------------------------------
 # Amendment C1b: one continuous instrument through the whole loop (sections 17.2, 17.3 and 17.5)
 #
-# No dataset can carry a continuous instrument yet: the loader walks no ``instruments/`` directory and
-# ``MarketMeta`` has no ``kind`` (both are gate G2's, section 17.9). The fixture below is therefore a
-# ``Market`` and a ``MarketMeta`` **subclassed** with the fields amendment C1b adds to them, which is
-# exactly the shape E1's ``Calendar`` and E2's ``instrument_spec`` read defensively today and exactly
-# the shape D1 will land. It is the only way the continuous half of E5 can be exercised before the
-# gate, and it is a real end-to-end run: the calendar, the observation, the execution, the cash event,
-# the forced flat, the horizon resolution and the projection all run over it.
+# The instrument, its meta, its cash event and its horizon forecasts are the declared records of
+# ``pmx.types`` (``ContinuousInstrument``, ``MarketMeta.kind``, ``CashEvent``, ``HorizonForecast`` and
+# ``Actions.horizon_forecasts``, all landed by gate G2), so this is a real end-to-end run over the real
+# types: the calendar, the observation, the execution, the cash event, the forced flat, the horizon
+# resolution and the projection all run over it.
 #
-# The journal such a run writes cannot be read back by ``read_journal``: ``cash_event_applied``,
-# ``forecast_resolved`` and ``instrument_closed`` are declared in ``journal.v2.json``'s ``$defs`` but
-# not in its ``oneOf``, and ``pmx.journal`` has no dataclass for them (ruling R164, gate G2). These
-# tests therefore read the file as raw canonical JSON, which is what the bytes are, and use
-# ``handle.projection`` for the projected side.
+# The window sits **inside** the demo pack's validation window, because ``Dataset.market`` clips a
+# continuous instrument at ``split.validation_end_ms`` (ruling R182): a perp whose bars are all in the
+# sealed months would reach the run with no tape at all, which is the clip working and not a fixture.
 # --------------------------------------------------------------------------------------------------
 PERP = "demo-btcusdt-perp"
 DAY_MS = 86_400_000
-PERP_T0 = 1_500_249_600_000
+#: Seven days ending at the demo pack's ``validation_end_ms``, so the delisting survives the clip.
+PERP_T0 = 1_479_945_600_000
 PERP_T1 = PERP_T0 + 6 * DAY_MS
 PERP_CLOSES = (5_000, 5_100, 5_050, 5_200, 5_150, 5_300)
 PERP_HORIZONS = (1, 7)
-
-
-@dataclass(frozen=True, slots=True)
-class ContinuousMeta(MarketMeta):
-    """``MarketMeta`` with the ``kind`` of ruling R144, which gate G2 adds to D1's dataclass."""
-
-    kind: str = "perp"
-
-
-@dataclass(frozen=True, slots=True)
-class ContinuousInstrument(Market):
-    """``ContinuousInstrument`` of section 17.1, as a ``Market`` plus the fields the base declares.
-
-    Ruling R144 keeps ``Market`` and satisfies the ``Instrument`` base through a ``Market.instrument``
-    view; until D1 lands both, the engine reads the base's names straight off the record, which is what
-    this subclass provides.
-    """
-
-    kind: str = "perp"
-    vendor: str = "binance"
-    symbol: str = "BTCUSDT"
-    tick_size_micro: int = 100
-    point_value_micro: int = 1_000_000
-    session_calendar_id: str = "continuous"
-    short_allowed: bool = True
-    listed_at_ms: int = 0
-    delisted_at_ms: int | None = None
-    borrow_schedule_id: str | None = None
-    carry_schedule_id: str | None = None
-    cash_events: tuple[object, ...] = ()
-
-
-@dataclass(frozen=True, slots=True)
-class DataCashEvent:
-    """``pmx.types.CashEvent`` of section 17.3, which gate G2 adds to D1's file (ruling R151)."""
-
-    cash_event_id: str
-    market_id: str
-    kind: str
-    t_ms: int
-    origin: str
-    source_url: str
-    detail: Mapping[str, int | str]
 
 
 def _perp_bars() -> tuple[Bar, ...]:
@@ -1590,31 +1560,35 @@ def _perp_bars() -> tuple[Bar, ...]:
 
 
 def _perp_instrument() -> ContinuousInstrument:
+    """The perpetual of section 17.1: shortable, an underlying, no borrow and no carry schedule."""
     return ContinuousInstrument(
-        schema_version="market.v2",
+        schema_version="instrument.v1",
         id=PERP,
         provider="demo",
-        provider_id="BTCUSDT",
-        url="https://example.invalid/btcusdt",
-        question="BTCUSDT perpetual",
-        description="a perpetual future, for the continuous half of the engine",
-        category="crypto",
-        tags=(),
-        wiki_subjects=(),
+        vendor="binance",
+        symbol="BTCUSDT",
+        kind="perp",
         currency="usd",
-        source="reconstructed",
-        created_at_ms=PERP_T0,
-        close_at_ms=PERP_T1,
-        resolved_at_ms=PERP_T1,
-        resolution=-1,
-        resolution_source="none",
-        event_key=None,
+        tick_size_micro=100,
+        point_value_micro=1_000_000,
+        session_calendar_id="continuous",
+        fee_schedule_id="demo-zero",
+        borrow_schedule_id=None,
+        carry_schedule_id=None,
+        listed_at_ms=PERP_T0,
+        delisted_at_ms=PERP_T1,
+        short_allowed=True,
         interval_min=1_440,
         bars=_perp_bars(),
         trades=(),
-        first_price_bp=PERP_CLOSES[0],
-        final_price_bp=PERP_CLOSES[-1],
-        hardness_tags=(),
+        url="https://example.invalid/btcusdt",
+        description="a perpetual future, for the continuous half of the engine",
+        category="crypto",
+        tags=(),
+        twins=(),
+        underlying_id="demo-btcusdt-spot",
+        roll_source=None,
+        first_price_ticks=PERP_CLOSES[0],
         quality=MarketQuality(
             n_trades=0,
             unique_bettors=0,
@@ -1623,27 +1597,23 @@ def _perp_instrument() -> ContinuousInstrument:
             traded_bars=6,
             tape_kind="bars_only",
         ),
-        fee_schedule_id="demo-zero",
-        notes="",
-        listed_at_ms=PERP_T0,
-        delisted_at_ms=PERP_T1,
         cash_events=(
-            DataCashEvent(
-                cash_event_id="ce-0000000000000001",
+            CashEvent.build(
                 market_id=PERP,
                 kind="funding",
                 t_ms=PERP_T0 + 2 * DAY_MS,
-                origin="data",
-                source_url="https://example.invalid/funding",
                 detail={"rate_ppm": 1_000, "mark_ticks": PERP_CLOSES[2]},
+                source_url="https://example.invalid/funding",
             ),
         ),
+        source="reconstructed",
+        notes="",
     )
 
 
-def _perp_meta() -> ContinuousMeta:
+def _perp_meta() -> MarketMeta:
     """The continuous ``MarketMeta`` values of ruling R186, spelled out."""
-    return ContinuousMeta(
+    return MarketMeta(
         id=PERP,
         provider="demo",
         category="crypto",
@@ -1658,6 +1628,7 @@ def _perp_meta() -> ContinuousMeta:
         hardness_tags=(),
         fee_schedule_id="demo-zero",
         fold="all",
+        kind="perp",
     )
 
 
@@ -1713,23 +1684,6 @@ def perp_agent() -> PerpAgent:
     )
 
 
-@dataclass(frozen=True, slots=True)
-class StubHorizonForecast:
-    """``pmx.types.HorizonForecast`` of section 17.5, which gate G2 adds to D1's file (ruling R157)."""
-
-    market_id: str
-    horizon_bars: int
-    up_probability_ppm: int
-    quantiles_ticks: tuple[int, ...] | None
-
-
-@dataclass(frozen=True, slots=True)
-class HorizonActions(Actions):
-    """``Actions`` with the ``horizon_forecasts`` array of section 17.5 (ruling R157, gate G2)."""
-
-    horizon_forecasts: tuple[StubHorizonForecast, ...] = ()
-
-
 @dataclass(slots=True)
 class QuantileAgent(StubAgent):
     """An agent that states five pairs, of which one is legal and four break one rule each.
@@ -1743,17 +1697,17 @@ class QuantileAgent(StubAgent):
         obs = self.observation
         assert obs is not None
         market_id = obs.markets[0].market_id
-        return HorizonActions(
+        return Actions(
             actions_version="actions.v2",
             markets=(
                 MarketAction(market_id=market_id, prob_ppm=640_000, kind="hold"),
             ),
             horizon_forecasts=(
-                StubHorizonForecast(market_id, 1, 999_000, None),
-                StubHorizonForecast(market_id, 1, 640_000, (4_900, 4_950, 5_000, 5_050, 5_100)),
-                StubHorizonForecast(market_id, 1, 640_000, None),
-                StubHorizonForecast(market_id, 3, 500_000, None),
-                StubHorizonForecast(market_id, 7, 500_000, (5_000, 4_000, 5_100, 5_200, 5_300)),
+                HorizonForecast(market_id, 1, 999_000, None),
+                HorizonForecast(market_id, 1, 640_000, (4_900, 4_950, 5_000, 5_050, 5_100)),
+                HorizonForecast(market_id, 1, 640_000, None),
+                HorizonForecast(market_id, 3, 500_000, None),
+                HorizonForecast(market_id, 7, 500_000, (5_000, 4_000, 5_100, 5_200, 5_300)),
             ),
         )
 

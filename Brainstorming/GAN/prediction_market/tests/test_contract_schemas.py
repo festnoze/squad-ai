@@ -546,9 +546,12 @@ def test_a_generation_that_scored_nothing_on_validation_is_still_legal() -> None
 # --------------------------------------------------------------------------------------------------
 # The contract text and the schema agree
 # --------------------------------------------------------------------------------------------------
-#: Amendment C1b's three events: declared under ``$defs`` now, admitted to ``oneOf`` by gate G2 together with
-#: their ``pmx.journal`` dataclasses, which D7's tests pin to the schema (ruling R164, the discipline of R129).
-C1B_PENDING_EVENTS = frozenset({"cash_event_applied", "instrument_closed", "forecast_resolved"})
+#: Amendment C1b's three events. Gate G2 admitted all three to ``oneOf`` in the same commit that landed
+#: their ``pmx.journal`` dataclasses, which is what ruling R164 says that gate does, so they are pinned
+#: here as admitted rather than as pending; D7's tests pin the classes to the schema (the discipline of
+#: ruling R129). The day one leaves ``oneOf``, loses its ``$defs`` entry or stops being in the catalogue,
+#: the assertions below fail and the gate has to say why.
+C1B_EVENTS = frozenset({"cash_event_applied", "instrument_closed", "forecast_resolved"})
 
 
 def test_every_catalogue_event_has_a_schema_and_vice_versa() -> None:
@@ -558,12 +561,13 @@ def test_every_catalogue_event_has_a_schema_and_vice_versa() -> None:
     catalogue = set(re.findall(r"^\| `([a-z_]+)` \|", text[start:end], flags=re.MULTILINE))
     schema = _schema("journal.v2.json")
     in_schema = {ref["$ref"].rsplit("/", 1)[1] for ref in schema["oneOf"]}
-    assert catalogue == in_schema | C1B_PENDING_EVENTS
-    # Ruling R164: the three are declared, not yet admitted; the day one is admitted without its class, or
-    # dropped from $defs, this fails and the gate has to say why.
-    assert set(schema["$defs"]) >= C1B_PENDING_EVENTS
-    assert C1B_PENDING_EVENTS.isdisjoint(in_schema)
-    for event in C1B_PENDING_EVENTS:
+    assert catalogue == in_schema
+    # Ruling R164 as gate G2 applied it: the three are declared under $defs, admitted to oneOf, and in
+    # the contract's own catalogue table, all three at once.
+    assert set(schema["$defs"]) >= C1B_EVENTS
+    assert in_schema >= C1B_EVENTS
+    assert catalogue >= C1B_EVENTS
+    for event in C1B_EVENTS:
         assert schema["$defs"][event]["properties"]["type"] == {"const": event}
     deferred = _flat(text.split("### 17.9 What amendment C1b does not own")[1])
     assert "EVENT_TYPES" in deferred and "PHASES" in deferred and "gate G2" in deferred
@@ -1544,7 +1548,7 @@ def test_the_journal_schema_accepts_the_c1b_events_and_widenings() -> None:
     validator = _validator("journal.v2.json")
     bar = 1_772_438_400_000
     perp = "binance-BTCUSDT.PERP"
-    pending = {name: _subschema("journal.v2.json", name) for name in C1B_PENDING_EVENTS}
+    pending = {name: _subschema("journal.v2.json", name) for name in C1B_EVENTS}
     applied = {
         **_envelope(10, "cash_event_applied", "settle", bar), "agent_id": "carry_a", "market_id": perp,
         "cash_event_id": "ce-" + "0" * 16, "kind": "funding", "origin": "data", "position_before": 2_500,
@@ -1552,7 +1556,7 @@ def test_the_journal_schema_accepts_the_c1b_events_and_widenings() -> None:
         "cash_delta_cents": -16, "order_ids": [], "detail": {"rate_ppm": 100, "mark_ticks": 6_352_010},
     }
     assert _errors(pending["cash_event_applied"], applied) == []
-    assert _errors(validator, applied) != []  # not in oneOf until gate G2 lands the dataclass (R164)
+    assert _errors(validator, applied) == []  # in oneOf since gate G2 landed the dataclass (R164)
     split = {**applied, "kind": "split", "cash_delta_cents": 0, "position_after": 10_000,
              "avg_cost_ticks_after": 1_582_750, "detail": {"numerator": 4, "denominator": 1}}
     assert _errors(pending["cash_event_applied"], split) == []
@@ -1590,10 +1594,14 @@ def test_the_journal_schema_accepts_the_c1b_events_and_widenings() -> None:
     placed = copy.deepcopy(_of_type(_events("journal.backtest.jsonl"), "order_placed")[0])
     assert _errors(validator, {**placed, "origin": "forced_flat"}) == []
     assert _errors(validator, {**placed, "origin": "liquidation"}) != []
-    # the settle phase of an event fill is what pmx.journal's PHASES pin: declared, widened at gate G2 (R164)
+    # The settle phase of an event fill, widened at gate G2 (ruling R152 and R164): the three events an
+    # event fill writes carry both phases, and nothing else does.
     for event in ("order_placed", "filled", "fee_charged"):
-        assert _schema("journal.v2.json")["$defs"][event]["properties"]["phase"]["const"] == "execute"
-    assert _errors(validator, {**event_fill, "phase": "settle"}) != []
+        spec = _schema("journal.v2.json")["$defs"][event]["properties"]["phase"]
+        assert "const" not in spec
+        assert spec["enum"] == ["execute", "settle"]
+    assert _errors(validator, {**event_fill, "phase": "settle"}) == []
+    assert _errors(validator, {**event_fill, "phase": "learn"}) != []
     marked = copy.deepcopy(_of_type(_events("journal.backtest.jsonl"), "equity_marked")[0])
     assert _errors(validator, {**marked, "positions_value_cents": -1_250}) == []
     # Rulings R179 and R180: a debit balance and a negative equity are journal states, not schema failures.
@@ -1903,3 +1911,100 @@ def test_the_four_data_rulings_say_what_the_data_files_do() -> None:
                     "wiki_subject_provenance", "kalshi_series_categories.v1.json", "kalshi_series_subjects.v1.json",
                     'derive_seed(0, f"dataset/{name}")', "R105"):
         assert literal in rulings, literal
+
+
+# --------------------------------------------------------------------------------------------------
+# Ruling R165 and R149: what the widened market and dataset schemas now accept, and still refuse
+#
+# The widenings landed at gate G2 with no test over them: the contract's own market fixture is a demo
+# binary and its manifest fixture is binary only, so nothing exercised an exchange id, a quote currency
+# or any of amendment C1b's manifest blocks.
+# --------------------------------------------------------------------------------------------------
+def test_market_v2_accepts_an_exchange_id_and_a_quote_currency_and_refuses_an_unknown_provider() -> None:
+    """R165: seventeen providers and five currencies, and nothing outside either list."""
+    validator = _validator("market.v2.json")
+    base = _fixture("market.demo-brexit-2016.json")
+    assert _errors(validator, base) == []
+    for provider, market_id in (
+        ("xnys", "xnys-KO"),
+        ("xnas", "xnas-AAPL"),
+        ("otcfx", "otcfx-EURUSD"),
+        ("binance", "binance-BTCUSDT"),
+        ("xcme", "xcme-ESH26"),
+    ):
+        doc = copy.deepcopy(base)
+        doc.update(id=market_id, provider=provider)
+        assert _errors(validator, doc) == [], provider
+    for currency in ("usd", "mana", "usdt", "eur", "jpy"):
+        doc = copy.deepcopy(base)
+        doc["currency"] = currency
+        assert _errors(validator, doc) == [], currency
+    for bad in ("nasdaq", "ibkr", "demo2"):
+        doc = copy.deepcopy(base)
+        doc.update(id=f"{bad}-X", provider=bad)
+        assert _errors(validator, doc) != [], bad
+    doc = copy.deepcopy(base)
+    doc["currency"] = "gbp"
+    assert _errors(validator, doc) != [], "the quote currencies of 17.1 are five"
+    doc = copy.deepcopy(base)
+    doc["id"] = "xnys:KO"
+    assert _errors(validator, doc) != [], "the id separator is a hyphen"
+
+
+def test_dataset_v1_accepts_amendment_c1bs_manifest_blocks_and_refuses_a_bad_file_prefix() -> None:
+    """R149 and R166: kinds, instruments, schedules, the three split counts and the new file paths."""
+    validator = _validator("dataset.v1.json")
+    base = _fixture("dataset.manifest.json")
+    assert _errors(validator, base) == [], "the binary manifest the contract ships still validates"
+    doc = copy.deepcopy(base)
+    doc["kinds"] = ["binary", "equity", "perp"]
+    doc["instruments"] = {
+        "per_kind": {"equity": 1, "perp": 1},
+        "per_provider": {"xnas": 1, "binance": 1},
+        "per_vendor": {"yahoo": 1, "binance": 1},
+        "n_cash_events": {"per_kind": {"equity": 2, "perp": 1}},
+        "n_calendars": 1,
+    }
+    doc["schedules"] = {
+        "fee": ["xnas-zero-2026-09"],
+        "borrow": ["xnas-borrowgc-2026-09"],
+        "carry": [],
+    }
+    doc["split"] = {
+        **base["split"],
+        "n_instruments_train": 0,
+        "n_instruments_validation": 2,
+        "n_instruments_sealed": 0,
+    }
+    doc["files"] = [
+        *base["files"],
+        {"path": "instruments/xnas-AAPL.json", "sha256": "a" * 64, "bytes": 4_096},
+        {"path": "calendars/xnys.json", "sha256": "b" * 64, "bytes": 2_048},
+    ]
+    assert _errors(validator, doc) == []
+    assert _errors(validator, {**doc, "kinds": []}) != [], "kinds is minItems 1 when written"
+    assert _errors(validator, {**doc, "kinds": ["bond"]}) != [], "the six kinds of 17.1 and no other"
+    assert _errors(validator, {**doc, "kinds": ["binary", "binary"]}) != [], "uniqueItems"
+    partial = copy.deepcopy(doc)
+    del partial["instruments"]["n_calendars"]
+    assert _errors(validator, partial) != [], "the instruments block is required as a whole (7.8)"
+    bad_path = copy.deepcopy(doc)
+    bad_path["files"] = [*base["files"], {"path": "tapes/xnas-AAPL.json", "sha256": "c" * 64, "bytes": 1}]
+    assert _errors(validator, bad_path) != [], "the hashed prefixes are the six of ruling R149"
+
+
+def test_the_committed_instrument_and_calendar_fixtures_validate_against_their_schemas() -> None:
+    """The two file shapes amendment C1b added, against the shipped fixtures (17.1 and 17.2)."""
+    instruments = _validator("instrument.v1.json")
+    for name in ("instrument.xnas-aapl.json", "instrument.binance-btcusdt-perp.json"):
+        assert _errors(instruments, _fixture(name)) == [], name
+    calendars = _validator("session_calendar.v1.json")
+    calendar = _fixture("session_calendar.xnys.json")
+    assert _errors(calendars, calendar) == []
+    assert _errors(calendars, {**calendar, "calendar_id": "continuous"}) != [], "ruling R185"
+    perp = _fixture("instrument.binance-btcusdt-perp.json")
+    assert _errors(instruments, {**perp, "kind": "binary"}) != [], "a binary is a Market, never one of these"
+    assert _errors(instruments, {**perp, "tick_size_micro": 0}) != []
+    events = _validator("cash_event.v1.json")
+    for event in _fixture("instrument.xnas-aapl.json")["cash_events"]:
+        assert _errors(events, event) == [], event["kind"]

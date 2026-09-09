@@ -19,7 +19,9 @@ through `Decimal`) and numpy's index arithmetic, which never touches a reported 
 
 The scores themselves belong to E3: the binary Brier is `pmx.types.brier_micro` and the directional
 Brier of a continuous forecast, tie rule included, is `pmx.scoring.directional_brier_micro` against
-`pmx.scoring.RANDOM_WALK_BRIER_MICRO`. This module rescores a permutation, it does not invent a loss.
+`pmx.types.RANDOM_WALK_BRIER_MICRO`, the constant section 13 declares in `pmx.types` and every consumer
+reads from there rather than through the module that scores. This module rescores a permutation, it does
+not invent a loss.
 
 This is the one module of `pmx` that imports numpy (architecture rule 4): the resample is 10 000 draws
 over every block of the dataset and a Python loop over it would dominate the run. numpy is seeded from
@@ -42,9 +44,10 @@ import numpy as np
 from numpy.typing import NDArray
 
 from pmx.rng import RngTree
-from pmx.scoring import RANDOM_WALK_BRIER_MICRO, directional_brier_micro
+from pmx.scoring import directional_brier_micro
 from pmx.types import (
     PPM_ONE,
+    RANDOM_WALK_BRIER_MICRO,
     MarketMeta,
     brier_micro,
     iso_date_from_ms,

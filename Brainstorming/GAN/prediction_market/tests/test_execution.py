@@ -34,7 +34,6 @@ from pmx import CONTRACT_VERSION, ENGINE_VERSION
 from pmx.engine import fees
 from pmx.engine.execution import (
     CashEventLike,
-    EngineCashEvent,
     Execution,
     InstrumentLike,
     applies_at,
@@ -81,10 +80,14 @@ from pmx.types import (
     BP_ONE,
     MS_PER_DAY,
     Bar,
+    CashEvent,
+    DatasetWindow,
     Market,
     MarketAction,
     MarketQuality,
     RunConfig,
+    Session,
+    SessionCalendar,
     Trade,
     bar_of,
     cost_cents,
@@ -239,33 +242,19 @@ def crypto(
     )
 
 
-@dataclass(frozen=True, slots=True)
-class DataCashEvent:
-    """A ``CashEvent`` an instrument file carries (17.3): one of ``DATA_CASH_EVENT_KINDS``.
-
-    ``pmx.types.CashEvent`` is D1's record, landed by gate G2 (17.9); this is the same six fields under
-    the same names, which is what ``pmx.engine.execution.CashEventLike`` reads.
-    """
-
-    cash_event_id: str
-    market_id: str
-    kind: str
-    t_ms: int
-    detail: Mapping[str, int | str]
-    origin: str = "data"
-    source_url: str = "https://example.invalid/corporate-actions"
-
-
 def data_event(*, market_id: str, kind: str, t_ms: int,
-               detail: Mapping[str, int | str]) -> DataCashEvent:
-    """One data cash event with the contract's id: ``"ce-" + sha256([market_id, kind, t_ms, detail])``."""
-    payload = [market_id, kind, t_ms, dict(detail)]
-    return DataCashEvent(
-        cash_event_id="ce-" + canonical_sha256(payload)[:16],
+               detail: Mapping[str, int | str]) -> CashEvent:
+    """One data cash event of an instrument file (17.3), through D1's own record and its id (R176).
+
+    ``CashEvent.build`` derives the origin from the kind, which is ruling R177's rule, so a data kind
+    cannot be built with an engine origin here by accident.
+    """
+    return CashEvent.build(
         market_id=market_id,
         kind=kind,
         t_ms=t_ms,
         detail=dict(detail),
+        source_url="https://example.invalid/corporate-actions",
     )
 
 
@@ -305,9 +294,23 @@ def continuous_fixture(
     )
 
 
-def sessions_of(*days: int) -> Mapping[str, object]:
-    """A session calendar of one whole day per named day offset, in the loader's own mapping shape."""
-    return {"sessions": [{"open_ms": T0 + day * DAY, "close_ms": T0 + (day + 1) * DAY} for day in days]}
+def sessions_of(calendar_id: str, *days: int) -> SessionCalendar:
+    """A sealed session calendar of one whole day per named day offset (17.2, ruling R174).
+
+    The record is ``pmx.types.SessionCalendar``, the type ruling R174 declares ``Execution(calendars=)``
+    against, so a test drives execution through the same object a run does and not through a second
+    shape of the same data.
+    """
+    return SessionCalendar(
+        calendar_id=calendar_id,
+        description=f"A fixture venue open on the days {days} of the window.",
+        source_url="https://example.invalid/calendar",
+        as_of_date="2026-09-08",
+        window=DatasetWindow(start_ms=T0, end_ms=T0 + 64 * DAY),
+        sessions=tuple(
+            Session(open_ms=T0 + day * DAY, close_ms=T0 + (day + 1) * DAY) for day in days
+        ),
+    )
 
 
 def config_of(**extra: object) -> RunConfig:
@@ -324,7 +327,7 @@ def config_of(**extra: object) -> RunConfig:
 
 
 def execution_of(*, config: RunConfig | None = None, journal: Journal | None = None,
-                 calendars: Mapping[str, object] | None = None,
+                 calendars: Mapping[str, SessionCalendar] | None = None,
                  carry_schedules: Mapping[str, fees.CarrySchedule] | None = None,
                  validate: bool = False) -> tuple[Execution, Journal]:
     """An execution over the shipped fee schedules and the ``historical`` model."""
@@ -1846,7 +1849,7 @@ def test_a_roll_with_a_positive_gap_shrinks_a_position_the_agent_cannot_fund() -
 
 def test_borrow_fee_is_charged_at_every_session_close_and_a_weekend_is_charged_on_monday() -> None:
     """17.3 and ruling R176: one engine event per (instrument, session), ``days`` since the previous close."""
-    calendars = {"xnas": sessions_of(0, 1, 4, 5)}
+    calendars = {"xnas": sessions_of("xnas", 0, 1, 4, 5)}
     bars = tuple(
         make_bar(T0 + day * DAY, open_bp=10_000, high_bp=10_000, low_bp=10_000, close_bp=10_000,
                  volume_milli=1_000_000)
@@ -1873,7 +1876,7 @@ def test_borrow_fee_is_charged_at_every_session_close_and_a_weekend_is_charged_o
 
 def test_a_long_owes_no_borrow_fee() -> None:
     """17.3: ``borrow_fee`` exists only for agents who are short."""
-    calendars = {"xnas": sessions_of(0, 1, 2, 3, 4)}
+    calendars = {"xnas": sessions_of("xnas", 0, 1, 2, 3, 4)}
     instrument = equity_fixture(borrow_schedule_id="xnas-borrowgc-2026-09",
                                 session_calendar_id="xnas")
     execution, log = execution_of(config=continuous_config(n_bars=5, bankroll_cents=100_000_000),
@@ -1897,7 +1900,7 @@ def test_carry_credits_a_long_at_a_positive_rate_and_debits_it_at_a_negative_one
             as_of_date="2026-09-08",
         ),
     }
-    calendars = {"otcfx": sessions_of(0, 1, 2, 3, 4)}
+    calendars = {"otcfx": sessions_of("otcfx", 0, 1, 2, 3, 4)}
     for schedule_id, expected in (("otcfx-carrygc-2026-09", 22), ("otcfx-carrydebit-2026-09", -22)):
         instrument = fx_fixture(carry_schedule_id=schedule_id, session_calendar_id="otcfx")
         execution, log = execution_of(config=continuous_config(n_bars=5, bankroll_cents=10_000_000),
@@ -2126,7 +2129,7 @@ def generated_bar(t_ms: int, *, level: int, span: int, volume: int, spread: int,
 
 
 def cash_events_of(profile: KindProfile, *, bars: Sequence[Bar], detail: Mapping[str, int],
-                   ) -> tuple[DataCashEvent, ...]:
+                   ) -> tuple[CashEvent, ...]:
     """The data events the kind's row of 17.3 allows, stamped so that they apply at bar index two.
 
     A ``funding`` time is an instant of its own bar; a ``dividend``, a ``split`` and a ``roll`` are
@@ -2179,9 +2182,11 @@ def drive_sequence(
                       quoted=profile.quoted)
         for index in range(n_bars)
     )
-    calendars: Mapping[str, object] | None = None
+    calendars: Mapping[str, SessionCalendar] | None = None
     if profile.session_calendar_id != "continuous":
-        calendars = {profile.session_calendar_id: sessions_of(*range(n_bars))}
+        calendars = {
+            profile.session_calendar_id: sessions_of(profile.session_calendar_id, *range(n_bars))
+        }
     config = config_of(t1_ms=T0 + n_bars * DAY, bankroll_cents=profile.bankroll_cents,
                        volume_cap_permille=1_000, slippage_bp_per_pct=20)
     execution, log = execution_of(config=config, calendars=calendars,
@@ -2486,7 +2491,7 @@ def test_an_engine_events_id_hashes_the_last_instant_of_the_bar_it_applies_at() 
     drive_continuous(execution, instrument, plan={T0: [("alpha", target(instrument.id, 1_000))]})
     applied = events_of(log, "cash_event_applied")[-1]
     last_bar = T0 + 3 * DAY
-    expected = EngineCashEvent.build(
+    expected = CashEvent.build(
         market_id=instrument.id, kind="forced_flat", t_ms=last_bar + DAY - 1,
         detail={"reason": "window_end", "price_ticks": 6_300_000},
     )

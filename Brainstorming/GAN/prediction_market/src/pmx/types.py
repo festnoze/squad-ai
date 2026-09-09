@@ -2226,9 +2226,10 @@ class RunConfig:
     liquidity: str = "historical"
     liquidity_params_hash: str = ""
     #: Amendment C1b's two fields (17.2, 17.5, rulings R144 and R157): the horizons a run scores, in bars
-    #: of the instrument's own sequence (``()`` meaning ``default_horizons_bars(interval_min)``, which
-    #: ``run_backtest`` resolves before hashing), and the kinds it carries (``()`` meaning every kind the
-    #: dataset has).
+    #: of the instrument's own sequence, and the kinds it carries (``()`` meaning every kind the dataset
+    #: has). ``()`` horizons means ``default_horizons_bars(interval_min)`` and ``__post_init__`` resolves
+    #: it **here**, before ``to_dict`` and therefore before ``config_hash`` (17.5, ruling R188): a config
+    #: that spells the default and one that omits it are one run and must not be two run ids.
     horizons_bars: tuple[int, ...] = ()
     kinds: tuple[str, ...] = ()
 
@@ -2245,6 +2246,8 @@ class RunConfig:
             raise InvalidConfigError("horizons_bars are integers in 1..99999", horizons_bars=list(self.horizons_bars))
         if tuple(sorted(set(self.horizons_bars))) != self.horizons_bars:
             raise InvalidConfigError("horizons_bars must be sorted and unique", value=list(self.horizons_bars))
+        if not self.horizons_bars:
+            object.__setattr__(self, "horizons_bars", default_horizons_bars(self.interval_min))
         unknown_kinds = [kind for kind in self.kinds if kind not in INSTRUMENT_KINDS]
         if unknown_kinds:
             raise InvalidConfigError("unknown kind in config.kinds", kinds=unknown_kinds)

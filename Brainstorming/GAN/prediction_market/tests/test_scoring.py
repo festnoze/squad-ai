@@ -1091,34 +1091,42 @@ def test_calibration_is_not_time_weighted() -> None:
 
 
 def test_calibration_imports_nothing_from_execution_and_reads_no_fill() -> None:
-    """The plan's done-when for E3, asserted here as well as in the architecture test's rule 2."""
+    """The plan's done-when for E3, asserted here as well as in the architecture test's rule 2.
+
+    The whitelist is exact, so a new import is a deliberate act. It is the stdlib plus ``pmx.types``:
+    the module dropped ``typing`` and a duplicate ``dataclasses`` when gate G2 landed the C1b names it
+    needed in ``pmx.types``, which is what moved the tuple and not what it stands for.
+    """
     path = REPO_ROOT / "src" / "pmx" / "metrics" / "calibration.py"
     assert module_imports(path) == (
         "__future__",
-        "dataclasses",
         "collections.abc",
         "dataclasses",
-        "typing",
         "pmx.types",
     )
+    assert not [name for name in module_imports(path) if name.startswith(("pmx.engine", "pmx.journal"))]
     identifiers = module_identifiers(path)
     for banned in ("Fill", "fee_cents", "cash_delta_cents", "position", "filled", "Execution"):
         assert banned not in identifiers
 
 
 def test_scoring_reads_no_fill_either() -> None:
-    """The separation is the module's reason to exist: a score never touches money (12.1)."""
+    """The separation is the module's reason to exist: a score never touches money (12.1).
+
+    The whitelist is exact for the same reason as ``calibration``'s. It lost ``re`` and ``pmx`` when
+    gate G2 landed ``RE_HORIZON_BUCKET`` in ``pmx.types`` (ruling R188), so the horizon-bucket pattern
+    has one spelling and this module compiles no regular expression of its own.
+    """
     path = REPO_ROOT / "src" / "pmx" / "scoring.py"
     assert module_imports(path) == (
         "__future__",
-        "re",
         "bisect",
         "collections.abc",
         "dataclasses",
         "decimal",
-        "pmx",
         "pmx.types",
     )
+    assert not [name for name in module_imports(path) if name.startswith(("pmx.engine", "pmx.journal"))]
     identifiers = module_identifiers(path)
     for banned in ("Fill", "fee_cents", "cash_delta_cents", "bankroll_cents", "Execution"):
         assert banned not in identifiers

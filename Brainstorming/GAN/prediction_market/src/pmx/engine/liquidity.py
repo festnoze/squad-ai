@@ -44,6 +44,7 @@ __all__ = [
     "ENVELOPE_BREACHES",
     "LIQUIDITY_MODELS",
     "MILLI",
+    "PRICE_SOURCES",
     "UNFILLED_REASONS",
     "Fill",
     "HistoricalLiquidity",

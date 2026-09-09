@@ -54,15 +54,18 @@ from pmx.journal import (
     BarClosed,
     BarOpened,
     CandidateScored,
+    CashEventApplied,
     EquityMarked,
     EvolutionEnded,
     EvolutionStarted,
     FeeCharged,
     Filled,
     ForecastRecorded,
+    ForecastResolved,
     GenerationClosed,
     GenerationStarted,
     HiveWritten,
+    InstrumentClosed,
     Journal,
     JournalEvent,
     MarketListed,
@@ -127,6 +130,10 @@ CONTRACT_FIXTURES = REPO / "tests" / "fixtures" / "contract"
 RUN_ID = "r-f60463ae-7-f119e64e"
 EVO_RUN_ID = "e-f60463ae-7-f119e64e"
 MARKET_ID = "demo-brexit-2016"
+#: The continuous instrument of the three events ruling R164 added to the catalogue at gate G2
+#: (``cash_event_applied``, ``forecast_resolved`` and ``instrument_closed``), whose ``kind`` enums
+#: exclude ``binary``.
+PERP_ID = "binance-BTCUSDT"
 AGENT_ID = "contrarian"
 HASH_A = "a" * 64
 HASH_B = "b" * 64
@@ -481,7 +488,9 @@ def _schema_event_names() -> tuple[str, ...]:
 
 def test_every_event_of_the_schema_has_a_class_and_the_reverse() -> None:
     assert set(EVENT_TYPES) == set(_schema_event_names())
-    assert len(EVENT_TYPES) == len(set(EVENT_TYPES)) == 29
+    # Twenty-nine before gate G2; thirty-two since ruling R164 added cash_event_applied,
+    # forecast_resolved and instrument_closed to both the catalogue and the schema's oneOf.
+    assert len(EVENT_TYPES) == len(set(EVENT_TYPES)) == 32
     assert tuple(EVENT_CLASSES) == EVENT_TYPES
 
 
@@ -626,6 +635,15 @@ def _backtest_payloads() -> tuple[tuple[type[JournalEvent], int, str | None, dic
                 "fee_schedule_id": "demo-zero",
                 "hardness_tags": ("upset",),
                 "fold": "train",
+                # The binary mapping of section 17.1, which ruling R164 makes required (gate G2).
+                "kind": "binary",
+                "vendor": "demo",
+                "symbol": "brexit-2016",
+                "tick_size_micro": 100,
+                "point_value_micro": 1_000_000,
+                "session_calendar_id": "continuous",
+                "borrow_schedule_id": None,
+                "carry_schedule_id": None,
             },
         ),
         (
@@ -705,7 +723,14 @@ def _backtest_payloads() -> tuple[tuple[type[JournalEvent], int, str | None, dic
             ForecastRecorded,
             T0_MS,
             None,
-            {"agent_id": AGENT_ID, "market_id": MARKET_ID, "prob_ppm": 480_000, "carried": False},
+            {
+                "agent_id": AGENT_ID,
+                "market_id": MARKET_ID,
+                "prob_ppm": 480_000,
+                "carried": False,
+                "price_ref_ticks": None,
+                "horizons": None,
+            },
         ),
         (
             ResearchSpent,
@@ -735,7 +760,7 @@ def _backtest_payloads() -> tuple[tuple[type[JournalEvent], int, str | None, dic
         (
             OrderPlaced,
             T0_MS,
-            None,
+            "execute",
             {
                 "order_id": "o-00000002",
                 "agent_id": AGENT_ID,
@@ -748,6 +773,7 @@ def _backtest_payloads() -> tuple[tuple[type[JournalEvent], int, str | None, dic
                 "expires_at_ms": None,
                 "reserved_cents": 3_060,
                 "origin": "target",
+                "decided_at_ms": T0_MS - 86_400_000,
             },
         ),
         (
@@ -760,12 +786,13 @@ def _backtest_payloads() -> tuple[tuple[type[JournalEvent], int, str | None, dic
                 "item_index": 0,
                 "reason": "not_tradable",
                 "detail": "the settling bar never fills",
+                "decided_at_ms": T0_MS - 86_400_000,
             },
         ),
         (
             Filled,
             T0_MS,
-            None,
+            "execute",
             {
                 "order_id": "o-00000002",
                 "agent_id": AGENT_ID,
@@ -792,7 +819,7 @@ def _backtest_payloads() -> tuple[tuple[type[JournalEvent], int, str | None, dic
         (
             FeeCharged,
             T0_MS,
-            None,
+            "execute",
             {
                 "order_id": "o-00000002",
                 "agent_id": AGENT_ID,
@@ -829,6 +856,58 @@ def _backtest_payloads() -> tuple[tuple[type[JournalEvent], int, str | None, dic
                 "realised_pnl_cents": -1_864,
                 "agent_brier_tw_micro": 270_400,
                 "n_forecast_bars": 2,
+            },
+        ),
+        (
+            CashEventApplied,
+            T0_MS,
+            None,
+            {
+                "agent_id": AGENT_ID,
+                "market_id": PERP_ID,
+                "cash_event_id": "ce-0123456789abcdef",
+                "kind": "funding",
+                "origin": "data",
+                "position_before": 1_000,
+                "position_after": 1_000,
+                "avg_cost_ticks_before": 5_000,
+                "avg_cost_ticks_after": 5_000,
+                "cash_delta_cents": -5,
+                "order_ids": (),
+                "detail": {"rate_ppm": 1_000, "mark_ticks": 5_050},
+            },
+        ),
+        (
+            ForecastResolved,
+            T0_MS,
+            None,
+            {
+                "agent_id": AGENT_ID,
+                "market_id": PERP_ID,
+                "forecast_bar_ms": T0_MS - 86_400_000,
+                "horizon_bars": 1,
+                "up_probability_ppm": 700_000,
+                "quantiles_ticks": None,
+                "price_ref_ticks": 5_000,
+                "price_realised_ticks": 5_100,
+                "realised_sign": 1,
+                "directional_brier_micro": 90_000,
+                "pinball_micro": None,
+                "baseline_pinball_micro": 20_000,
+                "carried": False,
+            },
+        ),
+        (
+            InstrumentClosed,
+            T0_MS,
+            None,
+            {
+                "market_id": PERP_ID,
+                "kind": "perp",
+                "reason": "delisted",
+                "last_price_ticks": 5_100,
+                "n_bars": 2,
+                "n_forecasts_unresolved": 1,
             },
         ),
         (
@@ -879,7 +958,7 @@ def _backtest_payloads() -> tuple[tuple[type[JournalEvent], int, str | None, dic
             None,
             {"agent_id": AGENT_ID, "equity_cents": 0, "cancelled_order_ids": ("o-00000002",)},
         ),
-        (BarClosed, T0_MS, None, {"n_events": 21}),
+        (BarClosed, T0_MS, None, {"n_events": 24}),
         (
             RunEnded,
             T1_MS,
@@ -1053,9 +1132,9 @@ def backtest_journal() -> Iterator[Journal]:
 
 def test_a_journal_of_every_backtest_event_validates_and_verifies(backtest_journal: Journal) -> None:
     events = backtest_journal.events
-    assert len(events) == 25
+    assert len(events) == 28
     assert {event.TYPE for event in events} == {cls.TYPE for cls, _, _, _ in _backtest_payloads()}
-    assert [event.seq for event in events] == list(range(1, 26))
+    assert [event.seq for event in events] == list(range(1, 29))
     verify_journal(events)
     for event in events:
         validate_event_dict(event.to_dict())
@@ -1105,7 +1184,7 @@ def test_the_file_is_lf_and_utf8_and_its_bytes_hash_to_the_journal_hash(tmp_path
     raw = path.read_bytes()
     assert b"\r" not in raw
     assert raw.endswith(b"\n")
-    assert raw.decode("utf-8").count("\n") == 25
+    assert raw.decode("utf-8").count("\n") == 28
     assert journal_hash_of_file(path) == journal.hash()
     assert journal_hash(journal.events) == journal.hash()
     with open(path, encoding=JOURNAL_ENCODING, newline=JOURNAL_NEWLINE) as handle:
@@ -1523,12 +1602,21 @@ def test_the_replay_iterator_validates_every_event_against_the_schema(tmp_path: 
     path.write_text(JOURNAL_NEWLINE.join(lines) + JOURNAL_NEWLINE, encoding=JOURNAL_ENCODING, newline=JOURNAL_NEWLINE)
     with pytest.raises(SchemaError, match="fails its JSON schema"):
         read_journal(path)
-    assert len(tuple(iter_journal(path, validate=False))) == 25
+    assert len(tuple(iter_journal(path, validate=False))) == 28
 
 
 def test_a_journal_can_validate_at_append_time() -> None:
     journal = _build(RUN_ID, _backtest_payloads()[:1], validate=True)
-    journal.emit(ForecastRecorded, bar_ms=T0_MS, agent_id=AGENT_ID, market_id=MARKET_ID, prob_ppm=1, carried=False)
+    journal.emit(
+        ForecastRecorded,
+        bar_ms=T0_MS,
+        agent_id=AGENT_ID,
+        market_id=MARKET_ID,
+        prob_ppm=1,
+        carried=False,
+        price_ref_ticks=None,
+        horizons=None,
+    )
     with pytest.raises(SchemaError, match="fails its JSON schema"):
         journal.emit(
             ForecastRecorded,
@@ -1537,6 +1625,8 @@ def test_a_journal_can_validate_at_append_time() -> None:
             market_id=MARKET_ID,
             prob_ppm=2_000_000,
             carried=False,
+            price_ref_ticks=None,
+            horizons=None,
         )
     assert journal.next_seq == 3
 
@@ -1574,7 +1664,7 @@ def test_a_blank_line_is_skipped_not_parsed(tmp_path: Path) -> None:
 def test_iter_bars_groups_once_per_bar_and_keeps_the_order_inside(backtest_journal: Journal) -> None:
     grouped = list(iter_bars(backtest_journal.events))
     assert [bar_ms for bar_ms, _ in grouped] == [0, T0_MS, T1_MS]
-    assert [len(events) for _, events in grouped] == [2, 22, 1]
+    assert [len(events) for _, events in grouped] == [2, 25, 1]
     bar_events = grouped[1][1]
     assert [event.seq for event in bar_events] == sorted(event.seq for event in bar_events)
     assert sum(len(events) for _, events in grouped) == len(backtest_journal.events)
