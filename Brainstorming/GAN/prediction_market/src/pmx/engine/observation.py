@@ -47,7 +47,7 @@ from types import MappingProxyType
 from typing import Final, NoReturn, Protocol, cast
 
 from pmx import OBS_VERSION
-from pmx.engine.calendar import KIND_BINARY, Calendar
+from pmx.engine.calendar import KIND_BINARY, Calendar, applies_at
 from pmx.errors import InvalidConfigError, LeakError, ObservationTooLargeError, SchemaError
 from pmx.journal import canonical_json
 from pmx.types import (
@@ -107,8 +107,6 @@ HIVE_RESOLUTIONS_VIEW_MAX: Final = 200
 MEMORY_NOTES_VIEW_MAX: Final = 20
 #: A granted ``news`` research request is a deeper digest: three times the caps (section 8.4).
 RESEARCH_NEWS_MULTIPLIER: Final = 3
-#: The kinds whose application bar is the last bar priced in the OLD regime (ruling R175).
-_OLD_REGIME_KINDS: Final = ("dividend", "split", "roll")
 
 #: Every key section 8.3's clock test forbids anywhere in an observation, plus section 7.9's fields, the
 #: cluster-derived and detector-derived names amendment C1 adds (ruling R116, sections 16.3 and 16.4) and
@@ -189,9 +187,15 @@ _TAPE_STATS_CACHE_MAX: Final = 4_096
 
 
 # --------------------------------------------------------------------------------------------------
-# The surfaces E1 reads. Every one of them is a name the contract declares in a file another package
-# owns and that does not exist in this wave; they are structural, so the declared types satisfy them the
-# moment they land, and each is reported as a contract issue.
+# The surfaces E1 reads. Each one is the read side of a record another package owns, and gate G2 has
+# landed all of them (``pmx.types.Instrument``, ``CashEvent``, and A2's memory and hive): they stay
+# structural here because the builder reads only what it filters, and the declared classes satisfy them.
+# What is NOT resolved, and is reported as a contract issue rather than settled inside one package: the
+# same four names are declared a second time in the engine wave (``InstrumentLike`` and
+# ``CashEventLike`` in ``pmx.engine.execution``, ``MemoryLike`` and ``HiveLike`` in
+# ``pmx.engine.runner``), with different member sets, so a caller cannot tell which surface a record
+# must satisfy. Consolidating them means choosing where the engine's structural protocols live, which
+# section 11.1 already argues for and which the gate must rule on (see the file list of section 13).
 # --------------------------------------------------------------------------------------------------
 class InstrumentLike(Protocol):
     """What the builder reads of an instrument: ``pmx.types.Instrument`` (D1, gate G2, ruling R144).
@@ -358,37 +362,6 @@ def cash_events_of(instrument: InstrumentLike) -> tuple[CashEventLike, ...]:
 # --------------------------------------------------------------------------------------------------
 # Cash events: what has been applied, and when it was
 # --------------------------------------------------------------------------------------------------
-def cash_event_applies_at(
-    event: CashEventLike, *, interval_min: int, calendar: Calendar | None
-) -> int | None:
-    """The bar at whose settle phase execution applies ``event`` (section 17.3, ruling R175).
-
-    A ``dividend``, a ``split`` and a ``roll`` are stamped with the first instant of the **new** regime
-    (the ex-date open, the split's effective open, the first new-contract bar) and apply at the last bar
-    priced in the old one, which is ``prev_bar(i, bar_of(t_ms))``: the buyer of the ex-date open receives
-    no dividend, and a fill made at new-contract prices nets nothing against a roll. Everything else is a
-    charge on a position held through an instant and applies at ``bar_of(t_ms)``.
-
-    ``None`` means the event has no application bar in this run and is therefore not applied, and so is
-    never visible. Without a ``calendar`` the three old-regime kinds have no ``prev_bar`` to read and are
-    treated as not applied, which is the conservative side of a leak boundary: an event whose application
-    bar cannot be computed stays hidden rather than being shown at a guessed bar.
-
-    Ruling R175 declares the rule as ``pmx.engine.execution.applies_at``, and this is a second spelling
-    of it, because the leak boundary may not import the module that moves money to answer a question
-    about visibility. That the two agree is not left to inspection: ``tests/test_observation.py`` pins
-    them against each other on every kind, the ``None`` case included. Reported as a contract issue: the
-    gate should say which file owns the rule once the structural protocols of the engine wave have a
-    home, so that one of the two spellings can become an import.
-    """
-    bar = bar_of(event.t_ms, interval_min)
-    if event.kind in _OLD_REGIME_KINDS:
-        if calendar is None:
-            return None
-        return calendar.prev_bar(event.market_id, bar)
-    return bar
-
-
 def visible_cash_events(
     instrument: InstrumentLike, *, now_ms: int, calendar: Calendar | None = None
 ) -> tuple[CashEventView, ...]:
@@ -401,13 +374,20 @@ def visible_cash_events(
 
     The three engine kinds (``borrow_fee``, ``carry``, ``forced_flat``) are never in a market view: they
     are the agent's own charges and reach it through its portfolio (ruling R183).
+
+    The application bar comes from :func:`pmx.engine.calendar.applies_at`, ruling R175's **one**
+    implementation, which is also what ``Execution.apply_cash_events`` calls: the leak boundary and the
+    money path answer "when did this apply" with the same body, so an agent can never be shown a
+    dividend at a bar the engine paid it at another. Without a ``calendar`` the three old-regime kinds
+    have no ``prev_bar`` to read, so that function answers ``None`` and they stay hidden; the runner
+    always passes the run's calendar (ruling R187), so no run takes that branch.
     """
     span = interval_ms(instrument.interval_min)
     applied: list[tuple[tuple[int, int, int, str], CashEventView]] = []
     for event in cash_events_of(instrument):
         if event.kind not in DATA_CASH_EVENT_KINDS or event.origin != "data":
             continue
-        at_ms = cash_event_applies_at(event, interval_min=instrument.interval_min, calendar=calendar)
+        at_ms = applies_at(event, instrument, calendar)
         if at_ms is None or at_ms + span > now_ms:
             continue
         order = (at_ms, CASH_EVENT_KINDS.index(event.kind), event.t_ms, event.cash_event_id)

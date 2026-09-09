@@ -73,6 +73,7 @@ from pmx.engine.liquidity import (
     slippage_ticks,
     truncate_for_cash,
 )
+from pmx.engine.observation import instrument_kind as observation_instrument_kind
 from pmx.errors import InvalidConfigError
 from pmx.journal import Journal, RunStarted, canonical_sha256
 from pmx.rng import RNG_ALGORITHM_VERSION
@@ -1590,6 +1591,49 @@ def test_instrument_spec_reads_the_binary_row_of_the_17_1_table() -> None:
         instrument_spec(continuous_fixture(kind="commodity"))
 
 
+@dataclass(frozen=True, slots=True)
+class ContinuousWithABinaryView(Continuous):
+    """A record whose own ``kind`` is a perp while its ``instrument`` view answers ``binary``.
+
+    The real records cannot be in that state (``Market.kind`` is ``binary`` and ``Market.instrument``
+    restates it, ``ContinuousInstrument.instrument`` is the record itself), which is exactly why the tie
+    needs a test: a reader that took the view first would answer ``binary`` for every record that
+    carries a binary view, and E1 and E2 would disagree about the kind of one instrument inside one run.
+    """
+
+    @property
+    def instrument(self) -> Continuous:
+        return Continuous(
+            id=self.id,
+            kind="binary",
+            tick_size_micro=self.tick_size_micro,
+            point_value_micro=self.point_value_micro,
+            bars=self.bars,
+        )
+
+
+def test_the_kind_is_read_off_the_record_and_not_off_its_binary_view() -> None:
+    """One question, one answer: ``instrument_spec`` and E1's reader agree on the kind (ruling R144).
+
+    The scale fields still come from the view, which is what R144's table is for; only the kind is the
+    record's. A perp read as a binary would be netted by 8.5, settled instead of forced flat and priced
+    at a hundredth of its tick, so this is the tie whose breaking side has to be written down.
+    """
+    record = ContinuousWithABinaryView(
+        id="binance-btcusdt",
+        kind="perp",
+        tick_size_micro=10_000,
+        point_value_micro=1_000_000,
+        bars=(make_bar(T0, open_bp=6_300_000, volume_milli=5_000),),
+    )
+    assert record.instrument.kind == "binary", "the double's own view disagrees with it on purpose"
+    spec = instrument_spec(record)
+    assert spec.kind == "perp"
+    assert spec.is_binary is False
+    assert spec.tick_size_micro == 10_000, "the scale fields are still the view's (R144)"
+    assert observation_instrument_kind(record) == "perp", "E1's reader answers the same kind"
+
+
 # --------------------------------------------------------------------------------------------------
 # 17.3: the seven cash event kinds, their entitlement rule and their ordering
 # --------------------------------------------------------------------------------------------------
@@ -1640,7 +1684,7 @@ def fx_fixture(**extra: object) -> Continuous:
 
 
 class DenseGrid:
-    """A ``BarCalendar`` over a dense daily grid, which is all :func:`applies_at` reads (ruling R187).
+    """A ``BarLookups`` over a dense daily grid, which is all :func:`applies_at` reads (ruling R187).
 
     E1's ``Calendar`` is the run's implementation; this is the same three questions answered over one
     instrument, so the entitlement rule can be tested without a runner.

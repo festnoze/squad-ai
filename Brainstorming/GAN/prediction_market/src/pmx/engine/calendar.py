@@ -42,6 +42,7 @@ from __future__ import annotations
 from bisect import bisect_left, bisect_right
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
+from typing import Final, Protocol
 
 from pmx.data.sessions import next_bar_ms, session_bars
 from pmx.errors import InvalidConfigError, SchemaError
@@ -497,6 +498,88 @@ class Calendar:
                 calendar_id=calendar_id,
                 dataset=self._dataset.manifest.name,
             ) from error
+
+
+# --------------------------------------------------------------------------------------------------
+# When a cash event applies: ruling R175, in one place
+# --------------------------------------------------------------------------------------------------
+#: The three kinds whose application bar is the last bar priced in the **old** regime (ruling R175).
+#: Every name is one of ``pmx.types.CASH_EVENT_KINDS``; the other four apply at ``bar_of(t_ms)``.
+OLD_REGIME_KINDS: Final = ("dividend", "split", "roll")
+
+
+class BarLookups(Protocol):
+    """The three bar lookups of section 8.3 (ruling R187), which ``applies_at`` and E2's queue read.
+
+    :class:`Calendar` is the one implementation for a run; ``Execution`` builds an equivalent over the
+    session calendars it was handed, because 8.6 gives it those and not a ``Calendar``. Declared here
+    rather than twice, so a caller cannot satisfy one lookup surface and fail the other.
+    """
+
+    def last_bar(self, market_id: str) -> int: ...
+
+    def next_bar(self, market_id: str, t_ms: int) -> int | None: ...
+
+    def prev_bar(self, market_id: str, t_ms: int) -> int | None: ...
+
+
+class CashEventStamp(Protocol):
+    """What :func:`applies_at` reads of a cash event: the kind and the instant (section 17.3).
+
+    Structural, and only these two members, so the one rule is callable from the leak boundary and from
+    the module that moves money without either of them naming the other's protocols.
+    """
+
+    @property
+    def kind(self) -> str: ...
+
+    @property
+    def t_ms(self) -> int: ...
+
+
+class InstrumentClock(Protocol):
+    """What :func:`applies_at` reads of an instrument: its id and its bar interval (section 17.1)."""
+
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def interval_min(self) -> int: ...
+
+
+def applies_at(
+    event: CashEventStamp, instrument: InstrumentClock, calendar: BarLookups | None
+) -> int | None:
+    """The bar at whose settle phase execution applies ``event`` (section 17.3, ruling R175).
+
+    A ``dividend``, a ``split`` and a ``roll`` are stamped with the first instant of the **new** regime
+    (the ex-date open, the split's effective open, the first new-contract bar) and the raw tape already
+    reflects them from that bar's open, so they apply one bar earlier, at the last close priced in the
+    old regime: ``prev_bar(i, bar_of(t_ms))``. Without that shift a buy at the ex-date open collects a
+    dividend the tape had already taken out of the price, which anyone holding a corporate calendar
+    could farm. ``funding``, ``borrow_fee``, ``carry`` and ``forced_flat`` are charges on, or the close
+    of, a position held through an instant, and apply at ``bar_of(t_ms)``.
+
+    Ruling R175 declares the rule as ``pmx.engine.execution.applies_at`` and that name is this function,
+    re-exported: the body lives here because the money path (``Execution.apply_cash_events``) and the
+    leak boundary (``pmx.engine.observation.visible_cash_events``, ruling R183) both decide visibility
+    and entitlement with it, and an engine whose two halves each held a copy would show an agent a
+    dividend at a bar it was paid at another. ``pmx.engine.calendar`` is the module both may import,
+    because it moves no money and reads no fill.
+
+    Returns:
+        The application bar, or ``None`` when it lies outside the run and no position can exist there.
+        ``None`` is also the answer for the three old-regime kinds when there is no ``calendar`` to read
+        ``prev_bar`` from: an event whose application bar cannot be computed is not applied, and is
+        therefore never visible, which is the conservative side of both boundaries. ``Execution`` always
+        holds a calendar and the runner always passes one, so no run takes that branch.
+    """
+    bar = bar_of(event.t_ms, instrument.interval_min)
+    if event.kind in OLD_REGIME_KINDS:
+        if calendar is None:
+            return None
+        return calendar.prev_bar(instrument.id, bar)
+    return bar
 
 
 # --------------------------------------------------------------------------------------------------

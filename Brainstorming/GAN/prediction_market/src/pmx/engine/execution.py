@@ -41,6 +41,8 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 from pmx.data.sessions import days_since_previous_close, in_session, next_bar_ms, prev_bar_ms
 from pmx.engine import fees
+from pmx.engine.calendar import KIND_BINARY
+from pmx.engine.calendar import applies_at as applies_at
 from pmx.engine.fees import (
     BINARY_POINT_VALUE_MICRO,
     BINARY_TICK_SIZE_MICRO,
@@ -175,26 +177,13 @@ class CashEventLike(Protocol):
     def detail(self) -> Mapping[str, int | str]: ...
 
 
-class BarCalendar(Protocol):
-    """The three bar lookups of 8.3 (ruling R187), which ``applies_at`` and the queue read.
-
-    E1's ``Calendar`` is the one implementation for a run; :class:`Execution` builds an equivalent over
-    the session calendars it was handed, because 8.6 gives it those and not a ``Calendar``.
-    """
-
-    def last_bar(self, market_id: str) -> int: ...
-
-    def next_bar(self, market_id: str, t_ms: int) -> int | None: ...
-
-    def prev_bar(self, market_id: str, t_ms: int) -> int | None: ...
-
-
 @dataclass(frozen=True, slots=True)
 class InstrumentSpec:
     """The ``Instrument`` base of 17.1 as execution needs it, for a binary and a continuous kind alike.
 
-    A ``Market`` satisfies the base "through the view ``Market.instrument``" (17.1), a property gate G2
-    adds; until then :func:`instrument_spec` derives exactly the mapping that section's table declares
+    A ``Market`` satisfies the base "through the view ``Market.instrument``" (17.1), the property gate G2
+    landed; :func:`instrument_spec` reads that view and falls back to exactly the mapping the table
+    declares for a record that carries none
     (``kind = "binary"``, ``tick_size_micro = 100``, ``point_value_micro = 1_000_000``,
     ``session_calendar_id = "continuous"``, no borrow or carry schedule, ``listed_at_ms =
     created_at_ms``, ``delisted_at_ms = resolved_at_ms``, ``short_allowed = True``), so no code path here
@@ -226,7 +215,7 @@ class InstrumentSpec:
     @property
     def is_binary(self) -> bool:
         """True for the binary kind, whose netting, settlement and payout are 8.5's and 8.7's."""
-        return self.kind == "binary"
+        return self.kind == KIND_BINARY
 
     @property
     def interval_ms(self) -> int:
@@ -263,14 +252,23 @@ def _bool_attr(obj: object, name: str, fallback: bool) -> bool:
 def instrument_spec(instrument: InstrumentLike) -> InstrumentSpec:
     """Read the ``Instrument`` base of 17.1 off a market or a continuous instrument.
 
-    Prefers the instrument's own ``instrument`` view when it carries one (the property of ruling R144),
-    then the object's own fields, then the binary mapping of 17.1's table. A binary therefore keeps every
-    number it has today and a continuous instrument is read from its own record.
+    The scale fields come from the instrument's own ``instrument`` view when it carries one (the
+    property of ruling R144), then from the object's own fields, then from the binary mapping of 17.1's
+    table. A binary therefore keeps every number it has today and a continuous instrument is read from
+    its own record.
+
+    **The kind is read off the record first**, and only then off the view, which is how
+    ``pmx.engine.observation.instrument_kind`` and ``pmx.engine.calendar.meta_kind`` read it: one
+    question, one answer across the engine. It matters because ``Market.instrument`` is a *view* whose
+    ``kind`` is the constant ``binary`` (R144's table), so a record read view-first would answer
+    ``binary`` for anything that carries a binary view, and E1 and E2 would disagree about the kind of
+    one instrument inside one run. Reported as a contract issue: section 17.1 should say in words that
+    the record's ``kind`` is the authority and the view restates it.
     """
     base: object = getattr(instrument, "instrument", None)
     if base is None:
         base = instrument
-    kind = _str_attr(base, "kind", "binary")
+    kind = _str_attr(instrument, "kind", _str_attr(base, "kind", KIND_BINARY))
     if kind not in fees.INSTRUMENT_KINDS:
         raise InvalidConfigError("instrument kind is not one of INSTRUMENT_KINDS", market_id=instrument.id,
                                  kind=kind)
@@ -292,37 +290,13 @@ def instrument_spec(instrument: InstrumentLike) -> InstrumentSpec:
         borrow_schedule_id=_opt_str_attr(base, "borrow_schedule_id"),
         carry_schedule_id=_opt_str_attr(base, "carry_schedule_id"),
         listed_at_ms=_int_attr(base, "listed_at_ms", created),
-        delisted_at_ms=_opt_int_attr(base, "delisted_at_ms", resolved if kind == "binary" else None),
+        delisted_at_ms=_opt_int_attr(base, "delisted_at_ms", resolved if kind == KIND_BINARY else None),
         short_allowed=_bool_attr(base, "short_allowed", kind != "spot_crypto"),
         interval_min=instrument.interval_min,
         close_at_ms=_int_attr(instrument, "close_at_ms", 0),
         resolved_at_ms=resolved,
         resolution=_int_attr(instrument, "resolution", -1),
     )
-
-
-#: The three corporate kinds, whose entitlement follows the regime of the prices (ruling R175).
-_OLD_REGIME_KINDS: tuple[str, ...] = ("dividend", "split", "roll")
-
-
-def applies_at(event: CashEventLike, instrument: InstrumentLike, calendar: BarCalendar) -> int | None:
-    """The bar at whose settle phase execution applies ``event`` (17.3, ruling R175).
-
-    A ``dividend``, a ``split`` and a ``roll`` are stamped with the first instant of the **new** regime
-    (the ex-date open, the split's effective open, the first new-contract bar) and the raw tape already
-    reflects them from that bar's open, so they apply one bar earlier, at the last close priced in the
-    old regime. Without that shift a buy at the ex-date open collects a dividend the tape had already
-    taken out of the price, which anyone holding a corporate calendar could farm. ``funding``,
-    ``borrow_fee``, ``carry`` and ``forced_flat`` are charges on, or the close of, a position held
-    through an instant, and apply at ``bar_of(t_ms)``.
-
-    Returns:
-        The application bar, or ``None`` when it lies outside the run and no position can exist there.
-    """
-    bar = bar_of(event.t_ms, instrument.interval_min)
-    if event.kind in _OLD_REGIME_KINDS:
-        return calendar.prev_bar(instrument.id, bar)
-    return bar
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1594,6 +1568,9 @@ def _is_cash_event(candidate: object) -> bool:
 
 class _SessionGrid:
     """The bar arithmetic execution needs, over the sealed session calendars it was handed (17.2).
+
+    It satisfies ``pmx.engine.calendar.BarLookups``, the one declaration of the three lookups of 8.3
+    (ruling R187), which is checked where :func:`applies_at` is called with it and nowhere restated.
 
     E1's ``Calendar`` is the run's implementation of ``last_bar``, ``next_bar`` and ``prev_bar`` (ruling
     R187), and ``Execution`` is given ``calendars`` rather than a ``Calendar`` (8.6, ruling R174), so this

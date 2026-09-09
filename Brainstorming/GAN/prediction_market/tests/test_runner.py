@@ -50,7 +50,7 @@ from __future__ import annotations
 
 import random
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -112,6 +112,7 @@ from pmx.types import (
     CashEvent,
     ContinuousInstrument,
     Dataset,
+    DatasetWindow,
     HiveView,
     HorizonForecast,
     Lesson,
@@ -121,6 +122,8 @@ from pmx.types import (
     Observation,
     ResearchRequest,
     RunConfig,
+    Session,
+    SessionCalendar,
     market_set_hash,
     ppm_from_bp,
     round_half_up,
@@ -2026,3 +2029,158 @@ def test_the_projection_of_a_continuous_run_carries_the_cells_of_section_17_6(
     assert {row.horizon_bars for row in rows_of_board} == {1}
     assert all(row.pinball_skill is not None for row in rows_of_board)
     assert all(row.log_micronats == 0 for row in rows_of_board)
+
+
+# --------------------------------------------------------------------------------------------------
+# The run's calendar reaches the observation (rulings R183 and R187)
+#
+# ``build_observation`` takes the run's ``Calendar`` and three fields of a market view are lookups only
+# it can answer: ``tradable`` on a continuous instrument, ``hours_to_next_bar`` and the application bar
+# of a cash event. A runner that built the observation without it would publish ``hours_to_next_bar =
+# 0`` across every session gap and hide a dividend the engine had already paid, and no binary test could
+# see it, because a binary's own answer for that field is ``0`` and a binary carries no cash event.
+# So the run below is a **session** instrument: a weekday venue whose Friday bar is followed by Monday,
+# which is the one shape where the venue's schedule and the run's own timeline differ by more than a
+# bar. A ``0`` in that column means the calendar did not reach the builder.
+# --------------------------------------------------------------------------------------------------
+HOUR_MS = 3_600_000
+SESSION_CALENDAR_ID = "xtst"
+#: The Monday before ``PERP_T0``, which is a Thursday: the calendar starts before the run and ends after
+#: it, as a sealed calendar covers the dataset window and not one run's window (17.2).
+SESSION_MONDAY = PERP_T0 - 3 * DAY_MS
+SESSION_SESSIONS: tuple[Session, ...] = tuple(
+    Session(
+        open_ms=SESSION_MONDAY + day * DAY_MS + 13 * HOUR_MS + 30 * 60_000,
+        close_ms=SESSION_MONDAY + day * DAY_MS + 20 * HOUR_MS,
+    )
+    for day in range(21)
+    if day % 7 not in (5, 6)
+)
+SESSION_CALENDAR = SessionCalendar(
+    calendar_id=SESSION_CALENDAR_ID,
+    description="A weekday venue, 13:30Z to 20:00Z, for the session half of amendment C1b.",
+    source_url="https://example.invalid/xtst",
+    as_of_date="2026-09-09",
+    window=DatasetWindow(start_ms=SESSION_MONDAY, end_ms=SESSION_MONDAY + 21 * DAY_MS),
+    sessions=SESSION_SESSIONS,
+)
+#: Thursday, Friday, Monday, Tuesday: the four session bars of the perp's window, weekend removed.
+SESSION_BARS = (PERP_T0, PERP_T0 + DAY_MS, PERP_T0 + 4 * DAY_MS, PERP_T0 + 5 * DAY_MS)
+#: The venue's hours to the next bar at each of them, the weekend included and the last bar's answered
+#: from the sealed calendar and never from the run (ruling R181).
+SESSION_HOURS = (24, 72, 24, 24)
+
+
+def _session_instrument() -> ContinuousInstrument:
+    """The perpetual of :func:`_perp_instrument` on a weekday venue, with only its session bars.
+
+    Every bar is inside a session, which is what the loader requires of a sealed dataset, and the
+    funding event is stamped on the Friday so that its application bar is a bar of the run.
+    """
+    base = _perp_instrument()
+    bars = tuple(bar for bar in base.bars if bar.t_ms in SESSION_BARS)
+    assert len(bars) == len(SESSION_BARS), "the fixture's bars are the venue's session bars"
+    return replace(
+        base,
+        session_calendar_id=SESSION_CALENDAR_ID,
+        bars=bars,
+        cash_events=(
+            CashEvent.build(
+                market_id=PERP,
+                kind="funding",
+                t_ms=PERP_T0 + DAY_MS,
+                detail={"rate_ppm": 1_000, "mark_ticks": PERP_CLOSES[1]},
+                source_url="https://example.invalid/funding",
+            ),
+        ),
+    )
+
+
+@pytest.fixture(scope="module")
+def perp_sessions(pack: Dataset) -> Dataset:
+    """The perpetual on a weekday venue, with the sealed calendar the dataset hands the run."""
+    instrument = _session_instrument()
+    return Dataset(
+        manifest=pack.manifest,
+        metas=(replace(_perp_meta(), n_bars=len(SESSION_BARS)),),
+        path=pack.path,
+        market_loader=lambda market_id: instrument,
+        news_loader=lambda: (),
+        background_loader=lambda market_id: (),
+        calendar_loader=lambda calendar_id: SESSION_CALENDAR,
+    )
+
+
+@dataclass(slots=True)
+class RecordingPerpAgent(PerpAgent):
+    """:class:`PerpAgent` that keeps every market view it was shown, bar by bar."""
+
+    seen: list[tuple[int, int, bool, tuple[tuple[str, int], ...]]] = field(default_factory=list)
+
+    def observe(self, obs: Observation) -> None:
+        # Named explicitly rather than through a zero-argument ``super()``: ``dataclass(slots=True)``
+        # rebuilds the class, so the implicit ``__class__`` cell of a slotted dataclass is the old one.
+        StubAgent.observe(self, obs)
+        for view in obs.markets:
+            self.seen.append(
+                (
+                    obs.now_ms,
+                    view.hours_to_next_bar,
+                    view.tradable,
+                    tuple((event.kind, event.applied_at_ms) for event in view.cash_events),
+                )
+            )
+
+
+def test_a_continuous_run_publishes_the_venues_session_gap_in_every_observation(
+    perp_sessions: Dataset, tmp_path: Path
+) -> None:
+    """The runner hands ``build_observation`` the run's calendar, so the gap is published (R187).
+
+    Four bars, one weekend, and the hours to the next bar read off the sealed calendar at every one of
+    them: ``24``, ``72`` across the weekend, ``24``, and ``24`` on the instrument's last bar, where the
+    run has no next bar and the venue reopens the next morning (ruling R181). A runner that did not pass
+    its calendar publishes ``0`` at all four, which is why the exact tuple is asserted and why the
+    weekend is one of its entries.
+    """
+    config = _perp_config()
+    agent = RecordingPerpAgent(
+        agent_id="perp_trader",
+        family="trend",
+        genome=StubGenome(family="trend", genes=(("lookback_bars", 3),)),
+        trades=True,
+    )
+    handle = run_backtest(
+        perp_sessions,
+        [agent],
+        config,
+        tree=RngTree(config.seed),
+        journal_dir=tmp_path,
+        liquidity=make_liquidity(config),
+    )
+    assert handle.n_bars == len(SESSION_BARS), "a weekend is not a bar of a session run (17.2)"
+    assert [row[0] for row in agent.seen] == list(SESSION_BARS)
+    assert [row[1] for row in agent.seen] == list(SESSION_HOURS)
+    assert 0 not in [row[1] for row in agent.seen], (
+        "hours_to_next_bar is 0 only when build_observation was given no calendar"
+    )
+    assert [row[2] for row in agent.seen] == [True, True, True, True], (
+        "tradable is open(i, t) on a continuous instrument and every session bar is open (R181)"
+    )
+    # Ruling R183 through the runner, on the one implementation of R175: the Friday funding is the
+    # venue's published past from the Monday on, and never before its own application bar completed.
+    assert [row[3] for row in agent.seen] == [
+        (),
+        (),
+        (("funding", PERP_T0 + DAY_MS),),
+        (("funding", PERP_T0 + DAY_MS),),
+    ]
+    events = _raw_events(handle.journal_path)
+    listed = _rows_of(events, "market_listed")
+    assert len(listed) == 1
+    assert listed[0]["session_calendar_id"] == SESSION_CALENDAR_ID
+    applied = _rows_of(events, "cash_event_applied")
+    assert [(str(row["kind"]), int(row["bar_ms"])) for row in applied] == [
+        ("funding", PERP_T0 + DAY_MS),
+        ("forced_flat", SESSION_BARS[-1]),
+    ], "the funding applies at its own bar and the flat at last_bar(i), which is the Tuesday"

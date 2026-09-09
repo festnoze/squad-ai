@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Protocol, runtime_checkable
 from pmx.engine.fees import (
     BINARY_POINT_VALUE_MICRO,
     BINARY_TICK_SIZE_MICRO,
+    INSTRUMENT_KINDS,
     MILLI,
     PRICE_TICKS_MAX,
     FeeSchedule,
@@ -122,7 +123,7 @@ class LiquidityMarketView:
     source: str
     interval_min: int
     liquidity_decile: int = -1
-    kind: str = "binary"
+    kind: str = INSTRUMENT_KINDS[0]
     tick_size_micro: int = BINARY_TICK_SIZE_MICRO
     point_value_micro: int = BINARY_POINT_VALUE_MICRO
     short_allowed: bool = True
@@ -221,14 +222,14 @@ def clamp_price(x: int, *, view: LiquidityMarketView | None = None) -> int:
     A ``clamp_price_bp`` left on a continuous path would print 6 341 257 ticks as 9 999, which is exactly
     what E2's continuous envelope test fails a model for (ruling R173).
     """
-    if view is None or view.kind == "binary":
+    if view is None or view.kind == INSTRUMENT_KINDS[0]:
         return clamp_price_bp(x)
     return max(1, min(PRICE_TICKS_MAX, x))
 
 
-def envelope_bounds(bar: Bar, *, kind: str = "binary") -> tuple[int, int]:
+def envelope_bounds(bar: Bar, *, kind: str = INSTRUMENT_KINDS[0]) -> tuple[int, int]:
     """The ``(low, high)`` a fill must sit inside, after the legal-price clamp (rule 3, ruling R173)."""
-    view = _BINARY_VIEW if kind == "binary" else LiquidityMarketView(
+    view = _BINARY_VIEW if kind == INSTRUMENT_KINDS[0] else LiquidityMarketView(
         market_id="",
         provider="",
         category="",
@@ -252,7 +253,7 @@ def slippage_ticks(base: int, *, config: RunConfig, taken_pct: int, view: Liquid
     """
     if taken_pct <= 0 or config.slippage_bp_per_pct <= 0:
         return 0
-    if view is None or view.kind == "binary":
+    if view is None or view.kind == INSTRUMENT_KINDS[0]:
         return config.slippage_bp_per_pct * taken_pct
     return round_half_up(base * config.slippage_bp_per_pct * taken_pct, BP_ONE)
 
@@ -350,7 +351,7 @@ def _fee_size(filled_milli: int, view: LiquidityMarketView) -> int:
     A ``// MILLI`` on a continuous instrument would turn a one milli-coin fill into a fee on nothing
     (ruling R173).
     """
-    return filled_milli // MILLI if view.kind == "binary" else filled_milli
+    return filled_milli // MILLI if view.kind == INSTRUMENT_KINDS[0] else filled_milli
 
 
 def _fee_of(*, price: int, filled_milli: int, order: LiquidityOrder, schedule: FeeSchedule,
@@ -604,7 +605,7 @@ class HistoricalLiquidity:
                 )
                 continue
             filled = allocated[index]
-            if view.kind == "binary":
+            if view.kind == INSTRUMENT_KINDS[0]:
                 filled -= filled % MILLI
             if order.kind == "limit":
                 quoted = bases[index]

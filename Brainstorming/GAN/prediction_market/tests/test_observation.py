@@ -35,6 +35,7 @@ import pytest
 from pmx.data.loader import load_dataset, load_manifest
 from pmx.data.sessions import in_session
 from pmx.engine.calendar import BarSlice, Calendar, meta_kind
+from pmx.engine.calendar import applies_at as calendar_applies_at
 from pmx.engine.execution import applies_at as execution_applies_at
 from pmx.engine.observation import (
     CASH_EVENTS_VIEW_MAX,
@@ -49,7 +50,6 @@ from pmx.engine.observation import (
     assert_no_leak,
     build_grant,
     build_observation,
-    cash_event_applies_at,
     completed_bars,
     filter_grant,
     filter_hive_view,
@@ -66,6 +66,7 @@ from pmx.engine.observation import (
     unsensed_view_fields,
     visible_cash_events,
 )
+from pmx.engine.observation import applies_at as observation_applies_at
 from pmx.errors import (
     InvalidConfigError,
     LeakError,
@@ -1888,15 +1889,18 @@ def test_an_observation_over_the_cap_is_refused_rather_than_truncated() -> None:
         one_observation([market], now_ms=150 * DAY, config=config, news=fat_news, grants=[huge])
 
 
-def test_the_two_spellings_of_ruling_r175_agree_on_every_kind() -> None:
-    """Ruling R175 is computed twice in the engine, so the two answers are pinned against each other.
+def test_ruling_r175_has_one_implementation_and_every_kind_reads_it() -> None:
+    """Ruling R175 is computed **once** in the engine, and this pins both halves onto that one body.
 
-    ``pmx.engine.execution.applies_at`` is the declared home (R175) and
-    ``pmx.engine.observation.cash_event_applies_at`` is the leak boundary's own spelling, because the
-    observation may not import the module that moves money. A divergence between them would show an
-    agent a dividend at a bar the engine paid it at another, which is exactly the asymmetry R183 exists
-    to close, so this test is the guard until the gate says which file owns the rule.
+    ``pmx.engine.calendar.applies_at`` is the implementation; ``pmx.engine.execution.applies_at`` is the
+    name ruling R175 declares, re-exported from there, and ``pmx.engine.observation`` imports the same
+    object for the visibility rule of ruling R183. A second body would show an agent a dividend at a bar
+    the engine paid it at another, which is exactly the asymmetry R183 exists to close, so the identity
+    is asserted first and the per-kind values after it: the function object is one, and it answers what
+    17.3's table says on every one of the seven kinds.
     """
+    assert execution_applies_at is calendar_applies_at, "R175's declared name is a re-export"
+    assert observation_applies_at is calendar_applies_at, "the leak boundary reads the same body"
     instrument = FakeContinuous(id="xnas-AAPL", bars=daily_bars(MONDAY, 12))
     _, calendar = continuous_setup(instrument, window_end_ms=MONDAY + 12 * DAY)
     for kind in CASH_EVENT_KINDS:
@@ -1910,11 +1914,16 @@ def test_the_two_spellings_of_ruling_r175_agree_on_every_kind() -> None:
                 source_url="",
                 detail={},
             )
-            mine = cash_event_applies_at(event, interval_min=instrument.interval_min, calendar=calendar)
-            theirs = execution_applies_at(event, instrument, calendar)
-            assert mine == theirs, (kind, day)
+            answer = calendar_applies_at(event, instrument, calendar)
+            expected = (
+                calendar.prev_bar(instrument.id, MONDAY + day * DAY)
+                if kind in ("dividend", "split", "roll")
+                else MONDAY + day * DAY
+            )
+            assert answer == expected, (kind, day)
+            assert execution_applies_at(event, instrument, calendar) == answer, (kind, day)
     # Without a calendar the corporate kinds have no application bar and stay hidden, which is the one
-    # deliberate difference: execution always holds a calendar and the runner always passes one.
+    # branch a run never takes: execution always holds a grid and the runner always passes a calendar.
     dividend = FakeCashEvent(
         cash_event_id="ce-0123456789abcdef",
         market_id=instrument.id,
@@ -1924,7 +1933,17 @@ def test_the_two_spellings_of_ruling_r175_agree_on_every_kind() -> None:
         source_url="",
         detail={},
     )
-    assert cash_event_applies_at(dividend, interval_min=1_440, calendar=None) is None
+    assert calendar_applies_at(dividend, instrument, None) is None
+    funding = FakeCashEvent(
+        cash_event_id="ce-0123456789abcdef",
+        market_id=instrument.id,
+        kind="funding",
+        t_ms=MONDAY + 5 * DAY,
+        origin="data",
+        source_url="",
+        detail={},
+    )
+    assert calendar_applies_at(funding, instrument, None) == MONDAY + 5 * DAY
     assert visible_cash_events(instrument, now_ms=MONDAY + 6 * DAY, calendar=None) == ()
 
 

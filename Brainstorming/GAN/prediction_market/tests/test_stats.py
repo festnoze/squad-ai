@@ -44,6 +44,7 @@ from pmx.metrics.stats import (
     PERMUTATIONS,
     Interval,
     NullResult,
+    _binary_skill_micro,
     block_key,
     bootstrap_lower_bound,
     deflated_lower_bound,
@@ -53,7 +54,7 @@ from pmx.metrics.stats import (
 )
 from pmx.rng import RngTree, bernoulli
 from pmx.scoring import RANDOM_WALK_BRIER_MICRO as E3_RANDOM_WALK_BRIER_MICRO
-from pmx.scoring import directional_brier_micro
+from pmx.scoring import ForecastBar, bar_weights_ms, directional_brier_micro, skill_micro
 from pmx.types import (
     MS_PER_DAY,
     MS_PER_HOUR,
@@ -61,6 +62,7 @@ from pmx.types import (
     MarketMeta,
     brier_micro,
     ms_from_iso_date,
+    ppm_from_bp,
     round_half_up,
 )
 
@@ -863,3 +865,58 @@ def test_continuous_null_refuses_a_binary_shaped_call() -> None:
             forecasts, {}, (), {}, blocks, rng=_tree(), permutations=4, inner=4,
             realised_signs=signs, bar_keys=short_keys,
         )
+
+
+# --------------------------------------------------------------------------------------------------
+# The null measures the statistic the leaderboard reports (sections 12.1 and 12.6)
+#
+# ``permutation_null`` recomputes each market's skill from the ``weights`` its caller hands over, while
+# the projection's observed skill is ``pmx.scoring.skill_micro``, whose time weights are derived inside
+# from ``bar_weights_ms``. If the two disagree, ``null_lb_micro`` is compared against a number the
+# leaderboard never reports and part 4 of the bar of 12.6 is measured against the wrong thing. So the
+# identity is pinned here, on an IRREGULAR bar grid where a constant weighting gives a different answer:
+# ``WeightSeries`` is ``bar_weights_ms`` of the same bars and nothing else, and wave 4's caller (O4's
+# ``claims.py``) has no second weighting to invent.
+# --------------------------------------------------------------------------------------------------
+#: Three forecast bars with a two-day hole in the middle, so ``w = (1d, 2d, 1d)`` and not ``(1d, 1d, 1d)``.
+SKILL_BARS = (
+    ForecastBar(t_ms=0, prob_ppm=700_000, market_price_bp=4_000),
+    ForecastBar(t_ms=MS_PER_DAY, prob_ppm=800_000, market_price_bp=5_500),
+    ForecastBar(t_ms=3 * MS_PER_DAY, prob_ppm=900_000, market_price_bp=6_000),
+)
+
+
+def test_the_nulls_observed_skill_is_e3s_skill_over_the_same_bar_weights() -> None:
+    """``stats._binary_skill_micro`` over ``bar_weights_ms`` is exactly ``pmx.scoring.skill_micro``.
+
+    Both outcomes are checked, because a binary null scores each market under both and selects (the
+    ``skill_yes`` and ``skill_no`` lists of ``_binary_null``), and both rounding sides therefore have to
+    agree, not just the YES one.
+    """
+    weights = bar_weights_ms(SKILL_BARS, interval_ms=MS_PER_DAY)
+    assert weights == (MS_PER_DAY, 2 * MS_PER_DAY, MS_PER_DAY), "the grid is irregular on purpose"
+    # ``PriceSeries`` is the market's probability in ppm and ``ForecastBar.market_price_bp`` is the same
+    # price in basis points, which is the one conversion between E3's record and E4's series.
+    probs = tuple((bar.t_ms, bar.prob_ppm) for bar in SKILL_BARS)
+    prices = tuple(ppm_from_bp(bar.market_price_bp) for bar in SKILL_BARS)
+    for outcome in (1, 0):
+        assert _binary_skill_micro(probs, prices, weights, outcome=outcome) == skill_micro(
+            SKILL_BARS, outcome=outcome, interval_ms=MS_PER_DAY
+        ), outcome
+
+
+def test_a_weighting_that_is_not_bar_weights_ms_measures_a_different_statistic() -> None:
+    """Why the row above is an invariant and not a coincidence: the weights are load bearing.
+
+    A caller that hands ``permutation_null`` one weight per bar instead of ``t_{i+1} - t_i`` gets a
+    number that is not the leaderboard's skill for the same market, so the null would be compared
+    against a statistic nobody reports. The zero-denominator rule of section 12 is pinned beside it: a
+    market whose weights sum to zero scores ``0`` and is not silently skipped.
+    """
+    probs = tuple((bar.t_ms, bar.prob_ppm) for bar in SKILL_BARS)
+    prices = tuple(ppm_from_bp(bar.market_price_bp) for bar in SKILL_BARS)
+    flat = (MS_PER_DAY,) * len(SKILL_BARS)
+    assert _binary_skill_micro(probs, prices, flat, outcome=1) != skill_micro(
+        SKILL_BARS, outcome=1, interval_ms=MS_PER_DAY
+    )
+    assert _binary_skill_micro(probs, prices, (0, 0, 0), outcome=1) == 0
