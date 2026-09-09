@@ -272,6 +272,36 @@ reconciliation, run `lot4d` then `lot4e`. If it died before the reconciliation, 
 with `resumeFromRunId: "wf_71f2fa90-5fe"` so the three cached diagnostics come back instantly, or read
 their JSON from the scratchpad and run the fixers by hand.
 
+### Update 2026-09-09 11:55 : lot 4d (gate G2) done, the order starts at lot 5a
+
+Gate G2 ran alone (`lot4d_gate_g2_alone.js`, one agent on Fable) after lot 4c2 (commit `7493d688`).
+What it did is in `docs/CONTRACTS_V2.md` 15.3 (rulings R200 to R227) and `docs/BUILD_STATE.md` section 8:
+28 rulings over the 56 merged issues, the 30 mismatches and the 23 fixer items; 17.9's G2 rows applied
+and verified; AC-3 measured on `data/datasets/y2026` through the real CLI with the scripted-stub roster
+(`tests/stub_roster.py`, `pmx run backtest --roster-module tests.stub_roster`): 50 seeds, 50
+deterministic, 50 replays byte for byte, 50 invariants holding, verdict
+pass with the limits stated there; AC-4 partial (the twelve tests
+pass, `pmx audit leaks` is A6's and does not exist). Suite: EXIT 0; ruff
+and mypy --strict clean; no em-dash. Report: `<scratchpad>/lot4d_gate_g2.json`.
+
+**The order from here** (this supersedes "The order after lot 4c" above):
+
+1. **Lot 5a**: amendment C1c writes contract section 18 (sensors, rules, minute grids, workflow genomes)
+   **and** the normative text of both reviews (D-R1..D-R14 of `docs/REVIEW_2026-09-08.md`, D-S1..D-S14 of
+   `docs/REVIEW_2026-09-09_SCALE_TAGS.md`). One critic, one arbiter, on Fable. It also carries the four
+   shapes gate G2 declared without applying (BUILD_STATE 8.6: R213, R214, R217, R221), to be applied by
+   E2 and E5 in the first engine lot after it, with the fixture and the pinned hashes regenerated in the
+   same change.
+2. **Lot 5b**: DS1, then DS2 (after DS1's rebuild, D-S13), S1, S2, R2a..R2e, F1..F5, U1, U2; gates G3
+   and G3b. A1's registry lands `DEFAULT_ROSTER` and `make_agent`, which `pmx run backtest` already reads.
+3. **Lot 6**: agents for the measured edges, calibrator per cohort, optimizer, claims, live; gate G4.
+4. **Lot 7**: U3, U4 (the `pmx` dispatch and `pmx audit leaks` through A6's `cli_audit.py`), U5; gate G5.
+5. **Lots 8 and after**: the ladder rungs, then the acceptance audit over AC-1..AC-34.
+6. **Last lot**: Polymarket read from the chain, blocked on the indexer credential.
+
+`lot4e_audit_g2.js` (the two adversarial auditors) is not in the order: it may be run before lot 5a if a
+second pair of eyes on the gate is wanted, and nothing downstream depends on it.
+
 ### The one open question for the user
 
 The indexer credential above. Everything else in the sequence is decided and written down.
@@ -355,3 +385,33 @@ should verify rather than redo them. Everything is committed as `8c38cb8d`.
    fixers' many test edits.
 
 Then lot 5a, the amendment, as section 6 of this file states.
+
+---
+
+## 8. STANDING ORDER, 2026-09-09 11:40 : stop at the end of gate G2
+
+The user asked to **stop everything at the end of gate G2**. When lot 4d (`wf_5101a9fc-cbd`) returns:
+
+1. Verify the four checks independently (suite, ruff, mypy --strict, em-dash sweep), from
+   `c:/Dev/squad-ai/Brainstorming/GAN/prediction_market` with `.venv/Scripts/python.exe`. Do not take
+   the gate's numbers on trust.
+2. Commit the gate's work, naming in the message what it ruled, what it resolved against the proposal,
+   and the AC-3 and AC-4 verdicts **with their limits**.
+3. Append the outcome to this file: the rulings written, the items still open with their gate, and the
+   AC verdicts.
+4. Report, and **stop**. Do **not** launch lot 4e, the two adversarial auditors, without an explicit go
+   from the user, even though the session goal says to continue in order.
+
+**What is waiting, in order, when the user gives the go:**
+
+* **Lot 4e** (`...\scratchpad\lot4e_audit_g2.js`, 2 agents plus 1 conditional): the two adversarial
+  auditors on the gate, one on test integrity and the honesty of the claims (it mutates the source to
+  prove every touched test still bites, which is the guard against the many test edits of lots 4c and
+  4c2), one on contract coherence, ownership and completeness. Then a fix pass only if a blocker or a
+  major is confirmed. **This is the only remaining check on the gate's own work, so the engine wave is
+  not independently verified until it runs.**
+* **Lot 5a**: amendment C1c, contract section 18, extended by the twenty-eight decisions of the two
+  reviews (D-R1 to D-R14 of `docs/REVIEW_2026-09-08.md` and D-S1 to D-S14 of
+  `docs/REVIEW_2026-09-09_SCALE_TAGS.md`), with one critic and one arbiter, on Fable.
+* Then lot 5b, lot 6, lot 7, the ladder rungs, the acceptance audit, and last the Polymarket lot of
+  plan part 5, which stays blocked on the user supplying an indexer credential.
