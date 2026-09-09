@@ -404,7 +404,15 @@ Then lot 5a, the amendment, as section 6 of this file states.
 
 ---
 
-## 8. STANDING ORDER, 2026-09-09 11:40 : stop at the end of gate G2
+## 8. LIFTED 2026-09-09 16:05 : the stop order below is discharged
+
+The user gave the go for the next wave at 16:05. Steps 1 to 3 of the order were carried out (the four
+checks re-run independently, the work committed, the outcome recorded in section 6 and in BUILD_STATE
+section 8), and step 4, the stop, held from 11:55 to 16:05 with nothing launched in between. **Lot 4e is
+now running or has run; the order of work is the list at the end of this section.** The text below is
+kept as the record of what the order was.
+
+### The order as it was written
 
 The user asked to **stop everything at the end of gate G2**. When lot 4d (`wf_5101a9fc-cbd`) returns:
 
