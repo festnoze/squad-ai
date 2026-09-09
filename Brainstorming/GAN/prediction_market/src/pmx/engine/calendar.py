@@ -420,7 +420,7 @@ class Calendar:
         # ``bar_of(delisted_at_ms)``"). With no delisting the instrument is listed to the end of the run,
         # which is where the window clamps it. ``MarketMeta`` cannot tell the two apart, because R186
         # collapses ``delisted_at_ms`` and the dataset's window end into one ``resolved_at_ms``, so the
-        # field is read from the instrument record (gate G2 ruling: the record is the one place it lives).
+        # field is read from the instrument record, the one place it lives unsummed (ruling R228).
         instrument = self._dataset.market(meta.id).instrument
         delisted_at_ms = instrument.delisted_at_ms
         last_open = (

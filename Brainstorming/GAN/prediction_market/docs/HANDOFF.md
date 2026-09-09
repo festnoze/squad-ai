@@ -144,10 +144,13 @@ fix agents, re-audit.
 
 ## 4. Open defects and decisions pending
 
-- Kalshi markets still absent from the real dataset (diagnosis above; fix landed but unverified).
+- ~~Kalshi markets still absent from the real dataset~~ CLOSED 2026-09-08: `data/datasets/y2026` carries
+  220 Kalshi markets of 287 (BUILD_STATE section 7).
 - Wikipedia items linked to zero markets in the 08:59 build; R169's linker renormalisation and derived
   subjects should change that, to be confirmed by the rebuild.
-- Section 17.9 lists everything C1b deferred to gate G2 with owners; G2 must apply all of it.
+- ~~Section 17.9 lists everything C1b deferred to gate G2 with owners; G2 must apply all of it.~~
+  CLOSED 2026-09-09 by gate G2: applied, with the four rows it declared without applying listed in
+  BUILD_STATE section 8.6 and the rulings in CONTRACTS_V2 15.3 (R200 to R229).
 - `README.md` still describes v1 plus a v2 pointer; U4 rewrites it.
 - The Polymarket importer is evidence of the ANJ block only; Polymarket markets never enter a built
   dataset (R105) until a size-carrying tape is reachable.
@@ -275,14 +278,16 @@ their JSON from the scratchpad and run the fixers by hand.
 ### Update 2026-09-09 11:55 : lot 4d (gate G2) done, the order starts at lot 5a
 
 Gate G2 ran alone (`lot4d_gate_g2_alone.js`, one agent on Fable) after lot 4c2 (commit `7493d688`).
-What it did is in `docs/CONTRACTS_V2.md` 15.3 (rulings R200 to R227) and `docs/BUILD_STATE.md` section 8:
-28 rulings over the 56 merged issues, the 30 mismatches and the 23 fixer items; 17.9's G2 rows applied
+What it did is in `docs/CONTRACTS_V2.md` 15.3 (rulings R200 to R229) and `docs/BUILD_STATE.md` section 8:
+30 rulings over the 56 merged issues, the 30 mismatches and the 23 fixer items; 17.9's G2 rows applied
 and verified; AC-3 measured on `data/datasets/y2026` through the real CLI with the scripted-stub roster
 (`tests/stub_roster.py`, `pmx run backtest --roster-module tests.stub_roster`): 50 seeds, 50
-deterministic, 50 replays byte for byte, 50 invariants holding, verdict
-pass with the limits stated there; AC-4 partial (the twelve tests
+deterministic, 50 replays byte for byte, 50 invariants holding, and 6 seeds of the seed-consuming roster
+(`tests/stub_roster_rng.py`) added by the audit pass, verdict **partial** with the limits stated there
+(three stubs, not the eleven scripted families); AC-4 partial (the twelve tests
 pass, `pmx audit leaks` is A6's and does not exist). Suite: EXIT 0; ruff
-and mypy --strict clean; no em-dash. Report: `<scratchpad>/lot4d_gate_g2.json`.
+and mypy --strict clean; no em-dash. Reports: `<scratchpad>/lot4d_gate_g2.json` (the gate) and
+`<scratchpad>/lot4e_audit_fix.json` (its audit and this fix pass: R228, the AC-3 regrade, six doc fixes).
 
 ### Independent check of gate G2's numbers, and where the commit is
 

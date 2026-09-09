@@ -708,7 +708,10 @@ class MarketMeta:
     # when set, else the dataset's window end_ms; close_at_ms = resolved_at_ms; resolution = -1;
     # event_key = None; hardness_tags = (); fold = "all"; n_bars = the number of bars of the file. The
     # canonical order of section 3, block_key of 12.4 and Folds of 12.7 read these values and nothing else,
-    # so every package that iterates instruments "in canonical order" iterates the same sequence.
+    # so every package that iterates instruments "in canonical order" iterates the same sequence. The
+    # collapse is one-way and this meta therefore carries no delisted_at_ms: the calendar's listed(i, t)
+    # and last_bar(i) (17.2) read Dataset.market(id).instrument.delisted_at_ms, where None means listed to
+    # the end of the run, and never resolved_at_ms (ruling R228).
 ```
 
 `Dataset` (D1, the return type of `load_dataset`) is what `run_backtest` receives:
@@ -1407,7 +1410,9 @@ class Calendar:
     def next_bar(self, market_id: str, t_ms: int) -> int | None: ...   # the instrument's next bar after t_ms
     def prev_bar(self, market_id: str, t_ms: int) -> int | None: ...   # its last bar before t_ms, in the run
         # The three lookups are E1's one implementation (ruling R187): the queue drain of 17.2, decided_at_ms
-        # (R192), applies_at (R175) and the forced flat read them and compute nothing of their own.
+        # (R192), applies_at (R175) and the forced flat read them and compute nothing of their own. The three
+        # are the BarLookups protocol applies_at takes (ruling R204), declared in pmx.engine.calendar beside
+        # its one body; Calendar satisfies it by shape.
     def session_next_bar(self, market_id: str, t_ms: int) -> int | None: ...
         # The venue's next bar from the sealed calendar, UNCLAMPED by the run window: the one route to
         # MarketView.hours_to_next_bar, because next_bar is clamped and would announce last_bar(i) (R208)
@@ -1789,8 +1794,8 @@ Shipped schedules (data, not code):
 
 | `schedule_id` | provider | taker | maker | source | as of |
 |---|---|---|---|---|---|
-| `kalshi-general-2026-09` | kalshi | `70` | `0` | `https://kalshi.com/docs/kalshi-fee-schedule.pdf` | `2026-09-07` (PRD probe); the PDF returned 429 to the contract author on the same day, so E2 re-reads it and updates `as_of_date` and the constants if they moved |
-| `kalshi-reduced-2026-09` | kalshi | `35` | `0` | same PDF; applied to the series listed in `KALSHI_REDUCED_FEE_SERIES` (data in `fees.py`, empty until E2 reads the PDF) | `2026-09-07` |
+| `kalshi-general-2026-09` | kalshi | `70` | `0` | `https://kalshi.com/docs/kalshi-fee-schedule.pdf` | `2026-09-07` (PRD probe); the PDF returned 429 to the contract author on the same day, so D2, the package that may open a socket, re-reads it and updates `as_of_date` and the constants if they moved (ruling R216) |
+| `kalshi-reduced-2026-09` | kalshi | `35` | `0` | same PDF; applied to the series listed in `KALSHI_REDUCED_FEE_SERIES` (data in `fees.py`, empty until D2 reads the PDF, ruling R216) | `2026-09-07` |
 | `polymarket-zero-2026-09` | polymarket | `0` | `0` | `https://docs.polymarket.com/` (standard markets carry no trading fee) | `2026-09-07` |
 | `manifold-zero-2026-09` | manifold | `0` | `0` | `https://manifoldmarkets.notion.site/` (play money, no trading fee) | `2026-09-07` |
 | `demo-zero` | demo | `0` | `0` | none | none |
@@ -2281,7 +2286,7 @@ times 200 markets times 300 bars, which breaches `OBSERVATION_MAX_BYTES` on ever
 | `reputations` | the agent's own open categories plus every author of a returned lesson | one row per `(agent_id, category)` |
 | `resolutions` | every settled market of the run | the most recent 200 by `(-visible_from_ms, entry_id)` |
 | `forecasts` | **settled markets only**, over the categories of the agent's open markets | the most recent `limits.hive_forecasts` by `(-visible_from_ms, entry_id)` |
-| `prev_bar_forecasts` | every other agent, the agent's open markets, `bar_ms == now_ms - interval_ms` | empty unless `live_coop` |
+| `prev_bar_forecasts` | every other agent, the agent's open markets, `bar_ms ==` the instrument's previous bar (`now_ms - interval_ms` on a `continuous` calendar, rulings R192 and R211) | empty unless `live_coop` |
 
 `view` is a pure function of `(now_ms, agent_id, market_ids, limits, live_coop)` and of the entries written
 at bars `< now_ms`; it never depends on the order agents are served in.
@@ -2356,7 +2361,8 @@ emits `kind = "hold"` and therefore no order at all (section 8.4).
 
 The constructor of a roster row is 10.1's `make_agent(agent_id, genome)`, and `pmx run backtest` reads it and
 `DEFAULT_ROSTER` from `pmx.agents.registry` unless `--roster-module` names another module exposing the same
-two names (gate G2's scripted-stub roster, `tests/stub_roster.py`, ruling R200).
+two names (gate G2's scripted-stub roster, `tests/stub_roster.py`, ruling R200, and its seed-consuming
+variant `tests/stub_roster_rng.py`, ruling R229).
 
 **The default roster** (`pmx.agents.registry.DEFAULT_ROSTER`) is the eight v1 archetypes as eight literal
 genomes, and `tests/test_agents_families.py` asserts each one reproduces the frozen v1 belief on the
@@ -3369,6 +3375,8 @@ prediction_market/
     test_runner.py                                E5
     stub_roster.py                                E5   (the scripted-stub roster of gate G2, ruling R200;
                                                        not a test file, never imported by src/)
+    stub_roster_rng.py                            E5   (that roster plus the seed-consuming coin_flipper,
+                                                       ruling R229; same rules as the line above)
     test_agents_families.py                       A1
     test_memory.py                                A2
     test_hive.py                                  A3
@@ -3470,7 +3478,7 @@ only to build a fallback reply.
 
 ```python
 __version__ = "2.0.0-dev"
-ENGINE_VERSION = "2.0.0"        # bump when a journal byte can move for the same inputs
+ENGINE_VERSION = "2.0.0"        # bump when an existing run's journal bytes would move (R227)
 CONTRACT_VERSION = "2.0"        # this document
 OBS_VERSION = "obs.v2"; ACTIONS_VERSION = "actions.v2"; JOURNAL_VERSION = "journal.v2"
 MARKET_SCHEMA = "market.v2"; NEWS_SCHEMA = "news.v1"; DATASET_SCHEMA = "dataset.v1"
@@ -3480,6 +3488,16 @@ SESSION_CALENDAR_SCHEMA = "session_calendar.v1"; FORECAST_SCHEMA = "forecast.v1"
 
 `run_started` carries `engine_version`, `contract_version` and `rng_algorithm_version`; a replay refuses a
 journal whose `engine_version` differs from the running engine (exit code 2, message names both).
+
+The bump trigger is a run, not a shape (ruling R227): a byte of a **journal a run has written** must move
+for the same inputs. A change that moves the bytes of every future journal while no such run exists (the
+eight `market_listed` fields of R201, the run id of a config that omits `horizons_bars`, the observation
+bytes of a continuous run) versions nothing, because there is no journal a replay could refuse; the
+contract fixture is a completed historical document and not a run (R202), and a gate's measurement runs
+are evidence taken on one tree, not artefacts a later engine must reproduce. The first lot that applies
+R213, R214, R217 or R221 moves what a future journal carries again and bumps both constants in the same
+commit as R111 asks; from the first run a later engine is expected to replay, every byte movement bumps
+again, and a replay's exit-2 refusal is what the constant buys.
 
 ---
 
@@ -3708,16 +3726,19 @@ when they arrive as JSON numbers, so a money provider's body is read with `get_t
 
 The five engine packages reported 69 contract issues (56 after merging duplicates: 12 blockers, 33 majors,
 11 minors), the tree diagnostic found 30 cross-package disagreements, and the two reconciliation agents
-and the redesign agent left 23 more items for the gate. R200 to R227 settle all of them. **Seven are
+and the redesign agent left 23 more items for the gate. R200 to R228 settle all of them (R228 was
+added by the audit pass of this gate, which found merged issue I09 settled by no ruling while this
+sentence claimed otherwise), and R229 records what that pass changed in the measurement itself. **Seven are
 resolved against the resolution proposed** and each says why (R202 on regenerating the fixture, R205 on
 moving the protocols into `pmx.types`, R207 on one error family, R215 on the reservation, R219 on an
-`alpha_ppm` field, R224 on the import path, R225 on where `pmx audit leaks` lives). Five rulings declare a
+`alpha_ppm` field, R224 on the import path, R225 on where `pmx audit leaks` lives). Four rulings declare a
 shape the code does not yet carry and name the package that applies it in the next lot (R213's last-bar
 drain, R214's `bar_prev`, R217's continuous calibration, R221's `n_quantile_forecasts` and `seed`); each
 one moves `results.json` or the journal of every future run and no run exists. Nothing the two reviews
 assign to amendment C1c (decisions D-R1 to D-R14 and D-S1 to D-S14, and the `sensors` keyword the sensor
 hook added to `build_observation`) is settled here. **No ruling moves a byte of an existing run:
-`ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"` (R227).**
+`ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"` (R227), and 13.2 carries that
+trigger in place.**
 
 | # | Ruling | Sections |
 |---|---|---|
@@ -3732,7 +3753,7 @@ hook added to `build_observation`) is settled here. **No ruling moves a byte of 
 | R208 | **The observation path receives the calendar, and the five view caps are `pmx.types` constants** (I08, I10, I11). `Calendar.__init__` gains keyword-only `calendars: Mapping[str, SessionCalendar] \| None = None` (`None` reads `Dataset.calendar(id)` for the ids the run's instruments name, else the synthesised `continuous`); `Calendar.session_next_bar(market_id, t_ms) -> int \| None` is the venue's next bar from the sealed calendar, **unclamped** by the run window, and is the one route to `MarketView.hours_to_next_bar`, because `next_bar` is clamped by `t1_ms` and `last_bar(i)` and would announce both (7.9, R181); `build_observation` gains keyword-only `calendar: Calendar \| None = None` and a run carrying a continuous kind passes it. The runner did not: a continuous run published `tradable = True` on its closing bar, `hours_to_next_bar = 0` across every weekend and no cash event at all, silently, because the continuous path died earlier on `market_listed`. It passes `calendar=self.calendar` now, and `tests/test_runner.py` asserts the exact hours to the next bar of every bar of a session run (`24, 72, 24, 24`) and the Friday funding visible from the Monday; removing the argument fails that test (mutation-checked). `NEWS_VIEW_TEXT_CHARS = 600`, `DESCRIPTION_VIEW_CHARS = 1_000`, `HIVE_RESOLUTIONS_VIEW_MAX = 200`, `MEMORY_NOTES_VIEW_MAX = 20` and `RESEARCH_NEWS_MULTIPLIER = 3`, stated in prose in 8.3 and 8.4 and spelled in `observation.py`, are `pmx.types` constants the builder imports. The `sensors` keyword the sensor hook added to `build_observation` is amendment C1c's to declare and is not settled here | 8.3, 8.4 |
 | R209 | **The clock test scans `leak_scan_payload(obs.to_dict())` and bans the structural names of the forbidden records** (I13, I16). 8.3 item 1 banned `resolved_at_ms` anywhere in the key set while 8.3 itself declares `HiveView.resolutions` with that field and R183 puts an applied event's `detail` inside `MarketView.cash_events`: the test as written could not pass on legal data. The exemption is contract: the scan runs over the payload with `HiveView.resolutions` (a settled market's published resolution) and `MarketView.cash_events` (an applied event's verbatim detail) set aside, which is exactly what `assert_no_leak`, the guard the builder runs, scans, and E1's continuous poisoned-future test scans the same payload (the one test-versus-code disagreement of the wave, resolved against the test, which contradicted itself two lines later). 7.9's list is **record-scoped**: no `MatchReason`, `EventCluster`, `Constraint`, `OpportunityEvent` or unapplied `CashEvent` record reaches an observation, and the key scan bans their structural names (`cluster_id`, `constraint_id`, `reasons`, `asof`, `score_permille`, `resolution_span_ms`, `opportunity_id`, `detector_id`, `evidence`, `window`, `duration_bars`, `size_ppm`, `size_net_bp`, `payoff_cents`, `tradable_for_money`, `detail`, and 7.9's fields), while `kind`, `source`, `currency` and `market_ids` are legal keys of legal views and are covered by the poisoned-record test rather than by the key scan | 7.9, 8.3 |
 | R210 | **A `wiki_asof` grant carries at most `news_per_market` revisions, most recent first, filtered by `visible_from_ms`** (I14). 8.4 gave the payload no cap while 8.1 makes an observation over `OBSERVATION_MAX_BYTES` raise rather than truncate, so a year of revisions of one subject could kill the bar for every agent. The cap is listed beside the others in 8.1, so E1, D5 and A5 read one number | 8.1, 8.4 |
-| R211 | **`prev_bar_forecasts` carries the instrument's previous bar** (I15). 8.3's sentence `bar_ms == now_ms - interval_ms` was not generalised by R192, so on a session instrument the Monday view dropped Friday's legal `live_coop` entries; it reads "the instrument's previous bar (`now_ms - interval_ms` on a `continuous` calendar, ruling R192)", A3's test asserts it per instrument, and R192's list of the places it rewrote gains this one | 8.3 |
+| R211 | **`prev_bar_forecasts` carries the instrument's previous bar** (I15). 8.3's sentence `bar_ms == now_ms - interval_ms` was not generalised by R192, so on a session instrument the Monday view dropped Friday's legal `live_coop` entries; it reads "the instrument's previous bar (`now_ms - interval_ms` on a `continuous` calendar, ruling R192)", A3's test asserts it per instrument, and R192's list of the places it rewrote gains this one | 8.3, 10.4 |
 | R212 | **`LiquidityMarketView` is E2's and reaches no observation** (I17). The E1 brief listed it among 8.3's structures; 8.3 and section 13 are right, `Execution` builds it for a `LiquidityModel` and the observation path constructs and imports none. No text changes; recorded so a later reader does not re-add it | 8.3, 16.1 |
 | R213 | **`Execution`'s surface is completed with what the phase order requires, and the last-bar drain is owed and open** (I18, I19, I20, I44, I45). 8.6's listing gains keyword-only `carry_schedules: Mapping[str, CarrySchedule] \| None = None` beside `calendars`, `expire_orders(*, t_ms, markets)` (the open phase's `order_expired`, whose only emitter is execution), `register_agent(agent_id)`, `agent_ids()`, `is_ruined(agent_id)`, `ruined_agent_ids()`, `drain_ruined()` (the `cancelled_order_ids` 9.2 requires and only execution knows) and `mark(..., agent_ids=None)`, exactly as E2 shipped and E5 calls them. `pending_market_ids` is the union, in canonical market order, of the instruments holding an item accepted at their previous bar and the instruments carrying a resting order of any agent (R131 named the first only, while 8.6 has a resting order try against each later bar's range and `execute_bar` is the only entry point that prices one). `FEE_SCHEDULES`, `BORROW_SCHEDULES` and `CARRY_SCHEDULES` are declared registries of `pmx.engine.fees` keyed by `schedule_id`, and `CARRY_SCHEDULES` is empty until F2 lands a dataset that declares a rate-differential row (E2's test builds its own). **Open, stated plainly**: 17.2's "an item whose instrument never has another bar in the run is `order_rejected(not_tradable)` at the run's last bar" is not written, because `Execution` receives neither the resolved window nor E1's `Calendar` and `RunConfig.t1_ms` is legally `None`; on the demo pack 5 of 1 627 queued items are dropped and `tests/test_runner.py::test_every_queued_item_produces_exactly_one_execute_phase_event` pins the drop (`dropped > 0`). The rule stands; `Execution.__init__` gains keyword-only `t0_ms: int` and `t1_ms: int` (the run's resolved window, which `run_backtest` computes), E2 and E5 apply it in the next lot with the test reading `dropped == 0`, and it adds events to every future journal, none of which exists | 8.6, 8.8, 16.2, 17.4 |
 | R214 | **Envelope rule 1 binds taker orders, `truncate_for_cash` carries the order, and `quote_bar` carries the previous bar** (I21, I22, I23). A resting buy fills at `min(L, bar.open_bp)`, at or below the ask by construction, so rule 1 as written reported `quote_inside_spread` for obeying 8.6's limit rule: rule 1 reads "a **taker** buy quotes `price_bp >= ask`, a taker sell `price_bp <= bid`; a resting limit fill is governed by 8.6's limit rule and by rule 3", and `check_envelope` checks it on orders whose kind is `market`. `truncate_for_cash` gains keyword-only `order: LiquidityOrder \| None = None` and rule 5's re-established fee takes its side and role from that order (a truncated sell was re-priced as a buy). `quote_bar` gains keyword-only `bar_prev: Bar \| None = None`, the instrument's previous bar from the dataset, `None` only on the instrument's first bar where the floor is `schedule.min_half_spread_ticks`: `HistoricalLiquidity` remembers the last bar it was asked to price, so the half-spread estimate depended on which bars a model happened to be asked about. **Declared now, applied by E2 in the next lot**: it moves the fallback base of every future fill on a quoteless bar (a Kalshi bar without quotes estimates a non-zero `hs` from two non-flat bars), and the gate's AC-3 run was taken on the engine as it stands | 16.1 |
@@ -3749,10 +3770,13 @@ hook added to `build_observation`) is settled here. **No ruling moves a byte of 
 | R225 | **`pmx audit leaks` is A6's `cli_audit.py`, and the four families it runs are named now.** AC-4 requires the poisoned-future, clock, seal and shuffled-outcome tests to pass and to be part of `pmx audit leaks`; the four pass on the tree of 2026-09-09 and the command does not exist, because section 13 gives `cli_audit.py` to A6 (wave 3) and `cli.py` to U4. The families, by test id: poisoned-future `tests/test_observation.py::test_the_poisoned_future_test`, `::test_the_poisoned_future_test_on_a_continuous_instrument` and `::test_one_of_each_cluster_and_detector_record_is_refused`; clock `tests/test_observation.py::test_the_clock_test`; seal `tests/test_builder.py::test_the_built_dataset_loads_seals_verifies_and_fails_on_a_changed_byte` (one byte of a market file changed, `verify` names the file) and `tests/test_types_loader.py::test_seal_stamps_an_imported_dataset_and_rehashes_it`; shuffled-outcome `tests/test_stats.py::test_permutation_null_of_the_market_follower_is_exactly_zero`, `::test_permutation_null_of_a_coin_flip_agent_centres_on_zero`, `::test_permutation_null_of_a_skilled_agent_is_unmatched_and_negative` and the three `test_continuous_null_*` siblings. A6 mounts `pmx audit leaks` as the runner of exactly these ids plus the amnesic test of PRD 6.3 (`--amnesic` and `--no-hive` produce a different journal hash), and it fails when any id is missing from the tree. **What the shuffled-outcome family does not yet prove**: PRD 6.3's population form ("no scripted agent's skill lower bound exceeds zero on the training set over 200 seeds") needs the scripted families of wave 3 and O4's claim path; what exists is the null over synthetic agents and the stub roster. AC-4 is therefore **partial** at this gate and 13's `cli_audit.py` row says what the command runs | 13, 14 |
 | R226 | **R151's kind tuple is superseded by R177.** R151's row still spells `CASH_EVENT_KINDS` with six kinds while R177 and 17.3 make it seven (`carry`); the row now says so, and `pmx.types.CASH_EVENT_KINDS` is the seven-tuple | 15.9, 17.3 |
 | R227 | **`ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"`.** R201, R202 and R208 change what every future journal carries (the eight `market_listed` fields and two nulls on a binary, the run id of a config that omits `horizons_bars`, the observation bytes of a continuous run) and R213, R214, R217 and R221 will move more when applied; a journal byte moves when an existing journal's bytes change for the same inputs, and no run exists: the contract fixture is a completed historical document and not a run (R202), and the gate's own AC-3 runs are evidence taken on this engine, not artefacts a later engine must reproduce. A bump before the first run would version nothing. The first lot that changes a byte of a journal a run has written bumps both in the same commit, as R111 says | 13.2 |
+| R228 | **`Calendar.last_bar` reads `delisted_at_ms` off the instrument record, and `MarketMeta` carries no such field** (I09, left unruled by the first pass of this gate and found by its audit). R186 collapses `delisted_at_ms` and the dataset's window end into one `MarketMeta.resolved_at_ms`, so a meta cannot tell a delisted instrument from one still listed at the window end, while 17.2's `listed(i, t)` and `last_bar(i)` need exactly that difference: the engine reads `Dataset.market(id).instrument.delisted_at_ms`, the one place the value lives unsummed, and `None` there means the instrument is listed to the end of the run. `last_bar(i)` is therefore `min(bar_of(delisted_at_ms) - interval_ms, the run's last grid bar)` when the record carries a delisting and the run's last grid bar otherwise, so the window-end case is clamped by `t1_ms` alone and no `bar_of(resolved_at_ms)` is ever taken for a delisting bar. R186 stands unchanged for what it rules on: the canonical order of section 3, `block_key` and `Folds` read `MarketMeta.resolved_at_ms` and never the record, and the calendar reads the record and never the meta, which is why the two do not compete. Behaviour is unchanged (`calendar.py` already reads the record; its comment cited a ruling of this gate that had not been written, and now cites this one) | 7.2, 17.2 |
+| R229 | **AC-3's seed claim is measured with an agent that draws from the `RngTree`, and AC-3 is `partial` until the scripted families land** (the audit pass of this gate). None of R200's three stubs draws from the substream `reset` hands it and neither `execution` nor `liquidity` draws at all, so the 50 seeds of the gate's sweep produced 50 journals differing in the `run_started` line alone (measured: 1 differing line in 94 803, seed 0 against seed 1, run id masked): the sweep measured reproducibility and not the engine under a varying RNG, which is what AC-3's "for 50 seeds" is for. `tests/stub_roster_rng.py` (E5's, created by this gate like `stub_roster.py`, never collected by pytest and never imported by `src/`) is the same roster plus `coin_flipper`, which draws one belief per open market per bar from the substream, so a seed moves the events; `pmx run backtest --roster-module tests.stub_roster_rng` measured 6 seeds of `y2026` on the same protocol (BUILD_STATE 8.3) and `tests/test_runner.py::test_a_seed_consuming_agent_makes_the_seed_change_the_journal_it_reproduces` keeps the claim in the suite, mutation-checked. AC-3 as written asks for the eleven scripted families, so its verdict is **partial** (as AC-4's is for its missing command) and A1's landing of `pmx.agents.registry.DEFAULT_ROSTER` is what regrades it | 10.5, 13 |
 
 Gate G2's measurements (AC-3 on `data/datasets/y2026` through `pmx run backtest --roster-module
-tests.stub_roster`, AC-4 over the four families of R225, the suite, ruff, mypy and the em-dash sweep) are
-in `docs/BUILD_STATE.md` section 8, with their limits.
+tests.stub_roster` and, for the seed, `--roster-module tests.stub_roster_rng` (R229), AC-4 over the four
+families of R225, the suite, ruff, mypy and the em-dash sweep) are in `docs/BUILD_STATE.md` section 8,
+with their limits, and the audit pass that corrected them is section 8.8.
 
 ### 15.4 Wave 3 (A1..A6, gate G3)
 
@@ -4357,6 +4381,8 @@ analysis/<dataset_name>/<detector_id>.json   opportunity.v1.json: params, params
                                              summary with its permutation null, and the events
 analysis/<dataset_name>/opportunity_map.json one row per detector: lower bound, interval, null,
                                              n_detectors_run, currency, params_sha256
+                                             (mapped fields: payoff_lb_micro and null_lb_micro beside
+                                             their bounds, never an embedded Interval.to_dict(), R219)
 analysis/<dataset_name>/manifest.json        dataset_name, dataset_hash, detectors run, pmx_version,
                                              contract_version, features_hash when a detector used features
 ```
@@ -4413,7 +4439,8 @@ vector on disk is integers (`features.v1.json#/$defs/feature_vector`).
 The card is `model_card.v1.json`: `model_id` (`"mc-" + weights_sha256[:16]`), `weights_sha256`,
 `weights_bytes`, `architecture`, `n_parameters`, `inference_kind`, `features_version`, `features_hash`,
 the `train` block (dataset, fold, window, algorithm, steps, seeds, framework, device) and the
-`validation` block (the walk-forward numbers with their bootstrap). Because the card is inside the
+`validation` block (the walk-forward numbers with their bootstrap, as **mapped** fields (`skill_lb_micro`,
+`null_lb_micro` and the bound's parts) and never an embedded `Interval.to_dict()`, ruling R219). Because the card is inside the
 genome, `genome_hash` covers the weights hash, and a claim names the exact model it was made with. The
 weights file itself lives in `models/<weights_sha256>.pt`, is git-ignored, and is never inside a hash
 other than its own digest. `train.fold` is `"train"`: a card trained on anything else is a contaminated
@@ -4746,7 +4773,7 @@ The four predicates of 5.3 read, for an instrument `i` at a bar `t` of the run:
 
 | Predicate | Binary (unchanged, 5.3) | Continuous |
 |---|---|---|
-| `listed(i, t)` | `bar_of(created_at_ms) <= t <= bar_of(resolved_at_ms)` | `bar_of(listed_at_ms) <= t` and (`delisted_at_ms is None` or `t < bar_of(delisted_at_ms)`) |
+| `listed(i, t)` | `bar_of(created_at_ms) <= t <= bar_of(resolved_at_ms)` | `bar_of(listed_at_ms) <= t` and (`delisted_at_ms is None` or `t < bar_of(delisted_at_ms)`), where `delisted_at_ms` is read off `Dataset.market(i).instrument` and never off `MarketMeta` (ruling R228) |
 | `open(i, t)` (in observations) | `listed and not settled before t` | `listed(i, t) and in_session(i, t)` |
 | `tradable(i, t)` (a fill may land) | `listed and t + interval_ms <= close_at_ms and not settles(i, t)` | `open(i, t) and t < last_bar(i)`, where `last_bar(i)` is the last bar of the run at which `open(i, t)` holds; `MarketView.tradable` carries `open(i, t)`, not this predicate, and `MarketView.close_at_ms` is `0`, because both would announce `last_bar(i)` (ruling R181) |
 | `actionable(i, t)` (16.2) | `tradable(i, t + interval_ms)` | `tradable(i, t + interval_ms)` where `t + interval_ms` is read as **the next bar of `i`**, not the next grid point |
@@ -4869,17 +4896,23 @@ can. A binary's NO leg keeps 8.5 exactly, because a NO contract is a long in the
 `cash_delta_cents` from an agent who may have spent the cash a short brought in on other instruments, and
 no truncation applies to a charge the venue would have collected: cash may fall below zero. While
 `cash_cents(a) < 0` the agent carries a debit balance: `free_cash` is `0`, so no opening fill lands
-(`unfilled_reason = "cash"`); the event that took cash below zero expires every resting order of the agent
-with `reason = "debit"`, so `reserved_cents(a) == 0`; closing fills and credits repay it; and ruin stays
-8.7's rule on equity, which the debit lowers cent for cent. The shortfall is not a separate liability field:
+(`unfilled_reason = "cash"`); closing fills and credits repay it; and ruin stays 8.7's rule on equity,
+which the debit lowers cent for cent. The expiry is triggered by the reservation and not by the sign of
+cash (ruling R215, one sentence with 8.9's invariant line): **the cash event that leaves
+`reserved_cents(a)` above `max(0, cash_cents(a))` expires every resting order of the agent with
+`reason = "debit"`**, which includes every event that takes cash below zero, so `reserved_cents(a) == 0`
+while cash is negative and a debit that leaves cash positive yet under the reservations fires the same
+expiry instead of leaving a reservation unfunded. The shortfall is not a separate liability field:
 `equity_marked.cash_cents` and `PortfolioView.cash_cents` are signed and `equity = cash + positions_value`
 holds unchanged. E2's cases include a dividend debit on a short whose cash was spent elsewhere.
 
-**The forced flat at the window end** (ruling R150). At the settle phase of `last_bar(i)` (the
-instrument's last bar in the run: the bar before `bar_of(delisted_at_ms)`, or the run's last bar at
-which the instrument is open), every non-zero position is closed by an engine order at that bar's close
-and the runner emits `instrument_closed`. The flat is a **fill** and never a mark: a mark would let a
-run end with a paper number nobody could have realised, and a fill pays the fee the venue would have
+**The forced flat at the window end** (ruling R150). At the settle phase of `last_bar(i)`, the
+instrument's last bar in the run: `min(bar_of(delisted_at_ms) - interval_ms, the run's last grid bar)`
+when `Dataset.market(i).instrument.delisted_at_ms` is set (the bar **before** the one that contains the
+delisting instant) and the run's last grid bar when it is `None`, read off the record and never off
+`MarketMeta.resolved_at_ms` (ruling R228). At that bar every non-zero position is closed by an engine
+order at the bar's close and the runner emits `instrument_closed`. The flat is a **fill** and never a
+mark: a mark would let a run end with a paper number nobody could have realised, and a fill pays the fee the venue would have
 charged. A run whose `t1_ms` falls inside the dataset's window therefore ends flat on every continuous
 instrument, and a claim on the sealed fold cannot carry an open position across its edge. Section 8.7's
 "positions ride to settlement" is the binary row of this rule; a continuous instrument has nothing to

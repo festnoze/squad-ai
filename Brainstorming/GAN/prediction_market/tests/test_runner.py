@@ -55,6 +55,7 @@ from typing import Any
 
 import pytest
 from tests.stub_roster import StubAgent, StubGenome, contrarian, limit_agent, market_follower
+from tests.stub_roster_rng import coin_flipper
 
 from pmx import ENGINE_VERSION
 from pmx.cli_run import main as cli_main
@@ -915,6 +916,38 @@ def test_the_same_inputs_give_the_same_journal_over_fifty_seeds(demo: Dataset, t
         assert first.run_id == second.run_id
         hashes.add(first.journal_hash)
     assert len(hashes) == 50
+
+
+def test_a_seed_consuming_agent_makes_the_seed_change_the_journal_it_reproduces(
+    pack: Dataset, tmp_path: Path
+) -> None:
+    """The other half of AC-3's claim: determinism *under a varying RNG* (ruling R200, section 8.3).
+
+    The three stubs of ``tests/stub_roster.py`` draw nothing from the substream ``reset`` hands them, and
+    neither ``execution`` nor ``liquidity`` draws either, so over that roster two seeds of one dataset
+    produce journals that differ in the ``run_started`` line alone (the seed and the ``config_hash`` it
+    enters) and the test above measures reproducibility only. ``CoinFlipAgent`` draws its belief from the
+    substream, so here the seed reaches the events: two seeds record different forecasts and different
+    fills, and each seed still reproduces its own journal byte for byte.
+    """
+    seeds = (11, 12)
+    beliefs: dict[int, tuple[int, ...]] = {}
+    fills: dict[int, tuple[int, ...]] = {}
+    hashes: dict[int, str] = {}
+    for seed in seeds:
+        config = _config(market_ids=_all_ids(pack), t0_ms=None, t1_ms=None, seed=seed)
+        first = _run(pack, tmp_path / f"a{seed}", roster=[coin_flipper()], config=config)
+        second = _run(pack, tmp_path / f"b{seed}", roster=[coin_flipper()], config=config)
+        assert first.journal_hash == second.journal_hash, "one seed still reproduces its own journal"
+        events = _read(first.journal_path)
+        beliefs[seed] = tuple(e.prob_ppm for e in _of(events, ForecastRecorded))
+        fills[seed] = tuple(e.filled_size for e in _of(events, Filled))
+        hashes[seed] = first.journal_hash
+        assert beliefs[seed], "the coin flipper forecasts on every open bar"
+
+    assert hashes[seeds[0]] != hashes[seeds[1]]
+    assert beliefs[seeds[0]] != beliefs[seeds[1]], "the seed reaches the forecasts, not only run_started"
+    assert fills[seeds[0]] != fills[seeds[1]], "and the different beliefs trade a different book"
 
 
 def test_replay_rebuilds_results_json_byte_for_byte(demo: Dataset, tmp_path: Path) -> None:

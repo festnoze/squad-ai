@@ -557,7 +557,7 @@ Checked after the rebuild: `pytest` 662 passed, 4 skipped (the legal `PMX_LIVE` 
 tests` clean; `mypy --strict` clean over the 49 source files of `src/pmx`.
 
 
-## 8. Gate G2, 2026-09-09: the engine wave closed (`docs/CONTRACTS_V2.md` 15.3, rulings R200 to R227)
+## 8. Gate G2, 2026-09-09: the engine wave closed (`docs/CONTRACTS_V2.md` 15.3, rulings R200 to R229)
 
 The five engine packages (E1 observation, E2 execution, E3 scoring, E4 statistics, E5 runner) were built
 in parallel against sections 16 and 17 and never saw each other's code. Lot 4c reconciled them (1 023
@@ -585,6 +585,7 @@ from a report.
 | `src/pmx/store.py` | E5 | 398 | idem |
 | `src/pmx/cli_run.py` | E5 | 282 | idem (`pmx run backtest`, `pmx run replay`) |
 | `tests/stub_roster.py` | E5 (created by the gate, R200) | 191 | not a test file: the scripted-stub roster |
+| `tests/stub_roster_rng.py` | E5 (created by the gate's audit pass, R229) | 118 | idem, plus the seed-consuming `coin_flipper` |
 
 Landed by the gates' passes in wave-1 files and measured here: `src/pmx/types.py` 3 030 lines (every
 name of 17.9's first row, `BINARY_TICK_SIZE_MICRO == 100`, seven `CASH_EVENT_KINDS` with `carry`,
@@ -648,25 +649,74 @@ window 2025-09-07 to 2026-09-06. Seeds `0..49`, eight in parallel.
 | seeds whose two runs give the same `journal_hash` and `run_id` | 50 |
 | seeds whose `pmx run replay` rebuilt `results.json` byte for byte (exit 0) | 50 |
 | seeds whose accounting invariant holds for every agent, from the journal alone | 50 |
-| distinct journal hashes over the seeds | 50 (one per seed: the seed enters `config_hash` and the run id) |
+| distinct journal hashes over the seeds | 50 (one per seed, and by the `run_started` line alone: see below) |
 | bars per run | 452 |
 | events per run | 94803 |
-| wall clock per backtest, eight in parallel | 148.9 to 326.9 s |
+| wall clock per backtest, eight in parallel | 148.5 to 465.7 s (the 60 freshly run backtests) |
 | seed 0 | `r-83fbf211-0-5f754f05`, journal `9d93901cf44dd2a8...` |
 | seed 49 | `r-83fbf211-49-991bb77b`, journal `44ef8c992fd038dd...` |
+
+**What the seed changes over this roster: one line.** None of the three stubs draws from the `RngTree`
+substream `reset` hands it (`tests/stub_roster.py`: `reset` counts the call and discards the `Random`),
+and `pmx/engine/execution.py` and `pmx/engine/liquidity.py` draw nothing either, so the historical
+liquidity model and all three agents are seed-free. Masking the run id, the seed 0 and seed 1 journals
+differ in exactly 1 of their 94 803 lines, the `run_started` line that carries the seed and the
+`config_hash` it enters; every one of the 50 seeds has the same 94 803 events. The 50 rows above are
+therefore 50 reproductions of one run plus a config echo: they measure that the same inputs give the
+same bytes on 50 config hashes, which is the half of AC-3 the stub roster can measure. The other half,
+the engine under a *varying* RNG, is the measurement below.
 
 The invariant is recomputed per agent per seed from `journal.jsonl` and nothing else: `cash_cents ==
 bankroll + sum(filled.cash_delta) - sum(fee_charged.fee) + sum(settlement_applied.cash_delta) +
 sum(cash_event_applied.cash_delta)` at the last `equity_marked`, `reserved_cents == 0`,
-`positions_value_cents == 0` and `equity == cash + positions_value`, in integers. every seed passes all four checks. The driver
+`positions_value_cents == 0` and `equity == cash + positions_value`, in integers. Every seed passes all
+four checks. The driver
 and its per-seed JSON are in the scratchpad (`g2d/ac3_driver.py`, `g2d/ac3/summary.json`); one seed 0
 run reports `contrarian` brier 551 889, skill -319 414, pnl 40 686 cents, 284 of 287 markets traded;
 `limiter` 1 market traded, pnl -1; `market_follower` skill 0, pnl 0.
 
-**Verdict: pass, with these limits.** (1) The population is three stubs, not the eleven
-scripted families of 10.5: AC-3's "full scripted population" is measurable only after A1 lands, and the
-same command (`--roster-module pmx.agents.registry`, the default) is what will measure it. (2) Two of the
-three stubs trade; `market_follower` never does, by design. (3) The three stubs are binary-only; the
+How the 100 runs were taken, exactly: an earlier attempt of the driver on this same tree was killed, and
+the driver reuses a run directory that already carries `results.json` and `manifest.json`, so 40 of the
+100 backtests (24 of the 50 in `a`, 16 of the 50 in `b`) are that attempt's, reported with `seconds: 0.0`,
+and 60 were run fresh. The hashes agreed across the two attempts on every seed, which is why the
+determinism row reads 50 of 50: it compares runs taken before and after the gate's own edits to the tree.
+The wall-clock row covers the 60 fresh backtests only.
+
+**The seed-consuming roster** (added by the gate's audit pass, lot 4e). `tests/stub_roster_rng.py` is the
+same three stubs plus `coin_flipper`, which draws one belief per open market per bar from the substream
+`reset` hands it and sizes it by 10.5's default rule, so the seed reaches the events and not only the
+header. The same protocol, same dataset, same CLI, `--roster-module tests.stub_roster_rng`, seeds `0..5`,
+six in parallel:
+
+| Measured | Value |
+|---|---|
+| seeds run, each twice into two directories | 6 of 6 |
+| seeds whose two runs give the same `journal_hash` and `run_id` | 6 |
+| seeds whose `pmx run replay` rebuilt `results.json` byte for byte (exit 0) | 6 |
+| seeds whose accounting invariant holds for all four agents, from the journal alone | 6 |
+| distinct journal hashes | 6 |
+| events per run, by seed | 113 489, 111 860, 116 024, 110 183, 115 016, 113 126 |
+| positive fills, by seed | 3 118, 3 017, 3 273, 2 803, 3 235, 3 170 |
+| bars per run | 452 (unchanged: the calendar does not depend on the roster) |
+| wall clock per backtest, six in parallel | 427.5 to 476.4 s |
+| `contrarian` final cash, seed 0 and seed 1 | 141 949 and 142 087 cents (the fourth agent moves the book the others trade) |
+
+The event count, the fill count and the other agents' cash all move with the seed, so this run exercises
+the `RngTree` and the invariant is checked on six different books rather than on one book six times.
+`tests/test_runner.py::test_a_seed_consuming_agent_makes_the_seed_change_the_journal_it_reproduces`
+keeps the claim in the suite (two seeds, each run twice: same hash within a seed, different forecasts and
+different fills across seeds; mutation-checked, a `coin_flipper` that ignores the substream fails it).
+Driver and per-seed JSON: `<scratchpad>/lot4e/ac3_rng_driver.py`, `<scratchpad>/lot4e/ac3rng/summary.json`.
+
+**Verdict: partial** (the gate first graded this `pass` with the limits below; its audit pass regraded it,
+because AC-4's analogous gap is graded `partial` and the acceptance audit over AC-1..AC-34 reads these
+verdicts at face value). What is measured is measured: determinism, replay and the invariant hold on 50
+seeds of the three-stub roster and on 6 seeds of the seed-consuming roster, over the real dataset, through
+the real CLI. What AC-3 asks for and this is not: (1) The population is three stubs (four with
+`coin_flipper`), not the eleven scripted families of 10.5: AC-3's "full scripted population" is
+measurable only after A1 lands, and the same command (`--roster-module pmx.agents.registry`, the
+default) is what will measure it, at which point AC-3 is regraded. (2) Two of the three stubs trade;
+`market_follower` never does, by design. (3) The three stubs are binary-only; the
 continuous path of the runner is exercised by `tests/test_runner.py` on a synthetic perp and a session
 instrument, not by this dataset, which carries binaries only. (4) The runs were taken on the engine as it
 stands at this gate; rulings R213, R214, R217 and R221 declare shapes that will move the journal or
@@ -715,8 +765,14 @@ O4's claim path.
 
 ### 8.5 The rulings
 
-28 rulings, R200 to R227, in 15.3. They settle the 56 merged contract issues, the 30 cross-package
-mismatches and the 23 items the reconciliation and redesign agents left. Seven resolved **against** the
+30 rulings, R200 to R229, in 15.3. They settle the 56 merged contract issues, the 30 cross-package
+mismatches and the 23 items the reconciliation and redesign agents left. R228 was added by the audit
+pass of this gate (lot 4e): merged issue I09 (`last_bar(i)` against R186's collapse of `delisted_at_ms`
+into `MarketMeta.resolved_at_ms`) was settled by no ruling while 15.3 and this section claimed all 56
+were settled, and `engine/calendar.py` cited "a gate G2 ruling" a reader could not find. The ruling
+states what the code already did (the field is read off `Dataset.market(id).instrument`) and amends 7.2
+and 17.2 in place; no behaviour moved. R229, from the same pass, records the seed-consuming roster the
+AC-3 measurement gained and the regrade of AC-3 to `partial` (8.3). Seven resolved **against** the
 proposed resolution: R202 (the fixture is completed, not regenerated, because regeneration would have made
 E5's two reproduction tests compare a run to itself), R205 (the protocols stay structural stand-ins in the
 engine rather than moving `Agent`, `Memory`, `Hive` into `pmx.types`), R207 (two error families for two
@@ -731,6 +787,14 @@ the runner's `MemoryLike`/`HiveLike` extending the observation's, the five view 
 `Journal.take_tail` replacing the runner's subclass, `make_agent` and `--roster-module` in `cli_run`,
 `.scratch/` in `.gitignore`, the PRD v4 1.2 correction (R189) and the PLAN_V3 F4 row (R174), and every
 stale "reported as a contract issue" comment in the engine files replaced by the ruling that settled it.
+
+One artefact outside its owner, for the record (found by the gate's audit, lot 4e): lot 4c's reconciliation
+regenerated `data/demo_v1/manifest.json`, D1's generated pack, to carry R188's `filters.config.kinds:
+["binary"]` (commit `8c38cb8d`, one inserted key). The file equals a fresh `migrate_v1` output today,
+which `tests/test_types_loader.py::test_the_committed_demo_pack_is_what_the_migration_produces_today`
+asserts, and `dataset_hash` did not move because the filters sit outside the hash. Regenerating a pack
+after a schema ruling is D1's or a gate's; the edit was neither recorded nor attributed at the time, and
+this sentence is that record.
 
 ### 8.6 What 17.9 still owes, and what this gate declared without applying
 
@@ -760,7 +824,70 @@ assigned to the next engine lot (E2 or E5, before the first claim):
   hive under a sensor are C1c's (the sensor-hook report lists them).
 * The four rows of 8.6 above, with the fixture and the pinned hashes regenerated in the same change.
 * `pmx audit leaks` (A6) and the `pmx` dispatch (U4).
+* **`run_id` does not name the population** (found by lot 4e's seed-consuming sweep). `run_id` is
+  `r-<dataset_hash[:8]>-<seed>-<config_hash[:8]>` and the roster is journaled in `run_started.roster`
+  but enters no hash, so the four-agent `tests.stub_roster_rng` runs of 8.3 carry the **same run ids** as
+  the three-agent `tests.stub_roster` runs of the same seeds (`r-83fbf211-0-5f754f05` and the rest) with
+  different journals. Two populations therefore collide in the run index and in a claim's provenance.
+  Naming the roster in `config_hash` moves the run id of every future run, so it belongs to the lot that
+  applies R213, R214, R217 and R221 and bumps `ENGINE_VERSION` with them (R227), and it needs a ruling
+  first: nothing in 9.5 or 13.2 says a run id must identify its population.
 * `dataset_hash` moving between two rebuilds of the same data (`NewsItem.fetched_at_ms`), open since
   section 7.
 * The runner passes one sensor set to every agent (`sensors=None`); `sensors=genome.sensors` needs A1's
   `Genome` and C1c's declaration.
+
+### 8.8 The audit pass of gate G2 (lot 4e, 2026-09-09): what two auditors found, and what changed
+
+Two auditors read the gate's closure (one on the contract, one on the tests and the measurements). One
+blocker, six majors and five minors survived their own verification at the file and the line; every one
+of them held, and all are fixed here. Nothing was refuted.
+
+| Finding | Where it was wrong | Fixed by |
+|---|---|---|
+| blocker | 10.4's `HiveView` cap table still read `bar_ms == now_ms - interval_ms`, the rule R211 superseded three sections earlier | the row now reads the instrument's previous bar, and R211's `Sections` column gains 10.4 |
+| major | merged issue I09 (`last_bar(i)` against R186's collapse of `delisted_at_ms`) was settled by no ruling, while 15.3 and 8.5 claimed all 56 were settled and `engine/calendar.py` cited a gate ruling that did not exist | **R228**, amending 7.2 and 17.2 in place; `calendar.py` cites it |
+| major | 8.3 presented the 50-seed sweep as 50 independent measurements when the seed enters only `run_started` over this roster | 8.3 says so in plain words and measures the seed-consuming roster (`tests/stub_roster_rng.py`, **R229**) beside it |
+| major | 17.3's debit paragraph still carried R179's literal trigger, not R215's widened one | the paragraph carries R215's sentence and cites it |
+| major | 8.8's fee rows assigned the Kalshi PDF re-read to E2, three lines above the paragraph giving it to D2 | both rows name D2 and cite R216 |
+| major | 13.2's `ENGINE_VERSION` comment stated a trigger R227 does not apply, and R227 named a section it had not amended | 13.2 carries R227's trigger, with the paragraph that says which byte movement bumps and when |
+| major | AC-3 was graded `pass` on a three-stub roster while AC-4's analogous gap is graded `partial` | AC-3 is **partial** in 8.3, with what is measured stated exactly (R229) |
+| minor | the wall-clock row covered one directory of the two; 40 of the 100 runs were reused from a killed attempt and this was not disclosed | both stated in 8.3 |
+| minor | R219 and R204 named sections that carried nothing of theirs | the one-line cross-reference added to 8.3, 16.4 and 16.5 |
+| minor | `data/demo_v1/manifest.json` was regenerated in lot 4c with no record | recorded in 8.5 |
+| minor | HANDOFF section 4 still listed two defects the gate and the data finish closed | struck and dated, pointing at sections 7 and 8 |
+
+One defect the fix pass found on its own is open, not fixed: `run_id` does not name the population (8.7,
+last bullet). It needs a ruling and a version bump, so it belongs to the next engine lot, not to an audit
+pass whose brief was the record.
+
+The four checks after every edit above:
+
+```
+$ .venv/Scripts/python.exe -m pytest -p no:warnings -rs
+....................                                                     [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_import_kalshi.py:1264: live network probe; set PMX_LIVE=1 to run it
+SKIPPED [1] tests\test_import_manifold.py:1124: set PMX_LIVE=1 to hit api.manifold.markets
+SKIPPED [1] tests\test_import_polymarket.py:795: live network test; set PMX_LIVE=1 to run
+SKIPPED [1] tests\test_news.py:1222: PMX_LIVE is not set
+1024 passed, 4 skipped in 524.32s (0:08:44)
+EXIT 0
+
+$ .venv/Scripts/python.exe -m ruff check src tests
+All checks passed!
+RUFF_EXIT=0
+
+$ .venv/Scripts/python.exe -m mypy --strict
+Success: no issues found in 65 source files
+MYPY_EXIT=0
+
+em-dash sweep (U+2014, every file under src, tests, schemas, docs, web/src)
+files scanned: 220
+em-dash hits: 0
+```
+
+1 024 passed is 1 023 plus the one test this pass added
+(`test_a_seed_consuming_agent_makes_the_seed_change_the_journal_it_reproduces`, mutation-checked: a
+`coin_flipper` whose belief ignores the substream fails it on the forecasts). No test was weakened: no
+assertion was removed, no tolerance loosened, no parametrisation narrowed, nothing skipped or xfailed.
