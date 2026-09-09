@@ -37,7 +37,7 @@ class LeaderboardRow:
     The field order differs from section 12.11's listing, which puts defaulted fields (``kind``,
     ``horizon_bars``, ``vendor``, ``n_units``, ``n_quantile_forecasts``, ``pinball_skill``) **before**
     required ones and is therefore not a dataclass Python can define. Every field, every name and every
-    default is the contract's; only the order is legal. Reported as a contract issue.
+    default is the contract's; 12.11 lists them in this order since ruling R221.
 
     Nine columns are agent-level rather than slice-level: ``sharpe_milli``, ``max_drawdown_bp``,
     ``fill_ratio_ppm``, ``turnover_ppm``, ``abstention_ppm``, ``explicit_abstain_ppm``,
@@ -49,8 +49,9 @@ class LeaderboardRow:
 
     ``n_quantile_forecasts`` is ``0`` on every row for the same reason: section 12.11 gives
     ``PerMarket`` the two pinball losses of a cell but not the count of the forecasts that stated a
-    quantile, so the column is not computable from a ``RunProjection`` and is reported as a contract
-    issue rather than approximated. ``vendor`` reads the row's ``provider``, which is what a binary
+    quantile, so the column is not computable from a ``RunProjection`` today; ruling R221 declares
+    ``PerMarket.n_quantile_forecasts`` and E5 fills it in the next lot rather than approximating it here.
+    ``vendor`` reads the row's ``provider``, which is what a binary
     provider's vendor is (17.1) and what a single-venue continuous slice carries.
     """
 
@@ -124,7 +125,8 @@ def seed_of_run_id(run_id: str) -> int:
     ``RunProjection`` carries ``run_id`` but no ``seed``, and the block bootstrap needs the run's
     ``RngTree`` (section 6.2). The id is ``r-<dataset8>-<seed>-<config8>``, so the seed is recoverable
     from the journal-derived id and the intervals of a rebuilt leaderboard are byte-identical to the
-    original's. Reported as a contract issue: ``RunProjection`` could simply carry ``seed``.
+    original's. Ruling R221 declares ``RunProjection.seed``; when E5 fills it in the next lot this parser
+    goes and ``build`` reads the field.
     """
     if RE_RUN_BACKTEST_ID.fullmatch(run_id) is None and RE_RUN_EVOLUTION_ID.fullmatch(run_id) is None:
         raise JournalError("run id does not match section 2's format", run_id=run_id)
@@ -144,7 +146,7 @@ def build(
         projection: The run's projection, rebuilt from its journal.
         contaminated: Contaminated market ids per key, from the caller (section 11.5). The declared
             mapping is keyed by **model** and a ``RunProjection`` carries no model per agent, so the
-            key is read as an ``agent_id`` here; reported as a contract issue. An agent with no entry
+            key is an ``agent_id`` (ruling R221; the caller maps a model onto its seats). An agent with no entry
             reports ``n_clean = None``.
         tree: The statistics tree, defaulting to ``RngTree(seed_of_run_id(run_id)).child("stats")``
             (a keyword-only extension under preamble rule 2, reported).

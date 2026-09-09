@@ -555,3 +555,212 @@ the build rather than the hash.
 
 Checked after the rebuild: `pytest` 662 passed, 4 skipped (the legal `PMX_LIVE` skips); `ruff check src
 tests` clean; `mypy --strict` clean over the 49 source files of `src/pmx`.
+
+
+## 8. Gate G2, 2026-09-09: the engine wave closed (`docs/CONTRACTS_V2.md` 15.3, rulings R200 to R227)
+
+The five engine packages (E1 observation, E2 execution, E3 scoring, E4 statistics, E5 runner) were built
+in parallel against sections 16 and 17 and never saw each other's code. Lot 4c reconciled them (1 023
+tests green at commit `8c38cb8d`), lot 4c2 finished the redesign at the root (commit `7493d688`, 7
+mutation checks), and this gate ruled on what they raised, applied what 17.9 deferred, and measured AC-3
+and AC-4 on the real dataset. Everything below was measured on the tree at the end of the gate, not taken
+from a report.
+
+### 8.1 What the engine wave built
+
+| File | Owner | Lines | Tests (file, count) |
+|---|---|---|---|
+| `src/pmx/engine/calendar.py` | E1 | 726 | `tests/test_observation.py`, 90 (shared with observation) |
+| `src/pmx/engine/observation.py` | E1 | 1 360 | idem |
+| `src/pmx/engine/execution.py` | E2 | 1 641 | `tests/test_execution.py`, 84 |
+| `src/pmx/engine/liquidity.py` | E2 | 849 | idem |
+| `src/pmx/engine/fees.py` | E2 | 496 | idem |
+| `src/pmx/scoring.py` | E3 | 767 | `tests/test_scoring.py`, 63 |
+| `src/pmx/metrics/calibration.py` | E3 | 282 | idem |
+| `src/pmx/metrics/stats.py` | E4 | 703 | `tests/test_stats.py`, 44 |
+| `src/pmx/engine/runner.py` | E5 | 1 927 | `tests/test_runner.py`, 40 |
+| `src/pmx/metrics/projection.py` | E5 | 1 295 | idem |
+| `src/pmx/metrics/leaderboard.py` | E5 | 312 | idem |
+| `src/pmx/metrics/performance.py`, `behavioral.py` | E5 | 198, 142 | idem |
+| `src/pmx/store.py` | E5 | 398 | idem |
+| `src/pmx/cli_run.py` | E5 | 282 | idem (`pmx run backtest`, `pmx run replay`) |
+| `tests/stub_roster.py` | E5 (created by the gate, R200) | 191 | not a test file: the scripted-stub roster |
+
+Landed by the gates' passes in wave-1 files and measured here: `src/pmx/types.py` 3 030 lines (every
+name of 17.9's first row, `BINARY_TICK_SIZE_MICRO == 100`, seven `CASH_EVENT_KINDS` with `carry`,
+`RunConfig.horizons_bars` resolved in `__post_init__`, the five view caps of R208), `src/pmx/journal.py`
+1 984 lines (32 event types, `oneOf` equal to `EVENT_TYPES`, `Journal.take_tail`), `src/pmx/data/sessions.py`
+333 lines (rule 11's one implementation), `src/pmx/data/loader.py` 1 015 lines (the `instruments/` and
+`calendars/` walk). `tests/test_types_loader.py` 77 tests, `tests/test_rng_journal.py` 65,
+`tests/test_contract_schemas.py` 85, `tests/test_architecture.py` 14.
+
+### 8.2 The four checks, verbatim
+
+```
+$ .venv/Scripts/python.exe -m pytest -p no:warnings -rs
+...................                                                      [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] tests\test_import_kalshi.py:1264: live network probe; set PMX_LIVE=1 to run it
+SKIPPED [1] tests\test_import_manifold.py:1124: set PMX_LIVE=1 to hit api.manifold.markets
+SKIPPED [1] tests\test_import_polymarket.py:795: live network test; set PMX_LIVE=1 to run
+SKIPPED [1] tests\test_news.py:1222: PMX_LIVE is not set
+1023 passed, 4 skipped in 435.71s (0:07:15)
+EXIT 0
+
+$ .venv/Scripts/python.exe -m ruff check src tests
+All checks passed!
+RUFF_EXIT=0
+
+$ .venv/Scripts/python.exe -m mypy --strict
+Success: no issues found in 65 source files
+MYPY_EXIT=0
+
+em-dash sweep (U+2014, every file under src, tests, docs)
+files scanned: 208
+em-dash hits: 0
+```
+
+The four skips are the legal `PMX_LIVE` network probes. State at the start of the gate, for the record:
+1 023 passed, ruff clean, mypy clean (lot 4c2's tree).
+
+### 8.3 AC-3: the scripted-stub population on `data/datasets/y2026`
+
+AC-3 asks for a run of the full scripted population that journals, replays with an identical hash and
+satisfies the accounting invariant on every agent for 50 seeds. The scripted families are wave 3's and do
+not exist, so the population is the **scripted-stub roster** of `tests/stub_roster.py` (ruling R200):
+`contrarian` (`legacy(name=0)`, the mirror of the market price, sized by 10.5's default rule),
+`limiter` (one resting limit order per open market per bar at 1 bp, `ttl_bars = 1`) and
+`market_follower` (`follower(1000, 0)`, never an order). Three agents, of which two trade. Driven through
+the real CLI, every seed twice into two directories, then replayed:
+
+```
+.venv/Scripts/python.exe -m pmx.cli_run backtest --dataset data/datasets/y2026 --seed <s> \
+    --runs-dir <dir a|b> --roster-module tests.stub_roster --no-index --json
+.venv/Scripts/python.exe -m pmx.cli_run replay <run_id> --runs-dir <dir a>
+```
+
+Dataset `y2026`, hash `83fbf21166899712...`, 287 markets (220 Kalshi, 67 Manifold), 1 440-minute bars,
+window 2025-09-07 to 2026-09-06. Seeds `0..49`, eight in parallel.
+
+| Measured | Value |
+|---|---|
+| seeds run | 50 of 50 |
+| seeds whose two runs give the same `journal_hash` and `run_id` | 50 |
+| seeds whose `pmx run replay` rebuilt `results.json` byte for byte (exit 0) | 50 |
+| seeds whose accounting invariant holds for every agent, from the journal alone | 50 |
+| distinct journal hashes over the seeds | 50 (one per seed: the seed enters `config_hash` and the run id) |
+| bars per run | 452 |
+| events per run | 94803 |
+| wall clock per backtest, eight in parallel | 148.9 to 326.9 s |
+| seed 0 | `r-83fbf211-0-5f754f05`, journal `9d93901cf44dd2a8...` |
+| seed 49 | `r-83fbf211-49-991bb77b`, journal `44ef8c992fd038dd...` |
+
+The invariant is recomputed per agent per seed from `journal.jsonl` and nothing else: `cash_cents ==
+bankroll + sum(filled.cash_delta) - sum(fee_charged.fee) + sum(settlement_applied.cash_delta) +
+sum(cash_event_applied.cash_delta)` at the last `equity_marked`, `reserved_cents == 0`,
+`positions_value_cents == 0` and `equity == cash + positions_value`, in integers. every seed passes all four checks. The driver
+and its per-seed JSON are in the scratchpad (`g2d/ac3_driver.py`, `g2d/ac3/summary.json`); one seed 0
+run reports `contrarian` brier 551 889, skill -319 414, pnl 40 686 cents, 284 of 287 markets traded;
+`limiter` 1 market traded, pnl -1; `market_follower` skill 0, pnl 0.
+
+**Verdict: pass, with these limits.** (1) The population is three stubs, not the eleven
+scripted families of 10.5: AC-3's "full scripted population" is measurable only after A1 lands, and the
+same command (`--roster-module pmx.agents.registry`, the default) is what will measure it. (2) Two of the
+three stubs trade; `market_follower` never does, by design. (3) The three stubs are binary-only; the
+continuous path of the runner is exercised by `tests/test_runner.py` on a synthetic perp and a session
+instrument, not by this dataset, which carries binaries only. (4) The runs were taken on the engine as it
+stands at this gate; rulings R213, R214, R217 and R221 declare shapes that will move the journal or
+`results.json` of every future run when the next lot applies them (section 8.6 below), so these hashes
+are evidence for this tree and not pins.
+
+### 8.4 AC-4: the four leak families
+
+AC-4 asks for the poisoned-future, clock, seal and shuffled-outcome tests to pass and to be part of
+`pmx audit leaks`. The families, by test id (ruling R225), run by name:
+
+```
+$ .venv/Scripts/python.exe -m pytest -o addopts= -p no:warnings -v <the twelve ids of ruling R225>
+tests/test_observation.py::test_the_clock_test PASSED                    [  8%]
+tests/test_observation.py::test_the_poisoned_future_test PASSED          [ 16%]
+tests/test_observation.py::test_the_poisoned_future_test_on_a_continuous_instrument PASSED [ 25%]
+tests/test_observation.py::test_one_of_each_cluster_and_detector_record_is_refused PASSED [ 33%]
+tests/test_builder.py::test_the_built_dataset_loads_seals_verifies_and_fails_on_a_changed_byte PASSED [ 41%]
+tests/test_types_loader.py::test_seal_stamps_an_imported_dataset_and_rehashes_it PASSED [ 50%]
+tests/test_stats.py::test_permutation_null_of_the_market_follower_is_exactly_zero PASSED [ 58%]
+tests/test_stats.py::test_permutation_null_of_a_coin_flip_agent_centres_on_zero PASSED [ 66%]
+tests/test_stats.py::test_permutation_null_of_a_skilled_agent_is_unmatched_and_negative PASSED [ 75%]
+tests/test_stats.py::test_continuous_null_of_the_random_walk_is_exactly_zero PASSED [ 83%]
+tests/test_stats.py::test_continuous_null_of_a_coin_flip_agent_centres_on_zero PASSED [ 91%]
+tests/test_stats.py::test_continuous_null_of_a_directional_agent_is_unmatched_and_negative PASSED [100%]
+============================= 12 passed in 3.67s ==============================
+EXIT 0
+```
+
+Read, not only run: the binary poisoned-future test injects a future bar (close `7777`, volume
+`987654321`), a future news item, a memory record and a hive lesson stamped after `now_ms`, another
+agent's open forecast and the resolution of a market settling at this very bar, and asserts by content
+match on the rendered JSON that none surfaces while a visible headline does; the continuous one injects a
+`delisted_at_ms`, a `last_bar` and an unapplied dividend and asserts the applied one is shown. The clock
+test is 8.3's key-set scan over `leak_scan_payload` plus the two bar-count identities and the as-of price.
+The seal test changes one byte of a market file and asserts `verify_dataset_report` names that file. The
+shuffled-outcome family is E4's permutation null: the market follower's null is exactly zero, a coin flip
+centres on zero, a skilled agent's is unmatched and negative, and the same three on the continuous null.
+
+**Verdict: partial.** All twelve pass. `pmx audit leaks` does not exist: section 13 gives `cli_audit.py`
+to A6 (wave 3) and the `pmx` dispatch to U4, so the gate did not create the command in a file two later
+packages own; ruling R225 names the twelve ids A6 mounts and the amnesic test it adds. And the
+shuffled-outcome family proves the null, not PRD 6.3's population statement ("no scripted agent's skill
+lower bound exceeds zero on the training set over 200 seeds"), which needs the scripted families and
+O4's claim path.
+
+### 8.5 The rulings
+
+28 rulings, R200 to R227, in 15.3. They settle the 56 merged contract issues, the 30 cross-package
+mismatches and the 23 items the reconciliation and redesign agents left. Seven resolved **against** the
+proposed resolution: R202 (the fixture is completed, not regenerated, because regeneration would have made
+E5's two reproduction tests compare a run to itself), R205 (the protocols stay structural stand-ins in the
+engine rather than moving `Agent`, `Memory`, `Hive` into `pmx.types`), R207 (two error families for two
+conditions rather than one), R215 (the maker fee is handled by truncating the partial fill, not by
+reserving it), R219 (deflation at `ALPHA_PPM` only rather than an `alpha_ppm` field on `Interval`), R224
+(both metrics files read `RANDOM_WALK_BRIER_MICRO` from `pmx.types`, the owner, not through
+`pmx.scoring`), R225 (`pmx audit leaks` is A6's, not U4's). `ENGINE_VERSION` stays `2.0.0` and
+`CONTRACT_VERSION` `"2.0"` (R227): no run exists whose bytes a ruling could move.
+
+Applied in code at this gate: the one `InstrumentLike`/`CashEventLike` declaration (`engine/calendar.py`),
+the runner's `MemoryLike`/`HiveLike` extending the observation's, the five view caps in `pmx.types`,
+`Journal.take_tail` replacing the runner's subclass, `make_agent` and `--roster-module` in `cli_run`,
+`.scratch/` in `.gitignore`, the PRD v4 1.2 correction (R189) and the PLAN_V3 F4 row (R174), and every
+stale "reported as a contract issue" comment in the engine files replaced by the ruling that settled it.
+
+### 8.6 What 17.9 still owes, and what this gate declared without applying
+
+17.9 rows applied and verified here: `pmx.types` (R201), `market.v2.json` and `dataset.v1.json` (R201),
+the loader walk (R201, R223), `pmx.data.sessions` (R203), the PRD v4 correction (R201), the journal
+classes and the fixture (R202), E2's liquidity and execution names (R204, R213, R214), E4's permutation
+(R219). Rows that stay open with their gate: `news.v1.json`'s widening (gate G3b), `pyproject.toml`
+package-data for `data/calendars/*.json` (gate G3b), `Hive.write_forecast`'s four arguments (gate G3, A3),
+`open_sealed_test(..., kind=)` and the claim record (gate G4, O1 and O4), `opportunity.v1.json` (amendment
+C2).
+
+Declared by a ruling, not yet in code, each moving the journal or `results.json` of every future run and
+assigned to the next engine lot (E2 or E5, before the first claim):
+
+| Ruling | Shape | Why it is not applied here |
+|---|---|---|
+| R213 | `Execution.__init__(..., t0_ms, t1_ms)` and the last-bar drain of a queued item with no later bar as `order_rejected(not_tradable)` | adds events to every journal; today 5 of 1 627 demo-pack items are dropped and `test_every_queued_item_produces_exactly_one_execute_phase_event` pins `dropped > 0` |
+| R214 | `quote_bar(..., bar_prev=)` | moves the fallback base of every fill on a quoteless Kalshi bar |
+| R217 | `project()` builds continuous calibration entries through `continuous_entry` | a continuous row's `ece_ppm` is `0` today |
+| R221 | `PerMarket.n_quantile_forecasts`, `RunProjection.seed` | `results.json` gains two keys; `seed_of_run_id` goes |
+
+### 8.7 Open for the next lot
+
+* Lot 5a, amendment C1c: section 18 (sensors, rules, minute grids, workflow genomes) and the normative
+  text of both reviews (D-R1..D-R14, D-S1..D-S14); the `sensors` keyword of `build_observation`, the
+  `Observation.sensors` record for replay, `SensorAbsentError`, and the placement of `cash_events` and the
+  hive under a sensor are C1c's (the sensor-hook report lists them).
+* The four rows of 8.6 above, with the fixture and the pinned hashes regenerated in the same change.
+* `pmx audit leaks` (A6) and the `pmx` dispatch (U4).
+* `dataset_hash` moving between two rebuilds of the same data (`NewsItem.fetched_at_ms`), open since
+  section 7.
+* The runner passes one sensor set to every agent (`sensors=None`); `sensors=genome.sensors` needs A1's
+  `Genome` and C1c's declaration.

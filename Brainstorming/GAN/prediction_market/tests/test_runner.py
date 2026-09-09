@@ -48,13 +48,13 @@ the continuous half runs over the real types and not over a stand-in for them.
 
 from __future__ import annotations
 
-import random
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
 import pytest
+from tests.stub_roster import StubAgent, StubGenome, contrarian, limit_agent, market_follower
 
 from pmx import ENGINE_VERSION
 from pmx.cli_run import main as cli_main
@@ -125,7 +125,6 @@ from pmx.types import (
     Session,
     SessionCalendar,
     market_set_hash,
-    ppm_from_bp,
     round_half_up,
 )
 
@@ -159,110 +158,11 @@ LIFE_MEAN_PRICE_BP = 6_400
 
 
 # --------------------------------------------------------------------------------------------------
-# The scripted stubs the contract names (section 10.5). A1 ships the real families in wave 3; these are
-# E5's own test vehicles and they implement exactly the two rows of the default roster this journal
-# uses: ``follower(shrink_permille=1000, edge_min_bp=0)``, which ties the market's Brier and trades
-# nothing, and ``legacy(name=0)``, the contrarian, which states ``PPM_ONE - ppm_from_bp(last)`` and
-# takes the position the default rule of 10.5 sizes.
+# The scripted stubs the contract names (section 10.5) live in tests/stub_roster.py, the module the
+# gate's ``pmx run backtest --roster-module tests.stub_roster`` reaches (ruling R200); this file imports
+# them so one definition of each stub exists. TalkativeAgent, NoisyAgent and the perp agents below are
+# test vehicles of this file alone.
 # --------------------------------------------------------------------------------------------------
-@dataclass(frozen=True, slots=True)
-class StubGenome:
-    """A genome in the shape ``run_started.roster`` journals (section 10.1)."""
-
-    family: str
-    genes: tuple[tuple[str, int], ...]
-
-    def to_dict(self) -> dict[str, object]:
-        return {
-            "family": self.family,
-            "genes": {name: value for name, value in sorted(self.genes)},
-            "inner": None,
-            "members": [],
-            "prompt": None,
-        }
-
-
-def _default_target(prob_ppm: int, last_price_bp: int) -> int:
-    """The default position rule of section 10.5: full size 20 points of edge from the price."""
-    edge_ppm = prob_ppm - ppm_from_bp(last_price_bp)
-    return max(-100, min(100, edge_ppm * 100 // 200_000))
-
-
-@dataclass(slots=True)
-class StubAgent:
-    """One scripted agent: a belief rule, the default position rule, and no memory of its own."""
-
-    agent_id: str
-    family: str
-    genome: StubGenome
-    trades: bool = True
-    needs_gateway: bool = False
-    kind: str = "scripted"
-    model: str | None = None
-    knowledge_cutoff_ms: int | None = None
-    observation: Observation | None = None
-    learned: list[ResolutionEvent] = field(default_factory=list)
-    resets: int = 0
-
-    def belief_ppm(self, last_price_bp: int) -> int:
-        if self.family == "legacy":
-            return PPM_ONE - ppm_from_bp(last_price_bp)
-        return ppm_from_bp(last_price_bp)
-
-    def reset(self, *, rng: object, memory: object, config: RunConfig) -> None:
-        assert isinstance(rng, random.Random)
-        self.resets += 1
-
-    def observe(self, obs: Observation) -> None:
-        self.observation = obs
-
-    def decide(self) -> Actions:
-        obs = self.observation
-        assert obs is not None
-        actions: list[MarketAction] = []
-        for view in obs.markets:
-            prob_ppm = self.belief_ppm(view.last_price_bp)
-            target = _default_target(prob_ppm, view.last_price_bp) if self.trades else 0
-            if target == 0:
-                actions.append(MarketAction(market_id=view.market_id, prob_ppm=prob_ppm, kind="hold"))
-            else:
-                actions.append(
-                    MarketAction(
-                        market_id=view.market_id,
-                        prob_ppm=prob_ppm,
-                        kind="target",
-                        target_position=target,
-                    )
-                )
-        return Actions(actions_version="actions.v2", markets=tuple(actions))
-
-    def learn(self, event: ResolutionEvent) -> None:
-        self.learned.append(event)
-
-    def snapshot(self) -> dict[str, object]:
-        return {"resets": self.resets}
-
-
-def market_follower() -> StubAgent:
-    """``follower(shrink_permille=1000, edge_min_bp=0)``: the market's own Brier, and no order ever."""
-    return StubAgent(
-        agent_id="market_follower",
-        family="follower",
-        genome=StubGenome(family="follower", genes=(("edge_min_bp", 0), ("shrink_permille", 1_000))),
-        trades=False,
-    )
-
-
-def contrarian() -> StubAgent:
-    """``legacy(name=0)``: the mirror of the market price, sized by the default rule of 10.5."""
-    return StubAgent(
-        agent_id="contrarian",
-        family="legacy",
-        genome=StubGenome(family="legacy", genes=(("name", 0),)),
-        trades=True,
-    )
-
-
 @dataclass(slots=True)
 class RecordingHive:
     """A hive that records the four writes of section 10.4 and returns an empty view.
@@ -372,45 +272,6 @@ class TalkativeAgent(StubAgent):
                 Lesson(text="volume before the close is thin", market_ids=()),
             ),
         )
-
-
-@dataclass(slots=True)
-class LimitAgent(StubAgent):
-    """One resting limit order per open market per bar, priced where it can never cross.
-
-    It exists for ruling R131's identity: section 8.4 gives ``target`` and ``abstain`` two no-op rules
-    and a ``limit`` none, so every intent this agent sends produces exactly one execute-phase event.
-    ``ttl_bars=1`` makes the order expire at the next bar's open phase, so the reservation never grows.
-    """
-
-    def decide(self) -> Actions:
-        obs = self.observation
-        assert obs is not None
-        return Actions(
-            actions_version="actions.v2",
-            markets=tuple(
-                MarketAction(
-                    market_id=view.market_id,
-                    prob_ppm=ppm_from_bp(view.last_price_bp),
-                    kind="limit",
-                    side="buy",
-                    price_bp=1,
-                    size=1,
-                    ttl_bars=1,
-                )
-                for view in obs.markets
-            ),
-        )
-
-
-def limit_agent() -> LimitAgent:
-    """The limit-only roster of the R131 test."""
-    return LimitAgent(
-        agent_id="limiter",
-        family="follower",
-        genome=StubGenome(family="follower", genes=(("edge_min_bp", 0),)),
-        trades=True,
-    )
 
 
 @dataclass(slots=True)

@@ -556,6 +556,8 @@ test.<anything>            test scaffolding only
 Adding randomness means adding a name here **and** in `pmx.rng` in the same commit. An unregistered name
 raises `UnknownSubstreamError`. `numpy` (allowed only in `pmx.metrics.stats`) is seeded as
 `numpy.random.default_rng(tree.seed_for("stats.bootstrap") % 2**64)` and never from its global state.
+`permutation_null` draws its shuffles from `stats.permutation` and its inner resamples from `stats.bootstrap`
+(ruling R219).
 
 ### 6.4 Determinism claims
 
@@ -720,8 +722,9 @@ class Dataset:
     def market(self, market_id: str) -> Instrument: ...    # loaded and validated on demand; a continuous
         # instrument comes back CLIPPED at manifest.split.validation_end_ms (bars, trades, cash_events) so
         # no consumer outside the claim path ever holds the sealed months of a price path (ruling R182)
-    def sealed_market(self, market_id: str) -> Instrument: ...   # the unclipped record; named only in
-        # optimizer/folds.py and optimizer/claims.py (architecture rule 3 scans for it, ruling R182)
+    def sealed_market(self, market_id: str) -> Instrument: ...   # the unclipped record; named only here,
+        # where it is declared, and in optimizer/folds.py and optimizer/claims.py (architecture rule 3
+        # scans for it, rulings R182 and R223)
     def news_for(self, market_id: str, now_ms: int) -> tuple[NewsItem, ...]: ...   # visible_from_ms <= now_ms
     def news_global(self, now_ms: int) -> tuple[NewsItem, ...]: ...
     def calendar(self, calendar_id: str) -> SessionCalendar: ...   # amendment C1b, section 17.2 (sealed);
@@ -951,6 +954,13 @@ every eight hours, the sealed session calendar) is not on this list, because it 
 not a datum about the future. A cluster peer's **prices** are not on this list and
 are visible exactly as any other market's are (section 16.3); what is forbidden is the grouping itself.
 
+The list is **record-scoped** (ruling R209): no `MatchReason`, `EventCluster`, `Constraint`, `OpportunityEvent`
+or unapplied `CashEvent` record reaches an observation, and 8.3's key scan bans their structural names, while
+`kind`, `source`, `currency` and `market_ids` are legal keys of `NewsView`, `MarketView`, `CashEventView`,
+`LessonView` and `NoteView` and are guarded by the poisoned-record test. Two subtrees are legal where they sit
+and are set aside before the key scan: `HiveView.resolutions` (a settled market's published resolution carries
+`resolved_at_ms`) and `MarketView.cash_events` (an applied event's verbatim `detail`, ruling R183).
+
 The poisoned-future test (E1) injects one of each (including a memory record stamped after `now_ms`, one
 of each cluster-derived name, a `CashEvent` whose application bar has not completed, a `delisted_at_ms` and
 a `last_bar` value) and asserts by content match that none surfaces, and that a `CashEvent` applied before
@@ -1140,8 +1150,9 @@ disagrees with these two names, so a journal can never claim a liquidity it did 
 `horizons_bars` and `kinds` are amendment C1b's two fields (sections 17.2 and 17.5, rulings R144 and
 R157) and are in the config for the same reason: the horizons a run scores and the kinds it carries
 change every continuous score and every row, so two runs that differ in them must not share a run id.
-`run_backtest` resolves `()` to the defaults before hashing, so a config that spells the default and one
-that omits it are one run.
+`RunConfig.__post_init__` resolves `()` to `default_horizons_bars(interval_min)` before `to_dict()` and
+therefore before hashing, so a config that spells the default and one that omits it are one run (ruling
+R201; the runner reads the resolved field and resolves nothing of its own).
 
 `memory_from_run_id` and `hive_from_run_id` are in the config for the same reason: memory carried between
 runs is a channel into an observation, so it must move the run id. The runner loads the named run's
@@ -1155,7 +1166,9 @@ Caps the config may not exceed (`pmx.types`, mirrored in the schemas): `BARS_WIN
 50`, `HIVE_FORECASTS_MAX = 2_000`, `MARKETS_PER_OBS_MAX = 200`, `NOTES_MAX_CHARS = 500`,
 `LESSON_MAX_CHARS = 300`, `LESSONS_PER_BAR_MAX = 5`, `RATIONALE_MAX_CHARS = 2_000`,
 `OBSERVATION_MAX_BYTES = 8_388_608` (8 MiB of canonical JSON; the builder raises
-`ObservationTooLargeError` rather than truncating silently).
+`ObservationTooLargeError` rather than truncating silently). A `wiki_asof` grant carries at most
+`news_per_market` revisions (most recent first, `visible_from_ms` filtered, ruling R210), so a granted request
+cannot push an observation over the cap.
 
 Research costs are a table, not a guess, so E1 (which grants) and E5 (which journals) agree:
 
@@ -1253,14 +1266,17 @@ class MarketView:
     tick_size_micro: int = 100
     point_value_micro: int = 1_000_000
     session_calendar_id: str = "continuous"
-    hours_to_next_bar: int = 0             # (next_bar(i, now_ms) - now_ms) // MS_PER_HOUR from the sealed
-                                           # calendar (public, the venue's rule); 0 on a binary
+    hours_to_next_bar: int = 0             # (Calendar.session_next_bar(i, now_ms) - now_ms) // MS_PER_HOUR from
+                                           # the sealed calendar (public, the venue's rule; R208); 0 on a binary
     underlying_id: str | None = None       # a perp's spot twin when the run carries it (17.7 basis)
     twins: tuple[str, ...] = ()            # the instrument's twins the run carries (17.7 pairs)
     cash_events: tuple[CashEventView, ...] = ()   # APPLIED data events, oldest first, <= CASH_EVENTS_VIEW_MAX
                                            # (ruling R183); () on a binary
 
 CASH_EVENTS_VIEW_MAX = 30
+# The view caps stated in prose here and in 8.4 are pmx.types constants the builder imports (ruling R208):
+NEWS_VIEW_TEXT_CHARS = 600; DESCRIPTION_VIEW_CHARS = 1_000; HIVE_RESOLUTIONS_VIEW_MAX = 200
+MEMORY_NOTES_VIEW_MAX = 20; RESEARCH_NEWS_MULTIPLIER = 3
 
 @dataclass(frozen=True, slots=True)
 class CashEventView:                       # amendment C1b, ruling R183: one applied data cash event
@@ -1296,7 +1312,8 @@ class MemoryView:                          # section 10.3; a snapshot, never the
     calibration: tuple[CalibrationBinView, ...]      # (category, horizon_bucket, bin, n, n_yes, n_yes_x2 = 0)
                                                      # n_yes_x2 is 2 * n_yes on a binary slice; on a continuous
                                                      # slice n_yes = n_yes_x2 // 2 and every ratio reads n_yes_x2
-                                                     # over 2 * n (17.5, ruling R194)
+                                                     # over 2 * n (17.5, ruling R194); to_dict() renders
+                                                     # n_yes_x2 always (ruling R217)
     priors: tuple[PriorView, ...]                    # (category or "tag:<tag>", n, n_yes)
     features: tuple[FeatureStatView, ...]            # (family, key, n, sum_milli, sum_sq_milli)
     lessons: tuple[LessonView, ...]                  # (written_at_ms, text, market_ids)
@@ -1308,7 +1325,7 @@ class HiveView:
     reputations: tuple[ReputationView, ...]          # (agent_id, category, n, skill_micro, pnl_cents) visible as of now
     resolutions: tuple[ResolutionView, ...]          # (market_id, outcome, life_mean_price_bp, resolved_at_ms), last 200
     forecasts: tuple[ForecastView, ...]              # (agent_id, market_id, bar_ms, prob_ppm) of SETTLED markets only, <= hive_forecasts
-    prev_bar_forecasts: tuple[ForecastView, ...]     # forecasts of other agents at bar t - interval_ms; EMPTY unless live_coop
+    prev_bar_forecasts: tuple[ForecastView, ...]     # forecasts of other agents at the instrument's previous bar (R211); EMPTY unless live_coop
 
 @dataclass(frozen=True, slots=True)
 class ResearchView:
@@ -1325,7 +1342,8 @@ class Limits:
 `prev_bar_forecasts` is named for what it is. The earlier spelling (`live_forecasts`, "same-bar forecasts")
 was impossible: every observation is built in the `observe` phase, before any agent decides, so no same-bar
 forecast exists, and a view that read one would depend on the order agents are served in and would break
-byte determinism. Normatively: every entry satisfies `bar_ms == now_ms - interval_ms`, the tuple is empty
+byte determinism. Normatively: every entry satisfies `bar_ms ==` the instrument's previous bar (`now_ms - interval_ms` on a
+`continuous` calendar, rulings R192 and R211), the tuple is empty
 when `live_coop` is false, and `Hive.view` is a pure function of `(now_ms, agent_id, market_ids, limits,
 live_coop)`. A3's test asserts both.
 
@@ -1348,9 +1366,15 @@ Brexit market), `close_at_ms` is required in every `MarketView`, and `Limits` ca
 and `news_per_market = 20`, which collide with the bar count of any 90-bar or 20-bar market. The test is
 therefore, literally:
 
-1. the recursive **key set** of `Observation.to_dict()` contains none of `resolved_at_ms`, `n_bars`,
+1. the recursive **key set** of `leak_scan_payload(Observation.to_dict())`, the payload with
+   `HiveView.resolutions` (a settled market's published resolution) and `MarketView.cash_events` (an applied
+   event's verbatim detail, ruling R183) set aside, contains none of `resolved_at_ms`, `n_bars`,
    `bars_remaining`, `bar_index`, `t1_ms`, `resolution`, `resolution_source`, `hardness_tags`, `quality`,
-   `fold`, `final_price_bp`, `delisted_at_ms`, `last_bar`;
+   `fold`, `final_price_bp`, `delisted_at_ms`, `last_bar`, nor any structural name of the records 7.9 bans
+   (`cluster_id`, `constraint_id`, `reasons`, `asof`, `score_permille`, `resolution_span_ms`,
+   `opportunity_id`, `detector_id`, `evidence`, `window`, `duration_bars`, `size_ppm`, `size_net_bp`,
+   `payoff_cents`, `tradable_for_money`, `detail`); `kind`, `source`, `currency` and `market_ids` are legal
+   keys of legal views and are covered by the poisoned-record test, not by the key scan (ruling R209);
 2. for a market whose total bar count is deliberately `bars_window` and again `bars_window + 7`,
    `len(view.bars) == min(bars_window, completed bars so far)`, so a length that leaked the end differs;
 3. `view.last_price_bp == market.bars[k].close_bp` for the last completed bar `k`, and
@@ -1369,7 +1393,10 @@ class BarSlice:
     closing_ids: tuple[str, ...] = ()      # amendment C1b, ruling R187: the instruments with closes(i, t)
 
 class Calendar:
-    def __init__(self, dataset: Dataset, config: RunConfig) -> None: ...
+    def __init__(self, dataset: Dataset, config: RunConfig, *,
+                 calendars: Mapping[str, SessionCalendar] | None = None) -> None: ...
+        # None reads Dataset.calendar(id) for the ids the run's instruments name, else the synthesised
+        # continuous calendar; the keyword is an override (ruling R208)
     @property
     def t0_ms(self) -> int: ...
     @property
@@ -1381,11 +1408,17 @@ class Calendar:
     def prev_bar(self, market_id: str, t_ms: int) -> int | None: ...   # its last bar before t_ms, in the run
         # The three lookups are E1's one implementation (ruling R187): the queue drain of 17.2, decided_at_ms
         # (R192), applies_at (R175) and the forced flat read them and compute nothing of their own.
+    def session_next_bar(self, market_id: str, t_ms: int) -> int | None: ...
+        # The venue's next bar from the sealed calendar, UNCLAMPED by the run window: the one route to
+        # MarketView.hours_to_next_bar, because next_bar is clamped and would announce last_bar(i) (R208)
 
 def build_observation(*, agent_id: str, now_ms: int, config: RunConfig, markets: Sequence[Market],
                       positions: Mapping[str, PositionView], portfolio: PortfolioView,
                       memory: Memory | None, hive: Hive | None, news: Sequence[NewsItem],
-                      grants: Sequence[ResearchGrant]) -> Observation: ...
+                      grants: Sequence[ResearchGrant],
+                      calendar: Calendar | None = None) -> Observation: ...
+    # calendar is keyword-only like the rest and a run carrying a continuous kind passes it (ruling R208):
+    # tradable = open(i, t), hours_to_next_bar and cash_events are lookups only the calendar can answer
 def render_observation_json(obs: Observation) -> str: ...        # canonical_json, for observations/ dumps
 ```
 
@@ -1405,7 +1438,7 @@ class MarketAction:
 
 @dataclass(frozen=True, slots=True)
 class ResearchRequest:
-    kind: str                              # "news" (deeper digest, 3x caps) | "history" (trades_window trades) | "wiki_asof" (background article)
+    kind: str                              # "news" (deeper digest, 3x caps) | "history" (trades_window trades) | "wiki_asof" (background article: at most news_per_market revisions, most recent first, visible_from_ms filtered, R210)
     market_id: str | None                  # required for "history" and "wiki_asof"
 
 @dataclass(frozen=True, slots=True)
@@ -1477,12 +1510,16 @@ An order is expressed on YES (`buy` or `sell`). Netting is mechanical:
   `proceeds_cents(c, 10_000 - p)`; then **opens** `s - c` YES, paying `cost_cents(s - c, p)`.
 - `sell s` with `position = q`: first closes `c = min(s, max(0, q))` YES, receiving
   `proceeds_cents(c, p)`; then opens `s - c` NO, paying `cost_cents(s - c, 10_000 - p)`.
-- A fill never takes cash below zero: the opening part is truncated to `floor(free_cash / unit_cost)`
-  contracts (`unfilled_reason = "cash"`). `free_cash = max(0, cash - reserved)`. Only a debit cash event of
+- A fill never takes cash below zero: the opening part is truncated to the largest size whose total outlay
+  (the opening cost minus the closing proceeds plus the fee of 8.8) free cash pays (`unfilled_reason = "cash"`),
+  which is `floor(free_cash / unit_cost)` on a pure opening fill with no fee (ruling R215; `truncate_for_cash`
+  of 16.1 implements it, ruling R130). `free_cash = max(0, cash - reserved)`. Only a debit cash event of
   section 17.3 can leave `cash < 0` (a debit balance, ruling R179), and while it does `free_cash` is `0`.
 - A resting limit order reserves the worst-case opening cost of its full size at its limit price
   (`cost_cents(size, p)` for `buy`, `cost_cents(size, 10_000 - p)` for `sell`); the reservation is
-  released on fill, expiry or cancellation and re-computed to the remainder on a partial fill.
+  released on fill, expiry or cancellation and re-computed to the remainder on a partial fill; a partial limit
+  fill is truncated so that the remainder's reservation stays funded at the maker fee of 8.8, so a remainder
+  never rests against an unfunded reservation (ruling R215).
 - `avg_cost_bp` of the open leg is volume-weighted on opening fills (`round_half_up`), unchanged on
   closing fills, `0` when flat.
 
@@ -1608,7 +1645,13 @@ class Execution:
     def __init__(self, *, journal: Journal, config: RunConfig,
                  schedules: Mapping[str, FeeSchedule],
                  liquidity: LiquidityModel,                       # section 16.1; keyword-only, required
-                 calendars: Mapping[str, SessionCalendar] | None = None) -> None: ...
+                 calendars: Mapping[str, SessionCalendar] | None = None,
+                 carry_schedules: Mapping[str, CarrySchedule] | None = None) -> None: ...
+        # `carry_schedules` (ruling R213): the carry rows by id, CARRY_SCHEDULES of 17.4 by default, which is
+        # empty until F2 lands a dataset that declares a rate-differential row. OWED (ruling R213): keyword-only
+        # t0_ms: int and t1_ms: int, the run's resolved window, so that at the run's last bar execute_bar drains
+        # every queued item whose instrument has no later bar as order_rejected(not_tradable) (17.2); today
+        # such an item is dropped and E5's test pins the drop; E2 and E5 apply it in the next lot.
         # `calendars` is amendment C1b's (ruling R174): the sealed session calendars by id, which the
         # per-instrument queue of 17.2, borrow_fee and carry (one event per session, days since the previous
         # session close) read. None means the synthesised `continuous` calendar for every instrument, which
@@ -1618,8 +1661,10 @@ class Execution:
         # Called in the DECIDE phase of bar t_ms. It validates and queues; it emits no event, moves no
         # cent and reserves nothing (amendment C1, section 16.2, ruling R110).
     def pending_market_ids(self, *, t_ms: int) -> tuple[str, ...]: ...
-        # The markets holding an item place accepted at the instrument's previous bar (t_ms - interval_ms on
-        # a `continuous` calendar, ruling R192), in canonical market order.
+        # The union, in canonical market order, of the markets holding an item place accepted at the
+        # instrument's previous bar (t_ms - interval_ms on a `continuous` calendar, ruling R192) and the
+        # instruments carrying a resting order of any agent, because a resting order tries against each later
+        # bar's range and execute_bar is the only entry point that prices one (rulings R131 and R213).
         # The runner drives execute_bar over exactly this tuple (amendment C1, section 16.2, ruling
         # R131). It is NOT a subset of bar t's tradable set: a market that closed or settled at
         # t - interval_ms is in it and is owed the order_rejected(not_tradable) of step 0, and the
@@ -1633,9 +1678,19 @@ class Execution:
         # Pays every position, expires every resting order on the market (reason "settled") and returns
         # {agent_id: cash_delta_cents}. It emits order_expired only: the two scored events of the settle
         # phase (settled, settlement_applied) belong to the runner, which holds the forecast history.
-    def mark(self, *, t_ms: int, markets: Sequence[Market]) -> Mapping[str, PortfolioView]: ...
+    def mark(self, *, t_ms: int, markets: Sequence[Market],
+             agent_ids: Sequence[str] | None = None) -> Mapping[str, PortfolioView]: ...   # None: every registered agent (R213)
     def portfolio(self, agent_id: str) -> PortfolioView: ...
     def position(self, agent_id: str, market_id: str) -> PositionView: ...
+    def expire_orders(self, *, t_ms: int, markets: Sequence[Instrument]) -> None: ...
+        # The OPEN phase's order_expired (ttl, not_tradable): execution is its one emitter (9.3, ruling R213).
+    def register_agent(self, agent_id: str) -> None: ...      # the roster, before any agent's first fill
+    def agent_ids(self) -> tuple[str, ...]: ...
+    def is_ruined(self, agent_id: str) -> bool: ...
+    def ruined_agent_ids(self) -> tuple[str, ...]: ...
+    def drain_ruined(self) -> tuple[tuple[str, int, tuple[str, ...]], ...]: ...
+        # (agent_id, equity_cents, cancelled_order_ids) of the agents ruined since the previous call: 9.2's
+        # agent_ruined needs the cancelled ids and only execution knows them (ruling R213).
     def apply_cash_events(self, *, t_ms: int, market: Instrument) -> None: ...
         # Amendment C1b, section 17.3 (ruling R151). Called in the SETTLE phase for each continuous
         # instrument in canonical order: applies every CashEvent whose application bar (applies_at of 17.3,
@@ -1744,7 +1799,11 @@ The market's `fee_schedule_id` is set at import; a market order is a taker, a re
 fills is a maker. Fees are journaled per fill (`fee_charged`) and are the only cash movement that is
 neither a fill, a settlement nor a cash event of section 17.3. The five rows above are the `binary`
 schedules and are unchanged; the schedules of the other five kinds, and the borrow and carry schedules
-(`CarrySchedule`, `CARRY_SCHEDULES`), are section 17.4's table (ruling R155).
+(`CarrySchedule`, `CARRY_SCHEDULES`), are section 17.4's table (ruling R155). `FEE_SCHEDULES: Mapping[str,
+FeeSchedule]` keyed by `schedule_id` is the declared registry of the rows above (and `BORROW_SCHEDULES`,
+`CARRY_SCHEDULES` those of 17.4), from which every caller builds `Execution`'s mapping (ruling R213). The
+re-read of the Kalshi PDF this section asks for belongs to D2, the package that may open a socket; until it
+runs, the numbers above stand with their `as_of_date` and `KALSHI_REDUCED_FEE_SERIES = ()` (ruling R216).
 
 ### 8.9 The accounting invariant
 
@@ -1759,8 +1818,9 @@ cash_cents(a)     >= 0 unless the last event that moved it is a cash_event_appli
                      borrow_fee or carry with cash_delta_cents < 0): a fill never takes cash below zero, a debit
                      may, and the debit balance is repaid by the next credit (ruling R179)
 reserved_cents(a) == sum(order_placed.reserved_cents) - sum(filled.released_cents) - sum(order_expired.released_cents)   (all for a)
-reserved_cents(a) <= max(0, cash_cents(a));  reserved_cents(a) == 0 while cash_cents(a) < 0 (the event that took
-                     cash below zero expired every resting order of the agent with reason "debit")
+reserved_cents(a) <= max(0, cash_cents(a)) at every bar close: the cash event that leaves reserved above
+                     max(0, cash) expires every resting order of the agent with reason "debit", which includes
+                     every event that takes cash below zero, so reserved == 0 while cash < 0 (rulings R179, R215)
 reserved_cents(a) == 0 at run end (every market of the run has settled or been closed)
 position(a, i)    == the last position_after written for (a, i) by a filled or a cash_event_applied, where every
                      filled satisfies position_after - position_before == its signed filled size and every
@@ -1814,6 +1874,13 @@ the `phase` never goes backwards in `PHASE_ORDER`; `seq == 1` is `run_started` o
 `run_ended` (or `evolution_ended`) is the last event; inside a phase the order is the canonical order of
 section 3.
 
+`validate_event_dict` dispatches on the event's `type` to the `$defs` entry of `journal.v2.json` the `oneOf`
+would have selected and keeps the whole-schema path for an unknown type (ruling R202: the 32-branch `oneOf`
+cost 27 ms an event and a 15 000-event journal took seven minutes to validate). `Journal.take_tail() ->
+tuple[JournalEvent, ...]` returns the events appended since the previous call and forgets them, so the
+runner reads the fills execution just journaled in linear time (ruling R220); `Journal.events` stays the
+whole journal.
+
 ### 9.2 The backtest catalogue
 
 Every field is typed; `int` fields are integers in the unit their suffix says; `object` fields are
@@ -1854,19 +1921,20 @@ they are applied **here**, in the document C1 owns, rather than deferred to the 
 `price_source` no longer lists `vwap`: the fallback base moved to the execution bar's open (ruling R113)
 and no `LiquidityModel` may return the old spelling (ruling R138). `src/pmx/schemas/journal.v2.json` is
 widened in the same pass and keeps `vwap` in its enum so a journal written before the amendment still
-validates; `decided_at_ms` is declared there but is not yet `required`, because the event dataclasses of
-`pmx.journal` (D7) do not carry it and the shipped `tests/fixtures/contract/journal.backtest.jsonl` is a
-pre-latency journal. Making it `required` is one contract issue with one owner and one commit (section
-16.8).
+validates; `decided_at_ms` is `required` there since gate G2 (rulings R129 and R202), when `pmx.journal` (D7) gained
+it; the shipped `tests/fixtures/contract/journal.backtest.jsonl` is a pre-latency journal the gate
+**completed** (`decided_at_ms = bar_ms`, R164's eight `market_listed` fields, the two `forecast_recorded`
+nulls) and never regenerates, because its documented differences from a latency-correct run are what E5's
+reproduction tests measure.
 
-Amendment C1b's three rows above are **declared** in `journal.v2.json` under `$defs` and enter its
-`oneOf` in the gate G2 commit that gives `pmx.journal` (D7) their dataclasses, and the `settle` phase of
-the three execute-phase events of an event fill enters the schema's phase enum and the classes' `PHASES`
-in the same commit (ruling R164, the discipline of R129: D7's tests pin the schema's `oneOf` and phase
+Amendment C1b's three rows above **are** in `journal.v2.json`'s `oneOf` since gate G2 (rulings R164 and
+R202), which gave `pmx.journal` (D7) their dataclasses, and the `settle` phase of the three execute-phase
+events of an event fill is in the schema's phase enum and the classes' `PHASES` since the same commit (the
+discipline of R129: D7's tests pin the schema's `oneOf` and phase
 enums to its classes, so a schema ahead of the classes would refuse the journals the engine wave must
 write). Every other widening is applied now: the enums of `order_expired.reason`, `order_placed.origin`
-and `filled.price_source`, the signed `equity_marked.positions_value_cents`, the optional `market_listed`
-and `forecast_recorded` fields, the id patterns and the tick and milli bounds (rulings R148, R152, R160,
+and `filled.price_source`, the signed `equity_marked.positions_value_cents`, the `market_listed`
+and `forecast_recorded` fields (`required` since gate G2, ruling R202), the id patterns and the tick and milli bounds (rulings R148, R152, R160,
 R165). On a continuous instrument `market_priced` carries ticks in its three price fields and
 `close_at_ms` of `market_listed` reads `delisted_at_ms`.
 
@@ -2050,10 +2118,17 @@ def structural_mutate(genome: Genome, *, rng: random.Random, config: EvolutionCo
 def random_genome(*, rng: random.Random, config: EvolutionConfig) -> Genome: ...        # immigrants
 ```
 
+A member the engine only reads (`family`, `agent_id`, `genome`, `needs_gateway`, `kind`, `model`,
+`knowledge_cutoff_ms`) is declared **read-only** in any structural protocol that stands in for these types
+(ruling R205): `Genome` is `frozen=True`, and a protocol that declared a mutable attribute would be satisfied
+by no frozen dataclass at all.
+
 ### 10.2 `Agent`
 
 ```python
 class Agent(Protocol):
+    # The seven attributes below are read by the engine and never written: a structural stand-in for this
+    # protocol declares them read-only (ruling R205).
     agent_id: str
     family: str
     genome: Genome
@@ -2112,7 +2187,8 @@ RE_HORIZON_BUCKET = re.compile(r"^(30d|7d|2d|0d|h[0-9]{1,5})$")   # a bucket str
 # so a continuous bucket is validated by RE_HORIZON_BUCKET and never looked up in the tuple.
 # Amendment C1b (17.5, ruling R161): a continuous ledger is keyed (kind, f"h{horizon_bars}", bin) through the
 # same CalibrationBin, with `category = kind` and a horizon string "h<n>" per declared horizon; n_yes is
-# kept as n_yes_x2 (an up adds 2, a flat realisation adds 1) so a tie is half a yes and nothing is dropped.
+# kept as n_yes_x2 (an up adds 2, a flat realisation adds 1) so a tie is half a yes and nothing is dropped;
+# CalibrationBinView.to_dict() renders n_yes_x2 always (ruling R217).
 # The last bucket is `< 2`, not `[0, 2)`: section 5.3 keeps a market open between close_at_ms and
 # resolved_at_ms, where days_to_close is negative, and `0d` absorbs those settlement-lag bars.
 
@@ -2162,7 +2238,7 @@ which is what wave 2's scripted-stub gate run produces.
 ### 10.4 `Hive` (`pmx.agents.hive`, A3)
 
 ```python
-REPUTATION_WINDOW_MARKETS = 50
+REPUTATION_WINDOW_MARKETS = 50                 # a pmx.types constant (D1), re-exported here (ruling R201)
 
 @dataclass(frozen=True, slots=True)
 class HiveEntry:
@@ -2277,6 +2353,10 @@ Default position rule of a belief family without a `kelly` overlay (the v1 rule,
 = clamp(edge_ppm * 100 // 200_000, -100, 100)` where `edge_ppm = p - ppm_from_bp(last_price_bp)`, so a
 belief 20 points from the price takes the full 100 contracts, subject to cash. A family that "holds"
 emits `kind = "hold"` and therefore no order at all (section 8.4).
+
+The constructor of a roster row is 10.1's `make_agent(agent_id, genome)`, and `pmx run backtest` reads it and
+`DEFAULT_ROSTER` from `pmx.agents.registry` unless `--roster-module` names another module exposing the same
+two names (gate G2's scripted-stub roster, `tests/stub_roster.py`, ruling R200).
 
 **The default roster** (`pmx.agents.registry.DEFAULT_ROSTER`) is the eight v1 archetypes as eight literal
 genomes, and `tests/test_agents_families.py` asserts each one reproduces the frozen v1 belief on the
@@ -2476,6 +2556,8 @@ def audit(*, gateway: Gateway, metas: Sequence[MarketMeta], model: ModelSpec,
 # pmx.metrics.leaderboard (E5): the set arrives from the caller, never from an import
 def build(projection: RunProjection, *,
           contaminated: Mapping[str, frozenset[str]] | None = None) -> tuple[LeaderboardRow, ...]: ...
+    # contaminated is keyed by agent_id (ruling R221): A6's audit maps its per-model verdict onto the run's
+    # seats before handing it over; the caller owns the mapping, never the leaderboard
 ```
 
 ---
@@ -2523,6 +2605,11 @@ and a `forecast_recorded` exists, carried or not) and outcome `y`:
   using the close at the first bar `>= t_i + h * MS_PER_DAY` that is still `< bar_of(resolved_at_ms)`;
   bars with no such future bar are skipped; reported as the mean over the remaining bars for
   `h in (1, 7)`, and `0` when every bar was skipped.
+- Log-odds, for `newsbayes` (10.3) and `features.v1`'s `logit_last_milli` (16.5): `logit_milli(prob_ppm) -> int`
+  and `unlogit_ppm(logit_milli) -> int` (E3, ruling R217). The table has 10 001 entries indexed by a probability
+  in basis points, built in `Decimal` at precision 40 and exactly antisymmetric; the index rounds to the nearest
+  basis point with a tie toward even odds; `unlogit_ppm` returns a probability in `[100, 999_900]` ppm and is
+  antisymmetric, monotone and idempotent; the round trip is within `LOGIT_ROUND_TRIP_PPM_MAX = 250` ppm.
 
 Everything above is the **binary** row of section 17.5 (amendment C1b, rulings R157 to R159). A
 continuous instrument has no outcome `y`: a forecast at `t` is a per-horizon `up_probability_ppm` with
@@ -2546,7 +2633,13 @@ count forecasts), which is stated so nobody "fixes" it. On a continuous kind the
 realisation as `1` (amendment C1b, section 17.5, ruling R161); nothing is pooled across kinds or horizons.
 `CalibrationBinView` carries `n_yes_x2` as a defaulted field (`2 * n_yes` on a binary slice) and every
 consumer computes `yes_rate_ppm` from it over `2 * n`, one spelling in `pmx.metrics.calibration` (ruling
-R194), so a tie is never dropped and no ratio is off by two.
+R194), so a tie is never dropped and no ratio is off by two. `AgentResult` carries the two numbers as `ece_ppm` and
+`sharpness_ppm` over the agent's own slice (ruling R221), so 12.10's column is read and never recomputed;
+`CalibrationBinView` carries no `mean_prob_ppm`, because 8.3 hands the view to an agent and a per-bin mean
+probability is a second channel. Every consumer imports `CalibrationBinView` from `pmx.types` and no module
+re-exports it (ruling R217). `project()` builds one calibration entry per resolved continuous horizon through
+`continuous_entry` keyed `(kind, f"h{horizon_bars}", bin)` (declared by ruling R217, wired by E5 in the next
+lot: today the projection calls `binary_entry` only), so a continuous row's `ece_ppm` is its own ledger's.
 
 ### 12.3 Trading metrics (E5, `pmx.metrics.performance`)
 
@@ -2594,24 +2687,40 @@ def block_key(market: MarketMeta, *, cluster_id: str | None = None) -> str
     # venues' markets on one event are one block, not two independent draws. E4 ships the argument in wave 2
     # and R1b fills it in wave 7. This is the engine's own use of the grouping, in the statistics, where
     # hindsight is allowed and no agent is looking (section 16.3).
+def iso_week_key(t_ms: int) -> str
+    # the one spelling of f"w{iso_year}-{iso_week:02d}" (ruling R219): block_key's week branch calls it and
+    # PerMarket.unit_key is f"{market_id}/{iso_week_key(cell_ms)}" on a continuous cell
 def bootstrap_lower_bound(values: Sequence[int], blocks: Sequence[str], *, rng: RngTree, alpha_ppm: int = ALPHA_PPM,
                           resamples: int = BOOTSTRAP_RESAMPLES) -> Interval
-    # Interval(point: int, lower: int, upper: int, sd: int, n: int, n_blocks: int, resamples: int)
+    # Interval(point: int, lower: int, upper: int, sd: int, n: int, n_blocks: int, resamples: int); to_dict() renders
+    # exactly those keys, and opportunity.v1.json and model_card.v1.json carry MAPPED fields (payoff_point_cents,
+    # payoff_lb_cents, null_lb_cents, skill_lb_micro), never an embedded to_dict() (ruling R219)
     # resample n_blocks blocks with replacement, mean of the concatenated values, empirical quantile at
     # floor(alpha * B) (lower) and ceil((1 - alpha) * B) - 1 (upper); every field rounded half away from zero.
     # Fewer than two blocks (an empty `values` included) has no bootstrap: return
     # Interval(point=mean(values) or 0, lower=point, upper=point, sd=0, n=len(values), n_blocks, resamples)
-def paired_lower_bound(agent: Sequence[int], baseline: Sequence[int], blocks, *, rng) -> Interval       # bootstrap of (agent - baseline)
+def paired_lower_bound(agent: Sequence[int], baseline: Sequence[int], blocks: Sequence[str], *, rng: RngTree,
+                       alpha_ppm: int = ALPHA_PPM, resamples: int = BOOTSTRAP_RESAMPLES) -> Interval   # bootstrap of (agent - baseline), R219
 def deflated_lower_bound(interval: Interval, *, candidates: int) -> int
     # Bonferroni on the family-wise count: lower_defl = point - z(1 - alpha / K) * sd, K = max(1, candidates),
     # z from statistics.NormalDist().inv_cdf, the product rounded half away from zero to an integer.
     # The undeflated bound is the empirical quantile; the deflated one is the normal approximation because
     # an empirical quantile at alpha / K needs B >= 20 K / alpha resamples, which is out of reach for K in the thousands.
-def permutation_null(forecasts: Mapping[str, Sequence[tuple[int, int]]], market_prices: ..., outcomes: Sequence[int], weights: ...,
-                     blocks, *, rng, permutations: int = PERMUTATIONS, inner: int = PERMUTATION_INNER_RESAMPLES,
+    # Defined at ALPHA_PPM only: bootstrap_lower_bound's alpha_ppm is for reporting and is never deflated (ruling R219).
+def permutation_null(forecasts: Mapping[str, Sequence[tuple[int, int]]], market_prices: Mapping[str, Sequence[int]],
+                     outcomes: Sequence[int], weights: Mapping[str, Sequence[int]], blocks: Sequence[str],
+                     *, rng: RngTree, permutations: int = PERMUTATIONS, inner: int = PERMUTATION_INNER_RESAMPLES,
                      realised_signs: Mapping[str, Sequence[int]] | None = None,
                      bar_keys: Mapping[str, Sequence[str]] | None = None) -> NullResult
-    # NullResult(null_lb_micro: int, p_value_ppm: int, permutations: int)
+    # NullResult(null_lb_micro: int, p_value_ppm: int, permutations: int); to_dict() renders exactly those keys
+    # forecasts: (bar_ms, prob_ppm) pairs in bar order (up_probability_ppm at the claim's horizon on a continuous cell);
+    # market_prices: the market's own prob_ppm on the same bars; weights: section 12.1's w_i in ms, which is
+    # bar_weights_ms of the same bars and nothing else (asserted against scoring.skill_micro); blocks: one block key
+    # per unit; outcomes and blocks are aligned with sorted(forecasts), the one order the module reads; a continuous
+    # call passes empty market_prices and weights (ruling R219). The shuffles draw from stats.permutation and the
+    # inner resamples from stats.bootstrap, each from the handed RngTree: the split fixes every published
+    # null_lb_micro. The exchangeability group is (block, bar key); on a clustered instrument the block is the
+    # cluster, deliberately coarser (ruling R219).
     # for each permutation: shuffle outcomes across markets, recompute skill per market (forecasts and prices fixed),
     # take the block-bootstrap lower bound with `inner` resamples; null_lb_micro = 95th percentile of those lower bounds;
     # p_value_ppm = share of permutations whose mean skill >= the observed mean skill
@@ -2623,7 +2732,8 @@ def permutation_null(forecasts: Mapping[str, Sequence[tuple[int, int]]], market_
 ```
 
 E4's tests: a synthetic agent with known skill gets an interval containing it; the shuffled null centres on
-zero; `deflated_lower_bound` is strictly decreasing in `candidates`.
+zero; `deflated_lower_bound` is strictly decreasing in `candidates` on an interval with `sd > 0` and invariant
+on the degenerate interval of ruling R68 (R219).
 
 ### 12.5 Behavioural descriptors and the archive grid (E5 computes, O2 bins)
 
@@ -2813,14 +2923,19 @@ binary row and the pinned baseline of a continuous slice is `random_walk`): `n_m
 (claims only), `vendor`, `n_units`, `n_quantile_forecasts`, `pinball_skill: Interval` (the last four
 amendment C1b's; `n: 0` on a binary row). The `market_follower` row is present in every slice with `skill.point == 0` by construction
 and is pinned by the UI; on a roster of one it is a complete row of zeros, not an exception (section 12's
-preamble).
+preamble). Per slice: `n_markets`, `n_markets_traded`, `n_markets_open`, `brier_tw_micro`, `skill`, `pnl`,
+`log_micronats`, `n_units`, `n_quantile_forecasts`, `pinball_skill`, and `ece_ppm` where a per-slice ledger
+exists; `sharpe_milli`, `max_drawdown_bp`, `fill_ratio_ppm`, `turnover_ppm`, `abstention_ppm`,
+`explicit_abstain_ppm`, `category_coverage_ppm` and `ruined` are 12.3's agent-level number repeated on every
+slice (ruling R221).
 
 ### 12.11 The structures and signatures that cross a wave
 
 Five packages in three later waves code blind against these, so they are declared here once, field by
 field. Every dataclass is `frozen=True, slots=True` and `to_dict()`-able through `canonical_json`.
 
-`Interval` is section 12.4's, `Descriptors` section 12.5's, `CalibrationBinView` section 8.3's, and
+`Interval` is section 12.4's, `Descriptors` section 12.5's, `CalibrationBinView` section 8.3's (imported
+from `pmx.types` by every consumer, ruling R217), and
 `JournalEvent` is the union of D7's `pmx.journal.events.*` dataclasses. The four remaining names are
 declared here:
 
@@ -2831,15 +2946,15 @@ class HorizonBucket:                   # section 12.1
     n_bars: int; brier_tw_micro: int; market_brier_tw_micro: int; skill_micro: int
 
 @dataclass(frozen=True, slots=True)
-class LeaderboardRow:                  # section 12.10, one per slice
-    agent_id: str; provider: str; fold: str; category: str; hardness_tag: str
-    kind: str = "binary"; horizon_bars: int = 0; vendor: str = ""          # amendment C1b, ruling R163
-    n_units: int = 0; n_quantile_forecasts: int = 0; pinball_skill: Interval | None = None
-    n_markets: int; n_markets_traded: int; n_markets_open: int
+class LeaderboardRow:                  # section 12.10, one per slice; the listing order IS the dataclass order,
+    agent_id: str; provider: str; fold: str; category: str; hardness_tag: str   # and a defaulted field never
+    n_markets: int; n_markets_traded: int; n_markets_open: int                    # precedes a required one (R221)
     brier_tw_micro: int; skill: Interval; pnl: Interval; log_micronats: int; ece_ppm: int
     sharpe_milli: int; max_drawdown_bp: int; fill_ratio_ppm: int; turnover_ppm: int
     abstention_ppm: int; explicit_abstain_ppm: int; category_coverage_ppm: int
     ruined: bool; n_clean: int | None; verdict: str | None
+    kind: str = "binary"; horizon_bars: int = 0; vendor: str = ""          # amendment C1b, ruling R163
+    n_units: int = 0; n_quantile_forecasts: int = 0; pinball_skill: Interval | None = None
 
 @dataclass(frozen=True, slots=True)
 class CandidateScore:                  # section 9.4's candidate_scored payload
@@ -2860,6 +2975,8 @@ class PerMarket:                       # one row per (agent, market); the input 
     kind: str = "binary"; horizon_bars: int = 0; unit_key: str = ""       # amendment C1b, 17.6: one row per
     dir_brier_micro: int = 0; pinball_micro: int = 0; baseline_pinball_micro: int = 0   # (agent, instrument, week,
     n_resolved: int = 0; n_cash_events: int = 0                             # horizon) on a continuous kind
+    n_quantile_forecasts: int = 0          # the cell's resolved forecasts whose quantiles_ticks was not null (ruling
+                                           # R221, declared here and filled by E5 in the next lot; the row's column is its sum)
 
 @dataclass(frozen=True, slots=True)
 class AgentResult:
@@ -2875,6 +2992,7 @@ class AgentResult:
     pinball_skill: Interval | None = None                        # amendment C1b, 17.6
     exposure_by_kind: tuple[tuple[str, int], ...] = ()           # (kind, mean absolute marked notional in cents)
     n_cash_events: int = 0
+    ece_ppm: int = 0; sharpness_ppm: int = 0                      # 12.2 over the agent's own slice (ruling R221)
 
 @dataclass(frozen=True, slots=True)
 class MarketResult:
@@ -2889,6 +3007,9 @@ class MarketResult:
 class RunProjection:
     run_id: str; dataset_hash: str; config_hash: str; interval_min: int; t0_ms: int; t1_ms: int
     liquidity: str; liquidity_params_hash: str                   # section 16.1, read from run_started.config
+    seed: int                                                    # read from run_started.config too (ruling R221, declared
+                                                                 # here and filled by E5 in the next lot); leaderboard.build
+                                                                 # builds its RngTree from it and never from the run id
     agents: tuple[AgentResult, ...]                              # sorted by agent_id
     markets: tuple[MarketResult, ...]                            # canonical market order
     per_market: tuple[PerMarket, ...]                            # sorted by (agent_id, market_id, horizon_bars, unit_key) (R199)
@@ -3014,7 +3135,13 @@ Every file has exactly one owning package. A package creates or edits only the f
 plus fixtures under `tests/fixtures/<package>/`. `__init__.py` files carry a docstring and nothing else
 (the top level `src/pmx/__init__.py` also carries the version constants); submodules import by full path.
 The gate that closes a wave may edit any file to resolve reported contract issues, and records what it
-changed in section 15.
+changed in section 15. Scratch files live in the agent scratchpad and never in the repository (`.scratch/`
+is git-ignored, ruling R218). A `pmx.types` constant is imported from `pmx.types`; a module that re-exports
+another module's name does so explicitly (`from pmx.types import X as X`) and no module is required to declare
+`__all__` (ruling R224). The engine's structural protocols have one declaration each: `InstrumentLike`,
+`CashEventLike`, `BarLookups`, `CashEventStamp` and `InstrumentClock` in `engine/calendar.py`, the read side
+`MemoryLike` and `HiveLike` in `engine/observation.py`, extended by the runner's write-side protocols (ruling
+R205).
 
 ```
 prediction_market/
@@ -3068,11 +3195,12 @@ prediction_market/
     store.py                                      E5   (sqlite run index)
     cli.py                                        U4   (the argparse tree only: it builds the parser and
                                                        dispatches to each cli_*.register(subparsers))
-    cli_run.py                                    E5   (pmx backtest, pmx replay)
+    cli_run.py                                    E5   (pmx backtest with --roster-module, pmx replay; R200)
     cli_evolve.py                                 O2   (pmx evolve, pmx resume)
     cli_claim.py                                  O4   (pmx claim)
     cli_data.py                                   D6
-    cli_audit.py                                  A6
+    cli_audit.py                                  A6   (pmx audit contamination; pmx audit leaks runs the
+                                                       four families named in ruling R225)
     cli_live.py                                   L1
     cli_analyze.py                                R2e  (pmx analyze <detector>, pmx analyze all)
     cli_learn.py                                  R3d  (pmx learn train, pmx learn export)
@@ -3239,6 +3367,8 @@ prediction_market/
     test_scoring.py                               E3
     test_stats.py                                 E4
     test_runner.py                                E5
+    stub_roster.py                                E5   (the scripted-stub roster of gate G2, ruling R200;
+                                                       not a test file, never imported by src/)
     test_agents_families.py                       A1
     test_memory.py                                A2
     test_hive.py                                  A3
@@ -3321,7 +3451,7 @@ only to build a fallback reply.
 
 | Error | Raised by | Meaning |
 |---|---|---|
-| `SchemaError` | loader, runner | a file or a payload fails its JSON schema |
+| `SchemaError` | loader, runner, `pmx.engine.calendar.meta_kind` | a file or a payload fails its JSON schema; an instrument kind outside `INSTRUMENT_KINDS` read off a record or a meta (ruling R207) |
 | `LeakError` | builder, observation builder | an instant after the freeze, or a future item reaching a view |
 | `SealError` | `seal_dataset` | a reconstructed market in a dataset being sealed |
 | `DatasetHashMismatchError` | `verify_dataset`, `run_backtest` | recomputed hash differs |
@@ -3333,7 +3463,7 @@ only to build a fallback reply.
 | `ClaimRefusedError` | claims | a second claim on the same `(dataset_hash, kind, provider, horizon_bars, genome_hash)`, or an `access.jsonl` line for it without a completed file (12.8, ruling R199) |
 | `ProviderBlockedError` | importers | the ANJ block page (or any non-provider certificate) was served |
 | `ProviderError`, `MalformedResponseError`, `BudgetExceededError`, `GatewayError` | gateway, importers | the impure edge failed; mapped to `RejectReason` at the gateway boundary |
-| `InvalidConfigError` | every config `__post_init__` | a config value outside its cap |
+| `InvalidConfigError` | every config `__post_init__`, `MarketMeta.__post_init__` | a config value outside its cap; a `MarketMeta` built with a kind outside the table, a construction error and not a file's (ruling R207) |
 | `NotConfiguredError` | metaculus importer, live jobs | an optional path used without its token or setting |
 
 ### 13.2 Version constants (`pmx/__init__.py`, C0)
@@ -3358,7 +3488,7 @@ journal whose `engine_version` differs from the running engine (exit code 2, mes
 | Plan package | Sections of this contract it implements | Contract names it must produce |
 |---|---|---|
 | C0 | all; 13; 15 | this document, the five schemas, `tests/test_architecture.py`, `tests/test_contract_schemas.py` |
-| D1 | 1, 2, 4.1 (consumer), 7.2, 7.3, 7.8, 7.10, 7.13, 13.1, 13.2, 17.2 (`pmx.data.sessions`: `in_session`, `next_bar_ms`, `load_calendar`, the synthesised `continuous` calendar, ruling R174, applied by gate G2 with the `pmx.types` names of 17.9) | `pmx.types` (every constant and dataclass named here, plus `AgentReply`, the `Gateway` protocol, `MarketMeta`, `Dataset`, `MarketQuality`, `RESEARCH_UNIT_COST`, `PHASE_ORDER`, `market_set_hash`, `CATEGORIES`, `LEXICON_COUNT`, `Descriptors`), `pmx.errors`, `pmx.data.schema` (`SCHEMA_DIR`, `load_schema`, `schema_path`), `pmx.data.loader` (`load_dataset`, `load_market`, `seal_dataset`, `verify_dataset`), `pmx.data.migrate_v1.migrate_v1`, `data/demo_v1/` |
+| D1 | 1, 2, 4.1 (consumer), 7.2, 7.3, 7.8, 7.10, 7.13, 13.1, 13.2, 17.2 (`pmx.data.sessions`: `in_session`, `next_bar_ms`, `load_calendar`, the synthesised `continuous` calendar, ruling R174, applied by gate G2 with the `pmx.types` names of 17.9) | `pmx.types` (every constant and dataclass named here, `brier_micro` and `neg_ln_micronats` of 1.2 and 1.3 (ruling R217), plus `AgentReply`, the `Gateway` protocol, `MarketMeta`, `Dataset`, `MarketQuality`, `RESEARCH_UNIT_COST`, `PHASE_ORDER`, `market_set_hash`, `CATEGORIES`, `LEXICON_COUNT`, `Descriptors`), `pmx.errors`, `pmx.data.schema` (`SCHEMA_DIR`, `load_schema`, `schema_path`), `pmx.data.loader` (`load_dataset`, `load_market`, `seal_dataset`, `verify_dataset`), `pmx.data.migrate_v1.migrate_v1`, `data/demo_v1/` |
 | D2 | 7.2 (Kalshi mapping), 7.4 (shard exclusion), 7.11, 7.12, 8.8 (fee ids) | `pmx.data.importers._http.HttpClient` (7.11 verbatim), `pmx.data.importers.kalshi.import_kalshi`, `list_open_kalshi`, `KALSHI_EXCLUDED_SERIES` |
 | D3 | 7.2 (Manifold mapping), 7.3 (comments), 7.12 | `import_manifold`, `list_open_manifold`, `pmx.data.news.manifold_comments.fetch_comments` |
 | D4 | 7.2, 13.1 (`ProviderBlockedError`) | `import_polymarket`, `PMX_HTTP_PROXY` |
@@ -3367,7 +3497,7 @@ journal whose `engine_version` differs from the running engine (exit code 2, mes
 | D7 | 4, 6, 9.1 | `pmx.rng` (all names of 6.1), `pmx.journal` (`canonical_json`, `Journal`, `read_journal`, `write_journal`, `verify_journal`, `iter_bars`, `filter_events`, `journal_hash`, `JOURNAL_ENCODING`, `JOURNAL_NEWLINE`), the event dataclasses of 9.2 and 9.4 as `pmx.journal.events.*` |
 | E1 | 5.3, 5.4, 7.9, 8.3, 16.3 (the leak list of 7.9 gains every cluster-derived name of 16.3, and the poisoned-future test gains one of each), 17.2 (the run calendar as the union of the instruments' bars, `open`/`tradable`/`last_bar` for a continuous instrument, `MarketView.kind` and its scale fields, `hours_to_next_bar`, `underlying_id`, `twins` and `cash_events` filled on D1's defaulted fields (ruling R188), `MarketView.close_at_ms = 0` and `tradable = open(i, t)` on a continuous instrument (ruling R181), `BarSlice.closing_ids`, `Calendar.last_bar`, `next_bar` and `prev_bar` (ruling R187); the poisoned-future test gains a `CashEvent` whose application bar has not completed, an applied one that must surface, a `delisted_at_ms`, a `last_bar` and an unresolved `price_realised_ticks`) | `pmx.engine.calendar.Calendar` and `BarSlice`, `pmx.engine.observation.build_observation`, `render_observation_json` (the three signatures of 8.3, literal) |
 | E2 | 8.5 to 8.9, 16.1, 16.2, 17.1, 17.3, 17.4 (the generalised netting and the liability model, `apply_cash_events`, `force_flat`, `event_fill`, the half-spread floor, the `bad_size` check, every fee model and `CARRY_SCHEDULES`, the `calendars` argument and the per-instrument queue of ruling R174, `applies_at` and the entitlement rule of ruling R175, the engine events' `t_ms` of ruling R176, the `carry` event of ruling R177, the debit balance of ruling R179, `slippage_ticks`, `clamp_price` and the continuous `check_envelope` case of ruling R173, the per-kind accounting property tests) | `pmx.engine.liquidity` (the `LiquidityModel` protocol, `Fill`, `LiquidityOrder`, `LiquidityMarketView`, `ObservedFlow`, `ENVELOPE_BREACHES`, `check_envelope`, `finalise_fill`, `truncate_for_cash`, `cap_milli`, `allocate_cap`, `envelope_bounds`, `MILLI`, `LIQUIDITY_MODELS`, `make_liquidity`, and the `historical` implementation, all literal in 16.1), `pmx.engine.execution.Execution` (`place`, `pending_market_ids`, `execute_bar`, `settle`, `mark`, `portfolio`, `position`, the constructor of 8.6), `pmx.engine.fees.FEE_SCHEDULES`, `fee_cents`. It emits no `settled` and no `settlement_applied` (section 9.3) and needs nothing from `pmx.scoring` |
-| E3 | 1.3, 12.1, 12.2, 17.5 | `pmx.scoring` (`brier_micro`, `brier_tw_micro`, `horizon_briers`, `skill_micro`, `neg_ln_micronats`, `log_score_tw_micronats`, `pmv_bp`, `logit_milli`, `unlogit_ppm`, and amendment C1b's `directional_brier_micro`, `pinball_micro`, `directional_skill_micro`, `pinball_skill_micro`, the per-instrument-and-horizon plain-mean aggregation of ruling R191; `default_horizons_bars` is `pmx.types`', ruling R188), `pmx.metrics.calibration.calibration_table` (per `(kind, horizon)` slice, `n_yes_x2` and `CalibrationBinView.n_yes_x2`, ruling R194); asserts the random-walk zero-skill identity and the tie rule |
+| E3 | 1.3, 12.1, 12.2, 17.5 | `pmx.scoring` (`brier_tw_micro`, `horizon_buckets`, `horizon_bucket_of`, `skill_micro`, `log_micronats`, `pmv_bp`, `logit_milli`, `unlogit_ppm` (12.1, ruling R217; `brier_micro` and `neg_ln_micronats` are `pmx.types`'), and amendment C1b's `directional_brier_micro`, `pinball_micro`, `directional_skill_micro`, `pinball_skill_micro`, the per-instrument-and-horizon plain-mean aggregation of ruling R191; `default_horizons_bars` is `pmx.types`', ruling R188), `pmx.metrics.calibration.calibration_table` (per `(kind, horizon)` slice, `n_yes_x2` and `CalibrationBinView.n_yes_x2`, ruling R194); asserts the random-walk zero-skill identity and the tie rule |
 | E4 | 12.4, 16.3, 17.6 | every name of 12.4, with `block_key(market, *, cluster_id: str | None = None)` (ruling R118): the keyword-only argument ships in wave 2 and R1b fills it in wave 7, so no signature is widened later; `permutation_null(..., realised_signs=None, bar_keys=None)`, the within-week permutation of `realised_sign` (ruling R190) |
 | E5 | 8.2, 9.2, 9.3, 9.5, 12.3, 12.5, 12.10, 12.11, 16.1, 16.2, 17.3, 17.5, 17.6 (the settle-phase drive of `apply_cash_events` and `force_flat`, `forecast_resolved` and `instrument_closed`, the reference and realisation lookups, the carried horizon statements, the per-horizon hive writes, `kind`/`horizon_bars`/`unit_key` on every row, `exposure_by_kind`, the `(instrument, week)` units) | `pmx.engine.runner.run_backtest` and `replay` (12.11, literal, including the **required** keyword-only `liquidity`, ruling R139), the decision-latency plumbing of 16.2 (`place` in `decide`, `execute_bar` driven over `pending_market_ids(t_ms)` and draining the previous bar's queue, `decided_at_ms` in the two execute-phase events), `pmx.metrics.projection.project` with `RunProjection`, `PerMarket`, `AgentResult`, `MarketResult`, `RunHandle`, `performance`, `behavioral.descriptors`, `leaderboard.build`, `pmx.store`, `pmx.cli_run` |
 | A1 | 10.1, 10.2, 10.5, 16.5, 17.7 (the `random_walk` baseline and the `carry`, `basis`, `pairs`, `vol_regime` and `calendar` families; the one-line tick generalisation of `trend`, `revert`, `breakout` and `volume`) | `pmx.agents.protocol` (`Agent`, `Genome` with the fifth component `card: ModelCard | None` of ruling R119, always rendered by `to_dict()` and `null` for every family but `torch_policy`, `GeneSpec`, `FamilySpec`, `ResolutionEvent`, `Explanation`), `pmx.agents.registry` (`FAMILIES`, `DEFAULT_ROSTER`, `genome_from_dict`, `make_agent`, `mutate`, `crossover`, `structural_mutate`, `random_genome`), the eleven family modules of 10.5 except `stacker` |
@@ -3576,7 +3706,53 @@ when they arrive as JSON numbers, so a money provider's body is read with `get_t
 
 ### 15.3 Wave 2 (E1..E5, gate G2)
 
-None.
+The five engine packages reported 69 contract issues (56 after merging duplicates: 12 blockers, 33 majors,
+11 minors), the tree diagnostic found 30 cross-package disagreements, and the two reconciliation agents
+and the redesign agent left 23 more items for the gate. R200 to R227 settle all of them. **Seven are
+resolved against the resolution proposed** and each says why (R202 on regenerating the fixture, R205 on
+moving the protocols into `pmx.types`, R207 on one error family, R215 on the reservation, R219 on an
+`alpha_ppm` field, R224 on the import path, R225 on where `pmx audit leaks` lives). Five rulings declare a
+shape the code does not yet carry and name the package that applies it in the next lot (R213's last-bar
+drain, R214's `bar_prev`, R217's continuous calibration, R221's `n_quantile_forecasts` and `seed`); each
+one moves `results.json` or the journal of every future run and no run exists. Nothing the two reviews
+assign to amendment C1c (decisions D-R1 to D-R14 and D-S1 to D-S14, and the `sensors` keyword the sensor
+hook added to `build_observation`) is settled here. **No ruling moves a byte of an existing run:
+`ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"` (R227).**
+
+| # | Ruling | Sections |
+|---|---|---|
+| R200 | **Gate G2's population is the scripted-stub roster, reached through the real CLI.** The G2 spec asks for a full scripted-stub run and the scripted families are wave 3's, so `tests/stub_roster.py` (E5's test double, created by the gate, never collected by pytest and never imported by `src/`) exposes the two names 10.1 declares for the registry, `DEFAULT_ROSTER` (`contrarian`, `limiter`, `market_follower`) and `make_agent(agent_id, genome)`, and `pmx run backtest` gains `--roster-module` (default `pmx.agents.registry`) so the gate's run and A1's future run use one code path. `pmx.cli_run` read `build_agent`, a name no section declares, and would have exited `NotConfiguredError` on the day A1 lands `make_agent`: the contract was right and the code wrong (I55), so the CLI reads `make_agent` and 10.5 points at 10.1's constructor. `tests/test_runner.py` imports the stubs rather than declaring them a second time | 10.1, 10.5, 13 |
+| R201 | **Section 17.9's `pmx.types` row is applied and every placeholder is gone** (I01, I02, I04, I06, I41). Every name of the row is in `pmx.types` with the value the rulings fix (`BINARY_TICK_SIZE_MICRO = 100`, seven `CASH_EVENT_KINDS` with `carry`, `RE_MARKET_ID` over the seventeen providers, `RunConfig.horizons_bars` and `kinds` inside `to_dict()`), and `DECISION_LATENCY_BARS` (16.2, R107), which the row omitted, joins it. `REPUTATION_WINDOW_MARKETS` is a `pmx.types` constant re-exported by `pmx.agents.hive`, like every number a test can pin. `RunConfig.__post_init__` resolves an empty `horizons_bars` to `default_horizons_bars(interval_min)` **before** `to_dict()`, so a config that spells the default and one that omits it share one `config_hash` and one run id, which is what 8.1 and R188 already said and what `run_backtest` alone could not deliver; it moves `run_id` for every config that omits the field, no run exists, and `tests/test_runner.py` pins the fixture's config hash beside today's. The five engine files' local constants, `getattr` shims, `_int_of`/`_tuple_of` re-derivations and structural copies of `pmx.types` records (`AppliedCashEvent`, `EngineCashEvent`, the two id bodies of R176) are deleted; a second spelling of a `pmx.types` name is a defect from this commit on | 8.1, 10.4, 17.9 |
+| R202 | **Rulings R129 and R164 are applied, the schema dispatches per type, and the contract fixture is completed rather than regenerated** (I05, I42, I56). `pmx.journal` carries `CashEventApplied`, `InstrumentClosed` and `ForecastResolved` (32 event types, `oneOf` equal to `EVENT_TYPES`, asserted), `decided_at_ms` on `OrderPlaced` and `OrderRejected`, `PHASES = ("execute", "settle")` on `OrderPlaced`, `Filled` and `FeeCharged`, and the eight `market_listed` and two `forecast_recorded` fields are `required`: the runner emits **one** `market_listed` shape for every kind, the eight read off `record.instrument` (R144's view gives exactly R164's binary mapping), and `price_ref_ticks = null`, `horizons = null` on a binary. `validate_event_dict` dispatches on `type` to the `$defs` entry the `oneOf` would have selected (27 ms an event through a 32-branch `oneOf` made a 15 000-event journal take seven minutes to validate) and keeps the whole-schema path for an unknown type. **Against the proposal to regenerate `tests/fixtures/contract/journal.backtest.jsonl` from a run of the fixed runner**: the fixture is a pre-latency journal whose six documented differences from a contract-correct run are what `test_run_reproduces_the_contract_fixture` and `test_the_run_reproduces_the_fixture_payload_for_payload` measure, so a fixture written by the runner would compare a run to itself; the six lines R164 completed were filled in (the eight fields, the two nulls, `decided_at_ms = bar_ms` as a pre-latency journal means) and re-serialised through `canonical_json`, the gate validated all 40 lines against the schema and their canonical bytes, and the two reproduction tests prove the completed lines are byte for byte what the runner emits. 9.2's note reads the post-gate state; `tests/test_rng_journal.py` pins 32 types and `tests/test_contract_schemas.py` asserts the three events **are** in `oneOf` with a class whose `PHASES` matches (`C1B_EVENTS`), the positive form of R164's promise | 9.1, 9.2, 17.9 |
+| R203 | **Architecture rule 11 has one body and the plan's F4 row says so** (I07). `pmx.data.sessions` ships `in_session`, `next_bar_ms`, `prev_bar_ms`, `session_bars`, `is_session_close`, `days_since_previous_close`, `load_calendar`, `calendar_from_payload`, `check_calendar` and `generate_calendar`; E1's `Calendar` and E2's `_SessionGrid` call them and keep only the run-window clamping, which is the run's and not the calendar's (`Calendar.next_bar` versus `Calendar.session_next_bar`, R208). The rule-11 test scanned for the identifier `in_session` and let a second implementation ship under the name `covers`; it now also refuses any file outside `data/sessions.py`, `data/schema.py`, `types.py` and `engine/calendar.py` that reads a session's `open_ms` and `close_ms` in one expression. `docs/PLAN_V3_WAVES.md`'s F4 row no longer lists `src/pmx/data/sessions.py` (R174; 17.7 and 13 already said D1). The module has functional tests (`tests/test_types_loader.py`: the generator with a holiday and its overlap refusal, intersection not containment, Friday to Monday, the weekend charged on Monday, `continuous` never a file) | 13, 17.2, 17.7, 17.9, PLAN_V3 |
+| R204 | **`applies_at` has one body, in `pmx.engine.calendar`, and its declared name stays `pmx.engine.execution.applies_at`** (I12, the three-bodies mismatch). R175 declared the function in `execution.py` while R183's visibility rule is applied on the observation path, so E1 spelled `cash_event_applies_at`, E2 `applies_at` and a third copy sat in `calendar.py` with no caller, each with its own tuple of the three old-regime kinds; the observation's copy answered `None` for a dividend when the runner passed no calendar while execution's answered `prev_bar`, a leak-boundary rule computed two ways in one bar. The body lives in `calendar.py`, the module both halves of the engine already import (`OLD_REGIME_KINDS`, `BarLookups`, `CashEventStamp`, `InstrumentClock` beside it); `execution.py` re-exports it under R175's name and `observation.py` calls the same object. Its signature is `applies_at(event, instrument, calendar: BarLookups \| None) -> int \| None`, where `BarLookups` is the protocol of 8.3's three lookups (R187) and `None` means there is no calendar to read `prev_bar` from, so a corporate kind is not applied and is therefore never visible, which is the conservative side of the boundary; 17.3's code block and `tests/test_contract_schemas.py`'s pinned phrase read the new signature. Mutation-checked: removing the old-regime shift fails a test in E1's file and one in E2's | 8.3, 17.3 |
+| R205 | **The engine's structural protocols have one declaration each, and wave 3 satisfies them by shape** (I47, I48, the four-protocols mismatch). `InstrumentLike` and `CashEventLike` are declared once in `pmx.engine.calendar` (the union of the members execution and the observation builder read; `Market` and `ContinuousInstrument` satisfy both) and imported by `execution.py` and `observation.py`; the read side `MemoryLike` and `HiveLike` are declared once in `pmx.engine.observation` and the runner's write-side protocols **extend** them, so `view` has one declaration; `GenomeLike`, `ReplyLike`, `GatewayLike` and `ResolutionEvent` stay the runner's structural stand-ins until A1, A2, A3 and A5 land the declared classes, which must satisfy them (a gate G3 test imports both and asserts it). **Against I47's proposal** to move `Agent`, `Memory`, `Hive`, `Gateway`, `AgentReply` and `ResolutionEvent` into `pmx.types`: 10.2 to 10.4 and 11.1 declare them in the files of the packages that build them, a `Protocol` matches by shape so the runner needs no import to be annotated, and `pmx.types` is wave 1's closed file; 11.1's argument for `Gateway` and `AgentReply` already places those two in `pmx.types` and nothing more moves. A member the engine only reads is declared **read-only** in any structural protocol (10.1's `Genome` is `frozen=True`, which a mutable protocol attribute would refuse); 10.1 and 10.2 say so | 10.1, 10.2, 13 |
+| R206 | **A record's own `kind` is the authority; the R144 view restates it.** `Market.instrument` carries the constant `"binary"`, so a reader that preferred the view answered `binary` for a double whose record said `perp`, while `Calendar.kind_of` and `observation.instrument_kind` read the record: E1 and E2 disagreed about the kind of one instrument inside one run (seven failures). `execution.instrument_spec` reads the kind off the record first and the scale fields off the view, `tests/test_execution.py` pins the tie the real types cannot be in, and 17.1 states the rule in words | 17.1 |
+| R207 | **An unknown instrument kind is a `SchemaError` when read off a record or a meta, and an `InvalidConfigError` when a `MarketMeta` is built with one.** `pmx.engine.calendar.meta_kind(meta)` (E1's reader, which `tests/test_observation.py` pins) raises `SchemaError`: the kind came from a file. `MarketMeta.__post_init__` keeps `InvalidConfigError`: a meta is built by `meta_of` from a validated record, and a kind outside the table there is a construction error and not a file's. 13.1's two rows say so; the two conditions are different and the taxonomy is not inconsistent | 13.1 |
+| R208 | **The observation path receives the calendar, and the five view caps are `pmx.types` constants** (I08, I10, I11). `Calendar.__init__` gains keyword-only `calendars: Mapping[str, SessionCalendar] \| None = None` (`None` reads `Dataset.calendar(id)` for the ids the run's instruments name, else the synthesised `continuous`); `Calendar.session_next_bar(market_id, t_ms) -> int \| None` is the venue's next bar from the sealed calendar, **unclamped** by the run window, and is the one route to `MarketView.hours_to_next_bar`, because `next_bar` is clamped by `t1_ms` and `last_bar(i)` and would announce both (7.9, R181); `build_observation` gains keyword-only `calendar: Calendar \| None = None` and a run carrying a continuous kind passes it. The runner did not: a continuous run published `tradable = True` on its closing bar, `hours_to_next_bar = 0` across every weekend and no cash event at all, silently, because the continuous path died earlier on `market_listed`. It passes `calendar=self.calendar` now, and `tests/test_runner.py` asserts the exact hours to the next bar of every bar of a session run (`24, 72, 24, 24`) and the Friday funding visible from the Monday; removing the argument fails that test (mutation-checked). `NEWS_VIEW_TEXT_CHARS = 600`, `DESCRIPTION_VIEW_CHARS = 1_000`, `HIVE_RESOLUTIONS_VIEW_MAX = 200`, `MEMORY_NOTES_VIEW_MAX = 20` and `RESEARCH_NEWS_MULTIPLIER = 3`, stated in prose in 8.3 and 8.4 and spelled in `observation.py`, are `pmx.types` constants the builder imports. The `sensors` keyword the sensor hook added to `build_observation` is amendment C1c's to declare and is not settled here | 8.3, 8.4 |
+| R209 | **The clock test scans `leak_scan_payload(obs.to_dict())` and bans the structural names of the forbidden records** (I13, I16). 8.3 item 1 banned `resolved_at_ms` anywhere in the key set while 8.3 itself declares `HiveView.resolutions` with that field and R183 puts an applied event's `detail` inside `MarketView.cash_events`: the test as written could not pass on legal data. The exemption is contract: the scan runs over the payload with `HiveView.resolutions` (a settled market's published resolution) and `MarketView.cash_events` (an applied event's verbatim detail) set aside, which is exactly what `assert_no_leak`, the guard the builder runs, scans, and E1's continuous poisoned-future test scans the same payload (the one test-versus-code disagreement of the wave, resolved against the test, which contradicted itself two lines later). 7.9's list is **record-scoped**: no `MatchReason`, `EventCluster`, `Constraint`, `OpportunityEvent` or unapplied `CashEvent` record reaches an observation, and the key scan bans their structural names (`cluster_id`, `constraint_id`, `reasons`, `asof`, `score_permille`, `resolution_span_ms`, `opportunity_id`, `detector_id`, `evidence`, `window`, `duration_bars`, `size_ppm`, `size_net_bp`, `payoff_cents`, `tradable_for_money`, `detail`, and 7.9's fields), while `kind`, `source`, `currency` and `market_ids` are legal keys of legal views and are covered by the poisoned-record test rather than by the key scan | 7.9, 8.3 |
+| R210 | **A `wiki_asof` grant carries at most `news_per_market` revisions, most recent first, filtered by `visible_from_ms`** (I14). 8.4 gave the payload no cap while 8.1 makes an observation over `OBSERVATION_MAX_BYTES` raise rather than truncate, so a year of revisions of one subject could kill the bar for every agent. The cap is listed beside the others in 8.1, so E1, D5 and A5 read one number | 8.1, 8.4 |
+| R211 | **`prev_bar_forecasts` carries the instrument's previous bar** (I15). 8.3's sentence `bar_ms == now_ms - interval_ms` was not generalised by R192, so on a session instrument the Monday view dropped Friday's legal `live_coop` entries; it reads "the instrument's previous bar (`now_ms - interval_ms` on a `continuous` calendar, ruling R192)", A3's test asserts it per instrument, and R192's list of the places it rewrote gains this one | 8.3 |
+| R212 | **`LiquidityMarketView` is E2's and reaches no observation** (I17). The E1 brief listed it among 8.3's structures; 8.3 and section 13 are right, `Execution` builds it for a `LiquidityModel` and the observation path constructs and imports none. No text changes; recorded so a later reader does not re-add it | 8.3, 16.1 |
+| R213 | **`Execution`'s surface is completed with what the phase order requires, and the last-bar drain is owed and open** (I18, I19, I20, I44, I45). 8.6's listing gains keyword-only `carry_schedules: Mapping[str, CarrySchedule] \| None = None` beside `calendars`, `expire_orders(*, t_ms, markets)` (the open phase's `order_expired`, whose only emitter is execution), `register_agent(agent_id)`, `agent_ids()`, `is_ruined(agent_id)`, `ruined_agent_ids()`, `drain_ruined()` (the `cancelled_order_ids` 9.2 requires and only execution knows) and `mark(..., agent_ids=None)`, exactly as E2 shipped and E5 calls them. `pending_market_ids` is the union, in canonical market order, of the instruments holding an item accepted at their previous bar and the instruments carrying a resting order of any agent (R131 named the first only, while 8.6 has a resting order try against each later bar's range and `execute_bar` is the only entry point that prices one). `FEE_SCHEDULES`, `BORROW_SCHEDULES` and `CARRY_SCHEDULES` are declared registries of `pmx.engine.fees` keyed by `schedule_id`, and `CARRY_SCHEDULES` is empty until F2 lands a dataset that declares a rate-differential row (E2's test builds its own). **Open, stated plainly**: 17.2's "an item whose instrument never has another bar in the run is `order_rejected(not_tradable)` at the run's last bar" is not written, because `Execution` receives neither the resolved window nor E1's `Calendar` and `RunConfig.t1_ms` is legally `None`; on the demo pack 5 of 1 627 queued items are dropped and `tests/test_runner.py::test_every_queued_item_produces_exactly_one_execute_phase_event` pins the drop (`dropped > 0`). The rule stands; `Execution.__init__` gains keyword-only `t0_ms: int` and `t1_ms: int` (the run's resolved window, which `run_backtest` computes), E2 and E5 apply it in the next lot with the test reading `dropped == 0`, and it adds events to every future journal, none of which exists | 8.6, 8.8, 16.2, 17.4 |
+| R214 | **Envelope rule 1 binds taker orders, `truncate_for_cash` carries the order, and `quote_bar` carries the previous bar** (I21, I22, I23). A resting buy fills at `min(L, bar.open_bp)`, at or below the ask by construction, so rule 1 as written reported `quote_inside_spread` for obeying 8.6's limit rule: rule 1 reads "a **taker** buy quotes `price_bp >= ask`, a taker sell `price_bp <= bid`; a resting limit fill is governed by 8.6's limit rule and by rule 3", and `check_envelope` checks it on orders whose kind is `market`. `truncate_for_cash` gains keyword-only `order: LiquidityOrder \| None = None` and rule 5's re-established fee takes its side and role from that order (a truncated sell was re-priced as a buy). `quote_bar` gains keyword-only `bar_prev: Bar \| None = None`, the instrument's previous bar from the dataset, `None` only on the instrument's first bar where the floor is `schedule.min_half_spread_ticks`: `HistoricalLiquidity` remembers the last bar it was asked to price, so the half-spread estimate depended on which bars a model happened to be asked about. **Declared now, applied by E2 in the next lot**: it moves the fallback base of every future fill on a quoteless bar (a Kalshi bar without quotes estimates a non-zero `hs` from two non-flat bars), and the gate's AC-3 run was taken on the engine as it stands | 16.1 |
+| R215 | **The cash rules are one sentence each** (I24, I25, I26). 8.5's truncation `floor(free_cash / unit_cost)` ignored the fee paid out of the same cash and could leave cash below zero against 8.9: the opening part is truncated to the largest size whose total outlay (opening cost minus closing proceeds plus the fee of 8.8) free cash pays, which is `floor(free_cash / unit_cost)` on a pure opening fill with no fee. A partial limit fill is truncated so that the remainder's reservation stays funded at the maker fee of 8.8, so a remainder never rests against an unfunded reservation and no new `order_expired.reason` is needed (E2's shipped rule; the alternative, a reservation that includes the worst-case maker fee, produces different fill sizes and is not taken). R179's trigger and 8.9's line are one sentence: the cash event that leaves `reserved_cents` above `max(0, cash_cents)` expires every resting order of the agent with `reason = "debit"`, which includes every event that takes cash below zero (a debit that leaves cash positive yet under the reservations broke the invariant line while leaving R179's trigger unfired) | 8.5, 8.6, 8.9, 17.3 |
+| R216 | **Venue re-reads belong to the packages that may open a socket** (I27). 8.8 and 17.4 asked E2 to re-read the Kalshi PDF and nine venue pages while architecture rule 5 forbids engine code a socket and the build ran offline. D2 re-reads Kalshi, F1 and F2 the crypto, equity and fx venues, or the gate; until then the shipped numbers, `KALSHI_REDUCED_FEE_SERIES = ()` and `sale_bp = 0` on the three equity rows stand with their `as_of_date`, each row's note recording why, and 8.8's worked values (`175` and `7` cents) pin `taker_permille = 70` | 8.8, 17.4 |
+| R217 | **The scoring names are declared where they are read** (I03, I28, I29, I30, I31). Section 14's E3 row reads `log_micronats`, `horizon_buckets` and `horizon_bucket_of` (the field names of 12.1 and 12.11 win over the row's spellings) and `brier_micro` and `neg_ln_micronats` move to the D1 row where 1.2 and 1.3 put them. `logit_milli(prob_ppm) -> int` and `unlogit_ppm(logit_milli) -> int` are declared in 12.1 with the units E3 pinned: a 10 001-entry table indexed by basis points, built in `Decimal` at precision 40, exactly antisymmetric, the index rounding to the nearest basis point with a tie toward even odds, `unlogit_ppm` in `[100, 999_900]` and antisymmetric, monotone and idempotent, the round trip within `LOGIT_ROUND_TRIP_PPM_MAX = 250` ppm. `CalibrationBinView.to_dict()` renders `n_yes_x2` always and every consumer imports the view from `pmx.types` (no module re-exports it). **Declared now, wired by E5 in the next lot**: `project()` builds one calibration entry per resolved continuous horizon through `pmx.metrics.calibration.continuous_entry` keyed `(kind, f"h{horizon_bars}", bin)`, so a continuous row's `ece_ppm` is its own ledger's (17.6) and not `0`; today the projection calls `binary_entry` only and `continuous_entry` has no caller, which moves `results.json` of every future continuous run and no run exists | 8.3, 10.3, 12.1, 12.2, 12.11, 14, 17.6 |
+| R218 | **`.scratch/` is git-ignored and scratch files never live in the repository** (I32). An interrupted attempt left three scratch scripts at the root that accounted for 345 of 355 ruff errors and would have been committed; `.gitignore` (C0's) gains the line and section 13's preamble the sentence | 13 |
+| R219 | **Section 12.4 is complete** (I33 to I40, the null's statistic). `permutation_null`'s four `...` types are E4's: `forecasts: Mapping[str, Sequence[tuple[int, int]]]` of `(bar_ms, prob_ppm)` in bar order, `market_prices: Mapping[str, Sequence[int]]`, `weights: Mapping[str, Sequence[int]]` (`w_i` in ms, **`bar_weights_ms` of the same bars and nothing else**, or the null measures a statistic the leaderboard does not report; asserted against `scoring.skill_micro` on an irregular grid), `blocks: Sequence[str]`, with `outcomes` and `blocks` aligned to `sorted(forecasts)`, and a continuous call passing empty `market_prices` and `weights`. `iso_week_key(t_ms) -> str` is the one spelling of `f"w{iso_year}-{iso_week:02d}"`, `block_key`'s week branch calls it and `PerMarket.unit_key` is `f"{market_id}/{iso_week_key(cell_ms)}"`. The exchangeability group of R190 is `(block, bar key)`, and on a clustered instrument the block is the cluster, deliberately coarser (a week vector no caller can build is worse than a coarser block every caller can). `Interval.to_dict()` renders `point, lower, upper, sd, n, n_blocks, resamples` and `NullResult.to_dict()` `null_lb_micro, p_value_ppm, permutations`; `opportunity.v1.json` and `model_card.v1.json` carry **mapped** fields, never an embedded `Interval.to_dict()`. The shuffles draw from `stats.permutation` and the inner resamples from `stats.bootstrap`, each from the handed `RngTree`, and the split fixes every published `null_lb_micro`. Deflation is defined at `ALPHA_PPM` only and `bootstrap_lower_bound`'s `alpha_ppm` is for reporting, never deflated (**against I38's preferred half**, an `alpha_ppm` field on `Interval`: every claim interval is built at `ALPHA_PPM` by 12.6, so the field would be a constant column in every `results.json`). `paired_lower_bound` carries keyword-only `alpha_ppm` and `resamples`. E4's test line reads "strictly decreasing in `candidates` on an interval with `sd > 0` and invariant on R68's degenerate interval" | 6.3, 12.4, 16.4, 16.5, 17.6 |
+| R220 | **`Journal` exposes its tail** (I43). `Journal.events` copies the whole journal into a tuple on every access, so the runner's contracted "read the fills execution just journaled" (8.7) was quadratic (190 s for a whole-pack limit-order run) and E5 subclassed `Journal` to keep the tail. `Journal.take_tail() -> tuple[JournalEvent, ...]` (the events appended since the previous call, then forgotten) is declared in 9.1, D7's file, and the runner's subclass is deleted | 9.1 |
+| R221 | **The leaderboard and projection structures are definable and complete** (I49 to I54, I52). `LeaderboardRow`'s listing puts the six defaulted amendment fields last, keeping every name and default, because a defaulted field never precedes a required one and the class as listed raised `TypeError` at import; the field order in a 12.11 listing is the dataclass's order. `AgentResult` carries `ece_ppm: int = 0` and `sharpness_ppm: int = 0` computed per 12.2 over the agent's own slice, so 12.10's column is read and never recomputed, and `CalibrationBinView` gains no `mean_prob_ppm` (8.3 hands the view to an agent and a per-bin mean probability is a second channel). Nine columns (`sharpe_milli`, `max_drawdown_bp`, `fill_ratio_ppm`, `turnover_ppm`, `abstention_ppm`, `explicit_abstain_ppm`, `category_coverage_ppm`, `ruined`, and `ece_ppm` where no per-slice ledger exists) are 12.3's agent-level number repeated on every slice and 12.10 names them, so a UI never compares two definitions of one column. `leaderboard.build`'s `contaminated` is keyed by `agent_id`; A6 maps its per-model verdict onto the run's seats before handing it over. **Declared now, applied by E5 in the next lot** because each moves `results.json` of every future run: `PerMarket.n_quantile_forecasts: int = 0` (the cell's resolved forecasts whose `quantiles_ticks` was not null; the row's column is its sum, and today every row reports `0`) and `RunProjection.seed: int` (read from `run_started.config`, so `leaderboard.build` builds its `RngTree` from it and `seed_of_run_id`, which parses an identifier's spelling, goes) | 11.5, 12.2, 12.10, 12.11 |
+| R222 | **E5's `HiveLike.write_forecast` matches 10.4 field for field** (I46): the four keyword-only arguments of R160 are declared with the contract's defaults and filled per horizon on a continuous instrument, so A3's landing needs no runner edit; A3's test asserts a horizon entry's `visible_from_ms` is `t_h + interval_ms`. No text changes | 10.4 |
+| R223 | **Architecture rule 3's allow-list names the declaration site of `Dataset.sealed_market`.** R182 said only `optimizer/folds.py` and `optimizer/claims.py` may spell the name, and a declaration is necessarily a spelling, so the rule-3 test failed on `types.py`; the allow-list reads "where it is declared in `types.py`, and in `optimizer/folds.py` and `optimizer/claims.py`", the test allows exactly that one declaration line and asserts exactly one exists, and 7.2's interface comment says so | 7.2, 17.2 |
+| R224 | **A `pmx.types` constant is imported from `pmx.types`; a module that re-exports another module's name does so explicitly** (the import-path and `__all__` mismatches). Five of the six `mypy --strict` errors were a consumer reading a domain constant through an intermediate module with no `__all__` (`RANDOM_WALK_BRIER_MICRO` through `pmx.scoring`, `CONTINUOUS_CALENDAR_ID` through `pmx.engine.calendar`); both metrics files read `RANDOM_WALK_BRIER_MICRO` from `pmx.types`, section 13's owner (**against the tree diagnostic's recommendation** to route both through `pmx.scoring`: `tests/test_stats.py` still cross-checks E3's and E4's spelling, and the owner is the one path a reader need not guess), `pmx.engine.fees` re-exports the price-model constants with `import X as X` because 16.1 lists `MILLI` on liquidity's declared surface, and no module of the package is required to declare `__all__`. Section 13's preamble carries the rule | 13 |
+| R225 | **`pmx audit leaks` is A6's `cli_audit.py`, and the four families it runs are named now.** AC-4 requires the poisoned-future, clock, seal and shuffled-outcome tests to pass and to be part of `pmx audit leaks`; the four pass on the tree of 2026-09-09 and the command does not exist, because section 13 gives `cli_audit.py` to A6 (wave 3) and `cli.py` to U4. The families, by test id: poisoned-future `tests/test_observation.py::test_the_poisoned_future_test`, `::test_the_poisoned_future_test_on_a_continuous_instrument` and `::test_one_of_each_cluster_and_detector_record_is_refused`; clock `tests/test_observation.py::test_the_clock_test`; seal `tests/test_builder.py::test_the_built_dataset_loads_seals_verifies_and_fails_on_a_changed_byte` (one byte of a market file changed, `verify` names the file) and `tests/test_types_loader.py::test_seal_stamps_an_imported_dataset_and_rehashes_it`; shuffled-outcome `tests/test_stats.py::test_permutation_null_of_the_market_follower_is_exactly_zero`, `::test_permutation_null_of_a_coin_flip_agent_centres_on_zero`, `::test_permutation_null_of_a_skilled_agent_is_unmatched_and_negative` and the three `test_continuous_null_*` siblings. A6 mounts `pmx audit leaks` as the runner of exactly these ids plus the amnesic test of PRD 6.3 (`--amnesic` and `--no-hive` produce a different journal hash), and it fails when any id is missing from the tree. **What the shuffled-outcome family does not yet prove**: PRD 6.3's population form ("no scripted agent's skill lower bound exceeds zero on the training set over 200 seeds") needs the scripted families of wave 3 and O4's claim path; what exists is the null over synthetic agents and the stub roster. AC-4 is therefore **partial** at this gate and 13's `cli_audit.py` row says what the command runs | 13, 14 |
+| R226 | **R151's kind tuple is superseded by R177.** R151's row still spells `CASH_EVENT_KINDS` with six kinds while R177 and 17.3 make it seven (`carry`); the row now says so, and `pmx.types.CASH_EVENT_KINDS` is the seven-tuple | 15.9, 17.3 |
+| R227 | **`ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"`.** R201, R202 and R208 change what every future journal carries (the eight `market_listed` fields and two nulls on a binary, the run id of a config that omits `horizons_bars`, the observation bytes of a continuous run) and R213, R214, R217 and R221 will move more when applied; a journal byte moves when an existing journal's bytes change for the same inputs, and no run exists: the contract fixture is a completed historical document and not a run (R202), and the gate's own AC-3 runs are evidence taken on this engine, not artefacts a later engine must reproduce. A bump before the first run would version nothing. The first lot that changes a byte of a journal a run has written bumps both in the same commit, as R111 says | 13.2 |
+
+Gate G2's measurements (AC-3 on `data/datasets/y2026` through `pmx run backtest --roster-module
+tests.stub_roster`, AC-4 over the four families of R225, the suite, ruff, mypy and the em-dash sweep) are
+in `docs/BUILD_STATE.md` section 8, with their limits.
 
 ### 15.4 Wave 3 (A1..A6, gate G3)
 
@@ -3673,7 +3849,7 @@ listed in section 17.9 with the gate that applies it.
 | R148 | **`size_milli` and `price_ticks` are the two units, and the v2 field names carry them.** A continuous instrument's `size`, `target_position` and `position` fields are milli-units and its `_bp` price fields are ticks, so `filled`, `market_priced`, `order_placed`, `MarketAction` and `PositionView` stay one event and one shape per name; a binary keeps whole contracts and bp everywhere it has them, becomes `size * MILLI` at the liquidity boundary as 16.1 already does, and is truncated to whole contracts there as before. `actions.v2.json` and `journal.v2.json` widen the bounds to `SIZE_MILLI_MAX` and `PRICE_TICKS_MAX`; the loader and the runner enforce `1..9_999` and whole contracts on a binary, where the schema used to. `MILLI` is declared in `pmx.types` and re-exported by `pmx.engine.liquidity` (R86's rule) | 1.1, 8.4, 8.5, 9.2, 17.1, `actions.v2.json`, `journal.v2.json` |
 | R149 | **A bar exists only inside a session, and the run calendar is the union of the instruments' bars.** A session calendar is a **dated** record (`session_calendar.v1.json`: explicit `sessions [{open_ms, close_ms}]` for the window, because daylight saving makes a weekly UTC template wrong for half the year), generated by F4, sealed with the dataset at `calendars/<id>.json` inside the walk of 4.3 with `instruments/`. A bar exists iff its interval intersects a session; a bar outside every session, or a missing bar inside one, fails the loader. `Calendar.bars()` yields every grid point at which at least one instrument has a bar and nothing else; a `continuous` calendar reduces every rule to 7.2's dense grid, so no binary file and no hash of 2026-09-08 moves | 4.3, 5.2, 5.3, 7.1, 7.8, 17.2 |
 | R150 | **A continuous instrument is tradable while it is open and before its last bar, and its last bar is a fill, not a mark.** `open(i, t) = listed and in_session`, `tradable(i, t) = open and t < last_bar(i)`, `settles` never holds and `closes(i, t) = (t == last_bar(i))`; `actionable` reads `t + interval_ms` as the instrument's next bar. At `last_bar(i)` (`delisted_at_ms` or the window end, a fold's edge included) `Execution.force_flat` closes every position at the bar's close through an event fill that pays the taker fee, and the runner emits `instrument_closed`. A run therefore never ends with a paper number nobody could have realised, and a claim on the sealed fold cannot carry a position across its edge. 8.7's "positions ride to settlement" is the binary row of this rule | 5.3, 8.2, 8.6, 8.7, 9.2, 17.2, 17.3 |
-| R151 | **Every cash flow that is not a fill is a dated `CashEvent`, applied by execution in the settle phase and journaled once.** `CASH_EVENT_KINDS = ("funding", "dividend", "split", "roll", "borrow_fee", "forced_flat")`; the first four come from data (`origin = "data"`), the last two are the engine's. `Execution.apply_cash_events` applies the events with `bar_of(t_ms) == t` in `(t_ms, kind order, cash_event_id)` order, agents in agent order, after the binary settlements; one `cash_event_applied` per (agent, instrument, event) with a non-zero position before or after. One event per money movement is kept: a cent moves in exactly one of `filled`, `fee_charged`, `settlement_applied` or `cash_event_applied`, and a `roll` or a `forced_flat` carries `0` there because its money moves in its event fills. A `CashEvent` record never reaches an observation, a prompt or a research result (a dated future event is future information; hiding an announced dividend is the price of one rule), and 7.9's list is extended by its fields; a venue's fixed schedule is not on the list | 7.9, 8.2, 8.6, 8.9, 9.2, 9.3, 17.3 |
+| R151 | **Every cash flow that is not a fill is a dated `CashEvent`, applied by execution in the settle phase and journaled once.** `CASH_EVENT_KINDS = ("funding", "dividend", "split", "roll", "borrow_fee", "forced_flat")` (superseded by R177 on the kind tuple: `carry` is the seventh, ruling R226); the first four come from data (`origin = "data"`), the last two are the engine's. `Execution.apply_cash_events` applies the events with `bar_of(t_ms) == t` in `(t_ms, kind order, cash_event_id)` order, agents in agent order, after the binary settlements; one `cash_event_applied` per (agent, instrument, event) with a non-zero position before or after. One event per money movement is kept: a cent moves in exactly one of `filled`, `fee_charged`, `settlement_applied` or `cash_event_applied`, and a `roll` or a `forced_flat` carries `0` there because its money moves in its event fills. A `CashEvent` record never reaches an observation, a prompt or a research result (a dated future event is future information; hiding an announced dividend is the price of one rule), and 7.9's list is extended by its fields; a venue's fixed schedule is not on the list | 7.9, 8.2, 8.6, 8.9, 9.2, 9.3, 17.3 |
 | R152 | **A roll is two event fills at the two contracts' prices, priced by `pmx.engine.liquidity.event_fill`.** A position held across a roll is closed at `from_price_ticks` and reopened at `to_price_ticks`, each leg a `filled` with its taker `fee_charged` and an `order_placed(origin="roll")`, the gap recorded in `detail.gap_ticks` and never traded through. The forced flat is the same mechanism with one leg at the bar's close. `event_fill` lives in E2's `liquidity.py` so architecture rule 9 holds, emits `price_source = "event"`, which no `LiquidityModel` may return, and is not driven by `check_envelope` because it is not a model: its price is a printed price of the tape. These are the only `order_placed`, `filled` and `fee_charged` events written in the `settle` phase; `journal.v2.json` and the classes' `PHASES` admit it together at gate G2 (R164) | 8.6, 9.2, 16.1, 17.3, `journal.v2.json` |
 | R153 | **A split multiplies the position half-up away from zero and divides the average cost.** `position_after = sign(q) * round_half_up(abs(q) * numerator, denominator)`, `avg_cost_ticks_after = round_half_up(avg_cost_ticks * denominator, numerator)`, `cash_delta_cents = 0` (cash in lieu is not modelled; the rounding is at most half a milli-unit and is stated so nobody "fixes" it), every resting order on the instrument is expired with `reason = "corporate_action"` because its price is in the old scale, and a split on the same bar as a dividend applies after it. Equities are stored raw; the adjusted view for features multiplies earlier prices by `denominator / numerator` and never touches execution | 9.2, 17.3 |
 | R154 | **A short on a continuous instrument is a liability, guarded by free cash, and never by an invented margin account.** Opening a short receives `cash_in_cents`, covering pays `cash_out_cents`, the position is marked `-ceil` of its notional, `positions_value_cents` and therefore `equity_marked.positions_value_cents` are signed, and equity may fall below zero while a fill never takes cash below zero (a debit cash event may, ruling R179). The opening notional of a short may not exceed the agent's free cash at the fill, so a cover up to a doubling is always affordable; beyond that the cover is truncated by `truncate_for_cash`, the residual is carried, the forced flat reports it as `position_after != 0` and 8.7's ruin freezes the agent. `short_allowed` is per instrument from the kind table (`spot_crypto` never, `equity` only with a borrow schedule) and the loader refuses a value the table forbids. A binary's NO leg keeps 8.5 exactly | 8.5, 8.7, 8.9, 9.2, 17.3 |
@@ -3788,7 +3964,11 @@ class LiquidityModel(Protocol):
     params_hash: str                         # sha256(canonical_json(params)), "" when the model has none
     def quote_bar(self, market_view: LiquidityMarketView, bar: Bar,
                   orders: Sequence[LiquidityOrder], *, schedule: FeeSchedule,
-                  now_ms: int) -> tuple[Fill, ...]: ...      # one Fill per order, in the same positions
+                  now_ms: int,
+                  bar_prev: Bar | None = None) -> tuple[Fill, ...]: ...   # one Fill per order, in the same positions
+        # bar_prev (ruling R214, declared here and applied by E2 in the next lot): the instrument's previous
+        # bar from the dataset, None only on its first bar, so the half-spread floor of 17.4 is a function
+        # of the tape and not of the call sequence
     def on_bar_end(self, observed_flow: ObservedFlow) -> None: ...
 
 def cap_milli(bar: Bar, *, config: RunConfig, source: str) -> int: ...
@@ -3800,7 +3980,8 @@ def finalise_fill(*, quoted_bp: int, base_bp: int, order: LiquidityOrder, bar: B
                   unfilled_reason: str, price_source: str, schedule: FeeSchedule,
                   market_view: LiquidityMarketView | None = None) -> Fill: ...   # None reads as a binary view (R173)
 def truncate_for_cash(fill: Fill, *, max_filled_milli: int, schedule: FeeSchedule,
-                      market_view: LiquidityMarketView | None = None) -> Fill: ...
+                      market_view: LiquidityMarketView | None = None,
+                      order: LiquidityOrder | None = None) -> Fill: ...   # the side and role of the re-established fee (R214)
 def make_liquidity(config: RunConfig, *, params: Mapping[str, object] | None = None) -> LiquidityModel: ...
 def event_fill(order: LiquidityOrder, *, price_ticks: int, schedule: FeeSchedule) -> Fill: ...   # 17.3, ruling R152
 def half_spread_ticks(bar_prev: Bar, bar: Bar, *, schedule: FeeSchedule) -> int: ...             # 17.4, ruling R156;
@@ -3833,7 +4014,10 @@ applies to it as engine code), and it may not read the dataset.
 
 1. **Never quote inside the observed spread when it is known.** With `low, high = envelope_bounds(bar)`,
    let `ask = min(max(bar.yes_ask_bp, low), high)` and `bid = min(max(bar.yes_bid_bp, low), high)` when
-   the bar carries them. A buy quotes `price_bp >= ask`; a sell quotes `price_bp <= bid`. The clamp comes
+   the bar carries them. A **taker** buy quotes `price_bp >= ask`; a taker sell quotes `price_bp <= bid`; a
+   resting limit fill is governed by 8.6's limit rule (`min(L, bar.open_bp)` for a buy, `max(L, bar.open_bp)`
+   for a sell) and by rule 3, not by this rule, and `check_envelope` checks rule 1 on orders whose kind is
+   `market` (ruling R214). The clamp comes
    first so that rules 1 and 3 cannot contradict each other (ruling R115). A bar with no quote is
    constrained by rule 3 and by the **half-spread floor** of section 17.4 (amendment C1b, ruling R156):
    with `hs = half_spread_ticks(previous bar, bar, schedule=schedule)`, a buy quotes `price_bp >=
@@ -3869,7 +4053,8 @@ applies to it as engine code), and it may not read the dataset.
    point_value_micro=market_view.point_value_micro)` exactly (ruling R173: on a binary the call is 8.8's to
    the letter, on a continuous instrument the size is the milli size and a `// MILLI` would turn a one
    milli-coin fill into a fee on nothing), with `fill.role == "taker"` when `order.kind` is
-   `market` and `"maker"` for a resting `limit` fill. The equality is stated over **the fill the journal
+   `market` and `"maker"` for a resting `limit` fill; a fill truncated by `truncate_for_cash` takes the side and
+   the role of its own order, which the function receives (ruling R214). The equality is stated over **the fill the journal
    writes**, not over an intermediate the journal never sees: `finalise_fill` establishes it and
    `truncate_for_cash` re-establishes it after 8.6 step 5 shrinks a fill against cash (ruling R130). Fees
    are venue data (section 8.8); an adversary that could discount them would be rewriting the venue rather
@@ -3955,7 +4140,8 @@ R108). Two rows of the table change meaning:
   submission order, and prices it against bar `t` through the run's `LiquidityModel`. Every execute-phase
   event of 9.2 comes from here, exactly as before, so section 8.9's accounting invariant and section
   9.3's one-event-per-money-movement rule are untouched. **The runner drives it over
-  `Execution.pending_market_ids(t_ms=t)`, not over the bar slice** (ruling R131): the queue's own market
+  `Execution.pending_market_ids(t_ms=t)`, not over the bar slice** (ruling R131; the tuple also carries every
+  instrument with a resting order of any agent, ruling R213): the queue's own market
   set is the only correct enumeration, because a market that closed or settled at `t - interval_ms` is in
   no tuple of E1's `BarSlice` at `t` and is still owed the rejection the table below promises. The runner
   resolves each `Market` from the dataset it was handed, and E5 asserts that every item `place` accepted
@@ -4372,7 +4558,8 @@ mapping below. A continuous instrument is `pmx.types.ContinuousInstrument`, seri
 `src/pmx/schemas/instrument.v1.json` (the schema refuses `kind == "binary"`, because a binary record is
 `market.v2.json` and there is exactly one file shape per record). Nothing moves out of `Market`: the base
 is a **view** of it, `Market.instrument` (a property D1 adds, ruling R144), and no code path reads
-`tick_size_micro` off a `Market` field that does not exist.
+`tick_size_micro` off a `Market` field that does not exist. A record's own `kind` is the authority and the
+view restates it: a reader takes `kind` off the record and the scale fields off the view (ruling R206).
 
 | Base field | Type | Rule | On a `Market` (binary) |
 |---|---|---|---|
@@ -4609,10 +4796,13 @@ class CashEvent:
     source_url: str           # "" for an engine event
     detail: Mapping[str, int | str]    # the kind's fields below, integers and strings only
 
-# pmx.engine.execution (E2), ruling R175: the bar at whose settle phase execution applies the event.
-def applies_at(event: CashEvent, instrument: Instrument, calendar: Calendar) -> int | None:
+# Ruling R175: the bar at whose settle phase execution applies the event. One body, in pmx.engine.calendar,
+# re-exported by pmx.engine.execution under this name and called by the observation path for R183 (ruling R204).
+def applies_at(event: CashEvent, instrument: Instrument, calendar: BarLookups | None) -> int | None:
     bar = bar_of(event.t_ms, instrument.interval_min)
-    if event.kind in ("dividend", "split", "roll"):
+    if event.kind in OLD_REGIME_KINDS:                  # ("dividend", "split", "roll"), pmx.engine.calendar
+        if calendar is None:
+            return None                                 # no calendar to read prev_bar from: not applied, never visible
         return calendar.prev_bar(instrument.id, bar)   # the last bar priced in the OLD regime; None: not applied
     return bar                                          # funding, borrow_fee, carry, forced_flat
 ```
@@ -4815,8 +5005,10 @@ F2 may add a venue's tier by adding a row, never by changing a formula):
 | `cme-es-2026-09` | xcme | future | per_contract | `per_contract_cents = 125`, `exchange_cents = 128` (round turn halved per side) | `https://www.cmegroup.com/company/clearing-fees.html` | `2026-09-08` |
 | `otcfx-spread-2026-09` | otcfx | fx | zero | `min_half_spread_ticks = 5` (half a pip at a tenth-of-a-pip tick, the retail floor) | `https://www.bis.org/statistics/rpfx22.htm` | `2026-09-08` |
 
-The numbers are what the pages showed on the date; E2 re-reads each page, corrects a number that moved
-and records the correction in the row, exactly as 8.8 says of the Kalshi PDF. A row is never a formula.
+The numbers are what the pages showed on the date; F1 and F2, the packages that may open a socket (ruling
+R216), re-read each page, correct a number that moved and record the correction in the row, exactly as D2
+does for the Kalshi PDF of 8.8; until then the rows stand with their `as_of_date` and the three equity rows
+keep `sale_bp = 0` with the reason in their note. A row is never a formula.
 
 **Borrow and carry schedules are the same record family** with the rate in `detail` fields of their own:
 
@@ -5070,7 +5262,7 @@ on a binary row); on a continuous row `brier_tw_micro` is the mean directional B
 `skill` the directional skill interval, `log_micronats` is `0`, `ece_ppm` is the `(kind, horizon)`
 ledger's, and the pinned baseline row is `random_walk` (`skill.point == 0` by construction) where a
 binary slice pins `market_follower`. `PerMarket` gains `kind`, `horizon_bars`, `unit_key` (the market id
-on a binary, `f"{market_id}/w{iso_year}-{iso_week:02d}"` on a continuous cell), `dir_brier_micro`,
+on a binary, `f"{market_id}/{iso_week_key(cell_ms)}"` on a continuous cell, one spelling in `pmx.metrics.stats`, ruling R219), `dir_brier_micro`,
 `pinball_micro`, `baseline_pinball_micro`, `n_resolved` and `n_cash_events`; `MarketResult` gains
 `kind`, `vendor` and `last_price_ticks`, and its `outcome` is `-1` and `life_mean_price_bp` is the mean
 close in ticks on a continuous instrument; `AgentResult` gains `pinball_skill: Interval`,
@@ -5180,16 +5372,16 @@ file another package owns, listed with the gate that applies it (ruling R171):
 
 | Issue | File and owner | Applied by |
 |---|---|---|
-| R144, R145, R147, R148: `INSTRUMENT_KINDS`, `CONTINUOUS_KINDS`, `MICRO`, `MILLI`, `NOTIONAL_DENOMINATOR`, `BINARY_TICK_SIZE_MICRO`, `BINARY_POINT_VALUE_MICRO`, the five caps, `notional_micro`, `cash_out_cents`, `cash_in_cents`, `mark_value_cents`, `price_micro`, `Instrument` (with `bar_at` and `bars_before` on the base, R173), `ContinuousInstrument` (`bars: tuple[Bar, ...]`, `trades: tuple[Trade, ...]`, R173), `SessionCalendar`, `CashEvent`, `CASH_EVENT_KINDS` (seven, R177), `DATA_CASH_EVENT_KINDS`, `cash_event_id`, `split_position_milli`, `HorizonForecast`, `QUANTILE_LEVELS_PPM`, `RANDOM_WALK_UP_PPM`, `RANDOM_WALK_BRIER_MICRO`, `default_horizons_bars` (R188), `Market.instrument`, `MarketMeta.kind` and the continuous `MarketMeta` values of 7.2 through `meta_of` (R186), `Dataset.calendar`, `Dataset.sealed_market` (R182), `RunConfig.horizons_bars` and `RunConfig.kinds`, `BuildConfig.kinds` and `BuildConfig.min_traded_bars`, `Actions.horizon_forecasts`, the eight defaulted `MarketView` fields of 8.3 with `CashEventView` and `CASH_EVENTS_VIEW_MAX` (R181, R183, R188), `CalibrationBinView.n_yes_x2` (R194), the signed `PortfolioView.cash_cents` and `equity_cents` (R179, R180), `MarketQuality.tape_kind`, the `RejectReason` values `bad_horizon`, `bad_quantiles`, `RE_HORIZON_BUCKET` (R188), `INT63_MAX`, `TRADE_SIDES` gaining `buy` and `sell` (R173), `VENDORS`, and the widened `PROVIDERS`, `CURRENCIES` (17.1's quote currencies), `NEWS_SOURCES`, `NEWS_KINDS`, `NEWS_KIND_BY_SOURCE`, `NEWS_CODE_BY_SOURCE`, `RE_NEWS_ID`, `RE_LIVE_FORECAST_ID`, `RE_MARKET_ID`, `RE_PROVIDER`, `RE_CLAIM_ID` (without the last group `BuildConfig.__post_init__` refuses every F1 and F3 build as `InvalidConfigError`, R188) | `src/pmx/types.py` (D1) | gate G2 (the engine wave needs every name) |
-| R165: the widened `id`, `provider` and `currency` patterns (`quality.tape_kind` and `wiki_subject_provenance` of rulings R167 and R169 are in the schema already, landed by the data package) | `src/pmx/schemas/market.v2.json` (C0's, edited by the data package now working in it) | gate G2 |
-| R149, R168, R170: the walk gains `instruments/` and `calendars/`; the manifest gains `kinds`, `instruments {per_kind, per_provider, per_vendor, n_cash_events {per_kind}, n_calendars}`, `schedules {fee: [ids], borrow: [ids], carry: [ids]}`, `split.n_instruments_train`, `n_instruments_validation`, `n_instruments_sealed`; `files.path` accepts `instruments/` and `calendars/`; `providers` and `news.sources[].source` widen (`counts.precap_per_provider_month`, `n_bars_only` and `n_category_fallback` of rulings R168 and R170 are in the schema already) | `src/pmx/schemas/dataset.v1.json` (C0's, same package) | gate G2 |
-| R149, R173, R182, R185: `seal_dataset`, `verify_dataset` and `load_dataset` walk `instruments/` and `calendars/`, validate `instrument.v1.json` and `session_calendar.v1.json`, refuse a bar of a `ContinuousInstrument` outside its calendar and never check a binary against one, map the file's `_ticks` fields onto `Bar` and `Trade`, clip a continuous instrument at `validation_end_ms` behind `Dataset.market` and expose the whole record through `Dataset.sealed_market`, synthesise the `continuous` calendar and refuse a `calendars/continuous.json`; `SCHEMA_FILES` gains the four names and `pmx/__init__.py` the four `*_SCHEMA` constants of 13.2 | `src/pmx/data/loader.py`, `src/pmx/data/schema.py` (D1), `src/pmx/__init__.py` (C0) | gate G2 |
-| R174: `pmx.data.sessions` (`in_session`, `next_bar_ms`, `load_calendar`, the synthesised `continuous` calendar, the exchange-calendar generator) moves from F4 to D1 so that it exists when E1, E2 and the loader need it; `docs/PLAN_V3_WAVES.md`'s F4 row still lists the file and is a contract issue for the gate (the contract wins for code, preamble); F4 keeps `data/calendars/*.json` and `universe_finance.py` | `src/pmx/data/sessions.py` (D1), `docs/PLAN_V3_WAVES.md` (the plan's author) | gate G2 |
-| R189: PRD v4 1.2's binary row (`tick_size_micro = 10_000`) and its rounding sentence contradict rulings R145 and R146 and the PRD's own invariant ("nothing written for prediction markets changes value", which `100` keeps and `10_000` breaks by a factor of one hundred); the PRD's 1.2 binary row reads `tick_size_micro = 100`, its rounding sentence reads "one rounding, at the end, against the agent for a cash movement; round half up for a score or a quantile", and its revision history gains a 1.1 entry citing R145, R146 and R189. The PRD defers the formulas to this amendment, so the point is this document's to decide and the preamble's PRD-wins rule is not engaged; the correction is recorded here rather than made because the PRD is not a file this amendment owns | `docs/PRD_V4_MULTI_ASSET.md` (the PRD's author) | gate G2, in the commit that lands the `pmx.types` constants |
+| R144, R145, R147, R148: `INSTRUMENT_KINDS`, `CONTINUOUS_KINDS`, `MICRO`, `MILLI`, `NOTIONAL_DENOMINATOR`, `BINARY_TICK_SIZE_MICRO`, `BINARY_POINT_VALUE_MICRO`, the five caps, `notional_micro`, `cash_out_cents`, `cash_in_cents`, `mark_value_cents`, `price_micro`, `Instrument` (with `bar_at` and `bars_before` on the base, R173), `ContinuousInstrument` (`bars: tuple[Bar, ...]`, `trades: tuple[Trade, ...]`, R173), `SessionCalendar`, `CashEvent`, `CASH_EVENT_KINDS` (seven, R177), `DATA_CASH_EVENT_KINDS`, `cash_event_id`, `split_position_milli`, `HorizonForecast`, `QUANTILE_LEVELS_PPM`, `RANDOM_WALK_UP_PPM`, `RANDOM_WALK_BRIER_MICRO`, `default_horizons_bars` (R188), `Market.instrument`, `MarketMeta.kind` and the continuous `MarketMeta` values of 7.2 through `meta_of` (R186), `Dataset.calendar`, `Dataset.sealed_market` (R182), `RunConfig.horizons_bars` and `RunConfig.kinds`, `BuildConfig.kinds` and `BuildConfig.min_traded_bars`, `Actions.horizon_forecasts`, the eight defaulted `MarketView` fields of 8.3 with `CashEventView` and `CASH_EVENTS_VIEW_MAX` (R181, R183, R188), `CalibrationBinView.n_yes_x2` (R194), the signed `PortfolioView.cash_cents` and `equity_cents` (R179, R180), `MarketQuality.tape_kind`, the `RejectReason` values `bad_horizon`, `bad_quantiles`, `RE_HORIZON_BUCKET` (R188), `INT63_MAX`, `TRADE_SIDES` gaining `buy` and `sell` (R173), `VENDORS`, and the widened `PROVIDERS`, `CURRENCIES` (17.1's quote currencies), `NEWS_SOURCES`, `NEWS_KINDS`, `NEWS_KIND_BY_SOURCE`, `NEWS_CODE_BY_SOURCE`, `RE_NEWS_ID`, `RE_LIVE_FORECAST_ID`, `RE_MARKET_ID`, `RE_PROVIDER`, `RE_CLAIM_ID` (without the last group `BuildConfig.__post_init__` refuses every F1 and F3 build as `InvalidConfigError`, R188), `DECISION_LATENCY_BARS` (16.2, R107; added by ruling R201) | `src/pmx/types.py` (D1) | gate G2, **applied** (ruling R201) |
+| R165: the widened `id`, `provider` and `currency` patterns (`quality.tape_kind` and `wiki_subject_provenance` of rulings R167 and R169 are in the schema already, landed by the data package) | `src/pmx/schemas/market.v2.json` (C0's, edited by the data package now working in it) | gate G2, **applied** (ruling R201) |
+| R149, R168, R170: the walk gains `instruments/` and `calendars/`; the manifest gains `kinds`, `instruments {per_kind, per_provider, per_vendor, n_cash_events {per_kind}, n_calendars}`, `schedules {fee: [ids], borrow: [ids], carry: [ids]}`, `split.n_instruments_train`, `n_instruments_validation`, `n_instruments_sealed`; `files.path` accepts `instruments/` and `calendars/`; `providers` and `news.sources[].source` widen (`counts.precap_per_provider_month`, `n_bars_only` and `n_category_fallback` of rulings R168 and R170 are in the schema already) | `src/pmx/schemas/dataset.v1.json` (C0's, same package) | gate G2, **applied** (ruling R201) |
+| R149, R173, R182, R185: `seal_dataset`, `verify_dataset` and `load_dataset` walk `instruments/` and `calendars/`, validate `instrument.v1.json` and `session_calendar.v1.json`, refuse a bar of a `ContinuousInstrument` outside its calendar and never check a binary against one, map the file's `_ticks` fields onto `Bar` and `Trade`, clip a continuous instrument at `validation_end_ms` behind `Dataset.market` and expose the whole record through `Dataset.sealed_market`, synthesise the `continuous` calendar and refuse a `calendars/continuous.json`; `SCHEMA_FILES` gains the four names and `pmx/__init__.py` the four `*_SCHEMA` constants of 13.2 | `src/pmx/data/loader.py`, `src/pmx/data/schema.py` (D1), `src/pmx/__init__.py` (C0) | gate G2, **applied** (rulings R201 and R223) |
+| R174: `pmx.data.sessions` (`in_session`, `next_bar_ms`, `load_calendar`, the synthesised `continuous` calendar, the exchange-calendar generator) moves from F4 to D1 so that it exists when E1, E2 and the loader need it; `docs/PLAN_V3_WAVES.md`'s F4 row still lists the file and is a contract issue for the gate (the contract wins for code, preamble); F4 keeps `data/calendars/*.json` and `universe_finance.py` | `src/pmx/data/sessions.py` (D1), `docs/PLAN_V3_WAVES.md` (the plan's author) | gate G2, **applied** (ruling R203) |
+| R189: PRD v4 1.2's binary row (`tick_size_micro = 10_000`) and its rounding sentence contradict rulings R145 and R146 and the PRD's own invariant ("nothing written for prediction markets changes value", which `100` keeps and `10_000` breaks by a factor of one hundred); the PRD's 1.2 binary row reads `tick_size_micro = 100`, its rounding sentence reads "one rounding, at the end, against the agent for a cash movement; round half up for a score or a quantile", and its revision history gains a 1.1 entry citing R145, R146 and R189. The PRD defers the formulas to this amendment, so the point is this document's to decide and the preamble's PRD-wins rule is not engaged; the correction is recorded here rather than made because the PRD is not a file this amendment owns | `docs/PRD_V4_MULTI_ASSET.md` (the PRD's author) | gate G2, **applied** (ruling R201: the PRD's 1.2 binary row reads `100`, its rounding sentence reads R146's, and its revision history carries 1.1) |
 | R165: `news.v1.json` gains sources `edgar`, `fred`, `cboe` and kinds `filing`, `release`, and the three news id codes | `src/pmx/schemas/news.v1.json` (C0's) | gate G3b |
-| R129 and R164: `pmx.journal` gains `CashEventApplied`, `InstrumentClosed` and `ForecastResolved` (registered in `EVENT_TYPES` and `EVENT_CLASSES`), `OrderPlaced`, `Filled` and `FeeCharged` gain `"settle"` in `PHASES`, and the existing classes gain the optional `market_listed` and `forecast_recorded` fields; `journal.v2.json` admits the three events to `oneOf`, widens the three phase enums and promotes the new fields with `decided_at_ms` to `required` in the same commit that rebuilds the backtest fixture | `pmx.journal` (D7); the `oneOf`, the phase enums, the `required` lists and the fixture (C1b) | gate G2 |
-| R152, R173: `event_fill`, `slippage_ticks`, `clamp_price`, `envelope_bounds(bar, *, kind)`, the `market_view` keyword of `finalise_fill` and `truncate_for_cash` in `pmx.engine.liquidity`; `historical` reads the half-spread floor of 17.4; `applies_at` and the `calendars` argument in `pmx.engine.execution` (R174, R175) | `src/pmx/engine/liquidity.py`, `src/pmx/engine/execution.py` (E2) | wave 2 (E2 builds against this section) |
+| R129 and R164: `pmx.journal` gains `CashEventApplied`, `InstrumentClosed` and `ForecastResolved` (registered in `EVENT_TYPES` and `EVENT_CLASSES`), `OrderPlaced`, `Filled` and `FeeCharged` gain `"settle"` in `PHASES`, and the existing classes gain the optional `market_listed` and `forecast_recorded` fields; `journal.v2.json` admits the three events to `oneOf`, widens the three phase enums and promotes the new fields with `decided_at_ms` to `required` in the same commit that rebuilds the backtest fixture | `pmx.journal` (D7); the `oneOf`, the phase enums, the `required` lists and the fixture (C1b) | gate G2, **applied** (ruling R202) |
+| R152, R173: `event_fill`, `slippage_ticks`, `clamp_price`, `envelope_bounds(bar, *, kind)`, the `market_view` keyword of `finalise_fill` and `truncate_for_cash` in `pmx.engine.liquidity`; `historical` reads the half-spread floor of 17.4; `applies_at` and the `calendars` argument in `pmx.engine.execution` (R174, R175) | `src/pmx/engine/liquidity.py`, `src/pmx/engine/execution.py` (E2) | wave 2, **applied** (rulings R204, R213 and R214) |
 | R160: `Hive.write_forecast`'s four keyword-only arguments | `src/pmx/agents/hive.py` (A3) | gate G3 |
-| R162, R190: `open_sealed_test(..., kind="binary")`, the claim id, the `(instrument, week)` units and the within-week permutation of `realised_sign` (`permutation_null(..., realised_signs=None, bar_keys=None)`); `claims.py` is the one caller of `Dataset.sealed_market` (R182) | `src/pmx/optimizer/folds.py` (O1), `claims.py` (O4), `pmx.metrics.stats` (E4) | gate G2 (E4), gate G4 (O1, O4) |
+| R162, R190: `open_sealed_test(..., kind="binary")`, the claim id, the `(instrument, week)` units and the within-week permutation of `realised_sign` (`permutation_null(..., realised_signs=None, bar_keys=None)`); `claims.py` is the one caller of `Dataset.sealed_market` (R182) | `src/pmx/optimizer/folds.py` (O1), `claims.py` (O4), `pmx.metrics.stats` (E4) | gate G2 (E4, **applied**, ruling R219), gate G4 (O1, O4) |
 | R166: `opportunity.v1.json` gains `cross_domain`, `kinds`, `providers` and the currency widening | `src/pmx/schemas/opportunity.v1.json` (C1's) | amendment C2 |
 | R166: `.gitignore` and `pyproject.toml` package-data gain `data/calendars/*.json` and `lexicons/*.json` (already) | `.gitignore` (C0), `pyproject.toml` (U4) | gate G3b |

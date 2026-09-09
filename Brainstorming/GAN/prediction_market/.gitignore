@@ -18,3 +18,5 @@ live/*
 !live/.gitkeep
 data/datasets/*
 !data/datasets/.gitkeep
+# scratch files live in the agent scratchpad, never in the repository (CONTRACTS_V2 ruling R218)
+.scratch/

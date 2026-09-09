@@ -50,12 +50,14 @@ from pmx.types import (
     CONTINUOUS_CALENDAR_ID,
     DECISION_LATENCY_BARS,
     INSTRUMENT_KINDS,
+    Bar,
     Dataset,
     Instrument,
     MarketMeta,
     RunConfig,
     Session,
     SessionCalendar,
+    Trade,
     bar_of,
     interval_ms,
     sorted_market_ids,
@@ -73,10 +75,9 @@ def meta_kind(meta: MarketMeta) -> str:
     ``MarketMeta`` itself, because this is the reader every phase of the bar loop goes through and a kind
     outside ``INSTRUMENT_KINDS`` would otherwise pick a code path by falling off the binary branch.
 
-    Reported as a contract issue (section 13.1's error taxonomy): ``pmx.types.MarketMeta`` refuses the
-    same value as an ``InvalidConfigError`` while a record whose kind is not one of the six is a
-    ``SchemaError`` on the engine's side of the boundary, which is what the dataset it came from failed
-    to be. The gate should pick one of the two for the condition.
+    Ruling R207 (section 13.1): the engine's reader raises ``SchemaError``, because the kind came from a
+    file, while ``pmx.types.MarketMeta.__post_init__`` keeps ``InvalidConfigError`` for a meta *built* with
+    a kind outside the table, which is a construction error and not a file's. Two conditions, two errors.
     """
     kind = str(getattr(meta, "kind", KIND_BINARY))
     if kind not in INSTRUMENT_KINDS:
@@ -545,6 +546,80 @@ class InstrumentClock(Protocol):
 
     @property
     def interval_min(self) -> int: ...
+
+
+class InstrumentLike(Protocol):
+    """The instrument surface the engine reads (sections 7.2 and 17.1), declared once (ruling R205).
+
+    The union of what execution and the observation builder read: a ``Market`` and a
+    ``ContinuousInstrument`` both satisfy it, and neither half of the engine declares its own copy, so a
+    caller cannot satisfy one surface and fail the other. Every member is read-only, which a frozen
+    dataclass field and a property both satisfy; the two per-kind spellings the base resolves
+    (``listed_at_ms`` for ``created_at_ms``, ``first_price_ticks`` for ``first_price_bp``) are read through
+    the builder's accessors and are deliberately not members.
+    """
+
+    @property
+    def id(self) -> str: ...
+
+    @property
+    def provider(self) -> str: ...
+
+    @property
+    def url(self) -> str: ...
+
+    @property
+    def description(self) -> str: ...
+
+    @property
+    def category(self) -> str: ...
+
+    @property
+    def tags(self) -> tuple[str, ...]: ...
+
+    @property
+    def currency(self) -> str: ...
+
+    @property
+    def source(self) -> str: ...
+
+    @property
+    def interval_min(self) -> int: ...
+
+    @property
+    def bars(self) -> tuple[Bar, ...]: ...
+
+    @property
+    def trades(self) -> tuple[Trade, ...]: ...
+
+    @property
+    def fee_schedule_id(self) -> str: ...
+
+    def bar_at(self, t_ms: int) -> Bar | None: ...
+
+    def bars_before(self, now_ms: int, limit: int) -> tuple[Bar, ...]: ...
+
+
+class CashEventLike(Protocol):
+    """One dated cash event, ``pmx.types.CashEvent`` (section 17.3), declared once (ruling R205)."""
+
+    @property
+    def cash_event_id(self) -> str: ...
+
+    @property
+    def market_id(self) -> str: ...
+
+    @property
+    def kind(self) -> str: ...
+
+    @property
+    def t_ms(self) -> int: ...
+
+    @property
+    def origin(self) -> str: ...
+
+    @property
+    def detail(self) -> Mapping[str, int | str]: ...
 
 
 def applies_at(

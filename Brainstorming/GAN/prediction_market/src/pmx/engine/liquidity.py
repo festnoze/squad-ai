@@ -538,8 +538,9 @@ class HistoricalLiquidity:
     bar at all: the model therefore remembers the last bar it was asked to price per market and uses it
     only when its ``t_ms`` is strictly earlier. When there is no earlier bar (the first bar of an
     instrument's life inside this run, or a bar nobody traded into) the schedule's
-    ``min_half_spread_ticks`` stands alone rather than an estimate being fabricated from one bar. This is
-    reported as a contract issue against 16.1.
+    ``min_half_spread_ticks`` stands alone rather than an estimate being fabricated from one bar. Ruling
+    R214 declares ``quote_bar(..., bar_prev=)`` so the previous bar arrives from the dataset; E2 applies it
+    in the next lot, and until then this memory is the fallback.
     """
 
     __slots__ = ("_config", "_last_bar", "model_id", "params_hash")
@@ -757,7 +758,7 @@ def check_envelope(
     Rule 1 is checked on **taker** fills only, and that reading is deliberate: 8.6's limit rule prices a
     resting buy at ``min(L, bar.open_bp)``, which on a quoted bar is below the ask by construction, so
     applying "a buy quotes at or above the ask" to a maker fill would fail every implementation for
-    obeying the other half of the contract. It is reported as a contract issue against 16.1 rule 1.
+    obeying the other half of the contract. 16.1 rule 1 reads "a taker buy" since ruling R214.
 
     Returns:
         The breaches observed, in :data:`ENVELOPE_BREACHES` order, empty when the model is inside the

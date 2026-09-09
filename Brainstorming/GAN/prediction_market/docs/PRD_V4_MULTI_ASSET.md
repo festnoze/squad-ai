@@ -47,16 +47,18 @@ unit) and `point_value_micro` (the cash value of a one-point move of one unit of
 of the quote currency). Prices are stored as `price_ticks: int`. Cash is integer cents (or the quote
 currency's minor unit). Position value and PnL are exact integer arithmetic on those three integers.
 
-- A binary contract is `tick_size_micro = 10_000` (one basis point of a one-unit payout),
-  `point_value_micro = 1_000_000` on a one-dollar payout: `price_ticks` is the bp price v2 already uses.
-  Nothing written for prediction markets changes value.
+- A binary contract is `tick_size_micro = 100` (one basis point of a one-unit payout is one hundred
+  millionths of it), `point_value_micro = 1_000_000` on a one-dollar payout: `price_ticks` is the bp price
+  v2 already uses. Nothing written for prediction markets changes value (CONTRACTS_V2 rulings R145 and
+  R189: `10_000` would have priced a contract a hundred times too high).
 - BTCUSDT on Binance is quoted to the cent: `tick_size_micro = 10_000`; one unit is one coin, so
   `point_value_micro = 1_000_000`. A position of `size_milli = 1` is one thousandth of a coin.
 - ES is quoted in quarter points with a fifty-dollar multiplier: `tick_size_micro = 250_000`,
   `point_value_micro = 50_000_000`.
 - EURUSD is quoted to the pip (a tenth of a pip on some venues): `tick_size_micro = 100` or `10`.
 
-The conversion formulas, the rounding rule (round half up, once, at the end) and the overflow bounds
+The conversion formulas, the rounding rule (one rounding, at the end, against the agent for a cash
+movement; round half up for a score or a quantile: CONTRACTS_V2 ruling R146) and the overflow bounds
 (all products fit in 63 bits at the declared scales) are contract material for C1b.
 
 ### 1.3 Sessions and calendars
@@ -234,6 +236,9 @@ an interval and a permutation null, and appears on the opportunity map of v3.
 
 ## 9. Revision history
 
+- 1.1, 2026-09-09: section 1.2's binary row reads `tick_size_micro = 100` and its rounding sentence reads
+  the contract's, both corrected by gate G2 as the contract issue of CONTRACTS_V2 rulings R145, R146 and
+  R189 (section 17.9); the BTCUSDT, ES and EURUSD rows are unchanged.
 - 1.0, 2026-09-08: written after the user widened the scope to every market and after live probes of
   Binance, Kraken, Coinbase, Bybit, Yahoo, Frankfurter, ECB, SEC EDGAR, FRED, CBOE (working) and Stooq,
   Dukascopy (not usable from this machine).

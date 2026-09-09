@@ -94,6 +94,15 @@ DECISION_LATENCY_BARS = 1
 CONTINUOUS_CALENDAR_ID = "continuous"
 #: How many applied data cash events a ``MarketView`` shows (section 8.3, ruling R183).
 CASH_EVENTS_VIEW_MAX = 30
+#: The view caps section 8.3 and 8.4 state in prose, declared here so the observation builder imports one
+#: spelling (gate G2, ruling R208): ``NewsView.text`` is 600 characters of body (the dataset keeps 4 000),
+#: ``MarketView.description`` at most 1 000, ``HiveView.resolutions`` the last 200 settled markets,
+#: ``MemoryView.notes`` the last 20 notes, and a granted ``news`` research request is three times the caps.
+NEWS_VIEW_TEXT_CHARS = 600
+DESCRIPTION_VIEW_CHARS = 1_000
+HIVE_RESOLUTIONS_VIEW_MAX = 200
+MEMORY_NOTES_VIEW_MAX = 20
+RESEARCH_NEWS_MULTIPLIER = 3
 #: The five pinball levels (section 17.5, ruling R159), fixed for every kind and every horizon.
 QUANTILE_LEVELS_PPM = (100_000, 250_000, 500_000, 750_000, 900_000)
 #: The random walk: the efficient-market statement for a price series (ruling R158). Its directional

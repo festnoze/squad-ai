@@ -53,6 +53,8 @@ from pmx.engine.fees import (
     FeeSchedule,
 )
 from pmx.engine.liquidity import LiquidityModel
+from pmx.engine.observation import HiveLike as ObservationHiveLike
+from pmx.engine.observation import MemoryLike as ObservationMemoryLike
 from pmx.engine.observation import (
     ResearchLedger,
     build_grant,
@@ -121,12 +123,9 @@ from pmx.types import (
     Actions,
     ContinuousInstrument,
     Dataset,
-    HiveView,
     Lesson,
-    Limits,
     Market,
     MarketAction,
-    MemoryView,
     Observation,
     PortfolioView,
     PositionView,
@@ -170,10 +169,11 @@ def run_horizons_bars(config: RunConfig) -> tuple[int, ...]:
 # Section 10.2 declares ``Agent``, ``Memory``, ``Hive`` and ``ResolutionEvent`` in files A1, A2 and A3
 # own and section 11.1 declares ``Gateway`` and ``AgentReply`` in ``pmx.types`` (D1). None of those names
 # exists while wave 2 is being built, and the runner cannot be annotated against a module that is not
-# there. The protocols below are therefore the **structural view** of what the runner actually calls:
-# every concrete agent, memory and hive of wave 3 satisfies them without importing anything from here,
-# because a ``Protocol`` matches by shape. Reported as a contract issue: the four protocols and
-# ``ResolutionEvent`` belong in a wave-1 file (section 11.1 already argues exactly that for ``Gateway``).
+# there. The protocols below are therefore the **structural view** of what the runner actually calls
+# (ruling R205): every concrete agent, memory and hive of wave 3 satisfies them without importing anything
+# from here, because a ``Protocol`` matches by shape, and a gate G3 test asserts it. ``MemoryLike`` and
+# ``HiveLike`` extend the read side E1's ``pmx.engine.observation`` declares, so ``view`` has one
+# declaration in the engine.
 # --------------------------------------------------------------------------------------------------
 class GenomeLike(Protocol):
     """What the runner needs of a genome: its family and its canonical dictionary (section 10.1).
@@ -189,39 +189,30 @@ class GenomeLike(Protocol):
     def to_dict(self) -> dict[str, object]: ...
 
 
-class MemoryLike(Protocol):
-    """What the runner needs of a memory (section 10.3): the read side and the two write paths.
+class MemoryLike(ObservationMemoryLike, Protocol):
+    """What the runner needs of a memory (section 10.3): E1's read side plus the two write paths.
 
-    ``view`` is here because the runner hands the same object to E1's ``build_observation``, whose own
-    protocol is the read side (section 8.3). One object, one shape, no cast.
+    ``view`` is inherited from ``pmx.engine.observation.MemoryLike`` because the runner hands the same
+    object to E1's ``build_observation`` (ruling R205). One object, one shape, no cast.
     """
 
     @property
     def agent_id(self) -> str: ...
 
-    def view(self, *, now_ms: int) -> MemoryView: ...
     def add_lesson(self, text: str, market_ids: tuple[str, ...], *, written_at_ms: int) -> None: ...
     def add_note(self, text: str, market_id: str | None, *, written_at_ms: int) -> None: ...
     def snapshot(self) -> dict[str, object]: ...
     def freeze(self) -> None: ...
 
 
-class HiveLike(Protocol):
-    """What the runner needs of a hive (section 10.4): the read side, the four writes, a snapshot.
+class HiveLike(ObservationHiveLike, Protocol):
+    """What the runner needs of a hive (section 10.4): E1's read side, the four writes, a snapshot.
 
-    ``write_forecast`` carries amendment C1b's four keyword-only arguments (ruling R160), which the
-    runner fills for a continuous instrument and leaves at their defaults for a binary.
+    ``view`` is inherited from ``pmx.engine.observation.HiveLike`` (ruling R205). ``write_forecast``
+    carries amendment C1b's four keyword-only arguments (ruling R160), which the runner fills for a
+    continuous instrument and leaves at their defaults for a binary.
     """
 
-    def view(
-        self,
-        *,
-        now_ms: int,
-        agent_id: str,
-        market_ids: Sequence[str],
-        limits: Limits,
-        live_coop: bool,
-    ) -> HiveView: ...
     def write_forecast(
         self,
         *,
@@ -739,8 +730,8 @@ def _check_liquidity(config: RunConfig, liquidity: LiquidityModel) -> None:
 def _schedules_for(dataset: Dataset, market_ids: Sequence[str]) -> dict[str, FeeSchedule]:
     """The fee schedules the run's markets name, from the shipped rows of ``pmx.engine.fees``.
 
-    ``FEE_SCHEDULES`` is E2's registry; section 8.8 ships the schedules as data but names no registry, so
-    the name is E2's and this is its one reader in the engine. Reported as a contract issue.
+    ``FEE_SCHEDULES`` is the registry section 8.8 declares since ruling R213, and this is its one reader in
+    the engine.
     """
     wanted = {dataset.meta(market_id).fee_schedule_id for market_id in market_ids}
     return {
@@ -778,34 +769,6 @@ def _memory_provenance(
             t0_ms=t0_ms,
         )
     return canonical_sha256(snapshots), source_t1
-
-
-class _TailJournal(Journal):
-    """D7's :class:`~pmx.journal.Journal`, plus the events appended since the last read.
-
-    The runner writes ``settlement_applied.realised_pnl_cents`` and reads the fills and fees
-    ``Execution`` journaled to build it (section 8.7), rather than keeping a second ledger that could
-    disagree with the journal. The obvious way to read them is ``journal.events[first_seq - 1:]``, and
-    it is quadratic: ``Journal.events`` copies the **whole** journal into a tuple on every access, so a
-    run of a few thousand bars over a few hundred markets spends minutes copying pointers. This
-    subclass keeps the tail as it is appended and hands it over once, which is the same events in
-    constant amortised time. Reported as a contract issue: ``Journal`` could expose the tail itself.
-    """
-
-    def __init__(self, run_id: str, path: Path | None = None) -> None:
-        super().__init__(run_id, path)
-        self._tail: list[JournalEvent] = []
-
-    def append(self, event: JournalEvent) -> JournalEvent:
-        appended = super().append(event)
-        self._tail.append(appended)
-        return appended
-
-    def take_tail(self) -> tuple[JournalEvent, ...]:
-        """The events appended since the last call, and forget them."""
-        tail = tuple(self._tail)
-        self._tail.clear()
-        return tail
 
 
 def _write_text(path: Path, payload: str) -> None:
@@ -884,7 +847,7 @@ def run_backtest(
     agent_ids = sorted_agent_ids(agent.agent_id for agent in agents)
     by_id = {agent.agent_id: agent for agent in agents}
 
-    journal = _TailJournal(run_id, journal_path)
+    journal = Journal(run_id, journal_path)
     schedules = _schedules_for(dataset, market_ids)
     # E1's ``Calendar`` and E2's session grid are built from one set of sessions (ruling R174): without
     # the mapping, execution believes every instrument trades at every grid point and its ``next_bar``
@@ -1038,7 +1001,7 @@ class _RunState:
     execution: Execution
     hive: HiveLike | None
     horizons: tuple[int, ...]
-    journal: _TailJournal
+    journal: Journal
     memory: Mapping[str, MemoryLike] | None
     research: ResearchLedger
     span: int

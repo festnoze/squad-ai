@@ -47,7 +47,7 @@ from types import MappingProxyType
 from typing import Final, NoReturn, Protocol, cast
 
 from pmx import OBS_VERSION
-from pmx.engine.calendar import KIND_BINARY, Calendar, applies_at
+from pmx.engine.calendar import KIND_BINARY, Calendar, CashEventLike, InstrumentLike, applies_at
 from pmx.errors import InvalidConfigError, LeakError, ObservationTooLargeError, SchemaError
 from pmx.journal import canonical_json
 from pmx.types import (
@@ -57,12 +57,17 @@ from pmx.types import (
     CASH_EVENTS_VIEW_MAX,
     CONTINUOUS_CALENDAR_ID,
     DATA_CASH_EVENT_KINDS,
+    DESCRIPTION_VIEW_CHARS,
+    HIVE_RESOLUTIONS_VIEW_MAX,
     INSTRUMENT_KINDS,
+    MEMORY_NOTES_VIEW_MAX,
     MS_PER_DAY,
     MS_PER_HOUR,
     NEWS_PER_MARKET_MAX,
+    NEWS_VIEW_TEXT_CHARS,
     OBSERVATION_MAX_BYTES,
     RESEARCH_KINDS,
+    RESEARCH_NEWS_MULTIPLIER,
     RESEARCH_UNIT_COST,
     Bar,
     CashEventView,
@@ -94,19 +99,10 @@ from pmx.types import (
 # ``CASH_EVENT_KINDS``, ``DATA_CASH_EVENT_KINDS`` and ``CASH_EVENTS_VIEW_MAX`` are no longer here: they
 # are ``pmx.types``' (section 13, 17.9's R177 and R183 rows) and are imported above, so the kind order
 # ruling R193 makes normative has one spelling and the view cannot sort by an order the engine did not
-# apply in. The five below are still stated in prose only and each remains a reported contract issue,
-# so that D1 can hold the one spelling.
+# apply in. The five view caps (``NEWS_VIEW_TEXT_CHARS``, ``DESCRIPTION_VIEW_CHARS``,
+# ``HIVE_RESOLUTIONS_VIEW_MAX``, ``MEMORY_NOTES_VIEW_MAX``, ``RESEARCH_NEWS_MULTIPLIER``) are ``pmx.types``'
+# too since ruling R208 and are imported above.
 # --------------------------------------------------------------------------------------------------
-#: ``NewsView.text`` is 600 characters of body, never the 4 000 the dataset keeps (section 8.3).
-NEWS_VIEW_TEXT_CHARS: Final = 600
-#: ``MarketView.description`` is at most 1 000 characters (section 8.3).
-DESCRIPTION_VIEW_CHARS: Final = 1_000
-#: ``HiveView.resolutions`` carries the last 200 settled markets (section 8.3).
-HIVE_RESOLUTIONS_VIEW_MAX: Final = 200
-#: ``MemoryView.notes`` carries the last 20 notes (section 8.3).
-MEMORY_NOTES_VIEW_MAX: Final = 20
-#: A granted ``news`` research request is a deeper digest: three times the caps (section 8.4).
-RESEARCH_NEWS_MULTIPLIER: Final = 3
 
 #: Every key section 8.3's clock test forbids anywhere in an observation, plus section 7.9's fields, the
 #: cluster-derived and detector-derived names amendment C1 adds (ruling R116, sections 16.3 and 16.4) and
@@ -187,84 +183,11 @@ _TAPE_STATS_CACHE_MAX: Final = 4_096
 
 
 # --------------------------------------------------------------------------------------------------
-# The surfaces E1 reads. Each one is the read side of a record another package owns, and gate G2 has
-# landed all of them (``pmx.types.Instrument``, ``CashEvent``, and A2's memory and hive): they stay
-# structural here because the builder reads only what it filters, and the declared classes satisfy them.
-# What is NOT resolved, and is reported as a contract issue rather than settled inside one package: the
-# same four names are declared a second time in the engine wave (``InstrumentLike`` and
-# ``CashEventLike`` in ``pmx.engine.execution``, ``MemoryLike`` and ``HiveLike`` in
-# ``pmx.engine.runner``), with different member sets, so a caller cannot tell which surface a record
-# must satisfy. Consolidating them means choosing where the engine's structural protocols live, which
-# section 11.1 already argues for and which the gate must rule on (see the file list of section 13).
+# The surfaces E1 reads. ``InstrumentLike`` and ``CashEventLike`` are ``pmx.engine.calendar``'s one
+# declaration (ruling R205) and are imported above; the two below are the READ side of A2's memory and
+# A3's hive (sections 10.3 and 10.4), which the runner's write-side protocols extend, so ``view`` has
+# one declaration in the engine and the concrete wave-3 classes satisfy it by shape.
 # --------------------------------------------------------------------------------------------------
-class InstrumentLike(Protocol):
-    """What the builder reads of an instrument: ``pmx.types.Instrument`` (D1, gate G2, ruling R144).
-
-    A ``Market`` satisfies it today. The two per-kind spellings the base resolves (``listed_at_ms`` for
-    ``created_at_ms``, ``first_price_ticks`` for ``first_price_bp``) are read through the accessors below
-    rather than declared here, so that this protocol is exactly the surface both kinds share.
-    """
-
-    @property
-    def id(self) -> str: ...
-
-    @property
-    def provider(self) -> str: ...
-
-    @property
-    def url(self) -> str: ...
-
-    @property
-    def description(self) -> str: ...
-
-    @property
-    def category(self) -> str: ...
-
-    @property
-    def tags(self) -> tuple[str, ...]: ...
-
-    @property
-    def currency(self) -> str: ...
-
-    @property
-    def interval_min(self) -> int: ...
-
-    @property
-    def bars(self) -> tuple[Bar, ...]: ...
-
-    @property
-    def trades(self) -> tuple[Trade, ...]: ...
-
-    @property
-    def fee_schedule_id(self) -> str: ...
-
-    def bar_at(self, t_ms: int) -> Bar | None: ...
-
-    def bars_before(self, now_ms: int, limit: int) -> tuple[Bar, ...]: ...
-
-
-class CashEventLike(Protocol):
-    """One dated cash event: ``pmx.types.CashEvent`` (D1, gate G2, section 17.3)."""
-
-    @property
-    def cash_event_id(self) -> str: ...
-
-    @property
-    def market_id(self) -> str: ...
-
-    @property
-    def kind(self) -> str: ...
-
-    @property
-    def t_ms(self) -> int: ...
-
-    @property
-    def origin(self) -> str: ...
-
-    @property
-    def detail(self) -> Mapping[str, int | str]: ...
-
-
 class MemoryLike(Protocol):
     """The read side of ``pmx.agents.memory.Memory`` (section 10.3, A2, wave 3).
 
@@ -556,10 +479,9 @@ def build_grant(
       linked items, exactly as the per-market digest of a view is;
     * ``history``: the last ``config.trades_window`` prints strictly before ``granted_at_ms``;
     * ``wiki_asof``: the point-in-time background snapshots visible at ``granted_at_ms``, the most recent
-      ``config.news_per_market`` of them. Section 8.4 calls the payload "a background article" and states
-      no cap; an uncapped one would carry a year of revisions of one subject and could push the whole
-      observation over ``OBSERVATION_MAX_BYTES``, which raises rather than truncates (8.1), so the
-      per-market digest cap is applied and reported as a contract issue.
+      ``config.news_per_market`` of them (sections 8.1 and 8.4, ruling R210): an uncapped payload would
+      carry a year of revisions of one subject and could push the whole observation over
+      ``OBSERVATION_MAX_BYTES``, which raises rather than truncates.
     """
     kind = request.kind
     if kind not in RESEARCH_KINDS:
@@ -702,11 +624,11 @@ def market_view_fields(
 ) -> dict[str, object]:
     """Every field of ``MarketView`` (section 8.3), including amendment C1b's eight, as a mapping.
 
-    It is a mapping and not a ``MarketView`` because D1 has not landed the eight defaulted fields of
-    ruling R188 yet (``kind``, ``tick_size_micro``, ``point_value_micro``, ``session_calendar_id``,
-    ``hours_to_next_bar``, ``underlying_id``, ``twins``, ``cash_events``): the values are computed here,
-    where they belong, and :func:`_market_view` drops the ones the dataclass cannot yet accept. That is
-    the one place gate G2's change lands, and it is reported as a contract issue.
+    It is a mapping because the eight defaulted fields of ruling R188 (``kind``, ``tick_size_micro``,
+    ``point_value_micro``, ``session_calendar_id``, ``hours_to_next_bar``, ``underlying_id``, ``twins``,
+    ``cash_events``) are computed here, where they belong, and the sensor hook narrows the mapping before
+    :func:`_market_view` builds the ``MarketView`` from it; a name the dataclass does not carry is a
+    ``TypeError`` there and never a silent drop.
 
     ``close_at_ms`` is the venue's published close on a binary and ``0`` on a continuous instrument, whose
     ``delisted_at_ms`` is future information; ``tradable`` is the caller's, because on a continuous

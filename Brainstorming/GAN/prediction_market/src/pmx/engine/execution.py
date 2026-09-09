@@ -27,21 +27,21 @@ receives no dividend and a buy at a split's effective open is not multiplied.
 **One rounding, against the agent** (ruling R146). Every cash movement is an exact integer product divided
 once, up when the agent pays and down when it receives, so no cent is ever created by rounding.
 
-Two dependencies of this module do not exist yet and are reported as contract issues rather than papered
-over: the C1b names of ``pmx.types`` (section 17.9, gate G2), which ``pmx.engine.fees`` bridges, and the
-journal event classes of ruling R164, which the private bridges below supply until ``pmx.journal`` carries
-them. Both bridges prefer the real name the moment it exists.
+Every name this module reads of ``pmx.types`` and ``pmx.journal`` exists since gate G2 (section 17.9,
+rulings R201 and R202); the price-model constants are read through ``pmx.engine.fees``' explicit
+re-exports because 16.1 lists ``MILLI`` on liquidity's declared surface (ruling R224), and the structural
+protocols ``InstrumentLike`` and ``CashEventLike`` are ``pmx.engine.calendar``'s (ruling R205).
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING
 
 from pmx.data.sessions import days_since_previous_close, in_session, next_bar_ms, prev_bar_ms
 from pmx.engine import fees
-from pmx.engine.calendar import KIND_BINARY
+from pmx.engine.calendar import KIND_BINARY, CashEventLike, InstrumentLike
 from pmx.engine.calendar import applies_at as applies_at
 from pmx.engine.fees import (
     BINARY_POINT_VALUE_MICRO,
@@ -116,67 +116,9 @@ __all__ = [
 
 
 # --------------------------------------------------------------------------------------------------
-# What execution reads of an instrument, a cash event and a bar calendar
+# What execution reads of an instrument: ``InstrumentLike`` and ``CashEventLike`` are declared once, in
+# ``pmx.engine.calendar`` (ruling R205), and imported above.
 # --------------------------------------------------------------------------------------------------
-@runtime_checkable
-class InstrumentLike(Protocol):
-    """The instrument surface execution reads (7.2 and 17.1).
-
-    Declared structurally so that a ``Market`` (the binary instrument, which exists) and a
-    ``ContinuousInstrument`` (which gate G2 lands in ``pmx.types``) satisfy it without this module
-    naming a class that is not written yet. Every member is read-only, which both a frozen dataclass
-    field and a property satisfy.
-    """
-
-    @property
-    def id(self) -> str: ...
-
-    @property
-    def provider(self) -> str: ...
-
-    @property
-    def interval_min(self) -> int: ...
-
-    @property
-    def source(self) -> str: ...
-
-    @property
-    def category(self) -> str: ...
-
-    @property
-    def currency(self) -> str: ...
-
-    @property
-    def fee_schedule_id(self) -> str: ...
-
-    def bar_at(self, t_ms: int) -> Bar | None: ...
-
-    def bars_before(self, now_ms: int, limit: int) -> tuple[Bar, ...]: ...
-
-
-@runtime_checkable
-class CashEventLike(Protocol):
-    """One dated cash event (17.3), read structurally for the reason :class:`InstrumentLike` is."""
-
-    @property
-    def cash_event_id(self) -> str: ...
-
-    @property
-    def market_id(self) -> str: ...
-
-    @property
-    def kind(self) -> str: ...
-
-    @property
-    def t_ms(self) -> int: ...
-
-    @property
-    def origin(self) -> str: ...
-
-    @property
-    def detail(self) -> Mapping[str, int | str]: ...
-
-
 @dataclass(frozen=True, slots=True)
 class InstrumentSpec:
     """The ``Instrument`` base of 17.1 as execution needs it, for a binary and a continuous kind alike.
@@ -262,8 +204,8 @@ def instrument_spec(instrument: InstrumentLike) -> InstrumentSpec:
     question, one answer across the engine. It matters because ``Market.instrument`` is a *view* whose
     ``kind`` is the constant ``binary`` (R144's table), so a record read view-first would answer
     ``binary`` for anything that carries a binary view, and E1 and E2 would disagree about the kind of
-    one instrument inside one run. Reported as a contract issue: section 17.1 should say in words that
-    the record's ``kind`` is the authority and the view restates it.
+    one instrument inside one run. Section 17.1 says it in words since ruling R206: the record's ``kind``
+    is the authority and the view restates it.
     """
     base: object = getattr(instrument, "instrument", None)
     if base is None:
@@ -518,8 +460,7 @@ class Execution:
         previous bar is in no tuple of E1's ``BarSlice`` at ``t_ms`` and is still owed its
         ``order_rejected(not_tradable)``. Second, every instrument carrying a **resting** limit order,
         because 8.6 has a resting order try against each later bar's range until its ttl runs out and the
-        drain is the only entry point the runner has. The second half is reported as a contract issue
-        against R131, which names only the first.
+        drain is the only entry point the runner has. 8.6 and R131 name both halves since ruling R213.
         """
         ready = {item.market_id for item in self._pending if item.drain_at_ms == t_ms}
         for state in self._states.values():
@@ -566,8 +507,7 @@ class Execution:
         """Expire the resting orders phase 1 of 8.2 expires: the ttl ran out, or the market closed.
 
         Additive to 8.6's surface, and required by 8.2: the open phase emits ``order_expired`` and 9.3
-        makes execution its one emitter, while the surface of 8.6 has no open-phase entry point. The
-        omission is reported as a contract issue.
+        makes execution its one emitter; 8.6's surface lists it since ruling R213.
         """
         known: dict[str, tuple[InstrumentSpec, InstrumentLike]] = {}
         for market in markets:
@@ -1071,7 +1011,7 @@ class Execution:
         ``reserved_cents`` above ``max(0, cash_cents)``, which is wider than ruling R179's literal
         trigger ("the event that took cash below zero"): a charge that leaves cash positive but under
         the reservations would break 8.9's ``reserved_cents(a) <= max(0, cash_cents(a))`` line, and that
-        line is the one the invariant asserts. The widening is reported as a contract issue.
+        line is the one the invariant asserts. R179 and 8.9 read this trigger since ruling R215.
         """
         if event.kind in ("split", "roll"):
             expiry = "corporate_action" if event.kind == "split" else "roll"
@@ -1266,7 +1206,7 @@ class Execution:
         is implemented is the property the invariant asserts: the largest size whose **total** outlay
         (the opening cost, minus the closing proceeds, plus the fee) the free cash can pay, plus the
         short-notional rule of 17.3 on a continuous opening short. On a pure opening fill with no fee the
-        two agree exactly. The deviation is reported as a contract issue.
+        two agree exactly. 8.5 states this rule since ruling R215.
 
         ``resting`` is the row behind a limit fill, and the third term of the predicate is its reason:
         8.5 sizes a reservation at the worst-case opening **cost** and says nothing about the maker fee,
@@ -1274,7 +1214,7 @@ class Execution:
         remainder resting against a reservation the agent no longer holds and 8.9's
         ``reserved_cents(a) <= max(0, cash_cents(a))`` would be false by the fee. The predicate therefore
         asks what the invariant asks: after this fill, does the cash still cover every reservation,
-        including the one the remainder keeps. It is reported as a contract issue against 8.5.
+        including the one the remainder keeps. 8.5 states this rule since ruling R215.
 
         The predicate is true at ``0`` (the invariant held before the fill) and false after its largest
         true size (the outlay falls while the opposite leg closes and rises once the new leg opens), so a

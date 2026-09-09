@@ -1817,7 +1817,8 @@ def test_the_arbitration_pass_of_c1b_is_applied_in_place() -> None:
     sessions = next(line for line in module_map.splitlines() if "data/sessions.py" in line)
     assert re.search(r"\s+D1\s+\(", sessions), sessions  # R174
     events = _flat(_contract_section("### 17.3 `CashEvent`", "### 17.4 Fee, borrow"))
-    for phrase in ("def applies_at(event: CashEvent, instrument: Instrument, calendar: Calendar) -> int | None:",
+    applies = "def applies_at(event: CashEvent, instrument: Instrument, calendar: BarLookups | None) -> int | None:"
+    for phrase in (applies,
                    "Entitlement follows the regime of the prices", "t_ms = last_bar(i) + interval_ms - 1",
                    "| `carry` | `fx` with a `carry_schedule_id`", "A debit balance", 'reason = "debit"',
                    "(kind order as in CASH_EVENT_KINDS, t_ms, cash_event_id)",

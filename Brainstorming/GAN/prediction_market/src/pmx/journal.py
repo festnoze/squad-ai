@@ -1418,7 +1418,17 @@ class Journal:
     ``run_id`` changed halfway through, is an AC-3 failure that no later check can repair.
     """
 
-    __slots__ = ("_buffer_size", "_closed", "_events", "_handle", "_path", "_pending", "_run_id", "_validate")
+    __slots__ = (
+        "_buffer_size",
+        "_closed",
+        "_events",
+        "_handle",
+        "_path",
+        "_pending",
+        "_run_id",
+        "_tail_from",
+        "_validate",
+    )
 
     def __init__(
         self,
@@ -1450,6 +1460,7 @@ class Journal:
         self._run_id = run_id
         self._path = path
         self._events: list[JournalEvent] = []
+        self._tail_from = 0
         self._pending: list[str] = []
         self._buffer_size = buffer_size
         self._validate = validate
@@ -1478,6 +1489,18 @@ class Journal:
     def events(self) -> tuple[JournalEvent, ...]:
         """Every event appended so far, in ``seq`` order."""
         return tuple(self._events)
+
+    def take_tail(self) -> tuple[JournalEvent, ...]:
+        """The events appended since the previous call, then forgotten (section 9.1, ruling R220).
+
+        The runner reads the fills and fees execution just journaled to build ``settlement_applied``
+        (section 8.7) rather than keeping a second ledger; reading them through :attr:`events` copied the
+        whole journal on every bar and was quadratic. This is the same events in linear time, and it
+        changes no byte: the journal is what it was, only read from a cursor.
+        """
+        tail = tuple(self._events[self._tail_from :])
+        self._tail_from = len(self._events)
+        return tail
 
     @property
     def closed(self) -> bool:

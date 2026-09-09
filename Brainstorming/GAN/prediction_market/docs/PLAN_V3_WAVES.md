@@ -523,8 +523,9 @@ random-walk baseline; E5 emits the horizon resolution events.
 
 ### F4 sessions, calendars and the finance universe
 
-- **Owns**: `src/pmx/data/sessions.py`, `src/pmx/data/calendars/*.json`, `src/pmx/data/universe_finance.py`,
-  `tests/test_sessions_universe.py`.
+- **Owns**: `src/pmx/data/calendars/*.json`, `src/pmx/data/universe_finance.py`,
+  `tests/test_sessions_universe.py`. (`src/pmx/data/sessions.py` is D1's since CONTRACTS_V2 ruling R174 and
+  exists since gate G2, ruling R203; F4 calls it and does not own it.)
 - **Does**: static session calendars for crypto, FX and the US exchanges with holidays for the window;
   the universe of PRD v4 section 2.2 chosen at the window start from a dated list; the `--kinds` option
   of the builder wired through a hook D6 exposes (a contract issue if it does not).

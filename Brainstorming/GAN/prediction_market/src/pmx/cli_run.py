@@ -7,11 +7,13 @@ roster over the dataset, indexes the run, and prints the summary. ``replay`` reb
 from ``journal.jsonl`` alone and refuses a journal written by another engine with exit code 2, which is
 what section 13.2 asks for.
 
-The roster is A1's to build (``pmx.agents.registry``, wave 3). It is imported inside the handler rather
-than at module level so that this file is importable, testable and usable for ``replay`` while wave 2 is
-being built, and a run asked for before A1 lands fails with ``NotConfiguredError`` naming the missing
-name rather than with an ``ImportError``. Reported as a contract issue: section 10.5 names
-``FAMILIES`` and ``DEFAULT_ROSTER`` but no constructor, and ``pmx.cli_run`` needs one.
+The roster is A1's to build (``pmx.agents.registry``, wave 3), through the two names section 10.1
+declares for the registry: ``DEFAULT_ROSTER`` and ``make_agent(agent_id, genome)``. The module is imported
+inside the handler rather than at module level so that this file is importable, testable and usable for
+``replay`` while wave 2 is being built, and a run asked for before A1 lands fails with
+``NotConfiguredError`` naming the missing name rather than with an ``ImportError``. ``--roster-module``
+names another module exposing the same two names (ruling R200): gate G2's scripted-stub run drives
+``tests.stub_roster`` through this command, so the real registry lands on a path a run has already used.
 """
 
 from __future__ import annotations
@@ -34,7 +36,14 @@ from pmx.rng import RngTree
 from pmx.store import DEFAULT_STORE_NAME, RunStore
 from pmx.types import Dataset, RunConfig, market_set_hash
 
-__all__ = ("build_parser", "config_from_args", "main", "register", "run_from_args")
+__all__ = (
+    "DEFAULT_ROSTER_MODULE",
+    "build_parser",
+    "config_from_args",
+    "main",
+    "register",
+    "run_from_args",
+)
 
 #: Where a run directory is created unless the caller says otherwise (section 9.5).
 DEFAULT_RUNS_DIR = Path("runs")
@@ -47,40 +56,46 @@ def _load_dataset(path: Path) -> Dataset:
     return load_dataset(path)
 
 
-def _build_roster(dataset: Dataset, agent_ids: Sequence[str]) -> tuple[Agent, ...]:
-    """The run's roster, from A1's registry (section 10.5).
+#: The module ``pmx run backtest`` reads its roster from unless ``--roster-module`` says otherwise (10.1).
+DEFAULT_ROSTER_MODULE = "pmx.agents.registry"
+
+
+def _build_roster(
+    dataset: Dataset, agent_ids: Sequence[str], *, roster_module: str = DEFAULT_ROSTER_MODULE
+) -> tuple[Agent, ...]:
+    """The run's roster, from the registry module (section 10.1's ``DEFAULT_ROSTER`` and ``make_agent``).
 
     Args:
         dataset: The dataset, so a registry that wants the run's providers can have them.
-        agent_ids: The agent ids to run, or empty for A1's ``DEFAULT_ROSTER``.
+        agent_ids: The agent ids to run, or empty for the module's ``DEFAULT_ROSTER``.
+        roster_module: The module exposing ``DEFAULT_ROSTER`` and ``make_agent``; A1's registry by
+            default, ``tests.stub_roster`` for the gate's scripted-stub run (ruling R200).
 
     Raises:
-        NotConfiguredError: While ``pmx.agents.registry`` (A1, wave 3) does not exist, or does not
-            expose the two names section 10.5 describes. The message names what is missing, because a
-            wave-2 caller that wants a run drives ``pmx.engine.runner.run_backtest`` directly with its
-            own agents, exactly as ``tests/test_runner.py`` does.
+        NotConfiguredError: While the module does not exist (``pmx.agents.registry`` lands in wave 3,
+            A1), or does not expose the two names section 10.1 declares. The message names what is
+            missing, because a wave-2 caller that wants a run drives ``pmx.engine.runner.run_backtest``
+            directly with its own agents, exactly as ``tests/test_runner.py`` does.
     """
     try:
-        registry = import_module("pmx.agents.registry")
+        registry = import_module(roster_module)
     except ModuleNotFoundError as error:
         raise NotConfiguredError(
             "the agent registry lands in wave 3 (A1); run_backtest takes a roster directly",
-            missing="pmx.agents.registry",
+            missing=roster_module,
         ) from error
     default_roster = getattr(registry, "DEFAULT_ROSTER", None)
-    build_agent = getattr(registry, "build_agent", None)
-    if default_roster is None or build_agent is None:
+    make_agent = getattr(registry, "make_agent", None)
+    if default_roster is None or make_agent is None:
         raise NotConfiguredError(
-            "pmx.agents.registry must expose DEFAULT_ROSTER and build_agent",
-            missing="DEFAULT_ROSTER,build_agent",
+            f"{roster_module} must expose DEFAULT_ROSTER and make_agent (section 10.1)",
+            missing="DEFAULT_ROSTER,make_agent",
         )
     rows = cast(Sequence[tuple[str, object]], default_roster)
     wanted = frozenset(agent_ids)
-    builder = cast(Callable[..., Agent], build_agent)
+    builder = cast(Callable[..., Agent], make_agent)
     return tuple(
-        builder(agent_id=agent_id, genome=genome)
-        for agent_id, genome in rows
-        if not wanted or agent_id in wanted
+        builder(agent_id, genome) for agent_id, genome in rows if not wanted or agent_id in wanted
     )
 
 
@@ -108,7 +123,11 @@ def run_from_args(args: argparse.Namespace) -> RunHandle:
     dataset = _load_dataset(Path(args.dataset))
     market_ids = [meta.id for meta in dataset.metas if args.fold in ("all", meta.fold)]
     config = config_from_args(args, dataset, market_ids)
-    roster = _build_roster(dataset, tuple(str(name) for name in (args.agents or ())))
+    roster = _build_roster(
+        dataset,
+        tuple(str(name) for name in (args.agents or ())),
+        roster_module=str(getattr(args, "roster_module", DEFAULT_ROSTER_MODULE)),
+    )
     handle = run_backtest(
         dataset,
         roster,
@@ -192,6 +211,13 @@ def _add_backtest(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--t0-ms", dest="t0_ms", type=int, default=None)
     parser.add_argument("--t1-ms", dest="t1_ms", type=int, default=None)
     parser.add_argument("--agents", nargs="*", default=(), help="agent ids, default the whole roster")
+    parser.add_argument(
+        "--roster-module",
+        dest="roster_module",
+        default=DEFAULT_ROSTER_MODULE,
+        help="module exposing DEFAULT_ROSTER and make_agent (section 10.1); the gate's stub roster "
+        "is tests.stub_roster",
+    )
     parser.add_argument("--amnesic", action="store_true", help="start from an empty memory")
     parser.add_argument("--no-hive", dest="no_hive", action="store_true", help="empty every hive read")
     parser.add_argument(
