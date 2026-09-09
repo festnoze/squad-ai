@@ -38,6 +38,117 @@
     { "$ref": "#/$defs/evolution_ended" }
   ],
   "$defs": {
+    "sensorName": { "enum": ["calendar", "comments", "cross_asset", "filings", "gdelt_recent", "hive_insights", "hive_reputation", "hn", "macro_releases", "memory", "microstructure", "tape", "volume_profile", "wiki_asof", "wiki_daily"] },
+    "sensorList": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/sensorName" }, "description": "Amendment C1c (CONTRACTS_V2 18.1): a resolved sensor set, sorted, always containing tape." },
+    "ruleId": { "type": "string", "pattern": "^ru-[0-9a-f]{16}$" },
+    "familyId": { "type": "string", "pattern": "^hf-[0-9a-f]{16}$" },
+    "rule_proposed": {
+      "description": "Amendment C1c (CONTRACTS_V2 18.2, rulings R237 and R274): a valid propose_rule of an agent. Declared here and admitted to oneOf by the first engine lot after the amendment, in the commit that gives pmx.journal its dataclass (the discipline of rulings R129 and R164).",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "rule_id", "rule", "diet_cost_units"],
+      "properties": {
+        "type": { "const": "rule_proposed" },
+        "phase": { "const": "decide" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "rule_id": { "$ref": "#/$defs/ruleId" },
+        "rule": { "$ref": "#/$defs/object" },
+        "diet_cost_units": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "workflow_step_executed": {
+      "description": "Amendment C1c (CONTRACTS_V2 18.4, rulings R243 and R274): one step of a workflow genome, digest only; never emitted for a linear genome. Declared here and admitted to oneOf with rule_proposed.",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["agent_id", "step_index", "kind", "ref", "n_inputs", "n_out", "output_sha256"],
+      "properties": {
+        "type": { "const": "workflow_step_executed" },
+        "phase": { "const": "decide" },
+        "agent_id": { "$ref": "#/$defs/agentId" },
+        "step_index": { "type": "integer", "minimum": 0, "maximum": 11 },
+        "kind": { "enum": ["sense", "features", "rules", "belief", "overlay", "sizing", "propose_rule", "llm_belief", "actions"] },
+        "ref": { "type": ["string", "null"], "maxLength": 128 },
+        "n_inputs": { "$ref": "#/$defs/nonNegInt" },
+        "n_out": { "$ref": "#/$defs/nonNegInt" },
+        "output_sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "family_registered": {
+      "description": "Amendment C1c (CONTRACTS_V2 18.2, ruling R238): a pre-registered hypothesis family, written before any replicate-fold read of its rules. Declared here and admitted to oneOf by gate G4 with O2's evolution journal.",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["generation", "family_id", "template", "n_candidates", "n_screened", "fit_t1_ms", "registered_at_ms"],
+      "properties": {
+        "type": { "const": "family_registered" },
+        "phase": { "const": "generation" },
+        "generation": { "$ref": "#/$defs/nonNegInt" },
+        "family_id": { "$ref": "#/$defs/familyId" },
+        "template": { "$ref": "#/$defs/object" },
+        "n_candidates": { "$ref": "#/$defs/nonNegInt" },
+        "n_screened": { "$ref": "#/$defs/nonNegInt" },
+        "fit_t1_ms": { "$ref": "#/$defs/ms" },
+        "registered_at_ms": { "$ref": "#/$defs/ms" }
+      }
+    },
+    "rule_tested": {
+      "description": "Amendment C1c (CONTRACTS_V2 18.2, ruling R238): one test of one rule on one fold, fit, replicate, live or transfer. Declared here and admitted to oneOf with family_registered.",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["generation", "rule_id", "family_id", "stage", "fold", "target", "support", "n_markets", "effect", "usual_bp", "p_value_ppm", "fdr_m", "fdr_k", "fdr_passed", "passed"],
+      "properties": {
+        "type": { "const": "rule_tested" },
+        "phase": { "const": "generation" },
+        "generation": { "$ref": "#/$defs/nonNegInt" },
+        "rule_id": { "$ref": "#/$defs/ruleId" },
+        "family_id": { "$ref": "#/$defs/familyId" },
+        "stage": { "enum": ["fit", "replicate", "live", "transfer"] },
+        "fold": { "type": "string", "maxLength": 64 },
+        "target": { "type": ["string", "null"], "maxLength": 64 },
+        "support": { "$ref": "#/$defs/nonNegInt" },
+        "n_markets": { "$ref": "#/$defs/nonNegInt" },
+        "effect": { "$ref": "#/$defs/object" },
+        "usual_bp": { "type": ["integer", "null"] },
+        "p_value_ppm": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/ppm" } ] },
+        "fdr_m": { "type": ["integer", "null"], "minimum": 0 },
+        "fdr_k": { "type": ["integer", "null"], "minimum": 0 },
+        "fdr_passed": { "type": ["boolean", "null"] },
+        "passed": { "type": "boolean" }
+      }
+    },
+    "rule_promoted": {
+      "description": "Amendment C1c (CONTRACTS_V2 18.2, rulings R238 and R239): a rule that held on the replicate fold and passed its family's FDR step enters the hive as an insight visible from fit_t1_ms + interval_ms.",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["generation", "rule_id", "family_id", "author_kind", "author_id", "fit_t1_ms", "visible_from_ms", "entry_id"],
+      "properties": {
+        "type": { "const": "rule_promoted" },
+        "phase": { "const": "generation" },
+        "generation": { "$ref": "#/$defs/nonNegInt" },
+        "rule_id": { "$ref": "#/$defs/ruleId" },
+        "family_id": { "$ref": "#/$defs/familyId" },
+        "author_kind": { "enum": ["agent", "miner", "detector"] },
+        "author_id": { "type": "string", "maxLength": 64 },
+        "fit_t1_ms": { "$ref": "#/$defs/ms" },
+        "visible_from_ms": { "$ref": "#/$defs/ms" },
+        "entry_id": { "$ref": "#/$defs/hiveId" }
+      }
+    },
+    "rule_demoted": {
+      "description": "Amendment C1c (CONTRACTS_V2 18.2, ruling R239): a promoted rule whose live record turned against it, or whose author's reputation fell; never re-promoted.",
+      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "unevaluatedProperties": false,
+      "required": ["generation", "rule_id", "reason", "live_support", "live_effect", "demoted_at_ms"],
+      "properties": {
+        "type": { "const": "rule_demoted" },
+        "phase": { "const": "generation" },
+        "generation": { "$ref": "#/$defs/nonNegInt" },
+        "rule_id": { "$ref": "#/$defs/ruleId" },
+        "reason": { "enum": ["live_negative", "author_reputation"] },
+        "live_support": { "$ref": "#/$defs/nonNegInt" },
+        "live_effect": { "$ref": "#/$defs/object" },
+        "demoted_at_ms": { "$ref": "#/$defs/ms" }
+      }
+    },
     "int": { "type": "integer" },
     "nonNegInt": { "type": "integer", "minimum": 0 },
     "posInt": { "type": "integer", "minimum": 1 },
@@ -104,7 +215,10 @@
               }
             }
           ]
-        }
+        },
+        "card": { "description": "Amendment C1 (16.5, ruling R119) and amendment C1c (18.1, 18.4, rulings R230 and R243): the three components A1 ships in lot 6; optional here until gate G4 completes the evolution fixture with them at their defaults.", "type": ["object", "null"] },
+        "sensors": { "$ref": "#/$defs/sensorList" },
+        "workflow": { "type": ["object", "null"] }
       }
     },
     "rosterEntry": {
@@ -150,7 +264,7 @@
         "rng_algorithm_version": { "type": "string" },
         "dataset_name": { "type": "string" },
         "dataset_hash": { "$ref": "#/$defs/sha256" },
-        "interval_min": { "enum": [60, 1440] },
+        "interval_min": { "enum": [1, 60, 1440] },
         "t0_ms": { "$ref": "#/$defs/ms" },
         "t1_ms": { "$ref": "#/$defs/ms" },
         "market_ids": { "$ref": "#/$defs/marketIdList" },
@@ -169,7 +283,8 @@
         "memory_hash": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/sha256" } ] },
         "memory_from_run_t1_ms": { "type": ["integer", "null"], "minimum": 0 },
         "contamination_hash": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/sha256" } ] },
-        "roster": { "type": "array", "items": { "$ref": "#/$defs/rosterEntry" } }
+        "roster": { "type": "array", "items": { "$ref": "#/$defs/rosterEntry" } },
+        "sensor_catalogue_hash": { "description": "Amendment C1c (CONTRACTS_V2 18.1, rulings R231 and R274): the CATALOGUE_HASH the run read; optional until promoted with observation_built.sensors.", "$ref": "#/$defs/sha256" }
       }
     },
     "sealed_test_opened": {
@@ -213,9 +328,13 @@
         "event_key": { "type": ["string", "null"], "maxLength": 128 },
         "created_at_ms": { "$ref": "#/$defs/ms" },
         "close_at_ms": { "$ref": "#/$defs/ms" },
-        "interval_min": { "enum": [60, 1440] },
+        "interval_min": { "enum": [1, 60, 1440] },
         "fee_schedule_id": { "type": "string", "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" },
         "hardness_tags": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "enum": ["trivial", "upset", "whipsaw", "illiquid"] } },
+        "provider_labels": { "description": "Amendment C1c (CONTRACTS_V2 7.2, 7.14, rulings R265 and R274): the four taxonomy fields, optional until the first engine lot after the amendment promotes them with their dataclass fields.", "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" } },
+        "subject": { "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" } },
+        "structure": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+        "horizon": { "enum": ["intraday", "week", "month", "quarter", "year-plus"] },
         "fold": { "enum": ["train", "validation", "sealed", "all"] }
       }
     },
@@ -276,7 +395,8 @@
         "n_bars_max": { "$ref": "#/$defs/nonNegInt" },
         "research_remaining": { "$ref": "#/$defs/nonNegInt" },
         "bytes": { "$ref": "#/$defs/nonNegInt" },
-        "obs_sha256": { "$ref": "#/$defs/sha256" }
+        "obs_sha256": { "$ref": "#/$defs/sha256" },
+        "sensors": { "description": "Amendment C1c (CONTRACTS_V2 18.1, rulings R231 and R274): the resolved sensor set the observation was narrowed to; optional until the first engine lot after the amendment promotes it with its dataclass field.", "$ref": "#/$defs/sensorList" }
       }
     },
     "reply_received": {
@@ -331,7 +451,7 @@
         "phase": { "const": "decide" },
         "agent_id": { "$ref": "#/$defs/agentId" },
         "market_id": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/marketId" } ] },
-        "scope": { "enum": ["market", "research", "notes", "lessons", "actions"] },
+        "scope": { "enum": ["market", "research", "notes", "lessons", "actions", "rule"] },
         "item_index": { "$ref": "#/$defs/nonNegInt" },
         "reason": { "type": "string" },
         "detail": { "type": "string" }
@@ -511,7 +631,7 @@
         "type": { "const": "hive_written" },
         "phase": { "const": "hive" },
         "entry_id": { "$ref": "#/$defs/hiveId" },
-        "kind": { "enum": ["forecast", "resolution", "lesson", "reputation"] },
+        "kind": { "enum": ["forecast", "resolution", "lesson", "reputation", "insight"] },
         "author_id": { "type": "string" },
         "market_id": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/marketId" } ] },
         "visible_from_ms": { "$ref": "#/$defs/ms" },
@@ -719,6 +839,12 @@
         "brier_tw_micro": { "$ref": "#/$defs/ppm" },
         "ruined": { "type": "boolean" },
         "research_units_spent": { "$ref": "#/$defs/nonNegInt" },
+        "tier": { "description": "Amendment C1c (CONTRACTS_V2 12.6, 18.1, rulings R235 and R254): the six fields are optional until gate G4 lands O2's dataclasses.", "enum": ["proxy", "engine"] },
+        "matrix_hash": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/sha256" } ] },
+        "features_hash": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/sha256" } ] },
+        "diet_cost_units": { "$ref": "#/$defs/nonNegInt" },
+        "sensors": { "$ref": "#/$defs/sensorList" },
+        "n_rules_proposed": { "$ref": "#/$defs/nonNegInt" },
         "descriptors": {
           "type": "object",
           "additionalProperties": false,
@@ -728,7 +854,8 @@
             "contrarian_bp": { "$ref": "#/$defs/int" },
             "abstention_ppm": { "$ref": "#/$defs/ppm" },
             "holding_horizon_bars": { "$ref": "#/$defs/nonNegInt" },
-            "category_coverage_ppm": { "$ref": "#/$defs/ppm" }
+            "category_coverage_ppm": { "$ref": "#/$defs/ppm" },
+            "diet_class": { "description": "Amendment C1c (CONTRACTS_V2 12.5, ruling R235): 0 tape and market, 1 news, 2 hive; optional, a v2 payload reads as 0.", "type": "integer", "minimum": 0, "maximum": 2 }
           }
         }
       }
@@ -768,7 +895,7 @@
               "agent_id": { "$ref": "#/$defs/agentId" },
               "genome_hash": { "$ref": "#/$defs/sha256" },
               "genome": { "$ref": "#/$defs/genome" },
-              "op": { "enum": ["mutation", "crossover", "structural", "immigrant", "prompt_mutation"] },
+              "op": { "enum": ["mutation", "crossover", "structural", "immigrant", "prompt_mutation", "sensor_drop"] },
               "parents": { "$ref": "#/$defs/agentIdList" }
             }
           }
@@ -807,7 +934,12 @@
         "candidates_evaluated_cum": { "$ref": "#/$defs/nonNegInt" },
         "best_validation_lb_micro": { "$ref": "#/$defs/int" },
         "patience_left": { "$ref": "#/$defs/nonNegInt" },
-        "research_budget_next": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } }
+        "research_budget_next": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "sensor_budget_next": { "description": "Amendment C1c (CONTRACTS_V2 9.4, 12.6, rulings R235, R239 and R254): the five fields are optional until gate G4 lands O2's dataclasses.", "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "culled_by_budget": { "$ref": "#/$defs/agentIdList" },
+        "rule_rewards": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["agent_id", "rule_id", "kind", "skill_bonus_micro", "sensor_units"], "properties": { "agent_id": { "$ref": "#/$defs/agentId" }, "rule_id": { "$ref": "#/$defs/ruleId" }, "kind": { "enum": ["promoted", "rejected", "demoted"] }, "skill_bonus_micro": { "$ref": "#/$defs/int" }, "sensor_units": { "$ref": "#/$defs/int" } } } },
+        "n_engine_tier": { "$ref": "#/$defs/nonNegInt" },
+        "n_proxy_tier": { "$ref": "#/$defs/nonNegInt" }
       }
     },
     "evolution_ended": {

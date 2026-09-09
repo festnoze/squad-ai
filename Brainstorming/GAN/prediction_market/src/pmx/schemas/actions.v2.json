@@ -75,6 +75,19 @@
           }
         }
       }
+    },
+    "propose_rule": {
+      "description": "Amendment C1c (CONTRACTS_V2 8.4, 18.2, ruling R237): at most one rule proposal per agent per bar, a Rule minus what the engine stamps (rule_id, author_kind, author_id, born_at_ms, family_id). Optional; a second one in a bar or an invalid one is action_rejected(scope=rule, reason=bad_rule). The predicate vocabulary, the claim consistency rules and the bounds are those of rule.v1.json.",
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["scope", "condition", "claim", "horizon_bars", "min_support"],
+      "properties": {
+        "scope": { "type": "object", "additionalProperties": false, "required": ["kinds", "providers", "categories", "tags", "cohorts"], "properties": { "kinds": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }, "providers": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }, "categories": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }, "tags": { "type": "array", "uniqueItems": true, "items": { "type": "string" } }, "cohorts": { "type": "array", "uniqueItems": true, "items": { "type": "string" } } } },
+        "condition": { "type": "array", "minItems": 1, "maxItems": 3, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["feature", "op", "value"], "properties": { "feature": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,47}$" }, "op": { "enum": ["lt", "le", "gt", "ge", "eq", "ne"] }, "value": { "type": "integer" } } } },
+        "claim": { "type": "object", "additionalProperties": false, "required": ["kind", "direction", "magnitude_bp", "factor_ppm"], "properties": { "kind": { "enum": ["bias", "drift", "volatility"] }, "direction": { "enum": [-1, 0, 1] }, "magnitude_bp": { "type": "integer", "minimum": 0, "maximum": 10000 }, "factor_ppm": { "type": "integer", "minimum": 0 } } },
+        "horizon_bars": { "type": "integer", "minimum": 0, "maximum": 99999 },
+        "min_support": { "type": "integer", "minimum": 30 }
+      }
     }
   }
 }

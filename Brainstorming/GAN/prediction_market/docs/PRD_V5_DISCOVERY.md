@@ -124,10 +124,15 @@ Every proposed rule goes through the **rule tester**, which is a projection of t
 1. Evaluate the condition on every bar of the **training fold** (as-of); measure the claim (realised
    bias, drift or volatility) on the matches; report lift, block-bootstrap interval, permutation null,
    support.
-2. If the lower bound clears zero on train, evaluate on the **validation fold** the same way; a rule
-   is **promoted** only if the validation lower bound clears zero after deflation for the number of
-   rules tested this generation.
-3. Promoted rules enter the **hive** as `Insight` entries with `visible_from = now + one bar`, their
+2. If the claim holds on the **fit fold**, evaluate on the **replicate fold** the same way (the rolling
+   pair inside evolution, the headline train / validation pair for the live book and for claims): a rule
+   is **promoted** only if its claim holds out of time on the replicate fold **and** it passes
+   Benjamini-Hochberg false discovery rate control at q = 0.05 within its **pre-registered hypothesis
+   family**, whose candidate count is journaled (contract 18.2, decision D-R8, ruling R238; this step
+   first read "the validation lower bound clears zero after deflation for the number of rules tested").
+3. Promoted rules enter the **hive** as `Insight` entries with `visible_from_ms = fit_t1_ms +
+   interval_ms`, the first bar strictly after the last bar the promotion read (ruling R238; the first
+   form, `now + one bar`, would let a rule fit on validation outcomes be traded on the same fold), their
    test record, and a rolling **live track record** updated at every later bar where the condition
    fires (the rule keeps being scored after promotion; a rule whose live record decays is demoted).
 4. The sealed test fold is never touched by the tester; a claim on the sealed test may include the
@@ -221,16 +226,17 @@ sense(sensor set) -> features -> [rules that fire] -> belief (family or policy) 
   every sensor in the catalogue.
 - AC-27: on a fixture with a planted conditional effect (for example "category politics, last week,
   price above 7000: outcome rate 12 points below price"), the symbolic miner proposes a rule that
-  matches it, the tester promotes it on validation, and the same miner promotes nothing on the shuffled
-  twin.
+  matches it, the tester promotes it out of time on the replicate fold, and the same miner promotes
+  nothing on the shuffled twin.
 - AC-28: a minute dataset builds from Binance and Hacker News fixtures, and the minute event study
   reports the planted 10-minute drift as a rule with a positive lower bound.
 - AC-29: a workflow genome with a propose step runs, journals its steps, replays to the same hash, and
   a structure mutation changes the hash.
 - AC-30: the rule ledger and the sensor ablation appear in the UI for a real run.
 - **E2E-5a** (`tests/e2e/test_e2e_5a_discovery.py`): fixture with planted effects, the miner and one
-  agent propose rules, promotion on validation, an agent trades the promoted rule and beats the
-  follower on validation, the shuffled twin promotes nothing; replay holds.
+  agent propose rules, promotion on the rolling pair inside the training fold, an agent trades the
+  promoted rule out of time on the validation fold and beats the follower there, the shuffled twin
+  promotes nothing; replay holds (as corrected by contract ruling R238).
 
 ---
 
@@ -251,3 +257,6 @@ sense(sensor set) -> features -> [rules that fire] -> belief (family or policy) 
 
 - 1.0, 2026-09-08: written after the user's challenge; sources probed the same day (Hacker News Algolia
   and Firebase, Binance 1-minute klines, GDELT recent, Kalshi cutoff).
+- 1.1, 2026-09-09: 2.3 steps 2 and 3, AC-27 and E2E-5a corrected in place by amendment C1c (contract
+  15.10, ruling R238): pre-registered families, false discovery rate control within a family, out-of-time
+  replication as the primary criterion, and an insight visible from `fit_t1_ms + interval_ms`.

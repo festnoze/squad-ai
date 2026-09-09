@@ -1,0 +1,279 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pmx.local/schemas/rule.v1.json",
+  "title": "pmx rule v1",
+  "description": "A rule of the hypothesis layer (CONTRACTS_V2 18.2, amendment C1c): Rule.to_dict(). A structured, testable statement in a closed vocabulary: a scope (categorical facts), a conjunction of one to three predicates over integer sensor features (18.1's blocks), a claim (bias, drift or volatility) with integer magnitudes, a horizon in bars and a support floor. rule_id is ru- plus the first sixteen hex digits of sha256(canonical_json([scope, condition, claim, horizon_bars, min_support])), author-independent. The condition is sorted by (feature, op, value) and carries no duplicate (feature, op) pair; the schema states what it can and the Rule dataclass refuses the rest with RuleRefusedError.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "rule_id",
+    "author_kind",
+    "author_id",
+    "born_at_ms",
+    "scope",
+    "condition",
+    "claim",
+    "horizon_bars",
+    "min_support",
+    "family_id"
+  ],
+  "properties": {
+    "rule_id": {
+      "type": "string",
+      "pattern": "^ru-[0-9a-f]{16}$"
+    },
+    "author_kind": {
+      "enum": [
+        "agent",
+        "miner",
+        "detector"
+      ]
+    },
+    "author_id": {
+      "type": "string",
+      "pattern": "^([a-z][a-z0-9_]{0,31}(-[0-9a-f]{8})?|miner|news_lead|divergence|logic|comparative|cross_domain)$"
+    },
+    "born_at_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "scope": {
+      "$ref": "#/$defs/scope"
+    },
+    "condition": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/predicate"
+      }
+    },
+    "claim": {
+      "$ref": "#/$defs/claim"
+    },
+    "horizon_bars": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 99999
+    },
+    "min_support": {
+      "type": "integer",
+      "minimum": 30
+    },
+    "family_id": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^hf-[0-9a-f]{16}$"
+    }
+  },
+  "allOf": [
+    {
+      "description": "the claim kind fixes the horizon, the direction and which magnitude is used (18.2)",
+      "oneOf": [
+        {
+          "properties": {
+            "claim": {
+              "properties": {
+                "kind": {
+                  "const": "bias"
+                },
+                "direction": {
+                  "enum": [
+                    -1,
+                    1
+                  ]
+                },
+                "magnitude_bp": {
+                  "minimum": 1
+                },
+                "factor_ppm": {
+                  "const": 0
+                }
+              }
+            },
+            "horizon_bars": {
+              "const": 0
+            }
+          }
+        },
+        {
+          "properties": {
+            "claim": {
+              "properties": {
+                "kind": {
+                  "const": "drift"
+                },
+                "direction": {
+                  "enum": [
+                    -1,
+                    1
+                  ]
+                },
+                "magnitude_bp": {
+                  "minimum": 1
+                },
+                "factor_ppm": {
+                  "const": 0
+                }
+              }
+            },
+            "horizon_bars": {
+              "minimum": 1
+            }
+          }
+        },
+        {
+          "properties": {
+            "claim": {
+              "properties": {
+                "kind": {
+                  "const": "volatility"
+                },
+                "direction": {
+                  "const": 0
+                },
+                "magnitude_bp": {
+                  "const": 0
+                },
+                "factor_ppm": {
+                  "minimum": 1
+                }
+              }
+            },
+            "horizon_bars": {
+              "minimum": 1
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "$defs": {
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kinds",
+        "providers",
+        "categories",
+        "tags",
+        "cohorts"
+      ],
+      "properties": {
+        "kinds": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "binary",
+              "spot",
+              "perp",
+              "future",
+              "equity",
+              "fx"
+            ]
+          }
+        },
+        "providers": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]+$"
+          }
+        },
+        "categories": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z]+$"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9_-]{1,32}$"
+          }
+        },
+        "cohorts": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^co-[a-z]+-[a-z]+-[a-z0-9-]+-[a-z-]+-[a-z-]+$"
+          }
+        }
+      }
+    },
+    "predicate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "feature",
+        "op",
+        "value"
+      ],
+      "properties": {
+        "feature": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]{0,47}$"
+        },
+        "op": {
+          "enum": [
+            "lt",
+            "le",
+            "gt",
+            "ge",
+            "eq",
+            "ne"
+          ]
+        },
+        "value": {
+          "type": "integer"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "direction",
+        "magnitude_bp",
+        "factor_ppm"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "bias",
+            "drift",
+            "volatility"
+          ]
+        },
+        "direction": {
+          "enum": [
+            -1,
+            0,
+            1
+          ]
+        },
+        "magnitude_bp": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        },
+        "factor_ppm": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000
+        }
+      }
+    }
+  }
+}

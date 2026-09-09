@@ -381,6 +381,33 @@ def test_rule_11_only_sessions_decides_session_membership() -> None:
 
 
 # --------------------------------------------------------------------------------------------------
+# The one rule of amendment C1c (CONTRACTS_V2 18.7, ruling R245)
+# --------------------------------------------------------------------------------------------------
+#: The tagger, the cohorts, the rules and the sensors are never a model call: a tag decides which cohort a
+#: market lands in and a rule decides what an agent trades, so a tag or a rule a model wrote would move a
+#: claim between two rebuilds. Green on the tree of 2026-09-09, where `rules/` and `sensors/` hold only
+#: their `__init__.py`, and binding on the first commit that adds a file under them.
+RULE_12_PREFIXES = ("data/", "rules/", "sensors/")
+RULE_12_FILES = frozenset({"cohorts.py"})
+RULE_12_BANNED_IMPORTS = ("pmx.gateway", "pmx.llm")
+
+
+def test_rule_12_the_tagger_the_cohorts_the_rules_and_the_sensors_never_import_gateway_or_llm() -> None:
+    offenders: list[str] = []
+    for path in _v2_python_files():
+        rel = _rel(path)
+        if not (rel.startswith(RULE_12_PREFIXES) or rel in RULE_12_FILES):
+            continue
+        for name in _imports(path):
+            if any(_imports_module(name, module) for module in RULE_12_BANNED_IMPORTS):
+                offenders.append(f"{rel} imports {name}")
+    assert offenders == [], offenders
+    # The three package directories the amendment opened exist with a docstring-only __init__ (ruling R245).
+    for rel in ("sensors", "rules", "features"):
+        assert (SRC / rel / "__init__.py").is_file(), rel
+
+
+# --------------------------------------------------------------------------------------------------
 # House rules that share the scan
 # --------------------------------------------------------------------------------------------------
 def _produced_text_files() -> Iterator[Path]:

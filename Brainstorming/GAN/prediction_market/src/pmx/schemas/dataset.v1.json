@@ -20,7 +20,7 @@
       "required": ["start_ms", "end_ms"],
       "properties": { "start_ms": { "$ref": "#/$defs/ms" }, "end_ms": { "$ref": "#/$defs/ms" } }
     },
-    "interval_min": { "enum": [60, 1440] },
+    "interval_min": { "enum": [1, 60, 1440] },
     "providers": {
       "type": "array",
       "minItems": 1,
@@ -105,7 +105,7 @@
             "additionalProperties": false,
             "required": ["source", "n_items", "fetched_at_ms_min", "fetched_at_ms_max"],
             "properties": {
-              "source": { "enum": ["wikipedia_current_events", "wikipedia_asof", "wayback", "gdelt", "manifold_comment", "edgar", "fred", "cboe"] },
+              "source": { "enum": ["wikipedia_current_events", "wikipedia_asof", "wayback", "gdelt", "manifold_comment", "edgar", "fred", "cboe", "hn"] },
               "n_items": { "$ref": "#/$defs/nonNegInt" },
               "fetched_at_ms_min": { "$ref": "#/$defs/ms" },
               "fetched_at_ms_max": { "$ref": "#/$defs/ms" }
@@ -113,7 +113,9 @@
           }
         },
         "n_items": { "$ref": "#/$defs/nonNegInt" },
-        "n_linked": { "$ref": "#/$defs/nonNegInt" }
+        "n_linked": { "$ref": "#/$defs/nonNegInt" },
+        "safety_lag_by_source": { "description": "Amendment C1c (CONTRACTS_V2 5.5, 18.3, ruling R241): the lag applied per source; optional, a manifest without it lags every source by safety_lag_ms.", "type": "object", "additionalProperties": { "$ref": "#/$defs/ms" } },
+        "linker_audit": { "description": "Decision D-R4, ruling R250: the fifty-link precision audit; null until gate G3 reviews it.", "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/audit" } ] }
       }
     },
     "split": {
@@ -129,7 +131,13 @@
         "n_sealed": { "$ref": "#/$defs/nonNegInt" },
         "n_instruments_train": { "description": "Amendment C1b (17.6, 17.9): a continuous instrument belongs to every fold whose months it has bars in, so the three count instruments per fold and do not partition them. Absent from a binary-only manifest.", "$ref": "#/$defs/nonNegInt" },
         "n_instruments_validation": { "$ref": "#/$defs/nonNegInt" },
-        "n_instruments_sealed": { "$ref": "#/$defs/nonNegInt" }
+        "n_instruments_sealed": { "$ref": "#/$defs/nonNegInt" },
+        "method": { "description": "Amendment C1c (CONTRACTS_V2 7.7, decisions D-R1 and D-R2, rulings R247 and R248): the six fields are optional, absent from a manifest cut by calendar thirds before the amendment, and written by every build from DS1 on.", "const": "count_quantile" },
+        "quantiles_permille": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer", "minimum": 1, "maximum": 999 } },
+        "train_end_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "validation_end_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "cluster_moves": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["market_id", "from_fold", "to_fold", "group_id"], "properties": { "market_id": { "type": "string", "maxLength": 128 }, "from_fold": { "enum": ["train", "validation", "sealed"] }, "to_fold": { "enum": ["train", "validation", "sealed"] }, "group_id": { "type": "string", "maxLength": 128 } } } },
+        "n_moved": { "$ref": "#/$defs/nonNegInt" }
       }
     },
     "files": {
@@ -139,7 +147,7 @@
         "additionalProperties": false,
         "required": ["path", "sha256", "bytes"],
         "properties": {
-          "path": { "type": "string", "pattern": "^(markets|news|wiki_asof|clusters|instruments|calendars)/[A-Za-z0-9._/-]+$" },
+          "path": { "type": "string", "pattern": "^(markets|news|wiki_asof|clusters|instruments|calendars|taxonomy)/[A-Za-z0-9._/-]+$" },
           "sha256": { "$ref": "#/$defs/sha256" },
           "bytes": { "$ref": "#/$defs/nonNegInt" }
         }
@@ -238,9 +246,92 @@
         },
         "n_markets_fit": { "$ref": "#/$defs/nonNegInt" }
       }
+    },
+    "purpose": { "description": "Amendment C1c (CONTRACTS_V2 5.6, 7.8, decision D-S4, ruling R263): research or showcase. Every block from here to build is optional, because a manifest written before the amendment has none, and is written by every build from DS1 on.", "enum": ["research", "showcase"] },
+    "window_days": { "type": "integer", "minimum": 1, "maximum": 730 },
+    "resolution_span": { "type": "object", "additionalProperties": false, "required": ["min_ms", "max_ms"], "properties": { "min_ms": { "$ref": "#/$defs/ms" }, "max_ms": { "$ref": "#/$defs/ms" } } },
+    "universe": {
+      "description": "Decision D-R13, ruling R258: the Kalshi series list is an output of the builder.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["rule", "series", "n_series_before", "n_series_after"],
+      "properties": {
+        "rule": { "type": "object", "additionalProperties": false, "required": ["min_settled", "min_volume_cents"], "properties": { "min_settled": { "$ref": "#/$defs/nonNegInt" }, "min_volume_cents": { "$ref": "#/$defs/nonNegInt" } } },
+        "series": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["series", "n_settled", "n_kept", "volume_cents", "labels"], "properties": { "series": { "type": "string", "pattern": "^[A-Z0-9]{1,32}$" }, "n_settled": { "$ref": "#/$defs/nonNegInt" }, "n_kept": { "$ref": "#/$defs/nonNegInt" }, "volume_cents": { "$ref": "#/$defs/nonNegInt" }, "labels": { "type": "array", "uniqueItems": true, "items": { "enum": ["forecastable_from_public_models"] } } } } },
+        "n_series_before": { "$ref": "#/$defs/nonNegInt" },
+        "n_series_after": { "$ref": "#/$defs/nonNegInt" }
+      }
+    },
+    "taxonomy": {
+      "description": "Decisions D-S6, D-S8, D-S9 as corrected by D-S14, rulings R265, R267 and R268: coverage per venue and per facet, the cohort histogram and the fifty-tagging audit.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "lexicon_sha256", "series_facets_sha256", "per_venue", "cohort_size_histogram", "audit"],
+      "properties": {
+        "version": { "const": "tags.v1" },
+        "lexicon_sha256": { "$ref": "#/$defs/sha256" },
+        "series_facets_sha256": { "$ref": "#/$defs/sha256" },
+        "per_venue": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["subject_coverage_permille", "structure_coverage_permille", "n_distinct_subjects", "n_other_subject", "n_other_structure", "n_platform_meta", "n_cohorts", "n_cohorts_usable", "label"],
+            "properties": {
+              "subject_coverage_permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+              "structure_coverage_permille": { "type": "integer", "minimum": 0, "maximum": 1000 },
+              "n_distinct_subjects": { "$ref": "#/$defs/nonNegInt" },
+              "n_other_subject": { "$ref": "#/$defs/nonNegInt" },
+              "n_other_structure": { "$ref": "#/$defs/nonNegInt" },
+              "n_platform_meta": { "$ref": "#/$defs/nonNegInt" },
+              "n_cohorts": { "$ref": "#/$defs/nonNegInt" },
+              "n_cohorts_usable": { "$ref": "#/$defs/nonNegInt" },
+              "label": { "enum": ["ok", "weak"] }
+            }
+          }
+        },
+        "cohort_size_histogram": { "type": "object", "additionalProperties": false, "required": ["1", "2-4", "5-9", "10-29", "30+"], "properties": { "1": { "$ref": "#/$defs/nonNegInt" }, "2-4": { "$ref": "#/$defs/nonNegInt" }, "5-9": { "$ref": "#/$defs/nonNegInt" }, "10-29": { "$ref": "#/$defs/nonNegInt" }, "30+": { "$ref": "#/$defs/nonNegInt" } } },
+        "audit": { "oneOf": [ { "type": "null" }, { "$ref": "#/$defs/audit" } ] }
+      }
+    },
+    "cohorts": {
+      "description": "Decision D-S7, ruling R266: every field of 18.5's Cohort but market_ids, sorted by cohort_id.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["cohort_id", "category", "subject", "structure", "horizon", "provider", "n_train", "n_validation", "n_sealed", "usable", "usable_for_paired_test"],
+        "properties": {
+          "cohort_id": { "type": "string", "pattern": "^co-[a-z]+-[a-z]+-[a-z0-9-]+-[a-z-]+-[a-z-]+$", "maxLength": 96 },
+          "category": { "type": "string", "pattern": "^[a-z]+$" },
+          "subject": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+          "structure": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+          "horizon": { "enum": ["intraday", "week", "month", "quarter", "year-plus"] },
+          "provider": { "type": "string", "pattern": "^[a-z]+$" },
+          "n_train": { "$ref": "#/$defs/nonNegInt" },
+          "n_validation": { "$ref": "#/$defs/nonNegInt" },
+          "n_sealed": { "$ref": "#/$defs/nonNegInt" },
+          "usable": { "type": "boolean" },
+          "usable_for_paired_test": { "type": "boolean" }
+        }
+      }
+    },
+    "build": {
+      "description": "Decisions D-S11 and D-S12, rulings R260, R270 and R271: the cohort target per venue, the reachable universe, the shortfall per filter and the fallback steps taken, in order.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "targets", "reachable", "shortfall", "fallbacks"],
+      "properties": {
+        "status": { "enum": ["ok", "failed"] },
+        "targets": { "type": "object", "additionalProperties": false, "required": ["kalshi_cohorts", "manifold_cohorts", "kalshi_markets", "manifold_markets"], "properties": { "kalshi_cohorts": { "$ref": "#/$defs/nonNegInt" }, "manifold_cohorts": { "$ref": "#/$defs/nonNegInt" }, "kalshi_markets": { "$ref": "#/$defs/nonNegInt" }, "manifold_markets": { "$ref": "#/$defs/nonNegInt" } } },
+        "reachable": { "type": "object", "additionalProperties": { "$ref": "#/$defs/nonNegInt" } },
+        "shortfall": { "type": "object", "additionalProperties": { "type": "object", "additionalProperties": { "$ref": "#/$defs/nonNegInt" } } },
+        "fallbacks": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["step", "from", "to", "reason"], "properties": { "step": { "enum": ["window_days", "min_trades", "min_traded_bars", "cohort_target"] }, "from": { "type": "integer" }, "to": { "type": "integer" }, "reason": { "type": "string", "maxLength": 2000 } } } }
+      }
     }
   },
   "$defs": {
+    "audit": { "type": "object", "additionalProperties": false, "required": ["path", "n", "precision_permille"], "properties": { "path": { "type": "string", "pattern": "^audit/[a-z_]+_[0-9a-f]{16}\\.json$" }, "n": { "$ref": "#/$defs/nonNegInt" }, "precision_permille": { "type": "integer", "minimum": 0, "maximum": 1000 } } },
     "scheduleIdList": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" } },
     "ms": { "type": "integer", "minimum": 0 },
     "nonNegInt": { "type": "integer", "minimum": 0 },

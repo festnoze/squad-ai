@@ -55,7 +55,9 @@ SCHEMA_FILES = ("market.v2.json", "news.v1.json", "dataset.v1.json", "actions.v2
 V3_SCHEMA_FILES = ("cluster.v1.json", "opportunity.v1.json", "features.v1.json", "model_card.v1.json")
 #: Amendment C1b, CONTRACTS_V2 section 17: the four schemas the instrument generalisation is built against.
 C1B_SCHEMA_FILES = ("instrument.v1.json", "cash_event.v1.json", "session_calendar.v1.json", "forecast.v1.json")
-ALL_SCHEMA_FILES = SCHEMA_FILES + V3_SCHEMA_FILES + C1B_SCHEMA_FILES
+#: Amendment C1c, CONTRACTS_V2 section 18: the three schemas the discovery layer is built against.
+C1C_SCHEMA_FILES = ("rule.v1.json", "sensor.v1.json", "workflow.v1.json")
+ALL_SCHEMA_FILES = SCHEMA_FILES + V3_SCHEMA_FILES + C1B_SCHEMA_FILES + C1C_SCHEMA_FILES
 PPM_ONE = 1_000_000
 BP_ONE = 10_000
 MS_PER_DAY = 86_400_000
@@ -585,8 +587,10 @@ def test_every_event_type_in_a_fixture_is_in_the_catalogue() -> None:
     assert {"market_listed", "market_priced"} <= used
 
 
-#: The one optional field of the 7.2 table (ruling R169): a file written before the flag existed still loads.
-OPTIONAL_MARKET_FIELDS = frozenset({"wiki_subject_provenance"})
+#: The five optional fields of the 7.2 table: ruling R169's provenance flag, and amendment C1c's four taxonomy
+#: fields (7.14, ruling R265). A file written before either existed still loads; the loader requires the four
+#: on a dataset whose manifest carries the `taxonomy` block.
+OPTIONAL_MARKET_FIELDS = frozenset({"wiki_subject_provenance", "provider_labels", "subject", "structure", "horizon"})
 
 
 def test_every_schema_field_of_the_market_table_is_in_the_schema() -> None:
@@ -1015,13 +1019,16 @@ def test_the_cluster_visibility_rule_has_both_halves() -> None:
 def test_every_module_map_row_of_amendment_c1_has_exactly_one_owner_from_the_v3_plan() -> None:
     module_map = _contract_section("## 13. Module map and file ownership", "### 13.1 The error taxonomy")
     plan = (REPO / "docs" / "PLAN_V3_WAVES.md").read_text(encoding="utf-8")
-    packages = set(re.findall(r"^### ([A-Z][0-9a-z]{1,3})\b", plan, re.MULTILINE))
+    # A package id is one or two capitals and up to three digits or lowercase letters: `R1a`, `E2`, and since
+    # part 4 of the plan `DS1`, `DS2` and `FM1` (amendment C1c, ruling R245, which moves `data/universe.py`
+    # to DS1).
+    packages = set(re.findall(r"^### ([A-Z]{1,2}[0-9a-z]{1,3})\b", plan, re.MULTILINE))
     assert {"R1a", "R2e", "R3d", "R4a", "R5a", "C1"} <= packages
-    known = packages | {"E2", "C2", "C3", "C4", "C5"}
+    known = packages | {"E2", "C2", "C3", "C4", "C5", "DS1", "DS2", "FM1"}
     for path in C1_MAP_PATHS:
         rows = [line for line in module_map.splitlines() if path in line]
         assert len(rows) == 1, (path, rows)
-        match = re.search(r"\s+([A-Z][0-9a-z]{1,3})(?:\s+\(|\s*$)", rows[0])
+        match = re.search(r"\s+([A-Z]{1,2}[0-9a-z]{1,3})(?:\s+\(|\s*$)", rows[0])
         assert match is not None, rows[0]
         assert match.group(1) in known, (path, match.group(1))
 
@@ -1761,7 +1768,10 @@ def test_the_binary_only_wording_is_generalised_in_place() -> None:
     bar = _flat(_contract_section("### 12.6 The selection objective", "### 12.7 Folds"))
     assert "per `(kind, provider)`" in bar and "(instrument, ISO week)" in bar
     folds = _contract_section("### 12.7 Folds", "### 12.8 Claims")
-    assert 'kind: str = "binary") -> tuple[str, ...]' in folds and "every** fold whose months" in folds
+    # Amendment C1c (ruling R247): the headline cuts are count quantiles, so a continuous instrument belongs to
+    # every fold whose SPAN it has bars in; "whose months" was C1b's wording and is superseded in 12.7 and 17.6.
+    assert 'kind: str = "binary") -> tuple[str, ...]' in folds and "every** fold whose span" in folds
+    assert "whose months" not in folds
     claims = _flat(_contract_section("### 12.8 Claims", "### 12.9 Prompt mutation"))
     assert "c-{dataset_hash[:8]}-{kind}-{provider}-h{horizon_bars}-{genome_hash[:16]}" in claims
     board = _flat(_contract_section("### 12.10 The leaderboard", "### 12.11 The structures"))
@@ -2009,3 +2019,448 @@ def test_the_committed_instrument_and_calendar_fixtures_validate_against_their_s
     events = _validator("cash_event.v1.json")
     for event in _fixture("instrument.xnas-aapl.json")["cash_events"]:
         assert _errors(events, event) == [], event["kind"]
+
+
+
+# --------------------------------------------------------------------------------------------------
+# Amendment C1c: section 18, 7.14, the two reviews, and what the amendment applies in its own files
+# --------------------------------------------------------------------------------------------------
+#: The six events section 18 declares. They are under `$defs` of `journal.v2.json` and OUTSIDE `oneOf`: the
+#: lot that gives `pmx.journal` their dataclasses admits them to `oneOf`, to `EVENT_TYPES` and to the
+#: catalogue rows in one commit (rulings R164 and R274). Until then the catalogue tables mark them
+#: `(declared, <applier>)`, so `test_every_catalogue_event_has_a_schema_and_vice_versa` does not count them.
+C1C_DECLARED_EVENTS = frozenset({
+    "rule_proposed", "workflow_step_executed", "family_registered", "rule_tested", "rule_promoted",
+    "rule_demoted",
+})
+#: The closed catalogue of 18.1, sorted: `SENSOR_NAMES`.
+SENSOR_NAMES = (
+    "calendar", "comments", "cross_asset", "filings", "gdelt_recent", "hive_insights", "hive_reputation", "hn",
+    "macro_releases", "memory", "microstructure", "tape", "volume_profile", "wiki_asof", "wiki_daily",
+)
+#: The nine step kinds of 18.4.
+STEP_KINDS = ("sense", "features", "rules", "belief", "overlay", "sizing", "propose_rule", "llm_belief", "actions")
+#: One assertion helper for the many "this document is refused" checks below.
+FOUR_PREDICATES_TAIL = (
+    {"feature": "ret_1b_bp", "op": "gt", "value": 0},
+    {"feature": "spread_bp", "op": "lt", "value": 50},
+)
+
+
+def test_section_18_declares_every_interface_the_discovery_wave_is_built_against() -> None:
+    text = CONTRACT.read_text(encoding="utf-8")
+    for heading in (
+        "## 18. Discovery (amendment C1c): sensors, the hypothesis layer, minute grids, workflow genomes, cohorts",
+        "### 18.1 The sensor catalogue, the sensor gene and the sensor budget",
+        "### 18.2 The hypothesis layer: rules, families, promotion, insights",
+        "### 18.3 Minute grids and the timestamped-sources rule",
+        "### 18.4 Workflow genomes",
+        "### 18.5 The cohort",
+        "### 18.6 Evaluation additions",
+        "### 18.7 The module map, the architecture rule and the identifier formats of this amendment",
+        "### 18.8 What amendment C1c does not own",
+        "### 7.14 The tag taxonomy and the deterministic tagger",
+        "### 15.10 Amendment C1c",
+    ):
+        assert heading in text, heading
+    assert "18. Discovery" in text[: text.index("## 1. Units")]
+    section = _contract_section("### 15.10 Amendment C1c", "\n---\n")
+    rulings = set(re.findall(r"^\| (R2[3-9][0-9]) \|", section, re.MULTILINE))
+    # R230..R246 are section 18's, R247..R259 land D-R1..D-R14, R260..R273 land D-S1..D-S14 in the form
+    # section G corrected, R274 carries gate G2's four shapes forward and R275 says what is left alone.
+    # The numbering starts at R230 because gate G2's audit pass took R228 and R229 (15.3).
+    assert rulings == {f"R{n}" for n in range(230, 276)}
+    decisions = [f"D-R{n}" for n in range(1, 15)] + [f"D-S{n}" for n in range(1, 15)]
+    for decision in decisions:
+        if decision == "D-R8":
+            assert re.search(r"^\| R238 \| \*\*Decision D-R8", section, re.MULTILINE)  # the promotion ruling
+            continue
+        assert re.search(rf"^\| R2[3-7][0-9] \| \*\*Decision {decision}\b", section, re.MULTILINE), decision
+
+
+def test_the_sensor_catalogue_fixture_is_the_normative_table_of_18_1() -> None:
+    catalogue = _fixture("sensor.catalogue.json")
+    assert _errors(_validator("sensor.v1.json"), catalogue) == []
+    sensors = catalogue["sensors"]
+    assert tuple(s["name"] for s in sensors) == SENSOR_NAMES, "keys sorted, fifteen sensors, no other"
+    assert catalogue["catalogue_hash"] == _sha(sensors), "CATALOGUE_HASH = sha256(canonical_json(specs))"
+    assert sum(s["cost_units"] for s in sensors) == 17, "SENSOR_BUDGET_UNITS_DEFAULT is the catalogue's cost"
+    by_name = {s["name"]: s for s in sensors}
+    for free in ("tape", "calendar", "memory"):
+        assert by_name[free]["cost_units"] == 0, free
+    assert by_name["wiki_asof"]["cost_units"] == 3 and by_name["hn"]["cost_units"] == 2  # PRD v5 1.1 verbatim
+    for s in sensors:
+        assert s["version"] == f"{s['name']}.v1"
+        assert [f["index"] for f in s["features"]] == list(range(len(s["features"]))), s["name"]
+        assert all(f["source"] == s["name"] and f["asof_only"] is True for f in s["features"]), s["name"]
+    names = [f["name"] for s in sensors for f in s["features"]]
+    assert len(names) == len(set(names)) == 75, "FEATURE_NAMES is the union of the blocks, unique across them"
+    # features.v1 is unchanged: every entry but the portfolio block belongs to exactly one sensor block, by
+    # index, with the same name, unit, bounds and scale (18.1, ruling R234).
+    v1 = {f["index"]: f for f in _fixture("features.spec.json")["features"]}
+    used = sorted(
+        f["features_v1_index"] for s in sensors for f in s["features"] if f["features_v1_index"] is not None
+    )
+    assert used == list(range(31)), used
+    assert all(v1[i]["source"] == "portfolio" for i in range(31, 37))
+    for s in sensors:
+        for f in s["features"]:
+            if f["features_v1_index"] is None:
+                continue
+            entry = v1[f["features_v1_index"]]
+            keys = ("name", "unit", "lo", "hi", "scale")
+            assert tuple(entry[k] for k in keys) == tuple(f[k] for k in keys), f["name"]
+    # The gates of 18.1's table and the hn features 18.3 names.
+    assert {"cash_events", "bars.volume_milli"} <= set(by_name["volume_profile"]["market_fields"]), "R233"
+    assert by_name["hive_reputation"]["observation_fields"] == ["hive.reputations"]
+    assert by_name["hive_reputation"]["per_market"] is False
+    assert {"hn_story_points", "hn_story_comments", "hn_mentions_subject", "minutes_since_story"} <= set(names)
+    section = _contract_section("### 18.1 The sensor catalogue", "### 18.2 The hypothesis layer")
+    for name in SENSOR_NAMES:
+        assert f"| `{name}` |" in section, name
+    assert "SENSOR_BUDGET_UNITS_DEFAULT = sum(cost_units) = 17" in section
+    # The journal's sensor list is the same closed enum.
+    assert tuple(_schema("journal.v2.json")["$defs"]["sensorName"]["enum"]) == SENSOR_NAMES
+    # A catalogue with a sixteenth sensor or a bad cost is refused.
+    validator = _validator("sensor.v1.json")
+    assert _errors(validator, {**catalogue, "sensors": [*sensors, sensors[0]]}) != []
+    dear = copy.deepcopy(catalogue)
+    dear["sensors"][0]["cost_units"] = 11
+    assert _errors(validator, dear) != [], "SENSOR_COST_MAX = 10"
+
+
+def test_the_rule_sample_is_content_addressed_and_the_schema_refuses_an_inconsistent_claim() -> None:
+    validator = _validator("rule.v1.json")
+    rule = _fixture("rule.sample.json")
+    assert _errors(validator, rule) == []
+    hashed = [rule["scope"], rule["condition"], rule["claim"], rule["horizon_bars"], rule["min_support"]]
+    assert rule["rule_id"] == "ru-" + _sha(hashed)[:16], "18.2: the id is the content, never the author"
+    assert rule["condition"] == sorted(rule["condition"], key=lambda p: (p["feature"], p["op"], p["value"]))
+    assert rule["claim"]["kind"] == "bias" and rule["horizon_bars"] == 0  # AC-27's planted effect
+    catalogue_names = {f["name"] for s in _fixture("sensor.catalogue.json")["sensors"] for f in s["features"]}
+    assert {p["feature"] for p in rule["condition"]} <= catalogue_names, "a predicate names a sensor feature"
+
+    def refused(**changes: Any) -> None:
+        doc = copy.deepcopy(rule)
+        for key, value in changes.items():
+            if key.startswith("claim."):
+                doc["claim"][key.split(".", 1)[1]] = value
+            else:
+                doc[key] = value
+        assert _errors(validator, doc) != [], changes
+
+    refused(condition=[*rule["condition"], *FOUR_PREDICATES_TAIL])  # RULE_PREDICATES_MAX = 3
+    refused(condition=[])
+    refused(**{"claim.magnitude_bp": 0})                              # a bias with no magnitude
+    refused(**{"claim.kind": "drift"})                                # a drift with horizon_bars 0
+    refused(**{"claim.kind": "volatility"})                           # a volatility with a direction
+    refused(min_support=29)                                           # RULE_MIN_SUPPORT_DEFAULT = 30
+    refused(condition=[{"feature": "bars_to_close", "op": "==", "value": 7}])
+    refused(author_kind="human")
+    refused(rule_id="rule-1")
+    refused(**{"claim.magnitude_bp": 1200.5})                         # integers only
+    drift = copy.deepcopy(rule)
+    drift["claim"] = {"kind": "drift", "direction": 1, "magnitude_bp": 200, "factor_ppm": 0}
+    drift["horizon_bars"] = 10
+    assert _errors(validator, drift) == []
+    volatility = copy.deepcopy(rule)
+    volatility["claim"] = {"kind": "volatility", "direction": 0, "magnitude_bp": 0, "factor_ppm": 1_500_000}
+    volatility["horizon_bars"] = 10
+    assert _errors(validator, volatility) == []
+
+
+def _closure(successors: dict[int, set[int]], start: int) -> set[int]:
+    seen: set[int] = set()
+    frontier = [start]
+    while frontier:
+        node = frontier.pop()
+        for nxt in successors[node]:
+            if nxt not in seen:
+                seen.add(nxt)
+                frontier.append(nxt)
+    return seen
+
+
+def test_the_workflow_sample_is_canonical_and_bounded() -> None:
+    validator = _validator("workflow.v1.json")
+    workflow = _fixture("workflow.sample.json")
+    assert _errors(validator, workflow) == []
+    steps, edges = workflow["steps"], [tuple(e) for e in workflow["edges"]]
+    assert steps[0]["kind"] == "sense" and steps[-1]["kind"] == "actions"
+    assert all(step["kind"] in STEP_KINDS for step in steps)
+    assert edges == sorted(edges) and all(a < b for a, b in edges), "the canonical form"
+    assert sum(step["kind"] == "propose_rule" for step in steps) == 1, "AC-29: a workflow with a propose step"
+    successors: dict[int, set[int]] = {i: set() for i in range(len(steps))}
+    for a, b in edges:
+        successors[a].add(b)
+    assert _closure(successors, 0) | {0} == set(range(len(steps))), "every step reachable from sense"
+    last = len(steps) - 1
+    for i, step in enumerate(steps):
+        reaches = i == last or last in _closure(successors, i)
+        assert reaches or step["kind"] == "propose_rule", (i, step["kind"])
+    assert not successors[[s["kind"] for s in steps].index("propose_rule")], "propose_rule feeds nothing"
+    too_many = {**workflow, "steps": [*steps, *([steps[1]] * 7)]}
+    assert _errors(validator, too_many) != [], "WORKFLOW_STEPS_MAX = 12"
+    assert _errors(validator, {**workflow, "steps": [steps[1], *steps[1:]]}) != [], "steps[0] is sense"
+    assert _errors(validator, {**workflow, "edges": [*workflow["edges"], [0, 12]]}) != []
+    assert _errors(validator, {**workflow, "steps": [{**steps[3], "kind": "llm"}, *steps[1:]]}) != []
+    floats = copy.deepcopy(workflow)
+    floats["steps"][2]["params"]["weight_permille"] = 0.5
+    assert _errors(validator, floats) != [], "integers only"
+
+
+def test_amendment_c1c_declares_its_events_under_defs_and_leaves_oneof_to_the_owning_lots() -> None:
+    """Rulings R164 and R274: the schema is ahead of the classes only in `$defs`, never in `oneOf`."""
+    schema = _schema("journal.v2.json")
+    in_one_of = {ref["$ref"].rsplit("/", 1)[1] for ref in schema["oneOf"]}
+    assert set(schema["$defs"]) >= C1C_DECLARED_EVENTS
+    assert not (C1C_DECLARED_EVENTS & in_one_of)
+    for event in C1C_DECLARED_EVENTS:
+        entry = schema["$defs"][event]
+        assert entry["properties"]["type"] == {"const": event}
+        assert entry["unevaluatedProperties"] is False
+        assert set(entry["required"]) <= set(entry["properties"])
+    text = CONTRACT.read_text(encoding="utf-8")
+    catalogue = text[text.index("### 9.2 The backtest catalogue"): text.index("### 9.5 Artefacts on disk")]
+    for event in C1C_DECLARED_EVENTS:
+        assert re.search(rf"^\| `{event}` \(declared, (R274|gate G4)\) \|", catalogue, re.MULTILINE), event
+    assert "(declared, <applier>)" in catalogue
+    # A journal line of a declared type is still refused today: the oneOf is the catalogue.
+    envelope = {
+        "seq": 1, "type": "rule_proposed", "run_id": "r-83fbf211-0-5f754f05", "bar_ms": 0, "phase": "decide",
+        "agent_id": "miner", "rule_id": "ru-54c3a4c30fc3272d", "rule": {}, "diet_cost_units": 1,
+    }
+    assert _errors(_validator("journal.v2.json"), envelope) != []
+    # But the declared shape itself validates as a $defs entry, so the applying lot writes nothing new.
+    assert _errors(_subschema("journal.v2.json", "rule_proposed"), envelope) == []
+    owned = _flat(text.split("### 18.8 What amendment C1c does not own")[1])
+    for phrase in (
+        "pmx.journal", "R274", "gate G4", "oneOf", "A section of this document is never a contract issue",
+        "docs/PRD_V3_TRADING_OPTIMIZER.md", "docs/PRD_V2_HARD_OPTIMIZER.md", "docs/PRD_V5_DISCOVERY.md",
+    ):
+        assert phrase in owned, phrase
+
+
+def test_the_journal_and_market_schemas_carry_the_c1c_fields_as_optional() -> None:
+    journal = _schema("journal.v2.json")["$defs"]
+    for event, fields in (
+        ("observation_built", {"sensors"}),
+        ("run_started", {"sensor_catalogue_hash"}),
+        ("market_listed", {"provider_labels", "subject", "structure", "horizon"}),
+        ("candidate_scored", {"tier", "matrix_hash", "features_hash", "diet_cost_units", "sensors",
+                              "n_rules_proposed"}),
+        ("generation_closed", {"sensor_budget_next", "culled_by_budget", "rule_rewards", "n_engine_tier",
+                               "n_proxy_tier"}),
+        ("genome", {"card", "sensors", "workflow"}),
+    ):
+        assert fields <= set(journal[event]["properties"]), event
+        assert not (fields & set(journal[event]["required"])), event
+    assert "insight" in journal["hive_written"]["properties"]["kind"]["enum"]
+    assert "rule" in journal["action_rejected"]["properties"]["scope"]["enum"]
+    children = journal["generation_closed"]["properties"]["children"]["items"]["properties"]
+    assert "sensor_drop" in children["op"]["enum"]
+    assert "diet_class" in journal["candidate_scored"]["properties"]["descriptors"]["properties"]
+    assert journal["run_started"]["properties"]["interval_min"]["enum"] == [1, 60, 1440], "ruling R241"
+    # The backtest fixture written before the amendment still validates line by line: nothing became required.
+    validator = _validator("journal.v2.json")
+    lines = _events("journal.backtest.jsonl")
+    for line in lines:
+        assert _errors(validator, line) == [], line["type"]
+    listed = next(e for e in lines if e["type"] == "market_listed")
+    tagged = {
+        **listed, "provider_labels": ["kxbtcmaxmon"], "subject": ["bitcoin"], "structure": "threshold-above",
+        "horizon": "month",
+    }
+    assert _errors(validator, tagged) == []
+    assert _errors(validator, {**tagged, "subject": []}) != [], "one or more subjects"
+    assert _errors(validator, {**tagged, "horizon": "decade"}) != []
+    built = next(e for e in lines if e["type"] == "observation_built")
+    assert _errors(validator, {**built, "sensors": ["tape", "volume_profile"]}) == []
+    assert _errors(validator, {**built, "sensors": ["tape", "twitter"]}) != [], "the catalogue is closed"
+    market = _schema("market.v2.json")
+    assert market["properties"]["interval_min"]["enum"] == [1, 60, 1440]
+    brexit = _fixture("market.demo-brexit-2016.json")
+    market_validator = _validator("market.v2.json")
+    assert _errors(market_validator, brexit) == []
+    tagged_market = {
+        **brexit, "provider_labels": ["brexit"], "subject": ["elections-uk"], "structure": "by-date",
+        "horizon": "quarter",
+    }
+    assert _errors(market_validator, tagged_market) == []
+    five = ["a", "b", "c", "d", "e"]
+    assert _errors(market_validator, {**tagged_market, "subject": five}) != [], "at most 4"
+    assert _errors(market_validator, {**tagged_market, "structure": "Threshold Above"}) != [], "a slug"
+
+
+def test_the_dataset_manifest_carries_the_c1c_blocks_as_optional() -> None:
+    validator = _validator("dataset.v1.json")
+    base = _fixture("dataset.manifest.json")
+    assert _errors(validator, base) == [], "a manifest written before the amendment still validates"
+    cohort = {
+        "cohort_id": "co-kalshi-crypto-bitcoin-threshold-above-month", "category": "crypto", "subject": "bitcoin",
+        "structure": "threshold-above", "horizon": "month", "provider": "kalshi", "n_train": 31,
+        "n_validation": 9, "n_sealed": 8, "usable": True, "usable_for_paired_test": True,
+    }
+    venue = {
+        "subject_coverage_permille": 800, "structure_coverage_permille": 877, "n_distinct_subjects": 20,
+        "n_other_subject": 44, "n_other_structure": 27, "n_platform_meta": 0, "n_cohorts": 60,
+        "n_cohorts_usable": 0, "label": "weak",
+    }
+    series = {"series": "KXBTCMAXMON", "n_settled": 40, "n_kept": 16, "volume_cents": 1_000_000, "labels": []}
+    doc = copy.deepcopy(base)
+    doc.update(
+        purpose="research", window_days=365, resolution_span={"min_ms": 1, "max_ms": 2},
+        universe={"rule": {"min_settled": 5, "min_volume_cents": 100_000}, "n_series_before": 731,
+                  "n_series_after": 200, "series": [series]},
+        taxonomy={"version": "tags.v1", "lexicon_sha256": "a" * 64, "series_facets_sha256": "b" * 64,
+                  "per_venue": {"kalshi": venue},
+                  "cohort_size_histogram": {"1": 58, "2-4": 20, "5-9": 18, "10-29": 6, "30+": 0}, "audit": None},
+        cohorts=[cohort],
+        build={"status": "failed",
+               "targets": {"kalshi_cohorts": 40, "manifold_cohorts": 8, "kalshi_markets": 7000,
+                           "manifold_markets": 2000},
+               "reachable": {"kalshi": 15000}, "shortfall": {"kalshi": {"min_trades": 3000}},
+               "fallbacks": [{"step": "window_days", "from": 365, "to": 730,
+                              "reason": "the 365-day window did not reach 40 cohorts"}]},
+    )
+    move = {"market_id": "kalshi-KXBTC-1", "from_fold": "train", "to_fold": "validation", "group_id": "KXBTC"}
+    doc["split"] = {
+        **base["split"], "method": "count_quantile", "quantiles_permille": [600, 800],
+        "train_end_date": "2026-05-01", "validation_end_date": "2026-07-01", "cluster_moves": [move], "n_moved": 1,
+    }
+    doc["news"] = {
+        **base["news"], "safety_lag_by_source": {"wikipedia_current_events": 21_600_000, "hn": 300_000},
+        "linker_audit": None,
+    }
+    doc["files"] = [*base["files"], {"path": "taxonomy/tags.v1.json", "sha256": "c" * 64, "bytes": 10}]
+    assert _errors(validator, doc) == []
+    assert _errors(validator, {**doc, "window_days": 731}) != [], "WINDOW_DAYS_MAX = 730 (ruling R262)"
+    assert _errors(validator, {**doc, "purpose": "demo"}) != [], "research or showcase (ruling R263)"
+    assert _errors(validator, {**doc, "split": {**doc["split"], "method": "calendar_thirds"}}) != []
+    assert _errors(validator, {**doc, "cohorts": [{**cohort, "cohort_id": "bitcoin-month"}]}) != []
+    assert _errors(validator, {**doc, "cohorts": [{**cohort, "n_train": 31.5}]}) != [], "integers only"
+    assert _errors(validator, {**doc, "build": {**doc["build"], "status": "partial"}}) != []
+    outside = copy.deepcopy(doc)
+    audit_path = "audit/taxonomy_0123456789abcdef.json"
+    outside["files"] = [*base["files"], {"path": audit_path, "sha256": "d" * 64, "bytes": 1}]
+    assert _errors(validator, outside) != [], "audit/ is outside the walk and never in files (7.14)"
+    audited = copy.deepcopy(doc)
+    audited["taxonomy"]["audit"] = {"path": audit_path, "n": 50, "precision_permille": 920}
+    assert _errors(validator, audited) == []
+    sources = _schema("dataset.v1.json")["properties"]["news"]["properties"]["sources"]
+    assert "hn" in sources["items"]["properties"]["source"]["enum"]
+
+
+def test_the_news_schema_admits_hacker_news_and_a_revision_stamped_bullet() -> None:
+    """Rulings R241 (the `hn` source) and R249 (decision D-R3: a `wce` bullet stamped from its revision)."""
+    validator = _validator("news.v1.json")
+    item = _fixture("news.wce-20160623-0007.json")
+    assert _errors(validator, item) == [], "a file written before the amendment still validates"
+    story = copy.deepcopy(item)
+    story.update(news_id="hn-20260101-0001", source="hn", kind="story", section=None, revid=None, asof_day=None)
+    assert _errors(validator, story) == []
+    assert _errors(validator, {**story, "kind": "headline"}) != [], "the source fixes the kind"
+    assert _errors(validator, {**story, "published_at_source": "revision"}) != [], "wce only"
+    stamped = copy.deepcopy(item)
+    stamped.update(published_at_source="revision", revid=1_234_567)
+    assert _errors(validator, stamped) == []
+    assert _errors(validator, {**stamped, "revid": None}) != [], "a revision stamp names its revision"
+    page_day = {**item, "published_at_source": "page_day"}
+    assert _errors(validator, {**page_day, "revid": 5}) != [], "a page-day stamp has no revid"
+    assert _errors(validator, page_day) == []
+    assert _errors(validator, {**item, "published_at_source": "guess"}) != []
+
+
+def test_the_actions_schema_admits_one_optional_rule_proposal() -> None:
+    validator = _validator("actions.v2.json")
+    actions = _fixture("actions.sample.json")
+    assert _errors(validator, actions) == [], "a binary-only agent omits propose_rule"
+    rule = _fixture("rule.sample.json")
+    proposal = {key: rule[key] for key in ("scope", "condition", "claim", "horizon_bars", "min_support")}
+    assert _errors(validator, {**actions, "propose_rule": proposal}) == []
+    assert _errors(validator, {**actions, "propose_rule": None}) == []
+    assert _errors(validator, {**actions, "propose_rule": {**proposal, "min_support": 10}}) != []
+    stamped = {**proposal, "rule_id": rule["rule_id"]}
+    assert _errors(validator, {**actions, "propose_rule": stamped}) != [], "the engine stamps the id"
+    four = {**proposal, "condition": [*proposal["condition"], *FOUR_PREDICATES_TAIL]}
+    assert _errors(validator, {**actions, "propose_rule": four}) != [], "RULE_PREDICATES_MAX = 3"
+
+
+def test_the_review_decisions_are_landed_in_the_sections_the_reviews_name() -> None:
+    """Every decision of the two reviews is normative text, in place, in its corrected form (section G)."""
+    window = _flat(_contract_section("### 5.6 The freeze", "## 6. The RNG tree"))
+    assert "730" in window and "knowledge cutoff" in window and "showcase" in window  # D-S3, D-S4
+    folds = _flat(_contract_section("### 7.7 Split", "### 7.8 Manifest"))
+    assert "FOLD_QUANTILES_PERMILLE = (600, 800)" in folds and "latest-resolving" in folds  # D-R1, D-R2
+    assert "FoldIntegrityError" in folds and "111 train, 46 validation and 130" in folds
+    filters = _flat(_contract_section("### 7.4 Window and quality filters", "### 7.5 Hardness tags"))
+    for phrase in ("KALSHI_COHORT_TARGET = 40", "MANIFOLD_COHORT_TARGET = 8", "7 000", "WINDOW_DAYS_MAX",
+                   "only last", "forecastable_from_public_models", "universe_min_settled"):
+        assert phrase in filters, phrase  # D-S11, D-S12, D-R13
+    news = _flat(_contract_section("### 7.3 NewsItem", "### 7.4 Window"))
+    assert "published_at_source" in news and "`hn`" in news  # D-R3, the minute sources
+    linker = _flat(_contract_section("### 7.6 The linker", "### 7.7 Split"))
+    assert "LINKER_PRECISION_MIN_PERMILLE = 800" in linker and 'news_links: "weak"' in linker  # D-R4
+    grid = _flat(_contract_section("### 5.2 The bar grid", "### 5.3 The run calendar"))
+    assert "y2026h" in grid and "INTERVALS_MIN" in grid  # D-R5, the minute grid
+    units = _contract_section("### 5.1 Time is an integer", "### 5.2 The bar grid")
+    assert "INTERVALS_MIN = (1, 60, 1_440)" in units
+    contamination = _flat(_contract_section("### 11.5 Contamination", "## 12. Scoring"))
+    assert "coarse" in contamination and "LIVE_REPLICATION_MIN_RESOLVED" in contamination  # D-R6
+    objective = _flat(_contract_section("### 12.6 The selection objective", "### 12.7 Folds"))
+    for phrase in ("generator", "certif", "proxy", "engine", "no genome enters a claim on proxy fitness"):
+        assert phrase in objective, phrase  # D-R7, D-R9
+    trading = _flat(_contract_section("### 12.3 Trading metrics", "### 12.4 Statistics"))
+    assert "capacity_cents" in trading and "CAPACITY_SCALE_GRID_PERMILLE" in trading  # D-R10
+    mutation = _flat(_contract_section("### 12.9 Prompt mutation", "### 12.10 The leaderboard"))
+    assert "LIVE_REPLICATION_MIN_RESOLVED" in mutation and "deferred" in mutation  # D-R11
+    board = _flat(_contract_section("### 12.10 The leaderboard", "### 12.11 The structures"))
+    for phrase in ("currency", "mana", "cohort_id", "taxonomy:weak"):
+        assert phrase in board, phrase  # D-R12, D-S7, D-S9
+    taxonomy = _flat(_contract_section("### 7.14 The tag taxonomy", "## 8. The engine"))
+    for phrase in ("never a model call", "provider_labels", "`platform-meta`", "TAXONOMY_COVERAGE_MIN_PERMILLE = 900",
+                   "threshold-above", "TAXONOMY_AUDIT_N = 50", "per venue"):
+        assert phrase in taxonomy, phrase  # D-S6, D-S8, D-S14
+    hypotheses = _flat(_contract_section("### 18.2 The hypothesis layer", "### 18.3 Minute grids"))
+    for phrase in ("family_registered", "FDR_Q_PPM = 50_000", "benjamini_hochberg", "replicate fold",
+                   "fit_t1_ms + interval_ms", "n_candidates", "never an `Insight`"):
+        assert phrase in hypotheses, phrase  # D-R8
+    cohort = _flat(_contract_section("### 18.5 The cohort", "### 18.6 Evaluation additions"))
+    for phrase in ("COHORT_MIN_TRAIN = 30", "usable_for_paired_test", "never crosses a fold", "CohortRefusedError",
+                   "exactly one cohort"):
+        assert phrase in cohort, phrase  # D-S7, D-S13
+    errors = _contract_section("### 13.1 The error taxonomy", "### 13.2 Version constants")
+    for name in ("SensorAbsentError", "RuleRefusedError", "FoldIntegrityError", "ShowcaseDatasetError",
+                 "CohortRefusedError"):
+        assert f"| `{name}` |" in errors, name
+    claims = _contract_section("### 17.6 Claims, leaderboards", "### 17.7 The wave 3b module map")
+    assert "every** fold whose span" in claims and "whose months" not in claims
+    # The PRD and plan sentences the rulings correct in place carry the corrected form and a revision entry.
+    prd3 = (REPO / "docs" / "PRD_V3_TRADING_OPTIMIZER.md").read_text(encoding="utf-8")
+    assert "40 usable cohorts" in prd3 and "1.1, 2026-09-09" in prd3
+    assert "at least 1 000 Kalshi markets and 1 000" not in prd3
+    prd2 = (REPO / "docs" / "PRD_V2_HARD_OPTIMIZER.md").read_text(encoding="utf-8")
+    assert "count quantiles of resolution order" in prd2 and "1.1, 2026-09-09" in prd2
+    prd5 = (REPO / "docs" / "PRD_V5_DISCOVERY.md").read_text(encoding="utf-8")
+    assert "fit_t1_ms" in prd5 and "1.1, 2026-09-09" in prd5
+    assert "visible_from = now + one bar`, their" not in prd5
+    plan = (REPO / "docs" / "PLAN_V3_WAVES.md").read_text(encoding="utf-8").replace("\r\n", "\n")
+    assert "40 usable on Kalshi and\n  8 on Manifold" in plan
+
+
+def test_the_four_declared_shapes_of_gate_g2_are_restated_where_they_belong() -> None:
+    """Ruling R274: R213, R214, R217 and R221 read from the document by the first engine lot after C1c."""
+    text = CONTRACT.read_text(encoding="utf-8")
+    fills = _flat(_contract_section("### 8.6 Fills", "### 8.7 Settlement"))
+    assert "t0_ms" in fills and "t1_ms" in fills and "not_tradable" in fills  # R213
+    liquidity = _flat(_contract_section("### 16.1 The `LiquidityModel` protocol", "### 16.2 The decision"))
+    assert "bar_prev" in liquidity  # R214
+    calibration = _flat(_contract_section("### 12.2 Calibration", "### 12.3 Trading metrics"))
+    assert "continuous_entry" in calibration  # R217
+    structures = _contract_section("### 12.11 The structures", "### 12.12 The HTTP surface")
+    assert "n_quantile_forecasts" in structures and "seed: int" in structures  # R221
+    row = next(line for line in text.splitlines() if line.startswith("| R274 |"))
+    for phrase in ("dropped == 0", "dropped > 0", "fixture", "pinned", "ENGINE_VERSION"):
+        assert phrase in row, phrase
+    versions = _flat(_contract_section("### 13.2 Version constants", "## 14. Wave plan"))
+    assert 'ENGINE_VERSION = "2.0.0"' in versions and 'CONTRACT_VERSION = "2.0"' in versions

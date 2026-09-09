@@ -627,10 +627,11 @@ place with a ruling each:
   its usable size of `n_train >= 30`; a rule's `scope` gains `cohorts`; leaderboards and claims gain
   per-cohort rows with their own intervals and their own candidate count; a cohort claim below the usable
   size is refused (D-S7).
-- **7.4 and 12.7, the target**: the build target stated in cohorts (at least 40 usable per venue), the
-  2 000 markets per venue of decision D-R7 restated as a floor, and **AC-11 of
+- **7.4 and 12.7, the target**: the build target stated in cohorts **per venue**, 40 usable on Kalshi and
+  8 on Manifold (D-S1 as corrected by D-S11), the market floor following the cohort target (about 7 000
+  Kalshi markets measured, D-S12) with the fallback order decided in advance, and **AC-11 of
   `docs/PRD_V3_TRADING_OPTIMIZER.md` corrected in place** so it no longer asks for 1 000 and says nothing
-  about cohorts (D-S1).
+  about cohorts.
 - The `market_listed` journal event and `market.v2.json` widened for `provider_labels` and the facets.
 
 The critic's lens gains: can a tag leak? (it cannot, a tag is known before the first bar, but the

@@ -58,6 +58,8 @@ Rules for every contributor, restated from the plan because they are the ones th
 16. v3 interfaces (amendment C1: liquidity, decision latency, clusters, opportunities, features, learning)
 17. Instruments across kinds (amendment C1b: the six kinds, the integer price model, session calendars,
     cash events, schedules, horizon forecasts, per-kind claims)
+18. Discovery (amendment C1c: the sensor catalogue and gene, the hypothesis layer, minute grids,
+    workflow genomes, the cohort; the two reviews of 2026-09-08 and 2026-09-09 landed in place)
 
 ---
 
@@ -372,7 +374,7 @@ explicit offset.
 MS_PER_MINUTE = 60_000
 MS_PER_HOUR = 3_600_000
 MS_PER_DAY = 86_400_000
-INTERVALS_MIN = (60, 1_440)
+INTERVALS_MIN = (1, 60, 1_440)          # the minute grid is amendment C1c's (section 18.3, ruling R241)
 def interval_ms(interval_min: int) -> int: return interval_min * MS_PER_MINUTE
 def bar_of(t_ms: int, interval_min: int) -> int: return (t_ms // interval_ms(interval_min)) * interval_ms(interval_min)
 def day_start_ms(t_ms: int) -> int: return (t_ms // MS_PER_DAY) * MS_PER_DAY
@@ -395,6 +397,16 @@ Resampling (D6, `pmx.data.resample.bars_from_trades`): `open` is the first print
 last, `high`/`low` the extremes, `vwap = round_half_up(sum(price_bp * size_milli), sum(size_milli))`,
 `volume_milli = sum(size_milli)`, `n_trades` the count. A bar before the first trade takes
 `first_price_bp` (the provider's opening quote when known, else the first print) as its carried close.
+
+**Three grids, one per dataset** (amendment C1c, section 18.3, rulings R241 and R251). `INTERVALS_MIN` is
+`(1, 60, 1_440)`: daily, hourly and **minute**. The rules above hold on every grid unchanged (a minute
+bar opens at a multiple of `MS_PER_MINUTE`), one grid per run and one dataset per grid hold (5.3, 7.8),
+and a minute dataset is built per instrument or series on demand for the event studies and the minute
+agents, never for the evolution of a whole population. **The hourly grid is the headline Kalshi grid**
+(decision D-R5): Kalshi's median life is 29 days and it publishes 1-minute candlesticks, so a daily grid
+discards its intraday content and the latency rule of 16.2 costs a full day; `y2026h` is the headline
+Kalshi dataset, the daily grid stays for Manifold and for the showcase pack (5.6), and which news sources
+a minute dataset may carry is 18.3's rule.
 
 ### 5.3 The run calendar
 
@@ -480,18 +492,52 @@ stamped in the manifest and applied **at build time** by D5 as `visible_from_ms 
 safety_lag_ms`. The observation builder reads `visible_from_ms` and nothing else, so the lag cannot be
 skipped by a consumer.
 
-For a Wikipedia Current events page of day `D`, `published_at_ms` is the **end of day D**, that is
-`day_start_ms(D) + MS_PER_DAY` (00:00:00Z of `D + 1`), and `visible_from_ms` is therefore `D + 1` at
-06:00Z with the default lag, exactly the PRD's "readable from D+1 06:00 UTC". A Manifold comment carries
-its own `createdTime` as `published_at_ms`. A Wayback snapshot carries its capture time. An as-of
-Wikipedia article carries the revision timestamp.
+For a Wikipedia Current events bullet, `published_at_ms` is **the timestamp of the first revision of
+`Portal:Current events/<day>` that carries the bullet** (decision D-R3, ruling R249; the item's `revid`
+names that revision and `published_at_source = "revision"`), so that a bullet added at 09:14Z is visible
+from 15:14Z and not from the next morning; when the revision history is unavailable the stamp falls back to
+the **end of day D**, `day_start_ms(D) + MS_PER_DAY` (00:00:00Z of `D + 1`, `published_at_source =
+"page_day"`), which with the default lag is the PRD's "readable from D+1 06:00 UTC". The six-hour figure
+was a guess about the page and is now a floor over a measured instant. A Manifold comment carries its own
+`createdTime` as `published_at_ms`. A Wayback snapshot carries its capture time. An as-of Wikipedia
+article carries the revision timestamp. A Hacker News story carries `created_at_i * 1_000` (18.3).
+
+**The lag is per source** (amendment C1c, section 18.3, ruling R241): `visible_from_ms = published_at_ms
++ lag(source)`, where `lag(source)` is `manifest.news.safety_lag_by_source[source]` when the manifest
+carries the block and `manifest.safety_lag_ms` otherwise, so a dataset built before the amendment
+recomputes to the same bytes. The defaults are `SAFETY_LAG_MS_BY_SOURCE` of `pmx.types` (six hours for a
+day-granular source, fifteen minutes for GDELT, five minutes for Hacker News, one minute for a Manifold
+comment or a filing, none for a release whose time is the release), defaults the first minute build
+reports against, never below the source's granularity.
 
 ### 5.6 The freeze
 
 A dataset has `freeze_ms = day_start_ms(freeze_date)`. Its window is
-`[freeze_ms - 365 * MS_PER_DAY, freeze_ms - MS_PER_DAY)` on `resolved_at_ms` (the freeze day itself is
-excluded). No file in the dataset may carry an instant `> freeze_ms`: the builder refuses a news item with
-`published_at_ms > freeze_ms` and a market with `resolved_at_ms >= freeze_ms` (`LeakError`).
+`[freeze_ms - window_days * MS_PER_DAY, freeze_ms - MS_PER_DAY)` on `resolved_at_ms` (the freeze day
+itself is excluded), with `BuildConfig.window_days = 365` by default. No file in the dataset may carry an
+instant `> freeze_ms`: the builder refuses a news item with `published_at_ms > freeze_ms` and a market with
+`resolved_at_ms >= freeze_ms` (`LeakError`).
+
+**The window is explicit and bounded** (decision D-S3, ruling R262). `window_days` is a `BuildConfig`
+field written into every manifest beside the true `resolution_span {min_ms, max_ms}` of the markets kept,
+and `BuildConfig.__post_init__` refuses a value above `WINDOW_DAYS_MAX = 730` with `InvalidConfigError`,
+for two reasons that no flag may override: a market that resolved before a model's knowledge cutoff is a
+possible **recall** rather than a forecast, so an older resolution buys nothing an LLM row can be scored
+on; and a regime three years old is not the regime being traded, so an older tape teaches a scripted
+family the wrong market. A leaderboard row computed on a dataset with `window_days > 365` carries
+`window_days:<n>` in its `labels` (12.10).
+
+**Two purposes, one exemption** (decision D-S4, ruling R263). `DatasetManifest.purpose` is `"research"`
+or `"showcase"`. A **showcase** dataset holds landmark events kept apart rather than thrown away (the 2016
+referendum, a central-bank surprise, a crypto threshold: the events of the v1 demo pack and the pack DS2
+builds, 7.1); it is **exempt** from the window rule of this section and from nothing else: it seals and
+replays like any other dataset, `run_backtest` runs it, and it is never the source of a fold, a fitness
+value, a rule promotion, an insight or a claim, which `make_folds`, `run_generation`, `evolve`, `claim`,
+the rule tester and the feature matrix each refuse with `ShowcaseDatasetError` (13.1) before reading a
+market. A **research** dataset obeys the window. The field replaces the ad hoc `Dataset.is_demo_pack`
+(an unsealed pack whose only provider is `demo`), which the loader reads as `showcase` on a manifest
+written before this amendment and which is deleted from the code by DS1; the builder writes `purpose`
+into every manifest from then on.
 
 ---
 
@@ -588,9 +634,17 @@ data/
     wiki_asof/<market_id>/<yyyymmdd>.json   point-in-time background article snapshots, news.v1.json (kind "background")
     clusters/clusters.json          event clusters and constraints, cluster.v1.json (section 16.3, R1b)
     clusters/overrides.json         the hand-written review, cluster.v1.json#/$defs/override_file
+    taxonomy/tags.v1.json           the tag vocabulary the build tagged with, copied from src/pmx/lexicons/ (7.14, DS2)
+    taxonomy/kalshi_series_facets.v1.json   the sealed series-to-facets map the tagger read first (7.14, DS2)
     contamination.json              per-model contaminated market ids, outside the dataset hash (section 11.5)
+    audit/linker_<hash16>.json      the 50-link precision audit of 7.6, outside the hash, keyed by dataset_hash (D-R4)
+    audit/taxonomy_<hash16>.json    the 50-tagging audit of 7.14, outside the hash, keyed by dataset_hash (D-S9)
     cache/                          raw provider responses, excluded from the hash, may be deleted
 ```
+
+`taxonomy/` is inside the walk of 4.3 (a tag decides a cohort, a cohort decides a claim row, so the
+vocabulary a build tagged with is part of what the hash pins, ruling R267); `audit/` is outside it, like
+`contamination.json`, because an audit happens after the seal and is keyed by the hash it audits.
 
 **The day key of a news file** is `day_start_ms(item.published_at_ms)` rendered as `yyyymmdd`, which for a
 Wikipedia Current events page of day `D` is `D + 1` (section 5.5), while the item's `news_id` names `D`
@@ -606,12 +660,20 @@ because that is the signature of the highest-value leak in the design (today's a
 which states the outcome, stamped with an early date). D5's test asserts that the stored text of a resolved
 market's snapshot is byte-identical to the revision named by its `revid`.
 
-**The demo pack is exempt from the window rules.** `data/demo_v1/` holds markets that resolved between
-2016 and 2024, so section 5.6's twelve-month window and freeze checks do not apply to it: its
-`window.start_ms = day_start_ms(min created_at_ms)`, its `window.end_ms = max(resolved_at_ms) + 1`, its
-`freeze_ms = day_start_ms` of the build's freeze date, and its month edges are section 7.7's formula
-applied to that window. The loader skips the 5.6 window and freeze checks for a dataset with
-`sealed: false` whose only provider is `demo`, and for no other dataset.
+**A showcase dataset is exempt from the window rule** (decision D-S4, ruling R263; section 5.6).
+`data/demo_v1/` holds markets that resolved between 2016 and 2024, so section 5.6's window check does not
+apply to it: its `window.start_ms = day_start_ms(min created_at_ms)`, its `window.end_ms =
+max(resolved_at_ms) + 1`, its `freeze_ms = day_start_ms` of the build's freeze date, and its month edges
+are section 7.7's formula applied to that window. The loader skips the 5.6 window check for a dataset
+whose `purpose` is `showcase` (read as such from a manifest that predates the field when `sealed: false`
+and the only provider is `demo`, the old `is_demo_pack` signature), and for no other dataset; it never
+skips the freeze check, and it never lets a showcase dataset reach a fold, a fitness value, a rule
+promotion, an insight or a claim (`ShowcaseDatasetError`). The demo pack stays the migration identity of
+7.10; the **showcase pack** DS2 builds (decision D-S5, ruling R264) is a second showcase dataset, sealed,
+with a few dozen landmark markets carrying the same bars, trades, news and as-of stamps as a research
+market wherever a real tape survives in the Wayback archive or in Manifold's history, and a `notes` entry
+documenting what could not be sourced, because a showcase whose data is shallower than the research data
+teaches the wrong lesson about the product.
 
 ### 7.2 Market (`market.v2.json`, `pmx.types.Market`)
 
@@ -625,7 +687,11 @@ applied to that window. The loader skips the 5.6 window and freeze checks for a 
 | `question` | `str`, 1..500 | |
 | `description` | `str`, 0..4000 | resolution criteria as published; truncated at import with `...` |
 | `category` | category | section 2 |
-| `tags` | `list[str]`, each `^[a-z0-9_-]{1,32}$`, `<= 16`, sorted, unique | provider and builder labels only |
+| `tags` | `list[str]`, each `^[a-z0-9_-]{1,32}$`, `<= 16`, sorted, unique | the sorted union of the market's facet values and builder labels from the controlled vocabulary of 7.14 (amendment C1c, decision D-S6, ruling R265); the builder refuses a value outside `tags.v1.json`. Raw provider strings live in `provider_labels`, never here |
+| `provider_labels` | `list[str]`, each `^[a-z0-9_-]{1,32}$`, `<= 16`, sorted, unique, **optional** | the provider's own labels verbatim (a Kalshi series ticker, a Manifold group slug, `nonpredictive`): never a cohort key, never displayed as a tag, kept for the reviewer (7.14). Optional in the schema so a file written before the taxonomy loads; required by the loader on a dataset whose manifest carries the `taxonomy` block |
+| `subject` | `list[str]`, 1..4, unique, **in tagger precedence order** (the first is the primary subject, the cohort key of 18.5), **optional** as above | the fine topic under the category, values of the `subject` facet of `tags.v1.json` (7.14) |
+| `structure` | `str`, a value of the `structure` facet, **optional** as above | the question's shape (`threshold-above`, `by-date`, `head-to-head`, ...), which decides whether two markets are comparable at all (7.14) |
+| `horizon` | `str`, one of `intraday`, `week`, `month`, `quarter`, `year-plus`, **optional** as above | derived from `close_at_ms - created_at_ms` by 7.14's boundaries, never from provider text and never from `resolved_at_ms` |
 | `wiki_subjects` | `list[str]`, each 1..256 chars, `<= 8`, sorted, unique | the market's Wikipedia subject page titles as the importer read them, verbatim (capitals, spaces, colons and parentheses kept); the linker's `shared_links` compares against this list, never against `tags` |
 | `currency` | `"usd"` or `"mana"` | `mana` iff `provider == "manifold"` |
 | `source` | `"imported"` or `"reconstructed"` | `reconstructed` is refused by `seal` |
@@ -635,7 +701,7 @@ applied to that window. The loader skips the 5.6 window and freeze checks for a 
 | `resolution` | `0` or `1` | |
 | `resolution_source` | `str`, 0..500 | the venue's stated source, `"venue"` when unknown |
 | `event_key` | `str` or `null` | Kalshi `event_ticker`, Manifold `groupSlugs[0]`, else `null`; the block key of section 12.3 |
-| `interval_min` | `60` or `1440` | the grid of `bars` |
+| `interval_min` | `1`, `60` or `1440` (`1` is amendment C1c's minute grid, 18.3, ruling R241) | the grid of `bars` |
 | `bars` | `list[Bar]`, `>= 2` | dense on the grid from `bar_of(created_at_ms)` to `bar_of(resolved_at_ms)` |
 | `trades` | `list[Trade]` | sorted per section 3; may be empty for `reconstructed` |
 | `first_price_bp` | int in `[1, 9999]` | the first quote or print; also the as-of price on a market's very first bar (section 5.4) |
@@ -643,7 +709,7 @@ applied to that window. The loader skips the 5.6 window and freeze checks for a 
 | `hardness_tags` | `list[str]` subset of `trivial, upset, whipsaw, illiquid`, sorted | section 7.5; never shown to agents |
 | `quality` | object (`pmx.types.MarketQuality`) | `n_trades: int, unique_bettors: int|null, life_days: int, volume_milli_total: int, traded_bars: int`, plus `tape_kind: "prints"|"bars_only"` (ruling R167: `bars_only` when the provider publishes per-bar volume and no print tape, in which case `n_trades == 0` and `traded_bars` counts the bars with `volume_milli > 0`; the schema field is a contract issue of section 17.9) |
 | `fee_schedule_id` | fee schedule id | section 8.8 |
-| `wiki_subject_provenance` | `list["stated"|"derived"]`, `<= 8`, **optional** | one flag per entry of `wiki_subjects`, in the same order (ruling R169): `stated` for a subject the provider published or the sealed series map names, `derived` for one computed from the question or the title. Optional in the schema so that a file written before the flag existed still loads; an absent or empty list beside a non-empty `wiki_subjects` reads as every subject stated. The one optional field of this table |
+| `wiki_subject_provenance` | `list["stated"|"derived"]`, `<= 8`, **optional** | one flag per entry of `wiki_subjects`, in the same order (ruling R169): `stated` for a subject the provider published or the sealed series map names, `derived` for one computed from the question or the title. Optional in the schema so that a file written before the flag existed still loads; an absent or empty list beside a non-empty `wiki_subjects` reads as every subject stated. The first of the five optional fields of this table (the taxonomy's four are amendment C1c's) |
 | `notes` | `str`, 0..2000 | free text for humans |
 
 `Bar`: `t_ms, open_bp, high_bp, low_bp, close_bp, vwap_bp` (all `[1, 9999]`, `low <= open, close, vwap <=
@@ -704,6 +770,14 @@ class MarketMeta:
     created_at_ms: int; close_at_ms: int; resolved_at_ms: int; resolution: int
     interval_min: int; n_bars: int; hardness_tags: tuple[str, ...]; fee_schedule_id: str; fold: str
     kind: str = "binary"                # amendment C1b, ruling R144: one of INSTRUMENT_KINDS
+    # Amendment C1c (7.14, 18.5, rulings R265 and R266): the taxonomy and the cohort, defaulted so a meta of a
+    # dataset built before the taxonomy is what it was. None of the five reads a field of 7.9, so every one of
+    # them may sit in a MarketView and in a rule's scope at every bar.
+    subject: tuple[str, ...] = ()       # tagger precedence order; subject[0] is the primary subject
+    structure: str = ""                 # "" on an untagged dataset, else a structure facet value
+    horizon: str = ""                   # "" on an untagged dataset, else intraday | week | month | quarter | year-plus
+    provider_labels: tuple[str, ...] = ()
+    cohort_id: str | None = None        # the one cohort of 18.5, None for platform-meta, other and untagged markets
     # On a continuous instrument (ruling R186): created_at_ms = listed_at_ms; resolved_at_ms = delisted_at_ms
     # when set, else the dataset's window end_ms; close_at_ms = resolved_at_ms; resolution = -1;
     # event_key = None; hardness_tags = (); fold = "all"; n_bars = the number of bars of the file. The
@@ -732,6 +806,12 @@ class Dataset:
     def news_global(self, now_ms: int) -> tuple[NewsItem, ...]: ...
     def calendar(self, calendar_id: str) -> SessionCalendar: ...   # amendment C1b, section 17.2 (sealed);
         # "continuous" is synthesised (one session [0, INT63_MAX)) and never read from a file (ruling R185)
+    @property
+    def purpose(self) -> str: ...      # "research" | "showcase" (5.6, ruling R263); replaces is_demo_pack, which is deleted
+    @property
+    def cohorts(self) -> tuple[Cohort, ...]: ...   # pmx.cohorts.list_cohorts(self.metas), sorted by cohort_id (18.5);
+        # () on a dataset built before the taxonomy; the loader refuses a manifest whose cohort rows disagree
+        # with the folds it recomputes (FoldIntegrityError, ruling R266)
 ```
 
 `market(market_id)` returns a `Market` for a binary and a `ContinuousInstrument` for every other kind;
@@ -758,12 +838,13 @@ mana becomes `size_milli = round_half_up_decimal(Decimal(amount) * 1_000)`.
 |---|---|---|
 | `schema_version` | `"news.v1"` | |
 | `news_id` | news id | section 2 |
-| `source` | `wikipedia_current_events`, `wikipedia_asof`, `wayback`, `gdelt`, `manifold_comment` | |
-| `kind` | `headline`, `background`, `frontpage`, `article`, `comment` | `wce -> headline`, `wasof -> background`, `wb -> frontpage`, `gd -> article`, `mfc -> comment` |
-| `published_at_ms` | int | `<= freeze_ms`; for `wce` the end of the page day (section 5.5) |
-| `revid` | `int` or `null` | required non-null for `source == "wikipedia_asof"`: the MediaWiki revision id the text came from, so the snapshot is auditable against the API |
+| `source` | `wikipedia_current_events`, `wikipedia_asof`, `wayback`, `gdelt`, `manifold_comment`, and amendment C1b's `edgar`, `fred`, `cboe` (17.7), and amendment C1c's `hn` (18.3, ruling R241) | `NEWS_SOURCES`; each carries a granularity and a default lag in `SOURCE_GRANULARITY_MS` and `SAFETY_LAG_MS_BY_SOURCE` (18.3) |
+| `kind` | `headline`, `background`, `frontpage`, `article`, `comment`, `filing`, `release`, `story` | `wce -> headline`, `wasof -> background`, `wb -> frontpage`, `gd -> article`, `mfc -> comment`, `edg -> filing`, `fred` and `cboe -> release`, `hn -> story` for a Hacker News story and `comment` for one of its comments |
+| `published_at_ms` | int | `<= freeze_ms`; for `wce` the timestamp of the first revision of the day page that carries the bullet, with the end of the page day as the fallback (section 5.5, decision D-R3, ruling R249); for `hn` `created_at_i * 1_000` |
+| `published_at_source` | `"revision"` or `"page_day"` or `null`, **optional** | `wce` only: which of 5.5's two stamps `published_at_ms` is; `null` for every other source and absent on a file written before decision D-R3 |
+| `revid` | `int` or `null` | required non-null for `source == "wikipedia_asof"`: the MediaWiki revision id the text came from, so the snapshot is auditable against the API; for a `wce` bullet stamped from its revision, the id of that revision (ruling R249) |
 | `asof_day` | `str` (`yyyy-mm-dd`) or `null` | required non-null for `source == "wikipedia_asof"`: the day the fetch asked for. The loader refuses `published_at_ms > day_start_ms(asof_day) + MS_PER_DAY` |
-| `visible_from_ms` | int | `== published_at_ms + safety_lag_ms` of the manifest; the loader recomputes and refuses a mismatch |
+| `visible_from_ms` | int | `== published_at_ms + lag(source)`, where `lag(source)` is `manifest.news.safety_lag_by_source[source]` when the manifest carries the block and `manifest.safety_lag_ms` otherwise (section 5.5, ruling R241); the loader recomputes and refuses a mismatch |
 | `fetched_at_ms` | int | wall clock of the fetch; allowed here because a dataset is built, not run |
 | `url` | `str` | |
 | `headline` | `str`, 1..300 | |
@@ -800,6 +881,12 @@ class BuildConfig:                                  # D6; every field enters man
     limit_per_provider: int | None = None           # applied AFTER the window walk, stratified by month (R168)
     kinds: tuple[str, ...] = ("binary",)            # amendment C1b, section 17: the instrument kinds imported
     min_traded_bars: int = 20                        # ruling R167: the bars-only proxy of the min_trades filter
+    # Amendment C1c (section 18, decisions D-R13, D-S3, D-S4; rulings R258, R262, R263). __post_init__ refuses
+    # window_days > WINDOW_DAYS_MAX = 730 (5.6), interval_min outside INTERVALS_MIN, and on interval_min == 1 a
+    # news source whose SOURCE_GRANULARITY_MS exceeds MINUTE_SOURCE_GRANULARITY_MAX_MS (18.3), all InvalidConfigError.
+    purpose: str = "research"                        # "research" | "showcase" (5.6); written into every manifest
+    universe_min_settled: int = 5                    # the documented universe rule of D-R13, below: defaults the first
+    universe_min_volume_cents: int = 100_000         # build reports against, not laws
     def to_dict(self) -> dict[str, object]: ...      # manifest.filters.config, canonical
 ```
 
@@ -810,7 +897,7 @@ against a fixed shape: `window`, `opened_early`, `binary`, `min_trades`, `min_li
 
 | Filter | Default | Rule |
 |---|---|---|
-| window | 365 days | `freeze_ms - 365 d <= resolved_at_ms < freeze_ms - 1 d` |
+| window | `window_days = 365`, refused above `WINDOW_DAYS_MAX = 730` (5.6, ruling R262) | `freeze_ms - window_days d <= resolved_at_ms < freeze_ms - 1 d`; not applied to a `purpose: "showcase"` build (ruling R263) |
 | opened early | 90 days | `created_at_ms >= window_start_ms - 90 d` |
 | binary | always | one YES/NO leg; multi-outcome events imported as their binary legs each with its own id |
 | min trades | `50` | `quality.n_trades >= 50` **or** `quality.unique_bettors >= 30` **or** (`quality.tape_kind == "bars_only"` **and** `quality.traded_bars >= min_traded_bars`, default `20`). The third clause is ruling R167: Kalshi publishes no settled print tape (`GET /markets/trades` answers nothing for a settled ticker) while its candlesticks carry per-bar volume and open interest, so a bars-only provider carries `tape_kind = "bars_only"`, `n_trades = 0` and a real `traded_bars`, fills under 8.6 on bar volume exactly as before, and is accepted on that count. This is distinct from ruling R105's Polymarket case, whose tape carries no volume at all and which stays out |
@@ -820,9 +907,29 @@ against a fixed shape: `window`, `opened_early`, `binary`, `min_trades`, `min_li
 | Kalshi shards | on | refuse tickers matching `^KXMVE` and any series in `KALSHI_EXCLUDED_SERIES` (data, D2) |
 | per-provider cap | none | `limit_per_provider`, applied **after** the window walk by deterministic stratified sampling across the window's twelve months (ruling R168): quota `limit // 12` per month, the remainder (and any quota a thin month cannot fill) to the busiest months by pre-cap count, ties to the earlier month; inside a month the ids are drawn with `sample_without_replacement` from the one `dataset.subsample` substream of `RngTree(sample_seed_for(name))`, `sample_seed_for(name) = derive_seed(0, f"dataset/{name}") % SEED_SPACE`, providers in sorted order and months in order. Every fold of 12.7 is therefore populated by construction, and the manifest records the pre-cap count per provider and month (`counts.precap_per_provider_month`, twelve integers per provider). The earlier behaviour, each importer capping from its own end of the window, gave one provider the first two days and the other the last thirteen (`docs/BUILD_STATE.md` 5.3) |
 | kinds | `("binary",)` | `kinds`: which instrument kinds the build imports (section 17.1); a continuous kind's instruments are filtered by `min_life_days` and `density` on their own calendars and by nothing else in this table |
-| Kalshi series | none | `kalshi_series_allow_list`, empty meaning every series that is not excluded. It is passed to the provider as `series_ticker`, which is the only narrowing either settled listing honours: without it a twelve-month window is unreachable (ruling R100) |
+| Kalshi series | the documented universe rule (decision D-R13, ruling R258) | **The series list is an output of the builder, not an input.** From the settled walk the builder keeps every Kalshi series (the ticker prefix before the first dash) with at least `universe_min_settled` settled markets in the window and at least `universe_min_volume_cents` of volume, and writes the manifest's `universe` block (7.8): the rule, every series with its counts before and after the quality filters and its volume, `n_series_before` and `n_series_after`. Weather series are kept and carry the builder label `forecastable_from_public_models` in `tags` (7.14). `kalshi_series_allow_list` stays as a **debug narrowing** only (empty by default; it is still what is passed to the provider as `series_ticker`, the only narrowing either settled listing honours, ruling R100, so the builder passes the universe it listed). The 731 series of the first build were picked by hand and were category-biased; a universe a reader cannot recompute is not a denominator |
 | resolution | always | `resolution` in `{0, 1}`; Manifold `MKT`, `CANCEL`, `N/A` refused |
 | no leak | always | `resolved_at_ms < freeze_ms`, every news `published_at_ms <= freeze_ms` |
+
+**The build target is stated in cohorts, per venue, and the market count follows** (decisions D-S1,
+D-S11 and D-S12 in the form section G of `docs/REVIEW_2026-09-09_SCALE_TAGS.md` corrected them; rulings
+R260, R270, R271). A research build must reach `KALSHI_COHORT_TARGET = 40` usable cohorts on Kalshi
+(`n_train >= COHORT_MIN_TRAIN = 30`, 18.5) and `MANIFOLD_COHORT_TARGET = 8` on Manifold, whose role is
+breadth and print-tape depth rather than comparative analysis (the prototype tagger found zero Manifold
+cohorts of ten and no dense question templates to concentrate). The market floor is what the cohort target
+costs: about **7 000 Kalshi markets** on the measured distribution, against a reachable in-window listing of
+about 15 000 rows living a week or more (`docs/BUILD_STATE.md` 7.5), and 2 000 Manifold markets (decision
+D-R7's number, kept as Manifold's floor). The builder reports the reachable count against the target
+**before** building (`pmx data build --plan`), and when the 365-day window cannot deliver it the fallback
+order is fixed in advance: **first** widen `window_days` toward `WINDOW_DAYS_MAX` (5.6), **then** relax
+`min_trades` and `min_traded_bars` with the count removed stated per filter, and **only last** lower the
+cohort target, each step recorded with its reason in `manifest.build.fallbacks`. Widening the window costs
+contamination risk for LLM agents alone, which the clean-market rule of 11.5 handles; lowering the cohort
+target costs the comparison itself, which nothing else recovers. A build that reaches the market floor and
+not the cohort floor is a **failed** build: `manifest.build.status = "failed"` with the shortfall per
+filter and per venue, and gate G3 fails on a Kalshi shortfall while it records a Manifold one. The
+per-provider cap of ruling R168 stays lifted and is a debug option. AC-11 of
+`docs/PRD_V3_TRADING_OPTIMIZER.md` is corrected in place to this statement (ruling R260).
 
 ### 7.5 Hardness tags (computed by D6, stored, never used to drop, never shown to agents)
 
@@ -874,20 +981,59 @@ A6's contamination prompt) and **one lexicon per category of section 2**, in tha
 `LEXICON_COUNT = 12` is a constant in `pmx.types` and `newsbayes.lexicon_id` is `0..11` (section 10.5)
 without A1 having to count D5's files. A lexicon file that is missing means no hits, never a crash.
 
+**The linker's precision is measured, and a weak build says so** (decision D-R4, ruling R250). Per build,
+`LINKER_AUDIT_N = 50` links are drawn with `sample_without_replacement` from the `dataset.subsample`
+substream over every `(news_id, market_id)` link of the dataset and written to
+`data/datasets/<name>/audit/linker_<dataset_hash[:16]>.json` as `{dataset_hash, sample_seed, n, links:
+[{news_id, market_id, score_permille, verdict: "correct" | "wrong" | "unsure" | null, reviewer}],
+precision_permille}`, where the verdicts are a human's (gate G3 performs the review) and
+`precision_permille = round_half_up(1_000 * n_correct, n_correct + n_wrong)`; `pmx data audit-links` writes
+the file with `null` verdicts and recomputes the precision once they are filled. The manifest's
+`news.linker_audit {path, n, precision_permille}` reports it (7.8), and a dataset whose precision is below
+`LINKER_PRECISION_MIN_PERMILLE = 800` carries `news_links: "weak"`: every leaderboard row of a run whose
+roster bought a news sensor (18.1) carries `news_links:weak` in `LeaderboardRow.labels` (12.10). The file
+is outside the dataset hash because the audit happens after the seal; it is keyed by the hash it audits.
+
 ### 7.7 Split (D6, section 12.7 defines the folds)
 
 ```python
 month_edges_ms = [window_start_ms + ((k * 365) // 12) * MS_PER_DAY for k in range(13)]
-# offsets in days: 0, 30, 60, 91, 121, 152, 182, 212, 243, 273, 304, 334, 365
-train_end_ms = month_edges_ms[8]          # months 1..8
-validation_end_ms = month_edges_ms[10]    # months 9..10
-# sealed test: validation_end_ms <= resolved_at_ms < freeze_ms - 1 d
+# offsets in days: 0, 30, 60, 91, 121, 152, 182, 212, 243, 273, 304, 334, 365 (window_days = 365; the
+# formula reads window_days in place of 365 on a wider window, still thirteen edges)
+# The two headline cuts are COUNT QUANTILES of resolution order (decision D-R1, ruling R247), not month edges:
+ordered = sort_markets(binaries)                          # (resolved_at_ms, id) ascending, section 3
+n = len(ordered)
+k_train = (n * FOLD_QUANTILES_PERMILLE[0]) // 1_000       # FOLD_QUANTILES_PERMILLE = (600, 800): 60 / 20 / 20
+k_validation = (n * FOLD_QUANTILES_PERMILLE[1]) // 1_000
+train_end_ms = bar_of(ordered[k_train].resolved_at_ms, interval_min)              # a bar open, so a run can clip to it
+validation_end_ms = bar_of(ordered[k_validation].resolved_at_ms, interval_min)
+# train: resolved_at_ms < train_end_ms; validation: train_end_ms <= resolved_at_ms < validation_end_ms;
+# sealed test: validation_end_ms <= resolved_at_ms < freeze_ms - 1 d. Every market resolving in the cut bar
+# goes to the LATER fold (the predicates are strict below the cut), so the realised counts may differ from
+# k_train and n - k_validation by the ties of one bar, and the manifest reports the realised counts.
 ```
 
-A market belongs to exactly one fold by `resolved_at_ms`. The manifest stores the thirteen edges and the
-three counts. A continuous instrument belongs to every fold whose months intersect
-`[created_at_ms, resolved_at_ms)` of its `MarketMeta` (amendment C1b, rulings R162 and R186; 17.6): the
-test needs no bar and no sealed file, and a run on a fold clips its `t0_ms` and `t1_ms` to the fold's months.
+The calendar thirds this section used to cut gave the first real dataset 111 train, 46 validation and 130
+sealed markets, an inverted pyramid (`docs/REVIEW_2026-09-08.md`); count quantiles are still chronological
+(a train market always resolved before a validation one, which before a sealed one) and put the mass where
+the fitting is. **Folds are cluster-aware** (decision D-R2, ruling R248): after the cut, every market of an
+`EventCluster` (16.3) and every market sharing a Kalshi `event_key` takes the fold of its
+**latest-resolving** member, because a train price path may otherwise encode a sealed outcome that the
+cross-asset sensor, a cluster feature or a hive resolution would carry; the moves are listed in
+`manifest.split.cluster_moves` as `{market_id, from_fold, to_fold, group_id}` (a `cluster_id` or the
+`event_key`), the loader recomputes them and refuses a mismatch, `pmx data verify` checks that no group
+spans two folds, and `make_folds`, the rule tester and `claim` refuse a dataset whose folds split a group
+with `FoldIntegrityError` (13.1). A cohort (18.5) is cut inside the folds so cut and never across them.
+
+A binary belongs to exactly one fold, by its `resolved_at_ms` and its group. The manifest stores the
+thirteen edges (still the rolling folds' edges), the two cuts with
+their dates, the quantiles, the moves and the three realised counts (7.8). A continuous instrument belongs
+to every fold whose span intersects `[created_at_ms, resolved_at_ms)` of its `MarketMeta` (amendment
+C1b, rulings R162 and R186; 17.6), where a fold's span is `[window_start_ms, train_end_ms)`,
+`[train_end_ms, validation_end_ms)` and `[validation_end_ms, freeze_ms - MS_PER_DAY)`: the test needs no
+bar and no sealed file, and a run on a fold clips its `t0_ms` and `t1_ms` to the fold's span. The
+**rolling folds** of 12.7 (`train 1..k, validate k+1` for `k` in `4..9`) keep the month edges: they are the
+patience criterion's and the rule tester's rolling pair (18.2), and a month is the unit a reader can name.
 
 ### 7.8 Manifest, seal and verify (`dataset.v1.json`)
 
@@ -910,8 +1056,27 @@ counts.precap_per_provider_month {provider: [12 ints]}, counts.n_bars_only, coun
 split.n_instruments_train, split.n_instruments_validation, split.n_instruments_sealed
                                                                          amendment C1b, sections 17.2, 17.6,
                                                                          17.9; rulings R149, R168, R170;
-                                                                         `dataset.v1.json` is a contract
-                                                                         issue for gate G2 (section 17.9)
+                                                                         applied by gate G2 (R201)
+purpose: "research" | "showcase",  window_days: int,  resolution_span {min_ms, max_ms}          5.6; rulings R262, R263
+split.method: "count_quantile", split.quantiles_permille [600, 800], split.train_end_date, split.validation_end_date,
+split.cluster_moves [{market_id, from_fold, to_fold, group_id}], split.n_moved                7.7; rulings R247, R248
+news.safety_lag_by_source {source: ms}, news.linker_audit {path, n, precision_permille} | null   5.5, 7.6; rulings R241, R250
+universe {rule: {min_settled, min_volume_cents}, series: [{series, n_settled, n_kept, volume_cents, labels}],
+          n_series_before, n_series_after}                                                 7.4; ruling R258
+taxonomy {version, lexicon_sha256, series_facets_sha256,
+          per_venue {provider: {subject_coverage_permille, structure_coverage_permille, n_distinct_subjects,
+                     n_other_subject, n_other_structure, n_platform_meta, n_cohorts, n_cohorts_usable,
+                     label: "ok" | "weak"}},
+          cohort_size_histogram {"1", "2-4", "5-9", "10-29", "30+"}, audit {path, n, precision_permille} | null}
+                                                                         7.14; rulings R265, R267, R268
+cohorts [Cohort.to_dict() ...]  (every field of 18.5's Cohort but market_ids, sorted by cohort_id)   18.5; ruling R266
+build {status: "ok" | "failed", targets {kalshi_cohorts, manifold_cohorts, kalshi_markets, manifold_markets},
+       reachable {provider: n}, shortfall {provider: {filter: n}}, fallbacks [{step, from, to, reason}]}
+                                                                         7.4; rulings R260, R271
+                                                                         every block of this group is optional in
+                                                                         `dataset.v1.json` (a manifest written before
+                                                                         amendment C1c has none) and written by every
+                                                                         build from DS1 on
 ```
 
 The last two blocks are absent from a dataset built with no cluster matcher and no impact calibration, and
@@ -925,9 +1090,13 @@ hourly headline claim is a **second dataset** built with `interval_min = 60`, wi
 folds and its own claims.
 
 `pmx data seal` (D1's `seal_dataset(path)`): refuses any `reconstructed` market (`SealError`), recomputes
-`files` and `dataset_hash` over `markets/`, `news/`, `wiki_asof/`, `clusters/`, `instruments/` and
-`calendars/` (the last two are amendment C1b's, ruling R149, applied to the loader by gate G2; an absent
-directory adds no line, so no hash of 2026-09-08 moves), writes `sealed: true`. `pmx data verify` (`verify_dataset(path)`): recomputes
+`files` and `dataset_hash` over `markets/`, `news/`, `wiki_asof/`, `clusters/`, `instruments/`,
+`calendars/` and `taxonomy/` (the middle two are amendment C1b's, ruling R149, applied to the loader by gate
+G2; `taxonomy/` is amendment C1c's, ruling R267; an absent directory adds no line, so no hash of
+2026-09-09 moves), writes `sealed: true`. `pmx data verify` also checks, on a manifest that carries
+`split.cluster_moves`, that no cluster or `event_key` group spans two folds (`FoldIntegrityError`, ruling
+R248), and on one that carries `cohorts`, that every cohort row matches the folds and facets it
+recomputes (ruling R266). `pmx data verify` (`verify_dataset(path)`): recomputes
 and raises `DatasetHashMismatchError` on any difference; `run_backtest` calls it before reading a single
 market and refuses to start on failure. The demo pack carries `sealed: false` and a valid hash so it is
 reproducible without being claimable.
@@ -968,6 +1137,18 @@ The poisoned-future test (E1) injects one of each (including a memory record sta
 of each cluster-derived name, a `CashEvent` whose application bar has not completed, a `delisted_at_ms` and
 a `last_bar` value) and asserts by content match that none surfaces, and that a `CashEvent` applied before
 `now_ms` does.
+
+Amendment C1c adds to the list and says what is **not** on it (section 18, rulings R230, R239, R265, R266).
+Added: a `HypothesisFamily`, a rule's test record, an `Insight` before its `visible_from_ms` (which is the
+first bar after the last bar its promotion read, 18.2), a rule's live record beyond `now_ms`, and every
+`SensorBlock` value of a bar that has not completed. Not on it, deliberately: a market's `subject`,
+`structure`, `horizon`, `provider_labels` and `cohort_id` (7.14, 18.5), because they are computed from
+`question`, `provider_id`, the sealed series map and the published life (`close_at_ms - created_at_ms`)
+and never from `resolved_at_ms`, a bar or a resolution, so they are known before the market's first bar
+and add no leak; and a sensor set, because it can only narrow what the filters above produced. The
+poisoned-future test runs **for every sensor set** (AC-26): E1's test iterates the sets and asserts the
+same content match on each, and S1's per-sensor test injects a future item of each sensor's source and
+asserts the block does not move.
 
 ### 7.10 v1 migration identities (D1, `migrate_v1`)
 
@@ -1084,7 +1265,8 @@ an installed `pmx`. D1 exposes the one resolver, and no package builds a schema 
 SCHEMA_DIR: Path                                          # pmx.data.schema, = Path(__file__).parent.parent / "schemas"
 SCHEMA_FILES = ("market.v2.json", "news.v1.json", "dataset.v1.json", "actions.v2.json", "journal.v2.json")
 # amendment C1 added cluster.v1, opportunity.v1, features.v1, model_card.v1; amendment C1b adds
-# instrument.v1, cash_event.v1, session_calendar.v1, forecast.v1 (section 17; the tuple is D1's, 17.9)
+# instrument.v1, cash_event.v1, session_calendar.v1, forecast.v1 (section 17; the tuple is D1's, 17.9);
+# amendment C1c adds rule.v1, sensor.v1, workflow.v1 (section 18; applied to the tuple by DS1, 18.8)
 def load_schema(name: str) -> dict[str, object]: ...       # cached; raises SchemaError on an unknown name
 def schema_path(name: str) -> Path: ...                    # for --json-schema argv
 ```
@@ -1092,6 +1274,77 @@ def schema_path(name: str) -> Path: ...                    # for --json-schema a
 U4 adds the packaging line that ships them in a wheel
 (`[tool.setuptools.package-data] pmx = ["schemas/*.json", "llm/prompts/*.md"]`); it is a contract issue
 against `pyproject.toml`, not a file any other package edits.
+
+### 7.14 The tag taxonomy and the deterministic tagger (amendment C1c, decisions D-S6, D-S8, D-S9, D-S14)
+
+`tags` was a raw dump of provider labels: 201 distinct values over the 287 markets of `y2026`, the most
+frequent a Kalshi series ticker seen sixteen times, 58 markets whose tag merely repeated their category
+(`docs/REVIEW_2026-09-09_SCALE_TAGS.md`). A field like that cannot group markets for a comparison, and a
+comparison is what the cohort of 18.5 is for. So:
+
+**Three facets and a controlled vocabulary** (ruling R265). `src/pmx/lexicons/tags.v1.json` (DS2) ships
+the vocabulary as `{"version": "tags.v1", "facets": {"subject": {<value>: {"keywords": [..]}},
+"structure": {<value>: {"patterns": [..]}}, "horizon": [..], "builder": [..]}}`; every market carries:
+
+| Facet | Cardinality | Values (the vocabulary starts from what was measured, D-S14, and grows only by a new lexicon version) |
+|---|---|---|
+| `subject` | one or more, **in tagger precedence order** (the first is the primary subject, the cohort key of 18.5), unique, at most 4 | at least `bitcoin`, `gold-silver`, `gas-prices`, `oil`, `cpi-inflation`, `treasury-yields`, `equity-index`, `single-equity`, `precipitation`, `temperature`, `elections-us`, `us-executive`, `armed-conflict`, `ai-models`, `spaceflight`, `net-worth`, `platform-meta`, plus D-S6's `central-bank-rates`, `employment`, `fx-major`, `epidemics`, `storms`, `court-rulings`, and `other` |
+| `structure` | exactly one | `threshold-above` (145 Kalshi markets measured), `threshold-below` (15), `count-over-period` (10), `head-to-head` (9), `range-band` (7), `by-date` (7 Kalshi, 12 Manifold), `multi-outcome-leg`, `recurring-series-leg`, `other` |
+| `horizon` | exactly one, **derived from the market's life and never from provider text**: `life_ms = close_at_ms - created_at_ms` (the venue's published close, public from listing; never `resolved_at_ms`) | `intraday` (`< MS_PER_DAY`), `week` (`< 7 d`), `month` (`< 31 d`), `quarter` (`< 183 d`), `year-plus` (the rest); the boundaries are defaults the first tagged build reports against |
+| `builder` (a label, not a facet a market must carry) | zero or more | `forecastable_from_public_models` (weather series, D-R13) |
+
+`tags` **stays**, as the sorted unique union of the market's facet values and builder labels (so
+`Memory.prior(tag=...)`, `PerMarket.tags`, `per_tag` of a claim and every consumer of `tags` keep working
+on values that mean something), and the builder refuses a `tags` value outside the vocabulary
+(`SchemaError`). The raw provider strings move, verbatim, to **`provider_labels`** (same pattern as
+`tags`, `<= 16`, sorted, unique): never a cohort key, never displayed as a tag, kept so a reviewer can see
+what the provider said. `market.v2.json` carries `provider_labels`, `subject`, `structure` and `horizon`
+as **optional** fields so that a file written before the taxonomy still loads; the loader requires all four
+on every market of a dataset whose manifest carries the `taxonomy` block below, and refuses a facet value
+outside the vocabulary that block names. `market_listed` (9.2) carries the four beside `tags`.
+
+**The tagger is deterministic and auditable, never a model call** (ruling R267; `pmx.data.taxonomy`, DS2):
+
+```python
+def tag_market(market: Market, *, lexicon: TagLexicon, series_facets: Mapping[str, SeriesFacets]) -> Facets: ...
+    # Facets(subject: tuple[str, ...], structure: str, horizon: str, labels: tuple[str, ...], source: str)
+```
+
+in this order and no other: (1) the sealed provider mapping `src/pmx/lexicons/kalshi_series_facets.v1.json`
+(DS2), a series ticker (the part of a Kalshi ticker before the first dash, the key of ruling R170's map)
+to its subjects and its structure, which wins outright when the series is present (`source =
+"series"`); (2) the keyword rules of the vocabulary over the lowercase alphabetic tokens of `question`
+(the stop list of 7.6 applied), each subject's `keywords` matched as whole tokens and the subjects
+ordered by the vocabulary's order, then the `structure` decided by the **first** of the vocabulary's
+ordered regular expressions that matches the question (`source = "keywords"`); (3) `other` for a facet
+nothing decided, counted in the manifest (`source = "other"`). `horizon` is always derived. No network, no
+randomness, no wall clock; the two lexicon files are **copied into the dataset** at
+`data/datasets/<name>/taxonomy/tags.v1.json` and `taxonomy/kalshi_series_facets.v1.json`, inside the walk
+of 4.3 and therefore inside `dataset_hash`, so a tag that moved between two rebuilds moves the hash and
+not a claim. Byte-identical across two runs is a DS2 test. A self-referential Manifold market ("Will this
+market be above 50 percent when it closes?") is `subject = ("platform-meta",)` by keyword rule, and the
+provider's `nonpredictive` label is reconciled into the same subject (measured: 7 self-referential, 8
+`nonpredictive`, not the same set, D-S14), so `platform-meta` is one audited subject and never a silent
+`other`; a `platform-meta` market belongs to no cohort (18.5).
+
+**Coverage is measured and labelled** (rulings R268 and R273). The manifest's `taxonomy` block (7.8)
+records, **per venue** and per facet, the share of markets carrying a value other than `other`
+(`coverage_permille`), the number of distinct values, the `other` and `platform-meta` counts, the
+cohort size histogram (`1`, `2-4`, `5-9`, `10-29`, `30+`), the number of cohorts and of usable cohorts,
+and a label per venue: `taxonomy: "weak"` for a venue whose `subject` coverage is below
+`TAXONOMY_COVERAGE_MIN_PERMILLE = 900` (ninety percent, D-S14: a single 95 percent bar is unreachable on
+Manifold by construction, whose `other` bucket is expected to be large and is reported rather than hidden)
+or whose usable cohorts are fewer than `TAXONOMY_MIN_USABLE_COHORTS = 10`, `"ok"` otherwise. Every
+leaderboard row and every chart grouping by a facet or a cohort carries the venue's label in
+`LeaderboardRow.labels` (12.10), exactly as `news_links: "weak"` is carried (7.6). **A manual audit of
+`TAXONOMY_AUDIT_N = 50` random taggings** per build, drawn with `sample_without_replacement` from the
+`dataset.subsample` substream, is stored as `data/datasets/<name>/audit/taxonomy_<dataset_hash[:16]>.json`
+(outside the walk, keyed by `dataset_hash`, like `contamination.json`) with the reviewer's verdicts
+(`correct | wrong | unsure` per facet) and the manifest's `taxonomy.audit {path, n, precision_permille}`
+reports the precision; gate G3 performs the review. A tag cannot leak (18.5): it is computed from
+`question`, `provider_id`, the series map and the published life, and the tagger reads none of 7.9's fields,
+which `tests/test_taxonomy.py` asserts by handing it a market whose `resolution`, `resolved_at_ms`,
+`final_price_bp` and bars are poisoned and checking the facets do not move.
 
 ---
 
@@ -1132,6 +1385,9 @@ class RunConfig:
     liquidity_params_hash: str = ""            # sha256(canonical_json(params)) of that model, "" when none
     horizons_bars: tuple[int, ...] = ()        # amendment C1b, 17.5: () means default_horizons_bars(interval_min)
     kinds: tuple[str, ...] = ()                # amendment C1b, 17.2: the kinds the run carries, () meaning every kind
+    sensor_catalogue_hash: str = ""            # amendment C1c, 18.1, ruling R231: CATALOGUE_HASH of the sensor catalogue
+                                               # the run must read; "" means the shipped one; a non-empty value that
+                                               # differs from it is InvalidConfigError (the liquidity_params_hash pattern)
     def to_dict(self) -> dict[str, object]: ...
         # every value is an int, a bool, a str, None, or a list of [str, int] pairs; canonical_json accepts it
 ```
@@ -1190,8 +1446,8 @@ For every bar `t` of the calendar, in this order, with this purity:
 | # | Phase | What happens | Pure? | Events |
 |---|---|---|---|---|
 | 1 | `open` | list newly listed markets; compute the open, tradable, settling and closing sets; record each market's metadata once and each open market's bar prices; expire limit orders whose `expires_at_ms <= t` or whose market is no longer tradable | yes | `bar_opened`, `market_listed`, `market_priced`, `order_expired` |
-| 2 | `observe` | build one `Observation` per non-ruined agent with the as-of filter (section 5.4); grant research requested at `t - interval` | yes | `observation_built` |
-| 3 | `decide` | scripted agents: `observe(obs)` then `decide()`; LLM agents: one gateway call per agent covering every open market, reply handed to the agent, then `decide()`; validate every `Actions`; record a forecast for every open market (carried when missing); write LLM lessons to memory; hand every order-producing action to `Execution.place` (section 8.6), which **queues** it for the next bar and reserves nothing | **impure for LLM agents only** (the gateway) | `reply_received`, `action_received`, `action_rejected`, `forecast_recorded`, `research_spent`, `memory_written` (lessons) |
+| 2 | `observe` | build one `Observation` per non-ruined agent with the as-of filter (section 5.4) **narrowed to the agent's sensor set** (`build_observation(..., sensors=genome.sensors)`, section 18.1, ruling R230; the sensor blocks of 18.1 are computed here from the same views); grant research requested at `t - interval` | yes | `observation_built` (carrying `sensors`, ruling R231) |
+| 3 | `decide` | scripted agents: `observe(obs)` then `decide()` (a workflow genome runs its steps in topological order, section 18.4); LLM agents: one gateway call per agent covering every open market, reply handed to the agent, then `decide()`; validate every `Actions` (a `propose_rule` included, section 8.4); record a forecast for every open market (carried when missing); write LLM lessons to memory; hand every order-producing action to `Execution.place` (section 8.6), which **queues** it for the next bar and reserves nothing | **impure for LLM agents only** (the gateway) | `reply_received`, `action_received`, `action_rejected`, `forecast_recorded`, `research_spent`, `memory_written` (lessons), `rule_proposed`, `workflow_step_executed` (amendment C1c, section 18) |
 | 4 | `execute` | drain the queue `place` accepted at the instrument's previous bar (`t - interval_ms` on a `continuous` calendar, Friday's last bar on a Monday, section 17.2, ruling R192), agents in `agent_id` order, intents in submission order: place orders, fill market orders at bar `t`'s open through the run's `LiquidityModel` (section 16.1), try resting limit orders against bar `t`'s range, charge fees, reserve and release cash | yes | `order_placed`, `order_rejected`, `filled`, `fee_charged` |
 | 5 | `settle` | for each market with `settles(m, t)`, in market order: `Execution.settle` pays every position and cancels every resting order on it and returns the per-agent cash deltas; the runner, which holds the forecast history and `pmx.scoring`, emits the two scored events. Then, for each continuous instrument in canonical order (amendment C1b, section 17.3): `Execution.apply_cash_events` applies the cash events whose application bar is `t` (section 17.3, ruling R175) and, at `last_bar(i)`, `Execution.force_flat` closes every position at the bar's close; the runner emits `forecast_resolved` for every horizon that resolves at `t` and `instrument_closed` at `last_bar(i)` | yes | `settled`, `settlement_applied` (both from the runner), `order_expired` (reason `settled`, from execution); `cash_event_applied`, event-fill `order_placed`, `filled`, `fee_charged`, `order_expired` (reasons `corporate_action`, `roll`, `delisted`, from execution); `forecast_resolved`, `instrument_closed` (from the runner) |
 | 6 | `learn` | for each settled market and each agent that forecast or held it, in agent order: `agent.learn(ResolutionEvent)`; memory writes journaled | yes | `memory_written` |
@@ -1244,6 +1500,11 @@ class Observation:
     hive: HiveView                         # empty when no_hive
     research: ResearchView
     limits: Limits
+    sensors: tuple[str, ...] = ()          # amendment C1c, 18.1, ruling R231: the RESOLVED sensor set, sorted; the full
+                                           # SENSOR_NAMES when the genome bought everything, so a catalogue change is
+                                           # visible on the face of every observation; () only on a view built before
+                                           # the field existed. A field a sensor set did not buy is ABSENT from this
+                                           # object and from to_dict(), never zeroed (ruling R230)
     def to_dict(self) -> dict[str, object]: ...     # canonical-json-able, no float
 
 @dataclass(frozen=True, slots=True)
@@ -1329,6 +1590,18 @@ class HiveView:
     resolutions: tuple[ResolutionView, ...]          # (market_id, outcome, life_mean_price_bp, resolved_at_ms), last 200
     forecasts: tuple[ForecastView, ...]              # (agent_id, market_id, bar_ms, prob_ppm) of SETTLED markets only, <= hive_forecasts
     prev_bar_forecasts: tuple[ForecastView, ...]     # forecasts of other agents at the instrument's previous bar (R211); EMPTY unless live_coop
+    insights: tuple[InsightView, ...] = ()           # amendment C1c, 18.2, ruling R239: the promoted, undemoted rules
+                                                     # whose condition FIRES at now_ms on one of the agent's open markets,
+                                                     # <= limits.hive_insights, ranked (-lower_bp, rule_id); gated by the
+                                                     # hive_insights sensor; reputations by hive_reputation (ruling R233)
+
+@dataclass(frozen=True, slots=True)
+class InsightView:                                   # amendment C1c, 18.2: one firing insight on one market
+    rule_id: str; market_id: str
+    claim_kind: str; direction: int                  # RuleClaim.kind and .direction (18.2)
+    lift_bp: int; lower_bp: int; upper_bp: int       # the replicate-fold interval of the rule's effect, in bp
+    live_support: int; live_lower_bp: int            # the live record so far (rows after fit_t1_ms)
+    author_id: str; author_skill_micro: int          # the author's reputation in the rule's dominant category as of now_ms
 
 @dataclass(frozen=True, slots=True)
 class ResearchView:
@@ -1340,6 +1613,7 @@ class Limits:
     bars_window: int; news_per_market: int; news_global: int; hive_lessons: int; hive_forecasts: int
     markets_per_obs_max: int
     notes_max_chars: int; lessons_per_bar_max: int; lesson_max_chars: int; research_units_total: int
+    hive_insights: int = 50                          # HIVE_INSIGHTS_VIEW_MAX (18.2, ruling R239)
 ```
 
 `prev_bar_forecasts` is named for what it is. The earlier spelling (`live_forecasts`, "same-bar forecasts")
@@ -1421,9 +1695,17 @@ def build_observation(*, agent_id: str, now_ms: int, config: RunConfig, markets:
                       positions: Mapping[str, PositionView], portfolio: PortfolioView,
                       memory: Memory | None, hive: Hive | None, news: Sequence[NewsItem],
                       grants: Sequence[ResearchGrant],
-                      calendar: Calendar | None = None) -> Observation: ...
+                      calendar: Calendar | None = None,
+                      sensors: Iterable[str] | None = None) -> Observation: ...
     # calendar is keyword-only like the rest and a run carrying a continuous kind passes it (ruling R208):
     # tradable = open(i, t), hours_to_next_bar and cash_events are lookups only the calendar can answer
+    # sensors is the agent's sensor set (amendment C1c, 18.1, ruling R230): None means every sensor and is
+    # byte-identical to the builder without the keyword; a set is applied by SUBTRACTION over what the as-of
+    # filters produced, so it can only narrow; an unbought field is absent from the view and from to_dict()
+    # and reading it raises SensorAbsentError (13.1); an unknown name is InvalidConfigError. The runner passes
+    # genome.sensors. resolve_sensor_set, unsensed_view_fields, SENSOR_VIEW_FIELDS (E1) are the hook's names;
+    # the catalogue's reach per sensor is 18.1's table, which SENSOR_VIEW_FIELDS reads from pmx.sensors.catalogue
+    # once S1 lands it (the seven rows E1 shipped are the catalogue's rows for the data a dataset carries today)
 def render_observation_json(obs: Observation) -> str: ...        # canonical_json, for observations/ dumps
 ```
 
@@ -1460,6 +1742,14 @@ class Actions:
     lessons: tuple[Lesson, ...]            # <= LESSONS_PER_BAR_MAX; scripted agents send ()
     rationale: str | None                  # LLM only; goes to llm_trace.jsonl, never to the journal
     horizon_forecasts: tuple[HorizonForecast, ...] = ()   # amendment C1b, 17.5: continuous instruments only
+    propose_rule: RuleProposal | None = None    # amendment C1c, 18.2, ruling R237: at most one per agent per bar
+
+@dataclass(frozen=True, slots=True)
+class RuleProposal:                        # amendment C1c, 18.2: a Rule minus what the engine stamps
+    scope: RuleScope; condition: tuple[Predicate, ...]; claim: RuleClaim; horizon_bars: int; min_support: int
+    # The runner builds Rule(author_kind="agent", author_id=agent_id, born_at_ms=now_ms, family_id=None, ...)
+    # through rule_from_dict, journals it as rule_proposed (9.2) and refuses a bad one as
+    # action_rejected(scope="rule", reason="bad_rule"); actions.v2.json carries it as an optional property.
 ```
 
 `horizon_forecasts` (ruling R157) carries one `HorizonForecast(market_id, horizon_bars,
@@ -1492,14 +1782,22 @@ Semantics:
   tradable market the forecast is recorded and any order is `order_rejected(not_tradable)`.
 - A `ResearchRequest` costs `RESEARCH_UNIT_COST[kind]` units (section 8.1) and is granted at the **next**
   bar; a request that would exceed the agent's remaining budget is `research_spent(granted=false)` and
-  costs nothing.
+  costs nothing. A request of a kind whose sensor is not in the agent's diet (`history` needs
+  `microstructure`, `news` needs `wiki_daily`, `wiki_asof` needs `wiki_asof`; section 18.1, ruling R233) is
+  `action_rejected(bad_research)` and costs nothing: the sensor gates whether the request may be made, the
+  research budget prices the grant.
+- A `propose_rule` (amendment C1c, section 18.2) is validated by `rule_from_dict`; a second one in a bar,
+  a predicate outside the vocabulary or a malformed claim is `action_rejected(scope="rule",
+  reason="bad_rule")`, a valid one is journaled `rule_proposed` and costs one sensor unit of that bar's diet
+  cost (18.1). It produces no order and no forecast.
 
 Validation reasons (`pmx.types.RejectReason`, a `StrEnum`): `unknown_market`, `duplicate`, `bad_prob`,
 `bad_kind`, `missing_field`, `bad_price`, `bad_size`, `bad_ttl`, `notes_too_long`, `too_many_lessons`,
 `lesson_too_long`, `bad_research`, `schema_invalid`, `not_tradable`, `insufficient_cash`, `zero_size`,
-`ruined`, `budget_exceeded`, `agent_timeout`, `provider_error`, `malformed_response`, and amendment C1b's
+`ruined`, `budget_exceeded`, `agent_timeout`, `provider_error`, `malformed_response`, amendment C1b's
 `bad_horizon` (a horizon outside `config.horizons_bars`) and `bad_quantiles` (a non-monotone or
-wrong-length quantile tuple). The notional cap of 17.1 is checked by `Execution` at the execute phase,
+wrong-length quantile tuple), and amendment C1c's `bad_rule` (a `propose_rule` that `rule_from_dict`
+refuses, section 18.2). `action_rejected.scope` gains `rule`. The notional cap of 17.1 is checked by `Execution` at the execute phase,
 where the price is known, and refused as `order_rejected(bad_size)` there and nowhere else (ruling R196). A
 structurally
 invalid payload (schema failure) becomes a single `action_rejected(scope="actions", schema_invalid)`
@@ -1653,10 +1951,15 @@ class Execution:
                  calendars: Mapping[str, SessionCalendar] | None = None,
                  carry_schedules: Mapping[str, CarrySchedule] | None = None) -> None: ...
         # `carry_schedules` (ruling R213): the carry rows by id, CARRY_SCHEDULES of 17.4 by default, which is
-        # empty until F2 lands a dataset that declares a rate-differential row. OWED (ruling R213): keyword-only
-        # t0_ms: int and t1_ms: int, the run's resolved window, so that at the run's last bar execute_bar drains
-        # every queued item whose instrument has no later bar as order_rejected(not_tradable) (17.2); today
-        # such an item is dropped and E5's test pins the drop; E2 and E5 apply it in the next lot.
+        # empty until F2 lands a dataset that declares a rate-differential row. DECLARED, NOT YET IN CODE
+        # (rulings R213 and R274): keyword-only t0_ms: int and t1_ms: int, the run's resolved window, which
+        # run_backtest computes and passes, so that at the run's last bar execute_bar drains every queued item
+        # whose instrument has no later bar as order_rejected(not_tradable) with its decided_at_ms (17.2, 16.2);
+        # today such an item is dropped (5 of 1 627 on the demo pack) and
+        # tests/test_runner.py::test_every_queued_item_produces_exactly_one_execute_phase_event pins `dropped > 0`.
+        # The first engine lot after amendment C1c applies it with R214, R217 and R221 in one commit, reads
+        # `dropped == 0` in that test, regenerates the contract fixture and the pinned hashes, and bumps
+        # ENGINE_VERSION and CONTRACT_VERSION (13.2).
         # `calendars` is amendment C1b's (ruling R174): the sealed session calendars by id, which the
         # per-instrument queue of 17.2, borrow_fee and carry (one event per session, days since the previous
         # session close) read. None means the synthesised `continuous` calendar for every instrument, which
@@ -1893,16 +2196,18 @@ canonical-json-able mappings whose keys are listed.
 
 | Event | Phase | Per | Payload |
 |---|---|---|---|
-| `run_started` | pre | run | `seed: int`, `engine_version: str`, `contract_version: str`, `rng_algorithm_version: str`, `dataset_name: str`, `dataset_hash: str`, `interval_min: int`, `t0_ms: int`, `t1_ms: int`, `market_ids: list[str]`, `config: object` (`RunConfig.to_dict()`), `config_hash: str`, `folds: object` (`{train_end_ms, validation_end_ms}`), `memory_from_run_id: str|null`, `memory_hash: str|null`, `memory_from_run_t1_ms: int|null`, `contamination_hash: str|null`, `roster: list[object]` each `{agent_id, family, kind: "scripted"|"llm", genome_hash, genome: object, model: str|null, knowledge_cutoff_ms: int|null}` |
+| `run_started` | pre | run | `seed: int`, `engine_version: str`, `contract_version: str`, `rng_algorithm_version: str`, `dataset_name: str`, `dataset_hash: str`, `interval_min: int`, `t0_ms: int`, `t1_ms: int`, `market_ids: list[str]`, `config: object` (`RunConfig.to_dict()`), `config_hash: str`, `folds: object` (`{train_end_ms, validation_end_ms}`), `memory_from_run_id: str|null`, `memory_hash: str|null`, `memory_from_run_t1_ms: int|null`, `contamination_hash: str|null`, `roster: list[object]` each `{agent_id, family, kind: "scripted"|"llm", genome_hash, genome: object, model: str|null, knowledge_cutoff_ms: int|null}`; amendment C1c adds `sensor_catalogue_hash: str` (18.1, ruling R231; declared, optional in the schema until ruling R274's lot) |
 | `sealed_test_opened` | pre | claim | `claim_id: str`, `dataset_hash: str`, `genome_hash: str`, `provider: str`, `n_markets: int`, `market_ids: list[str]`; emitted by `open_sealed_test` into the claim's journal, so a read of the sealed fold cannot exist without a record of it (section 12.7) |
-| `market_listed` | open | market, once per run, at the first bar where `open(m, t)` holds | `market_id`, `provider: str`, `category: str`, `tags: list[str]`, `event_key: str|null`, `created_at_ms: int`, `close_at_ms: int`, `interval_min: int`, `fee_schedule_id: str`, `hardness_tags: list[str]`, `fold: str`; amendment C1b adds `kind: str`, `vendor: str`, `symbol: str`, `tick_size_micro: int`, `point_value_micro: int`, `session_calendar_id: str`, `borrow_schedule_id: str|null`, `carry_schedule_id: str|null`, declared and not yet required (ruling R164; the projection reads `binary`, the provider, `100`, `1_000_000`, `"continuous"`, `null`, `null` when absent); on a continuous instrument `close_at_ms` is `delisted_at_ms` or `0` when unset |
+| `market_listed` | open | market, once per run, at the first bar where `open(m, t)` holds | `market_id`, `provider: str`, `category: str`, `tags: list[str]`, `event_key: str|null`, `created_at_ms: int`, `close_at_ms: int`, `interval_min: int`, `fee_schedule_id: str`, `hardness_tags: list[str]`, `fold: str`; amendment C1b adds `kind: str`, `vendor: str`, `symbol: str`, `tick_size_micro: int`, `point_value_micro: int`, `session_calendar_id: str`, `borrow_schedule_id: str|null`, `carry_schedule_id: str|null`, required since gate G2 (rulings R164 and R202); on a continuous instrument `close_at_ms` is `delisted_at_ms` or `0` when unset; amendment C1c adds `provider_labels: list[str]`, `subject: list[str]`, `structure: str`, `horizon: str` (7.14, ruling R265; declared, optional in the schema until ruling R274's lot, the projection reading `[]`, `[]`, `""`, `""` when absent) |
 | `market_priced` | open | (bar, open market) | `market_id`, `close_bp: int` (the close of bar `t` itself, the `mark_price_bp` of section 8.7), `last_close_bp: int` (the close of the last completed bar at `t`, else `first_price_bp`: the market's own forecast on this bar), `vwap_bp: int`, `volume_milli: int` |
 | `bar_opened` | open | bar | `open_market_ids: list[str]`, `tradable_market_ids: list[str]`, `settling_market_ids: list[str]`, `listed_market_ids: list[str]` (newly listed this bar) |
 | `order_expired` | open, settle, close | order | `order_id`, `agent_id`, `market_id`, `remaining_size: int`, `released_cents: int`, `reason: "ttl"|"not_tradable"|"settled"|"ruined"|"corporate_action"|"roll"|"delisted"|"debit"` (the last four are amendment C1b's, section 17.3; `debit` is ruling R179's: a cash-event debit took the agent's cash below zero and every resting order of the agent is expired) |
-| `observation_built` | observe | agent | `agent_id`, `n_markets: int`, `n_news: int`, `n_hive: int`, `n_bars_max: int`, `research_remaining: int`, `bytes: int`, `obs_sha256: str` |
+| `observation_built` | observe | agent | `agent_id`, `n_markets: int`, `n_news: int`, `n_hive: int`, `n_bars_max: int`, `research_remaining: int`, `bytes: int`, `obs_sha256: str`; amendment C1c adds `sensors: list[str]` (the resolved sensor set of `Observation.sensors`, 18.1, ruling R231; declared, optional in the schema until ruling R274's lot) |
 | `reply_received` | decide | LLM agent | `agent_id`, `source: "llm"|"fallback"`, `error: str|null` (a `RejectReason`), `schema_valid: bool`, `n_lessons: int` |
 | `action_received` | decide | agent | `agent_id`, `source: "scripted"|"llm"|"fallback"`, `intents: list[object]` (validated `MarketAction`s as dicts, sorted by `market_id`), `research: object|null`, `notes: str`, `n_lessons: int`, `n_rejected: int` |
-| `action_rejected` | decide | rejected item | `agent_id`, `market_id: str|null`, `scope: "market"|"research"|"notes"|"lessons"|"actions"`, `item_index: int`, `reason: str`, `detail: str` |
+| `action_rejected` | decide | rejected item | `agent_id`, `market_id: str|null`, `scope: "market"|"research"|"notes"|"lessons"|"actions"|"rule"` (`rule` is amendment C1c's, 8.4), `item_index: int`, `reason: str`, `detail: str` |
+| `rule_proposed` (declared, R274) | decide | valid `propose_rule` of an agent | `agent_id`, `rule_id: str`, `rule: object` (`Rule.to_dict()`, 18.2), `diet_cost_units: int` (the bar's diet cost including the proposal's unit); amendment C1c, ruling R237: declared under `$defs` of `journal.v2.json` and admitted to `oneOf` by ruling R274's lot with its `pmx.journal` dataclass (the discipline of R164) |
+| `workflow_step_executed` (declared, R274) | decide | (agent with `Genome.workflow` not `None`, step) | `agent_id`, `step_index: int`, `kind: str` (one of `STEP_KINDS`), `ref: str|null`, `n_inputs: int`, `n_out: int`, `output_sha256: str` (18.4, ruling R243; digest only, so the payload is bounded by construction; never emitted for a linear genome). Declared and admitted as the row above |
 | `forecast_recorded` | decide | (agent, open market) | `agent_id`, `market_id`, `prob_ppm: int`, `carried: bool`; on a continuous instrument also `price_ref_ticks: int` and `horizons: list[object]` each `{horizon_bars, up_probability_ppm, quantiles_ticks: list[int]|null}` (amendment C1b, section 17.5, ruling R157; absent on a binary) |
 | `research_spent` | decide | request | `agent_id`, `kind: str`, `market_id: str|null`, `units: int`, `remaining: int`, `granted: bool` |
 | `memory_written` | decide (LLM lessons), learn | write | `agent_id`, `kind: "calibration"|"prior"|"feature"|"lesson"|"note"`, `key: str`, `payload: object`, `bytes_after: int` |
@@ -1912,7 +2217,7 @@ canonical-json-able mappings whose keys are listed.
 | `fee_charged` | execute | fill | `order_id`, `agent_id`, `market_id`, `fee_cents: int`, `schedule_id: str`, `role: "taker"|"maker"` |
 | `settled` | settle | market | `market_id`, `outcome: int`, `payout_bp: int`, `resolved_at_ms: int`, `n_bars: int`, `market_brier_tw_micro: int`, `life_mean_price_bp: int` (section 8.7 defines the last two) |
 | `settlement_applied` | settle | (agent, market) with a position or a forecast | `agent_id`, `market_id`, `position: int`, `cash_delta_cents: int`, `cash_after_cents: int`, `realised_pnl_cents: int` (fills + settlement - fees on this market), `agent_brier_tw_micro: int`, `n_forecast_bars: int` |
-| `hive_written` | hive | entry | `entry_id`, `kind: "forecast"|"resolution"|"lesson"|"reputation"`, `author_id: str` (`"engine"` for resolution and reputation), `market_id: str|null`, `visible_from_ms: int`, `payload: object` |
+| `hive_written` | hive | entry | `entry_id`, `kind: "forecast"|"resolution"|"lesson"|"reputation"|"insight"` (`insight` is amendment C1c's, 18.2, ruling R239: written by the optimizer at generation close and by L1 daily into the hive snapshot, never by an agent), `author_id: str` (`"engine"` for resolution and reputation; the rule's author for an insight), `market_id: str|null`, `visible_from_ms: int`, `payload: object` |
 | `equity_marked` | close | agent | `agent_id`, `cash_cents` (signed since ruling R179: a debit cash event may leave a debit balance), `reserved_cents`, `positions_value_cents` (signed since amendment C1b: a short on a continuous instrument is a liability, ruling R154), `equity_cents` (signed, rulings R154 and R180), `fees_paid_cents`, `peak_equity_cents`, `drawdown_bp` (`<= 0`, below `-10_000` when equity is negative, ruling R180), `n_open_positions: int`, `n_open_orders: int` |
 | `agent_ruined` | close | ruined agent | `agent_id`, `equity_cents: int` (signed, ruling R180), `cancelled_order_ids: list[str]` |
 | `bar_closed` | close | bar | `n_events: int` (events of this bar including itself) |
@@ -1977,7 +2282,8 @@ hashes. A pair of runs whose non-`run_started` events are identical **fails** th
 
 | Event | The one module that emits it |
 |---|---|
-| `run_started`, `bar_opened`, `market_listed`, `market_priced`, `observation_built`, `reply_received`, `action_received`, `action_rejected`, `forecast_recorded`, `research_spent`, `settled`, `settlement_applied`, `bar_closed`, `run_ended`, `agent_ruined`, `equity_marked` | `engine/runner.py` (E5) |
+| `run_started`, `bar_opened`, `market_listed`, `market_priced`, `observation_built`, `reply_received`, `action_received`, `action_rejected`, `forecast_recorded`, `research_spent`, `settled`, `settlement_applied`, `bar_closed`, `run_ended`, `agent_ruined`, `equity_marked`, and amendment C1c's `rule_proposed` and `workflow_step_executed` (section 18) | `engine/runner.py` (E5) |
+| `family_registered`, `rule_tested`, `rule_promoted`, `rule_demoted` (amendment C1c, 9.4) | `rules/tester.py` (S2), into the evolution journal `optimizer/evolution.py` hands it, or into the standalone ledger of 18.2 |
 | `order_placed`, `order_rejected`, `filled`, `fee_charged`, `order_expired` | `engine/execution.py` (E2), through the `Journal` the runner hands it |
 | `cash_event_applied` | `engine/execution.py` (E2), inside `apply_cash_events` and `force_flat` (section 17.3) |
 | `forecast_resolved` | `engine/runner.py` (E5), which holds the forecast history and the price lookups of section 17.5 |
@@ -2011,12 +2317,29 @@ run ids it produced, which differ between the training and the validation fold b
 |---|---|
 | `evolution_started` | `seed`, `engine_version`, `contract_version`, `dataset_hash`, `config: object` (`EvolutionConfig.to_dict()`), `config_hash`, `population_size: int`, `max_generations: int`, `folds: object` (`{train_end_ms, validation_end_ms, n_train, n_validation, n_sealed}`), `initial_population: list[object]` (`{agent_id, family, genome_hash, genome}`) |
 | `generation_started` | `generation: int`, `run_seed: int`, `train_run_id: str`, `validation_run_id: str`, `population: list[str]` (agent ids) |
-| `candidate_scored` | `generation`, `agent_id`, `genome_hash`, `fold: "train"|"validation"`, `n_markets: int`, `skill_point_micro`, `skill_lb_micro`, `pnl_point_cents`, `pnl_lb_cents`, `brier_tw_micro`, `ruined: bool`, `research_units_spent: int`, `descriptors: object` (section 12.5) |
-| `generation_closed` | `generation`, `ranked: list[object]` (`{agent_id, genome_hash, skill_lb_micro, pnl_lb_cents, rank}`), `culled: list[str]`, `elites: list[str]`, `children: list[object]` (`{agent_id, genome_hash, genome, op: "mutation"|"crossover"|"structural"|"immigrant"|"prompt_mutation", parents: list[str]}`), `archive: list[object]` (`{cell_key, agent_id, genome_hash, skill_lb_micro}`), `archive_filled: int`, `archive_cells: int`, `hall_of_fame: list[object]` (`{family, genome_hash, genome, skill_lb_micro, run_id}`), `candidates_evaluated_cum: int`, `best_validation_lb_micro: int`, `patience_left: int`, `research_budget_next: object` (`{agent_id: units}`) |
+| `candidate_scored` | `generation`, `agent_id`, `genome_hash`, `fold: "train"|"validation"`, `n_markets: int`, `skill_point_micro`, `skill_lb_micro`, `pnl_point_cents`, `pnl_lb_cents`, `brier_tw_micro`, `ruined: bool`, `research_units_spent: int`, `descriptors: object` (section 12.5, `diet_class` included); amendment C1c adds `tier: "proxy"|"engine"`, `matrix_hash: str|null` and `features_hash: str|null` (the proxy tier's inputs, 12.6, ruling R254; `null` on the engine tier), `diet_cost_units: int`, `sensors: list[str]`, `n_rules_proposed: int` (18.1, ruling R235); the six are declared, optional in the schema until gate G4 lands O2's dataclasses |
+| `family_registered` (declared, gate G4) | `generation`, `family_id: str`, `template: object` (`FamilyTemplate.to_dict()`, 18.2), `n_candidates: int`, `n_screened: int`, `fit_t1_ms: int`, `registered_at_ms: int`; written **before** any `rule_tested(stage="replicate")` of the family (ruling R238) |
+| `rule_tested` (declared, gate G4) | `generation`, `rule_id`, `family_id`, `stage: "fit"|"replicate"|"live"|"transfer"`, `fold: str` (the fold or fold pair read), `target: str|null` (a provider, category or kind on `transfer`), `support: int`, `n_markets: int`, `effect: object` (`Interval.to_dict()`, in bp), `usual_bp: int|null` (volatility claims), `p_value_ppm: int|null`, `fdr_m: int|null`, `fdr_k: int|null`, `fdr_passed: bool|null` (replicate stage only), `passed: bool` |
+| `rule_promoted` (declared, gate G4) | `generation`, `rule_id`, `family_id`, `author_kind`, `author_id`, `fit_t1_ms: int`, `visible_from_ms: int` (`fit_t1_ms + interval_ms`), `entry_id: str` (the hive `insight` entry) |
+| `rule_demoted` (declared, gate G4) | `generation`, `rule_id`, `reason: "live_negative"|"author_reputation"`, `live_support: int`, `live_effect: object`, `demoted_at_ms: int` |
+| `generation_closed` | `generation`, `ranked: list[object]` (`{agent_id, genome_hash, skill_lb_micro, pnl_lb_cents, rank}`), `culled: list[str]`, `elites: list[str]`, `children: list[object]` (`{agent_id, genome_hash, genome, op: "mutation"|"crossover"|"structural"|"immigrant"|"prompt_mutation"|"sensor_drop", parents: list[str]}`; `sensor_drop` is amendment C1c's, 18.1), `archive: list[object]` (`{cell_key, agent_id, genome_hash, skill_lb_micro}`), `archive_filled: int`, `archive_cells: int`, `hall_of_fame: list[object]` (`{family, genome_hash, genome, skill_lb_micro, run_id}`), `candidates_evaluated_cum: int`, `best_validation_lb_micro: int`, `patience_left: int`, `research_budget_next: object` (`{agent_id: units}`); amendment C1c adds `sensor_budget_next: object` (`{agent_id: units}`), `culled_by_budget: list[str]`, `rule_rewards: list[object]` (`{agent_id, rule_id, kind: "promoted"|"rejected"|"demoted", skill_bonus_micro, sensor_units}`), `n_engine_tier: int` and `n_proxy_tier: int` (12.6, rulings R235, R239, R254; declared, optional until gate G4) |
 | `evolution_ended` | `reason: "max_generations"|"patience"|"aborted"`, `generations_run: int`, `candidates_evaluated_cum: int`, `champion: object` (`{agent_id, genome_hash, genome, validation_skill_lb_micro}`) |
 
+A row whose name carries **`(declared, <applier>)`**, here and in 9.2, is declared and not yet in the
+catalogue: its definition is under `$defs` of `journal.v2.json` (applied by this amendment) and outside
+`oneOf`, and the named applier admits it to `oneOf`, to `EVENT_TYPES` and to the catalogue proper in one
+commit with its `pmx.journal` dataclass (the discipline of rulings R129 and R164: D7's tests pin `oneOf` to
+the classes, and `tests/test_contract_schemas.py` pins the catalogue rows to `oneOf`, so the three move
+together or not at all). The four rule events above are gate G4's, with O2's evolution journal; the
+widenings of `candidate_scored` and `generation_closed` are optional in the schema until the same commit.
+
+`hall_of_fame`, `archive` and `champion` only ever name a
+genome scored at the **engine** tier (12.6, ruling R254): a proxy score selects who gets a full replay and
+nothing more.
+
 `candidates_evaluated_cum` counts **distinct genome hashes ever scored on the validation fold** in this
-evolution run; it is one of the three inputs to the `K` of the deflation in section 12.4 and is copied
+evolution run, **at either tier** (a proxy score is a look at the validation fold and deflation counts
+looks, ruling R254); it is one of the three inputs to the `K` of the deflation in section 12.4 and is copied
 into the claim. It is `0` for a generation that scored no candidate on the validation fold (validation
 runs every `k` generations), so both the `generation_closed` and the `evolution_ended` field are
 non-negative, never strictly positive.
@@ -2039,6 +2362,11 @@ runs/<run_id>/
   observations/      optional, --dump-observations: <bar_ms>-<agent_id>.json for the leak audit (E1's renderer, E5 writes)
 claims/<claim_id>.json, claims/access.jsonl                                          (O4)
 live/forecasts.jsonl, live/resolutions.jsonl                                         (L1)
+rules/<dataset_hash[:8]>/families.jsonl, rules/<dataset_hash[:8]>/rules.jsonl        (S2; TRACKED like claims/,
+                     the rule ledger of 18.2: one canonical line per family_registered, rule_proposed,
+                     rule_tested, rule_promoted and rule_demoted, chained by prev_sha256)
+data/datasets/<name>/audit/linker_<hash16>.json, audit/taxonomy_<hash16>.json      (gate G3 fills the verdicts;
+                     DS1 and DS2 write the files; outside the dataset hash, 7.1)
 ```
 
 `memory_snapshots` is `Memory.snapshot()` per agent, `agent_snapshots` is `Agent.snapshot()` per agent
@@ -2081,11 +2409,24 @@ class Genome:
     inner: "Genome | None"                 # composition: this family wraps inner (depth <= COMPOSITION_DEPTH_MAX = 3)
     members: tuple["Genome", ...]          # ensembles only (stacker); () for every other family
     prompt: "PromptGenome | None"          # LLM agents only (section 11.4)
+    card: "ModelCard | None" = None        # torch_policy only (amendment C1, 16.5, ruling R119); always rendered, null otherwise
+    sensors: tuple[str, ...] = SENSOR_NAMES   # amendment C1c, 18.1, ruling R230: the sensor gene, sorted, unique,
+                                           # always containing "tape"; the explicit full tuple for the v1 archetypes
+    workflow: "Workflow | None" = None     # amendment C1c, 18.4, ruling R243: None is the linear composition above
     def to_dict(self) -> dict[str, object]: ...
-        # {"family", "genes": {name: value}, "inner": ..., "members": [...], "prompt": ...}
+        # {"family", "genes": {name: value}, "inner": ..., "members": [...], "prompt": ..., "card": ...,
+        #  "sensors": [...], "workflow": ...}: every key always present, so genome_hash is defined once and for all
     @property
     def genome_hash(self) -> str: ...                  # sha256(canonical_json(self.to_dict()))
 ```
+
+`card`, `sensors` and `workflow` are the three components amendments C1 and C1c added; A1 ships all three
+in lot 6, when no genome hash exists yet and the addition is free (the argument of ruling R119); the
+genomes of `tests/fixtures/contract/journal.evolution.jsonl` are completed with the three keys at their
+defaults by gate G4, the way gate G2 completed the backtest fixture (ruling R202), and `journal.v2.json`'s
+`genome` definition accepts them as optional until then. A genome that omits `tape`, names a sensor outside
+`SENSOR_NAMES`, or lacks a sensor its family, `inner` or a `member` requires (`FamilySpec.required_sensors`
+below) is refused by `genome_from_dict` and by `make_agent` with `InvalidConfigError` (18.1).
 
 `members` exists because the `stacker` of section 10.5 weights "the members it is composed with" and a
 single `inner` cannot represent them: without it the family has no member set, its weighted mean divides
@@ -2098,8 +2439,12 @@ Gene values are integers; mutation adds `round_half_up(step * z)` with `z ~ norm
 `EvolutionConfig` field, section 12.11) draws uniformly in the range instead. Crossover is uniform per
 gene between two genomes of the same family (and recurses into `inner`, and pairwise into `members`, when
 both have them). Structural mutation swaps `family` for another of the same role (belief, overlay), or
-wraps the genome in an overlay, within the depth cap. Every operation is a pure function of
-`(genome(s), rng, config)`.
+wraps the genome in an overlay, within the depth cap; on a genome with an explicit `workflow` it adds,
+removes or rewires a step within 18.4's bounds and returns the parent unchanged when the result breaches
+one (ruling R243). Sensor mutation adds or removes one sensor of the catalogue with probability
+`sensor_mutation_permille` (never `tape`, never a required one); sensor crossover is uniform per sensor
+name; the **sensor drop** of 18.1 is the optimizer's deterministic narrowing of a child that exceeds its
+allowance (`op = "sensor_drop"`). Every operation is a pure function of `(genome(s), rng, config)`.
 
 The registry is data, so O2 can drive it blind (A1 owns all of it):
 
@@ -2111,6 +2456,9 @@ class FamilySpec:
     genes: tuple[GeneSpec, ...]                  # sorted by name
     evolvable: bool                              # False for `legacy`: never a mutation or crossover target
     make: Callable[[str, Genome], Agent]         # (agent_id, genome) -> a live agent
+    required_sensors: frozenset[str] = frozenset()   # amendment C1c, 18.1: the sensors the family's rule reads;
+                                                 # no operator produces, and no constructor accepts, a genome whose
+                                                 # sensors omit one of its family's, its inner's or a member's
 
 FAMILIES: Mapping[str, FamilySpec]               # keys sorted, section 10.5's table exactly
 DEFAULT_ROSTER: tuple[tuple[str, Genome], ...]   # (agent_id, genome), the eight v1 names of section 10.5
@@ -2164,6 +2512,7 @@ class Agent(Protocol):
 class ResolutionEvent:
     market_id: str; category: str; tags: tuple[str, ...]; provider: str
     outcome: int; resolved_at_ms: int; close_at_ms: int; created_at_ms: int
+    cohort_id: str | None = None                  # amendment C1c, 18.5: the market's cohort, None when it has none
     forecasts: tuple[tuple[int, int], ...]        # (bar_ms, prob_ppm) the agent stated, oldest first
     market_prices: tuple[tuple[int, int], ...]    # (bar_ms, close_bp) on the same bars
     realised_pnl_cents: int; fees_cents: int
@@ -2201,7 +2550,12 @@ class Memory(Protocol):
     agent_id: str
     frozen: bool
     def record_outcome(self, event: ResolutionEvent, *, written_at_ms: int) -> None: ...   # ledger + priors
-    def calibration(self, *, category: str | None, horizon: str | None) -> tuple[CalibrationBin, ...]: ...
+    def calibration(self, *, category: str | None, horizon: str | None,
+                    cohort_id: str | None = None) -> tuple[CalibrationBin, ...]: ...
+        # amendment C1c (18.5, ruling R266): the ledger is keyed (cohort_id or category, horizon_bucket, bin), so
+        # a bin is per cohort when the market has one and per category otherwise; ResolutionEvent carries cohort_id
+        # (10.2) and record_outcome increments both the cohort's bin and the category's, which is what lets
+        # `calibrator` read the cohort first and fall back to the category below min_n
     def prior(self, *, category: str | None, tag: str | None) -> tuple[int, int]: ...   # (n, n_yes)
     def feature_stat(self, family: str, key: str) -> FeatureStat: ...      # (n, sum_milli, sum_sq_milli)
     def add_feature(self, family: str, key: str, value_milli: int, *, written_at_ms: int) -> None: ...
@@ -2265,8 +2619,16 @@ class Hive(Protocol):
         # visible_from_ms = bar_ms + interval_ms; the engine writes it from Actions.lessons and Actions.notes
     def write_reputation(self, *, agent_id: str, category: str, bar_ms: int, interval_min: int, n: int, skill_micro: int, pnl_cents: int) -> HiveEntry: ...
         # visible_from_ms = bar_ms + interval_ms; engine only, recomputed in the hive phase
+    def write_insight(self, *, rule: Rule, test: Mapping[str, object], fit_t1_ms: int, interval_min: int) -> HiveEntry: ...
+        # amendment C1c (18.2, ruling R239): kind "insight", author_id = rule.author_id, market_id None,
+        # visible_from_ms = fit_t1_ms + interval_ms(interval_min), the first bar strictly after the last bar the
+        # promotion read; written by the optimizer at generation close and by L1, never by an agent
+    def demote_insight(self, *, rule_id: str, bar_ms: int, interval_min: int) -> HiveEntry: ...
+        # stamps demoted_at_ms on the insight; it stops firing in views from bar_ms + interval_ms
     def view(self, *, now_ms: int, agent_id: str, market_ids: Sequence[str], limits: Limits,
-             live_coop: bool) -> HiveView: ...
+             live_coop: bool, blocks: Mapping[str, Mapping[str, SensorBlock]] | None = None) -> HiveView: ...
+        # blocks (18.1): {market_id: {sensor: SensorBlock}} of this bar, what HiveView.insights needs to decide
+        # which rules fire; None means no insight fires (a run before S1 and S2 landed)
     def reputation(self, *, agent_id: str, category: str | None, now_ms: int) -> ReputationView: ...
     def snapshot(self) -> dict[str, object]: ...
     def restore(self, state: Mapping[str, object]) -> None: ...
@@ -2287,9 +2649,13 @@ times 200 markets times 300 bars, which breaches `OBSERVATION_MAX_BYTES` on ever
 | `resolutions` | every settled market of the run | the most recent 200 by `(-visible_from_ms, entry_id)` |
 | `forecasts` | **settled markets only**, over the categories of the agent's open markets | the most recent `limits.hive_forecasts` by `(-visible_from_ms, entry_id)` |
 | `prev_bar_forecasts` | every other agent, the agent's open markets, `bar_ms ==` the instrument's previous bar (`now_ms - interval_ms` on a `continuous` calendar, rulings R192 and R211) | empty unless `live_coop` |
+| `insights` | the promoted, undemoted `insight` entries with `visible_from_ms <= now_ms` whose rule fires at `now_ms` on one of the agent's open markets (18.2, ruling R239) | `limits.hive_insights` (`HIVE_INSIGHTS_VIEW_MAX = 50`), ranked by `(-lower_bp, rule_id)` |
 
-`view` is a pure function of `(now_ms, agent_id, market_ids, limits, live_coop)` and of the entries written
-at bars `< now_ms`; it never depends on the order agents are served in.
+`view` is a pure function of `(now_ms, agent_id, market_ids, limits, live_coop, blocks)` and of the
+entries written at bars `< now_ms`; it never depends on the order agents are served in. The `insight`
+entries are the one kind whose `visible_from_ms` is not one bar after their writing bar: it is one bar
+after the last bar their promotion **read** (18.2), which is later than the writing bar by construction
+and is the only rule under which a promoted rule can be read by agents trading bars its promotion never saw.
 
 Reputation is computed by the engine (A3 exposes `compute_reputation(events)`) over the last
 `REPUTATION_WINDOW_MARKETS` settled markets of the agent in the category: `n`, `skill_micro` (mean of
@@ -2336,7 +2702,8 @@ default position rule; `overlay` families wrap an `inner` genome and transform i
 | `volume` | belief | `vol_lookback: 1..60 (2) [7]`, `conviction_permille: 0..2000 (50) [500]` | `ratio_permille = min(2_000, round_half_up(1_000 * bar.volume_milli, median volume over the clamped lookback))` (`0` when the median is `0`); `p = clamp_ppm(ppm_from_bp(last) + ppm_from_bp(move) * conviction_permille * ratio_permille // 1_000_000)`, so a thin move is faded and a heavy one trusted |
 | `breakout` | belief | `range_bars: 2..90 (3) [20]`, `trigger_bp: 0..2000 (50) [200]`, `hold_bars: 1..60 (2) [5]` | lean in the direction of a close outside the trailing (clamped) range by more than `trigger_bp`, by `ppm_from_bp(excess_bp)`, held `hold_bars` bars |
 | `newsbayes` | belief | `prior_permille: 0..1000 (50) [1000]` (weight on the market price as prior), `lexicon_id: 0..11 (1) [0]`, `weight_per_hit_milli: 0..2000 (50) [200]`, `decay_bars: 1..60 (2) [7]` | log-odds update in fixed point: `logit_milli(p) = logit_milli(prior) + sum(hits * weight_per_hit_milli)` with an integer logit table (`pmx.scoring.logit_milli`, `unlogit_ppm`, both from a 10 001-entry table built with `Decimal` at import); hits from lexicon `lexicon_id`, which is `src/pmx/lexicons/<CATEGORIES[lexicon_id]>.v1.json` (`LEXICON_COUNT = 12`, section 7.6), on as-of headlines, decayed per bar. A missing lexicon file means no hits |
-| `calibrator` | overlay | `min_n: 5..100 (5) [20]`, `shrink_to_prior_permille: 0..1000 (50) [500]` | maps the inner `prob_ppm` through the memory's calibration table for `(category, horizon)`: `p' = yes_rate_ppm` of the bin when `n >= min_n`, blended with the inner value by `shrink_to_prior_permille`; pools `HiveView.forecasts` (settled markets only) when own `n < min_n` and the hive is on. It has **no `bins` gene**: the ledger is `CALIBRATION_BINS = 10` deciles (section 10.3) and a genome asking for 17 would have no table to read |
+| `calibrator` | overlay | `min_n: 5..100 (5) [20]`, `shrink_to_prior_permille: 0..1000 (50) [500]` | maps the inner `prob_ppm` through the memory's calibration table for `(cohort_id, horizon)` when the market has a cohort and its bin has `n >= min_n`, else for `(category, horizon)` (amendment C1c, 18.5, ruling R266: the family is **per cohort**, because a class of question systematically mispriced is a cohort-level statement): `p' = yes_rate_ppm` of the bin when `n >= min_n`, blended with the inner value by `shrink_to_prior_permille`; pools `HiveView.forecasts` (settled markets only) when own `n < min_n` and the hive is on; with `hive_insights` in the diet, a firing insight's `lift_bp` shifts the prior (ruling R240). It has **no `bins` gene**: the ledger is `CALIBRATION_BINS = 10` deciles (section 10.3) and a genome asking for 17 would have no table to read |
+| `rule_follower` | belief | `min_lower_bp: 0..2000 (50) [100]`, `weight_permille: 0..2000 (50) [1000]` | amendment C1c (18.2, ruling R240): `p = clamp_ppm(ppm_from_bp(last + sum(lift_bp * weight_permille // 1_000 over the HiveView.insights of the market with lower_bp >= min_lower_bp)))`, `ppm_from_bp(last)` when none fires; `required_sensors = {hive_insights}`; trades by the default position rule. A promoted rule reaches it through the hive-insight sensor and through nothing else: no family reads the ledger files of 18.2 |
 | `specialist` | overlay | `category: 0..11 (1) [0]`, `outside_mode: 0..1 (1) [0]` (`0` follow the market, `1` abstain) | inner family inside `CATEGORIES[category]`, `follower(1000, 0)` or `abstain` elsewhere |
 | `kelly` | overlay | `kelly_permille: 0..1000 (50) [250]`, `max_position_pct: 1..100 (5) [20]`, `min_edge_bp: 0..2000 (50) [200]` | sizes `target_position` from the inner belief: `edge = p - ppm_from_bp(last)`; Kelly fraction of free cash on the favourable side, capped at `max_position_pct` of equity, no trade when `abs(edge) // 100 < min_edge_bp` |
 | `stacker` | ensemble (coop) | `k: 1..16 (1) [5]`, `window_markets: 5..100 (5) [30]`, `extremize_permille: 1000..2000 (50) [1200]` | see below |
@@ -2539,6 +2906,15 @@ outcome; a market where at least two of three answers name the true outcome with
 leaderboard rows are computed on `clean and not contaminated` markets and carry `n_clean`. The scripted
 population never reads this file.
 
+**The audit is coarse and says so** (decision D-R6, ruling R252). Three paraphrases at temperature zero
+detect blatant recall of an outcome and nothing subtler (a model that knows the outcome and answers the
+paraphrase with a hedge passes), so every LLM leaderboard row carries `contamination_audit:coarse` in
+`LeaderboardRow.labels` (12.10), and **an LLM result never enters a claim before the live book replicates
+it**: a claim on an LLM genome computes and records its four parts, and its `verdict` reads
+`awaiting_live_replication` until `live/` holds at least `LIVE_REPLICATION_MIN_RESOLVED = 100` resolved
+forecasts of that `genome_hash` and `model` whose `skill_lb_micro` is positive; only then may it read
+`beats_market` (12.8). The number is decision D-R11's and is a default.
+
 **The file is outside the dataset hash, so it is inside the run's.** `contamination.json` decides which
 sealed markets an LLM genome is scored on, which is a result-changing input: `RunConfig.contamination_hash`
 (section 8.1) carries `sha256` of its bytes, `run_started` journals it, `claims/<claim_id>.json` records
@@ -2669,6 +3045,19 @@ Two abstention numbers, because one was gameable by silence:
   12.5 and the leaderboard of section 12.10 use.
 - `explicit_abstain_ppm` is the share with `kind == "abstain"`, reported beside it.
 
+**Capacity** (decision D-R10, ruling R255; `pmx.metrics.capacity`, O4). Kalshi's fee of seven percent of
+`p(1-p)` and thin books make most micro-edges untradeable, so a PnL failure will be liquidity and not
+skill, and a claim has to say at what size. `capacity_cents(fills, bars, config, schedule) ->
+CapacityReport` re-prices every fill of a run at each scale of `CAPACITY_SCALE_GRID_PERMILLE = (1000,
+2000, 5000, 10000, 20000, 50000, 100000)` (the requested size times the scale) through `historical`'s own
+cap, slippage and fee functions of `pmx.engine.liquidity` on the same bars (architecture rule 9 holds: no
+fill price is computed elsewhere), and reports, per market and in aggregate, `capacity_cents`: the notional
+in cents at the **first** grid scale whose after-fee return is at most half the unit-scale return, and
+`-1` with `grid_max_permille` when no grid scale halves it (no interpolation, stated so nobody smooths it).
+It needs the dataset's bars, so it is computed at claim time (12.8) and never by the journal projection;
+every claim reports `capacity` beside `pnl`. Every cohort row of 12.10 and 12.8 carries its `n` beside
+every number, so a comparison across cohorts is never read without its size (decision D-S7).
+
 The earlier definition measured only the keyword, and section 8.4 treats a missing market as `hold` while
 `follower` with `edge_min_bp > 0` never trades: the agent that is silent on every market reported
 `abstention_ppm = 0`, so the one column meant to expose silence read zero for the most silent agent, and
@@ -2713,6 +3102,13 @@ def deflated_lower_bound(interval: Interval, *, candidates: int) -> int
     # The undeflated bound is the empirical quantile; the deflated one is the normal approximation because
     # an empirical quantile at alpha / K needs B >= 20 K / alpha resamples, which is out of reach for K in the thousands.
     # Defined at ALPHA_PPM only: bootstrap_lower_bound's alpha_ppm is for reporting and is never deflated (ruling R219).
+def benjamini_hochberg(p_values_ppm: Sequence[int], *, q_ppm: int = FDR_Q_PPM) -> tuple[bool, ...]
+    # Amendment C1c (18.2, decision D-R8, ruling R238): false discovery rate control WITHIN a pre-registered
+    # hypothesis family. FDR_Q_PPM = 50_000. With m = len(p_values_ppm) and p_(1) <= ... <= p_(m) the sorted
+    # values, k is the largest index with p_(k) * m <= k * q_ppm (integers, no division); the result marks True
+    # every position whose p-value is <= p_(k), and no position when no such k exists. Deflation of a CLAIM stays
+    # deflated_lower_bound above (Bonferroni on K); this function governs rule promotion only and never a claim.
+    # E4's name, added by S2 by the agreement recorded in section 13.
 def permutation_null(forecasts: Mapping[str, Sequence[tuple[int, int]]], market_prices: Mapping[str, Sequence[int]],
                      outcomes: Sequence[int], weights: Mapping[str, Sequence[int]], blocks: Sequence[str],
                      *, rng: RngTree, permutations: int = PERMUTATIONS, inner: int = PERMUTATION_INNER_RESAMPLES,
@@ -2750,6 +3146,7 @@ on the degenerate interval of ruling R68 (R219).
 | `abstention_ppm` | section 12.3 | yes | `[0, 100_000)`, `[100_000, 500_000)`, `[500_000, 1_000_000]` |
 | `holding_horizon_bars` | mean bars between opening and flattening a leg | reported | |
 | `category_coverage_ppm` | `round_half_up(PPM_ONE * categories traded, categories open)` | reported | |
+| `diet_class` | amendment C1c (18.1, ruling R235): `0` when the diet carries no news sensor and no hive sensor, `1` when it carries at least one news sensor (`wiki_daily`, `comments`, `hn`, `gdelt_recent`, `filings`, `macro_releases`, `wiki_asof`) and no hive sensor, `2` when it carries `hive_insights` or `hive_reputation`; a pure function of `Genome.sensors` | yes | `{0}`, `{1}`, `{2}` |
 
 `n_markets_open` is **the number of distinct markets that appeared in at least one of the agent's
 observations during the run** (equivalently, that carry at least one `forecast_recorded` for it), and it is
@@ -2759,25 +3156,52 @@ markets, "categories traded" the number over the markets with at least one fill.
 mean over the agent's forecast bars of `(prob_ppm // 100 - market_priced.last_close_bp)` with `bp_ratio`
 rounding. Each of the three is `0` when its denominator is `0`.
 
-The five of them travel together as one frozen dataclass, which E5 fills and O2 bins:
+The six of them travel together as one frozen dataclass, which E5 fills and O2 bins:
 
 ```python
 @dataclass(frozen=True, slots=True)
 class Descriptors:
     turnover_ppm: int; contrarian_bp: int; abstention_ppm: int
     holding_horizon_bars: int; category_coverage_ppm: int
+    diet_class: int = 0                             # amendment C1c (18.1, ruling R235); defaulted so a v2 payload reads
     def to_dict(self) -> dict[str, int]: ...        # the candidate_scored.descriptors payload of 9.4
 ```
 
-`ARCHIVE_CELLS = 4 * 4 * 3 = 48`; `cell_key = f"t{i}-c{j}-a{k}"`. AC-6's "at least 40 percent" is 20 cells.
-Decision D-7 records the choice of three axes.
+`ARCHIVE_CELLS = 4 * 4 * 3 * 3 = 144`; `cell_key = f"t{i}-c{j}-a{k}-d{l}"`. AC-6's "at least 40 percent" is
+therefore **58 cells**, which the first evolution on a real dataset reports against. Decision D-7 recorded
+the choice of three axes and is amended by amendment C1c (ruling R235): PRD v5 1.2 asks the archive to keep
+a volume-reader, a news-reader and a hive-reader alive even when one dominates, and a descriptor that is
+reported but not binned keeps nothing alive.
 
 ### 12.6 The selection objective and the beat-the-market bar
 
 Objective (O1, on the **training** fold of a generation): the tuple `(skill_lb_micro, pnl_lb_cents)`,
 both 95 percent block-bootstrap lower bounds of the per-market means, compared lexicographically,
 descending; ties by `agent_id`. A `ruined` agent ranks below every non-ruined one. Patience is measured on
-`best_validation_lb_micro`, the best validation-fold `skill_lb_micro` of the population.
+`best_validation_lb_micro`, the best validation-fold `skill_lb_micro` of the population, **at the engine
+tier**.
+
+**The evolutionary loop is a generator, not a certifier** (decision D-R7, ruling R253). One hundred and
+eleven training markets cannot detect a Brier edge of 0.005 when the market-level standard deviation is
+near 0.15, and 48 by 30 evaluations make the deflated bound of 12.4 unreachable on them; the objective
+above **selects** what is worth a full replay and a claim, and nothing it ranks is evidence. Certification
+comes from two places only: the sealed fold of a dataset of thousands of markets (7.4's cohort target,
+12.8) and the live book (9.5, 11.5). Every claim's `note` carries the sentence.
+
+**Two tiers of fitness** (decision D-R9, ruling R254). A full engine replay per genome is impossible on
+hourly and minute grids for a whole population, so a generation scores at two tiers and journals which:
+
+| Tier | What it computes | Who gets it | Where it may reach |
+|---|---|---|---|
+| `proxy` | the belief function of the genome evaluated on `pmx.features.matrix` (FM1): precomputed integer feature matrices, one row per `(market, bar)` of the fold with the sensor blocks of 18.1 and the market price, giving `prob_ppm` per row; scored by 12.1's time-weighted Brier against the market (`skill_point_micro`, the block-bootstrap `skill_lb_micro`) and `pmv_bp` at one bar; no fills, no fees, no memory, no hive, `descriptors` at their zeros, `pnl_*` zero | every candidate of the generation, on train and on validation | `ranked` and the choice of who gets the engine tier; `candidates_evaluated_cum` |
+| `engine` | `run_generation`'s full replay of 12.11 | the elites, the `engine_tier_count` (an `EvolutionConfig` field, default `12`, the elites always included) best by proxy on train, every archive offer (descriptors need fills) and every claim | everything: `elites`, `archive`, `hall_of_fame`, `champion`, `best_validation_lb_micro`, patience, a claim |
+
+`candidate_scored.tier` records the tier with `matrix_hash` and `features_hash` on a proxy row;
+`generation_closed.n_engine_tier` and `n_proxy_tier` count them; and **no genome enters a claim on proxy
+fitness**: `claim` (12.8) refuses with `ClaimRefusedError` a genome whose store row carries no engine-tier
+validation score. The matrix is built once per `(dataset_hash, fold, features_hash)` and cached under
+`runs/matrices/` (git-ignored); it reads the training and validation folds through `Dataset.market` and
+therefore never a sealed month (ruling R182), and it refuses a showcase dataset (5.6).
 
 **The research budget adjustment** (PRD 5.5, "agents that spend research units and do not convert them
 into skill lose the budget in the next generation") is this rule and no other: an agent whose
@@ -2785,6 +3209,29 @@ into skill lose the budget in the next generation") is this rule and no other: a
 gets `max(0, units - RESEARCH_PENALTY_UNITS)` next generation; every other agent keeps
 `config.research_budget_units`. The result is `generation_closed.research_budget_next`, and O2 applies it
 by building the next generation's `RunConfig.research_budget_by_agent` from it (sections 8.1 and 9.4).
+
+**The sensor budget is the same rule over the diet** (amendment C1c, 18.1, ruling R235): an agent whose
+`skill_lb_micro` did not improve over its own previous generation **and** whose `diet_cost_units > 0`
+gets `max(0, allowance - SENSOR_PENALTY_UNITS)` next generation, every other agent keeps
+`config.sensor_budget_units`, the result is `generation_closed.sensor_budget_next`, and O2 applies it by
+the **sensor drop** of 18.1 on every child whose diet exceeds its allowance (a genome whose required
+sensors alone exceed it is culled, `culled_by_budget`). Both budgets are per-bar caps, never cash: fitness
+is net of nothing.
+
+**The author's reward** (18.2, ruling R239): for every rule promoted this generation whose author is an
+agent of the population, `RULE_AUTHOR_BONUS_MICRO = 5_000` is added to the author's `skill_lb_micro` **for
+the ranking of this generation only** (the recorded interval, `candidate_scored` and every claim carry the
+unbonused number) and `RULE_AUTHOR_SENSOR_BONUS_UNITS = 2` to its next allowance; for every rule of the
+author rejected at the replicate stage or demoted this generation, its next allowance loses
+`SENSOR_PENALTY_UNITS`. `generation_closed.rule_rewards` lists every entry. This is how building knowledge
+becomes a selected behaviour rather than a hope, and why the bonus never reaches a claim: a claim is about
+the sealed fold, not about what the agent taught the others.
+
+**Per-cohort rows** (decision D-S7, ruling R266): the objective is computed over the whole fold, and beside
+it every `candidate_scored` and every claim carries one row per cohort of 18.5 with `usable_for_paired_test`
+(its own `skill` and `pnl` intervals over the cohort's markets, its own `n`), so that the discovery that an
+agent beats the market on `co-kalshi-crypto-bitcoin-threshold-above-month` and nowhere else is on the
+record. A cohort row never enters the objective.
 
 The bar (O4, on the **sealed test**, per `(kind, provider)` since amendment C1b (section 17.6, ruling
 R162), `n_markets >= CLAIM_MIN_MARKETS = 60`, where on a continuous kind a "market" is an `(instrument,
@@ -2799,11 +3246,15 @@ and the permutation shuffles realised returns across instruments within a week):
 | 4 | `permutation_null(...).null_lb_micro <= 0` | `null: NullResult` |
 
 `verdict = "beats_market"` iff all four hold; `"insufficient_n"` when `n_markets < CLAIM_MIN_MARKETS`;
-otherwise `"no_demonstrated_edge"`, with every part's boolean beside it. Claims on Manifold and on Kalshi
+otherwise `"no_demonstrated_edge"`, with every part's boolean beside it; and, on an LLM genome,
+`"awaiting_live_replication"` in place of `beats_market` until the live book of 11.5 replicates it
+(decision D-R6, ruling R252). Claims on Manifold and on Kalshi
 are separate claims and separate `claim_id`s (section 2); nothing is pooled across providers, and since
 amendment C1b nothing is pooled across kinds either: a claim names its kind, its provider and its horizon
 in its id (section 17.8), and `no_demonstrated_edge` is the expected verdict on a continuous kind and is
-reported as such (AC-25).
+reported as such (AC-25). A **per-cohort** row of a claim (18.5, ruling R266) applies the same four parts
+to the cohort's markets with the cohort's own `K` and reads the same three verdicts; a cohort that is not
+`usable_for_paired_test` has no row, and `pmx claim --cohort <id>` on one is `CohortRefusedError`.
 
 **Why part 2 counts traded markets.** The `n_markets >= 60` guard counts forecasts, not trades, so part 2
 was clearable by silence: an agent that trades 5 of the 60 sealed markets and abstains from 55 submits a
@@ -2825,6 +3276,7 @@ K = max(candidates_evolution, candidates_store, candidates_prior_claims + 1, 1)
 # candidates_evolution      = candidates_evaluated_cum of the evolution run that produced the genome, else 0
 # candidates_store          = distinct genome hashes ever scored against this dataset_hash in pmx.store
 # candidates_prior_claims   = claim files plus claims/access.jsonl lines for this dataset_hash
+# a per-cohort row (18.5) computes its own K with candidates_prior_claims counted per (dataset_hash, cohort_id)
 ```
 
 `claims.py` computes all three from the sqlite run index and the claim ledger, records all three and the
@@ -2837,12 +3289,13 @@ reports a strictly larger `K`.
 @dataclass(frozen=True, slots=True)
 class Folds:
     train_ids: tuple[str, ...]             # resolved_at_ms < train_end_ms, canonical order; a continuous
-                                           # instrument is in every list whose months intersect its MarketMeta
+                                           # instrument is in every list whose span intersects its MarketMeta
                                            # life [created_at_ms, resolved_at_ms) (17.6, ruling R186)
     validation_ids: tuple[str, ...]        # train_end_ms <= resolved_at_ms < validation_end_ms
     rolling: tuple[tuple[tuple[str, ...], tuple[str, ...]], ...]   # (train 1..k, validate month k+1) for k in 4..9
-    train_end_ms: int; validation_end_ms: int; sealed_count: int
+    train_end_ms: int; validation_end_ms: int; sealed_count: int   # the count-quantile cuts of 7.7 (ruling R247)
     _sealed_ids: tuple[str, ...]           # private; read by exactly one function below
+    cohorts: tuple[Cohort, ...] = ()       # amendment C1c, 18.5 (ruling R266): per-fold counts inside these folds
 
 def make_folds(manifest: DatasetManifest, markets: Sequence[MarketMeta]) -> Folds
 def open_sealed_test(folds: Folds, *, claim_id: str, dataset_hash: str, genome_hash: str, provider: str,
@@ -2858,11 +3311,23 @@ def open_sealed_test(folds: Folds, *, claim_id: str, dataset_hash: str, genome_h
     at least one bar inside the sealed months, and the run is clipped to those months."""
 ```
 
-A continuous instrument does not resolve, so it belongs to **every** fold whose months it has bars in
-(amendment C1b, section 17.6): `make_folds` places its bars against the same thirteen edges, a run on a
-fold carries it when it has a bar inside the fold's months and clips `t0_ms`/`t1_ms` to them, and the
+A continuous instrument does not resolve, so it belongs to **every** fold whose span it has bars in
+(amendment C1b, section 17.6): `make_folds` places its bars against the fold spans of 7.7, a run on a
+fold carries it when it has a bar inside the fold's span and clips `t0_ms`/`t1_ms` to it, and the
 forced flat of 17.3 closes every position at the fold's edge, so no position and no unresolved horizon
-crosses from the training months into the validation or the sealed ones.
+crosses from the training span into the validation or the sealed one.
+
+**What `make_folds` reads and refuses** (amendment C1c, rulings R247, R248, R263, R266, R272). The two
+headline cuts are the manifest's `split.train_end_ms` and `split.validation_end_ms`, **count quantiles**
+of resolution order (60/20/20 by default, 7.7), and the fold of a market is its cut fold moved to its
+cluster's or `event_key` group's latest member (`split.cluster_moves`); `make_folds` recomputes both from
+the metas and raises `FoldIntegrityError` when they disagree with the manifest or when any group spans two
+folds, so a dataset built before decision D-R2 is refused rather than silently re-cut. It raises
+`ShowcaseDatasetError` on a `purpose: "showcase"` dataset before reading a market: a showcase dataset has
+no folds. `Folds` gains `cohorts: tuple[Cohort, ...]` (18.5), each with its per-fold counts and
+`usable_for_paired_test` (false when any fold is empty, decision D-S13), computed inside the folds and never
+across them, so no cohort is measured on a dataset whose folds the fold fix has not reached. The build
+target of 7.4 is stated in cohorts, and the manifest's `build.status` says whether this dataset met it.
 
 The earlier text said of this function that "it emits nothing itself", which defeated PRD 2.6 ("the sealed
 set is touched by a named claim, logged, and refused on reuse"): a run that opened the sealed fold and
@@ -2900,10 +3365,29 @@ claims/<claim_id>.json: claim_id, created_run_id, created_at_index, prev_claim_s
   skill {point, lower, upper, sd, n, n_blocks, resamples}, pnl {...},
   skill_lb_deflated_micro, pnl_lb_deflated_cents, null {null_lb_micro, p_value_ppm, permutations},
   parts {skill: bool, pnl: bool, deflated: bool, null: bool}, verdict, per_tag {tag: {n, skill_point_micro}},
-  contract_version, engine_version
+  contract_version, engine_version,
+  note (the generator sentence of 12.6 and the continuous expectation of 17.6),
+  fitness_tier: "engine" (a claim on a proxy-scored genome is refused, ruling R254),
+  capacity {per_market: [{market_id, capacity_cents, halving_scale_permille}], aggregate_cents,
+            halving_scale_permille, grid_max_permille}                      (12.3, ruling R255)
+  per_cohort: [{cohort_id, n, n_traded, skill, pnl, skill_lb_deflated_micro, pnl_lb_deflated_cents, null,
+                candidates, parts, verdict}]                               (18.5, ruling R266)
+  rules_used: [{rule_id, live_support, live_lower_bp, n_bars_fired}]     (18.6, ruling R244: the insights the
+                                                                            run's rules step or rule_follower read,
+                                                                            with their live records AT CLAIM TIME)
+  sensors, diet_cost_units, sensor_ablation: [{sensor, run_id, skill_point_micro, skill_drop_micro}] | null
+                                                                            (18.1; the table when --ablate-sensors ran)
+  labels: [..]  (the dataset's and the roster's labels of 12.10: news_links:weak, taxonomy:weak,
+                 contamination_audit:coarse, window_days:<n>)
+  live_replication: {n_resolved, skill_lb_micro} | null                  (11.5, ruling R252; LLM genomes)
 claims/access.jsonl:    {"claim_id", "dataset_hash", "kind", "provider", "horizon_bars", "genome_hash",
-                         "n_markets", "market_ids", "run_id"}      one line, appended before any id is returned
+                         "n_markets", "market_ids", "run_id", "cohort_id": str | null}      one line, appended before any id is returned
 ```
+
+`claim` refuses, before any sealed read and in this order: a second claim or an aborted peek
+(`ClaimRefusedError`), a `purpose: "showcase"` dataset (`ShowcaseDatasetError`), a dataset whose folds split
+a group (`FoldIntegrityError`), a genome with no engine-tier validation score (`ClaimRefusedError`,
+ruling R254), and `--cohort <id>` on a cohort that is not `usable_for_paired_test` (`CohortRefusedError`).
 
 The ledger is append-only by convention, by chaining (`prev_claim_sha256`) and by test (a second claim is
 refused before any read of the sealed fold; the spy dataset in O1's tests asserts zero reads outside
@@ -2917,6 +3401,12 @@ use `ScriptedGateway`); `ab_on_validation(parent, child, folds, ...)` runs both 
 with the same seed; `promote(child) iff child.skill_lb_micro > parent.skill_lb_micro` on validation, never
 on train, never on the sealed test. A child that wins on train and loses on validation is rejected, and
 that is a test.
+
+**O3 is deferred** (decision D-R11, ruling R256): prompt mutation runs only once the live book of 9.5
+holds at least `LIVE_REPLICATION_MIN_RESOLVED = 100` resolved markets, because two and a half months of
+clean markets (11.5) are not a set anyone should tune a prompt on. `pmx evolve` refuses `prompt_mutation`
+on a roster with LLM seats until then (`NotConfiguredError`, naming the count), the package text above
+stands, and the number is a default.
 
 ### 12.10 The leaderboard (E5, `pmx.metrics.leaderboard`)
 
@@ -2934,6 +3424,17 @@ preamble). Per slice: `n_markets`, `n_markets_traded`, `n_markets_open`, `brier_
 exists; `sharpe_milli`, `max_drawdown_bp`, `fill_ratio_ppm`, `turnover_ppm`, `abstention_ppm`,
 `explicit_abstain_ppm`, `category_coverage_ppm` and `ruined` are 12.3's agent-level number repeated on every
 slice (ruling R221).
+
+Amendment C1c adds three columns and one slice (rulings R250, R257, R266). `currency` (`mana` iff the row's
+provider is `manifold`, decision D-R12): no leaderboard, chart or README sentence pools Manifold with
+Kalshi, every Manifold number carries `currency: mana`, and gates G3 onward check it. `labels`, the one
+carrier of every quality label a reader must see beside a number (`news_links:weak` from 7.6,
+`taxonomy:weak` from 7.14 for the row's venue, `contamination_audit:coarse` on an LLM row from 11.5,
+`window_days:<n>` from 5.6 when `n > 365`), filled by `leaderboard.build(..., labels=)` from the manifest
+by the caller because the projection reads no dataset. `cohort_id` (`"all"` on today's rows): 12.10 emits
+one row per cohort of 18.5 with `usable_for_paired_test`, keyed `(agent_id, kind, provider, horizon_bars,
+fold, cohort_id)` with `category` and `hardness_tag` at `"all"`, each with its own `skill` and `pnl`
+intervals and its `n_markets`, and the UI shows the cohort's size beside every number of the row.
 
 ### 12.11 The structures and signatures that cross a wave
 
@@ -2961,12 +3462,21 @@ class LeaderboardRow:                  # section 12.10, one per slice; the listi
     ruined: bool; n_clean: int | None; verdict: str | None
     kind: str = "binary"; horizon_bars: int = 0; vendor: str = ""          # amendment C1b, ruling R163
     n_units: int = 0; n_quantile_forecasts: int = 0; pinball_skill: Interval | None = None
+    currency: str = "usd"; labels: tuple[str, ...] = (); cohort_id: str = "all"   # amendment C1c, 12.10,
+                                                                          # rulings R250, R257, R266
 
 @dataclass(frozen=True, slots=True)
 class CandidateScore:                  # section 9.4's candidate_scored payload
     generation: int; agent_id: str; genome_hash: str; fold: str; n_markets: int
     skill_point_micro: int; skill_lb_micro: int; pnl_point_cents: int; pnl_lb_cents: int
     brier_tw_micro: int; ruined: bool; research_units_spent: int; descriptors: Descriptors
+    tier: str = "engine"; matrix_hash: str | None = None; features_hash: str | None = None   # 12.6, ruling R254
+    diet_cost_units: int = 0; sensors: tuple[str, ...] = (); n_rules_proposed: int = 0         # 18.1, ruling R235
+    per_cohort: tuple[CohortScore, ...] = ()                                                  # 18.5, ruling R266
+
+@dataclass(frozen=True, slots=True)
+class CohortScore:                     # amendment C1c, 18.5: one cohort's slice of a candidate's score or a claim
+    cohort_id: str; n_markets: int; n_markets_traded: int; skill: Interval; pnl: Interval
 ```
 
 ```python
@@ -2983,6 +3493,8 @@ class PerMarket:                       # one row per (agent, market); the input 
     n_resolved: int = 0; n_cash_events: int = 0                             # horizon) on a continuous kind
     n_quantile_forecasts: int = 0          # the cell's resolved forecasts whose quantiles_ticks was not null (ruling
                                            # R221, declared here and filled by E5 in the next lot; the row's column is its sum)
+    cohort_id: str | None = None           # amendment C1c, 18.5 (ruling R266): read off market_listed once R274's lot
+                                           # journals the facets; None until then and on a market with no cohort
 
 @dataclass(frozen=True, slots=True)
 class AgentResult:
@@ -3072,6 +3584,12 @@ class EvolutionConfig:
     validate_every: int = 1
     research_budget_units: int = 10
     run: RunConfig | None = None             # the template every generation's backtest starts from
+    # Amendment C1c (18.1, 12.6; rulings R235, R254): every value below is a default the first evolution reports
+    # against, and every one enters to_dict() and therefore config_hash.
+    sensor_budget_units: int = 17            # SENSOR_BUDGET_UNITS_DEFAULT: a fresh genome's per-bar diet allowance
+    sensor_mutation_permille: int = 100      # the probability a mutation adds or removes one sensor
+    engine_tier_count: int = 12              # candidates replayed at the engine tier per generation, elites included
+    ablate_sensors: bool = False             # re-run the champion once per sensor of its diet at the end (18.1)
     def to_dict(self) -> dict[str, object]: ...
     @property
     def config_hash(self) -> str: ...        # sha256(canonical_json(self.to_dict()))
@@ -3111,16 +3629,21 @@ and `dataset_hash` (PRD 7.2). All bodies are JSON in the units of section 1.
 | Method and path | Answers |
 |---|---|
 | `GET /health` | `{"ok": true, "pmx_version", "contract_version", "engine_version"}` |
-| `GET /datasets` | `[{name, freeze_date, interval_min, providers, counts, sealed, dataset_hash}]` |
+| `GET /datasets` | `[{name, freeze_date, interval_min, providers, counts, sealed, dataset_hash, purpose, window_days}]`, research datasets first, newest first (decision D-S2, ruling R261: the UI's default dataset is the newest sealed research dataset and **never** a showcase one, which is reachable only through an explicit selector that labels it `showcase`) |
 | `GET /datasets/{name}` | the manifest of section 7.8, verbatim |
 | `GET /datasets/{name}/verify` | `{"ok": bool, "dataset_hash", "expected", "mismatched_files": [..]}` |
-| `GET /datasets/{name}/markets` | `[MarketMeta]` (section 7.2), paged by `?limit=&cursor=` |
+| `GET /datasets/{name}/markets` | `[MarketMeta]` (section 7.2), server-side paged by `?limit=&cursor=`, filtered by `?category=&subject=&structure=&horizon=&provider=&fold=&hardness_tag=&outcome=&cohort_id=` and sorted by `?sort=resolved_at_ms|life_days|volume_milli_total|final_price_bp` (decision D-S10, ruling R269; `outcome` and `final_price_bp` are the resolved market's, which a dataset browser may show, 14's U2 rule) |
+| `GET /datasets/{name}/cohorts` | `[Cohort.to_dict()]` of 18.5 with per-fold counts and the two flags; `?usable=true` narrows |
+| `GET /datasets/{name}/cohorts/{cohort_id}` | the cohort's markets side by side and, `?run_id=`, each agent's calibration table on that cohort (the cohort view of decision D-S10) |
+| `GET /rules` | the rule ledger of 18.2: `[{rule, family_id, status: "proposed"\|"rejected"\|"promoted"\|"demoted", test, live, transfer}]`, filtered by `?dataset_hash=&status=&author_id=&cohort_id=` |
+| `GET /rules/{rule_id}` | one rule with every `rule_tested` row and, `?run_id=`, the bars it fired on |
 | `GET /markets/{market_id}` | one market: metadata, `bars`, `trades`, linked news; `?as_of_ms=` applies the as-of filter of section 5.4 and hides the outcome until `as_of_ms >= resolved_at_ms` |
 | `GET /runs` | `[{run_id, kind, dataset_name, dataset_hash, fold, seed, config_hash, n_bars, created_at_index}]` |
 | `GET /runs/{run_id}` | the run manifest of section 9.5 |
 | `GET /runs/{run_id}/journal` | the journal, paged by `?from_seq=&limit=`, one event per array item |
 | `GET /runs/{run_id}/results` | `results.json`, verbatim (`RunProjection.to_dict()`) |
-| `GET /runs/{run_id}/leaderboard` | `[LeaderboardRow]` (section 12.10), filtered by `?provider=&fold=&category=&hardness_tag=&kind=&horizon_bars=` (the last two since amendment C1b) |
+| `GET /runs/{run_id}/leaderboard` | `[LeaderboardRow]` (section 12.10), filtered by `?provider=&fold=&category=&hardness_tag=&kind=&horizon_bars=&cohort_id=` (`kind` and `horizon_bars` since amendment C1b, `cohort_id` since C1c); every row carries `currency` and `labels` (ruling R257) |
+| `GET /claims/{claim_id}/ablation` | the claim's `sensor_ablation` table of 18.1, or `404` when the claim ran without `--ablate-sensors` |
 | `GET /runs/{run_id}/calibration` | `[{agent_id, bins, ece_ppm, sharpness_ppm, horizons}]` |
 | `GET /evolutions` | `[{run_id, dataset_hash, generations_run, champion}]` |
 | `GET /evolutions/{run_id}/generations` | `[generation_closed payloads]` (section 9.4) |
@@ -3129,7 +3652,7 @@ and `dataset_hash` (PRD 7.2). All bodies are JSON in the units of section 1.
 | `GET /claims/{claim_id}` | one claim, verbatim |
 | `GET /live/book` | `{pending: [...], resolved: [...], score: {...}}` from `live/` (section 9.5) |
 | `POST /runs` | body `{kind: "backtest"\|"evolution", dataset, config, roster\|population, seed}`, answers `202 {"job_id"}` |
-| `POST /claims` | body `{dataset, genome, provider}`, answers `202 {"job_id"}` |
+| `POST /claims` | body `{dataset, genome, provider, kind?, horizon_bars?, cohort_id?, ablate_sensors?}`, answers `202 {"job_id"}` |
 | `GET /jobs/{job_id}` | `{job_id, kind, state: "queued"\|"running"\|"done"\|"failed", run_id\|null, error\|null, progress_permille}` |
 | `GET /jobs/{job_id}/events` | server-sent events, `event:` one of `job_queued`, `job_started`, `bar_progress`, `generation_closed`, `job_done`, `job_failed`, `data:` a JSON object carrying `job_id` and the payload |
 
@@ -3193,6 +3716,9 @@ prediction_market/
     schemas/cash_event.v1.json                    C1b  (section 17.3)
     schemas/session_calendar.v1.json              C1b  (section 17.2)
     schemas/forecast.v1.json                      C1b  (section 17.5)
+    schemas/rule.v1.json                          C1c  (amendment C1c, section 18.2)
+    schemas/sensor.v1.json                        C1c  (section 18.1)
+    schemas/workflow.v1.json                      C1c  (section 18.4)
     types.py                                      D1
     errors.py                                     D1   (the error taxonomy of section 13.1)
     rng.py                                        D7
@@ -3202,6 +3728,8 @@ prediction_market/
     cli.py                                        U4   (the argparse tree only: it builds the parser and
                                                        dispatches to each cli_*.register(subparsers))
     cli_run.py                                    E5   (pmx backtest with --roster-module, pmx replay; R200)
+    cli_rules.py                                  S2   (pmx rules mine|test|ledger, section 18.2)
+    cohorts.py                                    DS2  (Cohort, list_cohorts, RE_COHORT_ID, section 18.5)
     cli_evolve.py                                 O2   (pmx evolve, pmx resume)
     cli_claim.py                                  O4   (pmx claim)
     cli_data.py                                   D6
@@ -3218,9 +3746,19 @@ prediction_market/
     data/loader.py                                D1
     data/migrate_v1.py                            D1
     data/resample.py                              D6
-    data/builder.py                               D6   (R1d adds the hourly build option in wave 7, by
-                                                       the agreement PLAN_V3_WAVES states and this map records)
-    data/universe.py                              R1a  (the allow-list, the quality bar, the statistics)
+    data/builder.py                               DS1  (D6 wrote it; DS1 owns it from lot 5b for the fold fix, the
+                                                       window, the purpose, the universe rule and the hourly build
+                                                       of section 18 (ruling R245); DS2 adds the tagging and
+                                                       cohort-listing calls of 7.14 and 18.5 by the agreement this
+                                                       map records, and R1d the hourly option by ruling R123's)
+    data/loader.py                                DS1  (D1 wrote it; DS1 owns it from lot 5b: purpose, window_days,
+                                                       the count-quantile cuts and cluster moves, the per-source
+                                                       lag, the taxonomy/ walk; DS2 adds the facet and cohort
+                                                       reads by the agreement this map records)
+    data/taxonomy.py                              DS2  (the deterministic tagger of 7.14)
+    data/showcase.py                              DS2  (the showcase pack of decision D-S5)
+    data/universe.py                              DS1  (the documented universe rule of 7.4; R1a keeps the
+                                                       statistics of PRD v3 3.1 and adds them here by agreement)
     data/clusters.py                              R1b  (EventCluster, Constraint, residuals, section 16.3)
     data/impact.py                                R1c  (the impact calibration projection, section 16.1)
     data/embeddings.py                            R3b  (as-of text embeddings at build time, section 16.5)
@@ -3238,7 +3776,8 @@ prediction_market/
     data/importers/manifold.py                    D3
     data/importers/polymarket.py                  D4
     data/importers/metaculus.py                   D2   (optional, token-gated; stub that raises NotConfigured until built)
-    data/importers/binance.py                     F1   (klines, aggTrades, funding; spot_crypto and perp)
+    data/importers/binance.py                     F1   (klines, aggTrades, funding; spot_crypto and perp; the
+                                                       1-minute path and liquidation instants of section 18.3)
     data/importers/kraken.py                      F1
     data/importers/coinbase.py                    F1
     data/importers/bybit.py                       F1   (linear klines; perp)
@@ -3246,11 +3785,14 @@ prediction_market/
     data/importers/frankfurter.py                 F2   (daily FX reference rates)
     data/importers/ecb.py                         F2   (daily FX reference rates, the official anchor)
     data/news/__init__.py                         C0
-    data/news/wikipedia_current_events.py         D5
+    data/news/wikipedia_current_events.py         DS1  (D5 wrote it; DS1 owns it for the per-bullet revision
+                                                       timestamps of decision D-R3, section 5.5)
     data/news/wikipedia_asof.py                   D5
     data/news/wayback.py                          D5
     data/news/gdelt.py                            D5
-    data/news/linker.py                           D5
+    data/news/linker.py                           DS1  (D5 wrote it; DS1 owns it for the audit tooling of 7.6)
+    data/news/hn.py                               F5   (Hacker News through Algolia, section 18.3)
+    data/news/timestamped.py                      F5   (the admission rule and the per-source lag of 18.3)
     data/news/manifold_comments.py                D3
     data/news/edgar.py                            F3   (SEC submissions as filings, as-of by acceptance time)
     data/news/fred.py                             F3   (ALFRED vintages; a series without one is features-only)
@@ -3269,6 +3811,7 @@ prediction_market/
     agents/__init__.py                            C0
     agents/protocol.py                            A1
     agents/registry.py                            A1
+    agents/workflow.py                            A1   (Workflow, Step, linear_workflow, run_workflow; section 18.4)
     agents/memory.py                              A2
     agents/hive.py                                A3
     agents/ensembles.py                           A4
@@ -3292,6 +3835,17 @@ prediction_market/
     agents/families/pairs.py                      A1
     agents/families/vol_regime.py                 A1
     agents/families/calendar.py                   A1
+    agents/families/rule_follower.py              A1   (section 18.2, ruling R240)
+    sensors/__init__.py                           C1c  (ruling R122: created by this amendment, docstring only)
+    sensors/catalogue.py                          S1   (SENSORS, SENSOR_NAMES, CATALOGUE_HASH, SENSOR_BY_NEWS_SOURCE,
+                                                       SensorSpec, SensorBlock, RE_SENSOR; section 18.1)
+    sensors/<sensor>.py                           S1   (one module per sensor of the catalogue; the sense function)
+    rules/__init__.py                             C1c  (ruling R122)
+    rules/vocabulary.py                           S2   (FEATURE_NAMES over the sensor blocks)
+    rules/rule.py                                 S2   (Predicate, RuleScope, RuleClaim, Rule, rule_from_dict, RE_RULE_ID)
+    rules/tester.py                               S2   (HypothesisFamily, FamilyTemplate, the tester of 18.2, RE_FAMILY_ID;
+                                                       adds benjamini_hochberg to metrics/stats.py by agreement, R238)
+    rules/miner.py                                S2   (the symbolic miner of 18.2)
     gateway/__init__.py                           C0
     gateway/protocol.py                           A5
     gateway/budget.py                             A5
@@ -3309,7 +3863,8 @@ prediction_market/
     metrics/calibration.py                        E3
     metrics/performance.py                        E5
     metrics/behavioral.py                         E5
-    metrics/stats.py                              E4
+    metrics/stats.py                              E4   (S2 adds benjamini_hochberg by the agreement of ruling R238)
+    metrics/capacity.py                           O4   (the capacity metric of 12.3, computed at claim time)
     metrics/leaderboard.py                        E5
     optimizer/__init__.py                         C0
     optimizer/folds.py                            O1
@@ -3329,6 +3884,7 @@ prediction_market/
     api/sse.py                                    U1
     api/worker.py                                 U1
     api/routes_analysis.py                        R2e  (the analysis routes, section 16.4)
+    api/routes_rules.py                           U1   (the rule ledger, cohort and ablation routes of 12.12)
     analysis/__init__.py                          C2   (ruling R122)
     analysis/news_lead.py                         R2a
     analysis/divergence.py                        R2b
@@ -3336,7 +3892,11 @@ prediction_market/
     analysis/comparative.py                       R2d
     analysis/report.py                            R2e  (the opportunity map and RE_OPPORTUNITY_ID)
     analysis/cross_domain.py                      R2f  (the cross-domain detectors of section 17.6)
-    features/__init__.py                          C3   (ruling R122)
+    features/__init__.py                          C1c  (ruling R122 as ruling R245 applies it: FM1 opens features/
+                                                       in lot 6, before amendment C3, so this amendment creates the
+                                                       docstring-only file)
+    features/matrix.py                            FM1  (the precomputed integer feature matrices of the proxy tier,
+                                                       section 12.6, decision D-R9)
     features/spec.py                              R3a  (the layout of section 16.5 and features_hash)
     features/build.py                             R3a
     features/view.py                              R3a  (the float view, the one crossing into torch)
@@ -3413,6 +3973,13 @@ prediction_market/
     test_import_yahoo_fx.py                       F2
     test_finance_news.py                          F3
     test_sessions_universe.py                     F4
+    test_sensors.py                               S1   (fixtures/s1/)
+    test_rules.py                                 S2   (fixtures/s2/: the planted effect and its shuffled twin, AC-27)
+    test_hn.py                                    F5   (fixtures/f5/)
+    test_taxonomy.py  test_cohorts.py  test_showcase.py   DS2 (fixtures/ds2/)
+    test_feature_matrix.py                        FM1
+    test_workflow.py                              A1
+    e2e/test_e2e_5a_discovery.py                  gate G4 (PRD v5's E2E-5a as ruling R238 corrects it)
     e2e/test_e2e_0_base.py                        gate G6 (ruling R137): the first point at which build,
                                                   run, replay and claim all exist, which is what rung 0
                                                   of PRD v3 section 2 asks an end-to-end test to cover
@@ -3428,6 +3995,7 @@ prediction_market/
     src/components/market/**  src/components/portfolio/**       U2
     src/components/clusters/**                    R1d
     src/components/opportunities/**               R2e
+    src/components/rules/**  src/components/cohorts/**   U3  (the rule ledger, the ablation table, the cohort view)
     src/components/portfolio_alloc/**  src/components/live_opportunities/**   R6b
     src/components/board/**  src/components/evolution/**  src/components/hive/**
     src/components/claims/**  src/components/dataset/**  src/components/live/**   U3
@@ -3471,8 +4039,13 @@ only to build a fallback reply.
 | `ClaimRefusedError` | claims | a second claim on the same `(dataset_hash, kind, provider, horizon_bars, genome_hash)`, or an `access.jsonl` line for it without a completed file (12.8, ruling R199) |
 | `ProviderBlockedError` | importers | the ANJ block page (or any non-provider certificate) was served |
 | `ProviderError`, `MalformedResponseError`, `BudgetExceededError`, `GatewayError` | gateway, importers | the impure edge failed; mapped to `RejectReason` at the gateway boundary |
-| `InvalidConfigError` | every config `__post_init__`, `MarketMeta.__post_init__` | a config value outside its cap; a `MarketMeta` built with a kind outside the table, a construction error and not a file's (ruling R207) |
-| `NotConfiguredError` | metaculus importer, live jobs | an optional path used without its token or setting |
+| `InvalidConfigError` | every config `__post_init__`, `MarketMeta.__post_init__`, `genome_from_dict`, `make_agent`, `Workflow.__post_init__`, `resolve_sensor_set` | a config value outside its cap; a `MarketMeta` built with a kind outside the table, a construction error and not a file's (ruling R207); a genome without `tape`, with an unknown sensor or without a required one, a workflow outside 18.4's bounds, `window_days` above `WINDOW_DAYS_MAX`, a minute build naming a coarse source (amendment C1c) |
+| `NotConfiguredError` | metaculus importer, live jobs, `pmx evolve` with `prompt_mutation` | an optional path used without its token or setting; prompt mutation before the live book holds `LIVE_REPLICATION_MIN_RESOLVED` resolutions (12.9, ruling R256) |
+| `SensorAbsentError` | the sensed views of the observation builder (`SensedMarketView`, `SensedObservation`, `SensedBar`, `SensedHiveView`) | an agent read a field its sensor set did not buy (18.1, ruling R232); carries `field`, `unsensed` and `view`. Replaces the `SchemaError` E1's hook raised for want of a better fit |
+| `RuleRefusedError` | `Rule.__post_init__`, `rule_from_dict`, the rule tester | a predicate outside the vocabulary or its bounds, a fourth predicate, a claim inconsistent with its kind, a rule whose family has no earlier `family_registered`, a duplicate of a rule already tested on the same fold pair (18.2, rulings R236 and R238) |
+| `FoldIntegrityError` | `verify_dataset`, `load_dataset`, `make_folds`, the rule tester, `claim` | the count-quantile cuts or the cluster moves of the manifest disagree with what is recomputed from the metas, a cluster or `event_key` group spans two folds, or a cohort row disagrees with the folds and facets recomputed (7.7, 18.5, rulings R248 and R266) |
+| `ShowcaseDatasetError` | `make_folds`, `run_generation`, `evolve`, `claim`, the rule tester, `pmx.features.matrix` | a `purpose: "showcase"` dataset reached a fold, a fitness value, a rule promotion or a claim (5.6, ruling R263); never a silent skip |
+| `CohortRefusedError` | `claim --cohort`, the per-cohort leaderboard | a cohort claim on a cohort that is not `usable_for_paired_test` (18.5, ruling R266): refused, never weakened to a smaller bar |
 
 ### 13.2 Version constants (`pmx/__init__.py`, C0)
 
@@ -3484,6 +4057,7 @@ OBS_VERSION = "obs.v2"; ACTIONS_VERSION = "actions.v2"; JOURNAL_VERSION = "journ
 MARKET_SCHEMA = "market.v2"; NEWS_SCHEMA = "news.v1"; DATASET_SCHEMA = "dataset.v1"
 INSTRUMENT_SCHEMA = "instrument.v1"; CASH_EVENT_SCHEMA = "cash_event.v1"          # amendment C1b, 17.9
 SESSION_CALENDAR_SCHEMA = "session_calendar.v1"; FORECAST_SCHEMA = "forecast.v1"
+RULE_SCHEMA = "rule.v1"; SENSOR_SCHEMA = "sensor.v1"; WORKFLOW_SCHEMA = "workflow.v1"   # amendment C1c, 18.8 (DS1 applies)
 ```
 
 `run_started` carries `engine_version`, `contract_version` and `rng_algorithm_version`; a replay refuses a
@@ -3495,9 +4069,12 @@ eight `market_listed` fields of R201, the run id of a config that omits `horizon
 bytes of a continuous run) versions nothing, because there is no journal a replay could refuse; the
 contract fixture is a completed historical document and not a run (R202), and a gate's measurement runs
 are evidence taken on one tree, not artefacts a later engine must reproduce. The first lot that applies
-R213, R214, R217 or R221 moves what a future journal carries again and bumps both constants in the same
+R213, R214, R217 or R221 (together with amendment C1c's `observation_built.sensors`,
+`run_started.sensor_catalogue_hash`, `RunConfig.sensor_catalogue_hash` and the four `market_listed`
+facets, ruling R274) moves what a future journal carries again and bumps both constants in the same
 commit as R111 asks; from the first run a later engine is expected to replay, every byte movement bumps
-again, and a replay's exit-2 refusal is what the constant buys.
+again, and a replay's exit-2 refusal is what the constant buys. Amendment C1c moves no byte of a journal a
+run has written and leaves both constants (ruling R275).
 
 ---
 
@@ -3922,6 +4499,77 @@ listed in section 17.9 with the gate that applies it.
 | R197 | **A schedule row names one provider.** `usequity-zero-2026-09` listed `xnys, xnas, arcx` while `FeeSchedule.provider` is one provider, the id pattern carries one and an instrument's `provider` names "the venue whose fee schedule applies"; the borrow schedule `usequity-borrowgc-2026-09` had the same shape. Three fee rows (`xnys-zero-2026-09`, `xnas-zero-2026-09`, `arcx-zero-2026-09`) and three borrow rows (`xnys-borrowgc-2026-09`, `xnas-borrowgc-2026-09`, `arcx-borrowgc-2026-09`) ship with the same numbers, and the AAPL fixture names the `xnas` pair | 17.4, `instrument.xnas-aapl.json` |
 | R198 | **A roll's reopening leg is truncated like any fill, and a residual after `instrument_closed` is marked at the last price.** 17.3 said a position "never earns or loses the gap, it pays two fills" without saying what happens when cash cannot pay the second one, and the residual short after `instrument_closed` had no mark price for an instrument with no more bars. The reopening leg goes through `truncate_for_cash` and the short-notional rule, its residual is in the leg's `unfilled_size` and `unfilled_reason` and in `cash_event_applied.position_after`, a residual position after `instrument_closed` is marked at `instrument_closed.last_price_ticks` until run end, and E2's cases gain a roll with a positive gap on an agent with no free cash | 8.6, 8.7, 17.3 |
 | R199 | **Three binary-only sentences are corrected.** `ClaimRefusedError` (13.1) keys on `(dataset_hash, kind, provider, horizon_bars, genome_hash)` as 12.8 does; `RunProjection.per_market` is sorted by `(agent_id, market_id, horizon_bars, unit_key)`, a total order once a continuous `(agent, instrument, week, horizon)` has its own row; and R163's "byte-identical" claim is replaced by what is true, that `to_dict()` renders the defaulted fields, so a v2 journal's `results.json` gains keys at their defaults and no byte that exists moves because no run exists | 12.11, 13.1, 15.9 |
+
+### 15.10 Amendment C1c (the discovery layer of `docs/PRD_V5_DISCOVERY.md` and the two reviews)
+
+C1c writes section 18 and 7.14 after gate G2 and before the agents wave (`docs/PLAN_V3_WAVES.md` lots 5b
+and 6), so that S1, S2, F5, DS1, DS2, FM1, A1..A6 and O1..O4 are built once against the sensor gene, the
+hypothesis layer, the minute grid, the workflow genome, the cohort and the two reviews together.
+**R230 to R246 are the section 18 rulings**, **R247 to R259 land decisions D-R1 to D-R14** of
+`docs/REVIEW_2026-09-08.md` (D-R8 is R238, the promotion ruling, because the decision is the
+mechanism), **R260 to R273 land decisions D-S1 to D-S14** of `docs/REVIEW_2026-09-09_SCALE_TAGS.md`, in
+the form section G of that review corrected (D-S11, D-S12 and D-S14 supersede D-S1 and D-S9 as first
+written, so the corrected form is what is normative and the first form appears nowhere), and **R274 and
+R275 carry gate G2's four declared-not-applied shapes forward** and state what this amendment leaves
+alone. The numbering starts at R230 because gate G2's audit pass took R228 and R229 (15.3). Every
+normative passage this amendment changes lives in a file C1c owns and is amended in place (ruling R136);
+what is left is code in another package's file, listed in 18.8 with the package that applies it. Where a
+value has a measurement behind it, the ruling cites it; where it has none, the text says it is a default the
+first build reports against. **No ruling here moves a byte of a journal a run has written: no such run
+exists, `ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"` (R275, the trigger of
+R227 and 13.2 unchanged).**
+
+| # | Ruling | Sections |
+|---|---|---|
+| R230 | **The sensor hook is normative and the tape is mandatory.** `build_observation(..., sensors=genome.sensors)` is the signature E1 shipped and 8.3 now declares it: `None` means every sensor and is byte-identical to the builder without the keyword, a set narrows by **subtraction** over what the as-of filters produced, and an unbought field is **absent** (no slot value, no key in the payload), never zeroed and never `None`, so no sensor set can widen an observation and the as-of law needs no second proof. `Genome.sensors: tuple[str, ...]` is sorted, unique, always rendered by `to_dict()` and **always contains `tape`**: a genome that omits it is refused (`InvalidConfigError`) rather than given a view without a price, because every family of 10.5 reads `last_price_bp` and a tape-less view would be a second observation shape for a diet nobody asked for. `FamilySpec.required_sensors` names what a family reads and no operator produces a genome that lacks one. The catalogue is closed at the fifteen sensors of PRD v5 1.1, with the PRD's costs verbatim and lags that are defaults | 8.3, 10.1, 18.1 |
+| R231 | **A run records the diet it ran under.** `Observation.sensors` (the resolved set, sorted, the full `SENSOR_NAMES` when everything was bought), `observation_built.sensors: list[str]`, `run_started.sensor_catalogue_hash` and `RunConfig.sensor_catalogue_hash: str = ""` (`""` meaning the shipped catalogue; a non-empty value that differs from `CATALOGUE_HASH` is `InvalidConfigError`, the `liquidity_params_hash` pattern of R112) are declared. The runner passes `genome.sensors` where it passes `None` today (BUILD_STATE 8.7). The two journal fields move every future journal and no run exists: they are applied by the first engine lot together with R213, R214, R217 and R221 (R274), and `journal.v2.json` declares them optional until then (R164's discipline) | 8.1, 8.3, 9.2, 18.1 |
+| R232 | **`SensorAbsentError` joins 13.1.** Reading an unbought field raises `SchemaError` today for want of a better fit (E1's hook report); the taxonomy gains `SensorAbsentError(field, unsensed, view)`, raised by the sensed views of the observation builder and by nothing else, because "the agent did not buy this" is a distinct failure from "a file failed its schema" and a test that pins one must not pass on the other. `pmx.errors` is D1's and S1 adds the class and switches the raise by the agreement recorded in section 13; E1's tests that pin `SchemaError` on an unsensed read are corrected to the contracted class in the same commit, which is a test disagreeing with the contract and not a weakening | 8.3, 13.1, 18.1 |
+| R233 | **`cash_events` sits under `volume_profile`, the hive is split between its two sensors, and three gates go one level down.** The v5 catalogue names no sensor for `MarketView.cash_events`; PRD v5 1.1's `volume_profile` row reads "volume z-scores, open interest, funding" and 17.7's `carry` family reads funding from `cash_events`, so applied cash events (funding, dividends, splits, rolls) are that sensor's, and `carry` requires it. `Observation.hive` is present when either hive sensor is bought: `hive_reputation` gates `HiveView.reputations`, `hive_insights` gates the rest (`insights`, `lessons`, `resolutions`, `forecasts`, `prev_bar_forecasts`). The hook gated whole fields only; three nested gates are declared with the same absence semantics (`SensedBar` for `volume_milli`, `n_trades`, `open_interest` under `volume_profile` and `yes_bid_bp`, `yes_ask_bp` under `microstructure`; `SensedHiveView`; the `news` tuples filtered by `SENSOR_BY_NEWS_SOURCE`). A `ResearchRequest` whose kind's sensor is not in the diet is `action_rejected(bad_research)`; the grant still costs research units: the research budget prices grants, the sensor budget prices standing subscriptions, and the hook's question ("which one prices a grant") is answered | 8.3, 8.4, 18.1 |
+| R234 | **A `SensorBlock` is a slice of `features.v1`.** Every sensor is a pure function from the as-of views to a fixed-width integer block whose layout is a tuple of 16.5's `FeatureSpec` with `source` the sensor name and `asof_only = True`, plus `features_v1_index`; `features.v1` is unchanged and each of its thirty-one non-portfolio fields belongs to exactly one block through that index, the blocks outside it (seventy-five names in all on the shipped fixture) await a `features.v2` of R3a's before a torch policy sees them, a missing input takes the sentinel its description names (`lo` by default), and `pmx.rules.vocabulary.FEATURE_NAMES` is exactly the union of the blocks' names, so a rule's predicate can only name a sensor feature. Blocks are computed in `observe`, never journaled (a projection of the observation) | 16.5, 18.1 |
+| R235 | **The sensor budget is a per-bar cap with the research-penalty rule generalised, and the diet is a fourth archive axis.** `diet_cost_units(genome)` is the sum of the diet's costs per bar; `EvolutionConfig.sensor_budget_units` (default the full catalogue's `17`) is a fresh genome's allowance and a cap the diet must fit; an agent whose `skill_lb_micro` did not improve and whose diet costs more than `0` loses `SENSOR_PENALTY_UNITS = 2` next generation (`generation_closed.sensor_budget_next`); a child that does not fit its allowance takes the deterministic **sensor drop** (`op = "sensor_drop"`: the most expensive non-`tape`, non-required sensor first, ties by name descending) and one that cannot fit is `culled_by_budget`. Fitness stays net of nothing: a sensor cost never moves a cent. `Descriptors.diet_class` (`0` tape and market, `1` news, `2` hive) is an archive axis with three bins, `ARCHIVE_CELLS = 144`, `cell_key = f"t{i}-c{j}-a{k}-d{l}"`, and AC-6's forty percent becomes 58 cells, which the first evolution reports against and 14.1's D-7 records as amended. `candidate_scored` gains `diet_cost_units`, `sensors` and `n_rules_proposed`. The two numbers are defaults | 9.4, 12.5, 12.6, 12.11, 14.1, 18.1 |
+| R236 | **A rule is a record in a closed vocabulary, content-addressed, and a bad one is `RuleRefusedError`.** `Rule(rule_id, author_kind, author_id, born_at_ms, scope, condition, claim, horizon_bars, min_support, family_id)` with `Predicate(feature, op, value)` over `FEATURE_NAMES` and `PREDICATE_OPS`, at most `RULE_PREDICATES_MAX = 3` predicates sorted by `(feature, op, value)`, `RuleScope(kinds, providers, categories, tags, cohorts)` and `RuleClaim(kind, direction, magnitude_bp, factor_ppm)`; `rule_id = "ru-" + sha256(canonical_json([scope, condition, claim, horizon_bars, min_support]))[:16]` is author-independent so two authors of one statement produce one rule (the first proposal in journal order is the author of record). Categorical facts (category, provider, kind, tag, cohort) are **scope**, predicates are over integer sensor features only, so the grammar is closed and every rule is evaluable on every bar of every dataset by `Rule.fires`. What a claim measures per matched row is the table of 18.2 (integers, bp), the effect is the block bootstrap of 12.4 over those rows, and the sign is what is tested, not the magnitude. `rule.v1.json` and `rule.sample.json` are this amendment's | 13.1, 18.2, 18.7 |
+| R237 | **Three authors, one ledger, one tester.** The symbolic miner (deterministic beam search on the fit fold, `RULE_MINER_BEAM = 32`, at most `RULE_MINER_CANDIDATES_MAX = 10_000` enumerated per family, thresholds at `RULE_THRESHOLD_QUANTILES_PPM`, no substream), an agent's `Actions.propose_rule` (at most one per bar, journaled `rule_proposed`, `action_rejected(scope="rule", reason="bad_rule")` when invalid, one sensor unit of that bar's diet cost) and every detector of 16.4 whose finding is statable in the vocabulary (`author_kind = "detector"`) feed the same ledger and go through the same tester, so hand-written and discovered knowledge are compared on one footing. `actions.v2.json` gains the optional `propose_rule`; `RejectReason` gains `bad_rule` | 8.4, 9.2, 16.4, 18.2 |
+| R238 | **Decision D-R8: pre-registered families, Benjamini-Hochberg within a family at five percent, out-of-time replication as the primary criterion, and visibility that follows the data.** Bonferroni over the miner's millions of candidates kills everything or invites cheating, so: every rule of a generation is assigned to a `HypothesisFamily(family_id, generation, template, n_candidates, n_screened, registered_at_ms)` whose `FamilyTemplate(scope_keys, features, claim_kind, horizon_bars, author_kind)` is the grammar of what may vary, registered by a `family_registered` event **before** any replicate-fold read (the tester refuses a rule whose family has no earlier registration in the same journal or ledger); `n_candidates` is journaled whatever became of them. The fit-fold screen keeps the candidates whose claim held; each survivor's one-sided `p_value_ppm` on the **replicate** fold comes from `permutation_null` with the rule's implied forecasts (`RULE_PERMUTATIONS = 200`, substreams `rules.permutation` and `rules.bootstrap`); `benjamini_hochberg(p_values_ppm, *, q_ppm = FDR_Q_PPM = 50_000)` over the family's `n_screened` p-values (`p_(k) * m <= k * q`, integers) marks `fdr_passed`. A rule is **promoted** iff its claim holds on the replicate fold **and** `fdr_passed`; one that passes the FDR step and fails replication is a recorded negative result, never an `Insight`, still counted in its family, and its content is a duplicate the tester will not re-test on the same fold pair. The fold pair is the **rolling pair** `(months 1..k, month k+1)` inside evolution or the **headline pair** `(train, validation)` for L1 and claims; `fit_t1_ms` is the replicate fold's last bar and an `Insight` is visible from `fit_t1_ms + interval_ms`, never earlier, mirroring 5.4's release rule. **PRD v5 2.3 step 3 and E2E-5a are corrected in place**: "`visible_from = now + one bar`" and "promotion on validation, then trades it on validation" would let a rule fit on validation outcomes be traded on the same fold; the fixture promotes on the rolling pair and trades out of time on validation, and PRD v5's revision history carries a 1.1 entry. `benjamini_hochberg` is E4's name in 12.4, added by S2 by the agreement of section 13 | 9.4, 12.4, 12.6, 18.2, PRD v5 |
+| R239 | **An `Insight` is the promoted rule with its records, the live record demotes it, and the author is paid in rank and in allowance.** `HiveEntry(kind="insight")` carries the rule, the fit and replicate intervals, `p_value_ppm`, the family and the live record; `HiveView.insights` carries, for the agent's open markets, the undemoted insights whose rule **fires at `now_ms`**, at most `HIVE_INSIGHTS_VIEW_MAX = 50`, ranked by `(-lower_bp, rule_id)`, a pure function of the bar; `Hive.write_insight` and `Hive.demote_insight` are the two engine-only writers; `hive_written.kind` gains `insight`. Demotion fires when `live_support >= RULE_LIVE_MIN_SUPPORT = 30` and `live_interval.upper < 0`, or when the author's reputation in the dominant category is negative while the live lower bound is not positive; a demoted rule is never re-promoted. The author of a promoted rule gains `RULE_AUTHOR_BONUS_MICRO = 5_000` on `skill_lb_micro` **for ranking only** (never in a recorded interval or a claim) and `RULE_AUTHOR_SENSOR_BONUS_UNITS = 2` of allowance; a rejected or demoted rule costs its author `SENSOR_PENALTY_UNITS`; `generation_closed.rule_rewards` records every entry. The poisoning test gains a false insight from a negative-reputation author. The three numbers are defaults | 9.2, 9.4, 10.4, 12.6, 18.2 |
+| R240 | **`rule_follower` is a belief family and `llm_belief` is a step kind.** `rule_follower` (`min_lower_bp: 0..2000 (50) [100]`, `weight_permille: 0..2000 (50) [1000]`) states `ppm_from_bp(last + sum over firing insights of lift_bp * weight_permille // 1_000)` clamped, where the sum runs over `HiveView.insights` of the market with `lower_bp >= min_lower_bp`, and the random walk or `ppm_from_bp(last)` when none fires; `required_sensors = {hive_insights}`. `calibrator` and `newsbayes` take a firing insight's `lift_bp` as a prior shift when `hive_insights` is in the diet, and the hive-insight sensor is the only channel: no family reads the ledger files. `llm_belief` is 18.4's step kind for an LLM seat and obeys 11.3 whatever the graph | 10.5, 18.4 |
+| R241 | **The minute grid is the third grid and a source enters it only if its stamp is fine enough.** `INTERVALS_MIN = (1, 60, 1_440)`, the schemas' `interval_min` enums gain `1`, `bar_of` and the density rule are unchanged, and a minute dataset is a separate dataset built per instrument on demand (`pmx data build --interval-min 1` refuses a bare provider). `SOURCE_GRANULARITY_MS` and `SAFETY_LAG_MS_BY_SOURCE` are `pmx.types` tables; a source enters a `interval_min = 1` dataset iff its granularity is at most `MINUTE_SOURCE_GRANULARITY_MAX_MS = 15 * MS_PER_MINUTE` (`BuildConfig.__post_init__` refuses otherwise), so no Wikipedia day page, Wayback capture or daily VIX print ever carries a minute hypothesis; daily and hourly datasets admit every source (D-R5). The lag becomes **per source**: `visible_from_ms = published_at_ms + lag(source)` with `lag` read from `manifest.news.safety_lag_by_source` when present and `manifest.safety_lag_ms` otherwise, recomputed and refused on mismatch by the loader as today, so a dataset built before this amendment recomputes to the same bytes. Hacker News is `NEWS_SOURCES` entry `hn` (kinds `story` and `comment`, id code `hn`, `published_at_ms = created_at_i * 1_000`), fetched by F5 through the one HTTP client; `pmx.data.news.timestamped` is the one implementation of the admission rule. Funding and liquidation instants are `CashEvent`s, never news. The lags are defaults the first minute build reports against | 5.1, 5.2, 5.5, 7.3, 7.4, 7.8, 18.3 |
+| R242 | **The minute event study emits rules.** On a minute dataset R2a runs at `NEWS_LEAD_MINUTE_HORIZONS_BARS = (1, 5, 10, 30, 60)` per source and story feature and emits each finding as a `drift` or `volatility` rule with `author_kind = "detector"` beside its `OpportunityEvent`, tested by S2's tester; AC-28's planted ten-minute drift is such a rule with a positive lower bound on the replicate fold | 16.4, 18.3 |
+| R243 | **A workflow is a bounded DAG over a closed step catalogue, and the linear genome is its degenerate case.** `Genome.workflow: Workflow | None`, always rendered, `None` meaning `linear_workflow(genome)` (`sense -> features -> belief -> overlay... -> sizing -> actions` from `(family, inner, members)`), so no genome hash of a linear genome depends on the graph and every family and composition of 10.5 is a valid workflow. `STEP_KINDS` are nine, `Step(kind, ref, params)`, `Workflow(steps, edges)` in topological order with `from < to` as the canonical form; `WORKFLOW_STEPS_MAX = 12`, `WORKFLOW_DEPTH_MAX = 8`, `WORKFLOW_WIDTH_MAX = 4` (defaults), exactly one `sense` and one `actions`, at least one belief, at most one `sizing` and one `propose_rule`, two beliefs into one sizing combined by the unweighted mean. `workflow_step_executed` is one event per `(agent, bar, step)` in `decide`, digest only (`output_sha256`, `n_out`), emitted **only** for a genome whose `workflow` is not `None`, so no v2 journal gains a byte; structure mutation that breaches a bound returns the parent unchanged. `workflow.v1.json` and `workflow.sample.json` are this amendment's | 9.2, 10.1, 18.4 |
+| R244 | **Three evaluation additions, all projections.** The knowledge-transfer re-test (`rule_tested(stage="transfer")` per provider, category and kind outside the scope, never promoting and never widening a scope), the rule-adjusted claim (`rules_used` with each insight's live record at claim time) and the sensor ablation (`--ablate-sensors`: one run per sensor of the champion's diet with that sensor removed, `skill_drop_micro` from the two `results.json`, never from two hashes, in the claim's `sensor_ablation` table and served by `GET /claims/{claim_id}`); U3 shows the ledger and the table (AC-30) | 12.8, 12.12, 18.1, 18.6 |
+| R245 | **Every new file has one owner, three `__init__.py` are this amendment's, and rule 12 says the tagger is never a model call.** Section 13 gains the rows of 18.7 (S1, S2, F5, DS1, DS2, FM1, A1, O4, U1, U3, gate G4 and C1c) and `data/universe.py` moves from R1a to DS1 (R1a keeps the statistics); `sensors/__init__.py`, `rules/__init__.py` and `features/__init__.py` are created here, docstring-only (R122: `features/` is opened by FM1 in lot 6, before amendment C3, so C3's row is amended); DS2 adds the tagging and cohort calls to DS1's `builder.py` and `loader.py`, S1 adds `SensorAbsentError` and the nested gates to D1's and E1's files, S2 adds `benjamini_hochberg` to E4's, each by the agreement recorded in the map (the R1a and R1d precedent). Rule 12: nothing under `data/`, `cohorts.py`, `rules/` or `sensors/` imports `pmx.gateway` or `pmx.llm`; green on the tree of 2026-09-09 and binding on the first commit that adds a file it covers | 13, 14, 16.6, 18.7 |
+| R246 | **The identifier formats of 18.7.** Sensor names, `ru-` rule ids, `hf-` family ids, `co-` cohort ids, the rule author regex, the nine step kinds, the `hn` news code and the facet-value slug, each a constant beside its owning module (R121) | 2, 18.7 |
+| R247 | **Decision D-R1: folds are cut by count quantiles of resolution order, 60/20/20 by default, still chronological.** The calendar thirds gave `y2026` 111 train, 46 validation and 130 sealed markets, an inverted pyramid (`docs/REVIEW_2026-09-08.md`). Markets are sorted `(resolved_at_ms, id)`, `k_train = (n * 600) // 1000`, `k_validation = (n * 800) // 1000`, `train_end_ms = bar_of(resolved_at_ms of the market at k_train)` and `validation_end_ms` likewise (a bar open, so a run can clip to it; every market resolving in the cut bar goes to the later fold), the fold predicates of 12.7 keep their form over the new cuts, the thirteen month edges stay for the rolling folds while a continuous instrument follows the headline spans (7.7 and 17.6, amended in place), and the manifest's `split` gains `method`, `quantiles_permille`, the cut dates and the realised counts. `docs/PRD_V2_HARD_OPTIMIZER.md` 6.1's "months 1 to 8 ... 9 and 10 ... 11 and 12" is corrected in place with a 1.1 revision entry: the review's decision was accepted by the user, so the PRD-wins rule of the preamble is honoured by amending the PRD, not by leaving two documents that disagree. `make_folds` (O1) reads the cuts from the manifest, recomputes them from the metas and refuses a mismatch with `FoldIntegrityError` (R248); it never cuts on its own | 7.7, 7.8, 12.7, PRD v2 |
+| R248 | **Decision D-R2: folds are cluster-aware and a dataset whose folds split a cluster is refused.** Every market of an `EventCluster` (16.3) and of a Kalshi `event_key` group takes the fold of its **latest-resolving** member, after the cut of R247; a train price path may otherwise encode a sealed outcome that the cross-asset sensor or a cluster feature carries. The manifest's `split.cluster_moves` lists every moved market `(market_id, from_fold, to_fold, group_id)`, the loader recomputes the moves and refuses a mismatch, `pmx data verify` gains the check, and `make_folds`, the rule tester and `claim` refuse a dataset whose folds split a group with `FoldIntegrityError` (13.1). Cohorts inherit the same rule (R266): a cohort never crosses a fold | 7.7, 7.8, 12.7, 13.1, 16.3 |
+| R249 | **Decision D-R3: a Current events bullet is stamped with the revision time at which it first appeared.** D5's `published_at_ms` for a `wce` item becomes the timestamp of the first revision of `Portal:Current events/<day>` that carries the bullet (`revid` filled, `published_at_source = "revision"`), the end-of-day stamp of 5.5 remaining the fallback when the revision history is unavailable (`published_at_source = "page_day"`) and the blanket lag remaining the floor of `visible_from_ms`; the six-hour figure was a guess and is now a floor over a measured instant. The day key of a news file (7.1) is unchanged in form and now names the revision's day. Applied by DS1, with a rebuild | 5.5, 7.1, 7.3 |
+| R250 | **Decision D-R4: the linker's precision is audited and a weak build says so.** Fifty random links per build (`sample_without_replacement` from `dataset.subsample`) are reviewed into `data/datasets/<name>/audit/linker_<dataset_hash[:16]>.json` (outside the walk, keyed by the hash) with the reviewer's verdicts; the manifest's `news.linker_audit {path, n, precision_permille}` reports it, and a build below `LINKER_PRECISION_MIN_PERMILLE = 800` carries `news_links: "weak"` in `LeaderboardRow.labels` of every row of a run whose roster bought a news sensor. `LeaderboardRow.labels: tuple[str, ...] = ()` is the one carrier of every such label (`news_links:weak`, `taxonomy:weak`, `contamination_audit:coarse`, `window_days:<n>`), filled by `leaderboard.build(..., labels=)` from the manifest by the caller, since the projection reads no dataset. Gate G3 performs the review | 7.6, 7.8, 12.10, 12.11 |
+| R251 | **Decision D-R5: the hourly grid is the headline Kalshi grid.** Kalshi's median life is 29 days and it publishes 1-minute candlesticks, so a daily grid discards its intraday content and the latency rule costs a full day; `y2026h` (`interval_min = 60`) is the headline Kalshi dataset, daily stays for Manifold and for the showcase pack, minute grids serve the event studies (18.3). 5.2 and 7.8 say so; one grid per run and one dataset per grid are unchanged | 5.2, 7.8 |
+| R252 | **Decision D-R6: the contamination audit is labelled coarse and an LLM result awaits the live book.** The audit of 11.5 detects blatant recall only: every LLM leaderboard row carries `contamination_audit:coarse` in `labels`, and a claim on an LLM genome records its four parts but its `verdict` is `awaiting_live_replication` until `live/` holds at least `LIVE_REPLICATION_MIN_RESOLVED = 100` resolved forecasts of that `genome_hash` and `model` with a positive `skill_lb_micro`; only then may it read `beats_market`. The number is D-R11's and is a default | 11.5, 12.8 |
+| R253 | **Decision D-R7: the evolutionary loop is a generator, not a certifier.** 111 training markets cannot detect a Brier edge of 0.005 at a market-level standard deviation near 0.15, and 48 by 30 evaluations make the deflated bound unreachable; 12.6 says in the normative text that the objective **selects** and that certification comes from the sealed fold of a dataset of thousands of markets and from the live book, and a claim's `note` carries the sentence. The per-provider cap stays lifted (a debug option). The targets D-R7 first stated (2 000 and 2 000 at the hourly grid) are restated by R260, R270 and R271 | 12.6 |
+| R254 | **Decision D-R9: two-tier fitness, and no genome enters a claim on proxy fitness.** Full engine replay per genome is impossible on hourly and minute grids for a whole population. Tier `proxy`: the belief function evaluated on `pmx.features.matrix` (FM1), precomputed integer feature matrices per `(market, bar)` of the fold, scoring the time-weighted Brier of 12.1 against the market and `pmv_bp` at one bar, with no fills, fees, memory or hive; tier `engine`: `run_generation`'s full replay. Every candidate of a generation is proxy-scored; the elites, the `engine_tier_count` (default `12`, elites always included) best by proxy on train, every archive offer (descriptors need fills) and every claim are engine-scored; `best_validation_lb_micro` and patience read engine scores only. `candidate_scored.tier`, `matrix_hash` and `features_hash` record what an evaluation used, `candidates_evaluated_cum` counts distinct genomes scored on validation at **either** tier, and `claim` refuses (`ClaimRefusedError`) a genome whose store row has no engine-tier validation score. `pmx/features/matrix.py` is FM1's (lot 6) | 9.4, 12.6, 12.11, 13 |
+| R255 | **Decision D-R10: the capacity metric.** Kalshi's fee of seven percent of `p(1-p)` and thin books make most micro-edges untradeable, so PnL failure will be liquidity and not skill. `pmx.metrics.capacity.capacity_cents(fills, bars, config, schedule)` (O4) re-prices every fill of a claim run at each scale of `CAPACITY_SCALE_GRID_PERMILLE = (1000, 2000, 5000, 10000, 20000, 50000, 100000)` through `historical`'s cap, slippage and fee (`pmx.engine.liquidity`'s own functions, so rule 9 holds) on the same bars, and reports per market and in aggregate the notional in cents at the **first grid scale** whose after-fee return is at most half the unit-scale return (`-1` when no grid scale halves it, with the grid's ceiling stated). It needs the dataset, so it is computed at claim time and lives in the claim record beside `pnl` (`capacity {per_market, aggregate_cents, halving_scale_permille}`), never in the journal projection | 12.3, 12.8 |
+| R256 | **Decision D-R11: prompt mutation is deferred.** O3 (12.9) runs only when the live book holds at least `LIVE_REPLICATION_MIN_RESOLVED = 100` resolved markets: two and a half months of clean markets are not a training set. 12.9 says it in the text; the package text stands | 12.9 |
+| R257 | **Decision D-R12: the Manifold separation is a gate check with a structural carrier.** `LeaderboardRow.currency` (`mana` iff `provider == "manifold"`), every 12.12 answer that carries a score carries `currency`, no leaderboard, chart or README sentence pools Manifold with Kalshi, and gates G3 onward check it. Nothing else changes: claims were already per provider | 12.10, 12.11, 12.12 |
+| R258 | **Decision D-R13: the universe is an output of the builder, documented in the manifest.** The 731 Kalshi series were picked ad hoc and are category-biased. The builder lists every Kalshi series with at least `BuildConfig.universe_min_settled` settled markets in the window and at least `BuildConfig.universe_min_volume_cents` of volume from the settled walk (defaults `5` and `100_000`, reported against, not laws); `kalshi_series_allow_list` becomes a debug narrowing; the manifest's `universe` block carries the rule, the series with their before and after counts and volumes, and `n_series_before`, `n_series_after`; weather series are kept and carry the builder label `forecastable_from_public_models` in `tags` | 7.4, 7.8 |
+| R259 | **Decision D-R14: detectors move before agents.** Seventeen families were scheduled before any inefficiency had been measured. Section 14's rows read lot 5b (DS1, DS2, S1, S2, R2a..R2e, F1..F5, U1, U2) before lot 6 (A1..A6, FM1, O1, O2, O4, L1), the agent roster of 10.5 is ordered by the opportunity map, and `trend` and `revert` stay in the roster as baselines, not as bets. The contract records the order; the plan carries it | 14 |
+| R260 | **Decision D-S1, in the form D-S11 and D-S12 corrected it: the build target is stated in cohorts, per venue.** The research dataset must reach `KALSHI_COHORT_TARGET = 40` usable cohorts (`n_train >= COHORT_MIN_TRAIN = 30`) on Kalshi and `MANIFOLD_COHORT_TARGET = 8` on Manifold, whose stated role is breadth and print-tape depth; the market count is whatever that takes (the prototype tagger put Kalshi at about 7 000 markets, review section G) and the 2 000 per venue of D-R7 is a **floor** for Manifold and is superseded for Kalshi by the cohort arithmetic. A build that reaches a market floor and not the cohort floor is a **failed** build: `manifest.build.status = "failed"` with `shortfall` per filter and per venue. **AC-11 of `docs/PRD_V3_TRADING_OPTIMIZER.md` is corrected in place** (it asked for 1 000 markets per venue and said nothing about cohorts) with a 1.1 revision entry; AC-32 supersedes it | 7.4, 12.7, PRD v3 |
+| R261 | **Decision D-S2: the interface never reads the demo pack by default.** `GET /datasets` orders `purpose: "research"` datasets first, the API's default dataset is the newest sealed research dataset, the market index is server-side paged, and a showcase dataset is reachable only through an explicit selector that labels it `showcase`. U1 and U2, lot 5b | 12.12 |
+| R262 | **Decision D-S3: `window_days` is explicit, 365 by default and refused above 730.** `WINDOW_DAYS_MAX = 730`; `BuildConfig.__post_init__` raises `InvalidConfigError` above it, and the two reasons are in 5.6's normative text so no flag widens it silently: a resolution older than a model's knowledge cutoff is a possible recall rather than a forecast, and a regime three years old is not the regime being traded. The manifest records `window_days` and `resolution_span {min_ms, max_ms}`; a row from a dataset with `window_days > 365` carries `window_days:<n>` in `labels` | 5.6, 7.4, 7.8, 12.10 |
+| R263 | **Decision D-S4: `purpose` replaces `Dataset.is_demo_pack`, and a showcase dataset is refused by name.** `DatasetManifest.purpose: "research" | "showcase"` (absent in a manifest written before this amendment: `showcase` iff `sealed == false and providers == ("demo",)`, the old signature, else `research`; the builder writes it always from DS1 on). A showcase dataset is exempt from the window rule of 5.6, seals and replays like any other, may be run by `run_backtest`, and is **never** the source of a fold, a fitness value, a rule promotion, an insight or a claim: `make_folds` (O1), `run_generation` and `evolve` (O2), `claim` (O4), the rule tester (S2) and `pmx.features.matrix` (FM1) each raise `ShowcaseDatasetError` (13.1) before reading a market, and each has a test. No silent skip anywhere. `is_demo_pack` is deleted by DS1 in the same commit; 7.1's exemption paragraph reads `purpose` | 5.6, 7.1, 7.8, 12.7, 13.1 |
+| R264 | **Decision D-S5: the showcase pack grows past twelve.** DS2 builds it (`pmx.data.showcase`) from landmark events wherever a real tape survives in Wayback or Manifold's history, with the same bars, trades, news and as-of stamps as a research market, `purpose: "showcase"`, sealed, a few dozen markets, and a `notes` entry documenting what could not be sourced. The v1 demo pack stays as the migration identity of 7.10 and is not the showcase pack | 7.1 |
+| R265 | **Decision D-S6: a controlled vocabulary, three facets, and `provider_labels`.** 7.14 is written: `tags.v1.json` with the `subject` (one or more, tagger precedence order, at most 4), `structure` (exactly one) and `horizon` (exactly one, derived from `close_at_ms - created_at_ms`, never from provider text and never from `resolved_at_ms`) facets and a `builder` label list; `tags` stays as the sorted union of a market's facet values and labels; the raw provider strings move to `provider_labels`; the four fields are optional in `market.v2.json` (a file written before the taxonomy loads) and required by the loader on a dataset whose manifest carries the `taxonomy` block; `market_listed` gains the four, optional until R274's lot | 7.2, 7.14, 9.2 |
+| R266 | **Decision D-S7: the cohort is a first-class object and the unit of comparative analysis.** `Cohort(cohort_id, category, subject, structure, horizon, provider, n_train, n_validation, n_sealed, usable, usable_for_paired_test)` keyed on the primary subject, listed by the builder into `manifest.cohorts` and by the loader into `Dataset.cohorts` through the one `pmx.cohorts.list_cohorts`, usable at `n_train >= 30`, `usable_for_paired_test` false when any fold is empty (D-S13), never crossing a fold (`FoldIntegrityError` on a mismatch); `MarketMeta` gains `subject`, `structure`, `horizon`, `provider_labels` and `cohort_id`; R2d runs per cohort, `calibrator`'s ledger keys on the cohort, `RuleScope.cohorts` names them and a family may be keyed on one, `LeaderboardRow.cohort_id` gives one row per usable cohort, a claim gains `per_cohort` rows with their own `K` and verdict at the same `CLAIM_MIN_MARKETS`, and `pmx claim --cohort` below the usable size or without a paired fold is `CohortRefusedError`, never a smaller bar. A `platform-meta` market belongs to no cohort | 7.2, 12.3, 12.6, 12.7, 12.10, 12.11, 13.1, 18.5 |
+| R267 | **Decision D-S8: the tagger is deterministic and auditable, never a model call.** The sealed series-to-facets map first, then the vocabulary's keyword and pattern rules over the question, then a counted `other`; no network, no wall clock, no randomness; the two lexicon files are copied into `taxonomy/` inside the walk so they enter `dataset_hash`; byte-identical across two runs is a test; rule 12 (R245) binds the import graph; and `tests/test_taxonomy.py` poisons 7.9's fields and asserts the facets do not move | 7.14, 18.7 |
+| R268 | **Decision D-S9, in the form D-S14 corrected it: coverage is measured per venue and labelled at ninety percent.** The manifest's `taxonomy` block records per venue and per facet the coverage, the distinct values, the `other` and `platform-meta` counts, the cohort size histogram, the cohort counts and a label; a venue below `TAXONOMY_COVERAGE_MIN_PERMILLE = 900` on `subject`, or with fewer than `TAXONOMY_MIN_USABLE_COHORTS = 10` usable cohorts, is `taxonomy: "weak"` **for that venue only** (a single 95 percent bar is unreachable on Manifold by construction), carried in `labels` on every row and chart that groups by facet or cohort; the fifty-tagging audit is stored under `audit/` with its precision in the manifest, reviewed by gate G3 | 7.8, 7.14, 12.10 |
+| R269 | **Decision D-S10: the market view is a browsable index.** `GET /datasets/{name}/markets` gains filters on `category`, `subject`, `structure`, `horizon`, `provider`, `fold`, `hardness_tag` and `outcome` and sorts on `resolved_at_ms`, `life_days`, `volume_milli_total` and `final_price_bp` (the last two after the cursor passes resolution, 14's U2 rule), `GET /datasets/{name}/cohorts` lists the cohorts and `GET /datasets/{name}/cohorts/{cohort_id}` the markets of one with each agent's calibration on it; U2 and U3 build the views and U5's tour gains the chapter | 12.12 |
+| R270 | **Decision D-S11: the cohort target differs per venue.** Kalshi carries the comparison at `40`; Manifold reached zero cohorts of ten on the prototype and has no dense templates to concentrate, so its target is `8` and a gate that finds it below records the shortfall and does not fail the build, while a gate that finds Kalshi below `40` fails it. Stated in 7.4 beside R260 | 7.4, 12.7 |
+| R271 | **Decision D-S12: the market floor follows the cohort target and the fallback is decided in advance.** Forty Kalshi cohorts at `n_train >= 30` imply on the order of 7 000 markets (review section G) against a reachable in-window listing of about 15 000 rows living a week or more (`docs/BUILD_STATE.md` 7.5), so DS1 reports the reachable count against the target before building, and when the 365-day window cannot deliver it the order is: **first** widen `window_days` toward `WINDOW_DAYS_MAX`, **then** relax `min_trades` (and `min_traded_bars`) with the count removed stated per filter, and **only last** lower the cohort target, with the reason recorded in `manifest.build.fallbacks`. Widening the window costs contamination risk for LLM agents alone, which the clean-market rule handles; lowering the cohort target costs the comparison, which nothing recovers | 7.4 |
+| R272 | **Decision D-S13: no cohort is measured before the fold fix lands.** All six cohorts that reached ten markets on the prototype sat inside one fold, a consequence of the inverted split; DS2 starts after DS1's rebuild with R247's and R248's folds, and the loader reports per cohort its per-fold counts and `usable_for_paired_test`, false when any fold is empty. Section 14's DS2 row says "after DS1" | 7.7, 12.7, 14, 18.5 |
+| R273 | **Decision D-S14: the vocabulary starts from the measured rules, and `platform-meta` is a subject.** 7.14's tables carry at least the structure values and subject values the prototype measured (`threshold-above` 145, `threshold-below` 15, `count-over-period` 10, `head-to-head` 9, `range-band` 7, `by-date` 7 and 12; the seventeen subjects), `platform-meta` names Manifold's self-referential markets (7 measured, against 8 `nonpredictive` provider labels, not the same set, reconciled by the tagger) and keeps them out of forecast cohorts, and the coverage bar is R268's per-venue ninety percent. AC-32 and AC-34 are read in their restated form | 7.14, 18.5 |
+| R274 | **Gate G2's four declared-not-applied shapes are restated where they belong and applied together by the first engine lot after this amendment.** R213's `Execution.__init__(..., t0_ms, t1_ms)` and the last-bar drain of a queued item whose instrument has no later bar as `order_rejected(not_tradable)` (8.6, 16.2, 17.2), R214's `quote_bar(..., bar_prev=)` (16.1), R217's continuous calibration entries through `continuous_entry` (12.2), R221's `PerMarket.n_quantile_forecasts` and `RunProjection.seed` (12.11), together with this amendment's `observation_built.sensors`, `run_started.sensor_catalogue_hash`, `RunConfig.sensor_catalogue_hash` and the four `market_listed` facets (R231, R265): one lot, one commit, E2 and E5 with D7's dataclasses, **the contract fixture and every pinned hash regenerated in that same change** (the backtest fixture completed as R202 did, the pinned config hashes of `tests/test_runner.py` moved beside today's), `tests/test_runner.py::test_every_queued_item_produces_exactly_one_execute_phase_event` reading `dropped == 0` where it pins `dropped > 0` today, and `ENGINE_VERSION` and `CONTRACT_VERSION` bumped in that commit as R111 and R227 require, because from that commit a run exists whose bytes a later engine is expected to reproduce. Until then each shape stays declared in its section and in `journal.v2.json` as optional | 8.6, 9.2, 12.2, 12.11, 13.2, 16.1, 16.2 |
+| R275 | **What this amendment leaves alone.** `ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"`: no ruling here changes a byte of a journal a run has written, because no such run exists (R227's trigger, unchanged in 13.2). `run_id` not naming the population (BUILD_STATE 8.7) is not settled: neither review assigns it and it belongs to R274's lot with the bump. R1a's universe statistics, R1b's matcher, the detectors' bodies, O3's package text and every family rule of 10.5 not named above stand as written. The numbering of this section starts at R230 because R228 and R229 are gate G2's audit rulings | 13.2, 15.3 |
+
+Amendment C1c's own review (one critic, then this author resolves and records rulings, the pattern of
+15.8 and 15.9) is the next entry of this section.
 
 ---
 
@@ -5305,12 +5953,14 @@ categories on a continuous row. Every `GET /runs/{run_id}/leaderboard` and `/cla
 gains `?kind=&horizon_bars=` filters and the new columns, with no other route change.
 
 **Folds** (7.7, 12.7) are unchanged in form and generalised in key: a continuous instrument belongs to
-**every** fold whose months it has bars in, because it does not resolve; `make_folds` places a continuous
-instrument's **bars** by `t_ms` against the same thirteen edges, a run on fold `f` carries an instrument
-if it has at least one bar inside the fold's months and clips the run's `t0_ms`/`t1_ms` to those months,
-and the forced flat of 17.3 closes it at the fold's edge. A binary belongs to one fold by
-`resolved_at_ms`, as today. The sealed fold of a continuous kind is therefore the sealed **months**, and
-`open_sealed_test` returns the instrument ids that have a bar in them; the manifest's `split` block gains
+**every** fold whose span it has bars in, because it does not resolve; `make_folds` places a continuous
+instrument's **bars** by `t_ms` against the fold spans of 7.7 (the count-quantile cuts of amendment C1c,
+ruling R247, which replaced this paragraph's month edges; the thirteen edges stay for the rolling folds), a
+run on fold `f` carries an instrument if it has at least one bar inside the fold's span and clips the run's
+`t0_ms`/`t1_ms` to that span, and the forced flat of 17.3 closes it at the fold's edge. A binary belongs to
+one fold by `resolved_at_ms` and its cluster group, as 7.7 says. The sealed fold of a continuous kind is
+therefore the sealed **span** `[validation_end_ms, freeze_ms - MS_PER_DAY)`, and `open_sealed_test`
+returns the instrument ids that have a bar in it; the manifest's `split` block gains
 `n_instruments_train`, `n_instruments_validation` and `n_instruments_sealed` (17.9).
 
 **Cross-domain detectors** (R2f, wave 8) emit `OpportunityEvent`s exactly as 16.4 declares, with two
@@ -5418,3 +6068,687 @@ file another package owns, listed with the gate that applies it (ruling R171):
 | R162, R190: `open_sealed_test(..., kind="binary")`, the claim id, the `(instrument, week)` units and the within-week permutation of `realised_sign` (`permutation_null(..., realised_signs=None, bar_keys=None)`); `claims.py` is the one caller of `Dataset.sealed_market` (R182) | `src/pmx/optimizer/folds.py` (O1), `claims.py` (O4), `pmx.metrics.stats` (E4) | gate G2 (E4, **applied**, ruling R219), gate G4 (O1, O4) |
 | R166: `opportunity.v1.json` gains `cross_domain`, `kinds`, `providers` and the currency widening | `src/pmx/schemas/opportunity.v1.json` (C1's) | amendment C2 |
 | R166: `.gitignore` and `pyproject.toml` package-data gain `data/calendars/*.json` and `lexicons/*.json` (already) | `.gitignore` (C0), `pyproject.toml` (U4) | gate G3b |
+
+---
+
+## 18. Discovery (amendment C1c): sensors, the hypothesis layer, minute grids, workflow genomes, cohorts
+
+`docs/PRD_V5_DISCOVERY.md` makes two things the optimizer searches over that the build so far wrote by
+hand: **which information an agent consumes** (the sensor gene) and **which rules it trades on** (the
+hypothesis layer), with minute grids so that sub-hour statements are testable and workflow genomes so
+that the whole decision graph is one heritable object. This section is the amendment the agents wave
+(`docs/PLAN_V3_WAVES.md` lots 5b and 6: S1, S2, F5, DS1, DS2, A1..A6, FM1, O1..O4) is built against,
+and it lands **after** gate G2 and before that wave for the reason sections 16 and 17 did: fourteen
+packages written blind of each other must fit, and the engine wave showed what a vague sentence costs
+(five packages, 30 cross-package disagreements, 69 contract issues). Everything below binds exactly as
+sections 1 to 17 do. Where it changes earlier text, the earlier text has already been amended in place
+and the change is a ruling in 15.10; the two reviews of 2026-09-08 and 2026-09-09 (decisions D-R1 to
+D-R14 and D-S1 to D-S14) are landed the same way, each in the section the review names, and 18.5 holds
+the one object both reviews and PRD v5 share, the **cohort**.
+
+Three sentences carry the design. **What is not sensed is not seen**: an observation is assembled by the
+filters of 5.4 exactly as before and then narrowed by subtraction to the agent's sensor set, so a sensor
+set can only ever remove a field, never add one, and the as-of law needs no second proof. **Knowledge is a
+record, never a sentence**: a rule is data in a closed vocabulary with an author, a birth instant, a
+pre-registered family, a test record and a live record, and only a rule that replicated out of time on
+data its promotion never read becomes visible to anyone. **Nothing already built is invalidated**: the
+default sensor set is every sensor and is byte-identical to the builder that predates the hook, the linear
+family composition of 10.1 is the degenerate workflow, and a dataset built before this amendment loads,
+seals and replays as it did.
+
+### 18.1 The sensor catalogue, the sensor gene and the sensor budget
+
+**The catalogue is closed** and lives in `pmx.sensors.catalogue` (S1) as `SENSORS: Mapping[str,
+SensorSpec]`, keys sorted, with `SENSOR_NAMES = tuple(sorted(SENSORS))` and `CATALOGUE_HASH =
+sha256(canonical_json([spec.to_dict() for spec in SENSORS.values()]))`, so a run records which catalogue it
+read. The declaration document is `src/pmx/schemas/sensor.v1.json` (C1c) and the normative table is the
+fixture `tests/fixtures/contract/sensor.catalogue.json`, which S1 implements exactly:
+
+```python
+@dataclass(frozen=True, slots=True)
+class SensorSpec:
+    name: str                      # section 18.7's sensor regex; one of the fifteen below
+    version: str                   # "<name>.v1": bumps when the block's features or the lag change
+    cost_units: int                # sensor units per bar (PRD v5 1.1's column), 0..SENSOR_COST_MAX = 10
+    granularity_ms: int            # the finest timestamp the source carries: MS_PER_DAY, MS_PER_HOUR,
+                                   # 15 * MS_PER_MINUTE, MS_PER_MINUTE, 1_000, or 0 for "the bar grid"
+    lag_ms: int                    # the as-of lag the builder applies to the source (5.5); 0 on the grid
+    sources: tuple[str, ...]       # the NEWS_SOURCES it reads, () for a tape or engine sensor
+    market_fields: tuple[str, ...] # the MarketView fields it gates (8.3), sorted
+    observation_fields: tuple[str, ...]   # the Observation fields it gates, sorted
+    per_market: bool               # True: one block per open market; False: one block per observation (hive_reputation)
+    features: tuple[SensorFeatureSpec, ...]   # the SensorBlock layout below, in block order
+    def to_dict(self) -> dict[str, object]: ...
+```
+
+| Sensor | Gates (`MarketView` unless stated) | Source and granularity | `lag_ms` | `cost_units` |
+|---|---|---|---|---|
+| `tape` | `bars` (the price fields of every `Bar`: `open_bp`, `high_bp`, `low_bp`, `close_bp`, `vwap_bp`, `t_ms`), `first_price_bp`, `last_price_bp` | the instrument's own bars, grid | 0 | 0 (**always on**, below) |
+| `microstructure` | `best_bid_bp`, `best_ask_bp`, `trades`; inside every `Bar`: `yes_bid_bp`, `yes_ask_bp`; the research kind `history` | prints and quotes, grid | 0 | 1 |
+| `volume_profile` | `volume_milli_7d`, `volume_milli_to_date`, `n_trades_to_date`, `cash_events` (ruling R233); inside every `Bar`: `volume_milli`, `n_trades`, `open_interest` | bars and applied cash events, grid | 0 | 1 |
+| `cross_asset` | `underlying_id`, `twins` | the run's other instruments, grid | 0 | 1 |
+| `calendar` | `close_at_ms`, `session_calendar_id`, `hours_to_next_bar` | the venue's published schedule, grid | 0 | 0 |
+| `wiki_daily` | `news` items of sources `wikipedia_current_events` and `wayback`, in `MarketView.news` and `Observation.news`; the research kind `news` | Wikipedia Current events, per-bullet revision time (D-R3, 5.5), floor `SAFETY_LAG_MS_DEFAULT` | 21_600_000 | 1 |
+| `comments` | `news` items of source `manifold_comment` | Manifold comments, `createdTime`, millisecond | 60_000 | 1 |
+| `hn` | `news` items of source `hn` | Hacker News through Algolia `search_by_date`, `created_at_i`, second | 300_000 | 2 |
+| `gdelt_recent` | `news` items of source `gdelt` | GDELT DOC 2.0 `seendate`, 15 minutes | 900_000 | 2 |
+| `filings` | `news` items of source `edgar` | SEC EDGAR acceptance time, second | 60_000 | 2 |
+| `macro_releases` | `news` items of sources `fred` and `cboe` and the release calendar of 17.7 | ALFRED vintages and release times | 0 | 1 |
+| `wiki_asof` | the research kind `wiki_asof` (a granted request's `ResearchGrant` payload) | point-in-time revisions, day | 21_600_000 | 3 |
+| `hive_insights` | `Observation.hive`: `HiveView.insights`, `lessons`, `resolutions`, `forecasts`, `prev_bar_forecasts` | the hive, bar | 0 | 1 |
+| `hive_reputation` | `Observation.hive`: `HiveView.reputations` | the hive, bar | 0 | 1 |
+| `memory` | `Observation.memory` | the agent's own memory, bar | 0 | 0 |
+
+The costs are PRD v5 1.1's column verbatim; the lags are **defaults the first minute build reports
+against**, not laws (no measurement of a source's publication delay exists yet), and each one is the lag
+the builder stamps for that source through 5.5's per-source table, so a sensor cannot see an item before
+the dataset says it was visible. `SENSOR_BUDGET_UNITS_DEFAULT = sum(cost_units) = 17` is the full
+catalogue's cost.
+
+**The gene.** `Genome.sensors: tuple[str, ...]` (10.1, A1) is sorted, unique, drawn from `SENSOR_NAMES`,
+**always contains `"tape"`**, and is always rendered by `to_dict()` (the explicit full tuple for the eight
+v1 archetypes of 10.5, so a genome names its diet and `genome_hash` covers it). A genome that omits `tape`
+is refused by `genome_from_dict` and by `make_agent` with `InvalidConfigError`: a view without a price is
+not a view an agent can decide on (every family of 10.5 reads `last_price_bp`, the forecast record of 8.4
+carries `500_000` for an agent that never saw the market, and the alternative, defining what a tape-less
+view answers, would be a second observation shape for a diet nobody asked for). A genome that names a
+sensor outside the catalogue is refused the same way (`resolve_sensor_set`, E1's hook, already does).
+Every `FamilySpec` (10.1) carries `required_sensors: frozenset[str]`, the sensors its rule reads (`volume`
+needs `volume_profile`, `newsbayes` needs at least one news sensor, `carry` needs `volume_profile`,
+`calibrator` with the hive on needs `hive_insights`, `stacker` needs `hive_reputation`, `rule_follower`
+needs `hive_insights`); `genome_from_dict`, `make_agent`, `mutate` and `structural_mutate` refuse or never
+produce a genome whose `sensors` omit a required sensor of its family, its `inner` or a `member`.
+Mutation adds or removes one sensor (`evolution.mutation`, probability `sensor_mutation_permille` of
+`EvolutionConfig`, default `100`), never `tape` and never a required one; crossover is uniform per sensor
+name between the two parents' sets.
+
+**The hook, made normative** (8.3, ruling R230). `build_observation(..., sensors=genome.sensors)`: the
+keyword is what E1 shipped, `None` means every sensor and is byte-identical to the builder without it, a
+set is applied by **subtraction** over what the as-of filters produced, and a field the set did not buy is
+**absent** from the view and from the payload, never zeroed and never `None`: reading it raises
+`SensorAbsentError` (13.1, ruling R232), `hasattr` raises too, and `to_dict()` omits the key. Three
+gates go one level below a top-level field and are the same subtraction applied to a nested payload (ruling
+R233): the `Bar` fields of `volume_profile` and `microstructure` inside `MarketView.bars` (a bar rendered
+without `volume_milli` is a `SensedBar` with the same absence semantics; `tape` keeps the six price and
+time fields of every bar), the `HiveView` fields split between `hive_insights` and `hive_reputation`
+(`Observation.hive` is present when either is bought and carries only the bought half), and `news` items
+filtered by `SENSOR_BY_NEWS_SOURCE` (`pmx.sensors.catalogue`, the source-to-sensor map of the table above;
+`Observation.news` and `MarketView.news` are present when at least one news sensor is bought and carry
+the items of the bought sources only). A `ResearchRequest` whose kind's sensor is not in the diet
+(`history` needs `microstructure`, `news` needs `wiki_daily`, `wiki_asof` needs `wiki_asof`) is
+`action_rejected(bad_research)`; a granted request still costs `RESEARCH_UNIT_COST[kind]` research units:
+the **research budget** of 8.1 pays for on-demand grants and stays a per-run stock, the **sensor budget**
+below pays for standing subscriptions and is a per-bar cap, and the two are distinct on purpose (the hook's
+report asked which one prices a grant: the research budget does, and the sensor gates whether the request
+may be made at all).
+
+**What a run records** (rulings R231 and R274). `Observation.sensors: tuple[str, ...]` is the resolved
+set, sorted (the full `SENSOR_NAMES` when the genome bought everything, so a catalogue change is visible
+on the face of every observation); `observation_built` gains `sensors: list[str]` and `run_started` gains
+`sensor_catalogue_hash: str`; `RunConfig.sensor_catalogue_hash: str = ""` names the catalogue a run must
+read (`""` meaning the shipped one; `run_backtest` raises `InvalidConfigError` when a non-empty value
+differs from `CATALOGUE_HASH`, exactly as it checks `liquidity_params_hash`). The runner passes
+`sensors=genome.sensors` (today it passes `None` to every agent, BUILD_STATE 8.7); a roster whose agents
+all buy everything therefore journals the same bytes it does today except the two new fields.
+
+**The `SensorBlock`** (S1). Every sensor is a pure function `sense(view: SensorInputs, *, now_ms: int,
+spec: SensorSpec) -> SensorBlock` from the as-of dataset views of 8.3 to an integer block:
+
+```python
+@dataclass(frozen=True, slots=True)
+class SensorBlock:
+    sensor: str; version: str          # SensorSpec.name and .version
+    market_id: str | None              # None for an observation-level block (memory, the hive)
+    values: tuple[int, ...]            # one per spec.features entry, in block order, each clamped to [lo, hi]
+    def to_dict(self) -> dict[str, object]: ...
+```
+
+`spec.features` is a tuple of `SensorFeatureSpec` (`pmx.sensors.catalogue`, S1): 16.5's `FeatureSpec`
+fields (`index`, the position inside the block; `name`, `unit`, `lo`, `hi`, `scale`, `description`, `source
+= sensor name`, `asof_only = True`) plus **`features_v1_index: int | None`**, the entry's position in the
+`features.v1` vector when the feature is one of its thirty-seven fields and `None` otherwise. **`features.v1`
+is unchanged**: its thirty-seven fields keep 16.5's order, names and bounds, and every one of them but the
+six of the `portfolio` block (indices 31 to 36, the agent's own book, gated by no sensor) belongs to
+exactly one sensor block through `features_v1_index` (the `category` block's two fields sit under `tape`,
+the always-on sensor, because a market's category and provider are metadata known before its first bar).
+The features outside `features.v1` (every news sensor but `wiki_daily`, the hive and memory blocks, the
+additions to the market blocks) are available to a rule and to the `features` step of 18.4 from the first
+build; appending them to a torch policy's vector is a `features.v2` that belongs to R3a and amendment C2,
+not to this one. A block's feature names are the closed vocabulary 18.2's predicates draw from
+(`pmx.rules.vocabulary.FEATURE_NAMES`, S2, is exactly the union of `spec.features[*].name` over the
+catalogue, seventy-five names on the shipped fixture, unique across sensors, asserted by S2's test). A
+missing input (no quote, no item, no memory) takes the value the feature's `description` names, `lo`
+unless the description says otherwise (a count or a magnitude reads `0`, a signed gap reads `0`, a
+`minutes_since_*` or `bars_to_*` reads its `hi` of `100000`), never `None`: a block is fixed-width and
+every sentinel is written down. The contents of the blocks outside `features.v1` are this amendment's
+defaults, which the first build reports against; S1 may not add, remove or rename a feature without
+bumping the sensor's `version` and therefore `CATALOGUE_HASH`, and the fixture's `catalogue_hash` is
+`CATALOGUE_HASH` (S1's test asserts equality). Blocks are computed in the `observe` phase from the same
+views the agent receives, are never journaled (they are a projection of the observation, 9.5) and are what
+the `features` step of 18.4 hands to a belief.
+
+**The sensor budget and its penalty** (ruling R235). `diet_cost_units(genome) = sum(SENSORS[s].cost_units
+for s in genome.sensors)` is the diet's cost **per bar**. `EvolutionConfig.sensor_budget_units: int =
+SENSOR_BUDGET_UNITS_DEFAULT` is the per-generation allowance of a fresh genome and a per-bar cap: an
+agent's diet must satisfy `diet_cost_units <= allowance` or the genome does not run. The allowance is
+per agent and shrinks by the generalised research-penalty rule of 12.6: an agent whose `skill_lb_micro` did
+not improve over its own previous generation **and** whose `diet_cost_units > 0` gets
+`max(0, allowance - SENSOR_PENALTY_UNITS)` (`SENSOR_PENALTY_UNITS = 2`, a default the first evolution
+reports against) next generation; every other agent keeps `config.sensor_budget_units`. The result is
+`generation_closed.sensor_budget_next {agent_id: units}` (9.4). When a child's diet exceeds its
+allowance, O2 applies the **sensor drop** (`structural_mutate`, `op = "sensor_drop"` in
+`generation_closed.children`): drop the most expensive sensor that is neither `tape` nor required by the
+genome's families, ties by name descending, until the diet fits; a genome that cannot fit (its required
+sensors alone exceed the allowance) is culled and the cull is recorded as `culled_by_budget` in
+`generation_closed`. Money is money: fitness is **net of nothing**, a sensor cost is never a cash
+movement and never reaches a journal cent (PRD v5 section 7); what a rich diet without skill loses is
+its allowance, so it dies. `candidate_scored` gains `diet_cost_units: int` and `sensors: list[str]`, so
+the diet an evaluation ran under is on the record beside its score.
+
+**The diet descriptor** (12.5, ruling R235). `Descriptors` gains `diet_class: int` in `0..2`: `0` when the
+diet carries no news sensor and no hive sensor (a tape, volume or cross-asset reader), `1` when it carries
+at least one news sensor (`wiki_daily`, `comments`, `hn`, `gdelt_recent`, `filings`, `macro_releases`,
+`wiki_asof`) and no hive sensor, `2` when it carries `hive_insights` or `hive_reputation`. It is a fourth
+archive axis with three bins, so `ARCHIVE_CELLS = 4 * 4 * 3 * 3 = 144` and `cell_key =
+f"t{i}-c{j}-a{k}-d{l}"`; AC-6's "at least 40 percent" is therefore **58 cells**, which the first evolution
+on a real dataset reports against and which 14.1's decision D-7 records as amended.
+
+**The sensor ablation** (PRD v5 section 5, AC-5 as gate G4 reads it). `pmx evolve --ablate-sensors` and
+O4's `claim --ablate-sensors` re-run the champion once per sensor of its diet with that sensor removed
+(`tape` excepted), each a run with its own run id (the genome differs, so `genome_hash` and the run id
+differ), and report `skill_drop_micro` per sensor as the difference of the two `results.json` skill
+intervals' points, never of two hashes (9.2's AC-5 rule); the claim record carries the table as
+`sensor_ablation: [{sensor, run_id, skill_point_micro, skill_drop_micro}]`, and `GET
+/claims/{claim_id}` serves it. A sensor whose removal changes no forecast is a sensor the agent paid for
+and did not read, which is the measurement the budget rule acts on.
+
+### 18.2 The hypothesis layer: rules, families, promotion, insights
+
+**The record** (`pmx.rules.rule`, S2; `src/pmx/schemas/rule.v1.json`, C1c; fixture
+`tests/fixtures/contract/rule.sample.json`):
+
+```python
+RULE_PREDICATES_MAX = 3                  # PRD v5 2.2: conjunctions of up to three predicates, every author alike
+PREDICATE_OPS = ("lt", "le", "gt", "ge", "eq", "ne")
+CLAIM_KINDS = ("bias", "drift", "volatility")
+RULE_MIN_SUPPORT_DEFAULT = 30            # matched (market, bar) rows on the fit fold, a default the first build reports against
+
+@dataclass(frozen=True, slots=True)
+class Predicate:
+    feature: str                   # one of pmx.rules.vocabulary.FEATURE_NAMES (the sensor blocks of 18.1)
+    op: str                        # one of PREDICATE_OPS
+    value: int                     # in the feature's unit, inside [lo, hi] of its FeatureSpec
+
+@dataclass(frozen=True, slots=True)
+class RuleScope:                   # where the rule claims to hold; every tuple sorted, () meaning "any"
+    kinds: tuple[str, ...]; providers: tuple[str, ...]; categories: tuple[str, ...]
+    tags: tuple[str, ...]; cohorts: tuple[str, ...]        # cohort ids of 18.5 (D-S7)
+
+@dataclass(frozen=True, slots=True)
+class RuleClaim:
+    kind: str                      # one of CLAIM_KINDS
+    direction: int                 # -1 | 1 for bias and drift ("the price is too high" is -1); 0 for volatility
+    magnitude_bp: int              # bias, drift: basis points of the payout on a binary, bp_ratio of the price
+                                   # on a continuous kind; 0 for volatility
+    factor_ppm: int                # volatility: realised absolute move over the fit fold's median, PPM_ONE = usual;
+                                   # 0 for bias and drift
+
+@dataclass(frozen=True, slots=True)
+class Rule:
+    rule_id: str                   # "ru-" + sha256(canonical_json([scope, condition, claim, horizon_bars, min_support]))[:16]
+    author_kind: str               # "agent" | "miner" | "detector"
+    author_id: str                 # an agent id, "miner", or a detector id of 16.4
+    born_at_ms: int                # the bar at which it was proposed (a bar open of the proposing run)
+    scope: RuleScope
+    condition: tuple[Predicate, ...]     # 1..RULE_PREDICATES_MAX, sorted by (feature, op, value), no duplicate feature+op
+    claim: RuleClaim
+    horizon_bars: int              # 0 for bias (measured at resolution); >= 1 for drift and volatility
+    min_support: int               # >= RULE_MIN_SUPPORT_DEFAULT
+    family_id: str | None          # the pre-registered family it was tested under (None until registered)
+    def to_dict(self) -> dict[str, object]: ...
+    def fires(self, blocks: Mapping[str, SensorBlock], meta: MarketMeta) -> bool: ...   # scope and every predicate
+```
+
+Rules are data, never code: a rule is evaluated on any bar of any dataset by `fires`, which reads the
+sensor blocks of that bar and the market's `MarketMeta` (its `kind`, `provider`, `category`, `tags`, its
+cohort of 18.5) and nothing else, so the same rule is testable on every fold, every grid and every
+provider. `rule_id` is content-derived (`"ru-" + sha256(canonical_json([scope.to_dict(), [p.to_dict() for p in
+condition], claim.to_dict(), horizon_bars, min_support]))[:16]`, the dict forms of `rule.v1.json`, so the
+fixture's id recomputes from its own fields, asserted) and author-independent: two authors proposing the same statement
+produce one rule, whose `author_id` is the first proposal's in journal order and whose ledger row counts
+`n_proposals`. A predicate on a feature outside `FEATURE_NAMES`, an operator outside `PREDICATE_OPS`, a
+value outside the feature's bounds, a fourth predicate, a `horizon_bars` of `0` on a drift or a
+volatility claim, or a `magnitude_bp` of `0` on a bias or a drift claim is refused by `Rule.__post_init__`
+and by `genome_from_dict`'s neighbour `rule_from_dict` with `RuleRefusedError` (13.1, ruling R236). A rule
+never names a bar count, a fold, an outcome or any field of 7.9: its predicates are as-of by construction
+because the blocks are, and the tester refuses a predicate on any name not in the catalogue.
+
+**What a claim measures.** For a matched `(market, bar)` row (the rule fires at bar `t` on market `m`):
+
+| Claim | Realised measurement `y_row` (an integer) | Unit |
+|---|---|---|
+| `bias(direction, magnitude_bp)` | `direction * (outcome_bp - price_bp(t))` on a binary, where `outcome_bp` is `BP_ONE * resolution`; on a continuous kind `direction * bp_ratio(price_{t+h} - price_t, price_t)` with `h` the shortest declared horizon | bp |
+| `drift(direction, magnitude_bp, horizon_bars)` | `direction * (price_{t+h} - price_t)` on a binary (bp); `direction * bp_ratio(price_{t+h} - price_t, price_t)` otherwise, `price_{t+h}` the close of the `h`-th completed bar after `t`, rows with no such bar before `bar_of(resolved_at_ms)` skipped | bp |
+| `volatility(factor_ppm, horizon_bars)` | `abs(price_{t+h} - price_t)` (bp, or `bp_ratio` on a continuous kind) minus `usual_bp`, where `usual_bp` is the median of the same quantity over **every** row of the fit fold in the rule's scope (matched or not), computed once per `(scope, horizon)` and recorded in the test record | bp |
+
+The rule's **effect** is the block-bootstrap `Interval` (12.4) of the mean of `y_row` over the matched rows,
+with `blocks` from `block_key` (event key, cluster or week) and `rng` from the tester's `RngTree`
+(`stats.bootstrap`); `support` is the number of matched rows and `n_markets` the distinct markets among
+them; `lift_bp` is the interval's `point`. A claim **holds** on a fold iff `support >= min_support`,
+`n_markets >= RULE_MIN_MARKETS = 5` (a default), and `interval.lower > 0`. The statement "the price is
+off by about `magnitude_bp`" is recorded and displayed but is not what is tested: the sign is (a rule
+with the right direction and a magnitude off by half is a useful rule, not a false one), and the
+magnitude is re-estimated on every fold as `point`.
+
+**Who proposes** (ruling R237). Three authors, one ledger:
+
+- **The symbolic miner** (`pmx.rules.miner`, S2; `pmx rules mine`): deterministic beam search on the
+  **fit fold** over conjunctions of up to `RULE_PREDICATES_MAX` predicates, thresholds drawn from the
+  feature's quantiles at `RULE_THRESHOLD_QUANTILES_PPM = (100_000, 250_000, 500_000, 750_000, 900_000)`
+  over the fit fold's rows in scope, beam width `RULE_MINER_BEAM = 32`, at most
+  `RULE_MINER_CANDIDATES_MAX = 10_000` candidates enumerated per family, scored by `lift_bp` with the
+  support floor, ties broken by the canonical order of the predicate tuple. No randomness: the miner draws
+  from no substream and two runs on one dataset produce one candidate list. Every candidate enumerated
+  counts toward its family's `n_candidates`, whether or not it reaches the bootstrap.
+- **An agent**: `Actions.propose_rule: RuleProposal | None` (8.4), at most one per agent per bar
+  (`RULE_PROPOSALS_PER_BAR_MAX = 1`), validated by `rule_from_dict` and journaled as `rule_proposed`
+  (9.2) with `author_kind = "agent"`; a scripted family proposes from its own parameters when its
+  memory's `FeatureStat` for the effect has `n >= min_support` and a sign it has held for
+  `RULE_PROPOSE_STABLE_BARS = 20` bars (A1 records the per-family rule); an LLM agent writes the record
+  in the vocabulary, and a proposal that fails validation is `action_rejected(scope="rule",
+  reason="bad_rule")`. Proposing costs the diet: an agent that proposes in a generation carries
+  `n_rules_proposed` in `candidate_scored`, and a proposal counts as one sensor unit of that bar's cost
+  against the same cap (`diet_cost_units + 1 <= allowance` on a proposing bar), which is what "proposing
+  costs sensor budget" means in integers.
+- **A detector** (16.4): every `OpportunityEvent` of `news_lead`, `divergence`, `logic`, `comparative` and
+  `cross_domain` that its detector can state as a `Rule` in the vocabulary is emitted as one, with
+  `author_kind = "detector"` and `author_id` the detector id, into the same ledger and through the same
+  tester; a finding that cannot be so stated stays an `OpportunityEvent` only and says so in its
+  `evidence`. Hand-written and discovered knowledge are therefore compared on one footing.
+
+**How a rule is tested and promoted** (decision D-R8, ruling R238). The tester (`pmx.rules.tester`, S2)
+is a projection of the dataset and of the journals that proposed the rules; it never writes a backtest
+journal, never reads the sealed fold (architecture rules 3 and 8 apply to `pmx.rules` exactly as to
+`pmx.analysis`) and refuses a `purpose: "showcase"` dataset with `ShowcaseDatasetError` (12.7).
+
+1. **Pre-registration.** Before the tester reads a single row of the replicate fold, every rule of a
+   generation is assigned to a **hypothesis family**, and the family is written down:
+
+   ```python
+   @dataclass(frozen=True, slots=True)
+   class HypothesisFamily:
+       family_id: str                 # "hf-" + sha256(canonical_json([generation, template]))[:16]
+       generation: int                # 0 for a standalone `pmx rules` run, else the evolution generation
+       template: FamilyTemplate
+       n_candidates: int              # every rule enumerated or proposed under the template, journaled
+       n_screened: int                # the candidates whose claim held on the fit fold and were submitted to replication
+       fit_t1_ms: int                 # the replicate fold's last bar: the visibility anchor of every promotion of this family (step 6)
+       registered_at_ms: int          # the fit fold's last bar (the data the template was drawn on)
+   @dataclass(frozen=True, slots=True)
+   class FamilyTemplate:              # the grammar of a family: what may vary and what is fixed
+       scope_keys: tuple[str, ...]    # subset of ("kinds", "providers", "categories", "tags", "cohorts") whose values vary
+       features: tuple[str, ...]      # the predicate features, 1..RULE_PREDICATES_MAX, sorted (operators and thresholds vary)
+       claim_kind: str; horizon_bars: int
+       author_kind: str               # "agent" | "miner" | "detector": agent proposals of one generation are one family per template
+   ```
+
+   A family is registered by a `family_registered` event (9.4, phase `generation`; in a standalone run,
+   the first line of the family's ledger file) **before** any `rule_tested(stage="replicate")` of its
+   rules, and the tester refuses (`RuleRefusedError`) to replicate a rule whose family has no earlier
+   `family_registered` in the same journal or ledger. `n_candidates` is the family's whole count on the
+   fit fold, journaled, whatever happened to them.
+2. **The fit-fold screen.** Every candidate's claim is measured on the **fit fold** (18.2's table).
+   Candidates whose claim does not hold are `rule_tested(stage="fit", passed=false)` and stop;
+   the survivors are `n_screened` and are the hypotheses of the family's FDR step.
+3. **False discovery rate control within the family** (Benjamini-Hochberg at `FDR_Q_PPM = 50_000`, five
+   percent). Each screened rule receives a one-sided `p_value_ppm` on the **replicate fold**, computed
+   by `permutation_null` (12.4) with the rule's implied forecasts on its matched rows (`price + direction
+   * magnitude_bp` for a bias, the row's realised measurement for a drift or a volatility through the
+   continuous branch with `realised_signs` and `bar_keys`), `permutations = RULE_PERMUTATIONS = 200`,
+   `inner = PERMUTATION_INNER_RESAMPLES`, drawn from the tester's `RngTree` substreams `rules.permutation`
+   and `rules.bootstrap` (6.3). `benjamini_hochberg(p_values_ppm: Sequence[int], *, q_ppm: int =
+   FDR_Q_PPM) -> tuple[bool, ...]` (12.4, E4's name, applied by S2 by the agreement recorded in section
+   13) sorts the `m = n_screened` p-values ascending, finds the largest `k` with `p_(k) * m <= k * q_ppm`,
+   and rejects the null of every rule with `p <= p_(k)`; when no `k` exists nothing passes. The
+   rule's `rule_tested(stage="replicate")` carries `p_value_ppm`, `m`, `k` and `fdr_passed`.
+4. **Out-of-time replication is the primary criterion.** A rule is **promoted** iff its claim **holds on
+   the replicate fold** (`interval.lower > 0` with the fold's own support and market floors) **and**
+   `fdr_passed`. A rule that passes the FDR step and fails replication (or the reverse) is
+   `rule_tested(stage="replicate", passed=false)` with every number recorded, status `rejected`; it is
+   never an `Insight`, it keeps counting in its family, and the same content re-proposed later on the
+   same `(dataset_hash, fit, replicate)` pair is a duplicate the tester refuses to re-test
+   (`RuleRefusedError`, `reason = "duplicate"`), so nobody re-rolls a rejected rule. A negative result is a
+   first-class ledger row.
+5. **The folds a promotion may read.** The tester takes a pair of disjoint chronological folds
+   `(fit, replicate)` from 12.7: **the rolling pair** `(months 1..k, month k+1)` for `k` in `4..9`
+   (`pmx rules test --rolling k`, the pair every evolution generation uses, with `k` the last complete
+   month of the training fold), or **the headline pair** `(train, validation)` (`pmx rules test
+   --headline`, used by L1 and by the claim path). `fit_t1_ms` is the last bar of the replicate fold, and
+   the promotion **never reads a bar after it**. The sealed fold is never read by the tester (rule 3).
+6. **Visibility follows the data** (10.4, ruling R239). A promoted rule enters the hive as an `Insight`
+   with `visible_from_ms = fit_t1_ms + interval_ms`: the first bar strictly after the last bar its
+   promotion read, mirroring the resolution release of 5.4. A rule promoted on the headline pair is
+   therefore visible in the sealed fold and in the live book only; a rule promoted on the rolling pair at
+   `k` is visible from the first bar of month `k + 2` of the training fold, so `rule_follower` and the
+   families that take insights as priors can use it inside evolution on bars its promotion never saw.
+   PRD v5 2.3 step 3 ("`visible_from = now + one bar`") and E2E-5a's sentence ("promotion on validation,
+   an agent trades the promoted rule ... on validation") are corrected in place to this rule (ruling
+   R238): the E2E fixture promotes on the rolling pair and trades on the validation fold, out of time.
+7. **The live record and demotion.** After promotion the rule is scored at every later bar where it
+   fires, on the same measurement, by the tester at each generation close and by L1 daily:
+   `live_support`, `live_interval` (block bootstrap, the rows after `fit_t1_ms` only). A rule is
+   **demoted** (`rule_demoted`, the `Insight` gains `demoted_at_ms` and stops firing in views from the
+   next bar) when `live_support >= RULE_LIVE_MIN_SUPPORT = 30` and `live_interval.upper < 0`, or when
+   its author's reputation in the rule's dominant category falls below `0` while
+   `live_interval.lower <= 0`. A demoted rule is never re-promoted by re-testing; a new proposal with the
+   same content is a duplicate.
+8. **Knowledge transfer** (PRD v5 section 5). Every promoted rule is re-tested by the same procedure on
+   every other provider, category and kind of the dataset outside its scope, one `rule_tested(stage=
+   "transfer", target=...)` per target, and the ledger records where it held and where it did not;
+   a transfer test never promotes anything and never widens a scope.
+
+**The `Insight`** (10.4, A3): `HiveEntry(kind="insight", author_id=rule.author_id, market_id=None,
+written_at_ms=promotion bar, visible_from_ms=fit_t1_ms + interval_ms, payload={rule: Rule.to_dict(),
+test: {fit: Interval, replicate: Interval, p_value_ppm, fdr_m, fdr_k, family_id}, live: {support,
+interval}, demoted_at_ms: int | None})`, journaled as `hive_written(kind="insight")`.
+`HiveView.insights: tuple[InsightView, ...]` carries, for the agent's open markets, the promoted and
+undemoted insights **whose rule fires at `now_ms`** on that market (`InsightView(rule_id, market_id,
+claim, lift_bp, lower_bp, upper_bp, live_support, author_id, author_skill_micro)`), ranked by
+`(-lower_bp, rule_id)`, at most `limits.hive_insights = HIVE_INSIGHTS_VIEW_MAX = 50`; the view is a pure
+function of `(now_ms, agent_id, market_ids, the blocks of this bar)` and never depends on the order
+agents are served in. `Hive.write_insight(*, rule: Rule, test: Mapping, fit_t1_ms: int, interval_min:
+int) -> HiveEntry` and `Hive.demote_insight(*, rule_id: str, bar_ms: int) -> HiveEntry` are the two
+writers, both engine-only (O2 at generation close through the hive snapshot of 9.5, L1 daily). The
+poisoning test of 10.4 gains a false insight from an author with negative reputation and asserts it ranks
+last and never fires above a true one.
+
+**The author's reward** (12.6, ruling R239). At every generation close, for every rule promoted this
+generation whose `author_kind == "agent"`, the author receives `RULE_AUTHOR_BONUS_MICRO = 5_000` added
+to its `skill_lb_micro` **for ranking only** (never to the recorded interval, never to a claim) and
+`RULE_AUTHOR_SENSOR_BONUS_UNITS = 2` added to its next allowance; for every rule of the author demoted
+this generation, or rejected at the replicate stage, the author's next allowance loses
+`SENSOR_PENALTY_UNITS`. `generation_closed` carries `rule_rewards: [{agent_id, rule_id, kind:
+"promoted" | "rejected" | "demoted", skill_bonus_micro, sensor_units}]`. The three numbers are defaults
+the first evolution with rules reports against.
+
+**The ledger on disk.** `rules/<dataset_hash[:8]>/families.jsonl` and `rules/<dataset_hash[:8]>/
+rules.jsonl`, **tracked** like `claims/` (12.7: the ledger is evidence), one canonical line per
+`family_registered`, `rule_proposed`, `rule_tested`, `rule_promoted` and `rule_demoted` event, appended
+by the tester whether it runs inside an evolution (where the same events also enter the evolution
+journal) or standalone; each line carries `dataset_hash`, and `prev_sha256` chains the file as claims are
+chained. `pmx rules ledger` renders it; `GET /rules` and `GET /rules/{rule_id}` (12.12) serve it.
+
+### 18.3 Minute grids and the timestamped-sources rule
+
+**The third grid** (5.1, 5.2, ruling R241). `INTERVALS_MIN = (1, 60, 1_440)`; `bar_of`, the density rule
+and the one-grid-per-run rule are unchanged; a minute dataset is a **separate dataset** with its own hash,
+folds and claims, exactly as an hourly one is (7.8). A minute bar opens at a multiple of `MS_PER_MINUTE`;
+`bars_window` is the caller's and `BARS_WINDOW_MAX = 720` (twelve hours of minute bars) is unchanged.
+Minute datasets are built per instrument on demand for the event studies and the minute agents, never for
+the evolution of a whole population (PRD v5 section 7): `pmx data build --interval-min 1` requires an
+explicit instrument or series list and refuses a bare provider.
+
+**Which sources may enter which grid.** Every news source carries a granularity and a default lag in
+`pmx.types`:
+
+```python
+SOURCE_GRANULARITY_MS = {"wikipedia_current_events": MS_PER_DAY, "wikipedia_asof": MS_PER_DAY, "wayback": MS_PER_DAY,
+                         "cboe": MS_PER_DAY, "gdelt": 15 * MS_PER_MINUTE, "manifold_comment": 1, "hn": 1_000,
+                         "edgar": 1_000, "fred": 1_000}
+SAFETY_LAG_MS_BY_SOURCE = {"wikipedia_current_events": SAFETY_LAG_MS_DEFAULT, "wikipedia_asof": SAFETY_LAG_MS_DEFAULT,
+                           "wayback": SAFETY_LAG_MS_DEFAULT, "cboe": SAFETY_LAG_MS_DEFAULT, "gdelt": 15 * MS_PER_MINUTE,
+                           "manifold_comment": MS_PER_MINUTE, "hn": 5 * MS_PER_MINUTE, "edgar": MS_PER_MINUTE, "fred": 0}
+MINUTE_SOURCE_GRANULARITY_MAX_MS = 15 * MS_PER_MINUTE
+```
+
+A source enters a dataset with `interval_min = 1` iff `SOURCE_GRANULARITY_MS[source] <=
+MINUTE_SOURCE_GRANULARITY_MAX_MS` (Hacker News, GDELT recent, Manifold comments, SEC filings, ALFRED
+releases; **never** a Wikipedia day page, a Wayback capture or a daily VIX print), and
+`BuildConfig.__post_init__` refuses a `news_sources` entry that fails it with `InvalidConfigError`: a
+minute dataset never carries a source whose timestamp is coarser than fifteen bars of its grid, because an
+item stamped to a day and lagged six hours is indistinguishable from one hundred and eighty minute-items
+and every minute hypothesis on it is a hypothesis about the stamp. Daily and hourly datasets admit every
+source (D-R5: the day pages stay in the daily and hourly datasets). The lags are defaults the first
+minute build reports against; `visible_from_ms = published_at_ms + lag(source)` where `lag(source)` is
+`manifest.news.safety_lag_by_source[source]` when present, else `manifest.safety_lag_ms` (5.5, 7.3), and
+the loader recomputes it per source and refuses a mismatch as it does today. Funding and liquidation
+instants of a crypto venue are `CashEvent`s (17.3) and reach an agent through `MarketView.cash_events`
+under `volume_profile`, never as news.
+
+**Hacker News** (`pmx.data.news.hn`, F5): Algolia `search_by_date` with `numericFilters=created_at_i`
+windows and `hitsPerPage` pagination through the one HTTP client of 7.11; a story is
+`NewsItem(source="hn", kind="story", published_at_ms = created_at_i * 1_000)` with `points` and
+`num_comments` in `text`'s first line as `points=<n> comments=<n>` and in the `hn` sensor block as
+integer features (`hn_story_points`, `hn_story_comments`, `hn_mentions_subject`, `minutes_since_story`), a
+comment is `kind="comment"`, subjects are matched through the linker of 7.6, and the news id code is `hn`
+(18.7). `pmx.data.news.timestamped` (F5) is the one implementation of the admission rule above and of
+the per-source lag, imported by the builder.
+
+**The minute event study** (R2a, 16.4, ruling R242). On a minute dataset the news-lead detector runs at
+`NEWS_LEAD_MINUTE_HORIZONS_BARS = (1, 5, 10, 30, 60)`, per source and per story feature (points band,
+comment-count band, subject match), and emits its findings as **rules** (18.2, `author_kind =
+"detector"`, `claim.kind = "drift"` or `"volatility"`, `horizon_bars` one of the five) into the ledger
+beside its `OpportunityEvent`s, so "if a story of this type appears, watch the next ten minutes" is a
+tested statement with an interval and a null, not a chart. AC-28's planted ten-minute drift is such a rule
+with `interval.lower > 0` on the replicate fold.
+
+### 18.4 Workflow genomes
+
+**The genome** (10.1, A1, ruling R243). `Genome.workflow: Workflow | None`, always rendered by
+`to_dict()`; `None` is the **degenerate linear case**: the graph `sense -> features -> belief(family)
+[-> overlay(inner chain)...] -> sizing -> actions` derived from `(family, inner, members)` by
+`pmx.agents.workflow.linear_workflow(genome)`, so every family and every composition of 10.5 is a valid
+workflow and no genome hash of a linear genome depends on the graph (the key renders `null`). The
+declaration document is `src/pmx/schemas/workflow.v1.json` (C1c); the fixture is
+`tests/fixtures/contract/workflow.sample.json`.
+
+```python
+STEP_KINDS = ("sense", "features", "rules", "belief", "overlay", "sizing", "propose_rule", "llm_belief", "actions")
+WORKFLOW_STEPS_MAX = 12; WORKFLOW_DEPTH_MAX = 8; WORKFLOW_WIDTH_MAX = 4      # defaults the first build reports against
+
+@dataclass(frozen=True, slots=True)
+class Step:
+    kind: str                            # one of STEP_KINDS
+    ref: str | None                      # belief/overlay/sizing: a family name of 10.5 with that role; rules: None;
+                                         # llm_belief: the seat's model id; sense/features/actions/propose_rule: None
+    params: tuple[tuple[str, int], ...]  # sorted by name: the family's genes for belief/overlay/sizing (10.1's ranges);
+                                         # rules: min_lower_bp, weight_permille; propose_rule: stable_bars, min_support
+
+@dataclass(frozen=True, slots=True)
+class Workflow:
+    steps: tuple[Step, ...]              # in topological order; steps[0].kind == "sense", steps[-1].kind == "actions"
+    edges: tuple[tuple[int, int], ...]   # (from, to) with from < to, sorted; every step reachable from 0 and, propose_rule
+                                         # excepted (it feeds nothing), reaching the last
+    def to_dict(self) -> dict[str, object]: ...
+        # {"steps": [{"kind", "ref", "params": {name: value}}, ...], "edges": [[from, to], ...]}: workflow.v1.json
+```
+
+**The bounds and the shape.** `len(steps) <= WORKFLOW_STEPS_MAX`; the longest path has at most
+`WORKFLOW_DEPTH_MAX` steps; no step has more than `WORKFLOW_WIDTH_MAX` predecessors or successors;
+exactly one `sense` (the source) and one `actions` (the sink); at least one `belief` or `llm_belief`; at
+most one `sizing` and at most one `propose_rule`; `rules` takes its input from `features` and feeds a
+`belief`, an `overlay` or `actions`; `propose_rule` hangs off a `belief` or a `rules` step and feeds
+nothing (its output is `Actions.propose_rule`); `llm_belief` requires `needs_gateway` and obeys 11.3 (one
+call per agent per bar, whatever the graph). `edges` with `from < to` over a topologically ordered
+`steps` tuple is the canonical form, so two workflows that draw the same graph serialise to the same
+bytes and `genome_hash` is defined once. `Workflow.__post_init__` refuses a breach with
+`InvalidConfigError`. The sensor set of the `sense` step is the genome's `sensors` (18.1), never a
+parameter of the step, so the diet has one home.
+
+**Execution** (`pmx.agents.workflow.run_workflow`, A1). Each bar, in topological order, every step is a
+pure function of its predecessors' outputs and of `(genome, memory view, rng)`: `sense` yields the
+observation's sensor blocks (18.1); `features` the concatenated integer vector; `rules` the insights
+firing on each market with `lower_bp >= params.min_lower_bp`, folded into a per-market prior shift of
+`lift_bp * weight_permille // 1_000` bp; a `belief` yields `prob_ppm` per open market by its family's
+rule of 10.5 (an inner chain of `overlay` steps transforms it); `sizing` yields `MarketAction`s by its
+family (`kelly`) or by 10.5's default rule when absent; `propose_rule` yields at most one `RuleProposal`;
+`actions` assembles the `Actions`. Two belief steps feeding one sizing step are combined by the
+unweighted mean of their `prob_ppm` (the stacker's fallback rule), stated so nobody invents a weight.
+Every step's inputs and outputs are integers; determinism and replay are unchanged.
+
+**The journal** (9.2, ruling R243). For an agent whose `Genome.workflow` is not `None`, the runner emits
+one `workflow_step_executed` per `(agent, bar, step)` in the `decide` phase: `agent_id`, `step_index:
+int`, `kind`, `ref: str | null`, `n_inputs: int`, `n_out: int` (the number of integers the step produced)
+and `output_sha256: str` over `canonical_json` of the step's output; the payload is bounded by
+construction (no output is journaled, only its digest) and there are at most `WORKFLOW_STEPS_MAX` per
+agent-bar. A linear genome (`workflow: null`) emits none, so no journal of a v2 roster gains a byte.
+AC-29 reads: a workflow genome with a `propose_rule` step runs, its steps are journaled, `pmx run
+replay` rebuilds `results.json` byte for byte, and a structure mutation changes `genome_hash` and the
+journal hash.
+
+**Mutation** (10.1). Structure mutation (`structural_mutate`) adds a step of the catalogue, removes a
+non-mandatory step, rewires one edge or swaps a `belief`, `overlay` or `sizing` family for another of the
+same role, then re-canonicalises and re-validates; a result that breaches a bound is discarded and the
+parent is returned unchanged (never a silent clamp). Parameter mutation acts inside a step exactly as
+10.1's gene mutation does. The `op` of a structural child in `generation_closed.children` is
+`"structural"` as today; `sensor_drop` (18.1) is the one new value.
+
+### 18.5 The cohort
+
+**The object** (decision D-S7, ruling R266; `pmx.cohorts`, DS2):
+
+```python
+COHORT_MIN_TRAIN = 30                         # usable at n_train >= 30 (D-S6, D-S7)
+
+@dataclass(frozen=True, slots=True)
+class Cohort:
+    cohort_id: str                            # f"co-{provider}-{category}-{subject}-{structure}-{horizon}" (18.7)
+    category: str; subject: str; structure: str; horizon: str; provider: str
+    n_train: int; n_validation: int; n_sealed: int
+    usable: bool                              # n_train >= COHORT_MIN_TRAIN
+    usable_for_paired_test: bool              # usable and n_train > 0 and n_validation > 0 and n_sealed > 0 (D-S13)
+    market_ids: tuple[str, ...]               # canonical order; in the loader's object, never in the manifest row
+    def to_dict(self) -> dict[str, object]: ...   # the manifest row: every field but market_ids
+```
+
+A market belongs to **exactly one cohort**, keyed on its `provider`, `category`, **primary subject**
+(`subject[0]`, the tagger's precedence order of 7.14), `structure` and `horizon`; a market whose
+subject is `platform-meta` or whose `structure` or `horizon` is `other` belongs to no cohort
+(`MarketMeta.cohort_id = None`). `pmx.cohorts.list_cohorts(metas) -> tuple[Cohort, ...]` is the one
+implementation, sorted by `cohort_id`, and both the builder (into `manifest.cohorts`) and the loader
+(into `Dataset.cohorts`) call it; `MarketMeta` gains `subject`, `structure`, `horizon`, `provider_labels`
+and `cohort_id` as defaulted fields (7.2). **A cohort never crosses a fold**: it is cut inside the folds of
+7.7 and its per-fold counts are what the folds gave it, so a cohort confined to one fold is reported with
+`usable_for_paired_test = false` and is unusable for a paired bound or a replication (D-S13), and the
+loader refuses (`FoldIntegrityError`) a manifest whose cohort rows disagree with the folds it recomputes.
+
+**The unit of comparative analysis** (D-S7): detector `comparative` (R2d, 16.4) runs **per cohort**
+and reports per-cohort intervals and nulls with the cohort size beside every number; the `calibrator`
+family's ledger key gains the cohort (`(cohort_id or category, horizon_bucket, bin)`, 10.3, 10.5), so a
+class of question systematically mispriced is a cohort-level statement; a rule's `scope.cohorts` (18.2)
+names cohort ids and a hypothesis family may be keyed on a cohort (`scope_keys` containing `"cohorts"`),
+whose `n_candidates` is journaled like any other family's; `LeaderboardRow` gains `cohort_id: str =
+"all"` and 12.10 emits one row per usable cohort (`n_train >= COHORT_MIN_TRAIN`) with its own `skill` and
+`pnl` intervals; a claim (12.8) gains `per_cohort: [{cohort_id, n, n_traded, skill, pnl, null,
+candidates, verdict}]`, one row per cohort with `usable_for_paired_test`, each with its own `K`
+(`candidates_prior_claims` counted per `(dataset_hash, cohort_id)`) and its own four-part verdict at the
+same `CLAIM_MIN_MARKETS`; `pmx claim --cohort <id>` on a cohort below the usable size, or not
+`usable_for_paired_test`, is refused with `CohortRefusedError` (13.1) before any sealed read, never
+weakened to a smaller bar. `GET /datasets/{name}/cohorts` and the cohort filters of 12.12 serve them.
+
+**Why a tag cannot leak** (7.9). A facet, a provider label and a cohort id are data about the question that
+exist before the market's first bar: they are computed from `question`, `provider_id` and the market's
+declared life (`created_at_ms`, `close_at_ms`, which are public on every venue from listing), never from
+`resolved_at_ms`, a bar or a resolution, and the tagger reads none of 7.9's fields (7.14). They may
+therefore sit in a `MarketView` and in a rule's scope at every bar. `horizon` is derived from
+`close_at_ms - created_at_ms`, the venue's published close, never from `resolved_at_ms`, for exactly this
+reason.
+
+### 18.6 Evaluation additions
+
+Three additions, each a projection of things already journaled: the **knowledge-transfer re-test** (18.2
+step 8, `rule_tested(stage="transfer")` rows in the ledger, `GET /rules/{rule_id}` serves them); the
+**rule-adjusted claim** (12.8): a claim lists `rules_used: [{rule_id, live_support, live_lower_bp,
+n_bars_fired}]`, the insights the agent's `rules` step or `rule_follower` genome read during the claim run,
+with their live records **at claim time**, so a reader can tell an agent that learned from an agent that
+followed a lucky rule; and the **sensor ablation** (18.1, the claim's `sensor_ablation` table and gate
+G4's AC-5). The UI (U3, lot 7) shows the rule ledger (every rule, its author, its condition in words, its
+test and live records, where it fires on a chart) and the ablation table, which is AC-30.
+
+### 18.7 The module map, the architecture rule and the identifier formats of this amendment
+
+Section 13 carries one owner per new file (ruling R245):
+
+| File | Owner | What it is |
+|---|---|---|
+| `src/pmx/schemas/rule.v1.json`, `sensor.v1.json`, `workflow.v1.json` | C1c | this amendment's three schemas (18.2, 18.1, 18.4) |
+| `src/pmx/sensors/__init__.py`, `src/pmx/rules/__init__.py`, `src/pmx/features/__init__.py` | C1c | docstring-only, created by this amendment (ruling R122: the amendment that opens a package's directory owns its `__init__`; `features/` is opened by FM1 in lot 6, before amendment C3) |
+| `src/pmx/sensors/catalogue.py`, `src/pmx/sensors/<sensor>.py` (one module per sensor of 18.1) | S1 | `SENSORS`, `SENSOR_NAMES`, `CATALOGUE_HASH`, `SENSOR_BY_NEWS_SOURCE`, `SensorSpec`, `SensorBlock`, `sense`; `SensorAbsentError` added to `pmx.errors` and raised by E1's sensed views, by the agreement recorded in section 13 (ruling R232) |
+| `src/pmx/rules/vocabulary.py`, `rule.py`, `tester.py`, `miner.py`, `src/pmx/cli_rules.py` | S2 | `FEATURE_NAMES`, `Predicate`, `RuleScope`, `RuleClaim`, `Rule`, `rule_from_dict`, `HypothesisFamily`, `FamilyTemplate`, the tester and the miner of 18.2, `pmx rules mine|test|ledger`; `benjamini_hochberg` added to E4's `pmx.metrics.stats` by the agreement recorded in section 13 (ruling R238) |
+| `src/pmx/data/news/hn.py`, `src/pmx/data/news/timestamped.py` | F5 | Hacker News through Algolia, the admission rule and the per-source lag of 18.3 |
+| `src/pmx/data/importers/binance.py` (the minute path) | F1 | 1-minute klines, funding and liquidation instants as `CashEvent`s (17.7's row, widened) |
+| `src/pmx/data/builder.py`, `loader.py`, `universe.py`, `src/pmx/data/news/wikipedia_current_events.py`, `src/pmx/data/news/linker.py`, `src/pmx/cli_data.py` | DS1 | the fold fix (D-R1, D-R2), per-bullet timestamps (D-R3), the linker audit tooling (D-R4), the hourly headline build (D-R5), the documented universe rule (D-R7, D-R13), `window_days` and `purpose` (D-S3, D-S4); `data/universe.py` moves from R1a to DS1 and R1a's row reads "the statistics only" |
+| `src/pmx/data/taxonomy.py`, `src/pmx/cohorts.py`, `src/pmx/lexicons/tags.v1.json`, `src/pmx/lexicons/kalshi_series_facets.v1.json`, `src/pmx/data/showcase.py` | DS2 | the tagger and the vocabulary of 7.14, `Cohort` and `list_cohorts` of 18.5, the showcase pack of D-S5; the tagging and cohort-listing calls are added to DS1's `builder.py` and `loader.py` by the agreement recorded in section 13, against the signatures of 7.14 and 18.5 (the R1d precedent) |
+| `src/pmx/features/matrix.py` | FM1 | the precomputed integer feature matrices of the proxy tier (12.6, D-R9) |
+| `src/pmx/agents/workflow.py`, `src/pmx/agents/families/rule_follower.py` | A1 | `Workflow`, `Step`, `linear_workflow`, `run_workflow` (18.4); the `rule_follower` family of 10.5 |
+| `src/pmx/metrics/capacity.py` | O4 | the capacity metric of 12.3 (D-R10), computed at claim time |
+| `src/pmx/api/routes_rules.py`, `web/src/components/rules/**` | U1, U3 | the rule ledger and ablation routes of 12.12 and their views |
+| `tests/test_sensors.py`, `tests/fixtures/s1/` | S1 | |
+| `tests/test_rules.py`, `tests/fixtures/s2/` | S2 | the planted-effect fixture and its shuffled twin (AC-27) |
+| `tests/test_hn.py`, `tests/fixtures/f5/` | F5 | |
+| `tests/test_taxonomy.py`, `tests/test_cohorts.py`, `tests/test_showcase.py`, `tests/fixtures/ds2/` | DS2 | |
+| `tests/test_feature_matrix.py` | FM1 | |
+| `tests/test_workflow.py` | A1 | |
+| `tests/e2e/test_e2e_5a_discovery.py` | gate G4 | PRD v5's E2E-5a, as corrected by ruling R238 |
+
+**Rule 12 joins the eleven of `tests/test_architecture.py`** (ruling R245), green on the tree of
+2026-09-09 where none of the files exists: **the tagger is never a model call.** Nothing under
+`src/pmx/data/`, nor `src/pmx/cohorts.py`, nor `src/pmx/rules/`, nor `src/pmx/sensors/` imports
+`pmx.gateway` or `pmx.llm`, and none of them opens a socket (rule 5 already binds the last). A tag decides
+which cohort a market lands in and a rule decides what an agent trades; a tag or a rule that a model
+wrote would move a claim between two rebuilds.
+
+**Identifier formats**, the continuation of the tables of sections 2, 16.7 and 17.8 (ruling R246). Every
+regex is a constant beside its owning module (ruling R121):
+
+| Entity | Format | Regex | Assigned by |
+|---|---|---|---|
+| Sensor | lowercase name, one of fifteen | `^(tape\|microstructure\|volume_profile\|cross_asset\|calendar\|wiki_daily\|comments\|hn\|gdelt_recent\|filings\|macro_releases\|wiki_asof\|hive_insights\|hive_reputation\|memory)$` | this contract, `pmx.sensors.catalogue.RE_SENSOR` |
+| Rule | `ru-<sha256(canonical_json([scope, condition, claim, horizon_bars, min_support]))[:16]>` | `^ru-[0-9a-f]{16}$` | `pmx.rules.rule.RE_RULE_ID` |
+| Hypothesis family | `hf-<sha256(canonical_json([generation, template]))[:16]>` | `^hf-[0-9a-f]{16}$` | `pmx.rules.tester.RE_FAMILY_ID` |
+| Cohort | `co-<provider>-<category>-<subject>-<structure>-<horizon>` | `^co-[a-z]+-[a-z]+-[a-z0-9-]+-[a-z-]+-[a-z-]+$` (at most 96 characters) | `pmx.cohorts.RE_COHORT_ID` |
+| Rule author | an agent id, `miner`, or a detector id | `^([a-z][a-z0-9_]{0,31}(-[0-9a-f]{8})?\|miner\|news_lead\|divergence\|logic\|comparative\|cross_domain)$` | `pmx.rules.rule.RE_AUTHOR_ID` |
+| Step kind | one of nine | `^(sense\|features\|rules\|belief\|overlay\|sizing\|propose_rule\|llm_belief\|actions)$` | this contract, `STEP_KINDS` |
+| News item | `<source_code>-<yyyymmdd>-<idx:04d>` | `^(wce\|wasof\|wb\|gd\|mfc\|edg\|fred\|cboe\|hn)-[0-9]{8}-[0-9]{4}$` | F5; `hn` Hacker News |
+| Facet value | lowercase slug from `tags.v1.json` | `^[a-z][a-z0-9-]{0,31}$` | DS2, 7.14 |
+
+### 18.8 What amendment C1c does not own
+
+C1c owns `docs/CONTRACTS_V2.md` (this section, 7.14, 15.10 and every in-place amendment recorded there),
+the three new schemas, the widenings of `market.v2.json`, `news.v1.json`, `dataset.v1.json`,
+`actions.v2.json` and `journal.v2.json`, `tests/test_contract_schemas.py`, `tests/test_architecture.py`,
+the fixtures under `tests/fixtures/contract/`, the three `__init__.py` files of 18.7, and the sentences
+of `docs/PRD_V2_HARD_OPTIMIZER.md` 6.1, `docs/PRD_V3_TRADING_OPTIMIZER.md` AC-11, `docs/PRD_V5_DISCOVERY.md`
+2.3 and 6, and `docs/PLAN_V3_WAVES.md` part 4 that its rulings correct in place. Applied by this amendment in those files,
+on the tree of 2026-09-09: `market.v2.json`'s four optional taxonomy fields and its `interval_min` of `1`;
+`journal.v2.json`'s six declared events under `$defs` (outside `oneOf`), the optional
+`observation_built.sensors`, `run_started.sensor_catalogue_hash`, `market_listed` facets, `candidate_scored`
+and `generation_closed` fields, the `insight`, `rule` and `sensor_drop` enum values and the `genome`'s
+`card`, `sensors` and `workflow`; `dataset.v1.json`'s optional `purpose`, `window_days`, `resolution_span`,
+`split` cuts and moves, `news.safety_lag_by_source`, `news.linker_audit`, `universe`, `taxonomy`, `cohorts`
+and `build` blocks, the `hn` source and the `taxonomy/` path prefix; `actions.v2.json`'s optional
+`propose_rule`; `news.v1.json`'s `hn` source and `story` kind, `published_at_source` and the
+revision-stamped `revid` of a `wce` bullet; `rule.v1.json`, `sensor.v1.json`, `workflow.v1.json` and their
+three fixtures (`rule.sample.json`, `sensor.catalogue.json`, `workflow.sample.json`); the three
+`__init__.py`; rule 12 in `tests/test_architecture.py`; and the PRD and plan sentences named above.
+`news.v1.json`'s C1b widening (`edgar`, `fred`, `cboe`) stays gate G3b's as 17.9 says. **A section of this
+document is never a contract issue** (ruling R136), so every normative passage this amendment changes is
+amended in place: 0, 5.1, 5.2, 5.5, 5.6, 7.1 to 7.4, 7.6 to 7.9, 7.13, 8.1 to 8.4, 8.6, 9.2 to 9.5, 10.1,
+10.3 to 10.5, 11.5, 12.2 to 12.12, 13, 13.1, 13.2, 14, 14.1, 16.1, 16.3, 16.4, 16.5, 17.6 and 17.7. What
+is left is code in a file another package owns, listed with the package that applies it:
+
+| Issue | File and owner | Applied by |
+|---|---|---|
+| R230, R231, R235, R241, R243, R247, R262, R263, R265, R266: `INTERVALS_MIN`, `SOURCE_GRANULARITY_MS`, `SAFETY_LAG_MS_BY_SOURCE`, `MINUTE_SOURCE_GRANULARITY_MAX_MS`, `WINDOW_DAYS_MAX`, `COHORT_MIN_TRAIN`, `SENSOR_BUDGET_UNITS_DEFAULT`, `SENSOR_PENALTY_UNITS`, `SENSOR_COST_MAX`, `HIVE_INSIGHTS_VIEW_MAX`, `RULE_*` constants of 18.2, `STEP_KINDS`, `WORKFLOW_*` bounds, `FDR_Q_PPM`, `ARCHIVE_CELLS = 144`, `Descriptors.diet_class`, `RunConfig.sensor_catalogue_hash`, `Observation.sensors`, `Limits.hive_insights`, `HiveView.insights` and `InsightView`, `MarketMeta.subject`, `structure`, `horizon`, `provider_labels`, `cohort_id`, `DatasetManifest.purpose`, `window_days`, `universe`, `taxonomy`, `cohorts`, the `split` fields of 7.7, `Dataset.purpose` and `Dataset.cohorts`, the deletion of `Dataset.is_demo_pack`, `BuildConfig.purpose`, `universe_min_settled`, `universe_min_volume_cents`, `NEWS_SOURCES` gaining `hn`, `NEWS_KINDS` gaining `story`, `RejectReason.bad_rule`, `Actions.propose_rule` | `src/pmx/types.py` (D1) | DS1 for the data names in lot 5b, A1 for the agent and observation names in lot 6, the first engine lot for `Observation.sensors` and `RunConfig.sensor_catalogue_hash` (below), each as gate G2 applied 17.9's row |
+| R232, R236, R248, R263, R266: `SensorAbsentError`, `RuleRefusedError`, `FoldIntegrityError`, `ShowcaseDatasetError`, `CohortRefusedError` | `src/pmx/errors.py` (D1) | S1, S2, DS1, DS1, DS2 respectively, each adding its own class in lot 5b by the agreement of section 13 |
+| R231, R243, R265, R274: `observation_built.sensors`, `run_started.sensor_catalogue_hash`, `market_listed`'s `provider_labels`, `subject`, `structure`, `horizon`, the `rule_proposed` and `workflow_step_executed` dataclasses, `hive_written.kind = "insight"`, `action_rejected.scope = "rule"`; `journal.v2.json` promotes the fields to `required` and admits the two events to `oneOf` in the same commit | `pmx.journal` (D7); the `required` lists, `oneOf` and the backtest fixture (C1c's files) | the first engine lot after this amendment, with R213, R214, R217 and R221 (15.10, ruling R274) |
+| R238, R254: `family_registered`, `rule_tested`, `rule_promoted`, `rule_demoted`, `candidate_scored.tier`, `diet_cost_units`, `sensors`, `n_rules_proposed`, `generation_closed.sensor_budget_next`, `culled_by_budget`, `rule_rewards`, `children.op = "sensor_drop"` | `pmx.journal` (D7), `journal.v2.json`'s `oneOf` and `required` lists (C1c) | gate G4, in the commit that lands O2's evolution journal |
+| R230, R233: `build_observation(..., sensors=genome.sensors)` in the runner; the `SensedBar` and `SensedHiveView` gates and the news source filter in the observation builder | `src/pmx/engine/runner.py` (E5), `src/pmx/engine/observation.py` (E1) | A1's lot (the runner reads `genome.sensors` once `Genome` carries it); S1 for the three nested gates, by the agreement of section 13 |
+| R238: `benjamini_hochberg` | `src/pmx/metrics/stats.py` (E4) | S2, by the agreement of section 13 |
+| R230, R236, R243: `SCHEMA_FILES` gaining `rule.v1.json`, `sensor.v1.json` and `workflow.v1.json` (the three files exist and validate; 7.13) | `src/pmx/data/schema.py` (D1) | DS1, lot 5b, as gate G2 applied 17.9's row |
+| R253, R254, R255: the two-tier fitness, the generator statement's `note`, the capacity metric | `src/pmx/optimizer/evolution.py`, `archive.py` (O2), `claims.py` (O4), `src/pmx/metrics/capacity.py` (O4) | lot 6 |
+| R251, R260, R262: the hourly headline build, the cohort target and the fallback order as build outcomes, `window_days` and `purpose` in every manifest | `src/pmx/data/builder.py`, `cli_data.py` (DS1) | lot 5b |
+| R247, R248: `make_folds` reads the manifest's count-quantile cuts and cluster moves; `open_sealed_test` unchanged in form | `src/pmx/optimizer/folds.py` (O1) | lot 6 |
+| R252: the `contamination_audit: "coarse"` label and the live-replication guard on an LLM claim | `src/pmx/llm/contamination.py` (A6), `claims.py` (O4) | lot 6 |
+| R261, R269, R273: the API serves the research dataset by default, the paged and filtered market index, the cohort view, the rule ledger routes | `src/pmx/api/*` (U1), `web/src/**` (U2, U3) | lots 5b and 7 |
+| R274: the pinned config hash of `tests/test_runner.py`, `tests/test_types_loader.py`'s `is_demo_pack` uses, and every test that spells a name this amendment renames | the owning package's test file | the lot that applies the rename; a test that disagrees with the contract is the one that is wrong |

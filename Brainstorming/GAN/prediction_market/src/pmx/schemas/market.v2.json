@@ -26,6 +26,16 @@
       "uniqueItems": true,
       "items": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" }
     },
+    "provider_labels": {
+      "description": "Amendment C1c (CONTRACTS_V2 7.2 and 7.14, decision D-S6, ruling R265): the provider's own labels verbatim (a Kalshi series ticker, a Manifold group slug, nonpredictive), never a cohort key and never displayed as a tag. Optional, with subject, structure and horizon, so a file written before the taxonomy still loads; the loader requires all four on a dataset whose manifest carries the taxonomy block.",
+      "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" }
+    },
+    "subject": {
+      "description": "The subject facet, one to four values of tags.v1.json in tagger precedence order; the first is the primary subject, the cohort key of 18.5.",
+      "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" }
+    },
+    "structure": { "description": "The structure facet, exactly one value of tags.v1.json: the question's shape.", "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
+    "horizon": { "description": "The horizon facet, derived from close_at_ms - created_at_ms by 7.14's boundaries and never from provider text.", "enum": ["intraday", "week", "month", "quarter", "year-plus"] },
     "wiki_subjects": {
       "description": "The market's Wikipedia subject page titles, verbatim: capitals, spaces, colons and parentheses kept, because that is what the linker of CONTRACTS_V2 section 7.6 compares an item's wiki_links against. Sorted, unique.",
       "type": "array",
@@ -47,7 +57,7 @@
     "resolution": { "enum": [0, 1] },
     "resolution_source": { "type": "string", "maxLength": 500 },
     "event_key": { "type": ["string", "null"], "maxLength": 128 },
-    "interval_min": { "enum": [60, 1440] },
+    "interval_min": { "enum": [1, 60, 1440] },
     "bars": { "type": "array", "minItems": 2, "items": { "$ref": "#/$defs/bar" } },
     "trades": { "type": "array", "items": { "$ref": "#/$defs/trade" } },
     "first_price_bp": { "$ref": "#/$defs/priceBp" },

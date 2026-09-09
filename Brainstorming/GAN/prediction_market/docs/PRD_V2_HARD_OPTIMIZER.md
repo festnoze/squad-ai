@@ -484,9 +484,13 @@ their members. If they do not, that is reported as such.
 
 ### 6.1 Splits
 
-Markets are ordered by `resolved_at`. The dataset is split into **rolling-origin folds**: with a
-twelve-month window, months 1 to 8 are training, months 9 and 10 validation, months 11 and 12 the
-**sealed test**. Rolling variants (train 1..k, validate k+1) are used for the patience criterion.
+Markets are ordered by `resolved_at`. The two headline cuts are **count quantiles of resolution order**,
+60 / 20 / 20 by default (training, validation, **sealed test**), still chronological and **cluster-aware**
+(every market of one event takes the fold of its latest-resolving member), with the cut dates and the
+realised counts in the manifest (amendment C1c, decisions D-R1 and D-R2 of `docs/REVIEW_2026-09-08.md`,
+contract rulings R247 and R248; the calendar thirds this section first stated, months 1 to 8, 9 and 10,
+11 and 12, gave the first real dataset 111 / 46 / 130 markets, an inverted pyramid). Rolling variants
+(train months 1..k, validate month k+1) keep the month edges and are used for the patience criterion.
 Memory and hive states carry forward in time only. The sealed test is never used for any decision;
 `pmx claim` runs it once per named claim, writes `claims/<claim_id>.json` with the dataset hash, the
 genome, the results and the confidence intervals, and refuses a second claim with the same genome on
@@ -756,6 +760,8 @@ module for the bootstrap, with results rounded to integers before they are repor
 
 ## 14. Revision history
 
+- 1.1, 2026-09-09: 6.1 corrected in place by amendment C1c (contract 15.10, ruling R247): count-quantile,
+  cluster-aware headline folds replace the calendar thirds.
 - 1.0, 2026-09-07: first version, after the v1 review and live probes of Kalshi, Manifold, Polymarket
   (blocked), Metaculus (token required), Wikipedia (Current events and revisions), Wayback CDX and
   GDELT (throttled).

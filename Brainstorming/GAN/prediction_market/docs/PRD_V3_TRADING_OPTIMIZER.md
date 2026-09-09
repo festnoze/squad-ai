@@ -117,8 +117,14 @@ green (section 9).
 
 ### 3.4 Acceptance and E2E-1
 
-- AC-11: a dataset of at least 1 000 Kalshi markets and 1 000 Manifold markets builds from the network
-  (or the shortfall is documented), with universe statistics in the manifest.
+- AC-11 (corrected in place by amendment C1c, contract 15.10 ruling R260, and superseded by AC-32 of
+  `docs/REVIEW_2026-09-09_SCALE_TAGS.md`): the sealed research dataset reaches at least **40 usable cohorts
+  on Kalshi and 8 on Manifold** (`n_train >= 30`, contract 7.4 and 18.5), with the market count that takes
+  (about 7 000 Kalshi markets on the prototype tagger of the review's section G) and the reachable universe
+  reported against the target, the fallback order of decision D-S12 followed and recorded, and universe
+  statistics in the manifest; a build that reaches a market floor and not the cohort floor is a failed
+  build and says so in the manifest. The first form of this criterion asked for 1 000 markets per venue
+  and said nothing about cohorts.
 - AC-12: clusters and constraints are computed on the real dataset; a sample of 30 clusters reviewed in
   the UI has no false positive.
 - AC-13: the impact calibration is reproducible across two builds of the same raw data.
@@ -374,3 +380,5 @@ AC-11 to AC-17 as stated in sections 3 to 6, plus:
 ## 13. Revision history
 
 - 1.0, 2026-09-07: written after the interview that confirmed the intent in section 0.
+- 1.1, 2026-09-09: AC-11 corrected in place by amendment C1c (contract 15.10, ruling R260): the build target
+  is stated in usable cohorts per venue, 40 on Kalshi and 8 on Manifold, not in 1 000 markets per venue.
