@@ -23,6 +23,7 @@ other's internals, and ``main`` exists so the group runs today as ``python -m pm
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import importlib
 import inspect
 import json
@@ -33,11 +34,29 @@ from pathlib import Path
 from typing import Protocol, cast
 
 from pmx.data.builder import (
+    FOLD_NAMES,
+    PURPOSE_RESEARCH,
+    PURPOSES,
+    UNIVERSE_MIN_SETTLED_DEFAULT,
+    UNIVERSE_MIN_VOLUME_CENTS_DEFAULT,
+    WINDOW_DAYS_MAX,
     BuildResult,
     as_plain_dict,
     build_config_from_manifest,
     build_dataset_from_payloads,
+    check_purpose,
+    check_window_days,
 )
+from pmx.data.news.linker import (
+    LINKER_AUDIT_N,
+    LINKER_PRECISION_MIN_PERMILLE,
+    LinkerAudit,
+    all_links_of,
+    audit_from_dict,
+    linker_audit_path,
+    sample_audit_links,
+)
+from pmx.data.universe import UniverseRule, render_series_list
 from pmx.errors import InvalidConfigError, NotConfiguredError, PmxError
 from pmx.types import (
     MS_PER_DAY,
@@ -125,6 +144,11 @@ NEWS_MIN_INTERVAL_MS = {
     "manifold_comment": 1_000,
 }
 
+#: The repository root, which is where the **tracked** ``audits/`` tree of 7.1 lives (ruling R296): it
+#: is outside every dataset directory and every dataset hash, and it is not under the git-ignored
+#: ``data/datasets/``, because git cannot re-include a file under an excluded directory.
+AUDITS_ROOT = Path()
+
 DEFAULT_DATASETS = Path("data/datasets")
 DEFAULT_DEMO_OUT = Path("data/demo_v1")
 DEFAULT_DATASET_NAME = "default"
@@ -134,6 +158,10 @@ DEFAULT_DATASET_NAME = "default"
 #: ``markets/``, ``news/`` and ``wiki_asof/`` and nothing else), so the git-ignored ``data/datasets/*``
 #: already covers both and no new ignore rule is needed for a year of raw provider answers.
 STAGING_DIR = "staging"
+
+#: The Kalshi series list a build produces (7.4, ruling R258): an output, one ticker per line, at the
+#: dataset root and outside the four hashed directories of 4.3.
+SERIES_LIST_FILE = "kalshi_series.txt"
 
 #: One background snapshot per this many days of a market's life (section 7.1).
 ASOF_EVERY_DAYS = 7
@@ -655,6 +683,10 @@ def _cmd_news_fetch(args: argparse.Namespace) -> int:
 # build and refresh
 # --------------------------------------------------------------------------------------------------
 def _config_from_args(args: argparse.Namespace, providers: Sequence[str]) -> BuildConfig:
+    # Decision D-S3, ruling R262: the ceiling is refused at the flag as well as inside the build, so
+    # ``pmx data build --window-days 900`` fails before it opens a socket rather than after the walk.
+    check_window_days(int(args.window_days))
+    check_purpose(str(getattr(args, "purpose", PURPOSE_RESEARCH)))
     return BuildConfig(
         freeze_date=cast(str, args.freeze),
         providers=tuple(sorted(set(providers))),
@@ -711,6 +743,80 @@ def _mapped_series() -> tuple[str, ...]:
     return tuple(str(series) for series in mapping)
 
 
+def _series_categories() -> dict[str, str]:
+    """D2's sealed series-to-category map (ruling R170), read for the weather label of 7.4.
+
+    Read off the importer for the reason ``_excluded_series`` is, and with the same tolerance for an
+    absent one: the universe rule keeps a weather series and labels it
+    ``forecastable_from_public_models``, and it can only know which series those are from the map.
+    """
+    try:
+        module = importlib.import_module("pmx.data.importers.kalshi")
+    except ImportError:  # pragma: no cover - D2 is a wave-1 sibling and lands before the gate
+        return {}
+    loader = getattr(module, "load_series_categories", None)
+    if not callable(loader):
+        return {}
+    mapping = loader()
+    if not isinstance(mapping, Mapping):
+        return {}
+    return {str(series): str(category) for series, category in mapping.items()}
+
+
+def _write_linker_audit(dataset_dir: Path, *, root: Path, n: int = LINKER_AUDIT_N) -> LinkerAudit:
+    """Draw ``n`` links of a sealed dataset and write ``audits/<hash[:16]>/linker.json`` (7.6, R250).
+
+    Two rules of the file are worth stating where it is written. It is drawn **after** the seal and is
+    keyed by the hash it audits, because a link the reviewer read must be a link the dataset still
+    carries. And it lives in the **tracked** ``audits/`` tree and never under the git-ignored
+    ``data/datasets/`` (ruling R296): fifty human verdicts cannot be regenerated, and git cannot
+    re-include a file under an excluded directory.
+
+    Re-running over a file whose verdicts are filled keeps every verdict, because the draw is a pure
+    function of the dataset hash: the same dataset always offers the same fifty links.
+    """
+    load_dataset = cast(Callable[..., object], _resolve("pmx.data.loader", "load_dataset"))
+    dataset = load_dataset(dataset_dir)
+    manifest = cast(DatasetManifest, getattr(dataset, "manifest", None))  # noqa: B009
+    news_loader = getattr(dataset, "news_global", None)
+    items = news_loader(1 << 62) if callable(news_loader) else ()
+    sample_seed = cast(Callable[[str], int], _resolve("pmx.data.builder", "sample_seed_for"))(manifest.name)
+    drawn = sample_audit_links(all_links_of(items), sample_seed=sample_seed, n=n)
+    path = linker_audit_path(root, manifest.dataset_hash)
+    previous: dict[tuple[str, str], tuple[str | None, str]] = {}
+    if path.is_file():
+        for link in audit_from_dict(json.loads(path.read_text(encoding="utf-8"))).links:
+            previous[(link.news_id, link.market_id)] = (link.verdict, link.reviewer)
+    kept = tuple(
+        dataclasses.replace(
+            link,
+            verdict=previous.get((link.news_id, link.market_id), (None, ""))[0],
+            reviewer=previous.get((link.news_id, link.market_id), (None, ""))[1],
+        )
+        for link in drawn
+    )
+    audit = LinkerAudit(
+        dataset_hash=manifest.dataset_hash, sample_seed=sample_seed, n=len(kept), links=kept
+    )
+    writer = cast(Callable[[Path, object], int], _resolve("pmx.data.loader", "write_canonical_json"))
+    writer(path, audit.to_dict())
+    return audit
+
+
+def _cmd_audit_links(args: argparse.Namespace) -> int:
+    """``pmx data audit-links``: write the fifty-link audit file, or recompute its precision (D-R4)."""
+    dataset_dir = Path(args.dataset)
+    audit = _write_linker_audit(dataset_dir, root=Path(args.audits_root), n=int(args.n))
+    path = linker_audit_path(Path(args.audits_root), audit.dataset_hash)
+    print(f"linker audit {path}")
+    print(f"  links      {audit.n} drawn, {audit.n_reviewed} reviewed")
+    print(f"  verdicts   correct {audit.n_correct}  wrong {audit.n_wrong}")
+    print(f"  precision  {audit.precision_permille} permille (bar {LINKER_PRECISION_MIN_PERMILLE})")
+    if audit.weak:
+        print("  label      news_links: weak")
+    return 0
+
+
 def _run_build(
     *,
     out_dir: Path,
@@ -724,6 +830,9 @@ def _run_build(
     name: str | None,
     fetch_news: bool,
     min_interval_ms: int,
+    purpose: str = PURPOSE_RESEARCH,
+    universe_rule: UniverseRule | None = None,
+    audits_root: Path | None = None,
 ) -> int:
     if not offline:
         for provider in config.providers:
@@ -759,6 +868,9 @@ def _run_build(
         news_payloads=_staged_news(staging),
         excluded_series=_excluded_series(),
         mapped_series=_mapped_series(),
+        series_categories=_series_categories(),
+        purpose=purpose,
+        universe_rule=universe_rule,
         name=name,
         notes=notes,
         overwrite=overwrite,
@@ -767,6 +879,19 @@ def _run_build(
     extra = [
         f"  dropped    {result.n_news_dropped} news items (source not selected, or older than every market)"
     ]
+    extra.extend(_build_report(result))
+    universe = result.universe
+    if universe is not None and universe.n_series_after:
+        # The series list is an **output** of the build (7.4, ruling R258), written one ticker per line:
+        # the file the first build shipped was one comma-separated line and a reader that split on
+        # newlines silently got zero series (docs/MEASURE_2026-09-09_KALSHI_UNIVERSE.md section 4.2).
+        # It sits at the dataset root, outside the four hashed directories of 4.3, because it is a
+        # convenience for the next build and the evidence is the manifest block.
+        series_path = out_dir / SERIES_LIST_FILE
+        series_path.write_text(
+            render_series_list(universe.series_tickers), encoding="utf-8", newline="\n"
+        )
+        extra.append(f"  series     {universe.n_series_after} tickers written to {series_path}")
     # Ruling R101: a provider a build asked for and got nothing from is a result, not a silent zero. The
     # Manifold creator-resolved filter removes the whole provider by default, and a dataset that quietly
     # lost a provider reads exactly like one that never had it.
@@ -776,8 +901,50 @@ def _run_build(
     if seal:
         sealer = cast(Callable[[Path], DatasetManifest], _resolve("pmx.data.loader", "seal_dataset"))
         manifest = sealer(out_dir)
+        # The audit is drawn after the seal and keyed by the hash it audits (7.6, ruling R250), so it is
+        # written here and never inside the builder, whose hash is still moving when it returns.
+        audit = _write_linker_audit(out_dir, root=audits_root if audits_root is not None else AUDITS_ROOT)
+        extra.append(
+            f"  audit      {audit.n} links drawn for review at "
+            f"{linker_audit_path(audits_root if audits_root is not None else AUDITS_ROOT, manifest.dataset_hash)}"
+        )
     _print_manifest(manifest, out_dir, extra=extra)
     return 0
+
+
+def _build_report(result: BuildResult) -> list[str]:
+    """The four answers amendment C1c added to a build, printed because they cannot yet be written.
+
+    ``purpose``, ``window_days``, the ``split`` cuts and moves, ``universe`` and ``build`` are manifest
+    blocks in 7.8 and every one of them is refused by the strict ``DatasetManifestModel`` of
+    ``pmx.data.schema`` until D1 lands the fields (the agreement DS1 reports). Printing them keeps the
+    operator and the gate reading the same numbers the manifest will carry, and
+    ``BuildResult.manifest_blocks`` is the document itself.
+    """
+    lines = [f"  purpose    {result.purpose}"]
+    plan = result.plan
+    if plan is not None:
+        lines.append(
+            f"  cuts       train_end {day_key(plan.train_end_ms)}"
+            f"  validation_end {day_key(plan.validation_end_ms)}"
+            f"  method count_quantile {list(plan.quantiles_permille)}"
+        )
+        lines.append(
+            f"  realised   {list(plan.realised_permille)} permille"
+            f"  moved {len(plan.cluster_moves)}"
+            + (f"  EMPTY FOLDS {list(plan.empty_folds)}" if plan.empty_folds else "")
+        )
+    universe = result.universe
+    if universe is not None and universe.n_series_before:
+        lines.append(
+            f"  universe   {universe.n_series_after} of {universe.n_series_before} series pass"
+            f" (>= {universe.rule.min_settled} settled, >= {universe.rule.min_volume_cents} cents),"
+            f" {universe.n_markets_kept} markets kept in them"
+        )
+    outcome = result.outcome
+    if outcome:
+        lines.append(f"  build      status {outcome.get('status')}  shortfall {outcome.get('shortfall')}")
+    return lines
 
 
 def _cmd_build(args: argparse.Namespace) -> int:
@@ -803,6 +970,17 @@ def _cmd_build(args: argparse.Namespace) -> int:
         name=cast("str | None", args.name),
         fetch_news=not bool(args.no_news),
         min_interval_ms=int(args.min_interval_ms),
+        purpose=cast(str, args.purpose),
+        universe_rule=_universe_rule_from_args(args),
+        audits_root=Path(args.audits_root),
+    )
+
+
+def _universe_rule_from_args(args: argparse.Namespace) -> UniverseRule:
+    """The two bars of the documented universe rule (7.4, decision D-R13, ruling R258)."""
+    return UniverseRule(
+        min_settled=int(args.universe_min_settled),
+        min_volume_cents=int(args.universe_min_volume_cents),
     )
 
 
@@ -816,6 +994,7 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
             path=str(out_dir),
         )
     config = build_config_from_manifest(_load_manifest(source_dir), freeze_date=cast(str, args.freeze))
+    check_window_days(config.window_days)
     staging = Path(args.staging) if args.staging else out_dir / STAGING_DIR
     return _run_build(
         out_dir=out_dir,
@@ -829,6 +1008,9 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
         name=None,
         fetch_news=not bool(args.no_news),
         min_interval_ms=int(args.min_interval_ms),
+        purpose=cast(str, args.purpose),
+        universe_rule=_universe_rule_from_args(args),
+        audits_root=Path(args.audits_root),
     )
 
 
@@ -857,7 +1039,21 @@ def _cmd_verify(args: argparse.Namespace) -> int:
     recomputed = cast(str, getattr(report, "dataset_hash", ""))
     expected = cast(str, getattr(report, "expected", ""))
     if ok:
+        # 7.8, ruling R248: ``pmx data verify`` also checks that no cluster or ``event_key`` group spans
+        # two folds and that the manifest's three counts are what the group-aware cut recomputes. The
+        # hash says the bytes are the ones the manifest names; this says the folds they fall into are
+        # the count-quantile, cluster-aware folds of 7.7 and not the calendar thirds that gave the first
+        # real dataset an inverted pyramid.
+        folds = cast(Callable[[Path], Mapping[str, str]], _resolve("pmx.data.loader", "verify_folds"))
+        try:
+            assignment = folds(dataset_dir)
+        except PmxError as error:
+            print(f"FOLD INTEGRITY {dataset_dir}", file=sys.stderr)
+            print(f"  {error}", file=sys.stderr)
+            return 1
+        counted = {name: sum(1 for fold in assignment.values() if fold == name) for name in FOLD_NAMES}
         print(f"verified {dataset_dir} {recomputed}")
+        print(f"  folds      {' '.join(f'{name} {counted[name]}' for name in FOLD_NAMES)}")
         return 0
     print(f"MISMATCH {dataset_dir}", file=sys.stderr)
     print(f"  recomputed {recomputed}", file=sys.stderr)
@@ -903,17 +1099,44 @@ def _cmd_migrate_v1(args: argparse.Namespace) -> int:
 
 
 def _csv(value: object) -> tuple[str, ...]:
+    """A comma separated flag, split on newlines as well.
+
+    The newline is the measurement's correction of 7.4 applied to the flag (ruling R258,
+    ``docs/MEASURE_2026-09-09_KALSHI_UNIVERSE.md`` section 4.2): a build writes its series list one
+    ticker per line, so ``--kalshi-series "$(cat data/datasets/y2026/kalshi_series.txt)"`` has to mean
+    seven hundred tickers and not one seven-thousand-character ticker the exchange has never heard of.
+    """
     if not isinstance(value, str) or not value.strip():
         return ()
-    return tuple(part.strip() for part in value.split(",") if part.strip())
+    flattened = value.replace("\r", ",").replace("\n", ",")
+    return tuple(part.strip() for part in flattened.split(",") if part.strip())
 
 
 # --------------------------------------------------------------------------------------------------
 # The parser
 # --------------------------------------------------------------------------------------------------
 def _add_filter_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument("--interval-min", type=int, default=1_440, choices=(60, 1_440))
-    parser.add_argument("--window-days", type=int, default=365)
+    parser.add_argument(
+        "--interval-min",
+        type=int,
+        default=1_440,
+        choices=(60, 1_440),
+        help=(
+            "the dataset's one bar grid (5.2, 5.3). 60 is the headline Kalshi grid (decision D-R5): "
+            "Kalshi publishes 1-minute candlesticks and a daily grid discards its intraday content "
+            "while the latency rule costs a full day. 1440 stays for Manifold and the showcase pack"
+        ),
+    )
+    parser.add_argument(
+        "--window-days",
+        type=int,
+        default=365,
+        help=(
+            f"the window on resolved_at_ms (5.6, decision D-S3); refused above {WINDOW_DAYS_MAX} "
+            "because an older resolution is recall rather than forecast for an LLM and an older "
+            "regime is not the regime being traded"
+        ),
+    )
     parser.add_argument("--opened-early-days", type=int, default=90)
     parser.add_argument("--min-trades", type=int, default=50)
     parser.add_argument("--min-unique-bettors", type=int, default=30)
@@ -938,6 +1161,33 @@ def _add_filter_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_build_arguments(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--purpose",
+        default=PURPOSE_RESEARCH,
+        choices=PURPOSES,
+        help=(
+            "research obeys the window rule of 5.6; showcase holds landmark events kept apart, is "
+            "exempt from the window rule and from nothing else, and is never the source of a fold, a "
+            "fitness value, a rule promotion or a claim (decision D-S4)"
+        ),
+    )
+    parser.add_argument(
+        "--universe-min-settled",
+        type=int,
+        default=UNIVERSE_MIN_SETTLED_DEFAULT,
+        help="settled markets in the window a Kalshi series needs to enter the universe (7.4, D-R13)",
+    )
+    parser.add_argument(
+        "--universe-min-volume-cents",
+        type=int,
+        default=UNIVERSE_MIN_VOLUME_CENTS_DEFAULT,
+        help="volume in cents a Kalshi series needs to enter the universe (7.4, D-R13)",
+    )
+    parser.add_argument(
+        "--audits-root",
+        default=str(AUDITS_ROOT),
+        help="root of the tracked audits/ tree the linker audit is written into (7.1, ruling R296)",
+    )
     parser.add_argument("--staging", default="", help="staged import directory (default <out>/staging)")
     parser.add_argument("--cache-dir", default="", help="raw provider cache (default <out>/cache)")
     parser.add_argument("--offline", action="store_true", help="build from staging only, open no socket")
@@ -1021,6 +1271,19 @@ def build_parser(parser: argparse.ArgumentParser) -> None:
     p_verify.add_argument("--dataset", required=True)
     p_verify.set_defaults(func=_cmd_verify)
 
+    p_audit = sub.add_parser(
+        "audit-links",
+        help="draw the fifty-link precision audit of a sealed dataset, or recompute its precision",
+    )
+    p_audit.add_argument("--dataset", required=True)
+    p_audit.add_argument(
+        "--audits-root",
+        default=str(AUDITS_ROOT),
+        help="root of the tracked audits/ tree (7.1, ruling R296)",
+    )
+    p_audit.add_argument("--n", type=int, default=LINKER_AUDIT_N, help="how many links to draw (7.6)")
+    p_audit.set_defaults(func=_cmd_audit_links)
+
     p_status = sub.add_parser("status", help="print a dataset's window, counts, filters and split")
     p_status.add_argument("--dataset", required=True)
     p_status.add_argument("--json", action="store_true", help="print the manifest as canonical JSON")
@@ -1035,7 +1298,10 @@ def build_parser(parser: argparse.ArgumentParser) -> None:
 
 def _dispatch_group(args: argparse.Namespace) -> int:
     """What ``pmx data`` alone does: nothing, loudly."""
-    print("pmx data needs a subcommand: import, news, build, refresh, seal, verify, status, migrate-v1")
+    print(
+        "pmx data needs a subcommand: import, news, build, refresh, seal, verify, audit-links, "
+        "status, migrate-v1"
+    )
     return 2
 
 

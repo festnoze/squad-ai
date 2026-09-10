@@ -27,7 +27,7 @@ from __future__ import annotations
 
 import shutil
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from pmx import CONTRACT_VERSION, DATASET_SCHEMA
@@ -42,6 +42,14 @@ from pmx.data.loader import (
 from pmx.data.news.linker import LinkIndex, load_stopwords, market_terms_of, tokens_of
 from pmx.data.resample import median_daily_volume_milli_of
 from pmx.data.schema import validate_against_schema
+from pmx.data.universe import (
+    MarketUniverseRow,
+    UniverseReport,
+    UniverseRule,
+    notional_cents_of,
+    series_of,
+    universe_of,
+)
 from pmx.errors import InvalidConfigError, LeakError, SchemaError
 from pmx.rng import SEED_SPACE, RngTree, derive_seed, sample_without_replacement
 from pmx.types import (
@@ -64,25 +72,47 @@ from pmx.types import (
     Market,
     NewsItem,
     NewsSourceCount,
+    bar_of,
     day_key,
     day_start_ms,
     hardness_tags_from_closes,
+    iso_date_from_ms,
     month_edges_for,
+    round_half_up,
 )
 
 __all__ = [
     "BACKGROUND_SOURCE",
+    "FOLD_QUANTILES_PERMILLE",
+    "FOLD_NAMES",
     "ILLIQUID_DECILE_MIN_SLICE",
+    "KALSHI_COHORT_TARGET",
+    "KALSHI_MARKET_FLOOR",
+    "MANIFOLD_COHORT_TARGET",
+    "MANIFOLD_MARKET_FLOOR",
     "MULTI_OUTCOME_TAGS",
+    "PURPOSES",
+    "PURPOSE_RESEARCH",
+    "PURPOSE_SHOWCASE",
     "SAMPLE_SUBSTREAM",
     "SELF_RESOLVED_SOURCE",
     "SELF_RESOLVED_TAG",
+    "UNIVERSE_MIN_SETTLED_DEFAULT",
+    "UNIVERSE_MIN_VOLUME_CENTS_DEFAULT",
+    "WINDOW_DAYS_MAX",
     "BuildResult",
+    "ClusterMove",
     "MarketFacts",
+    "SplitPlan",
     "as_plain_dict",
     "build_config_from_manifest",
     "build_dataset",
     "build_dataset_from_payloads",
+    "build_outcome",
+    "check_purpose",
+    "check_window_days",
+    "fold_keys_of",
+    "group_ids_of",
     "hardness_tags_for",
     "illiquid_boundaries",
     "link_news_payloads",
@@ -91,10 +121,14 @@ __all__ = [
     "month_index_of",
     "month_quotas",
     "news_floor_ms",
+    "plan_folds",
     "removal_reason",
     "sample_seed_for",
+    "split_block_of",
     "stratified_cap",
+    "universe_of_facts",
     "window_bounds",
+    "window_exempt",
 ]
 
 #: The twelve month buckets of a window (CONTRACTS_V2 7.7: thirteen edges, twelve months). The cap is
@@ -160,6 +194,60 @@ ILLIQUID_DECILE_MIN_SLICE = 10
 NOTES_MAX = 4_000
 
 _UPSET_WINDOW_MS = 30 * MS_PER_DAY
+
+# --------------------------------------------------------------------------------------------------
+# Amendment C1c's data constants (CONTRACTS_V2 5.6, 7.4, 7.7; decisions D-R1, D-R2, D-S3, D-S4, D-S11,
+# D-S12; rulings R247, R248, R258, R262, R263, R270, R290).
+#
+# Every constant below is declared here **for want of its contracted home**: section 15.10's deferral
+# table puts ``WINDOW_DAYS_MAX``, ``BuildConfig.purpose``, ``universe_min_settled`` and
+# ``universe_min_volume_cents`` in ``src/pmx/types.py``, which is D1's file and not this package's to
+# edit. Each one therefore has exactly one definition in the tree, here, and moves to ``pmx.types``
+# unchanged in the commit that lands the agreement (reported by DS1 as an agreement needed). Nothing
+# imports a second spelling of any of them.
+# --------------------------------------------------------------------------------------------------
+
+#: The ceiling on ``BuildConfig.window_days`` (5.6, decision D-S3, ruling R262), refused for two reasons
+#: no flag may override: a market that resolved before a model's knowledge cutoff is a possible **recall**
+#: rather than a forecast, so an older resolution buys nothing an LLM row can be scored on; and a regime
+#: three years old is not the regime being traded, so an older tape teaches a scripted family the wrong
+#: market.
+WINDOW_DAYS_MAX = 730
+
+#: The two headline cuts as count quantiles of group resolution order: 60 / 20 / 20 (7.7, decision D-R1,
+#: rulings R247 and R290). Calendar thirds gave the first real dataset 111 train, 46 validation and 130
+#: sealed markets, an inverted pyramid; a count quantile is still chronological and puts the mass where
+#: the fitting is.
+FOLD_QUANTILES_PERMILLE = (600, 800)
+
+#: The three folds, in chronological order (7.7, 12.7).
+FOLD_NAMES = ("train", "validation", "sealed")
+
+#: ``DatasetManifest.purpose`` (5.6, decision D-S4, ruling R263), which replaces the ad hoc
+#: ``is_demo_pack`` property. A **showcase** dataset holds landmark events kept apart rather than thrown
+#: away and is exempt from the window rule of 5.6 and from nothing else; a **research** dataset obeys it.
+PURPOSE_RESEARCH = "research"
+PURPOSE_SHOWCASE = "showcase"
+PURPOSES = (PURPOSE_RESEARCH, PURPOSE_SHOWCASE)
+
+#: The build target of 7.4, stated in cohorts per venue (decisions D-S1, D-S11 and D-S12 as section G of
+#: ``docs/REVIEW_2026-09-09_SCALE_TAGS.md`` corrected them; rulings R260, R270, R271). A build below the
+#: Kalshi target is a **failed** build; a build that misses only the Manifold target is ``ok`` with the
+#: shortfall recorded, because Manifold's role is breadth and print-tape depth and not comparison.
+KALSHI_COHORT_TARGET = 40
+MANIFOLD_COHORT_TARGET = 8
+
+#: The market floor the cohort target costs on the measured distribution (7.4, decision D-S12).
+KALSHI_MARKET_FLOOR = 7_000
+MANIFOLD_MARKET_FLOOR = 2_000
+
+#: The documented universe rule's two defaults (7.4, decision D-R13, ruling R258). They are the numbers
+#: the first build reports against, not laws.
+UNIVERSE_MIN_SETTLED_DEFAULT = 5
+UNIVERSE_MIN_VOLUME_CENTS_DEFAULT = 100_000
+
+#: The provider whose universe rule 7.4 states. Manifold has no series and is counted whole.
+UNIVERSE_PROVIDER = "kalshi"
 
 
 # --------------------------------------------------------------------------------------------------
@@ -327,6 +415,10 @@ class MarketFacts:
     #: ``prints`` or ``bars_only`` (section 7.2). Read from the market file, defaulting to ``prints`` for
     #: a file written before the flag existed.
     tape_kind: str = TAPE_KIND_PRINTS
+    #: The venue's own event grouping (7.2): a Kalshi ``event_ticker``, a Manifold ``groupSlugs[0]``, else
+    #: ``None``. It is the group the cluster-aware cut of 7.7 falls back to when no ``EventCluster`` names
+    #: the market, so the builder reads it here rather than off the payload at the cut site.
+    event_key: str | None = None
 
     @property
     def life_days(self) -> int:
@@ -384,26 +476,160 @@ def market_facts(payload: Mapping[str, object]) -> MarketFacts:
         tape_kind=(
             _str_field(quality, "tape_kind") if "tape_kind" in quality else TAPE_KIND_PRINTS
         ),
+        event_key=_opt_str_field(payload, "event_key"),
     )
 
 
 # --------------------------------------------------------------------------------------------------
 # Window, filters, hardness tags, split
 # --------------------------------------------------------------------------------------------------
-def window_bounds(config: BuildConfig, facts: Sequence[MarketFacts]) -> tuple[int, int]:
+def check_window_days(window_days: int) -> None:
+    """Refuse a window wider than :data:`WINDOW_DAYS_MAX`, with the two reasons 5.6 states.
+
+    Decision D-S3, ruling R262. The contract puts this refusal in ``BuildConfig.__post_init__``, which is
+    in D1's ``pmx.types``; until that agreement lands it is enforced here, at the one boundary every
+    build passes through, and by ``pmx data build`` on the flag itself. The two reasons are not style:
+
+    * a market that resolved before a model's knowledge cutoff is a possible **recall** rather than a
+      forecast, so an older resolution buys nothing an LLM row can be scored on;
+    * a regime three years old is not the regime being traded, so an older tape teaches a scripted
+      family the wrong market.
+
+    No flag overrides either, which is why this is a refusal and not a warning.
+    """
+    if window_days < 1:
+        raise InvalidConfigError("window_days must be at least 1", window_days=window_days)
+    if window_days > WINDOW_DAYS_MAX:
+        raise InvalidConfigError(
+            "window_days is refused above WINDOW_DAYS_MAX: an older resolution is recall rather than "
+            "forecast for an LLM, and an older regime is not the regime being traded",
+            window_days=window_days,
+            window_days_max=WINDOW_DAYS_MAX,
+        )
+
+
+def check_purpose(purpose: str) -> None:
+    """``research`` or ``showcase`` and nothing else (5.6, decision D-S4, ruling R263)."""
+    if purpose not in PURPOSES:
+        raise InvalidConfigError("purpose is research or showcase", purpose=purpose, allowed=list(PURPOSES))
+
+
+def universe_of_facts(
+    walked: Sequence[MarketFacts],
+    kept_ids: frozenset[str],
+    *,
+    rule: UniverseRule,
+    series_categories: Mapping[str, str] = {},
+    provider: str = UNIVERSE_PROVIDER,
+) -> UniverseReport:
+    """The documented universe rule of 7.4 over the settled walk (decision D-R13, ruling R258).
+
+    ``walked`` is every market of the provider the walk returned, **before** the quality filters, so the
+    counts the manifest carries are a real before and after; ``kept_ids`` is what survived them. The rule
+    itself is decided on the before, because a series with a hundred settled markets is a real series
+    whatever this build's density bar did to it, and the series list this produces is what the next build
+    passes as ``series_ticker`` (the only narrowing either settled listing honours, ruling R100).
+    """
+    rows = [
+        MarketUniverseRow(
+            series=series_of(item.provider_id),
+            volume_cents=notional_cents_of(item.volume_milli_total),
+            kept=item.id in kept_ids,
+        )
+        for item in walked
+        if item.provider == provider
+    ]
+    return universe_of(rows, rule=rule, series_categories=series_categories)
+
+
+def build_outcome(
+    *,
+    per_provider: Mapping[str, int],
+    cohorts_per_provider: Mapping[str, int] | None = None,
+    fallbacks: Sequence[Mapping[str, object]] = (),
+) -> dict[str, object]:
+    """``manifest.build`` (7.8): the per-venue status, targets, reachable counts and shortfall.
+
+    Ruling R290 in the form ruling R270 states: **``build.status`` is per venue.** A build below
+    ``KALSHI_COHORT_TARGET`` on Kalshi is a **failed** build and gate G3 fails on it, because Kalshi
+    carries the comparison; a build that misses only ``MANIFOLD_COHORT_TARGET`` is ``ok`` with
+    ``build.shortfall.manifold`` filled, because Manifold's role is breadth and print-tape depth and its
+    shortfall costs breadth and not the comparison. The blanket sentence 7.4 used to carry ("a build that
+    reaches the market floor and not the cohort floor is a failed build") contradicted that and is gone.
+
+    ``cohorts_per_provider`` is ``None`` until DS2's ``pmx.cohorts.list_cohorts`` exists (18.5): the
+    cohort count is the primary target and the market floor is what it costs, so with no cohort count the
+    status is decided on the market floor alone and ``targets`` says both numbers either way. A shortfall
+    row is only ever written for a venue that is short, and the count itself is not echoed back into the
+    block: ``dataset.v1.json``'s ``build`` object carries exactly the five keys 7.8 names.
+    """
+    targets = {
+        "kalshi_cohorts": KALSHI_COHORT_TARGET,
+        "manifold_cohorts": MANIFOLD_COHORT_TARGET,
+        "kalshi_markets": KALSHI_MARKET_FLOOR,
+        "manifold_markets": MANIFOLD_MARKET_FLOOR,
+    }
+    floors = {"kalshi": KALSHI_MARKET_FLOOR, "manifold": MANIFOLD_MARKET_FLOOR}
+    cohort_targets = {"kalshi": KALSHI_COHORT_TARGET, "manifold": MANIFOLD_COHORT_TARGET}
+    shortfall: dict[str, dict[str, int]] = {}
+    for provider, floor in sorted(floors.items()):
+        reached = per_provider.get(provider, 0)
+        rows: dict[str, int] = {}
+        if reached < floor:
+            rows["markets"] = floor - reached
+        if cohorts_per_provider is not None:
+            cohorts = cohorts_per_provider.get(provider, 0)
+            if cohorts < cohort_targets[provider]:
+                rows["cohorts"] = cohort_targets[provider] - cohorts
+        if rows:
+            shortfall[provider] = dict(sorted(rows.items()))
+    status = "failed" if "kalshi" in shortfall else "ok"
+    outcome: dict[str, object] = {
+        "status": status,
+        "targets": dict(sorted(targets.items())),
+        "reachable": {name: per_provider[name] for name in sorted(per_provider)},
+        "shortfall": shortfall,
+        "fallbacks": [dict(sorted(step.items())) for step in fallbacks],
+    }
+    return outcome
+
+
+def window_exempt(config: BuildConfig, *, purpose: str) -> bool:
+    """Whether the window rule of 5.6 does not apply to this build.
+
+    Exactly two builds are exempt and they are the same build under two spellings: a ``showcase``
+    dataset (decision D-S4, ruling R263), which holds landmark events kept apart rather than thrown away,
+    and the migrated demo pack of 7.1, whose only provider is ``demo`` and which is the ``is_demo_pack``
+    signature ``purpose`` replaces. Nothing else is exempt, and the freeze rule is never skipped for
+    either.
+    """
+    return purpose == PURPOSE_SHOWCASE or tuple(config.providers) == ("demo",)
+
+
+def window_bounds(
+    config: BuildConfig, facts: Sequence[MarketFacts], *, purpose: str = PURPOSE_RESEARCH
+) -> tuple[int, int]:
     """The window on ``resolved_at_ms``: ``[freeze_ms - window_days, freeze_ms - 1 day)``.
 
-    Section 7.1 exempts the migrated demo pack, whose markets resolved years before any freeze: a build
-    whose only provider is ``demo`` takes its window from its own markets, exactly as the contract's
-    manifest fixture does (start at the first creation day, end one millisecond after the last resolution).
+    Section 7.1 and decision D-S4 exempt the same shape twice: a ``showcase`` dataset and the migrated
+    demo pack take their window from their own markets (start at the first creation day, end one
+    millisecond after the last resolution), exactly as the contract's manifest fixture does, because
+    their markets resolved years before any freeze.
     """
     freeze_ms = config.freeze_ms
-    if tuple(config.providers) == ("demo",):
-        if not facts:
-            raise InvalidConfigError("a demo build needs at least one market")
+    if window_exempt(config, purpose=purpose):
+        # The freeze rule is never skipped (7.1, 5.6), so a market at or after the freeze is not part
+        # of the window either: it is about to be removed by the ``no_leak`` filter, and letting it set
+        # ``window.end_ms`` would put a dataset's stated window past its own freeze.
+        inside = [item for item in facts if item.resolved_at_ms < freeze_ms]
+        if not inside:
+            raise InvalidConfigError(
+                "a build exempt from the window rule needs at least one market inside its freeze",
+                purpose=purpose,
+            )
         return (
-            day_start_ms(min(item.created_at_ms for item in facts)),
-            max(item.resolved_at_ms for item in facts) + 1,
+            day_start_ms(min(item.created_at_ms for item in inside)),
+            max(item.resolved_at_ms for item in inside) + 1,
         )
     return freeze_ms - config.window_days * MS_PER_DAY, freeze_ms - MS_PER_DAY
 
@@ -420,6 +646,10 @@ def removal_reason(
 ) -> str | None:
     """The first filter of ``FILTER_ORDER`` this market fails, or ``None`` when it is kept.
 
+    ``window_checks`` turns off the **window** and **opened early** filters, which is what a
+    ``purpose: "showcase"`` build and the migrated demo pack are exempt from (5.6, 7.1, ruling R263).
+    It never turns off ``no_leak``: the freeze rule applies to every dataset there is.
+
     One of the ten filters of section 7.4 reads a signal no field of ``market.v2`` carries: whether a leg is
     a single binary market (``binary``), which is read off ``tags`` because that is the only channel an
     importer has, and which is reported as a contract issue against section 7.2. ``self_resolved`` reads
@@ -429,7 +659,10 @@ def removal_reason(
     checks: dict[str, bool] = {
         "resolution": facts.resolution not in (0, 1),
         "binary": any(tag in MULTI_OUTCOME_TAGS for tag in facts.tags),
-        "no_leak": window_checks and facts.resolved_at_ms >= freeze_ms,
+        # Never gated by ``window_checks``: a dataset exempt from the **window** rule of 5.6 is exempt
+        # from the **freeze** rule of nothing (7.1, ruling R263). A landmark market that resolved after
+        # the freeze is a leak in a showcase pack exactly as it is in a research one.
+        "no_leak": facts.resolved_at_ms >= freeze_ms,
         "window": window_checks and not (window_start_ms <= facts.resolved_at_ms < window_end_ms),
         "opened_early": (
             window_checks and facts.created_at_ms < window_start_ms - config.opened_early_days * MS_PER_DAY
@@ -605,25 +838,262 @@ def hardness_tags_for(facts: MarketFacts, *, illiquid_boundary_milli: int) -> tu
     )
 
 
-def make_split(*, window_start_ms: int, fold_counts: Mapping[str, int]) -> DatasetSplit:
-    """The thirteen month edges of section 7.7 and the three fold counts, cut at months 8 and 10."""
-    edges = month_edges_for(window_start_ms)
-    return DatasetSplit(
-        month_edges_ms=edges,
-        train_end_ms=edges[8],
-        validation_end_ms=edges[10],
-        n_train=fold_counts.get("train", 0),
-        n_validation=fold_counts.get("validation", 0),
-        n_sealed=fold_counts.get("sealed", 0),
+# --------------------------------------------------------------------------------------------------
+# 7.7 The split: count quantiles of GROUP resolution order (decision D-R1, rulings R247, R248, R290)
+# --------------------------------------------------------------------------------------------------
+def group_ids_of(
+    facts: Sequence[MarketFacts], *, clusters: Mapping[str, str] = {}
+) -> dict[str, str]:
+    """The fold group of every market: its ``EventCluster``, else its ``event_key`` group, else itself.
+
+    Section 7.7's ``group_of``. The three tiers are ordered by how much they know: a cluster (16.3) is a
+    cross-venue statement about one real-world event and wins; a venue's own ``event_key`` groups the legs
+    of one event on one venue; a market that is in neither is its own group of one. The singleton is
+    prefixed so that no market id can ever collide with an ``event_key`` a venue happens to spell the same
+    way, and the prefix is what the manifest's ``cluster_moves`` reports as ``group_id``.
+    """
+    groups: dict[str, str] = {}
+    for item in facts:
+        cluster_id = clusters.get(item.id)
+        if cluster_id:
+            groups[item.id] = cluster_id
+        elif item.event_key:
+            groups[item.id] = f"{item.provider}:{item.event_key}"
+        else:
+            groups[item.id] = f"m:{item.id}"
+    return groups
+
+
+def fold_keys_of(
+    facts: Sequence[MarketFacts], *, interval_min: int, clusters: Mapping[str, str] = {}
+) -> dict[str, int]:
+    """``fold_key_ms`` per market: the resolution **bar** of the latest-resolving member of its group.
+
+    Section 7.7 and ruling R248. A train price path may otherwise encode a sealed outcome that the
+    cross-asset sensor, a cluster feature or a hive resolution would carry: two legs of one event whose
+    resolutions straddle a cut would sit on both sides of it, and the earlier leg's tape is a forecast of
+    the later leg's outcome.
+
+    The value is a bar open (``bar_of``) and not the raw instant, so a run can clip ``t0_ms`` and
+    ``t1_ms`` to a cut without landing inside a bar.
+    """
+    groups = group_ids_of(facts, clusters=clusters)
+    latest: dict[str, int] = {}
+    for item in facts:
+        group = groups[item.id]
+        latest[group] = max(latest.get(group, item.resolved_at_ms), item.resolved_at_ms)
+    return {item.id: bar_of(latest[groups[item.id]], interval_min) for item in facts}
+
+
+@dataclass(frozen=True, slots=True)
+class ClusterMove:
+    """One row of ``manifest.split.cluster_moves`` (7.8): a market its group pulled into a later fold.
+
+    Ruling R290 kept the shape and changed what fills it. Nothing is moved any more, because the cut is
+    taken on ``fold_key_ms`` in one step; a row here says that the market's **own** resolution bar falls
+    in an earlier fold than the fold its group put it in, which is the fact a reviewer wants and which the
+    two-step rule used to express as an actual move.
+    """
+
+    market_id: str
+    from_fold: str
+    to_fold: str
+    group_id: str
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "market_id": self.market_id,
+            "from_fold": self.from_fold,
+            "to_fold": self.to_fold,
+            "group_id": self.group_id,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SplitPlan:
+    """The whole answer of the cut: the two cuts, every market's fold, and what the manifest reports."""
+
+    train_end_ms: int
+    validation_end_ms: int
+    folds: Mapping[str, str]
+    fold_keys: Mapping[str, int]
+    group_ids: Mapping[str, str]
+    cluster_moves: tuple[ClusterMove, ...]
+    quantiles_permille: tuple[int, ...]
+
+    @property
+    def counts(self) -> dict[str, int]:
+        counted = dict.fromkeys(FOLD_NAMES, 0)
+        for fold in self.folds.values():
+            counted[fold] += 1
+        return counted
+
+    @property
+    def realised_permille(self) -> tuple[int, ...]:
+        """``split.realised_permille`` (7.8, ruling R290): the share each fold actually got, in permille.
+
+        The targets are ``FOLD_QUANTILES_PERMILLE``; the realised shares differ from them by the ties of
+        one bar and by nothing else, which is exactly what this field lets a reader check.
+        """
+        counted = self.counts
+        total = sum(counted.values())
+        if total == 0:
+            return (0, 0, 0)
+        return tuple(round_half_up(1_000 * counted[name], total) for name in FOLD_NAMES)
+
+    @property
+    def empty_folds(self) -> tuple[str, ...]:
+        """The folds the cut left empty, in chronological order.
+
+        The builder reports them and does not refuse them: a dataset of one market has two empty folds
+        and is still a dataset. The refusal is ``make_folds``'s (7.7, 13.1, ``FoldIntegrityError``),
+        because it is the consumer for which every paired bound and every ``usable_for_paired_test``
+        depends on all three being populated.
+        """
+        counted = self.counts
+        return tuple(name for name in FOLD_NAMES if counted[name] == 0)
+
+
+def _fold_of(key_ms: int, *, train_end_ms: int, validation_end_ms: int) -> str:
+    if key_ms < train_end_ms:
+        return FOLD_NAMES[0]
+    if key_ms < validation_end_ms:
+        return FOLD_NAMES[1]
+    return FOLD_NAMES[2]
+
+
+def plan_folds(
+    facts: Sequence[MarketFacts],
+    *,
+    interval_min: int,
+    window_start_ms: int,
+    clusters: Mapping[str, str] = {},
+    quantiles_permille: Sequence[int] = FOLD_QUANTILES_PERMILLE,
+) -> SplitPlan:
+    """The count-quantile, cluster-aware cut of section 7.7, in one step (rulings R247, R248, R290).
+
+    The whole of the rule, and why each half of it is where it is:
+
+    * **Count quantiles, not calendar thirds** (decision D-R1). Calendar thirds gave the first real
+      dataset 111 train, 46 validation and 130 sealed markets, an inverted pyramid, because resolutions
+      are not uniform over a year. Sorting by resolution order and cutting at 60 and 80 percent of the
+      **count** is still chronological (a train market always resolved before a validation one) and puts
+      the mass where the fitting is.
+    * **The cluster rule is inside the cut** (ruling R290, which refused the two-step form R248 first
+      had). Cutting on the market's own resolution and then moving each group to its latest member's fold
+      moves markets one way only, always later and without bound, thinning the train fold exactly on the
+      dense Kalshi ``event_key`` groups the cohort target of 7.4 is built from: D-R1's own inverted
+      pyramid, reintroduced silently. Cutting the quantiles on ``fold_key_ms`` reaches the folds R248
+      intended in one step, with the 60/20/20 shares held up to the ties of one bar.
+    * **Ties go to the later fold.** ``train_end_ms`` is a fold key, and the predicate is strict below it,
+      so every market of every group whose key is the cut bar lands together in the later fold. That is
+      what makes "no group spans two folds" true by construction rather than by a repair afterwards, and
+      it is the only reason the realised counts differ from the targets at all.
+    """
+    # ``1_000`` is refused and not clamped, at both cuts. 7.7's formula reads the cut bar off the
+    # ordered list (``train_end_ms = fold_key_ms(ordered[k_train])``), and ``k = (n * 1_000) // 1_000``
+    # is ``n``, one past the last market: a permille of a thousand asks for the bar of a market that
+    # does not exist. Left unchecked it raised ``IndexError`` from inside the cut, which section 13.1's
+    # taxonomy has no room for; a quantile is configuration, so a bad one is an ``InvalidConfigError``
+    # named at the boundary. Nothing legitimate passes it either, since a cut at a thousand permille is
+    # a fold with no markets in it, which ``make_folds`` refuses anyway.
+    if (
+        len(quantiles_permille) != 2
+        or not 0 <= quantiles_permille[0] <= quantiles_permille[1]
+        or quantiles_permille[1] >= 1_000
+    ):
+        raise InvalidConfigError(
+            "the fold quantiles are two permille values in order and below one thousand",
+            quantiles=list(quantiles_permille),
+        )
+    keys = fold_keys_of(facts, interval_min=interval_min, clusters=clusters)
+    groups = group_ids_of(facts, clusters=clusters)
+    ordered = sorted(facts, key=lambda item: (keys[item.id], item.resolved_at_ms, item.id))
+    n = len(ordered)
+    if n == 0:
+        # No market, no cut. Both cuts sit at the window's open so that every predicate of 7.7 is still
+        # well defined and the three counts are three zeros.
+        return SplitPlan(
+            train_end_ms=window_start_ms,
+            validation_end_ms=window_start_ms,
+            folds={},
+            fold_keys={},
+            group_ids={},
+            cluster_moves=(),
+            quantiles_permille=tuple(quantiles_permille),
+        )
+    k_train = (n * quantiles_permille[0]) // 1_000
+    k_validation = (n * quantiles_permille[1]) // 1_000
+    train_end_ms = keys[ordered[k_train].id]
+    validation_end_ms = keys[ordered[k_validation].id]
+    folds = {
+        item.id: _fold_of(keys[item.id], train_end_ms=train_end_ms, validation_end_ms=validation_end_ms)
+        for item in ordered
+    }
+    moves: list[ClusterMove] = []
+    for item in ordered:
+        own = _fold_of(
+            bar_of(item.resolved_at_ms, interval_min),
+            train_end_ms=train_end_ms,
+            validation_end_ms=validation_end_ms,
+        )
+        if own != folds[item.id]:
+            moves.append(
+                ClusterMove(
+                    market_id=item.id,
+                    from_fold=own,
+                    to_fold=folds[item.id],
+                    group_id=groups[item.id],
+                )
+            )
+    return SplitPlan(
+        train_end_ms=train_end_ms,
+        validation_end_ms=validation_end_ms,
+        folds=folds,
+        fold_keys=keys,
+        group_ids=groups,
+        cluster_moves=tuple(sorted(moves, key=lambda move: move.market_id)),
+        quantiles_permille=tuple(quantiles_permille),
     )
 
 
-def _fold_of(resolved_at_ms: int, *, train_end_ms: int, validation_end_ms: int) -> str:
-    if resolved_at_ms < train_end_ms:
-        return "train"
-    if resolved_at_ms < validation_end_ms:
-        return "validation"
-    return "sealed"
+def make_split(*, window_start_ms: int, plan: SplitPlan) -> DatasetSplit:
+    """The thirteen month edges of section 7.7 and the plan's two cuts and three counts.
+
+    The month edges stay and are still the rolling folds' edges of 12.7 (ruling R247): a month is the unit
+    a reader can name, and the rolling pair the rule tester replicates on is a calendar pair. What changed
+    is only where the two **headline** cuts fall, which are now the plan's count quantiles and no longer
+    ``edges[8]`` and ``edges[10]``.
+    """
+    counts = plan.counts
+    return DatasetSplit(
+        month_edges_ms=month_edges_for(window_start_ms),
+        train_end_ms=plan.train_end_ms,
+        validation_end_ms=plan.validation_end_ms,
+        n_train=counts[FOLD_NAMES[0]],
+        n_validation=counts[FOLD_NAMES[1]],
+        n_sealed=counts[FOLD_NAMES[2]],
+    )
+
+
+def split_block_of(split: DatasetSplit, plan: SplitPlan) -> dict[str, object]:
+    """``manifest.split`` as 7.8 states it after amendment C1c, the six new fields included.
+
+    ``DatasetSplit`` (D1's ``pmx.types``) does not carry ``method``, ``quantiles_permille``, the two cut
+    dates, ``cluster_moves``, ``n_moved`` or ``realised_permille`` yet, and neither does the strict
+    ``SplitModel`` of ``pmx.data.schema`` that reads a manifest back: both files belong to D1 and adding
+    the fields is the agreement DS1 reports. This renderer is where the block is assembled, so the day the
+    fields land the builder writes ``document["split"] = split_block_of(...)`` and nothing else moves.
+    """
+    block = split.to_dict()
+    block["method"] = "count_quantile"
+    block["quantiles_permille"] = list(plan.quantiles_permille)
+    block["train_end_date"] = iso_date_from_ms(plan.train_end_ms)
+    block["validation_end_date"] = iso_date_from_ms(plan.validation_end_ms)
+    block["cluster_moves"] = [move.to_dict() for move in plan.cluster_moves]
+    block["n_moved"] = len(plan.cluster_moves)
+    block["realised_permille"] = list(plan.realised_permille)
+    return block
 
 
 # --------------------------------------------------------------------------------------------------
@@ -645,10 +1115,51 @@ class BuildResult:
     n_news_linked: int
     n_news_dropped: int
     n_bytes: int
+    #: Amendment C1c's four answers a build now produces (7.7, 7.8; decisions D-R1, D-R2, D-R13, D-S4;
+    #: rulings R247, R248, R258, R263, R270, R290). Every one of them is a **manifest block** in the
+    #: contract and is carried here as well, because ``DatasetManifest`` and the strict ``SplitModel``
+    #: that reads a manifest back are D1's ``pmx.types`` and ``pmx.data.schema``: until that agreement
+    #: lands, a manifest that carried these keys would not load. They are defaulted so that a caller
+    #: written before them still constructs a ``BuildResult``.
+    plan: SplitPlan | None = None
+    universe: UniverseReport | None = None
+    purpose: str = PURPOSE_RESEARCH
+    outcome: Mapping[str, object] = field(default_factory=dict)
+    #: ``manifest.resolution_span`` (7.8, ruling R262): the true span of the markets kept, beside the
+    #: declared ``window_days``. A reader compares the two and sees whether the window is a statement
+    #: about the data or about the flag.
+    resolution_span_ms: tuple[int, int] | None = None
 
     @property
     def dataset_hash(self) -> str:
         return self.manifest.dataset_hash
+
+    @property
+    def manifest_blocks(self) -> dict[str, object]:
+        """The manifest as 7.8 states it after amendment C1c: ``manifest.to_dict()`` plus the new blocks.
+
+        This is the whole of what DS1 owes the manifest and cannot yet write into it. The blocks are
+        assembled here, validated by the tests against ``dataset.v1.json`` (which already admits every
+        one of them, C1c landed the schema), and written by the builder the day ``DatasetManifest`` and
+        ``DatasetManifestModel`` carry the fields: ``document.update(result.manifest_blocks)``.
+        """
+        document = self.manifest.to_dict()
+        document["purpose"] = self.purpose
+        window_days = self.manifest.filters.config.get("window_days")
+        if isinstance(window_days, int) and not isinstance(window_days, bool):
+            document["window_days"] = window_days
+        if self.plan is not None:
+            document["split"] = split_block_of(self.manifest.split, self.plan)
+        if self.universe is not None:
+            document["universe"] = self.universe.to_dict()
+        if self.outcome:
+            document["build"] = dict(self.outcome)
+        if self.resolution_span_ms is not None:
+            document["resolution_span"] = {
+                "min_ms": self.resolution_span_ms[0],
+                "max_ms": self.resolution_span_ms[1],
+            }
+        return document
 
 
 def _sorted_markets(payloads: Sequence[Mapping[str, object]]) -> tuple[Mapping[str, object], ...]:
@@ -899,6 +1410,12 @@ def build_dataset_from_payloads(
     news_payloads: Sequence[Mapping[str, object]] = (),
     excluded_series: Sequence[str] = (),
     mapped_series: Sequence[str] = (),
+    series_categories: Mapping[str, str] = {},
+    clusters: Mapping[str, str] = {},
+    purpose: str = PURPOSE_RESEARCH,
+    universe_rule: UniverseRule | None = None,
+    cohorts_per_provider: Mapping[str, int] | None = None,
+    fallbacks: Sequence[Mapping[str, object]] = (),
     name: str | None = None,
     notes: str = "",
     overwrite: bool = False,
@@ -917,6 +1434,8 @@ def build_dataset_from_payloads(
     for one number: how many kept markets fell back to the ``other`` category (section 2). It arrives as
     an argument for the same reason ``excluded_series`` does.
     """
+    check_window_days(config.window_days)
+    check_purpose(purpose)
     dataset_name = name if name is not None else out_dir.name
     if RE_DATASET_NAME.fullmatch(dataset_name) is None:
         raise InvalidConfigError("a dataset name is not the lowercase slug of section 2", name=dataset_name)
@@ -953,7 +1472,7 @@ def build_dataset_from_payloads(
             )
         all_facts.append(facts)
 
-    window_start_ms, window_end_ms = window_bounds(config, all_facts)
+    window_start_ms, window_end_ms = window_bounds(config, all_facts, purpose=purpose)
     freeze_ms = config.freeze_ms
     excluded = frozenset(excluded_series)
     removed = dict.fromkeys(REMOVED_FILTER_KEYS, 0)
@@ -967,7 +1486,7 @@ def build_dataset_from_payloads(
             window_end_ms=window_end_ms,
             freeze_ms=freeze_ms,
             excluded_series=excluded,
-            window_checks=tuple(config.providers) != ("demo",),
+            window_checks=not window_exempt(config, purpose=purpose),
         )
         if reason is not None:
             removed[reason] += 1
@@ -996,15 +1515,15 @@ def build_dataset_from_payloads(
         facts.id: hardness_tags_for(facts, illiquid_boundary_milli=boundaries.get(facts.provider, -1))
         for facts in kept_facts
     }
-    edges = month_edges_for(window_start_ms)
-    folds = {
-        facts.id: _fold_of(facts.resolved_at_ms, train_end_ms=edges[8], validation_end_ms=edges[10])
-        for facts in kept_facts
-    }
-    fold_counts: dict[str, int] = {}
-    for fold in folds.values():
-        fold_counts[fold] = fold_counts.get(fold, 0) + 1
-    split = make_split(window_start_ms=window_start_ms, fold_counts=fold_counts)
+    # The count-quantile, cluster-aware cut of 7.7 (decisions D-R1 and D-R2, rulings R247, R248, R290).
+    plan = plan_folds(
+        kept_facts,
+        interval_min=config.interval_min,
+        window_start_ms=window_start_ms,
+        clusters=clusters,
+    )
+    folds = dict(plan.folds)
+    split = make_split(window_start_ms=window_start_ms, plan=plan)
     if split.n_train + split.n_validation + split.n_sealed != len(kept_facts):
         raise InvalidConfigError(
             "the three folds do not partition the kept markets",
@@ -1107,6 +1626,31 @@ def build_dataset_from_payloads(
         n_news_linked=n_linked,
         n_news_dropped=dropped_news,
         n_bytes=n_bytes,
+        plan=plan,
+        universe=universe_of_facts(
+            all_facts,
+            frozenset(facts.id for facts in kept_facts),
+            rule=(
+                universe_rule
+                if universe_rule is not None
+                else UniverseRule(
+                    min_settled=UNIVERSE_MIN_SETTLED_DEFAULT,
+                    min_volume_cents=UNIVERSE_MIN_VOLUME_CENTS_DEFAULT,
+                )
+            ),
+            series_categories=series_categories,
+        ),
+        purpose=purpose,
+        outcome=build_outcome(
+            per_provider=manifest.counts.per_provider,
+            cohorts_per_provider=cohorts_per_provider,
+            fallbacks=fallbacks,
+        ),
+        resolution_span_ms=(
+            (min(item.resolved_at_ms for item in kept_facts), max(item.resolved_at_ms for item in kept_facts))
+            if kept_facts
+            else None
+        ),
     )
 
 
@@ -1129,6 +1673,12 @@ def build_dataset(
     news: Sequence[NewsItem] = (),
     excluded_series: Sequence[str] = (),
     mapped_series: Sequence[str] = (),
+    series_categories: Mapping[str, str] = {},
+    clusters: Mapping[str, str] = {},
+    purpose: str = PURPOSE_RESEARCH,
+    universe_rule: UniverseRule | None = None,
+    cohorts_per_provider: Mapping[str, int] | None = None,
+    fallbacks: Sequence[Mapping[str, object]] = (),
     name: str | None = None,
     notes: str = "",
     overwrite: bool = False,
@@ -1141,6 +1691,12 @@ def build_dataset(
         news_payloads=[as_plain_dict(item) for item in news],
         excluded_series=excluded_series,
         mapped_series=mapped_series,
+        series_categories=series_categories,
+        clusters=clusters,
+        purpose=purpose,
+        universe_rule=universe_rule,
+        cohorts_per_provider=cohorts_per_provider,
+        fallbacks=fallbacks,
         name=name,
         notes=notes,
         overwrite=overwrite,

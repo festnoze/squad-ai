@@ -18,6 +18,7 @@ test rather than recorded, so a fixture can never drift from the loader it is me
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import shutil
 from collections.abc import Sequence
@@ -35,10 +36,13 @@ from pmx.data.loader import (
     load_dataset,
     load_manifest,
     load_market_file,
+    manifest_purpose,
     read_canonical_text,
+    read_cluster_groups,
     seal_dataset,
     verify_dataset,
     verify_dataset_report,
+    verify_folds,
     write_canonical_json,
     write_canonical_jsonl,
     write_manifest,
@@ -1750,3 +1754,276 @@ def test_a_portfolio_view_carries_a_debit_balance_and_a_negative_equity() -> Non
     assert view.drawdown_bp <= 0, "a drawdown has no floor and is never positive (R180)"
     assert view.to_dict()["cash_cents"] == -2_500
     assert view.to_dict()["equity_cents"] == -1_250
+
+
+# --------------------------------------------------------------------------------------------------
+# 7.7 The loader recomputes the folds, group by group (decisions D-R1 and D-R2, rulings R248, R290)
+# --------------------------------------------------------------------------------------------------
+def two_market_dataset(root: Path, *, early_days: int, late_days: int, event_key: str | None) -> Path:
+    """A sealed two-market dataset whose cuts sit between the two resolutions.
+
+    The cuts are placed by hand rather than by the builder, because the point of these tests is what the
+    **loader** does with a manifest it is handed: a dataset built before the fold fix, or written by
+    hand, must not be readable as if its folds were the count-quantile, cluster-aware folds of 7.7.
+    """
+    from pmx.data.builder import build_dataset_from_payloads
+    from pmx.data.loader import load_manifest, write_manifest
+
+    freeze = "2026-09-07"
+    freeze_ms = ms_from_iso_date(freeze)
+    window_start = freeze_ms - 365 * MS_PER_DAY
+    payloads = [
+        _hourlyless_market(
+            "kalshi-KXPAIRA-1",
+            resolved_at_ms=window_start + early_days * MS_PER_DAY,
+            event_key=event_key,
+        ),
+        _hourlyless_market(
+            "kalshi-KXPAIRB-1",
+            resolved_at_ms=window_start + late_days * MS_PER_DAY,
+            event_key=event_key,
+        ),
+    ]
+    result = build_dataset_from_payloads(
+        out_dir=root,
+        config=BuildConfig(freeze_date=freeze, providers=("kalshi",), min_traded_bars=5),
+        market_payloads=payloads,
+        news_payloads=[],
+    )
+    assert len(result.kept_ids) == 2, result.removed
+    # Re-cut by hand between the two resolutions, which is what a pre-fix manifest looks like.
+    manifest = load_manifest(result.path)
+    midpoint = window_start + ((early_days + late_days) // 2) * MS_PER_DAY
+    write_manifest(
+        result.path,
+        dataclasses.replace(
+            manifest,
+            split=dataclasses.replace(
+                manifest.split,
+                train_end_ms=midpoint,
+                validation_end_ms=midpoint + MS_PER_DAY,
+                n_train=1,
+                n_validation=0,
+                n_sealed=1,
+            ),
+        ),
+    )
+    return result.path
+
+
+def _hourlyless_market(market_id: str, *, resolved_at_ms: int, event_key: str | None) -> dict[str, object]:
+    """A schema-valid daily market with a dense thirty-bar tape, for the fold fixtures above."""
+    created = resolved_at_ms - 30 * MS_PER_DAY
+    day0 = created // MS_PER_DAY * MS_PER_DAY
+    n_bars = (resolved_at_ms // MS_PER_DAY * MS_PER_DAY - day0) // MS_PER_DAY + 1
+    ticker = market_id.split("-", 1)[1]
+    return {
+        "schema_version": "market.v2",
+        "id": market_id,
+        "provider": "kalshi",
+        "provider_id": ticker,
+        "url": "https://kalshi.com/x",
+        "question": f"Will {ticker} settle yes?",
+        "description": "",
+        "category": "economics",
+        "tags": [],
+        "wiki_subjects": [],
+        "currency": "usd",
+        "source": "imported",
+        "created_at_ms": created,
+        "close_at_ms": resolved_at_ms - MS_PER_DAY,
+        "resolved_at_ms": resolved_at_ms,
+        "resolution": 1,
+        "resolution_source": "venue",
+        "event_key": event_key,
+        "interval_min": 1_440,
+        "bars": [
+            {
+                "t_ms": day0 + index * MS_PER_DAY,
+                "open_bp": 5_000, "high_bp": 5_100, "low_bp": 4_900, "close_bp": 5_000, "vwap_bp": 5_000,
+                "volume_milli": 2_000, "n_trades": 0, "yes_bid_bp": 4_950, "yes_ask_bp": 5_050,
+                "open_interest": 10,
+            }
+            for index in range(n_bars)
+        ],
+        "trades": [],
+        "first_price_bp": 5_000,
+        "final_price_bp": 5_000,
+        "hardness_tags": [],
+        "quality": {
+            "n_trades": 0,
+            "unique_bettors": None,
+            "life_days": 30,
+            "volume_milli_total": 2_000 * n_bars,
+            "traded_bars": n_bars,
+            "tape_kind": "bars_only",
+        },
+        "fee_schedule_id": "kalshi-general-2026-09",
+        "notes": "",
+    }
+
+
+def test_the_loader_gives_a_group_one_fold_whatever_the_manifest_cut(tmp_path: Path) -> None:
+    """Ruling R248 on the reading side: the fold is the group's, not the market's own.
+
+    The two legs share an ``event_key`` and resolve on either side of the manifest's cut. Under the
+    fold assignment the loader used to make, the early leg was a training market whose price path
+    encodes the late leg's sealed outcome. Now both take the later leg's fold key, and the manifest's
+    own counts are refused because they describe a split that is not the one 7.7 asks for.
+    """
+    root = two_market_dataset(tmp_path / "grouped", early_days=100, late_days=300, event_key="KXPAIR-EV")
+    with pytest.raises(SchemaError, match="group-aware cut"):
+        load_dataset(root)
+    manifest = load_manifest(root)
+    fixed = dataclasses.replace(
+        manifest, split=dataclasses.replace(manifest.split, n_train=0, n_validation=0, n_sealed=2)
+    )
+    write_manifest(root, fixed)
+    dataset = load_dataset(root)
+    assert {meta.fold for meta in dataset.metas} == {"sealed"}
+
+
+def test_a_dataset_whose_manifest_miscounts_its_folds_is_refused(tmp_path: Path) -> None:
+    """The check that bites on a dataset built before the fold fix (7.8, ``pmx data verify``)."""
+    root = two_market_dataset(tmp_path / "solo", early_days=100, late_days=300, event_key=None)
+    dataset = load_dataset(root)  # ungrouped: one train, one sealed, which is what the manifest says
+    assert sorted(meta.fold for meta in dataset.metas) == ["sealed", "train"]
+    manifest = load_manifest(root)
+    write_manifest(
+        root, dataclasses.replace(manifest, split=dataclasses.replace(manifest.split, n_train=2, n_sealed=0))
+    )
+    with pytest.raises(SchemaError, match="group-aware cut") as raised:
+        load_dataset(root)
+    assert raised.value.context["declared"] == [2, 0, 0]
+    assert raised.value.context["recomputed"] == [1, 0, 1]
+
+
+def test_verify_folds_reads_the_same_law_as_the_loader(tmp_path: Path) -> None:
+    root = two_market_dataset(tmp_path / "verify", early_days=100, late_days=300, event_key=None)
+    assert sorted(verify_folds(root).values()) == ["sealed", "train"]
+    manifest = load_manifest(root)
+    write_manifest(
+        root,
+        dataclasses.replace(manifest, split=dataclasses.replace(manifest.split, n_train=0, n_sealed=2)),
+    )
+    with pytest.raises(SchemaError, match="group-aware cut"):
+        verify_folds(root)
+
+
+def test_verify_refuses_a_dataset_whose_hash_is_right_and_whose_folds_are_wrong(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """7.8 and ruling R248: ``pmx data verify`` gained the fold check, so the hash is not the whole answer.
+
+    The manifest is outside the dataset hash (4.3 hashes ``markets/``, ``news/``, ``wiki_asof/``,
+    ``clusters/``, ``instruments/`` and ``calendars/`` and nothing else), so a manifest that miscounts
+    its own folds passes every byte comparison there is. That is exactly the shape of the dataset the
+    fold fix is for: ``data/datasets/y2026`` declares 111 / 46 / 130 from a calendar-thirds cut on each
+    market's own resolution, and its hash is perfectly good. Three assertions, one per door: the hash
+    report still says ok, the raising ``verify_dataset`` refuses it, and the CLI exits 1 and names the
+    reason rather than printing ``verified``.
+    """
+    from pmx import cli_data
+
+    root = two_market_dataset(tmp_path / "hashok", early_days=100, late_days=300, event_key=None)
+    manifest = load_manifest(root)
+    write_manifest(
+        root,
+        dataclasses.replace(manifest, split=dataclasses.replace(manifest.split, n_train=2, n_sealed=0)),
+    )
+    # The bytes are untouched, so the hash half of verification is still satisfied.
+    report = verify_dataset_report(root)
+    assert report.ok and report.dataset_hash == manifest.dataset_hash
+    with pytest.raises(SchemaError, match="group-aware cut"):
+        verify_dataset(root)
+    capsys.readouterr()
+    assert cli_data.main(["verify", "--dataset", str(root)]) == 1
+    captured = capsys.readouterr()
+    assert "FOLD INTEGRITY" in captured.err
+    assert "group-aware cut" in captured.err
+    assert "verified" not in captured.out
+
+
+def test_a_clusters_file_overrides_the_event_key_when_the_loader_reads_the_folds(tmp_path: Path) -> None:
+    """``clusters/clusters.json`` is the first tier of the fold group (7.7, 16.3)."""
+    root = two_market_dataset(tmp_path / "clustered", early_days=100, late_days=300, event_key=None)
+    assert read_cluster_groups(root) == {}
+    (root / "clusters").mkdir(exist_ok=True)
+    (root / "clusters" / "clusters.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "cluster.v1",
+                "dataset_name": "clustered",
+                "matcher_version": "clusters.v1",
+                "min_score_permille": 700,
+                "resolution_tolerance_ms": 0,
+                "overrides_sha256": "0" * 64,
+                "clusters": [
+                    {
+                        "cluster_id": "ec-0123456789abcdef",
+                        "market_ids": ["kalshi-KXPAIRA-1", "kalshi-KXPAIRB-1"],
+                        "providers": ["kalshi"],
+                        "currencies": ["usd"],
+                        "asof": True,
+                        "score_permille": 900,
+                        "resolution_span_ms": -1,
+                        "source": "matcher",
+                        "reasons": [],
+                    }
+                ],
+                "constraints": [],
+            }
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    assert read_cluster_groups(root) == {
+        "kalshi-KXPAIRA-1": "ec-0123456789abcdef",
+        "kalshi-KXPAIRB-1": "ec-0123456789abcdef",
+    }
+    manifest = load_manifest(root)
+    with pytest.raises(SchemaError, match="group-aware cut"):
+        load_dataset(root)  # the cluster pulls the early leg into the sealed fold, so 1 / 0 / 1 is wrong
+    write_manifest(
+        root,
+        dataclasses.replace(manifest, split=dataclasses.replace(manifest.split, n_train=0, n_sealed=2)),
+    )
+    dataset = load_dataset(root)
+    assert {meta.fold for meta in dataset.metas} == {"sealed"}
+
+
+def test_a_market_in_two_clusters_is_refused_rather_than_given_two_fold_keys(tmp_path: Path) -> None:
+    root = tmp_path / "twoclusters"
+    (root / "clusters").mkdir(parents=True)
+    (root / "clusters" / "clusters.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "cluster.v1",
+                "dataset_name": "x",
+                "matcher_version": "clusters.v1",
+                "min_score_permille": 700,
+                "resolution_tolerance_ms": 0,
+                "overrides_sha256": "0" * 64,
+                "clusters": [
+                    {"cluster_id": "ec-" + "a" * 16, "market_ids": ["kalshi-KXA-1"], "providers": ["kalshi"],
+                     "currencies": ["usd"], "asof": True, "score_permille": 900,
+                     "resolution_span_ms": -1, "source": "matcher", "reasons": []},
+                    {"cluster_id": "ec-" + "b" * 16, "market_ids": ["kalshi-KXA-1"], "providers": ["kalshi"],
+                     "currencies": ["usd"], "asof": True, "score_permille": 900,
+                     "resolution_span_ms": -1, "source": "matcher", "reasons": []},
+                ],
+                "constraints": [],
+            }
+        ),
+        encoding="utf-8",
+        newline="\n",
+    )
+    with pytest.raises(SchemaError, match="two clusters"):
+        read_cluster_groups(root)
+
+
+def test_the_purpose_of_a_manifest_written_before_the_field_is_the_signature_it_replaces() -> None:
+    """5.6 and ruling R263: an unsealed pack whose only provider is ``demo`` reads as ``showcase``."""
+    demo = load_manifest(DEMO_PACK)
+    assert manifest_purpose(demo) == "showcase"
+    assert demo.is_demo_pack is True  # the signature the field replaces, still the one on disk

@@ -27,6 +27,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, cast
 
+from pmx.errors import SchemaError
+from pmx.rng import RngTree, sample_without_replacement
 from pmx.types import (
     LINK_THRESHOLD_PERMILLE,
     SUBJECT_DERIVED,
@@ -378,6 +380,218 @@ def link_items(items: Sequence[NewsItem], markets: Sequence[Market]) -> tuple[Ne
             )
         )
     return tuple(linked)
+
+
+# --------------------------------------------------------------------------------------------------
+# 7.6 The precision audit: fifty links per build, a human's verdicts, a measured precision
+# (decision D-R4, rulings R250 and R296)
+# --------------------------------------------------------------------------------------------------
+#: How many links a build draws for review. Fifty is what a reviewer will actually read (7.6).
+LINKER_AUDIT_N = 50
+
+#: Below this measured precision the dataset carries ``news_links: "weak"``, and every leaderboard row of
+#: a run whose roster bought a news sensor carries :data:`NEWS_LINKS_WEAK_LABEL` (7.6, 12.10).
+LINKER_PRECISION_MIN_PERMILLE = 800
+
+#: The label a weak build puts on a leaderboard row.
+NEWS_LINKS_WEAK_LABEL = "news_links:weak"
+
+#: The verdicts a reviewer may record. ``None`` is "not yet reviewed" and is what the file is written
+#: with; ``unsure`` counts in neither half of the precision, because a reviewer who cannot tell is
+#: evidence about the reviewer and not about the link.
+AUDIT_VERDICTS = ("correct", "wrong", "unsure")
+
+#: The **tracked** tree the two human audits live in (7.1, ruling R296), outside every dataset directory
+#: and every dataset hash. It is not under ``data/datasets/``, which is git-ignored, because git cannot
+#: re-include a file under an excluded directory and fifty reviewer verdicts are the least reproducible
+#: artefact of a build wave: an audit written there is one ``rm -rf`` from having to be redone.
+AUDITS_DIR = "audits"
+LINKER_AUDIT_FILE = "linker.json"
+
+#: The registered substream the draw comes from (6.3), the same one the build's stratified cap uses.
+AUDIT_SUBSTREAM = "dataset.subsample"
+
+#: How much of the dataset hash names the audit directory (7.1).
+AUDIT_HASH_PREFIX = 16
+
+
+@dataclass(frozen=True, slots=True)
+class AuditLink:
+    """One reviewed link: the pair, the score the linker gave it, and the human's verdict."""
+
+    news_id: str
+    market_id: str
+    score_permille: int
+    verdict: str | None = None
+    reviewer: str = ""
+
+    def __post_init__(self) -> None:
+        if self.verdict is not None and self.verdict not in AUDIT_VERDICTS:
+            raise SchemaError("an audit verdict is correct, wrong or unsure", verdict=self.verdict)
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "news_id": self.news_id,
+            "market_id": self.market_id,
+            "score_permille": self.score_permille,
+            "verdict": self.verdict,
+            "reviewer": self.reviewer,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class LinkerAudit:
+    """``audits/<dataset_hash[:16]>/linker.json`` (7.6): the sample, the verdicts and the precision.
+
+    The file is **outside** the dataset hash because the audit happens after the seal, and it is keyed by
+    the hash it audits, so a rebuild that moves one byte gets its own audit rather than inheriting one.
+    """
+
+    dataset_hash: str
+    sample_seed: int
+    n: int
+    links: tuple[AuditLink, ...]
+
+    @property
+    def n_correct(self) -> int:
+        return sum(1 for link in self.links if link.verdict == "correct")
+
+    @property
+    def n_wrong(self) -> int:
+        return sum(1 for link in self.links if link.verdict == "wrong")
+
+    @property
+    def n_reviewed(self) -> int:
+        return sum(1 for link in self.links if link.verdict is not None)
+
+    @property
+    def precision_permille(self) -> int:
+        """``round_half_up(1000 * n_correct, n_correct + n_wrong)``, and ``0`` on an empty denominator.
+
+        An unreviewed file therefore reports ``0`` and not a flattering absence, which is the point: a
+        build whose links nobody has looked at is not a build whose links are good.
+        """
+        denominator = self.n_correct + self.n_wrong
+        if denominator == 0:
+            return 0
+        return round_half_up(1_000 * self.n_correct, denominator)
+
+    @property
+    def weak(self) -> bool:
+        """Whether the dataset carries ``news_links: "weak"`` (7.6)."""
+        return self.precision_permille < LINKER_PRECISION_MIN_PERMILLE
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "dataset_hash": self.dataset_hash,
+            "sample_seed": self.sample_seed,
+            "n": self.n,
+            "links": [link.to_dict() for link in self.links],
+            "precision_permille": self.precision_permille,
+        }
+
+    def manifest_block(self, path: str) -> dict[str, object]:
+        """``manifest.news.linker_audit {path, n, precision_permille}`` (7.8, ruling R250)."""
+        return {"path": path, "n": self.n, "precision_permille": self.precision_permille}
+
+
+def audit_dir_for(root: Path, dataset_hash: str) -> Path:
+    """``<root>/audits/<dataset_hash[:16]>/`` (7.1, ruling R296)."""
+    if len(dataset_hash) < AUDIT_HASH_PREFIX:
+        raise SchemaError("a dataset hash is sixty-four hex characters", dataset_hash=dataset_hash)
+    return root / AUDITS_DIR / dataset_hash[:AUDIT_HASH_PREFIX]
+
+
+def linker_audit_path(root: Path, dataset_hash: str) -> Path:
+    return audit_dir_for(root, dataset_hash) / LINKER_AUDIT_FILE
+
+
+def all_links_of(items: Sequence[NewsItem]) -> tuple[tuple[str, str, int], ...]:
+    """Every ``(news_id, market_id, score_permille)`` of a dataset, in canonical order.
+
+    The population the audit samples from is every link the dataset carries, not every link of a source
+    or of a market: precision is a statement about the linker, so the sample has to be able to reach a
+    Manifold comment's stated link as readily as a Current events bullet's scored one.
+    """
+    rows: list[tuple[str, str, int]] = []
+    for item in items:
+        for market_id, score in zip(item.match_ids, item.match_scores_permille, strict=True):
+            rows.append((item.news_id, market_id, score))
+    return tuple(sorted(rows))
+
+
+def sample_audit_links(
+    links: Sequence[tuple[str, str, int]], *, sample_seed: int, n: int = LINKER_AUDIT_N
+) -> tuple[AuditLink, ...]:
+    """``n`` links drawn with ``sample_without_replacement`` from the ``dataset.subsample`` substream.
+
+    Deterministic in the dataset and in nothing else: the same dataset always offers the same fifty links
+    for review, so a reviewer who is interrupted can come back to the same file, and a second reviewer
+    audits the same sample rather than a fresh one that could be shopped for.
+    """
+    if n < 0:
+        raise SchemaError("an audit draws a non-negative number of links", n=n)
+    ordered = sorted(links)
+    rng = RngTree(sample_seed).substream(AUDIT_SUBSTREAM)
+    keys = sample_without_replacement(
+        rng, [f"{news_id} {market_id}" for news_id, market_id, _ in ordered], min(n, len(ordered))
+    )
+    by_key = {f"{news_id} {market_id}": (news_id, market_id, score) for news_id, market_id, score in ordered}
+    drawn = sorted(by_key[key] for key in keys)
+    return tuple(
+        AuditLink(news_id=news_id, market_id=market_id, score_permille=score)
+        for news_id, market_id, score in drawn
+    )
+
+
+def audit_from_dict(payload: object) -> LinkerAudit:
+    """Read an audit file back, verdicts included, so the precision can be recomputed over them."""
+    if not isinstance(payload, Mapping):
+        raise SchemaError("a linker audit file is not an object")
+    dataset_hash = payload.get("dataset_hash")
+    sample_seed = payload.get("sample_seed")
+    n = payload.get("n")
+    rows = payload.get("links")
+    if (
+        not isinstance(dataset_hash, str)
+        or isinstance(sample_seed, bool)
+        or not isinstance(sample_seed, int)
+        or isinstance(n, bool)
+        or not isinstance(n, int)
+        or not isinstance(rows, Sequence)
+        or isinstance(rows, str | bytes)
+    ):
+        raise SchemaError("a linker audit file is missing a field", keys=sorted(map(str, payload)))
+    links: list[AuditLink] = []
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise SchemaError("an audit link is not an object")
+        verdict = row.get("verdict")
+        reviewer = row.get("reviewer", "")
+        score = row.get("score_permille")
+        news_id = row.get("news_id")
+        market_id = row.get("market_id")
+        if (
+            not isinstance(news_id, str)
+            or not isinstance(market_id, str)
+            or isinstance(score, bool)
+            or not isinstance(score, int)
+            or not isinstance(reviewer, str)
+            or not (verdict is None or isinstance(verdict, str))
+        ):
+            raise SchemaError("an audit link is malformed", news_id=str(news_id))
+        links.append(
+            AuditLink(
+                news_id=news_id,
+                market_id=market_id,
+                score_permille=score,
+                verdict=verdict,
+                reviewer=reviewer,
+            )
+        )
+    return LinkerAudit(
+        dataset_hash=dataset_hash, sample_seed=sample_seed, n=n, links=tuple(links)
+    )
 
 
 # --------------------------------------------------------------------------------------------------

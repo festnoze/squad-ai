@@ -40,7 +40,7 @@ from pmx.data.news import linker as lk
 from pmx.data.news import wayback as wb
 from pmx.data.news import wikipedia_asof as wa
 from pmx.data.news import wikipedia_current_events as wce
-from pmx.errors import InvalidConfigError, LeakError, MalformedResponseError
+from pmx.errors import InvalidConfigError, LeakError, MalformedResponseError, SchemaError
 from pmx.types import (
     CATEGORIES,
     LEXICON_COUNT,
@@ -107,6 +107,49 @@ def recording_handler(body: str, *, status: int = 200) -> tuple[Handler, list[ht
         return httpx.Response(status, text=body)
 
     return handle, seen
+
+
+def routing_handler(bodies: Mapping[str, str], *, status: int = 200) -> tuple[Handler, list[httpx.Request]]:
+    """A handler that answers per MediaWiki ``action``, so the two calls of a stamped fetch differ.
+
+    Decision D-R3 made the Current events fetch two requests: ``action=parse`` for the page as it stands
+    and ``action=query&prop=revisions`` for the history the stamp is measured from. A handler that
+    answered the same body to both would let a broken second call pass as a working one.
+    """
+    seen: list[httpx.Request] = []
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        action = dict(httpx.QueryParams(request.url.query.decode("ascii"))).get("action", "")
+        if action not in bodies:
+            raise AssertionError(f"the fetcher asked for an unexpected action: {action}")
+        return httpx.Response(status, text=bodies[action])
+
+    return handle, seen
+
+
+def revisions_payload(*revisions: Mapping[str, object]) -> str:
+    """A ``prop=revisions&rvslots=main`` answer carrying the given revisions, in the API's shape."""
+    return json.dumps(
+        {
+            "query": {
+                "pages": [
+                    {
+                        "pageid": 1,
+                        "title": "Portal:Current events/2016 June 23",
+                        "revisions": [
+                            {
+                                "revid": row["revid"],
+                                "timestamp": row["timestamp"],
+                                "slots": {"main": {"content": row["content"]}},
+                            }
+                            for row in revisions
+                        ],
+                    }
+                ]
+            }
+        }
+    )
 
 
 def market(
@@ -390,12 +433,24 @@ def test_two_parses_of_the_same_page_agree_field_for_field() -> None:
 # Wikipedia Current events: the fetcher
 # --------------------------------------------------------------------------------------------------
 def test_the_fetcher_asks_for_the_day_page_with_a_descriptive_user_agent(tmp_path: Path) -> None:
-    """A generic User-Agent earns a 403 from the MediaWiki API, verified live on 2026-09-07."""
-    handler, seen = recording_handler(fixture_text("wce_parse_20160623.json"))
+    """A generic User-Agent earns a 403 from the MediaWiki API, verified live on 2026-09-07.
+
+    Decision D-R3 (ruling R249) made the fetch **two** requests, so this test keeps every assertion it
+    made about the first one and states the post-ruling shape of the second: the page as it stands, and
+    the revision history the per-bullet stamp is measured from, both under the same descriptive agent.
+    """
+    handler, seen = routing_handler(
+        {
+            "parse": fixture_text("wce_parse_20160623.json"),
+            "query": revisions_payload(
+                {"revid": 1, "timestamp": "2016-06-23T09:14:00Z", "content": "*Nothing yet.\n"}
+            ),
+        }
+    )
     client = client_for(tmp_path, handler)
     items = wce.fetch_wikipedia_current_events(client=client, day_start_ms=DAY_20160623)  # type: ignore[arg-type]
     assert len(items) == 17
-    assert len(seen) == 1
+    assert len(seen) == 2
     request = seen[0]
     assert request.url.path == wce.MEDIAWIKI_PATH
     query = query_of(request)
@@ -407,6 +462,13 @@ def test_the_fetcher_asks_for_the_day_page_with_a_descriptive_user_agent(tmp_pat
     assert agent.startswith("pmx-research/")
     assert CONTACT in agent
     assert items[0].fetched_at_ms > 1_600_000_000_000
+    history = query_of(seen[1])
+    assert seen[1].url.path == wce.MEDIAWIKI_PATH
+    assert history["action"] == "query" and history["prop"] == "revisions"
+    assert history["titles"] == "Portal:Current events/2016 June 23"
+    assert history["rvprop"] == "ids|timestamp|content"
+    assert history["rvdir"] == "newer" and history["rvslots"] == "main"
+    assert CONTACT in seen[1].headers["User-Agent"]
 
 
 def test_a_day_without_a_page_yields_no_items_rather_than_an_error(tmp_path: Path) -> None:
@@ -1236,3 +1298,325 @@ def test_live_current_events_page(tmp_path: Path) -> None:
         client.close()
     assert len(items) >= 10
     assert any("United Kingdom" in item.text for item in items)
+
+
+# --------------------------------------------------------------------------------------------------
+# 5.5 Per-bullet revision timestamps (decision D-R3, ruling R249)
+#
+# The six-hour lag on a Wikipedia day page was a guess about the page. It is now a floor over a measured
+# instant: a bullet carries the timestamp of the first revision of the day page that carried it, and the
+# end of the page day only when no revision does.
+# --------------------------------------------------------------------------------------------------
+DAY_END_20160623 = DAY_20160623 + MS_PER_DAY
+
+PAGE_MORNING = "'''Politics and elections'''\n*The referendum polls open in the United Kingdom.\n"
+PAGE_EVENING = (
+    "'''Politics and elections'''\n"
+    "*The referendum polls open in the United Kingdom.\n"
+    "*A [[volcano]] erupts in the evening.\n"
+)
+
+
+def revision(revid: int, timestamp: str, content: str) -> wce.PageRevision:
+    return wce.PageRevision(
+        revid=revid, timestamp_ms=wce.ms_from_iso_timestamp(timestamp), wikitext=content
+    )
+
+
+def test_a_revision_timestamp_is_read_in_integers() -> None:
+    assert wce.ms_from_iso_timestamp("1970-01-01T00:00:00Z") == 0
+    assert wce.ms_from_iso_timestamp("2016-06-23T00:00:00Z") == DAY_20160623
+    assert wce.ms_from_iso_timestamp("2016-06-23T09:14:00Z") == DAY_20160623 + 9 * 3_600_000 + 14 * 60_000
+    assert wce.ms_from_iso_timestamp("2016-06-23T23:59:59Z") == DAY_20160623 + 86_399_000
+    with pytest.raises(MalformedResponseError):
+        wce.ms_from_iso_timestamp("2016-06-23 09:14:00")
+
+
+def test_each_bullet_is_stamped_at_the_first_revision_that_carried_it() -> None:
+    """Decision D-R3: a bullet added at 09:14Z is visible from 15:14Z and not from the next morning."""
+    items = wce.parse_current_events(
+        PAGE_EVENING,
+        day_start_ms=DAY_20160623,
+        fetched_at_ms=1,
+        revisions=[
+            revision(1, "2016-06-23T09:14:00Z", PAGE_MORNING),
+            revision(2, "2016-06-23T20:03:00Z", PAGE_EVENING),
+        ],
+    )
+    assert len(items) == 2
+    morning, evening = items
+    assert morning.published_at_ms == DAY_20160623 + 9 * 3_600_000 + 14 * 60_000
+    assert evening.published_at_ms == DAY_20160623 + 20 * 3_600_000 + 3 * 60_000
+    # the lag remains, applied over the measured instant: 09:14Z plus six hours is 15:14Z
+    assert morning.visible_from_ms == morning.published_at_ms + SAFETY_LAG_MS_DEFAULT
+    assert morning.visible_from_ms == DAY_20160623 + 15 * 3_600_000 + 14 * 60_000
+    assert evening.visible_from_ms == evening.published_at_ms + SAFETY_LAG_MS_DEFAULT
+    # ... and both are earlier than the end-of-day stamp this ruling replaced
+    assert morning.visible_from_ms < DAY_END_20160623 + SAFETY_LAG_MS_DEFAULT
+
+
+def test_a_bullet_no_revision_carries_falls_back_to_the_end_of_the_page_day() -> None:
+    """The fallback is the conservative direction: a later stamp can never create a leak."""
+    items = wce.parse_current_events(
+        PAGE_EVENING,
+        day_start_ms=DAY_20160623,
+        fetched_at_ms=1,
+        revisions=[revision(1, "2016-06-23T09:14:00Z", PAGE_MORNING)],
+    )
+    assert items[0].published_at_ms < DAY_END_20160623
+    assert items[1].published_at_ms == DAY_END_20160623
+    assert items[1].visible_from_ms == DAY_END_20160623 + SAFETY_LAG_MS_DEFAULT
+
+
+def test_with_no_revision_history_every_bullet_keeps_the_page_day_stamp() -> None:
+    items = wce.parse_current_events(PAGE_EVENING, day_start_ms=DAY_20160623, fetched_at_ms=1)
+    assert {item.published_at_ms for item in items} == {DAY_END_20160623}
+
+
+def test_the_stamp_survives_a_copyedit_between_revisions() -> None:
+    """Matching on the raw text would miss every copyedited bullet and cost eleven hours of recall."""
+    edited = (
+        "'''Politics and elections'''\n"
+        "*The Referendum polls open, in the United Kingdom!\n"
+    )
+    items = wce.parse_current_events(
+        edited,
+        day_start_ms=DAY_20160623,
+        fetched_at_ms=1,
+        revisions=[revision(1, "2016-06-23T06:00:00Z", PAGE_MORNING)],
+    )
+    assert items[0].published_at_ms == DAY_20160623 + 6 * 3_600_000
+
+
+def test_the_revisions_may_arrive_in_any_order_and_the_earliest_wins() -> None:
+    ascending = [
+        revision(1, "2016-06-23T09:14:00Z", PAGE_MORNING),
+        revision(2, "2016-06-23T20:03:00Z", PAGE_EVENING),
+    ]
+    first = wce.parse_current_events(
+        PAGE_EVENING, day_start_ms=DAY_20160623, fetched_at_ms=1, revisions=ascending
+    )
+    second = wce.parse_current_events(
+        PAGE_EVENING, day_start_ms=DAY_20160623, fetched_at_ms=1, revisions=list(reversed(ascending))
+    )
+    assert [item.to_dict() for item in first] == [item.to_dict() for item in second]
+    assert wce.first_appearances(ascending)[wce.bullet_key("A volcano erupts in the evening.")].revid == 2
+
+
+def test_the_stamp_source_is_recoverable_from_the_item_and_the_page_day() -> None:
+    """``news.v1``'s ``published_at_source`` (7.3, ruling R249), derived until ``NewsItem`` carries it."""
+    items = wce.parse_current_events(
+        PAGE_EVENING,
+        day_start_ms=DAY_20160623,
+        fetched_at_ms=1,
+        revisions=[revision(1, "2016-06-23T09:14:00Z", PAGE_MORNING)],
+    )
+    assert wce.published_at_source_of(items[0], day_start_ms=DAY_20160623) == wce.STAMP_REVISION
+    assert wce.published_at_source_of(items[1], day_start_ms=DAY_20160623) == wce.STAMP_PAGE_DAY
+
+
+def test_the_fetcher_stamps_from_the_history_and_can_be_told_not_to(tmp_path: Path) -> None:
+    handler, seen = routing_handler(
+        {
+            "parse": json.dumps({"parse": {"title": "x", "pageid": 1, "wikitext": PAGE_EVENING}}),
+            "query": revisions_payload(
+                {"revid": 7, "timestamp": "2016-06-23T09:14:00Z", "content": PAGE_MORNING},
+                {"revid": 8, "timestamp": "2016-06-23T20:03:00Z", "content": PAGE_EVENING},
+            ),
+        }
+    )
+    client = client_for(tmp_path, handler)
+    items = wce.fetch_wikipedia_current_events(client=client, day_start_ms=DAY_20160623)  # type: ignore[arg-type]
+    assert [item.published_at_ms for item in items] == [
+        DAY_20160623 + 9 * 3_600_000 + 14 * 60_000,
+        DAY_20160623 + 20 * 3_600_000 + 3 * 60_000,
+    ]
+    assert len(seen) == 2
+    plain, _ = routing_handler(
+        {"parse": json.dumps({"parse": {"title": "x", "pageid": 1, "wikitext": PAGE_EVENING}})}
+    )
+    unstamped = wce.fetch_wikipedia_current_events(
+        client=client_for(tmp_path / "b", plain),  # type: ignore[arg-type]
+        day_start_ms=DAY_20160623,
+        stamp_from_revisions=False,
+    )
+    assert {item.published_at_ms for item in unstamped} == {DAY_END_20160623}
+
+
+def test_a_revision_whose_content_the_api_withheld_is_skipped_rather_than_fatal(tmp_path: Path) -> None:
+    handler, _ = routing_handler(
+        {
+            "parse": json.dumps({"parse": {"title": "x", "pageid": 1, "wikitext": PAGE_EVENING}}),
+            "query": json.dumps(
+                {
+                    "query": {
+                        "pages": [
+                            {
+                                "pageid": 1,
+                                "revisions": [
+                                    {"revid": 5, "timestamp": "2016-06-23T05:00:00Z", "texthidden": True},
+                                    {
+                                        "revid": 6,
+                                        "timestamp": "2016-06-23T09:14:00Z",
+                                        "slots": {"main": {"content": PAGE_MORNING}},
+                                    },
+                                ],
+                            }
+                        ]
+                    }
+                }
+            ),
+        }
+    )
+    items = wce.fetch_wikipedia_current_events(client=client_for(tmp_path, handler), day_start_ms=DAY_20160623)  # type: ignore[arg-type]
+    assert items[0].published_at_ms == DAY_20160623 + 9 * 3_600_000 + 14 * 60_000
+
+
+def test_a_day_with_no_page_asks_for_no_history_at_all(tmp_path: Path) -> None:
+    handler, seen = routing_handler({"parse": fixture_text("wce_parse_missing.json")})
+    assert wce.fetch_wikipedia_current_events(client=client_for(tmp_path, handler), day_start_ms=DAY_20160623) == ()  # type: ignore[arg-type]
+    assert len(seen) == 1  # the history costs a request, so it is never asked for a page that is absent
+
+
+def test_a_history_response_that_is_not_a_history_is_a_malformed_response(tmp_path: Path) -> None:
+    handler, _ = routing_handler(
+        {
+            "parse": json.dumps({"parse": {"title": "x", "pageid": 1, "wikitext": PAGE_EVENING}}),
+            "query": json.dumps({"batchcomplete": True}),
+        }
+    )
+    with pytest.raises(MalformedResponseError):
+        wce.fetch_page_revisions(client=client_for(tmp_path, handler), day_start_ms=DAY_20160623)  # type: ignore[arg-type]
+
+
+# --------------------------------------------------------------------------------------------------
+# 7.6 The linker precision audit (decision D-R4, rulings R250 and R296)
+# --------------------------------------------------------------------------------------------------
+def audit_items(n: int) -> tuple[NewsItem, ...]:
+    """``n`` items, each linked to two markets, so the population is ``2n`` links."""
+    return tuple(
+        NewsItem(
+            schema_version="news.v1",
+            news_id=f"wce-20160623-{index:04d}",
+            source="wikipedia_current_events",
+            kind="headline",
+            published_at_ms=DAY_END_20160623,
+            revid=None,
+            asof_day=None,
+            visible_from_ms=DAY_END_20160623 + SAFETY_LAG_MS_DEFAULT,
+            fetched_at_ms=DAY_END_20160623,
+            url="https://en.wikipedia.org/wiki/x",
+            headline=f"item {index}",
+            text="",
+            section=None,
+            wiki_links=(),
+            source_urls=(),
+            match_ids=(f"kalshi-KXA{index}", f"kalshi-KXB{index}"),
+            match_scores_permille=(300, 900),
+            lang="en",
+            author_key=None,
+        )
+        for index in range(n)
+    )
+
+
+def test_the_population_is_every_link_the_dataset_carries_in_canonical_order() -> None:
+    links = lk.all_links_of(audit_items(3))
+    assert len(links) == 6
+    assert links == tuple(sorted(links))
+    assert links[0] == ("wce-20160623-0000", "kalshi-KXA0", 300)
+
+
+def test_fifty_links_are_drawn_and_the_draw_is_a_function_of_the_dataset_alone() -> None:
+    population = lk.all_links_of(audit_items(60))
+    first = lk.sample_audit_links(population, sample_seed=1234)
+    again = lk.sample_audit_links(population, sample_seed=1234)
+    other = lk.sample_audit_links(population, sample_seed=4321)
+    assert len(first) == lk.LINKER_AUDIT_N == 50
+    assert [link.to_dict() for link in first] == [link.to_dict() for link in again]
+    assert [link.news_id for link in first] != [link.news_id for link in other]
+    assert len({(link.news_id, link.market_id) for link in first}) == 50  # without replacement
+    reordered = lk.sample_audit_links(list(reversed(population)), sample_seed=1234)
+    assert [link.to_dict() for link in reordered] == [link.to_dict() for link in first]
+
+
+def test_a_dataset_with_fewer_links_than_fifty_draws_all_of_them() -> None:
+    drawn = lk.sample_audit_links(lk.all_links_of(audit_items(3)), sample_seed=1)
+    assert len(drawn) == 6
+    assert all(link.verdict is None and link.reviewer == "" for link in drawn)
+
+
+def test_the_precision_is_the_contract_formula_and_unsure_counts_in_neither_half() -> None:
+    links = (
+        lk.AuditLink(news_id="a", market_id="m", score_permille=900, verdict="correct"),
+        lk.AuditLink(news_id="b", market_id="m", score_permille=900, verdict="correct"),
+        lk.AuditLink(news_id="c", market_id="m", score_permille=900, verdict="correct"),
+        lk.AuditLink(news_id="d", market_id="m", score_permille=200, verdict="wrong"),
+        lk.AuditLink(news_id="e", market_id="m", score_permille=500, verdict="unsure"),
+    )
+    audit = lk.LinkerAudit(dataset_hash="a" * 64, sample_seed=1, n=5, links=links)
+    assert audit.precision_permille == round_half_up(1_000 * 3, 4) == 750
+    assert (audit.n_correct, audit.n_wrong, audit.n_reviewed) == (3, 1, 5)
+    assert audit.weak is True  # 750 is below LINKER_PRECISION_MIN_PERMILLE
+    strong = lk.LinkerAudit(dataset_hash="a" * 64, sample_seed=1, n=1, links=links[:1])
+    assert strong.precision_permille == 1_000 and strong.weak is False
+
+
+def test_an_unreviewed_audit_reports_zero_precision_and_is_weak() -> None:
+    """A build whose links nobody has looked at is not a build whose links are good."""
+    audit = lk.LinkerAudit(
+        dataset_hash="a" * 64,
+        sample_seed=1,
+        n=1,
+        links=(lk.AuditLink(news_id="a", market_id="m", score_permille=900),),
+    )
+    assert audit.precision_permille == 0
+    assert audit.weak is True
+    assert lk.LINKER_PRECISION_MIN_PERMILLE == 800
+    assert lk.NEWS_LINKS_WEAK_LABEL == "news_links:weak"
+
+
+def test_the_audit_lives_in_the_tracked_tree_outside_every_dataset_directory(tmp_path: Path) -> None:
+    """Ruling R296: git cannot re-include a file under an excluded directory, and ``data/datasets/`` is."""
+    path = lk.linker_audit_path(tmp_path, "abcdef0123456789" + "0" * 48)
+    assert path == tmp_path / "audits" / "abcdef0123456789" / "linker.json"
+    assert "datasets" not in str(path)
+    with pytest.raises(SchemaError):
+        lk.linker_audit_path(tmp_path, "short")
+
+
+def test_the_audit_file_round_trips_with_its_verdicts() -> None:
+    audit = lk.LinkerAudit(
+        dataset_hash="a" * 64,
+        sample_seed=7,
+        n=2,
+        links=(
+            lk.AuditLink(news_id="a", market_id="m", score_permille=900, verdict="correct", reviewer="g3"),
+            lk.AuditLink(news_id="b", market_id="m", score_permille=200, verdict="wrong", reviewer="g3"),
+        ),
+    )
+    document = audit.to_dict()
+    assert document["precision_permille"] == 500
+    back = lk.audit_from_dict(document)
+    assert back.to_dict() == document
+    assert back.manifest_block("audits/aaaaaaaaaaaaaaaa/linker.json") == {
+        "path": "audits/aaaaaaaaaaaaaaaa/linker.json",
+        "n": 2,
+        "precision_permille": 500,
+    }
+
+
+def test_a_verdict_outside_the_three_is_refused() -> None:
+    with pytest.raises(SchemaError):
+        lk.AuditLink(news_id="a", market_id="m", score_permille=900, verdict="probably")
+    with pytest.raises(SchemaError):
+        lk.audit_from_dict({"dataset_hash": "a" * 64, "sample_seed": 1})
+    with pytest.raises(SchemaError):
+        lk.audit_from_dict(
+            {
+                "dataset_hash": "a" * 64,
+                "sample_seed": 1,
+                "n": 1,
+                "links": [{"news_id": "a", "market_id": "m", "score_permille": "high", "verdict": None}],
+            }
+        )

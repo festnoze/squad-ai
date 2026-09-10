@@ -79,6 +79,21 @@ from pmx.types import (
     sort_market_metas,
 )
 
+#: **A bridge, and the one line that removes it.** Section 13.1 declares ``FoldIntegrityError`` in
+#: ``pmx.errors`` (rulings R248, R266, R277, R290) and 18.8's deferral table assigns the class to DS1 in
+#: lot 5b "by the agreement of section 13"; ``src/pmx/errors.py`` is D1's file and is not this package's
+#: to edit, so every raise site below names this alias instead of the class it will name. When D1 lands
+#: the class, this becomes ``from pmx.errors import FoldIntegrityError`` and no raise site moves. It is
+#: an alias of ``SchemaError`` and not a new subclass on purpose: a second class with the contract's name
+#: living in the wrong module is what a later import would silently pick up.
+FoldIntegrityError = SchemaError
+
+#: The purpose of a dataset that predates the ``purpose`` field (5.6, decision D-S4, ruling R263): an
+#: unsealed pack whose only provider is ``demo``, which is the ``is_demo_pack`` signature the field
+#: replaces. See :func:`manifest_purpose`.
+PURPOSE_RESEARCH = "research"
+PURPOSE_SHOWCASE = "showcase"
+
 MANIFEST_NAME = "manifest.json"
 MARKETS_DIR = "markets"
 NEWS_DIR = "news"
@@ -330,13 +345,30 @@ def _window_days(manifest: DatasetManifest) -> int:
     return max(1, (manifest.window.end_ms - manifest.window.start_ms) // MS_PER_DAY)
 
 
+def manifest_purpose(manifest: DatasetManifest) -> str:
+    """``research`` or ``showcase`` (5.6, decision D-S4, ruling R263), read off the manifest.
+
+    The field itself is ``DatasetManifest.purpose`` in the contract, which is D1's ``pmx.types`` and the
+    strict ``DatasetManifestModel`` of ``pmx.data.schema``: neither carries it yet and both refuse a
+    manifest that spells it, so **no dataset on disk can carry the field today** and this reads the
+    signature the field replaces, the old ``is_demo_pack`` (an unsealed pack whose only provider is
+    ``demo``). The contract already says a manifest written before the field reads as ``showcase`` on
+    exactly that signature, so this function's answer is the contract's answer for every dataset that
+    exists; when D1 lands the field it becomes ``return manifest.purpose`` and every caller below is
+    already asking the right question.
+    """
+    return PURPOSE_SHOWCASE if manifest.is_demo_pack else PURPOSE_RESEARCH
+
+
 def _check_market_window(market: Market, *, manifest: DatasetManifest) -> None:
-    """The window and freeze rules of section 5.6, skipped for the demo pack and for nothing else.
+    """The window and freeze rules of 5.6, skipped for a ``showcase`` dataset and for nothing else.
 
     The rule is relative to the freeze, not to the stated window: a manifest whose window disagrees with
-    its own freeze would otherwise smuggle a market of any age into a sealed dataset.
+    its own freeze would otherwise smuggle a market of any age into a sealed dataset. A showcase dataset
+    (decision D-S4) is exempt from the window rule of 5.6 and from nothing else: the freeze check below
+    is never skipped, for any dataset.
     """
-    if manifest.is_demo_pack:
+    if manifest_purpose(manifest) == PURPOSE_SHOWCASE:
         return
     if market.resolved_at_ms >= manifest.freeze_ms:
         raise LeakError(
@@ -788,6 +820,141 @@ def _expected_edges(manifest: DatasetManifest) -> tuple[int, ...]:
     return month_edges_for(manifest.window.start_ms)
 
 
+# --------------------------------------------------------------------------------------------------
+# 7.7 The folds, as the loader recomputes them (decisions D-R1 and D-R2, rulings R247, R248, R290)
+# --------------------------------------------------------------------------------------------------
+def read_cluster_groups(path: Path) -> dict[str, str]:
+    """``clusters/clusters.json`` as a market-to-cluster map, or an empty map when there is none.
+
+    The file is written by R1b's matcher (16.3) and is inside the dataset hash, so it is evidence like
+    any other file of the walk. The loader reads it for one purpose: an ``EventCluster`` is the first
+    tier of the fold group of 7.7, ahead of the venue's own ``event_key``, because a cluster is a
+    cross-venue statement about one real-world event and a fold that split it would put one venue's
+    price path on the training side of a sealed outcome.
+    """
+    cluster_path = path / CLUSTERS_DIR / "clusters.json"
+    if not cluster_path.is_file():
+        return {}
+    document = read_json_file(cluster_path)
+    if not isinstance(document, Mapping):
+        raise SchemaError("clusters.json is not an object", path=str(cluster_path))
+    rows = document.get("clusters")
+    if not isinstance(rows, Sequence) or isinstance(rows, str | bytes):
+        raise SchemaError("clusters.json carries no clusters array", path=str(cluster_path))
+    groups: dict[str, str] = {}
+    for row in rows:
+        if not isinstance(row, Mapping):
+            raise SchemaError("a cluster row is not an object", path=str(cluster_path))
+        cluster_id = row.get("cluster_id")
+        members = row.get("market_ids")
+        if not isinstance(cluster_id, str) or not isinstance(members, Sequence) or isinstance(members, str):
+            raise SchemaError("a cluster row carries no cluster_id and market_ids", path=str(cluster_path))
+        for member in members:
+            if not isinstance(member, str):
+                raise SchemaError("a cluster member is not a market id", cluster_id=cluster_id)
+            if member in groups and groups[member] != cluster_id:
+                raise FoldIntegrityError(
+                    "a market is in two clusters, so it has two fold keys",
+                    market_id=member,
+                    clusters=sorted({groups[member], cluster_id}),
+                )
+            groups[member] = cluster_id
+    return groups
+
+
+def fold_group_of(
+    market_id: str, *, provider: str, event_key: str | None, clusters: Mapping[str, str]
+) -> str:
+    """The fold group of one market: its cluster, else its ``event_key`` group, else itself (7.7).
+
+    The three tiers and the singleton prefix are ``pmx.data.builder.group_ids_of``'s, spelled once per
+    side of the boundary because the builder reasons over payloads and the loader over loaded records;
+    the two must agree market for market, which is what the fold-integrity check below is for.
+    """
+    cluster_id = clusters.get(market_id)
+    if cluster_id:
+        return cluster_id
+    if event_key:
+        return f"{provider}:{event_key}"
+    return f"m:{market_id}"
+
+
+def fold_assignment(
+    markets: Sequence[Market], *, manifest: DatasetManifest, clusters: Mapping[str, str] = {}
+) -> dict[str, str]:
+    """Every binary's fold, decided by its **group's** latest resolution bar (7.7, rulings R248, R290).
+
+    This is the half of the fold fix that lives on the reading side. A market's fold is **not** decided
+    by its own ``resolved_at_ms``: it is decided by ``fold_key_ms``, the resolution bar of the
+    latest-resolving member of its ``EventCluster`` or of its Kalshi ``event_key`` group, because a train
+    price path may otherwise encode a sealed outcome that the cross-asset sensor, a cluster feature or a
+    hive resolution would carry. Deciding it here, from the metas, is what makes "no group spans two
+    folds" true of the dataset a consumer holds and not merely of the dataset the builder wrote.
+    """
+    latest: dict[str, int] = {}
+    groups: dict[str, str] = {}
+    for market in markets:
+        group = fold_group_of(
+            market.id, provider=market.provider, event_key=market.event_key, clusters=clusters
+        )
+        groups[market.id] = group
+        latest[group] = max(latest.get(group, market.resolved_at_ms), market.resolved_at_ms)
+    return {
+        market.id: manifest.split.fold_of(bar_of(latest[groups[market.id]], manifest.interval_min))
+        for market in markets
+    }
+
+
+def check_fold_integrity(
+    markets: Sequence[Market], *, manifest: DatasetManifest, clusters: Mapping[str, str] = {}
+) -> dict[str, str]:
+    """Refuse a dataset whose folds split a group or whose manifest miscounts them (13.1, ruling R248).
+
+    Two refusals, both ``FoldIntegrityError``:
+
+    * **a group spans two folds.** With :func:`fold_assignment` this cannot happen by construction, so
+      the check is the assertion that the construction held: it also catches a ``clusters.json`` that
+      names a market the dataset does not carry alongside one it does, which would otherwise put half a
+      cluster in the sealed fold silently.
+    * **the manifest's three counts are not what the folds recompute to.** This is the check that bites
+      on a dataset built before the fold fix: ``data/datasets/y2026`` was cut by calendar thirds on each
+      market's own resolution and declares 111 / 46 / 130, and no consumer should be able to read it as
+      if it were a count-quantile, cluster-aware split. A hand-written manifest that miscounts its own
+      folds is refused for the same reason.
+    """
+    folds = fold_assignment(markets, manifest=manifest, clusters=clusters)
+    by_group: dict[str, set[str]] = {}
+    for market in markets:
+        group = fold_group_of(
+            market.id, provider=market.provider, event_key=market.event_key, clusters=clusters
+        )
+        by_group.setdefault(group, set()).add(folds[market.id])
+    split_groups = sorted(group for group, seen in by_group.items() if len(seen) > 1)
+    if split_groups:
+        raise FoldIntegrityError(
+            "a cluster or event_key group spans two folds",
+            groups=split_groups,
+            n_groups=len(split_groups),
+        )
+    counted = {"train": 0, "validation": 0, "sealed": 0}
+    for fold in folds.values():
+        counted[fold] += 1
+    declared = {
+        "train": manifest.split.n_train,
+        "validation": manifest.split.n_validation,
+        "sealed": manifest.split.n_sealed,
+    }
+    if counted != declared:
+        raise FoldIntegrityError(
+            "the manifest's fold counts are not what the group-aware cut recomputes",
+            declared=[declared[name] for name in ("train", "validation", "sealed")],
+            recomputed=[counted[name] for name in ("train", "validation", "sealed")],
+            train_end_ms=manifest.split.train_end_ms,
+            validation_end_ms=manifest.split.validation_end_ms,
+        )
+    return folds
+
+
 def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
     """Load a dataset directory: the manifest, every market's metadata, and lazy access to the tapes.
 
@@ -809,7 +976,7 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
     if not markets_dir.is_dir() and not instruments_dir.is_dir():
         raise SchemaError("dataset has no markets and no instruments directory", path=str(path))
     calendars = load_calendars(path, manifest=manifest)
-    metas: list[MarketMeta] = []
+    binaries: list[Market] = []
     for candidate in sorted(markets_dir.glob("*.json")) if markets_dir.is_dir() else ():
         market = load_market_file(candidate, manifest=manifest)
         if market.provider not in manifest.providers:
@@ -819,13 +986,17 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
                 provider=market.provider,
                 providers=list(manifest.providers),
             )
-        metas.append(meta_of(market, fold=manifest.split.fold_of(market.resolved_at_ms)))
-    if len(metas) != manifest.counts.markets:
+        binaries.append(market)
+    if len(binaries) != manifest.counts.markets:
         raise SchemaError(
             "the manifest's market count is not the number of market files",
-            counted=len(metas),
+            counted=len(binaries),
             manifest_count=manifest.counts.markets,
         )
+    # The fold of a binary is its **group's** (7.7, rulings R248 and R290), which is why it is decided
+    # here over the whole set and not market by market as each file is read.
+    folds = check_fold_integrity(binaries, manifest=manifest, clusters=read_cluster_groups(path))
+    metas: list[MarketMeta] = [meta_of(market, fold=folds[market.id]) for market in binaries]
     # Amendment C1b (17.2, ruling R149): the continuous instruments, one meta each with ``kind`` on it and
     # ``fold = "all"`` (ruling R186), checked against the calendar they name.
     n_instruments = 0
@@ -895,7 +1066,25 @@ def verify_dataset(path: Path, *, manifest: DatasetManifest | None = None) -> Da
             missing_files=list(report.missing_files),
             extra_files=list(report.extra_files),
         )
+    verify_folds(path, manifest=manifest)
     return report
+
+
+def verify_folds(path: Path, *, manifest: DatasetManifest | None = None) -> dict[str, str]:
+    """``pmx data verify``'s fold check (7.8, ruling R248): no group spans two folds, counts agree.
+
+    Separated from the hash check because it answers a different question and costs a full read of every
+    market file: the hash says the bytes are the ones the manifest names, this says the folds those bytes
+    fall into are the count-quantile, cluster-aware folds of 7.7 and not the calendar thirds that gave
+    the first real dataset an inverted pyramid.
+    """
+    resolved = manifest if manifest is not None else load_manifest(path)
+    markets_dir = path / MARKETS_DIR
+    binaries = [
+        load_market_file(candidate, manifest=resolved)
+        for candidate in (sorted(markets_dir.glob("*.json")) if markets_dir.is_dir() else ())
+    ]
+    return check_fold_integrity(binaries, manifest=resolved, clusters=read_cluster_groups(path))
 
 
 def verify_dataset_report(path: Path, *, manifest: DatasetManifest | None = None) -> DatasetVerification:

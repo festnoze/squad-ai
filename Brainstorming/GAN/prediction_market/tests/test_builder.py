@@ -28,26 +28,37 @@ from pmx import cli_data
 from pmx.data.builder import (
     BACKGROUND_SOURCE,
     ILLIQUID_DECILE_MIN_SLICE,
+    KALSHI_COHORT_TARGET,
+    KALSHI_MARKET_FLOOR,
+    MANIFOLD_COHORT_TARGET,
+    MANIFOLD_MARKET_FLOOR,
     SELF_RESOLVED_SOURCE,
     SELF_RESOLVED_TAG,
+    WINDOW_DAYS_MAX,
     BuildResult,
     MarketFacts,
+    SplitPlan,
     as_plain_dict,
     build_config_from_manifest,
     build_dataset,
     build_dataset_from_payloads,
+    build_outcome,
+    check_window_days,
     hardness_tags_for,
     illiquid_boundaries,
     link_news_payloads,
     market_facts,
     month_index_of,
     month_quotas,
+    plan_folds,
     removal_reason,
     sample_seed_for,
+    split_block_of,
     stratified_cap,
     window_bounds,
 )
 from pmx.data.loader import load_dataset, load_manifest, seal_dataset, verify_dataset_report
+from pmx.data.news import linker
 from pmx.data.resample import (
     Quote,
     bars_from_trades,
@@ -56,6 +67,7 @@ from pmx.data.resample import (
     volume_milli_total,
 )
 from pmx.data.schema import market_from_payload, validate_against_schema
+from pmx.data.universe import read_series_list
 from pmx.errors import InvalidConfigError, LeakError, SchemaError
 from pmx.journal import canonical_json
 from pmx.types import (
@@ -69,6 +81,7 @@ from pmx.types import (
     BuildConfig,
     Trade,
     day_key,
+    iso_date_from_ms,
     month_edges_for,
     ms_from_iso_date,
     round_half_up,
@@ -533,15 +546,34 @@ def test_a_provider_slice_under_ten_markets_has_no_decile_and_tags_nothing() -> 
 # 7.7 The split
 # --------------------------------------------------------------------------------------------------
 def test_the_month_edges_are_the_contract_offsets_and_the_two_cuts(tmp_path: Path) -> None:
+    """The thirteen edges stay; the two headline cuts are the count quantiles and no longer month edges.
+
+    Ruling R247 replaced the calendar cut of section 7.7 and R290 made the cut key ``fold_key_ms``. The
+    month edges are still in the manifest, because they are the rolling folds' edges of 12.7, so this
+    test keeps every assertion it made about them and replaces the two it made about the cuts with the
+    post-ruling statement: each cut is the fold key of the market at its quantile index, computed here
+    by hand from the sorted keys rather than read back off the object that produced it.
+    """
     result = build(tmp_path)
-    edges = result.manifest.split.month_edges_ms
+    split = result.manifest.split
+    edges = split.month_edges_ms
     assert len(edges) == 13
     assert [(edge - edges[0]) // MS_PER_DAY for edge in edges] == [
         0, 30, 60, 91, 121, 152, 182, 212, 243, 273, 304, 334, 365,
     ]
     assert edges == month_edges_for(WINDOW_START_MS)
-    assert result.manifest.split.train_end_ms == edges[8]
-    assert result.manifest.split.validation_end_ms == edges[10]
+    plan = result.plan
+    assert plan is not None
+    keys = sorted(plan.fold_keys[market_id] for market_id in result.kept_ids)
+    n = len(keys)
+    assert (split.train_end_ms, split.validation_end_ms) == (
+        keys[(n * 600) // 1_000],
+        keys[(n * 800) // 1_000],
+    )
+    # The cut is a bar open, so a run can clip t0_ms and t1_ms to it (7.7).
+    assert split.train_end_ms % MS_PER_DAY == 0 and split.validation_end_ms % MS_PER_DAY == 0
+    # ... and it is NOT the calendar cut this ruling replaced, on this dataset.
+    assert split.train_end_ms != edges[8]
 
 
 def test_the_split_is_chronological_and_no_market_is_in_two_folds(tmp_path: Path) -> None:
@@ -1416,8 +1448,18 @@ def test_a_build_seals_by_default_and_the_sealed_dataset_verifies(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """AC-1 asks ``pmx data build`` for a sealed dataset, so sealing is the default and ``--no-seal`` opts
-    out. A dataset holding a reconstructed tape then fails loudly instead of being quietly left unsealed."""
+    out. A dataset holding a reconstructed tape then fails loudly instead of being quietly left unsealed.
+
+    ``--audits-root`` is passed for a reason the default makes easy to miss: sealing draws the linker
+    audit of 7.6, and :data:`pmx.cli_data.AUDITS_ROOT` is the working directory, which for a test run is
+    the repository itself. Without the flag this test writes ``audits/<hash>/linker.json`` into the
+    tracked tree of ruling R296, where a reviewer's real verdicts live, on every run of the suite. The
+    two assertions below pin both halves: the audit lands under ``tmp_path``, and the repository's own
+    ``audits/`` tree is left exactly as the run found it.
+    """
     out_dir = tmp_path / "y2026"
+    repository_audits = Path(cli_data.AUDITS_ROOT) / linker.AUDITS_DIR
+    before = sorted(repository_audits.rglob("*")) if repository_audits.is_dir() else []
     code = cli_data.main(
         [
             "build",
@@ -1427,6 +1469,7 @@ def test_a_build_seals_by_default_and_the_sealed_dataset_verifies(
             "--news-source", "manifold_comment,wikipedia_current_events",
             "--staging", str(STAGING),
             "--out", str(out_dir),
+            "--audits-root", str(tmp_path),
         ]
     )
     assert code == 0
@@ -1436,3 +1479,578 @@ def test_a_build_seals_by_default_and_the_sealed_dataset_verifies(
     assert manifest.sealed is True
     assert verify_dataset_report(out_dir).ok
     assert cli_data.main(["verify", "--dataset", str(out_dir)]) == 0
+    assert linker.linker_audit_path(tmp_path, manifest.dataset_hash).is_file()
+    after = sorted(repository_audits.rglob("*")) if repository_audits.is_dir() else []
+    assert after == before
+
+
+# --------------------------------------------------------------------------------------------------
+# 7.7 The count-quantile, cluster-aware cut (decisions D-R1 and D-R2, rulings R247, R248, R290)
+#
+# The fixtures below are synthetic on purpose: every one of them is a distribution whose folds can be
+# worked out by hand, which is the only way a test of a quantile says anything. The staged fixtures of
+# tests/fixtures/d6 exercise the same code on real documents, above.
+# --------------------------------------------------------------------------------------------------
+def dated(market_id: str, day: int, *, event_key: str | None = None, provider: str = "kalshi") -> MarketFacts:
+    """A market resolving ``day`` days into the window, optionally inside an event group."""
+    resolved = WINDOW_START_MS + day * MS_PER_DAY + 12 * MS_PER_HOUR
+    return facts(
+        id=market_id,
+        provider=provider,
+        provider_id=market_id.split("-", 1)[1],
+        created_at_ms=WINDOW_START_MS,
+        close_at_ms=resolved - MS_PER_DAY,
+        resolved_at_ms=resolved,
+        event_key=event_key,
+    )
+
+
+def plan_of(rows: Sequence[MarketFacts], **overrides: object) -> SplitPlan:
+    kwargs: dict[str, object] = {"interval_min": 1_440, "window_start_ms": WINDOW_START_MS}
+    kwargs.update(overrides)
+    return plan_folds(rows, **kwargs)  # type: ignore[arg-type]
+
+
+def test_the_cut_is_a_count_quantile_and_the_realised_counts_are_the_hand_computation() -> None:
+    """Ten markets, one per group, resolving on ten different days: 6 / 2 / 2 exactly.
+
+    ``k_train = (10 * 600) // 1000 = 6`` and ``k_validation = 8``, so the cuts are the sixth and the
+    eighth fold key in order and the three folds hold six, two and two.
+    """
+    rows = [dated(f"kalshi-KX{index}", 30 * index) for index in range(10)]
+    plan = plan_of(rows)
+    assert plan.counts == {"train": 6, "validation": 2, "sealed": 2}
+    assert plan.realised_permille == (600, 200, 200)
+    keys = sorted(plan.fold_keys.values())
+    assert (plan.train_end_ms, plan.validation_end_ms) == (keys[6], keys[8])
+    assert plan.cluster_moves == ()
+    assert plan.empty_folds == ()
+
+
+def test_the_split_stays_chronological_market_by_market() -> None:
+    rows = [dated(f"kalshi-KX{index}", 7 * index) for index in range(20)]
+    plan = plan_of(rows)
+    by_fold: dict[str, list[int]] = {"train": [], "validation": [], "sealed": []}
+    for item in rows:
+        by_fold[plan.folds[item.id]].append(item.resolved_at_ms)
+    assert max(by_fold["train"]) < min(by_fold["validation"])
+    assert max(by_fold["validation"]) < min(by_fold["sealed"])
+
+
+def test_a_group_straddling_a_boundary_lands_whole_in_the_later_fold() -> None:
+    """Ruling R248: every market of a group takes the fold of its latest-resolving member.
+
+    The pair below resolves on day 30 and on day 300, which the cut puts on opposite sides of
+    ``train_end_ms``. The early leg follows the late one, and the manifest reports it as a
+    ``cluster_moves`` row: a train price path on the early leg would otherwise encode the sealed
+    outcome of the late one, which is exactly what the cross-asset sensor would carry.
+    """
+    rows = [dated(f"kalshi-KX{index}", 30 * index) for index in range(10)]
+    rows.append(dated("kalshi-KXPAIRA-1", 30, event_key="KXPAIR-EV"))
+    rows.append(dated("kalshi-KXPAIRB-1", 300, event_key="KXPAIR-EV"))
+    plan = plan_of(rows)
+    assert plan.folds["kalshi-KXPAIRA-1"] == plan.folds["kalshi-KXPAIRB-1"] == "sealed"
+    assert plan.fold_keys["kalshi-KXPAIRA-1"] == plan.fold_keys["kalshi-KXPAIRB-1"]
+    moved = {move.market_id: move for move in plan.cluster_moves}
+    assert set(moved) == {"kalshi-KXPAIRA-1"}
+    assert (moved["kalshi-KXPAIRA-1"].from_fold, moved["kalshi-KXPAIRA-1"].to_fold) == ("train", "sealed")
+    assert moved["kalshi-KXPAIRA-1"].group_id == "kalshi:KXPAIR-EV"
+
+
+def test_a_cluster_beats_the_event_key_and_can_join_two_venues() -> None:
+    rows = [dated(f"kalshi-KX{index}", 30 * index) for index in range(10)]
+    rows.append(dated("kalshi-KXEARLY-1", 30, event_key="KXEARLY-EV"))
+    rows.append(dated("manifold-late", 300, provider="manifold"))
+    cluster = "ec-0123456789abcdef"
+    plan = plan_of(rows, clusters={"kalshi-KXEARLY-1": cluster, "manifold-late": cluster})
+    assert plan.folds["kalshi-KXEARLY-1"] == plan.folds["manifold-late"]
+    assert plan.group_ids["kalshi-KXEARLY-1"] == cluster  # the cluster, not the event key
+    assert [move.group_id for move in plan.cluster_moves] == [cluster]
+
+
+def test_the_cluster_rule_is_inside_the_cut_and_does_not_thin_the_train_fold() -> None:
+    """Ruling R290, as the measurement that refused the two-step rule.
+
+    Twelve markets in six dense two-leg groups whose legs straddle the calendar. Cutting on each
+    market's own resolution and moving each group afterwards moves markets one way only, always later,
+    so the train fold can only lose: that reintroduces the inverted pyramid D-R1 was written to fix.
+    Cutting on ``fold_key_ms`` holds the shares up to the ties of one bar.
+    """
+    rows: list[MarketFacts] = []
+    for index in range(6):
+        rows.append(dated(f"kalshi-KXGA{index}-1", 10 * index, event_key=f"KXG{index}-EV"))
+        rows.append(dated(f"kalshi-KXGB{index}-1", 10 * index + 200, event_key=f"KXG{index}-EV"))
+    plan = plan_of(rows)
+    assert sum(plan.counts.values()) == 12
+    assert plan.counts["train"] == 6 and plan.counts["validation"] == 2 and plan.counts["sealed"] == 4
+    # What the refused two-step rule does on this same fixture: cut on each market's own bar, then move
+    # every group to its latest member's fold. Every early leg leaves the train fold and none arrives.
+    own_keys = sorted(item.resolved_at_ms for item in rows)
+    train_end_own = own_keys[(12 * 600) // 1_000]
+    latest = {
+        key: max(item.resolved_at_ms for item in rows if item.event_key == key)
+        for key in {item.event_key for item in rows}
+    }
+    two_step_train = sum(
+        1
+        for item in rows
+        if item.resolved_at_ms < train_end_own and latest[item.event_key] < train_end_own
+    )
+    assert two_step_train < plan.counts["train"]  # the drift the ruling names, measured
+
+
+def test_a_dataset_of_one_market_puts_it_in_the_sealed_fold_and_reports_two_empty_folds() -> None:
+    """``k_train = k_validation = 0``, so both cuts are the one market's key and it lands sealed.
+
+    The builder reports the empty folds and does not refuse them: a dataset of one market is still a
+    dataset. The refusal is ``make_folds``'s (7.7, ``FoldIntegrityError``), because that is the consumer
+    for which every paired bound depends on all three folds being populated.
+    """
+    plan = plan_of([dated("kalshi-KXONE-1", 100)])
+    assert plan.counts == {"train": 0, "validation": 0, "sealed": 1}
+    assert plan.empty_folds == ("train", "validation")
+    assert plan.realised_permille == (0, 0, 1_000)
+
+
+def test_an_empty_dataset_cuts_at_the_window_open_and_counts_three_zeros() -> None:
+    plan = plan_of([])
+    assert plan.counts == {"train": 0, "validation": 0, "sealed": 0}
+    assert (plan.train_end_ms, plan.validation_end_ms) == (WINDOW_START_MS, WINDOW_START_MS)
+    assert plan.realised_permille == (0, 0, 0)
+    assert plan.empty_folds == ("train", "validation", "sealed")
+
+
+def test_every_cut_is_a_bar_open_on_the_hourly_grid_too() -> None:
+    rows = [
+        facts(
+            id=f"kalshi-KXH{index}-1",
+            provider_id=f"KXH{index}-1",
+            interval_min=60,
+            created_at_ms=WINDOW_START_MS,
+            close_at_ms=WINDOW_START_MS + (index + 1) * MS_PER_DAY,
+            resolved_at_ms=WINDOW_START_MS + (index + 1) * MS_PER_DAY + 90 * 60_000,
+        )
+        for index in range(10)
+    ]
+    plan = plan_of(rows, interval_min=60)
+    assert plan.train_end_ms % MS_PER_HOUR == 0
+    assert plan.validation_end_ms % MS_PER_HOUR == 0
+    assert plan.counts == {"train": 6, "validation": 2, "sealed": 2}
+
+
+def test_the_quantiles_are_validated_rather_than_trusted() -> None:
+    """Every malformed pair is an ``InvalidConfigError`` named at the boundary, never an ``IndexError``.
+
+    The last two cases are the ones the first version of the guard let through. 7.7 reads the cut bar off
+    the ordered list, ``k = (n * 1_000) // 1_000`` is ``n``, and ``ordered[n]`` is one past the end, so a
+    permille of a thousand at either cut escaped from inside :func:`plan_folds` as an ``IndexError``,
+    which section 13.1's taxonomy does not admit.
+    """
+    one = [dated("kalshi-KXA-1", 10)]
+    with pytest.raises(InvalidConfigError):
+        plan_of(one, quantiles_permille=(800, 600))
+    with pytest.raises(InvalidConfigError):
+        plan_of(one, quantiles_permille=(600, 1_400))
+    with pytest.raises(InvalidConfigError):
+        plan_of(one, quantiles_permille=(600,))
+    with pytest.raises(InvalidConfigError):
+        plan_of(one, quantiles_permille=(600, 1_000))
+    with pytest.raises(InvalidConfigError):
+        plan_of(one, quantiles_permille=(1_000, 1_000))
+    # 999 is legal and is the degenerate cut next to the refusal: the sealed fold keeps the last market.
+    ten = [dated(f"kalshi-KX{index}-1", 10 * index) for index in range(10)]
+    assert plan_of(ten, quantiles_permille=(998, 999)).counts == {
+        "train": 9, "validation": 0, "sealed": 1
+    }
+
+
+def test_the_split_block_is_the_shape_section_7_8_states_after_the_amendment(tmp_path: Path) -> None:
+    result = build(tmp_path)
+    plan = result.plan
+    assert plan is not None
+    block = split_block_of(result.manifest.split, plan)
+    assert block["method"] == "count_quantile"
+    assert block["quantiles_permille"] == [600, 800]
+    assert block["n_moved"] == len(plan.cluster_moves)
+    assert block["realised_permille"] == list(plan.realised_permille)
+    assert block["train_end_date"] == iso_date_from_ms(result.manifest.split.train_end_ms)
+    assert block["validation_end_date"] == iso_date_from_ms(result.manifest.split.validation_end_ms)
+    assert set(block) >= {
+        "month_edges_ms", "train_end_ms", "validation_end_ms", "n_train", "n_validation", "n_sealed",
+        "method", "quantiles_permille", "train_end_date", "validation_end_date", "cluster_moves",
+        "n_moved", "realised_permille",
+    }
+
+
+def test_the_manifest_blocks_the_build_cannot_yet_write_validate_against_dataset_v1(tmp_path: Path) -> None:
+    """Every block of 7.8 amendment C1c added is assembled and is legal against the shipped schema.
+
+    ``dataset.v1.json`` already admits ``purpose``, ``window_days``, ``resolution_span``, the ``split``
+    cuts and moves, ``universe`` and ``build`` (C1c landed the schema); what refuses them today is the
+    strict pydantic model of ``pmx.data.schema`` and the dataclass of ``pmx.types``, both D1's. This
+    test is the proof that the day those two carry the fields the builder's document is already right.
+    """
+    result = build(tmp_path)
+    document = result.manifest_blocks
+    # CONTRACT ISSUE, reported by DS1 and owned by amendment C1c: 7.8 and ruling R290 require
+    # ``split.realised_permille``, and ``dataset.v1.json``'s ``split`` object (additionalProperties
+    # false) does not declare it, so the block the contract asks for is refused by the shipped schema.
+    # The two assertions below pin both halves, so the day C1c adds the property this test says so.
+    split = document["split"]
+    assert isinstance(split, dict)
+    assert "realised_permille" in split
+    with pytest.raises(SchemaError, match="realised_permille"):
+        validate_against_schema("dataset.v1.json", document, where="dataset manifest")
+    without = {**document, "split": {k: v for k, v in split.items() if k != "realised_permille"}}
+    validate_against_schema("dataset.v1.json", without, where="dataset manifest")
+    assert document["purpose"] == "research"
+    assert document["window_days"] == 365
+    assert isinstance(document["universe"], dict)
+    assert isinstance(document["build"], dict)
+    span = document["resolution_span"]
+    assert isinstance(span, dict) and span["min_ms"] < span["max_ms"]
+
+
+# --------------------------------------------------------------------------------------------------
+# 5.6 window_days and purpose (decisions D-S3 and D-S4, rulings R262, R263)
+# --------------------------------------------------------------------------------------------------
+def test_a_window_wider_than_the_ceiling_is_refused_with_its_reason(tmp_path: Path) -> None:
+    assert WINDOW_DAYS_MAX == 730
+    check_window_days(730)  # exactly at the ceiling is legal
+    with pytest.raises(InvalidConfigError) as raised:
+        check_window_days(731)
+    assert raised.value.context["window_days_max"] == 730
+    assert "recall" in str(raised.value) and "regime" in str(raised.value)
+    with pytest.raises(InvalidConfigError):
+        build(tmp_path, config=config(window_days=1_095))
+
+
+def test_the_ceiling_is_refused_at_the_flag_before_a_socket_is_opened(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``pmx data build --window-days 900`` exits 1 with the reason, and writes no dataset."""
+    out = tmp_path / "wide"
+    code = cli_data.main(
+        [
+            "build", "--provider", "kalshi", "--freeze", FREEZE_DATE, "--window-days", "900",
+            "--offline", "--out", str(out), "--staging", str(STAGING),
+        ]
+    )
+    assert code == 1
+    assert "window_days_max=730" in capsys.readouterr().err
+    assert not (out / "manifest.json").exists()
+
+
+def test_a_purpose_outside_the_two_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(InvalidConfigError):
+        build(tmp_path, purpose="demo")
+
+
+def test_a_showcase_build_is_exempt_from_the_window_rule_and_from_nothing_else(tmp_path: Path) -> None:
+    """Decision D-S4: the landmark events are kept in a quarantined partition, not thrown away.
+
+    The staged fixture ``manifold-tooold`` resolved outside the window and a research build counts it
+    under the ``window`` filter. A showcase build keeps it, takes its window from its own markets, and
+    still applies every other filter: the multi-outcome leg and the short-lived market are still gone.
+    """
+    research = build(tmp_path / "research")
+    assert research.removed["window"] == 1 and research.purpose == "research"
+    showcase = build(tmp_path / "showcase", purpose="showcase")
+    assert showcase.purpose == "showcase"
+    assert showcase.removed["window"] == 0 and showcase.removed["opened_early"] == 0
+    assert "manifold-tooold" in showcase.kept_ids
+    assert showcase.removed["no_leak"] == 1  # the freeze rule is never lifted, for any purpose
+    assert "manifold-afterfreeze" not in showcase.kept_ids
+    assert showcase.removed["binary"] == 1 and showcase.removed["min_life"] == 1
+    created = [
+        int(
+            json.loads(
+                (showcase.path / "markets" / f"{market_id}.json").read_text(encoding="utf-8")
+            )["created_at_ms"]
+        )
+        for market_id in showcase.kept_ids
+    ]
+    assert showcase.window[0] <= min(created)
+
+
+def test_the_purpose_reaches_the_document_the_manifest_will_carry(tmp_path: Path) -> None:
+    showcase = build(tmp_path, purpose="showcase")
+    assert showcase.manifest_blocks["purpose"] == "showcase"
+
+
+# --------------------------------------------------------------------------------------------------
+# 7.4 build.status per venue (rulings R270 and R290)
+# --------------------------------------------------------------------------------------------------
+def test_a_kalshi_shortfall_fails_the_build_and_a_manifold_only_shortfall_does_not() -> None:
+    """Ruling R290 in the form R270 states, and the blanket sentence it deleted from 7.4."""
+    both_short = build_outcome(per_provider={"kalshi": 10, "manifold": 10})
+    assert both_short["status"] == "failed"
+    manifold_only = build_outcome(per_provider={"kalshi": KALSHI_MARKET_FLOOR, "manifold": 10})
+    assert manifold_only["status"] == "ok"
+    assert manifold_only["shortfall"] == {"manifold": {"markets": MANIFOLD_MARKET_FLOOR - 10}}
+    neither = build_outcome(
+        per_provider={"kalshi": KALSHI_MARKET_FLOOR, "manifold": MANIFOLD_MARKET_FLOOR}
+    )
+    assert neither["status"] == "ok" and neither["shortfall"] == {}
+
+
+def test_the_cohort_target_decides_the_status_once_a_cohort_count_exists() -> None:
+    outcome = build_outcome(
+        per_provider={"kalshi": KALSHI_MARKET_FLOOR, "manifold": MANIFOLD_MARKET_FLOOR},
+        cohorts_per_provider={"kalshi": 12, "manifold": 8},
+    )
+    assert outcome["status"] == "failed"
+    assert outcome["shortfall"] == {"kalshi": {"cohorts": KALSHI_COHORT_TARGET - 12}}
+    assert outcome["targets"] == {
+        "kalshi_cohorts": KALSHI_COHORT_TARGET,
+        "kalshi_markets": KALSHI_MARKET_FLOOR,
+        "manifold_cohorts": MANIFOLD_COHORT_TARGET,
+        "manifold_markets": MANIFOLD_MARKET_FLOOR,
+    }
+
+
+def test_the_fallback_steps_are_recorded_in_the_order_they_were_taken() -> None:
+    outcome = build_outcome(
+        per_provider={"kalshi": 100},
+        fallbacks=[
+            {"step": "window_days", "from": 365, "to": 540, "reason": "cohort target unreachable at 365"},
+            {"step": "min_trades", "from": 50, "to": 20, "reason": "still short by 900 markets"},
+        ],
+    )
+    steps = outcome["fallbacks"]
+    assert isinstance(steps, list)
+    assert [step["step"] for step in steps] == ["window_days", "min_trades"]
+
+
+# --------------------------------------------------------------------------------------------------
+# 5.2 The hourly grid is a first-class path (decision D-R5)
+# --------------------------------------------------------------------------------------------------
+def hourly_market(market_id: str, *, day: int, hours: int = 240) -> dict[str, object]:
+    """A schema-valid hourly market: dense bars on the 60-minute grid, enough size to pass 7.4."""
+    created = WINDOW_START_MS + day * MS_PER_DAY
+    resolved = created + hours * MS_PER_HOUR
+    ticker = market_id.split("-", 1)[1]
+    bars = [
+        {
+            "t_ms": created + index * MS_PER_HOUR,
+            "open_bp": 5_000, "high_bp": 5_100, "low_bp": 4_900, "close_bp": 5_000, "vwap_bp": 5_000,
+            "volume_milli": 2_000, "n_trades": 0, "yes_bid_bp": 4_950, "yes_ask_bp": 5_050,
+            "open_interest": 100,
+        }
+        for index in range(hours + 1)
+    ]
+    return {
+        "schema_version": "market.v2",
+        "id": market_id,
+        "provider": "kalshi",
+        "provider_id": ticker,
+        "url": "https://kalshi.com/x",
+        "question": f"Will {ticker} settle yes?",
+        "description": "",
+        "category": "economics",
+        "tags": [],
+        "wiki_subjects": [],
+        "currency": "usd",
+        "source": "imported",
+        "created_at_ms": created,
+        "close_at_ms": resolved - MS_PER_HOUR,
+        "resolved_at_ms": resolved,
+        "resolution": 1,
+        "resolution_source": "venue",
+        "event_key": f"{ticker}-EV",
+        "interval_min": 60,
+        "bars": bars,
+        "trades": [],
+        "first_price_bp": 5_000,
+        "final_price_bp": 5_000,
+        "hardness_tags": [],
+        "quality": {
+            "n_trades": 0,
+            "unique_bettors": None,
+            "life_days": hours // 24,
+            "volume_milli_total": 2_000 * (hours + 1),
+            "traded_bars": hours + 1,
+            "tape_kind": TAPE_KIND_BARS_ONLY,
+        },
+        "fee_schedule_id": "kalshi-general-2026-09",
+        "notes": "",
+    }
+
+
+def test_an_hourly_build_is_a_first_class_path_through_the_builder_and_the_loader(tmp_path: Path) -> None:
+    """Decision D-R5: ``y2026h`` at ``interval_min = 60`` is the headline Kalshi dataset.
+
+    Built, sealed, verified and loaded back, with the cuts on the hourly grid and every market of the
+    dataset on that one grid (5.3: one grid per dataset, and an hourly claim is a second dataset).
+    """
+    payloads = [hourly_market(f"kalshi-KXH{index}-1", day=10 * index) for index in range(10)]
+    result = build_dataset_from_payloads(
+        out_dir=tmp_path / "y2026h",
+        config=config(interval_min=60, providers=("kalshi",), min_traded_bars=200),
+        market_payloads=payloads,
+        news_payloads=[],
+    )
+    assert result.manifest.interval_min == 60
+    assert len(result.kept_ids) == 10
+    assert (result.manifest.split.n_train, result.manifest.split.n_validation) == (6, 2)
+    assert result.manifest.split.train_end_ms % MS_PER_HOUR == 0
+    seal_dataset(result.path)
+    assert verify_dataset_report(result.path).ok
+    dataset = load_dataset(result.path)
+    assert {meta.interval_min for meta in dataset.metas} == {60}
+    assert sorted({meta.fold for meta in dataset.metas}) == ["sealed", "train", "validation"]
+
+
+def test_a_whole_hourly_market_is_still_refused_by_a_daily_build(tmp_path: Path) -> None:
+    """5.3: one grid per dataset, and the refusal reads the market's own ``interval_min``.
+
+    The sibling above flips the field on a daily fixture; this one offers a genuinely hourly market,
+    dense on the 60-minute grid, so the refusal is not an artefact of a market whose bars contradict
+    its declared grid.
+    """
+    with pytest.raises(InvalidConfigError, match="another grid"):
+        build_dataset_from_payloads(
+            out_dir=tmp_path / "mixed",
+            config=config(providers=("kalshi",)),
+            market_payloads=[hourly_market("kalshi-KXH0-1", day=10)],
+            news_payloads=[],
+        )
+
+
+# --------------------------------------------------------------------------------------------------
+# The CLI half of amendment C1c: the audit file, the series list and the new reports
+# --------------------------------------------------------------------------------------------------
+def sealed_cli_build(tmp_path: Path, *extra: str) -> Path:
+    """A sealed dataset built through ``pmx data build``, with the audits tree inside ``tmp_path``."""
+    out_dir = tmp_path / "y2026"
+    argv = [
+        "build",
+        "--provider", "kalshi,manifold",
+        "--freeze", FREEZE_DATE,
+        "--offline",
+        "--news-source", "manifold_comment,wikipedia_current_events",
+        "--staging", str(STAGING),
+        "--out", str(out_dir),
+        "--audits-root", str(tmp_path),
+        *extra,
+    ]
+    assert cli_data.main(argv) == 0
+    return out_dir
+
+
+def test_the_build_writes_the_linker_audit_into_the_tracked_audits_tree(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Decision D-R4 and ruling R296: fifty links per build, in ``audits/``, keyed by the sealed hash."""
+    out_dir = sealed_cli_build(tmp_path)
+    printed = capsys.readouterr().out
+    manifest = load_manifest(out_dir)
+    path = tmp_path / "audits" / manifest.dataset_hash[:16] / "linker.json"
+    assert path.is_file()
+    assert "links drawn for review" in printed
+    audit = json.loads(path.read_text(encoding="utf-8"))
+    assert audit["dataset_hash"] == manifest.dataset_hash
+    assert audit["precision_permille"] == 0  # nobody has reviewed it yet
+    assert all(link["verdict"] is None for link in audit["links"])
+    assert audit["n"] == len(audit["links"]) <= 50
+    # the audit is outside the dataset directory and therefore outside its hash
+    assert not str(path).startswith(str(out_dir))
+    assert verify_dataset_report(out_dir).ok
+
+
+def test_audit_links_keeps_the_verdicts_a_reviewer_has_already_filled(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    out_dir = sealed_cli_build(tmp_path)
+    capsys.readouterr()
+    manifest = load_manifest(out_dir)
+    path = tmp_path / "audits" / manifest.dataset_hash[:16] / "linker.json"
+    audit = json.loads(path.read_text(encoding="utf-8"))
+    assert audit["links"], "the fixture dataset carries at least one link to review"
+    for index, link in enumerate(audit["links"]):
+        link["verdict"] = "correct" if index % 4 else "wrong"
+        link["reviewer"] = "g3"
+    path.write_text(json.dumps(audit), encoding="utf-8", newline="\n")
+
+    assert cli_data.main(["audit-links", "--dataset", str(out_dir), "--audits-root", str(tmp_path)]) == 0
+    printed = capsys.readouterr().out
+    again = json.loads(path.read_text(encoding="utf-8"))
+    assert [link["verdict"] for link in again["links"]] == [link["verdict"] for link in audit["links"]]
+    n_correct = sum(1 for link in again["links"] if link["verdict"] == "correct")
+    n_wrong = sum(1 for link in again["links"] if link["verdict"] == "wrong")
+    assert again["precision_permille"] == round_half_up(1_000 * n_correct, n_correct + n_wrong)
+    assert "precision" in printed
+
+
+def test_the_build_writes_the_series_list_as_an_output_one_ticker_per_line(tmp_path: Path) -> None:
+    """Ruling R258: the series list is an output, and one comma-separated line is what broke a reader."""
+    out_dir = sealed_cli_build(tmp_path, "--universe-min-settled", "1", "--universe-min-volume-cents", "0")
+    listed = (out_dir / "kalshi_series.txt").read_text(encoding="utf-8")
+    assert listed.endswith("\n")
+    tickers = listed.split("\n")[:-1]
+    assert tickers == sorted(set(tickers))
+    assert "KXCPI" in tickers
+    assert read_series_list(listed) == tuple(tickers)
+    assert verify_dataset_report(out_dir).ok  # the list is outside the hashed walk of 4.3
+
+
+def test_the_build_prints_the_blocks_the_manifest_cannot_yet_carry(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    sealed_cli_build(tmp_path)
+    printed = capsys.readouterr().out
+    assert "purpose    research" in printed
+    assert "method count_quantile [600, 800]" in printed
+    assert "realised   [600, 200, 200] permille" in printed
+    assert "universe   " in printed
+    assert "build      status failed" in printed  # five markets is far below the Kalshi market floor
+
+
+def test_a_showcase_build_through_the_cli_keeps_the_landmark_market(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """``--purpose showcase`` keeps the out-of-window landmark, and cannot yet be sealed.
+
+    The build half of decision D-S4 is here and works: the landmark market that a research build counts
+    under the ``window`` filter is kept, the window is taken from the dataset's own markets, and the
+    purpose is reported. The **read** half is blocked on an agreement DS1 reports: ``purpose`` is
+    ``DatasetManifest.purpose`` in 5.6 and neither ``pmx.types`` nor the strict ``DatasetManifestModel``
+    of ``pmx.data.schema`` carries it, so no manifest on disk can say it and the loader applies the
+    window rule of 5.6 to a dataset it cannot tell apart from a research one. The second half of this
+    test pins that, so the day the field lands it says so.
+    """
+    out_dir = tmp_path / "y2026"
+    assert (
+        cli_data.main(
+            [
+                "build", "--provider", "kalshi,manifold", "--freeze", FREEZE_DATE, "--offline",
+                "--no-seal", "--purpose", "showcase", "--staging", str(STAGING),
+                "--out", str(out_dir), "--audits-root", str(tmp_path),
+            ]
+        )
+        == 0
+    )
+    printed = capsys.readouterr().out
+    assert "purpose    showcase" in printed
+    # Seven: the five a research build keeps, plus the out-of-window landmark and the one that opened
+    # before the window, which are the two filters 5.6's window rule covers and the only two lifted.
+    assert "markets    7" in printed
+    assert (out_dir / "markets" / "manifold-tooold.json").is_file()
+    # BLOCKED, reported as an agreement needed: without DatasetManifest.purpose the loader reads this
+    # dataset as research and applies the window rule of 5.6 to it.
+    with pytest.raises(SchemaError, match="before the window opens"):
+        load_dataset(out_dir)
+
+
+def test_the_audit_links_command_is_in_the_group_help(capsys: pytest.CaptureFixture[str]) -> None:
+    assert cli_data.main([]) == 2
+    assert "audit-links" in capsys.readouterr().out
+
+
+def test_a_comma_separated_flag_also_splits_on_the_newline_a_build_writes() -> None:
+    """``--kalshi-series "$(cat kalshi_series.txt)"`` must mean the tickers and not one long ticker."""
+    newline = chr(10)
+    assert cli_data._csv(f"KXCPI{newline}KXFED{newline}") == ("KXCPI", "KXFED")
+    assert cli_data._csv("KXCPI,KXFED") == ("KXCPI", "KXFED")
+    assert cli_data._csv(f"KXCPI, KXFED{newline}KXBTC") == ("KXCPI", "KXFED", "KXBTC")
+    assert cli_data._csv("") == () and cli_data._csv(None) == ()
