@@ -165,6 +165,27 @@ namespace Viewpoint
         }
 
         /// <summary>
+        /// Whether <paramref name="candidate"/> is THIS block's own visual.
+        ///
+        /// Exists because "is this renderer a block's?" cannot be answered by
+        /// walking up the hierarchy. The renderer lives on a child called
+        /// "Mesh", so a renderer parented to the block that is NOT the block
+        /// (the painted backdrop panel, which BuildBackdrop parents to the
+        /// carvable wall it hangs on) is a SIBLING of that child:
+        /// GetComponentInParent finds the block from both, and depth cannot
+        /// separate them either.
+        ///
+        /// The distinction matters because a block must be driven through
+        /// <see cref="SetReveal"/> rather than written with a second
+        /// MaterialPropertyBlock, which would erase its _Seed and _CutGlow,
+        /// while the panel has no such owner and must be written directly.
+        /// </summary>
+        public bool Owns(Renderer candidate)
+        {
+            return candidate != null && ReferenceEquals(candidate, meshRenderer);
+        }
+
+        /// <summary>
         /// The one factory every caller goes through. <paramref name="seed"/> is
         /// optional and LAST on purpose: LevelBuilder, PhotoContent and the
         /// EditMode suites all call this by position, and only a carve has a

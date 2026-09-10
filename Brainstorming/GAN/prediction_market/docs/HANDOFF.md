@@ -74,7 +74,7 @@ Documents: `docs/PRD_V2_HARD_OPTIMIZER.md`, `docs/PRD_V3_TRADING_OPTIMIZER.md`, 
 
 ---
 
-## 3. Resume procedure
+## 3. Resume procedure (DISCHARGED 2026-09-10: see section 9, the order starts at lot 5b)
 
 ### Step 0: verify the tree
 
@@ -176,7 +176,7 @@ Scripts under `C:\Users\e.millerioux\.claude\projects\C--Dev-squad-ai-Brainstorm
 
 ---
 
-## 6. Update 2026-09-09 00:50 : durable resume point (written before an unattended overnight run)
+## 6. Update 2026-09-09 00:50 : durable resume point (DISCHARGED 2026-09-10, see section 9)
 
 A one-shot timer is set for 03:45 with the prompt "continue l'implementation dans l'ordre, a partir de
 la derniere tache en cours lors de l'interuption". That timer lives in the Claude session's memory only,
@@ -409,7 +409,7 @@ Then lot 5a, the amendment, as section 6 of this file states.
 
 ---
 
-## 8. LIFTED 2026-09-09 16:05 : the stop order below is discharged
+## 8. LIFTED 2026-09-09 16:05 : the stop order below is discharged (its lot 5a is done, see section 9)
 
 The user gave the go for the next wave at 16:05. Steps 1 to 3 of the order were carried out (the four
 checks re-run independently, the work committed, the outcome recorded in section 6 and in BUILD_STATE
@@ -444,3 +444,85 @@ The user asked to **stop everything at the end of gate G2**. When lot 4d (`wf_51
   `docs/REVIEW_2026-09-09_SCALE_TAGS.md`), with one critic and one arbiter, on Fable.
 * Then lot 5b, lot 6, lot 7, the ladder rungs, the acceptance audit, and last the Polymarket lot of
   plan part 5, which stays blocked on the user supplying an indexer credential.
+
+---
+
+## 9. Update 2026-09-10 : amendment C1c is closed. **The order now starts at lot 5b.**
+
+Lot 5a ran in three passes, each one agent on Fable: the amendment wrote contract section 18 and section
+7.14 and landed the twenty-eight review decisions in place (rulings R230 to R275 in `docs/CONTRACTS_V2.md`
+15.10); one adversarial critic raised twenty-four findings (eight blockers, twelve major, four minor,
+report at `<scratchpad>/lot5a_critic.json`); this arbitration verified every finding in the text and
+recorded twenty-seven more rulings, R276 to R302, nine of them **against the fix the critic proposed**
+and four of them answering questions the amendment had flagged about itself. `docs/BUILD_STATE.md`
+section 9 is the record: what section 18 states, where each decision landed, what was refuted, what is
+left to code with its package and lot, and section 9.6b, the places the document still asks a package to
+invent something.
+
+Reports: `<scratchpad>/lot5a_amend.json` (the amendment), `<scratchpad>/lot5a_critic.json` (the critic),
+`<scratchpad>/lot5a_arbiter.json` (this pass). Checks at the end of the arbitration: suite EXIT 0, ruff
+clean, `mypy --strict` clean, em-dash sweep clean, the tails pasted verbatim in BUILD_STATE 9.5.
+`ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"` (R275, R302): no run exists whose
+journal bytes any ruling of this amendment moves, and R274 names the lot that carries the first bump.
+
+**Sections 3, 6 and 8 of this file are discharged for everything up to and including lot 5a.** The order
+below replaces their lists.
+
+### The order, from here
+
+1. **Lot 5b, measure before building agents.** Read `docs/CONTRACTS_V2.md` section 18 and 7.14 first,
+   then 18.8's deferral table for what each package must apply in another owner's file.
+   1. **DS1** (`data/builder.py`, `loader.py`, `universe.py`, `news/wikipedia_current_events.py`,
+      `news/linker.py`, `cli_data.py`): the fold fix as **R290** now states it (the count quantile is cut
+      on `fold_key_ms`, the group's latest resolution bar, in one step, with `split.realised_permille` in
+      the manifest and `FoldIntegrityError` on an empty fold), the clipped rolling pairs (R277),
+      per-bullet Wikipedia timestamps (D-R3), the linker audit into the **tracked** `audits/` tree
+      (R296), the hourly headline build (D-R5), the documented universe rule (D-R13), `window_days` and
+      `purpose` (D-S3, D-S4), `BuildConfig.instruments` (R298), `build.status` per venue (R290), then
+      the rebuild against the per-venue cohort targets and the fallback order of 7.4.
+   2. **DS2** (`data/taxonomy.py`, `cohorts.py`, the two lexicons, `data/showcase.py`), **after DS1's
+      rebuild** (D-S13, R272): the tagger, `Cohort`, `list_cohorts` and `cohort_or_refuse` (R283), the
+      showcase pack, the fifty-tagging audit into `audits/`.
+   3. **S1** (`sensors/`): the catalogue exactly as `tests/fixtures/contract/sensor.catalogue.json`
+      ships it, `catalogue_hash =
+      1ac17eba640dc0875de4122dcc1eb1ec65351c687004bc4b5d194069fdebe109`, the `sentinel` field (R285), the
+      derived `granularity_ms` and `lag_ms` (R287), the fifteen `sense` bodies against `SensorInputs` as
+      12.11 declares it (R278), and the three nested gates in E1's file by section 13's agreement.
+   4. **S2** (`rules/`): the vocabulary, `Rule` with `readable_by` (R279), the miner, the tester with
+      pre-registered families whose id names its data (R284), `rule_permutation_p_ppm` and
+      `benjamini_hochberg` added to E4's `metrics/stats.py` (R282), the ledger with one writer per event
+      (R294).
+   5. **R2a to R2e** the detectors, **F1 to F5** the finance and Hacker News data, **U1** the API and
+      **U2** the market and cohort views.
+   6. **Gates G3 and G3b**. G3 performs the two human audits (fifty links, fifty taggings) into
+      `audits/<dataset_hash[:16]>/`; G3b writes and runs `tests/e2e/test_e2e_1b_multi_asset.py` and
+      carries `news.v1.json`'s C1b widening (17.9).
+2. **Lot 6**: A1 to A6 with the families the opportunity map measured, `rule_follower` with the
+   direction-and-kind filter (R280), FM1's proxy matrix, O1 folds, O2 evolution with two-tier fitness and
+   the 144-cell archive read as a rate (R297), O4 claims with capacity (R292) and per-cohort rows (R283),
+   L1 live; gate G4. O3 stays deferred (R256).
+3. **Lot 7**: U3, U4, U5; gate G5.
+4. **Lots 8 and after**: the ladder rungs of `docs/PLAN_V3_WAVES.md` part 2, each opened by its
+   amendment (C2 to C5, one critic, one arbiter) and closed by its gate running `tests/e2e/` in full.
+5. **The acceptance audit** over AC-1 to AC-34, then fix agents, then a re-audit.
+6. **Last lot**: Polymarket read from the chain (plan part 5). Still **blocked on the user supplying an
+   indexer credential** (an Envio HyperSync token or a Dune API key). Do not start it without one, and do
+   not attempt the free 50-block path.
+
+### The first engine lot after C1c has a fixed to-do (R274)
+
+Whichever lot first touches `pmx.journal` applies, in one commit with the version bump: R213
+(`Execution.__init__(..., t0_ms, t1_ms)` and the last-bar drain as `order_rejected(not_tradable)`), R214
+(`quote_bar(..., bar_prev=)`), R217 (continuous calibration through `continuous_entry`), R221
+(`PerMarket.n_quantile_forecasts`, `RunProjection.seed`), plus C1c's `observation_built.sensors`,
+`run_started.sensor_catalogue_hash`, `RunConfig.sensor_catalogue_hash`, `market_listed`'s four facets and
+`cohort_id` (R288), and the promotion of the six declared events into `oneOf` with their dataclasses. It
+regenerates the pinned hashes and the backtest fixture in the same commit and bumps `ENGINE_VERSION` and
+`CONTRACT_VERSION`. `run_id` not naming the population (BUILD_STATE 8.7) belongs to it too.
+
+### Rules that still govern the build
+
+Section 2 of this file, unchanged, plus the two the last three lots confirmed: **one lot per Workflow
+invocation** (a wave's packages plus its gate, or smaller), and **implementation packages on Opus, gates,
+amendments, critics and arbiters on Fable**. Long commands run in the background with a log that is
+polled; three minutes without a tool call is a kill.

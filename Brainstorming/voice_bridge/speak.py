@@ -9,6 +9,11 @@ Backends:
     edge   - Microsoft Edge neural voices. Free, no API key, best French prosody.
     sapi   - Windows built-in voices. Zero install, instant, robotic.
 
+Only one process may use the speakers at a time. Several terminals finishing
+at once each spawn their own speak.py; the later ones wait for the voice to be
+free (up to `queue_wait_seconds`) and then take their turn, or give up quietly
+when the wait would make their announcement stale. See VoiceLock.
+
 Usage:
     echo "Bonjour" | python speak.py
     python speak.py --text "Les tests passent." --backend edge
@@ -18,6 +23,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import collections
 import json
 import os
 import re
@@ -25,18 +31,51 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from pathlib import Path
+from typing import IO, NamedTuple
 
 ROOT = Path(__file__).resolve().parent
 STATE_DIR = Path(os.environ.get("LOCALAPPDATA", tempfile.gettempdir())) / "voice_bridge"
 PID_FILE = STATE_DIR / "player.pid"
 SEQ_FILE = STATE_DIR / "sequencer.pid"
+LOCK_FILE = STATE_DIR / "voice.lock"
+STOP_STAMP = STATE_DIR / "stop.stamp"
 CONFIG_FILE = ROOT / "config.json"
+
+# How often a waiting reader re-tries the voice lock.
+LOCK_POLL_SECONDS = 0.2
 
 # Above this, a single utterance makes you wait too long for the first sound,
 # so long text is cut into chunks played back to back.
 CHUNK_CHARS = 320
+
+# Pocket TTS is autoregressive: the cost per second of audio climbs with the
+# length of the request. Measured on this machine, one request goes from 1.1x
+# real time at 145 characters to 2.35x at 437, and the speakers run dry in the
+# middle of the sentence. Short requests keep the rate near 1.1x whatever the
+# total length of the answer.
+POCKET_CHUNK_CHARS = 150
+
+# Cushion on top of the computed need, for a CPU spike mid-answer.
+PREBUFFER_MARGIN_SECONDS = 0.6
+
+# Prior for how much text one second of speech holds, measured on the estelle
+# voice (437 characters gave 22.3 s, 145 gave 7.8 s). Only used before the first
+# chunk has been generated, to size the answer still to come; after that the
+# real ratio is known and this is not consulted again.
+CHARS_PER_AUDIO_SECOND = 19.0
+
+# The generation rate cannot be measured from the first block alone: at that
+# instant no time has passed since the first sample, so any daemon looks
+# infinitely fast and playback starts on a sample of one. Wait for this much
+# audio before trusting the rate. A shorter answer than this plays anyway, once
+# the feed closes.
+MIN_RATE_SAMPLE_SECONDS = 0.5
+
+# 16-bit mono PCM.
+PCM_BYTES_PER_SAMPLE = 2
 
 DEFAULTS = {
     "backend": "piper",
@@ -44,11 +83,15 @@ DEFAULTS = {
     "piper_port": 5111,
     "pocket_voice": "estelle",
     "pocket_port": 5112,
+    "pocket_chunk_chars": POCKET_CHUNK_CHARS,
     "edge_voice": "fr-FR-DeniseNeural",
     "edge_rate": "+15%",
     "sapi_voice": "Microsoft Julie",
     "max_chars": 260,
     "enabled": True,
+    # How long a reader waits for the speakers when another one is talking.
+    # 0 means: give up at once if the voice is busy.
+    "queue_wait_seconds": 30,
 }
 
 
@@ -104,8 +147,12 @@ FENCED_CODE = re.compile(r"```.*?```", re.DOTALL)
 INLINE_CODE = re.compile(r"`([^`]*)`")
 MD_LINK = re.compile(r"\[([^\]]+)\]\([^)]*\)")
 MD_EMPHASIS = re.compile(r"(\*\*|__|\*|_)")
-MD_HEADING = re.compile(r"^#{1,6}\s*", re.MULTILINE)
-MD_BULLET = re.compile(r"^\s*(?:[-*+]|\d+\.)\s+", re.MULTILINE)
+# Spaces and tabs only, never \s: with re.MULTILINE, `^\s*` also matches the
+# blank line that separates two paragraphs, so cleaning a bulleted answer used
+# to swallow one of the two newlines. Paragraphs then merged into a single
+# block, and picking the closing paragraph read out the opening instead.
+MD_HEADING = re.compile(r"^#{1,6}[ \t]*", re.MULTILINE)
+MD_BULLET = re.compile(r"^[ \t]*(?:[-*+]|\d+\.)[ \t]+", re.MULTILINE)
 HTML_TAG = re.compile(r"<[^>]+>")
 PATHY = re.compile(r"(?:[A-Za-z]:)?[\\/][\w.\-\\/]{6,}")
 MULTI_NL = re.compile(r"\n{3,}")
@@ -124,6 +171,18 @@ def clean_markdown(text: str) -> str:
     return text.strip()
 
 
+SENTENCE_START = re.compile(r"[.!?]\s+(\S)")
+
+
+def tail_on_sentence_boundary(text: str, max_chars: int) -> str:
+    """The end of the text, starting on a sentence rather than mid-word."""
+    if len(text) <= max_chars:
+        return text
+    tail = text[-max_chars:]
+    match = SENTENCE_START.search(tail)
+    return tail[match.start(1) :] if match else tail.lstrip()
+
+
 def pick_spoken_part(text: str, max_chars: int) -> str:
     """Choose what actually gets read aloud.
 
@@ -134,7 +193,10 @@ def pick_spoken_part(text: str, max_chars: int) -> str:
     """
     tagged = VOICE_TAG.search(text)
     if tagged:
-        return clean_markdown(tagged.group(1))
+        line = clean_markdown(tagged.group(1))
+        if line:
+            return line
+        # An empty tag must not silence the answer: fall through to the body.
 
     body = clean_markdown(VOICE_TAG.sub("", text))
     if not body:
@@ -147,6 +209,11 @@ def pick_spoken_part(text: str, max_chars: int) -> str:
         if len(para) >= 40:
             body = para
             break
+    else:
+        # Not one substantial paragraph, so there is no conclusion to single
+        # out. Keep the end of the answer anyway: cutting from the top would
+        # read out the opening, which is the part the reader already saw.
+        return tail_on_sentence_boundary(body, max_chars)
 
     if len(body) <= max_chars:
         return body
@@ -177,16 +244,114 @@ def kill_recorded(pid_file: Path) -> None:
     pid_file.unlink(missing_ok=True)
 
 
-def stop_playing(keep_sequencer: bool = False) -> None:
+def stop_playing() -> None:
     """Kill the current utterance. Makes barge-in possible.
 
     The sequencer goes first: killing only the player would let it queue the
     next chunk immediately, so the speech would not actually stop.
+
+    The stamp tells readers queued behind the lock to give up too: someone who
+    asks for silence does not want the next announcement to start instead.
     """
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    if not keep_sequencer:
-        kill_recorded(SEQ_FILE)
+    STOP_STAMP.touch()
+    kill_recorded(SEQ_FILE)
     kill_recorded(PID_FILE)
+
+
+def stop_requested_since(moment: float) -> bool:
+    try:
+        return STOP_STAMP.stat().st_mtime > moment
+    except OSError:
+        return False
+
+
+def _lock_exclusive_nonblocking(fd: int) -> bool:
+    if sys.platform == "win32":
+        import msvcrt
+
+        try:
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+            return True
+        except OSError:
+            return False
+    import fcntl
+
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return True
+    except OSError:
+        return False
+
+
+def _unlock(fd: int) -> None:
+    try:
+        if sys.platform == "win32":
+            import msvcrt
+
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+
+
+class VoiceLock:
+    """Exclusive, cross-process right to use the speakers.
+
+    Every terminal that finishes a turn spawns its own speak.py, and before this
+    lock existed each one killed whatever the previous one was saying. The lock
+    is an OS file lock rather than a marker file: the kernel drops it the moment
+    the holder dies, even under `taskkill /F`, so a crash can never leave the
+    voice locked for good.
+
+    Hold it for the whole playback, not just the launch of the player.
+    """
+
+    def __init__(self, path: Path = LOCK_FILE) -> None:
+        self._path = path
+        self._fh: IO[bytes] | None = None
+
+    def acquire(self, timeout: float) -> bool:
+        """Wait up to `timeout` seconds for the voice. False means: stay silent.
+
+        A `--stop` issued while we wait also returns False, so that cutting the
+        voice does not simply hand it to the next reader in line.
+        """
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+        queued_at = time.time()
+        deadline = time.monotonic() + max(0.0, timeout)
+        self._fh = open(self._path, "a+b")
+        if self._fh.tell() == 0:
+            # Windows locks a byte range, so the file needs at least one byte.
+            self._fh.write(b"\0")
+            self._fh.flush()
+        while True:
+            self._fh.seek(0)
+            if _lock_exclusive_nonblocking(self._fh.fileno()):
+                return True
+            if stop_requested_since(queued_at) or time.monotonic() >= deadline:
+                self.release()
+                return False
+            time.sleep(LOCK_POLL_SECONDS)
+
+    def release(self) -> None:
+        if self._fh is None:
+            return
+        try:
+            self._fh.seek(0)
+            _unlock(self._fh.fileno())
+        finally:
+            self._fh.close()
+            self._fh = None
+
+    def __enter__(self) -> "VoiceLock":
+        return self
+
+    def __exit__(self, *exc: object) -> None:
+        self.release()
 
 
 def sweep_old_clips(keep_seconds: int = 3600) -> None:
@@ -201,8 +366,12 @@ def sweep_old_clips(keep_seconds: int = 3600) -> None:
             pass  # still open, or already gone
 
 
-def play(path: Path, keep_sequencer: bool = False, wait: bool = False) -> None:
-    stop_playing(keep_sequencer=keep_sequencer)
+def play(path: Path) -> None:
+    """Play a clip and wait for it to finish.
+
+    Waiting is what makes the voice lock mean something: the lock lives in this
+    process, so it must stay alive as long as the speakers are in use.
+    """
     sweep_old_clips()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen(
@@ -211,8 +380,7 @@ def play(path: Path, keep_sequencer: bool = False, wait: bool = False) -> None:
         stderr=subprocess.DEVNULL,
     )
     PID_FILE.write_text(str(proc.pid), encoding="utf-8")
-    if wait:
-        proc.wait()
+    proc.wait()
 
 
 # --------------------------------------------------------------------------
@@ -295,19 +463,121 @@ def synth_piper(text: str, cfg: dict) -> Path:
     return out
 
 
-def speak_pocket(text: str, cfg: dict) -> None:
-    """Kyutai Pocket TTS: 24 kHz, far more natural in French than Piper.
+def required_prebuffer_seconds(
+    rtf: float,
+    remaining_audio: float,
+    pending_requests: int = 0,
+    request_latency: float = 0.0,
+) -> float:
+    """Seconds of audio to bank before starting, so the speakers never run dry.
 
-    Generation is only ~1.2x faster than real time, so we play the PCM as it
-    arrives instead of waiting for a finished file. This process stays alive
-    while it pumps, and records its pid so --stop can cut it.
+    Once playback starts with B seconds banked and R seconds still to generate,
+    the audio lasts B + R while generation needs rtf * R, plus one latency per
+    request still to be sent, since each one is silent until its first sample.
+    Silence appears unless B + R >= rtf * R + latencies, which gives the deficit
+    below. Generating faster than real time usually needs nothing banked.
+
+    Deliberately uncapped. Capping it would only trade a late start for gaps
+    mid-sentence, and buy nothing: the answer cannot finish before generation
+    does either way, so stuttering costs the same wall time and sounds worse.
+    A very slow daemon therefore ends up generating the whole answer first,
+    which is what `wait_for_prebuffer` does when the feed closes.
     """
+    deficit = (rtf - 1.0) * max(0.0, remaining_audio) + pending_requests * request_latency
+    # One measured latency of cushion on top, always. The rate is read early,
+    # on the calm part of the run, and it does get worse once the player is
+    # competing for the CPU; one seam is what an optimistic estimate costs
+    # before the ear notices. Measured seams here run at 0.48 s.
+    return max(0.0, deficit) + PREBUFFER_MARGIN_SECONDS + request_latency
+
+
+class Progress(NamedTuple):
+    """What has been observed of the generation so far.
+
+    Kept separate from the clock and the sockets so the decision below is a
+    pure function of the observations, and the whole strategy can be replayed
+    in the tests against measured daemon behaviour.
+    """
+
+    banked: float  # seconds of audio generated, all of it still unplayed
+    streamed_audio: float  # of that, how much arrived after the first block
+    streamed_seconds: float  # wall time spent receiving `streamed_audio`
+    request_latency: float  # from sending a request to its first block
+    chars_done: int  # characters whose audio is fully in hand
+    total_chars: int  # characters in the whole answer
+    pending_requests: int  # requests not yet sent, each paying the latency again
+
+
+class PcmFeed:
+    """PCM generated by a background thread, drained by the caller.
+
+    Splitting the answer into short requests is what keeps generation near real
+    time, and one shared player is what keeps the sentences seamless. This is
+    the buffer between the two.
+    """
+
+    def __init__(self) -> None:
+        self.cond = threading.Condition()
+        self.blocks: collections.deque[bytes] = collections.deque()
+        self.rate = 0
+        self.bytes_generated = 0
+        self.chars_done = 0
+        self.chunks_done = 0
+        # When the very first block arrived, as a monotonic reading, and how
+        # much audio existed then. The gap between the request and that moment
+        # is the daemon's start-up latency, which every later request pays
+        # again; the rate is measured only on what came after it.
+        self.first_sound_at: float | None = None
+        self.bytes_at_first_sound = 0
+        self.done = False
+        self.error: Exception | None = None
+
+    def push(self, rate: int, block: bytes) -> None:
+        with self.cond:
+            self.rate = self.rate or rate
+            self.blocks.append(block)
+            self.bytes_generated += len(block)
+            if self.first_sound_at is None:
+                self.first_sound_at = time.monotonic()
+                self.bytes_at_first_sound = self.bytes_generated
+            self.cond.notify_all()
+
+    def progress(self, started: float, total_chars: int, total_chunks: int) -> Progress | None:
+        """Observations for the start decision. None until the first block."""
+        if not self.rate or self.first_sound_at is None:
+            return None
+        per_second = self.rate * PCM_BYTES_PER_SAMPLE
+        return Progress(
+            banked=self.bytes_generated / per_second,
+            streamed_audio=(self.bytes_generated - self.bytes_at_first_sound) / per_second,
+            streamed_seconds=time.monotonic() - self.first_sound_at,
+            request_latency=self.first_sound_at - started,
+            chars_done=self.chars_done,
+            total_chars=total_chars,
+            # The chunk being generated is already paying its own latency.
+            pending_requests=max(0, total_chunks - self.chunks_done - 1),
+        )
+
+    def finish_chunk(self, chars: int) -> None:
+        with self.cond:
+            self.chars_done += chars
+            self.chunks_done += 1
+            self.cond.notify_all()
+
+    def close(self, error: Exception | None = None) -> None:
+        with self.cond:
+            self.error = error
+            self.done = True
+            self.cond.notify_all()
+
+
+def stream_pocket_chunk(text: str, cfg: dict, feed: PcmFeed) -> None:
+    """POST one chunk and push its PCM into the feed as it arrives."""
     import urllib.error
     import urllib.request
 
-    url = f"http://127.0.0.1:{cfg['pocket_port']}/stream"
     request = urllib.request.Request(
-        url,
+        f"http://127.0.0.1:{cfg['pocket_port']}/stream",
         data=text.encode("utf-8"),
         method="POST",
         headers={"X-Voice": cfg["pocket_voice"]},
@@ -320,33 +590,139 @@ def speak_pocket(text: str, cfg: dict) -> None:
             " Lance: .\\voice.ps1 start"
         ) from exc
 
-    rate = response.headers.get("X-Sample-Rate", "24000")
+    rate = int(response.headers.get("X-Sample-Rate") or 24000)
+    while True:
+        block = response.read(8192)
+        if not block:
+            return
+        feed.push(rate, block)
 
-    stop_playing()
-    STATE_DIR.mkdir(parents=True, exist_ok=True)
-    player = subprocess.Popen(
+
+def spawn_pcm_player(rate: int) -> subprocess.Popen:
+    """A player that reads raw PCM on stdin. Replaced wholesale by the tests."""
+    return subprocess.Popen(
         [
             find_tool("ffplay"),
-            "-f", "s16le", "-ar", rate, "-ac", "1",
+            "-f", "s16le", "-ar", str(rate), "-ac", "1",
             "-nodisp", "-autoexit", "-loglevel", "quiet", "-i", "-",
         ],
         stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    assert player.stdin is not None
-    PID_FILE.write_text(str(player.pid), encoding="utf-8")
-    SEQ_FILE.write_text(str(os.getpid()), encoding="utf-8")
-    try:
+
+
+def estimate_total_audio(progress: Progress) -> float:
+    """How many seconds the whole answer will last, best guess so far.
+
+    Once a chunk is done, its own characters-to-audio ratio is known and used.
+    Before that the prior stands in, so the decision below can be taken during
+    the very first chunk instead of after it: waiting for chunk one to finish
+    put the first word 6 s into a measured 24-second answer.
+    """
+    if progress.chars_done > 0:
+        return progress.banked * progress.total_chars / progress.chars_done
+    return progress.total_chars / CHARS_PER_AUDIO_SECOND
+
+
+def should_start_playing(progress: Progress) -> bool:
+    """Is enough audio banked to start playing and never run dry?
+
+    No speed is assumed. The rate is the one observed, over the window that
+    starts at the first block: measuring from the request instead would blame
+    the generator for the daemon's start-up latency, and crediting the first
+    block with no elapsed time at all would flatter it by a fifth. That latency
+    is charged separately, once per request still to be sent.
+    """
+    if progress.streamed_audio < MIN_RATE_SAMPLE_SECONDS:
+        return False  # too little audio to measure a rate on
+    remaining = max(0.0, estimate_total_audio(progress) - progress.banked)
+    return progress.banked >= required_prebuffer_seconds(
+        rtf=progress.streamed_seconds / progress.streamed_audio,
+        remaining_audio=remaining,
+        pending_requests=progress.pending_requests,
+        request_latency=progress.request_latency,
+    )
+
+
+def wait_for_prebuffer(feed: PcmFeed, total_chars: int, total_chunks: int) -> None:
+    """Hold the first sound back just long enough to outrun the generator.
+
+    A short answer starts almost immediately; a long one banks a few seconds
+    rather than stuttering halfway through.
+    """
+    started = time.monotonic()
+    with feed.cond:
         while True:
-            block = response.read(8192)
-            if not block:
-                break
-            player.stdin.write(block)
-        player.stdin.close()
-        player.wait()
-    except (BrokenPipeError, OSError):
-        pass  # --stop killed the player mid-sentence
+            if feed.error is not None:
+                raise feed.error
+            if feed.done:
+                return  # everything is generated; nothing left to outrun
+            progress = feed.progress(started, total_chars, total_chunks)
+            if progress is not None and should_start_playing(progress):
+                return
+            feed.cond.wait(0.05)
+
+
+def speak_pocket(text: str, cfg: dict) -> None:
+    """Kyutai Pocket TTS: 24 kHz, far more natural in French than Piper.
+
+    Generation runs close to real time on short requests and well below it on
+    long ones, so the text goes out sentence by sentence while a single player
+    consumes the PCM. This process stays alive while it pumps, and records its
+    pid so --stop can cut it.
+    """
+    chunks = chunk_text(text, cfg.get("pocket_chunk_chars", POCKET_CHUNK_CHARS))
+    if not chunks:
+        return
+    total_chars = sum(len(chunk) for chunk in chunks)
+
+    feed = PcmFeed()
+
+    def produce() -> None:
+        try:
+            for chunk in chunks:
+                stream_pocket_chunk(chunk, cfg, feed)
+                feed.finish_chunk(len(chunk))
+        except Exception as exc:  # noqa: BLE001 - reported to the consumer
+            feed.close(exc)
+        else:
+            feed.close()
+
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+    SEQ_FILE.write_text(str(os.getpid()), encoding="utf-8")
+    producer = threading.Thread(target=produce, daemon=True)
+    producer.start()
+    try:
+        wait_for_prebuffer(feed, total_chars, len(chunks))
+        player = spawn_pcm_player(feed.rate or 24000)
+        assert player.stdin is not None
+        PID_FILE.write_text(str(player.pid), encoding="utf-8")
+        try:
+            while True:
+                with feed.cond:
+                    while not feed.blocks and not feed.done:
+                        feed.cond.wait(0.1)
+                    block = feed.blocks.popleft() if feed.blocks else None
+                    drained = not feed.blocks
+                    # Only surface a failure once the queue is empty, so the
+                    # audio generated before it still reaches the speakers.
+                    error = feed.error if drained else None
+                    finished = feed.done and drained
+                if block:
+                    # Blocks once the player's pipe is full, which is exactly
+                    # the back-pressure that keeps memory flat.
+                    player.stdin.write(block)
+                if error is not None:
+                    player.stdin.close()
+                    player.wait()
+                    raise error
+                if block is None and finished:
+                    break
+            player.stdin.close()
+            player.wait()
+        except (BrokenPipeError, OSError):
+            pass  # --stop killed the player mid-sentence
     finally:
         SEQ_FILE.unlink(missing_ok=True)
 
@@ -376,7 +752,6 @@ def speak_sapi(text: str, cfg: dict) -> None:
         "$s.Rate = 2;"
         "$s.Speak([Console]::In.ReadToEnd())"
     )
-    stop_playing()
     STATE_DIR.mkdir(parents=True, exist_ok=True)
     proc = subprocess.Popen(
         ["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", script],
@@ -385,11 +760,11 @@ def speak_sapi(text: str, cfg: dict) -> None:
         stderr=subprocess.DEVNULL,
     )
     assert proc.stdin is not None
-    # Close stdin without waiting: communicate() would block until the whole
-    # sentence has been spoken, and --stop needs the pid to stay killable.
+    # Record the pid before waiting so --stop can still cut the sentence.
     proc.stdin.write(text.encode("utf-8"))
     proc.stdin.close()
     PID_FILE.write_text(str(proc.pid), encoding="utf-8")
+    proc.wait()
 
 
 BACKENDS = {"piper": synth_piper, "edge": synth_edge}
@@ -416,6 +791,27 @@ def speak(text: str, cfg: dict) -> None:
 SENTENCE_END = re.compile(r"(?<=[.!?:])\s+")
 
 
+def split_long_sentence(sentence: str, limit: int) -> list[str]:
+    """Break a sentence with no usable punctuation on word boundaries.
+
+    Sentence splitting alone leaves pieces over the limit whenever the text has
+    no full stop for a while, and an over-long request is exactly what makes the
+    Pocket daemon slow. A seam between words is barely audible; a stutter is not.
+    """
+    words = sentence.split()
+    pieces: list[str] = []
+    current = ""
+    for word in words:
+        if current and len(current) + len(word) + 1 > limit:
+            pieces.append(current)
+            current = word
+        else:
+            current = f"{current} {word}".strip()
+    if current:
+        pieces.append(current)
+    return pieces
+
+
 def chunk_text(text: str, limit: int = CHUNK_CHARS) -> list[str]:
     """Split on sentence boundaries into pieces small enough that the first
     one starts playing quickly, and long enough not to sound chopped."""
@@ -425,11 +821,12 @@ def chunk_text(text: str, limit: int = CHUNK_CHARS) -> list[str]:
         sentence = sentence.strip()
         if not sentence:
             continue
-        if current and len(current) + len(sentence) + 1 > limit:
-            chunks.append(current)
-            current = sentence
-        else:
-            current = f"{current} {sentence}".strip()
+        for piece in split_long_sentence(sentence, limit):
+            if current and len(current) + len(piece) + 1 > limit:
+                chunks.append(current)
+                current = piece
+            else:
+                current = f"{current} {piece}".strip()
     if current:
         chunks.append(current)
     return chunks
@@ -442,7 +839,6 @@ def speak_sequence(text: str, cfg: dict) -> None:
     chunk currently in the speakers.
     """
     STATE_DIR.mkdir(parents=True, exist_ok=True)
-    stop_playing()
     SEQ_FILE.write_text(str(os.getpid()), encoding="utf-8")
     try:
         backend = cfg["backend"]
@@ -455,7 +851,7 @@ def speak_sequence(text: str, cfg: dict) -> None:
             speak_pocket(text, cfg)
             return
         for chunk in chunk_text(text):
-            play(BACKENDS[backend](chunk, cfg), keep_sequencer=True, wait=True)
+            play(BACKENDS[backend](chunk, cfg))
     finally:
         SEQ_FILE.unlink(missing_ok=True)
 
@@ -483,6 +879,12 @@ def main() -> int:
     parser.add_argument("--backend", choices=["piper", "pocket", "edge", "sapi"])
     parser.add_argument("--voice", help="Override the backend voice.")
     parser.add_argument("--max-chars", type=int)
+    parser.add_argument(
+        "--queue-wait",
+        type=float,
+        metavar="SECONDS",
+        help="How long to wait if another reader holds the voice (0: give up at once).",
+    )
     parser.add_argument("--raw", action="store_true", help="Skip extraction, speak it all.")
     parser.add_argument("--stop", action="store_true", help="Cut the current playback.")
     parser.add_argument("--dry-run", action="store_true", help="Print what would be spoken.")
@@ -507,6 +909,8 @@ def main() -> int:
         cfg["backend"] = args.backend
     if args.max_chars:
         cfg["max_chars"] = args.max_chars
+    if args.queue_wait is not None:
+        cfg["queue_wait_seconds"] = args.queue_wait
     if args.voice:
         cfg[f"{cfg['backend']}_voice"] = args.voice
 
@@ -537,14 +941,25 @@ def main() -> int:
 
     spoken = clean_markdown(spoken) if speak_everything else spoken
 
-    if args.sequence:
-        speak_sequence(spoken, cfg)
-    elif args.tee:
+    if args.tee:
         # --raw matters: without it the sequencer would run the extraction
         # again and read only the closing paragraph of what we handed it.
+        # The detached child takes the voice lock itself.
         spawn_sequencer(spoken, ["--raw", "--backend", cfg["backend"]])
-    else:
-        speak(spoken, cfg)
+        return 0
+
+    lock = VoiceLock()
+    if not lock.acquire(float(cfg["queue_wait_seconds"])):
+        # Someone else kept the speakers for the whole wait, or the user asked
+        # for silence meanwhile: an announcement this late would only confuse.
+        return 0
+    try:
+        if args.sequence:
+            speak_sequence(spoken, cfg)
+        else:
+            speak(spoken, cfg)
+    finally:
+        lock.release()
     return 0
 
 

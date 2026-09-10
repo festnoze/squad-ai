@@ -115,6 +115,12 @@ namespace Viewpoint
 
         const float HeldSlideSeconds = 0.2f;
 
+        // Matches the raise tween in V-ANIM-04, so the card leaves the panel over
+
+        // exactly the time the picture takes to arrive in front of the eye.
+
+        const float CardRaiseFadeSeconds = 0.18f;
+
         /// <summary>
         /// Where the held panel parks while it is off screen. Its right edge is
         /// its pivot, so anything past its own width clears the frame whatever
@@ -253,6 +259,10 @@ namespace Viewpoint
         RectTransform _heldPanel;
         PhotoCard _heldCard;
         PhotoCardShadow _heldCardShadow;
+        readonly Tween _heldCardFade = new Tween();
+        float _heldCardFromA;
+        float _heldCardToA = 1f;
+        Texture2D _heldCardTexture;
         CanvasGroup _bannerGroup;
         Image _fade;
         CanvasGroup _rewindPulse;
@@ -327,6 +337,7 @@ namespace Viewpoint
         {
             State.BatteriesChanged += OnBatteriesChanged;
             State.FilmsChanged += OnFilmsChanged;
+            State.LevelStarted += OnLevelStarted;
             // The counters must be right before the first event arrives, or the
             // HUD spends the opening moments of a level lying about the tally.
             // Primed QUIETLY: the pop of V-VFX-04 announces a change the player
@@ -341,6 +352,7 @@ namespace Viewpoint
         {
             State.BatteriesChanged -= OnBatteriesChanged;
             State.FilmsChanged -= OnFilmsChanged;
+            State.LevelStarted -= OnLevelStarted;
         }
 
         void Update()
@@ -383,6 +395,7 @@ namespace Viewpoint
             _filmFader.Step(dt);
             StepPrompt();
             StepHeld(dt);
+            StepHeldCard(dt);
             StepPicture(dt);
             StepGhost(dt);
             StepViewfinder(dt);
@@ -665,9 +678,32 @@ namespace Viewpoint
                 return;
             }
             _heldTitle.text = "Photo : « " + title + " »";
-            bool showCard = texture != null && !raised;
-            _heldCard.Texture = showCard ? texture : null;
-            _heldCardShadow.Visible = showCard;
+
+            // V-ANIM-03: "no HUD element appears or vanishes in one frame", and
+            // this card was the exception. Main pushes `raised` EVERY frame, so
+            // blanking the texture on the frame the player right-clicks made the
+            // card and its shadow disappear instantly while the ghost copy was
+            // still 0.18 s from landing on the raised picture - a pop at both
+            // ends of a handoff that the ghost exists to make continuous.
+            //
+            // The texture is HELD rather than cleared, so the card still has
+            // something to draw while it fades, and it is only released once the
+            // fade has fully landed (StepHeldCard). CardRaiseFadeSeconds matches
+            // the raise's own duration so the card leaves exactly as the picture
+            // arrives.
+            bool wantCard = texture != null && !raised;
+            if (texture != null)
+            {
+                _heldCardTexture = texture;
+            }
+            float wantAlpha = wantCard ? 1f : 0f;
+            if (!Mathf.Approximately(wantAlpha, _heldCardToA))
+            {
+                _heldCardFromA = _heldCard.color.a;
+                _heldCardToA = wantAlpha;
+                _heldCardFade.Start(CardRaiseFadeSeconds);
+            }
+            StepHeldCard(0f);
         }
 
         /// <summary>
@@ -779,6 +815,36 @@ namespace Viewpoint
             _fade.color = new Color(color.r, color.g, color.b, target);
         }
 
+        /// <summary>
+        /// Reopens the quiet window for a level start, so the counters change
+        /// without popping.
+        ///
+        /// OnEnable's priming is not enough on its own, and the gap is easy to
+        /// miss: GameState.BeginLevel re-raises BOTH counter events on every
+        /// LoadLevel, long after OnEnable ran, and the battery line always
+        /// differs across a level boundary (level k ends "Teleporteur : N / N"
+        /// and level k+1 opens "0 / M"), so the early-out on an unchanged
+        /// string never catches it. The pop of V-VFX-04 exists to announce a
+        /// change THE PLAYER CAUSED; firing it on every level start, and after
+        /// every fall, announces a pickup that never happened.
+        ///
+        /// One frame is the right length. BeginLevel raises films, then this,
+        /// then batteries, all in the same call stack, so clearing the flag at
+        /// the end of the frame covers the counter events of the level start
+        /// and nothing the player could have caused since.
+        /// </summary>
+        void OnLevelStarted(int index)
+        {
+            _quiet = true;
+            StartCoroutine(EndQuietWindow());
+        }
+
+        IEnumerator EndQuietWindow()
+        {
+            yield return null;
+            _quiet = false;
+        }
+
         void OnBatteriesChanged(int carried, int inserted, int required)
         {
             string text = string.Format(
@@ -870,6 +936,32 @@ namespace Viewpoint
             if (_promptFader.Hidden && _promptLabel.text.Length > 0)
             {
                 _promptLabel.text = string.Empty;
+            }
+        }
+
+        /// <summary>
+        /// Fades the held card and its shadow between the panel and the raised
+        /// picture. The texture is released only when the card has finished
+        /// fading OUT, because a card with no texture draws nothing and would
+        /// bring back the very pop this fade removes.
+        /// </summary>
+        void StepHeldCard(float dt)
+        {
+            _heldCardFade.Step(dt);
+            float a = Mathf.Lerp(_heldCardFromA, _heldCardToA, _heldCardFade.Cursor);
+
+            bool visible = a > 0.001f && _heldCardTexture != null;
+            _heldCard.Texture = visible ? _heldCardTexture : null;
+            _heldCardShadow.Visible = visible;
+
+            Color c = _heldCard.color;
+            _heldCard.color = new Color(c.r, c.g, c.b, a);
+            Color sc = _heldCardShadow.color;
+            _heldCardShadow.color = new Color(sc.r, sc.g, sc.b, a);
+
+            if (_heldCardFade.Done && _heldCardToA <= 0f)
+            {
+                _heldCardTexture = null;
             }
         }
 

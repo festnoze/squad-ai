@@ -255,8 +255,10 @@ function Invoke-Demo {
         $label = "$($candidate.Backend) / $($candidate.Voice)"
         Write-Host "  $label"
         # --raw: on veut entendre la phrase entiere, pas l'extrait d'une reponse.
+        # speak.py ne rend la main qu'a la fin de la lecture (il tient le
+        # verrou de voix), la pause ne sert plus qu'a separer les voix.
         & python $speak --raw --backend $candidate.Backend --voice $candidate.Voice --text "$($candidate.Backend). $demoLine"
-        Start-Sleep -Seconds 12
+        Start-Sleep -Seconds 1
     }
     & python $speak --stop
 }

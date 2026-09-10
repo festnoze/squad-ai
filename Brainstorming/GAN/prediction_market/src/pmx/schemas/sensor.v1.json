@@ -79,6 +79,7 @@
         "scale",
         "source",
         "asof_only",
+        "sentinel",
         "description",
         "features_v1_index"
       ],
@@ -119,6 +120,10 @@
         },
         "asof_only": {
           "const": true
+        },
+        "sentinel": {
+          "type": "integer",
+          "description": "CONTRACTS_V2 18.1, ruling R285: the value the feature takes when its input is missing, inside [lo, hi]. A signed quantity's sentinel is 0, a since or until count's is its hi, every other feature's is its lo."
         },
         "description": {
           "type": "string",

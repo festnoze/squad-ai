@@ -50,6 +50,21 @@ namespace Viewpoint
 
         IEnumerator Run()
         {
+            // WITHOUT THIS THE HARNESS IS A COIN FLIP, and it took a red run
+            // that reproduced green to notice. ProjectSettings has
+            // runInBackground: 0, so a windowed player THROTTLES TO A STANDSTILL
+            // the moment it loses focus: the coroutine stops advancing, no
+            // exception is raised, no shot is written, and the only symptom is
+            // verify-player.ps1's "le jeu ne s'est jamais termine (300 s)".
+            // The same build, run with the window focused, finished in 20 s.
+            //
+            // Anything can steal focus on a build machine (another Unity
+            // instance, a compile, an agent opening a window), so the probe
+            // cannot depend on keeping it. Set here rather than in
+            // ProjectSettings because it is the PROBE that needs it: the shipped
+            // game should still idle when the player alt-tabs away.
+            Application.runInBackground = true;
+
             Line("VIEWPOINT shot probe");
             Line("graphics device: " + SystemInfo.graphicsDeviceType);
             Line("screen: " + Screen.width + "x" + Screen.height);
@@ -114,6 +129,10 @@ namespace Viewpoint
             yield return FeedbackViewfinder();
             yield return FeedbackRaisedPhoto();
             yield return FeedbackRewind();
+
+            Line("");
+            Line("--- interface moments ---");
+            yield return TitleScreen();
 
             File.WriteAllText(Path.Combine(_dir, "diagnostics.txt"), _log.ToString());
             Debug.Log("[ShotProbe] wrote " + _dir);
@@ -242,6 +261,71 @@ namespace Viewpoint
                 + " control=" + _main.Player.ControlEnabled);
         }
 
+        // ---- Interface moments ----------------------------------------------
+
+        /// <summary>
+        /// The title screen of V-MENU-01 and the level grid of V-MENU-02, the
+        /// two moments PRD_VISUAL 6.1 adds to the shot list for Tier 5.
+        ///
+        /// They come at the very END of the run rather than beside 01_title,
+        /// and that is what makes them worth two more frames instead of being a
+        /// second copy of one:
+        ///
+        ///  - 01_title is the COLD title screen, ten frames after boot. The
+        ///    diorama has not orbited and the thumbnail cache has not drained.
+        ///  - by here the run has played levels 1, 4, 6 and 16, so the grid
+        ///    carries unlocked cells WITH their names next to locked ones. It
+        ///    is the only frame in the run where V-MENU-02's and V-MENU-03's
+        ///    two button states can be compared side by side.
+        ///  - the two shots BRACKET the thumbnail cache. V-MENU-02 budgets
+        ///    under two seconds for all twenty-five at first show, so a census
+        ///    before and a census after a hundred fixed steps (two seconds of
+        ///    real time, see Settle) say which of three things happened: the
+        ///    cache filled between them, it never filled, or it was already
+        ///    full. One census could not tell those apart.
+        ///
+        /// Both frames are taken unconditionally, for the reason FeedbackRewind
+        /// gives: verify-player.ps1 counts the shots, and a title screen with
+        /// nothing behind its text is itself the evidence.
+        ///
+        /// Nothing here reaches past the menu's public API. ShowTitle is what
+        /// Main calls when the player leaves a level, and Main.Update reads the
+        /// mode by itself: it hides the HUD and drops the state treatments of
+        /// V-POST-04 and V-POST-05, which is correct for a title screen and is
+        /// why these two shots come after the band-weight moments and never
+        /// before them.
+        /// </summary>
+        IEnumerator TitleScreen()
+        {
+            Menu menu = _main.Menu;
+            if (menu == null)
+            {
+                // Main builds every subsystem inside its own try, so a menu
+                // that threw on the way up leaves the rest of the game running.
+                // Both shots are still taken, of whatever is on screen.
+                Line("menu: NO MENU, these two frames are of the level instead");
+            }
+            else
+            {
+                menu.ShowTitle();
+                Line("menu: title shown, mode=" + menu.Mode);
+            }
+
+            // Fifteen fixed steps is 0.3 s of REAL time, past the 0.2 s fade
+            // and slide of V-MENU-04 and into the diorama's orbit. Fixed steps
+            // and not frames, for the reason Settle gives: a frame here lasts
+            // well under a millisecond, so thirty of them would photograph an
+            // animation that has not started - which looks exactly like an
+            // animation nobody wrote.
+            yield return Settle(15);
+            DumpLevelGrid();
+            yield return Shot("08_title_diorama");
+
+            yield return Settle(100);
+            DumpLevelGrid();
+            yield return Shot("09_level_grid");
+        }
+
         // ---- Diagnostics ----------------------------------------------------
 
         void DumpRender()
@@ -297,18 +381,90 @@ namespace Viewpoint
             }
             Line("builtin LegacyRuntime.ttf: " + Describe(Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf")));
             Line("OS fonts installed: " + (Font.GetOSInstalledFontNames() ?? new string[0]).Length);
+
+            // V-HUD-01, and the two lines that tell a landed tier from a
+            // stripped one. Everything above them predates the tier and keeps
+            // its shape to the byte, because verify-player.ps1 reads these
+            // lines with literal matches.
+            //
+            // The failure this exists for is silent in a way nothing else here
+            // catches. Fonts.Default falls back to the engine builtin whenever
+            // the OFL file does not arrive, so the game boots, draws every
+            // pinned string of gameplay PRD 12, throws nothing, photographs
+            // itself, and looks EXACTLY like the tier was never done - which is
+            // the whole complaint of PRD_VISUAL 1.1 that V-HUD-01 answers. To
+            // anything that only greps for NULL, "Fonts.Default: LegacyRuntime"
+            // and "Fonts.Default: Manrope" are the same line.
+            //
+            // The two facts are reported SEPARATELY because they fail in
+            // different files. The RESOURCE says whether the asset reached this
+            // player at all: Resources.Load is the only path that survives a
+            // build (appendix C.8, and the same reason the level data and the
+            // textures live there). The FONT IN USE says whether Fonts.cs
+            // loaded it once it had. Manrope absent with the builtin in use is
+            // the documented degradation PRD_VISUAL 3.2 as amended REQUIRES (a
+            // checkout without the font still runs); Manrope present with the
+            // builtin in use is a broken load path. Only the two lines together
+            // separate those.
+            //
+            // The path is written out here rather than read off Fonts.cs on
+            // purpose: this line has to be able to CONTRADICT Fonts.cs, and a
+            // probe that asks the loader's own constant cannot.
+            Line("font resource Fonts/Manrope: " + Describe(Resources.Load<Font>("Fonts/Manrope")));
+            Line("font in use: " + (font != null ? font.name : "NONE")
+                + " builtin=" + IsBuiltinFont(font));
+        }
+
+        /// <summary>
+        /// Whether this font is the engine's own, which is what Fonts.Default
+        /// hands back when the OFL file of V-HUD-01 is missing or stripped.
+        ///
+        /// The builtin names live HERE and nowhere else: verify-player.ps1
+        /// reads the boolean this produces instead of deciding again from the
+        /// name, so there is one place to correct the day Unity renames the
+        /// builtin again. It was Arial.ttf before 2022 and LegacyRuntime.ttf
+        /// since, which is why both are on the list, with and without the
+        /// extension (a loaded Font drops it, Resources.GetBuiltinResource
+        /// wants it).
+        /// </summary>
+        static bool IsBuiltinFont(Font font)
+        {
+            if (font == null)
+            {
+                return false;
+            }
+            string name = font.name;
+            return name == "LegacyRuntime" || name == "LegacyRuntime.ttf"
+                || name == "Arial" || name == "Arial.ttf";
         }
 
         void DumpMenu()
         {
             Line("--- menu labels ---");
+            // Guarded for the same reason FeedbackRewind guards the rewind:
+            // Main builds each subsystem inside its own try, so a menu that
+            // threw on the way up leaves a live game with a null here, and a
+            // probe that dies on it reports nothing about anything else.
+            if (_main.Menu == null)
+            {
+                Line("Text under Menu: NO MENU");
+                return;
+            }
             var labels = new List<Text>();
             _main.Menu.GetComponentsInChildren(true, labels);
             Line("Text under Menu: " + labels.Count);
             var shown = 0;
             foreach (Text label in labels)
             {
-                if (shown >= 10)
+                // Thirty covers the four column labels the menu carries above
+                // the grid plus the whole grid below it, and the cap is not
+                // cosmetic: verify-player.ps1 greps this dump for
+                // text="1. Premiers pas", which is the FIRST GRID CELL's label.
+                // At a cap of ten that needle sat four lines inside the margin,
+                // so any tier that added a label above the grid (a key-cap
+                // glyph, a heading, a lock legend) would have turned the check
+                // red for a reason no picture and no other line would explain.
+                if (shown >= 30)
                 {
                     break;
                 }
@@ -321,15 +477,193 @@ namespace Viewpoint
                     + " text=\"" + Clip(text) + "\"");
                 shown++;
             }
+
+            DumpLevelGrid();
+        }
+
+        /// <summary>
+        /// The size a graphic's texture has to reach before it counts as a
+        /// picture OF A LEVEL rather than as a drawn glyph. V-MENU-02's
+        /// thumbnails are 160 x 90; the battery glyph of V-HUD-02 is 16 x 24
+        /// and a rounded panel is a few dozen pixels square. The width does
+        /// most of the work, because a thumbnail is the widest thing in a cell.
+        /// </summary>
+        const int ThumbnailMinWidth = 96;
+
+        const int ThumbnailMinHeight = 48;
+
+        /// <summary>
+        /// The level grid of V-MENU-02, counted the one way the player meets
+        /// it: how many buttons carry a picture, and how many are still a
+        /// number and a name.
+        ///
+        /// The item builds each level in the picture studio, shoots it and
+        /// tears it down, and every step of that can come back with nothing
+        /// while the menu keeps drawing perfectly: a studio whose render path
+        /// is stripped from the player (the failure the "held picture" line
+        /// already watches for), a cache that never drains, a texture that
+        /// arrives 1 x 1. In all of those the grid falls back to text - which
+        /// is exactly what the grid looked like BEFORE this tier - and nothing
+        /// else in the harness can tell the two apart. The strings are pinned
+        /// and therefore unchanged, all twenty-five buttons are there, and no
+        /// exception is raised.
+        ///
+        /// The thumbnail is looked for on the CELL'S OWN GRAPHICS and never
+        /// asked of the menu or of the studio, because the question is whether
+        /// a picture reached the screen and not whether someone rendered one.
+        /// The button's targetGraphic is skipped: it is the panel behind the
+        /// cell, and a text-only button has one too. An Image counts only when
+        /// its sprite is big enough to be a picture rather than one of the
+        /// glyphs and rounded panels V-HUD-02 and V-MENU-03 draw in code.
+        ///
+        /// The full inventory of the first cell is printed beside the counts so
+        /// that a graphic this heuristic puts in the wrong bucket is VISIBLE
+        /// rather than merely miscounted.
+        /// </summary>
+        void DumpLevelGrid()
+        {
+            if (_main.Menu == null)
+            {
+                Line("level grid: NO MENU");
+                return;
+            }
+
+            // Every Button in the menu is a level cell today, and reading them
+            // as components rather than by name ("Level7") survives a rename of
+            // the cells, which is somebody else's file.
+            var buttons = new List<Button>();
+            _main.Menu.GetComponentsInChildren(true, buttons);
+
+            var unlocked = 0;
+            var thumbnails = 0;
+            var textOnly = 0;
+            string inventory = null;
+            foreach (Button button in buttons)
+            {
+                if (button.interactable)
+                {
+                    unlocked++;
+                }
+                if (HasThumbnail(button))
+                {
+                    thumbnails++;
+                }
+                else
+                {
+                    textOnly++;
+                }
+                if (inventory == null)
+                {
+                    inventory = DescribeCell(button);
+                }
+            }
+
+            Line("level grid: buttons=" + buttons.Count + " unlocked=" + unlocked
+                + " thumbnails=" + thumbnails + " text-only=" + textOnly);
+            Line("level grid cell: " + (inventory ?? "NO BUTTON"));
+        }
+
+        /// <summary>
+        /// Whether any graphic under this cell, other than the cell's own
+        /// background, draws a picture the size of a level thumbnail.
+        /// </summary>
+        static bool HasThumbnail(Button button)
+        {
+            var graphics = new List<Graphic>();
+            button.GetComponentsInChildren(true, graphics);
+            foreach (Graphic graphic in graphics)
+            {
+                if (graphic == button.targetGraphic)
+                {
+                    continue;
+                }
+                Texture picture = PictureOf(graphic);
+                if (picture != null && picture.width >= ThumbnailMinWidth
+                    && picture.height >= ThumbnailMinHeight)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// The texture a uGUI graphic actually samples, or null when it has
+        /// none. Both shapes are tested because both are reasonable ways to put
+        /// a rendered thumbnail in a cell: a RawImage takes the Texture2D the
+        /// studio produced as it is, an Image needs a Sprite wrapped around it.
+        /// A Text has neither and falls out here, which is what makes a
+        /// text-only cell a text-only cell.
+        /// </summary>
+        static Texture PictureOf(Graphic graphic)
+        {
+            RawImage raw = graphic as RawImage;
+            if (raw != null)
+            {
+                return raw.texture;
+            }
+            Image image = graphic as Image;
+            if (image != null && image.sprite != null)
+            {
+                return image.sprite.texture;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Everything one cell draws, in one line: the type and name of each
+        /// graphic, which one is the background, and the size of any texture
+        /// behind it. This is the evidence half of the census. The counts say
+        /// how many cells have a picture; this says WHAT a cell is made of,
+        /// which is the only way to see that a thumbnail arrived at 1 x 1, or
+        /// that the size rule above counted a glyph as a picture.
+        /// </summary>
+        static string DescribeCell(Button button)
+        {
+            var graphics = new List<Graphic>();
+            button.GetComponentsInChildren(true, graphics);
+            var text = new StringBuilder(button.name);
+            foreach (Graphic graphic in graphics)
+            {
+                text.Append(" [").Append(graphic.GetType().Name)
+                    .Append(':').Append(graphic.name);
+                if (graphic == button.targetGraphic)
+                {
+                    text.Append(" background");
+                }
+                Texture picture = PictureOf(graphic);
+                if (picture != null)
+                {
+                    text.Append(' ').Append(picture.width).Append('x').Append(picture.height);
+                }
+                text.Append(']');
+            }
+            return text.ToString();
         }
 
         void DumpLevel()
         {
+            // camera_item is in this census for a reason the other five are not:
+            // it is the ONE group whose absence another part of this probe papers
+            // over. FeedbackViewfinder falls back to GameState.AddFilms(1) when
+            // the group is empty, so a level that lost its camera node (a builder
+            // or level-data regression) still produces a green run: the
+            // viewfinder goes up, the photo is taken, the rewind undoes it and
+            // every downstream check passes on a level a PLAYER could never
+            // finish, because no pickup ever hands out the film. Levels.json
+            // index 15 ("Le cliche") is named for that photo and defines the
+            // camera that makes it possible.
+            //
+            // Counted on EVERY level dump and not only in the moment that hides
+            // it: the census is taken while the level is pristine (the feedback
+            // moments come last precisely because they retire the pickup), so
+            // camera_item=0 on level 16 here is the trace the fallback erases.
             Line("groups: platform=" + Groups.Count(Groups.Platform)
                 + " carvable=" + Groups.Count(Groups.Carvable)
                 + " photographable=" + Groups.Count(Groups.Photographable)
                 + " photo_item=" + Groups.Count(Groups.PhotoItem)
                 + " battery=" + Groups.Count(Groups.Battery)
+                + " camera_item=" + Groups.Count(Groups.CameraItem)
                 + " teleporter=" + Groups.Count(Groups.Teleporter));
 
             // The question the pictures cannot answer on their own: is there

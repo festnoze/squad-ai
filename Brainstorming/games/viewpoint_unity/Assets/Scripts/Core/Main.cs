@@ -4,6 +4,8 @@ using System.Reflection;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.InputSystem.UI;
+using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
 namespace Viewpoint
@@ -31,12 +33,137 @@ namespace Viewpoint
         /// </summary>
         const float FallSpeedFloor = 4f;
 
+        // ---- Menu diorama (PRD_VISUAL 4.12 V-MENU-01) -----------------------
+        // The numbers of the little world the title and victory screens float
+        // over. What each one is for is on the member; the section that BUILDS
+        // it, far below, carries the reasoning that spans all of them.
+
         /// <summary>
-        /// The white a depart fades to (PRD_VISUAL V-POST-06: "leaving a level
-        /// fades to white"). A paper white rather than 1,1,1 so the HUD's banner
-        /// stays readable against it while the quad closes.
+        /// The layer the diorama lives on, and it is a literal here rather than
+        /// a <see cref="Layers"/> constant because Layers.cs and
+        /// ProjectSettings/TagManager.asset both belong to someone else this
+        /// round. Layers 6 to 9 are taken (World, Player, Interact,
+        /// PhotoStudio); 10 to 31 have no NAME in TagManager, which costs
+        /// nothing here: an integer layer works for culling and for a volume
+        /// mask whether or not it is named, and nothing in this file ever asks
+        /// LayerMask.NameToLayer.
+        ///
+        /// WHAT THE LAYER DOES AND DOES NOT BUY. It is what keeps the diorama
+        /// out of every other camera: the diorama camera below sees this bit and
+        /// nothing else, the picture studio's camera sees PhotoStudio and
+        /// nothing else (PhotoSnaps sets cullingMask = Layers.PhotoStudioMask,
+        /// which is why no polaroid can ever contain a menu prop), and the
+        /// player camera excludes only PhotoStudio, so it WOULD see this - the
+        /// parking distance below and the fact that the whole subtree is
+        /// inactive during play are what handle that.
+        ///
+        /// It buys nothing at all from physics. Row 10 of
+        /// ProjectSettings/DynamicsManager.asset's collision matrix is
+        /// fffcffff, i.e. it pairs with everything except Interact and
+        /// PhotoStudio - so it pairs with World and with Player. That file is
+        /// not mine to change, so the diorama is safe by CONSTRUCTION instead:
+        /// it carries NO COLLIDER of any kind, on any object, and the one Volume
+        /// it builds is global precisely so it needs no trigger box. Nothing
+        /// here can be hit by the interaction ray, stood on, or found by a
+        /// Physics query, because there is nothing to hit.
         /// </summary>
-        static readonly Color DepartWhite = new Color(0.97f, 0.97f, 0.99f);
+        const int DioramaLayer = 10;
+
+        /// <summary>Everything the diorama camera is allowed to see.</summary>
+        const int DioramaMask = 1 << DioramaLayer;
+
+        /// <summary>
+        /// The volume layers the diorama camera reads: Default, where every
+        /// Volume this game builds at runtime used to land, plus its own layer
+        /// for the blur of V-MENU-01. Both default profiles apply to every
+        /// camera whatever its mask (PhotoSnaps says the same where it sets
+        /// this), so this is not what gets the diorama the game's grading; what
+        /// it does is keep PostFx's four bands OUT, since those sit on
+        /// Layers.Player. A title screen must not inherit a rewind's
+        /// desaturation or a fall's motion blur.
+        /// </summary>
+        const int DioramaVolumeLayers = 1 | DioramaMask;
+
+        /// <summary>
+        /// Where the diorama is parked, and the axis is the interesting part.
+        ///
+        /// The picture studio parks itself at (0, -500, 0) and this could have
+        /// followed it down, but it must not: Viewpoint/Surface's height fog
+        /// (V-SKY-04 stage two) thickens by how far a surface sits BELOW y = 2,
+        /// saturating 12 m down. At y = -500 every island here would sit at the
+        /// bottom of that ramp, and the one thing this item asks for is that the
+        /// diorama look like the game rather than like a hazed cut-out of it. So
+        /// it is parked SIDEWAYS instead, at the walking height the fog is tuned
+        /// for, where every shading term (height fog, the rock fade measured
+        /// from an object's own origin, the sky's abyss darkening) gives exactly
+        /// what it gives in a level.
+        ///
+        /// 1200 m is far enough by any measure: the widest level's decor reaches
+        /// some 60 m, the player camera's far plane is 400 m, and the sun's
+        /// shadow distance is 50 m, so no camera and no cascade can hold both
+        /// this and the world at once.
+        /// </summary>
+        static readonly Vector3 DioramaOrigin = new Vector3(1200f, 0f, 0f);
+
+        /// <summary>V-MENU-01, verbatim: "rotating at 2 degrees per second".</summary>
+        const float DioramaSpinDegreesPerSecond = 2f;
+
+        /// <summary>
+        /// The eye, in the diorama's own local space. Set once and never
+        /// animated: the turntable turns, the camera holds still, so the slow
+        /// orbit costs one transform write a frame.
+        /// </summary>
+        static readonly Vector3 DioramaEyePosition = new Vector3(0f, 4.8f, -15f);
+        static readonly Vector3 DioramaEyeTarget = new Vector3(0f, 0.3f, 0f);
+
+        /// <summary>
+        /// 34 degrees, not the player's 75. A long lens is what makes a small
+        /// scene read as a place seen from outside rather than as a room the
+        /// viewer is standing in, and it keeps the three islands inside the
+        /// frame through a whole revolution (their bounding radius is 7.5 m,
+        /// against a half width of 8.2 m at this distance and a 16:9 aspect).
+        /// </summary>
+        const float DioramaFovDegrees = 34f;
+        const float DioramaNear = 0.3f;
+
+        /// <summary>
+        /// 60 m: the content ends at 21 m and the sky is drawn by the clear, not
+        /// by geometry, so nothing further away exists to clip.
+        /// </summary>
+        const float DioramaFar = 60f;
+
+        /// <summary>
+        /// ABOVE the player camera's 0, and the brief for this item asked for
+        /// below, so here is why it cannot be. A lower depth renders FIRST and
+        /// the player camera then clears the colour buffer over it
+        /// (clearFlags Skybox), so a diorama drawn behind would be erased every
+        /// frame by a camera that is looking at an empty world. PRD_VISUAL
+        /// 4.12's own wording is the one that works ("or directly with depth
+        /// 1"), and what keeps the two cameras from fighting is not the order
+        /// but the SWITCH: this whole subtree is active only while a title or
+        /// victory screen is up, which is exactly when the player camera has
+        /// nothing to say. The camera is also left Untagged, so
+        /// PlayerController's "MainCamera" stays the one Camera.main finds.
+        /// </summary>
+        const float DioramaCameraDepth = 1f;
+
+        /// <summary>
+        /// The slight depth of field V-MENU-01 asks for behind the text.
+        /// Gaussian, keyed in metres from the eye: content sits between 13 and
+        /// 21 m, so the near island keeps some definition (27 percent of the
+        /// radius) while the far one goes soft (73 percent). A uniform blur
+        /// would read as a blurred picture; a ramp reads as depth.
+        /// </summary>
+        const float DioramaBlurStart = 9f;
+        const float DioramaBlurEnd = 24f;
+        const float DioramaBlurRadius = 1f;
+
+        /// <summary>
+        /// Above both default profiles, which have no priority of their own.
+        /// The same 10 PostFx uses, and the two can never meet: its bands are on
+        /// Layers.Player and this camera does not read that bit.
+        /// </summary>
+        const float DioramaBlurPriority = 10f;
 
         public Transform LevelRoot { get; private set; }
         public PlayerController Player { get; private set; }
@@ -51,6 +178,40 @@ namespace Viewpoint
         /// the game.
         /// </summary>
         public PostFx PostFx { get; private set; }
+
+        /// <summary>
+        /// The little world behind the title and victory screens (PRD_VISUAL
+        /// 4.12 V-MENU-01), or null when its boot step failed - in which case
+        /// the game is exactly what it was before this item: a plain dimmed
+        /// menu over the live sky.
+        ///
+        /// READ ONLY, and deliberately so: there is no setter and no Show call
+        /// for <see cref="Menu"/> to reach for. Main already reads Menu.Mode
+        /// every frame to drive the HUD and the post-processing, and it drives
+        /// the diorama from that same read (see DriveMenuDiorama), so the two
+        /// cannot disagree about whether a title screen is up and no half of
+        /// this item can go missing the way appendix C.23 describes. The menu's
+        /// side of the contract is to LOOK at these three members - lighten the
+        /// dim while <see cref="MenuDioramaShowing"/> is true, keep the strong
+        /// dim for pause, where the live level is what the player wants to see.
+        /// </summary>
+        public Transform MenuDiorama { get; private set; }
+
+        /// <summary>
+        /// The second camera that renders the diorama, or null with it. Exposed
+        /// because it is the one object a menu might legitimately want to ask
+        /// something of (its field of view, to place text against the framing,
+        /// or its transform, to park a decoration in the same space).
+        /// </summary>
+        public Camera MenuDioramaCamera { get; private set; }
+
+        /// <summary>
+        /// True on the frames the diorama is actually on screen: a title or
+        /// victory screen is up AND the diorama was built. False during play,
+        /// during a transition and on the pause screen, which keeps the live
+        /// level behind a stronger dim.
+        /// </summary>
+        public bool MenuDioramaShowing { get; private set; }
 
         bool _transitioning;
         Teleporter _teleporter;
@@ -68,6 +229,28 @@ namespace Viewpoint
         /// </summary>
         MethodInfo _colourFade;
         bool _colourFadeResolved;
+
+        /// <summary>
+        /// The turning half of the diorama. The camera and the blur volume are
+        /// children of the ROOT and hold still; only this one turns, so the sky
+        /// and its sun disc stay put behind a scene on a turntable rather than
+        /// swinging around with it.
+        /// </summary>
+        Transform _dioramaTable;
+
+        /// <summary>
+        /// Degrees turned so far, kept rather than read back off the transform
+        /// so the rate is a rate and not an accumulation of quaternion rounding.
+        /// </summary>
+        float _dioramaSpinDegrees;
+
+        /// <summary>
+        /// The runtime profile carrying the menu blur. Held for one reason: a
+        /// ScriptableObject made with CreateInstance is not collected on its
+        /// own, so OnDestroy has to let it go (PhotoSnaps does the same with its
+        /// vignette veto).
+        /// </summary>
+        VolumeProfile _dioramaBlurProfile;
 
         static GameState State
         {
@@ -467,7 +650,13 @@ namespace Viewpoint
             {
                 PostFx.BeginDepart();
             }
-            yield return FadeOutTo(DepartWhite);
+            // Viewpoint.Hud and not Hud: this class's own Hud property shadows
+            // the TYPE name, so "Hud.FadeWhite" binds to the instance and a
+            // static read through an instance is CS0176. The namespace
+            // qualification is what makes the two transition colours readable
+            // from the one file that owns them (Hud.cs) instead of a third copy
+            // of the same white living here.
+            yield return FadeOutTo(Viewpoint.Hud.FadeWhite);
 
             if (State.HasNextLevel())
             {
@@ -491,10 +680,10 @@ namespace Viewpoint
         }
 
         /// <summary>
-        /// The fade out of a departure, in the colour V-POST-06 asks for. Falls
-        /// back to the plain fade when the HUD has no colour-taking form of it,
-        /// in which case a depart is still told apart from a fall by the bloom-up
-        /// PostFx puts under it.
+        /// The fade out of a transition, in the colour V-POST-06 asks for (white
+        /// for a depart, black for a fall). Falls back to the plain fade when the
+        /// HUD has no colour-taking form of it, in which case a depart is still
+        /// told apart from a fall by the bloom-up PostFx puts under it.
         ///
         /// Bound BY REFLECTION, for the same reason AttachProbes below binds the
         /// probes by name: Main must not fail to compile over a method that is
@@ -584,10 +773,28 @@ namespace Viewpoint
 
         IEnumerator RestartAfterFall()
         {
+            // Set here and not after the yield: StartCoroutine runs the body up
+            // to the first yield at once, so the flag is up before this frame's
+            // Update can treat a body that has already died as playing.
+            _transitioning = true;
             yield return null;
+
+            // The other half of V-POST-06. A fall used to be a HARD CUT: the
+            // blur ramped, the kill plane passed, and the next frame was the
+            // rebuilt level. LoadLevel's Hud.FadeIn() could not cover it either,
+            // because it fades to the alpha the quad already has, which on a
+            // fall is 0: it lerped 0 to 0 for 0.6 s and drew nothing. So the
+            // fade out has to happen HERE, and in black, which is what tells a
+            // fall apart from a depart's white (PRD_VISUAL V-POST-06). Hud owns
+            // the 0.6 s and the colour; see the note on the qualified name in
+            // Depart above. Coming back out of black is then LoadLevel's
+            // FadeIn(), which keeps whatever colour is on the screen.
+            yield return FadeOutTo(Viewpoint.Hud.FadeBlack);
+
             LoadLevel(State.LevelIndex);
             Player.ControlEnabled = Menu.Mode == MenuMode.Hidden;
             Hud.ShowToast("Chute : le niveau recommence a zero.");
+            _transitioning = false;
         }
 
         // ---- Pause ----------------------------------------------------------

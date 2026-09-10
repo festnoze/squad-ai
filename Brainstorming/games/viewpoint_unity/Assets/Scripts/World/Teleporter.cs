@@ -553,18 +553,7 @@ namespace Viewpoint
             _label.anchor = TextAnchor.MiddleCenter;
             _label.alignment = TextAlignment.Center;
             _label.color = Color.white;
-            Font font = Fonts.Default;
-            if (font != null)
-            {
-                _label.font = font;
-                // A TextMesh renders through its own MeshRenderer, and the font
-                // carries the material that knows how to draw its glyphs.
-                MeshRenderer labelRenderer = labelGo.GetComponent<MeshRenderer>();
-                if (labelRenderer != null)
-                {
-                    labelRenderer.sharedMaterial = font.material;
-                }
-            }
+            ApplyLabelFont(labelGo);
 
             _labelTransform.localPosition = new Vector3(0f, LabelY, 0f);
             _labelTransform.localScale = new Vector3(LabelPixelSize, LabelPixelSize, LabelPixelSize);
@@ -584,6 +573,63 @@ namespace Viewpoint
             // project a playable game. Built last, a broken column is a pad with
             // no motes and nothing worse.
             BuildChargeColumn();
+        }
+
+        /// <summary>
+        /// Gives the label the game's one typeface, which is the last clause of
+        /// PRD_VISUAL 4.11 (V-HUD-01): the HUD, the menus and this 3D label all
+        /// draw with whatever <c>Fonts.Default</c> hands out, so there is one
+        /// typeface in the game and one place that decides which.
+        /// <para>
+        /// BOTH the font AND the renderer's material are set, and that is the
+        /// part that is easy to get wrong. A TextMesh is two halves: the
+        /// component builds a quad per glyph with UVs into the font's ATLAS,
+        /// and its own MeshRenderer draws those quads with whatever material it
+        /// happens to hold. Setting <c>textMesh.font</c> alone re-cuts the UVs
+        /// for the new atlas while the renderer keeps sampling the OLD font's
+        /// texture, so the label comes out as the wrong glyphs, as confetti, or
+        /// as nothing at all - and it does so with no error anywhere. The
+        /// font's own material is used rather than a copy of it for a second
+        /// reason: a dynamic font rebuilds its atlas whenever a new character
+        /// is asked for, which swaps the TEXTURE on that material, and a copy
+        /// made once at build time would go on pointing at the atlas the font
+        /// has already thrown away.
+        /// </para>
+        /// <para>
+        /// A null font leaves the label exactly as it is today, on purpose.
+        /// <c>Fonts.Default</c> documents that callers must tolerate null (a
+        /// headless run has no use for a font), and this runs inside
+        /// <see cref="Build"/>: throwing here would abort the rest of the
+        /// method the way the TextMeshPro label once did, and the interaction
+        /// trigger is built after this point. A pad with an unstyled label is
+        /// nothing; a pad with no trigger is an unfinishable level.
+        /// </para>
+        /// </summary>
+        private void ApplyLabelFont(GameObject labelGo)
+        {
+            Font font = Fonts.Default;
+            if (font == null)
+            {
+                return;
+            }
+
+            _label.font = font;
+
+            // Same guard as the font itself, one level down: handing the
+            // renderer a null material would draw the label in the error shader
+            // (or in nothing at all), which is strictly worse than leaving it
+            // with the material the engine gave the component.
+            Material fontMaterial = font.material;
+            if (fontMaterial == null)
+            {
+                return;
+            }
+
+            MeshRenderer labelRenderer = labelGo.GetComponent<MeshRenderer>();
+            if (labelRenderer != null)
+            {
+                labelRenderer.sharedMaterial = fontMaterial;
+            }
         }
 
         /// <summary>

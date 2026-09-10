@@ -117,12 +117,28 @@ Une réponse complète de Claude Code est illisible à voix haute. Par ordre de
 priorité, `speak.py` lit :
 
 1. le contenu d'une balise `<voix>...</voix>` écrite par l'agent,
-2. sinon le dernier paragraphe, là où se trouve la conclusion,
-3. tronqué sur une fin de phrase à `max_chars` (260 par défaut).
+2. sinon le dernier paragraphe substantiel, là où se trouve la conclusion,
+3. sinon la **fin** de la réponse, jamais son début,
+4. tronqué sur une fin de phrase à `max_chars` (260 par défaut).
 
 Le hook `UserPromptSubmit` apprend la convention `<voix>` à l'agent, mais
 uniquement quand la voix est active : hors mode vocal, rien n'est injecté et
 les réponses écrites ne changent pas.
+
+Trois pièges dans cette extraction, corrigés et couverts par
+`tests/test_spoken_part.py` :
+
+- **Une balise vide rendait la réponse totalement muette.** Une `<voix></voix>`
+  correspondait au motif, son contenu vide gagnait, et plus rien n'était lu. Un
+  contenu vide repasse maintenant au corps du texte.
+- **Le nettoyage des puces mangeait le saut de ligne qui les précède.** Avec
+  `re.MULTILINE`, `^\s*` correspond aussi à la ligne vide entre deux
+  paragraphes. Les paragraphes fusionnaient donc en un seul bloc, et choisir le
+  dernier paragraphe revenait à lire le premier. Les motifs de titre et de puce
+  n'acceptent plus que les espaces et les tabulations.
+- **Une réponse sans aucun paragraphe substantiel était lue par son début.**
+  C'est exactement ce que le lecteur a déjà sous les yeux. La fin est désormais
+  conservée, en démarrant sur un début de phrase.
 
 ### Régler ce que l'agent dit
 
@@ -177,7 +193,9 @@ Le fichier se modifie aussi à la main :
   "backend": "edge",
   "edge_voice": "fr-FR-HenriNeural",
   "edge_rate": "+15%",
-  "max_chars": 260
+  "max_chars": 260,
+  "queue_wait_seconds": 30,
+  "pocket_chunk_chars": 150
 }
 ```
 
@@ -200,6 +218,83 @@ Voix Piper françaises disponibles au téléchargement : `siwis`, `tom`, `upmc`
 (qualité `medium`), `gilles`, `mls`, `mls_1840` (qualité `low`). Voix Edge :
 `Denise`, `Henri`, `Eloise`, `Vivienne` et `Remy` (ces deux dernières
 multilingues).
+
+## Plusieurs terminaux en même temps
+
+Chaque terminal qui termine un tour lance son propre `speak.py`. Avant, chacun
+tuait la lecture en cours pour démarrer la sienne : deux sessions qui finissent à
+quelques secondes d'écart s'entrecoupaient. Un **verrou de voix** règle ça.
+
+- Le verrou est un vrai verrou de fichier du système (`msvcrt.locking` sur
+  `%LOCALAPPDATA%oice_bridgeoice.lock`), pas un fichier témoin : le noyau
+  le relâche dès que le détenteur meurt, même sous `taskkill /F`, donc aucun
+  verrou orphelin ne peut bloquer la voix pour toujours.
+- Le lecteur le garde pendant **toute** la lecture. Les chemins Piper, Edge et
+  SAPI attendent donc la fin de leur lecteur au lieu de rendre la main tout de
+  suite ; c'est sans coût pour l'agent, le hook a déjà terminé.
+- Un lecteur qui trouve la voix occupée **attend** en sondant toutes les 200 ms,
+  jusqu'à `queue_wait_seconds` (30 s par défaut, `--queue-wait` en ligne de
+  commande). Le verrou libéré à temps, il parle à son tour. Sinon il **renonce
+  en silence** : une annonce qui arrive une minute après le fait n'aide plus.
+  Mettre `0` donne le comportement « annuler si occupé ».
+- `--stop` (`voice.ps1 shut`, `/voix off`) coupe la lecture en cours **et** fait
+  renoncer ceux qui attendaient : couper la voix ne doit pas lancer l'annonce
+  suivante. Il dépose un tampon horodaté, `stop.stamp`, et tout lecteur mis en
+  file avant ce tampon abandonne.
+
+Les tests de ce comportement, multi-processus, sont dans `tests/`. La suite
+complète compte 42 tests :
+
+```powershell
+uvx --with pytest --python 3.14 pytest tests -q
+```
+
+## Une lecture longue sans bégaiement
+
+Pocket TTS est autoregressif : le coût par seconde d'audio grimpe avec la
+longueur de la requête. Mesuré ici sur la voix `estelle`, en une seule requête :
+
+| Longueur du texte | Temps de synthèse / durée de l'audio |
+| --- | --- |
+| 145 caractères | 1,11 |
+| 291 caractères | 1,28 |
+| 437 caractères | 2,35 |
+
+Passé le temps réel, le lecteur se retrouve à sec et la phrase se hache. Une
+réponse de 454 caractères a ainsi pris 33,4 s pour 22,7 s d'audio, soit une
+dizaine de secondes de silence à l'intérieur de la phrase.
+
+La lecture est donc découpée, et le débit surveillé :
+
+- **des requêtes courtes**, 150 caractères par défaut (`pocket_chunk_chars`).
+  Le facteur reste autour de 1,1 quelle que soit la longueur totale. Une phrase
+  sans ponctuation interne est coupée sur un mot, pas laissée entière.
+- **un seul lecteur** pour toute la réponse, alimenté par un fil producteur qui
+  enchaîne les requêtes. Pas de couture audible entre les phrases, et le
+  morceau suivant se génère pendant que le précédent joue.
+- **une réserve d'audio avant le premier son**, calculée et non devinée : le
+  débit est mesuré sur ce qui est déjà arrivé, la durée totale est extrapolée
+  des caractères restants, et on attend d'avoir de quoi ne jamais se faire
+  rattraper. Un démon plus lent que le temps réel finit donc par tout générer
+  avant de parler, ce qui est préférable : bégayer ne fait pas gagner une
+  seconde et s'entend.
+
+Le résultat, sur la phrase qui bégayait, moyenné sur trois lectures :
+
+| | Avant | Après |
+| --- | --- | --- |
+| Premier son | 0,3 s | 1,2 s |
+| Silences dans la phrase | 10,7 s | 1,1 s |
+
+Deux détails appris en mesurant. Le débit ne peut pas se lire sur le premier
+bloc reçu, où aucun temps ne s'est encore écoulé : tout démon paraît alors
+infiniment rapide et la lecture démarre sur un échantillon de un. Et `ffplay`
+coûte 0,75 s fixes, démarrage du périphérique audio compris, ce qu'il faut
+retirer avant de conclure à un manque de données.
+
+Chaque requête reste muette pendant sa mise en route, 0,48 s mesurées, et le
+démon ne génère qu'une inférence à la fois : ces coutures ne peuvent pas se
+chevaucher, elles sont donc payées par la réserve.
 
 ## Pièges rencontrés
 
@@ -229,7 +324,7 @@ multilingues).
 
 ## Fichiers
 
-- `speak.py` - extraction du texte à dire, synthèse, lecture, `--tee`, `--stop`
+- `speak.py` - extraction du texte à dire, synthèse, lecture découpée, verrou de voix, `--tee`, `--stop`
 - `pocket_server.py` - démon Kyutai Pocket TTS, avec `/stream` en PCM continu
 - `piper_server.py` - démon qui garde la voix Piper en mémoire
 - `voice.ps1` - pilote (on/off/last/say/status)
@@ -237,3 +332,6 @@ multilingues).
 - `install.ps1` - outils, voix, branchement des agents
 - `hooks/stop_speak.ps1` - lit la réponse quand l'agent a fini
 - `hooks/prompt_context.ps1` - enseigne la convention `<voix>`
+- `tests/test_voice_lock.py` - le verrou de voix entre processus (attente, délai, `--stop`)
+- `tests/test_pocket_streaming.py` - le découpage et la réserve d'audio
+- `tests/test_spoken_part.py` - ce qui est extrait de la réponse et lu

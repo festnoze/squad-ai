@@ -2038,6 +2038,16 @@ SENSOR_NAMES = (
     "calendar", "comments", "cross_asset", "filings", "gdelt_recent", "hive_insights", "hive_reputation", "hn",
     "macro_releases", "memory", "microstructure", "tape", "volume_profile", "wiki_asof", "wiki_daily",
 )
+#: 18.3's two source tables, from which every sensor's granularity_ms and lag_ms derive (ruling R287).
+SOURCE_GRANULARITY_MS = {
+    "wikipedia_current_events": 86_400_000, "wikipedia_asof": 86_400_000, "wayback": 86_400_000,
+    "cboe": 86_400_000, "gdelt": 900_000, "manifold_comment": 1, "hn": 1_000, "edgar": 1_000, "fred": 1_000,
+}
+SAFETY_LAG_MS_BY_SOURCE = {
+    "wikipedia_current_events": 21_600_000, "wikipedia_asof": 21_600_000, "wayback": 21_600_000,
+    "cboe": 21_600_000, "gdelt": 900_000, "manifold_comment": 60_000, "hn": 300_000, "edgar": 60_000,
+    "fred": 0,
+}
 #: The nine step kinds of 18.4.
 STEP_KINDS = ("sense", "features", "rules", "belief", "overlay", "sizing", "propose_rule", "llm_belief", "actions")
 #: One assertion helper for the many "this document is refused" checks below.
@@ -2065,11 +2075,12 @@ def test_section_18_declares_every_interface_the_discovery_wave_is_built_against
         assert heading in text, heading
     assert "18. Discovery" in text[: text.index("## 1. Units")]
     section = _contract_section("### 15.10 Amendment C1c", "\n---\n")
-    rulings = set(re.findall(r"^\| (R2[3-9][0-9]) \|", section, re.MULTILINE))
+    rulings = set(re.findall(r"^\| (R[23][0-9][0-9]) \|", section, re.MULTILINE))
     # R230..R246 are section 18's, R247..R259 land D-R1..D-R14, R260..R273 land D-S1..D-S14 in the form
     # section G corrected, R274 carries gate G2's four shapes forward and R275 says what is left alone.
     # The numbering starts at R230 because gate G2's audit pass took R228 and R229 (15.3).
-    assert rulings == {f"R{n}" for n in range(230, 276)}
+    # R276..R302 are the arbitration of the amendment's own critic, the pattern of 15.8 and 15.9.
+    assert rulings == {f"R{n}" for n in range(230, 303)}
     decisions = [f"D-R{n}" for n in range(1, 15)] + [f"D-S{n}" for n in range(1, 15)]
     for decision in decisions:
         if decision == "D-R8":
@@ -2093,6 +2104,13 @@ def test_the_sensor_catalogue_fixture_is_the_normative_table_of_18_1() -> None:
         assert s["version"] == f"{s['name']}.v1"
         assert [f["index"] for f in s["features"]] == list(range(len(s["features"]))), s["name"]
         assert all(f["source"] == s["name"] and f["asof_only"] is True for f in s["features"]), s["name"]
+        # Ruling R285: the sentinel is a field, inside the bounds, and never a signed feature's floor.
+        for f in s["features"]:
+            assert f["lo"] <= f["sentinel"] <= f["hi"], f["name"]
+            assert f["lo"] >= 0 or f["sentinel"] == 0, f["name"]
+        # Ruling R287: granularity_ms and lag_ms are the maxima over the sensor's sources, 0 without one.
+        assert s["granularity_ms"] == max((SOURCE_GRANULARITY_MS[x] for x in s["sources"]), default=0), s["name"]
+        assert s["lag_ms"] == max((SAFETY_LAG_MS_BY_SOURCE[x] for x in s["sources"]), default=0), s["name"]
     names = [f["name"] for s in sensors for f in s["features"]]
     assert len(names) == len(set(names)) == 75, "FEATURE_NAMES is the union of the blocks, unique across them"
     # features.v1 is unchanged: every entry but the portfolio block belongs to exactly one sensor block, by
@@ -2118,7 +2136,9 @@ def test_the_sensor_catalogue_fixture_is_the_normative_table_of_18_1() -> None:
     section = _contract_section("### 18.1 The sensor catalogue", "### 18.2 The hypothesis layer")
     for name in SENSOR_NAMES:
         assert f"| `{name}` |" in section, name
-    assert "SENSOR_BUDGET_UNITS_DEFAULT = sum(cost_units) = 17" in section
+    assert "SENSOR_BUDGET_UNITS_DEFAULT = sum(cost_units) + RULE_PROPOSAL_COST_UNITS = 18" in section, "R281"
+    assert "`RULE_PROPOSAL_COST_UNITS = 1`" in section, "the full diet can propose (ruling R281)"
+    assert by_name["macro_releases"]["lag_ms"] == 21_600_000, "cboe is day-stamped and six hours late (R287)"
     # The journal's sensor list is the same closed enum.
     assert tuple(_schema("journal.v2.json")["$defs"]["sensorName"]["enum"]) == SENSOR_NAMES
     # A catalogue with a sixteenth sensor or a bad cost is refused.
@@ -2246,7 +2266,7 @@ def test_the_journal_and_market_schemas_carry_the_c1c_fields_as_optional() -> No
     for event, fields in (
         ("observation_built", {"sensors"}),
         ("run_started", {"sensor_catalogue_hash"}),
-        ("market_listed", {"provider_labels", "subject", "structure", "horizon"}),
+        ("market_listed", {"provider_labels", "subject", "structure", "horizon", "cohort_id"}),
         ("candidate_scored", {"tier", "matrix_hash", "features_hash", "diet_cost_units", "sensors",
                               "n_rules_proposed"}),
         ("generation_closed", {"sensor_budget_next", "culled_by_budget", "rule_rewards", "n_engine_tier",
@@ -2269,9 +2289,11 @@ def test_the_journal_and_market_schemas_carry_the_c1c_fields_as_optional() -> No
     listed = next(e for e in lines if e["type"] == "market_listed")
     tagged = {
         **listed, "provider_labels": ["kxbtcmaxmon"], "subject": ["bitcoin"], "structure": "threshold-above",
-        "horizon": "month",
+        "horizon": "month", "cohort_id": "co-kalshi-crypto-bitcoin-threshold-above-month",
     }
     assert _errors(validator, tagged) == []
+    assert _errors(validator, {**tagged, "cohort_id": None}) == [], "a market may belong to no cohort"
+    assert _errors(validator, {**tagged, "cohort_id": "bitcoin-month"}) != [], "RE_COHORT_ID (ruling R288)"
     assert _errors(validator, {**tagged, "subject": []}) != [], "one or more subjects"
     assert _errors(validator, {**tagged, "horizon": "decade"}) != []
     built = next(e for e in lines if e["type"] == "observation_built")
@@ -2341,9 +2363,12 @@ def test_the_dataset_manifest_carries_the_c1c_blocks_as_optional() -> None:
     assert _errors(validator, {**doc, "cohorts": [{**cohort, "n_train": 31.5}]}) != [], "integers only"
     assert _errors(validator, {**doc, "build": {**doc["build"], "status": "partial"}}) != []
     outside = copy.deepcopy(doc)
-    audit_path = "audit/taxonomy_0123456789abcdef.json"
+    audit_path = "audits/0123456789abcdef/taxonomy.json"
     outside["files"] = [*base["files"], {"path": audit_path, "sha256": "d" * 64, "bytes": 1}]
-    assert _errors(validator, outside) != [], "audit/ is outside the walk and never in files (7.14)"
+    assert _errors(validator, outside) != [], "the audits/ tree is outside the walk, never in files (R296)"
+    assert _errors(validator, {**doc, "taxonomy": {**doc["taxonomy"],
+                                                   "audit": {"path": "audit/taxonomy_0123456789abcdef.json",
+                                                             "n": 50, "precision_permille": 920}}}) != [], "R296"
     audited = copy.deepcopy(doc)
     audited["taxonomy"]["audit"] = {"path": audit_path, "n": 50, "precision_permille": 920}
     assert _errors(validator, audited) == []

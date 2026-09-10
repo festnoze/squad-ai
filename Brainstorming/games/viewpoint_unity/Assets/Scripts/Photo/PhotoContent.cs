@@ -254,7 +254,15 @@ namespace Viewpoint
                 // carrying only _Reveal would erase the _Seed a block pushes
                 // (its colour jitter, V-MAT-03) and the _CutGlow of a carve with
                 // it. ErasableBlock.SetReveal exists for exactly this.
-                if (target.GetComponentInParent<ErasableBlock>(true) != null)
+                // Only the block's OWN visual is skipped, not everything
+                // parented under a block. The painted backdrop panel hangs on
+                // the carvable wall it paints, so it is a sibling of that
+                // wall's "Mesh" child and GetComponentInParent finds the block
+                // from both: the wide test used to drop the panel, which is
+                // most of a placement's screen area, and it popped in while
+                // everything around it dissolved.
+                ErasableBlock owner = target.GetComponentInParent<ErasableBlock>(true);
+                if (owner != null && owner.Owns(target))
                 {
                     continue;
                 }
@@ -264,8 +272,9 @@ namespace Viewpoint
                 // Viewpoint/Surface got stripped (the failure this project has
                 // shipped once) shows its content INSTANTLY instead of clipping
                 // it away forever on a property nothing reads. The painted
-                // backdrop panel falls out here too, because Viewpoint/Backdrop
-                // has no _Reveal.
+                // backdrop panel now passes this test: Viewpoint/Backdrop
+                // declares _Reveal and clips in all three of its depth writing
+                // passes, so it thins out with the props around it.
                 if (material == null || !material.HasFloat(Materials.RevealId))
                 {
                     continue;

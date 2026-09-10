@@ -1356,3 +1356,61 @@ sans `CameraItem`). Les deux ecarts **gonflent** `painted`, donc le test
 repondait OK precisement sur les builds qu'il existe pour attraper : un rewind
 qui retire un pickup au cimetiere suffisait. Les deux nombres se lisent
 desormais sur le meme arbre.
+
+### C.22 Un player sans focus s'arrete, et le harnais lit cela comme une panne
+
+`ProjectSettings.asset` porte `runInBackground: 0`, donc un player en fenetre
+**se met en pause des qu'il perd le focus**. Consequence pour le harnais : la
+coroutine de la sonde n'avance plus, aucune exception n'est levee, aucune capture
+n'est ecrite, et `verify-player.ps1` ne dit qu'une chose : "le jeu ne s'est jamais
+termine (300 s)". Le meme executable, fenetre au premier plan, a fini en 20 s.
+
+N'importe quoi peut voler le focus sur une machine de build (une autre instance
+d'Unity, une compilation, un agent qui ouvre une fenetre), donc la sonde ne peut
+pas parier sur le garder : `ShotProbe` pose desormais
+`Application.runInBackground = true` elle-meme. Pose la plutot que dans les
+reglages du projet parce que c'est la SONDE qui en a besoin : le jeu livre doit
+continuer a se mettre au repos quand le joueur passe a une autre fenetre.
+
+Le piege plus general : **une panne de harnais ressemble a une regression de
+code**. Avant de chercher le bug, verifier que la panne se reproduit.
+
+### C.23 Une moitie d'item ne trouve jamais son autre moitie
+
+Cette etape a ete decoupee par PROPRIETAIRE DE FICHIER, un agent par fichier,
+pour que deux agents ne s'ecrivent jamais dessus. Le prix est structurel : un
+item qui traverse deux fichiers arrive a moitie fait, et personne ne le voit.
+
+Quatre cas reels, tous verts au harnais :
+  - `Battery.NoticeDropped()` ecrite, documentee comme ayant besoin d'un unique
+    appelant dans `PlayerController`, et **zero appelant** dans tout `Assets/` ;
+  - `Backdrop.shader` sans `_Reveal` du tout, donc la face qui occupe le plus
+    d'ecran d'une pose apparaissait d'un coup pendant que tout le reste se
+    dissolvait ;
+  - `Hud.FadeBlack` et `Hud.FadeWhite` ajoutees pour V-POST-06, **aucun
+    appelant** : une chute ne fondait au noir nulle part ;
+  - trois fichiers declarant chacun leur propre `PropertyToID("_Reveal")`, soit
+    trois occasions qu'un des trois derive du nom que le nuanceur declare.
+
+La lentille de relecture doit donc chasser explicitement la moitie manquante :
+une methode sans appelant, une propriete de nuanceur que personne n'ecrit, une
+constante que personne ne lit. Et le decoupage en vagues doit dire a chaque
+lentille QUELLE vague elle relit, sinon elle signale comme bloquants tous les
+items de l'autre vague, et la passe de reparation part implementer sans relecture
+ce que personne ne lui a demande.
+
+### C.24 Un garde qui remonte la hierarchie ne distingue pas un frere d'un proprietaire
+
+`PhotoContent` sautait tout renderer sous un `ErasableBlock`, pour une bonne
+raison : un bloc doit etre pilote par `SetReveal` et non par un second
+`MaterialPropertyBlock`, qui effacerait son `_Seed` (V-MAT-03) et son `_CutGlow`.
+
+Mais le panneau peint est accroche au mur qu'il peint : `BuildBackdrop` fait
+`quad.transform.SetParent(block.transform)`, alors que le renderer du bloc vit
+sur un enfant nomme "Mesh". Le panneau est donc un **frere** de ce renderer :
+`GetComponentInParent` trouve le bloc depuis les deux, et la profondeur ne les
+separe pas davantage. Le garde large jetait le panneau.
+
+D'ou `ErasableBlock.Owns(Renderer)`, et un garde qui ne saute que le visuel
+PROPRE du bloc. La regle generale : pour repondre "ce renderer est-il a X", il
+faut le demander a X, pas a la hierarchie.

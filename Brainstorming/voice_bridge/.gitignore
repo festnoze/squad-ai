@@ -12,3 +12,6 @@ config.json
 
 # Venv PyTorch de Pocket TTS (~3 Go)
 .venv-pocket/
+
+# Python bytecode
+__pycache__/

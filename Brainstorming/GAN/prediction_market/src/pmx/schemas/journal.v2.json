@@ -331,10 +331,11 @@
         "interval_min": { "enum": [1, 60, 1440] },
         "fee_schedule_id": { "type": "string", "pattern": "^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$" },
         "hardness_tags": { "type": "array", "maxItems": 4, "uniqueItems": true, "items": { "enum": ["trivial", "upset", "whipsaw", "illiquid"] } },
-        "provider_labels": { "description": "Amendment C1c (CONTRACTS_V2 7.2, 7.14, rulings R265 and R274): the four taxonomy fields, optional until the first engine lot after the amendment promotes them with their dataclass fields.", "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" } },
+        "provider_labels": { "description": "Amendment C1c (CONTRACTS_V2 7.2, 7.14, 18.5, rulings R265, R274 and R288): the four taxonomy fields and the cohort id, optional until the first engine lot after the amendment promotes them with their dataclass fields.", "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_-]{1,32}$" } },
         "subject": { "type": "array", "minItems": 1, "maxItems": 4, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" } },
         "structure": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,31}$" },
         "horizon": { "enum": ["intraday", "week", "month", "quarter", "year-plus"] },
+        "cohort_id": { "description": "Ruling R288: the market's cohort of 18.5, null when it belongs to none, so the projection reads PerMarket.cohort_id off the journal instead of re-implementing the keying rule.", "oneOf": [ { "type": "null" }, { "type": "string", "pattern": "^co-[a-z]+-[a-z]+-[a-z0-9-]+-[a-z-]+-[a-z-]+$", "maxLength": 96 } ] },
         "fold": { "enum": ["train", "validation", "sealed", "all"] }
       }
     },
