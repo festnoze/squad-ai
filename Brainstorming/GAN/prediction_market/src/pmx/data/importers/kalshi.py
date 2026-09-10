@@ -1111,7 +1111,9 @@ def _fetch_budget(rows: Sequence[_Row], limit: int | None) -> tuple[_Row, ...]:
 def _check_interval(interval_min: int) -> None:
     if interval_min not in INTERVALS_MIN:
         raise InvalidConfigError(
-            "the grid of a dataset is hourly or daily", interval_min=interval_min, allowed=str(INTERVALS_MIN)
+            "the grid of a dataset is one of INTERVALS_MIN (5.2: minute, hourly, daily)",
+            interval_min=interval_min,
+            allowed=str(INTERVALS_MIN),
         )
 
 

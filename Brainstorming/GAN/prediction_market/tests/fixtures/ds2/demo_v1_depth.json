@@ -1,0 +1,115 @@
+{
+ "notes": "The measured depth of the twelve markets of the v1 demo pack (data/demo_v1) on 2026-09-10: bars, prints, traded bars and news items. Every one of them reports n_trades = 0 and traded_bars = 0, and data/demo_v1 has no news directory at all, so n_news is 0 on all twelve. This is the measurement behind ruling R264's sentence that a showcase pack must carry a research market's depth: the pack the ruling replaces carries bars and nothing else, and tests/test_showcase.py asserts that check_showcase_depth refuses all twelve rather than accepting eleven of them.",
+ "dataset": "demo_v1",
+ "measured_on": "2026-09-10",
+ "markets": [
+  {
+   "id": "demo-argentina-wc-2022",
+   "question": "Will Argentina win the 2022 FIFA World Cup?",
+   "category": "sports",
+   "n_bars": 30,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-brexit-2016",
+   "question": "Will the UK vote to leave the EU in the June 2016 referendum?",
+   "category": "politics",
+   "n_bars": 145,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-btc-100k-2022",
+   "question": "Will Bitcoin reach $100,000 by the end of 2022?",
+   "category": "crypto",
+   "n_bars": 361,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-btc-60k-2021",
+   "question": "Will Bitcoin trade above $60,000 at any point during 2021?",
+   "category": "crypto",
+   "n_bars": 100,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-eth-merge-2022",
+   "question": "Will Ethereum complete the Merge to proof of stake in 2022?",
+   "category": "crypto",
+   "n_bars": 168,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-fed-hike-mar-2022",
+   "question": "Will the US Federal Reserve raise rates at its March 2022 meeting?",
+   "category": "economics",
+   "n_bars": 71,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-gpt4-2023",
+   "question": "Will OpenAI release GPT-4 during 2023?",
+   "category": "tech",
+   "n_bars": 64,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-lk99-superconductor-2023",
+   "question": "Will LK-99 be confirmed as a room-temperature ambient-pressure superconductor?",
+   "category": "science",
+   "n_bars": 37,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-titan-sub-found-2023",
+   "question": "Will the Titan submersible be found intact with survivors (June 2023)?",
+   "category": "other",
+   "n_bars": 4,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-trump-2016",
+   "question": "Will Donald Trump win the 2016 US presidential election?",
+   "category": "politics",
+   "n_bars": 162,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-trump-2024",
+   "question": "Will Donald Trump win the 2024 US presidential election?",
+   "category": "politics",
+   "n_bars": 129,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  },
+  {
+   "id": "demo-us-recession-2023",
+   "question": "Will the US enter a recession (two negative GDP quarters) in 2023?",
+   "category": "economics",
+   "n_bars": 356,
+   "n_trades": 0,
+   "traded_bars": 0,
+   "n_news": 0
+  }
+ ]
+}

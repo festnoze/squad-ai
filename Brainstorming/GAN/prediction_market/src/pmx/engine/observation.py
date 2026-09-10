@@ -48,7 +48,13 @@ from typing import Final, NoReturn, Protocol, cast
 
 from pmx import OBS_VERSION
 from pmx.engine.calendar import KIND_BINARY, Calendar, CashEventLike, InstrumentLike, applies_at
-from pmx.errors import InvalidConfigError, LeakError, ObservationTooLargeError, SchemaError
+from pmx.errors import (
+    InvalidConfigError,
+    LeakError,
+    ObservationTooLargeError,
+    SchemaError,
+    SensorAbsentError,
+)
 from pmx.journal import canonical_json
 from pmx.types import (
     BINARY_POINT_VALUE_MICRO,
@@ -937,13 +943,14 @@ def unsensed_view_fields(sensors: frozenset[str] | None) -> tuple[frozenset[str]
 def _unsensed_attribute(view: object, name: str) -> NoReturn:
     """Refuse the read of a field the agent's sensors did not buy, and say which field it was.
 
-    ``SchemaError`` is the taxonomy's nearest fit ("a structural rule of the contract that the schema
-    cannot express") and is reported as a contract issue: section 13.1 should carry a
-    ``SensorAbsentError`` of its own, because this is a distinct failure and ``errors.py`` is D1's file.
+    ``SensorAbsentError`` (13.1, ruling R232), and not the ``SchemaError`` this raised while
+    ``pmx.errors`` was another package's file. "The agent did not buy this" is a distinct failure from
+    "a file failed its schema": the remedies are a different sensor set and a different dataset, and a
+    test that pins one must not pass on the other.
     """
     unsensed = cast(frozenset[str], object.__getattribute__(view, "unsensed_fields"))
     if name in unsensed:
-        raise SchemaError(
+        raise SensorAbsentError(
             "field was not sensed",
             field=name,
             unsensed=sorted(unsensed),

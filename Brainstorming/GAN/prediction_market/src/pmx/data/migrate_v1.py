@@ -55,6 +55,7 @@ from pmx.types import (
     MS_PER_HOUR,
     MS_PER_MINUTE,
     MS_PER_SECOND,
+    PURPOSE_SHOWCASE,
     REMOVED_FILTER_KEYS,
     RNG_ALGORITHM_VERSION,
     SAFETY_LAG_MS_DEFAULT,
@@ -338,7 +339,17 @@ def demo_manifest(
         per_category[market.category] = per_category.get(market.category, 0) + 1
         for tag in market.hardness_tags:
             hardness[tag] = hardness.get(tag, 0) + 1
-    build = BuildConfig(freeze_date=freeze_date, providers=(DEMO_PROVIDER,), news_sources=())
+    # ``purpose = showcase`` (5.6, ruling R263): the pack holds landmark events resolved between 2016
+    # and 2024 and is exempt from the window rule for exactly that reason, so the config that describes
+    # it must say so. ``DatasetManifest.purpose`` itself stays unwritten here: the committed pack is the
+    # canonical manifest written **before** the field, and the loader's rule for one (unsealed, the one
+    # provider ``demo``) is a rule no artefact would exercise if the migration stamped the field.
+    build = BuildConfig(
+        freeze_date=freeze_date,
+        providers=(DEMO_PROVIDER,),
+        news_sources=(),
+        purpose=PURPOSE_SHOWCASE,
+    )
     return DatasetManifest(
         schema_version=pmx.DATASET_SCHEMA,
         name=name,

@@ -66,6 +66,11 @@ SCHEMA_FILES = (
     "cash_event.v1.json",
     "session_calendar.v1.json",
     "forecast.v1.json",
+    # Amendment C1c's three (section 18.8, rulings R230, R236 and R243): the three files exist and
+    # validate, and 7.13's tuple names them so ``load_schema`` can reach them by name like any other.
+    "rule.v1.json",
+    "sensor.v1.json",
+    "workflow.v1.json",
 )
 
 PriceBp = Annotated[int, Field(ge=1, le=9_999)]
@@ -263,7 +268,7 @@ class MarketModel(_Strict):
     resolution: Literal[0, 1]
     resolution_source: str = Field(max_length=500)
     event_key: str | None = Field(default=None, max_length=128)
-    interval_min: Literal[60, 1440]
+    interval_min: Literal[1, 60, 1440]
     bars: list[BarModel] = Field(min_length=2)
     trades: list[TradeModel]
     first_price_bp: PriceBp
@@ -334,6 +339,10 @@ class NewsItemModel(_Strict):
     match_scores_permille: list[Annotated[int, Field(ge=0, le=1_000)]]
     lang: Literal["en"]
     author_key: str | None = Field(default=None, pattern=r"^[0-9a-f]{16}$")
+    #: Amendment C1c (7.3, decision D-R3, ruling R249): optional, ``None`` for every source but a
+    #: Current events bullet and absent on a file written before the decision, which is why it defaults
+    #: rather than being required like ``revid`` and ``asof_day``.
+    published_at_source: Literal["revision", "page_day"] | None = None
 
     def to_news_item(self) -> NewsItem:
         return NewsItem(
@@ -356,6 +365,7 @@ class NewsItemModel(_Strict):
             match_scores_permille=tuple(self.match_scores_permille),
             lang=self.lang,
             author_key=self.author_key,
+            published_at_source=self.published_at_source,
         )
 
 
@@ -395,16 +405,47 @@ class NewsSourceModel(_Strict):
         "edgar",
         "fred",
         "cboe",
+        "hn",
     ]
     n_items: NonNegInt
     fetched_at_ms_min: Ms
     fetched_at_ms_max: Ms
 
 
+class AuditModel(_Strict):
+    """``{path, n, precision_permille}`` of 7.8's ``$defs/audit``: the linker audit and the tagger audit.
+
+    ``path`` points into the **tracked** ``audits/<dataset_hash[:16]>/`` tree and never into the dataset
+    (ruling R296): human verdicts cannot be regenerated, and the tree is keyed by the hash it audits.
+    """
+
+    path: str = Field(pattern=r"^audits/[0-9a-f]{16}/(linker|taxonomy)\.json$")
+    n: NonNegInt
+    precision_permille: Annotated[int, Field(ge=0, le=1_000)]
+
+
 class NewsBlockModel(_Strict):
     sources: list[NewsSourceModel]
     n_items: NonNegInt
     n_linked: NonNegInt
+    #: Amendment C1c (5.5, 7.6, 18.3, rulings R241 and R250). Both optional: a manifest without
+    #: ``safety_lag_by_source`` lags every source by ``safety_lag_ms``, and ``linker_audit`` is ``null``
+    #: until somebody draws the fifty links.
+    safety_lag_by_source: dict[str, Ms] | None = None
+    linker_audit: AuditModel | None = None
+
+
+class ClusterMoveModel(_Strict):
+    """One market a cluster or ``event_key`` group pulled across a cut (7.7, ruling R248).
+
+    The move is **inside** the cut and not a step after it: the group's fold key decides, and this row
+    records the market whose own bar sat in an earlier fold than its group's, so a reader can redo it.
+    """
+
+    market_id: str = Field(max_length=128)
+    from_fold: Literal["train", "validation", "sealed"]
+    to_fold: Literal["train", "validation", "sealed"]
+    group_id: str = Field(max_length=128)
 
 
 class SplitModel(_Strict):
@@ -418,6 +459,21 @@ class SplitModel(_Strict):
     n_instruments_train: NonNegInt = 0
     n_instruments_validation: NonNegInt = 0
     n_instruments_sealed: NonNegInt = 0
+    #: Amendment C1c's seven fields of 7.7 (rulings R247, R248, R290): the cut is a count quantile of
+    #: group resolution order, so the manifest states the method, the targets, the two cut days, the
+    #: markets a cluster moved and the realised shares. Optional, because a manifest cut by calendar
+    #: thirds before the amendment carries none of them and must still load.
+    method: Literal["count_quantile"] | None = None
+    quantiles_permille: list[Annotated[int, Field(ge=1, le=999)]] | None = Field(
+        default=None, min_length=2, max_length=2
+    )
+    train_end_date: str | None = Field(default=None, pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+    validation_end_date: str | None = Field(default=None, pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+    cluster_moves: list[ClusterMoveModel] | None = None
+    n_moved: NonNegInt | None = None
+    realised_permille: list[Annotated[int, Field(ge=0, le=1_000)]] | None = Field(
+        default=None, min_length=3, max_length=3
+    )
 
 
 class InstrumentsBlockModel(_Strict):
@@ -439,7 +495,9 @@ class SchedulesBlockModel(_Strict):
 
 
 class FileModel(_Strict):
-    path: str = Field(pattern=r"^(markets|news|wiki_asof|clusters|instruments|calendars)/[A-Za-z0-9._/-]+$")
+    path: str = Field(
+        pattern=r"^(markets|news|wiki_asof|clusters|instruments|calendars|taxonomy)/[A-Za-z0-9._/-]+$"
+    )
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     bytes: NonNegInt
 
@@ -450,6 +508,17 @@ class BuiltByModel(_Strict):
     rng_algorithm_version: str
 
 
+class ResolutionSpanModel(_Strict):
+    """``resolution_span {min_ms, max_ms}`` (7.8, ruling R262): the true span of the markets kept.
+
+    A reader compares it against the declared ``window_days`` and sees whether the window is a statement
+    about the data or about the flag.
+    """
+
+    min_ms: Ms
+    max_ms: Ms
+
+
 class DatasetManifestModel(_Strict):
     """``dataset.v1.json`` as a strict model."""
 
@@ -458,7 +527,7 @@ class DatasetManifestModel(_Strict):
     freeze_date: str = Field(pattern=r"^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
     freeze_ms: Ms
     window: WindowModel
-    interval_min: Literal[60, 1440]
+    interval_min: Literal[1, 60, 1440]
     providers: list[ProviderLiteral] = Field(min_length=1)
     safety_lag_ms: Ms
     filters: FiltersModel
@@ -477,6 +546,18 @@ class DatasetManifestModel(_Strict):
     kinds: list[Literal["binary", "spot_crypto", "perp", "fx", "equity", "future"]] = Field(default_factory=list)
     instruments: InstrumentsBlockModel | None = None
     schedules: SchedulesBlockModel | None = None
+    #: Amendment C1c's seven optional blocks of 7.8. ``purpose`` and ``window_days`` are typed here
+    #: because they are read by name (5.6); ``resolution_span`` is two integers; the last four are read
+    #: as opaque structures for the reason ``clusters`` and ``impact`` are, their typed owners being
+    #: other packages. Every one of them is validated in full by ``dataset.v1.json`` first, which runs
+    #: before this model does, so "opaque here" is not "unchecked".
+    purpose: Literal["research", "showcase"] | None = None
+    window_days: Annotated[int, Field(ge=1, le=730)] | None = None
+    resolution_span: ResolutionSpanModel | None = None
+    universe: dict[str, object] | None = None
+    taxonomy: dict[str, object] | None = None
+    cohorts: list[dict[str, object]] | None = None
+    build: dict[str, object] | None = None
 
     def to_manifest(self) -> DatasetManifest:
         return DatasetManifest(
@@ -518,6 +599,18 @@ class DatasetManifestModel(_Strict):
                 ),
                 n_items=self.news.n_items,
                 n_linked=self.news.n_linked,
+                safety_lag_by_source=(
+                    None if self.news.safety_lag_by_source is None else dict(self.news.safety_lag_by_source)
+                ),
+                linker_audit=(
+                    None
+                    if self.news.linker_audit is None
+                    else {
+                        "path": self.news.linker_audit.path,
+                        "n": self.news.linker_audit.n,
+                        "precision_permille": self.news.linker_audit.precision_permille,
+                    }
+                ),
             ),
             split=DatasetSplit(
                 month_edges_ms=tuple(self.split.month_edges_ms),
@@ -529,6 +622,21 @@ class DatasetManifestModel(_Strict):
                 n_instruments_train=self.split.n_instruments_train,
                 n_instruments_validation=self.split.n_instruments_validation,
                 n_instruments_sealed=self.split.n_instruments_sealed,
+                method=self.split.method or "",
+                quantiles_permille=tuple(self.split.quantiles_permille or ()),
+                train_end_date=self.split.train_end_date or "",
+                validation_end_date=self.split.validation_end_date or "",
+                cluster_moves=tuple(
+                    {
+                        "market_id": move.market_id,
+                        "from_fold": move.from_fold,
+                        "to_fold": move.to_fold,
+                        "group_id": move.group_id,
+                    }
+                    for move in (self.split.cluster_moves or ())
+                ),
+                n_moved=self.split.n_moved or 0,
+                realised_permille=tuple(self.split.realised_permille or ()),
             ),
             files=tuple(
                 DatasetFile(path=entry.path, sha256=entry.sha256, bytes=entry.bytes) for entry in self.files
@@ -560,6 +668,17 @@ class DatasetManifestModel(_Strict):
                 "borrow": tuple(self.schedules.borrow),
                 "carry": tuple(self.schedules.carry),
             },
+            purpose=self.purpose or "",
+            window_days=self.window_days or 0,
+            resolution_span=(
+                None
+                if self.resolution_span is None
+                else {"min_ms": self.resolution_span.min_ms, "max_ms": self.resolution_span.max_ms}
+            ),
+            universe=None if self.universe is None else dict(self.universe),
+            taxonomy=None if self.taxonomy is None else dict(self.taxonomy),
+            cohorts=None if self.cohorts is None else tuple(dict(row) for row in self.cohorts),
+            build=None if self.build is None else dict(self.build),
         )
 
 

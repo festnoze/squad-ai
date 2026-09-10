@@ -82,12 +82,15 @@ from pmx.data.sessions import (
 )
 from pmx.errors import (
     DatasetHashMismatchError,
+    FoldIntegrityError,
     InvalidConfigError,
     LeakError,
     NonCanonicalValueError,
     PmxError,
     SchemaError,
     SealError,
+    SensorAbsentError,
+    ShowcaseDatasetError,
 )
 from pmx.journal import canonical_json
 from pmx.types import (
@@ -97,7 +100,9 @@ from pmx.types import (
     CATEGORIES,
     HORIZON_BUCKETS,
     INSTRUMENT_KINDS,
+    INTERVALS_MIN,
     LEXICON_COUNT,
+    MINUTE_SOURCE_GRANULARITY_MAX_MS,
     MS_PER_DAY,
     PHASE_ORDER,
     PPM_ONE,
@@ -110,6 +115,7 @@ from pmx.types import (
     REMOVED_FILTER_KEYS,
     RNG_ALGORITHM_VERSION,
     SAFETY_LAG_MS_DEFAULT,
+    WINDOW_DAYS_MAX,
     Bar,
     BuildConfig,
     BuiltBy,
@@ -504,6 +510,59 @@ def test_build_config_renders_a_null_limit_as_zero_because_the_manifest_forbids_
             BuildConfig(**{"freeze_date": "2026-09-07", "providers": ("kalshi",), **override})  # type: ignore[arg-type]
 
 
+def test_a_minute_build_refuses_a_coarse_source_and_a_bare_provider() -> None:
+    """18.3 and rulings R241 and R298: what a minute dataset may carry, and what it must be told.
+
+    An item stamped to a day and lagged six hours is indistinguishable from one hundred and eighty
+    minute-items, so every minute hypothesis on it is a hypothesis about the stamp; and a minute build
+    is built for a named instrument or a named series and never for a bare provider.
+    """
+    assert INTERVALS_MIN == (1, 60, 1_440), "5.2's three grids"
+    assert MINUTE_SOURCE_GRANULARITY_MAX_MS == 15 * 60_000
+    minute: dict[str, object] = {
+        "freeze_date": "2026-09-07",
+        "providers": ("kalshi",),
+        "interval_min": 1,
+        "instruments": ("BTCUSDT",),
+        "news_sources": ("gdelt", "manifold_comment"),
+    }
+    ok = BuildConfig(**minute)  # type: ignore[arg-type]
+    assert ok.to_dict()["instruments"] == ["BTCUSDT"]
+    # A day-granular source is refused on the minute grid and admitted on the hourly and daily ones.
+    with pytest.raises(InvalidConfigError, match="coarser"):
+        BuildConfig(**{**minute, "news_sources": ("wikipedia_current_events",)})  # type: ignore[arg-type]
+    for grid in (60, 1_440):
+        BuildConfig(
+            **{**minute, "interval_min": grid, "news_sources": ("wikipedia_current_events",)}  # type: ignore[arg-type]
+        )
+    # And a minute build with neither an instrument list nor a series list is refused.
+    with pytest.raises(InvalidConfigError, match="explicit instrument or series list"):
+        BuildConfig(**{**minute, "instruments": ()})  # type: ignore[arg-type]
+    BuildConfig(**{**minute, "instruments": (), "kalshi_series_allow_list": ("KXBTC",)})  # type: ignore[arg-type]
+    with pytest.raises(InvalidConfigError, match="sorted and unique"):
+        BuildConfig(**{**minute, "instruments": ("B", "A")})  # type: ignore[arg-type]
+
+
+def test_a_build_config_carries_the_window_ceiling_and_the_purpose_it_declares() -> None:
+    """5.6 and 7.4, rulings R262 and R263: both are ``BuildConfig`` fields and both enter the manifest.
+
+    The ceiling is on the config and not only in the builder, because a caller that constructs a config
+    without going through the CLI would otherwise miss it, and 5.6 says no flag may override it.
+    """
+    assert WINDOW_DAYS_MAX == 730
+    base: dict[str, object] = {"freeze_date": "2026-09-07", "providers": ("kalshi",)}
+    assert BuildConfig(**base, window_days=730).window_days == 730  # type: ignore[arg-type]
+    with pytest.raises(InvalidConfigError) as raised:
+        BuildConfig(**base, window_days=731)  # type: ignore[arg-type]
+    assert raised.value.context["window_days_max"] == 730
+    assert "recall" in str(raised.value) and "regime" in str(raised.value)
+    with pytest.raises(InvalidConfigError, match="research or showcase"):
+        BuildConfig(**base, purpose="demo")  # type: ignore[arg-type]
+    rendered = BuildConfig(**base, purpose="showcase").to_dict()  # type: ignore[arg-type]
+    assert rendered["purpose"] == "showcase"
+    assert rendered["universe_min_settled"] == 5 and rendered["universe_min_volume_cents"] == 100_000
+
+
 def test_market_set_hash_is_stable_order_free_and_sensitive() -> None:
     a = market_set_hash(["demo-b", "demo-a"])
     b = market_set_hash(["demo-a", "demo-b"])
@@ -520,6 +579,20 @@ def test_every_schema_lives_inside_the_package_and_resolves() -> None:
     for name in SCHEMA_FILES:
         assert schema_path(name).is_file()
         assert load_schema(name)["$schema"].endswith("2020-12/schema")  # type: ignore[union-attr]
+    # Amendment C1c's three (7.13, 18.8): the tuple names them, so ``load_schema`` reaches them by
+    # name like any other, and 13.2's three constants name the three files.
+    assert (pmx.RULE_SCHEMA, pmx.SENSOR_SCHEMA, pmx.WORKFLOW_SCHEMA) == ("rule.v1", "sensor.v1", "workflow.v1")
+    for version in (pmx.RULE_SCHEMA, pmx.SENSOR_SCHEMA, pmx.WORKFLOW_SCHEMA):
+        name = f"{version}.json"
+        assert name in SCHEMA_FILES, name
+        assert schema_path(name).is_file()
+        assert load_schema(name)["$id"] == f"https://pmx.local/schemas/{name}"  # type: ignore[index]
+    # ``sensor.v1`` is a **file** and carries the version header; a rule and a workflow are records
+    # embedded in a ledger row and in a genome, so neither declares one and neither should.
+    sensor = load_schema("sensor.v1.json")["properties"]["schema_version"]  # type: ignore[index,call-overload]
+    assert sensor["const"] == pmx.SENSOR_SCHEMA
+    for embedded in ("rule.v1.json", "workflow.v1.json"):
+        assert "schema_version" not in load_schema(embedded)["properties"], embedded  # type: ignore[operator,index]
     with pytest.raises(SchemaError):
         schema_path("market.v1.json")
     with pytest.raises(SchemaError):
@@ -579,7 +652,7 @@ def test_the_news_model_reads_the_contract_fixture_and_refuses_a_contradicting_k
 def test_the_manifest_model_reads_the_contract_fixture() -> None:
     manifest = manifest_from_payload(_fixture("dataset.manifest.json"))
     assert manifest.name == "demo_v1" and manifest.sealed is False
-    assert manifest.is_demo_pack is True
+    assert manifest_purpose(manifest) == "showcase"  # ruling R263: the field, on the signature it replaces
     assert manifest.split.fold_of(manifest.split.train_end_ms - 1) == "train"
     assert manifest.split.fold_of(manifest.split.train_end_ms) == "validation"
     assert manifest.split.fold_of(manifest.split.validation_end_ms) == "sealed"
@@ -728,7 +801,7 @@ def test_the_demo_manifest_says_what_the_pack_is(tmp_path: Path) -> None:
     dataset = migrate_v1(tmp_path / "demo_v1")
     manifest = dataset.manifest
     assert manifest.name == "demo_v1" and manifest.sealed is False
-    assert manifest.providers == ("demo",) and manifest.is_demo_pack
+    assert manifest.providers == ("demo",) and manifest_purpose(manifest) == "showcase"
     assert manifest.interval_min == 1_440
     assert manifest.freeze_date == DEMO_FREEZE_DATE
     assert manifest.freeze_ms == ms_from_iso_date(DEMO_FREEZE_DATE)
@@ -907,14 +980,14 @@ def test_the_demo_pack_exemption_is_only_for_the_demo_pack(tmp_path: Path) -> No
     """Section 7.1: an unsealed demo-only pack skips the section 5.6 window, and nothing else does."""
     market = load_market_file(DEMO_PACK / "markets" / "demo-brexit-2016.json")
     demo_manifest = load_manifest(DEMO_PACK)
-    assert demo_manifest.is_demo_pack
+    assert manifest_purpose(demo_manifest) == "showcase"
     loader_module.check_market_structure(market, manifest=demo_manifest)
     not_demo = _with(demo_manifest, providers=("demo", "kalshi"))
-    assert not not_demo.is_demo_pack
+    assert manifest_purpose(not_demo) == "research"
     with pytest.raises(SchemaError):
         loader_module.check_market_structure(market, manifest=not_demo)
     once_sealed = _with(demo_manifest, sealed=True)
-    assert not once_sealed.is_demo_pack
+    assert manifest_purpose(once_sealed) == "research"
     with pytest.raises(SchemaError):
         loader_module.check_market_structure(market, manifest=once_sealed)
 
@@ -1107,6 +1180,79 @@ def test_every_error_renders_its_context_in_a_stable_order() -> None:
     assert isinstance(error, PmxError)
     assert str(SchemaError("plain")) == "plain"
     assert repr(SchemaError("plain", n=1)) == "SchemaError('plain', n=1)"
+
+
+def test_the_three_classes_amendment_c1c_adds_are_their_own_and_not_an_alias() -> None:
+    """13.1's three new rows (rulings R232, R248, R263, R291), and why each is a class of its own.
+
+    Each was raised as something else while ``pmx.errors`` belonged to another package in flight:
+    ``FoldIntegrityError`` was a documented alias of ``SchemaError`` in the loader, and
+    ``SensorAbsentError`` was the ``SchemaError`` the observation hook raised for want of a better fit.
+    An alias is not a taxonomy: a test that pins "the folds disagree with what is recomputed" would
+    pass on "a file failed its schema", which is a different failure with a different remedy. So the
+    three are asserted to be ``PmxError`` subclasses and **not** subclasses of one another.
+    """
+    for error_class in (FoldIntegrityError, ShowcaseDatasetError, SensorAbsentError):
+        assert issubclass(error_class, PmxError)
+        assert not issubclass(error_class, SchemaError), "an alias of SchemaError is what these replace"
+        assert not issubclass(error_class, LeakError)
+    assert not issubclass(ShowcaseDatasetError, FoldIntegrityError)
+    assert not issubclass(SensorAbsentError, FoldIntegrityError)
+    # The context is the point of the taxonomy: a refusal is as specific as a result.
+    raised = SensorAbsentError("unbought", field="volume_milli", unsensed="volume_profile", view="SensedBar")
+    assert raised.context["field"] == "volume_milli" and raised.context["view"] == "SensedBar"
+
+
+def test_the_per_source_safety_lag_is_what_the_loader_recomputes() -> None:
+    """5.5 and 18.3, ruling R241: ``news.safety_lag_by_source`` when the manifest carries it.
+
+    A dataset written before amendment C1c carries no block and recomputes to exactly the bytes it was
+    written with, which is why the fallback is ``manifest.safety_lag_ms`` and not the default table:
+    the table is a **builder** input, and what the loader recomputes is what the build declared.
+    """
+    manifest = manifest_from_payload(_fixture("dataset.manifest.json"))
+    item = news_item_from_payload(_fixture("news.wce-20160623-0007.json"))
+    assert manifest.news.safety_lag_by_source is None, "the fixture predates the block"
+    assert item.visible_from_ms == item.published_at_ms + manifest.safety_lag_ms
+    loader_module.check_news_item(item, manifest=manifest)
+    assert loader_module.safety_lag_ms_for(manifest, item.source) == manifest.safety_lag_ms
+
+    # Declare a different lag for this item's source, and the same file is refused: the block is read.
+    declared = dataclasses.replace(
+        manifest,
+        news=dataclasses.replace(manifest.news, safety_lag_by_source={item.source: 60_000}),
+    )
+    assert loader_module.safety_lag_ms_for(declared, item.source) == 60_000
+    with pytest.raises(SchemaError, match="safety lag") as raised:
+        loader_module.check_news_item(item, manifest=declared)
+    assert raised.value.context["safety_lag_ms"] == 60_000
+    # A source the block does not name still falls back to the dataset lag, so one named source cannot
+    # silently move every other source's visibility.
+    other = dataclasses.replace(
+        manifest, news=dataclasses.replace(manifest.news, safety_lag_by_source={"gdelt": 60_000})
+    )
+    loader_module.check_news_item(item, manifest=other)
+    assert loader_module.safety_lag_ms_for(other, item.source) == manifest.safety_lag_ms
+
+
+def test_a_news_item_carries_the_stamp_its_published_at_ms_came_from() -> None:
+    """7.3 and ruling R249: ``published_at_source``, optional and rendered only when it is set.
+
+    Rendering it always would put a key in every ``news/<day>.jsonl`` line of every dataset ever built
+    and move every dataset hash there is, so the absent case is asserted as hard as the present one.
+    """
+    payload = _fixture("news.wce-20160623-0007.json")
+    item = news_item_from_payload(payload)
+    assert item.published_at_source is None
+    assert "published_at_source" not in item.to_dict()
+    assert item.to_dict() == payload
+
+    stamped = dataclasses.replace(item, published_at_source="revision", revid=1_234_567)
+    assert stamped.to_dict()["published_at_source"] == "revision"
+    assert news_item_from_payload(stamped.to_dict()).published_at_source == "revision"
+    # And the strict model refuses a value outside 7.3's two.
+    with pytest.raises(SchemaError):
+        news_item_from_payload({**payload, "published_at_source": "guess"})
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1872,7 +2018,7 @@ def test_the_loader_gives_a_group_one_fold_whatever_the_manifest_cut(tmp_path: P
     own counts are refused because they describe a split that is not the one 7.7 asks for.
     """
     root = two_market_dataset(tmp_path / "grouped", early_days=100, late_days=300, event_key="KXPAIR-EV")
-    with pytest.raises(SchemaError, match="group-aware cut"):
+    with pytest.raises(FoldIntegrityError, match="group-aware cut"):
         load_dataset(root)
     manifest = load_manifest(root)
     fixed = dataclasses.replace(
@@ -1892,7 +2038,7 @@ def test_a_dataset_whose_manifest_miscounts_its_folds_is_refused(tmp_path: Path)
     write_manifest(
         root, dataclasses.replace(manifest, split=dataclasses.replace(manifest.split, n_train=2, n_sealed=0))
     )
-    with pytest.raises(SchemaError, match="group-aware cut") as raised:
+    with pytest.raises(FoldIntegrityError, match="group-aware cut") as raised:
         load_dataset(root)
     assert raised.value.context["declared"] == [2, 0, 0]
     assert raised.value.context["recomputed"] == [1, 0, 1]
@@ -1906,7 +2052,7 @@ def test_verify_folds_reads_the_same_law_as_the_loader(tmp_path: Path) -> None:
         root,
         dataclasses.replace(manifest, split=dataclasses.replace(manifest.split, n_train=0, n_sealed=2)),
     )
-    with pytest.raises(SchemaError, match="group-aware cut"):
+    with pytest.raises(FoldIntegrityError, match="group-aware cut"):
         verify_folds(root)
 
 
@@ -1934,7 +2080,7 @@ def test_verify_refuses_a_dataset_whose_hash_is_right_and_whose_folds_are_wrong(
     # The bytes are untouched, so the hash half of verification is still satisfied.
     report = verify_dataset_report(root)
     assert report.ok and report.dataset_hash == manifest.dataset_hash
-    with pytest.raises(SchemaError, match="group-aware cut"):
+    with pytest.raises(FoldIntegrityError, match="group-aware cut"):
         verify_dataset(root)
     capsys.readouterr()
     assert cli_data.main(["verify", "--dataset", str(root)]) == 1
@@ -1982,7 +2128,7 @@ def test_a_clusters_file_overrides_the_event_key_when_the_loader_reads_the_folds
         "kalshi-KXPAIRB-1": "ec-0123456789abcdef",
     }
     manifest = load_manifest(root)
-    with pytest.raises(SchemaError, match="group-aware cut"):
+    with pytest.raises(FoldIntegrityError, match="group-aware cut"):
         load_dataset(root)  # the cluster pulls the early leg into the sealed fold, so 1 / 0 / 1 is wrong
     write_manifest(
         root,
@@ -2018,12 +2164,17 @@ def test_a_market_in_two_clusters_is_refused_rather_than_given_two_fold_keys(tmp
         encoding="utf-8",
         newline="\n",
     )
-    with pytest.raises(SchemaError, match="two clusters"):
+    with pytest.raises(FoldIntegrityError, match="two clusters"):
         read_cluster_groups(root)
 
 
 def test_the_purpose_of_a_manifest_written_before_the_field_is_the_signature_it_replaces() -> None:
     """5.6 and ruling R263: an unsealed pack whose only provider is ``demo`` reads as ``showcase``."""
     demo = load_manifest(DEMO_PACK)
+    assert demo.purpose == "", "the pack on disk predates the field, so the signature is what decides"
     assert manifest_purpose(demo) == "showcase"
-    assert demo.is_demo_pack is True  # the signature the field replaces, still the one on disk
+    assert not demo.sealed and demo.providers == ("demo",)  # the signature the field replaces
+    # And the field wins wherever it is written: a manifest that says ``research`` is research, whatever
+    # its providers say, which is the whole point of replacing a signature with a declaration.
+    assert manifest_purpose(dataclasses.replace(demo, purpose="research")) == "research"
+    assert manifest_purpose(dataclasses.replace(demo, purpose="showcase")) == "showcase"

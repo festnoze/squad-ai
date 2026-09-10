@@ -1156,6 +1156,7 @@ def test_there_is_exactly_one_lexicon_per_category() -> None:
         [f"{category}.v1.json" for category in CATEGORIES]
         + ["paraphrases.v1.json", "stopwords.v1.json"]
         + KALSHI_SERIES_FILES
+        + DS2_TAXONOMY_FILES
     )
 
 
@@ -1166,6 +1167,18 @@ def test_there_is_exactly_one_lexicon_per_category() -> None:
 KALSHI_SERIES_FILES = [
     "kalshi_series_categories.v1.json",
     "kalshi_series_subjects.v1.json",
+]
+
+#: The two files amendment C1c adds to this directory, owned by DS2 (CONTRACTS_V2 section 13 and 18.7,
+#: ruling R295): the three-facet tag vocabulary of 7.14 and the sealed series-to-facets map its first
+#: stage reads. They are not lexicons in D5's sense either, and ``kalshi_series_facets.v1.json`` never
+#: supersedes ``kalshi_series_subjects.v1.json`` above: that one holds Wikipedia article titles the
+#: linker of 7.6 compares against a news item's ``wiki_links``, this one holds ``tags.v1`` facet values
+#: that group markets for the cohort of 18.5. The inventory names them for the same reason it names the
+#: two above, which is that a file nobody declared still fails this test.
+DS2_TAXONOMY_FILES = [
+    "kalshi_series_facets.v1.json",
+    "tags.v1.json",
 ]
 
 

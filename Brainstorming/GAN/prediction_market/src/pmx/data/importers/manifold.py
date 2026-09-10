@@ -99,7 +99,7 @@ MANIFOLD_INTERVAL_MIN: Final = 1_440
 
 
 def check_interval_min(interval_min: int) -> None:
-    """Refuse a grid that is not one of the two of section 5.3 before a single request goes out."""
+    """Refuse a grid that is not one of ``INTERVALS_MIN`` (5.2) before a single request goes out."""
     if interval_min not in INTERVALS_MIN:
         raise InvalidConfigError("interval_min is not a dataset grid", interval_min=interval_min)
 

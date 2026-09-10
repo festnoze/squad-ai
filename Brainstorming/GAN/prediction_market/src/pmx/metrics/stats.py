@@ -43,9 +43,10 @@ from statistics import NormalDist
 import numpy as np
 from numpy.typing import NDArray
 
-from pmx.rng import RngTree
+from pmx.rng import RngTree, shuffle_seeded
 from pmx.scoring import directional_brier_micro
 from pmx.types import (
+    FDR_Q_PPM,
     PPM_ONE,
     RANDOM_WALK_BRIER_MICRO,
     MarketMeta,
@@ -58,6 +59,7 @@ from pmx.types import (
 __all__ = [
     "ALPHA_PPM",
     "BOOTSTRAP_RESAMPLES",
+    "FDR_Q_PPM",
     "PERMUTATIONS",
     "PERMUTATION_INNER_RESAMPLES",
     "BarKeys",
@@ -67,12 +69,14 @@ __all__ = [
     "PriceSeries",
     "RealisedSigns",
     "WeightSeries",
+    "benjamini_hochberg",
     "block_key",
     "bootstrap_lower_bound",
     "deflated_lower_bound",
     "iso_week_key",
     "paired_lower_bound",
     "permutation_null",
+    "rule_permutation_p_ppm",
 ]
 
 #: Bootstrap draws of a reported interval (section 12.4).
@@ -277,6 +281,119 @@ def deflated_lower_bound(interval: Interval, *, candidates: int) -> int:
     z = NormalDist().inv_cdf(1.0 - ALPHA_PPM / (PPM_ONE * k))
     widening = round_half_up_decimal(Decimal(z) * Decimal(interval.sd))
     return interval.point - widening
+
+
+# --------------------------------------------------------------------------------------------------
+# The hypothesis layer's two statistics (12.4, 18.2; amendment C1c, rulings R238 and R282)
+# --------------------------------------------------------------------------------------------------
+def benjamini_hochberg(p_values_ppm: Sequence[int], *, q_ppm: int = FDR_Q_PPM) -> tuple[bool, ...]:
+    """False discovery rate control **within** a pre-registered hypothesis family (12.4, ruling R238).
+
+    With ``m = len(p_values_ppm)`` and ``p_(1) <= ... <= p_(m)`` the sorted values, ``k`` is the largest
+    index with ``p_(k) * m <= k * q_ppm``; every position whose p-value is at most ``p_(k)`` is a
+    rejection and, when no such ``k`` exists, nothing is. No division anywhere, so the comparison is
+    exact, and the honest answer for a family whose best p-value is worse than ``q / m`` is that it
+    discovered nothing.
+
+    Bonferroni over the miner's millions of candidates kills everything or invites cheating, which is
+    why the family is the unit (18.2, decision D-R8). Deflation of a **claim** stays
+    :func:`deflated_lower_bound` above, Bonferroni on ``K``: this function governs rule promotion only
+    and never a claim.
+
+    Args:
+        p_values_ppm: One p-value per screened rule of the family, in parts per million, in the family's
+            own order. :func:`rule_permutation_p_ppm` is where they come from and it never returns zero.
+        q_ppm: The false discovery rate, in ppm. ``FDR_Q_PPM`` is five percent.
+
+    Returns:
+        One flag per input position, aligned with it: ``True`` where the step rejected the null.
+    """
+    k = _benjamini_hochberg_k(p_values_ppm, q_ppm=q_ppm)
+    if k == 0:
+        return tuple(False for _ in p_values_ppm)
+    cutoff = sorted(p_values_ppm)[k - 1]
+    return tuple(p <= cutoff for p in p_values_ppm)
+
+
+def _benjamini_hochberg_k(p_values_ppm: Sequence[int], *, q_ppm: int = FDR_Q_PPM) -> int:
+    """The ``k`` the step found, for the ledger row: ``0`` when nothing passes.
+
+    The **one** place the threshold ``p_(k) * m <= k * q_ppm`` is spelled. The first build of the rule
+    tester spelled it twice and the two copies disagreed: the flag loop dropped the ``k`` factor and
+    rejected only the single best p-value of a family whose first three were rejections. Two readings of
+    one arithmetic is one reading too many, so :func:`benjamini_hochberg` reads its cutoff off this
+    ``k`` and the tester reads its reported ``fdr_k`` off the same function.
+    """
+    m = len(p_values_ppm)
+    ordered = sorted(p_values_ppm)
+    for index in range(m, 0, -1):
+        if ordered[index - 1] * m <= index * q_ppm:
+            return index
+    return 0
+
+
+def rule_permutation_p_ppm(
+    y_rows: Sequence[int],
+    fired: Sequence[bool],
+    blocks: Sequence[str],
+    *,
+    rng: RngTree,
+    permutations: int,
+) -> int:
+    """The rule path's own null (12.4, ruling R282), on the statistic promotion tests.
+
+    The three sequences are aligned, one entry per row of the replicate fold in the rule's scope:
+    ``y_rows`` the row's realised measurement (18.2's table), ``fired`` whether the rule's condition
+    held there, ``blocks`` the row's ``block_key``. Each permutation shuffles ``fired`` **within each
+    block**, so every block keeps the number of rows the rule matched in it, and recomputes the mean of
+    ``y_rows`` over the matched rows: the same statistic the promotion criterion tests, so a rule cannot
+    pass one gate and fail the other for a reason nobody can read.
+
+    The estimator is ``round_half_up(PPM_ONE * (b + 1), permutations + 1)`` with ``b`` the permutations
+    whose mean reached the observed one. A permutation test may not report ``p = 0``: a ``p`` that can
+    only be ``0`` or a multiple of ``1 / B`` cannot be compared against a Benjamini-Hochberg threshold
+    of ``k * q / m``, and an inadmissible zero is what ruling R282 was fixing.
+
+    This is **not** :func:`permutation_null`, and the arbiter refused to redefine that function for
+    every caller: its ``market_prices``, ``outcomes`` and ``bar_weights_ms`` have no meaning for a
+    rule's matched ``(market, bar)`` rows, and a Brier skill against the market fails exactly the rule
+    whose direction is right and whose ``magnitude_bp`` is off by half, which 18.2 calls useful.
+
+    The shuffles draw from ``stats.permutation``, a **registered** substream of 6.3, and no name is
+    added: 18.2 had named ``rules.permutation``, which is in no ``SUBSTREAMS`` list, and these shuffles
+    run here, where the registered name already lives. There is no inner bootstrap: this is a mean over
+    rows and not a per-market lower bound, so raising ``permutations`` with the family size costs one
+    pass per shuffle.
+    """
+    if not y_rows:
+        return PPM_ONE
+    grouped: dict[str, list[int]] = {}
+    for position, key in enumerate(blocks):
+        grouped.setdefault(key, []).append(position)
+    observed = _matched_mean(y_rows, fired)
+    generator = rng.substream("stats.permutation")
+    at_least = 0
+    for _ in range(permutations):
+        shuffled = list(fired)
+        for key in sorted(grouped):
+            positions = grouped[key]
+            labels = shuffle_seeded(generator, [fired[position] for position in positions])
+            for position, label in zip(positions, labels, strict=True):
+                shuffled[position] = label
+        if _matched_mean(y_rows, shuffled) >= observed:
+            at_least += 1
+    return round_half_up(PPM_ONE * (at_least + 1), permutations + 1)
+
+
+def _matched_mean(y_rows: Sequence[int], fired: Sequence[bool]) -> int:
+    """The mean of the matched rows, rounded half away from zero. No match is a mean of zero."""
+    total = 0
+    count = 0
+    for value, hit in zip(y_rows, fired, strict=True):
+        if hit:
+            total += value
+            count += 1
+    return _mean_half_away(total, count)
 
 
 def permutation_null(

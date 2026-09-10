@@ -94,6 +94,52 @@ class MemoryFullError(PmxError):
     """A write would push the memory past ``MEMORY_MAX_BYTES`` and eviction could not make room."""
 
 
+class FoldIntegrityError(PmxError):
+    """The folds a manifest declares are not the folds the metas recompute (7.7, 18.5).
+
+    Raised by ``verify_dataset``, ``load_dataset``, ``make_folds``, the rule tester and ``claim`` when
+    the count-quantile cuts, the fold keys or the realised shares disagree with the recomputation, when a
+    cluster or ``event_key`` group spans two folds, when a fold is empty, when ``Folds.rolling`` would
+    hold no pair, or when a cohort row disagrees with the folds and facets recomputed (rulings R248,
+    R266, R277, R290). It is its own class and not a ``SchemaError``: the file parsed, and what failed is
+    an arithmetic a reader can redo.
+    """
+
+
+class ShowcaseDatasetError(PmxError):
+    """A ``purpose: "showcase"`` dataset reached something only a research dataset may feed.
+
+    A showcase dataset holds landmark events kept apart rather than thrown away (5.6, ruling R263): it
+    seals, loads and replays like any other and ``run_backtest`` runs it, but it is never the source of a
+    fold, a fitness value, a rule promotion, an insight or a claim, and ``make_folds``, ``run_generation``,
+    ``evolve``, ``claim``, the rule tester and ``pmx.features.matrix`` each raise this before reading a
+    market. ``run_backtest`` raises it too when ``memory_from_run_id`` or ``hive_from_run_id`` names a run
+    that ran on one (8.1, ruling R291), because memory carried between runs is a channel into an
+    observation. No flag lifts any of those refusals and none of them is a silent skip.
+    """
+
+
+class SensorAbsentError(PmxError):
+    """An agent read a field its sensor set did not buy (18.1, ruling R232).
+
+    Raised by the sensed views of the observation builder (``SensedMarketView``, ``SensedObservation``,
+    ``SensedBar``, ``SensedHiveView``) and by nothing else, carrying ``field``, ``unsensed`` and ``view``.
+    "The agent did not buy this" is a distinct failure from "a file failed its schema", which is what the
+    hook raised for want of a better fit, and a test that pins one must not pass on the other.
+    """
+
+
+class CohortRefusedError(PmxError):
+    """A cohort was asked for a measurement it cannot carry (18.5, rulings R266 and R283).
+
+    Raised by ``pmx.cohorts.cohort_or_refuse``, by the per-cohort leaderboard of 12.10 and by the
+    ``comparative`` detector when the cohort is unknown, when its train fold holds fewer than
+    ``COHORT_MIN_TRAIN`` markets, or when it is not ``usable_for_paired_test`` because one of its three
+    folds is empty. It fires **before** any measurement and is never weakened to a smaller bar: a paired
+    bound on a cohort that lives in one fold is not a weaker statement, it is a different and false one.
+    """
+
+
 class ClaimRefusedError(PmxError):
     """A second claim on the same ``(dataset_hash, provider, genome_hash)``, or an earlier aborted peek
     at the sealed fold: an aborted peek is a used claim, not a free one (section 12.8)."""

@@ -48,6 +48,9 @@ from pmx.data.builder import (
     check_window_days,
 )
 from pmx.data.news.linker import (
+    AUDIT_HASH_PREFIX,
+    AUDITS_DIR,
+    LINKER_AUDIT_FILE,
     LINKER_AUDIT_N,
     LINKER_PRECISION_MIN_PERMILLE,
     LinkerAudit,
@@ -808,6 +811,11 @@ def _cmd_audit_links(args: argparse.Namespace) -> int:
     dataset_dir = Path(args.dataset)
     audit = _write_linker_audit(dataset_dir, root=Path(args.audits_root), n=int(args.n))
     path = linker_audit_path(Path(args.audits_root), audit.dataset_hash)
+    # The manifest's ``news.linker_audit`` carries the precision, so a review that fills the verdicts
+    # has to move it: a leaderboard row reads ``news_links: weak`` off the dataset (7.6, 12.10) and a
+    # reviewed build whose manifest still said zero would be labelled weak forever.
+    reader = cast(Callable[[Path], DatasetManifest], _resolve("pmx.data.loader", "load_manifest"))
+    _stamp_linker_audit(dataset_dir, reader(dataset_dir), audit)
     print(f"linker audit {path}")
     print(f"  links      {audit.n} drawn, {audit.n_reviewed} reviewed")
     print(f"  verdicts   correct {audit.n_correct}  wrong {audit.n_wrong}")
@@ -902,24 +910,56 @@ def _run_build(
         sealer = cast(Callable[[Path], DatasetManifest], _resolve("pmx.data.loader", "seal_dataset"))
         manifest = sealer(out_dir)
         # The audit is drawn after the seal and keyed by the hash it audits (7.6, ruling R250), so it is
-        # written here and never inside the builder, whose hash is still moving when it returns.
-        audit = _write_linker_audit(out_dir, root=audits_root if audits_root is not None else AUDITS_ROOT)
+        # written here and never inside the builder, whose hash is still moving when it returns. The
+        # manifest then gains ``news.linker_audit`` (7.8): the manifest is outside ``dataset_hash``
+        # (4.3 hashes the directories and not the document that names their digest), so stamping it
+        # after the seal moves no hash and the label a leaderboard row reads is on the dataset itself
+        # rather than in a file beside it.
+        root = audits_root if audits_root is not None else AUDITS_ROOT
+        audit = _write_linker_audit(out_dir, root=root)
+        path = linker_audit_path(root, manifest.dataset_hash)
+        manifest = _stamp_linker_audit(out_dir, manifest, audit)
+        extra.append(f"  audit      {audit.n} links drawn for review at {path}")
         extra.append(
-            f"  audit      {audit.n} links drawn for review at "
-            f"{linker_audit_path(audits_root if audits_root is not None else AUDITS_ROOT, manifest.dataset_hash)}"
+            f"  precision  {audit.precision_permille} permille"
+            + ("  news_links: weak" if audit.weak else "")
         )
     _print_manifest(manifest, out_dir, extra=extra)
     return 0
 
 
-def _build_report(result: BuildResult) -> list[str]:
-    """The four answers amendment C1c added to a build, printed because they cannot yet be written.
+def _stamp_linker_audit(
+    out_dir: Path, manifest: DatasetManifest, audit: LinkerAudit
+) -> DatasetManifest:
+    """Write ``news.linker_audit {path, n, precision_permille}`` into the sealed manifest (7.8, R250).
 
-    ``purpose``, ``window_days``, the ``split`` cuts and moves, ``universe`` and ``build`` are manifest
-    blocks in 7.8 and every one of them is refused by the strict ``DatasetManifestModel`` of
-    ``pmx.data.schema`` until D1 lands the fields (the agreement DS1 reports). Printing them keeps the
-    operator and the gate reading the same numbers the manifest will carry, and
-    ``BuildResult.manifest_blocks`` is the document itself.
+    The path is the tracked ``audits/<dataset_hash[:16]>/linker.json`` of ruling R296, relative to the
+    audits root, which is the shape ``dataset.v1.json`` pins: an absolute path would be a statement
+    about one machine. ``precision_permille`` is ``0`` until a reviewer fills the verdicts, which is
+    deliberate (7.6): a build whose links nobody has looked at is not a build whose links are good.
+    """
+    stamped = dataclasses.replace(
+        manifest,
+        news=dataclasses.replace(
+            manifest.news,
+            linker_audit=audit.manifest_block(
+                f"{AUDITS_DIR}/{manifest.dataset_hash[:AUDIT_HASH_PREFIX]}/{LINKER_AUDIT_FILE}"
+            ),
+        ),
+    )
+    writer = cast(Callable[[Path, DatasetManifest], int], _resolve("pmx.data.loader", "write_manifest"))
+    writer(out_dir, stamped)
+    return stamped
+
+
+def _build_report(result: BuildResult) -> list[str]:
+    """The answers amendment C1c added to a build, printed beside the manifest that now carries them.
+
+    ``purpose``, ``window_days``, the ``split`` cuts and moves, ``universe``, ``resolution_span`` and
+    ``build`` are manifest blocks in 7.8 and the builder writes every one of them since 18.8's first
+    two rows landed in ``pmx.types`` and ``pmx.data.schema``. They are still printed, because an
+    operator reading a build log should not have to open the document to see what the cut did, and
+    ``BuildResult.manifest_blocks`` is that document.
     """
     lines = [f"  purpose    {result.purpose}"]
     plan = result.plan

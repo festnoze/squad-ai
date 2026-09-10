@@ -1,0 +1,2720 @@
+{
+ "schema": "kalshi_series_facets.v1",
+ "notes": "The sealed provider mapping of CONTRACTS_V2 7.14, stage 1 of the deterministic tagger (decision D-S8, ruling R267): a Kalshi series ticker (the part of a ticker before the first dash, ruling R170's key) to the tags.v1 subject facet it carries and, where the ticker itself fixes it, to its structure facet. It WINS OUTRIGHT over the keyword rules for the facets it declares, and a facet it does not declare falls through to them. This map and D2's kalshi_series_subjects.v1.json are two vocabularies with two purposes (ruling R295): that one holds English Wikipedia article titles, compared verbatim against a news item's wiki_links by the linker of 7.6; this one holds tags.v1 facet values, which group markets for the cohort of 18.5. This file never supersedes it.",
+ "derivation": {
+  "from": "kalshi_series_subjects.v1.json",
+  "rule": "A series is listed here when its Wikipedia titles imply EXACTLY ONE tags.v1 subject through the title table below, which is what 'where the two agree' means (ruling R295). A title that determines no facet on its own is absent from that table on purpose: a city, 'Weather forecasting', 'Cryptocurrency', 'United States dollar' and 'Economy of the United States' are all context rather than subject. So a series whose titles imply no subject, and one whose titles imply two, are both left out and their markets are tagged by the keyword rules of tags.v1 from the question text. The SNOW and RAIN series are the worked example: 'Dallas, Weather forecasting' cannot tell snow from temperature, so KXDALSNOWM is not here and 'Snow in Dallas in Jan 2026?' is tagged precipitation from its own question.",
+  "n_series_in_source": 737,
+  "n_series_derived": 500,
+  "n_series_ambiguous": 52,
+  "series_ambiguous": [
+   "FRM",
+   "KX30YMORTW",
+   "KXA100W",
+   "KXAMSAVO",
+   "KXB200AVGTEST",
+   "KXB200MON",
+   "KXB200MS",
+   "KXB200W",
+   "KXB200WS",
+   "KXBKNUGGETS",
+   "KXCFACHICKSAND",
+   "KXCHIPBURRITO",
+   "KXDATACENTCON",
+   "KXDDCOLDBREW",
+   "KXDDR5EMS",
+   "KXDDR5EWS",
+   "KXDDR5MS",
+   "KXDDR5WS",
+   "KXELONTWEETS",
+   "KXEPSTEIN",
+   "KXFAOFPI",
+   "KXFRM",
+   "KXH100MON",
+   "KXH100W",
+   "KXH200MON",
+   "KXH200W",
+   "KXH200WS",
+   "KXPCECORE",
+   "KXPCEHEAD",
+   "KXPOPCHICKSAND",
+   "KXPPISEMI",
+   "KXRETAIL",
+   "KXRTX5090MS",
+   "KXRTX5090W",
+   "KXRTX5090WS",
+   "KXRTXPRO6000W",
+   "KXSBUXSAR",
+   "KXTBCRUNCHWRAP",
+   "KXTRUMPMEET",
+   "KXUSDURABLE",
+   "KXUSGBEEF",
+   "KXUSIPMOM",
+   "KXUSMICHCSP",
+   "KXUSPINCOME",
+   "KXUSPPI",
+   "KXUSPPIYOY",
+   "KXUSPSPEND",
+   "KXUSRETAIL",
+   "KXWENBACONATOR",
+   "PCECORE",
+   "PPISEMI",
+   "RETAIL"
+  ],
+  "title_to_subject": {
+   "Act of Congress": "us-legislation",
+   "Air pollution": "climate-indicators",
+   "Air travel": "air-travel",
+   "Anti-obesity medication": "epidemics",
+   "Arctic sea ice decline": "climate-indicators",
+   "Artificial intelligence": "ai-models",
+   "Australian dollar": "fx-other",
+   "Avalanche (blockchain platform)": "crypto-other",
+   "Balance of trade": "trade-policy",
+   "Bankruptcy in the United States": "gdp-growth",
+   "Billie Eilish": "entertainment-media",
+   "Billionaire": "net-worth",
+   "Binance": "crypto-other",
+   "Bitcoin": "bitcoin",
+   "Bitcoin Cash": "crypto-other",
+   "Brazilian real": "fx-other",
+   "Brent Crude": "oil",
+   "COVID-19": "epidemics",
+   "COVID-19 pandemic": "epidemics",
+   "COVID-19 pandemic in the United States": "epidemics",
+   "COVID-19 vaccine": "epidemics",
+   "Canadian dollar": "fx-other",
+   "Carbon dioxide": "climate-indicators",
+   "Cattle": "agriculture",
+   "Chainlink (blockchain oracle)": "crypto-other",
+   "Chapter 11, Title 11, United States Code": "gdp-growth",
+   "China-United States trade war": "trade-policy",
+   "Climate of the United States": "temperature",
+   "Clinical trial": "epidemics",
+   "ClinicalTrials.gov": "epidemics",
+   "Cobalt": "metals-industrial",
+   "Cocoa bean": "agriculture",
+   "Coffee": "agriculture",
+   "Conservative Party (UK)": "elections-other",
+   "Construction": "housing",
+   "Consumer debt": "public-debt",
+   "Consumer price index": "cpi-inflation",
+   "Copper": "metals-industrial",
+   "Credit card debt": "public-debt",
+   "Data center": "ai-compute",
+   "Diesel fuel": "gas-prices",
+   "Dogecoin": "crypto-other",
+   "Donald Trump": "us-executive",
+   "Drought": "climate-indicators",
+   "Earthquake": "climate-indicators",
+   "Economy of the United States": "gdp-growth",
+   "Electric Reliability Council of Texas": "electricity",
+   "Electric vehicle": "single-equity",
+   "Electricity": "electricity",
+   "Electricity pricing": "electricity",
+   "Elon Musk": "net-worth",
+   "Employment": "employment",
+   "Ethereum": "ethereum",
+   "Euro": "fx-major",
+   "Federal Reserve": "central-bank-rates",
+   "Federal funds rate": "central-bank-rates",
+   "Fish meal": "agriculture",
+   "Food and Agriculture Organization": "agriculture",
+   "Food prices": "food-prices",
+   "Gasoline": "gas-prices",
+   "Gasoline and diesel usage and pricing": "gas-prices",
+   "Gold": "gold-silver",
+   "Gold as an investment": "gold-silver",
+   "Graphics processing unit": "ai-compute",
+   "Greenhouse gas emissions": "climate-indicators",
+   "Happier Than Ever": "entertainment-media",
+   "Head of government": "elections-other",
+   "Heating oil": "oil",
+   "ISM report on business": "gdp-growth",
+   "Illegal immigration to the United States": "us-executive",
+   "Indian rupee": "fx-other",
+   "Inflation": "cpi-inflation",
+   "Inflation in the United States": "cpi-inflation",
+   "Interest rate": "central-bank-rates",
+   "Iranian rial": "fx-other",
+   "Japanese yen": "fx-major",
+   "Jeffrey Epstein": "court-rulings",
+   "Jet fuel": "air-travel",
+   "Lake Mead": "climate-indicators",
+   "Lake Michigan": "climate-indicators",
+   "Large language model": "ai-models",
+   "Layoff": "employment",
+   "Litecoin": "crypto-other",
+   "Lithium": "metals-industrial",
+   "Maize": "agriculture",
+   "Mexican peso": "fx-other",
+   "Mortgage loan": "housing",
+   "Nasdaq-100": "equity-index",
+   "National debt of the United States": "public-debt",
+   "Natural gas": "natural-gas",
+   "Natural gas prices": "natural-gas",
+   "New Zealand dollar": "fx-other",
+   "Nickel": "metals-industrial",
+   "Nonfarm payrolls": "employment",
+   "Norwegian krone": "fx-other",
+   "Nvidia": "single-equity",
+   "Obesity": "epidemics",
+   "Petroleum": "oil",
+   "Plug-in electric vehicle": "single-equity",
+   "Polkadot (cryptocurrency)": "crypto-other",
+   "Pound sterling": "fx-major",
+   "President of the United States": "us-executive",
+   "Price of oil": "oil",
+   "Rain": "precipitation",
+   "Real estate economics": "housing",
+   "Reform UK": "elections-other",
+   "Renminbi": "fx-major",
+   "Renting": "housing",
+   "Richter scale": "climate-indicators",
+   "Ripple Labs": "crypto-other",
+   "Rocket launch": "spaceflight",
+   "Russian ruble": "fx-other",
+   "S&P 500": "equity-index",
+   "Sea ice": "climate-indicators",
+   "Shiba Inu (cryptocurrency)": "crypto-other",
+   "Silver": "gold-silver",
+   "Silver as an investment": "gold-silver",
+   "Solana (blockchain platform)": "crypto-other",
+   "Soybean": "agriculture",
+   "Spaceflight": "spaceflight",
+   "Steel": "metals-industrial",
+   "Stellar (payment network)": "crypto-other",
+   "Stock market index": "equity-index",
+   "Sugar": "agriculture",
+   "Swedish krona": "fx-other",
+   "Swiss franc": "fx-major",
+   "The New York Times": "single-equity",
+   "The World's Billionaires": "net-worth",
+   "Tornado": "storms",
+   "Transportation Security Administration": "air-travel",
+   "Travel warning": "us-executive",
+   "Twitter": "single-equity",
+   "U.S. Customs and Border Protection": "us-executive",
+   "Unemployment": "employment",
+   "Unemployment benefits": "employment",
+   "Unemployment in the United States": "employment",
+   "United Nations Security Council": "armed-conflict",
+   "United Nations Security Council veto power": "armed-conflict",
+   "United States Congress": "us-legislation",
+   "United States Department of State": "us-executive",
+   "United States Treasury security": "treasury-yields",
+   "United States housing bubble": "housing",
+   "United States presidential approval rating": "us-executive",
+   "West Texas Intermediate": "oil",
+   "Wheat": "agriculture",
+   "Yield curve": "treasury-yields",
+   "Zcash": "crypto-other",
+   "Zohran Mamdani": "elections-us"
+  }
+ },
+ "series": {
+  "538APPROVE": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "AAAGASD": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "AAAGASM": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "AAAGASW": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "APRPOTUS": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "ARINFLATIONM": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "ASYLUMCASES": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "AVGTEMP": {
+   "subjects": [
+    "temperature"
+   ]
+  },
+  "BANKRUPTS": {
+   "subjects": [
+    "gdp-growth"
+   ]
+  },
+  "BOOSTER": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "BOOSTERM": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "BTC": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "BTCD": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "BTCD-B": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "BTCMAXM": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "CASE7DCN": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "CASED": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "CASEM": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "CASEW": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "CASEWCN": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "CASEWDE": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "CASEWFR": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "CASEWIT": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "CNY": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "CO2": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "CPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CPIAPPAREL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CPICORE": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CPICOREYOY": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CPIFOOD": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CPIGAS": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CPISHELTER": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CPIUSEDCAR": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CPIYOY": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "CRED": {
+   "subjects": [
+    "public-debt"
+   ]
+  },
+  "DIESEL": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "DIESELM": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "ERCOTX": {
+   "subjects": [
+    "electricity"
+   ]
+  },
+  "ETH": {
+   "subjects": [
+    "ethereum"
+   ]
+  },
+  "ETHD": {
+   "subjects": [
+    "ethereum"
+   ]
+  },
+  "EURO": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "EUROIMF": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "EURUSD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "EURUSDH": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "EVMKT": {
+   "subjects": [
+    "single-equity"
+   ]
+  },
+  "FLIGHTJFK": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "FLIGHTLAX": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "FLIGHTORD": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "FXEURO": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "FXPESO": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "GAS": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "GAS-MONTH": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "GASM": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "GBP": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "GOLD": {
+   "subjects": [
+    "gold-silver"
+   ]
+  },
+  "HAPPIER": {
+   "subjects": [
+    "entertainment-media"
+   ]
+  },
+  "HIGHUS": {
+   "subjects": [
+    "temperature"
+   ]
+  },
+  "HMONTH": {
+   "subjects": [
+    "temperature"
+   ]
+  },
+  "HOME": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "HOMEUS": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "HOUSELENGTH": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "HOUSESTART": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "HPI": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "INX": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "INXAB": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "INXM": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "INXU": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "INXW": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "INXZ": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "JOBLESS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "JPY": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KX10YUSTSRY": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KX30YUSTW": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KX538APPROVE": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXAAAEVM": {
+   "subjects": [
+    "electricity"
+   ]
+  },
+  "KXAAAGASD": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDCA": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDFL": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDGA": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDIL": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDNC": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDNJ": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDNY": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDOH": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDPA": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDTX": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASDWA": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASM": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASMAXM": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASMINM": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASW": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAAAGASWNJ": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXAIADOPTION": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXAIFINANCE": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXAIFOOD": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXAIHEALTH": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXAIJOBLOSS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXAIMANU": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXAIRFARECPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXAISPEND1": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXAISPEND10": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXAITECH": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXANTHADOPT": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXAPRPOTUS": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXARINFLATIONM": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXARMOMINF": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXARNAULTNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXASYLUMCASES": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXAUDUSDAD": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXAUDUSDAW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXAUDUSDW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXAVAX": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXAVAXD": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXAVGTEMP": {
+   "subjects": [
+    "temperature"
+   ]
+  },
+  "KXBALLMERNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXBANKRUPTS": {
+   "subjects": [
+    "gdp-growth"
+   ]
+  },
+  "KXBCH": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXBCHD": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXBEZOSNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXBIGGESTQUAKE": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "KXBILLSCOUNT": {
+   "subjects": [
+    "us-legislation"
+   ]
+  },
+  "KXBILLSCOUNTWEEKLY": {
+   "subjects": [
+    "us-legislation"
+   ]
+  },
+  "KXBNBMAXMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXBNBMINMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXBOOSTER": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXBOOSTERM": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXBRENTD": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXBRENTMON": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXBRENTW": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXBRINNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXBTCMAXD": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXBTCMAXM": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXBTCMAXMON": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXBTCMAXW": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXBTCMINMON": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXBTCVSETH": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXBTCVSHYPE": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXBTCVSSOL": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXBUFFETTNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXCACPIYOY": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCAIVEYPMI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCASE7DCN": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXCASED": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXCASEM": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXCASEW": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXCASEWCN": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXCASEWDE": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXCASEWFR": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXCASEWIT": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXCH11": {
+   "subjects": [
+    "gdp-growth"
+   ]
+  },
+  "KXCHAICUTS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXCHCUTS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXCHINAOILINV": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXCNY": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXCO2": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "KXCOBALTMON": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXCOBALTW": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXCOCOAMON": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXCOCOAW": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXCOFFEEMON": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXCOFFEEW": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXCONTCLAIMS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXCOPPERD": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXCOPPERMON": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXCOPPERW": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXCORNMON": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXCORNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXCPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPIAPPAREL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPICOMBO": {
+   "subjects": [
+    "cpi-inflation"
+   ],
+   "structure": "multi-outcome-leg"
+  },
+  "KXCPICORE": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPICOREHEAD": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPICOREYOY": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPIFOOD": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPIGAS": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPINDEX": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPISHELTER": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPIUSEDCAR": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCPIYOY": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXCRED": {
+   "subjects": [
+    "public-debt"
+   ]
+  },
+  "KXDECPIPREL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXDEEPADOPT": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXDEGFK": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXDEIFO": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXDELLNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXDETRADEBAL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXDEZEW": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXDIESEL": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXDIESELM": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXDOGEMAXM": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXDOGEMAXMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXDOGEMAXW": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXDOGEMINMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXDOT": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXDOTD": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXEIACRUDEW": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXELLISONNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXEMPLOYMENTCOMBO": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXEOWEEK": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXERCOTX": {
+   "subjects": [
+    "electricity"
+   ]
+  },
+  "KXETHMAXMON": {
+   "subjects": [
+    "ethereum"
+   ]
+  },
+  "KXETHMINMON": {
+   "subjects": [
+    "ethereum"
+   ]
+  },
+  "KXEURO": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXEUROIMF": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXEURUSD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXEURUSDAD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXEURUSDD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXEURUSDW": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXEVMKT": {
+   "subjects": [
+    "single-equity"
+   ]
+  },
+  "KXEZCPIYOYF": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXFEDCOMBO": {
+   "subjects": [
+    "central-bank-rates"
+   ],
+   "structure": "multi-outcome-leg"
+  },
+  "KXFEDTWEETS": {
+   "subjects": [
+    "central-bank-rates"
+   ]
+  },
+  "KXFISHMEAL": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXFLIGHTJFK": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "KXFLIGHTLAX": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "KXFLIGHTORD": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "KXFRCPIPREL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXFULLLID8PM": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXFULLLIDBEFORE630PM": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXFULLLIDBEFORE8PM": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXFXEURO": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXFXPESO": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXFXUSDIRRMON": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXGAS": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXGAS-MONTH": {
+   "subjects": [
+    "gas-prices"
+   ]
+  },
+  "KXGBP": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXGBPUSDAD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXGBPUSDAW": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXGBPUSDD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXGOLD": {
+   "subjects": [
+    "gold-silver"
+   ]
+  },
+  "KXGOLDD": {
+   "subjects": [
+    "gold-silver"
+   ]
+  },
+  "KXGOLDMON": {
+   "subjects": [
+    "gold-silver"
+   ]
+  },
+  "KXGOLDW": {
+   "subjects": [
+    "gold-silver"
+   ]
+  },
+  "KXGPUSDW": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXHAPPIER": {
+   "subjects": [
+    "entertainment-media"
+   ]
+  },
+  "KXHICP": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXHIGHUS": {
+   "subjects": [
+    "temperature"
+   ]
+  },
+  "KXHMONTH": {
+   "subjects": [
+    "temperature"
+   ]
+  },
+  "KXHOILMON": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXHOILW": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXHOME": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXHOMEUS": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXHOUSELENGTH": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXHOUSESTART": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXHPI": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXHUANGNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXINCOMERATE": {
+   "subjects": [
+    "us-legislation"
+   ]
+  },
+  "KXINX": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXAB": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXDUD": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXM": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXMAXMM": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXMAXMON": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXMINMON": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXVSNDQ100": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXW": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXWUD": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXINXZ": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXIRANCPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXIRANCRUDE": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXITCPIPREL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXJETFUEL": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "KXJOBLESS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXJOBLESSCLAIMS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXJOLTSOPEN": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXJPCONCONF": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXJPCPIYOY": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXJPMOMINF": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXJPTRADEBAL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXJPY": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXJUDGECOUNT": {
+   "subjects": [
+    "us-legislation"
+   ]
+  },
+  "KXLAGODAYS": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXLCATTLEMON": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXLCATTLEW": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXLEADERCOMBOOUT": {
+   "subjects": [
+    "elections-other"
+   ]
+  },
+  "KXLINK": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXLINKD": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXLITHIUMMON": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXLITHIUMW": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXLTC": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXLTCD": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXLVL4WARNING": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXMANHATTANRENT": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXMEAD": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "KXMICHTEMP": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "KXMUSKNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXNASDAQ100": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNASDAQ100M": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNASDAQ100MAXMON": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNASDAQ100MINMON": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNASDAQ100W": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNASDAQ100Z": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNASDAQDUD": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNASDAQWUD": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNATGASD": {
+   "subjects": [
+    "natural-gas"
+   ]
+  },
+  "KXNATGASMON": {
+   "subjects": [
+    "natural-gas"
+   ]
+  },
+  "KXNATGASW": {
+   "subjects": [
+    "natural-gas"
+   ]
+  },
+  "KXNDQDUD": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "KXNEWTARIFFS": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXNGAS": {
+   "subjects": [
+    "natural-gas"
+   ]
+  },
+  "KXNGASW": {
+   "subjects": [
+    "natural-gas"
+   ]
+  },
+  "KXNICKELMON": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXNICKELW": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXNOTE10": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXNOTE10M": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXNOTE10W": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXNOTE30": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXNOTE30W": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXNYCRENTSM": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXNYTFULLWIDTH": {
+   "subjects": [
+    "single-equity"
+   ]
+  },
+  "KXNYTHEAD": {
+   "subjects": [
+    "single-equity"
+   ]
+  },
+  "KXNZDUSD": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXNZDUSDAD": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXNZDUSDAW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXOER": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXOIL": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXOILW": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXONRRP": {
+   "subjects": [
+    "central-bank-rates"
+   ]
+  },
+  "KXOPENADOPT": {
+   "subjects": [
+    "ai-models"
+   ]
+  },
+  "KXPAGENW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXPARDONANYONE": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXPARDONSTRUMP": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXPAYROLLS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXPAYROLLSREV": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXPESO": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXPHARMARACEM": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXPMLA": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "KXPOTUSTWEETS": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXPOWERKWH": {
+   "subjects": [
+    "electricity"
+   ]
+  },
+  "KXPROLLS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXRAIN": {
+   "subjects": [
+    "precipitation"
+   ]
+  },
+  "KXRAIND": {
+   "subjects": [
+    "precipitation"
+   ]
+  },
+  "KXRAINDC": {
+   "subjects": [
+    "precipitation"
+   ]
+  },
+  "KXRENTNYCM": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "KXRIPPLED": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXROCKET": {
+   "subjects": [
+    "spaceflight"
+   ]
+  },
+  "KXRUBLE": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXSAMOMINF": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXSARETAIL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXSATRADEBAL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXSEAICE": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "KXSHELTERCPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXSHIBA": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXSHIBAD": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXSILVERD": {
+   "subjects": [
+    "gold-silver"
+   ]
+  },
+  "KXSILVERMON": {
+   "subjects": [
+    "gold-silver"
+   ]
+  },
+  "KXSILVERW": {
+   "subjects": [
+    "gold-silver"
+   ]
+  },
+  "KXSOFR": {
+   "subjects": [
+    "central-bank-rates"
+   ]
+  },
+  "KXSOFRD": {
+   "subjects": [
+    "central-bank-rates"
+   ]
+  },
+  "KXSOLDATHOLDINGS": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXSOLMAXM": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXSOLMAXMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXSOLMINMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXSOYBEANMON": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXSOYBEANW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXSTEELMON": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXSTEELW": {
+   "subjects": [
+    "metals-industrial"
+   ]
+  },
+  "KXSUGARMON": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXSUGARW": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXSWENCOUNTERS": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXTECHLAYOFF": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXTEMPHELP": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXTEMPMON": {
+   "subjects": [
+    "temperature"
+   ]
+  },
+  "KXTNOTED": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXTNOTEW": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXTOBACCPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTONW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "KXTOPMODEL": {
+   "subjects": [
+    "ai-models"
+   ],
+   "structure": "multi-outcome-leg"
+  },
+  "KXTORNADO": {
+   "subjects": [
+    "storms"
+   ]
+  },
+  "KXTORYMPJOINREFORM": {
+   "subjects": [
+    "elections-other"
+   ]
+  },
+  "KXTRDDEFCN": {
+   "subjects": [
+    "trade-policy"
+   ]
+  },
+  "KXTRUFAIDP": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUFBFST": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUFBPPI": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXTRUFCCI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUFCMC": {
+   "subjects": [
+    "bitcoin"
+   ]
+  },
+  "KXTRUFCPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUFDEAD": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUFEGGS": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUFGAS": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUFHOUCPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUFPDEBT": {
+   "subjects": [
+    "public-debt"
+   ]
+  },
+  "KXTRUFTSA": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXTRUMPACT": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXTRUMPFAV": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXTRUMPVISITGREENLAND": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXTRUMPVISITWEEK": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXTRUTHSOCIAL": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXTSAW": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "KXTXERCOTPEAKD": {
+   "subjects": [
+    "electricity"
+   ]
+  },
+  "KXU3": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXUE": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXUKCPIYOY": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXUKGDPMOM": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXUKRETAIL": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXUKUNRATE": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXUSDBRLAD": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDBRLAW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDBRLMAXM": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDCADAD": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDCADAW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDCADW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDCHFAD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXUSDCHFAW": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXUSDEBTMON": {
+   "subjects": [
+    "public-debt"
+   ]
+  },
+  "KXUSDINRAD": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDINRAW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDJPY": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXUSDJPYAD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXUSDJPYAH": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXUSDJPYAW": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXUSDJPYD": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXUSDJPYW": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "KXUSDMXNAW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDNOKAD": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDNOKAW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDSEK": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSDSEKAW": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "KXUSEDCAR": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXUSEDCARCPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXUSFLYCAN": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "KXUSGASCPI": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "KXUSISMSERV": {
+   "subjects": [
+    "gdp-growth"
+   ]
+  },
+  "KXUSNFP": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "KXUST10": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST10A": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST10M": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST2": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST2A": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST30": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST30A": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST30M": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST5A": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST5M": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUST7A": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUSTM": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "KXUSUNSCVETO": {
+   "subjects": [
+    "armed-conflict"
+   ]
+  },
+  "KXVAXX": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXVAXXDEP": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXVENEZCRUDE": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXVOTEHUBTRUMPUPDOWN": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "KXWEIGHTDRUGS": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "KXWHEAT": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXWHEATMON": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXWHEATW": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "KXWTI": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXWTIMONTHLY": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXWTIW": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "KXXLM": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXXLMD": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXXRPMAXMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXXRPMINMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXZECHW": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXZECMAXMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXZECMINMON": {
+   "subjects": [
+    "crypto-other"
+   ]
+  },
+  "KXZUCKERBERGNW": {
+   "subjects": [
+    "net-worth"
+   ]
+  },
+  "MEAD": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "MICHTEMP": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "NASDAQ100": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "NASDAQ100M": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "NASDAQ100U": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "NASDAQ100W": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "NASDAQ100Z": {
+   "subjects": [
+    "equity-index"
+   ]
+  },
+  "NGAS": {
+   "subjects": [
+    "natural-gas"
+   ]
+  },
+  "NGASW": {
+   "subjects": [
+    "natural-gas"
+   ]
+  },
+  "NYCRENTS": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "NYCRENTSM": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "OIL": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "OILW": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "ONRRP": {
+   "subjects": [
+    "central-bank-rates"
+   ]
+  },
+  "PAYROLLS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "PESO": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "PMLA": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "PRESINDEXD": {
+   "subjects": [
+    "us-executive"
+   ]
+  },
+  "PROLLS": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "RENTNYC": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "RENTNYCM": {
+   "subjects": [
+    "housing"
+   ]
+  },
+  "ROCKET": {
+   "subjects": [
+    "spaceflight"
+   ]
+  },
+  "RUBLE": {
+   "subjects": [
+    "fx-other"
+   ]
+  },
+  "SEAICE": {
+   "subjects": [
+    "climate-indicators"
+   ]
+  },
+  "SOFR": {
+   "subjects": [
+    "central-bank-rates"
+   ]
+  },
+  "TBILL": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "TECHLAYOFF": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "TEMPMON": {
+   "subjects": [
+    "temperature"
+   ]
+  },
+  "TNOTE": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "TNOTED": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "TNOTEW": {
+   "subjects": [
+    "treasury-yields"
+   ]
+  },
+  "TORNADO": {
+   "subjects": [
+    "storms"
+   ]
+  },
+  "TRDDEFCN": {
+   "subjects": [
+    "trade-policy"
+   ]
+  },
+  "TSAW": {
+   "subjects": [
+    "air-travel"
+   ]
+  },
+  "U3": {
+   "subjects": [
+    "employment"
+   ]
+  },
+  "USDJPY": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "USDJPYH": {
+   "subjects": [
+    "fx-major"
+   ]
+  },
+  "USEDCAR": {
+   "subjects": [
+    "cpi-inflation"
+   ]
+  },
+  "VAXX": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "VAXXDEP": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "WEIGHTDRUGS": {
+   "subjects": [
+    "epidemics"
+   ]
+  },
+  "WHEAT": {
+   "subjects": [
+    "agriculture"
+   ]
+  },
+  "WTI": {
+   "subjects": [
+    "oil"
+   ]
+  },
+  "WTIW": {
+   "subjects": [
+    "oil"
+   ]
+  }
+ }
+}

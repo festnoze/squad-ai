@@ -1,0 +1,4172 @@
+{
+ "notes": "The 287 markets of the first real build (data/datasets/y2026, freeze 2026-09-08) reduced to the eight fields the tagger of CONTRACTS_V2 7.14 may read plus the fold the split of 7.7 gave each market. Recorded so tests/test_taxonomy.py can measure per-venue coverage over the real distribution without a dataset directory that .gitignore excludes, and so a vocabulary edit that moves coverage fails a test rather than a rebuild. No bar, no trade, no resolution and no price is here: the tagger may not read one, which is the point of the leak test beside this fixture.",
+ "dataset": "y2026",
+ "freeze_date": "2026-09-07",
+ "n_markets": 287,
+ "markets": [
+  {
+   "id": "kalshi-KXAAAGASM-25DEC31-2.85",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-25DEC31-2.85",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $2.85? (Above 2.85)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1764514800000,
+   "close_at_ms": 1767157140000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-25NOV30-3.05",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-25NOV30-3.05",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $3.05? (Above 3.05)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1761919200000,
+   "close_at_ms": 1764478740000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-25OCT31-3.05",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-25OCT31-3.05",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $3.05? (Above 3.05)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1759240800000,
+   "close_at_ms": 1761883140000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-25SEP30-3.15",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-25SEP30-3.15",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $3.15? (Above 3.15)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1756648800000,
+   "close_at_ms": 1759204740000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26APR30-4.20",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26APR30-4.20",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.20? (Above 4.20)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1774965600000,
+   "close_at_ms": 1777521540000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26AUG31-4.10",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26AUG31-4.10",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.10? (Above 4.10)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1782856800000,
+   "close_at_ms": 1788148740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26AUG31-4.20",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26AUG31-4.20",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.20? (Above 4.20)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1782856800000,
+   "close_at_ms": 1788148740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26FEB28-3.00",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26FEB28-3.00",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $3.00? (Above 3.00)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1769871600000,
+   "close_at_ms": 1772254740000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26JUL31-4.10",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26JUL31-4.10",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.10? (Above 4.10)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1782828000000,
+   "close_at_ms": 1785470340000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26JUN30-3.90",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26JUN30-3.90",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $3.90? (Above 3.90)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1780236000000,
+   "close_at_ms": 1782791940000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26MAR31-4.00",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26MAR31-4.00",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.00? (Above 4.00)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1772755200000,
+   "close_at_ms": 1774929540000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26MAR31-4.50",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26MAR31-4.50",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.50? (Above 4.50)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1772989200000,
+   "close_at_ms": 1774929540000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXAAAGASM-26MAY31-4.30",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASM-26MAY31-4.30",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.30? (Above 4.30)",
+   "tags": [
+    "economics",
+    "kxaaagasm"
+   ],
+   "created_at_ms": 1777557600000,
+   "close_at_ms": 1780199940000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXAAAGASW-26AUG10-4.000",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASW-26AUG10-4.000",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.000? (Above 4.000)",
+   "tags": [
+    "economics",
+    "kxaaagasw"
+   ],
+   "created_at_ms": 1785761100000,
+   "close_at_ms": 1786334340000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAAAGASW-26AUG17-4.080",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASW-26AUG17-4.080",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.080? (Above 4.080)",
+   "tags": [
+    "economics",
+    "kxaaagasw"
+   ],
+   "created_at_ms": 1786367700000,
+   "close_at_ms": 1786939140000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAAAGASW-26JUL27-4.120",
+   "provider": "kalshi",
+   "provider_id": "KXAAAGASW-26JUL27-4.120",
+   "category": "economics",
+   "question": "Will average **gas prices** be above $4.120? (Above 4.120)",
+   "tags": [
+    "economics",
+    "kxaaagasw"
+   ],
+   "created_at_ms": 1784552400000,
+   "close_at_ms": 1785124740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAPRPOTUS-26AUG14-39.2",
+   "provider": "kalshi",
+   "provider_id": "KXAPRPOTUS-26AUG14-39.2",
+   "category": "politics",
+   "question": "Will the President's approval rating be between 39.1 and 39.3 according to RealClearPolitics? (39.1 to 39.3)",
+   "tags": [
+    "kxaprpotus",
+    "politics"
+   ],
+   "created_at_ms": 1786114800000,
+   "close_at_ms": 1786723200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAPRPOTUS-26AUG28-38.7",
+   "provider": "kalshi",
+   "provider_id": "KXAPRPOTUS-26AUG28-38.7",
+   "category": "politics",
+   "question": "Will the President's approval rating be below 38.8 according to RealClearPolitics?",
+   "tags": [
+    "kxaprpotus",
+    "politics"
+   ],
+   "created_at_ms": 1787325600000,
+   "close_at_ms": 1787929200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAPRPOTUS-26JUL10-39.6",
+   "provider": "kalshi",
+   "provider_id": "KXAPRPOTUS-26JUL10-39.6",
+   "category": "politics",
+   "question": "Will the President's approval rating be below 39.6 according to RealClearPolitics?",
+   "tags": [
+    "kxaprpotus",
+    "politics"
+   ],
+   "created_at_ms": 1783090800000,
+   "close_at_ms": 1783695600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAPRPOTUS-26JUL17-39.6",
+   "provider": "kalshi",
+   "provider_id": "KXAPRPOTUS-26JUL17-39.6",
+   "category": "politics",
+   "question": "Will the President's approval rating be below 39.6 according to RealClearPolitics?",
+   "tags": [
+    "kxaprpotus",
+    "politics"
+   ],
+   "created_at_ms": 1783695600000,
+   "close_at_ms": 1784300400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAPRPOTUS-26JUL17-40.9",
+   "provider": "kalshi",
+   "provider_id": "KXAPRPOTUS-26JUL17-40.9",
+   "category": "politics",
+   "question": "Will the President's approval rating be between 40.8 and 41.0 according to RealClearPolitics? (40.8 to 41.0)",
+   "tags": [
+    "kxaprpotus",
+    "politics"
+   ],
+   "created_at_ms": 1783695600000,
+   "close_at_ms": 1784300400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAPRPOTUS-26JUL24-40.2",
+   "provider": "kalshi",
+   "provider_id": "KXAPRPOTUS-26JUL24-40.2",
+   "category": "politics",
+   "question": "Will the President's approval rating be below 40.2 according to RealClearPolitics?",
+   "tags": [
+    "kxaprpotus",
+    "politics"
+   ],
+   "created_at_ms": 1784300400000,
+   "close_at_ms": 1784905200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAPRPOTUS-26SEP04-38.7",
+   "provider": "kalshi",
+   "provider_id": "KXAPRPOTUS-26SEP04-38.7",
+   "category": "politics",
+   "question": "Will the President's approval rating be below 38.8 according to RealClearPolitics?",
+   "tags": [
+    "kxaprpotus",
+    "politics"
+   ],
+   "created_at_ms": 1787929200000,
+   "close_at_ms": 1788534000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAVGTKAUS-26AUG24-4",
+   "provider": "kalshi",
+   "provider_id": "KXAVGTKAUS-26AUG24-4",
+   "category": "weather",
+   "question": "Will the average temperature in Austin be above 90°F for 4 or more consecutive days in the week of Aug 18, 2026? (4+ consecutive days)",
+   "tags": [
+    "kxavgtkaus",
+    "weather"
+   ],
+   "created_at_ms": 1787011200000,
+   "close_at_ms": 1787547599000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXAVGTKSAN-26AUG30-2",
+   "provider": "kalshi",
+   "provider_id": "KXAVGTKSAN-26AUG30-2",
+   "category": "weather",
+   "question": "Will the average temperature in San Diego be above 90°F for 2 or more consecutive days in the week of Aug 24, 2026? (2+ consecutive days)",
+   "tags": [
+    "kxavgtksan",
+    "weather"
+   ],
+   "created_at_ms": 1787544000000,
+   "close_at_ms": 1788148799000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXB200MON-26AUG31-6.010",
+   "provider": "kalshi",
+   "provider_id": "KXB200MON-26AUG31-6.010",
+   "category": "tech",
+   "question": "Will the B200 compute per hour price be above $6.01 on Aug 31?",
+   "tags": [
+    "kxb200mon",
+    "tech"
+   ],
+   "created_at_ms": 1785628800000,
+   "close_at_ms": 1788211797000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXB200MON-26JUL31-6.460",
+   "provider": "kalshi",
+   "provider_id": "KXB200MON-26JUL31-6.460",
+   "category": "tech",
+   "question": "Will the B200 compute per hour price be above $6.46 on Jul 31?",
+   "tags": [
+    "kxb200mon",
+    "tech"
+   ],
+   "created_at_ms": 1784495400000,
+   "close_at_ms": 1785556799000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXB200WS-26AUG28-5.500",
+   "provider": "kalshi",
+   "provider_id": "KXB200WS-26AUG28-5.500",
+   "category": "tech",
+   "question": "Will the NVIDIA B200 compute per hour price be above $5.5 at 4 PM ET on Aug 28? (Above $5.50)",
+   "tags": [
+    "kxb200ws",
+    "tech"
+   ],
+   "created_at_ms": 1784320800000,
+   "close_at_ms": 1787947200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBILLSCOUNT-26MAR-0.0",
+   "provider": "kalshi",
+   "provider_id": "KXBILLSCOUNT-26MAR-0.0",
+   "category": "politics",
+   "question": "Will 0 to 0 bills become law in Mar 2026?",
+   "tags": [
+    "kxbillscount",
+    "politics"
+   ],
+   "created_at_ms": 1772377200000,
+   "close_at_ms": 1774621403000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBNBMINMON-BNB-26AUG31-49000",
+   "provider": "kalshi",
+   "provider_id": "KXBNBMINMON-BNB-26AUG31-49000",
+   "category": "crypto",
+   "question": "Will BNB trimmed mean be below $490.00 by 11:59 PM ET on Aug 31, 2026?",
+   "tags": [
+    "crypto",
+    "kxbnbminmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1788235199000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTMON-26APR3017-T104.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTMON-26APR3017-T104.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above $104.99 on Apr 30, 2026 at 5pm EDT?",
+   "tags": [
+    "finance",
+    "kxbrentmon"
+   ],
+   "created_at_ms": 1775067720000,
+   "close_at_ms": 1777582800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBRENTMON-26APR3017-T118.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTMON-26APR3017-T118.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above $118.99 on Apr 30, 2026 at 5pm EDT?",
+   "tags": [
+    "finance",
+    "kxbrentmon"
+   ],
+   "created_at_ms": 1775067720000,
+   "close_at_ms": 1777582800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBRENTMON-26AUG3117-T86.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTMON-26AUG3117-T86.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 86.99 USD/Bbl on August 31, 2026 at 5:00 PM EDT? (Above $86.99)",
+   "tags": [
+    "finance",
+    "kxbrentmon"
+   ],
+   "created_at_ms": 1785578400000,
+   "close_at_ms": 1788210000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTMON-26AUG3117-T92.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTMON-26AUG3117-T92.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 92.99 USD/Bbl on August 31, 2026 at 5:00 PM EDT? (Above $92.99)",
+   "tags": [
+    "finance",
+    "kxbrentmon"
+   ],
+   "created_at_ms": 1785578400000,
+   "close_at_ms": 1788210000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTMON-26JUL3117-T88.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTMON-26JUL3117-T88.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 88.99 USD/Bbl on July 31, 2026 at 5:00 PM EDT? (Above $88.99)",
+   "tags": [
+    "finance",
+    "kxbrentmon"
+   ],
+   "created_at_ms": 1783017060000,
+   "close_at_ms": 1785531600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTMON-26JUN3017-T90.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTMON-26JUN3017-T90.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 90.99 USD/Bbl on June 30, 2026 at 5:00 PM EDT? (above $90.99)",
+   "tags": [
+    "finance",
+    "kxbrentmon"
+   ],
+   "created_at_ms": 1780339020000,
+   "close_at_ms": 1782853200000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXBRENTMON-26MAY2917-T88.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTMON-26MAY2917-T88.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 88.99  USD/Bbl on May 29, 2026 at 5:00 PM EDT? (above $88.99)",
+   "tags": [
+    "finance",
+    "kxbrentmon"
+   ],
+   "created_at_ms": 1777675500000,
+   "close_at_ms": 1780088400000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXBRENTW-26AUG0717-T82.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTW-26AUG0717-T82.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 82.99 USD/Bbl on August 07, 2026 at 5:00 PM EDT? (Above $82.99)",
+   "tags": [
+    "finance",
+    "kxbrentw"
+   ],
+   "created_at_ms": 1785531600000,
+   "close_at_ms": 1786136400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTW-26AUG0717-T84.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTW-26AUG0717-T84.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 84.99 USD/Bbl on August 07, 2026 at 5:00 PM EDT? (Above $84.99)",
+   "tags": [
+    "finance",
+    "kxbrentw"
+   ],
+   "created_at_ms": 1785531600000,
+   "close_at_ms": 1786136400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTW-26AUG1417-T88.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTW-26AUG1417-T88.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 88.99 USD/Bbl on August 14, 2026 at 5:00 PM EDT? (Above $88.99)",
+   "tags": [
+    "finance",
+    "kxbrentw"
+   ],
+   "created_at_ms": 1786136400000,
+   "close_at_ms": 1786741200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTW-26AUG2117-T92.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTW-26AUG2117-T92.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 92.99 USD/Bbl on August 21, 2026 at 5:00 PM EDT? (Above $92.99)",
+   "tags": [
+    "finance",
+    "kxbrentw"
+   ],
+   "created_at_ms": 1786741200000,
+   "close_at_ms": 1787346000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTW-26AUG2117-T94.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTW-26AUG2117-T94.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 94.99 USD/Bbl on August 21, 2026 at 5:00 PM EDT? (Above $94.99)",
+   "tags": [
+    "finance",
+    "kxbrentw"
+   ],
+   "created_at_ms": 1786741200000,
+   "close_at_ms": 1787346000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTW-26AUG2817-T87.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTW-26AUG2817-T87.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 87.99 USD/Bbl on August 28, 2026 at 5:00 PM EDT? (Above $87.99)",
+   "tags": [
+    "finance",
+    "kxbrentw"
+   ],
+   "created_at_ms": 1787346000000,
+   "close_at_ms": 1787950800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTW-26JUL1717-T87.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTW-26JUL1717-T87.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 87.99 USD/Bbl on July 17, 2026 at 5:00 PM EDT? (above $87.99)",
+   "tags": [
+    "finance",
+    "kxbrentw"
+   ],
+   "created_at_ms": 1783717200000,
+   "close_at_ms": 1784322000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBRENTW-26JUL2417-T92.99",
+   "provider": "kalshi",
+   "provider_id": "KXBRENTW-26JUL2417-T92.99",
+   "category": "finance",
+   "question": "Will the brent crude oil close price be above 92.99 USD/Bbl on July 24, 2026 at 5:00 PM EDT? (Above $92.99)",
+   "tags": [
+    "finance",
+    "kxbrentw"
+   ],
+   "created_at_ms": 1784322000000,
+   "close_at_ms": 1784926800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMAXM-25OCT31-129999.99",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXM-25OCT31-129999.99",
+   "category": "crypto",
+   "question": "Will Bitcoin be above $129999.99 by Oct 31, 2025 at 11:59PM ET?",
+   "tags": [
+    "crypto",
+    "kxbtcmaxm"
+   ],
+   "created_at_ms": 1758290400000,
+   "close_at_ms": 1761969540000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26APR30-8000000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26APR30-8000000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $80000.00 by 11:59 PM ET on Apr 30, 2026? (Above $80,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1775060040000,
+   "close_at_ms": 1777607999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26APR30-8750000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26APR30-8750000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $87500.00 by 11:59 PM ET on Apr 30, 2026? (Above $87,500.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1775060040000,
+   "close_at_ms": 1777607999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26AUG31-7000000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26AUG31-7000000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $70000.00 by 11:59 PM ET on Aug 31, 2026? (Above $70,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1787234394000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26AUG31-7500000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26AUG31-7500000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $75000.00 by 11:59 PM ET on Aug 31, 2026? (Above $75,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1787287785000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26AUG31-8000000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26AUG31-8000000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $80000.00 by 11:59 PM ET on Aug 31, 2026? (Above $80,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1787678647000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26AUG31-8250000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26AUG31-8250000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $82500.00 by 11:59 PM ET on Aug 31, 2026? (Above $82,500.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1788235199000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26FEB28-8000000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26FEB28-8000000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $80000.00 by 11:59 PM ET on Feb 28, 2026? (Above $80,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1770042600000,
+   "close_at_ms": 1772341199000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26FEB28-8500000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26FEB28-8500000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $85000.00 by 11:59 PM ET on Feb 28, 2026? (Above $85,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1770042600000,
+   "close_at_ms": 1772341199000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26JAN31-100000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26JAN31-100000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $100000.00 by 11:59 PM ET on Jan 31, 2026? (Above $100,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1767737460000,
+   "close_at_ms": 1769921999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26JUL31-6500000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26JUL31-6500000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $65000.00 by 11:59 PM ET on Jul 31, 2026? (Above $65,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1782921840000,
+   "close_at_ms": 1784097276000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26JUL31-6750000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26JUL31-6750000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $67500.00 by 11:59 PM ET on Jul 31, 2026? (Above $67,500.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1782921840000,
+   "close_at_ms": 1785556799000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26JUL31-7250000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26JUL31-7250000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $72500.00 by 11:59 PM ET on Jul 31, 2026? (Above $72,500.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1782921840000,
+   "close_at_ms": 1785556799000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26JUN30-7500000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26JUN30-7500000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $75000.00 by 11:59 PM ET on Jun 30, 2026? (Above $75,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1780315320000,
+   "close_at_ms": 1782878399000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26MAR31-7750000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26MAR31-7750000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $77500.00 by 11:59 PM ET on Mar 31, 2026? (Above $77,500.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1772387340000,
+   "close_at_ms": 1775015999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26MAR31-8500000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26MAR31-8500000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $85000.00 by 11:59 PM ET on Mar 31, 2026? (Above $85,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1772387340000,
+   "close_at_ms": 1775015999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMAXMON-BTC-26MAY31-8500000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMAXMON-BTC-26MAY31-8500000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be above $85000.00 by 11:59 PM ET on May 31, 2026? (Above $85,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcmaxmon"
+   ],
+   "created_at_ms": 1777645020000,
+   "close_at_ms": 1780286399000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXBTCMINMON-BTC-26AUG31-6000000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMINMON-BTC-26AUG31-6000000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be below $60000.00 by 11:59 PM ET on Aug 31, 2026? (Below $60,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcminmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1788235199000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMINMON-BTC-26JUL31-5750000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMINMON-BTC-26JUL31-5750000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be below $57500.00 by 11:59 PM ET on Jul 31, 2026? (Below $57,500.00)",
+   "tags": [
+    "crypto",
+    "kxbtcminmon"
+   ],
+   "created_at_ms": 1782921840000,
+   "close_at_ms": 1785556799000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXBTCMINMON-BTC-26JUN30-5750000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMINMON-BTC-26JUN30-5750000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be below $57500.00 by 11:59 PM ET on Jun 30, 2026? (Below $57,500.00)",
+   "tags": [
+    "crypto",
+    "kxbtcminmon"
+   ],
+   "created_at_ms": 1780315380000,
+   "close_at_ms": 1782878399000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXBTCMINMON-BTC-26MAR31-6500000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMINMON-BTC-26MAR31-6500000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be below $65000.00 by 11:59 PM ET on Mar 31, 2026? (Below $65,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcminmon"
+   ],
+   "created_at_ms": 1772387460000,
+   "close_at_ms": 1775015999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXBTCMINMON-BTC-26MAY31-7000000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMINMON-BTC-26MAY31-7000000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be below $70000.00 by 11:59 PM ET on May 31, 2026? (Below $70,000.00)",
+   "tags": [
+    "crypto",
+    "kxbtcminmon"
+   ],
+   "created_at_ms": 1777645080000,
+   "close_at_ms": 1780286399000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXBTCMINMON-BTC-26MAY31-7250000",
+   "provider": "kalshi",
+   "provider_id": "KXBTCMINMON-BTC-26MAY31-7250000",
+   "category": "crypto",
+   "question": "Will BTC trimmed mean be below $72500.00 by 11:59 PM ET on May 31, 2026? (Below $72,500.00)",
+   "tags": [
+    "crypto",
+    "kxbtcminmon"
+   ],
+   "created_at_ms": 1777645080000,
+   "close_at_ms": 1780065944000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXCHIPBURRITO-26AUG02-T9.75",
+   "provider": "kalshi",
+   "provider_id": "KXCHIPBURRITO-26AUG02-T9.75",
+   "category": "economics",
+   "question": "Will the average U.S. price of a Chipotle Chicken Burrito for July 2026 be at least $9.75?",
+   "tags": [
+    "economics",
+    "kxchipburrito"
+   ],
+   "created_at_ms": 1782947700000,
+   "close_at_ms": 1785523071000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCHIPBURRITO-26SEP02-T9.80",
+   "provider": "kalshi",
+   "provider_id": "KXCHIPBURRITO-26SEP02-T9.80",
+   "category": "economics",
+   "question": "Will the average U.S. price of a Chipotle Chicken Burrito for August 2026 be at least $9.80?",
+   "tags": [
+    "economics",
+    "kxchipburrito"
+   ],
+   "created_at_ms": 1785796200000,
+   "close_at_ms": 1788209509000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCOPPERW-26AUG1417-T6.60",
+   "provider": "kalshi",
+   "provider_id": "KXCOPPERW-26AUG1417-T6.60",
+   "category": "finance",
+   "question": "Will the copper close price be above 6.60 USD/Lbs on August 14, 2026 at 5:00 PM EDT? (Above $6.60)",
+   "tags": [
+    "finance",
+    "kxcopperw"
+   ],
+   "created_at_ms": 1786136400000,
+   "close_at_ms": 1786741200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCOPPERW-26AUG2117-T6.57",
+   "provider": "kalshi",
+   "provider_id": "KXCOPPERW-26AUG2117-T6.57",
+   "category": "finance",
+   "question": "Will the copper close price be above 6.57 USD/Lbs on August 21, 2026 at 5:00 PM EDT? (Above $6.57)",
+   "tags": [
+    "finance",
+    "kxcopperw"
+   ],
+   "created_at_ms": 1786741200000,
+   "close_at_ms": 1787346000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCOPPERW-26AUG2817-T6.57",
+   "provider": "kalshi",
+   "provider_id": "KXCOPPERW-26AUG2817-T6.57",
+   "category": "finance",
+   "question": "Will the copper close price be above 6.57 USD/Lbs on August 28, 2026 at 5:00 PM EDT? (Above $6.57)",
+   "tags": [
+    "finance",
+    "kxcopperw"
+   ],
+   "created_at_ms": 1787346000000,
+   "close_at_ms": 1787950800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCPI-25AUG-T0.3",
+   "provider": "kalshi",
+   "provider_id": "KXCPI-25AUG-T0.3",
+   "category": "economics",
+   "question": "Will CPI rise more than 0.3% in August 2025? (Above 0.3%)",
+   "tags": [
+    "economics",
+    "kxcpi"
+   ],
+   "created_at_ms": 1752674400000,
+   "close_at_ms": 1757593500000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXCPI-25NOV-T0.2",
+   "provider": "kalshi",
+   "provider_id": "KXCPI-25NOV-T0.2",
+   "category": "economics",
+   "question": "Will CPI rise more than 0.2% in November 2025? (Above 0.2%)",
+   "tags": [
+    "economics",
+    "kxcpi"
+   ],
+   "created_at_ms": 1760623200000,
+   "close_at_ms": 1766064540000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXCPI-26FEB-T0.1",
+   "provider": "kalshi",
+   "provider_id": "KXCPI-26FEB-T0.1",
+   "category": "economics",
+   "question": "Will CPI rise more than 0.1% in February 2026? (Above 0.1%)",
+   "tags": [
+    "economics",
+    "kxcpi"
+   ],
+   "created_at_ms": 1768338000000,
+   "close_at_ms": 1773232140000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXCPI-26JUL-T0.0",
+   "provider": "kalshi",
+   "provider_id": "KXCPI-26JUL-T0.0",
+   "category": "economics",
+   "question": "Will CPI rise more than 0.0% in July 2026? (Above 0.0%)",
+   "tags": [
+    "economics",
+    "kxcpi"
+   ],
+   "created_at_ms": 1771599600000,
+   "close_at_ms": 1786537500000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCPI-26MAR-T0.7",
+   "provider": "kalshi",
+   "provider_id": "KXCPI-26MAR-T0.7",
+   "category": "economics",
+   "question": "Will CPI rise more than 0.7% in March 2026? (Above 0.7%)",
+   "tags": [
+    "economics",
+    "kxcpi"
+   ],
+   "created_at_ms": 1773151200000,
+   "close_at_ms": 1775823900000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXCPICOMBO-25DEC-0129",
+   "provider": "kalshi",
+   "provider_id": "KXCPICOMBO-25DEC-0129",
+   "category": "economics",
+   "question": "Will CPI be Above 0.1% AND YOYCPI be Above 2.9% for Dec 2025? (CPI: Above 0.1%, YOYCPI: Above 2.9%)",
+   "tags": [
+    "economics",
+    "kxcpicombo"
+   ],
+   "created_at_ms": 1764714600000,
+   "close_at_ms": 1768310940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXCPICORE-26APR-T0.3",
+   "provider": "kalshi",
+   "provider_id": "KXCPICORE-26APR-T0.3",
+   "category": "economics",
+   "question": "Will CPI Core rise more than 0.3% in April? (Above 0.3%)",
+   "tags": [
+    "economics",
+    "kxcpicore"
+   ],
+   "created_at_ms": 1773259200000,
+   "close_at_ms": 1778588700000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXCPICORE-26JUL-T0.1",
+   "provider": "kalshi",
+   "provider_id": "KXCPICORE-26JUL-T0.1",
+   "category": "economics",
+   "question": "Will CPI Core rise more than 0.1% in July? (Above 0.1%)",
+   "tags": [
+    "economics",
+    "kxcpicore"
+   ],
+   "created_at_ms": 1778601600000,
+   "close_at_ms": 1786537500000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCPICORE-26JUN-T0.1",
+   "provider": "kalshi",
+   "provider_id": "KXCPICORE-26JUN-T0.1",
+   "category": "economics",
+   "question": "Will CPI Core rise more than 0.1% in June? (Above 0.1%)",
+   "tags": [
+    "economics",
+    "kxcpicore"
+   ],
+   "created_at_ms": 1775829600000,
+   "close_at_ms": 1784031900000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCPICORE-26MAY-T0.1",
+   "provider": "kalshi",
+   "provider_id": "KXCPICORE-26MAY-T0.1",
+   "category": "economics",
+   "question": "Will CPI Core rise more than 0.1% in May? (Above 0.1%)",
+   "tags": [
+    "economics",
+    "kxcpicore"
+   ],
+   "created_at_ms": 1773439200000,
+   "close_at_ms": 1781094300000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXCPICOREYOY-26APR-T2.7",
+   "provider": "kalshi",
+   "provider_id": "KXCPICOREYOY-26APR-T2.7",
+   "category": "economics",
+   "question": "Will the rate of core CPI inflation be above 2.7% for the year ending in April 2026?",
+   "tags": [
+    "economics",
+    "kxcpicoreyoy"
+   ],
+   "created_at_ms": 1773255600000,
+   "close_at_ms": 1778588700000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXCPIYOY-25OCT-T3.0",
+   "provider": "kalshi",
+   "provider_id": "KXCPIYOY-25OCT-T3.0",
+   "category": "economics",
+   "question": "Will the rate of CPI inflation be above 3.0% for the year ending in October 2025?",
+   "tags": [
+    "economics",
+    "kxcpiyoy"
+   ],
+   "created_at_ms": 1757685600000,
+   "close_at_ms": 1763040540000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXCPIYOY-25SEP-T3.1",
+   "provider": "kalshi",
+   "provider_id": "KXCPIYOY-25SEP-T3.1",
+   "category": "economics",
+   "question": "Will the rate of CPI inflation be above 3.1% for the year ending in September 2025?",
+   "tags": [
+    "economics",
+    "kxcpiyoy"
+   ],
+   "created_at_ms": 1755093600000,
+   "close_at_ms": 1760531340000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXCPIYOY-26APR-T3.7",
+   "provider": "kalshi",
+   "provider_id": "KXCPIYOY-26APR-T3.7",
+   "category": "economics",
+   "question": "Will the rate of CPI inflation be above 3.7% for the year ending in April 2026?",
+   "tags": [
+    "economics",
+    "kxcpiyoy"
+   ],
+   "created_at_ms": 1773601200000,
+   "close_at_ms": 1778588940000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXCPIYOY-26JAN-T2.4",
+   "provider": "kalshi",
+   "provider_id": "KXCPIYOY-26JAN-T2.4",
+   "category": "economics",
+   "question": "Will the rate of CPI inflation be above 2.4% for the year ending in January 2026?",
+   "tags": [
+    "economics",
+    "kxcpiyoy"
+   ],
+   "created_at_ms": 1768338000000,
+   "close_at_ms": 1770989340000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXCPIYOY-26JUL-T4.2",
+   "provider": "kalshi",
+   "provider_id": "KXCPIYOY-26JUL-T4.2",
+   "category": "economics",
+   "question": "Will the rate of CPI inflation be above 4.2% for the year ending in July 2026?",
+   "tags": [
+    "economics",
+    "kxcpiyoy"
+   ],
+   "created_at_ms": 1778601600000,
+   "close_at_ms": 1786537740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCPIYOY-26JUN-T4.0",
+   "provider": "kalshi",
+   "provider_id": "KXCPIYOY-26JUN-T4.0",
+   "category": "economics",
+   "question": "Will the rate of CPI inflation be above 4.0% for the year ending in June 2026?",
+   "tags": [
+    "economics",
+    "kxcpiyoy"
+   ],
+   "created_at_ms": 1775667600000,
+   "close_at_ms": 1784032140000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXCPIYOY-26MAY-T4.3",
+   "provider": "kalshi",
+   "provider_id": "KXCPIYOY-26MAY-T4.3",
+   "category": "economics",
+   "question": "Will the rate of CPI inflation be above 4.3% for the year ending in May 2026?",
+   "tags": [
+    "economics",
+    "kxcpiyoy"
+   ],
+   "created_at_ms": 1777307400000,
+   "close_at_ms": 1781094540000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXDALSNOWM-26JAN-2.0",
+   "provider": "kalshi",
+   "provider_id": "KXDALSNOWM-26JAN-2.0",
+   "category": "weather",
+   "question": "Snow in Dallas in Jan 2026? (Above 2.0 inches)",
+   "tags": [
+    "kxdalsnowm",
+    "weather"
+   ],
+   "created_at_ms": 1767228194000,
+   "close_at_ms": 1769972339000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXDOGEMAXMON-DOGE-26AUG31-010",
+   "provider": "kalshi",
+   "provider_id": "KXDOGEMAXMON-DOGE-26AUG31-010",
+   "category": "crypto",
+   "question": "Will DOGE trimmed mean be above $0.10 by 11:59 PM ET on Aug 31, 2026?",
+   "tags": [
+    "crypto",
+    "kxdogemaxmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1788235199000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXEOWEEK-26AUG29-2",
+   "provider": "kalshi",
+   "provider_id": "KXEOWEEK-26AUG29-2",
+   "category": "politics",
+   "question": "Will the President sign more than 2 Executive Orders between Aug 23, 2026 and Aug 29, 2026? (Above 2)",
+   "tags": [
+    "kxeoweek",
+    "politics"
+   ],
+   "created_at_ms": 1787407200000,
+   "close_at_ms": 1788538472000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXEOWEEK-26JUL18-0",
+   "provider": "kalshi",
+   "provider_id": "KXEOWEEK-26JUL18-0",
+   "category": "politics",
+   "question": "Will the President sign more than 0 Executive Orders between Jul 12, 2026 and Jul 18, 2026? (Above 0)",
+   "tags": [
+    "kxeoweek",
+    "politics"
+   ],
+   "created_at_ms": 1783778400000,
+   "close_at_ms": 1784818780000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXEOWEEK-26MAY09-0",
+   "provider": "kalshi",
+   "provider_id": "KXEOWEEK-26MAY09-0",
+   "category": "politics",
+   "question": "Will the President sign more than 0 Executive Orders between May 3, 2026 and May 9, 2026? (Above 0)",
+   "tags": [
+    "kxeoweek",
+    "politics"
+   ],
+   "created_at_ms": 1777730400000,
+   "close_at_ms": 1779595140000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXETHMAXMON-ETH-26AUG31-250000",
+   "provider": "kalshi",
+   "provider_id": "KXETHMAXMON-ETH-26AUG31-250000",
+   "category": "crypto",
+   "question": "Will ETH trimmed mean be above $2500.00 by 11:59 PM ET on Aug 31, 2026? (Above $2,500.00)",
+   "tags": [
+    "crypto",
+    "kxethmaxmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1787354999000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXETHMINMON-ETH-26JUN30-125000",
+   "provider": "kalshi",
+   "provider_id": "KXETHMINMON-ETH-26JUN30-125000",
+   "category": "crypto",
+   "question": "Will ETH trimmed mean be below $1250.00 by 11:59 PM ET on Jun 30, 2026? (Below $1,250.00)",
+   "tags": [
+    "crypto",
+    "kxethminmon"
+   ],
+   "created_at_ms": 1780332240000,
+   "close_at_ms": 1782878399000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXFEDCOMBO-26JAN-25C-T0",
+   "provider": "kalshi",
+   "provider_id": "KXFEDCOMBO-26JAN-25C-T0",
+   "category": "economics",
+   "question": "Will Federal Funds Rates be 25bp cut AND Dissents be >0 for Jan 2026? (Federal Funds Rates: 25bp cut, Dissents: >0)",
+   "tags": [
+    "economics",
+    "kxfedcombo"
+   ],
+   "created_at_ms": 1765465200000,
+   "close_at_ms": 1769626800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXFEDCOMBO-26JUL-0-T0",
+   "provider": "kalshi",
+   "provider_id": "KXFEDCOMBO-26JUL-0-T0",
+   "category": "economics",
+   "question": "Will Federal Funds Rate Decision be No change AND Dissents be >0 for Jul 2026? (Rate: No change, Dissents: >0)",
+   "tags": [
+    "economics",
+    "kxfedcombo"
+   ],
+   "created_at_ms": 1781726400000,
+   "close_at_ms": 1785347700000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDMON-26APR3017-T4626.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDMON-26APR3017-T4626.99",
+   "category": "finance",
+   "question": "Will the gold close price be above $4626.99 on Apr 30, 2026 at 5pm EDT?",
+   "tags": [
+    "finance",
+    "kxgoldmon"
+   ],
+   "created_at_ms": 1775067720000,
+   "close_at_ms": 1777582800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXGOLDMON-26AUG3117-T4451.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDMON-26AUG3117-T4451.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4451.99 USD/t.oz on August 31, 2026 at 5:00 PM EDT? (Above $4451.99)",
+   "tags": [
+    "finance",
+    "kxgoldmon"
+   ],
+   "created_at_ms": 1785578400000,
+   "close_at_ms": 1788210000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDMON-26JUL3117-T4031.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDMON-26JUL3117-T4031.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4031.99 USD/t.oz on July 31, 2026 at 5:00 PM EDT? (Above $4031.99)",
+   "tags": [
+    "finance",
+    "kxgoldmon"
+   ],
+   "created_at_ms": 1783017060000,
+   "close_at_ms": 1785531600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26AUG0717-T4344.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26AUG0717-T4344.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4344.99 USD/t.oz on August 07, 2026 at 5:00 PM EDT? (Above $4344.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1785531600000,
+   "close_at_ms": 1786136400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26AUG1417-T4389.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26AUG1417-T4389.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4389.99 USD/t.oz on August 14, 2026 at 5:00 PM EDT? (Above $4389.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1786136400000,
+   "close_at_ms": 1786741200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26AUG2117-T4595.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26AUG2117-T4595.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4595.99 USD/t.oz on August 21, 2026 at 5:00 PM EDT? (Above $4595.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1786741200000,
+   "close_at_ms": 1787346000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26AUG2817-T4476.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26AUG2817-T4476.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4476.99 USD/t.oz on August 28, 2026 at 5:00 PM EDT? (Above $4476.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1787346000000,
+   "close_at_ms": 1787950800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26JUL1017-T4086.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26JUL1017-T4086.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4086.99 USD/t.oz on July 10, 2026 at 5:00 PM EDT? (above $4086.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1783112400000,
+   "close_at_ms": 1783717200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26JUL1017-T4106.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26JUL1017-T4106.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4106.99 USD/t.oz on July 10, 2026 at 5:00 PM EDT? (above $4106.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1783112400000,
+   "close_at_ms": 1783717200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26JUL1717-T4001.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26JUL1717-T4001.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4001.99 USD/t.oz on July 17, 2026 at 5:00 PM EDT? (above $4001.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1783717200000,
+   "close_at_ms": 1784322000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26JUL2417-T4063.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26JUL2417-T4063.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4063.99 USD/t.oz on July 24, 2026 at 5:00 PM EDT? (Above $4063.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1784322000000,
+   "close_at_ms": 1784926800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXGOLDW-26JUL3117-T4048.99",
+   "provider": "kalshi",
+   "provider_id": "KXGOLDW-26JUL3117-T4048.99",
+   "category": "finance",
+   "question": "Will the gold close price be above 4048.99 USD/t.oz on July 31, 2026 at 5:00 PM EDT? (Above $4048.99)",
+   "tags": [
+    "finance",
+    "kxgoldw"
+   ],
+   "created_at_ms": 1784926800000,
+   "close_at_ms": 1785531600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXH100MON-26APR30-1.800",
+   "provider": "kalshi",
+   "provider_id": "KXH100MON-26APR30-1.800",
+   "category": "tech",
+   "question": "Will the H100 SXM compute per hour price be above $1.8 on Apr 30? (Above $1.80)",
+   "tags": [
+    "kxh100mon",
+    "tech"
+   ],
+   "created_at_ms": 1775088000000,
+   "close_at_ms": 1777607999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXH100MON-26JUL31-2.710",
+   "provider": "kalshi",
+   "provider_id": "KXH100MON-26JUL31-2.710",
+   "category": "tech",
+   "question": "Will the H100 SXM compute per hour price be above $2.71 on Jul 31?",
+   "tags": [
+    "kxh100mon",
+    "tech"
+   ],
+   "created_at_ms": 1782950400000,
+   "close_at_ms": 1785556799000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXH100MON-26MAY31-2.170",
+   "provider": "kalshi",
+   "provider_id": "KXH100MON-26MAY31-2.170",
+   "category": "tech",
+   "question": "Will the H100 SXM compute per hour price be above $2.17 on May 31?",
+   "tags": [
+    "kxh100mon",
+    "tech"
+   ],
+   "created_at_ms": 1777932000000,
+   "close_at_ms": 1780286399000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXHMONTH-25AUG",
+   "provider": "kalshi",
+   "provider_id": "KXHMONTH-25AUG",
+   "category": "weather",
+   "question": "Will  Aug 2025 be the hottest Aug ever? (Hottest ever)",
+   "tags": [
+    "kxhmonth",
+    "weather"
+   ],
+   "created_at_ms": 1753365600000,
+   "close_at_ms": 1757995140000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXHMONTH-26JAN",
+   "provider": "kalshi",
+   "provider_id": "KXHMONTH-26JAN",
+   "category": "weather",
+   "question": "Will  Jan 2026 be the hottest Jan ever? (Hottest ever)",
+   "tags": [
+    "kxhmonth",
+    "weather"
+   ],
+   "created_at_ms": 1766847600000,
+   "close_at_ms": 1771217940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXHMONTH-26JUL",
+   "provider": "kalshi",
+   "provider_id": "KXHMONTH-26JUL",
+   "category": "weather",
+   "question": "Will  Jul 2026 be the hottest Jul ever? (Hottest ever)",
+   "tags": [
+    "kxhmonth",
+    "weather"
+   ],
+   "created_at_ms": 1782568800000,
+   "close_at_ms": 1786665676000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXHMONTH-26JUN",
+   "provider": "kalshi",
+   "provider_id": "KXHMONTH-26JUN",
+   "category": "weather",
+   "question": "Will  Jun 2026 be the hottest Jun ever? (Hottest ever)",
+   "tags": [
+    "kxhmonth",
+    "weather"
+   ],
+   "created_at_ms": 1779890400000,
+   "close_at_ms": 1783703264000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXHMONTH-26MAR",
+   "provider": "kalshi",
+   "provider_id": "KXHMONTH-26MAR",
+   "category": "weather",
+   "question": "Will  Mar 2026 be the hottest Mar ever? (Hottest ever)",
+   "tags": [
+    "kxhmonth",
+    "weather"
+   ],
+   "created_at_ms": 1772204400000,
+   "close_at_ms": 1775756240000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXHMONTH-26MAY",
+   "provider": "kalshi",
+   "provider_id": "KXHMONTH-26MAY",
+   "category": "weather",
+   "question": "Will  May 2026 be the hottest May ever? (Hottest ever)",
+   "tags": [
+    "kxhmonth",
+    "weather"
+   ],
+   "created_at_ms": 1777298400000,
+   "close_at_ms": 1781582340000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXJPMOMINF-26APR17-T-0.1",
+   "provider": "kalshi",
+   "provider_id": "KXJPMOMINF-26APR17-T-0.1",
+   "category": "economics",
+   "question": "Will the Japan inflation rate MoM for March 2026 be above -0.1%?",
+   "tags": [
+    "economics",
+    "kxjpmominf"
+   ],
+   "created_at_ms": 1774447200000,
+   "close_at_ms": 1776986700000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXLAGODAYS-26APR-2",
+   "provider": "kalshi",
+   "provider_id": "KXLAGODAYS-26APR-2",
+   "category": "politics",
+   "question": "Will Trump make 2 trips to Mar-a-Lago as President in Apr 2026?",
+   "tags": [
+    "kxlagodays",
+    "politics"
+   ],
+   "created_at_ms": 1775052000000,
+   "close_at_ms": 1777644000000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXLAGODAYS-26AUG-1",
+   "provider": "kalshi",
+   "provider_id": "KXLAGODAYS-26AUG-1",
+   "category": "politics",
+   "question": "Will Trump make 1 trips to Mar-a-Lago as President in Aug 2026?",
+   "tags": [
+    "kxlagodays",
+    "politics"
+   ],
+   "created_at_ms": 1785592800000,
+   "close_at_ms": 1788269046000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXLAGODAYS-26JUL-0",
+   "provider": "kalshi",
+   "provider_id": "KXLAGODAYS-26JUL-0",
+   "category": "politics",
+   "question": "Will Trump make 0 trips to Mar-a-Lago as President in Jul 2026?",
+   "tags": [
+    "kxlagodays",
+    "politics"
+   ],
+   "created_at_ms": 1782914400000,
+   "close_at_ms": 1785592800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXLAGODAYS-26JUL-1",
+   "provider": "kalshi",
+   "provider_id": "KXLAGODAYS-26JUL-1",
+   "category": "politics",
+   "question": "Will Trump make 1 trips to Mar-a-Lago as President in Jul 2026?",
+   "tags": [
+    "kxlagodays",
+    "politics"
+   ],
+   "created_at_ms": 1782914400000,
+   "close_at_ms": 1785592800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXLAGODAYS-26MAR-4",
+   "provider": "kalshi",
+   "provider_id": "KXLAGODAYS-26MAR-4",
+   "category": "politics",
+   "question": "Will Trump make 4 trips to Mar-a-Lago as President in Mar 2026?",
+   "tags": [
+    "kxlagodays",
+    "politics"
+   ],
+   "created_at_ms": 1772377200000,
+   "close_at_ms": 1775052000000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXLAGODAYS-26MAY-0",
+   "provider": "kalshi",
+   "provider_id": "KXLAGODAYS-26MAY-0",
+   "category": "politics",
+   "question": "Will Trump make 0 trips to Mar-a-Lago as President in May 2026?",
+   "tags": [
+    "kxlagodays",
+    "politics"
+   ],
+   "created_at_ms": 1777644000000,
+   "close_at_ms": 1780286340000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXMUSKNW-26AUG31-T800",
+   "provider": "kalshi",
+   "provider_id": "KXMUSKNW-26AUG31-T800",
+   "category": "finance",
+   "question": "Will Elon Musk's net worth for August be above $800 billion?",
+   "tags": [
+    "finance",
+    "kxmusknw"
+   ],
+   "created_at_ms": 1785535200000,
+   "close_at_ms": 1788217140000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXMUSKNW-26JUL31-T700",
+   "provider": "kalshi",
+   "provider_id": "KXMUSKNW-26JUL31-T700",
+   "category": "finance",
+   "question": "Will Elon Musk's net worth for July be above $700 billion?",
+   "tags": [
+    "finance",
+    "kxmusknw"
+   ],
+   "created_at_ms": 1782923400000,
+   "close_at_ms": 1785538740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXMUSKNW-26JUN30-T790",
+   "provider": "kalshi",
+   "provider_id": "KXMUSKNW-26JUN30-T790",
+   "category": "finance",
+   "question": "Will Elon Musk's net worth for June be above $790 billion?",
+   "tags": [
+    "finance",
+    "kxmusknw"
+   ],
+   "created_at_ms": 1780326000000,
+   "close_at_ms": 1782860340000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXNATGASMON-26JUL3117-T2.799",
+   "provider": "kalshi",
+   "provider_id": "KXNATGASMON-26JUL3117-T2.799",
+   "category": "finance",
+   "question": "Will the natural gas close price be above 2.799 USD/MMBtu on July 31, 2026 at 5:00 PM EDT? (Above $2.799)",
+   "tags": [
+    "finance",
+    "kxnatgasmon"
+   ],
+   "created_at_ms": 1783017060000,
+   "close_at_ms": 1785531600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXNATGASW-26AUG2817-T2.799",
+   "provider": "kalshi",
+   "provider_id": "KXNATGASW-26AUG2817-T2.799",
+   "category": "finance",
+   "question": "Will the natural gas close price be above 2.799 USD/MMBtu on August 28, 2026 at 5:00 PM EDT? (Above $2.799)",
+   "tags": [
+    "finance",
+    "kxnatgasw"
+   ],
+   "created_at_ms": 1787346000000,
+   "close_at_ms": 1787950800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXNATGASW-26JUL1717-T4.099",
+   "provider": "kalshi",
+   "provider_id": "KXNATGASW-26JUL1717-T4.099",
+   "category": "finance",
+   "question": "Will the natural gas close price be above 4.099 USD/MMBtu on July 17, 2026 at 5:00 PM EDT? (above $4.099)",
+   "tags": [
+    "finance",
+    "kxnatgasw"
+   ],
+   "created_at_ms": 1783717200000,
+   "close_at_ms": 1784322000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXNATGASW-26JUL2417-T2.899",
+   "provider": "kalshi",
+   "provider_id": "KXNATGASW-26JUL2417-T2.899",
+   "category": "finance",
+   "question": "Will the natural gas close price be above 2.899 USD/MMBtu on July 24, 2026 at 5:00 PM EDT? (Above $2.899)",
+   "tags": [
+    "finance",
+    "kxnatgasw"
+   ],
+   "created_at_ms": 1784322000000,
+   "close_at_ms": 1784926800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXNATGASW-26JUL3117-T2.799",
+   "provider": "kalshi",
+   "provider_id": "KXNATGASW-26JUL3117-T2.799",
+   "category": "finance",
+   "question": "Will the natural gas close price be above 2.799 USD/MMBtu on July 31, 2026 at 5:00 PM EDT? (Above $2.799)",
+   "tags": [
+    "finance",
+    "kxnatgasw"
+   ],
+   "created_at_ms": 1784926800000,
+   "close_at_ms": 1785531600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXNEWTARIFFS-26MAY-JUN01",
+   "provider": "kalshi",
+   "provider_id": "KXNEWTARIFFS-26MAY-JUN01",
+   "category": "politics",
+   "question": "Will Donald Trump issue any executive action on imposing new or increased tariffs on any country, provided the action specifies an effective date (even if such date occurs after expiration) during in May 2026? (Yes)",
+   "tags": [
+    "kxnewtariffs",
+    "politics"
+   ],
+   "created_at_ms": 1777644000000,
+   "close_at_ms": 1780286340000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXNYCSNOWM-25DEC-10.0",
+   "provider": "kalshi",
+   "provider_id": "KXNYCSNOWM-25DEC-10.0",
+   "category": "weather",
+   "question": "Snow in New York City in Dec 2025? (Above 10.0 inches)",
+   "tags": [
+    "kxnycsnowm",
+    "weather"
+   ],
+   "created_at_ms": 1763611122000,
+   "close_at_ms": 1767293939000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXNYCSNOWM-25DEC-6.0",
+   "provider": "kalshi",
+   "provider_id": "KXNYCSNOWM-25DEC-6.0",
+   "category": "weather",
+   "question": "Snow in New York City in Dec 2025? (Above 6.0 inches)",
+   "tags": [
+    "kxnycsnowm",
+    "weather"
+   ],
+   "created_at_ms": 1763611122000,
+   "close_at_ms": 1767293939000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXNYCSNOWM-26MAR-0.1",
+   "provider": "kalshi",
+   "provider_id": "KXNYCSNOWM-26MAR-0.1",
+   "category": "weather",
+   "question": "Snow in New York City in Mar 2026? (Above 0.1 inches)",
+   "tags": [
+    "kxnycsnowm",
+    "weather"
+   ],
+   "created_at_ms": 1772153743000,
+   "close_at_ms": 1775026740000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXPAYROLLS-25NOV-T100000",
+   "provider": "kalshi",
+   "provider_id": "KXPAYROLLS-25NOV-T100000",
+   "category": "economics",
+   "question": "Will above 100000 jobs be added in November 2025? (Above 100,000)",
+   "tags": [
+    "economics",
+    "kxpayrolls"
+   ],
+   "created_at_ms": 1761314400000,
+   "close_at_ms": 1765891740000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXPAYROLLS-25SEP-T0",
+   "provider": "kalshi",
+   "provider_id": "KXPAYROLLS-25SEP-T0",
+   "category": "economics",
+   "question": "Will above 0 jobs be added in September 2025?",
+   "tags": [
+    "economics",
+    "kxpayrolls"
+   ],
+   "created_at_ms": 1755871200000,
+   "close_at_ms": 1759494540000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXPHILSNOWM-26FEB-15.0",
+   "provider": "kalshi",
+   "provider_id": "KXPHILSNOWM-26FEB-15.0",
+   "category": "weather",
+   "question": "Snow in Philadelphia in Feb 2026? (Above 15.0 inches)",
+   "tags": [
+    "kxphilsnowm",
+    "weather"
+   ],
+   "created_at_ms": 1769629127000,
+   "close_at_ms": 1772351940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXRAINCHIM-26APR-7",
+   "provider": "kalshi",
+   "provider_id": "KXRAINCHIM-26APR-7",
+   "category": "weather",
+   "question": "Rain in Chicago in Apr 2026? (Above 7 inches)",
+   "tags": [
+    "kxrainchim",
+    "weather"
+   ],
+   "created_at_ms": 1775060520000,
+   "close_at_ms": 1777607999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXRAINCHIM-26AUG-4",
+   "provider": "kalshi",
+   "provider_id": "KXRAINCHIM-26AUG-4",
+   "category": "weather",
+   "question": "Rain in Chicago in Aug 2026? (Above 4 inches)",
+   "tags": [
+    "kxrainchim",
+    "weather"
+   ],
+   "created_at_ms": 1785038159000,
+   "close_at_ms": 1788235199000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRAINCHIM-26MAR-4",
+   "provider": "kalshi",
+   "provider_id": "KXRAINCHIM-26MAR-4",
+   "category": "weather",
+   "question": "Rain in Chicago in Mar 2026? (Above 4 inches)",
+   "tags": [
+    "kxrainchim",
+    "weather"
+   ],
+   "created_at_ms": 1772168159000,
+   "close_at_ms": 1775015999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXRAINDENM-26APR-1",
+   "provider": "kalshi",
+   "provider_id": "KXRAINDENM-26APR-1",
+   "category": "weather",
+   "question": "Rain in Denver in Apr 2026? (Above 1 inch)",
+   "tags": [
+    "kxraindenm",
+    "weather"
+   ],
+   "created_at_ms": 1775060520000,
+   "close_at_ms": 1777607999000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXRAINNYCM-25NOV-2",
+   "provider": "kalshi",
+   "provider_id": "KXRAINNYCM-25NOV-2",
+   "category": "weather",
+   "question": "Rain in NYC in Nov 2025? (Above 2 inches)",
+   "tags": [
+    "kxrainnycm",
+    "weather"
+   ],
+   "created_at_ms": 1761573600000,
+   "close_at_ms": 1764565140000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXRAINNYCM-26FEB-3",
+   "provider": "kalshi",
+   "provider_id": "KXRAINNYCM-26FEB-3",
+   "category": "weather",
+   "question": "Rain in NYC in Feb 2026? (Above 3 inches)",
+   "tags": [
+    "kxrainnycm",
+    "weather"
+   ],
+   "created_at_ms": 1769526000000,
+   "close_at_ms": 1772341140000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXRAINNYCM-26MAR-4",
+   "provider": "kalshi",
+   "provider_id": "KXRAINNYCM-26MAR-4",
+   "category": "weather",
+   "question": "Rain in NYC in Mar 2026? (Above 4 inches)",
+   "tags": [
+    "kxrainnycm",
+    "weather"
+   ],
+   "created_at_ms": 1772204400000,
+   "close_at_ms": 1775015940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXRAINNYCM-26MAY-3",
+   "provider": "kalshi",
+   "provider_id": "KXRAINNYCM-26MAY-3",
+   "category": "weather",
+   "question": "Rain in NYC in May 2026? (Above 3 inches)",
+   "tags": [
+    "kxrainnycm",
+    "weather"
+   ],
+   "created_at_ms": 1777298400000,
+   "close_at_ms": 1780286340000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXRAINSTPM-26JUL-8",
+   "provider": "kalshi",
+   "provider_id": "KXRAINSTPM-26JUL-8",
+   "category": "weather",
+   "question": "Rain in St. Petersburg in Jul 2026? (Above 8 inches)",
+   "tags": [
+    "kxrainstpm",
+    "weather"
+   ],
+   "created_at_ms": 1784760120000,
+   "close_at_ms": 1785556740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRAINSTPM-26JUL-9",
+   "provider": "kalshi",
+   "provider_id": "KXRAINSTPM-26JUL-9",
+   "category": "weather",
+   "question": "Rain in St. Petersburg in Jul 2026? (Above 9 inches)",
+   "tags": [
+    "kxrainstpm",
+    "weather"
+   ],
+   "created_at_ms": 1784760120000,
+   "close_at_ms": 1785556740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRTX5090MS-26AUG-1.000",
+   "provider": "kalshi",
+   "provider_id": "KXRTX5090MS-26AUG-1.000",
+   "category": "tech",
+   "question": "Will the monthly average compute price of NVIDIA's RTX 5090 be above $1.00 in August 2026?",
+   "tags": [
+    "kxrtx5090ms",
+    "tech"
+   ],
+   "created_at_ms": 1781703060000,
+   "close_at_ms": 1788212268000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRTX5090MS-26JUL-0.750",
+   "provider": "kalshi",
+   "provider_id": "KXRTX5090MS-26JUL-0.750",
+   "category": "tech",
+   "question": "Will the monthly average compute price of NVIDIA's RTX 5090 be above $0.75 in July 2026?",
+   "tags": [
+    "kxrtx5090ms",
+    "tech"
+   ],
+   "created_at_ms": 1781703060000,
+   "close_at_ms": 1785534253000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRTX5090WS-26AUG07-0.750",
+   "provider": "kalshi",
+   "provider_id": "KXRTX5090WS-26AUG07-0.750",
+   "category": "tech",
+   "question": "Will the NVIDIA RTX 5090 compute per hour price be above $0.75 at 4 PM ET on Aug 07?",
+   "tags": [
+    "kxrtx5090ws",
+    "tech"
+   ],
+   "created_at_ms": 1782760260000,
+   "close_at_ms": 1786132800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRTX5090WS-26AUG14-0.550",
+   "provider": "kalshi",
+   "provider_id": "KXRTX5090WS-26AUG14-0.550",
+   "category": "tech",
+   "question": "Will the NVIDIA RTX 5090 compute per hour price be above $0.55 at 4 PM ET on Aug 14?",
+   "tags": [
+    "kxrtx5090ws",
+    "tech"
+   ],
+   "created_at_ms": 1784320800000,
+   "close_at_ms": 1786737600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRTX5090WS-26JUL03-0.750",
+   "provider": "kalshi",
+   "provider_id": "KXRTX5090WS-26JUL03-0.750",
+   "category": "tech",
+   "question": "Will the NVIDIA RTX 5090 compute per hour price be above $0.75 at 4 PM ET on Jul 03?",
+   "tags": [
+    "kxrtx5090ws",
+    "tech"
+   ],
+   "created_at_ms": 1781305680000,
+   "close_at_ms": 1783108800000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXRTX5090WS-26JUL17-0.750",
+   "provider": "kalshi",
+   "provider_id": "KXRTX5090WS-26JUL17-0.750",
+   "category": "tech",
+   "question": "Will the NVIDIA RTX 5090 compute per hour price be above $0.75 at 4 PM ET on Jul 17?",
+   "tags": [
+    "kxrtx5090ws",
+    "tech"
+   ],
+   "created_at_ms": 1781305680000,
+   "close_at_ms": 1784318400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRTX5090WS-26JUL24-0.750",
+   "provider": "kalshi",
+   "provider_id": "KXRTX5090WS-26JUL24-0.750",
+   "category": "tech",
+   "question": "Will the NVIDIA RTX 5090 compute per hour price be above $0.75 at 4 PM ET on Jul 24?",
+   "tags": [
+    "kxrtx5090ws",
+    "tech"
+   ],
+   "created_at_ms": 1781305680000,
+   "close_at_ms": 1784923200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXRTX5090WS-26JUL31-1.000",
+   "provider": "kalshi",
+   "provider_id": "KXRTX5090WS-26JUL31-1.000",
+   "category": "tech",
+   "question": "Will the NVIDIA RTX 5090 compute per hour price be above $1 at 4 PM ET on Jul 31? (Above $1.00)",
+   "tags": [
+    "kxrtx5090ws",
+    "tech"
+   ],
+   "created_at_ms": 1782250140000,
+   "close_at_ms": 1785528000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXSILVERMON-26APR3017-T72.99",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERMON-26APR3017-T72.99",
+   "category": "finance",
+   "question": "Will the silver close price be above $72.99 on Apr 30, 2026 at 5pm EDT?",
+   "tags": [
+    "finance",
+    "kxsilvermon"
+   ],
+   "created_at_ms": 1775067720000,
+   "close_at_ms": 1777582800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXSILVERMON-26MAR3117-T64.50",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERMON-26MAR3117-T64.50",
+   "category": "finance",
+   "question": "Will the silver open price be below $64.50 at Mar 31, 2026 at 5pm EDT?",
+   "tags": [
+    "finance",
+    "kxsilvermon"
+   ],
+   "created_at_ms": 1772695860000,
+   "close_at_ms": 1774990800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXSILVERMON-26MAY2917-T75.99",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERMON-26MAY2917-T75.99",
+   "category": "finance",
+   "question": "Will the silver close price be above 75.99  USD/t.oz on May 29, 2026 at 5:00 PM EDT? (above $75.99)",
+   "tags": [
+    "finance",
+    "kxsilvermon"
+   ],
+   "created_at_ms": 1777675500000,
+   "close_at_ms": 1780088400000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXSILVERW-26AUG0717-T61.99",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERW-26AUG0717-T61.99",
+   "category": "finance",
+   "question": "Will the silver close price be above 61.99 USD/t.oz on August 07, 2026 at 5:00 PM EDT? (Above $61.99)",
+   "tags": [
+    "finance",
+    "kxsilverw"
+   ],
+   "created_at_ms": 1785531600000,
+   "close_at_ms": 1786136400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXSILVERW-26AUG2117-T68.99",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERW-26AUG2117-T68.99",
+   "category": "finance",
+   "question": "Will the silver close price be above 68.99 USD/t.oz on August 21, 2026 at 5:00 PM EDT? (Above $68.99)",
+   "tags": [
+    "finance",
+    "kxsilverw"
+   ],
+   "created_at_ms": 1786741200000,
+   "close_at_ms": 1787346000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXSILVERW-26JUL1017-T59.99",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERW-26JUL1017-T59.99",
+   "category": "finance",
+   "question": "Will the silver close price be above 59.99 USD/t.oz on July 10, 2026 at 5:00 PM EDT? (above $59.99)",
+   "tags": [
+    "finance",
+    "kxsilverw"
+   ],
+   "created_at_ms": 1783112400000,
+   "close_at_ms": 1783717200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXSILVERW-26JUL1717-T55.99",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERW-26JUL1717-T55.99",
+   "category": "finance",
+   "question": "Will the silver close price be above 55.99 USD/t.oz on July 17, 2026 at 5:00 PM EDT? (above $55.99)",
+   "tags": [
+    "finance",
+    "kxsilverw"
+   ],
+   "created_at_ms": 1783717200000,
+   "close_at_ms": 1784322000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXSILVERW-26JUL2417-T58.99",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERW-26JUL2417-T58.99",
+   "category": "finance",
+   "question": "Will the silver close price be above 58.99 USD/t.oz on July 24, 2026 at 5:00 PM EDT? (Above $58.99)",
+   "tags": [
+    "finance",
+    "kxsilverw"
+   ],
+   "created_at_ms": 1784322000000,
+   "close_at_ms": 1784926800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXSILVERW-26JUL3117-T58.99",
+   "provider": "kalshi",
+   "provider_id": "KXSILVERW-26JUL3117-T58.99",
+   "category": "finance",
+   "question": "Will the silver close price be above 58.99 USD/t.oz on July 31, 2026 at 5:00 PM EDT? (Above $58.99)",
+   "tags": [
+    "finance",
+    "kxsilverw"
+   ],
+   "created_at_ms": 1784926800000,
+   "close_at_ms": 1785531600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXSOLMAXMON-SOL-26AUG31-11000",
+   "provider": "kalshi",
+   "provider_id": "KXSOLMAXMON-SOL-26AUG31-11000",
+   "category": "crypto",
+   "question": "Will SOL trimmed mean be above $110.00 by 11:59 PM ET on Aug 31, 2026?",
+   "tags": [
+    "crypto",
+    "kxsolmaxmon"
+   ],
+   "created_at_ms": 1785557400000,
+   "close_at_ms": 1787869790000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXTBCRUNCHWRAP-26AUG02-T6.72",
+   "provider": "kalshi",
+   "provider_id": "KXTBCRUNCHWRAP-26AUG02-T6.72",
+   "category": "economics",
+   "question": "Will the average U.S. price of a Taco Bell Crunchwrap Supreme for July 2026 be at least $6.72?",
+   "tags": [
+    "economics",
+    "kxtbcrunchwrap"
+   ],
+   "created_at_ms": 1783432800000,
+   "close_at_ms": 1785521677000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXTOPMODEL-25NOV-GE25P",
+   "provider": "kalshi",
+   "provider_id": "KXTOPMODEL-25NOV-GE25P",
+   "category": "tech",
+   "question": "What will be the top AI model this month? (gemini-2.5-pro)",
+   "tags": [
+    "kxtopmodel",
+    "tech"
+   ],
+   "created_at_ms": 1762830000000,
+   "close_at_ms": 1764514800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTOPMODEL-26APR30-CLAUT",
+   "provider": "kalshi",
+   "provider_id": "KXTOPMODEL-26APR30-CLAUT",
+   "category": "tech",
+   "question": "What will be the top AI model this month? (claude-opus-4-6-thinking)",
+   "tags": [
+    "kxtopmodel",
+    "tech"
+   ],
+   "created_at_ms": 1774981800000,
+   "close_at_ms": 1777557600000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTOPMODEL-26AUG31-CLAUT",
+   "provider": "kalshi",
+   "provider_id": "KXTOPMODEL-26AUG31-CLAUT",
+   "category": "tech",
+   "question": "What will be the top AI model this month? (claude-opus-4-6-thinking)",
+   "tags": [
+    "kxtopmodel",
+    "tech"
+   ],
+   "created_at_ms": 1785769200000,
+   "close_at_ms": 1788184800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXTOPMODEL-26FEB28-CLAU",
+   "provider": "kalshi",
+   "provider_id": "KXTOPMODEL-26FEB28-CLAU",
+   "category": "tech",
+   "question": "What will be the top AI model this month? (claude-opus-4-5-20251101)",
+   "tags": [
+    "kxtopmodel",
+    "tech"
+   ],
+   "created_at_ms": 1769922000000,
+   "close_at_ms": 1772290800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTOPMODEL-26FEB28-GEMI",
+   "provider": "kalshi",
+   "provider_id": "KXTOPMODEL-26FEB28-GEMI",
+   "category": "tech",
+   "question": "What will be the top AI model this month? (gemini-3-pro)",
+   "tags": [
+    "kxtopmodel",
+    "tech"
+   ],
+   "created_at_ms": 1769922000000,
+   "close_at_ms": 1772290800000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTOPMODEL-26JAN-GPT5",
+   "provider": "kalshi",
+   "provider_id": "KXTOPMODEL-26JAN-GPT5",
+   "category": "tech",
+   "question": "What will be the top AI model this month? (gpt-5.2)",
+   "tags": [
+    "kxtopmodel",
+    "tech"
+   ],
+   "created_at_ms": 1767223800000,
+   "close_at_ms": 1769871600000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTOPMODEL-26JUL31-CLAUF",
+   "provider": "kalshi",
+   "provider_id": "KXTOPMODEL-26JUL31-CLAUF",
+   "category": "tech",
+   "question": "What will be the top AI model this month? (claude-fable-5)",
+   "tags": [
+    "kxtopmodel",
+    "tech"
+   ],
+   "created_at_ms": 1782878400000,
+   "close_at_ms": 1785506400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXTOPMODEL-26MAY31-CLAUT7",
+   "provider": "kalshi",
+   "provider_id": "KXTOPMODEL-26MAY31-CLAUT7",
+   "category": "tech",
+   "question": "What will be the top AI model this month? (claude-opus-4-7-thinking)",
+   "tags": [
+    "kxtopmodel",
+    "tech"
+   ],
+   "created_at_ms": 1777568400000,
+   "close_at_ms": 1780236000000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXTORNADO-25NOV-25",
+   "provider": "kalshi",
+   "provider_id": "KXTORNADO-25NOV-25",
+   "category": "weather",
+   "question": "Will there be more than 25 tornadoes in November? (Above 25)",
+   "tags": [
+    "kxtornado",
+    "weather"
+   ],
+   "created_at_ms": 1760968800000,
+   "close_at_ms": 1764565140000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTORNADO-26APR-275",
+   "provider": "kalshi",
+   "provider_id": "KXTORNADO-26APR-275",
+   "category": "weather",
+   "question": "Will there be more than 275 tornadoes in April? (Above 275)",
+   "tags": [
+    "kxtornado",
+    "weather"
+   ],
+   "created_at_ms": 1774015200000,
+   "close_at_ms": 1777607940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTORNADO-26JUL-125",
+   "provider": "kalshi",
+   "provider_id": "KXTORNADO-26JUL-125",
+   "category": "weather",
+   "question": "Will there be more than 125 tornadoes in July? (Above 125)",
+   "tags": [
+    "kxtornado",
+    "weather"
+   ],
+   "created_at_ms": 1781964000000,
+   "close_at_ms": 1785556740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXTORNADO-26MAR-200",
+   "provider": "kalshi",
+   "provider_id": "KXTORNADO-26MAR-200",
+   "category": "weather",
+   "question": "Will there be more than 200 tornadoes in March? (Above 200)",
+   "tags": [
+    "kxtornado",
+    "weather"
+   ],
+   "created_at_ms": 1771599600000,
+   "close_at_ms": 1775015940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTORNADO-26MAY-100",
+   "provider": "kalshi",
+   "provider_id": "KXTORNADO-26MAY-100",
+   "category": "weather",
+   "question": "Will there be more than 100 tornadoes in May? (Above 100)",
+   "tags": [
+    "kxtornado",
+    "weather"
+   ],
+   "created_at_ms": 1776693600000,
+   "close_at_ms": 1780286340000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXTRUMPMEET-26-XJI",
+   "provider": "kalshi",
+   "provider_id": "KXTRUMPMEET-26-XJI",
+   "category": "politics",
+   "question": "Will Donald Trump meet with Xi Jinping before Jan 2026?",
+   "tags": [
+    "kxtrumpmeet",
+    "politics"
+   ],
+   "created_at_ms": 1754488800000,
+   "close_at_ms": 1760568448004,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTRUMPMEET-26APR-VPUT",
+   "provider": "kalshi",
+   "provider_id": "KXTRUMPMEET-26APR-VPUT",
+   "category": "politics",
+   "question": "Donald Trump and Vladimir Putin meet before May 1, 2026?",
+   "tags": [
+    "kxtrumpmeet",
+    "politics"
+   ],
+   "created_at_ms": 1775052000000,
+   "close_at_ms": 1777510578000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTRUMPMEET-26JAN-EMAC",
+   "provider": "kalshi",
+   "provider_id": "KXTRUMPMEET-26JAN-EMAC",
+   "category": "politics",
+   "question": "Donald Trump and Emmanuel Macron meet before Feb 1, 2026?",
+   "tags": [
+    "kxtrumpmeet",
+    "politics"
+   ],
+   "created_at_ms": 1767394800000,
+   "close_at_ms": 1769921940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTRUMPMEET-26JAN-VPUT",
+   "provider": "kalshi",
+   "provider_id": "KXTRUMPMEET-26JAN-VPUT",
+   "category": "politics",
+   "question": "Donald Trump and Vladimir Putin meet before Feb 1, 2026?",
+   "tags": [
+    "kxtrumpmeet",
+    "politics"
+   ],
+   "created_at_ms": 1767394800000,
+   "close_at_ms": 1769921940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTRUMPMEET-26JUL-RDES",
+   "provider": "kalshi",
+   "provider_id": "KXTRUMPMEET-26JUL-RDES",
+   "category": "politics",
+   "question": "Donald Trump and Ron DeSantis meet before Aug 1, 2026?",
+   "tags": [
+    "kxtrumpmeet",
+    "politics"
+   ],
+   "created_at_ms": 1782914400000,
+   "close_at_ms": 1785556740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXTRUMPMEET-26MAR-XJIN",
+   "provider": "kalshi",
+   "provider_id": "KXTRUMPMEET-26MAR-XJIN",
+   "category": "politics",
+   "question": "Donald Trump and Xi Jinping meet before Apr 1, 2026?",
+   "tags": [
+    "kxtrumpmeet",
+    "politics"
+   ],
+   "created_at_ms": 1772377200000,
+   "close_at_ms": 1775015940000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTRUMPMEET-DEC25-VPUT",
+   "provider": "kalshi",
+   "provider_id": "KXTRUMPMEET-DEC25-VPUT",
+   "category": "politics",
+   "question": "Donald Trump and Vladimir Putin meet before Jan 1, 2026?",
+   "tags": [
+    "kxtrumpmeet",
+    "politics"
+   ],
+   "created_at_ms": 1764615600000,
+   "close_at_ms": 1766941296784,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXTRUTHSOCIAL-26AUG29-T240",
+   "provider": "kalshi",
+   "provider_id": "KXTRUTHSOCIAL-26AUG29-T240",
+   "category": "politics",
+   "question": "Will Donald Trump make above 240 Truth Social posts the week of Aug 23, 2026? (>240)",
+   "tags": [
+    "kxtruthsocial",
+    "politics"
+   ],
+   "created_at_ms": 1787493600000,
+   "close_at_ms": 1788098340000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXTRUTHSOCIAL-26JUL04-B89",
+   "provider": "kalshi",
+   "provider_id": "KXTRUTHSOCIAL-26JUL04-B89",
+   "category": "politics",
+   "question": "Will Donald Trump make between 80 and 99 Truth Social posts the week of Jun 28, 2026? (80-99)",
+   "tags": [
+    "kxtruthsocial",
+    "politics"
+   ],
+   "created_at_ms": 1782655200000,
+   "close_at_ms": 1783259940000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXTRUTHSOCIAL-26JUL11-B149",
+   "provider": "kalshi",
+   "provider_id": "KXTRUTHSOCIAL-26JUL11-B149",
+   "category": "politics",
+   "question": "Will Donald Trump make between 140 and 159 Truth Social posts the week of Jul 5, 2026? (140-159)",
+   "tags": [
+    "kxtruthsocial",
+    "politics"
+   ],
+   "created_at_ms": 1783260000000,
+   "close_at_ms": 1783864740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXTRUTHSOCIAL-26JUL11-T220",
+   "provider": "kalshi",
+   "provider_id": "KXTRUTHSOCIAL-26JUL11-T220",
+   "category": "politics",
+   "question": "Will Donald Trump make above 220 Truth Social posts the week of Jul 5, 2026? (>220)",
+   "tags": [
+    "kxtruthsocial",
+    "politics"
+   ],
+   "created_at_ms": 1783260000000,
+   "close_at_ms": 1783864740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXU3-25DEC-T4.4",
+   "provider": "kalshi",
+   "provider_id": "KXU3-25DEC-T4.4",
+   "category": "economics",
+   "question": "Will the unemployment rate (U-3) be above 4.4% in December?",
+   "tags": [
+    "economics",
+    "kxu3"
+   ],
+   "created_at_ms": 1765897200000,
+   "close_at_ms": 1767965340000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXU3-26APR-T4.1",
+   "provider": "kalshi",
+   "provider_id": "KXU3-26APR-T4.1",
+   "category": "economics",
+   "question": "Will the unemployment rate (U-3) be above 4.1% in April?",
+   "tags": [
+    "economics",
+    "kxu3"
+   ],
+   "created_at_ms": 1775228400000,
+   "close_at_ms": 1778243340000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXU3-26AUG-T4.2",
+   "provider": "kalshi",
+   "provider_id": "KXU3-26AUG-T4.2",
+   "category": "economics",
+   "question": "Will the unemployment rate (U-3) be above 4.2% in August?",
+   "tags": [
+    "economics",
+    "kxu3"
+   ],
+   "created_at_ms": 1780767600000,
+   "close_at_ms": 1788524940000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXU3-26FEB-T4.2",
+   "provider": "kalshi",
+   "provider_id": "KXU3-26FEB-T4.2",
+   "category": "economics",
+   "question": "Will the unemployment rate (U-3) be above 4.2% in February?",
+   "tags": [
+    "economics",
+    "kxu3"
+   ],
+   "created_at_ms": 1770861600000,
+   "close_at_ms": 1772803500000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXU3-26JUL-T4.2",
+   "provider": "kalshi",
+   "provider_id": "KXU3-26JUL-T4.2",
+   "category": "economics",
+   "question": "Will the unemployment rate (U-3) be above 4.2% in July?",
+   "tags": [
+    "economics",
+    "kxu3"
+   ],
+   "created_at_ms": 1780765800000,
+   "close_at_ms": 1786105740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXU3-26MAY-T4.1",
+   "provider": "kalshi",
+   "provider_id": "KXU3-26MAY-T4.1",
+   "category": "economics",
+   "question": "Will the unemployment rate (U-3) be above 4.1% in May?",
+   "tags": [
+    "economics",
+    "kxu3"
+   ],
+   "created_at_ms": 1778266800000,
+   "close_at_ms": 1780662540000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXUSDEBTMON-26MAY01-T39.10",
+   "provider": "kalshi",
+   "provider_id": "KXUSDEBTMON-26MAY01-T39.10",
+   "category": "economics",
+   "question": "Will Total Public Debt Outstanding for April 30, 2026 be above 39.10 trillion?",
+   "tags": [
+    "economics",
+    "kxusdebtmon"
+   ],
+   "created_at_ms": 1774533600000,
+   "close_at_ms": 1777665540000,
+   "fold": "train"
+  },
+  {
+   "id": "kalshi-KXUSFLYCAN-26AUG07-T5000",
+   "provider": "kalshi",
+   "provider_id": "KXUSFLYCAN-26AUG07-T5000",
+   "category": "other",
+   "question": "Will total cancellations within, into, or out of the United States for week ending August 7, 2026 be above 5,000?",
+   "tags": [
+    "kxusflycan",
+    "other"
+   ],
+   "created_at_ms": 1785531600000,
+   "close_at_ms": 1786136340000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXUSGASCPI-26AUG12-T330",
+   "provider": "kalshi",
+   "provider_id": "KXUSGASCPI-26AUG12-T330",
+   "category": "economics",
+   "question": "Will Gasoline (All Types) in U.S. City Average for July 2026 be above 330ㅤ?",
+   "tags": [
+    "economics",
+    "kxusgascpi"
+   ],
+   "created_at_ms": 1781631900000,
+   "close_at_ms": 1786537740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXUSGASCPI-26AUG12-T415",
+   "provider": "kalshi",
+   "provider_id": "KXUSGASCPI-26AUG12-T415",
+   "category": "economics",
+   "question": "Will Gasoline (All Types) in U.S. City Average for July 2026 be above 415ㅤ?",
+   "tags": [
+    "economics",
+    "kxusgascpi"
+   ],
+   "created_at_ms": 1781105100000,
+   "close_at_ms": 1786537740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXUSGASCPI-26JUL14-T365",
+   "provider": "kalshi",
+   "provider_id": "KXUSGASCPI-26JUL14-T365",
+   "category": "economics",
+   "question": "Will Gasoline (All Types) in U.S. City Average for June 2026 be above 365ㅤ?",
+   "tags": [
+    "economics",
+    "kxusgascpi"
+   ],
+   "created_at_ms": 1779922800000,
+   "close_at_ms": 1784032140000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXUSGASCPI-26JUN10-T380",
+   "provider": "kalshi",
+   "provider_id": "KXUSGASCPI-26JUN10-T380",
+   "category": "economics",
+   "question": "Will Gasoline (All Types) in U.S. City Average for May 2026 be above 380ㅤ?",
+   "tags": [
+    "economics",
+    "kxusgascpi"
+   ],
+   "created_at_ms": 1778605200000,
+   "close_at_ms": 1781094540000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXUST10-26JUN30-T4.65",
+   "provider": "kalshi",
+   "provider_id": "KXUST10-26JUN30-T4.65",
+   "category": "finance",
+   "question": "Will 10Y US Treasury Yield before month-end be above 4.65%?",
+   "tags": [
+    "finance",
+    "kxust10"
+   ],
+   "created_at_ms": 1780333200000,
+   "close_at_ms": 1782847740000,
+   "fold": "validation"
+  },
+  {
+   "id": "kalshi-KXUST10A-26AUG14-T4.65",
+   "provider": "kalshi",
+   "provider_id": "KXUST10A-26AUG14-T4.65",
+   "category": "finance",
+   "question": "Will the 10Y U.S. Treasury yield be above 4.65% on Aug 14, 2026? (4.66% or above)",
+   "tags": [
+    "finance",
+    "kxust10a"
+   ],
+   "created_at_ms": 1786131000000,
+   "close_at_ms": 1786735800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXUST10A-26JUL24-T4.68",
+   "provider": "kalshi",
+   "provider_id": "KXUST10A-26JUL24-T4.68",
+   "category": "finance",
+   "question": "Will the 10Y U.S. Treasury yield be above 4.68% on Jul 24, 2026? (4.69% or above)",
+   "tags": [
+    "finance",
+    "kxust10a"
+   ],
+   "created_at_ms": 1784316600000,
+   "close_at_ms": 1784921400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXUST5A-26AUG07-T4.35",
+   "provider": "kalshi",
+   "provider_id": "KXUST5A-26AUG07-T4.35",
+   "category": "finance",
+   "question": "Will the 5Y U.S. Treasury yield be above 4.35% on Aug 7, 2026? (4.36% or above)",
+   "tags": [
+    "finance",
+    "kxust5a"
+   ],
+   "created_at_ms": 1785526200000,
+   "close_at_ms": 1786131000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXUST7A-26JUL31-T4.57",
+   "provider": "kalshi",
+   "provider_id": "KXUST7A-26JUL31-T4.57",
+   "category": "finance",
+   "question": "Will the 7Y U.S. Treasury yield be above 4.57% on Jul 31, 2026? (4.58% or above)",
+   "tags": [
+    "finance",
+    "kxust7a"
+   ],
+   "created_at_ms": 1784921400000,
+   "close_at_ms": 1785526200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXWTIW-26AUG0714-T97.99",
+   "provider": "kalshi",
+   "provider_id": "KXWTIW-26AUG0714-T97.99",
+   "category": "finance",
+   "question": "Will the WTI crude oil settlement price be above 97.99 USD/Bbl on Aug 7, 2026? (Above $97.99)",
+   "tags": [
+    "finance",
+    "kxwtiw"
+   ],
+   "created_at_ms": 1785540600000,
+   "close_at_ms": 1786127400000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXWTIW-26AUG1414-B82.50",
+   "provider": "kalshi",
+   "provider_id": "KXWTIW-26AUG1414-B82.50",
+   "category": "finance",
+   "question": "Will the WTI crude oil settlement price be between 82.00 and 82.99 USD/Bbl on Aug 14, 2026? ($82.00 to $82.99)",
+   "tags": [
+    "finance",
+    "kxwtiw"
+   ],
+   "created_at_ms": 1786145400000,
+   "close_at_ms": 1786732200000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXWTIW-26AUG2114-B87.50",
+   "provider": "kalshi",
+   "provider_id": "KXWTIW-26AUG2114-B87.50",
+   "category": "finance",
+   "question": "Will the WTI crude oil settlement price be between 87.00 and 87.99 USD/Bbl on Aug 21, 2026? ($87.00 to $87.99)",
+   "tags": [
+    "finance",
+    "kxwtiw"
+   ],
+   "created_at_ms": 1786750200000,
+   "close_at_ms": 1787337000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXWTIW-26JUL1714-T77.99",
+   "provider": "kalshi",
+   "provider_id": "KXWTIW-26JUL1714-T77.99",
+   "category": "finance",
+   "question": "Will the WTI crude oil settlement price be above 77.99 USD/Bbl on Jul 17, 2026? (Above $77.99)",
+   "tags": [
+    "finance",
+    "kxwtiw"
+   ],
+   "created_at_ms": 1783726200000,
+   "close_at_ms": 1784313000000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXWTIW-26JUL2414-T94.99",
+   "provider": "kalshi",
+   "provider_id": "KXWTIW-26JUL2414-T94.99",
+   "category": "finance",
+   "question": "Will the WTI crude oil settlement price be above 94.99 USD/Bbl on Jul 24, 2026? (Above $94.99)",
+   "tags": [
+    "finance",
+    "kxwtiw"
+   ],
+   "created_at_ms": 1784331000000,
+   "close_at_ms": 1784917800000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXWTIW-26JUL3114-B84.50",
+   "provider": "kalshi",
+   "provider_id": "KXWTIW-26JUL3114-B84.50",
+   "category": "finance",
+   "question": "Will the WTI crude oil settlement price be between 84.00 and 84.99 USD/Bbl on Jul 31, 2026? ($84.00 to $84.99)",
+   "tags": [
+    "finance",
+    "kxwtiw"
+   ],
+   "created_at_ms": 1784935800000,
+   "close_at_ms": 1785522600000,
+   "fold": "sealed"
+  },
+  {
+   "id": "kalshi-KXXRPMINMON-XRP-26MAY31-130",
+   "provider": "kalshi",
+   "provider_id": "KXXRPMINMON-XRP-26MAY31-130",
+   "category": "crypto",
+   "question": "Will XRP trimmed mean be below $1.30 by 11:59 PM ET on May 31, 2026?",
+   "tags": [
+    "crypto",
+    "kxxrpminmon"
+   ],
+   "created_at_ms": 1777645080000,
+   "close_at_ms": 1779943804000,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-06c5RnNREU",
+   "provider": "manifold",
+   "provider_id": "06c5RnNREU",
+   "category": "politics",
+   "question": "Will Donald Trump attend the superbowl",
+   "tags": [
+    "donald-trump",
+    "magaland",
+    "super-bowl",
+    "trumps-second-term",
+    "us-politics"
+   ],
+   "created_at_ms": 1769101185061,
+   "close_at_ms": 1770508740000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-08Elun59E6",
+   "provider": "manifold",
+   "provider_id": "08Elun59E6",
+   "category": "other",
+   "question": "Will fatal ICE shooting in the US occur again before March 2026?",
+   "tags": [
+    "crime",
+    "guns",
+    "law-order",
+    "terrorism",
+    "us-immigration"
+   ],
+   "created_at_ms": 1769394689397,
+   "close_at_ms": 1772281555502,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-1wLY6p4Hy0",
+   "provider": "manifold",
+   "provider_id": "1wLY6p4Hy0",
+   "category": "other",
+   "question": "Do you like 4% odds?",
+   "tags": [
+    "behavior",
+    "fairlyrandom",
+    "fun",
+    "nonpredictive",
+    "psychology"
+   ],
+   "created_at_ms": 1777308604984,
+   "close_at_ms": 1777919520000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-26dSCqOhR2",
+   "provider": "manifold",
+   "provider_id": "26dSCqOhR2",
+   "category": "other",
+   "question": "Will @realDonaldTrump report that being banned from Manifold was good, actually?",
+   "tags": [
+    "manifold-users",
+    "nonpredictive"
+   ],
+   "created_at_ms": 1758742953612,
+   "close_at_ms": 1762026120000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-28ulh6tqLS",
+   "provider": "manifold",
+   "provider_id": "28ulh6tqLS",
+   "category": "other",
+   "question": "I raise at least 100 mana from this question by November?",
+   "tags": [
+    "fun",
+    "manifold-6748e065087e",
+    "manifold-users",
+    "metamarkets",
+    "nonpredictive",
+    "personal"
+   ],
+   "created_at_ms": 1760386533747,
+   "close_at_ms": 1761955140000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-2CElLQuA55",
+   "provider": "manifold",
+   "provider_id": "2CElLQuA55",
+   "category": "other",
+   "question": "RAS2026: Will Apple/Meta/Google announce a crypto wallet in January?",
+   "tags": [
+    "ras2026"
+   ],
+   "created_at_ms": 1768043429310,
+   "close_at_ms": 1769900399000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-2Ncu6yN2nz",
+   "provider": "manifold",
+   "provider_id": "2Ncu6yN2nz",
+   "category": "crypto",
+   "question": "Will Bitcoin close above $80,000 on April 30, 2026?",
+   "tags": [
+    "bitcoin",
+    "crypto-speculation"
+   ],
+   "created_at_ms": 1774526172184,
+   "close_at_ms": 1777593540000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-5L8sQuPcCg",
+   "provider": "manifold",
+   "provider_id": "5L8sQuPcCg",
+   "category": "politics",
+   "question": "Kristi Noem is first to leave Trump's cabinet",
+   "tags": [
+    "kristi-noem",
+    "politics-default",
+    "trump-cabinet",
+    "trumps-second-term",
+    "us-politics"
+   ],
+   "created_at_ms": 1769616196046,
+   "close_at_ms": 1772772271575,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-5RcECd9PAc",
+   "provider": "manifold",
+   "provider_id": "5RcECd9PAc",
+   "category": "other",
+   "question": "Does GPT-5-Thinking make egregious errors on pure-text queries?",
+   "tags": [
+    "chatgpt",
+    "gpt4-speculation",
+    "gpt5",
+    "gpt5-speculation",
+    "llms"
+   ],
+   "created_at_ms": 1754692617194,
+   "close_at_ms": 1757889240000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-5tc60SEZs6",
+   "provider": "manifold",
+   "provider_id": "5tc60SEZs6",
+   "category": "tech",
+   "question": "Sydney Sweeney partners with Polymarket before March?",
+   "tags": [
+    "celebrities",
+    "culture-default",
+    "polymarket",
+    "technology-default"
+   ],
+   "created_at_ms": 1768357003306,
+   "close_at_ms": 1772323140000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-69982qzL22",
+   "provider": "manifold",
+   "provider_id": "69982qzL22",
+   "category": "other",
+   "question": "Does Russia have a better claim to Ukraine than the US to Greenland?",
+   "tags": [
+    "free-mana"
+   ],
+   "created_at_ms": 1767744033120,
+   "close_at_ms": 1768348740000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-6AlQsOUcQs",
+   "provider": "manifold",
+   "provider_id": "6AlQsOUcQs",
+   "category": "other",
+   "question": "Jack OR Jesse wins Masters Season 39",
+   "tags": [
+    "competitive-gaming",
+    "game-shows"
+   ],
+   "created_at_ms": 1784450806127,
+   "close_at_ms": 1785452340000,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-6yREhcdA0S",
+   "provider": "manifold",
+   "provider_id": "6yREhcdA0S",
+   "category": "economics",
+   "question": "Will this market get more than 100 traders?",
+   "tags": [
+    "economics-default",
+    "fun",
+    "metamarkets",
+    "nonpredictive"
+   ],
+   "created_at_ms": 1772689886371,
+   "close_at_ms": 1773294540000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-8QSI5ptgyL",
+   "provider": "manifold",
+   "provider_id": "8QSI5ptgyL",
+   "category": "world",
+   "question": "Will the US-Iran war be over by April 23rd?",
+   "tags": [
+    "iran",
+    "iranian-politics",
+    "israeliran-conflict",
+    "middle-east",
+    "wars"
+   ],
+   "created_at_ms": 1774382548256,
+   "close_at_ms": 1776974520000,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-9950I0zQI8",
+   "provider": "manifold",
+   "provider_id": "9950I0zQI8",
+   "category": "sports",
+   "question": "Will AJ Dybantsa declare for the NBA draft this year?",
+   "tags": [
+    "basketball",
+    "brigham-young-university",
+    "nba"
+   ],
+   "created_at_ms": 1774242176657,
+   "close_at_ms": 1776972231144,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-9dZgN6PyqQ",
+   "provider": "manifold",
+   "provider_id": "9dZgN6PyqQ",
+   "category": "politics",
+   "question": "More ships through Strait of Hormuz than goals at 2026 FIFA World Cup?",
+   "tags": [
+    "2026-fifa-world-cup",
+    "donald-trump",
+    "iran",
+    "ms-community-wc2026",
+    "soccer",
+    "us-politics"
+   ],
+   "created_at_ms": 1780921103901,
+   "close_at_ms": 1784592028770,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-9QLUOClzlA",
+   "provider": "manifold",
+   "provider_id": "9QLUOClzlA",
+   "category": "tech",
+   "question": "Will Anthropic’s private valuation exceed 50% of OpenAI’s in their next funding rounds?",
+   "tags": [
+    "ai",
+    "anthropic",
+    "openai",
+    "technical-ai-timelines",
+    "technology-default"
+   ],
+   "created_at_ms": 1770566868507,
+   "close_at_ms": 1780131072925,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-A06gOOU5Ph",
+   "provider": "manifold",
+   "provider_id": "A06gOOU5Ph",
+   "category": "finance",
+   "question": "On February 20, 2026, the Apple stock will be higher than on February 12, 2026?",
+   "tags": [
+    "business",
+    "crypto-speculation",
+    "economics-default",
+    "stocks",
+    "technology-default"
+   ],
+   "created_at_ms": 1770471392879,
+   "close_at_ms": 1770883200000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-A59ct25ggS",
+   "provider": "manifold",
+   "provider_id": "A59ct25ggS",
+   "category": "economics",
+   "question": "We sell >2x the boosts now that we add 5k liquidity to the AMM?",
+   "tags": [
+    "economics-default",
+    "fun",
+    "manifold-6748e065087e",
+    "metamarkets",
+    "whale-watching"
+   ],
+   "created_at_ms": 1773180177205,
+   "close_at_ms": 1779167893033,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-AhlhCcOct6",
+   "provider": "manifold",
+   "provider_id": "AhlhCcOct6",
+   "category": "crypto",
+   "question": "Bitcoin $96K in December?",
+   "tags": [
+    "bitcoin",
+    "bitcoin-maxi",
+    "crypto-speculation",
+    "economics-default",
+    "prices"
+   ],
+   "created_at_ms": 1764638405119,
+   "close_at_ms": 1767254340000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-Au9C6AOg9Z",
+   "provider": "manifold",
+   "provider_id": "Au9C6AOg9Z",
+   "category": "world",
+   "question": "Is/Was Benjamin Netanyahu dead or grievously injured as of March 12-14, 2026",
+   "tags": [
+    "israel",
+    "israeli-politics",
+    "middle-east",
+    "world-default"
+   ],
+   "created_at_ms": 1773548059526,
+   "close_at_ms": 1774363554841,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-cd8Cdq8R0S",
+   "provider": "manifold",
+   "provider_id": "cd8Cdq8R0S",
+   "category": "other",
+   "question": "Will Jannik Sinner win Roland Garros 2026?",
+   "tags": [
+    "australian-open-2026",
+    "competitive-gaming",
+    "french-open-roland-garros",
+    "road-bicycle-racing",
+    "tennis"
+   ],
+   "created_at_ms": 1777307657073,
+   "close_at_ms": 1780031476984,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-cgtL266SNP",
+   "provider": "manifold",
+   "provider_id": "cgtL266SNP",
+   "category": "other",
+   "question": "Will the UK produce more solar energy in March - 2026 than it did in March - 2025?",
+   "tags": [],
+   "created_at_ms": 1772337601118,
+   "close_at_ms": 1774990800000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-cNplLZgUEu",
+   "provider": "manifold",
+   "provider_id": "cNplLZgUEu",
+   "category": "tech",
+   "question": "OpenAI browser by Oct 31?",
+   "tags": [
+    "ai",
+    "ai-impacts",
+    "openai",
+    "technical-ai-timelines",
+    "technology-default"
+   ],
+   "created_at_ms": 1756455306463,
+   "close_at_ms": 1761079833371,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-Dba1929c39",
+   "provider": "manifold",
+   "provider_id": "Dba1929c39",
+   "category": "sports",
+   "question": "Will Jannik Sinner win the 2026 US Open men's singles title?",
+   "tags": [
+    "mirror",
+    "sports-default",
+    "tennis",
+    "us-open"
+   ],
+   "created_at_ms": 1786357668285,
+   "close_at_ms": 1787859998148,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-ddCgEz0OPu",
+   "provider": "manifold",
+   "provider_id": "ddCgEz0OPu",
+   "category": "politics",
+   "question": "Government shutdown in 2026?",
+   "tags": [
+    "gov-shutdown-f8d8c012d5e7",
+    "news",
+    "politics-default",
+    "us-politics"
+   ],
+   "created_at_ms": 1759803779364,
+   "close_at_ms": 1769868368220,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-dhCL06pA6U",
+   "provider": "manifold",
+   "provider_id": "dhCL06pA6U",
+   "category": "crypto",
+   "question": "Nvidia below $140 by end of March 2026?",
+   "tags": [
+    "ai",
+    "bitcoin",
+    "crypto-speculation",
+    "economics-default",
+    "technology-default"
+   ],
+   "created_at_ms": 1763716395387,
+   "close_at_ms": 1775001540000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-dRIg50lR5n",
+   "provider": "manifold",
+   "provider_id": "dRIg50lR5n",
+   "category": "world",
+   "question": "Will I be invited to MOP 2026?",
+   "tags": [
+    "colleges-universities",
+    "competition-math",
+    "competitive-physics",
+    "imo",
+    "world-default"
+   ],
+   "created_at_ms": 1774294214962,
+   "close_at_ms": 1777071466376,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-ECAOqARnhn",
+   "provider": "manifold",
+   "provider_id": "ECAOqARnhn",
+   "category": "crypto",
+   "question": "Bitcoin $95K in Feburary?",
+   "tags": [
+    "bitcoin",
+    "bitcoin-maxi",
+    "crypto-speculation",
+    "economics-default",
+    "prices"
+   ],
+   "created_at_ms": 1769675482977,
+   "close_at_ms": 1772351940000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-gd8ERAuysQ",
+   "provider": "manifold",
+   "provider_id": "gd8ERAuysQ",
+   "category": "world",
+   "question": "[ACX 2026] Will NASA's Artemis II complete its mission successfully before 2027?",
+   "tags": [
+    "acx-2026-prediction-contest",
+    "news",
+    "space",
+    "technology-default",
+    "world-default"
+   ],
+   "created_at_ms": 1767743841911,
+   "close_at_ms": 1775955933641,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-ggqOdLIRd6",
+   "provider": "manifold",
+   "provider_id": "ggqOdLIRd6",
+   "category": "tech",
+   "question": "Will Anthropic remove the data retention rule on Fable 5 before July?",
+   "tags": [
+    "ai",
+    "anthropic",
+    "fable",
+    "openai",
+    "technology-default"
+   ],
+   "created_at_ms": 1781332481227,
+   "close_at_ms": 1782863940000,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-glQE0nn0Oc",
+   "provider": "manifold",
+   "provider_id": "glQE0nn0Oc",
+   "category": "crypto",
+   "question": "Bitcoin below $95K in November?",
+   "tags": [
+    "bitcoin",
+    "bitcoin-maxi",
+    "crypto-speculation",
+    "economics-default",
+    "prices"
+   ],
+   "created_at_ms": 1762238250164,
+   "close_at_ms": 1763167209739,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-gSIlhZgAZd",
+   "provider": "manifold",
+   "provider_id": "gSIlhZgAZd",
+   "category": "other",
+   "question": "Will anyone ask out @admit at the 2026 USAMO?",
+   "tags": [
+    "college-admissions",
+    "colleges-universities",
+    "competition-math",
+    "competitive-physics",
+    "imo"
+   ],
+   "created_at_ms": 1772671654669,
+   "close_at_ms": 1774222989212,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-hQNRtAsS9Q",
+   "provider": "manifold",
+   "provider_id": "hQNRtAsS9Q",
+   "category": "sports",
+   "question": "Will Khamzat Chimaev takedown Sean Strickland within the first 10 seconds of the fight ?",
+   "tags": [
+    "entertainment",
+    "fighting",
+    "sports-betting",
+    "sports-default",
+    "ufc"
+   ],
+   "created_at_ms": 1776108642038,
+   "close_at_ms": 1778525880000,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-IE06IhZ6II",
+   "provider": "manifold",
+   "provider_id": "IE06IhZ6II",
+   "category": "crypto",
+   "question": "Bitcoin below 107.5K in October?",
+   "tags": [
+    "bitcoin",
+    "bitcoin-maxi",
+    "crypto-speculation",
+    "economics-default",
+    "prices"
+   ],
+   "created_at_ms": 1759307320733,
+   "close_at_ms": 1760137357077,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-IIZl5dhqOs",
+   "provider": "manifold",
+   "provider_id": "IIZl5dhqOs",
+   "category": "other",
+   "question": "Bitcoin $83k in May?",
+   "tags": [],
+   "created_at_ms": 1778146723451,
+   "close_at_ms": 1780264740000,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-Iz0lRpO85N",
+   "provider": "manifold",
+   "provider_id": "Iz0lRpO85N",
+   "category": "politics",
+   "question": "One Nation gets at least 4 seats in the South Australian election?",
+   "tags": [
+    "australia",
+    "australian-politics",
+    "elections",
+    "elections-world"
+   ],
+   "created_at_ms": 1774176835380,
+   "close_at_ms": 1775114018350,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-LCgppU9SyA",
+   "provider": "manifold",
+   "provider_id": "LCgppU9SyA",
+   "category": "crypto",
+   "question": "Will Bitcoin be higher 7 days from now?",
+   "tags": [
+    "bitcoin",
+    "crypto-speculation"
+   ],
+   "created_at_ms": 1787834675213,
+   "close_at_ms": 1788439440000,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-LEctL2u0R2",
+   "provider": "manifold",
+   "provider_id": "LEctL2u0R2",
+   "category": "weather",
+   "question": "Named storm before start of Atlantic hurricane season",
+   "tags": [
+    "2026-hurricane-season",
+    "climate",
+    "extreme-weather",
+    "hurricanes",
+    "weather"
+   ],
+   "created_at_ms": 1774132649057,
+   "close_at_ms": 1780261818257,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-LhpSpN5ZQS",
+   "provider": "manifold",
+   "provider_id": "LhpSpN5ZQS",
+   "category": "weather",
+   "question": "Will an Atlantic hurricane form on or before August 20, 2026?",
+   "tags": [
+    "2026-hurricane-season",
+    "climate",
+    "natural-disasters",
+    "weather"
+   ],
+   "created_at_ms": 1784870939275,
+   "close_at_ms": 1787356740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-lRCA5I2ECA",
+   "provider": "manifold",
+   "provider_id": "lRCA5I2ECA",
+   "category": "economics",
+   "question": "Will this market have at least 20 commenters?",
+   "tags": [
+    "business",
+    "crypto-speculation",
+    "economics-default",
+    "fun",
+    "nonpredictive",
+    "technology-default"
+   ],
+   "created_at_ms": 1770305348362,
+   "close_at_ms": 1771794736443,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-m615b7a29a",
+   "provider": "manifold",
+   "provider_id": "m615b7a29a",
+   "category": "other",
+   "question": "Will Zanda Zhu remain in Masters after Season 40?",
+   "tags": [
+    "nonpredictive"
+   ],
+   "created_at_ms": 1785683375974,
+   "close_at_ms": 1788130740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-OIhySlytEh",
+   "provider": "manifold",
+   "provider_id": "OIhySlytEh",
+   "category": "entertainment",
+   "question": "Will Chainsaw Man part 3 be announced?",
+   "tags": [
+    "anime",
+    "culture-default",
+    "entertainment",
+    "fun",
+    "manga"
+   ],
+   "created_at_ms": 1773183485818,
+   "close_at_ms": 1780268160000,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-Op0LpzAzNP",
+   "provider": "manifold",
+   "provider_id": "Op0LpzAzNP",
+   "category": "crypto",
+   "question": "Will this bitcoin wallet receives $100 worth of BTC within next month?",
+   "tags": [
+    "bitcoin",
+    "bitcoin-maxi",
+    "crypto-prices",
+    "crypto-speculation",
+    "prices"
+   ],
+   "created_at_ms": 1763099394387,
+   "close_at_ms": 1765691220000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-OthtR0LAQE",
+   "provider": "manifold",
+   "provider_id": "OthtR0LAQE",
+   "category": "tech",
+   "question": "Will Pope Leo XIV's first encyclical 'Magnifica Humanitas' exceed 30,000 words in its official English translation?",
+   "tags": [
+    "ai",
+    "catholicism",
+    "pope",
+    "religion"
+   ],
+   "created_at_ms": 1779269567927,
+   "close_at_ms": 1779927762507,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-P2d2C6l22A",
+   "provider": "manifold",
+   "provider_id": "P2d2C6l22A",
+   "category": "other",
+   "question": "new Fooming Shoggoths song by April 1st 2026?",
+   "tags": [
+    "-ai-music-generation",
+    "ai-media-creation",
+    "lesswrong-annual-review",
+    "music-f213cbf1eab5"
+   ],
+   "created_at_ms": 1769719706729,
+   "close_at_ms": 1774659540000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-Pd59AAtPOR",
+   "provider": "manifold",
+   "provider_id": "Pd59AAtPOR",
+   "category": "politics",
+   "question": "US-Iran nuclear deal in 2025?",
+   "tags": [
+    "iranian-politics",
+    "news",
+    "politics-default",
+    "technology-default",
+    "wars",
+    "world-default"
+   ],
+   "created_at_ms": 1749582895871,
+   "close_at_ms": 1767203451827,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-PtAUZO5dOS",
+   "provider": "manifold",
+   "provider_id": "PtAUZO5dOS",
+   "category": "sports",
+   "question": "Will Hearts win the Scottish league?",
+   "tags": [
+    "premiere-league",
+    "soccer",
+    "sports-default",
+    "uefa",
+    "uefa-champions-league"
+   ],
+   "created_at_ms": 1778008651810,
+   "close_at_ms": 1778941393970,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-Q86zpNZRsU",
+   "provider": "manifold",
+   "provider_id": "Q86zpNZRsU",
+   "category": "politics",
+   "question": "Will the United States officially withdraw from NATO by March 31, 2026?",
+   "tags": [
+    "geopolitics",
+    "politics-default",
+    "trumps-second-term",
+    "wars",
+    "world-default"
+   ],
+   "created_at_ms": 1768740631524,
+   "close_at_ms": 1774990740000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-Q8y2sNLQzq",
+   "provider": "manifold",
+   "provider_id": "Q8y2sNLQzq",
+   "category": "politics",
+   "question": "Fable 5 reenabled for Americans by July 31?",
+   "tags": [
+    "ai",
+    "fable",
+    "openai",
+    "united-states",
+    "us-politics"
+   ],
+   "created_at_ms": 1781744586691,
+   "close_at_ms": 1782948226491,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-Qg5QIC5IR0",
+   "provider": "manifold",
+   "provider_id": "Qg5QIC5IR0",
+   "category": "other",
+   "question": "Will I walk 500k steps in October?",
+   "tags": [
+    "death-markets",
+    "personal",
+    "personal-goals"
+   ],
+   "created_at_ms": 1759430488129,
+   "close_at_ms": 1761841900157,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-RcyCSOnp0I",
+   "provider": "manifold",
+   "provider_id": "RcyCSOnp0I",
+   "category": "other",
+   "question": "D4vd arrested by September 30? [Polymarket]",
+   "tags": [
+    "crime",
+    "law-order",
+    "prison-markets",
+    "september-2025"
+   ],
+   "created_at_ms": 1758190216264,
+   "close_at_ms": 1759276740000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-RyqN2d8QLz",
+   "provider": "manifold",
+   "provider_id": "RyqN2d8QLz",
+   "category": "politics",
+   "question": "Will California pass a mid-cycle redistricting referendum in 2025?",
+   "tags": [
+    "california",
+    "news",
+    "politics-default",
+    "us-politics",
+    "world-default"
+   ],
+   "created_at_ms": 1755145131295,
+   "close_at_ms": 1762368466578,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-RzuzdCO0qO",
+   "provider": "manifold",
+   "provider_id": "RzuzdCO0qO",
+   "category": "entertainment",
+   "question": "Will \"Spider-Man: Brand New Day\" earn more than $230M in domestic gross earnings (in US dollars) during their opening we",
+   "tags": [
+    "boxoffice",
+    "cinema",
+    "culture-default",
+    "entertainment",
+    "movies"
+   ],
+   "created_at_ms": 1782119531045,
+   "close_at_ms": 1785818386521,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-S92CQ6gyNy",
+   "provider": "manifold",
+   "provider_id": "S92CQ6gyNy",
+   "category": "economics",
+   "question": "Will this market be above 50% when it closes?",
+   "tags": [
+    "economics-default",
+    "fun",
+    "manifold-6748e065087e",
+    "nonpredictive",
+    "technology-default"
+   ],
+   "created_at_ms": 1760840391256,
+   "close_at_ms": 1761445080000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-SA86tOqqSA",
+   "provider": "manifold",
+   "provider_id": "SA86tOqqSA",
+   "category": "other",
+   "question": "Will we hire a Community Manager by Pi Day?",
+   "tags": [
+    "jobs"
+   ],
+   "created_at_ms": 1768516579212,
+   "close_at_ms": 1773619140000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-sLtAudcPqO",
+   "provider": "manifold",
+   "provider_id": "sLtAudcPqO",
+   "category": "crypto",
+   "question": "Will the WTI Crude Oil Spot Price be above $98 on April 20, 2026?",
+   "tags": [
+    "bitcoin",
+    "bitcoin-maxi",
+    "crypto-speculation",
+    "economics-default",
+    "prices"
+   ],
+   "created_at_ms": 1775848454679,
+   "close_at_ms": 1776729540000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-sPuSducIS2",
+   "provider": "manifold",
+   "provider_id": "sPuSducIS2",
+   "category": "world",
+   "question": "Will Russia and Ukraine agree to a ceasefire before August 1, 2026?",
+   "tags": [
+    "geopolitics",
+    "middle-east",
+    "ukraine",
+    "ukrainerussia-war",
+    "wars"
+   ],
+   "created_at_ms": 1774209557006,
+   "close_at_ms": 1785580140000,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-UlZEC6Rys2",
+   "provider": "manifold",
+   "provider_id": "UlZEC6Rys2",
+   "category": "world",
+   "question": "Russia-Ukraine ceasefire before end of Iran War",
+   "tags": [
+    "russia",
+    "ukraine",
+    "ukrainerussia-war",
+    "wars"
+   ],
+   "created_at_ms": 1774233816527,
+   "close_at_ms": 1781878174261,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-uuhpU2ngnn",
+   "provider": "manifold",
+   "provider_id": "uuhpU2ngnn",
+   "category": "politics",
+   "question": "Will the US put boots on the ground in Iran before September?",
+   "tags": [
+    "iran",
+    "iranian-politics",
+    "israeliran-conflict",
+    "middle-east",
+    "us-politics"
+   ],
+   "created_at_ms": 1784241925462,
+   "close_at_ms": 1788220740000,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-y8LztqQUPS",
+   "provider": "manifold",
+   "provider_id": "y8LztqQUPS",
+   "category": "world",
+   "question": "Will Russia gain more territory than it loses in June 2026?",
+   "tags": [
+    "russia",
+    "ukraine",
+    "ukrainerussia-war",
+    "wars",
+    "world-default"
+   ],
+   "created_at_ms": 1780550394733,
+   "close_at_ms": 1783149621738,
+   "fold": "validation"
+  },
+  {
+   "id": "manifold-yC8C8ctPtP",
+   "provider": "manifold",
+   "provider_id": "yC8C8ctPtP",
+   "category": "science",
+   "question": "Will Starship flight 12 happen before New Glenn flight 3?",
+   "tags": [
+    "commercial-spaceflight",
+    "rockets",
+    "space",
+    "spacex",
+    "starship-launch-party"
+   ],
+   "created_at_ms": 1769413384271,
+   "close_at_ms": 1776630846139,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-yEdIL0gylE",
+   "provider": "manifold",
+   "provider_id": "yEdIL0gylE",
+   "category": "other",
+   "question": "Gemini 3.0 released by October 15?",
+   "tags": [
+    "ai-model-releases",
+    "gemini-3",
+    "google-gemini",
+    "gpt5-speculation",
+    "upcoming-releases"
+   ],
+   "created_at_ms": 1759313464808,
+   "close_at_ms": 1760517304383,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-yqgth08E9P",
+   "provider": "manifold",
+   "provider_id": "yqgth08E9P",
+   "category": "sports",
+   "question": "Will India win the T20 ICC World Cup",
+   "tags": [
+    "cricket",
+    "sports-default"
+   ],
+   "created_at_ms": 1771390036995,
+   "close_at_ms": 1773704582030,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-ZI2Igl6hUz",
+   "provider": "manifold",
+   "provider_id": "ZI2Igl6hUz",
+   "category": "world",
+   "question": "On February 24, 2026, will Meta Platforms’ stock price be higher than on February 20, 2026?",
+   "tags": [
+    "ai",
+    "business",
+    "economics-default",
+    "technology-default",
+    "world-default"
+   ],
+   "created_at_ms": 1771269281999,
+   "close_at_ms": 1771575420000,
+   "fold": "train"
+  },
+  {
+   "id": "manifold-zlUUlUhq50",
+   "provider": "manifold",
+   "provider_id": "zlUUlUhq50",
+   "category": "politics",
+   "question": "Will Fed (Kevin Warsh) cut interest rates by July 2026?",
+   "tags": [
+    "donald-trump",
+    "magaland",
+    "politics-default",
+    "trumps-second-term",
+    "us-politics"
+   ],
+   "created_at_ms": 1780998907682,
+   "close_at_ms": 1782863940000,
+   "fold": "sealed"
+  },
+  {
+   "id": "manifold-zthh5SNyzO",
+   "provider": "manifold",
+   "provider_id": "zthh5SNyzO",
+   "category": "other",
+   "question": "Daily Coinflip",
+   "tags": [
+    "fairlyrandom",
+    "gambling",
+    "nonpredictive",
+    "nonpredictive-profits"
+   ],
+   "created_at_ms": 1784435470678,
+   "close_at_ms": 1784606340000,
+   "fold": "sealed"
+  }
+ ]
+}

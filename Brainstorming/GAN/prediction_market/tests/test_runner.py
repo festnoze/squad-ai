@@ -48,6 +48,7 @@ the continuous half runs over the real types and not over a stand-in for them.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from pathlib import Path
@@ -61,7 +62,13 @@ from pmx import ENGINE_VERSION
 from pmx.cli_run import main as cli_main
 from pmx.engine.liquidity import make_liquidity
 from pmx.engine.runner import Agent, ResolutionEvent, replay, run_backtest
-from pmx.errors import DatasetHashMismatchError, InvalidConfigError, JournalError
+from pmx.errors import (
+    DatasetHashMismatchError,
+    InvalidConfigError,
+    JournalError,
+    LeakError,
+    ShowcaseDatasetError,
+)
 from pmx.journal import (
     ActionReceived,
     ActionRejected,
@@ -2078,3 +2085,105 @@ def test_a_continuous_run_publishes_the_venues_session_gap_in_every_observation(
         ("funding", PERP_T0 + DAY_MS),
         ("forced_flat", SESSION_BARS[-1]),
     ], "the funding applies at its own bar and the flat at last_bar(i), which is the Tuesday"
+
+
+# --------------------------------------------------------------------------------------------------
+# 5.6 and 8.1: the carry-forward refusals of ruling R291
+# --------------------------------------------------------------------------------------------------
+def _carry_forward(demo: Dataset, tmp_path: Path, **fields: str) -> RunHandle:
+    """One run whose config names a source run in ``memory_from_run_id`` or ``hive_from_run_id``."""
+    config = replace(_config(market_ids=[BREXIT]), **fields)  # type: ignore[arg-type]
+    return run_backtest(
+        demo,
+        [contrarian(), market_follower()],
+        config,
+        tree=RngTree(config.seed),
+        journal_dir=tmp_path,
+        liquidity=make_liquidity(config),
+    )
+
+
+def _write_source_run(tmp_path: Path, run_id: str, **document: object) -> str:
+    """A run manifest on disk, as thin as the guard reads it."""
+    directory = tmp_path / run_id
+    directory.mkdir(parents=True, exist_ok=True)
+    payload: dict[str, object] = {"t1_ms": 0, "memory_snapshots": {}}
+    payload.update(document)
+    (directory / "manifest.json").write_text(json.dumps(payload), encoding="utf-8")
+    return run_id
+
+
+def test_a_run_records_the_purpose_of_the_dataset_it_ran_on(demo: Dataset, tmp_path: Path) -> None:
+    """Ruling R291: the next run's guard reads this and never re-derives it from a dataset it lacks."""
+    handle = _run(demo, tmp_path)
+    manifest = json.loads((handle.run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["dataset_purpose"] == "showcase", "the demo pack is 5.6's showcase dataset"
+
+
+def test_a_carry_forward_from_a_run_on_a_showcase_dataset_is_refused_by_name(
+    demo: Dataset, tmp_path: Path
+) -> None:
+    """Ruling R291, the refusal the arbiter demanded **instead of** an escape hatch, on both fields.
+
+    A showcase pack holds landmark events resolved years ago, so its ``t1_ms`` sits below any research
+    ``t0_ms`` and 8.1's instant guard passes by construction: without this refusal a 2016 referendum
+    would flow into a research run's calibrator bin table and its hive resolutions. No flag lifts it.
+    """
+    source = _run(demo, tmp_path)
+    for field_name in ("memory_from_run_id", "hive_from_run_id"):
+        with pytest.raises(ShowcaseDatasetError) as raised:
+            _carry_forward(demo, tmp_path, **{field_name: source.run_id})
+        assert raised.value.context["field"] == field_name
+        assert raised.value.context["run_id"] == source.run_id
+
+
+def test_a_carry_forward_from_a_run_on_another_dataset_is_a_leak(demo: Dataset, tmp_path: Path) -> None:
+    """Ruling R291's second half: a foreign ``dataset_hash`` is ``LeakError``, on both fields."""
+    other = _write_source_run(tmp_path, "r-other", dataset_hash="f" * 64, dataset_purpose="research")
+    for field_name in ("memory_from_run_id", "hive_from_run_id"):
+        with pytest.raises(LeakError) as raised:
+            _carry_forward(demo, tmp_path, **{field_name: other})
+        assert raised.value.context["source_dataset_hash"] == "f" * 64
+        assert raised.value.context["dataset_hash"] == demo.manifest.dataset_hash
+
+
+def test_the_showcase_refusal_reads_a_manifest_written_before_the_field(
+    demo: Dataset, tmp_path: Path
+) -> None:
+    """A source manifest with no ``dataset_purpose`` and this run's own hash is this dataset's purpose.
+
+    That is the only case in which the purpose of an older run is knowable: when the hashes differ the
+    ``LeakError`` is the refusal either way, so nothing is decided on a guess.
+    """
+    same = _write_source_run(tmp_path, "r-older", dataset_hash=demo.manifest.dataset_hash)
+    with pytest.raises(ShowcaseDatasetError):
+        _carry_forward(demo, tmp_path, memory_from_run_id=same)
+
+
+def test_a_carry_forward_inside_one_research_dataset_is_allowed(demo: Dataset, tmp_path: Path) -> None:
+    """The guard refuses two named things and nothing else: the ordinary carry-forward still runs.
+
+    The same pack declared ``purpose: "research"`` is a research dataset by 5.6, so a second run over
+    it may name the first, which is what the whole memory-carry-forward mechanism of 8.1 is for.
+    """
+    research = replace(demo, manifest=replace(demo.manifest, purpose="research"))
+    ran = _run(research, tmp_path)
+    assert json.loads((ran.run_dir / "manifest.json").read_text(encoding="utf-8"))[
+        "dataset_purpose"
+    ] == "research", "a research run says so, so the next run's guard can read it"
+    # An **earlier** run of the same dataset: 8.1's own instant guard is what forbids carrying a
+    # snapshot backwards, and it is not this guard's business, so the source here ends before ``t0_ms``.
+    earlier = _write_source_run(
+        tmp_path, "r-earlier", dataset_hash=research.manifest.dataset_hash, dataset_purpose="research"
+    )
+    handle = _carry_forward(research, tmp_path, memory_from_run_id=earlier)
+    assert handle.n_bars > 0
+
+
+def test_a_carry_forward_that_names_no_run_directory_is_a_config_error(
+    demo: Dataset, tmp_path: Path
+) -> None:
+    """``hive_from_run_id`` is checked exactly as ``memory_from_run_id`` is, and was checked by nothing."""
+    for field_name in ("memory_from_run_id", "hive_from_run_id"):
+        with pytest.raises(InvalidConfigError, match="names no run directory"):
+            _carry_forward(demo, tmp_path, **{field_name: "r-missing"})

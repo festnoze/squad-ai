@@ -72,6 +72,7 @@ from pmx.errors import (
     LeakError,
     ObservationTooLargeError,
     SchemaError,
+    SensorAbsentError,
 )
 from pmx.journal import canonical_json
 from pmx.types import (
@@ -2101,10 +2102,15 @@ def test_absence_cannot_be_mistaken_for_zero_or_for_empty() -> None:
         "trades",
     ):
         assert gone not in payload, gone
-        with pytest.raises(SchemaError) as caught:
+        # Ruling R232: ``SensorAbsentError`` and not ``SchemaError``, which the hook raised for want of
+        # a better fit. "The agent did not buy this" is a distinct failure from "a file failed its
+        # schema", and a test that pins one must not pass on the other.
+        with pytest.raises(SensorAbsentError) as caught:
             getattr(view, gone)
         assert caught.value.context["field"] == gone
-        with pytest.raises(SchemaError):
+        assert caught.value.context["view"] == "SensedMarketView"
+        assert not isinstance(caught.value, SchemaError)
+        with pytest.raises(SensorAbsentError):
             hasattr(view, gone)
     expected = SENSOR_VIEW_FIELDS["volume_profile"].market | SENSOR_VIEW_FIELDS["microstructure"].market
     assert view.unsensed_fields == expected
@@ -2125,9 +2131,11 @@ def test_an_observation_level_sensor_is_absent_at_the_top_level() -> None:
     assert obs.unsensed_fields == frozenset({"memory", "news"})
     for gone in ("memory", "news"):
         assert gone not in payload
-        with pytest.raises(SchemaError) as caught:
+        with pytest.raises(SensorAbsentError) as caught:  # ruling R232, as above
             getattr(obs, gone)
         assert caught.value.context["field"] == gone
+        assert caught.value.context["view"] == "SensedObservation"
+        assert not isinstance(caught.value, SchemaError)
     assert "news" not in payload["markets"][0]
     assert "A-VISIBLE-NOTE" not in render_observation_json(obs)
     assert "A-VISIBLE-HEADLINE" not in render_observation_json(obs)

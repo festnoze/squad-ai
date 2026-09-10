@@ -1,0 +1,380 @@
+{
+ "notes": "Fifteen markets of the first real build whose three facets a reader can check by eye, with the facets CONTRACTS_V2 7.14's tagger must give them and the reason for each. The expectations are written out rather than computed, so an edit to tags.v1.json or to kalshi_series_facets.v1.json that moves one of them fails a test instead of moving a cohort. Every row carries only the eight fields the tagger may read.",
+ "cases": [
+  {
+   "market": {
+    "id": "kalshi-KXBTCMAXMON-BTC-26APR30-8000000",
+    "provider": "kalshi",
+    "provider_id": "KXBTCMAXMON-BTC-26APR30-8000000",
+    "category": "crypto",
+    "question": "Will BTC trimmed mean be above $80000.00 by 11:59 PM ET on Apr 30, 2026? (Above $80,000.00)",
+    "tags": [
+     "crypto",
+     "kxbtcmaxmon"
+    ],
+    "created_at_ms": 1775060040000,
+    "close_at_ms": 1777607999000
+   },
+   "expect": {
+    "subject": [
+     "bitcoin"
+    ],
+    "structure": "threshold-above",
+    "horizon": "month",
+    "source": "series"
+   },
+   "why": "The sealed series map answers KXBTCMAXMON and the question's own 'above' decides the structure."
+  },
+  {
+   "market": {
+    "id": "kalshi-KXBTCMINMON-BTC-26AUG31-6000000",
+    "provider": "kalshi",
+    "provider_id": "KXBTCMINMON-BTC-26AUG31-6000000",
+    "category": "crypto",
+    "question": "Will BTC trimmed mean be below $60000.00 by 11:59 PM ET on Aug 31, 2026? (Below $60,000.00)",
+    "tags": [
+     "crypto",
+     "kxbtcminmon"
+    ],
+    "created_at_ms": 1785557400000,
+    "close_at_ms": 1788235199000
+   },
+   "expect": {
+    "subject": [
+     "bitcoin"
+    ],
+    "structure": "threshold-below",
+    "horizon": "month",
+    "source": "series"
+   },
+   "why": "The same series and the same subject with the opposite threshold: the structure is the question's."
+  },
+  {
+   "market": {
+    "id": "kalshi-KXGOLDW-26AUG0717-T4344.99",
+    "provider": "kalshi",
+    "provider_id": "KXGOLDW-26AUG0717-T4344.99",
+    "category": "finance",
+    "question": "Will the gold close price be above 4344.99 USD/t.oz on August 07, 2026 at 5:00 PM EDT? (Above $4344.99)",
+    "tags": [
+     "finance",
+     "kxgoldw"
+    ],
+    "created_at_ms": 1785531600000,
+    "close_at_ms": 1786136400000
+   },
+   "expect": {
+    "subject": [
+     "gold-silver"
+    ],
+    "structure": "threshold-above",
+    "horizon": "month",
+    "source": "series"
+   },
+   "why": "The boundary case: KXGOLDW is the weekly gold series and this leg's life is exactly seven days, which is the month bucket because the week bucket is strictly below 7 d. The horizon is the market's own life, not the cadence of its series and not the word August in it."
+  },
+  {
+   "market": {
+    "id": "kalshi-KXAPRPOTUS-26AUG14-39.2",
+    "provider": "kalshi",
+    "provider_id": "KXAPRPOTUS-26AUG14-39.2",
+    "category": "politics",
+    "question": "Will the President's approval rating be between 39.1 and 39.3 according to RealClearPolitics? (39.1 to 39.3)",
+    "tags": [
+     "kxaprpotus",
+     "politics"
+    ],
+    "created_at_ms": 1786114800000,
+    "close_at_ms": 1786723200000
+   },
+   "expect": {
+    "subject": [
+     "us-executive"
+    ],
+    "structure": "range-band",
+    "horizon": "month",
+    "source": "series"
+   },
+   "why": "A range ladder leg: two numbers joined by 'and' beat the 'above' rule because range-band is first."
+  },
+  {
+   "market": {
+    "id": "kalshi-KXTORNADO-25NOV-25",
+    "provider": "kalshi",
+    "provider_id": "KXTORNADO-25NOV-25",
+    "category": "weather",
+    "question": "Will there be more than 25 tornadoes in November? (Above 25)",
+    "tags": [
+     "kxtornado",
+     "weather"
+    ],
+    "created_at_ms": 1760968800000,
+    "close_at_ms": 1764565140000
+   },
+   "expect": {
+    "subject": [
+     "storms"
+    ],
+    "structure": "count-over-period",
+    "horizon": "quarter",
+    "source": "series"
+   },
+   "why": "A count of events over a month, not a threshold on a price, and the series names the subject."
+  },
+  {
+   "market": {
+    "id": "kalshi-KXDALSNOWM-26JAN-2.0",
+    "provider": "kalshi",
+    "provider_id": "KXDALSNOWM-26JAN-2.0",
+    "category": "weather",
+    "question": "Snow in Dallas in Jan 2026? (Above 2.0 inches)",
+    "tags": [
+     "kxdalsnowm",
+     "weather"
+    ],
+    "created_at_ms": 1767228194000,
+    "close_at_ms": 1769972339000
+   },
+   "expect": {
+    "subject": [
+     "precipitation"
+    ],
+    "structure": "threshold-above",
+    "horizon": "quarter",
+    "source": "keywords"
+   },
+   "why": "The series map cannot tell snow from temperature from 'Dallas, Weather forecasting', so it is absent and the question's own 'snow' decides: this is the worked example of ruling R295."
+  },
+  {
+   "market": {
+    "id": "kalshi-KXAVGTKAUS-26AUG24-4",
+    "provider": "kalshi",
+    "provider_id": "KXAVGTKAUS-26AUG24-4",
+    "category": "weather",
+    "question": "Will the average temperature in Austin be above 90°F for 4 or more consecutive days in the week of Aug 18, 2026? (4+ consecutive days)",
+    "tags": [
+     "kxavgtkaus",
+     "weather"
+    ],
+    "created_at_ms": 1787011200000,
+    "close_at_ms": 1787547599000
+   },
+   "expect": {
+    "subject": [
+     "temperature"
+    ],
+    "structure": "count-over-period",
+    "horizon": "week",
+    "source": "keywords"
+   },
+   "why": "Consecutive days above a temperature is a count over a period, and the subject is the question's."
+  },
+  {
+   "market": {
+    "id": "kalshi-KXTOPMODEL-25NOV-GE25P",
+    "provider": "kalshi",
+    "provider_id": "KXTOPMODEL-25NOV-GE25P",
+    "category": "tech",
+    "question": "What will be the top AI model this month? (gemini-2.5-pro)",
+    "tags": [
+     "kxtopmodel",
+     "tech"
+    ],
+    "created_at_ms": 1762830000000,
+    "close_at_ms": 1764514800000
+   },
+   "expect": {
+    "subject": [
+     "ai-models"
+    ],
+    "structure": "multi-outcome-leg",
+    "horizon": "month",
+    "source": "series"
+   },
+   "why": "The ticker fixes the structure here: one leg of a multi-outcome event, which the question's own wording ('What will be the top') would also reach."
+  },
+  {
+   "market": {
+    "id": "kalshi-KXHMONTH-25AUG",
+    "provider": "kalshi",
+    "provider_id": "KXHMONTH-25AUG",
+    "category": "weather",
+    "question": "Will  Aug 2025 be the hottest Aug ever? (Hottest ever)",
+    "tags": [
+     "kxhmonth",
+     "weather"
+    ],
+    "created_at_ms": 1753365600000,
+    "close_at_ms": 1757995140000
+   },
+   "expect": {
+    "subject": [
+     "temperature"
+    ],
+    "structure": "recurring-series-leg",
+    "horizon": "quarter",
+    "source": "series"
+   },
+   "why": "One dated leg of a recurring climate benchmark, which is neither a threshold nor a comparison."
+  },
+  {
+   "market": {
+    "id": "manifold-S92CQ6gyNy",
+    "provider": "manifold",
+    "provider_id": "S92CQ6gyNy",
+    "category": "economics",
+    "question": "Will this market be above 50% when it closes?",
+    "tags": [
+     "economics-default",
+     "fun",
+     "manifold-6748e065087e",
+     "nonpredictive",
+     "technology-default"
+    ],
+    "created_at_ms": 1760840391256,
+    "close_at_ms": 1761445080000
+   },
+   "expect": {
+    "subject": [
+     "platform-meta"
+    ],
+    "structure": "threshold-above",
+    "horizon": "week",
+    "source": "keywords"
+   },
+   "why": "Self-referential by its question: platform-meta is first in precedence, so it wins outright."
+  },
+  {
+   "market": {
+    "id": "manifold-sPuSducIS2",
+    "provider": "manifold",
+    "provider_id": "sPuSducIS2",
+    "category": "world",
+    "question": "Will Russia and Ukraine agree to a ceasefire before August 1, 2026?",
+    "tags": [
+     "geopolitics",
+     "middle-east",
+     "ukraine",
+     "ukrainerussia-war",
+     "wars"
+    ],
+    "created_at_ms": 1774209557006,
+    "close_at_ms": 1785580140000
+   },
+   "expect": {
+    "subject": [
+     "armed-conflict"
+    ],
+    "structure": "by-date",
+    "horizon": "quarter",
+    "source": "keywords"
+   },
+   "why": "An event by a date. The horizon is the 131-day life, not the 'August 1, 2026' in the text."
+  },
+  {
+   "market": {
+    "id": "manifold-yC8C8ctPtP",
+    "provider": "manifold",
+    "provider_id": "yC8C8ctPtP",
+    "category": "science",
+    "question": "Will Starship flight 12 happen before New Glenn flight 3?",
+    "tags": [
+     "commercial-spaceflight",
+     "rockets",
+     "space",
+     "spacex",
+     "starship-launch-party"
+    ],
+    "created_at_ms": 1769413384271,
+    "close_at_ms": 1776630846139
+   },
+   "expect": {
+    "subject": [
+     "spaceflight"
+    ],
+    "structure": "head-to-head",
+    "horizon": "quarter",
+    "source": "keywords"
+   },
+   "why": "Two flights raced against each other: head-to-head, decided before the by-date rule."
+  },
+  {
+   "market": {
+    "id": "manifold-PtAUZO5dOS",
+    "provider": "manifold",
+    "provider_id": "PtAUZO5dOS",
+    "category": "sports",
+    "question": "Will Hearts win the Scottish league?",
+    "tags": [
+     "premiere-league",
+     "soccer",
+     "sports-default",
+     "uefa",
+     "uefa-champions-league"
+    ],
+    "created_at_ms": 1778008651810,
+    "close_at_ms": 1778941393970
+   },
+   "expect": {
+    "subject": [
+     "sports-competition"
+    ],
+    "structure": "head-to-head",
+    "horizon": "month",
+    "source": "keywords"
+   },
+   "why": "A contest with a winner. The ten-day life is a month horizon, which is the boundary at 7 days."
+  },
+  {
+   "market": {
+    "id": "manifold-Qg5QIC5IR0",
+    "provider": "manifold",
+    "provider_id": "Qg5QIC5IR0",
+    "category": "other",
+    "question": "Will I walk 500k steps in October?",
+    "tags": [
+     "death-markets",
+     "personal",
+     "personal-goals"
+    ],
+    "created_at_ms": 1759430488129,
+    "close_at_ms": 1761841900157
+   },
+   "expect": {
+    "subject": [
+     "other"
+    ],
+    "structure": "other",
+    "horizon": "month",
+    "source": "other"
+   },
+   "why": "The reported tail: a personal goal the vocabulary does not name, counted as other on both facets rather than forced into a subject."
+  },
+  {
+   "market": {
+    "id": "manifold-zthh5SNyzO",
+    "provider": "manifold",
+    "provider_id": "zthh5SNyzO",
+    "category": "other",
+    "question": "Daily Coinflip",
+    "tags": [
+     "fairlyrandom",
+     "gambling",
+     "nonpredictive",
+     "nonpredictive-profits"
+    ],
+    "created_at_ms": 1784435470678,
+    "close_at_ms": 1784606340000
+   },
+   "expect": {
+    "subject": [
+     "platform-meta"
+    ],
+    "structure": "other",
+    "horizon": "week",
+    "source": "keywords"
+   },
+   "why": "Not self-referential by its two words: it is platform-meta only because the provider labelled it nonpredictive, which is the half of decision D-S14's reconciliation the keyword rule misses."
+  }
+ ]
+}

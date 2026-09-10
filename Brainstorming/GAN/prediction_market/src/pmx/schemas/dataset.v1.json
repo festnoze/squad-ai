@@ -137,7 +137,8 @@
         "train_end_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
         "validation_end_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
         "cluster_moves": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["market_id", "from_fold", "to_fold", "group_id"], "properties": { "market_id": { "type": "string", "maxLength": 128 }, "from_fold": { "enum": ["train", "validation", "sealed"] }, "to_fold": { "enum": ["train", "validation", "sealed"] }, "group_id": { "type": "string", "maxLength": 128 } } } },
-        "n_moved": { "$ref": "#/$defs/nonNegInt" }
+        "n_moved": { "$ref": "#/$defs/nonNegInt" },
+        "realised_permille": { "description": "CONTRACTS_V2 7.7 and ruling R290: the shares the cut actually realised, [train, validation, sealed], beside the quantiles it targeted. Every market of a group whose fold key is the cut bar goes to the later fold, so the realised counts differ from the targets by the ties of one bar and by nothing else, and the manifest reports both.", "type": "array", "minItems": 3, "maxItems": 3, "items": { "type": "integer", "minimum": 0, "maximum": 1000 } }
       }
     },
     "files": {

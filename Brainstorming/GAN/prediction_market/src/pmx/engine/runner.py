@@ -62,7 +62,13 @@ from pmx.engine.observation import (
     check_observation_size,
     render_observation_json,
 )
-from pmx.errors import DatasetHashMismatchError, InvalidConfigError, JournalError, LeakError
+from pmx.errors import (
+    DatasetHashMismatchError,
+    InvalidConfigError,
+    JournalError,
+    LeakError,
+    ShowcaseDatasetError,
+)
 from pmx.journal import (
     ActionReceived,
     ActionRejected,
@@ -113,6 +119,7 @@ from pmx.types import (
     PPM_ONE,
     PRICE_MAX_BP,
     PRICE_MIN_BP,
+    PURPOSE_SHOWCASE,
     QUANTILE_LEVELS_PPM,
     RANDOM_WALK_UP_PPM,
     REPUTATION_WINDOW_MARKETS,
@@ -739,6 +746,57 @@ def _schedules_for(dataset: Dataset, market_ids: Sequence[str]) -> dict[str, Fee
     }
 
 
+def _carry_forward_refusals(config: RunConfig, dataset: Dataset, *, journal_dir: Path) -> None:
+    """The two refusals of ruling R291, before a single market is read.
+
+    8.1 calls memory carried between runs a channel into an observation, and 5.6 puts the carry-forward
+    on the list of things a ``purpose: "showcase"`` dataset may never feed. So a run whose
+    ``memory_from_run_id`` or ``hive_from_run_id`` names a run that ran on a showcase dataset is
+    ``ShowcaseDatasetError``, and one that names a run on a **different** dataset is ``LeakError``.
+    Without them a 2016 referendum would flow into a research run's calibrator bin table and its hive
+    resolutions, and a showcase pack's ``t1_ms`` sits below any research ``t0_ms``, so 8.1's instant
+    guard passes by construction and catches neither. The arbiter demanded the refusals **instead of**
+    an escape hatch: no flag lifts either, and none exists.
+
+    The source run's own purpose is read off its manifest's ``dataset_purpose``, which every run writes
+    from this commit on. A manifest written before it carries none, and then the purpose is knowable
+    only when the two runs share a dataset hash, in which case it is this dataset's; when the hashes
+    differ the ``LeakError`` below is the refusal either way, so nothing is decided on a guess.
+    """
+    for field_name, source in (
+        ("memory_from_run_id", config.memory_from_run_id),
+        ("hive_from_run_id", config.hive_from_run_id),
+    ):
+        if source is None:
+            continue
+        path = journal_dir / source / "manifest.json"
+        if not path.exists():
+            raise InvalidConfigError(f"{field_name} names no run directory", run_id=source, path=str(path))
+        document = read_json_file(path)
+        if not isinstance(document, dict):
+            raise InvalidConfigError("a run manifest is a JSON object", run_id=source)
+        source_hash = document.get("dataset_hash")
+        declared = document.get("dataset_purpose")
+        source_purpose = declared if isinstance(declared, str) else None
+        if source_purpose is None and source_hash == dataset.manifest.dataset_hash:
+            source_purpose = dataset.purpose
+        if source_purpose == PURPOSE_SHOWCASE:
+            raise ShowcaseDatasetError(
+                "a run may not carry memory or a hive forward from a run on a showcase dataset",
+                field=field_name,
+                run_id=source,
+                dataset_hash=source_hash,
+            )
+        if source_hash != dataset.manifest.dataset_hash:
+            raise LeakError(
+                "a run may not carry memory or a hive forward from a run on another dataset",
+                field=field_name,
+                run_id=source,
+                source_dataset_hash=source_hash,
+                dataset_hash=dataset.manifest.dataset_hash,
+            )
+
+
 def _memory_provenance(
     config: RunConfig, *, journal_dir: Path, t0_ms: int
 ) -> tuple[str | None, int | None]:
@@ -816,10 +874,14 @@ def run_backtest(
     Raises:
         InvalidConfigError: On a config that disagrees with the dataset, the market set or the model.
         DatasetHashMismatchError: On a ``market_ids_hash`` that is not the run's market set.
-        LeakError: On a memory snapshot from a run that ended after this one starts.
+        LeakError: On a memory snapshot from a run that ended after this one starts, or on a
+            carry-forward from a run on another dataset (5.6, 8.1, ruling R291).
+        ShowcaseDatasetError: On a carry-forward from a run that ran on a showcase dataset (ruling
+            R291). No flag lifts it.
     """
     agents = _check_roster(roster)
     _check_liquidity(config, liquidity)
+    _carry_forward_refusals(config, dataset, journal_dir=journal_dir)
     calendar = Calendar(dataset, config)
     market_ids = calendar.market_ids()
     if config.market_ids_hash == "":
@@ -953,6 +1015,9 @@ def run_backtest(
                 "seed": config.seed,
                 "dataset_name": dataset.manifest.name,
                 "dataset_hash": dataset.manifest.dataset_hash,
+                # Ruling R291: the next run's carry-forward guard reads this rather than re-deriving it
+                # from a dataset it may not have on disk.
+                "dataset_purpose": dataset.purpose,
                 "market_ids_hash": config.market_ids_hash,
                 "fold": config.fold,
                 "t0_ms": t0_ms,

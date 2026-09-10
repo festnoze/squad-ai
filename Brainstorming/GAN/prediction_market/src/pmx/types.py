@@ -122,10 +122,22 @@ MS_PER_SECOND = 1_000
 MS_PER_MINUTE = 60_000
 MS_PER_HOUR = 3_600_000
 MS_PER_DAY = 86_400_000
-#: The two grids a dataset may be built on. One dataset carries one of them (section 5.3).
-INTERVALS_MIN = (60, 1_440)
+#: The three grids a dataset may be built on: daily, hourly and, since amendment C1c, **minute**
+#: (5.2, 18.3, rulings R241 and R251). One dataset carries one of them (section 5.3), so a minute
+#: dataset is a separate dataset with its own hash, folds and claims exactly as an hourly one is.
+INTERVALS_MIN = (1, 60, 1_440)
 #: Six hours: a news item is readable this long after it was published (section 5.5).
 SAFETY_LAG_MS_DEFAULT = 21_600_000
+#: The widest window a build may declare (5.6, decision D-S3, ruling R262). Two reasons no flag may
+#: override: a market that resolved before a model's knowledge cutoff is a possible **recall** rather
+#: than a forecast, and a regime three years old is not the regime being traded.
+WINDOW_DAYS_MAX = 730
+#: ``DatasetManifest.purpose`` (5.6, decision D-S4, ruling R263), which replaces the ad hoc
+#: ``is_demo_pack`` property. A **showcase** dataset holds landmark events kept apart rather than thrown
+#: away; it is exempt from the window rule of 5.6 and from nothing else.
+PURPOSE_RESEARCH = "research"
+PURPOSE_SHOWCASE = "showcase"
+PURPOSES = (PURPOSE_RESEARCH, PURPOSE_SHOWCASE)
 
 # --------------------------------------------------------------------------------------------------
 # 2 Enumerations
@@ -241,6 +253,42 @@ NEWS_CODE_BY_SOURCE = {
     "fred": "fred",
     "cboe": "cboe",
 }
+#: The granularity of each source's own timestamp (18.3, ruling R241): how precisely the publisher
+#: dates an item, in milliseconds. A day page is stamped to the day, GDELT to its fifteen-minute update,
+#: a Manifold comment to the millisecond, Hacker News, EDGAR and ALFRED to the second.
+SOURCE_GRANULARITY_MS = {
+    "wikipedia_current_events": MS_PER_DAY,
+    "wikipedia_asof": MS_PER_DAY,
+    "wayback": MS_PER_DAY,
+    "cboe": MS_PER_DAY,
+    "gdelt": 15 * MS_PER_MINUTE,
+    "manifold_comment": 1,
+    "edgar": 1_000,
+    "fred": 1_000,
+}
+#: The default safety lag per source (5.5, 18.3, ruling R241): ``visible_from_ms = published_at_ms +
+#: lag(source)``, where ``lag(source)`` is ``manifest.news.safety_lag_by_source[source]`` when the
+#: manifest carries the block and ``manifest.safety_lag_ms`` otherwise, so a dataset built before the
+#: amendment recomputes to the same bytes. Defaults the first minute build reports against, never below
+#: the source's granularity: a release whose time **is** the release needs no lag at all.
+SAFETY_LAG_MS_BY_SOURCE = {
+    "wikipedia_current_events": SAFETY_LAG_MS_DEFAULT,
+    "wikipedia_asof": SAFETY_LAG_MS_DEFAULT,
+    "wayback": SAFETY_LAG_MS_DEFAULT,
+    "cboe": SAFETY_LAG_MS_DEFAULT,
+    "gdelt": 15 * MS_PER_MINUTE,
+    "manifold_comment": MS_PER_MINUTE,
+    "edgar": MS_PER_MINUTE,
+    "fred": 0,
+}
+#: A source enters a dataset with ``interval_min == 1`` iff its granularity is at most this (18.3): an
+#: item stamped to a day and lagged six hours is indistinguishable from one hundred and eighty
+#: minute-items, and every minute hypothesis on it is a hypothesis about the stamp.
+MINUTE_SOURCE_GRANULARITY_MAX_MS = 15 * MS_PER_MINUTE
+#: The false discovery rate a pre-registered hypothesis family is controlled at, in parts per million
+#: (12.4, 18.2, decision D-R8, ruling R238): five percent. ``benjamini_hochberg`` of ``pmx.metrics.stats``
+#: reads it as its default and the rule tester reports it in every ledger row.
+FDR_Q_PPM = 50_000
 #: Stored, never used to drop a market, never shown to an agent (section 7.5).
 HARDNESS_TAGS = ("trivial", "upset", "whipsaw", "illiquid")
 #: A market belongs to exactly one of the first three; ``all`` is the run-config spelling for "no filter".
@@ -1639,6 +1687,14 @@ class NewsItem:
     match_scores_permille: tuple[int, ...]
     lang: str
     author_key: str | None
+    #: Amendment C1c (5.5, 7.3, decision D-R3, ruling R249): which of 5.5's two stamps
+    #: ``published_at_ms`` is, for a Current events bullet and for no other source. ``"revision"`` when
+    #: it is the timestamp of the first revision of the day page that carries the bullet (and then
+    #: ``revid`` names that revision), ``"page_day"`` when the revision history was unavailable and the
+    #: stamp fell back to the end of day D. ``None`` for every other source and for a file written before
+    #: the decision, and rendered by ``to_dict`` only when set, so no item written before it moves a byte
+    #: and no dataset hash of 2026-09-09 moves.
+    published_at_source: str | None = None
 
     def score_for(self, market_id: str) -> int:
         """The link score this item carries for ``market_id``, or 0 when it is not linked to it."""
@@ -1649,7 +1705,7 @@ class NewsItem:
 
     def to_dict(self) -> dict[str, object]:
         """The ``news.v1.json`` shape, exactly: one line of ``news/<yyyymmdd>.jsonl``."""
-        return {
+        document: dict[str, object] = {
             "schema_version": self.schema_version,
             "news_id": self.news_id,
             "source": self.source,
@@ -1670,6 +1726,9 @@ class NewsItem:
             "lang": self.lang,
             "author_key": self.author_key,
         }
+        if self.published_at_source is not None:
+            document["published_at_source"] = self.published_at_source
+        return document
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1791,13 +1850,27 @@ class DatasetNews:
     sources: tuple[NewsSourceCount, ...]
     n_items: int
     n_linked: int
+    #: Amendment C1c's two optional blocks of 7.8. ``safety_lag_by_source`` (5.5, 18.3, ruling R241) is
+    #: the lag actually applied per source, so ``visible_from_ms`` is recomputable per source; a manifest
+    #: without it lags every source by ``safety_lag_ms`` and recomputes to the same bytes.
+    #: ``linker_audit`` (7.6, decision D-R4, ruling R250) is ``{path, n, precision_permille}`` of the
+    #: fifty-link precision audit, or ``None`` while nobody has drawn one. Both are written only when set.
+    safety_lag_by_source: Mapping[str, int] | None = None
+    linker_audit: Mapping[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        document: dict[str, object] = {
             "sources": [source.to_dict() for source in self.sources],
             "n_items": self.n_items,
             "n_linked": self.n_linked,
         }
+        if self.safety_lag_by_source is not None:
+            document["safety_lag_by_source"] = {
+                source: self.safety_lag_by_source[source] for source in sorted(self.safety_lag_by_source)
+            }
+        if self.linker_audit is not None:
+            document["linker_audit"] = dict(self.linker_audit)
+        return document
 
 
 @dataclass(frozen=True, slots=True)
@@ -1817,6 +1890,19 @@ class DatasetSplit:
     n_instruments_train: int = 0
     n_instruments_validation: int = 0
     n_instruments_sealed: int = 0
+    #: Amendment C1c's seven fields of 7.7 (decisions D-R1 and D-R2, rulings R247, R248, R290). The two
+    #: headline cuts are **count quantiles of group resolution order** and no longer month edges, so the
+    #: manifest states the method, the two target quantiles, the two cut days a reader can name, the
+    #: markets a cluster moved across a cut, how many there were, and the **realised** shares beside the
+    #: targets. Every one of them is written only when set, so a manifest cut by calendar thirds before
+    #: the amendment keeps its bytes and still loads.
+    method: str = ""
+    quantiles_permille: tuple[int, ...] = ()
+    train_end_date: str = ""
+    validation_end_date: str = ""
+    cluster_moves: tuple[Mapping[str, str], ...] = ()
+    n_moved: int = 0
+    realised_permille: tuple[int, ...] = ()
 
     def fold_of(self, resolved_at_ms: int) -> str:
         if resolved_at_ms < self.train_end_ms:
@@ -1838,6 +1924,21 @@ class DatasetSplit:
             value = getattr(self, name)
             if value:
                 block[name] = value
+        if self.method:
+            block["method"] = self.method
+        if self.quantiles_permille:
+            block["quantiles_permille"] = list(self.quantiles_permille)
+        if self.train_end_date:
+            block["train_end_date"] = self.train_end_date
+        if self.validation_end_date:
+            block["validation_end_date"] = self.validation_end_date
+        if self.method:
+            # Written whenever the cut is a count quantile, empty list included: "no market moved" is a
+            # statement about the cut and reads differently from "this manifest predates the method".
+            block["cluster_moves"] = [dict(move) for move in self.cluster_moves]
+            block["n_moved"] = self.n_moved
+        if self.realised_permille:
+            block["realised_permille"] = list(self.realised_permille)
         return block
 
 
@@ -1906,12 +2007,22 @@ class DatasetManifest:
     #: mappings so that a reseal never silently deletes them; their typed consumers land in waves 7 and 8.
     clusters: Mapping[str, object] | None = None
     impact: Mapping[str, object] | None = None
-
-    @property
-    def is_demo_pack(self) -> bool:
-        """The one dataset the window and freeze rules of section 5.6 do not apply to: an unsealed pack
-        whose only provider is ``demo`` (section 7.1). No other dataset gets the exemption."""
-        return not self.sealed and self.providers == ("demo",)
+    #: Amendment C1c's seven optional blocks of 7.8 (5.6, 7.4, 7.14, 18.5; decisions D-R13, D-S3, D-S4,
+    #: D-S7, D-S11; rulings R258, R260, R262, R263, R265, R266, R271). ``purpose`` and ``window_days``
+    #: are the two answers a reader needs before any number below them means anything: which rule the
+    #: window obeyed and how wide it was declared, beside the true ``resolution_span`` of the markets
+    #: kept. ``universe``, ``taxonomy``, ``cohorts`` and ``build`` are carried as opaque structures for
+    #: the reason ``clusters`` and ``impact`` are: their typed owners are other packages, and a reseal
+    #: that dropped a block it could not type would silently delete evidence. ``purpose`` is ``""`` on a
+    #: manifest written before the amendment, which :func:`pmx.data.loader.manifest_purpose` reads as
+    #: ``showcase`` on the old ``is_demo_pack`` signature and as ``research`` otherwise.
+    purpose: str = ""
+    window_days: int = 0
+    resolution_span: Mapping[str, int] | None = None
+    universe: Mapping[str, object] | None = None
+    taxonomy: Mapping[str, object] | None = None
+    cohorts: tuple[Mapping[str, object], ...] | None = None
+    build: Mapping[str, object] | None = None
 
     def to_dict(self) -> dict[str, object]:
         document: dict[str, object] = {
@@ -1943,6 +2054,20 @@ class DatasetManifest:
             document["clusters"] = dict(self.clusters)
         if self.impact is not None:
             document["impact"] = dict(self.impact)
+        if self.purpose:
+            document["purpose"] = self.purpose
+        if self.window_days:
+            document["window_days"] = self.window_days
+        if self.resolution_span is not None:
+            document["resolution_span"] = dict(self.resolution_span)
+        if self.universe is not None:
+            document["universe"] = dict(self.universe)
+        if self.taxonomy is not None:
+            document["taxonomy"] = dict(self.taxonomy)
+        if self.cohorts is not None:
+            document["cohorts"] = [dict(cohort) for cohort in self.cohorts]
+        if self.build is not None:
+            document["build"] = dict(self.build)
         return document
 
 
@@ -1976,6 +2101,22 @@ class Dataset:
     _calendars: dict[str, SessionCalendar] = field(default_factory=dict, compare=False, repr=False, kw_only=True)
     _news: list[NewsItem] = field(default_factory=list, compare=False, repr=False, kw_only=True)
     _news_loaded: list[bool] = field(default_factory=list, compare=False, repr=False, kw_only=True)
+
+    @property
+    def purpose(self) -> str:
+        """``"research"`` or ``"showcase"`` (5.6, decision D-S4, ruling R263).
+
+        The field replaces the ad hoc ``is_demo_pack`` property, which is deleted. A manifest written
+        before amendment C1c carries no ``purpose``, and the contract states its answer for exactly that
+        case: ``showcase`` on the old signature (unsealed, the one provider ``demo``), ``research``
+        otherwise. The rule is spelled once, here, so the loader, the optimizer, the rule tester and the
+        feature matrix all read the same answer and no caller re-derives it.
+        """
+        if self.manifest.purpose:
+            return self.manifest.purpose
+        if not self.manifest.sealed and self.manifest.providers == ("demo",):
+            return PURPOSE_SHOWCASE
+        return PURPOSE_RESEARCH
 
     def meta(self, market_id: str) -> MarketMeta:
         for meta in self.metas:
@@ -2124,6 +2265,16 @@ class BuildConfig:
     #: kind's instruments are filtered by ``min_life_days`` and ``density`` on their own calendars and by
     #: nothing else in 7.4's table.
     kinds: tuple[str, ...] = ("binary",)
+    #: Amendment C1c (7.4, 18.3; decisions D-R13, D-S3, D-S4; rulings R258, R262, R263, R298).
+    #: ``purpose`` is written into every manifest and decides whether the window rule of 5.6 applies at
+    #: all. ``universe_min_settled`` and ``universe_min_volume_cents`` are the documented universe rule
+    #: whose output is the Kalshi series list (7.4): defaults the first build reports against, not laws.
+    #: ``instruments`` is the minute build's explicit list of vendor symbols (17.1), sorted and unique,
+    #: because a minute dataset is built for a named instrument or series and never for a bare provider.
+    purpose: str = PURPOSE_RESEARCH
+    universe_min_settled: int = 5
+    universe_min_volume_cents: int = 100_000
+    instruments: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if RE_ISO_DATE.fullmatch(self.freeze_date) is None:
@@ -2143,10 +2294,27 @@ class BuildConfig:
         if tuple(sorted(set(self.providers))) != self.providers:
             raise InvalidConfigError("providers must be sorted and unique", providers=list(self.providers))
         if self.interval_min not in INTERVALS_MIN:
-            raise InvalidConfigError("interval_min must be 60 or 1440", interval_min=self.interval_min)
+            raise InvalidConfigError(
+                "interval_min must be one of INTERVALS_MIN",
+                interval_min=self.interval_min,
+                allowed=list(INTERVALS_MIN),
+            )
+        if self.purpose not in PURPOSES:
+            raise InvalidConfigError("purpose is research or showcase", purpose=self.purpose, allowed=list(PURPOSES))
+        if tuple(sorted(set(self.instruments))) != self.instruments:
+            raise InvalidConfigError("instruments must be sorted and unique", instruments=list(self.instruments))
         for name in ("window_days", "min_life_days"):
             if getattr(self, name) < 1:
                 raise InvalidConfigError(f"{name} must be at least 1", value=getattr(self, name))
+        # Section 5.6, ruling R262: two reasons no flag may override, so the cap is here and not only in
+        # the builder, where a caller that constructs a config without going through the CLI would miss it.
+        if self.window_days > WINDOW_DAYS_MAX:
+            raise InvalidConfigError(
+                "window_days is refused above WINDOW_DAYS_MAX: an older resolution is recall rather "
+                "than forecast, and an older regime is not the regime being traded",
+                window_days=self.window_days,
+                window_days_max=WINDOW_DAYS_MAX,
+            )
         negatives = ("opened_early_days", "min_trades", "min_unique_bettors", "min_traded_bars", "safety_lag_ms")
         for name in negatives:
             if getattr(self, name) < 0:
@@ -2159,6 +2327,28 @@ class BuildConfig:
         unknown_sources = [name for name in self.news_sources if name not in NEWS_SOURCES]
         if unknown_sources:
             raise InvalidConfigError("unknown news source", news_sources=unknown_sources)
+        if self.interval_min == 1:
+            # 18.3, rulings R241 and R298. A minute dataset never carries a source whose timestamp is
+            # coarser than fifteen bars of its grid, because an item stamped to a day and lagged six
+            # hours is indistinguishable from one hundred and eighty minute-items and every minute
+            # hypothesis on it is a hypothesis about the stamp. And it is built for a named instrument
+            # or a named series, never for a bare provider, so one of the two lists must be filled.
+            coarse = [
+                name
+                for name in self.news_sources
+                if SOURCE_GRANULARITY_MS.get(name, MS_PER_DAY) > MINUTE_SOURCE_GRANULARITY_MAX_MS
+            ]
+            if coarse:
+                raise InvalidConfigError(
+                    "a minute dataset admits no source coarser than MINUTE_SOURCE_GRANULARITY_MAX_MS",
+                    news_sources=coarse,
+                    granularity_max_ms=MINUTE_SOURCE_GRANULARITY_MAX_MS,
+                )
+            if not self.instruments and not self.kalshi_series_allow_list:
+                raise InvalidConfigError(
+                    "a minute build needs an explicit instrument or series list and refuses a bare provider",
+                    interval_min=self.interval_min,
+                )
         if self.limit_per_provider is not None and self.limit_per_provider < 0:
             raise InvalidConfigError("limit_per_provider must not be negative", value=self.limit_per_provider)
 
@@ -2185,6 +2375,10 @@ class BuildConfig:
             "news_sources": list(self.news_sources),
             "limit_per_provider": 0 if self.limit_per_provider is None else self.limit_per_provider,
             "kinds": list(self.kinds),
+            "purpose": self.purpose,
+            "universe_min_settled": self.universe_min_settled,
+            "universe_min_volume_cents": self.universe_min_volume_cents,
+            "instruments": list(self.instruments),
         }
 
 
@@ -2246,7 +2440,11 @@ class RunConfig:
         if not 0 <= self.seed < SEED_SPACE:
             raise InvalidConfigError("seed outside SEED_SPACE", seed=self.seed)
         if self.interval_min not in INTERVALS_MIN:
-            raise InvalidConfigError("interval_min must be 60 or 1440", interval_min=self.interval_min)
+            raise InvalidConfigError(
+                "interval_min must be one of INTERVALS_MIN",
+                interval_min=self.interval_min,
+                allowed=list(INTERVALS_MIN),
+            )
         if not isinstance(self.horizons_bars, tuple):
             object.__setattr__(self, "horizons_bars", tuple(self.horizons_bars))
         if not isinstance(self.kinds, tuple):

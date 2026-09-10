@@ -15,6 +15,7 @@ express, so "the filters ran" is a statement about counts rather than about cove
 
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import subprocess
@@ -23,6 +24,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from pmx import cli_data
 from pmx.data.builder import (
@@ -57,7 +59,15 @@ from pmx.data.builder import (
     stratified_cap,
     window_bounds,
 )
-from pmx.data.loader import load_dataset, load_manifest, seal_dataset, verify_dataset_report
+from pmx.data.loader import (
+    load_dataset,
+    load_manifest,
+    load_market_file,
+    manifest_purpose,
+    seal_dataset,
+    verify_dataset_report,
+    write_manifest,
+)
 from pmx.data.news import linker
 from pmx.data.resample import (
     Quote,
@@ -66,7 +76,12 @@ from pmx.data.resample import (
     traded_bars,
     volume_milli_total,
 )
-from pmx.data.schema import market_from_payload, validate_against_schema
+from pmx.data.schema import (
+    DatasetManifestModel,
+    manifest_from_payload,
+    market_from_payload,
+    validate_against_schema,
+)
 from pmx.data.universe import read_series_list
 from pmx.errors import InvalidConfigError, LeakError, SchemaError
 from pmx.journal import canonical_json
@@ -1383,7 +1398,7 @@ def test_migrate_v1_writes_the_demo_pack_and_seal_refuses_it(
     assert "provider   demo=12" in printed
     manifest = load_manifest(out_dir)
     assert manifest.sealed is False and manifest.providers == ("demo",)
-    assert manifest.is_demo_pack
+    assert manifest_purpose(manifest) == "showcase"  # ruling R263: the field, on the signature it replaces
     assert verify_dataset_report(out_dir).ok
 
     # a reconstructed tape is not evidence, so it can never be sealed and therefore never claimed
@@ -1682,33 +1697,117 @@ def test_the_split_block_is_the_shape_section_7_8_states_after_the_amendment(tmp
     }
 
 
-def test_the_manifest_blocks_the_build_cannot_yet_write_validate_against_dataset_v1(tmp_path: Path) -> None:
-    """Every block of 7.8 amendment C1c added is assembled and is legal against the shipped schema.
+def test_every_manifest_block_amendment_c1c_added_is_written_and_validates(tmp_path: Path) -> None:
+    """Every block of 7.8 amendment C1c added is **in the manifest** and legal against the schema.
 
-    ``dataset.v1.json`` already admits ``purpose``, ``window_days``, ``resolution_span``, the ``split``
-    cuts and moves, ``universe`` and ``build`` (C1c landed the schema); what refuses them today is the
-    strict pydantic model of ``pmx.data.schema`` and the dataclass of ``pmx.types``, both D1's. This
-    test is the proof that the day those two carry the fields the builder's document is already right.
+    ``dataset.v1.json`` admits ``purpose``, ``window_days``, ``resolution_span``, the ``split`` cuts and
+    moves, ``universe`` and ``build``; ``pmx.types`` and the strict ``DatasetManifestModel`` now carry
+    them (18.8's first two rows), so the document the build assembles is the document it writes.
+    ``split.realised_permille`` is the property the contract asked for and the shipped schema did not
+    declare, which is why the previous shape of this test asserted that validation **raised** on it: the
+    property is declared now and the whole block validates, which is what that test said it would say.
     """
     result = build(tmp_path)
     document = result.manifest_blocks
-    # CONTRACT ISSUE, reported by DS1 and owned by amendment C1c: 7.8 and ruling R290 require
-    # ``split.realised_permille``, and ``dataset.v1.json``'s ``split`` object (additionalProperties
-    # false) does not declare it, so the block the contract asks for is refused by the shipped schema.
-    # The two assertions below pin both halves, so the day C1c adds the property this test says so.
+    assert document == result.manifest.to_dict(), "one document, one renderer"
     split = document["split"]
     assert isinstance(split, dict)
     assert "realised_permille" in split
-    with pytest.raises(SchemaError, match="realised_permille"):
-        validate_against_schema("dataset.v1.json", document, where="dataset manifest")
-    without = {**document, "split": {k: v for k, v in split.items() if k != "realised_permille"}}
-    validate_against_schema("dataset.v1.json", without, where="dataset manifest")
+    validate_against_schema("dataset.v1.json", document, where="dataset manifest")
     assert document["purpose"] == "research"
     assert document["window_days"] == 365
     assert isinstance(document["universe"], dict)
     assert isinstance(document["build"], dict)
     span = document["resolution_span"]
     assert isinstance(span, dict) and span["min_ms"] < span["max_ms"]
+    # And the document is what is on disk, not only what the result renders.
+    on_disk = json.loads((result.path / "manifest.json").read_text(encoding="utf-8"))
+    assert on_disk == document
+
+
+def test_every_new_block_survives_a_seal_and_comes_back_off_disk(tmp_path: Path) -> None:
+    """End to end: build, seal, load back, and compare every block of 7.8 amendment C1c added.
+
+    Inspection of ``manifest_blocks`` proves the builder assembles the blocks; only a round trip proves
+    they reach the manifest and come back with their values. The seal is in the middle on purpose: it
+    rewrites ``manifest.json`` from the loaded object, so a field it forgot to carry would be a block
+    the seal silently deleted, and the deletion would look exactly like a build that never wrote it.
+    """
+    result = build(tmp_path)
+    before = result.manifest
+    assert before.purpose == "research" and before.window_days == 365
+    seal_dataset(result.path)
+    after = load_manifest(result.path)
+
+    assert after.sealed is True
+    assert after.purpose == before.purpose
+    assert after.window_days == before.window_days
+    assert after.resolution_span == before.resolution_span
+    assert after.universe == before.universe
+    assert after.build == before.build
+    assert after.split == before.split
+    # And the values are the build's own answers, not empty shells that happen to match.
+    plan = result.plan
+    assert plan is not None
+    assert after.split.method == "count_quantile"
+    assert after.split.quantiles_permille == (600, 800)
+    assert after.split.realised_permille == tuple(plan.realised_permille)
+    assert after.split.train_end_date == iso_date_from_ms(plan.train_end_ms)
+    assert after.split.validation_end_date == iso_date_from_ms(plan.validation_end_ms)
+    assert after.split.n_moved == len(plan.cluster_moves)
+    assert after.split.cluster_moves == tuple(
+        {
+            "market_id": move.market_id,
+            "from_fold": move.from_fold,
+            "to_fold": move.to_fold,
+            "group_id": move.group_id,
+        }
+        for move in plan.cluster_moves
+    )
+    universe = after.universe
+    assert isinstance(universe, dict) and universe["rule"] == {"min_settled": 5, "min_volume_cents": 100_000}
+    outcome = after.build
+    assert isinstance(outcome, dict) and outcome["status"] in {"ok", "failed"}
+    span = after.resolution_span
+    assert isinstance(span, dict)
+    assert span["min_ms"] == min(
+        load_market_file(result.path / "markets" / f"{market_id}.json").resolved_at_ms
+        for market_id in result.kept_ids
+    )
+    # The dataset the run receives answers the same question the manifest does.
+    assert load_dataset(result.path).purpose == "research"
+
+
+def test_a_manifest_block_the_loader_could_not_read_would_fail_here(tmp_path: Path) -> None:
+    """The other half of the round trip: the strict model refuses a block that is not the shape 7.8 states.
+
+    ``DatasetManifestModel`` is ``extra="forbid"``, ``strict=True`` and ``frozen=True``, so a field the
+    builder writes and the model does not declare makes the loader refuse **every** manifest the new
+    builder writes, not just a malformed one. That is the failure this lot was told to avoid, and the
+    only way to keep proving it is to write a block the model has no field for.
+    """
+    result = build(tmp_path)
+    document = result.manifest.to_dict()
+    validate_against_schema("dataset.v1.json", document, where="dataset manifest")
+    assert DatasetManifestModel.model_validate(document).to_manifest() == result.manifest
+    split = document["split"]
+    assert isinstance(split, dict)
+    for bad in (
+        {"purpose": "demo"},
+        {"window_days": 0},
+        {"resolution_span": {"min_ms": 1}},
+        {"split": {**split, "realised_permille": [600, 800]}},  # three shares, not two
+        {"split": {**split, "method": "calendar_thirds"}},
+        {"news": {**document["news"], "linker_audit": {"path": "linker.json", "n": 1}}},  # type: ignore[dict-item]
+    ):
+        payload = {**document, **bad}
+        # Both doors, because they catch different things and the loader goes through both: the JSON
+        # schema states the published shape, and the strict model is what refuses ``3200.0`` where an
+        # integer belongs and an unknown key that the schema's own ``additionalProperties`` missed.
+        with pytest.raises(SchemaError):
+            manifest_from_payload(payload, where="dataset manifest")
+        with pytest.raises(ValidationError):
+            DatasetManifestModel.model_validate(payload)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -1956,6 +2055,15 @@ def test_the_build_writes_the_linker_audit_into_the_tracked_audits_tree(
     # the audit is outside the dataset directory and therefore outside its hash
     assert not str(path).startswith(str(out_dir))
     assert verify_dataset_report(out_dir).ok
+    # 7.8 and ruling R250: the sealed manifest names it, so the label a leaderboard row reads is on the
+    # dataset and not in a file beside it. The manifest is outside ``dataset_hash``, which is why the
+    # stamp can happen after the seal without moving a byte the hash covers.
+    assert manifest.news.linker_audit == {
+        "path": f"audits/{manifest.dataset_hash[:16]}/linker.json",
+        "n": audit["n"],
+        "precision_permille": 0,
+    }
+    assert "precision  0 permille" in printed and "news_links: weak" in printed
 
 
 def test_audit_links_keeps_the_verdicts_a_reviewer_has_already_filled(
@@ -1978,7 +2086,17 @@ def test_audit_links_keeps_the_verdicts_a_reviewer_has_already_filled(
     assert [link["verdict"] for link in again["links"]] == [link["verdict"] for link in audit["links"]]
     n_correct = sum(1 for link in again["links"] if link["verdict"] == "correct")
     n_wrong = sum(1 for link in again["links"] if link["verdict"] == "wrong")
-    assert again["precision_permille"] == round_half_up(1_000 * n_correct, n_correct + n_wrong)
+    precision = round_half_up(1_000 * n_correct, n_correct + n_wrong)
+    assert again["precision_permille"] == precision
+    # 7.6, 7.8 and 12.10: a leaderboard row reads ``news_links: weak`` off the dataset, so a review
+    # that fills the verdicts has to move the manifest's block too or a reviewed build stays weak.
+    reviewed = load_manifest(out_dir)
+    assert reviewed.news.linker_audit == {
+        "path": f"audits/{reviewed.dataset_hash[:16]}/linker.json",
+        "n": again["n"],
+        "precision_permille": precision,
+    }
+    assert precision > 0
     assert "precision" in printed
 
 
@@ -2009,15 +2127,14 @@ def test_the_build_prints_the_blocks_the_manifest_cannot_yet_carry(
 def test_a_showcase_build_through_the_cli_keeps_the_landmark_market(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """``--purpose showcase`` keeps the out-of-window landmark, and cannot yet be sealed.
+    """``--purpose showcase`` keeps the out-of-window landmark, and the loader reads it back as one.
 
-    The build half of decision D-S4 is here and works: the landmark market that a research build counts
-    under the ``window`` filter is kept, the window is taken from the dataset's own markets, and the
-    purpose is reported. The **read** half is blocked on an agreement DS1 reports: ``purpose`` is
-    ``DatasetManifest.purpose`` in 5.6 and neither ``pmx.types`` nor the strict ``DatasetManifestModel``
-    of ``pmx.data.schema`` carries it, so no manifest on disk can say it and the loader applies the
-    window rule of 5.6 to a dataset it cannot tell apart from a research one. The second half of this
-    test pins that, so the day the field lands it says so.
+    Both halves of decision D-S4 are here now. The build keeps the landmark market that a research build
+    counts under the ``window`` filter, takes the window from the dataset's own markets and reports the
+    purpose; and ``DatasetManifest.purpose`` reaches the manifest, so the loader can tell the dataset
+    apart from a research one and does **not** apply the window rule of 5.6 to it. The previous shape of
+    this test pinned the blocked half by asserting that ``load_dataset`` refused the landmark, which is
+    what a loader that could not read the field had to do.
     """
     out_dir = tmp_path / "y2026"
     assert (
@@ -2036,8 +2153,15 @@ def test_a_showcase_build_through_the_cli_keeps_the_landmark_market(
     # before the window, which are the two filters 5.6's window rule covers and the only two lifted.
     assert "markets    7" in printed
     assert (out_dir / "markets" / "manifold-tooold.json").is_file()
-    # BLOCKED, reported as an agreement needed: without DatasetManifest.purpose the loader reads this
-    # dataset as research and applies the window rule of 5.6 to it.
+    # The read half: the manifest says ``showcase`` and the loader honours it, so the landmark loads.
+    manifest = load_manifest(out_dir)
+    assert manifest.purpose == "showcase"
+    dataset = load_dataset(out_dir)
+    assert dataset.purpose == "showcase"
+    assert "manifold-tooold" in {meta.id for meta in dataset.metas}
+    # And the exemption is the window rule and nothing else: the same dataset declared ``research`` is
+    # refused on exactly the market the window rule covers.
+    write_manifest(out_dir, dataclasses.replace(manifest, purpose="research"))
     with pytest.raises(SchemaError, match="before the window opens"):
         load_dataset(out_dir)
 

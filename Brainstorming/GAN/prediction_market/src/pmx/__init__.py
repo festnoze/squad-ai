@@ -18,3 +18,7 @@ INSTRUMENT_SCHEMA = "instrument.v1"
 CASH_EVENT_SCHEMA = "cash_event.v1"
 SESSION_CALENDAR_SCHEMA = "session_calendar.v1"
 FORECAST_SCHEMA = "forecast.v1"
+# Amendment C1c's three (13.2, 18.8; the amendment names DS1 as the package that applies them).
+RULE_SCHEMA = "rule.v1"
+SENSOR_SCHEMA = "sensor.v1"
+WORKFLOW_SCHEMA = "workflow.v1"

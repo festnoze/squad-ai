@@ -30,7 +30,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from pmx.data.schema import (
@@ -42,6 +42,7 @@ from pmx.data.schema import (
 from pmx.data.sessions import in_session, load_calendar, session_bars
 from pmx.errors import (
     DatasetHashMismatchError,
+    FoldIntegrityError,
     LeakError,
     NonCanonicalValueError,
     SchemaError,
@@ -58,6 +59,8 @@ from pmx.types import (
     NEWS_CODE_BY_SOURCE,
     NEWS_KIND_BY_SOURCE,
     PRICE_TICKS_MAX,
+    PURPOSE_RESEARCH,
+    PURPOSE_SHOWCASE,
     ContinuousInstrument,
     Dataset,
     DatasetFile,
@@ -79,20 +82,10 @@ from pmx.types import (
     sort_market_metas,
 )
 
-#: **A bridge, and the one line that removes it.** Section 13.1 declares ``FoldIntegrityError`` in
-#: ``pmx.errors`` (rulings R248, R266, R277, R290) and 18.8's deferral table assigns the class to DS1 in
-#: lot 5b "by the agreement of section 13"; ``src/pmx/errors.py`` is D1's file and is not this package's
-#: to edit, so every raise site below names this alias instead of the class it will name. When D1 lands
-#: the class, this becomes ``from pmx.errors import FoldIntegrityError`` and no raise site moves. It is
-#: an alias of ``SchemaError`` and not a new subclass on purpose: a second class with the contract's name
-#: living in the wrong module is what a later import would silently pick up.
-FoldIntegrityError = SchemaError
-
 #: The purpose of a dataset that predates the ``purpose`` field (5.6, decision D-S4, ruling R263): an
-#: unsealed pack whose only provider is ``demo``, which is the ``is_demo_pack`` signature the field
-#: replaces. See :func:`manifest_purpose`.
-PURPOSE_RESEARCH = "research"
-PURPOSE_SHOWCASE = "showcase"
+#: unsealed pack whose only provider is ``demo``, which is the signature the field replaces. Both names
+#: are re-exported from ``pmx.types``, where 18.8 puts them, so the loader, the builder and the CLI
+#: compare against one pair of strings. See :func:`manifest_purpose`.
 
 MANIFEST_NAME = "manifest.json"
 MARKETS_DIR = "markets"
@@ -348,16 +341,20 @@ def _window_days(manifest: DatasetManifest) -> int:
 def manifest_purpose(manifest: DatasetManifest) -> str:
     """``research`` or ``showcase`` (5.6, decision D-S4, ruling R263), read off the manifest.
 
-    The field itself is ``DatasetManifest.purpose`` in the contract, which is D1's ``pmx.types`` and the
-    strict ``DatasetManifestModel`` of ``pmx.data.schema``: neither carries it yet and both refuse a
-    manifest that spells it, so **no dataset on disk can carry the field today** and this reads the
-    signature the field replaces, the old ``is_demo_pack`` (an unsealed pack whose only provider is
-    ``demo``). The contract already says a manifest written before the field reads as ``showcase`` on
-    exactly that signature, so this function's answer is the contract's answer for every dataset that
-    exists; when D1 lands the field it becomes ``return manifest.purpose`` and every caller below is
-    already asking the right question.
+    ``DatasetManifest.purpose`` is the field, written by every build from DS1 on. A manifest written
+    before amendment C1c carries none, and the contract states its answer for exactly that case:
+    ``showcase`` on the signature the field replaces (unsealed, the one provider ``demo``),
+    ``research`` otherwise. ``Dataset.purpose`` answers the same question for a caller that holds a
+    dataset, and both read this one rule.
     """
-    return PURPOSE_SHOWCASE if manifest.is_demo_pack else PURPOSE_RESEARCH
+    if manifest.purpose:
+        return manifest.purpose
+    return PURPOSE_SHOWCASE if _predates_purpose_showcase(manifest) else PURPOSE_RESEARCH
+
+
+def _predates_purpose_showcase(manifest: DatasetManifest) -> bool:
+    """The signature ``purpose`` replaces (5.6, 7.1): an unsealed pack whose only provider is ``demo``."""
+    return not manifest.sealed and manifest.providers == ("demo",)
 
 
 def _check_market_window(market: Market, *, manifest: DatasetManifest) -> None:
@@ -566,10 +563,10 @@ def _check_instrument_window(
     if instrument.listed_at_ms >= manifest.window.end_ms:
         raise SchemaError("instrument is listed after the dataset window", market_id=instrument.id)
     delisted = instrument.delisted_at_ms
-    if delisted is not None and delisted >= manifest.freeze_ms and not manifest.is_demo_pack:
+    if delisted is not None and delisted >= manifest.freeze_ms and not _predates_purpose_showcase(manifest):
         raise LeakError("instrument is delisted at or after the freeze", market_id=instrument.id)
     for bar in instrument.bars:
-        if bar.t_ms >= manifest.freeze_ms and not manifest.is_demo_pack:
+        if bar.t_ms >= manifest.freeze_ms and not _predates_purpose_showcase(manifest):
             raise LeakError("instrument carries a bar at or after the freeze", market_id=instrument.id, t_ms=bar.t_ms)
     covered = calendar.is_continuous or not instrument.bars or (
         calendar.window.start_ms <= instrument.bars[0].t_ms and instrument.bars[-1].t_ms < calendar.window.end_ms
@@ -632,18 +629,34 @@ def load_calendars(path: Path, *, manifest: DatasetManifest | None = None) -> di
 # --------------------------------------------------------------------------------------------------
 # 7.3 One news file
 # --------------------------------------------------------------------------------------------------
+def safety_lag_ms_for(manifest: DatasetManifest, source: str) -> int:
+    """The lag applied to one source (5.5, 18.3, ruling R241).
+
+    ``manifest.news.safety_lag_by_source[source]`` when the manifest carries the block and names the
+    source, ``manifest.safety_lag_ms`` otherwise. A dataset built before amendment C1c carries no block
+    and therefore recomputes to exactly the bytes it was written with, which is why the fallback is the
+    whole rule and not a default table: the table of defaults is a **builder** input, and what the
+    loader recomputes is what the build declared it applied.
+    """
+    by_source = manifest.news.safety_lag_by_source
+    if by_source is not None and source in by_source:
+        return by_source[source]
+    return manifest.safety_lag_ms
+
+
 def check_news_item(item: NewsItem, *, manifest: DatasetManifest) -> None:
     """The as-of and leak rules of sections 5.5, 5.6, 7.1 and 7.3."""
-    expected_visible = item.published_at_ms + manifest.safety_lag_ms
+    lag_ms = safety_lag_ms_for(manifest, item.source)
+    expected_visible = item.published_at_ms + lag_ms
     if item.visible_from_ms != expected_visible:
         raise SchemaError(
             "visible_from_ms must be published_at_ms plus the dataset safety lag",
             news_id=item.news_id,
             visible_from_ms=item.visible_from_ms,
             expected=expected_visible,
-            safety_lag_ms=manifest.safety_lag_ms,
+            safety_lag_ms=lag_ms,
         )
-    if item.published_at_ms > manifest.freeze_ms and not manifest.is_demo_pack:
+    if item.published_at_ms > manifest.freeze_ms and not _predates_purpose_showcase(manifest):
         raise LeakError(
             "news item published after the freeze",
             news_id=item.news_id,
@@ -1135,31 +1148,10 @@ def seal_dataset(path: Path) -> DatasetManifest:
             n=len(reconstructed),
         )
     files = dataset_files(path)
-    manifest = dataset.manifest
-    sealed = DatasetManifest(
-        schema_version=manifest.schema_version,
-        name=manifest.name,
-        freeze_date=manifest.freeze_date,
-        freeze_ms=manifest.freeze_ms,
-        window=manifest.window,
-        interval_min=manifest.interval_min,
-        providers=manifest.providers,
-        safety_lag_ms=manifest.safety_lag_ms,
-        filters=manifest.filters,
-        counts=manifest.counts,
-        news=manifest.news,
-        split=manifest.split,
-        files=files,
-        dataset_hash=dataset_hash_of(files),
-        built_by=manifest.built_by,
-        sealed=True,
-        notes=manifest.notes,
-        kinds=manifest.kinds,
-        instruments=manifest.instruments,
-        schedules=manifest.schedules,
-        clusters=manifest.clusters,
-        impact=manifest.impact,
-    )
+    # ``replace`` and not a field-by-field reconstruction (the shape this had until amendment C1c added
+    # seven blocks to 7.8): a manifest field this function forgot to copy would be a block the seal
+    # silently deleted, and the deletion would look exactly like a build that never wrote it.
+    sealed = replace(dataset.manifest, files=files, dataset_hash=dataset_hash_of(files), sealed=True)
     write_manifest(path, sealed)
     return sealed
 
@@ -1178,27 +1170,4 @@ def reseal_hash(path: Path, manifest: DatasetManifest) -> DatasetManifest:
     being claimable").
     """
     files = dataset_files(path)
-    return DatasetManifest(
-        schema_version=manifest.schema_version,
-        name=manifest.name,
-        freeze_date=manifest.freeze_date,
-        freeze_ms=manifest.freeze_ms,
-        window=manifest.window,
-        interval_min=manifest.interval_min,
-        providers=manifest.providers,
-        safety_lag_ms=manifest.safety_lag_ms,
-        filters=manifest.filters,
-        counts=manifest.counts,
-        news=manifest.news,
-        split=manifest.split,
-        files=files,
-        dataset_hash=dataset_hash_of(files),
-        built_by=manifest.built_by,
-        sealed=manifest.sealed,
-        notes=manifest.notes,
-        kinds=manifest.kinds,
-        instruments=manifest.instruments,
-        schedules=manifest.schedules,
-        clusters=manifest.clusters,
-        impact=manifest.impact,
-    )
+    return replace(manifest, files=files, dataset_hash=dataset_hash_of(files))

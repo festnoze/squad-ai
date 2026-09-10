@@ -80,6 +80,7 @@ from pmx.types import (
     CATEGORIES as CATEGORIES_OF_SECTION_2,
 )
 from pmx.types import (
+    INTERVALS_MIN,
     MS_PER_DAY,
     MS_PER_HOUR,
     TAPE_KIND_BARS_ONLY,
@@ -793,17 +794,28 @@ def test_the_hourly_grid_asks_for_hourly_candlesticks(tmp_path: Path) -> None:
 
 
 def test_an_interval_off_the_grid_is_an_invalid_config(tmp_path: Path) -> None:
+    """Amendment C1c (5.2, 18.3, ruling R241): ``INTERVALS_MIN`` is three grids, and ``1`` is one of them.
+
+    This test used to pin ``interval_min=1`` as off the grid, which was true of the two-grid world it
+    was written in and is what the contract now contradicts: the minute grid exists, and Kalshi is the
+    venue it exists for, because it publishes one-minute candlesticks. So the refusal is asserted on the
+    values that are still off the grid, on both entry points, and ``1`` is asserted to be accepted.
+    """
     client = _client(tmp_path, _FixtureTransport())
-    with pytest.raises(InvalidConfigError):
-        import_kalshi(
-            client=client,
-            window_start_ms=WINDOW_START_MS,
-            window_end_ms=WINDOW_END_MS,
-            freeze_ms=FREEZE_MS,
-            interval_min=15,
-        )
-    with pytest.raises(InvalidConfigError):
-        list_open_kalshi(client=client, now_ms=FREEZE_MS, interval_min=1)
+    assert INTERVALS_MIN == (1, 60, 1_440)
+    for off_grid in (0, 5, 15, 1_441):
+        with pytest.raises(InvalidConfigError):
+            import_kalshi(
+                client=client,
+                window_start_ms=WINDOW_START_MS,
+                window_end_ms=WINDOW_END_MS,
+                freeze_ms=FREEZE_MS,
+                interval_min=off_grid,
+            )
+        with pytest.raises(InvalidConfigError):
+            list_open_kalshi(client=client, now_ms=FREEZE_MS, interval_min=off_grid)
+    for on_grid in INTERVALS_MIN:
+        list_open_kalshi(client=client, now_ms=FREEZE_MS, interval_min=on_grid)
 
 
 def test_a_series_allow_list_keeps_only_what_it_names(tmp_path: Path) -> None:

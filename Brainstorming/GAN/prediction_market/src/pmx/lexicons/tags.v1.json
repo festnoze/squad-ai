@@ -1,0 +1,528 @@
+{
+ "version": "tags.v1",
+ "notes": "The controlled tag vocabulary of CONTRACTS_V2 7.14 (amendment C1c, decisions D-S6, D-S8, D-S9 and D-S14, rulings R265, R267, R268 and R273). Three facets: subject (one or more, in the order of this file, which IS the tagger's precedence order, so the first value a market matches is its primary subject and therefore its cohort key of 18.5), structure (exactly one, decided by the first of the ordered regular expressions below that matches the question) and horizon (exactly one, always derived from close_at_ms - created_at_ms and never from provider text). The vocabulary starts from what a prototype tagger MEASURED over the 287 markets of data/datasets/y2026 (docs/REVIEW_2026-09-09_SCALE_TAGS.md section G: threshold-above 145, threshold-below 15, count-over-period 10, head-to-head 9, range-band 7, by-date 7 on Kalshi and 12 on Manifold) and from the 737 Kalshi series of kalshi_series_subjects.v1.json, which is the same build's universe; no value here is without a market behind it. platform-meta is a SUBJECT and not a filter: it names Manifold's self-referential markets and keeps them out of every forecast cohort while leaving them counted, and it is decided by the keyword rule AND by the provider's own non-predictive labels, because the two sets were measured and are not the same (7 self-referential questions against 8 nonpredictive labels). Ruling R301: the horizon boundaries (1 d, 7 d, 31 d, 183 d) and the order of the subject and structure blocks are part of tags.v1; moving either is a new lexicon version and therefore a new dataset hash, never an edit to this file.",
+ "facets": {
+  "subject": {
+   "platform-meta": {
+    "keywords": [
+     "amm",
+     "boost",
+     "boosts",
+     "commenter",
+     "commenters",
+     "liquidity",
+     "mana",
+     "manifold",
+     "market",
+     "markets",
+     "metamarket",
+     "metamarkets",
+     "odds",
+     "trader",
+     "traders"
+    ],
+    "provider_labels": [
+     "fairlyrandom",
+     "metamarkets",
+     "nonpredictive",
+     "nonpredictive-profits"
+    ]
+   },
+   "bitcoin": {
+    "keywords": [
+     "bitcoin",
+     "btc"
+    ]
+   },
+   "ethereum": {
+    "keywords": [
+     "eth",
+     "ethereum"
+    ]
+   },
+   "crypto-other": {
+    "keywords": [
+     "altcoin",
+     "avalanche",
+     "binance",
+     "bnb",
+     "cardano",
+     "chainlink",
+     "crypto",
+     "cryptocurrency",
+     "doge",
+     "dogecoin",
+     "litecoin",
+     "polkadot",
+     "ripple",
+     "sol",
+     "solana",
+     "stablecoin",
+     "stellar",
+     "xrp",
+     "zcash"
+    ]
+   },
+   "gold-silver": {
+    "keywords": [
+     "bullion",
+     "gold",
+     "silver"
+    ]
+   },
+   "metals-industrial": {
+    "keywords": [
+     "aluminium",
+     "aluminum",
+     "cobalt",
+     "copper",
+     "lithium",
+     "nickel",
+     "steel"
+    ]
+   },
+   "oil": {
+    "keywords": [
+     "brent",
+     "crude",
+     "opec",
+     "petroleum",
+     "wti"
+    ]
+   },
+   "natural-gas": {
+    "keywords": [
+     "mmbtu"
+    ]
+   },
+   "gas-prices": {
+    "keywords": [
+     "diesel",
+     "gasoline"
+    ]
+   },
+   "agriculture": {
+    "keywords": [
+     "cattle",
+     "cocoa",
+     "coffee",
+     "corn",
+     "livestock",
+     "maize",
+     "soybean",
+     "soybeans",
+     "sugar",
+     "wheat"
+    ]
+   },
+   "cpi-inflation": {
+    "keywords": [
+     "cpi",
+     "deflation",
+     "inflation",
+     "pce"
+    ]
+   },
+   "food-prices": {
+    "keywords": [
+     "burrito",
+     "crunchwrap",
+     "groceries",
+     "grocery"
+    ]
+   },
+   "central-bank-rates": {
+    "keywords": [
+     "basis",
+     "boj",
+     "dissents",
+     "ecb",
+     "fed",
+     "fomc"
+    ]
+   },
+   "treasury-yields": {
+    "keywords": [
+     "treasuries",
+     "treasury",
+     "yield",
+     "yields"
+    ]
+   },
+   "employment": {
+    "keywords": [
+     "employment",
+     "hire",
+     "jobless",
+     "jobs",
+     "layoff",
+     "layoffs",
+     "nonfarm",
+     "payroll",
+     "payrolls",
+     "unemployment"
+    ]
+   },
+   "gdp-growth": {
+    "keywords": [
+     "gdp",
+     "recession"
+    ]
+   },
+   "public-debt": {
+    "keywords": [
+     "debt"
+    ]
+   },
+   "housing": {
+    "keywords": [
+     "homes",
+     "housing",
+     "mortgage",
+     "renting",
+     "rents"
+    ]
+   },
+   "fx-major": {
+    "keywords": [
+     "euro",
+     "eurusd",
+     "franc",
+     "renminbi",
+     "sterling",
+     "yen",
+     "yuan"
+    ]
+   },
+   "fx-other": {
+    "keywords": [
+     "krona",
+     "krone",
+     "peso",
+     "rand",
+     "real",
+     "rial",
+     "ruble",
+     "rupee"
+    ]
+   },
+   "equity-index": {
+    "keywords": [
+     "nasdaq",
+     "russell",
+     "vix"
+    ]
+   },
+   "single-equity": {
+    "keywords": [
+     "alphabet",
+     "amazon",
+     "apple",
+     "google",
+     "meta",
+     "microsoft",
+     "nvidia",
+     "stock",
+     "tesla",
+     "valuation"
+    ]
+   },
+   "net-worth": {
+    "keywords": [
+     "billionaire",
+     "billionaires",
+     "richest"
+    ]
+   },
+   "ai-models": {
+    "keywords": [
+     "anthropic",
+     "chatgpt",
+     "claude",
+     "deepseek",
+     "fable",
+     "gemini",
+     "gpt",
+     "grok",
+     "llama",
+     "llm",
+     "mistral",
+     "openai"
+    ]
+   },
+   "ai-compute": {
+    "keywords": [
+     "compute",
+     "datacenter",
+     "gpu",
+     "rtx",
+     "sxm"
+    ]
+   },
+   "spaceflight": {
+    "keywords": [
+     "artemis",
+     "falcon",
+     "glenn",
+     "nasa",
+     "rocket",
+     "spaceflight",
+     "spacex",
+     "starship"
+    ]
+   },
+   "elections-us": {
+    "keywords": [
+     "electoral",
+     "midterm",
+     "midterms",
+     "primaries",
+     "redistricting",
+     "senate"
+    ]
+   },
+   "elections-other": {
+    "keywords": [
+     "chancellor",
+     "parliament",
+     "referendum",
+     "seats"
+    ]
+   },
+   "us-executive": {
+    "keywords": [
+     "approval",
+     "cabinet",
+     "impeach",
+     "nominee",
+     "potus",
+     "presidential",
+     "shutdown",
+     "trump"
+    ]
+   },
+   "us-legislation": {
+    "keywords": [
+     "bills",
+     "congress",
+     "filibuster"
+    ]
+   },
+   "court-rulings": {
+    "keywords": [
+     "arrested",
+     "convict",
+     "convicted",
+     "indict",
+     "indicted",
+     "lawsuit",
+     "verdict"
+    ]
+   },
+   "trade-policy": {
+    "keywords": [
+     "embargo",
+     "sanction",
+     "sanctions",
+     "tariff",
+     "tariffs"
+    ]
+   },
+   "armed-conflict": {
+    "keywords": [
+     "ceasefire",
+     "gaza",
+     "hormuz",
+     "invade",
+     "invasion",
+     "iran",
+     "israel",
+     "missile",
+     "nato",
+     "nuclear",
+     "russia",
+     "shooting",
+     "troops",
+     "ukraine",
+     "war",
+     "wars"
+    ]
+   },
+   "epidemics": {
+    "keywords": [
+     "covid",
+     "influenza",
+     "measles",
+     "outbreak",
+     "pandemic",
+     "vaccine"
+    ]
+   },
+   "storms": {
+    "keywords": [
+     "cyclone",
+     "hurricane",
+     "tornado",
+     "tornadoes",
+     "typhoon"
+    ],
+    "builder_labels": [
+     "forecastable_from_public_models"
+    ]
+   },
+   "precipitation": {
+    "keywords": [
+     "inches",
+     "precipitation",
+     "rain",
+     "rainfall",
+     "snow",
+     "snowfall"
+    ],
+    "builder_labels": [
+     "forecastable_from_public_models"
+    ]
+   },
+   "temperature": {
+    "keywords": [
+     "coldest",
+     "heat",
+     "hottest",
+     "temperature",
+     "temperatures"
+    ],
+    "builder_labels": [
+     "forecastable_from_public_models"
+    ]
+   },
+   "climate-indicators": {
+    "keywords": [
+     "dioxide",
+     "drought",
+     "emissions"
+    ]
+   },
+   "air-travel": {
+    "keywords": [
+     "airport",
+     "cancellations",
+     "flights"
+    ]
+   },
+   "electricity": {
+    "keywords": [
+     "electricity",
+     "ercot",
+     "kilowatt",
+     "solar"
+    ]
+   },
+   "sports-competition": {
+    "keywords": [
+     "cup",
+     "draft",
+     "final",
+     "finals",
+     "league",
+     "playoffs",
+     "season",
+     "singles",
+     "takedown",
+     "titles",
+     "tournament",
+     "win",
+     "wins"
+    ]
+   },
+   "entertainment-media": {
+    "keywords": [
+     "album",
+     "anime",
+     "announced",
+     "emmy",
+     "encyclical",
+     "film",
+     "grammy",
+     "gross",
+     "movie",
+     "oscar",
+     "song"
+    ]
+   },
+   "other": {
+    "keywords": []
+   }
+  },
+  "structure": {
+   "multi-outcome-leg": {
+    "patterns": [
+     "\\band\\b[^?]*\\bbe\\s+(?:above|below)\\b",
+     "\\([a-z][a-z ]*:\\s*[^,)]+,\\s*[a-z][a-z ]*:\\s*[^)]+\\)",
+     "^what will be the\\b"
+    ]
+   },
+   "recurring-series-leg": {
+    "patterns": [
+     "\\b(?:hottest|coldest|wettest|driest|warmest)\\b[^?]*\\bever\\b"
+    ]
+   },
+   "range-band": {
+    "patterns": [
+     "\\bbetween\\s+\\$?[\\d,.]+\\s+and\\s+\\$?[\\d,.]+",
+     "\\(\\s*\\$?[\\d,.]+\\s*(?:to|and)\\s*\\$?[\\d,.]+\\s*\\)",
+     "\\b\\d[\\d,.]*\\s+to\\s+\\d[\\d,.]*\\s+\\w+\\b"
+    ]
+   },
+   "count-over-period": {
+    "patterns": [
+     "\\b(?:more than|at least|fewer than|above)\\s+\\d[\\d,.]*\\s+\\w+[^?]*\\b(?:between|in|during|by|the week of)\\b",
+     "\\b(?:how many|number of)\\b",
+     "\\bfor\\s+\\d+\\s+or more consecutive\\b",
+     "\\bmake\\s+\\d+\\s+trips\\b",
+     "\\bsign\\s+more than\\s+\\d+\\b",
+     "\\b(?:more than|at least|fewer than)\\s+\\d[\\d,.]*\\s+[a-z]+s\\b"
+    ]
+   },
+   "head-to-head": {
+    "patterns": [
+     "\\b(?:more|higher|larger|greater|sooner|earlier|better)\\b[^?]*\\bthan\\s+(?!\\$?[\\d.,]+\\b)",
+     "\\bbefore\\b[^?]*\\bflight\\s+\\d+\\b",
+     "\\bwins?\\b"
+    ]
+   },
+   "threshold-above": {
+    "patterns": [
+     "\\b(?:above|higher than|greater than|more than|over|at or above|exceeds?|rise more than)\\b",
+     "\\bbe\\s+at least\\s+\\$?[\\d,.]+",
+     "\\b(?:snow|rain)\\s+in\\b"
+    ]
+   },
+   "threshold-below": {
+    "patterns": [
+     "\\b(?:below|lower than|less than|under|at or below)\\b"
+    ]
+   },
+   "by-date": {
+    "patterns": [
+     "\\b(?:by|before|on or before|prior to)\\s+(?:\\d{1,2}:\\d{2}|the\\s+)?(?:jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|end of|new year)",
+     "\\b(?:by|before)\\s+(?:pi day|next month|year end)",
+     "\\b(?:happen|occur|be released|be announced|resign|leave|sign|agree|attend|arrested|released|reenabled|remove|withdraw|form|announce|invited|declare|partners|issue)\\b[^?]*\\b(?:before|by|provided)\\b",
+     "\\b(?:in|during)\\s+\\d{4}\\?"
+    ]
+   },
+   "other": {
+    "patterns": []
+   }
+  },
+  "horizon": [
+   "intraday",
+   "week",
+   "month",
+   "quarter",
+   "year-plus"
+  ],
+  "builder": [
+   "forecastable_from_public_models"
+  ]
+ }
+}

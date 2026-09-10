@@ -47,8 +47,15 @@ from pathlib import Path
 from pmx import journal as journal_module
 from pmx.errors import InvalidConfigError, NotConfiguredError, PmxError, SchemaError
 from pmx.journal import Journal, JournalEvent, canonical_json, canonical_sha256
-from pmx.metrics.stats import Interval, bootstrap_lower_bound, iso_week_key
-from pmx.rng import RngTree, shuffle_seeded
+from pmx.metrics.stats import (
+    Interval,
+    _benjamini_hochberg_k,
+    benjamini_hochberg,
+    bootstrap_lower_bound,
+    iso_week_key,
+    rule_permutation_p_ppm,
+)
+from pmx.rng import RngTree
 from pmx.rules.rule import (
     RE_FAMILY_ID,
     RULE_MIN_MARKETS,
@@ -60,6 +67,7 @@ from pmx.rules.rule import (
 )
 from pmx.rules.vocabulary import FeatureBlock, SensorBlockLike
 from pmx.types import (
+    FDR_Q_PPM,
     PPM_ONE,
     DatasetSplit,
     MarketMeta,
@@ -105,9 +113,6 @@ __all__ = (
     "scope_rows",
     "usual_bp_for",
 )
-
-#: Benjamini-Hochberg's q, five percent (18.2 step 3).
-FDR_Q_PPM = 50_000
 
 #: The permutation count follows the family (ruling R282).
 RULE_PERMUTATIONS_MIN = 200
@@ -810,94 +815,12 @@ def _measure(rows: MarketRows, index: int, claim: RuleClaim, horizon: int) -> in
 # --------------------------------------------------------------------------------------------------
 # The two statistics E4 owns by the agreement of section 13 (rulings R238 and R282)
 # --------------------------------------------------------------------------------------------------
-def _benjamini_hochberg(p_values_ppm: Sequence[int], *, q_ppm: int = FDR_Q_PPM) -> tuple[bool, ...]:
-    """False discovery rate control within a pre-registered family, in integers (12.4, ruling R238).
-
-    ``m = len(p_values_ppm)``; with ``p_(1) <= ... <= p_(m)`` sorted, ``k`` is the largest index with
-    ``p_(k) * m <= k * q_ppm`` and every position whose p-value is at most ``p_(k)`` is rejected. No
-    division anywhere, so the comparison is exact. When no such ``k`` exists nothing passes, which is the
-    honest answer for a family whose best p-value is worse than ``q / m``.
-
-    Section 13 gives this name to E4's ``pmx.metrics.stats``, where S2 adds it by the recorded agreement;
-    this is the same function while that file belongs to another package in flight.
-    """
-    k = _benjamini_hochberg_k(p_values_ppm, q_ppm=q_ppm)
-    if k == 0:
-        return tuple(False for _ in p_values_ppm)
-    cutoff = sorted(p_values_ppm)[k - 1]
-    return tuple(p <= cutoff for p in p_values_ppm)
-
-
-def _benjamini_hochberg_k(p_values_ppm: Sequence[int], *, q_ppm: int = FDR_Q_PPM) -> int:
-    """The ``k`` the step found, for the ledger row: ``0`` when nothing passes.
-
-    The one place the threshold ``p_(k) * m <= k * q_ppm`` is spelled, because the first build of this
-    module spelled it twice and the two copies disagreed: the flag loop dropped the ``k`` factor and
-    rejected only the single best p-value of a family whose first three were rejections. Two readings of
-    one arithmetic is one reading too many, so :func:`_benjamini_hochberg` reads the cutoff off this
-    ``k`` and cannot drift from it again.
-    """
-    m = len(p_values_ppm)
-    ordered = sorted(p_values_ppm)
-    for index in range(m, 0, -1):
-        if ordered[index - 1] * m <= index * q_ppm:
-            return index
-    return 0
-
-
-def _rule_permutation_p_ppm(
-    y_rows: Sequence[int],
-    fired: Sequence[bool],
-    blocks: Sequence[str],
-    *,
-    rng: RngTree,
-    permutations: int,
-) -> int:
-    """The rule path's own null (12.4, ruling R282), on the statistic promotion tests.
-
-    The three sequences are aligned, one entry per row of the fold in the rule's scope. Each permutation
-    shuffles ``fired`` **within each block**, so every block keeps the number of rows the rule matched in
-    it, and recomputes the mean of ``y_rows`` over the matched rows. The estimator is
-    ``round_half_up(PPM_ONE * (b + 1), permutations + 1)`` with ``b`` the permutations whose mean reached
-    the observed one: a permutation test may not report ``p = 0``, and a ``p`` that can only be ``0`` or a
-    multiple of ``1 / B`` cannot be compared against a threshold of ``k * q / m``.
-
-    The shuffles draw from ``stats.permutation``, a **registered** substream of 6.3, and no name is added:
-    these are statistics, and 6.3 says a new name means a new entry in ``pmx.rng.SUBSTREAMS`` in the same
-    commit. Section 13 gives this name to E4's ``pmx.metrics.stats``, where S2 adds it by the recorded
-    agreement; this is the same function while that file belongs to another package in flight.
-    """
-    if not y_rows:
-        return PPM_ONE
-    grouped: dict[str, list[int]] = {}
-    for position, key in enumerate(blocks):
-        grouped.setdefault(key, []).append(position)
-    observed = _matched_mean(y_rows, fired)
-    generator = rng.substream("stats.permutation")
-    at_least = 0
-    for _ in range(permutations):
-        shuffled = list(fired)
-        for key in sorted(grouped):
-            positions = grouped[key]
-            labels = shuffle_seeded(generator, [fired[position] for position in positions])
-            for position, label in zip(positions, labels, strict=True):
-                shuffled[position] = label
-        if _matched_mean(y_rows, shuffled) >= observed:
-            at_least += 1
-    return round_half_up(PPM_ONE * (at_least + 1), permutations + 1)
-
-
-def _matched_mean(y_rows: Sequence[int], fired: Sequence[bool]) -> int:
-    """The mean of the matched rows, rounded half away from zero. No match is a mean of zero."""
-    total = 0
-    count = 0
-    for value, hit in zip(y_rows, fired, strict=True):
-        if hit:
-            total += value
-            count += 1
-    if count == 0:
-        return 0
-    return mean_half_away(total, count)
+# ``benjamini_hochberg`` and ``rule_permutation_p_ppm`` now live where 12.4 declares them, in E4's
+# ``pmx.metrics.stats``, added there by the agreement recorded in section 13; the two stand-ins this
+# module carried while that file belonged to another package in flight are gone, and the tester calls
+# the contracted names. ``_benjamini_hochberg_k`` comes from the same module for the reason its own
+# docstring gives: the threshold ``p_(k) * m <= k * q_ppm`` is spelled once, and a second spelling of
+# it here is exactly the drift that made the flag loop and the ledger's ``fdr_k`` disagree.
 
 
 def mean_half_away(total: int, count: int) -> int:
@@ -1297,7 +1220,7 @@ class RuleTester:
             rows = scope_rows(self._table, rule, ids=pair.replicate_ids, usual_bp=usual or 0)
             row_sets.append(rows)
             p_values.append(
-                _rule_permutation_p_ppm(
+                rule_permutation_p_ppm(
                     [row.y_bp for row in rows],
                     [row.fired for row in rows],
                     [row.block for row in rows],
@@ -1305,7 +1228,7 @@ class RuleTester:
                     permutations=permutations,
                 )
             )
-        flags = _benjamini_hochberg(p_values)
+        flags = benjamini_hochberg(p_values)
         fdr_k = _benjamini_hochberg_k(p_values)
         replicate_records: list[TestRecord] = []
         promotions: list[Promotion] = []

@@ -55,11 +55,15 @@ from pmx.rng import SEED_SPACE, RngTree, derive_seed, sample_without_replacement
 from pmx.types import (
     LINK_THRESHOLD_PERMILLE,
     MS_PER_DAY,
+    PURPOSE_RESEARCH,
+    PURPOSE_SHOWCASE,
+    PURPOSES,
     RE_DATASET_NAME,
     REMOVED_FILTER_KEYS,
     RNG_ALGORITHM_VERSION,
     TAPE_KIND_BARS_ONLY,
     TAPE_KIND_PRINTS,
+    WINDOW_DAYS_MAX,
     BuildConfig,
     BuiltBy,
     DatasetCounts,
@@ -124,6 +128,7 @@ __all__ = [
     "plan_folds",
     "removal_reason",
     "sample_seed_for",
+    "SPLIT_METHOD",
     "split_block_of",
     "stratified_cap",
     "universe_of_facts",
@@ -207,13 +212,6 @@ _UPSET_WINDOW_MS = 30 * MS_PER_DAY
 # imports a second spelling of any of them.
 # --------------------------------------------------------------------------------------------------
 
-#: The ceiling on ``BuildConfig.window_days`` (5.6, decision D-S3, ruling R262), refused for two reasons
-#: no flag may override: a market that resolved before a model's knowledge cutoff is a possible **recall**
-#: rather than a forecast, so an older resolution buys nothing an LLM row can be scored on; and a regime
-#: three years old is not the regime being traded, so an older tape teaches a scripted family the wrong
-#: market.
-WINDOW_DAYS_MAX = 730
-
 #: The two headline cuts as count quantiles of group resolution order: 60 / 20 / 20 (7.7, decision D-R1,
 #: rulings R247 and R290). Calendar thirds gave the first real dataset 111 train, 46 validation and 130
 #: sealed markets, an inverted pyramid; a count quantile is still chronological and puts the mass where
@@ -223,12 +221,8 @@ FOLD_QUANTILES_PERMILLE = (600, 800)
 #: The three folds, in chronological order (7.7, 12.7).
 FOLD_NAMES = ("train", "validation", "sealed")
 
-#: ``DatasetManifest.purpose`` (5.6, decision D-S4, ruling R263), which replaces the ad hoc
-#: ``is_demo_pack`` property. A **showcase** dataset holds landmark events kept apart rather than thrown
-#: away and is exempt from the window rule of 5.6 and from nothing else; a **research** dataset obeys it.
-PURPOSE_RESEARCH = "research"
-PURPOSE_SHOWCASE = "showcase"
-PURPOSES = (PURPOSE_RESEARCH, PURPOSE_SHOWCASE)
+#: ``manifest.split.method``: the cut is a count quantile of group resolution order and says so (7.7).
+SPLIT_METHOD = "count_quantile"
 
 #: The build target of 7.4, stated in cohorts per venue (decisions D-S1, D-S11 and D-S12 as section G of
 #: ``docs/REVIEW_2026-09-09_SCALE_TAGS.md`` corrected them; rulings R260, R270, R271). A build below the
@@ -1058,12 +1052,17 @@ def plan_folds(
 
 
 def make_split(*, window_start_ms: int, plan: SplitPlan) -> DatasetSplit:
-    """The thirteen month edges of section 7.7 and the plan's two cuts and three counts.
+    """The thirteen month edges of section 7.7, the plan's two cuts, its counts and its seven new fields.
 
     The month edges stay and are still the rolling folds' edges of 12.7 (ruling R247): a month is the unit
     a reader can name, and the rolling pair the rule tester replicates on is a calendar pair. What changed
     is only where the two **headline** cuts fall, which are now the plan's count quantiles and no longer
     ``edges[8]`` and ``edges[10]``.
+
+    Amendment C1c's seven fields (7.7, 7.8, rulings R247, R248, R290) are filled **here**, so that they
+    reach ``manifest.split`` through ``DatasetSplit.to_dict()`` like every other field of the block and
+    no second renderer can disagree with this one. ``cluster_moves`` renders as the plain ``{market_id,
+    from_fold, to_fold, group_id}`` rows ``dataset.v1.json`` declares.
     """
     counts = plan.counts
     return DatasetSplit(
@@ -1073,20 +1072,35 @@ def make_split(*, window_start_ms: int, plan: SplitPlan) -> DatasetSplit:
         n_train=counts[FOLD_NAMES[0]],
         n_validation=counts[FOLD_NAMES[1]],
         n_sealed=counts[FOLD_NAMES[2]],
+        method=SPLIT_METHOD,
+        quantiles_permille=tuple(plan.quantiles_permille),
+        train_end_date=iso_date_from_ms(plan.train_end_ms),
+        validation_end_date=iso_date_from_ms(plan.validation_end_ms),
+        cluster_moves=tuple(
+            {
+                "market_id": move.market_id,
+                "from_fold": move.from_fold,
+                "to_fold": move.to_fold,
+                "group_id": move.group_id,
+            }
+            for move in plan.cluster_moves
+        ),
+        n_moved=len(plan.cluster_moves),
+        realised_permille=tuple(plan.realised_permille),
     )
 
 
 def split_block_of(split: DatasetSplit, plan: SplitPlan) -> dict[str, object]:
-    """``manifest.split`` as 7.8 states it after amendment C1c, the six new fields included.
+    """``manifest.split`` as 7.8 states it after amendment C1c, the seven new fields included.
 
-    ``DatasetSplit`` (D1's ``pmx.types``) does not carry ``method``, ``quantiles_permille``, the two cut
-    dates, ``cluster_moves``, ``n_moved`` or ``realised_permille`` yet, and neither does the strict
-    ``SplitModel`` of ``pmx.data.schema`` that reads a manifest back: both files belong to D1 and adding
-    the fields is the agreement DS1 reports. This renderer is where the block is assembled, so the day the
-    fields land the builder writes ``document["split"] = split_block_of(...)`` and nothing else moves.
+    The fields now live on ``DatasetSplit`` (D1's ``pmx.types``, landed by the agreement of 18.8), so a
+    split built by :func:`make_split` renders the whole block by itself and this function is the one
+    reader's convenience it always was: given a split and the plan that produced it, hand back the block
+    the manifest carries. It fills the seven from ``plan`` rather than from ``split`` so that a split
+    built before the amendment, or by hand, still renders a complete block.
     """
     block = split.to_dict()
-    block["method"] = "count_quantile"
+    block["method"] = SPLIT_METHOD
     block["quantiles_permille"] = list(plan.quantiles_permille)
     block["train_end_date"] = iso_date_from_ms(plan.train_end_ms)
     block["validation_end_date"] = iso_date_from_ms(plan.validation_end_ms)
@@ -1117,10 +1131,10 @@ class BuildResult:
     n_bytes: int
     #: Amendment C1c's four answers a build now produces (7.7, 7.8; decisions D-R1, D-R2, D-R13, D-S4;
     #: rulings R247, R248, R258, R263, R270, R290). Every one of them is a **manifest block** in the
-    #: contract and is carried here as well, because ``DatasetManifest`` and the strict ``SplitModel``
-    #: that reads a manifest back are D1's ``pmx.types`` and ``pmx.data.schema``: until that agreement
-    #: lands, a manifest that carried these keys would not load. They are defaulted so that a caller
-    #: written before them still constructs a ``BuildResult``.
+    #: contract and is written into ``manifest`` above; each is carried here too, typed, because the CLI
+    #: prints the plan and the universe as structures and a caller should not have to re-parse the
+    #: document to reach them. They are defaulted so that a caller written before them still constructs
+    #: a ``BuildResult``.
     plan: SplitPlan | None = None
     universe: UniverseReport | None = None
     purpose: str = PURPOSE_RESEARCH
@@ -1136,30 +1150,15 @@ class BuildResult:
 
     @property
     def manifest_blocks(self) -> dict[str, object]:
-        """The manifest as 7.8 states it after amendment C1c: ``manifest.to_dict()`` plus the new blocks.
+        """The manifest as 7.8 states it after amendment C1c, which is now the manifest on disk.
 
-        This is the whole of what DS1 owes the manifest and cannot yet write into it. The blocks are
-        assembled here, validated by the tests against ``dataset.v1.json`` (which already admits every
-        one of them, C1c landed the schema), and written by the builder the day ``DatasetManifest`` and
-        ``DatasetManifestModel`` carry the fields: ``document.update(result.manifest_blocks)``.
+        This was the document the build assembled and could not write, because ``DatasetManifest`` and
+        the strict ``DatasetManifestModel`` that reads a manifest back carried none of C1c's fields.
+        They carry them now (18.8's first two rows), the builder writes them, and the loader reads them,
+        so this property is ``self.manifest.to_dict()`` and nothing else: one document, one renderer,
+        and no way for the printed answer and the written one to differ.
         """
-        document = self.manifest.to_dict()
-        document["purpose"] = self.purpose
-        window_days = self.manifest.filters.config.get("window_days")
-        if isinstance(window_days, int) and not isinstance(window_days, bool):
-            document["window_days"] = window_days
-        if self.plan is not None:
-            document["split"] = split_block_of(self.manifest.split, self.plan)
-        if self.universe is not None:
-            document["universe"] = self.universe.to_dict()
-        if self.outcome:
-            document["build"] = dict(self.outcome)
-        if self.resolution_span_ms is not None:
-            document["resolution_span"] = {
-                "min_ms": self.resolution_span_ms[0],
-                "max_ms": self.resolution_span_ms[1],
-            }
-        return document
+        return self.manifest.to_dict()
 
 
 def _sorted_markets(payloads: Sequence[Mapping[str, object]]) -> tuple[Mapping[str, object], ...]:
@@ -1581,6 +1580,41 @@ def build_dataset_from_payloads(
     all_news = list(digest_news) + list(background_news)
     n_linked = sum(1 for item in all_news if _str_tuple_field(item, "match_ids"))
     note_parts = [part for part in (notes.strip(), _boundary_note(boundaries)) if part]
+    # Amendment C1c's blocks of 7.8, written into the manifest rather than printed beside it. Every one
+    # of them is computed above; ``universe`` and ``build`` are assembled once here and handed to both
+    # the manifest and the ``BuildResult``, so the document on disk and the result the CLI prints cannot
+    # disagree. ``resolution_span`` is the true span of what was kept, which a reader compares against
+    # the declared ``window_days`` to see whether the window is a statement about the data or the flag.
+    universe = universe_of_facts(
+        all_facts,
+        frozenset(facts.id for facts in kept_facts),
+        rule=(
+            universe_rule
+            if universe_rule is not None
+            else UniverseRule(
+                min_settled=config.universe_min_settled,
+                min_volume_cents=config.universe_min_volume_cents,
+            )
+        ),
+        series_categories=series_categories,
+    )
+    resolution_span_ms = (
+        (min(item.resolved_at_ms for item in kept_facts), max(item.resolved_at_ms for item in kept_facts))
+        if kept_facts
+        else None
+    )
+    counts = _counts(
+        kept_facts,
+        hardness,
+        boundaries,
+        precap_per_provider_month=precap,
+        mapped_series=frozenset(series.upper() for series in mapped_series),
+    )
+    outcome = build_outcome(
+        per_provider=counts.per_provider,
+        cohorts_per_provider=cohorts_per_provider,
+        fallbacks=fallbacks,
+    )
     manifest = DatasetManifest(
         schema_version=DATASET_SCHEMA,
         name=dataset_name,
@@ -1591,13 +1625,7 @@ def build_dataset_from_payloads(
         providers=tuple(config.providers),
         safety_lag_ms=config.safety_lag_ms,
         filters=DatasetFilters(config=config.to_dict(), removed=removed),
-        counts=_counts(
-            kept_facts,
-            hardness,
-            boundaries,
-            precap_per_provider_month=precap,
-            mapped_series=frozenset(series.upper() for series in mapped_series),
-        ),
+        counts=counts,
         news=DatasetNews(sources=_news_sources(all_news), n_items=len(all_news), n_linked=n_linked),
         split=split,
         files=files,
@@ -1609,6 +1637,15 @@ def build_dataset_from_payloads(
         ),
         sealed=False,
         notes="; ".join(note_parts)[:NOTES_MAX],
+        purpose=purpose,
+        window_days=config.window_days,
+        resolution_span=(
+            None
+            if resolution_span_ms is None
+            else {"min_ms": resolution_span_ms[0], "max_ms": resolution_span_ms[1]}
+        ),
+        universe=universe.to_dict(),
+        build=dict(outcome),
     )
     validate_against_schema("dataset.v1.json", manifest.to_dict(), where="dataset manifest")
     n_bytes += write_manifest(out_dir, manifest)
@@ -1627,30 +1664,10 @@ def build_dataset_from_payloads(
         n_news_dropped=dropped_news,
         n_bytes=n_bytes,
         plan=plan,
-        universe=universe_of_facts(
-            all_facts,
-            frozenset(facts.id for facts in kept_facts),
-            rule=(
-                universe_rule
-                if universe_rule is not None
-                else UniverseRule(
-                    min_settled=UNIVERSE_MIN_SETTLED_DEFAULT,
-                    min_volume_cents=UNIVERSE_MIN_VOLUME_CENTS_DEFAULT,
-                )
-            ),
-            series_categories=series_categories,
-        ),
+        universe=universe,
         purpose=purpose,
-        outcome=build_outcome(
-            per_provider=manifest.counts.per_provider,
-            cohorts_per_provider=cohorts_per_provider,
-            fallbacks=fallbacks,
-        ),
-        resolution_span_ms=(
-            (min(item.resolved_at_ms for item in kept_facts), max(item.resolved_at_ms for item in kept_facts))
-            if kept_facts
-            else None
-        ),
+        outcome=outcome,
+        resolution_span_ms=resolution_span_ms,
     )
 
 

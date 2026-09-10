@@ -44,6 +44,11 @@ from pmx.cli_rules import _table as _cli_table
 from pmx.cli_rules import main as rules_main
 from pmx.errors import InvalidConfigError, NotConfiguredError, SchemaError
 from pmx.journal import canonical_json, canonical_sha256
+from pmx.metrics.stats import (
+    _benjamini_hochberg_k,
+    benjamini_hochberg,
+    rule_permutation_p_ppm,
+)
 from pmx.rng import RngTree
 from pmx.rules.miner import (
     MINER_OPS,
@@ -87,10 +92,7 @@ from pmx.rules.tester import (
     RowTable,
     RuleLedger,
     RuleTester,
-    _benjamini_hochberg,
-    _benjamini_hochberg_k,
     _median,
-    _rule_permutation_p_ppm,
     family_id_of,
     headline_pair,
     load_row_table,
@@ -588,19 +590,19 @@ def test_benjamini_hochberg_on_a_hand_computable_table() -> None:
     and the cutoff is 30_000: the first three are rejections and the fourth is not.
     """
     p_values = [30_000, 900_000, 1_000, 20_000]
-    assert _benjamini_hochberg(p_values) == (True, False, True, True)
+    assert benjamini_hochberg(p_values) == (True, False, True, True)
     assert _benjamini_hochberg_k(p_values) == 3
 
 
 def test_benjamini_hochberg_passes_nothing_when_no_k_exists() -> None:
-    assert _benjamini_hochberg([60_000, 70_000]) == (False, False)
+    assert benjamini_hochberg([60_000, 70_000]) == (False, False)
     assert _benjamini_hochberg_k([60_000, 70_000]) == 0
-    assert _benjamini_hochberg([]) == ()
+    assert benjamini_hochberg([]) == ()
 
 
 def test_benjamini_hochberg_is_less_strict_than_bonferroni_and_stricter_than_no_control() -> None:
     p_values = [5_000, 9_000, 12_000, 400_000, 800_000]
-    flags = _benjamini_hochberg(p_values)
+    flags = benjamini_hochberg(p_values)
     assert flags == (True, True, True, False, False)
     bonferroni = [p * len(p_values) <= FDR_Q_PPM for p in p_values]
     assert sum(flags) >= sum(bonferroni)
@@ -612,7 +614,7 @@ def test_the_permutation_p_value_is_never_zero_and_uses_the_b_plus_one_estimator
     y_rows = [1_000] * 10 + [-1_000] * 10
     fired = [True] * 10 + [False] * 10
     blocks = ["w2024-01"] * 20
-    p = _rule_permutation_p_ppm(y_rows, fired, blocks, rng=RngTree(3), permutations=200)
+    p = rule_permutation_p_ppm(y_rows, fired, blocks, rng=RngTree(3), permutations=200)
     assert p > 0
     assert p >= 1_000_000 // (200 + 1)
 
@@ -622,11 +624,11 @@ def test_the_permutation_null_is_deterministic_and_answers_nothing_when_nothing_
     y_rows = [10, -10, -10, 10, 10, -10, -10, 10]
     fired = [True, True, False, False, True, True, False, False]
     blocks = ["b1"] * 4 + ["b2"] * 4
-    first = _rule_permutation_p_ppm(y_rows, fired, blocks, rng=RngTree(11), permutations=200)
-    second = _rule_permutation_p_ppm(y_rows, fired, blocks, rng=RngTree(11), permutations=200)
+    first = rule_permutation_p_ppm(y_rows, fired, blocks, rng=RngTree(11), permutations=200)
+    second = rule_permutation_p_ppm(y_rows, fired, blocks, rng=RngTree(11), permutations=200)
     assert first == second, "two trees on one seed give one p-value"
     assert 100_000 < first < 1_000_000
-    planted = _rule_permutation_p_ppm(
+    planted = rule_permutation_p_ppm(
         [10, 10, -10, -10] * 2, [True, True, False, False] * 2, blocks, rng=RngTree(11), permutations=200
     )
     assert planted < first, "a real association is rarer under the null than a coin flip"
@@ -643,11 +645,11 @@ def test_the_permutation_shuffles_inside_a_block_and_never_across_two() -> None:
     """
     y_rows = [100] * 4 + [-100] * 4
     fired = [True] * 4 + [False] * 4
-    within = _rule_permutation_p_ppm(
+    within = rule_permutation_p_ppm(
         y_rows, fired, ["b1"] * 4 + ["b2"] * 4, rng=RngTree(2), permutations=200
     )
     assert within == PPM_ONE
-    across = _rule_permutation_p_ppm(y_rows, fired, ["b"] * 8, rng=RngTree(2), permutations=200)
+    across = rule_permutation_p_ppm(y_rows, fired, ["b"] * 8, rng=RngTree(2), permutations=200)
     assert across < within // 2
 
 
@@ -1794,23 +1796,71 @@ def test_nothing_in_the_package_imports_the_gateway_the_llm_or_numpy() -> None:
 
 
 def test_the_two_statistics_are_named_the_way_the_agreement_records_them() -> None:
-    """Rulings R238 and R282: E4's ``pmx.metrics.stats`` gains both names by the agreement of section 13.
+    """Rulings R238 and R282: both names live in E4's ``pmx.metrics.stats``, and only there.
 
-    Until it does, the tester carries them privately and this test pins the swap: when the names appear
-    upstream, they must have the signatures the contract states, and the private copies go.
+    The swap this test used to pin conditionally has happened: 12.4 declares ``benjamini_hochberg`` and
+    ``rule_permutation_p_ppm`` in ``pmx.metrics.stats``, section 13's agreement put them there, and the
+    private stand-ins the tester carried while that file belonged to another package in flight are
+    gone. A stand-in that came back would be two spellings of one statistic, which is what the tester's
+    own history says costs a wrong ``fdr_k``, so the absence is asserted and not merely assumed.
     """
     import pmx.metrics.stats as stats
+    import pmx.rules.tester as tester_module
 
-    upstream_bh = getattr(stats, "benjamini_hochberg", None)
-    upstream_perm = getattr(stats, "rule_permutation_p_ppm", None)
-    if upstream_bh is not None:
-        assert upstream_bh([30_000, 900_000, 1_000, 20_000]) == (True, False, True, True)
-    if upstream_perm is not None:
-        assert (
-            upstream_perm([1, 1, -1, -1], [True, True, False, False], ["b"] * 4, rng=RngTree(1), permutations=200)
-            > 0
+    assert stats.benjamini_hochberg([30_000, 900_000, 1_000, 20_000]) == (True, False, True, True)
+    assert (
+        stats.rule_permutation_p_ppm(
+            [1, 1, -1, -1], [True, True, False, False], ["b"] * 4, rng=RngTree(1), permutations=200
         )
-    assert (upstream_bh is None) == (upstream_perm is None), "the two names land in one commit"
+        > 0
+    )
+    assert "benjamini_hochberg" in stats.__all__ and "rule_permutation_p_ppm" in stats.__all__
+    for gone in ("_benjamini_hochberg", "_rule_permutation_p_ppm"):
+        assert not hasattr(tester_module, gone), f"{gone} is a second spelling of a contracted statistic"
+    assert tester_module.benjamini_hochberg is stats.benjamini_hochberg
+    assert tester_module.rule_permutation_p_ppm is stats.rule_permutation_p_ppm
+
+
+def test_the_family_procedure_calls_the_two_contracted_statistics(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A binding is not a call: the FDR step and the null must go **through** E4's two functions.
+
+    An inline re-implementation at the call site would leave the import in place and every other test
+    of this file passing, because the arithmetic would agree on the easy families. So both names are
+    replaced with recorders and the family procedure is run: if a call does not arrive, the tester is
+    spelling one of the two statistics a second time, which is the drift rulings R238 and R282 removed.
+    """
+    import pmx.rules.tester as tester_module
+
+    seen: list[str] = []
+
+    def recording_bh(p_values_ppm: Sequence[int], *, q_ppm: int = FDR_Q_PPM) -> tuple[bool, ...]:
+        seen.append("benjamini_hochberg")
+        return benjamini_hochberg(p_values_ppm, q_ppm=q_ppm)
+
+    def recording_null(
+        y_rows: Sequence[int],
+        fired: Sequence[bool],
+        blocks: Sequence[str],
+        *,
+        rng: RngTree,
+        permutations: int,
+    ) -> int:
+        seen.append("rule_permutation_p_ppm")
+        return rule_permutation_p_ppm(y_rows, fired, blocks, rng=rng, permutations=permutations)
+
+    monkeypatch.setattr(tester_module, "benjamini_hochberg", recording_bh)
+    monkeypatch.setattr(tester_module, "rule_permutation_p_ppm", recording_null)
+    table = _table()
+    pair = rolling_pair(table, 4)
+    tester = RuleTester(table, rng=RngTree(5), ledger=RuleLedger(root=tmp_path, dataset_hash=table.dataset_hash))
+    result = tester.run_family(
+        [_drift_rule(pair.registered_at_ms)], template=_template(), pair=pair, n_candidates=1
+    )
+    assert result.promotions, "the planted effect must promote, or the counts below are vacuous"
+    assert seen.count("rule_permutation_p_ppm") == 1, "one null per screened rule"
+    assert seen.count("benjamini_hochberg") == 1, "one FDR step per family"
 
 
 # --------------------------------------------------------------------------------------------------
@@ -2256,9 +2306,9 @@ def test_a_family_of_two_can_still_reject_which_is_the_arithmetic_r282_corrects(
     size, and a build that implemented the imagined floor would refuse every small family the
     ``(b + 1) / (B + 1)`` estimator exists to serve.
     """
-    assert _benjamini_hochberg([20_000, 900_000]) == (True, False)
+    assert benjamini_hochberg([20_000, 900_000]) == (True, False)
     assert _benjamini_hochberg_k([20_000, 900_000]) == 1
-    assert _benjamini_hochberg([25_000]) == (True,), "a family of one rejects at p <= q"
+    assert benjamini_hochberg([25_000]) == (True,), "a family of one rejects at p <= q"
     finest = PPM_ONE // (RULE_PERMUTATIONS_MIN + 1)
     assert finest * 2 <= FDR_Q_PPM, (
         "the minimum permutation count must resolve a p-value fine enough for the k = 1 bar of a family "
@@ -2377,7 +2427,7 @@ def test_the_null_is_drawn_on_the_replicate_fold_and_never_on_the_fit_fold(tmp_p
 
     def _measured(ids: Sequence[str]) -> int:
         rows = scope_rows(table, rule, ids=ids, usual_bp=0)
-        return _rule_permutation_p_ppm(
+        return rule_permutation_p_ppm(
             [row.y_bp for row in rows],
             [row.fired for row in rows],
             [row.block for row in rows],
