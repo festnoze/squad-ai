@@ -891,3 +891,220 @@ em-dash hits: 0
 (`test_a_seed_consuming_agent_makes_the_seed_change_the_journal_it_reproduces`, mutation-checked: a
 `coin_flipper` whose belief ignores the substream fails it on the forecasts). No test was weakened: no
 assertion was removed, no tolerance loosened, no parametrisation narrowed, nothing skipped or xfailed.
+
+---
+
+## 9. Amendment C1c closed, 2026-09-10: contract section 18 and the two reviews arbitrated (`docs/CONTRACTS_V2.md` 15.10, rulings R230 to R302)
+
+Amendment C1c wrote section 18 and section 7.14, landed the twenty-eight decisions of the two reviews in
+the sections they name, and recorded forty-six rulings (R230 to R275). One adversarial critic then
+attacked it and raised twenty-four findings; this arbitration verified every one in the text, fixed what
+held, refuted what did not, and recorded twenty-seven more rulings (R276 to R302). Everything below is
+the state of the tree at the end of the arbitration, not a report taken on trust.
+
+### 9.1 What section 18 now states
+
+| Subsection | What it makes normative |
+|---|---|
+| 18.1 | the closed catalogue of fifteen sensors with PRD v5 1.1's costs verbatim, `SensorSpec` with **derived** `granularity_ms` and `lag_ms` (the maxima over the sensor's sources, R287), `SensorFeatureSpec` with an explicit **`sentinel`** field (R285), `Genome.sensors` with `tape` mandatory, the `build_observation(..., sensors=)` hook as subtraction with `SensorAbsentError`, the three nested gates, `SensorBlock` as a slice of an unchanged `features.v1` through `features_v1_index`, the per-bar sensor budget with `RULE_PROPOSAL_COST_UNITS = 1` and `SENSOR_BUDGET_UNITS_DEFAULT = 18` (R281), the deterministic sensor drop, `diet_class` as a fourth archive axis with AC-6 read as a rate over the reachable cells (R297), and the sensor ablation |
+| 18.2 | `Rule`, `Predicate`, `RuleScope`, `RuleClaim` in a closed vocabulary, content-addressed and author-independent; `fires` total over the blocks it is handed plus `readable_by` as the filter (R279); the per-row measurement table for bias, drift and volatility; three authors (miner, agent, detector) with the proposal cost, its refusal and a per-generation cap (R281, R300); `HypothesisFamily` pre-registered, with `dataset_hash`, `fit_fold` and `replicate_fold` in the id (R284); the fit screen, Benjamini-Hochberg at `FDR_Q_PPM = 50_000` over `rule_permutation_p_ppm`'s `(b + 1) / (B + 1)` p-values with `permutations` scaled to the family (R282); out-of-time replication as the primary criterion on a rolling pair clipped to the training fold (R277); visibility from `fit_t1_ms + interval_ms`; the as-of live record and demotion (R276); the transfer test bounded to the promotion's own fold (R276); the author's reward; the tracked ledger with one writer per event (R294) |
+| 18.3 | `INTERVALS_MIN = (1, 60, 1_440)`, `SOURCE_GRANULARITY_MS`, `SAFETY_LAG_MS_BY_SOURCE`, the fifteen-minute admission rule with partial admission per sensor (R287), `BuildConfig.instruments` as the minute build's input (R298), Hacker News through Algolia, the minute event study emitting rules |
+| 18.4 | `Genome.workflow` with `None` as the linear degenerate case, nine step kinds, the bounds, `run_workflow`'s signature and `StepTrace` (R278), the `rules` step folding `claim.direction` and refusing a volatility claim (R280), `workflow_step_executed` for an explicit workflow only |
+| 18.5 | `Cohort`, `COHORT_MIN_TRAIN = 30`, `usable_for_paired_test`, one cohort per market on the primary subject, **a cohort as no fold-moving unit** (R293), the unit of comparative analysis with per-cohort rows and no per-cohort claim command (R283), why a tag cannot leak, the lexicon version on the record (R301) |
+| 18.6 | the knowledge-transfer re-test, the rule-adjusted claim, the sensor ablation |
+| 18.7, 18.8 | the module map rows (DS2's two lexicons included, R295), architecture rule 12 (the tagger is never a model call), the identifier formats, and the deferral table naming the package and lot that applies each code change |
+
+### 9.2 The twenty-eight decisions, where they landed
+
+D-R1 count-quantile folds (7.7, 12.7, PRD v2 6.1 corrected in place), D-R2 cluster-aware folds (7.7,
+7.8, 12.7, 13.1, 16.3), D-R3 per-bullet Wikipedia revision stamps (5.5, 7.1, 7.3), D-R4 the linker
+audit (7.6, 7.8, 12.10, 12.11), D-R5 the hourly headline grid (5.2, 7.8), D-R6 the coarse contamination
+label (11.5, 12.8), D-R7 the loop as a generator (12.6), D-R8 pre-registered families and FDR (9.4,
+12.4, 12.6, 18.2, PRD v5 2.3 and AC-27 corrected), D-R9 two-tier fitness (9.4, 12.6, 12.11, 13),
+D-R10 capacity (12.3, 12.8), D-R11 O3 deferred (12.9), D-R12 the Manifold separation (12.10 to 12.12),
+D-R13 the documented universe (7.4, 7.8), D-R14 detectors before agents (14); D-S1 as corrected by
+D-S11 and D-S12 (7.4, 12.7, PRD v3 AC-11 corrected), D-S2 the interface default (12.12), D-S3
+`window_days` (5.6, 7.4), D-S4 `purpose` replacing `is_demo_pack` (5.6, 7.1, 12.7, 13.1), D-S5 the
+showcase pack (7.1), D-S6 the controlled vocabulary (7.2, 7.14, 9.2), D-S7 the cohort (7.2, 12.3 to
+12.11, 18.5), D-S8 the deterministic tagger and rule 12 (7.14, 18.7), D-S9 as corrected by D-S14 (7.8,
+7.14, 12.10), D-S10 the browsable index (12.12), D-S11 and D-S12 the per-venue targets and the fallback
+order (7.4), D-S13 no cohort before the fold fix (7.7, 12.7, 14, 18.5), D-S14 the measured vocabulary
+(7.14, 18.5). None was left out and none was landed in a ruling only: every one is normative text in the
+section its review named.
+
+### 9.3 What the critic found, and what came of it
+
+Twenty-four findings: eight blockers, twelve major, four minor. Twenty-three were upheld in whole or in
+part; each is a ruling in 15.10.
+
+| Finding | Verdict | Ruling |
+|---|---|---|
+| C1 the live record and the transfer test read rows the tester may not | upheld in part: the sealed half is refuted (18.2 already bars the tester from the sealed fold), the validation half and the as-of gap hold | R276, **against the proposal** |
+| C2 the rolling pair defined twice and never clipped to the training fold | upheld | R277 |
+| C3 `SensorInputs` undefined, `run_workflow` unsigned | upheld | R278 |
+| C4 `fires` reads whose blocks, and what an unbought feature does | upheld | R279 |
+| C5 the rule shift drops `claim.direction` and ignores `claim.kind` | upheld | R280 |
+| C6 proposing is unreachable for the whole shipped roster; no allowance field on `RunConfig` | upheld | R281 |
+| C7 Benjamini-Hochberg on a 1/200 grid reporting `p = 0` | upheld in substance, reasoning corrected (`k` does climb past ten) | R282, **against the proposal** |
+| C8 two cohort claims collide on one `claim_id` | upheld | R283, **against the proposal** |
+| C9 `family_id` collides across fold pairs | upheld | R284 |
+| C10 the sentinel rule contradicts itself and reads `lo` on eleven signed features | upheld | R285 |
+| C11 prose and fixture disagree on which sensors are observation-level | upheld as a comment defect | R286, **against the proposal** |
+| C12 one `lag_ms` for a sensor with two sources; `macro_releases` internally false | upheld | R287 |
+| C13 `PerMarket.cohort_id` reads a field `market_listed` does not carry | upheld | R288 |
+| C14 `diet_class` is a function of a genome the projection cannot see | upheld | R289, **against the proposal** |
+| C15 the cluster move drifts the split one way; `build.status` contradicts R270 | upheld | R290, **against the proposal** |
+| C16 the showcase quarantine misses the memory and hive carry-forward | upheld | R291, **against the proposal** |
+| C17 capacity has no denominator and no sign handling | upheld on three sub-claims of four, the fourth refuted with the arithmetic | R292, **beyond the proposal** |
+| C18 "a cohort never crosses a fold" contradicts its own per-fold counts | upheld | R293 |
+| C19 the rule path cannot call `permutation_null` | upheld | R282 |
+| C20 architecture rule 8 forbids the tester what 9.3 requires of it | upheld | R294 |
+| C21 two DS2 files absent from section 13; two series maps unreconciled | upheld | R295 |
+| C22 the two human audits are written into a git-ignored tree | upheld | R296, **against the proposal** |
+| C23 AC-6 trebled by arithmetic on a degenerate axis | upheld | R297, **against the proposal** |
+| C24 the minute build's list has no field; AC-26's "every sensor set" is 2^14 | upheld | R298 |
+
+**Refuted, in the text of the rulings.** C1's claim that the tester reads the sealed fold: 18.2's own
+opening bars it under architecture rule 3, so the leak it traced runs through validation. C7's claim that
+nothing can be rejected below `k = 10`: once several rules report `p = 0`, `k` climbs and non-zero
+p-values are rejected, so the defect is the inadmissible `p = 0` and the coarse grid, not a floor.
+C17's claim that a negative unit return returns `-1` for every scale: the old wording was satisfied at
+scale 1000 and reported the unit notional as a capacity, which is worse than what the finding described.
+
+**Nine resolutions against the proposed fix**, each with its reason in the ruling: R276 (freezing the
+live window at the fold edge would make demotion impossible), R282 (redefining `permutation_null` for
+every caller moves numbers gate G2 measured, and part 4 of the claim bar thresholds `null_lb_micro` and
+not the p-value), R283 (a cohort segment in `claim_id` legalises a second sealed read and lets a genome
+cherry-pick its cohort), R286 (the fixture is right and one comment is wrong, so `CATALOGUE_HASH` need
+not move for it), R289 (a pre-C1c journal is a full-catalogue run by construction, so the descriptor is
+`2` and not unknown), R290 (a train-share floor with no recourse kills a real dataset; the group-aware
+cut removes the drift instead), R291 (an escape-hatch flag that no claim path may pass is a flag that
+ends up passed), R296 (git cannot re-include a file under an excluded directory, so the audits move to a
+top-level tree the ignore file never names), R297 (spreading the shipped roster's diets would break
+section 18's own byte-identity promise). R292 goes beyond its proposal: the capacity is the notional at
+the scale **below** the halving scale, because a size the edge did not survive is not a capacity.
+
+**Four rulings answer questions the amendment flagged and the critic passed over.** R299: a
+`torch_policy` genome's `required_sensors` covers every sensor with a `features_v1_index`, so a learned
+policy is never fed a vector mixing measured values and sentinels. R300: `RULE_PROPOSALS_PER_GENERATION_MAX
+= 20` bounds every author the way `RULE_MINER_CANDIDATES_MAX` bounds the miner, and a threshold
+perturbation still enters the family's `m`. R301: a `per_cohort` row carries the `manifest.taxonomy.version`
+it was cut under, and no second copy of that version is created. R302: the `(declared, <applier>)`
+convention stands, the rolling-visibility question is answered by R277's clip, and the two version
+constants do not move.
+
+### 9.4 What the arbitration applied in C1c's own files
+
+`docs/CONTRACTS_V2.md` sections 5.6, 7.1, 7.4, 7.6, 7.7, 7.8, 7.9, 7.14, 8.1, 8.4, 9.2, 9.3, 9.5, 10.4,
+10.5, 12.3, 12.4, 12.5, 12.7, 12.8, 12.10, 12.11, 12.12, 13, 13.1, 16.6, 18.1 to 18.8, and 15.10
+(twenty-seven new rulings plus fourteen earlier rows of the same section amended in place so that no two
+rows disagree, which is ruling R136 applied to a ruling). `src/pmx/schemas/sensor.v1.json` gained the
+required `sentinel`. `src/pmx/schemas/journal.v2.json` gained the optional `market_listed.cohort_id`.
+`src/pmx/schemas/dataset.v1.json`'s audit path pattern became `^audits/[0-9a-f]{16}/(linker|taxonomy)\.json$`.
+`tests/fixtures/contract/sensor.catalogue.json` gained seventy-five sentinels and the derived pair for
+`macro_releases`, so `catalogue_hash` moved from `2bac41c5...` to
+`1ac17eba640dc0875de4122dcc1eb1ec65351c687004bc4b5d194069fdebe109`; the fixture is a contract document
+and not a run artefact, so nothing downstream moves with it. `tests/test_contract_schemas.py` gained the
+sentinel and derived-pair assertions, the cohort-id and audits-path assertions, and the two source
+tables spelled out so the fixture is checked against the contract rather than against the code; two of
+its existing assertions pinned wording this arbitration changed and were corrected with it, which is a
+test disagreeing with the contract and not a weakening (R232's precedent). No assertion was removed, no
+tolerance loosened, no parametrisation narrowed, nothing skipped or xfailed.
+
+### 9.5 The four checks, verbatim
+
+```
+$ .venv/Scripts/python.exe -m pytest -q -p no:warnings -rs   (addopts already carry -q, so the count
+line is suppressed; counted from the progress marks: 1039 passed, 4 skipped, 0 failed)
+...................................                                      [100%]
+=========================== short test summary info ===========================
+SKIPPED [1] tests	est_import_kalshi.py:1264: live network probe; set PMX_LIVE=1 to run it
+SKIPPED [1] tests	est_import_manifold.py:1124: set PMX_LIVE=1 to hit api.manifold.markets
+SKIPPED [1] tests	est_import_polymarket.py:795: live network test; set PMX_LIVE=1 to run
+SKIPPED [1] tests	est_news.py:1222: PMX_LIVE is not set
+PYTEST_EXIT 0
+
+$ .venv/Scripts/python.exe -m ruff check src tests
+All checks passed!
+RUFF_EXIT 0
+
+$ .venv/Scripts/python.exe -m mypy --strict
+Success: no issues found in 68 source files
+MYPY_EXIT 0
+
+$ em-dash sweep (U+2014, every .py .json .md .ts .tsx .css .html .jsonl .sh .ps1 under src, tests, docs, web/src)
+files scanned: 220
+em-dash hits: 0
+
+$ .venv/Scripts/python.exe -m pytest tests/test_contract_schemas.py tests/test_architecture.py -q -p no:warnings -rs
+   (re-run after the last two prose edits, which are the only files any test reads at run time)
+.............................                                            [100%]
+PYTEST_EXIT 0
+```
+
+### 9.6 What is left to code, with its package and lot
+
+18.8's deferral table is the full list and names an owner and a lot for every row. The rows this
+arbitration added:
+
+| What | File and owner | Lot |
+|---|---|---|
+| `RULE_PROPOSAL_COST_UNITS`, `SENSOR_BUDGET_UNITS_DEFAULT = 18`, `RunConfig.sensor_budget_units` and `sensor_budget_by_agent`, `SensorFeatureSpec.sentinel`, the derived `granularity_ms` and `lag_ms`, `BuildConfig.instruments`, `RULE_PERMUTATIONS_MIN`, `RULE_PERMUTATIONS_MAX`, `RULE_PROPOSALS_PER_GENERATION_MAX`, `ARCHIVE_CELLS_REACHABLE`, `SENSOR_SETS_UNDER_TEST`, `torch_policy.required_sensors` | `types.py` (D1), `sensors/catalogue.py` (S1), `agents/registry.py` (A1) | DS1 and S1 in 5b, A1 and O2 in 6 |
+| `SensorInputs`, `run_workflow`'s signature, `StepTrace` | `types.py` (D1), `agents/workflow.py` (A1) | S1 and E1 in 5b and 6, A1 and E5 in 6 |
+| `Rule.readable_by`, the diet-narrowed `blocks`, `InsightView.required_sensors`, the direction-and-kind filter | `rules/rule.py` (S2), `agents/hive.py` (A3), `agents/families/rule_follower.py` and `workflow.py` (A1), `engine/runner.py` (E5) | S2 in 5b, A1, A3 and E5 in 6 |
+| `rule_permutation_p_ppm` | `metrics/stats.py` (E4) | S2, by section 13's agreement |
+| no `--cohort`, `cohort_or_refuse`, `market_listed.cohort_id`, `diet_class` off the journal | `claims.py` (O4), `cohorts.py` (DS2), `pmx.journal` (D7), `metrics/projection.py` (E5) | DS2 in 5b, O4 and E5 in 6, the journal field with R274's lot |
+| `fold_key_ms` as the cut key, `split.realised_permille`, the empty-fold and empty-rolling refusals, the clipped `Folds.rolling`, `build.status` per venue | `data/builder.py`, `loader.py` (DS1), `optimizer/folds.py` (O1) | DS1 in 5b, O1 in 6 |
+| the showcase and foreign-dataset refusals on the memory carry-forward | `engine/runner.py` (E5) | the first engine lot after this amendment |
+| the three-state capacity formula | `metrics/capacity.py` (O4) | lot 6 |
+| the `audits/<dataset_hash[:16]>/` tree (`.gitignore` needs no change: it never names `audits/`) | `data/builder.py`, `cli_data.py` (DS1), `data/taxonomy.py` (DS2) | lot 5b, verdicts by gate G3 |
+
+`ENGINE_VERSION` stays `2.0.0` and `CONTRACT_VERSION` stays `"2.0"` (R275, R302). Nothing here changes a
+byte of a journal a run has written, because no such run exists: the contract journal fixture is a
+completed historical document (R202), and the sensor catalogue this pass regenerated is a contract
+document that no run has yet read. The first lot that changes a byte of a written journal bumps both, and
+R274 names it: the first engine lot after C1c, which applies R213, R214, R217, R221, the six declared
+events and the optional journal fields together.
+
+### 9.6b The unflattering part: what the document still asks a package to invent
+
+Stated plainly, because the engine wave's 30 cross-package disagreements began as sentences like these.
+
+* **The contents of the blocks outside `features.v1`** are still this amendment's design with no
+  measurement behind their units, bounds or sentinels: 44 of the 75 features. The sentinel rule is now a
+  field rather than a sentence (R285) and the bounds are stated, so S1 and FM1 cannot disagree about
+  what a missing input reads; but whether `hn_story_points` at a one-day window or
+  `release_revision_abs_bp` in bp of the previous vintage is the right quantity is a guess the first
+  build reports against, and the catalogue's `version` and `CATALOGUE_HASH` are what a later correction
+  moves.
+* **The lags** in 18.1's table are defaults, not measurements. No measurement of any source's real
+  publication delay exists yet, so `hn` at five minutes and `gdelt` at fifteen are as-of guesses on the
+  safe side. The first minute build reports against them.
+* **The scripted families' proposal rule** ("its memory's `FeatureStat` has `n >= min_support` and a
+  sign it has held for `RULE_PROPOSE_STABLE_BARS = 20` bars") tells A1 when a family may propose and not
+  what it proposes: the mapping from a family's own parameters to a `RuleClaim` is A1's to invent, one
+  family at a time, and 18.2 says only that A1 records the per-family rule.
+* **`usual_bp` for a volatility claim** is the median over every fit-fold row in the rule's scope,
+  computed once per `(scope, horizon)`. On a scope with few rows that median is unstable and nothing
+  says a floor on the number of rows behind it; S2 will pick one.
+* **`RULE_MIN_MARKETS = 5`, `RULE_LIVE_MIN_SUPPORT = 30`, `RULE_AUTHOR_BONUS_MICRO = 5_000`,
+  `RULE_AUTHOR_SENSOR_BONUS_UNITS = 2`, `SENSOR_PENALTY_UNITS = 2`, `RULE_PROPOSALS_PER_GENERATION_MAX =
+  20`, the workflow bounds and the horizon boundaries** are all defaults with no measurement behind
+  them, each labelled as such in the text.
+* **The `comparative` detector per cohort** (R2d) has its unit and its refusal, and no statement of what
+  it compares beyond "per-cohort intervals and nulls": R2d's package text is where that lives, and this
+  amendment did not widen it.
+
+### 9.7 What is open
+
+* The four shapes gate G2 declared without applying (R213, R214, R217, R221) plus this amendment's
+  journal fields and six events are still declared and optional. R274 names the lot; until it runs, a
+  journal validates without them and the six events sit under `$defs` outside `oneOf`.
+* `run_id` does not name the population (8.7). Neither review assigns it; R275 leaves it to R274's lot
+  with the version bump.
+* `news.v1.json`'s C1b widening (`edgar`, `fred`, `cboe`) stays gate G3b's, as 17.9 says.
+* A `features.v2` appending the non-`features.v1` sensor blocks to a torch policy's vector belongs to
+  R3a and amendment C2. R299 bounds the damage in the meantime by requiring a torch genome's diet to
+  cover the whole `features.v1` layout, which is a restriction on the genome and not a widening of the
+  vector.
+* Nothing in section 18 has been built. Lot 5b is the first lot that reads it.
