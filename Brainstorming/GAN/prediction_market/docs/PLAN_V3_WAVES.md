@@ -42,7 +42,7 @@ hypothesis families with Benjamini-Hochberg control and out-of-time replication 
 criterion; D-R9 two-tier fitness with the rule that no claim rests on proxy fitness; D-R10 the capacity
 metric; D-R13 the documented universe rule. One critic, one arbiter.
 
-### Lot 5b : wave 5, measure first (Opus packages, Fable gates)
+### Lot 5b : wave 5, measure first (every agent on Opus)
 
 Fourteen packages in parallel, then gates G3 and G3b:
 
@@ -153,7 +153,8 @@ and the runner applying the latency rule.
 
 ## Wave 5 (revised by v5) : agents, sensors, rules, finance data, API and market view
 
-Runs after gate G2 and amendment C1c. Fourteen packages in parallel on Opus, two gates on Fable.
+Runs after gate G2 and amendment C1c. Fourteen packages in parallel, two gates, every agent on Opus
+(the model rule changed on 2026-09-10, see `docs/HANDOFF.md` rule 3).
 
 ### A1 agent protocol, workflow genome, scripted families
 

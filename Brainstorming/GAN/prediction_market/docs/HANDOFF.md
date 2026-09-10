@@ -65,8 +65,11 @@ Documents: `docs/PRD_V2_HARD_OPTIMIZER.md`, `docs/PRD_V3_TRADING_OPTIMIZER.md`, 
 2. **One Workflow invocation per lot** (a wave's packages plus its gate, or smaller). Session quotas
    killed a 39-agent run (38 failures) and a 9-agent run (9 failures); nothing downstream survives a
    quota hit, but files written by finished agents do.
-3. **Models**: implementation packages on Opus (`model: 'opus'`); gates, amendments, critics, arbiters
-   and acceptance audits on Fable (omit `model`).
+3. **Models: Opus for every task, with no exception** (`model: 'opus'` on every agent of every
+   Workflow script). Changed by the user on 2026-09-10, after the Fable credits ran out mid-lot and
+   killed the critic and the arbiter of amendment C1c. The previous rule sent implementation packages
+   to Opus and gates, amendments, critics, arbiters and acceptance audits to Fable; passages further
+   down this file that say a past lot ran on Fable are records of what happened and stay as they are.
 4. **Long network commands run in the background with a log and are polled**: an agent with no tool
    call for three minutes is killed as stalled (that is how the first data-fix agent died).
 5. Package reports go to a JSON file in the scratchpad that the gate reads, never inlined at 70 KB.
@@ -524,5 +527,6 @@ regenerates the pinned hashes and the backtest fixture in the same commit and bu
 
 Section 2 of this file, unchanged, plus the two the last three lots confirmed: **one lot per Workflow
 invocation** (a wave's packages plus its gate, or smaller), and **implementation packages on Opus, gates,
-amendments, critics and arbiters on Fable**. Long commands run in the background with a log that is
+amendments, critics and arbiters on Fable**, superseded on 2026-09-10 by **Opus for every task**
+(see rule 3 at the top of this file). Long commands run in the background with a log that is
 polled; three minutes without a tool call is a kill.
