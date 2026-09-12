@@ -32,7 +32,10 @@
     "listed_at_ms": { "$ref": "#/$defs/ms" },
     "delisted_at_ms": { "type": ["integer", "null"], "minimum": 0 },
     "short_allowed": { "type": "boolean" },
-    "interval_min": { "enum": [60, 1440] },
+    "interval_min": {
+      "description": "The bar grid, one of INTERVALS_MIN (CONTRACTS_V2 5.2). 1 is amendment C1c's minute grid (18.3, rulings R241 and R298), which 18.3 defines by BuildConfig.instruments, that is, by the continuous instruments of 17.1: a minute continuous instrument could not validate against its own schema while this enum named only the two coarser grids.",
+      "enum": [1, 60, 1440]
+    },
     "url": { "type": "string", "maxLength": 512 },
     "description": { "type": "string", "maxLength": 4000 },
     "category": { "enum": ["crypto", "finance", "economics", "other"] },

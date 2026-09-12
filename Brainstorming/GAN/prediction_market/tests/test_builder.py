@@ -15,9 +15,11 @@ express, so "the filters ran" is a statement about counts rather than about cove
 
 from __future__ import annotations
 
+import argparse
 import dataclasses
 import hashlib
 import json
+import shutil
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -27,8 +29,10 @@ import pytest
 from pydantic import ValidationError
 
 from pmx import cli_data
+from pmx.cohorts import RE_COHORT_ID, cohort_rows, cohorts_per_provider
 from pmx.data.builder import (
     BACKGROUND_SOURCE,
+    FALLBACK_STEPS,
     ILLIQUID_DECILE_MIN_SLICE,
     KALSHI_COHORT_TARGET,
     KALSHI_MARKET_FLOOR,
@@ -60,12 +64,15 @@ from pmx.data.builder import (
     window_bounds,
 )
 from pmx.data.loader import (
+    HASHED_DIRS,
+    dataset_lexicon,
     load_dataset,
     load_manifest,
     load_market_file,
     manifest_purpose,
     seal_dataset,
     verify_dataset_report,
+    write_canonical_json,
     write_manifest,
 )
 from pmx.data.news import linker
@@ -77,15 +84,28 @@ from pmx.data.resample import (
     volume_milli_total,
 )
 from pmx.data.schema import (
+    SCHEMA_DIR,
     DatasetManifestModel,
     manifest_from_payload,
     market_from_payload,
     validate_against_schema,
 )
+from pmx.data.taxonomy import (
+    BUILDER_LABELS,
+    HORIZONS,
+    LEXICON_DIR,
+    SERIES_FACETS_FILE,
+    TAGS_FILE,
+    TAXONOMY_AUDIT_N,
+    TAXONOMY_DIR,
+    horizon_of,
+    load_tag_lexicon,
+)
 from pmx.data.universe import read_series_list
-from pmx.errors import InvalidConfigError, LeakError, SchemaError
+from pmx.errors import FoldIntegrityError, InvalidConfigError, LeakError, SchemaError
 from pmx.journal import canonical_json
 from pmx.types import (
+    INTERVALS_MIN,
     LINK_THRESHOLD_PERMILLE,
     MS_PER_DAY,
     MS_PER_HOUR,
@@ -100,6 +120,7 @@ from pmx.types import (
     month_edges_for,
     ms_from_iso_date,
     round_half_up,
+    sha256_hex,
 )
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "d6"
@@ -649,9 +670,15 @@ def test_the_manifest_validates_against_its_schema_and_carries_the_build(tmp_pat
 
 
 def test_the_dataset_hash_is_the_contract_formula_over_the_files_on_disk(tmp_path: Path) -> None:
+    # The walk is ``HASHED_DIRS`` and not the three directories of v2: 7.8 recomputes over ``markets/``,
+    # ``news/``, ``wiki_asof/``, ``clusters/``, ``instruments/``, ``calendars/`` **and** ``taxonomy/``,
+    # the last by ruling R267, because the two lexicon files a build tagged under are inside the walk of
+    # 4.3 on purpose. Naming the three alone pinned a pre-amendment premise, so the loop reads the tuple
+    # the loader itself walks and the two assertions added below make this strictly stronger than it was:
+    # the taxonomy copies are in the listing, in the hash, and are the two files 7.14 names.
     result = build(tmp_path)
     rows: list[tuple[str, str]] = []
-    for directory in ("markets", "news", "wiki_asof"):
+    for directory in HASHED_DIRS:
         for path in sorted((result.path / directory).rglob("*")):
             if path.is_file():
                 digest = hashlib.sha256(path.read_bytes()).hexdigest()
@@ -661,21 +688,41 @@ def test_the_dataset_hash_is_the_contract_formula_over_the_files_on_disk(tmp_pat
     assert result.dataset_hash == hashlib.sha256(blob.encode("utf-8")).hexdigest()
     assert [entry.path for entry in result.manifest.files] == [name for name, _ in rows]
     assert all(not entry.path.endswith("manifest.json") for entry in result.manifest.files)
+    assert [name for name, _ in rows if name.startswith("taxonomy/")] == [
+        "taxonomy/kalshi_series_facets.v1.json",
+        "taxonomy/tags.v1.json",
+    ]
+    assert "taxonomy" in HASHED_DIRS
 
 
 def test_every_written_file_is_utf8_lf_and_canonical(tmp_path: Path) -> None:
+    # 4.2's first paragraph binds **every** text artefact (UTF-8, LF, no carriage return, one trailing
+    # newline) and its canonical-JSON rule binds the files it lists, which are the ones a canonical
+    # writer produces. The two ``taxonomy/`` files are neither: 7.14 says the lexicons are **copied**
+    # into the dataset, and DS2's ``copy_lexicons`` copies them byte for byte so that
+    # ``taxonomy.lexicon_sha256`` is the digest of the file the build tagged under and two runs are
+    # byte-identical. So they are held to the paragraph and to a stricter rule of their own instead of to
+    # the one-line rule: each must equal its shipped source exactly.
     result = build(tmp_path)
     written = sorted(path for path in result.path.rglob("*") if path.is_file())
-    assert len(written) == len(result.manifest.files) + 1  # the three directories plus manifest.json
+    assert len(written) == len(result.manifest.files) + 1  # every hashed file plus manifest.json
+    copied = {LEXICON_DIR / TAGS_FILE, LEXICON_DIR / SERIES_FACETS_FILE}
+    n_copied = 0
     for path in written:
         raw = path.read_bytes()
         text = raw.decode("utf-8")
         assert b"\r" not in raw
         assert text.endswith("\n") and not text.endswith("\n\n")
+        source = LEXICON_DIR / path.name
+        if path.parent.name == TAXONOMY_DIR and source in copied:
+            assert raw == source.read_bytes()
+            n_copied += 1
+            continue
         for line in text.splitlines():
             assert canonical_json(json.loads(line)) == line
         if path.suffix == ".json":
             assert len(text.splitlines()) == 1
+    assert n_copied == 2
 
 
 def test_the_quality_block_is_recomputed_from_the_tape(tmp_path: Path) -> None:
@@ -2178,3 +2225,339 @@ def test_a_comma_separated_flag_also_splits_on_the_newline_a_build_writes() -> N
     assert cli_data._csv("KXCPI,KXFED") == ("KXCPI", "KXFED")
     assert cli_data._csv(f"KXCPI, KXFED{newline}KXBTC") == ("KXCPI", "KXFED", "KXBTC")
     assert cli_data._csv("") == () and cli_data._csv(None) == ()
+
+
+# --------------------------------------------------------------------------------------------------
+# 7.14 and 18.5 (amendment C1c, rulings R265 to R268, R296): the tagging and cohort call sites
+# --------------------------------------------------------------------------------------------------
+def test_every_kept_market_is_tagged_and_the_two_lexicons_are_inside_the_hash(tmp_path: Path) -> None:
+    """7.14: the tagger runs per kept market before its file is written, and the vocabulary is copied in.
+
+    Three separate claims, and each of them is what the block on disk stands on: every kept market
+    carries the four fields, ``tags`` is the sorted unique union of the facet values, and the two lexicon
+    files are inside the walk of 4.3 so a vocabulary edit moves the hash and not a claim.
+    """
+    result = build(tmp_path)
+    lexicon = load_tag_lexicon()
+    assert len(result.tagged) == len(result.kept_ids)
+    for market_id in result.kept_ids:
+        payload = json.loads((result.path / "markets" / f"{market_id}.json").read_text(encoding="utf-8"))
+        assert 1 <= len(payload["subject"]) <= 4
+        assert payload["structure"] and payload["horizon"]
+        assert payload["horizon"] in HORIZONS
+        for value in payload["subject"]:
+            assert value in lexicon.subject_values
+        assert payload["structure"] in lexicon.structure_values
+        assert payload["tags"] == sorted(
+            {*payload["subject"], payload["structure"], payload["horizon"]}
+            | {label for label in payload["tags"] if label in BUILDER_LABELS}
+        )
+        # a facet is derived from the question and the declared life, never from the resolution (7.9)
+        assert payload["horizon"] == horizon_of(payload["created_at_ms"], payload["close_at_ms"])
+        # ``provider_labels`` is written only when the provider gave one, so a market with none keeps the
+        # bytes the record it loads back renders
+        assert ("provider_labels" in payload) == bool(market_from_payload(payload).provider_labels)
+
+    for name in ("tags.v1.json", "kalshi_series_facets.v1.json"):
+        copied = result.path / "taxonomy" / name
+        assert copied.read_bytes() == (LEXICON_DIR / name).read_bytes()
+        assert f"taxonomy/{name}" in [entry.path for entry in result.manifest.files]
+    block = result.manifest.taxonomy
+    assert block is not None
+    assert block["version"] == lexicon.version
+    assert block["lexicon_sha256"] == sha256_hex((LEXICON_DIR / "tags.v1.json").read_bytes())
+    assert block["series_facets_sha256"] == sha256_hex(
+        (LEXICON_DIR / "kalshi_series_facets.v1.json").read_bytes()
+    )
+    assert block["audit"] is None, "the build draws it; the CLI writes it after the seal"
+    assert sorted(block["per_venue"]) == ["kalshi", "manifold"]
+    assert sum(block["cohort_size_histogram"].values()) == len(result.cohorts)
+
+
+def test_the_manifest_cohorts_are_exactly_what_the_loader_recomputes(tmp_path: Path) -> None:
+    """7.8 and ruling R266: the block, the seal, the read back, and the refusal on any difference."""
+    result = build(tmp_path)
+    seal_dataset(result.path)
+    dataset = load_dataset(result.path, verify=True)
+    assert dataset.manifest.cohorts is not None
+    assert [dict(row) for row in dataset.manifest.cohorts] == [
+        cohort.to_dict() for cohort in dataset.cohorts
+    ]
+    assert [dict(row) for row in dataset.manifest.cohorts] == cohort_rows(result.cohorts)
+    # a manifest row is a count and never a market list (18.5), and the object carries the ids
+    for row in dataset.manifest.cohorts:
+        assert "market_ids" not in row
+        assert RE_COHORT_ID.fullmatch(str(row["cohort_id"])) is not None
+    assert all(cohort.market_ids for cohort in dataset.cohorts)
+    # the three per-fold counts are what 7.7's cut left, because a cohort has no fold of its own (R293)
+    for cohort in dataset.cohorts:
+        folds = [dataset.meta(market_id).fold for market_id in cohort.market_ids]
+        assert folds.count("train") == cohort.n_train
+        assert folds.count("validation") == cohort.n_validation
+        assert folds.count("sealed") == cohort.n_sealed
+
+    # and any difference is a FoldIntegrityError, not a warning
+    manifest = load_manifest(result.path)
+    assert manifest.cohorts, "the fixture build produces at least one cohort"
+    bent = [dict(row) for row in manifest.cohorts]
+    bent[0]["n_train"] = int(str(bent[0]["n_train"])) + 1
+    write_manifest(result.path, dataclasses.replace(manifest, cohorts=tuple(bent)))
+    with pytest.raises(FoldIntegrityError, match="cohort row"):
+        load_dataset(result.path)
+    write_manifest(result.path, dataclasses.replace(manifest, cohorts=()))
+    with pytest.raises(FoldIntegrityError, match="cohort row"):
+        load_dataset(result.path)
+
+
+def test_a_tagged_dataset_requires_its_taxonomy_and_its_own_vocabulary(tmp_path: Path) -> None:
+    """7.14: the loader requires the four on a manifest that carries the block, against its own copy."""
+    result = build(tmp_path)
+    seal_dataset(result.path)
+    manifest = load_manifest(result.path)
+    market_path = result.path / "markets" / f"{result.kept_ids[0]}.json"
+    original = json.loads(market_path.read_text(encoding="utf-8"))
+    lexicon = dataset_lexicon(result.path, manifest=manifest)
+    assert lexicon is not None and lexicon.version == "tags.v1"
+
+    for dropped in ("subject", "structure", "horizon"):
+        payload = {key: value for key, value in original.items() if key != dropped}
+        write_canonical_json(market_path, payload)
+        with pytest.raises(SchemaError, match="carries no taxonomy") as raised:
+            load_market_file(market_path, manifest=manifest, lexicon=lexicon)
+        assert raised.value.context["missing"] == [dropped]
+        # and the same file loads on a dataset that never declared the block
+        assert load_market_file(market_path, manifest=manifest, lexicon=None).id == result.kept_ids[0]
+
+    invented = {**original, "subject": ["not-a-subject"], "tags": ["not-a-subject"]}
+    write_canonical_json(market_path, invented)
+    with pytest.raises(SchemaError, match="outside the vocabulary"):
+        load_market_file(market_path, manifest=manifest, lexicon=lexicon)
+    write_canonical_json(market_path, original)
+    assert load_market_file(market_path, manifest=manifest, lexicon=lexicon).subject
+
+    # The vocabulary is the **dataset's own copy** and never the package's (7.14, ruling R301): the two
+    # lexicon files are inside the walk of 4.3, so a dataset sealed under ``tags.v1`` must keep
+    # validating the day ``src/pmx/lexicons/tags.v1.json`` becomes a vocabulary with other values. The
+    # dataset's copy is narrowed to a vocabulary that no longer ships this market's subject, and the
+    # refusal has to follow the copy: a loader reading the package's file would still accept it.
+    # The copy is made in a second directory because ``load_tag_lexicon`` caches by directory, which is
+    # what a real run wants and what a test rewriting a file in place would silently read past.
+    other_root = result.path.parent / "narrowed"
+    shutil.copytree(result.path, other_root)
+    # a market the keyword stage decided, so the value removed below is a real vocabulary entry and not
+    # the ``other`` bucket every lexicon carries whatever its own file says
+    decided = next(
+        candidate
+        for candidate in sorted((other_root / "markets").glob("*.json"))
+        if json.loads(candidate.read_text(encoding="utf-8"))["subject"][0] != "other"
+    )
+    subject = str(json.loads(decided.read_text(encoding="utf-8"))["subject"][0])
+    shipped = json.loads((other_root / "taxonomy" / "tags.v1.json").read_text(encoding="utf-8"))
+    narrowed = {
+        **shipped,
+        "facets": {
+            **shipped["facets"],
+            "subject": {
+                value: rule for value, rule in shipped["facets"]["subject"].items() if value != subject
+            },
+        },
+    }
+    write_canonical_json(other_root / "taxonomy" / "tags.v1.json", narrowed)
+    narrowed_lexicon = dataset_lexicon(other_root, manifest=manifest)
+    assert narrowed_lexicon is not None
+    assert subject not in narrowed_lexicon.subject_values
+    assert subject in load_tag_lexicon().subject_values, "the package still ships it"
+    with pytest.raises(SchemaError, match="outside the vocabulary"):
+        load_market_file(decided, manifest=manifest, lexicon=narrowed_lexicon)
+
+    # A manifest that declares the block over a dataset with no copy of the vocabulary is a build defect
+    # and says so by name, rather than failing on a missing file three frames down.
+    shutil.rmtree(result.path / "taxonomy")
+    with pytest.raises(SchemaError, match="carries no taxonomy/ copy"):
+        dataset_lexicon(result.path, manifest=manifest)
+
+
+def test_a_rebuild_over_its_own_tagged_files_moves_nothing(tmp_path: Path) -> None:
+    """The tagging is idempotent: a rebuild from the written payloads is the same dataset hash.
+
+    The trap this pins is ``provider_labels``: the tagger reads a market's raw provider strings out of
+    ``tags`` on an untagged payload, and on a tagged one ``tags`` holds facet values. Without reading
+    ``provider_labels`` off the payload first, a rebuild would write facet values into it and the second
+    build would not be the first.
+    """
+    first = build(tmp_path / "one")
+    payloads = [
+        json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted((first.path / "markets").glob("*.json"))
+    ]
+    second = build_dataset_from_payloads(
+        out_dir=tmp_path / "two",
+        config=config(),
+        market_payloads=payloads,
+        news_payloads=staged_news(),
+        name="y2026",
+    )
+    assert second.dataset_hash == first.dataset_hash
+    assert [dict(row) for row in (second.manifest.cohorts or ())] == [
+        dict(row) for row in (first.manifest.cohorts or ())
+    ]
+    assert second.manifest.taxonomy == first.manifest.taxonomy
+
+
+def test_the_build_writes_the_taxonomy_audit_into_the_tracked_audits_tree(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """7.14 and rulings R268 and R296: fifty taggings per build, in ``audits/``, keyed by the hash."""
+    out_dir = sealed_cli_build(tmp_path)
+    printed = capsys.readouterr().out
+    manifest = load_manifest(out_dir)
+    path = tmp_path / "audits" / manifest.dataset_hash[:16] / "taxonomy.json"
+    assert path.is_file()
+    assert "taggings drawn for review" in printed
+    audit = json.loads(path.read_text(encoding="utf-8"))
+    assert audit["dataset_hash"] == manifest.dataset_hash
+    assert audit["precision_permille"] == 0  # nobody has reviewed it yet
+    assert audit["n"] == len(audit["taggings"]) <= TAXONOMY_AUDIT_N
+    assert audit["taggings"], "the fixture dataset carries at least one tagging to review"
+    for row in audit["taggings"]:
+        assert row["verdicts"] == {"subject": None, "structure": None, "horizon": None}
+        assert row["question"], "a reviewer judges a tagging against the question, not the id"
+        assert row["source"] in ("series", "keywords", "other")
+    # outside the dataset directory and therefore outside its hash, beside the linker's audit
+    assert not str(path).startswith(str(out_dir))
+    assert (tmp_path / "audits" / manifest.dataset_hash[:16] / "linker.json").is_file()
+    assert verify_dataset_report(out_dir).ok
+    assert manifest.taxonomy is not None
+    assert manifest.taxonomy["audit"] == {
+        "path": f"audits/{manifest.dataset_hash[:16]}/taxonomy.json",
+        "n": audit["n"],
+        "precision_permille": 0,
+    }
+    assert "taxonomy: weak" in printed and "subject 500 structure 250 permille" in printed
+
+
+def test_audit_taxonomy_moves_the_precision_a_reviewer_filled(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The other half of the loop the linker already has (7.14, 12.10): a review has to move the label."""
+    out_dir = sealed_cli_build(tmp_path)
+    capsys.readouterr()
+    manifest = load_manifest(out_dir)
+    path = tmp_path / "audits" / manifest.dataset_hash[:16] / "taxonomy.json"
+    audit = json.loads(path.read_text(encoding="utf-8"))
+    for index, row in enumerate(audit["taggings"]):
+        row["verdicts"] = {facet: ("correct" if index % 4 else "wrong") for facet in row["verdicts"]}
+        row["reviewer"] = "g3"
+    path.write_text(json.dumps(audit), encoding="utf-8", newline="\n")
+
+    assert cli_data.main(["audit-taxonomy", "--dataset", str(out_dir), "--audits-root", str(tmp_path)]) == 0
+    printed = capsys.readouterr().out
+    reviewed = load_manifest(out_dir)
+    assert reviewed.taxonomy is not None
+    block = reviewed.taxonomy["audit"]
+    assert isinstance(block, dict)
+    assert int(str(block["precision_permille"])) > 0
+    assert "precision" in printed
+    # the re-stamp moves the manifest and no byte the dataset hash covers
+    assert reviewed.dataset_hash == manifest.dataset_hash
+    assert verify_dataset_report(out_dir).ok
+    # a rebuild over the same bytes keeps the verdicts, because the fifty are a function of the hash
+    assert sealed_cli_build(tmp_path, "--force") == out_dir
+    kept = json.loads(path.read_text(encoding="utf-8"))
+    assert kept["precision_permille"] == block["precision_permille"]
+
+
+def test_the_cohort_count_decides_the_build_status_of_a_real_build(tmp_path: Path) -> None:
+    """7.4 with rulings R260, R270 and R271: the cohort target is now measured, not passed in.
+
+    ``build_dataset_from_payloads`` took a ``cohorts_per_provider`` mapping from its caller while no
+    module could list cohorts. It lists them itself now, so the shortfall is a measurement of the build
+    and not an argument, which is what makes ``build.status`` a fact about the dataset.
+    """
+    result = build(tmp_path)
+    outcome = result.manifest.build
+    assert outcome is not None
+    counted = cohorts_per_provider(result.cohorts)
+    shortfall = outcome["shortfall"]
+    assert isinstance(shortfall, dict)
+    assert shortfall["kalshi"]["cohorts"] == KALSHI_COHORT_TARGET - counted.get("kalshi", 0)
+    assert outcome["status"] == "failed", "the fixture build is far below the Kalshi cohort target"
+    assert result.outcome == dict(outcome)
+    assert set(counted) <= {"kalshi", "manifold"}
+
+
+def test_the_fallback_order_of_a_build_is_recordable_from_the_command_line(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """7.4 with ruling R271: the fallback order a build took is a manifest block, so it must be sayable.
+
+    ``build_outcome(fallbacks=...)`` was reachable from Python alone, so ``manifest.build.fallbacks`` was
+    an empty list on every real build: an operator who widened the window to reach the cohort target had
+    no way to record it, and an empty list read exactly like a build that took no fallback.
+    """
+    out_dir = sealed_cli_build(
+        tmp_path,
+        "--fallback",
+        "window_days:365:540:cohort target unreachable at 365",
+        "--fallback",
+        "min_trades:20:10:kalshi publishes no settled print tape",
+    )
+    printed = capsys.readouterr().out
+    manifest = load_manifest(out_dir)
+    assert manifest.build is not None
+    assert manifest.build["fallbacks"] == [
+        {
+            "from": 365,
+            "reason": "cohort target unreachable at 365",
+            "step": "window_days",
+            "to": 540,
+        },
+        {
+            "from": 20,
+            "reason": "kalshi publishes no settled print tape",
+            "step": "min_trades",
+            "to": 10,
+        },
+    ], "the order given is the order recorded: a fallback order is an order"
+    assert "fallback" in printed
+    # the reason is prose and carries colons of its own, so only the first three are separators
+    assert cli_data._fallbacks_from_args(
+        argparse.Namespace(fallback=["cohort_target:40:8:because x: y and z"])
+    ) == ({"step": "cohort_target", "from": 40, "to": 8, "reason": "because x: y and z"},)
+    for malformed in ("window_days", "window_days:1:2", "window_days:1:2:", ":1:2:why"):
+        with pytest.raises(InvalidConfigError, match="step:from:to:reason"):
+            cli_data._fallbacks_from_args(argparse.Namespace(fallback=[malformed]))
+    # ``dataset.v1.json`` pins the four steps and pins both bounds as integers, so the flag refuses a
+    # fifth step and a non-integer bound here rather than letting a whole build fail its own schema
+    with pytest.raises(InvalidConfigError, match="four steps"):
+        cli_data._fallbacks_from_args(argparse.Namespace(fallback=["a_fifth_step:1:2:why"]))
+    with pytest.raises(InvalidConfigError, match="from one integer to another"):
+        cli_data._fallbacks_from_args(argparse.Namespace(fallback=["window_days:365:a year:why"]))
+    assert cli_data._fallbacks_from_args(argparse.Namespace(fallback=[])) == ()
+    schema = json.loads((SCHEMA_DIR / "dataset.v1.json").read_text(encoding="utf-8"))
+    steps = schema["properties"]["build"]["properties"]["fallbacks"]["items"]["properties"]
+    assert tuple(steps["step"]["enum"]) == FALLBACK_STEPS
+    assert steps["from"]["type"] == steps["to"]["type"] == "integer"
+
+
+def test_the_import_command_offers_every_grid_of_intervals_min() -> None:
+    """5.2 and 18.3, ruling R298: the minute grid is one of ``INTERVALS_MIN`` and the flag must offer it.
+
+    The refusal of an unsupportable minute build belongs to ``BuildConfig.__post_init__`` (a source
+    coarser than a minute, or neither an instrument list nor a series list), not to a staging flag that
+    silently narrowed the grid the contract declares.
+    """
+    parser = argparse.ArgumentParser()
+    cli_data.build_parser(parser)
+    actions = {
+        action.dest: action
+        for action in parser._subparsers._group_actions[0].choices["import"]._actions  # type: ignore[union-attr]
+    }
+    assert tuple(actions["interval_min"].choices or ()) == INTERVALS_MIN
+    with pytest.raises(SystemExit):
+        parser.parse_args(["import", "kalshi", "--freeze", FREEZE_DATE, "--interval-min", "5"])
+    for grid in INTERVALS_MIN:
+        parsed = parser.parse_args(
+            ["import", "kalshi", "--freeze", FREEZE_DATE, "--interval-min", str(grid)]
+        )
+        assert parsed.interval_min == grid

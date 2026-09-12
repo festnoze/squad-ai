@@ -140,6 +140,22 @@ class CohortRefusedError(PmxError):
     """
 
 
+class RuleRefusedError(PmxError):
+    """A rule, a proposal or a test the hypothesis layer refuses (13.1, ruling R236).
+
+    ``reason`` names which refusal it is, and the ones the contract spells are ``bad_rule`` (the record
+    does not validate), ``duplicate`` (the same content on the same fold pair, 18.2 step 4),
+    ``family_too_large`` (``n_screened`` above what the permutation grid can resolve, ruling R282) and
+    ``unregistered_family`` (a replicate read before the family was written down, 18.2 step 1).
+
+    It lives here and not in ``pmx.rules.rule``, where it was first written, because 13.1 names this
+    module for every error of the contract and 18.8's second row says so in as many words. A class with a
+    contracted name living in a module the contract does not name is the defect the ``FoldIntegrityError``
+    bridge was: ``pmx.rules.rule`` re-exports the name, so every raise site and every test that spells it
+    through that module is unchanged.
+    """
+
+
 class ClaimRefusedError(PmxError):
     """A second claim on the same ``(dataset_hash, provider, genome_hash)``, or an earlier aborted peek
     at the sealed fold: an aborted peek is a used claim, not a free one (section 12.8)."""

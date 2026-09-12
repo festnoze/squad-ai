@@ -33,7 +33,9 @@ from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Protocol, cast
 
+from pmx.cohorts import COHORT_MIN_TRAIN
 from pmx.data.builder import (
+    FALLBACK_STEPS,
     FOLD_NAMES,
     PURPOSE_RESEARCH,
     PURPOSES,
@@ -59,9 +61,21 @@ from pmx.data.news.linker import (
     linker_audit_path,
     sample_audit_links,
 )
+from pmx.data.taxonomy import (
+    TAXONOMY_AUDIT_N,
+    TAXONOMY_COVERAGE_MIN_PERMILLE,
+    TaggedMarket,
+    TaxonomyAudit,
+    sample_taxonomy_audit,
+    taxonomy_audit_from_dict,
+    taxonomy_audit_manifest_path,
+    taxonomy_audit_path,
+    weak_venues,
+)
 from pmx.data.universe import UniverseRule, render_series_list
 from pmx.errors import InvalidConfigError, NotConfiguredError, PmxError
 from pmx.types import (
+    INTERVALS_MIN,
     MS_PER_DAY,
     SAFETY_LAG_MS_DEFAULT,
     SUBJECT_STATED,
@@ -806,6 +820,140 @@ def _write_linker_audit(dataset_dir: Path, *, root: Path, n: int = LINKER_AUDIT_
     return audit
 
 
+def _write_taxonomy_audit(
+    dataset_dir: Path,
+    *,
+    root: Path,
+    rows: Sequence[TaggedMarket],
+    questions: Mapping[str, str],
+    dataset_hash: str,
+    name: str,
+    n: int = TAXONOMY_AUDIT_N,
+) -> TaxonomyAudit:
+    """Draw ``n`` taggings of a sealed build and write ``audits/<hash[:16]>/taxonomy.json`` (7.14, R268).
+
+    The same two rules as the linker's audit beside it (:func:`_write_linker_audit`): it is drawn
+    **after** the seal and keyed by the hash it audits, because a tagging the reviewer read must be a
+    tagging the dataset still carries, and it lives in the **tracked** ``audits/`` tree and never under
+    the git-ignored ``data/datasets/`` (ruling R296), because fifty human verdicts cannot be regenerated.
+
+    ``rows`` is the ``TaggedMarket`` list the build already assembled and is not re-derived from the
+    market files: the facet ``source`` a reviewer needs (``series``, ``keywords`` or ``other``) is what
+    the tagger decided and a market file does not store it. Re-running keeps every verdict already
+    filled, because the draw is a pure function of the dataset hash.
+    """
+    sample_seed = cast(Callable[[str], int], _resolve("pmx.data.builder", "sample_seed_for"))(name)
+    audit = sample_taxonomy_audit(
+        rows, questions, dataset_hash=dataset_hash, sample_seed=sample_seed, n=n
+    )
+    path = taxonomy_audit_path(root, dataset_hash)
+    audit = _merge_taxonomy_verdicts(audit, path)
+    writer = cast(Callable[[Path, object], int], _resolve("pmx.data.loader", "write_canonical_json"))
+    writer(path, audit.to_dict())
+    return audit
+
+
+def _merge_taxonomy_verdicts(audit: TaxonomyAudit, path: Path) -> TaxonomyAudit:
+    """Carry the verdicts of an existing audit file onto a freshly drawn one, per market and per facet.
+
+    Without this a second ``pmx data build`` over the same bytes would overwrite a reviewer's work with
+    fifty nulls. The draw is deterministic in the dataset hash, so the fifty are the same fifty and the
+    merge is a lookup by market id.
+    """
+    if not path.is_file():
+        return audit
+    previous = {
+        row.market_id: row.verdicts
+        for row in taxonomy_audit_from_dict(json.loads(path.read_text(encoding="utf-8"))).taggings
+    }
+    return dataclasses.replace(
+        audit,
+        taggings=tuple(
+            dataclasses.replace(row, verdicts=dict(previous[row.market_id]))
+            if row.market_id in previous
+            else row
+            for row in audit.taggings
+        ),
+    )
+
+
+def _stamp_taxonomy_audit(
+    out_dir: Path, manifest: DatasetManifest, audit: TaxonomyAudit
+) -> DatasetManifest:
+    """Write ``taxonomy.audit {path, n, precision_permille}`` into the sealed manifest (7.8, R268).
+
+    The manifest is outside ``dataset_hash`` (4.3 hashes the directories, not the document that names
+    their digest), so stamping it after the seal moves no hash, exactly as ``news.linker_audit`` does.
+    ``precision_permille`` is ``0`` until a reviewer fills the verdicts, which is the point: a build
+    whose taggings nobody has looked at is not a build whose taggings are good, and gate G3 is the review.
+    """
+    if manifest.taxonomy is None:
+        raise InvalidConfigError(
+            "a dataset with no taxonomy block cannot carry a taxonomy audit", path=str(out_dir)
+        )
+    stamped = dataclasses.replace(
+        manifest,
+        taxonomy={
+            **dict(manifest.taxonomy),
+            "audit": audit.manifest_block(taxonomy_audit_manifest_path(manifest.dataset_hash)),
+        },
+    )
+    writer = cast(Callable[[Path, DatasetManifest], int], _resolve("pmx.data.loader", "write_manifest"))
+    writer(out_dir, stamped)
+    return stamped
+
+
+def _taxonomy_audit_lines(audit: TaxonomyAudit, manifest: DatasetManifest, path: Path) -> list[str]:
+    """The three lines a build log prints about the tagging audit, beside the linker's two."""
+    weak = weak_venues(manifest.taxonomy or {})
+    lines = [
+        f"  taxonomy   {audit.n} taggings drawn for review at {path}",
+        f"  tag prec   {audit.precision_permille} permille"
+        + (f"  taxonomy: weak on {list(weak)}" if weak else ""),
+    ]
+    per_venue = (manifest.taxonomy or {}).get("per_venue")
+    if isinstance(per_venue, Mapping):
+        for provider in sorted(per_venue):
+            row = per_venue[provider]
+            if isinstance(row, Mapping):
+                lines.append(
+                    f"  facets     {provider}: subject {row.get('subject_coverage_permille')}"
+                    f" structure {row.get('structure_coverage_permille')} permille"
+                    f" (bar {TAXONOMY_COVERAGE_MIN_PERMILLE}),"
+                    f" cohorts {row.get('n_cohorts')} of which {row.get('n_cohorts_usable')} usable,"
+                    f" label {row.get('label')}"
+                )
+    return lines
+
+
+def _cmd_audit_taxonomy(args: argparse.Namespace) -> int:
+    """``pmx data audit-taxonomy``: recompute the tagging audit's precision and re-stamp the manifest.
+
+    The file itself is written by the build that drew it, because only the build holds the facet
+    ``source`` of each tagging. This command is the other half of the loop the linker already has: once a
+    reviewer has filled the verdicts, the manifest's ``taxonomy.audit.precision_permille`` has to move,
+    or a reviewed build reads ``taxonomy: weak`` forever.
+    """
+    dataset_dir = Path(args.dataset)
+    reader = cast(Callable[[Path], DatasetManifest], _resolve("pmx.data.loader", "load_manifest"))
+    manifest = reader(dataset_dir)
+    path = taxonomy_audit_path(Path(args.audits_root), manifest.dataset_hash)
+    if not path.is_file():
+        raise InvalidConfigError(
+            "no tagging audit was drawn for this dataset hash; the build that seals it draws one",
+            path=str(path),
+        )
+    audit = taxonomy_audit_from_dict(json.loads(path.read_text(encoding="utf-8")))
+    manifest = _stamp_taxonomy_audit(dataset_dir, manifest, audit)
+    print(f"taxonomy audit {path}")
+    print(f"  taggings   {audit.n} drawn, {audit.n_reviewed} reviewed")
+    print(f"  verdicts   correct {audit.n_correct}  wrong {audit.n_wrong}")
+    print(f"  precision  {audit.precision_permille} permille")
+    for line in _taxonomy_audit_lines(audit, manifest, path)[2:]:
+        print(line)
+    return 0
+
+
 def _cmd_audit_links(args: argparse.Namespace) -> int:
     """``pmx data audit-links``: write the fifty-link audit file, or recompute its precision (D-R4)."""
     dataset_dir = Path(args.dataset)
@@ -841,6 +989,7 @@ def _run_build(
     purpose: str = PURPOSE_RESEARCH,
     universe_rule: UniverseRule | None = None,
     audits_root: Path | None = None,
+    fallbacks: Sequence[Mapping[str, object]] = (),
 ) -> int:
     if not offline:
         for provider in config.providers:
@@ -879,6 +1028,7 @@ def _run_build(
         series_categories=_series_categories(),
         purpose=purpose,
         universe_rule=universe_rule,
+        fallbacks=fallbacks,
         name=name,
         notes=notes,
         overwrite=overwrite,
@@ -924,6 +1074,20 @@ def _run_build(
             f"  precision  {audit.precision_permille} permille"
             + ("  news_links: weak" if audit.weak else "")
         )
+        # The fifty-tagging audit of 7.14, drawn beside the linker's and into the same tracked tree
+        # (ruling R296). Both are keyed by the hash they audit and both stamp a manifest block outside
+        # the hash, so a reviewer's verdicts move a label and never a dataset.
+        tag_audit = _write_taxonomy_audit(
+            out_dir,
+            root=root,
+            rows=result.tagged,
+            questions=result.questions,
+            dataset_hash=manifest.dataset_hash,
+            name=manifest.name,
+        )
+        tag_path = taxonomy_audit_path(root, manifest.dataset_hash)
+        manifest = _stamp_taxonomy_audit(out_dir, manifest, tag_audit)
+        extra.extend(_taxonomy_audit_lines(tag_audit, manifest, tag_path))
     _print_manifest(manifest, out_dir, extra=extra)
     return 0
 
@@ -984,6 +1148,17 @@ def _build_report(result: BuildResult) -> list[str]:
     outcome = result.outcome
     if outcome:
         lines.append(f"  build      status {outcome.get('status')}  shortfall {outcome.get('shortfall')}")
+        steps = outcome.get("fallbacks")
+        if isinstance(steps, list) and steps:
+            for step in steps:
+                lines.append(f"  fallback   {step}")
+    taxonomy = result.manifest.taxonomy
+    if isinstance(taxonomy, Mapping):
+        lines.append(
+            f"  cohorts    {len(result.cohorts)} listed,"
+            f" {sum(1 for cohort in result.cohorts if cohort.usable)} usable at {COHORT_MIN_TRAIN}"
+            f" train markets, sizes {taxonomy.get('cohort_size_histogram')}"
+        )
     return lines
 
 
@@ -1013,6 +1188,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
         purpose=cast(str, args.purpose),
         universe_rule=_universe_rule_from_args(args),
         audits_root=Path(args.audits_root),
+        fallbacks=_fallbacks_from_args(args),
     )
 
 
@@ -1051,6 +1227,7 @@ def _cmd_refresh(args: argparse.Namespace) -> int:
         purpose=cast(str, args.purpose),
         universe_rule=_universe_rule_from_args(args),
         audits_root=Path(args.audits_root),
+        fallbacks=_fallbacks_from_args(args),
     )
 
 
@@ -1200,6 +1377,40 @@ def _add_filter_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--limit-per-provider", type=int, default=None)
 
 
+def _fallbacks_from_args(args: argparse.Namespace) -> tuple[Mapping[str, object], ...]:
+    """``manifest.build.fallbacks`` from the repeated ``--fallback`` flag (7.4, ruling R271).
+
+    R271 asks the builder to record the fallback order it took, and ``build_outcome(fallbacks=...)`` has
+    been reachable from Python alone since it landed, so the list was empty on every real build: an
+    operator who widened the window to reach the cohort target had no way to say so. The four fields of
+    7.8's row are positional and split on the **first three** colons, because a reason is prose and
+    contains them.
+    """
+    rows: list[Mapping[str, object]] = []
+    for raw in cast("list[str]", getattr(args, "fallback", []) or []):
+        parts = raw.split(":", 3)
+        if len(parts) != 4 or not all(part.strip() for part in parts):
+            raise InvalidConfigError(
+                "a fallback step is step:from:to:reason (7.8, ruling R271)", fallback=raw
+            )
+        step, moved_from, moved_to, reason = (part.strip() for part in parts)
+        if step not in FALLBACK_STEPS:
+            raise InvalidConfigError(
+                "a fallback names one of the four steps of 7.8",
+                step=step,
+                steps=list(FALLBACK_STEPS),
+            )
+        if not (moved_from.lstrip("-").isdigit() and moved_to.lstrip("-").isdigit()):
+            raise InvalidConfigError(
+                "a fallback moves a step from one integer to another (7.8: both are integers)",
+                fallback=raw,
+            )
+        rows.append(
+            {"step": step, "from": int(moved_from), "to": int(moved_to), "reason": reason}
+        )
+    return tuple(rows)
+
+
 def _add_build_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--purpose",
@@ -1228,6 +1439,17 @@ def _add_build_arguments(parser: argparse.ArgumentParser) -> None:
         default=str(AUDITS_ROOT),
         help="root of the tracked audits/ tree the linker audit is written into (7.1, ruling R296)",
     )
+    parser.add_argument(
+        "--fallback",
+        action="append",
+        default=[],
+        metavar="STEP:FROM:TO:REASON",
+        help=(
+            "one step of the fallback order this build took, repeatable and recorded in "
+            "manifest.build.fallbacks in the order given (7.4, ruling R271); for example "
+            "window_days:365:540:cohort target unreachable at 365"
+        ),
+    )
     parser.add_argument("--staging", default="", help="staged import directory (default <out>/staging)")
     parser.add_argument("--cache-dir", default="", help="raw provider cache (default <out>/cache)")
     parser.add_argument("--offline", action="store_true", help="build from staging only, open no socket")
@@ -1241,17 +1463,33 @@ def _add_build_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser(parser: argparse.ArgumentParser) -> None:
-    """Mount the eight ``data`` subcommands on ``parser``."""
+    """Mount the ten ``data`` subcommands on ``parser``.
+
+    The metavar is spelled out rather than left to argparse because it is what an error message shows,
+    and it had gone stale: ``audit-links`` was missing from it, and ``audit-taxonomy`` joins it here.
+    """
     sub = parser.add_subparsers(
         dest="data_command",
-        metavar="{import,news,build,refresh,seal,verify,status,migrate-v1}",
+        metavar=(
+            "{import,news,build,refresh,seal,verify,audit-links,audit-taxonomy,status,migrate-v1}"
+        ),
     )
 
     p_import = sub.add_parser("import", help="import settled markets of one provider into staging")
     p_import.add_argument("provider", choices=sorted(IMPORTER_TARGETS))
     p_import.add_argument("--freeze", required=True, help="freeze date, yyyy-mm-dd")
     p_import.add_argument("--window-days", type=int, default=365)
-    p_import.add_argument("--interval-min", type=int, default=1_440, choices=(60, 1_440))
+    # Every grid of ``INTERVALS_MIN`` (5.2), the minute one included: 18.3 and ruling R298 put the
+    # refusal of a minute build on ``BuildConfig.__post_init__`` (a coarse source, or neither an
+    # instrument list nor a series list), so a flag that offered only the two coarse grids refused a
+    # staging import the build itself would have judged on its own terms.
+    p_import.add_argument(
+        "--interval-min",
+        type=int,
+        default=1_440,
+        choices=INTERVALS_MIN,
+        help="the bar grid of the import, one of INTERVALS_MIN (5.2, 18.3)",
+    )
     p_import.add_argument("--staging", default=str(_default_staging(DEFAULT_DATASET_NAME)))
     p_import.add_argument("--cache-dir", default="", help="raw provider cache (default beside staging)")
     p_import.add_argument("--limit", type=int, default=None)
@@ -1323,6 +1561,18 @@ def build_parser(parser: argparse.ArgumentParser) -> None:
     )
     p_audit.add_argument("--n", type=int, default=LINKER_AUDIT_N, help="how many links to draw (7.6)")
     p_audit.set_defaults(func=_cmd_audit_links)
+
+    p_tags = sub.add_parser(
+        "audit-taxonomy",
+        help="recompute the fifty-tagging audit's precision and re-stamp manifest.taxonomy.audit",
+    )
+    p_tags.add_argument("--dataset", required=True)
+    p_tags.add_argument(
+        "--audits-root",
+        default=str(AUDITS_ROOT),
+        help="root of the tracked audits/ tree (7.1, ruling R296)",
+    )
+    p_tags.set_defaults(func=_cmd_audit_taxonomy)
 
     p_status = sub.add_parser("status", help="print a dataset's window, counts, filters and split")
     p_status.add_argument("--dataset", required=True)

@@ -24,10 +24,9 @@ typed:
   ``(feature, op)`` pair and every scope tuple is sorted and unique, because the id is the hash of the
   rendered statement: an unsorted twin would be a second id for one rule.
 
-``RuleRefusedError`` belongs to ``pmx.errors`` (13.1, ruling R236; 18.8 has S2 add it there). It is
-defined here while another package holds that file open in the same tree, and the move is a one-line
-import when it lands: nothing outside this package constructs it, and every raise site names it through
-this module.
+``RuleRefusedError`` belongs to ``pmx.errors`` (13.1, ruling R236; 18.8 has S2 add it there) and lives
+there now. It is re-exported from this module because every raise site and every test names it through
+here, which is what made the move a one-line import rather than a rename across two packages.
 """
 
 from __future__ import annotations
@@ -36,7 +35,7 @@ import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from pmx.errors import PmxError
+from pmx.errors import RuleRefusedError
 from pmx.journal import canonical_sha256
 from pmx.rules.vocabulary import (
     RE_FEATURE,
@@ -105,16 +104,6 @@ RE_AUTHOR_ID = re.compile(
 _MAGNITUDE_BP_MAX = 10_000
 _FACTOR_PPM_MAX = 1_000_000_000
 _HORIZON_BARS_MAX = 99_999
-
-
-class RuleRefusedError(PmxError):
-    """A rule, a proposal or a test the hypothesis layer refuses (13.1, ruling R236).
-
-    ``reason`` names which refusal it is, and the ones the contract spells are ``bad_rule`` (the record
-    does not validate), ``duplicate`` (the same content on the same fold pair, 18.2 step 4),
-    ``family_too_large`` (``n_screened`` above what the permutation grid can resolve, ruling R282) and
-    ``unregistered_family`` (a replicate read before the family was written down, 18.2 step 1).
-    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,9 +181,11 @@ class RuleScope:
     """Where a rule claims to hold: five sorted tuples of categorical facts, ``()`` meaning "any" (18.2).
 
     ``cohorts`` carries the cohort ids of 18.5 (decision D-S7). A market's cohort is read off its
-    ``MarketMeta``, which gains ``cohort_id`` in DS2's lot (18.8's deferral table); until it does, a scope
-    that names a cohort matches nothing, which is the safe direction: a rule cannot claim to hold
-    somewhere the dataset cannot yet place.
+    ``MarketMeta.cohort_id``, which amendment C1c landed (18.8's deferral table, ruling R266) and which
+    is derived from the four facets by the one keying rule of ``pmx.cohorts``. A meta of an untagged
+    dataset, or of a market 18.5 places in no cohort (``platform-meta``, or ``other`` on a facet),
+    carries ``None`` there and a scope naming a cohort does not match it, which is the safe direction: a
+    rule cannot claim to hold somewhere the dataset cannot place.
     """
 
     kinds: tuple[str, ...] = ()

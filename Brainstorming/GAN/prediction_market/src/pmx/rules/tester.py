@@ -257,7 +257,14 @@ class ShowcaseRowsError(PmxError):
 
 
 def _meta_from_dict(payload: Mapping[str, object]) -> MarketMeta:
-    """A ``MarketMeta`` from its ``to_dict()`` (7.2), which is how a row table travels on disk."""
+    """A ``MarketMeta`` from its ``to_dict()`` (7.2), which is how a row table travels on disk.
+
+    The five taxonomy fields of amendment C1c are read with their defaults, so a row table written before
+    the taxonomy comes back exactly as it did. Reading them is not optional decoration: ``cohort_id`` is
+    derived from the four facets (18.5), so a reader that dropped them would answer ``None`` on every row
+    of a tagged dataset and ``RuleScope.cohorts`` (18.2) would match nothing at all on a row table, which
+    is a rule silently claiming to hold nowhere rather than a rule refused.
+    """
     return MarketMeta(
         id=str(payload["id"]),
         provider=str(payload["provider"]),
@@ -274,6 +281,10 @@ def _meta_from_dict(payload: Mapping[str, object]) -> MarketMeta:
         fee_schedule_id=str(payload["fee_schedule_id"]),
         fold=str(payload["fold"]),
         kind=str(payload.get("kind", "binary")),
+        subject=tuple(str(value) for value in _as_list(payload.get("subject", ()))),
+        structure=str(payload.get("structure") or ""),
+        horizon=str(payload.get("horizon") or ""),
+        provider_labels=tuple(str(value) for value in _as_list(payload.get("provider_labels", ()))),
     )
 
 

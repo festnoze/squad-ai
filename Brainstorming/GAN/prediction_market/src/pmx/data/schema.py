@@ -277,6 +277,18 @@ class MarketModel(_Strict):
     quality: MarketQualityModel
     fee_schedule_id: str = Field(pattern=r"^([a-z]+-[a-z0-9]+-[0-9]{4}-[0-9]{2}|demo-zero)$")
     notes: str = Field(max_length=2_000)
+    #: Amendment C1c's four taxonomy fields (7.2, 7.14, ruling R265), optional exactly as
+    #: ``market.v2.json`` declares them. This model is ``extra="forbid"``, strict and frozen, so without
+    #: these four declarations a market the tagger tagged validated against its JSON schema and was
+    #: **refused** by the model that reads it back: the schema was widened by amendment C1c and the model
+    #: was not, which is the defect DS2 measured on a real ``y2026`` payload. No minimum is declared on
+    #: ``subject`` even though the schema says ``minItems: 1``, because the default of an absent field is
+    #: the empty list and an untagged market file has to keep loading; the schema is the pass that
+    #: refuses ``"subject": []`` on a file that carries the key at all.
+    provider_labels: list[str] = Field(default_factory=list, max_length=16)
+    subject: list[str] = Field(default_factory=list, max_length=4)
+    structure: str = ""
+    horizon: str = ""
 
     def to_market(self) -> Market:
         return Market(
@@ -308,6 +320,10 @@ class MarketModel(_Strict):
             quality=self.quality.to_quality(),
             fee_schedule_id=self.fee_schedule_id,
             notes=self.notes,
+            provider_labels=tuple(self.provider_labels),
+            subject=tuple(self.subject),
+            structure=self.structure,
+            horizon=self.horizon,
         )
 
 
@@ -858,7 +874,10 @@ class InstrumentModel(_Strict):
     listed_at_ms: Ms
     delisted_at_ms: NonNegInt | None
     short_allowed: bool
-    interval_min: Literal[60, 1440]
+    #: The three grids of ``INTERVALS_MIN`` (5.2). ``1`` is amendment C1c's minute grid, which 18.3
+    #: defines **by** ``BuildConfig.instruments``, that is by the continuous instruments of 17.1, so a
+    #: minute continuous instrument has to validate here and in ``instrument.v1.json`` alike.
+    interval_min: Literal[1, 60, 1440]
     url: str = Field(max_length=512)
     description: str = Field(max_length=4_000)
     category: Literal["crypto", "finance", "economics", "other"]

@@ -31,6 +31,7 @@ from decimal import ROUND_HALF_UP, Decimal, localcontext
 from enum import StrEnum
 from pathlib import Path
 
+from pmx.cohorts import Cohort, cohort_id_for_meta, list_cohorts
 from pmx.errors import InvalidConfigError, SchemaError
 
 # Re-exported (section 6.1) so that the engine version tuple
@@ -919,15 +920,38 @@ class Market:
     #: non-empty ``wiki_subjects`` reads as "every subject is stated", which is what every market written
     #: before the flag existed meant.
     wiki_subject_provenance: tuple[str, ...] = ()
+    #: Amendment C1c's four taxonomy fields (7.2, 7.14; decision D-S6, ruling R265), **optional** in
+    #: ``market.v2.json`` and defaulted here so a market file written before the taxonomy still loads and
+    #: still renders the bytes it was written with. ``provider_labels`` holds the provider's own strings
+    #: verbatim (a Kalshi series ticker, a Manifold group slug, ``nonpredictive``): never a cohort key,
+    #: never displayed as a tag, kept for the reviewer. ``subject`` is in **tagger precedence order** and
+    #: ``subject[0]`` is the primary subject and the cohort key of 18.5. ``structure`` is the question's
+    #: shape, and ``horizon`` is derived from ``close_at_ms - created_at_ms`` alone, never from provider
+    #: text and never from ``resolved_at_ms``, which is the whole reason a facet cannot leak (7.9, 18.5).
+    #: The loader **requires** all four on every market of a dataset whose manifest carries the
+    #: ``taxonomy`` block and refuses a facet value outside the vocabulary that block names.
+    provider_labels: tuple[str, ...] = ()
+    subject: tuple[str, ...] = ()
+    structure: str = ""
+    horizon: str = ""
 
     def __post_init__(self) -> None:
-        """Freeze the six sequence fields into tuples and default the subject provenance.
+        """Freeze the eight sequence fields into tuples and default the subject provenance.
 
         The declared type is a tuple, because a market is a hashable immutable record and half the engine
         slices its bars. An importer that hands a list gets it frozen here rather than silently carrying a
         mutable tape into a run whose journal must hash the same twice.
         """
-        for name in ("tags", "wiki_subjects", "bars", "trades", "hardness_tags", "wiki_subject_provenance"):
+        for name in (
+            "tags",
+            "wiki_subjects",
+            "bars",
+            "trades",
+            "hardness_tags",
+            "wiki_subject_provenance",
+            "provider_labels",
+            "subject",
+        ):
             value = getattr(self, name)
             if not isinstance(value, tuple):
                 object.__setattr__(self, name, tuple(value))
@@ -1045,6 +1069,18 @@ class Market:
         }
         if any(flag == SUBJECT_DERIVED for flag in self.wiki_subject_provenance):
             document["wiki_subject_provenance"] = list(self.wiki_subject_provenance)
+        # Each of the taxonomy's four renders **only when set** (7.2, 7.14). That is not a convenience:
+        # every one of them is optional in ``market.v2.json`` so a file written before amendment C1c
+        # still loads, and a renderer that emitted an empty list or an empty string would move the bytes
+        # of every market of the 2026-09-09 build and with them its ``dataset_hash``.
+        if self.provider_labels:
+            document["provider_labels"] = list(self.provider_labels)
+        if self.subject:
+            document["subject"] = list(self.subject)
+        if self.structure:
+            document["structure"] = self.structure
+        if self.horizon:
+            document["horizon"] = self.horizon
         return document
 
 
@@ -1449,10 +1485,30 @@ class MarketMeta:
     fee_schedule_id: str
     fold: str
     kind: str = "binary"
+    #: Amendment C1c's five defaulted fields (7.2, 7.14, 18.5; rulings R265 and R266). A meta of a
+    #: dataset built before the taxonomy is what it was: no facet, no cohort. **None of the five reads a
+    #: field of 7.9**, so every one of them may sit in a ``MarketView`` and in a rule's scope at every
+    #: bar: a facet, a provider label and a cohort id are data about the *question* that exist before the
+    #: market's first bar. ``cohort_id`` is **derived** in :meth:`__post_init__` from the four facets and
+    #: the venue and category through :func:`pmx.cohorts.cohort_id_for_meta`, so there is one
+    #: implementation of 18.5's keying rule, exclusions included, and no way for a meta's cohort to
+    #: disagree with the facets beside it.
+    subject: tuple[str, ...] = ()
+    structure: str = ""
+    horizon: str = ""
+    provider_labels: tuple[str, ...] = ()
+    cohort_id: str | None = None
 
     def __post_init__(self) -> None:
         if self.kind not in INSTRUMENT_KINDS:
             raise InvalidConfigError("unknown instrument kind", market_id=self.id, kind=self.kind)
+        for name in ("subject", "provider_labels"):
+            value = getattr(self, name)
+            if not isinstance(value, tuple):
+                object.__setattr__(self, name, tuple(value))
+        derived = cohort_id_for_meta(self)
+        if self.cohort_id != derived:
+            object.__setattr__(self, "cohort_id", derived)
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -1471,6 +1527,11 @@ class MarketMeta:
             "fee_schedule_id": self.fee_schedule_id,
             "fold": self.fold,
             "kind": self.kind,
+            "subject": list(self.subject),
+            "structure": self.structure,
+            "horizon": self.horizon,
+            "provider_labels": list(self.provider_labels),
+            "cohort_id": self.cohort_id,
         }
 
 
@@ -1500,6 +1561,10 @@ def meta_of(
             hardness_tags=market.hardness_tags,
             fee_schedule_id=market.fee_schedule_id,
             fold=fold,
+            subject=market.subject,
+            structure=market.structure,
+            horizon=market.horizon,
+            provider_labels=market.provider_labels,
         )
     if market.delisted_at_ms is not None:
         end_ms = market.delisted_at_ms
@@ -2117,6 +2182,19 @@ class Dataset:
         if not self.manifest.sealed and self.manifest.providers == ("demo",):
             return PURPOSE_SHOWCASE
         return PURPOSE_RESEARCH
+
+    @property
+    def cohorts(self) -> tuple[Cohort, ...]:
+        """``pmx.cohorts.list_cohorts(self.metas)``, sorted by ``cohort_id`` (7.2, 18.5, ruling R266).
+
+        ``()`` on a dataset built before the taxonomy, because every meta of one carries no facet and a
+        market with no primary subject belongs to no cohort. There is one implementation of the keying
+        rule and both the builder (into ``manifest.cohorts``) and this property call it, which is what
+        lets :func:`pmx.data.loader.check_fold_integrity` refuse a manifest whose cohort rows disagree
+        with the folds and facets it recomputes: the two answers come from the same function or the
+        dataset is not the one it says it is.
+        """
+        return list_cohorts(self.metas)
 
     def meta(self, market_id: str) -> MarketMeta:
         for meta in self.metas:

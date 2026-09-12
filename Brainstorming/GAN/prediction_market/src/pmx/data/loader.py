@@ -33,6 +33,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from pmx.cohorts import list_cohorts
 from pmx.data.schema import (
     instrument_from_payload,
     manifest_from_payload,
@@ -40,6 +41,12 @@ from pmx.data.schema import (
     news_item_from_payload,
 )
 from pmx.data.sessions import in_session, load_calendar, session_bars
+from pmx.data.taxonomy import (
+    TAXONOMY_DIR,
+    TagLexicon,
+    check_tags,
+    load_tag_lexicon,
+)
 from pmx.errors import (
     DatasetHashMismatchError,
     FoldIntegrityError,
@@ -94,12 +101,22 @@ WIKI_ASOF_DIR = "wiki_asof"
 CLUSTERS_DIR = "clusters"
 INSTRUMENTS_DIR = "instruments"
 CALENDARS_DIR = "calendars"
-#: The directories the dataset hash covers (section 4.3 as amended by rulings R117 and R149): the three of
-#: v2, amendment C1's ``clusters/`` and amendment C1b's ``instruments/`` and ``calendars/``. The walk of
-#: an absent directory adds no line, so no hash of 2026-09-08 moves. ``cache/``, ``staging/`` and
+#: The directories the dataset hash covers (section 4.3 as amended by rulings R117, R149 and R267): the
+#: three of v2, amendment C1's ``clusters/``, amendment C1b's ``instruments/`` and ``calendars/`` and
+#: amendment C1c's ``taxonomy/``, which holds the two lexicon files the build tagged under and is inside
+#: the walk on purpose (7.14): a tag that moved between two rebuilds moves the hash and not a claim. The
+#: walk of an absent directory adds no line, so no hash of 2026-09-09 moves. ``cache/``, ``staging/`` and
 #: ``contamination.json`` are deliberately outside it: disposable, or per-model and changing without the
 #: data changing (sections 7.1 and 11.5).
-HASHED_DIRS = (MARKETS_DIR, NEWS_DIR, WIKI_ASOF_DIR, CLUSTERS_DIR, INSTRUMENTS_DIR, CALENDARS_DIR)
+HASHED_DIRS = (
+    MARKETS_DIR,
+    NEWS_DIR,
+    WIKI_ASOF_DIR,
+    CLUSTERS_DIR,
+    INSTRUMENTS_DIR,
+    CALENDARS_DIR,
+    TAXONOMY_DIR,
+)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -221,8 +238,17 @@ class DatasetVerification:
 # --------------------------------------------------------------------------------------------------
 # 7.2 One market file
 # --------------------------------------------------------------------------------------------------
-def check_market_structure(market: Market, *, manifest: DatasetManifest | None = None) -> None:
-    """Everything about a market the JSON schema cannot say. Raises ``SchemaError`` or ``LeakError``."""
+def check_market_structure(
+    market: Market, *, manifest: DatasetManifest | None = None, lexicon: TagLexicon | None = None
+) -> None:
+    """Everything about a market the JSON schema cannot say. Raises ``SchemaError`` or ``LeakError``.
+
+    ``lexicon`` is the dataset's **own** copy of ``tags.v1.json``, read from ``<dataset>/taxonomy/`` by
+    :func:`load_dataset` when the manifest carries the ``taxonomy`` block, and ``None`` otherwise. It is
+    the dataset's copy and never the package's on purpose (7.14): the two lexicon files are inside the
+    walk of 4.3, so a dataset sealed under ``tags.v1`` keeps validating the day
+    ``src/pmx/lexicons/tags.v1.json`` becomes a ``tags.v2`` with different values.
+    """
     if manifest is not None and market.interval_min != manifest.interval_min:
         raise SchemaError(
             "market grid differs from the dataset grid",
@@ -275,8 +301,86 @@ def check_market_structure(market: Market, *, manifest: DatasetManifest | None =
         )
     if tuple(sorted(set(market.hardness_tags))) != market.hardness_tags:
         raise SchemaError("hardness_tags must be sorted and unique", market_id=market.id)
+    # 7.2 states ``provider_labels`` with the same shape as ``tags``: "each ``^[a-z0-9_-]{1,32}$``,
+    # ``<= 16``, sorted, unique". The pattern and the cap are ``market.v2.json``'s, and uniqueness is its
+    # ``uniqueItems``, but **sorted** is a structural rule no JSON schema can say, which is why ``tags``,
+    # ``wiki_subjects`` and ``hardness_tags`` are each checked here. The check is not gated on the
+    # manifest's ``taxonomy`` block: the field's shape is 7.2's whatever the dataset declares, and a file
+    # whose labels are out of order would hash differently from the one the record it loads back renders.
+    if tuple(sorted(set(market.provider_labels))) != market.provider_labels:
+        raise SchemaError(
+            "provider_labels must be sorted and unique",
+            market_id=market.id,
+            provider_labels=list(market.provider_labels),
+        )
+    if lexicon is not None:
+        _check_market_taxonomy(market, lexicon=lexicon)
     if manifest is not None:
         _check_market_window(market, manifest=manifest)
+
+
+def _check_market_taxonomy(market: Market, *, lexicon: TagLexicon) -> None:
+    """The four taxonomy fields are **required** on a dataset whose manifest carries the block (7.14).
+
+    ``market.v2.json`` declares them optional so a file written before amendment C1c still loads, and
+    the requirement is the manifest's: a dataset that says it was tagged has to carry the tags. Every
+    facet value is then held to the vocabulary that block names, which is the dataset's own copy, so a
+    build cannot ship a subject the file it was tagged under does not contain.
+    """
+    # The three facets are checked and ``provider_labels`` is not. 7.14 says "all four", and the fourth
+    # is the one of them a market can legitimately have none of: ``market.v2.json`` floors ``subject`` at
+    # one item and floors ``provider_labels`` at none, because a Manifold market the creator filed under
+    # no group has no provider string to keep verbatim, while the tagger's third stage writes ``other``
+    # rather than nothing on every facet (7.14). Requiring a label here would refuse such a market, which
+    # is a refusal no ruling asks for; the reading is reported as a contract issue rather than guessed at.
+    missing = [
+        name
+        for name, value in (
+            ("subject", market.subject),
+            ("structure", market.structure),
+            ("horizon", market.horizon),
+        )
+        if not value
+    ]
+    if missing:
+        raise SchemaError(
+            "a market of a tagged dataset carries no taxonomy (7.14: the loader requires all four)",
+            market_id=market.id,
+            missing=missing,
+            version=lexicon.version,
+        )
+    unknown = sorted(
+        {value for value in market.subject if value not in lexicon.subject_values}
+        | ({market.structure} if market.structure not in lexicon.structure_values else set())
+        | ({market.horizon} if market.horizon not in lexicon.horizons else set())
+    )
+    if unknown:
+        raise SchemaError(
+            "a facet value outside the vocabulary the manifest's taxonomy block names",
+            market_id=market.id,
+            unknown=unknown,
+            version=lexicon.version,
+        )
+    check_tags(market.tags, lexicon=lexicon)
+    # 7.2 does not say ``tags`` may hold vocabulary values; it says ``tags`` **is** "the sorted union of
+    # the market's facet values and builder labels". ``check_tags`` refuses a value outside the
+    # vocabulary and would accept a market whose ``tags`` named a subject its ``subject`` does not, which
+    # is the drift the facets exist to end: ``Memory.prior(tag=...)``, ``PerMarket.tags`` and ``per_tag``
+    # would then group a market under a topic its own facets deny. The builder labels are read off the
+    # dataset's own lexicon, so a market carrying one keeps it and a market carrying none needs none.
+    expected = tuple(
+        sorted(
+            {*market.subject, market.structure, market.horizon}
+            | {value for value in market.tags if value in lexicon.builder}
+        )
+    )
+    if expected != market.tags:
+        raise SchemaError(
+            "tags is the sorted union of the market's facet values and builder labels (7.2)",
+            market_id=market.id,
+            tags=list(market.tags),
+            expected=list(expected),
+        )
 
 
 def _check_bars(market: Market) -> None:
@@ -399,13 +503,35 @@ def _check_market_window(market: Market, *, manifest: DatasetManifest) -> None:
         )
 
 
-def load_market_file(path: Path, *, manifest: DatasetManifest | None = None) -> Market:
+def load_market_file(
+    path: Path, *, manifest: DatasetManifest | None = None, lexicon: TagLexicon | None = None
+) -> Market:
     """Load, validate and structurally check one ``markets/<id>.json``."""
     market = market_from_payload(read_json_file(path), where=path.name)
     if path.stem != market.id:
         raise SchemaError("market file name does not match its id", path=path.name, market_id=market.id)
-    check_market_structure(market, manifest=manifest)
+    check_market_structure(market, manifest=manifest, lexicon=lexicon)
     return market
+
+
+def dataset_lexicon(path: Path, *, manifest: DatasetManifest) -> TagLexicon | None:
+    """The dataset's own ``taxonomy/tags.v1.json``, or ``None`` on a dataset built before the taxonomy.
+
+    Read from the dataset and never from ``src/pmx/lexicons/`` (7.14, ruling R301): the two lexicon
+    files are copied inside the walk of 4.3, so the vocabulary a dataset was cut under is part of its
+    hash, and validating an old dataset against a new package's vocabulary would refuse a dataset whose
+    bytes never moved. A manifest that declares the block and carries no copy is a build defect and says
+    so by name rather than by a missing-file traceback.
+    """
+    if manifest.taxonomy is None:
+        return None
+    directory = path / TAXONOMY_DIR
+    if not (directory / "tags.v1.json").is_file():
+        raise SchemaError(
+            "the manifest declares a taxonomy block and the dataset carries no taxonomy/ copy of it",
+            path=str(directory),
+        )
+    return load_tag_lexicon(directory)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -563,10 +689,14 @@ def _check_instrument_window(
     if instrument.listed_at_ms >= manifest.window.end_ms:
         raise SchemaError("instrument is listed after the dataset window", market_id=instrument.id)
     delisted = instrument.delisted_at_ms
-    if delisted is not None and delisted >= manifest.freeze_ms and not _predates_purpose_showcase(manifest):
+    # The freeze check is never skipped, for any dataset (7.1, 5.6: a showcase dataset is exempt from
+    # the window rule "and from nothing else"). The two lines below carried ``and not
+    # _predates_purpose_showcase(manifest)`` while the field they read was ``is_demo_pack``, which made
+    # the demo-pack signature an exemption from a leak guard that no ruling grants it.
+    if delisted is not None and delisted >= manifest.freeze_ms:
         raise LeakError("instrument is delisted at or after the freeze", market_id=instrument.id)
     for bar in instrument.bars:
-        if bar.t_ms >= manifest.freeze_ms and not _predates_purpose_showcase(manifest):
+        if bar.t_ms >= manifest.freeze_ms:
             raise LeakError("instrument carries a bar at or after the freeze", market_id=instrument.id, t_ms=bar.t_ms)
     covered = calendar.is_continuous or not instrument.bars or (
         calendar.window.start_ms <= instrument.bars[0].t_ms and instrument.bars[-1].t_ms < calendar.window.end_ms
@@ -656,7 +786,9 @@ def check_news_item(item: NewsItem, *, manifest: DatasetManifest) -> None:
             expected=expected_visible,
             safety_lag_ms=lag_ms,
         )
-    if item.published_at_ms > manifest.freeze_ms and not _predates_purpose_showcase(manifest):
+    # As above: 7.1 says the loader "never skips the freeze check" and 5.6 exempts a showcase dataset
+    # from the window rule and from nothing else.
+    if item.published_at_ms > manifest.freeze_ms:
         raise LeakError(
             "news item published after the freeze",
             news_id=item.news_id,
@@ -934,6 +1066,13 @@ def check_fold_integrity(
       market's own resolution and declares 111 / 46 / 130, and no consumer should be able to read it as
       if it were a count-quantile, cluster-aware split. A hand-written manifest that miscounts its own
       folds is refused for the same reason.
+    * **a cohort row disagrees with the folds and facets recomputed** (7.8, 18.5, ruling R266), on a
+      manifest that carries the ``cohorts`` block. The rows are compared to
+      ``pmx.cohorts.list_cohorts`` over the metas this function has just folded, row for row and field
+      for field, because a cohort has no fold of its own (ruling R293) and its three per-fold counts are
+      therefore a statement about the cut: a manifest whose ``n_train`` says a cohort is usable while
+      the cut left it below ``COHORT_MIN_TRAIN`` would put a leaderboard row and a claim's
+      ``per_cohort`` row on a comparison that does not exist.
     """
     folds = fold_assignment(markets, manifest=manifest, clusters=clusters)
     by_group: dict[str, set[str]] = {}
@@ -965,7 +1104,39 @@ def check_fold_integrity(
             train_end_ms=manifest.split.train_end_ms,
             validation_end_ms=manifest.split.validation_end_ms,
         )
+    if manifest.cohorts is not None:
+        check_cohort_rows(
+            [meta_of(market, fold=folds[market.id]) for market in markets], manifest=manifest
+        )
     return folds
+
+
+def check_cohort_rows(metas: Sequence[MarketMeta], *, manifest: DatasetManifest) -> None:
+    """Refuse a manifest whose cohort rows are not the rows the metas recompute (7.8, ruling R266).
+
+    The comparison is on the rendered rows and not on a count of them, because every field of a row is a
+    claim about the cut: the venue, the four facet keys, the three per-fold counts and the two usability
+    flags. ``pmx.cohorts.list_cohorts`` is the one implementation and the builder called it too, so a
+    difference here is either a hand-edited manifest or a market file whose facets moved after the seal.
+    """
+    recomputed = [cohort.to_dict() for cohort in list_cohorts(metas)]
+    declared = [dict(row) for row in manifest.cohorts or ()]
+    if recomputed == declared:
+        return
+    recomputed_ids = [str(row.get("cohort_id")) for row in recomputed]
+    declared_ids = [str(row.get("cohort_id")) for row in declared]
+    raise FoldIntegrityError(
+        "a cohort row of the manifest is not what the folds and facets recompute",
+        n_declared=len(declared),
+        n_recomputed=len(recomputed),
+        only_declared=sorted(set(declared_ids) - set(recomputed_ids)),
+        only_recomputed=sorted(set(recomputed_ids) - set(declared_ids)),
+        changed=sorted(
+            str(row["cohort_id"])
+            for row in recomputed
+            if isinstance(row.get("cohort_id"), str) and row not in declared
+        ),
+    )
 
 
 def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
@@ -989,9 +1160,13 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
     if not markets_dir.is_dir() and not instruments_dir.is_dir():
         raise SchemaError("dataset has no markets and no instruments directory", path=str(path))
     calendars = load_calendars(path, manifest=manifest)
+    # The dataset's own vocabulary, read once (7.14): the four taxonomy fields are required on every
+    # market of a dataset whose manifest carries the ``taxonomy`` block, and every facet value is held
+    # to the copy under ``taxonomy/`` rather than to the package's current lexicon.
+    lexicon = dataset_lexicon(path, manifest=manifest)
     binaries: list[Market] = []
     for candidate in sorted(markets_dir.glob("*.json")) if markets_dir.is_dir() else ():
-        market = load_market_file(candidate, manifest=manifest)
+        market = load_market_file(candidate, manifest=manifest, lexicon=lexicon)
         if market.provider not in manifest.providers:
             raise SchemaError(
                 "market provider is not one of the dataset's",
@@ -1044,7 +1219,9 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
         instrument_path = path / INSTRUMENTS_DIR / f"{market_id}.json"
         if instrument_path.is_file():
             return load_instrument_file(instrument_path, manifest=manifest, calendars=calendars)
-        return load_market_file(path / MARKETS_DIR / f"{market_id}.json", manifest=manifest)
+        return load_market_file(
+            path / MARKETS_DIR / f"{market_id}.json", manifest=manifest, lexicon=lexicon
+        )
 
     def load_calendar_by_id(calendar_id: str) -> SessionCalendar:
         return _calendar_for(calendar_id, calendars, market_id="")
@@ -1093,8 +1270,9 @@ def verify_folds(path: Path, *, manifest: DatasetManifest | None = None) -> dict
     """
     resolved = manifest if manifest is not None else load_manifest(path)
     markets_dir = path / MARKETS_DIR
+    lexicon = dataset_lexicon(path, manifest=resolved)
     binaries = [
-        load_market_file(candidate, manifest=resolved)
+        load_market_file(candidate, manifest=resolved, lexicon=lexicon)
         for candidate in (sorted(markets_dir.glob("*.json")) if markets_dir.is_dir() else ())
     ]
     return check_fold_integrity(binaries, manifest=resolved, clusters=read_cluster_groups(path))

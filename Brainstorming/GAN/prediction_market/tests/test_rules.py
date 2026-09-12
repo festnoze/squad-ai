@@ -1604,6 +1604,45 @@ def test_the_fixture_is_a_row_table_the_loader_reads_back() -> None:
     assert ids == sorted(ids), "a row table is in canonical order"
 
 
+def test_a_row_table_carries_the_taxonomy_and_the_cohort_a_scope_names() -> None:
+    """7.2, 18.2 and 18.5: ``MarketMeta.to_dict`` round-trips through a row table, the facets included.
+
+    A row table travels on disk as ``MarketMeta.to_dict()``, and amendment C1c put five fields in that
+    document. A reader that dropped them would answer ``cohort_id = None`` on every row of a tagged
+    dataset, and a ``RuleScope`` naming a cohort would then match nothing at all: a rule silently
+    claiming to hold nowhere, which is the one failure a scope must never have, because it is
+    indistinguishable from a rule that holds and never fires.
+    """
+    from pmx.rules.tester import row_table_from_dict
+
+    document = json.loads((S2 / "planted.json").read_text(encoding="utf-8"))
+    # the fixture predates the taxonomy and must keep reading back exactly as it did
+    before = row_table_from_dict(document)
+    assert all(rows.meta.subject == () and rows.meta.cohort_id is None for rows in before.markets)
+
+    facets = {"subject": ["bitcoin"], "structure": "threshold-above", "horizon": "month"}
+    tagged = {
+        **document,
+        "markets": [
+            {**market, "meta": {**market["meta"], **facets, "provider_labels": ["kxbtc"]}}
+            for market in document["markets"]
+        ],
+    }
+    table = row_table_from_dict(tagged)
+    assert table.markets
+    for rows in table.markets:
+        meta = rows.meta
+        assert meta.subject == ("bitcoin",)
+        assert meta.structure == "threshold-above" and meta.horizon == "month"
+        assert meta.provider_labels == ("kxbtc",)
+        expected = f"co-{meta.provider}-{meta.category}-bitcoin-threshold-above-month"
+        assert meta.cohort_id == expected
+        assert RuleScope(cohorts=(expected,)).matches(meta)
+        assert not RuleScope(cohorts=("co-kalshi-politics-oil-threshold-above-month",)).matches(meta)
+        # and the document the reader was handed is the document the meta renders back
+        assert {key: meta.to_dict()[key] for key in facets} == facets
+
+
 def test_a_showcase_row_table_is_refused_before_a_row_is_read() -> None:
     """12.7: a showcase dataset has no folds, so it has no rules either."""
     document = json.loads((S2 / "planted.json").read_text(encoding="utf-8"))

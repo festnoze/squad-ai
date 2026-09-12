@@ -28,6 +28,8 @@ from pathlib import Path
 import pytest
 
 import pmx
+from pmx import errors as errors_module
+from pmx.cohorts import list_cohorts
 from pmx.data import loader as loader_module
 from pmx.data.loader import (
     DatasetVerification,
@@ -80,6 +82,7 @@ from pmx.data.sessions import (
     session_bars,
     session_index,
 )
+from pmx.data.taxonomy import load_tag_lexicon
 from pmx.errors import (
     DatasetHashMismatchError,
     FoldIntegrityError,
@@ -2178,3 +2181,234 @@ def test_the_purpose_of_a_manifest_written_before_the_field_is_the_signature_it_
     # its providers say, which is the whole point of replacing a signature with a declaration.
     assert manifest_purpose(dataclasses.replace(demo, purpose="research")) == "research"
     assert manifest_purpose(dataclasses.replace(demo, purpose="showcase")) == "showcase"
+
+
+# --------------------------------------------------------------------------------------------------
+# 7.2, 7.14 and 18.5 (amendment C1c, rulings R265 and R266): the four taxonomy fields on a market, the
+# five on its meta, and the one cohort a meta derives
+# --------------------------------------------------------------------------------------------------
+def _tagged(market: Market) -> Market:
+    """The same market with the facets a tagged build writes onto it."""
+    return dataclasses.replace(
+        market,
+        # ``tags`` **is** the sorted union of the facet values (7.2), so the helper spells the union
+        # rather than an arbitrary list: a fixture whose tags deny its own facets is a market the loader
+        # refuses on a tagged dataset, and a helper named ``_tagged`` should not produce one.
+        tags=("bitcoin", "equity-index", "quarter", "threshold-above"),
+        provider_labels=("kxtest", "nonpredictive"),
+        subject=("bitcoin", "equity-index"),
+        structure="threshold-above",
+        horizon="quarter",
+    )
+
+
+def test_a_market_carries_the_four_taxonomy_fields_and_renders_them_only_when_set() -> None:
+    """7.2 and 7.14, ruling R265: optional on the file, defaulted in the record, rendered only when set.
+
+    The absent case is asserted as hard as the present one. Every one of the four is optional in
+    ``market.v2.json`` so a file written before amendment C1c still loads, and a renderer that emitted
+    an empty list or an empty string would move the bytes of every market of the 2026-09-09 build and
+    with them its ``dataset_hash``.
+    """
+    plain = _synthetic_market(freeze_ms=ms_from_iso_date(SYNTH_FREEZE_DATE))
+    assert (plain.provider_labels, plain.subject, plain.structure, plain.horizon) == ((), (), "", "")
+    document = plain.to_dict()
+    for field_name in ("provider_labels", "subject", "structure", "horizon"):
+        assert field_name not in document
+    validate_against_schema("market.v2.json", document, where="market")
+    assert market_from_payload(document).to_dict() == document
+
+    tagged = _tagged(plain)
+    written = tagged.to_dict()
+    assert written["provider_labels"] == ["kxtest", "nonpredictive"]
+    assert written["subject"] == ["bitcoin", "equity-index"]
+    assert written["structure"] == "threshold-above" and written["horizon"] == "quarter"
+    validate_against_schema("market.v2.json", written, where="market")
+    # The strict model is ``extra="forbid"``: without the four declarations this payload was refused with
+    # four ``extra_forbidden`` errors while validating against its own JSON schema (DS2's measurement).
+    assert market_from_payload(written).to_dict() == written
+    # ``subject`` and ``provider_labels`` are frozen into tuples like the other six sequence fields, so
+    # a caller that hands a list does not carry a mutable value into a record a journal must hash twice.
+    from_lists = dataclasses.replace(plain, subject=["bitcoin"], provider_labels=["kxtest"])
+    assert from_lists.subject == ("bitcoin",) and from_lists.provider_labels == ("kxtest",)
+    assert isinstance(from_lists.subject, tuple) and isinstance(from_lists.provider_labels, tuple)
+
+
+def test_a_market_meta_carries_the_taxonomy_and_derives_its_one_cohort() -> None:
+    """7.2 and 18.5, ruling R266: five defaulted fields, and ``cohort_id`` derived and never declared."""
+    plain = _synthetic_market(freeze_ms=ms_from_iso_date(SYNTH_FREEZE_DATE))
+    untagged = meta_of(plain, fold="train")
+    assert (untagged.subject, untagged.structure, untagged.horizon) == ((), "", "")
+    assert untagged.provider_labels == () and untagged.cohort_id is None
+    assert untagged.to_dict()["cohort_id"] is None
+
+    meta = meta_of(_tagged(plain), fold="train")
+    assert meta.subject == ("bitcoin", "equity-index")
+    assert meta.structure == "threshold-above" and meta.horizon == "quarter"
+    assert meta.provider_labels == ("kxtest", "nonpredictive")
+    # The key is the **primary** subject and nothing else: a market with two subjects is one market in
+    # one cohort, never two rows of a table that would count it twice.
+    assert meta.cohort_id == f"co-kalshi-{plain.category}-bitcoin-threshold-above-quarter"
+    assert meta.to_dict()["subject"] == ["bitcoin", "equity-index"]
+    assert meta.to_dict()["cohort_id"] == meta.cohort_id
+    # A cohort id a caller invents is overwritten by the derivation, so the id can never disagree with
+    # the facets beside it (7.2: the field is ``pmx.cohorts.cohort_id_for_meta(meta)``).
+    assert dataclasses.replace(meta, cohort_id="co-kalshi-x-y-z-w").cohort_id == meta.cohort_id
+    # 18.5's exclusions: platform-meta, and ``other`` on any of the three facets, belong to no cohort.
+    for facets in (
+        {"subject": ("platform-meta",)},
+        {"subject": ("other",)},
+        {"structure": "other"},
+        {"horizon": "other"},
+    ):
+        assert dataclasses.replace(meta, **facets).cohort_id is None
+    assert list_cohorts([meta])[0].cohort_id == meta.cohort_id
+    assert list_cohorts([untagged]) == ()
+
+
+def test_the_freeze_check_is_never_skipped_on_the_demo_pack_signature() -> None:
+    """7.1 and 5.6: a showcase dataset is exempt from the **window** rule and from nothing else.
+
+    Three loader sites carried the demo-pack signature as an exemption from the freeze check itself,
+    which is a leak guard no ruling grants it. The window exemption is asserted beside the freeze
+    refusal so the tightening cannot be mistaken for the removal of the exemption.
+    """
+    demo_manifest = load_manifest(DEMO_PACK)
+    assert manifest_purpose(demo_manifest) == "showcase"
+    # still exempt from the window rule of 5.6: this is the market a research build filters out
+    loader_module.check_market_structure(
+        load_market_file(DEMO_PACK / "markets" / "demo-brexit-2016.json"), manifest=demo_manifest
+    )
+    after_freeze = news_item_from_payload(
+        _news_payload(
+            news_id="wce-20260601-0001",
+            source="wikipedia_current_events",
+            kind="headline",
+            published_at_ms=demo_manifest.freeze_ms + MS_PER_DAY,
+            safety_lag_ms=demo_manifest.safety_lag_ms,
+        )
+    )
+    with pytest.raises(LeakError, match="freeze"):
+        loader_module.check_news_item(after_freeze, manifest=demo_manifest)
+    # and the same item is refused on a research manifest, so the refusal is not about the purpose
+    with pytest.raises(LeakError, match="freeze"):
+        loader_module.check_news_item(after_freeze, manifest=replace(demo_manifest, sealed=True))
+
+
+def test_the_error_taxonomy_of_13_1_is_the_one_in_pmx_errors() -> None:
+    """13.1 and 18.8's second row: every contracted error class is defined in ``pmx.errors``.
+
+    ``RuleRefusedError`` was defined in ``src/pmx/rules/rule.py`` while 13.1 and 18.8 both name
+    ``src/pmx/errors.py``, which is the same defect the documented ``FoldIntegrityError = SchemaError``
+    bridge was: a class with a contracted name living in a module the contract does not name. The class
+    moved and ``pmx.rules.rule`` re-exports it, so this asserts the two names are **one object** and not
+    two classes that would each catch half the raise sites.
+    """
+    from pmx.errors import RuleRefusedError as contracted
+    from pmx.rules import rule as rule_module
+
+    assert rule_module.RuleRefusedError is contracted
+    assert contracted.__module__ == "pmx.errors"
+    assert issubclass(contracted, PmxError)
+    assert not issubclass(contracted, SchemaError)
+    for name in (
+        "CohortRefusedError",
+        "FoldIntegrityError",
+        "RuleRefusedError",
+        "SensorAbsentError",
+        "ShowcaseDatasetError",
+    ):
+        klass = getattr(errors_module, name)
+        assert issubclass(klass, PmxError) and klass.__module__ == "pmx.errors"
+
+
+def test_a_minute_continuous_instrument_validates_against_its_own_schema() -> None:
+    """5.2 and 18.3, ruling R298: ``INTERVALS_MIN`` is ``(1, 60, 1_440)`` and 18.3's minute build is
+    defined by ``BuildConfig.instruments``, that is by continuous instruments.
+
+    ``instrument.v1.json`` declared ``interval_min`` as ``enum [60, 1440]``, so the one shape 18.3 names
+    for a minute build could not validate against the schema of the file it lives in. Both doors are
+    driven here, because the JSON schema and the strict model are two separate refusals.
+    """
+    assert INTERVALS_MIN == (1, 60, 1_440)
+    payload = json.loads(json.dumps(_fixture("instrument.binance-btcusdt-perp.json")))
+    step_ms = 60_000
+    payload["interval_min"] = 1
+    payload["listed_at_ms"] = (payload["listed_at_ms"] // step_ms) * step_ms
+    for index, bar in enumerate(payload["bars"]):
+        bar["t_ms"] = payload["listed_at_ms"] + index * step_ms
+    for trade in payload["trades"]:
+        trade["t_ms"] = payload["listed_at_ms"]
+    validate_against_schema("instrument.v1.json", payload, where="instrument")
+    assert instrument_from_payload(payload).interval_min == 1
+    for off_grid in (0, 5, 15, 1_441):
+        payload["interval_min"] = off_grid
+        with pytest.raises(SchemaError):
+            validate_against_schema("instrument.v1.json", payload, where="instrument")
+        with pytest.raises(SchemaError):
+            instrument_from_payload(payload)
+    for on_grid in INTERVALS_MIN:
+        payload["interval_min"] = on_grid
+        validate_against_schema("instrument.v1.json", payload, where="instrument")
+
+
+def test_a_tagged_market_is_held_to_7_2_s_two_statements_about_its_label_lists() -> None:
+    """7.2: ``provider_labels`` is sorted and unique, and ``tags`` **is** the union of the facets.
+
+    Neither is a rule a JSON schema can state. ``market.v2.json`` gives ``provider_labels`` a pattern, a
+    cap of sixteen and ``uniqueItems`` and cannot say **sorted**, which is exactly why ``tags``,
+    ``wiki_subjects`` and ``hardness_tags`` are each checked here. And 7.2 does not say ``tags`` may hold
+    vocabulary values: it says ``tags`` is "the sorted union of the market's facet values and builder
+    labels". A market whose ``tags`` names a subject its own ``subject`` denies would be grouped by
+    ``Memory.prior(tag=...)``, ``PerMarket.tags`` and ``per_tag`` under a topic its facets refuse, which
+    is the drift the taxonomy exists to end.
+    """
+    lexicon = load_tag_lexicon()
+    plain = _synthetic_market(freeze_ms=ms_from_iso_date(SYNTH_FREEZE_DATE))
+    good = dataclasses.replace(
+        plain,
+        subject=("bitcoin",),
+        structure="threshold-above",
+        horizon="quarter",
+        tags=("bitcoin", "quarter", "threshold-above"),
+        provider_labels=("kxbtc", "nonpredictive"),
+    )
+    loader_module.check_market_structure(good, lexicon=lexicon)
+
+    # The order of ``provider_labels`` is the loader's to say on a tagged dataset and on an untagged one
+    # alike: the field's shape is 7.2's whatever the manifest declares.
+    unsorted_labels = dataclasses.replace(good, provider_labels=("nonpredictive", "kxbtc"))
+    for declared in (lexicon, None):
+        with pytest.raises(SchemaError, match="provider_labels must be sorted and unique"):
+            loader_module.check_market_structure(unsorted_labels, lexicon=declared)
+    with pytest.raises(SchemaError, match="provider_labels must be sorted and unique"):
+        loader_module.check_market_structure(
+            dataclasses.replace(good, provider_labels=("kxbtc", "kxbtc")), lexicon=lexicon
+        )
+    # and a market with no provider label at all is accepted: 7.2 floors the list at none, because a
+    # Manifold market its creator filed under no group has no provider string to keep verbatim
+    loader_module.check_market_structure(
+        dataclasses.replace(good, provider_labels=()), lexicon=lexicon
+    )
+
+    # The union is checked in both directions, because each is a different lie: a tag no facet names,
+    # and a facet no tag names. Every value below is inside the vocabulary, so ``check_tags`` alone
+    # accepts all three and this is the pass that does not.
+    for tags in (
+        ("bitcoin", "oil", "quarter", "threshold-above"),
+        ("bitcoin", "quarter"),
+        ("bitcoin", "quarter", "threshold-above", "week"),
+    ):
+        loader_taxonomy = dataclasses.replace(good, tags=tags)
+        with pytest.raises(SchemaError, match="sorted union"):
+            loader_module.check_market_structure(loader_taxonomy, lexicon=lexicon)
+    # A builder label is the one value of ``tags`` that names no facet (7.14), and it survives the check.
+    assert lexicon.builder
+    labelled = dataclasses.replace(
+        good,
+        subject=("temperature",),
+        tags=tuple(sorted({"temperature", "threshold-above", "quarter", *lexicon.builder})),
+    )
+    loader_module.check_market_structure(labelled, lexicon=lexicon)
+    # and the same union is not required of a dataset that never declared the block
+    loader_module.check_market_structure(plain, lexicon=None)

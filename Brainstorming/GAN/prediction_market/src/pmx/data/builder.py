@@ -32,6 +32,7 @@ from pathlib import Path
 
 from pmx import CONTRACT_VERSION, DATASET_SCHEMA
 from pmx import __version__ as PMX_VERSION
+from pmx.cohorts import Cohort, cohort_rows, cohorts_per_provider, list_cohorts
 from pmx.data.loader import (
     dataset_files,
     dataset_hash_of,
@@ -42,6 +43,18 @@ from pmx.data.loader import (
 from pmx.data.news.linker import LinkIndex, load_stopwords, market_terms_of, tokens_of
 from pmx.data.resample import median_daily_volume_milli_of
 from pmx.data.schema import validate_against_schema
+from pmx.data.taxonomy import (
+    TAXONOMY_DIR,
+    TaggedMarket,
+    apply_facets,
+    check_series_facets,
+    copy_lexicons,
+    load_series_facets,
+    load_tag_lexicon,
+    provider_labels_of,
+    tag_market,
+    taxonomy_block,
+)
 from pmx.data.universe import (
     MarketUniverseRow,
     UniverseReport,
@@ -74,6 +87,7 @@ from pmx.types import (
     DatasetSplit,
     DatasetWindow,
     Market,
+    MarketMeta,
     NewsItem,
     NewsSourceCount,
     bar_of,
@@ -87,6 +101,7 @@ from pmx.types import (
 
 __all__ = [
     "BACKGROUND_SOURCE",
+    "FALLBACK_STEPS",
     "FOLD_QUANTILES_PERMILLE",
     "FOLD_NAMES",
     "ILLIQUID_DECILE_MIN_SLICE",
@@ -242,6 +257,12 @@ UNIVERSE_MIN_VOLUME_CENTS_DEFAULT = 100_000
 
 #: The provider whose universe rule 7.4 states. Manifold has no series and is counted whole.
 UNIVERSE_PROVIDER = "kalshi"
+
+#: The four steps a build may fall back on, in ``manifest.build.fallbacks`` (7.4, ruling R271). The list
+#: is ``dataset.v1.json``'s own enum, restated here because the CLI has to refuse a fifth step by name
+#: rather than let the manifest fail its schema after a build has already run; a test asserts the two are
+#: the same four, so a widening of the schema cannot leave this behind.
+FALLBACK_STEPS = ("window_days", "min_trades", "min_traded_bars", "cohort_target")
 
 
 # --------------------------------------------------------------------------------------------------
@@ -413,6 +434,24 @@ class MarketFacts:
     #: ``None``. It is the group the cluster-aware cut of 7.7 falls back to when no ``EventCluster`` names
     #: the market, so the builder reads it here rather than off the payload at the cut site.
     event_key: str | None = None
+    #: The three fields amendment C1c's tagging and cohort call sites read (7.14, 18.5). With
+    #: ``question`` beside ``id``, ``provider``, ``provider_id``, ``category``, ``tags``,
+    #: ``created_at_ms`` and ``close_at_ms``, these facts satisfy
+    #: :class:`pmx.data.taxonomy.TaggableMarket` exactly, so the tagger is handed the eight fields it may
+    #: read and cannot reach a field of 7.9 even by accident. ``provider_labels`` is read off the payload
+    #: so that a **rebuild** over already tagged market files is idempotent: without it
+    #: :func:`pmx.data.taxonomy.provider_labels_of` would fall back to ``tags``, which on a tagged file
+    #: holds facet values, and the rebuild would write facet values into ``provider_labels``.
+    #: ``fee_schedule_id`` is what the ``MarketMeta`` the cohort listing is computed over needs.
+    question: str = ""
+    provider_labels: tuple[str, ...] = ()
+    fee_schedule_id: str = ""
+    #: Whether the payload these facts were read from **already carries** the taxonomy of 7.14, that is
+    #: whether it is a file this builder wrote rather than a payload an importer staged. It decides one
+    #: thing, in :func:`_provider_labels_for`: on a tagged payload ``tags`` holds facet values and an
+    #: absent ``provider_labels`` means the provider gave none, so the pre-taxonomy fallback of
+    #: :func:`pmx.data.taxonomy.provider_labels_of` must not run.
+    tagged: bool = False
 
     @property
     def life_days(self) -> int:
@@ -471,7 +510,29 @@ def market_facts(payload: Mapping[str, object]) -> MarketFacts:
             _str_field(quality, "tape_kind") if "tape_kind" in quality else TAPE_KIND_PRINTS
         ),
         event_key=_opt_str_field(payload, "event_key"),
+        question=_str_field(payload, "question"),
+        provider_labels=(
+            _str_tuple_field(payload, "provider_labels") if "provider_labels" in payload else ()
+        ),
+        fee_schedule_id=_str_field(payload, "fee_schedule_id"),
+        tagged="subject" in payload,
     )
+
+
+def _provider_labels_for(facts: MarketFacts) -> tuple[str, ...]:
+    """A market's own provider strings, whether its payload was already tagged or not (7.2, 7.14).
+
+    :func:`pmx.data.taxonomy.provider_labels_of` reads ``provider_labels`` when the market carries one
+    and falls back to ``tags``, which is the pre-taxonomy shape: an importer writes the provider's own
+    strings into ``tags`` and the tagger is what moves them across. On a payload this builder has
+    **already** tagged, ``tags`` holds facet values and an absent ``provider_labels`` means the provider
+    gave none, so the fallback would write facet values into the field and a rebuild over a dataset's own
+    files would not reproduce the build that wrote them. The taxonomy fields on the payload are what
+    tells the two shapes apart.
+    """
+    if facts.tagged and not facts.provider_labels:
+        return ()
+    return provider_labels_of(facts)
 
 
 # --------------------------------------------------------------------------------------------------
@@ -551,11 +612,13 @@ def build_outcome(
     shortfall costs breadth and not the comparison. The blanket sentence 7.4 used to carry ("a build that
     reaches the market floor and not the cohort floor is a failed build") contradicted that and is gone.
 
-    ``cohorts_per_provider`` is ``None`` until DS2's ``pmx.cohorts.list_cohorts`` exists (18.5): the
-    cohort count is the primary target and the market floor is what it costs, so with no cohort count the
-    status is decided on the market floor alone and ``targets`` says both numbers either way. A shortfall
-    row is only ever written for a venue that is short, and the count itself is not echoed back into the
-    block: ``dataset.v1.json``'s ``build`` object carries exactly the five keys 7.8 names.
+    ``cohorts_per_provider`` is what ``pmx.cohorts.cohorts_per_provider(cohorts)`` answered on this
+    build (18.5); every build passes it now that the cohorts are listed. It stays optional because the
+    cohort count is the primary target and the market floor is what it costs, so a caller with no cohort
+    count at all still gets a status decided on the market floor alone and ``targets`` says both numbers
+    either way. A shortfall row is only ever written for a venue that is short, and the count itself is
+    not echoed back into the block: ``dataset.v1.json``'s ``build`` object carries exactly the five keys
+    7.8 names.
     """
     targets = {
         "kalshi_cohorts": KALSHI_COHORT_TARGET,
@@ -648,11 +711,15 @@ def removal_reason(
     a single binary market (``binary``), which is read off ``tags`` because that is the only channel an
     importer has, and which is reported as a contract issue against section 7.2. ``self_resolved`` reads
     the ``resolution_source`` marker D3 declares, and the tag beside it for any importer that has none.
+    Both of those two read ``provider_labels`` as well as ``tags``, because amendment C1c moved the
+    provider's raw strings there (7.14): a payload this builder already tagged carries
+    ``nonpredictive`` and ``multiple_choice`` in ``provider_labels`` and facet values in ``tags``, and a
+    filter that read only ``tags`` would silently stop firing on a rebuild.
     """
     series = facts.provider_id.split("-", 1)[0]
     checks: dict[str, bool] = {
         "resolution": facts.resolution not in (0, 1),
-        "binary": any(tag in MULTI_OUTCOME_TAGS for tag in facts.tags),
+        "binary": any(tag in MULTI_OUTCOME_TAGS for tag in (*facts.tags, *facts.provider_labels)),
         # Never gated by ``window_checks``: a dataset exempt from the **window** rule of 5.6 is exempt
         # from the **freeze** rule of nothing (7.1, ruling R263). A landmark market that resolved after
         # the freeze is a leak in a showcase pack exactly as it is in a research one.
@@ -662,7 +729,11 @@ def removal_reason(
             window_checks and facts.created_at_ms < window_start_ms - config.opened_early_days * MS_PER_DAY
         ),
         "self_resolved": config.exclude_self_resolved
-        and (facts.resolution_source == SELF_RESOLVED_SOURCE or SELF_RESOLVED_TAG in facts.tags),
+        and (
+            facts.resolution_source == SELF_RESOLVED_SOURCE
+            or SELF_RESOLVED_TAG in facts.tags
+            or SELF_RESOLVED_TAG in facts.provider_labels
+        ),
         "kalshi_shards": (
             config.exclude_kalshi_shards
             and facts.provider == "kalshi"
@@ -1143,6 +1214,16 @@ class BuildResult:
     #: declared ``window_days``. A reader compares the two and sees whether the window is a statement
     #: about the data or about the flag.
     resolution_span_ms: tuple[int, int] | None = None
+    #: What the taxonomy of 7.14 produced, carried so the CLI can draw the fifty-tagging audit of the
+    #: build it just ran (ruling R268) without re-tagging anything: ``tagged`` is the row list
+    #: ``manifest.taxonomy`` was computed from, with the facet ``source`` a reviewer needs and a market
+    #: file does not store, ``cohorts`` are the objects behind ``manifest.cohorts`` with their
+    #: ``market_ids`` (which the manifest row deliberately omits), and ``questions`` is the
+    #: ``{market_id: question}`` the audit file quotes so a reviewer judges a tagging without opening
+    #: three hundred market files.
+    tagged: tuple[TaggedMarket, ...] = ()
+    cohorts: tuple[Cohort, ...] = ()
+    questions: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def dataset_hash(self) -> str:
@@ -1413,7 +1494,6 @@ def build_dataset_from_payloads(
     clusters: Mapping[str, str] = {},
     purpose: str = PURPOSE_RESEARCH,
     universe_rule: UniverseRule | None = None,
-    cohorts_per_provider: Mapping[str, int] | None = None,
     fallbacks: Sequence[Mapping[str, object]] = (),
     name: str | None = None,
     notes: str = "",
@@ -1435,6 +1515,13 @@ def build_dataset_from_payloads(
     """
     check_window_days(config.window_days)
     check_purpose(purpose)
+    # The vocabulary and the sealed series map, read **once** per build (7.14, agreement of section 13).
+    # ``check_series_facets`` runs before a single market is tagged: the two files are shipped together
+    # and edited by one package, and a subject renamed in one and not the other would otherwise tag a
+    # whole Kalshi series with a value ``tags`` refuses and fail at seal time on 220 markets at once.
+    lexicon = load_tag_lexicon()
+    series = load_series_facets()
+    check_series_facets(series, lexicon=lexicon)
     dataset_name = name if name is not None else out_dir.name
     if RE_DATASET_NAME.fullmatch(dataset_name) is None:
         raise InvalidConfigError("a dataset name is not the lowercase slug of section 2", name=dataset_name)
@@ -1509,6 +1596,26 @@ def build_dataset_from_payloads(
         kept_payloads = [payload for payload, _ in kept_pairs]
         kept_facts = [facts for _, facts in kept_pairs]
 
+    # The deterministic tagger of 7.14, run over every kept market **before** the linker and before a
+    # file is written. The order matters twice. 7.6 reads ``K_market`` off "the market's question plus
+    # tags", and after this amendment ``tags`` is the facet union of 7.14 and not the provider's raw
+    # strings, so the linker has to see the tagged market or a rebuild over a dataset's own files would
+    # produce different links from the build that wrote them. And the tagging runs **after** the filters,
+    # because two of them (``binary``, ``self_resolved``) read the provider's own labels.
+    tagged: list[TaggedMarket] = []
+    for index, (payload, facts) in enumerate(zip(kept_payloads, kept_facts, strict=True)):
+        facets = tag_market(facts, lexicon=lexicon, series_facets=series)
+        document = apply_facets(
+            payload, facets, provider_labels=_provider_labels_for(facts), lexicon=lexicon
+        )
+        # ``provider_labels`` is optional in ``market.v2.json`` and ``Market.to_dict`` renders it only
+        # when set (7.2), so an empty list is dropped rather than written: a file that carried
+        # ``"provider_labels": []`` would not be the bytes the record it loads back renders.
+        if not document["provider_labels"]:
+            del document["provider_labels"]
+        kept_payloads[index] = document
+        tagged.append(TaggedMarket(market_id=facts.id, provider=facts.provider, facets=facets))
+
     boundaries = illiquid_boundaries(kept_facts)
     hardness = {
         facts.id: hardness_tags_for(facts, illiquid_boundary_milli=boundaries.get(facts.provider, -1))
@@ -1576,6 +1683,11 @@ def build_dataset_from_payloads(
         path = out_dir / "wiki_asof" / market_id / f"{asof_day.replace('-', '')}.json"
         n_bytes += write_canonical_json(path, payload)
 
+    # The two lexicon files are copied into ``<dataset>/taxonomy/`` **before** the walk of 4.3 and are
+    # therefore inside ``dataset_hash`` (7.14, ruling R267): a tag that moved between two rebuilds moves
+    # the hash and not a claim. A re-copy writes the same bytes, so a rebuild under the same vocabulary
+    # moves nothing.
+    tags_sha256, series_sha256 = copy_lexicons(out_dir)
     files: tuple[DatasetFile, ...] = dataset_files(out_dir)
     all_news = list(digest_news) + list(background_news)
     n_linked = sum(1 for item in all_news if _str_tuple_field(item, "match_ids"))
@@ -1610,9 +1722,39 @@ def build_dataset_from_payloads(
         precap_per_provider_month=precap,
         mapped_series=frozenset(series.upper() for series in mapped_series),
     )
+    # The cohorts of 18.5, listed over the metas this build just tagged and folded. ``list_cohorts`` is
+    # the one implementation of the keying rule and ``Dataset.cohorts`` calls the same function over the
+    # metas the loader reads back, which is what lets ``check_fold_integrity`` refuse a manifest whose
+    # rows disagree with the folds and facets recomputed (ruling R266). A cohort has no fold of its own
+    # (ruling R293): every market keeps the fold 7.7 gave it and the three counts are what those left.
+    facets_of_id = {row.market_id: row.facets for row in tagged}
+    metas = tuple(
+        MarketMeta(
+            id=facts.id,
+            provider=facts.provider,
+            category=facts.category,
+            tags=facets_of_id[facts.id].tags,
+            event_key=facts.event_key,
+            created_at_ms=facts.created_at_ms,
+            close_at_ms=facts.close_at_ms,
+            resolved_at_ms=facts.resolved_at_ms,
+            resolution=facts.resolution,
+            interval_min=facts.interval_min,
+            n_bars=len(facts.bar_times_ms),
+            hardness_tags=hardness[facts.id],
+            fee_schedule_id=facts.fee_schedule_id,
+            fold=folds[facts.id],
+            subject=facets_of_id[facts.id].subject,
+            structure=facets_of_id[facts.id].structure,
+            horizon=facets_of_id[facts.id].horizon,
+            provider_labels=_provider_labels_for(facts),
+        )
+        for facts in kept_facts
+    )
+    cohorts = list_cohorts(metas)
     outcome = build_outcome(
         per_provider=counts.per_provider,
-        cohorts_per_provider=cohorts_per_provider,
+        cohorts_per_provider=cohorts_per_provider(cohorts),
         fallbacks=fallbacks,
     )
     manifest = DatasetManifest(
@@ -1645,6 +1787,15 @@ def build_dataset_from_payloads(
             else {"min_ms": resolution_span_ms[0], "max_ms": resolution_span_ms[1]}
         ),
         universe=universe.to_dict(),
+        taxonomy=taxonomy_block(
+            tagged,
+            cohorts,
+            lexicon=lexicon,
+            lexicon_hash=tags_sha256,
+            series_facets_hash=series_sha256,
+            audit=None,
+        ),
+        cohorts=tuple(cohort_rows(cohorts)),
         build=dict(outcome),
     )
     validate_against_schema("dataset.v1.json", manifest.to_dict(), where="dataset manifest")
@@ -1668,17 +1819,22 @@ def build_dataset_from_payloads(
         purpose=purpose,
         outcome=outcome,
         resolution_span_ms=resolution_span_ms,
+        tagged=tuple(tagged),
+        cohorts=cohorts,
+        questions={facts.id: facts.question for facts in kept_facts},
     )
 
 
 def _clear(out_dir: Path) -> None:
-    """Remove the three hashed directories of a dataset being rebuilt in place.
+    """Remove the four hashed directories of a dataset being rebuilt in place.
 
-    Only ``markets/``, ``news/`` and ``wiki_asof/`` are touched: ``cache/`` is the raw provider answers a
-    rebuild wants to keep, and ``contamination.json`` is per model and outside the hash (sections 7.1,
-    11.5). A stale file left behind would enter the next hash and make the manifest a lie.
+    Only ``markets/``, ``news/``, ``wiki_asof/`` and ``taxonomy/`` are touched: ``cache/`` is the raw
+    provider answers a rebuild wants to keep, and ``contamination.json`` is per model and outside the
+    hash (sections 7.1, 11.5). A stale file left behind would enter the next hash and make the manifest a
+    lie, which is why ``taxonomy/`` joins them (7.14): the directory is inside the walk of 4.3, so a
+    lexicon file renamed between two builds would leave the old one in the next dataset hash.
     """
-    for name in ("markets", "news", "wiki_asof"):
+    for name in ("markets", "news", "wiki_asof", TAXONOMY_DIR):
         shutil.rmtree(out_dir / name, ignore_errors=True)
 
 
@@ -1694,7 +1850,6 @@ def build_dataset(
     clusters: Mapping[str, str] = {},
     purpose: str = PURPOSE_RESEARCH,
     universe_rule: UniverseRule | None = None,
-    cohorts_per_provider: Mapping[str, int] | None = None,
     fallbacks: Sequence[Mapping[str, object]] = (),
     name: str | None = None,
     notes: str = "",
@@ -1712,7 +1867,6 @@ def build_dataset(
         clusters=clusters,
         purpose=purpose,
         universe_rule=universe_rule,
-        cohorts_per_provider=cohorts_per_provider,
         fallbacks=fallbacks,
         name=name,
         notes=notes,
