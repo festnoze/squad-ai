@@ -144,11 +144,42 @@ def load_schema(name: str) -> dict[str, object]:
     return copy.deepcopy(_schema_cached(name))
 
 
+def _inline_market_refs(schema: dict[str, object]) -> dict[str, object]:
+    """Expand this schema's simple local references once, preserving all validation constraints.
+
+    A large trade tape otherwise resolves the same four primitive references hundreds of thousands
+    of times. Only single-key references into the root definitions are expanded. References with
+    siblings, cycles or other scopes retain the standard resolver. The published schema is unchanged.
+    """
+    definitions = schema.get("$defs")
+    if not isinstance(definitions, dict):
+        return schema
+
+    def expand(node: object, seen: frozenset[str]) -> object:
+        if isinstance(node, list):
+            return [expand(item, seen) for item in node]
+        if not isinstance(node, dict):
+            return node
+        ref = node.get("$ref")
+        if len(node) == 1 and isinstance(ref, str) and ref.startswith("#/$defs/") and ref not in seen:
+            key = ref.removeprefix("#/$defs/")
+            target = definitions.get(key)
+            if isinstance(target, dict) and "$id" not in target:
+                return expand(target, seen | {ref})
+        return {key: expand(value, seen) for key, value in node.items()}
+
+    expanded = expand(schema, frozenset())
+    assert isinstance(expanded, dict)
+    return expanded
+
+
 @lru_cache(maxsize=len(SCHEMA_FILES))
 def validator_for(name: str) -> Draft202012Validator:
     """The compiled validator for one schema, built once per process."""
     schema = _schema_cached(name)
     Draft202012Validator.check_schema(schema)
+    if name == "market.v2.json":
+        schema = _inline_market_refs(schema)
     return Draft202012Validator(schema)
 
 
@@ -260,10 +291,11 @@ class MarketModel(_Strict):
     #: One flag per subject, in the same order. An empty list beside a non-empty ``wiki_subjects`` means
     #: every subject is stated, which is what a market file written before the flag existed meant.
     wiki_subject_provenance: list[Literal["stated", "derived"]] = Field(default_factory=list, max_length=8)
-    currency: Literal["usd", "mana", "usdt", "eur", "jpy"]
+    currency: Literal["usd", "mana", "usdt", "usdc", "eur", "jpy"]
     source: Literal["imported", "reconstructed"]
     created_at_ms: Ms
     close_at_ms: Ms
+    close_time_verified: bool = True
     resolved_at_ms: Ms
     resolution: Literal[0, 1]
     resolution_source: str = Field(max_length=500)
@@ -307,6 +339,7 @@ class MarketModel(_Strict):
             source=self.source,
             created_at_ms=self.created_at_ms,
             close_at_ms=self.close_at_ms,
+            close_time_verified=self.close_time_verified,
             resolved_at_ms=self.resolved_at_ms,
             resolution=self.resolution,
             resolution_source=self.resolution_source,
@@ -512,7 +545,7 @@ class SchedulesBlockModel(_Strict):
 
 class FileModel(_Strict):
     path: str = Field(
-        pattern=r"^(markets|news|wiki_asof|clusters|instruments|calendars|taxonomy)/[A-Za-z0-9._/-]+$"
+        pattern=r"^(markets|news|wiki_asof|clusters|instruments|calendars|taxonomy|archive)/[A-Za-z0-9._/-]+$"
     )
     sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
     bytes: NonNegInt

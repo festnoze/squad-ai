@@ -49,10 +49,11 @@
       "maxItems": 8,
       "items": { "enum": ["stated", "derived"] }
     },
-    "currency": { "description": "The quote currencies of CONTRACTS_V2 17.1 (ruling R165): usd or mana on a binary; usdt, eur and jpy are the ones amendment C1b adds.", "enum": ["usd", "mana", "usdt", "eur", "jpy"] },
+    "currency": { "description": "Quote currency; the archive uses usdc for its USDC.e collateral without assuming a conversion to USD.", "enum": ["usd", "mana", "usdt", "usdc", "eur", "jpy"] },
     "source": { "enum": ["imported", "reconstructed"] },
     "created_at_ms": { "$ref": "#/$defs/ms" },
     "close_at_ms": { "$ref": "#/$defs/ms" },
+    "close_time_verified": { "type": "boolean", "default": true, "description": "False when close_at_ms is a technical observed lifecycle boundary, unavailable as a historical expiry feature." },
     "resolved_at_ms": { "$ref": "#/$defs/ms" },
     "resolution": { "enum": [0, 1] },
     "resolution_source": { "type": "string", "maxLength": 500 },

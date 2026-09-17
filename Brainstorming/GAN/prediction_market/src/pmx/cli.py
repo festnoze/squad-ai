@@ -159,6 +159,11 @@ def build_parser() -> argparse.ArgumentParser:
     serve.add_argument("--data", default=DEFAULT_DATA)
     serve.set_defaults(func=_cmd_api_serve)
 
+    from pmx.cli_archive import register as register_archive
+    from pmx.cli_mvp import register
+
+    register(sub)
+    register_archive(sub)
     return parser
 
 

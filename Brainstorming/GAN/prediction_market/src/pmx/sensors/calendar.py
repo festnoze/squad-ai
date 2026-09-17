@@ -22,7 +22,7 @@ def sense(view: SensorInputsLike, *, now_ms: int, spec: SensorSpec) -> SensorBlo
     """``calendar``'s seven features (18.1)."""
     meta = view.meta
     bar_ms = interval_ms(meta.interval_min)
-    close_at_ms = meta.close_at_ms
+    close_at_ms = meta.close_at_ms if meta.close_time_verified else 0
     bars_to_close: int | None = None
     ms_to_close_log_milli: int | None = None
     if close_at_ms > 0:

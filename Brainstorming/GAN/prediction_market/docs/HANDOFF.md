@@ -1,5 +1,14 @@
 # pmx build handoff
 
+> Current entry point, 2026-09-13: [PLAN_DISCOVERY_MVP.md](PLAN_DISCOVERY_MVP.md) and
+> [CONTRACTS_MVP.md](CONTRACTS_MVP.md). The user authorized a complete MVP-first reprioritisation.
+> All resume orders below, including section 9, are historical. Resume from [DISCOVERY_MVP_STATUS.md](DISCOVERY_MVP_STATUS.md) rather
+> than starting the old measurement wave or applying obsolete model/Workflow restrictions.
+> Latest feedback and next research priority: [POST_CAMPAIGN_REVIEW_2026-09-13.md](POST_CAMPAIGN_REVIEW_2026-09-13.md).
+> Automatic subscription-backed campaign reviews are implemented and enabled on this machine.
+> R1 and beginner UI are now delivered: [R1_RESULTS_2026-09-14.md](R1_RESULTS_2026-09-14.md).
+> Resume at the R2 decision; do not rerun the frozen R1 study with silently adjusted thresholds.
+
 Written 2026-09-08 when the user stopped the build at their usage limit. This file says exactly where the
 multi-agent build stands and how to restart it at the same point. `docs/BUILD_STATE.md` (written by
 gate G1) records the verified state up to the first real dataset; this file covers what happened after

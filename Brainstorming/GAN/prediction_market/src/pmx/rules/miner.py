@@ -21,7 +21,7 @@ per family to rank candidates a mean already ranks identically.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 
 from pmx.rules.rule import (
@@ -194,6 +194,7 @@ def mine(
     min_support: int = RULE_MIN_SUPPORT_DEFAULT,
     beam: int = RULE_MINER_BEAM,
     candidates_max: int = RULE_MINER_CANDIDATES_MAX,
+    on_candidate: Callable[[MinedCandidate], None] | None = None,
 ) -> MinerResult:
     """Beam search over conjunctions of up to ``RULE_PREDICATES_MAX`` predicates on the **fit** fold.
 
@@ -261,6 +262,8 @@ def mine(
                         candidate = MinedCandidate(
                             rule=rule, lift_bp=lift_bp, support=support, n_markets=n_markets
                         )
+                        if on_candidate is not None:
+                            on_candidate(candidate)
                         grown.append(candidate)
                         if support >= min_support and n_markets >= RULE_MIN_MARKETS and lift_bp > 0:
                             scored[key] = candidate
@@ -273,7 +276,13 @@ def mine(
         if not grown:
             break
         grown.sort(key=lambda candidate: candidate.order_key)
-        beam_conditions = [candidate.rule.condition for candidate in grown[:beam]]
+        # A conjunction can only lose rows and markets. An unsupported parent can
+        # never produce an eligible child; letting its high but tiny-sample lift
+        # fill the beam would starve all feasible conjunctions of the search budget.
+        beam_conditions = [
+            candidate.rule.condition for candidate in grown
+            if candidate.support >= min_support and candidate.n_markets >= RULE_MIN_MARKETS
+        ][:beam]
         if truncated:
             break
 

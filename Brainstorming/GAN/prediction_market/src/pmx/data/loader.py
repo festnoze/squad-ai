@@ -116,6 +116,7 @@ HASHED_DIRS = (
     INSTRUMENTS_DIR,
     CALENDARS_DIR,
     TAXONOMY_DIR,
+    "archive",
 )
 
 
@@ -1140,21 +1141,20 @@ def check_cohort_rows(metas: Sequence[MarketMeta], *, manifest: DatasetManifest)
 
 
 def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
-    """Load a dataset directory: the manifest, every market's metadata, and lazy access to the tapes.
+    """Load a dataset directory and retain the immutable tapes validated while reading metadata.
 
     Every market file is opened and fully validated here, because the leak-free ``MarketMeta`` the
     metrics and the optimizer read carries the fold, the resolution and the bar count, and a dataset that
-    is half readable is not a dataset. The **tape** of a market is loaded on first use through
-    ``Dataset.market``, which is why a year of hourly bars over three hundred markets does not have to
-    fit in memory at once.
+    is half readable is not a dataset. These already validated records become the instance's tape
+    cache: throwing them away here made the catalogue validate every trade twice, or three times with
+    ``verify=True``. Continuous records still pass through ``Dataset.market``'s clipping boundary.
 
-    ``verify`` is keyword-only and defaults to false, because ``run_backtest`` calls ``verify_dataset``
-    itself before it reads a market (section 7.8) and the builder loads a dataset whose manifest hash is
-    still being computed.
+    With ``verify=True``, bytes are checked before parsing; the fold check follows in the same pass.
+    The builder may omit byte verification while its manifest hash is still being computed.
     """
     manifest = load_manifest(path)
     if verify:
-        verify_dataset(path, manifest=manifest)
+        _verify_bytes(path, manifest=manifest)
     markets_dir = path / MARKETS_DIR
     instruments_dir = path / INSTRUMENTS_DIR
     if not markets_dir.is_dir() and not instruments_dir.is_dir():
@@ -1185,6 +1185,7 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
     # here over the whole set and not market by market as each file is read.
     folds = check_fold_integrity(binaries, manifest=manifest, clusters=read_cluster_groups(path))
     metas: list[MarketMeta] = [meta_of(market, fold=folds[market.id]) for market in binaries]
+    records: dict[str, Market | ContinuousInstrument] = {market.id: market for market in binaries}
     # Amendment C1b (17.2, ruling R149): the continuous instruments, one meta each with ``kind`` on it and
     # ``fold = "all"`` (ruling R186), checked against the calendar they name.
     n_instruments = 0
@@ -1198,6 +1199,7 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
                 providers=list(manifest.providers),
             )
         metas.append(meta_of(instrument, fold="all", window_end_ms=manifest.window.end_ms))
+        records[instrument.id] = instrument
         n_instruments += 1
     if manifest.instruments is not None:
         per_kind = manifest.instruments.get("per_kind")
@@ -1234,6 +1236,7 @@ def load_dataset(path: Path, *, verify: bool = False) -> Dataset:
         news_loader=lambda: load_news(path, manifest=manifest),
         background_loader=lambda market_id: load_background(path, manifest=manifest, market_id=market_id),
         calendar_loader=load_calendar_by_id,
+        _whole=records,
     )
 
 
@@ -1245,6 +1248,13 @@ def verify_dataset(path: Path, *, manifest: DatasetManifest | None = None) -> Da
     one-byte edit to a market file has to be fatal rather than interesting. ``run_backtest`` calls it
     before reading a single market.
     """
+    report = _verify_bytes(path, manifest=manifest)
+    verify_folds(path, manifest=manifest)
+    return report
+
+
+def _verify_bytes(path: Path, *, manifest: DatasetManifest | None = None) -> DatasetVerification:
+    """The shared byte-integrity check, separate from the caller's structural/fold validation."""
     report = verify_dataset_report(path, manifest=manifest)
     if not report.ok:
         raise DatasetHashMismatchError(
@@ -1256,7 +1266,6 @@ def verify_dataset(path: Path, *, manifest: DatasetManifest | None = None) -> Da
             missing_files=list(report.missing_files),
             extra_files=list(report.extra_files),
         )
-    verify_folds(path, manifest=manifest)
     return report
 
 

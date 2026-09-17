@@ -1,5 +1,9 @@
 # pmx v2 - CONTRACTS
 
+> Scoped MVP amendment, authorized 2026-09-13: [CONTRACTS_MVP.md](CONTRACTS_MVP.md) takes precedence
+> for explicitly named MVP decisions, file ownership and staged version changes. Existing numerical,
+> as-of and journal contracts remain in force otherwise. The active plan is [PLAN_MVP.md](PLAN_MVP.md).
+
 **Status: authoritative for code.** `docs/PRD_V2_HARD_OPTIMIZER.md` says what and why;
 `docs/PLAN_V2_WAVES.md` says in which order and by whom; this document says how the code is shaped so that
 twenty-seven packages can be built in parallel and compose without anyone merging by hand.
@@ -703,10 +707,11 @@ teaches the wrong lesson about the product.
 | `structure` | `str`, a value of the `structure` facet, **optional** as above | the question's shape (`threshold-above`, `by-date`, `head-to-head`, ...), which decides whether two markets are comparable at all (7.14) |
 | `horizon` | `str`, one of `intraday`, `week`, `month`, `quarter`, `year-plus`, **optional** as above | derived from `close_at_ms - created_at_ms` by 7.14's boundaries, never from provider text and never from `resolved_at_ms` |
 | `wiki_subjects` | `list[str]`, each 1..256 chars, `<= 8`, sorted, unique | the market's Wikipedia subject page titles as the importer read them, verbatim (capitals, spaces, colons and parentheses kept); the linker's `shared_links` compares against this list, never against `tags` |
-| `currency` | `"usd"` or `"mana"` | `mana` iff `provider == "manifold"` |
+| `currency` | `"usd"`, `"mana"` or `"usdc"` | native accounting unit; archive USDC is not converted to USD (discovery MVP amendment) |
 | `source` | `"imported"` or `"reconstructed"` | `reconstructed` is refused by `seal` |
 | `created_at_ms` | int | `< close_at_ms` |
 | `close_at_ms` | int | `<= resolved_at_ms`; the venue's published close (Kalshi `close_time`, Manifold `closeTime`) |
+| `close_time_verified` | bool, **optional**, default `true` | `false` for inferred archive lifecycle boundaries: hide close from observations and sensors; first print visible after its bar completes (discovery MVP amendment) |
 | `resolved_at_ms` | int | the venue's settlement instant |
 | `resolution` | `0` or `1` | |
 | `resolution_source` | `str`, 0..500 | the venue's stated source, `"venue"` when unknown |
@@ -5443,7 +5448,7 @@ view restates it: a reader takes `kind` off the record and the scale fields off 
 | `id` | instrument id, section 17.8 | `<provider>-<slug>`; the field is still called `market_id` in every event, view and signature, for every kind (ruling R144: the name is the id namespace, not a claim about the kind) | `market.id` |
 | `provider` | provider | the venue whose fee schedule applies, section 17.8 | `market.provider` |
 | `vendor` | vendor | the data source the tape was read from, section 17.8; `yahoo` is unofficial and every claim on a `yahoo` tape carries the vendor caveat of PRD v4 section 8 | `== provider` |
-| `symbol` | `str`, 1..64 | the venue's own symbol, verbatim | `market.provider_id` |
+| `symbol` | `str`, 1..64 continuous; 1..128 binary | the venue's own symbol, verbatim; binary journal symbols preserve the existing `provider_id` bound, including 66-character Polygon condition IDs (discovery MVP compatibility amendment) | `market.provider_id` |
 | `kind` | one of `INSTRUMENT_KINDS` | | `"binary"` |
 | `currency` | `^[a-z]{3,5}$` | the quote currency, whose minor unit is the cash unit (`usd`, `usdt`, `eur`, `jpy`, `mana`) | `market.currency` |
 | `tick_size_micro` | `int`, `1..TICK_SIZE_MICRO_MAX` | the smallest price increment in millionths of one quote unit | `BINARY_TICK_SIZE_MICRO = 100` |

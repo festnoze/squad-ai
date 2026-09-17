@@ -1,0 +1,199 @@
+{
+  "checked_on": "2026-09-13",
+  "scope": "Read-only acquisition research; no full dataset import or completeness certification.",
+  "cryptohouse": {
+    "endpoint": "https://crypto-clickhouse.clickhouse.com/",
+    "access_documentation": "https://github.com/ClickHouse/CryptoHouse#direct-connections",
+    "public_user": "crypto",
+    "authentication": "Public account with empty password, documented by the operator.",
+    "schema_probe": {
+      "http_status": 200,
+      "tables": [
+        "assets",
+        "assets_mv",
+        "block_times",
+        "global_open_interest",
+        "market_open_interest",
+        "orders_filled",
+        "orders_filled_old",
+        "orders_matched",
+        "orders_matched_old",
+        "slugs",
+        "token_id_condition",
+        "user_balances",
+        "user_positions"
+      ]
+    },
+    "physical_rows_probe": {
+      "query": "SELECT name,total_rows,total_bytes,sorting_key FROM system.tables WHERE database='polymarket' AND engine != 'MaterializedView' FORMAT JSON",
+      "http_status": 200,
+      "orders_filled_rows": 257649337,
+      "orders_filled_bytes": 40806838454,
+      "orders_matched_rows": 112297716,
+      "assets_rows": 45535,
+      "warning": "Physical table rows can include versions and both sides of an economic execution. They are not independent bets or a completeness measure."
+    },
+    "trade_time_range_probe": {
+      "query": "SELECT min(timestamp) AS first_timestamp, max(timestamp) AS last_timestamp FROM polymarket.orders_filled FORMAT JSON",
+      "http_status": 200,
+      "first_timestamp_returned": "2022-11-21 19:50:09",
+      "last_timestamp_returned": "2026-01-05 22:05:45",
+      "server_elapsed_seconds": 1.425136803,
+      "rows_read": 257649337,
+      "bytes_read": 1030597348,
+      "warning": "The range is for this table, without FINAL/version deletion reconciliation; it does not certify continuity, uniqueness, or all other tables."
+    },
+    "metadata_time_range_probe": {
+      "query": "SELECT min(insert_time) AS first_insert,max(insert_time) AS last_insert,uniqExact(market_id) AS markets,uniqExact(event_id) AS events FROM polymarket.assets FORMAT JSON",
+      "http_status": 200,
+      "first_insert": "2026-05-14 12:30:00",
+      "last_insert": "2026-05-14 12:30:00",
+      "distinct_market_ids": 22759,
+      "distinct_event_ids": 8085,
+      "warning": "Metadata are a later snapshot, not proof of what was known at each historical trading instant."
+    }
+  },
+  "direct_polymarket_access": [
+    {
+      "url": "https://gamma-api.polymarket.com/markets/keyset?limit=1&closed=true",
+      "result": "TLS verification failed: certificate hostname does not match gamma-api.polymarket.com",
+      "tls_verification_disabled": false
+    },
+    {
+      "url": "https://data-api.polymarket.com/v2/status",
+      "result": "TLS verification failed: certificate hostname does not match data-api.polymarket.com",
+      "tls_verification_disabled": false
+    }
+  ],
+  "timeseventeen": {
+    "repository": "TimeSeventeen/Polymarket-v1",
+    "revision": "5aa1b9d52316a8b2e789e81c8ae42c7ed532e8aa",
+    "observed_at_utc": "2026-09-13T01:06:21.629274+00:00",
+    "groups": {
+      "root": {
+        "files": 2,
+        "bytes": 26964
+      },
+      "CTF": {
+        "files": 5,
+        "bytes": 8535196364
+      },
+      "OrderFilled": {
+        "files": 42,
+        "bytes": 27383416974
+      },
+      "daily_aligned": {
+        "files": 1248,
+        "bytes": 13175302607
+      },
+      "daily_aligned_multi": {
+        "files": 857,
+        "bytes": 3627211377
+      }
+    },
+    "samples": [
+      {
+        "path": "OrderFilled/2022_11.parquet",
+        "bytes": 5915,
+        "sha256": "100726a260d5ea49ac7f53b9e6e612c14a18ce79adc70cbcd2ebe11240fa0fbc",
+        "matches_published_lfs_sha256": true,
+        "rows": 138,
+        "schema": "id: string\nmaker: string\ntaker: string\nblock_timestamp: int64\nmaker_asset_id: string\ntaker_asset_id: string\nmaker_direction: string\ntaker_direction: string\ntoken_asset_id: string\ntoken_amount: double\nusdc_amount: double\nprice: double\nfee_usdc: double",
+        "timestamp_min_utc": "2022-11-21T19:50:09+00:00",
+        "timestamp_max_utc": "2022-11-30T22:53:25+00:00",
+        "unique_conditions": null,
+        "resolution_status_values": [],
+        "price_min": 0.01,
+        "price_max": 0.95
+      },
+      {
+        "path": "daily_aligned/2022_11_21.parquet",
+        "bytes": 10893,
+        "sha256": "bfae6caa7b7aa9db193d417274ee8f393fbd731b1fc1d5af8e607273c47c0bfb",
+        "matches_published_lfs_sha256": true,
+        "rows": 28,
+        "schema": "asset_id: large_string\nblock_timestamp: int64\nprice: double\nmaker: large_string\ntaker: large_string\ntaker_direction: large_string\nusdc_amount: double\nfee_usdc: double\ncondition_id: large_string\noutcome_seq: int64\nneg_risk: large_string\ncategory: large_string\ncategory_refined: large_string\noutcome_label: large_string\nwinning_outcome_label: large_string\nresolution_status: large_string\ntaker_base_fee: double\nmaker_base_fee: double\nopens_at: timestamp[us, tz=UTC]\nclose_at: timestamp[us, tz=UTC]\nresolved_at: timestamp[us, tz=UTC]\nmarket_slug: large_string\np_event: double\nD: int8",
+        "timestamp_min_utc": "2022-11-21T19:50:09+00:00",
+        "timestamp_max_utc": "2022-11-21T22:40:35+00:00",
+        "unique_conditions": 1,
+        "resolution_status_values": [
+          "resolved"
+        ],
+        "price_min": 0.5,
+        "price_max": 0.6
+      },
+      {
+        "path": "daily_aligned/2023_06_15.parquet",
+        "bytes": 24129,
+        "sha256": "410ec5816de28d3ec64bf3c70b302ae79484421dc64c230de522c5ad9d870cfd",
+        "matches_published_lfs_sha256": true,
+        "rows": 207,
+        "schema": "asset_id: large_string\nblock_timestamp: int64\nprice: double\nmaker: large_string\ntaker: large_string\ntaker_direction: large_string\nusdc_amount: double\nfee_usdc: double\ncondition_id: large_string\noutcome_seq: int64\nneg_risk: large_string\ncategory: large_string\ncategory_refined: large_string\noutcome_label: large_string\nwinning_outcome_label: large_string\nresolution_status: large_string\ntaker_base_fee: double\nmaker_base_fee: double\nopens_at: timestamp[us, tz=UTC]\nclose_at: timestamp[us, tz=UTC]\nresolved_at: timestamp[us, tz=UTC]\nmarket_slug: large_string\np_event: double\nD: int8",
+        "timestamp_min_utc": "2023-06-15T00:27:53+00:00",
+        "timestamp_max_utc": "2023-06-15T23:49:02+00:00",
+        "unique_conditions": 48,
+        "resolution_status_values": [
+          "resolved"
+        ],
+        "price_min": 0.005,
+        "price_max": 0.99
+      }
+    ],
+    "ctf_files": [
+      {
+        "path": "CTF/merges.parquet",
+        "bytes": 592059273
+      },
+      {
+        "path": "CTF/preparations.parquet",
+        "bytes": 101009561
+      },
+      {
+        "path": "CTF/redemptions.parquet",
+        "bytes": 2792374236
+      },
+      {
+        "path": "CTF/resolutions.parquet",
+        "bytes": 92752280
+      },
+      {
+        "path": "CTF/splits.parquet",
+        "bytes": 4957001014
+      }
+    ],
+    "footer_probes": [
+      {
+        "path": "CTF/resolutions.parquet",
+        "file_bytes": 92752280,
+        "http_range_status": 206,
+        "bytes_read": 13622,
+        "rows_in_footer": 1313030,
+        "row_groups": 11,
+        "schema": "required group field_id=-1 duckdb_schema {\n  optional binary field_id=-1 id (String);\n  optional binary field_id=-1 condition_id (String);\n  optional binary field_id=-1 oracle (String);\n  optional binary field_id=-1 question_id (String);\n  optional int64 field_id=-1 outcome_slot_count (Int(bitWidth=64, isSigned=true));\n  optional group field_id=-1 payout_numerators (List) {\n    repeated group field_id=-1 list {\n      optional binary field_id=-1 element (String);\n    }\n  }\n}\n"
+      },
+      {
+        "path": "daily_aligned/2026_04_15.parquet",
+        "file_bytes": 106048928,
+        "http_range_status": 206,
+        "bytes_read": 94586,
+        "rows_in_footer": 4387421,
+        "row_groups": 36,
+        "schema": "required group field_id=-1 root {\n  optional binary field_id=-1 asset_id (String);\n  optional int64 field_id=-1 block_timestamp;\n  optional double field_id=-1 price;\n  optional binary field_id=-1 maker (String);\n  optional binary field_id=-1 taker (String);\n  optional binary field_id=-1 taker_direction (String);\n  optional double field_id=-1 usdc_amount;\n  optional double field_id=-1 fee_usdc;\n  optional binary field_id=-1 condition_id (String);\n  optional int64 field_id=-1 outcome_seq;\n  optional binary field_id=-1 neg_risk (String);\n  optional binary field_id=-1 category (String);\n  optional binary field_id=-1 category_refined (String);\n  optional binary field_id=-1 outcome_label (String);\n  optional binary field_id=-1 winning_outcome_label (String);\n  optional binary field_id=-1 resolution_status (String);\n  optional double field_id=-1 taker_base_fee;\n  optional double field_id=-1 maker_base_fee;\n  optional int64 field_id=-1 opens_at (Timestamp(isAdjustedToUTC=true, timeUnit=microseconds, is_from_converted_type=false, force_set_converted_type=false));\n  optional int64 field_id=-1 close_at (Timestamp(isAdjustedToUTC=true, timeUnit=microseconds, is_from_converted_type=false, force_set_converted_type=false));\n  optional int64 field_id=-1 resolved_at (Timestamp(isAdjustedToUTC=true, timeUnit=microseconds, is_from_converted_type=false, force_set_converted_type=false));\n  optional binary field_id=-1 market_slug (String);\n  optional double field_id=-1 p_event;\n  optional int32 field_id=-1 D (Int(bitWidth=8, isSigned=true));\n}\n"
+      }
+    ],
+    "public_api_metadata": {
+      "gated": false,
+      "private": false,
+      "card_license": "cc-by-4.0",
+      "last_modified": "2026-08-30T02:33:57.000Z"
+    },
+    "inventory_total_bytes": 52721154286,
+    "initial_selection_bytes": 13369064448,
+    "verification_limits": [
+      "Inventory sizes are for the pinned revision, not a projection of an unbounded live feed.",
+      "Three small complete files were read and matched against published SHA-256 values.",
+      "Footer-only row counts do not certify data quality, uniqueness, or independent markets.",
+      "No full corpus was downloaded and no profitability was computed."
+    ]
+  }
+}

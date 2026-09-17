@@ -307,7 +307,14 @@
     },
     "market_listed": {
       "description": "A market's leak-free metadata, recorded once per run at the bar it is first listed. An observed input, not a derived number: without it the projection cannot rebuild the horizon buckets, the block keys or the per-category and per-fold rows from the journal alone (CONTRACTS_V2 sections 9.2 and 9.5).",
-      "allOf": [ { "$ref": "#/$defs/envelope" } ],
+      "allOf": [
+        { "$ref": "#/$defs/envelope" },
+        {
+          "if": { "properties": { "kind": { "const": "binary" } }, "required": ["kind"] },
+          "then": { "properties": { "symbol": { "maxLength": 128 } } },
+          "else": { "properties": { "symbol": { "maxLength": 64 } } }
+        }
+      ],
       "unevaluatedProperties": false,
       "required": ["market_id", "provider", "category", "tags", "event_key", "created_at_ms", "close_at_ms", "interval_min", "fee_schedule_id", "hardness_tags", "fold", "kind", "vendor", "symbol", "tick_size_micro", "point_value_micro", "session_calendar_id", "borrow_schedule_id", "carry_schedule_id"],
       "properties": {
@@ -317,7 +324,7 @@
         "provider": { "enum": ["kalshi", "manifold", "polymarket", "metaculus", "demo", "binance", "kraken", "coinbase", "bybit", "xnys", "xnas", "arcx", "xcme", "xnym", "xcec", "xcbt", "otcfx"] },
         "kind": { "description": "Amendment C1b (17.3, ruling R164): the eight instrument fields, required since gate G2 landed pmx.journal's dataclasses and rebuilt the backtest fixture. On a binary they carry the mapping of 17.1: binary, the provider, provider_id, 100, 1_000_000, continuous, null, null.", "$ref": "#/$defs/kind" },
         "vendor": { "$ref": "#/$defs/vendor" },
-        "symbol": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "symbol": { "description": "Binary instrument symbols carry provider_id verbatim, whose market schema permits 128 characters (including 66-character Polygon condition IDs). Continuous symbols remain limited to 64 by the conditional above.", "type": "string", "minLength": 1, "maxLength": 128 },
         "tick_size_micro": { "type": "integer", "minimum": 1, "maximum": 1000000000 },
         "point_value_micro": { "type": "integer", "minimum": 1, "maximum": 1000000000000 },
         "session_calendar_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,31}$" },

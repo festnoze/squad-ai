@@ -18,5 +18,7 @@ live/*
 !live/.gitkeep
 data/datasets/*
 !data/datasets/.gitkeep
+# Public archive objects, partial transfers and derived source projections are reproducible data.
+data/external/
 # scratch files live in the agent scratchpad, never in the repository (CONTRACTS_V2 ruling R218)
 .scratch/

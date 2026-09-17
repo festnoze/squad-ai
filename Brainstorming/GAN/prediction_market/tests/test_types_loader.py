@@ -790,11 +790,14 @@ def test_the_migration_is_deterministic_byte_for_byte(tmp_path: Path) -> None:
 
 
 def test_the_committed_demo_pack_is_what_the_migration_produces_today(tmp_path: Path) -> None:
-    """The pack is generated and committed, so a stale commit has to be a failing test."""
+    """The historical pack's data and semantics stay fixed across producer version bumps."""
     fresh = migrate_v1(tmp_path / "demo_v1")
     committed = load_dataset(DEMO_PACK, verify=True)
     assert fresh.manifest.dataset_hash == committed.manifest.dataset_hash
-    assert fresh.manifest.to_dict() == committed.manifest.to_dict()
+    assert fresh.manifest.built_by.pmx_version == pmx.__version__
+    assert fresh.manifest.built_by.contract_version == pmx.CONTRACT_VERSION
+    # The producer's version is provenance of the original build, not a data or schema change.
+    assert replace(fresh.manifest, built_by=committed.manifest.built_by).to_dict() == committed.manifest.to_dict()
     assert len(committed.manifest.files) == 12, "one file per demo market, and the hash covers them all"
     for entry in committed.manifest.files:
         assert (DEMO_PACK / entry.path).read_bytes() == (tmp_path / "demo_v1" / entry.path).read_bytes()

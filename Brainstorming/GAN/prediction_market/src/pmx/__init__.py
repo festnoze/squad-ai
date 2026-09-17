@@ -5,9 +5,9 @@ journal byte can move for the same inputs; ``CONTRACT_VERSION`` names the docume
 This module carries the docstring and these constants only: no import, no re-export.
 """
 
-__version__ = "2.0.0-dev"
-ENGINE_VERSION = "2.0.0"
-CONTRACT_VERSION = "2.0"
+__version__ = "2.2.1-dev"
+ENGINE_VERSION = "2.2.1"
+CONTRACT_VERSION = "2.2-discovery-mvp"
 OBS_VERSION = "obs.v2"
 ACTIONS_VERSION = "actions.v2"
 JOURNAL_VERSION = "journal.v2"

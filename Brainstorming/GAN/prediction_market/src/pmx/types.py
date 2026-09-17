@@ -934,6 +934,7 @@ class Market:
     subject: tuple[str, ...] = ()
     structure: str = ""
     horizon: str = ""
+    close_time_verified: bool = True
 
     def __post_init__(self) -> None:
         """Freeze the eight sequence fields into tuples and default the subject provenance.
@@ -1081,6 +1082,8 @@ class Market:
             document["structure"] = self.structure
         if self.horizon:
             document["horizon"] = self.horizon
+        if not self.close_time_verified:
+            document["close_time_verified"] = False
         return document
 
 
@@ -1498,6 +1501,7 @@ class MarketMeta:
     horizon: str = ""
     provider_labels: tuple[str, ...] = ()
     cohort_id: str | None = None
+    close_time_verified: bool = True
 
     def __post_init__(self) -> None:
         if self.kind not in INSTRUMENT_KINDS:
@@ -1532,6 +1536,7 @@ class MarketMeta:
             "horizon": self.horizon,
             "provider_labels": list(self.provider_labels),
             "cohort_id": self.cohort_id,
+            **({"close_time_verified": False} if not self.close_time_verified else {}),
         }
 
 
@@ -1565,6 +1570,7 @@ def meta_of(
             structure=market.structure,
             horizon=market.horizon,
             provider_labels=market.provider_labels,
+            close_time_verified=market.close_time_verified,
         )
     if market.delisted_at_ms is not None:
         end_ms = market.delisted_at_ms
@@ -2140,10 +2146,10 @@ class DatasetManifest:
 class Dataset:
     """What ``load_dataset`` returns and ``run_backtest`` receives (section 7.2).
 
-    Only the manifest and the leak-free metas are held in memory: a market's tape is loaded and validated
-    on demand, because a year of hourly bars over three hundred markets is not something to hold at once.
-    The cache is per ``Dataset`` instance and keyed by market id, so two calls return the same object and
-    a run reads a file once.
+    The manifest, metadata and tapes validated by the loader are cached per instance. Keeping those
+    immutable records avoids validating the same trades again when the catalogue or runner accesses
+    them. Continuous instruments still pass through the clipping boundary in ``market``. A custom
+    dataset may provide loaders without an initial cache; its records are then loaded on first access.
     """
 
     manifest: DatasetManifest

@@ -1,5 +1,8 @@
 # pmx v2 : the build plan in waves and parallel work packages
 
+> Historical package plan. The active delivery order is [PLAN_MVP.md](PLAN_MVP.md), authorized by the
+> user on 2026-09-13. See [CONTRACTS_MVP.md](CONTRACTS_MVP.md) for the scoped MVP amendment.
+
 Companion to `docs/PRD_V2_HARD_OPTIMIZER.md`. The PRD says what; this file says in which order, by
 whom (one agent per package), against which files, and what must be true before the next wave starts.
 

@@ -148,7 +148,7 @@
         "additionalProperties": false,
         "required": ["path", "sha256", "bytes"],
         "properties": {
-          "path": { "type": "string", "pattern": "^(markets|news|wiki_asof|clusters|instruments|calendars|taxonomy)/[A-Za-z0-9._/-]+$" },
+          "path": { "type": "string", "pattern": "^(markets|news|wiki_asof|clusters|instruments|calendars|taxonomy|archive)/[A-Za-z0-9._/-]+$" },
           "sha256": { "$ref": "#/$defs/sha256" },
           "bytes": { "$ref": "#/$defs/nonNegInt" }
         }

@@ -1,5 +1,9 @@
 # pmx v3 : the build plan, part 2
 
+> Superseded for execution on 2026-09-13 by [PLAN_MVP.md](PLAN_MVP.md), under explicit user authority.
+> Package descriptions below are backlog references. No old wave gate blocks the MVP; its scoped
+> contract is [CONTRACTS_MVP.md](CONTRACTS_MVP.md).
+
 Companion to `docs/PRD_V3_TRADING_OPTIMIZER.md`. Part 1 is `docs/PLAN_V2_WAVES.md` (waves 0 to 6). The
 method is unchanged: one contract, exclusive file ownership, dependency layers, an integration gate per
 wave, no weakened test. Two additions from v3:

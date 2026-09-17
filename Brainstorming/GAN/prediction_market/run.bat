@@ -1,51 +1,34 @@
 @echo off
-REM ---------------------------------------------------------------------------
-REM  pmx - start the API and the backtest dashboard together.
-REM  Opens two windows: the API (8175) and the Vite web UI (5510), then opens
-REM  the dashboard in your browser. Optional: run.bat 8176 to use another port.
-REM ---------------------------------------------------------------------------
+REM Start the complete local MVP on one port. Stop it with Ctrl+C.
 setlocal
 cd /d "%~dp0"
-
-set "API_PORT=%~1"
-if "%API_PORT%"=="" set "API_PORT=8175"
-set "WEB_PORT=5510"
-set "PMX_API=http://127.0.0.1:%API_PORT%"
-
+set "MVP_PORT=%~1"
+if "%MVP_PORT%"=="" set "MVP_PORT=8175"
 if not exist ".venv\Scripts\python.exe" goto :no_venv
-
-if not exist "data\markets" mkdir data\markets
-dir /b /a "data\markets" 2>nul | findstr /r /c:"." >nul
-if not errorlevel 1 goto :have_data
-echo [setup] Seeding the bundled markets...
-.venv\Scripts\python.exe -m pmx.cli data seed --out data\markets
-:have_data
-
-if exist "web\node_modules" goto :have_web
-echo [setup] Installing web dependencies (first run only)...
+if not exist "web\node_modules" goto :no_web
+echo [data] Preparing and verifying the local research snapshot...
+.venv\Scripts\python.exe -m pmx.data.prepare_mvp
+if errorlevel 1 goto :failed
+echo [web] Building the interface...
 pushd web
-call npm install
+call npm.cmd run build
+if errorlevel 1 (
+    popd
+    goto :failed
+)
 popd
-:have_web
-
-echo [start] API =^> http://127.0.0.1:%API_PORT%
-start "pmx API %API_PORT%" /D "%~dp0" cmd /k ".venv\Scripts\python.exe -m pmx.cli api serve --host 127.0.0.1 --port %API_PORT% --data data\markets"
-
-echo [start] Web =^> http://localhost:%WEB_PORT%
-start "pmx Web %WEB_PORT%" /D "%~dp0web" cmd /k "npm run dev"
-
-timeout /t 5 /nobreak >nul
-start "" "http://localhost:%WEB_PORT%"
-
-echo.
-echo Both servers are starting in separate windows.
-echo    API : http://127.0.0.1:%API_PORT%
-echo    Web : http://localhost:%WEB_PORT%
-goto :eof
-
+echo [start] Open http://127.0.0.1:%MVP_PORT% in your browser.
+echo [start] Keep this window open. Press Ctrl+C to stop.
+.venv\Scripts\python.exe -m pmx.cli mvp serve --port "%MVP_PORT%"
+if errorlevel 1 goto :failed
+exit /b 0
 :no_venv
-echo [error] Python venv not found at .venv
-echo         Create it first:
-echo             py -3.12 -m venv .venv
-echo             .venv\Scripts\python.exe -m pip install -e ".[dev]"
+echo [error] Create the Python environment first; see README.md.
+goto :failed
+:no_web
+echo [error] Run npm.cmd ci from the web directory first; see README.md.
+goto :failed
+:failed
+echo [error] Startup failed. The error above identifies the required action.
 pause
+exit /b 1

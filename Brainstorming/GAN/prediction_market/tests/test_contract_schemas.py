@@ -590,7 +590,9 @@ def test_every_event_type_in_a_fixture_is_in_the_catalogue() -> None:
 #: The five optional fields of the 7.2 table: ruling R169's provenance flag, and amendment C1c's four taxonomy
 #: fields (7.14, ruling R265). A file written before either existed still loads; the loader requires the four
 #: on a dataset whose manifest carries the `taxonomy` block.
-OPTIONAL_MARKET_FIELDS = frozenset({"wiki_subject_provenance", "provider_labels", "subject", "structure", "horizon"})
+OPTIONAL_MARKET_FIELDS = frozenset({
+    "wiki_subject_provenance", "provider_labels", "subject", "structure", "horizon", "close_time_verified",
+})
 
 
 def test_every_schema_field_of_the_market_table_is_in_the_schema() -> None:

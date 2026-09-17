@@ -452,6 +452,7 @@ class MarketFacts:
     #: absent ``provider_labels`` means the provider gave none, so the pre-taxonomy fallback of
     #: :func:`pmx.data.taxonomy.provider_labels_of` must not run.
     tagged: bool = False
+    close_time_verified: bool = True
 
     @property
     def life_days(self) -> int:
@@ -516,6 +517,7 @@ def market_facts(payload: Mapping[str, object]) -> MarketFacts:
         ),
         fee_schedule_id=_str_field(payload, "fee_schedule_id"),
         tagged="subject" in payload,
+        close_time_verified=payload.get("close_time_verified", True) is True,
     )
 
 
@@ -1748,6 +1750,7 @@ def build_dataset_from_payloads(
             structure=facets_of_id[facts.id].structure,
             horizon=facets_of_id[facts.id].horizon,
             provider_labels=_provider_labels_for(facts),
+            close_time_verified=facts.close_time_verified,
         )
         for facts in kept_facts
     )

@@ -1,5 +1,8 @@
 # pmx v2 build state
 
+> Historical gate record through C1c. The active delivery is now [PLAN_MVP.md](PLAN_MVP.md).
+> New MVP evidence is recorded separately in MVP_STATUS.md; the old gate numbers below remain history.
+
 Written by integration gate G1 on 2026-09-08. This file records what is on disk, what was actually run
 and what it answered. Every number below comes from a command that ran in this repository on that day;
 nothing here is a plan or an intention. Gates G2 to G6 append their own sections.

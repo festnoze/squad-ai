@@ -496,7 +496,7 @@ def test_a_split_rounds_half_up_and_keeps_the_sign() -> None:
 
 
 def test_every_shipped_schedule_carries_its_provenance() -> None:
-    """8.8 and 17.4: a fee is a venue fact with a page and a date, not a tuned constant."""
+    """Venue facts have dated sources; the discovery scenario declares its separate provenance."""
     assert set(FEE_SCHEDULES) >= {
         "kalshi-general-2026-09", "kalshi-reduced-2026-09", "polymarket-zero-2026-09",
         "manifold-zero-2026-09", "demo-zero", "binance-spot-2026-09", "binance-perp-2026-09",
@@ -508,7 +508,13 @@ def test_every_shipped_schedule_carries_its_provenance() -> None:
         assert schedule.model in fees.FEE_MODELS
         assert schedule.kind in fees.INSTRUMENT_KINDS
         assert schedule.rounding == "ceil"
-        if schedule_id != "demo-zero":
+        if schedule_id == "polymarket-research-2026-04":
+            assert schedule.as_of_date == "2026-09-13"
+            assert schedule.source_url == "urn:pmx:research:fee-scenario:20bp"
+            assert schedule.model == "notional_bp"
+            assert schedule.taker_bp == schedule.maker_bp == 20
+            assert "not a reconstructed venue fee" in schedule.note
+        elif schedule_id != "demo-zero":
             assert schedule.as_of_date != ""
             assert schedule.source_url.startswith("https://")
     assert set(CARRY_SCHEDULES) == {

@@ -1,78 +1,20 @@
-import { useEffect, useState } from "react";
-import { fetchTournament } from "../api";
-import type { Tournament } from "../types";
-import { agentColor, brierStr, dollars, skillStr } from "../util";
+import type { RunDetail } from "../types";
+import { agentColor, agentName, count, date, decimal, foldName, money, providerName, signed } from "../util";
+import { MarketReplay } from "./MarketReplay";
+import { PerformanceChart } from "./PerformanceChart";
 
-// The headline answer: across every market, which agent forecasts best and which actually beats the
-// market. The skill column (market Brier minus agent Brier) is the honest measure; a bar makes the sign
-// and size read at a glance. market_follower sits at exactly zero by construction.
-export function Leaderboard() {
-  const [t, setT] = useState<Tournament | null>(null);
-  const [err, setErr] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchTournament().then(setT).catch((e) => setErr(String(e)));
-  }, []);
-
-  if (err) return <div className="err">Failed to load: {err}</div>;
-  if (!t) return <div className="loading">Running the tournament…</div>;
-
-  const maxSkill = Math.max(...t.board.map((r) => Math.abs(r.skill_vs_market_micro)), 1);
-  const best = t.board[0];
-
-  return (
-    <div className="board-view">
-      <div className="board-lead">
-        <h2>Who beats the market?</h2>
-        <p>
-          Every agent forecast every one of {best.markets} real resolved markets. Lower Brier is a
-          sharper forecaster; <b>skill</b> is the market's own Brier minus the agent's, so positive means
-          it beat the crowd. Beating the market is meant to be hard: that is the whole point.
-        </p>
-      </div>
-      <table className="lead-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>agent</th>
-            <th>mean Brier</th>
-            <th>beat market</th>
-            <th>total PnL</th>
-            <th>skill vs market</th>
-          </tr>
-        </thead>
-        <tbody>
-          {t.board.map((r, i) => (
-            <tr key={r.agent_id} className={r.agent_id === "market_follower" ? "baseline-row" : ""}>
-              <td className="num">{i + 1}</td>
-              <td>
-                <span className="swatch" style={{ background: agentColor(r.agent_id) }} /> {r.agent_id}
-                {r.agent_id === "market_follower" && <span className="base">baseline</span>}
-              </td>
-              <td className="num">{brierStr(r.mean_brier_micro)}</td>
-              <td className="num">{r.beat_market_pct}%</td>
-              <td className={`num ${r.total_pnl_cents >= 0 ? "pos" : "neg"}`}>{dollars(r.total_pnl_cents)}</td>
-              <td>
-                <div className="skill-cell">
-                  <span className={`num ${r.skill_vs_market_micro >= 0 ? "pos" : "neg"}`}>
-                    {skillStr(r.skill_vs_market_micro)}
-                  </span>
-                  <span className="skill-bar">
-                    <i
-                      className={r.skill_vs_market_micro >= 0 ? "pos" : "neg"}
-                      style={{
-                        width: `${(Math.abs(r.skill_vs_market_micro) / maxSkill) * 50}%`,
-                        marginLeft: r.skill_vs_market_micro >= 0 ? "50%" : undefined,
-                        marginRight: r.skill_vs_market_micro < 0 ? "50%" : undefined,
-                      }}
-                    />
-                  </span>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+export function Leaderboard({ detail }: { detail: RunDetail }) {
+  const { run, leaderboard, equity } = detail;
+  return <div className="results-stack">
+    <section className="panel results-panel">
+      <div className="section-heading small-heading"><div><span className="eyebrow">02 / COMPARER LES STRATÉGIES</span><h3>Résultats de l'expérience</h3><p>{providerName(run.provider)} · {foldName(run.fold)} · {count(run.n_markets)} marchés · {date(run.created_at, true)} UTC</p></div><a className="button secondary" href={`/api/runs/${encodeURIComponent(run.run_id)}/export`} download>Exporter JSON ↓</a></div>
+      <div className="run-facts"><div><span>Capital initial par stratégie</span><strong>{money(run.bankroll_cents, run.currency)}</strong></div><div><span>Graine reproductible</span><strong>{run.seed}</strong></div><div><span>Unité de compte</span><strong>{run.currency}{run.provider === "manifold" ? " · monnaie virtuelle" : " · simulation"}</strong></div><span className="tag exploratory">Exploratoire</span></div>
+      <div className="metric-explainer"><div><strong>Qualité de prévision</strong><p>Le Brier mesure l'erreur : plus bas est meilleur. Le gain est la différence avec le Brier du marché ; un gain positif indique une amélioration sur cet échantillon.</p></div><div><strong>Résultat économique simulé</strong><p>Le résultat net inclut les frais. Un bon score de prévision ne garantit pas un gain monétaire. Ces estimations ponctuelles ne constituent pas une certification.</p></div></div>
+      <div className="table-scroll"><table className="data-table leaderboard"><thead><tr><th>Stratégie</th><th title="Erreur quadratique moyenne, de 0 à 1. Plus bas est meilleur.">Brier ↓</th><th title="Brier du marché moins Brier de la stratégie. Plus haut est meilleur.">Gain vs marché ↑</th><th>Résultat net</th><th>Frais</th><th title="Baisse maximale depuis un sommet de capital.">Repli max.</th><th>Exécutions</th></tr></thead><tbody>{leaderboard.map(agent => <tr key={agent.agent_id}><td><div className="agent-cell"><span className="agent-dot" style={{ background: agentColor(agent.agent_id) }} /><strong>{agentName(agent.agent_id)}</strong>{agent.baseline && <span className="tag subtle">Référence</span>}</div></td><td>{decimal(agent.mean_brier_micro / 1000000, 4)}</td><td className={agent.skill_micro > 0 ? "positive" : agent.skill_micro < 0 ? "negative" : ""}>{signed(agent.skill_micro / 1000000, 4)}</td><td className={agent.pnl_cents > 0 ? "positive" : agent.pnl_cents < 0 ? "negative" : ""}>{money(agent.pnl_cents, run.currency)}</td><td>{money(agent.fees_cents, run.currency)}</td><td>{decimal(agent.max_drawdown_bp / 100)} %</td><td>{count(agent.n_fills)}</td></tr>)}</tbody></table></div>
+      <p className="chart-note">Brier du marché : {leaderboard[0] ? decimal(leaderboard[0].market_brier_micro / 1000000, 4) : "indisponible"} · Chaque marché a le même poids dans la moyenne des scores temporels. Liquidité simulée partagée entre les stratégies.</p>
+      {!!equity.length && <PerformanceChart key={run.run_id} currency={run.currency} curves={run.agent_ids.map(id => ({ id, label: agentName(id), initial: run.bankroll_cents, points: equity.filter(point => point.agents[id] !== undefined).map(point => ({ t: point.t_ms, value: point.agents[id] })) }))} />}
+      <details className="provenance"><summary>Limites, échantillon sélectionné et reproductibilité</summary><ul>{run.limitations.map((text, index) => <li key={index}>{text}</li>)}</ul><dl><dt>Expérience</dt><dd className="mono">{run.run_id}</dd><dt>Jeu de données</dt><dd>{run.dataset}</dd><dt>Empreinte du jeu</dt><dd className="mono">{run.dataset_hash}</dd><dt>Empreinte du journal</dt><dd className="mono">{run.journal_hash}</dd></dl><h4>Marchés effectivement sélectionnés ({run.market_ids.length})</h4><ul className="sample-list">{detail.markets.map(m => <li key={m.id}>{m.question}<code>{m.id}</code></li>)}</ul></details>
+    </section>
+    <MarketReplay key={run.run_id} detail={detail} />
+  </div>;
 }

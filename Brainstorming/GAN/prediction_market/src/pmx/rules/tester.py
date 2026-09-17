@@ -40,6 +40,7 @@ comment on each says what replaces it. They are integer-only and draw through ``
 from __future__ import annotations
 
 import json
+from bisect import bisect_left
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -691,14 +692,27 @@ class ScopeRow:
     block: str
 
 
+def _target_index(rows: MarketRows, index: int, horizon: int) -> int | None:
+    if rows.meta.kind == "binary":
+        # Binary horizons use the fixed UTC grid, even when proposal rows have been sampled.
+        # Continuous instruments retain their trading-bar horizons across session gaps.
+        expected = rows.bars[index].t_ms + horizon * interval_ms(rows.meta.interval_min)
+        target = bisect_left(rows.bars, expected, key=lambda bar: bar.t_ms)
+        if target >= len(rows.bars) or rows.bars[target].t_ms != expected:
+            return None
+        return target
+    target = index + horizon
+    return target if target < len(rows.bars) else None
+
+
 def _delta_bp(rows: MarketRows, index: int, horizon: int) -> int | None:
     """``price_{t+h} - price_t`` in bp on a binary, ``bp_ratio`` of it on a continuous kind.
 
     ``None`` when the ``h``-th completed bar after ``t`` does not exist before the bar the market resolved
     in, which is 18.2's skip rule and not a zero.
     """
-    target = index + horizon
-    if target >= len(rows.bars):
+    target = _target_index(rows, index, horizon)
+    if target is None:
         return None
     resolution_bar = bar_of(rows.meta.resolved_at_ms, rows.meta.interval_min)
     if rows.bars[target].t_ms >= resolution_bar:
@@ -710,6 +724,21 @@ def _delta_bp(rows: MarketRows, index: int, horizon: int) -> int | None:
     if start == 0:
         return None
     return bp_ratio(end - start, start)
+
+
+def target_available_at_ms(rows: MarketRows, index: int, claim: RuleClaim, horizon: int) -> int | None:
+    """When a row's realised target can first be read by a later observation (MVP-6).
+
+    Trigger time alone cannot bound a live score: a past trigger can still depend on an unresolved
+    outcome or an unfinished horizon bar. Resolutions become visible after their settle bar.
+    """
+    span = interval_ms(rows.meta.interval_min)
+    if claim.kind == "bias" and rows.meta.kind == "binary":
+        return bar_of(rows.meta.resolved_at_ms, rows.meta.interval_min) + span
+    target = _target_index(rows, index, horizon)
+    if target is None:
+        return None
+    return rows.bars[target].t_ms + span
 
 
 def _median(values: Sequence[int]) -> int:
@@ -756,6 +785,7 @@ def scope_rows(
     from_ms: int | None = None,
     to_ms: int | None = None,
     scope: RuleScope | None = None,
+    available_at_ms: int | None = None,
 ) -> tuple[ScopeRow, ...]:
     """Every measurable row of ``ids`` in scope, with its ``y_row`` and whether the rule fired.
 
@@ -789,6 +819,10 @@ def scope_rows(
                 continue
             if to_ms is not None and bar.t_ms >= to_ms:
                 continue
+            if available_at_ms is not None:
+                ready = target_available_at_ms(rows, index, claim, horizon)
+                if ready is None or ready > available_at_ms:
+                    continue
             value = _measure(rows, index, claim, horizon)
             if value is None:
                 continue
@@ -1098,7 +1132,12 @@ class RuleTester:
         """
         if rule.claim.kind == "volatility" and usual_rows < RULE_VOLATILITY_USUAL_MIN_ROWS:
             return False
-        return support >= rule.min_support and n_markets >= RULE_MIN_MARKETS and interval.lower > 0
+        return (
+            support >= rule.min_support
+            and n_markets >= RULE_MIN_MARKETS
+            and interval.n_blocks >= 2
+            and interval.lower > 0
+        )
 
     def test_on_fold(
         self,
@@ -1311,14 +1350,16 @@ class RuleTester:
         was visible and strictly before the recomputing bar. Not unbounded, which would let month 11 demote
         an insight an agent is trading in month ``k + 2``, the field 7.9 forbids by name; and not frozen at
         the replicate fold's edge either, because a record that never grows can never demote a rule that
-        decays. Sealed markets are excluded here as everywhere in this module.
+        decays. A trigger contributes only after its target bar has completed, or its binary settlement
+        has become visible at the next observation (MVP-6). Sealed markets are excluded here.
         """
         rule = promotion.rule
         window_from = promotion.visible_from_ms
         ids = [rows.meta.id for rows in self._table.markets if rows.meta.fold != "sealed"]
         usual, _rows_behind = self._usual(rule, pair)
         rows = scope_rows(
-            self._table, rule, ids=ids, usual_bp=usual or 0, from_ms=window_from, to_ms=at_ms
+            self._table, rule, ids=ids, usual_bp=usual or 0, from_ms=window_from, to_ms=at_ms,
+            available_at_ms=at_ms,
         )
         interval, support, n_markets = self._interval(rows)
         reason: str | None = None

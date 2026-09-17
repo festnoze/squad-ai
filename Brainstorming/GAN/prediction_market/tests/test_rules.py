@@ -2008,9 +2008,13 @@ def test_the_live_record_excludes_the_bar_at_the_recomputing_instant(tmp_path: P
     as_of_the_bar = tester.live_record(promotion, pair, at_ms=bar)
     one_instant_later = tester.live_record(promotion, pair, at_ms=bar + 1)
     assert as_of_the_bar.to_ms == bar
-    assert one_instant_later.live_support > as_of_the_bar.live_support, (
-        "the bar at b enters the record from the next instant and not at b itself"
+    assert one_instant_later.live_support == as_of_the_bar.live_support, (
+        "passing the trigger instant does not make the future target available (MVP-6)"
     )
+    completed_target = tester.live_record(
+        promotion, pair, at_ms=bar + (promotion.rule.horizon_bars + 1) * MS_PER_HOUR
+    )
+    assert completed_target.live_support > as_of_the_bar.live_support
 
 
 def test_a_transfer_test_reads_no_bar_at_or_after_the_promotions_visibility(tmp_path: Path) -> None:

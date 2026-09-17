@@ -28,7 +28,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from pmx import cli_data
+from pmx import CONTRACT_VERSION, cli_data
 from pmx.cohorts import RE_COHORT_ID, cohort_rows, cohorts_per_provider
 from pmx.data.builder import (
     BACKGROUND_SOURCE,
@@ -664,7 +664,7 @@ def test_the_manifest_validates_against_its_schema_and_carries_the_build(tmp_pat
     assert payload["window"] == {"start_ms": WINDOW_START_MS, "end_ms": WINDOW_END_MS}
     assert payload["filters"]["config"] == config().to_dict()
     assert payload["filters"]["config"]["limit_per_provider"] == 0  # None renders as 0, never as null
-    assert payload["built_by"]["contract_version"] == "2.0"
+    assert payload["built_by"]["contract_version"] == CONTRACT_VERSION
     assert "fixture build" in payload["notes"]
     assert "illiquid decile boundary" in payload["notes"]
 

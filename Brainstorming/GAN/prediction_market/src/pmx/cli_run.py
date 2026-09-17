@@ -7,13 +7,11 @@ roster over the dataset, indexes the run, and prints the summary. ``replay`` reb
 from ``journal.jsonl`` alone and refuses a journal written by another engine with exit code 2, which is
 what section 13.2 asks for.
 
-The roster is A1's to build (``pmx.agents.registry``, wave 3), through the two names section 10.1
-declares for the registry: ``DEFAULT_ROSTER`` and ``make_agent(agent_id, genome)``. The module is imported
-inside the handler rather than at module level so that this file is importable, testable and usable for
-``replay`` while wave 2 is being built, and a run asked for before A1 lands fails with
-``NotConfiguredError`` naming the missing name rather than with an ``ImportError``. ``--roster-module``
-names another module exposing the same two names (ruling R200): gate G2's scripted-stub run drives
-``tests.stub_roster`` through this command, so the real registry lands on a path a run has already used.
+The default roster is the fixed MVP registry in ``pmx.agents.registry``, exposing ``DEFAULT_ROSTER``
+and ``make_agent(agent_id, genome)``. It is imported inside the run handler so replay stays independent
+of registry availability. ``--roster-module`` accepts another module with the same interface (R200);
+an unavailable module produces a useful ``NotConfiguredError``. The fixture registry remains a test
+dependency only, while ordinary runs construct the genuine MVP strategies.
 """
 
 from __future__ import annotations
@@ -21,11 +19,13 @@ from __future__ import annotations
 import argparse
 import sys
 from collections.abc import Callable, Sequence
+from dataclasses import replace
 from importlib import import_module
 from pathlib import Path
 from typing import cast
 
 from pmx import ENGINE_VERSION
+from pmx.engine.calendar import Calendar
 from pmx.engine.liquidity import make_liquidity
 from pmx.engine.runner import Agent, replay, run_backtest
 from pmx.errors import JournalError, NotConfiguredError, PmxError
@@ -72,16 +72,14 @@ def _build_roster(
             default, ``tests.stub_roster`` for the gate's scripted-stub run (ruling R200).
 
     Raises:
-        NotConfiguredError: While the module does not exist (``pmx.agents.registry`` lands in wave 3,
-            A1), or does not expose the two names section 10.1 declares. The message names what is
-            missing, because a wave-2 caller that wants a run drives ``pmx.engine.runner.run_backtest``
-            directly with its own agents, exactly as ``tests/test_runner.py`` does.
+        NotConfiguredError: The requested module does not exist or lacks one of the two registry
+            names. Direct runner callers may also supply their own agents.
     """
     try:
         registry = import_module(roster_module)
     except ModuleNotFoundError as error:
         raise NotConfiguredError(
-            "the agent registry lands in wave 3 (A1); run_backtest takes a roster directly",
+            "the requested agent registry could not be imported; check --roster-module",
             missing=roster_module,
         ) from error
     default_roster = getattr(registry, "DEFAULT_ROSTER", None)
@@ -123,6 +121,7 @@ def run_from_args(args: argparse.Namespace) -> RunHandle:
     dataset = _load_dataset(Path(args.dataset))
     market_ids = [meta.id for meta in dataset.metas if args.fold in ("all", meta.fold)]
     config = config_from_args(args, dataset, market_ids)
+    config = replace(config, market_ids_hash=market_set_hash(Calendar(dataset, config).market_ids()))
     roster = _build_roster(
         dataset,
         tuple(str(name) for name in (args.agents or ())),

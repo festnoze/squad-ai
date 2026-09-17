@@ -558,7 +558,13 @@ def test_run_reproduces_the_contract_fixture(demo: Dataset, tmp_path: Path) -> N
     """
     handle = _run(demo, tmp_path)
     assert handle.config_hash == RUN_CONFIG_HASH
-    assert handle.run_id == f"r-{demo.manifest.dataset_hash[:8]}-{SEED}-{RUN_CONFIG_HASH[:8]}"
+    # MVP-5: config_hash still identifies config; the run also identifies population and engine.
+    started_identity = _read(handle.journal_path)[0]
+    assert isinstance(started_identity, RunStarted)
+    identity_hash = canonical_sha256(
+        {"config_hash": RUN_CONFIG_HASH, "roster": list(started_identity.roster), "engine_version": ENGINE_VERSION}
+    )
+    assert handle.run_id == f"r-{demo.manifest.dataset_hash[:8]}-{SEED}-{identity_hash[:8]}"
     assert handle.n_bars == 2
     events = _read(handle.journal_path)
     assert len(events) == handle.n_events
@@ -1393,12 +1399,34 @@ def test_pmx_replay_reads_a_run_directory_and_prints_its_leaderboard(
 def test_pmx_backtest_reports_the_missing_registry_rather_than_an_import_error(
     demo: Dataset, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """The roster is A1's (wave 3); until it lands the command says so and exits 1, never crashes."""
+    """An explicitly missing registry reports a configuration error; the MVP default now exists."""
     code = cli_main(
-        ["backtest", "--dataset", str(DEMO), "--runs-dir", str(tmp_path), "--seed", "7", "--no-index"]
+        [
+            "backtest", "--dataset", str(DEMO), "--runs-dir", str(tmp_path), "--seed", "7", "--no-index",
+            "--roster-module", "pmx.agents.missing_registry",
+        ]
     )
     assert code == 1
     assert "registry" in capsys.readouterr().err
+
+
+def test_pmx_backtest_uses_the_real_mvp_registry_on_a_bounded_calendar(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The default registry runs; a time window hashes its actual Calendar selection (MVP-4/5)."""
+    code = cli_main(
+        [
+            "backtest", "--dataset", str(DEMO), "--runs-dir", str(tmp_path), "--no-index",
+            "--t0-ms", str(T0_MS), "--t1-ms", str(T0_MS + 86_400_000),
+        ]
+    )
+    assert code == 0
+    printed = capsys.readouterr().out
+    assert all(agent_id in printed for agent_id in ("follower", "trend", "revert"))
+    journal = next(tmp_path.glob("r-*/journal.jsonl"))
+    started = read_journal(journal)[0]
+    assert isinstance(started, RunStarted)
+    assert {row["agent_id"] for row in started.roster} == {"follower", "trend", "revert"}
 
 
 def test_the_projection_of_a_partial_window_scores_only_what_settled(

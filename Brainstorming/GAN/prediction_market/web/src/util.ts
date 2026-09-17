@@ -1,39 +1,18 @@
-// Formatting and a stable colour per agent.
-
-export const AGENT_COLORS: Record<string, string> = {
-  market_follower: "#8b95a7", // grey: the baseline
-  calibrated: "#38bdf8",
-  sharp: "#22d3ee",
-  momentum: "#34d399",
-  mean_revert: "#a78bfa",
-  contrarian: "#fb7185",
-  anchor: "#f59e0b",
-  stubborn: "#64748b",
-};
-
-export function agentColor(id: string): string {
-  return AGENT_COLORS[id] ?? "#38bdf8";
+const integer = new Intl.NumberFormat("fr-FR", { maximumFractionDigits: 0 });
+export const count = (value: number) => integer.format(value);
+export const decimal = (value: number, digits = 2) => new Intl.NumberFormat("fr-FR", { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(value);
+export const date = (value: number | string, withTime = false) => new Intl.DateTimeFormat("fr-FR", { dateStyle: "medium", ...(withTime ? { timeStyle: "short" as const } : {}), timeZone: "UTC" }).format(new Date(value));
+export const money = (cents: number, currency: string) => `${decimal(cents / 100)} ${currency.toUpperCase()}`;
+export const signed = (value: number, digits = 3) => `${value > 0 ? "+" : ""}${decimal(value, digits)}`;
+export const foldName = (fold: string) => fold === "train" ? "Entraînement" : fold === "validation" ? "Validation" : "Scellé";
+export const providerName = (provider: string) => provider === "kalshi" ? "Kalshi" : provider === "manifold" ? "Manifold" : provider === "polymarket" ? "Polymarket" : provider;
+export const providerCurrency = (provider: string) => provider === "polymarket" ? "USDC" : provider === "manifold" ? "MANA" : "USD";
+export const agentName = (id: string) => ({ follower: "Référence marché", trend: "Tendance", revert: "Retour à la moyenne" }[id] ?? id);
+export const agentColor = (id: string) => ({ follower: "#7a8898", trend: "#168da0", revert: "#b16b2d" }[id] ?? "#7357af");
+export const errorMessage = (error: unknown) => error instanceof Error ? error.message : String(error);
+export function stored(key: string): string | null {
+  try { return localStorage.getItem(key); } catch { return null; }
 }
-
-export function brierStr(micro: number): string {
-  return (micro / 1_000_000).toFixed(3);
-}
-
-export function skillStr(micro: number): string {
-  const v = micro / 1_000_000;
-  return (v >= 0 ? "+" : "") + v.toFixed(3);
-}
-
-export function dollars(cents: number): string {
-  const v = cents / 100;
-  return (v >= 0 ? "+$" : "-$") + Math.abs(v).toFixed(2);
-}
-
-export function pct(ppm: number): number {
-  return Math.round(ppm / 10_000);
-}
-
-// A short human label for the tick time, trimming ISO noise.
-export function shortT(t: string): string {
-  return t.replace("T", " ").replace(/:00$/, "h");
+export function remember(key: string, value: string | null) {
+  try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* Storage may be unavailable in a private session. */ }
 }

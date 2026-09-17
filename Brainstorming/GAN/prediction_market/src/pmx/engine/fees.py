@@ -319,6 +319,18 @@ _SCHEDULE_ROWS: tuple[FeeSchedule, ...] = (
         note="standard markets carry no trading fee",
     ),
     FeeSchedule(
+        schedule_id="polymarket-research-2026-04",
+        provider="polymarket",
+        kind="binary",
+        model="notional_bp",
+        taker_bp=20,
+        maker_bp=20,
+        min_half_spread_ticks=1,
+        source_url="urn:pmx:research:fee-scenario:20bp",
+        as_of_date="2026-09-13",
+        note="Research scenario: 20 bp per execution, not a reconstructed venue fee or an upper cost bound.",
+    ),
+    FeeSchedule(
         schedule_id="manifold-zero-2026-09",
         provider="manifold",
         kind="binary",

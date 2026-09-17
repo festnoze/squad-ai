@@ -645,6 +645,13 @@ def market_view_fields(
     quote = bars[-1] if bars else None
     volume_7d, volume_to_date, n_trades_to_date = tape_stats_at(instrument, now_ms=now_ms)
     close_at_ms = 0 if kind != KIND_BINARY else int(cast(int, getattr(instrument, "close_at_ms", 0)))
+    if not getattr(instrument, "close_time_verified", True):
+        close_at_ms = 0
+    first_price = first_price_of(instrument)
+    # Archive lifecycle metadata supplies no known listing quote. Its first print belongs to the
+    # initial bar and becomes observable only when that bar is complete.
+    if not getattr(instrument, "close_time_verified", True) and not bars:
+        first_price = 5_000
     return {
         "market_id": instrument.id,
         "provider": instrument.provider,
@@ -658,8 +665,8 @@ def market_view_fields(
         "close_at_ms": close_at_ms,
         "tradable": tradable,
         "bars": bars,
-        "first_price_bp": first_price_of(instrument),
-        "last_price_bp": quote.close_bp if quote is not None else first_price_of(instrument),
+        "first_price_bp": first_price,
+        "last_price_bp": quote.close_bp if quote is not None else first_price,
         "best_bid_bp": quote.yes_bid_bp if quote is not None else None,
         "best_ask_bp": quote.yes_ask_bp if quote is not None else None,
         "volume_milli_7d": volume_7d,

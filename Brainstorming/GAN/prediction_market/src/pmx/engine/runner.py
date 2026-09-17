@@ -900,12 +900,17 @@ def run_backtest(
     )
 
     config_hash = canonical_sha256(config.to_dict())
-    run_id = f"r-{dataset.manifest.dataset_hash[:8]}-{config.seed}-{config_hash[:8]}"
+    rows = _roster_rows(agents)
+    # MVP-5: the same config with a different population is a different experiment.
+    # Keep the identifier grammar so archived journals and seed extraction remain readable.
+    identity_hash = canonical_sha256(
+        {"config_hash": config_hash, "roster": list(rows), "engine_version": ENGINE_VERSION}
+    )
+    run_id = f"r-{dataset.manifest.dataset_hash[:8]}-{config.seed}-{identity_hash[:8]}"
     run_dir = journal_dir / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
     journal_path = run_dir / "journal.jsonl"
 
-    rows = _roster_rows(agents)
     agent_ids = sorted_agent_ids(agent.agent_id for agent in agents)
     by_id = {agent.agent_id: agent for agent in agents}
 

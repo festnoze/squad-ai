@@ -345,13 +345,14 @@ def _role_of(order: LiquidityOrder) -> str:
     return "taker" if order.kind == "market" else "maker"
 
 
-def _fee_size(filled_milli: int, view: LiquidityMarketView) -> int:
-    """The size ``fee_cents`` is called with: whole contracts on a binary, milli-units otherwise.
+def _fee_size(filled_milli: int, schedule: FeeSchedule) -> int:
+    """Whole contracts for the quadratic binary fee formula, milli-units for other fee models.
 
     A ``// MILLI`` on a continuous instrument would turn a one milli-coin fill into a fee on nothing
     (ruling R173).
     """
-    return filled_milli // MILLI if view.kind == INSTRUMENT_KINDS[0] else filled_milli
+    # Size units follow the fee formula: a binary market can also use notional fees.
+    return filled_milli // MILLI if schedule.model == "pq_permille" else filled_milli
 
 
 def _fee_of(*, price: int, filled_milli: int, order: LiquidityOrder, schedule: FeeSchedule,
@@ -359,7 +360,7 @@ def _fee_of(*, price: int, filled_milli: int, order: LiquidityOrder, schedule: F
     """Envelope rule 5, in one place: the fee of the fill the journal writes and no other number."""
     return fee_cents(
         schedule,
-        size=_fee_size(filled_milli, view),
+        size=_fee_size(filled_milli, schedule),
         price_bp=price,
         role=_role_of(order),
         side=order.side,
@@ -513,7 +514,7 @@ def event_fill(
         role="taker",
         fee_cents=fee_cents(
             schedule,
-            size=_fee_size(order.size_milli, view),
+            size=_fee_size(order.size_milli, schedule),
             price_bp=price,
             role="taker",
             side=order.side,

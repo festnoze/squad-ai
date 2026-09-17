@@ -1,97 +1,50 @@
-import type { Backtest } from "../types";
-import { agentColor, pct } from "../util";
+import { date, decimal } from "../util";
 
-// The hero chart. The market's YES price is the bold white line; each selected agent's stated
-// probability is a thin coloured line tracking it. The vertical cursor marks the current tick. Once you
-// reach the end, the resolution is revealed as a green (YES) or red (NO) band, so you can see which
-// lines were converging on the truth and which were fighting it.
-export function PriceChart({
-  bt,
-  tick,
-  selected,
-  revealed,
-}: {
-  bt: Backtest;
-  tick: number;
-  selected: Set<string>;
-  revealed: boolean;
+export interface ChartSeries { id: string; label: string; color: string; values: (number | null)[] }
+export function PriceChart({ times, series, volumes, cursor, onCursor, title = "Prix et probabilités", fixedDomain = true, markers = [] }: {
+  times: number[]; series: ChartSeries[]; volumes?: number[]; cursor?: number;
+  onCursor?: (index: number) => void; title?: string; fixedDomain?: boolean; markers?: number[];
 }) {
-  const W = 900;
-  const H = 340;
-  const padL = 40;
-  const padR = 16;
-  const padT = 16;
-  const padB = 34;
-  const n = bt.ticks.length;
-  const x = (i: number) => padL + (i / Math.max(1, n - 1)) * (W - padL - padR);
-  const y = (cents: number) => padT + (1 - cents / 100) * (H - padT - padB);
-
-  const marketPath = bt.ticks
-    .slice(0, tick + 1)
-    .map((r, i) => `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(r.price).toFixed(1)}`)
-    .join(" ");
-
-  const agentPath = (id: string) =>
-    bt.ticks
-      .slice(0, tick + 1)
-      .map((r, i) => {
-        const p = r.agents[id]?.prob_ppm ?? 500_000;
-        return `${i === 0 ? "M" : "L"} ${x(i).toFixed(1)} ${y(pct(p)).toFixed(1)}`;
-      })
-      .join(" ");
-
-  const yesBand = bt.market.resolution === 1;
-
-  return (
-    <div className="chart-wrap">
-      <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label="Market price and agent forecasts over time">
-        {/* resolution line, revealed at the end */}
-        {revealed && (
-          <g>
-            <line
-              x1={padL}
-              x2={W - padR}
-              y1={y(yesBand ? 100 : 0)}
-              y2={y(yesBand ? 100 : 0)}
-              className={yesBand ? "reso-line yes" : "reso-line no"}
-            />
-            <text x={W - padR} y={y(yesBand ? 100 : 0) + (yesBand ? 14 : -6)} textAnchor="end" className={`reso-label ${yesBand ? "yes" : "no"}`}>
-              resolved {yesBand ? "YES (100)" : "NO (0)"}
-            </text>
-          </g>
-        )}
-
-        {/* gridlines */}
-        {[0, 25, 50, 75, 100].map((g) => (
-          <g key={g}>
-            <line x1={padL} x2={W - padR} y1={y(g)} y2={y(g)} className="grid" />
-            <text x={padL - 6} y={y(g) + 3} textAnchor="end" className="axis">
-              {g}
-            </text>
-          </g>
-        ))}
-
-        {/* agent forecast lines */}
-        {bt.agent_ids
-          .filter((id) => selected.has(id))
-          .map((id) => (
-            <path key={id} d={agentPath(id)} fill="none" stroke={agentColor(id)} strokeWidth={1.6} opacity={0.85} />
-          ))}
-
-        {/* the market price, bold */}
-        <path d={marketPath} fill="none" className="market-line" strokeWidth={2.6} />
-
-        {/* current-tick cursor */}
-        <line x1={x(tick)} x2={x(tick)} y1={padT} y2={H - padB} className="cursor" />
-        <circle cx={x(tick)} cy={y(bt.ticks[tick].price)} r={4} className="market-dot" />
-
-        <text x={padL} y={H - 8} className="axis">
-          {bt.ticks[0].t}
-        </text>
-        <text x={W - padR} y={H - 8} textAnchor="end" className="axis">
-          {bt.ticks[bt.ticks.length - 1].t}
-        </text>
-      </svg>
-    </div>
-  );
+  if (!times.length) return <div className="empty compact">Aucun point disponible pour ce graphique.</div>;
+  const width = 900, height = volumes ? 310 : 260, left = 52, right = 20, top = 18, bottom = volumes ? 84 : 34;
+  const values = series.flatMap(s => s.values.filter((v): v is number => v !== null && Number.isFinite(v)));
+  const minimum = fixedDomain || !values.length ? 0 : Math.min(...values);
+  const maximum = fixedDomain ? 100 : !values.length ? 1 : Math.max(...values);
+  const margin = fixedDomain ? 0 : Math.max((maximum - minimum) * .12, 1);
+  const lo = minimum - margin, hi = maximum + margin;
+  const x = (i: number) => left + (times[i] - times[0]) / Math.max(1, times[times.length - 1] - times[0]) * (width - left - right);
+  const y = (value: number) => top + (hi - value) / Math.max(hi - lo, 1) * (height - top - bottom);
+  const ticks = Array.from({ length: 5 }, (_, i) => lo + (hi - lo) * i / 4);
+  const volumeMax = Math.max(1, ...(volumes ?? []));
+  const active = cursor ?? times.length - 1;
+  const path = (values: (number | null)[]) => {
+    let previous = false;
+    return values.map((value, i) => {
+      if (value === null || !Number.isFinite(value)) { previous = false; return ""; }
+      const point = `${previous ? "L" : "M"}${x(i).toFixed(2)},${y(value).toFixed(2)}`;
+      previous = true;
+      return point;
+    }).join(" ");
+  };
+  return <div className="chart-wrap">
+    <div className="chart-legend">{series.map(s => <span key={s.id}><i style={{ background: s.color }} />{s.label}</span>)}{volumes && <span><i className="volume-key" />Volume</span>}</div>
+    <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title} className={onCursor ? "chart interactive" : "chart"}
+      onPointerDown={event => {
+        if (!onCursor) return;
+        const rect = event.currentTarget.getBoundingClientRect();
+        const point = (event.clientX - rect.left) / rect.width * width;
+        const target = times[0] + (point - left) / (width - left - right) * (times[times.length - 1] - times[0]);
+        onCursor(times.reduce((best, time, index) => Math.abs(time - target) < Math.abs(times[best] - target) ? index : best, 0));
+      }}>
+      <title>{title}</title>
+      {ticks.map((tick, i) => <g key={i}><line x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} className="grid-line" /><text x={left - 10} y={y(tick) + 4} textAnchor="end" className="axis-label">{decimal(tick, fixedDomain ? 0 : 1)}{fixedDomain ? "%" : ""}</text></g>)}
+      {volumes?.map((volume, i) => <rect key={i} x={x(i) - Math.min(6, (width - left - right) / times.length * .35)} y={height - 33 - volume / volumeMax * 36} width={Math.max(1, Math.min(12, (width - left - right) / times.length * .7))} height={volume / volumeMax * 36} className="volume-bar" />)}
+      {series.map(s => <path key={s.id} d={path(s.values)} fill="none" stroke={s.color} strokeWidth={s.id === "market" ? 2.8 : 2} strokeLinejoin="round" strokeLinecap="round" />)}
+      {times.length <= 3 && series.map(s => s.values.map((value, index) => value !== null && Number.isFinite(value) && <circle key={`${s.id}-${index}`} cx={x(index)} cy={y(value)} r="4" fill={s.color} />))}
+      {markers.map((index, i) => <circle key={i} cx={x(index)} cy={height - bottom + 7} r="3" fill="#b16b2d"><title>Exécution simulée le {date(times[index])}</title></circle>)}
+      {cursor !== undefined && <g><line x1={x(active)} x2={x(active)} y1={top} y2={height - 30} className="cursor-line" />{series.map(s => s.values[active] !== null && s.values[active] !== undefined && <circle key={s.id} cx={x(active)} cy={y(s.values[active]!)} r="4" fill={s.color} stroke="white" strokeWidth="2" />)}</g>}
+      <text x={left} y={height - 8} className="axis-label">{date(times[0])}</text>
+      <text x={width - right} y={height - 8} textAnchor="end" className="axis-label">{date(times[times.length - 1])}</text>
+    </svg>
+  </div>;
 }
