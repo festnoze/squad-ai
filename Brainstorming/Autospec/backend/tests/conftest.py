@@ -72,6 +72,14 @@ def tmp_workspace(tmp_path, monkeypatch):
     # kills real process trees, which a test suite must never do. The tests
     # covering it monkeypatch `subprocess.run` and call the helper directly.
     monkeypatch.setattr(settings, "orphan_sweep_on_boot", False)
+    # Wave 5: the web-bootstrap guard ADDS one task to the plan whenever the
+    # product is expected to listen on a port (a declared frontend stream is
+    # enough) and no unit claims `main.py`. Pinned OFF (its CODE default is ON,
+    # what production does) because it changes the item counts the existing
+    # stream tests observe: with it ON, test_streams_build's scheduler tests see
+    # a fourth item `US-1-WEB` alongside T-A/T-B/T-C. The tests covering the
+    # guard opt in explicitly.
+    monkeypatch.setattr(settings, "web_wiring_task", False)
     monkeypatch.setattr(settings, "definition_of_done_enabled", False)
     monkeypatch.setattr(settings, "definition_of_done_strict_criteria", False)
     monkeypatch.setattr(settings, "runtime_acceptance_enabled", False)

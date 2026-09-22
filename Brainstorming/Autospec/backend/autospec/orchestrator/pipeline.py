@@ -4351,6 +4351,10 @@ class Pipeline:
             # P1: global declared-overlap floor across ALL stories/streams (catches
             # shared repo-root files the per-story/per-stream view misses), after
             # the judge so it benefits from any completed claims.
+            # Wave 5: nobody in the plan boots the server (the auto-discovery
+            # convention only wires ROUTES). Add the web bootstrap task BEFORE
+            # the floor so its shared-file claim is serialized like any other.
+            self._ensure_web_wiring_task(all_iterations=all_iterations)
             self._enforce_global_independence()
             await self._abuild_phase_streams(all_iterations=all_iterations)
             return
@@ -5064,6 +5068,163 @@ class Pipeline:
                 f"🔗 {n} arête(s) globale(s) de sérialisation (fichiers déclarés "
                 "partagés inter-stories/streams).",
             )
+
+    # ------------------------------------------- web bootstrap guard (wave 5)
+
+    @staticmethod
+    def _claims_main_entry(glob: str) -> bool:
+        """Does this declared file glob claim the Python entry point ``main.py``?"""
+        g = str(glob or "").strip().replace("\\", "/").lower()
+        return g == "main.py" or g.endswith("/main.py")
+
+    def _is_backend_task(self, task: Task) -> bool:
+        """Is this task built in a BACKEND (non-frontend) stream? The task's
+        stream is resolved through the project state, so a project with no
+        declared stream (flag-off / legacy) sees every task as backend."""
+        stream = self.state.stream(task.stream or self.state.primary_stream_id)
+        return not (
+            stream.kind == StreamKind.FRONTEND or toolchain.is_frontend(stream.language)
+        )
+
+    def _ensure_web_wiring_task(self, all_iterations: bool = False) -> None:
+        """Wave 5 (supervised run 2026-09-22): make sure SOMEBODY boots the server.
+
+        Observed factory defect (fullstack "Counter webapp"): the PO plan was
+        TS-1 (persistence) + US-1 (GET /count) + US-2 (POST /increment). The 8
+        tasks all merged green, yet ``main.py`` was never touched and NO file in
+        the repo mentioned ``uvicorn``: each feature publishes its routes into a
+        shared routing table through the auto-discovery convention and waits for
+        a mounter that no task owns. The smoke run then fails with "the process
+        exited (code 0) without listening on 127.0.0.1:8000", and only the
+        post-smoke repair agent catches up on what the plan should have held.
+
+        Root cause: the convention removes the need for an integration task for
+        the ROUTES, not for the SERVER BOOTSTRAP (an app factory plus a
+        ``main.py`` that actually runs uvicorn). This deterministic guard closes
+        that hole: when the product is expected to listen (profile or frontend
+        stream), the backend is Python, and no unit of the build pool claims
+        ``main.py``, it appends ONE web-wiring task at the END of the backend
+        chain (it depends on every other backend task of the pool).
+
+        Idempotent (the task it adds claims ``main.py``, so a second call is a
+        no-op) and run BEFORE the independence floor, so its ``pyproject.toml``
+        claim is serialized like any other declared overlap. Flag:
+        ``WEB_WIRING_TASK`` (ON). OFF restores the historic behaviour."""
+        if not self._setting("web_wiring_task"):
+            return
+        if not self._expects_web_app():
+            return
+        lang = getattr(self.state.backend_language, "value", self.state.backend_language)
+        if toolchain.normalize(str(lang)) != "python":
+            return
+        pool = (
+            self.state.stories
+            if all_iterations
+            else self.state.stories_of_iteration(self.state.iteration)
+        )
+        if not pool:
+            return
+        # Already planned? A task claiming `main.py`, or a TASKLESS story whose
+        # own text names it, means the plan already owns the bootstrap.
+        for story in pool:
+            if not story.tasks:
+                own_text = f"{story.title} {story.description} {story.contract}".lower()
+                if "main.py" in own_text:
+                    return
+                continue
+            for task in story.tasks:
+                if any(self._claims_main_entry(g) for g in task.files_hint):
+                    return
+        backend_stories = [s for s in pool if not self._is_frontend_story(s)]
+        if not backend_stories:
+            return
+        backend_tasks = [
+            t for s in backend_stories for t in s.tasks if self._is_backend_task(t)
+        ]
+        pkg = workspace.package_name(self.state)
+        taken = {s.id for s in self.state.stories} | {t.id for t in self.state.all_tasks()}
+        # Host = the LATEST backend story that is ALREADY a task container, so we
+        # never turn a taskless (leaf) story into a container it was not planned
+        # to be. When there is none, a technical story carries the task.
+        host = next((s for s in reversed(backend_stories) if s.tasks), None)
+        created_story: UserStory | None = None
+        if host is None:
+            host = UserStory(
+                id=_unique_id("TS-WEB", "TS", taken),
+                epic_id=backend_stories[-1].epic_id,
+                title="TS · Amorçage web",
+                technical=True,
+                contract=(
+                    "Le produit démarre réellement : une app factory monte les "
+                    "routes publiées par les features et `python main.py` écoute "
+                    "sur le port 8000."
+                ),
+                stream=self.state.primary_stream_id,
+                iteration=self.state.iteration,
+                depends_on=[s.id for s in backend_stories],
+            )
+            taken.add(host.id)
+            created_story = host
+        task = Task(
+            id=_unique_id(f"{host.id}-WEB", "WEB", taken),
+            story_id=host.id,
+            stream=self.state.primary_stream_id,
+            title="Amorçage web : app factory + main.py démarre le serveur",
+            description=(
+                f"Crée `{pkg}/app.py` avec une fonction `create_app()` qui instancie "
+                "FastAPI et MONTE les routes/hooks publiés par les features "
+                f"auto-découvertes (`{pkg}/features/`), puis sert `frontend/dist` à "
+                "la racine s'il existe. Dans `main.py` : les hooks des features "
+                "tournent d'abord, puis SANS argument (ou avec `serve`) l'entrée "
+                "démarre le serveur via "
+                "`uvicorn.run(create_app(), host=\"0.0.0.0\", port=8000)` ; "
+                "`--help`/`-h` affiche l'aide SANS lier de port. Déclare `fastapi` "
+                "et `uvicorn` dans les `dependencies` de `pyproject.toml`. Ne "
+                "réécris pas les modules de features : cette tâche FERME la "
+                "chaîne backend."
+            ),
+            acceptance_criteria=[
+                AcceptanceCriterion(
+                    id="AC-1",
+                    text=(
+                        "`python main.py` écoute sur 127.0.0.1:8000 et `GET /` "
+                        "répond."
+                    ),
+                    kind="nonfunctional",
+                ),
+                AcceptanceCriterion(
+                    id="AC-2",
+                    text="`python main.py --help` affiche l'aide sans ouvrir de port.",
+                    kind="nonfunctional",
+                ),
+            ],
+            gherkin=(
+                "Feature: Amorçage web\n"
+                "  Scenario: L'entrée nue démarre le serveur\n"
+                "    Given l'application générée\n"
+                "    When on lance `python main.py` sans argument\n"
+                "    Then le serveur écoute sur 127.0.0.1:8000 et `GET /` répond"
+            ),
+            depends_on=[t.id for t in backend_tasks],
+            files_hint=["main.py", f"{pkg}/app.py", "pyproject.toml"],
+            complexity="simple",
+            estimated_files=3,
+        )
+        host.tasks.append(task)
+        if created_story is not None:
+            self.state.stories.append(created_story)
+        self._log(
+            "web-wiring",
+            f"🔌 Tâche d'amorçage web {task.id} ajoutée à {host.id} "
+            f"(dépend de {len(backend_tasks)} tâche(s) backend) : aucune unité "
+            "du plan ne revendiquait `main.py`.",
+        )
+        self._chat(
+            ChatRole.SYSTEM,
+            "Tâche d'amorçage web ajoutée au plan (aucune tâche ne démarrait "
+            "le serveur).",
+        )
+        self._sync()
 
     # ---------------------------------------- adaptive split-on-failure (P6)
 

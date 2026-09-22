@@ -335,6 +335,13 @@ VIDE ou à un seul élément.
   `{package_name}/features/<son_module>.py` - sinon le scope guard retirera ce
   fichier légitime avant merge. Une sous-tâche de couche interne (entité,
   repository, service) n'a PAS à créer de module features/ : ne pas en générer.
+- AMORÇAGE WEB : cette convention câble les ROUTES, PAS le démarrage du serveur.
+  Si le produit doit ÉCOUTER sur un port, la DERNIÈRE sous-tâche est une tâche
+  d'amorçage (`file_globs` = `["main.py", "{package_name}/app.py", "pyproject.toml"]`,
+  `depends_on` toutes les autres) : app factory `create_app()` qui monte les
+  routes publiées par les features, `python main.py` nu qui démarre
+  `uvicorn.run(create_app(), host="0.0.0.0", port=8000)`, `--help` sans port.
+  L'usine l'ajoute d'office si tu l'oublies.
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{
@@ -1571,7 +1578,17 @@ PROPRES fichiers et exportent ; la tâche d'intégration fait le câblage et
 `depends_on` les features. C'est LA cause n°1 des conflits de merge inter-stream.
 MIEUX : le scaffold AUTO-DÉCOUVRE les features (`<pkg>/features/<feature>.py`
 exposant `register()` ; `frontend/src/features/<Feature>.tsx` en export default) —
-une feature câblée par convention n'a besoin d'AUCUNE tâche d'intégration.
+une feature câblée par convention n'a besoin d'AUCUNE tâche d'intégration
+POUR SES ROUTES.
+AMORÇAGE WEB (OBLIGATOIRE dès que le produit doit ÉCOUTER sur un port) : la
+convention câble les ROUTES, jamais le DÉMARRAGE DU SERVEUR. Le plan DOIT donc
+porter UNE tâche d'amorçage, en FIN de chaîne backend (elle `depends_on` toutes
+les autres tâches backend), avec `main.py`, `<pkg>/app.py` et `pyproject.toml`
+dans ses `file_globs` : une app factory `create_app()` qui monte les routes
+publiées par les features, puis `python main.py` SANS argument qui démarre
+`uvicorn.run(create_app(), host="0.0.0.0", port=8000)` (`--help` affiche l'aide
+sans lier de port). L'usine l'ajoute d'office si le plan l'oublie, mais c'est au
+plan de la porter.
 
 TECHNICAL STORIES (TS) — découpage fin du travail technique/complexe.
 Pour un travail TECHNIQUE transverse ou une pièce COMPLEXE qui n'est pas une vraie
@@ -1680,7 +1697,13 @@ def sizing_rules() -> str:
   les features. C'est LA cause n°1 des conflits de merge entre unités parallèles.
   MIEUX : le scaffold AUTO-DÉCOUVRE `<pkg>/features/<feature>.py` (`register()`)
   et `frontend/src/features/<Feature>.tsx` (export default) — une feature câblée
-  par convention n'a besoin d'AUCUNE tâche d'intégration.
+  par convention n'a besoin d'AUCUNE tâche d'intégration POUR SES ROUTES.
+- AMORÇAGE WEB : la convention câble les ROUTES, PAS le démarrage du serveur.
+  Un produit qui doit ÉCOUTER sur un port porte TOUJOURS une tâche d'amorçage en
+  FIN de chaîne backend (app factory `<pkg>/app.py` + `main.py` qui lance
+  `uvicorn.run(create_app(), host="0.0.0.0", port=8000)`, `--help` sans port),
+  avec `main.py`/`<pkg>/app.py`/`pyproject.toml` dans ses `file_globs`. L'usine
+  l'ajoute d'office si le plan l'oublie.
 - NI TROP GROS NI TROP FIN : fusionner les unités triviales adjacentes qui ne
   justifient pas chacune une session d'agent."""
 
@@ -2341,6 +2364,10 @@ PROCESSUS OBLIGATOIRE (BDD puis TDD, outside-in) :
    et la DÉPENDANCE D'EXÉCUTION (ex. `uvicorn`) DOIT être déclarée dans
    `pyproject.toml` (`dependencies`). Ne te contente JAMAIS d'imprimer des
    instructions de lancement à la place du démarrage réel.
+   SI TA TÂCHE PORTE `main.py` DANS SON PÉRIMÈTRE : `python main.py` NU (sans
+   aucun argument) DOIT DÉMARRER LE SERVEUR et rester en écoute ; `--help`/`-h`
+   affiche l'aide et ne lie AUCUN port. Une bannière suivie d'un `return 0` est
+   un ÉCHEC du smoke run.
 
 CONTRAINTES :
 - Ne modifie JAMAIS les fichiers .feature ni autospec-state.json.

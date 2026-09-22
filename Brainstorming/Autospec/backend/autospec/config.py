@@ -555,6 +555,19 @@ class Settings:
     independence_enabled: bool = field(
         default_factory=lambda: _env_bool("INDEPENDENCE", False)
     )
+    # Wave 5 (supervised run 2026-09-22) - the "nobody boots the server" factory
+    # defect: every feature publishes its routes through the auto-discovery
+    # convention, so the plan legitimately contains NO integration task, and
+    # `main.py` is never touched. The product is green, merged... and the smoke
+    # run fails with "the process exited (code 0) without listening on
+    # 127.0.0.1:8000". With this ON, a deterministic guard adds ONE web-wiring
+    # task (app factory + `main.py` starting uvicorn) at the end of the backend
+    # chain whenever the product is expected to listen and no unit claims
+    # `main.py`. OFF = historic behaviour (the post-smoke repair agent has to
+    # catch up afterwards).
+    web_wiring_task: bool = field(
+        default_factory=lambda: _env_bool("WEB_WIRING_TASK", True)
+    )
     setup_install: bool = field(
         default_factory=lambda: _env_bool("SETUP_INSTALL", False)
     )

@@ -66,6 +66,13 @@ CLI contract (relied upon by the Autospec smoke run):
   the relayed argv itself (argparse prints its own help and raises SystemExit).
 * A hook raising ``SystemExit`` (argparse) is left alone: it propagates.
 * A hook returning a non-zero ``int`` sets the exit code (first one wins).
+
+WEB PRODUCT (anything that must LISTEN on a port): the BARE entry point MUST
+START THE SERVER. That is the smoke contract the factory checks, so a banner
+followed by exit 0 is a FAILURE here; the banner below is only the default
+behaviour of a product that has no server. Typically ``main()`` runs the feature
+hooks first, then calls the package's ``create_app()`` and
+``uvicorn.run(app, host="0.0.0.0", port=8000)``. ``--help`` must stay port-free.
 """
 
 import inspect

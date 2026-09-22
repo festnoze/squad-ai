@@ -783,3 +783,166 @@ vague 3 ajoute 10 tests backend et 25 tests vitest.
     texte anglais.
 12. **`ruff check --no-fix` signale `arestore_story` en C901 (11 > 10)** ;
     laisse tel quel, le fichier porte deja 28 C901 preexistants.
+### Vague 5 (2026-09-22) - tache d'amorcage web
+
+**Statut : livree. Backend complet : 1341 passed, 0 failed (361,10 s) (`uv run pytest -q -p no:cacheprovider`,
+log `backend/logs/wave5_gate.log`), dont 13 nouveaux tests
+`tests/test_wave5_web_wiring.py`.**
+
+#### Defaut d'usine observe
+
+Run reel supervise du 2026-09-22, projet fullstack « Counter webapp »
+(`workspace/drv-p3-9ae648a7`, streams backend + frontend, profil `auto`). Le plan
+PO a produit TS-1 (persistance, 4 taches), US-1 (GET /count + affichage) et US-2
+(POST /increment + bouton). Les 8 taches sont vertes et mergees. Et pourtant :
+
+- `main.py` n'a **jamais** ete modifie depuis le scaffold ;
+- **aucun** fichier du depot ne contient la chaine « uvicorn » ;
+- les features publient leurs routes dans une table partagee
+  (`counter_webapp/features/_routing.py`) en attendant un « mounter » qu'aucune
+  tache ne prevoit.
+
+Le smoke run echoue donc : « le process s'est arrete (code 0) sans ecouter sur
+127.0.0.1:8000 » (`main.py` affiche la banniere d'aide et sort). C'est la
+reparation post-smoke (agent `integration_fix`) qui doit rattraper apres coup ce
+que le plan aurait du contenir.
+
+#### Cause
+
+1. **Les prompts de plan disent le contraire.** `prompts._streams_plan_block`
+   (bloc TECHNICAL STORIES / FICHIERS PARTAGES), `prompts.sizing_rules()` et
+   `prompts.decompose_story` affirmaient tous les trois qu'« une feature cablee
+   par convention n'a besoin d'AUCUNE tache d'integration ». C'est vrai pour les
+   ROUTES (le scaffold auto-decouvre `<pkg>/features/<feature>.py`), c'est FAUX
+   pour l'**amorcage du serveur** (app factory + `main.py` qui demarre uvicorn),
+   que personne ne porte alors.
+2. **La regle « `python main.py` DOIT DEMARRER LE SERVEUR » n'existait que dans
+   `prompts.dev_story`**, donc uniquement pour la tache qui aurait deja `main.py`
+   dans son perimetre - et le scope gate retire justement `main.py` a toutes les
+   autres. Personne ne lisait la regle parce que personne n'avait le fichier.
+3. **Le scaffold `MAIN_TEMPLATE`** (contrat CLI livre en vague 2) affiche une
+   banniere et retourne 0 quand aucun hook ne consomme `argv`. Pour un produit
+   CLI c'est le contrat ; pour un produit web c'est exactement l'echec smoke.
+
+#### Fix
+
+1. **Garde deterministe `Pipeline._ensure_web_wiring_task()`**
+   (`autospec/orchestrator/pipeline.py`). Appelee dans `_abuild_phase` juste
+   avant `_enforce_global_independence()` (donc **apres**
+   `_adecompose_pending()`, la ou naissent les taches, et **avant** le floor
+   d'independance, pour beneficier de la serialisation). Conditions cumulees :
+   flag ON, `self._expects_web_app()` vrai (profil `api`/`web-ssr`/`fullstack`,
+   ou profil `auto`/`brownfield` avec un stream frontend declare), langage
+   backend `python`, et **aucune** unite du pool ne revendique `main.py` (ni un
+   `files_hint` de tache, ni le texte d'une story sans taches).
+   Elle ajoute alors UNE tache `<story>-WEB` :
+   - hote = la **derniere** story backend du pool qui est **deja** un conteneur
+     de taches (on ne transforme jamais une story feuille en conteneur) ; s'il
+     n'y en a pas, une Technical Story `TS-WEB` est creee (`technical=True`,
+     `contract`, `depends_on` = les stories backend du pool) ;
+   - `stream` = stream primaire backend, `complexity` = `simple`,
+     `estimated_files` = 3 ;
+   - `files_hint` = `["main.py", "<pkg>/app.py", "pyproject.toml"]` ;
+   - `depends_on` = **toutes** les autres taches backend du pool (elle ferme la
+     chaine) ; les taches frontend sont exclues ;
+   - `acceptance_criteria` = « `python main.py` ecoute sur 127.0.0.1:8000 et
+     `GET /` repond » + « `python main.py --help` affiche l'aide sans ouvrir de
+     port », plus un Gherkin minimal coherent ;
+   - description explicite : `create_app()` dans `<pkg>/app.py` qui instancie
+     FastAPI et monte les routes/hooks publies par les features, sert
+     `frontend/dist` a la racine si present ; dans `main.py` les hooks tournent
+     puis, sans argument (ou avec `serve`),
+     `uvicorn.run(create_app(), host="0.0.0.0", port=8000)` ; `--help`/`-h` sans
+     port ; `fastapi` + `uvicorn` declares dans `pyproject.toml`.
+   Log `web-wiring` + message de chat SYSTEM « Tache d'amorcage web ajoutee au
+   plan (aucune tache ne demarrait le serveur). ». **Idempotente** : la tache
+   qu'elle cree revendique `main.py`, donc le deuxieme appel ne fait rien.
+   Deux helpers l'accompagnent : `_claims_main_entry(glob)` et
+   `_is_backend_task(task)`.
+2. **Prompts** (`autospec/agents/prompts.py`). Dans `_streams_plan_block`,
+   `sizing_rules()` et `decompose_story` : la phrase « aucune tache
+   d'integration » est desormais **bornee aux ROUTES**, et un bloc
+   « AMORCAGE WEB » rend la tache d'amorcage OBLIGATOIRE en fin de chaine
+   backend, avec `main.py` / `<pkg>/app.py` / `pyproject.toml` dans ses
+   `file_globs`, en precisant que l'usine l'ajoute d'office si le plan l'oublie.
+   Dans `dev_story`, rappel ajoute : « SI TA TACHE PORTE `main.py` DANS SON
+   PERIMETRE : `python main.py` NU DOIT DEMARRER LE SERVEUR et rester en
+   ecoute ; `--help`/`-h` affiche l'aide et ne lie AUCUN port. Une banniere
+   suivie d'un `return 0` est un ECHEC du smoke run. »
+3. **`workspace.MAIN_TEMPLATE`** : paragraphe « WEB PRODUCT » ajoute a la
+   docstring du contrat CLI (en anglais, comme le reste du template) : pour un
+   produit qui doit ecouter sur un port, l'entree nue DOIT demarrer le serveur
+   (contrat smoke), la banniere n'est que le comportement par defaut d'un produit
+   sans serveur ; typiquement `main()` lance les hooks puis appelle
+   `create_app()` du package et `uvicorn.run(app, host="0.0.0.0", port=8000)` ;
+   `--help` reste sans port. **Le comportement du template est inchange**
+   (`tests/test_wave2_cli_scaffold.py` reste vert a l'octet pres).
+
+#### Flag
+
+`Settings.web_wiring_task` / env `WEB_WIRING_TASK`, **defaut ON** (code +
+`backend/.env.example` + `backend/.env`). OFF = comportement historique (la
+reparation post-smoke rattrape apres coup).
+
+**Pin conftest : `False`** (contrairement a l'usage « pin au defaut code »). La
+garde AJOUTE une tache au plan des qu'un stream frontend est declare, ce qui
+change le nombre d'items que les tests de streams observent : avec le pin a
+`True`, `tests/test_streams_build.py::test_frontend_task_starts_only_after_backend_dep_is_merged`
+et `::test_dynamic_scheduler_starts_dependent_before_slow_sibling` voient un
+quatrieme item `US-1-WEB` a cote de T-A/T-B/T-C et echouent. Le module
+`tests/test_wave5_web_wiring.py` reactive le flag explicitement via une fixture
+`autouse`.
+
+#### Tests
+
+`tests/test_wave5_web_wiring.py` (13 tests) :
+
+- le trou reel : deux taches backend sans `main.py` -> une tache `US-1-WEB`
+  ajoutee, `depends_on` = les deux, `files_hint` contient `main.py`,
+  `pyproject.toml` et `<pkg>/app.py`, criteres et Gherkin presents, message de
+  chat SYSTEM emis ;
+- idempotence (deuxieme appel = rien) ;
+- profil `fullstack` sans stream frontend : garde active quand meme (intention,
+  pas artefact) ;
+- aucun conteneur de taches dans le pool -> Technical Story `TS-WEB` creee, les
+  stories feuilles restent sans taches ;
+- une tache declare deja `main.py` -> rien ; une story sans taches qui nomme
+  `main.py` -> rien ;
+- profil `cli` -> rien ; flag OFF -> rien ; backend Go -> rien ;
+- les taches frontend ne comptent pas comme backend (ni hote, ni dependance) ;
+- passage du floor d'independance : recouvrement declare sur `pyproject.toml`,
+  serialisation dans le bon sens, pas de cycle, pas de crash ;
+- les prompts portent le rappel (`amor` + `app factory` dans le bloc streams et
+  dans `sizing_rules`, `amor` + `main.py` dans `decompose_story`, le rappel
+  `main.py` dans `dev_story`) et `MAIN_TEMPLATE` porte le paragraphe
+  « WEB PRODUCT ».
+
+Suites ciblees rejouees vertes : `test_wave2_cli_scaffold.py`, `test_pipeline.py`,
+`test_streams_build.py`, `test_streams_planning.py`, `test_decompose.py`,
+`test_independence.py`, `test_technical_story_plan.py`, `test_plan_pipeline.py`,
+`test_workspace.py`, `test_smoke_run.py`, `test_wave2_smoke_cli.py`,
+`test_generated_app_encoding.py` (205 passed).
+
+#### Points d'attention
+
+1. **La garde ne tourne que dans la branche streams/decompose de
+   `_abuild_phase`** (`if streams_enabled or decompose_enabled`). Un projet
+   entierement en chemin legacy (les deux flags OFF) n'est pas couvert ; c'est
+   coherent, ce chemin n'a pas de taches.
+2. **Le pin conftest est a `False` alors que le defaut code est `True`** : tout
+   nouveau test qui veut voir la garde doit la reactiver explicitement, et les
+   tests de streams existants ne decrivent donc PAS le comportement de
+   production sur ce point.
+3. **`_ensure_web_wiring_task` est signalee `C901` (13 > 10) par
+   `ruff check --no-fix`** ; laissee telle quelle, `pipeline.py` porte deja une
+   trentaine de C901 preexistants.
+4. **`complexity="simple"`** n'appartient pas a la taxonomie documentee
+   (`trivial` / `standard` / `complex`) mais n'est compare nulle part a autre
+   chose que `complex` et `trivial` : sans effet, a renommer si la taxonomie
+   devient stricte.
+5. **La garde fait confiance aux `files_hint` declares.** Une tache qui
+   modifierait `main.py` sans le declarer (le scope gate le lui retirerait de
+   toute facon) est invisible pour elle : la tache WEB serait ajoutee en plus.
+6. **Rien ne verifie a la livraison que la tache WEB a effectivement produit un
+   serveur** : c'est toujours le smoke run qui tranche. La garde deplace le
+   travail du rattrapage post-smoke vers le plan, elle ne remplace pas la gate.
