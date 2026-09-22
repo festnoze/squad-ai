@@ -262,3 +262,303 @@ commit.
     run** (`output[-1500:]`), pas celle du rejeu. Le verdict est correct, seul
     le diagnostic affiché est le plus ancien.
 
+
+### Vague 2 (2026-09-22)
+
+**Statut : livrée et validée. Suite backend complète : 1318 passed, 0 failed
+(195,99 s, `uv run pytest -q -p no:cacheprovider`). AUCUNE correction de gate
+n'a été nécessaire : la suite est passée verte du premier coup, avec les 6
+agents de la vague (W, S1, S2, S3, S4, M) intégrés dans le même arbre de
+travail. Rappel : la vague 1 finissait à 1254 tests, la vague 2 en ajoute 64.**
+
+#### Items livrés
+
+1. **FUSION P1-A - canari post-merge par rafale.** Sous contention du verrou de
+   merge, les merges qui arrivent ensemble forment une rafale (`_CanaryBatch` /
+   `_CanaryEntry`) vérifiée par UN SEUL run de suite au lieu d'un par merge. Le
+   dernier worker encore dans la phase de merge (`_merge_queue == 1`) règle la
+   rafale ; les autres se garent en `BuildStage.MERGING` et attendent leur
+   future. Rouge sémantique -> bisect par revert du merge le PLUS RÉCENT vers le
+   plus ancien (`_abisect_canary_batch`), avec rejeu de confirmation après
+   chaque revert sauf sur la plus ancienne entrée (c'est cette exception qui
+   rend une rafale de taille 1 strictement identique, en coût comme en
+   comportement, au chemin historique). Verdicts infra diffusés tels quels.
+   Nouveaux helpers : `_anote_merge_sha`, `_acanary_verdict`,
+   `_abandon_canary_batch`, `_adrain_canary_batch`, `_asettle_canary_batch`,
+   `_publish_canary`. `_OwnedLock` expose désormais `waiters`.
+   Nouveaux événements monitor `canary` : `batched`, `batch_green`,
+   `bisect_revert`. Nouveaux compteurs `PlanCalibration.canary_batches` et
+   `canary_bisect_reverts`.
+2. **FUSION P2-A - rebuild SOLO en dernier recours.** Sur un échec de fusion
+   PERSISTANT (conflit de merge ou revert post-canari) et une fois le budget de
+   requeue épuisé, l'item n'est plus déclaré FAILED tout de suite : il obtient
+   UNE reconstruction seule sur le HEAD final. `_mark_solo_retry` le remet en
+   TODO/QUEUED sans consommer de budget ; le scheduler ne démarre plus rien à
+   côté d'un solo en vol et fait attendre l'item solo que TOUS les workers aient
+   atterri (`_solo_ids`, `_solo_running`). La tentative est dépensée au
+   DÉMARRAGE (`solo_attempted = True`), donc pas de boucle possible. Le solo
+   repasse par `_aresume_green_branch` + `_averify_resumed` (rebase +
+   re-vérification + merge, AUCUN run dev). Nouveaux champs
+   `Task.solo_attempted`, `UserStory.solo_attempted`,
+   `PlanCalibration.solo_requeues`. Nouvel événement monitor `solo_retry`.
+   Ordre final du repli : budget de requeue -> SOLO -> split -> FAILED.
+3. **FUSION P2-B - cache npm partagé.** `_anpm_install_in` ajoute
+   `--cache <workspace_root résolu>/_npm-cache --prefer-offline` à l'argv npm et
+   crée le dossier à la demande ; un `OSError` sur le mkdir n'est jamais fatal
+   (log + repli sur le cache npm par défaut). `node_modules` reste par worktree,
+   seul le cache de téléchargement est partagé. `_npm-cache` est invisible pour
+   `storage.list_states()`, comme `_worktrees`.
+4. **FUSION P3 - observabilité de la boucle de fusion.** Trois compteurs sur
+   `PlanCalibration` : `suite_runs` (incrémenté DANS `_arun_pytest` et
+   `_arun_frontend_tests`, après les court-circuits démo, donc jamais chez les
+   appelants), `canary_verdicts` (histogramme `dict[str, int]` alimenté aux 9
+   sites d'émission `monitor.event("canary", verdict=...)` plus le vert), et
+   `items_delivered` (incrémenté au seul endroit où un work item devient livré).
+   Propriété calculée `suites_per_item`. Exposition : nouveau bloc `fusion` dans
+   `metrics.compute_metrics()` (donc dans `GET /api/metrics`, sans
+   `response_model` à modifier) via le nouvel helper public
+   `metrics.fusion_snapshot()` + la constante `metrics.FUSION_COUNTERS`, et le
+   même bloc (itération courante seulement) dans `prompts.retro_review()`, avec
+   une instruction qui interdit à l'agent rétro de transformer une boucle de
+   fusion infra en leçon « code ». `pattern_detector.aggregate_signals()` a dû
+   être adapté : il sommait TOUS les champs de `PlanCalibration`, ce qui plantait
+   sur le premier champ de type `dict` ; il ne totalise plus que les champs
+   annotés `int` et fusionne l'histogramme dans une clé sœur.
+5. **FACTORY #4 - CLI générée qui parle.** `workspace.MAIN_TEMPLATE` est
+   réécrit en vrai point d'entrée : `main(argv=None) -> int`, découverte des
+   hooks via `features.discover()`, relais d'argv aux hooks qui l'acceptent
+   (`inspect.signature`, un hook `register()` historique reste appelé sans
+   argument), bannière sur `-h` / `--help` ou sur un lancement nu sans
+   consommateur, code de sortie piloté par le premier `int` non nul retourné
+   (les `bool` sont exclus), `SystemExit` propagé. Côté gate, nouveau sondage
+   `Pipeline._smoke_cli_help_run` : la branche CLI du smoke rejoue le MÊME
+   lanceur avec `--help` et exige code 0 ET une sortie standard non vide.
+   Point critique : stdout et stderr sont capturés SÉPARÉMENT, sinon les lignes
+   de démarrage de `uv run` (« Creating virtual environment at: .venv ») feraient
+   passer n'importe quel CLI muet. La branche web n'est pas touchée.
+6. **TS extraites avec critères d'acceptance.** `_technical_story_evidence`
+   donne à toute Technical Story au moins un critère : ceux de la tâche en échec
+   (copie PROFONDE, la TS ne peut pas muter la tâche) sinon un critère
+   synthétique `<TS id>.AC-1` dérivé du contrat. La TS reçoit AUSSI un Gherkin
+   technique : c'est indispensable, des critères seuls auraient troqué
+   l'avertissement `no_acceptance_criteria` contre le BLOQUANT
+   `no_acceptance_evidence` sur les profils qui forcent `DOD_STRICT_CRITERIA`
+   (web-ssr, fullstack). Résultat : la TS ne lève plus AUCUN problème DoD.
+7. **Balayage des orphelins de workspace au démarrage.**
+   `Pipeline._sweep_workspace_orphans(ws_root)` réutilise les primitives de
+   `_kill_workspace_port_holders` (une sonde PowerShell/CIM sur Windows,
+   `ps -eo pid=,ppid=,command=` sur POSIX) mais SANS condition de port : seul un
+   processus dont la ligne de commande contient la racine de workspace résolue
+   est candidat, le pid courant et TOUTE sa chaîne d'ancêtres sont retirés des
+   candidats AVANT quoi que ce soit, et les survivants sont repliés sur leurs
+   ancêtres les plus hauts. Câblé dans `server._arecover_projects()` APRÈS
+   `list_states` et AVANT `recover_projects`, via `asyncio.to_thread`, muet en
+   mode `fake_agents` ou flag éteint, et incapable de faire échouer la reprise.
+8. **D11 - consolidation du statut stocké d'une story décomposée.** Le statut
+   stocké d'une story qui possède des tâches est consolidé exactement UNE fois,
+   par la tâche qui atterrit en dernier (`_aconsolidate_story_status`, sous
+   `_merge_lock`, ce qui donne la garantie d'unicité même quand plusieurs tâches
+   de la même story finissent dans la même rafale P1-A). Les deux autres
+   émetteurs de « story <id> done » (`_abuild_story`,
+   `_amaybe_arbitrate_wrong_test`) sont gardés par `_story_rollup_incomplete`.
+   `arebuild_task` annule la consolidation (`_unconsolidate_story`).
+
+#### Flags (tous dans `autospec/config.py`, documentés dans `backend/.env` et `backend/.env.example`, épinglés dans `tests/conftest.py::tmp_workspace`)
+
+| Champ Settings | Variable d'env | Défaut code | Épinglé en test |
+| --- | --- | --- | --- |
+| `canary_batch_enabled` | `CANARY_BATCH` | `True` | `True` |
+| `solo_on_conflict` | `SOLO_ON_CONFLICT` | `True` | `False` |
+| `npm_shared_cache` | `NPM_SHARED_CACHE` | `True` | `True` |
+| `consolidate_story_status` | `CONSOLIDATE_STORY_STATUS` | `True` | `True` |
+| `ts_acceptance_criteria` | `TS_ACCEPTANCE_CRITERIA` | `True` | `True` |
+| `smoke_cli_help` | `SMOKE_CLI_HELP` | `True` | `True` |
+| `orphan_sweep_on_boot` | `ORPHAN_SWEEP_ON_BOOT` | `True` | `False` |
+
+Deux épinglages ne sont pas au défaut de production, et pour deux raisons
+différentes :
+
+- `solo_on_conflict` est OFF parce que le solo insère UNE reconstruction de plus
+  entre le budget de requeue épuisé et la fin historique, ce qui changerait les
+  comptes de merges de `test_wave1_requeue_budget.py` (2 -> 3 et 1 -> 2). Les
+  tests du chemin solo activent le flag explicitement.
+- `orphan_sweep_on_boot` est OFF pour une raison de SÛRETÉ, pas d'herméticité :
+  le balayage lance PowerShell/`ps` et tue de vrais arbres de processus, ce
+  qu'une suite de tests ne doit jamais faire.
+
+`backend/.env` et `backend/.env.example` ne sont pas suivis par git : la
+documentation des 7 variables existe sur disque mais n'apparaîtra pas dans le
+commit.
+
+#### Fichiers modifiés
+
+- `backend/autospec/orchestrator/pipeline.py` (+757 / -18) : P1-A (rafale de
+  canari, bisect, `_OwnedLock.waiters`), P2-A (solo + scheduler), P2-B (cache
+  npm), P3 (`_count_suite_run`, `_count_canary`, `items_delivered`), D11
+  (`_aconsolidate_story_status`, `_story_rollup_incomplete`,
+  `_unconsolidate_story`), FACTORY #4 (`_smoke_cli_help_run`), critères de TS
+  (`_technical_story_evidence`), balayage (`_sweep_workspace_orphans`).
+- `backend/autospec/config.py` (+77) : les 7 champs ci-dessus.
+- `backend/autospec/models.py` (+27) : `Task.solo_attempted`,
+  `UserStory.solo_attempted`, et sur `PlanCalibration` `canary_batches`,
+  `canary_bisect_reverts`, `solo_requeues`, `suite_runs`, `canary_verdicts`,
+  `items_delivered`, `suites_per_item` (champ calculé).
+- `backend/autospec/metrics.py` (+54 / -1) : `FUSION_COUNTERS`,
+  `fusion_snapshot()`, bloc `fusion` dans `compute_metrics`.
+- `backend/autospec/agents/prompts.py` (+18) : bloc `fusion` dans les signaux de
+  `retro_review` + la règle « signaux de fusion ».
+- `backend/autospec/orchestrator/pattern_detector.py` (+15 / -2) :
+  `aggregate_signals` ne somme plus que les champs `int` et fusionne
+  `canary_verdicts` dans une clé dédiée.
+- `backend/autospec/api/server.py` (+33 / -1) : `_asweep_workspace_orphans`
+  appelé depuis `_arecover_projects`.
+- `backend/autospec/orchestrator/workspace.py` (+79 / -6) : `MAIN_TEMPLATE`
+  réécrit en point d'entrée CLI, `FEATURES_INIT_TEMPLATE` documente le contrat
+  de signature des hooks.
+- `backend/tests/conftest.py` (+39) : épinglage des 7 flags, chacun avec le
+  commentaire qui explique le choix.
+- `backend/.env`, `backend/.env.example` (non suivis par git).
+
+Aucun fichier n'a changé de convention de fin de ligne :
+`backend/autospec/orchestrator/pipeline.py` est toujours 100 % CRLF (9762
+lignes, 9762 CRLF, 0 LF isolé), `tests/conftest.py` aussi (213/213), et les
+fichiers qui étaient LF le sont restés. Zéro tiret cadratin ajouté
+(`git diff -U0 -- backend/ | grep '^+'` n'en contient aucun).
+
+#### Tests ajoutés (9 fichiers, 64 fonctions de test)
+
+- `tests/test_wave2_canary_batch.py` (6) : P1-A, dont une rafale de 3 merges
+  RÉELLEMENT sérialisés sous `_merge_lock` vérifiée par un seul run, le bisect
+  qui ne reverte que le coupable (avec le SHA capturé sous le verrou), la rafale
+  abandonnée qui ne bloque personne, et deux tests unitaires de
+  `_OwnedLock.waiters`.
+- `tests/test_wave2_solo.py` (5) : P2-A, dont le solo qui remplace FAILED sans
+  relancer de dev, le flag OFF, l'absence de boucle, et les deux invariants de
+  scheduler (rien ne démarre à côté d'un solo, un solo attend que tout ait
+  atterri).
+- `tests/test_wave2_npm_cache.py` (3) : P2-B, argv capturé, flag OFF, racine de
+  workspace relative résolue en absolu.
+- `tests/test_wave2_fusion_observability.py` (7) : P3 (compteurs, site de
+  comptage épinglé sur le VRAI `_arun_pytest`, `suites_per_item`) et D11
+  (consolidation par la dernière tâche, flag OFF, garde de rollup, annulation
+  par `arebuild_task`).
+- `tests/test_wave2_metrics_fusion.py` (7) : exposition P3 dans
+  `compute_metrics` et `retro_review`, tolérance aux états pré-P3, ratio calculé
+  sur les TOTAUX et pas sur la moyenne des ratios.
+- `tests/test_wave2_cli_scaffold.py` (11) : contrat du `main.py` généré
+  (sous-processus réels, `PYTHONUTF8=1`).
+- `tests/test_wave2_smoke_cli.py` (8) : sondage `--help`, dont le piège du bruit
+  stderr et l'absence de sondage sur un produit web.
+- `tests/test_wave2_ts_criteria.py` (6) : critères hérités/synthétiques, copie
+  profonde, Gherkin technique, DoD strict silencieuse, flag OFF.
+- `tests/test_wave2_orphan_sweep.py` (11) : périmètre du balayage, remontée aux
+  ancêtres, protection du processus courant et de ses ancêtres, branche POSIX,
+  sonde en échec, câblage au démarrage.
+
+#### Corrections de gate
+
+Aucune. Contrairement à la vague 1, aucun test historique n'a dû être adapté par
+la gate : les deux seuls tests qui auraient contredit la nouvelle sémantique
+(`test_wave1_requeue_budget.py` pour le solo,
+`test_generation_hardening.py::test_semantic_conflict_is_reverted_and_requeued`
+pour la rafale) ont été traités pendant la vague elle-même, l'un par un
+épinglage OFF documenté, l'autre par la règle « pas de rejeu de confirmation sur
+la plus ancienne entrée d'une rafale ».
+
+#### Points d'attention restants
+
+1. **`SMOKE_CLI_HELP` est un vrai DURCISSEMENT de gate, actif par défaut.** Un
+   projet CLI dont le `main.py` ne répond rien sur `--help` échoue désormais au
+   smoke alors qu'il passait avant. C'est l'effet recherché, mais un projet
+   brownfield importé ou un `main.py` en boucle de démon se mettra à échouer.
+   Repli : `SMOKE_CLI_HELP=0`.
+2. **`REQUEUE_MAX=0` n'est plus terminal au premier conflit** quand
+   `SOLO_ON_CONFLICT=1` (défaut) : l'item garde son unique rebuild solo, donc 2
+   tentatives de merge au lieu d'une. Un opérateur strict doit maintenant poser
+   les deux variables.
+3. **LE BALAYAGE TUE DE VRAIS PROCESSUS ET EST ACTIF PAR DÉFAUT.** Sa seule
+   garde est « la ligne de commande contient la racine de workspace résolue »,
+   en comparaison de sous-chaîne insensible à la casse. Une `WORKSPACE_ROOT`
+   trop large, ou qui est le préfixe d'un autre chemin réel, élargit d'autant la
+   cible. À regarder une fois avant le premier démarrage supervisé avec ce flag.
+   La remontée pid -> ppid est également sensible à la RÉUTILISATION DE PID
+   (faiblesse héritée de `_kill_workspace_port_holders`, mais avec un ensemble
+   de candidats bien plus large).
+4. **La sonde Windows doit continuer à renvoyer la table de processus
+   COMPLÈTE** (chaque pid, avec un drapeau 0/1 « dans le workspace »). Si une
+   optimisation future refiltre côté CIM, la chaîne d'ancêtres n'est plus
+   reconstructible et le balayage peut tuer le shell ou l'IDE qui a lancé le
+   backend. Garde-fou :
+   `test_the_current_process_and_its_ancestors_are_never_killed`.
+5. **`os.path.realpath` (et pas `Path(...).resolve()`) dans
+   `_sweep_workspace_orphans` est délibéré** : `pathlib` arbitre sur `os.name`
+   au moment de l'appel, donc le test de la branche POSIX (qui monkeypatche
+   `os.name`) plante sur Windows avec `UnsupportedOperation`. Ne pas
+   « moderniser ».
+6. **La décision de rafale repose sur `self._merge_queue > 1`, PAS sur
+   `_OwnedLock.waiters`** (qui compte aussi `_aworktree_add`,
+   `_arevert_head_merge`, le commit de feature et, depuis D11, la consolidation
+   de story). Toute modification qui déplacerait la lecture de `contended` hors
+   de sa position actuelle (dans le `try`, sans `await` entre la libération du
+   verrou et la lecture) rendrait le batching à la fois faux et exposé à un
+   blocage. Invariant épinglé par
+   `test_a_released_lock_still_shows_its_queue_in_the_same_step`.
+7. **Si la règle « pas de rejeu de confirmation sur la plus ancienne entrée »
+   disparaît du bisect**, une rafale de taille 1 coûte un run de suite de plus
+   et `test_generation_hardening.py::test_semantic_conflict_is_reverted_and_requeued`
+   repasse au rouge (3 runs au lieu de 2).
+8. **`suite_runs` compte des SUITES DEMANDÉES, pas des processus.** Un rejeu
+   flaky à l'intérieur d'un `_arun_pytest`, ou Vitest + le build de production
+   dans un `_arun_frontend_tests`, n'ajoutent qu'une unité. Un tableau de bord
+   doit écrire « suites demandées », jamais « processus de test ».
+9. **`items_delivered` n'est incrémenté que par le chemin streams.** Sur un
+   projet construit par le chemin séquentiel hérité, `suites_per_item` dégénère
+   en `suite_runs / 1`, et `compute_metrics` agrégeant TOUS les projets, un seul
+   projet hérité gonfle le ratio global. À affiner en vague 3 (ratio par projet,
+   ou exclusion des états à `items_delivered == 0`).
+10. **DEUX endroits à mettre à jour pour tout nouveau compteur de
+    `PlanCalibration`** : `metrics.FUSION_COUNTERS` (sinon le compteur est
+    absent de `/api/metrics` et de la rétro) et le filtre « champs annotés
+    `int` » de `pattern_detector.aggregate_signals` (qui DÉPOSE silencieusement
+    tout champ non-`int` au lieu de planter). Les deux échouent en silence.
+11. **Le contrat frontend n'est pas à jour** : `frontend/src/types.ts`
+    (`export interface Metrics`) n'expose pas le bloc `fusion`. Rien ne casse,
+    mais aucune UI ne peut le lire tant que l'interface n'est pas étendue. C'est
+    le premier item de la vague 3.
+12. **`aforce_done_task` / `aforce_done_story` ne sont pas câblés à la
+    consolidation D11** : forcer manuellement la dernière tâche d'une story
+    laisse le statut stocké du conteneur non consolidé et n'émet pas de commit
+    de rollup. C'est le trou restant de D11.
+13. **Les deux émetteurs hérités de « story <id> done » ne sont gardés que sur
+    le COMMIT, pas sur `story.status = DONE`.** `_abuild_story` écrit toujours
+    DONE sur un conteneur construit d'un bloc : sur le chemin hérité,
+    `effective_status()` reste la source de vérité, pas le statut stocké.
+14. **Les hooks de features tournent AUSSI sur `--help`** dans le `main.py`
+    généré (c'est ce qu'exige le critère d'acceptance « les deux formes de hook
+    sont appelées »). Une feature dont le `register()` a de vrais effets de bord
+    s'exécute donc sur `python main.py --help`. Si c'est jugé dangereux, le
+    changement est d'une ligne dans `MAIN_TEMPLATE`, au prix d'un test à
+    assouplir.
+15. **FACTORY #4 n'est clos que pour le profil Python.** `GO_MAIN_TEMPLATE` et
+    `RUST_MAIN_TEMPLATE` génèrent toujours un binaire muet ; `_asmoke_phase`
+    saute de toute façon les langages non-Python.
+16. **`_solo_ids` n'est qu'en mémoire** (comme `_conflict_retry_ids`) : un
+    arrêt/relance entre l'octroi et le lancement perd le solo en attente.
+    `solo_attempted` est persisté, donc pas de second octroi après une telle
+    relance ; la dégradation est le chemin historique.
+17. **Le maintien du solo est fondé sur `running`, pas sur une réservation** :
+    tant qu'un solo attend, le scheduler continue à démarrer d'AUTRES items
+    prêts. Pas de famine en pratique (le backlog est fini et l'item solo est
+    repris à chaque passe), mais il n'y a pas de compteur d'équité.
+18. **`<workspace_root>/_npm-cache` doit être exclu de toute future routine
+    « nettoyer la racine de workspace »**, sinon chaque projet repaie le coût de
+    téléchargement.
+19. **Cinq flags de production ne sont toujours pas exercés par la suite**
+    (épinglés OFF dans la conftest) : `canary_replay_on_empty`,
+    `empty_red_is_infra`, `resume_reprobe_min` (vague 1), `solo_on_conflict` et
+    `orphan_sweep_on_boot` (vague 2). Les tests dédiés les activent
+    explicitement, mais la combinaison « tout à ON » n'est jamais jouée par la
+    suite : c'est le rôle du run démo de la vague 4.
+20. **Toujours interdit** : `uv run ruff check` sans `--no-fix` sous
+    `Brainstorming/` (le `pyproject.toml` parent pose `fix = true` et réécrit
+    les fichiers en silence).

@@ -61,6 +61,17 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "setup_install", False)
     monkeypatch.setattr(settings, "ui_tests_enabled", False)
     monkeypatch.setattr(settings, "smoke_run", False)
+    # FACTORY_IMPROVEMENTS #4: the CLI smoke adds a SECOND subprocess
+    # (`main.py --help`) to the non-web smoke path. Pinned to its CODE default
+    # (ON, what production does) - `smoke_run` above is already OFF, so no
+    # existing test reaches it; the tests covering it drive
+    # `_smoke_run_python` directly and opt in or out explicitly.
+    monkeypatch.setattr(settings, "smoke_cli_help", True)
+    # FACTORY_IMPROVEMENTS (orphan sweep): pinned OFF, and this pin is a SAFETY
+    # rule, not a hermeticity one - the sweep shells out to PowerShell/ps and
+    # kills real process trees, which a test suite must never do. The tests
+    # covering it monkeypatch `subprocess.run` and call the helper directly.
+    monkeypatch.setattr(settings, "orphan_sweep_on_boot", False)
     monkeypatch.setattr(settings, "definition_of_done_enabled", False)
     monkeypatch.setattr(settings, "definition_of_done_strict_criteria", False)
     monkeypatch.setattr(settings, "runtime_acceptance_enabled", False)
@@ -86,6 +97,11 @@ def tmp_workspace(tmp_path, monkeypatch):
     # is ON) so the existing canary tests keep their single-run flow; the tests
     # that cover the replay opt in explicitly.
     monkeypatch.setattr(settings, "canary_replay_on_empty", False)
+    # P1-A: the canary by burst only changes anything under merge-lock
+    # contention (a burst of size 1 replays the historic single canary), so it
+    # is pinned to its CODE default (ON, what production does); the tests that
+    # exercise a real burst opt in or out explicitly.
+    monkeypatch.setattr(settings, "canary_batch_enabled", True)
     # WF-P1: an empty red (a RED suite that executed ZERO test) is treated as an
     # infra failure - it adds a venv purge + a SECOND suite run and refunds the
     # dev attempt, which flips every test whose fake runner answers red with no
@@ -96,6 +112,29 @@ def tmp_workspace(tmp_path, monkeypatch):
     # to its code default so a developer's REQUEUE_MAX cannot change how many
     # times a conflicting item is re-queued in the tests.
     monkeypatch.setattr(settings, "requeue_max", 3)
+    # P2-A: the solo last resort inserts ONE extra rebuild between the exhausted
+    # requeue budget and the historic ending, which changes how many merges the
+    # existing conflict tests observe before FAILED (e.g.
+    # test_wave1_requeue_budget's exhausted/REQUEUE_MAX=0 cases). Pin it OFF (its
+    # default is ON) so those tests keep their historic counts; the tests
+    # covering the solo path opt in explicitly.
+    monkeypatch.setattr(settings, "solo_on_conflict", False)
+    # D11 (P3 wave): consolidating a task-decomposed story writes the container's
+    # STORED status and emits ONE extra "story <id> done" commit when its last
+    # task merges. Pinned to its CODE default (ON, what production does) - the
+    # existing stream tests read `effective_status()` (unchanged) and a story
+    # with an incomplete rollup is untouched; the tests covering the rollup opt
+    # in or out explicitly.
+    monkeypatch.setattr(settings, "consolidate_story_status", True)
+    # FACTORY_IMPROVEMENTS (TS criteria): an extracted Technical Story is now
+    # born with acceptance criteria and a technical Gherkin instead of neither.
+    # Pinned to its CODE default (ON, what production does) - the existing split
+    # tests assert on the TS's id/contract/tasks, never on empty criteria.
+    monkeypatch.setattr(settings, "ts_acceptance_criteria", True)
+    # P2-B: the shared npm cache only changes the `npm ci` argv (and creates one
+    # cache dir under the workspace root). Pinned to its CODE default (ON), so a
+    # developer's NPM_SHARED_CACHE cannot change what the frontend tests observe.
+    monkeypatch.setattr(settings, "npm_shared_cache", True)
     # P1-C: the critical-path pick order and the fan-out attempt bonus are pinned
     # to their CODE defaults (they are on in production and the existing stream
     # tests stay green with them), so a developer's FANOUT_FIRST /

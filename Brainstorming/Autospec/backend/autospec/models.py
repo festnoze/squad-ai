@@ -262,6 +262,10 @@ class Task(BaseModel):
     # THIS budget, not `attempts`: the generated code is green on its own, so a
     # collision with a sibling can never burn the dev re-generation budget.
     requeue_attempts: int = 0
+    # P2-A: True once this task has been GRANTED its one solo rebuild (the last
+    # resort on a persistent merge conflict). Granted at most once, so a solo try
+    # that fails again ends on the historic path (split, then FAILED).
+    solo_attempted: bool = False
     last_error: str = ""
     files_hint: list[str] = Field(default_factory=list)   # files/zones it expects to touch
     split_depth: int = 0  # how many adaptive failure-splits produced/refined this task (bounds recursion)
@@ -300,6 +304,10 @@ class UserStory(BaseModel):
     # THIS budget, not `attempts`: the generated code is green on its own, so a
     # collision with a sibling can never burn the dev re-generation budget.
     requeue_attempts: int = 0
+    # P2-A: True once this story has been GRANTED its one solo rebuild (the last
+    # resort on a persistent merge conflict). Granted at most once, so a solo try
+    # that fails again ends on the historic path (split, then FAILED).
+    solo_attempted: bool = False
     last_error: str = ""
     split_depth: int = 0  # adaptive failure-splits applied to this story (bounds re-decomposition)
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
@@ -410,10 +418,29 @@ class PlanCalibration(BaseModel):
     # §8 — orchestration health, separated from sizing signals above:
     merge_requeues: int = 0      # merge conflicts that re-queued an item
     canary_reverts: int = 0      # semantic conflicts (green+green=red) reverted post-merge
+    canary_batches: int = 0      # bursts of >= 2 merges settled by ONE canary (P1-A)
+    canary_bisect_reverts: int = 0  # merges undone while bisecting a red burst (P1-A)
     p2b_resumes: int = 0         # preserved green branches merged WITHOUT a dev rebuild
     orphan_resets: int = 0       # mid-flight items reset to TODO after a crash/restart
     infra_retries: int = 0       # transient provider/CLI failures (never a sizing signal)
     requeue_refunds: int = 0     # dev attempts given back on a fusion requeue (P0-B)
+    solo_requeues: int = 0       # items re-queued for a SOLO rebuild on a persistent conflict (P2-A)
+    # P3 (GENERATION_FUSION_REVIEW) - fusion-loop observability. The review's
+    # verdict ("120 suites for 17 items") could only be reconstructed by hand
+    # from the logs; these three counters make the same ratio readable from the
+    # state itself, per iteration.
+    suite_runs: int = 0          # REAL test-suite executions (pytest + frontend), demo mode excluded
+    canary_verdicts: dict[str, int] = Field(default_factory=dict)  # per canary verdict: green/semantic/infra/…
+    items_delivered: int = 0     # work items that reached DONE with their merge on the shared HEAD
+
+    @computed_field
+    @property
+    def suites_per_item(self) -> float:
+        """P3: the fusion loop's cost ratio - suites actually run per delivered
+        item. This is the number GENERATION_FUSION_REVIEW's P1-A is meant to
+        bring down (one canary per merge -> one canary per burst). Safe before
+        anything is delivered (the denominator floors at 1)."""
+        return round(self.suite_runs / max(1, self.items_delivered), 2)
 
 
 class Finding(BaseModel):

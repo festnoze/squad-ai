@@ -156,14 +156,25 @@ def aggregate_signals(state: ProjectState, kb: KnowledgeBase) -> dict:
         "failure_rate": round(len(failures) / len(measured), 3) if measured else 0.0,
     }
 
-    calib_fields = list(PlanCalibration.model_fields)
+    # P3: PlanCalibration is no longer a flat bag of counters - `canary_verdicts`
+    # is a per-verdict histogram, which cannot be summed like an int. Scalar
+    # counters keep their exact previous aggregation; the histogram is merged
+    # key by key into its own total.
+    calib_fields = [
+        name for name, info in PlanCalibration.model_fields.items()
+        if info.annotation is int
+    ]
     calib_by_iteration: dict[int, dict] = {}
     calib_totals = dict.fromkeys(calib_fields, 0)
+    calib_verdicts: dict[str, int] = {}
     for it in sorted(state.calibration):
-        entry = {f: getattr(state.calibration[it], f) for f in calib_fields}
+        calib = state.calibration[it]
+        entry = {f: getattr(calib, f) for f in calib_fields}
         calib_by_iteration[it] = entry
         for f in calib_fields:
             calib_totals[f] += entry[f]
+        for verdict, n in (calib.canary_verdicts or {}).items():
+            calib_verdicts[verdict] = calib_verdicts.get(verdict, 0) + n
 
     # Debt per stream: a DebtEntry carries no stream — it is resolved through
     # its source observation (untraceable entries land in the "" bucket).
@@ -188,6 +199,8 @@ def aggregate_signals(state: ProjectState, kb: KnowledgeBase) -> dict:
         "calibration": {
             "by_iteration": calib_by_iteration,
             "totals": calib_totals,
+            # P3: the post-merge canary histogram, merged over all iterations.
+            "canary_verdicts": calib_verdicts,
         },
         "debt": {
             "total": len(kb.debt_register),

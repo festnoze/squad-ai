@@ -145,9 +145,29 @@ class _OwnedLock:
     def __init__(self) -> None:
         self._lock = asyncio.Lock()
         self.owner: str = ""
+        self._waiters = 0
 
     def locked(self) -> bool:
         return self._lock.locked()
+
+    @property
+    def waiters(self) -> int:
+        """P1-A: how many tasks are currently BLOCKED waiting for this lock.
+
+        The counter is decremented only once the acquisition actually succeeded,
+        so a task that has been woken by ``release()`` but has not resumed yet
+        is still counted. That is what makes the count readable by the task that
+        just released the lock, in the very same event-loop step: it sees the
+        merge queue exactly as it left it (contention = a burst is forming)."""
+        return self._waiters
+
+    async def _aacquire(self) -> None:
+        """Acquire while accounting for the wait (see ``waiters``)."""
+        self._waiters += 1
+        try:
+            await self._lock.acquire()
+        finally:
+            self._waiters -= 1
 
     def ahold(self, owner: str):
         """Acquire the lock as an async-context-manager, stamping ``owner`` for
@@ -155,7 +175,7 @@ class _OwnedLock:
         return _OwnedLockCtx(self, owner)
 
     async def __aenter__(self):
-        await self._lock.acquire()
+        await self._aacquire()
         return self
 
     async def __aexit__(self, *exc):
@@ -171,7 +191,7 @@ class _OwnedLockCtx:
         self._owner = owner
 
     async def __aenter__(self):
-        await self._lock._lock.acquire()
+        await self._lock._aacquire()
         self._lock.owner = self._owner
         return self._lock
 
@@ -179,6 +199,40 @@ class _OwnedLockCtx:
         self._lock.owner = ""
         self._lock._lock.release()
         return False
+
+
+class _CanaryEntry:
+    """P1-A: ONE merge parked in a canary burst.
+
+    ``future`` carries the verdict published by the burst owner: the same
+    ``(ok, kind, tail, reverted)`` tuple ``_acanary_verdict`` returns, or None
+    when the burst was abandoned (the worker then falls back to its own
+    individual canary, so a burst can never strand a worker)."""
+
+    __slots__ = ("future", "is_frontend", "item", "sha")
+
+    def __init__(self, item, is_frontend: bool, sha: str) -> None:
+        self.item = item
+        self.is_frontend = is_frontend
+        self.sha = sha
+        self.future: asyncio.Future = asyncio.get_running_loop().create_future()
+
+
+class _CanaryBatch:
+    """P1-A: a burst of merges that share a SINGLE post-merge canary.
+
+    Under merge-lock contention a worker does not replay the whole suite right
+    after its own merge (the cost item n.1: one suite per merge). It parks here
+    instead, and the LAST merger of the burst - the one that finds an empty
+    merge queue - runs ONE canary per language present and publishes the verdict
+    to everybody. A red burst is bisected by reverting its merges from the
+    newest backwards, so only the merge that really breaks the combination is
+    undone."""
+
+    __slots__ = ("entries",)
+
+    def __init__(self) -> None:
+        self.entries: list[_CanaryEntry] = []
 
 
 def _clamp_1_5(value, default: int = 3) -> int:
@@ -549,6 +603,13 @@ class Pipeline:
         # seulement declared_overlap) tant qu'un rival potentiel est en vol —
         # un retry ne doit jamais pouvoir re-conflicter avec un item en cours.
         self._conflict_retry_ids: set[str] = set()
+        # P2-A: items awaiting their ONE solo rebuild (last resort on a
+        # persistent merge conflict). The scheduler starts such an item only when
+        # NO worker is in flight, and `_solo_running` then holds it until it
+        # returns so nothing else starts beside it - it owns the HEAD alone, so
+        # it can no longer conflict with anybody.
+        self._solo_ids: set[str] = set()
+        self._solo_running: set[str] = set()
         # P1-B: set by _set_stage whenever a worker leaves the dev/verify stages
         # (it entered the serialized merge queue, or it is finishing). The stream
         # scheduler otherwise only wakes when a whole worker completes, so
@@ -605,6 +666,20 @@ class Pipeline:
         # B6 (UX): owner-tracking wrapper so the tick can report who holds it
         # (``merge_lock_held:US-3``) and stamp the holder's ``merge_wait`` ring.
         self._merge_lock = _OwnedLock()
+        # P1-A: the canary burst currently forming (None = none open). A worker
+        # whose merge landed under contention parks in it instead of replaying
+        # the whole suite for itself; the last merger settles it for everybody.
+        self._canary_batch: _CanaryBatch | None = None
+        # P1-A: how many workers are inside the merge phase (queued on the merge
+        # lock or merging). Read right after a merge, still inside the phase, it
+        # answers the ONLY question that matters for liveness: "is another
+        # merger still coming?". The worker that answers no owns the burst, so a
+        # burst always has exactly one settler.
+        self._merge_queue = 0
+        # P1-A: sha of the merge commit each item landed, captured UNDER the
+        # merge lock (a sibling merge would otherwise have moved HEAD already).
+        # The bisect of a red burst reverts those shas, not just HEAD.
+        self._merge_shas: dict[str, str] = {}
         # Serialize the one-time `npm install` of the frontend stream so parallel
         # frontend work items don't each kick off (or race) an install.
         self._npm_lock = asyncio.Lock()
@@ -1651,6 +1726,7 @@ class Pipeline:
             story.attempts = 0
             story.infra_attempts = 0
             story.requeue_attempts = 0  # P0-B
+            story.solo_attempted = False  # P2-A
             story.last_error = ""
         self._chat(ChatRole.ANALYST, f"🔍 Impact : {message}\n✏️ Story {story.id} mise à jour.")
 
@@ -3978,6 +4054,82 @@ class Pipeline:
         await self._agit(ws, "add", "-A")
         await self._agit(ws, "commit", "-m", f"story {sid} done", "--allow-empty")
 
+    # ---------------------- D11: story rollup (stored status + rollup commit)
+
+    def _story_rollup_incomplete(self, story: UserStory) -> bool:
+        """D11: True when ``story`` is a CONTAINER (it owns tasks) whose tasks
+        are NOT all done.
+
+        Such a story must never emit a ``story <id> done`` commit: that commit
+        is the delivery marker of the WHOLE story and belongs to the task that
+        completes it (see :meth:`_aconsolidate_story_status`). Returns False
+        when ``consolidate_story_status`` is off, so the legacy emitters keep
+        their exact historic behaviour."""
+        if not self._setting("consolidate_story_status"):
+            return False
+        return bool(story.tasks) and story.effective_status() != StoryStatus.DONE
+
+    async def _aconsolidate_story_status(self, item, ws) -> None:
+        """D11 / FACTORY_IMPROVEMENTS: roll a task-decomposed story up to DONE.
+
+        A container US derives its real status from its tasks
+        (``effective_status``) while its STORED status was never written back:
+        the board showed a fully built story as TODO, and no single point in
+        time marked the story as delivered. With
+        ``consolidate_story_status`` ON, the task that merges LAST aligns the
+        stored status with ``effective_status()`` and emits ONE
+        ``story <id> done`` commit on the shared repo.
+
+        The check and the commit both happen under ``_merge_lock``: the commit
+        touches the same shared HEAD the mergers move, and holding the lock is
+        also what makes the "exactly once" guarantee hold when several tasks of
+        the same story finish in the same burst (the first one in wins, the
+        others see the stored DONE and return).
+
+        No-op for a story item, for a taskless story, for an incomplete rollup,
+        and when the flag is off (= byte-identical legacy behaviour)."""
+        if not self._setting("consolidate_story_status") or item.kind != "task":
+            return
+        try:
+            story = self.state.story(self.state.task(item.id).story_id)
+        except KeyError:  # a task whose story vanished (re-plan): nothing to roll up
+            return
+        if not story.tasks:
+            return
+        async with self._merge_lock.ahold(f"rollup:{story.id}"):
+            if story.status == StoryStatus.DONE:
+                return  # already consolidated (a sibling won the race)
+            if story.effective_status() != StoryStatus.DONE:
+                return  # at least one task is still pending: not a rollup yet
+            story.status = StoryStatus.DONE
+            self._log(
+                f"dev:{story.id}",
+                f"🧩 Toutes les tâches de {story.id} sont vertes et mergées - "
+                "story consolidée DONE.",
+            )
+            await self._acommit_story(ws, story.id)
+        self._sync()
+
+    def _unconsolidate_story(self, story_id: str) -> None:
+        """D11: undo a consolidated DONE when one of the story's tasks goes back
+        to TODO (a rebuild).
+
+        The stored status must never contradict ``effective_status()``: a story
+        whose task is queued again is not done any more. No-op for a taskless
+        story, for a story that was never consolidated, and when the flag is
+        off."""
+        if not self._setting("consolidate_story_status"):
+            return
+        try:
+            story = self.state.story(story_id)
+        except KeyError:
+            return
+        if not story.tasks or story.status != StoryStatus.DONE:
+            return
+        effective = story.effective_status()
+        if effective != StoryStatus.DONE:
+            story.status = effective
+
     async def aexport_git(self) -> dict:
         """Clean git delivery of the generated workspace: ensure the repo
         exists, stage everything and commit. Returns the HEAD commit hash.
@@ -4332,7 +4484,11 @@ class Pipeline:
                     self._log(f"dev:{story.id}", f"✅ Suite de tests verte — {story.id} terminé.")
                     # Commit the workspace as this story's green state so its diff
                     # can be exposed (git show of the "story <id> done" commit).
-                    await self._acommit_story(ws, story.id)
+                    # D11: a CONTAINER story whose tasks are not all done has not
+                    # been delivered - its rollup commit belongs to the task that
+                    # finishes it (_aconsolidate_story_status), not to this run.
+                    if not self._story_rollup_incomplete(story):
+                        await self._acommit_story(ws, story.id)
                     # Refinement + mutation testing are Python-suite operations
                     # (they rerun pytest / mutate the package); skip them for a
                     # frontend-stream story (ST-7).
@@ -4441,6 +4597,8 @@ class Pipeline:
         # Work items currently building, by id — the live set the dynamic
         # scheduler refills as slots free.
         running: dict[str, asyncio.Task] = {}
+        # P2-A: no solo rebuild can be in flight when a build phase starts.
+        self._solo_running.clear()
 
         async def _acommit_feature(item: "work_streams.WorkItem") -> None:
             """Ensure an item's acceptance feature file is at the shared repo HEAD
@@ -4466,6 +4624,7 @@ class Pipeline:
             propagates (cooperative stop)."""
             for wid in [k for k, v in running.items() if v.done()]:
                 finished = running.pop(wid)
+                self._solo_running.discard(wid)  # P2-A: the solo hold is over
                 exc = finished.exception()
                 if exc is None or isinstance(exc, asyncio.CancelledError):
                     continue
@@ -4554,7 +4713,17 @@ class Pipeline:
                 # Cleared BEFORE the stages are read below, so a transition that
                 # lands during the fill re-arms the waiter instead of being lost.
                 self._slot_released.clear()
+                # P2-A: a SOLO rebuild owns the shared HEAD alone. While one is
+                # in flight NOTHING else starts, and a solo item itself only
+                # starts once every worker has landed - that is the whole point:
+                # rebased on the FINAL HEAD with no rival worker, it cannot
+                # conflict any more. The hold is released by _reap_done.
+                solo_inflight = bool(self._solo_running & running.keys())
                 for it in picks:
+                    if solo_inflight:
+                        break  # P2-A: the solo rebuild has the HEAD to itself
+                    if it.id in self._solo_ids and running:
+                        continue  # P2-A: wait for every in-flight worker to land
                     if release_on_merge:
                         busy = sum(1 for rid in running if self._holds_dev_slot(rid))
                         if busy >= cap or len(running) >= cap + 1:
@@ -4580,6 +4749,19 @@ class Pipeline:
                     if any(overlap(claim, other) for other in inflight_claims):
                         continue  # would clash on files with an in-flight item
                     self._conflict_retry_ids.discard(it.id)
+                    if it.id in self._solo_ids:
+                        # P2-A: the solo try is spent the moment it STARTS, so a
+                        # solo rebuild that fails again ends on the historic path
+                        # (split, then FAILED) - no loop is possible.
+                        self._solo_ids.discard(it.id)
+                        self._item_target(it).solo_attempted = True
+                        self._solo_running.add(it.id)
+                        solo_inflight = True
+                        self._log(
+                            f"dev:{it.id}",
+                            f"🧍 {it.id} démarre SEUL sur le HEAD final "
+                            "(rebuild solo, aucun autre item en vol).",
+                        )
                     await _acommit_feature(it)
                     running[it.id] = asyncio.create_task(self._abuild_work_item(it))
                     inflight_claims.append(claim)
@@ -5151,7 +5333,8 @@ class Pipeline:
         for test in story.test_plan:
             if test.status == TestState.NONEXISTENT:
                 test.status = TestState.GREEN
-        await self._acommit_story(ws, story.id)
+        if not self._story_rollup_incomplete(story):  # D11: never a partial rollup
+            await self._acommit_story(ws, story.id)
         self._set_recovery(story, "", sync=False)
         self._set_stage(story, BuildStage.DONE, sync=False)
         self._log(f"arbiter:{story.id}", "✅ Test erroné corrigé — suite verte, story livrée.")
@@ -5426,6 +5609,54 @@ class Pipeline:
         )
         return True
 
+    def _technical_story_evidence(
+        self, tid: str, failed: Task, contract: str
+    ) -> tuple[list[AcceptanceCriterion], str]:
+        """FACTORY_IMPROVEMENTS: give an extracted Technical Story the acceptance
+        criteria the Definition of Done asks of every story.
+
+        A TS used to be born with an empty ``acceptance_criteria`` AND an empty
+        Gherkin, so the DoD raised ``no_acceptance_criteria`` on every delivery
+        that split a task. Criteria alone would only TRADE that warning for
+        ``no_acceptance_evidence`` (a blocker under ``DOD_STRICT_CRITERIA``), so
+        the TS also gets a technical Gherkin restating its contract: a TS is
+        non-functional, and its scenario IS the contract.
+
+        Where the criteria come from, in order:
+
+        1. the failed task's own ``acceptance_criteria``, deep-copied so editing
+           the TS can never mutate the task that produced it;
+        2. otherwise ONE synthetic criterion derived from the technical
+           contract. ``Task`` carries no criterion-id back-reference to its
+           parent story (only ``PlannedTest.criteria`` does, and a task owns no
+           test plan), so there is no subset of the parent's criteria to inherit.
+
+        Returns ``([], "")`` when the flag is off (byte-identical legacy TS)."""
+        if not self._setting("ts_acceptance_criteria"):
+            return [], ""
+
+        def one_line(text: str) -> str:
+            return " ".join((text or "").split())
+
+        criteria = [c.model_copy(deep=True) for c in failed.acceptance_criteria]
+        if not criteria:
+            criteria = [
+                AcceptanceCriterion(
+                    id=f"{tid}.AC-1",
+                    text=f"Contrat technique : {one_line(contract) or tid}",
+                    kind="nonfunctional",
+                )
+            ]
+        lines = [
+            f"Feature: {tid} (story technique)",
+            "  Scenario: Le contrat technique est tenu",
+            f"    Étant donné le périmètre de {failed.id}",
+            f"    Quand les sous-tâches de {tid} sont livrées et vertes",
+            f"    Alors {one_line(criteria[0].text)}",
+        ]
+        lines += [f"    Et {one_line(c.text)}" for c in criteria[1:]]
+        return criteria, "\n".join(lines)
+
     def _make_technical_story(
         self,
         parent: UserStory,
@@ -5438,12 +5669,15 @@ class Pipeline:
         sub-tasks — a non-functional container (``technical=True``, no functional
         Gherkin, a technical ``contract``) tied to its origin via ``parent_id``,
         carrying the failed task's upstream deps at the story level (inherited by
-        its tasks). Its id is unique project-wide."""
+        its tasks). Its id is unique project-wide. Its acceptance criteria and
+        technical Gherkin come from :meth:`_technical_story_evidence` (both empty
+        when ``TS_ACCEPTANCE_CRITERIA`` is off)."""
         taken = {s.id for s in self.state.stories} | {t.id for t in self.state.all_tasks()}
         tid = f"TS-{failed.id}"
         while tid in taken:
             tid += "x"
         contract = failed.description or failed.gherkin or failed.title or failed.id
+        criteria, gherkin = self._technical_story_evidence(tid, failed, contract)
         return UserStory(
             id=tid,
             epic_id=parent.epic_id,
@@ -5451,7 +5685,8 @@ class Pipeline:
             technical=True,
             contract=contract,
             parent_id=parent.id,
-            gherkin="",
+            acceptance_criteria=criteria,
+            gherkin=gherkin,
             stream=failed.stream or parent.stream,
             tasks=tasks,
             depends_on=list(depends_on if depends_on is not None else failed.depends_on),
@@ -5659,6 +5894,43 @@ class Pipeline:
         limit = settings.requeue_max if ceiling is None else ceiling
         return target.requeue_attempts <= limit
 
+    def _mark_solo_retry(self, item, target, subject) -> bool:
+        """P2-A: LAST RESORT before the adaptive split, on a PERSISTENT fusion
+        failure (merge conflict or semantic revert) whose requeue budget is spent.
+
+        The item's own code is green - it passed in its worktree - and what keeps
+        failing is the FUSION with the siblings landing beside it. Splitting or
+        failing such a unit throws away working code for a scheduling problem, so
+        it is granted ONE extra try in SOLO mode instead: re-queued without
+        consuming any budget, and started by the scheduler only when NO other
+        worker is in flight (nothing else starts while it runs). Rebased on the
+        FINAL HEAD with no rival, it can no longer conflict - only a genuinely
+        red combination can still sink it, and that falls through to the historic
+        ending on the next pass.
+
+        The green branch is preserved by the caller (``keep_branch``), so the
+        solo pass is usually a rebase + re-verify + merge with NO dev run at all
+        (P2b, ``_aresume_green_branch``).
+
+        Returns True when the item was queued for a solo rebuild, False when the
+        flag is off or the item already had its solo try (no loop possible)."""
+        if not self._setting("solo_on_conflict"):
+            return False
+        if getattr(target, "solo_attempted", False) or item.id in self._solo_ids:
+            return False
+        self._solo_ids.add(item.id)
+        target.status = subject.status = StoryStatus.TODO
+        self._set_stage(target, BuildStage.QUEUED, sync=False)
+        self.state.calibration_for().solo_requeues += 1  # §8
+        self.monitor.event("solo_retry", item=item.id, phase="build")
+        self._log(
+            f"dev:{item.id}",
+            f"🧍 Conflit persistant sur {item.id} (budget de requeue épuisé) : "
+            "dernier recours : rebuild SOLO sur le HEAD final, branche verte "
+            "conservée, aucun autre item en vol.",
+        )
+        return True
+
     def _note_suite_outcome(self, wid: str, suite_green: bool, results: dict[str, str]) -> None:
         """WF-P1: remember whether the LAST real suite run of this item executed
         at least one test. Only a RED run that parsed ZERO outcome is an
@@ -5816,9 +6088,30 @@ class Pipeline:
                 keep_branch = True
                 # B1/B6: green → waiting for the merge lock, then merging.
                 self._set_stage(target, BuildStage.MERGE_WAIT, "")
-                merged, conflict_files = await self._amerge_work_item(
-                    ws, branch, item.id, worktree
-                )
+                # P1-A: the merge phase is counted so the LAST merger of a burst
+                # can recognise itself (see `_merge_queue`). `contended` is read
+                # BEFORE leaving the phase and WITHOUT any await in between - a
+                # worker still blocked on the lock has not decremented the
+                # waiter counter yet, so this is the only place where the burst
+                # forming behind this merge is observable.
+                self._merge_queue += 1
+                try:
+                    merged, conflict_files = await self._amerge_work_item(
+                        ws, branch, item.id, worktree
+                    )
+                    contended = (
+                        bool(merged)
+                        and self._merge_lock.waiters > 0
+                        and self._merge_queue > 1
+                    )
+                finally:
+                    self._merge_queue -= 1
+                if not merged:
+                    # P1-A: a merge that did NOT land never joins the burst, so
+                    # the workers parked behind it would wait for a verdict
+                    # nobody publishes. Drain it here (no-op unless this worker
+                    # was the last merger in flight).
+                    await self._adrain_canary_batch()
                 # Canari : un revert post-merge est un conflit SÉMANTIQUE — il
                 # partage la mécanique de requeue du conflit de merge mais pas
                 # son diagnostic (pas de fichiers en collision à recalibrer).
@@ -5830,14 +6123,23 @@ class Pipeline:
                     # fraîchement mergé ; rouge → le merge est REVERTÉ (HEAD
                     # reste toujours vert pour les items suivants) et l'item
                     # re-queué comme un conflit, branche verte préservée.
-                    canary_ok, canary_kind, canary_tail = await self._apost_merge_canary(
-                        item, is_frontend
-                    )
+                    # P1-A: under contention the suite is NOT replayed here - the
+                    # item joins the burst and the last merger settles it (a red
+                    # burst is bisected, so ``canary_reverted`` tells whether
+                    # this item's merge has already been undone).
+                    (
+                        canary_ok,
+                        canary_kind,
+                        canary_tail,
+                        canary_reverted,
+                    ) = await self._acanary_verdict(item, is_frontend, contended)
                     # Seul un rouge SÉMANTIQUE (conflit de code réel) justifie un
                     # revert. Un rouge d'INFRA (venv/outil) ne se répare pas en
                     # jetant le merge — le canari a déjà tenté la reconstruction,
                     # on garde le vert et on signale.
-                    if canary_kind == "semantic" and await self._arevert_head_merge(ws, item.id):
+                    if canary_kind == "semantic" and (
+                        canary_reverted or await self._arevert_head_merge(ws, item.id)
+                    ):
                         merged = False
                         semantic_revert = True
                         self.state.calibration_for().canary_reverts += 1  # §8
@@ -5877,6 +6179,9 @@ class Pipeline:
                         # §8: a preserved branch shipped without any dev rebuild.
                         self.state.calibration_for().p2b_resumes += 1
                     target.status = subject.status = StoryStatus.DONE
+                    # P3: an item is "delivered" only here - green AND merged on
+                    # the shared HEAD. This is the denominator of suites_per_item.
+                    self.state.calibration_for().items_delivered += 1
                     for test in subject.test_plan:
                         if test.status == TestState.NONEXISTENT:
                             test.status = TestState.GREEN
@@ -5885,6 +6190,11 @@ class Pipeline:
                     self._set_recovery(target, "", sync=False)  # B1: clear
                     self._set_stage(target, BuildStage.DONE, sync=False)  # B1
                     self._log(f"dev:{item.id}", f"✅ {item.id} vert et mergé.")
+                    # D11: this task may have been the LAST one of its story -
+                    # consolidate the container's stored status and emit its
+                    # single rollup commit. No-op for a story item, for an
+                    # incomplete rollup, and when the flag is off.
+                    await self._aconsolidate_story_status(item, ws)
                 else:
                     # ST-10/11: a merge conflict means a sibling work item changed
                     # the SAME files. An immediate same-inputs retry (in
@@ -5923,6 +6233,12 @@ class Pipeline:
                             f"⚠️ Conflit de merge {item.id} — branche verte conservée, reprise "
                             f"sur HEAD à jour (requeue {target.requeue_attempts}/{requeue_ceiling}).",
                         )
+                    # P2-A: before touching the plan, ONE last resort - rebuild
+                    # the item ALONE on the final HEAD. It costs no budget and
+                    # keeps the green branch, so it is usually a rebase +
+                    # re-verify + merge with no dev run at all.
+                    elif self._mark_solo_retry(item, target, subject):
+                        keep_branch = True  # P2b: the solo pass resumes this work
                     # A PERSISTENT conflict is a sizing smell: the unit claims file
                     # zones that keep colliding with its siblings. Try the adaptive
                     # finer split (smaller, disjoint sub-tasks) before failing.
@@ -6034,6 +6350,11 @@ class Pipeline:
             self._log(f"dev:{item.id}", f"⛔ Crash worker {item.id} isolé : {exc}")
         finally:
             self._empty_red.pop(item.id, None)  # WF-P1: per-attempt marker
+            self._merge_shas.pop(item.id, None)  # P1-A: per-attempt marker
+            # P1-A: last-resort drain - a worker that died before (or inside)
+            # its merge must not leave a burst without a settler. No-op unless
+            # a burst is open AND no merger is left in flight.
+            await self._adrain_canary_batch()
             if worktree is not None:
                 await self._aworktree_remove(ws, worktree, branch, keep_branch=keep_branch)
             # V3-F1: a TERMINAL item (DONE or FAILED — requeues are skipped
@@ -6349,6 +6670,7 @@ class Pipeline:
         run = self._arun_frontend_tests if is_frontend else self._arun_pytest
         ok, output, results = await run()
         if ok:
+            self._count_canary("green")  # P3
             return True, "green", ""
         # Rouge. Est-ce l'environnement plutôt que le code ?
         if not is_frontend and self._looks_like_infra_failure(output, results):
@@ -6357,6 +6679,7 @@ class Pipeline:
                 f"🐤 Canari ROUGE après {item.id} mais SANS test exécuté — "
                 "suspicion d'infra (venv/outil). Réparation puis nouvel essai.",
             )
+            self._count_canary("infra_suspected")  # P3
             self.monitor.event("canary", item=item.id, verdict="infra_suspected")
             await asyncio.to_thread(self._purge_venv_dir, workspace_dir(self.state.id))
             ok2, output2, _ = await self._arun_pytest()
@@ -6368,6 +6691,7 @@ class Pipeline:
                     f"le rouge de {item.id} venait de l'infra, PAS d'un conflit. "
                     "Merge conservé.",
                 )
+                self._count_canary("infra_healed")  # P3
                 self.monitor.event("canary", item=item.id, verdict="infra_healed")
                 return True, "infra", output2[-1500:]
             # Toujours rouge après un environnement neuf : outage profond de
@@ -6378,6 +6702,7 @@ class Pipeline:
                 f"⛔ Canari toujours ROUGE après reconstruction — outillage "
                 f"indisponible, pas un conflit de code. Merge de {item.id} conservé.",
             )
+            self._count_canary("infra_persistent")  # P3
             self.monitor.event("canary", item=item.id, verdict="infra_persistent")
             return False, "infra", output2[-1500:]
         # P0-A: red with NO test executed and NO known signature. Repair and
@@ -6391,6 +6716,7 @@ class Pipeline:
             f"🐤 Canari post-merge ROUGE après le merge de {item.id} — "
             "conflit sémantique (vert+vert=rouge), revert du merge.",
         )
+        self._count_canary("semantic")  # P3
         self.monitor.event("canary", item=item.id, verdict="semantic")
         return False, "semantic", output[-1500:]
 
@@ -6424,6 +6750,7 @@ class Pipeline:
             "signature connue - réparation de l'environnement puis UN rejeu "
             "avant tout verdict sémantique.",
         )
+        self._count_canary("empty_replay")  # P3
         self.monitor.event("canary", item=item.id, verdict="empty_replay")
         if is_frontend:
             # The frontend runner carries its own `npm ci` auto-heal.
@@ -6438,6 +6765,7 @@ class Pipeline:
                 f"✅ Canari VERT au rejeu - le rouge de {item.id} venait de "
                 "l'environnement, PAS d'un conflit. Merge conservé.",
             )
+            self._count_canary("infra_healed")  # P3
             self.monitor.event("canary", item=item.id, verdict="infra_healed")
             return True, "infra", output2[-1500:]
         replay_signature = (
@@ -6454,17 +6782,254 @@ class Pipeline:
                 f"⛔ Canari toujours ROUGE au rejeu avec une signature d'infra - "
                 f"outillage indisponible, merge de {item.id} conservé.",
             )
+            self._count_canary("infra_persistent")  # P3
             self.monitor.event("canary", item=item.id, verdict="infra_persistent")
             return False, "infra", output2[-1500:]
         return None  # still red for an unexplained reason → semantic (revert)
 
-    async def _arevert_head_merge(self, repo, wid: str) -> bool:
+    # ------------------------------------- P3: fusion-loop observability (§8)
+
+    def _count_suite_run(self) -> None:
+        """P3: record ONE real test-suite execution on the current iteration.
+
+        Called by the two suite runners themselves (``_arun_pytest`` and
+        ``_arun_frontend_tests``) rather than by their callers, so every path
+        that runs a suite is counted exactly once whatever it was run for (dev
+        verification, canary, resume re-verify, mutation rerun...). Demo mode
+        (``fake_agents``) short-circuits before this point and is NOT counted:
+        nothing is executed there. Together with ``items_delivered`` this gives
+        ``suites_per_item``, the ratio GENERATION_FUSION_REVIEW's P1-A attacks."""
+        self.state.calibration_for().suite_runs += 1
+
+    def _count_canary(self, verdict: str) -> None:
+        """P3: record ONE post-merge canary verdict on the current iteration.
+
+        Mirrors the ``canary`` timeline events (``green``, ``semantic``,
+        ``infra_suspected``, ``infra_healed``, ``infra_persistent``,
+        ``empty_replay``, ``batched``, ``batch_green``, ``bisect_revert``) into a
+        durable per-kind histogram: the timeline is volatile, the calibration is
+        persisted with the state. Never raises on an unknown verdict - the dict
+        simply grows a key."""
+        verdicts = self.state.calibration_for().canary_verdicts
+        verdicts[verdict] = verdicts.get(verdict, 0) + 1
+
+    # ------------------------------------------------ P1-A: canary by burst
+
+    async def _anote_merge_sha(self, repo, wid: str) -> None:
+        """P1-A: remember the sha of the merge commit ``wid`` just landed.
+
+        Read UNDER the merge lock, because a sibling merge would move HEAD the
+        instant the lock is released. The bisect of a red burst needs to revert
+        a SPECIFIC merge (``git revert -m 1 <sha>``), not whatever sits on HEAD.
+        Best-effort: an unreadable sha simply falls back to HEAD. Skipped
+        entirely when the burst canary (or the canary itself) is off, so the
+        legacy path does not pay for one extra git call per merge."""
+        if not self._setting("canary_batch_enabled") or not self._setting("post_merge_canary"):
+            return
+        code, out = await self._agit(repo, "rev-parse", "HEAD")
+        self._merge_shas[wid] = out.strip() if code == 0 else ""
+
+    async def _acanary_verdict(
+        self, item: "work_streams.WorkItem", is_frontend: bool, contended: bool
+    ) -> tuple[bool, str, str, bool]:
+        """P1-A: the post-merge verdict of ONE item, batched under contention.
+
+        With the flag off - or with an empty merge queue and no burst already
+        open - this is exactly ``_apost_merge_canary``: one suite per merge, the
+        historic behaviour (a burst of size 1).
+
+        Under contention the worker does NOT replay the suite: it parks in the
+        burst being formed (stage MERGING, so it holds no dev slot and its
+        dependents stay blocked) and waits for the verdict of the LAST merger,
+        which runs ONE canary per language present in the burst.
+
+        Returns ``(ok, kind, tail, reverted)``; ``reverted`` True means the
+        merge of THIS item was already undone by the burst's bisect, so the
+        caller must not revert it a second time."""
+        if not self._setting("canary_batch_enabled") or not self._setting("post_merge_canary"):
+            ok, kind, tail = await self._apost_merge_canary(item, is_frontend)
+            return ok, kind, tail, False
+        batch = self._canary_batch
+        if batch is None:
+            batch = self._canary_batch = _CanaryBatch()
+        entry = _CanaryEntry(item, is_frontend, self._merge_shas.pop(item.id, ""))
+        batch.entries.append(entry)
+        if contended:
+            # Another merger is still coming: it (or the drain) will settle the
+            # burst. Park - no suite run at all for this merge.
+            self._set_stage(self._item_target(item), BuildStage.MERGING, "")
+            self._count_canary("batched")  # P3
+            self.monitor.event("canary", item=item.id, verdict="batched")
+            verdict = await entry.future
+            if verdict is not None:
+                return verdict
+            # Abandoned burst (stop, crash of the settler): fall back to this
+            # item's own canary rather than trusting an unverified HEAD.
+            ok, kind, tail = await self._apost_merge_canary(item, is_frontend)
+            return ok, kind, tail, False
+        # Last merger: close the burst to newcomers and settle it for everybody.
+        self._canary_batch = None
+        try:
+            return await self._asettle_canary_batch(batch)
+        except Exception as exc:  # noqa: BLE001 - a burst must never strand a worker
+            self._abandon_canary_batch(batch)
+            self._log(
+                f"dev:{item.id}",
+                f"⚠️ Rafale de canaris abandonnée ({exc}) - canari individuel.",
+            )
+            ok, kind, tail = await self._apost_merge_canary(item, is_frontend)
+            return ok, kind, tail, False
+        finally:
+            self._abandon_canary_batch(batch)
+
+    @staticmethod
+    def _abandon_canary_batch(batch: "_CanaryBatch") -> None:
+        """P1-A: resolve every still-pending entry of ``batch`` with None.
+
+        Idempotent and synchronous: whatever happens to the settler (exception,
+        cancellation, early return), no parked worker is ever left waiting - a
+        None verdict simply sends it back to the individual canary path."""
+        for entry in batch.entries:
+            if not entry.future.done():
+                entry.future.set_result(None)
+
+    async def _adrain_canary_batch(self) -> None:
+        """P1-A: settle a burst whose expected settler will never come.
+
+        The settler is the last worker of the merge phase; a worker whose merge
+        CONFLICTED (or that died before merging) leaves the phase without
+        joining the burst. When no merger is left in flight (``_merge_queue``
+        back to zero) and a burst is still open, this drains it on behalf of the
+        parked workers. Best-effort: never raises."""
+        batch = self._canary_batch
+        if batch is None or not batch.entries or self._merge_queue > 0:
+            return
+        self._canary_batch = None
+        try:
+            await self._asettle_canary_batch(batch)
+        except Exception as exc:  # noqa: BLE001
+            self._log("streams", f"⚠️ Rafale de canaris abandonnée : {exc}")
+        finally:
+            self._abandon_canary_batch(batch)
+
+    async def _asettle_canary_batch(
+        self, batch: "_CanaryBatch"
+    ) -> tuple[bool, str, str, bool]:
+        """P1-A: run the burst's canary and publish a verdict to every entry.
+
+        ONE canary per language present in the burst (backend and/or frontend)
+        replaces the one-suite-per-merge of the historic path. A green (or
+        infra) verdict is broadcast as-is; a SEMANTIC red is bisected by
+        ``_abisect_canary_batch``, so only the merges that really break the
+        combination are reverted and requeued - the others stay merged and DONE.
+
+        Returns the verdict of the LAST entry (the settler's own item when it
+        merged; an arbitrary parked entry when this is a drain, where the value
+        is discarded)."""
+        if len(batch.entries) >= 2:
+            self.state.calibration_for().canary_batches += 1  # §8
+            self._log(
+                "streams",
+                f"🐤 Canari groupé : {len(batch.entries)} merges vérifiés par UNE "
+                f"suite ({', '.join(e.item.id for e in batch.entries)}).",
+            )
+        # Deterministic order (backend first), one probe item per language.
+        verdicts: dict[bool, tuple[bool, str, str]] = {}
+        for lang in sorted({e.is_frontend for e in batch.entries}):
+            probe = next(e for e in batch.entries if e.is_frontend == lang)
+            verdicts[lang] = await self._apost_merge_canary(probe.item, lang)
+        red = [lang for lang, (_ok, kind, _t) in verdicts.items() if kind == "semantic"]
+        if not red:
+            if len(batch.entries) >= 2:
+                self._count_canary("batch_green")  # P3
+                self.monitor.event(
+                    "canary", item=batch.entries[-1].item.id, verdict="batch_green",
+                    size=len(batch.entries),
+                )
+            for entry in batch.entries:
+                ok, kind, tail = verdicts[entry.is_frontend]
+                self._publish_canary(entry, (ok, kind, tail, False))
+            return (*verdicts[batch.entries[-1].is_frontend], False)
+        lang = red[0]
+        reverted, blocked = await self._abisect_canary_batch(
+            batch, lang, verdicts[lang][2]
+        )
+        for entry in batch.entries:
+            if entry.item.id in reverted:
+                result = (False, "semantic", reverted[entry.item.id], True)
+            elif entry.item.id == blocked:
+                # git refused the revert: the caller retries it and shouts.
+                result = (False, "semantic", verdicts[lang][2], False)
+            else:
+                result = (True, "green", "", False)
+            self._publish_canary(entry, result)
+        last = batch.entries[-1]
+        if last.item.id in reverted:
+            return False, "semantic", reverted[last.item.id], True
+        if last.item.id == blocked:
+            return False, "semantic", verdicts[lang][2], False
+        return True, "green", "", False
+
+    @staticmethod
+    def _publish_canary(entry: "_CanaryEntry", result: tuple[bool, str, str, bool]) -> None:
+        """Hand one entry its verdict (ignored if it already left the burst)."""
+        if not entry.future.done():
+            entry.future.set_result(result)
+
+    async def _abisect_canary_batch(
+        self, batch: "_CanaryBatch", is_frontend: bool, tail: str
+    ) -> tuple[dict[str, str], str]:
+        """P1-A: a RED burst - revert its merges from the NEWEST backwards.
+
+        After each revert the suite is replayed: green (or infra) stops the
+        bisect, so only the merges that actually break the combination are
+        undone. The loop is bounded by the burst size, and a git refusal stops
+        it at once (the item whose revert failed is reported as ``blocked`` so
+        the caller keeps the historic "revert impossible" warning).
+
+        The OLDEST entry never triggers a confirmation replay: nothing is left
+        to revert after it, so the extra suite would answer no question. A burst
+        of size 1 therefore costs exactly what the historic path costs (one
+        canary, one revert, no replay).
+
+        Returns ``({item id: red tail}, blocked item id)``."""
+        ws = workspace_dir(self.state.id)
+        reverted: dict[str, str] = {}
+        oldest = batch.entries[0]
+        for entry in reversed(batch.entries):
+            wid = entry.item.id
+            if not await self._arevert_head_merge(ws, wid, entry.sha):
+                return reverted, wid
+            self.state.calibration_for().canary_bisect_reverts += 1  # §8
+            self._count_canary("bisect_revert")  # P3
+            self.monitor.event("canary", item=wid, verdict="bisect_revert")
+            reverted[wid] = tail
+            if entry is oldest:
+                break  # the burst is exhausted: no replay can narrow it further
+            self._log(
+                "streams",
+                f"🔎 Bisect de la rafale : merge de {wid} reverté, suite rejouée.",
+            )
+            ok, kind, tail2 = await self._apost_merge_canary(entry.item, is_frontend)
+            if ok or kind != "semantic":
+                break  # HEAD is green again (or the red is infra): stop here
+            tail = tail2
+        return reverted, ""
+
+    async def _arevert_head_merge(self, repo, wid: str, sha: str = "HEAD") -> bool:
         """Revert le commit de merge en tête de HEAD (celui de ``wid``), sous le
         merge lock — l'invariant « HEAD toujours vert » est restauré pour les
         items suivants. Best-effort : False si git refuse (HEAD reste rouge,
-        signalé bruyamment par l'appelant)."""
+        signalé bruyamment par l'appelant).
+
+        P1-A: ``sha`` names the merge commit to undo. It defaults to ``HEAD``
+        (the individual canary always reverts the merge it just made); the
+        bisect of a burst passes the sha captured under the merge lock, because
+        older merges of the burst are no longer on HEAD by then."""
         async with self._merge_lock.ahold(f"revert:{wid}"):
-            code, out = await self._agit(repo, "revert", "-m", "1", "--no-edit", "HEAD")
+            code, out = await self._agit(
+                repo, "revert", "-m", "1", "--no-edit", sha or "HEAD"
+            )
             if code != 0:
                 await self._agit(repo, "revert", "--abort")
                 self._log(
@@ -6843,6 +7408,7 @@ class Pipeline:
                 repo, "merge", "--no-ff", "-m", f"merge work item {wid}", branch
             )
             if code == 0:
+                await self._anote_merge_sha(repo, wid)  # P1-A (still under the lock)
                 return True, []
             conflict_files = await self._aconflict_files(repo, merge_output=out)
             # Manifest conflicts (pyproject/package.json/lockfiles) are the one
@@ -6857,6 +7423,7 @@ class Pipeline:
                         f"🧩 {wid} : conflit de manifeste auto-résolu (union des "
                         f"dépendances de {', '.join(conflict_files[:3])}).",
                     )
+                    await self._anote_merge_sha(repo, wid)  # P1-A
                     return True, []
             await self._agit(repo, "merge", "--abort")
             # P2: preserve the green branch — rebase it onto the now-updated HEAD
@@ -6874,6 +7441,7 @@ class Pipeline:
                             "streams",
                             f"✅ {wid} préservé : rebase sur HEAD à jour puis merge.",
                         )
+                        await self._anote_merge_sha(repo, wid)  # P1-A
                         return True, []
                     for f in await self._aconflict_files(repo, merge_output=out):
                         if f not in conflict_files:
@@ -6917,6 +7485,7 @@ class Pipeline:
         story.attempts = 0
         story.infra_attempts = 0
         story.requeue_attempts = 0  # P0-B
+        story.solo_attempted = False  # P2-A
         story.last_error = ""
         for t in story.test_plan:
             t.status = TestState.NONEXISTENT
@@ -6928,6 +7497,7 @@ class Pipeline:
             task.attempts = 0
             task.infra_attempts = 0
             task.requeue_attempts = 0  # P0-B
+            task.solo_attempted = False  # P2-A
             task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
@@ -7056,6 +7626,7 @@ class Pipeline:
             story.attempts = 0
             story.infra_attempts = 0
             story.requeue_attempts = 0  # P0-B
+            story.solo_attempted = False  # P2-A
             story.last_error = ""
             for t in story.test_plan:
                 t.status = TestState.NONEXISTENT
@@ -7065,6 +7636,7 @@ class Pipeline:
                     task.attempts = 0
                     task.infra_attempts = 0
                     task.requeue_attempts = 0  # P0-B
+                    task.solo_attempted = False  # P2-A
                     task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
@@ -7234,7 +7806,11 @@ class Pipeline:
         task.attempts = 0
         task.infra_attempts = 0
         task.requeue_attempts = 0  # P0-B
+        task.solo_attempted = False  # P2-A
         task.last_error = ""
+        # D11: the parent's consolidated DONE is no longer true once one of its
+        # tasks is queued again - roll the stored status back on effective_status.
+        self._unconsolidate_story(task.story_id)
         self._stop_requested = False
         self._delivery_blocked = False
         delivery_state.reset(self.state)
@@ -7720,6 +8296,7 @@ class Pipeline:
         if settings.fake_agents:
             # Demo / e2e mode: no real code is written, trust the scripted dev.
             return True, "mode démo : vérification des tests court-circuitée", {}
+        self._count_suite_run()  # P3: one REAL suite execution, whoever asked for it
         # Run in a worker thread via subprocess: asyncio's subprocess support is
         # unavailable on Windows' SelectorEventLoop (used by uvicorn), so we stay
         # off the event loop entirely for child processes.
@@ -8077,6 +8654,109 @@ class Pipeline:
                     subprocess.run(["kill", "-9", str(top)], check=False, timeout=10)
                     killed += 1
         except Exception:  # noqa: BLE001 — cleanup must never break a gate
+            return killed
+        return killed
+
+    @staticmethod
+    def _sweep_workspace_orphans(ws_root: Path) -> int:
+        """Kill every leftover factory process whose command line points INSIDE
+        ``ws_root``, starting from its TOPMOST workspace ancestor (supervisors
+        included). Returns the number of trees killed.
+
+        This completes fixes #10/#13 (FACTORY_IMPROVEMENTS). The port-scoped
+        killer only reaps what holds the ONE port a gate is about to use, so a
+        backend that died, or a repair agent that bypassed its own cleanup,
+        leaves smoke runs, uvicorn reload supervisors and dev servers behind.
+        They resurface much later as an "infra" park on an unrelated project.
+        Called at boot, when nothing of ours is running yet: anything under the
+        workspace root is an orphan by construction.
+
+        Safety, in this order:
+
+        * only a process whose command line CONTAINS the resolved workspace root
+          is ever a candidate (never a third party);
+        * the current process AND its whole ancestor chain are removed from the
+          candidate map first, so the sweep can never kill the backend running
+          it (nor the shell or IDE that launched it) even if their command line
+          happens to mention the workspace;
+        * the remaining candidates are collapsed to their topmost workspace
+          ancestor, so a reload supervisor cannot respawn a worker we just
+          killed.
+
+        Best-effort: any failure returns what was already killed, never raises.
+        """
+        # os.path (not pathlib) on purpose: the needle must be resolvable with
+        # the HOST's path flavour even when the caller passed a relative root.
+        needle = os.path.realpath(str(ws_root)).lower()
+        killed = 0
+        try:
+            parents: dict[int, int] = {}
+            workspace_procs: dict[int, int] = {}
+            if os.name == "nt":
+                quoted = needle.replace("'", "''")
+                script = (
+                    "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
+                    "ForEach-Object { $c = $_.CommandLine; $w = 0; "
+                    f"if ($c -and $c.ToLower().Contains('{quoted}')) {{ $w = 1 }}; "
+                    '"$($_.ProcessId)|$($_.ParentProcessId)|$w" }'
+                )
+                proc = subprocess.run(
+                    ["powershell", "-NoProfile", "-Command", script],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                    text=True, encoding="utf-8", errors="replace", timeout=40,
+                )
+                for line in (proc.stdout or "").splitlines():
+                    parts = line.strip().split("|")
+                    if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
+                        continue
+                    pid, ppid = int(parts[0]), int(parts[1])
+                    parents[pid] = ppid
+                    if parts[2].strip() == "1":
+                        workspace_procs[pid] = ppid
+            else:
+                ps = subprocess.run(
+                    ["ps", "-eo", "pid=,ppid=,command="],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                    text=True, timeout=30,
+                )
+                for line in (ps.stdout or "").splitlines():
+                    parts = line.split(None, 2)
+                    if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
+                        continue
+                    pid, ppid = int(parts[0]), int(parts[1])
+                    parents[pid] = ppid
+                    if needle in parts[2].lower():
+                        workspace_procs[pid] = ppid
+            protected = {os.getpid()}
+            cursor = os.getpid()
+            while True:
+                parent = parents.get(cursor)
+                if parent is None or parent in protected:
+                    break
+                protected.add(parent)
+                cursor = parent
+            workspace_procs = {
+                pid: ppid for pid, ppid in workspace_procs.items()
+                if pid not in protected
+            }
+            if not workspace_procs:
+                return 0
+            tops = Pipeline._topmost_workspace_ancestors(
+                sorted(workspace_procs), workspace_procs
+            )
+            for top in tops:
+                if os.name == "nt":
+                    subprocess.run(
+                        ["taskkill", "/PID", str(top), "/T", "/F"],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        check=False, timeout=15,
+                    )
+                else:
+                    # SIGTERM the subtree (children first, then the supervisor).
+                    subprocess.run(["pkill", "-15", "-P", str(top)], check=False, timeout=10)
+                    subprocess.run(["kill", "-15", str(top)], check=False, timeout=10)
+                killed += 1
+        except Exception:  # noqa: BLE001 - a boot sweep must never break startup
             return killed
         return killed
 
@@ -8440,7 +9120,9 @@ class Pipeline:
         Web/API app (its pyproject declares a web framework, OR the project
         INTENT is web — profile/frontend stream): ``uv run python main.py``
         must open a listening TCP port within the timeout. CLI: it must
-        exit 0 within the timeout. Returns (ok, human-readable detail)."""
+        exit 0 within the timeout AND, with ``SMOKE_CLI_HELP`` on, answer
+        ``--help`` with a non-empty stdout (see :meth:`_smoke_cli_help_run`).
+        Returns (ok, human-readable detail)."""
         import socket
 
         pyproject = (ws / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
@@ -8505,7 +9187,50 @@ class Pipeline:
             return False, f"lancement impossible : {exc}"
         if proc.returncode != 0:
             return False, f"sortie non nulle (code {proc.returncode}) : {(proc.stdout or '')[-300:].strip()}"
-        return True, "CLI exécuté (code 0)"
+        if not self._setting("smoke_cli_help"):
+            return True, "CLI exécuté (code 0)"
+        return self._smoke_cli_help_run(ws, cmd, env, timeout)
+
+    @staticmethod
+    def _smoke_cli_help_run(
+        ws: Path, cmd: list[str], env: dict[str, str], timeout: float
+    ) -> tuple[bool, str]:
+        """FACTORY_IMPROVEMENTS #4: a non-web product must ANSWER, not just exit 0.
+
+        ``exit 0`` is trivially satisfied by a ``main.py`` that prints nothing,
+        so the factory could ship a mute binary and call it green. A delivered
+        CLI must honour the scaffold contract: ``python main.py --help`` exits 0
+        AND writes a usable help message on stdout. stdout and stderr are
+        captured SEPARATELY on purpose - the launcher (``uv run``) writes its own
+        progress lines ("Creating virtual environment...") to stderr, and merging
+        them would make every mute CLI look talkative."""
+        try:
+            helped = subprocess.run(
+                [*cmd, "--help"], cwd=str(ws), capture_output=True,
+                env=env, text=True, encoding="utf-8",
+                errors="replace", timeout=timeout,
+            )
+        except subprocess.TimeoutExpired:
+            return False, (
+                f"`main.py --help` n'a pas terminé en {timeout:.0f}s "
+                "(le CLI attend une entrée ou boucle ?)"
+            )
+        except OSError as exc:
+            return False, f"lancement impossible : {exc}"
+        out = (helped.stdout or "").strip()
+        err = (helped.stderr or "").strip()
+        if helped.returncode != 0:
+            return False, (
+                f"`main.py --help` sort en erreur (code {helped.returncode}) : "
+                f"{(out or err)[-300:]}"
+            )
+        if not out:
+            return False, (
+                "CLI muet : `main.py --help` n'affiche RIEN sur la sortie standard "
+                "(code 0). Un produit en ligne de commande doit relayer argv à ses "
+                "features et afficher une aide utilisable."
+            )
+        return True, f"CLI exécuté (code 0) et `--help` documenté ({len(out)} car.)"
 
     # ------------------------------------------------- Frontend stream (ST-7)
 
@@ -8574,6 +9299,19 @@ class Pipeline:
         present, else ``install``. Returns True on success; non-fatal."""
         ci = use_ci and (root / "package-lock.json").exists()
         args = [settings.npm_cmd, "ci" if ci else "install", "--no-audit", "--no-fund"]
+        # P2-B: every frontend worktree runs its OWN hermetic install, so without
+        # a shared download cache the same tarballs are fetched again for each
+        # one. One cache under the workspace root (npm's cache IS concurrency
+        # safe) plus --prefer-offline makes every install after the first a local
+        # copy. Only the cache is shared - node_modules stays per worktree.
+        if self._setting("npm_shared_cache"):
+            cache = Path(settings.workspace_root).resolve() / "_npm-cache"
+            try:
+                cache.mkdir(parents=True, exist_ok=True)
+            except OSError as exc:  # unwritable root: fall back to npm's default
+                self._log("streams", f"📦 cache npm partagé indisponible : {exc}")
+            else:
+                args += ["--cache", str(cache), "--prefer-offline"]
 
         def _run():
             env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
@@ -8648,6 +9386,7 @@ class Pipeline:
         stream = next(iter(workspace.frontend_streams(self.state)), None)
         if stream is None:
             return True, "aucun stream frontend", {}
+        self._count_suite_run()  # P3: one REAL suite execution (Vitest + build)
         root = workspace.stream_root(self.state, stream)
         if ws is not None:
             # Re-root the frontend zone onto the worktree copy of the repo.

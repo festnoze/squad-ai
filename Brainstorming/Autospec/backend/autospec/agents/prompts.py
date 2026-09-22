@@ -6,6 +6,7 @@ import csv
 import json
 
 from ..config import settings
+from ..metrics import fusion_snapshot
 from ..models import (
     DEFAULT_STREAM_CATALOG,
     EngineeringObservation,
@@ -2484,10 +2485,16 @@ def retro_review(state: ProjectState) -> str:
         for s in state.stories_of_iteration(state.iteration)
     ]
     u = state.usage
+    # P3 (GENERATION_FUSION_REVIEW §8): the fusion-loop counters of the
+    # iteration that just ended. Read without ``calibration_for`` so building a
+    # prompt never creates a calibration bucket as a side effect; an iteration
+    # that produced none simply reports zeros.
+    current = state.calibration.get(state.iteration)
     signals = {
         "iteration": state.iteration,
         "plan_quality": state.plan_quality,
         "stories": stories,
+        "fusion": fusion_snapshot([current] if current is not None else []),
         "usage": {
             "cost_usd": round(u.cost_usd, 4),
             "tokens": u.input_tokens + u.output_tokens,
@@ -2518,6 +2525,17 @@ Ta mission, à partir de CES SIGNAUX uniquement :
 2. RECOMMANDATIONS DE RÉGLAGE : repère les signaux problématiques (raffinement
    trop court/long vu les scores, parallélisme à ajuster, dépendance
    chroniquement en échec) et propose des réglages concrets.
+3. SIGNAUX DE FUSION (bloc "fusion") : ces compteurs mesurent le COÛT de la
+   boucle merge/canari, pas la qualité du code. Un ratio "suites_per_item"
+   élevé (beaucoup de suites de tests rejouées pour peu d'items livrés), des
+   "canary_verdicts" dominés par les verdicts d'infrastructure
+   (infra_suspected, infra_healed, infra_persistent, empty_replay) ou beaucoup
+   de "merge_requeues" / "infra_retries" signalent un problème
+   d'ENVIRONNEMENT et d'ORCHESTRATION : n'en tire AUCUNE leçon "code" ni
+   consigne de test, et convertis-les uniquement en recommandations de réglage
+   d'usine (parallélisme, canari par rafale, budgets de tentatives, taille des
+   lots). Seul "canary_reverts" (verdict "semantic") est un signal de code :
+   deux items verts séparément qui se cassent une fois fusionnés.
 
 Réponds avec EXACTEMENT UN objet JSON :
 {{

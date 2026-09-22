@@ -180,6 +180,33 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
     return recovered
 
 
+async def _asweep_workspace_orphans() -> int:
+    """FACTORY_IMPROVEMENTS (completes fixes #10/#13): at boot, reap every
+    process a previous backend left behind under ``workspace_root`` (a leaked
+    smoke run, a uvicorn reload supervisor, a repair-agent child). Nothing of
+    ours runs there yet, so whatever is found is an orphan; the sweep never
+    leaves the workspace root and never touches this process or its ancestors.
+
+    Offloaded to a thread (it shells out to PowerShell/ps) and strictly
+    best-effort: startup must never fail because a cleanup did. Returns the
+    number of process trees killed (0 when the flag is off or in fake-agents
+    mode, where no real process is ever spawned)."""
+    if not settings.orphan_sweep_on_boot or settings.fake_agents:
+        return 0
+    try:
+        killed = await asyncio.to_thread(
+            Pipeline._sweep_workspace_orphans, Path(settings.workspace_root)
+        )
+    except Exception:  # noqa: BLE001 - boot cleanup is never fatal
+        return 0
+    if killed:
+        print(
+            f"[autospec] orphan sweep: {killed} leftover workspace process "
+            "tree(s) killed at boot"
+        )
+    return killed
+
+
 async def _arecover_projects() -> None:
     """Background recovery (BUG2): offload the heavy state-file I/O so a blocked
     startup never leaves the freshly-launched front's WS proxy connect ETIMEDOUT.
@@ -187,8 +214,13 @@ async def _arecover_projects() -> None:
     synchronous recovery (read every state file + re-persist) starves accept().
     The list_states() read runs in a thread; the registration runs back on the
     event loop, so M2 resume timers are armed and `pipelines` is mutated
-    race-free (recover_projects is synchronous — atomic w.r.t. other loop tasks)."""
+    race-free (recover_projects is synchronous — atomic w.r.t. other loop tasks).
+
+    Between the two, the workspace orphan sweep (ORPHAN_SWEEP_ON_BOOT) reaps the
+    process trees a previous backend leaked, BEFORE any recovered project can
+    re-arm a resume timer and meet a port those orphans still hold."""
     states = await asyncio.to_thread(list_states)
+    await _asweep_workspace_orphans()
     recover_projects(states)
 
 

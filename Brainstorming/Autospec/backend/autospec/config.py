@@ -237,6 +237,16 @@ def _default_model_ladder() -> list[str]:
 class Settings:
     bmad_dir: Path = field(default_factory=_default_bmad_dir)
     workspace_root: Path = field(default_factory=_default_workspace_root)
+    # FACTORY_IMPROVEMENTS (completes fixes #10/#13) - at backend boot, kill
+    # every leftover process whose command line points INSIDE `workspace_root`
+    # (a smoke run leaked by a previous backend, a uvicorn reload supervisor, a
+    # repair agent's child...). Without this the next gate meets a port already
+    # held and parks the project as "infra". Never touches a process outside the
+    # workspace root, nor the current process and its ancestors. Skipped in
+    # fake-agents mode. OFF = historic boot (the port-scoped killer only).
+    orphan_sweep_on_boot: bool = field(
+        default_factory=lambda: _env_bool("ORPHAN_SWEEP_ON_BOOT", True)
+    )
     claude_cmd: str = field(default_factory=_resolve_claude_cmd)
     # Default model of the Claude Code CLI harness ("claude code" provider):
     # Opus 5 (the current Opus) unless CLAUDE_MODEL overrides it.
@@ -550,6 +560,16 @@ class Settings:
     )
     node_cmd: str = field(default_factory=lambda: os.environ.get("NODE_CMD", "node"))
     npm_cmd: str = field(default_factory=lambda: os.environ.get("NPM_CMD", "npm"))
+    # P2-B (GENERATION_FUSION_REVIEW) - cost item n.2: every frontend worktree
+    # runs its OWN hermetic `npm ci`, re-downloading the same tarballs over and
+    # over. With this ON the installs share ONE npm cache directory under the
+    # workspace root (`_npm-cache`) and run `--prefer-offline`, so only the first
+    # install of a package hits the network. The installs stay hermetic (each
+    # worktree keeps its own `node_modules`); only the download cache is shared,
+    # and npm's cache is concurrency-safe. OFF = legacy per-install default cache.
+    npm_shared_cache: bool = field(
+        default_factory=lambda: _env_bool("NPM_SHARED_CACHE", True)
+    )
     # Claude usage-window watchdog (M2): when the Claude harness reports an
     # exhausted usage window, schedule an automatic resume when a fresh session
     # opens. Reset time read from the CLI error, else from ccusage's active
@@ -802,6 +822,15 @@ class Settings:
     smoke_run_port: int = field(
         default_factory=lambda: _env_int("SMOKE_RUN_PORT", 8000, minimum=1)
     )
+    # FACTORY_IMPROVEMENTS #4 - a NON-web product (cli profile, or no web
+    # framework in its pyproject) used to pass the smoke gate on "exit 0" alone,
+    # which a `main.py` printing nothing satisfies trivially: the factory shipped
+    # a mute binary. With this ON the gate additionally runs
+    # ``python main.py --help`` and requires exit 0 AND a non-empty stdout (the
+    # CLI contract the scaffold template delivers). OFF = historic "exit 0" only.
+    smoke_cli_help: bool = field(
+        default_factory=lambda: _env_bool("SMOKE_CLI_HELP", True)
+    )
     # Untrusted-code sandbox (R1): run the generated app inside a no-network
     # Docker container. OFF by default; needs Docker + an image carrying the
     # project toolchain (uv). The image/binary are configurable.
@@ -902,6 +931,18 @@ class Settings:
     canary_replay_on_empty: bool = field(
         default_factory=lambda: _env_bool("CANARY_REPLAY_ON_EMPTY", True)
     )
+    # P1-A (GENERATION_FUSION_REVIEW) - cost item n.1: one FULL suite per merge
+    # (120 suites for 17 items). Merges are serialized by the merge lock, so
+    # under contention several of them land back to back: with this ON, a worker
+    # whose merge landed while others were still queued does NOT replay the
+    # suite. It parks in the burst being formed and the LAST merger runs ONE
+    # canary per language for the whole burst. A red burst is bisected (revert
+    # the newest merge, replay, repeat) so only the merge that really breaks the
+    # combination is undone. With no contention the burst has size 1 and the
+    # behaviour is the historic one. OFF = byte-identical legacy behaviour.
+    canary_batch_enabled: bool = field(
+        default_factory=lambda: _env_bool("CANARY_BATCH", True)
+    )
     # P0-B (GENERATION_FUSION_REVIEW) - budget SEPARATE from `dev_max_attempts`
     # for the fusion requeues: merge conflict and post-merge canary revert. The
     # item's own code is green (it passed in its worktree), so the collision with
@@ -910,6 +951,42 @@ class Settings:
     # then FAILED). 0 = no requeue at all (a first conflict ends the item).
     requeue_max: int = field(
         default_factory=lambda: _env_int("REQUEUE_MAX", 3, minimum=0)
+    )
+    # P2-A (GENERATION_FUSION_REVIEW) - LAST RESORT before the adaptive split on
+    # a PERSISTENT fusion failure (merge conflict / semantic revert once
+    # `requeue_max` is spent). The item's own code is green, so failing it only
+    # because its siblings keep landing beside it wastes the whole unit. With
+    # this ON it gets ONE extra try in SOLO mode: the scheduler starts it only
+    # when NO other worker is in flight and starts nothing else while it runs, so
+    # it rebases on the FINAL HEAD and can no longer collide with anybody. It
+    # costs no budget, is granted at most once per item (`solo_attempted`), and
+    # a still-failing solo try falls back to the historic ending (split, then
+    # FAILED). OFF = byte-identical legacy behaviour.
+    solo_on_conflict: bool = field(
+        default_factory=lambda: _env_bool("SOLO_ON_CONFLICT", True)
+    )
+    # D11 / FACTORY_IMPROVEMENTS - a task-decomposed US is a CONTAINER: its real
+    # status is derived from its tasks (``effective_status``) while its STORED
+    # status was never written back, so the board could show TODO for a fully
+    # built story, and a "story <id> done" commit could be emitted on a rollup
+    # that was still incomplete. With this ON the stored status is consolidated
+    # (and the rollup commit emitted ONCE) only when EVERY task of the story is
+    # DONE, and it is rolled back as soon as one of them returns to TODO.
+    # OFF = byte-identical legacy behaviour (no stored status, no rollup commit).
+    consolidate_story_status: bool = field(
+        default_factory=lambda: _env_bool("CONSOLIDATE_STORY_STATUS", True)
+    )
+    # FACTORY_IMPROVEMENTS - a Technical Story extracted from a failed task used
+    # to be born with NO acceptance criterion and an empty Gherkin, so the
+    # Definition of Done flagged it ("no_acceptance_criteria") on every single
+    # delivery. With this ON the TS inherits the failed task's acceptance
+    # criteria (or, when it has none, gets ONE synthetic criterion derived from
+    # its technical contract) plus a technical Gherkin stating that contract, so
+    # the criterion carries verifiable evidence instead of trading one DoD
+    # warning for another. OFF = byte-identical legacy TS (no criterion, no
+    # Gherkin).
+    ts_acceptance_criteria: bool = field(
+        default_factory=lambda: _env_bool("TS_ACCEPTANCE_CRITERIA", True)
     )
     # WORKFLOW_REVIEW P1 - a RED verification that executed ZERO test never
     # proves anything about the generated code (broken venv/toolchain). With this
