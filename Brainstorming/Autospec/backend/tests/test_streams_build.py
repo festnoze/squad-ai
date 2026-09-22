@@ -173,9 +173,10 @@ async def test_cycle_is_broken_at_ingestion_and_everything_builds(streams_on):
 
 async def test_persistent_merge_conflict_fails_after_exhausting_retries(streams_on, monkeypatch):
     # A conflict that never clears: the item is re-queued and rebuilt on the
-    # updated HEAD each attempt, and only ends FAILED once dev_max_attempts is
-    # exhausted — aborting cleanly on every failed merge.
+    # updated HEAD each attempt, and only ends FAILED once the FUSION budget
+    # (requeue_max, P0-B) is exhausted, aborting cleanly on every failed merge.
     monkeypatch.setattr(settings, "dev_max_attempts", 2)
+    monkeypatch.setattr(settings, "requeue_max", 1)
     state = _streams_state([_us("US-1", stream="backend")])
     pipeline = Pipeline(state, ScriptedRunner())
 
@@ -196,7 +197,11 @@ async def test_persistent_merge_conflict_fails_after_exhausting_retries(streams_
     story = state.story("US-1")
     assert story.status == StoryStatus.FAILED
     assert story.last_error.startswith("conflit de merge inter-stream")
-    assert story.attempts == 2  # rebuilt once on a fresh worktree before failing
+    # P0-B: a merge conflict is a FUSION failure, so every dev attempt it
+    # consumed on entry is refunded: only the requeue budget was spent (one
+    # requeue, then the terminal attempt that exhausted it).
+    assert story.attempts == 0
+    assert story.requeue_attempts == 2
     # Two build attempts × (one merge + one in-lock retry) = four clean aborts.
     assert len(aborts) == 4
 
@@ -213,10 +218,12 @@ async def test_merge_conflict_requeues_and_resolves_on_rebuild(streams_on, monke
 
     async def _agit(ws, *args):
         # Conflict only on the first build attempt; clean once rebuilt (attempt 2).
+        # P0-B: the dev attempt is refunded on a conflict, so the fusion budget
+        # (requeue_attempts) is what counts the attempts here.
         if (
             args[:1] == ("merge",)
             and "--abort" not in args
-            and state.story("US-1").attempts < 2
+            and state.story("US-1").requeue_attempts < 1
         ):
             return 1, "CONFLICT (content): merge conflict in app.py"
         return await real_agit(ws, *args)
@@ -226,7 +233,9 @@ async def test_merge_conflict_requeues_and_resolves_on_rebuild(streams_on, monke
 
     story = state.story("US-1")
     assert story.status == StoryStatus.DONE
-    assert story.attempts == 2
+    # One conflict (dev attempt refunded, one requeue spent) then a clean merge.
+    assert story.attempts == 1
+    assert story.requeue_attempts == 1
 
 
 # ----------------------------------------------- (d) frontend toolchain robustness

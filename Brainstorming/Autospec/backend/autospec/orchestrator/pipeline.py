@@ -549,6 +549,22 @@ class Pipeline:
         # seulement declared_overlap) tant qu'un rival potentiel est en vol —
         # un retry ne doit jamais pouvoir re-conflicter avec un item en cours.
         self._conflict_retry_ids: set[str] = set()
+        # P1-B: set by _set_stage whenever a worker leaves the dev/verify stages
+        # (it entered the serialized merge queue, or it is finishing). The stream
+        # scheduler otherwise only wakes when a whole worker completes, so
+        # without this edge a freed slot would stay idle until then.
+        self._slot_released = asyncio.Event()
+        # WF-P1: per-item marker recorded by the real verification runners -
+        # True when their last run was RED with ZERO test executed (a broken
+        # environment, not generated code). A MISSING key means no real run was
+        # observed in this attempt (e.g. a stubbed dev in a unit test), in which
+        # case the legacy verdict is kept untouched.
+        self._empty_red: dict[str, bool] = {}
+        # P1-C: transitive fan-out per work item, measured on the CURRENT work
+        # graph by the last scheduler pass (see _abuild_phase_streams). It drives
+        # both the pick order and the extra dev attempt granted to a critical
+        # item (_max_attempts_for). Empty = never measured, hence no bonus.
+        self._fanout: dict[str, int] = {}
         # W2: wrong-test arbitrations spent per item this run (bounded by
         # settings.arbitration_max) — a loop of test rewrites would be checker erosion.
         self._arbitration_count: dict[str, int] = {}
@@ -950,6 +966,11 @@ class Pipeline:
         item.current_stage = stage
         item.stage_started_at = time.time()
         item.current_persona = persona
+        if stage not in self._DEV_SLOT_STAGES:
+            # P1-B: this worker just stopped occupying a dev slot (it entered the
+            # merge queue, or it reached a terminal stage). Wake the stream
+            # scheduler so it can refill that slot right away.
+            self._slot_released.set()
         if sync:
             self._sync()
 
@@ -1520,7 +1541,26 @@ class Pipeline:
         self._resume_timer = asyncio.create_task(self._aresume_timer(at))
 
     async def _aresume_timer(self, at: float) -> None:
-        await asyncio.sleep(max(0.0, at - time.time()))
+        # WF-P7: `at` is usually the CONSERVATIVE fallback estimate
+        # (RESUME_FALLBACK_MIN), so the real billing block often reopens much
+        # earlier. `await_window` sleeps in slices and re-probes ccusage every
+        # `resume_reprobe_min` minutes, returning an earlier epoch when one lands
+        # (it can only shorten the wait, never lengthen it). 0 minutes - or a
+        # context where the watchdog is inactive, e.g. a test or a non-claude
+        # provider - restores the historical single sleep.
+        planned = at
+        reprobe_min = int(getattr(settings, "resume_reprobe_min", 0) or 0)
+        if reprobe_min < 0 or not session_monitor.monitor_active():
+            reprobe_min = 0
+        at = await session_monitor.await_window(at, reprobe_s=reprobe_min * 60)
+        if at < planned:
+            # Persist the shortened target: a backend restart re-arms from it.
+            self.state.resume_at = at
+            self._chat(
+                ChatRole.SYSTEM,
+                "⏰ Fenêtre d'usage rouverte plus tôt que prévu "
+                f"({time.strftime('%H:%M', time.localtime(at))}) : reprise anticipée.",
+            )
         # The clean stop runs asynchronously: the interrupted lifecycle task only
         # unwinds (phase leaves BUILD) at its next checkpoint. Wait for it to land
         # before resuming, otherwise aresume_build's active-pipeline guard rejects
@@ -1610,6 +1650,7 @@ class Pipeline:
             story.status = StoryStatus.TODO
             story.attempts = 0
             story.infra_attempts = 0
+            story.requeue_attempts = 0  # P0-B
             story.last_error = ""
         self._chat(ChatRole.ANALYST, f"🔍 Impact : {message}\n✏️ Story {story.id} mise à jour.")
 
@@ -3581,7 +3622,16 @@ class Pipeline:
             )
             data = extract_json(result.text)
         except AgentError as exc:
+            # WORKFLOW_REVIEW P3: a design failure stays non-fatal, but it must
+            # NOT be silent - the whole build then runs without architecture
+            # context, which only a log line used to reveal.
             self._log("architect", f"Architecte indisponible ({exc}) — build sans design.")
+            short = str(exc)[:200]
+            self._notify("warning", "Architecture indisponible", short)
+            self._chat(
+                ChatRole.SYSTEM,
+                f"Architecture indisponible ({short}) - le build continue sans design.",
+            )
             return
         self.state.architecture = data.get("design", "")
         self._chat(
@@ -3604,6 +3654,20 @@ class Pipeline:
     def _emit_refine(self, role: str, message: str) -> None:
         self._chat(_REFINE_ROLE_TO_CHAT.get(role, ChatRole.SYSTEM), message)
 
+    def _note_refine_degraded(self, role: str, outcome) -> None:
+        """WORKFLOW_REVIEW P4: a refinement loop that stopped because the CRITIC
+        was unavailable (``stopped_reason == "critic_error"``) is a DEGRADED
+        review, not a clean pass. Say so on the timeline and in the chat instead
+        of letting the harness quietly fall back to no review at all. No-op for
+        every other stop reason."""
+        if getattr(outcome, "stopped_reason", "") != "critic_error":
+            return
+        self.monitor.event("refine_degraded", role=role, reason=outcome.stopped_reason)
+        self._chat(
+            ChatRole.SYSTEM,
+            f"Revue {role} dégradée (critique indisponible).",
+        )
+
     async def _arefine_plan(self, initial_text: str, pkg: str) -> str:
         async def _revise(previous: str, critique: str) -> str:
             res = await self._tracked.arun(
@@ -3621,6 +3685,7 @@ class Pipeline:
             revise=_revise,
             emit=self._emit_refine,
         )
+        self._note_refine_degraded("po", outcome)
         if outcome.stopped_reason != "disabled":
             self.state.plan_quality = outcome.score
             self.state.plan_review_issues = list(outcome.issues)
@@ -3721,6 +3786,7 @@ class Pipeline:
                 f"Raffinement interrompu ({exc}) — retour à l'état vert.",
             )
             return
+        self._note_refine_degraded("dev", outcome)
         if outcome.stopped_reason != "disabled":
             story.quality_score = outcome.score
             self._chat(
@@ -4208,6 +4274,17 @@ class Pipeline:
                     ok, output, real = await self._arun_frontend_tests()
                 else:
                     ok, output, real = await self._arun_pytest()
+                # WF-P1: a red that executed ZERO test is a broken environment,
+                # not generated code - repair it and replay ONCE before judging.
+                # ``infra_red`` (still nothing executed) refunds the dev attempt
+                # below. No requeue budget here: this path never merges.
+                infra_red = False
+                if not ok:
+                    ok, output, replayed, infra_red = await self._areplay_empty_red(
+                        story.id, ws, is_frontend, output, not real
+                    )
+                    if replayed is not None:
+                        real = replayed
                 tail = output[-2000:]
                 self._apply_test_states(story, reply.get("test_results", []), real)
                 regs = regression.find_regressions(set(self.state.green_tests), real)
@@ -4271,7 +4348,30 @@ class Pipeline:
                 else:
                     story.last_error = tail
                     self._log(f"dev:{story.id}", f"❌ Tests rouges après passage du dev:\n{tail}")
-                    if story.attempts < settings.dev_max_attempts:
+                    if infra_red:
+                        # WF-P1: the repaired environment still ran no test - the
+                        # dev never got a verdict, so its attempt is refunded and
+                        # the separate infra budget is spent instead.
+                        story.attempts = max(0, story.attempts - 1)
+                        story.infra_attempts += 1
+                        self.state.calibration_for().infra_retries += 1  # §8
+                        if story.infra_attempts <= settings.infra_max_retries:
+                            story.status = StoryStatus.TODO
+                            self._set_stage(story, BuildStage.QUEUED, sync=False)  # B1
+                            self._log(
+                                f"dev:{story.id}",
+                                f"⚡ Aucun test exécuté sur {story.id} (environnement) : "
+                                f"tentative dev remboursée, retry infra "
+                                f"{story.infra_attempts}/{settings.infra_max_retries}.",
+                            )
+                        else:
+                            story.last_error = (
+                                "infra : aucun test exécuté (environnement réparé "
+                                f"puis rejoué sans succès)\n{tail}"
+                            )
+                            story.status = StoryStatus.FAILED
+                            self._set_stage(story, BuildStage.FAILED, sync=False)  # B1
+                    elif story.attempts < settings.dev_max_attempts:
                         story.status = StoryStatus.TODO  # will be rescheduled
                         self._set_stage(story, BuildStage.QUEUED, sync=False)  # B1: requeue
                     elif await self._amaybe_arbitrate_wrong_test(
@@ -4433,8 +4533,33 @@ class Pipeline:
                     self._item_claim(graph.items[rid])
                     for rid in running if rid in graph.items
                 ]
-                for it in items:
-                    if len(running) >= cap:
+                # P1-C: measure the transitive fan-out ONCE per pass (the graph
+                # changes when a merge lands or a unit is split) and pick the
+                # items that block the most work first. `rank_ready` only
+                # REORDERS - readiness, the independence floor and the cap below
+                # are unchanged, and the topological order remains the tie-break,
+                # so FANOUT_FIRST=0 replays the historic order exactly.
+                picks = items
+                if self._setting("fanout_first_enabled") or self._setting("fanout_bonus_threshold"):
+                    self._fanout = work_streams.fanout(graph)
+                if self._setting("fanout_first_enabled"):
+                    picks = scheduler.rank_ready(items, graph, fanout_counts=self._fanout)
+                # P1-B: a worker parked in MERGE_WAIT / MERGING (or inside the
+                # post-merge canary that follows) is serialized by _merge_lock -
+                # it queues, it does not generate code - so it must not keep a
+                # dev slot busy. When the flag is on, the fill counter only
+                # counts the dev/verify workers, under a HARD ceiling of cap + 1
+                # workers in flight so a slow merge queue can never fan out.
+                release_on_merge = bool(self._setting("slot_release_on_merge"))
+                # Cleared BEFORE the stages are read below, so a transition that
+                # lands during the fill re-arms the waiter instead of being lost.
+                self._slot_released.clear()
+                for it in picks:
+                    if release_on_merge:
+                        busy = sum(1 for rid in running if self._holds_dev_slot(rid))
+                        if busy >= cap or len(running) >= cap + 1:
+                            break
+                    elif len(running) >= cap:
                         break
                     if it.id in running or not work_streams.is_ready(it, graph.items):
                         continue
@@ -4512,10 +4637,19 @@ class Pipeline:
                     break
 
                 # Block until the first worker finishes, then loop to refill its
-                # slot with whatever its merge just unblocked.
-                await asyncio.wait(
-                    set(running.values()), return_when=asyncio.FIRST_COMPLETED
-                )
+                # slot with whatever its merge just unblocked. P1-B: also wake on
+                # a worker entering the serialized merge queue - its dev slot is
+                # free from that instant, long before the worker itself returns.
+                waiters: set[asyncio.Task] = set(running.values())
+                slot_waiter: asyncio.Task | None = None
+                if release_on_merge:
+                    slot_waiter = asyncio.create_task(self._slot_released.wait())
+                    waiters.add(slot_waiter)
+                try:
+                    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    if slot_waiter is not None and not slot_waiter.done():
+                        slot_waiter.cancel()
         finally:
             # Stop / completion / error: let any still-running worker finish so its
             # worktree is cleaned up (its finally runs); killed agents return fast.
@@ -5392,6 +5526,31 @@ class Pipeline:
             depends_on=tuple(item.depends_on),
         )
 
+    # P1-B: the stages during which a worker really occupies a dev slot (it is
+    # generating or verifying code). Everything else - MERGE_WAIT, MERGING and
+    # the post-merge canary that follows, plus the terminal DONE / FAILED of a
+    # worker about to be reaped - is serialized by the merge lock or already over.
+    _DEV_SLOT_STAGES = frozenset(
+        {
+            BuildStage.QUEUED,
+            BuildStage.ANALYZING,
+            BuildStage.CONTRACTS,
+            BuildStage.IMPLEMENTING,
+            BuildStage.VERIFYING,
+        }
+    )
+
+    def _holds_dev_slot(self, wid: str) -> bool:
+        """P1-B: does the in-flight worker ``wid`` still hold a dev slot?
+
+        Reads the persistent model's ``current_stage`` (stamped by ``_set_stage``
+        at every real transition). An id that no longer resolves counts as
+        holding a slot: the accounting fails CLOSED, never over-committing."""
+        target = self._find_item_target(wid)
+        if target is None:
+            return True
+        return getattr(target, "current_stage", None) in self._DEV_SLOT_STAGES
+
     def _find_item_target(self, wid: str):
         """Resolve a work-item id (task id or story id) to its persistent model,
         or None if it no longer exists (defensive — the plan may have changed)."""
@@ -5437,6 +5596,118 @@ class Pipeline:
             self.state.calibration_for().orphan_resets += n  # §8
         return n
 
+    @staticmethod
+    def _refund_dev_attempt(target, subject) -> None:
+        """P0-B: give the dev attempt consumed on entry back to an item whose
+        failure is NOT imputable to the generated code (merge conflict, canary
+        revert, red run where zero test executed). ``dev_max_attempts`` must only
+        ever count real code re-generations; the fusion and infra loops have
+        their own budgets. Never goes below zero."""
+        target.attempts = subject.attempts = max(0, subject.attempts - 1)
+
+    def _fanout_bonus_for(self, item) -> int:
+        """P1-C: the extra try (0 or 1) ONE work item earns from its fan-out.
+
+        An item that transitively blocks many others sits on the critical path:
+        failing it strands its whole subgraph, so it is granted one attempt more
+        than a leaf (see ``scheduler.fanout_bonus_attempts``). The fan-out is the
+        one measured on the current work graph by the last scheduler pass; when
+        nothing was measured yet (a caller outside ``_abuild_phase_streams``) it
+        is derived once from the state, and any failure to do so simply grants
+        nothing. A threshold of 0, or an item absent from the graph, grants
+        nothing either.
+
+        ``item`` may be a work item, a story/task, or a plain id.
+        """
+        threshold = int(self._setting("fanout_bonus_threshold"))
+        if threshold <= 0:
+            return 0
+        if not self._fanout:
+            try:
+                self._fanout = work_streams.fanout(work_streams.build_work_graph(self.state))
+            except Exception:  # noqa: BLE001 - the bonus is an optimisation, never a blocker
+                return 0
+        wid = getattr(item, "id", item)
+        return scheduler.fanout_bonus_attempts(self._fanout.get(wid, 0), threshold)
+
+    def _max_attempts_for(self, item) -> int:
+        """P1-C: the dev-attempt ceiling of ONE work item - ``dev_max_attempts``
+        plus the bonus try a critical item earns (0 for everything else, so the
+        historic ceiling is kept)."""
+        return int(self._setting("dev_max_attempts")) + self._fanout_bonus_for(item)
+
+    def _requeue_max_for(self, item) -> int:
+        """P1-C: the FUSION requeue ceiling of ONE work item - ``requeue_max``
+        plus the same bonus unit, because a critical item stranded by a merge
+        collision costs its whole subgraph too. P0-B semantics are untouched:
+        this budget stays separate from the dev one and remains the only bound
+        of the conflict loop. A budget explicitly disabled with 0 stays disabled
+        (bonus or not), so ``REQUEUE_MAX=0`` still ends on the first conflict."""
+        base = int(self._setting("requeue_max"))
+        if base <= 0:
+            return base
+        return base + self._fanout_bonus_for(item)
+
+    @staticmethod
+    def _consume_requeue_budget(target, subject, ceiling: int | None = None) -> bool:
+        """P0-B: spend one unit of the FUSION requeue budget and tell the caller
+        whether the item may be re-queued (True) or must fall through to the
+        historic ending (split-on-failure, then FAILED). ``ceiling`` defaults to
+        ``settings.requeue_max``; P1-C widens it by one for a critical item."""
+        target.requeue_attempts = getattr(target, "requeue_attempts", 0) + 1
+        subject.requeue_attempts = target.requeue_attempts
+        limit = settings.requeue_max if ceiling is None else ceiling
+        return target.requeue_attempts <= limit
+
+    def _note_suite_outcome(self, wid: str, suite_green: bool, results: dict[str, str]) -> None:
+        """WF-P1: remember whether the LAST real suite run of this item executed
+        at least one test. Only a RED run that parsed ZERO outcome is an
+        environment suspect; a green suite, real failures, or no observed run at
+        all (a stubbed dev in a unit test) all keep the legacy verdict."""
+        self._empty_red[wid] = (not suite_green) and not results
+
+    async def _areplay_empty_red(
+        self, wid: str, ws, is_frontend: bool, output: str, empty_red: bool | None
+    ) -> tuple[bool, str, dict[str, str] | None, bool]:
+        """WF-P1: a RED verification that executed ZERO test proves nothing about
+        the generated code - it is a broken environment (venv half-deleted,
+        toolchain missing, npm install lost). Repair it and replay the suite ONCE
+        before any verdict is drawn.
+
+        ``empty_red`` tells whether the run being judged was red with zero test
+        executed; None (no real run observed) and False both keep the legacy
+        verdict untouched.
+
+        Returns ``(green, output, results, infra_red)``: ``green`` True when the
+        replay passed (the caller proceeds exactly as with a green dev run),
+        ``results`` the replay's outcomes or None when no replay happened, and
+        ``infra_red`` True when the replay is STILL red without executing a
+        single test (the caller refunds the dev attempt and spends the infra
+        budget instead of failing the item on the code).
+        """
+        if not settings.empty_red_is_infra or not empty_red:
+            return False, output, None, False
+        self.monitor.event("empty_red", item=wid, phase="replay")
+        self._log(
+            f"dev:{wid}",
+            "🧪 Rouge sans aucun test exécuté : environnement réparé puis suite "
+            "rejouée une fois avant tout verdict.",
+        )
+        if is_frontend:
+            # The frontend runner heals its own node_modules (npm ci) before running.
+            ok, out, real = await self._arun_frontend_tests(ws=ws)
+        else:
+            await asyncio.to_thread(self._purge_venv_dir, ws)
+            ok, out, real = await self._arun_pytest(ws=ws)
+        if ok:
+            self._log(
+                f"dev:{wid}",
+                "✅ Suite verte après réparation de l'environnement (le rouge "
+                "précédent n'avait exécuté aucun test).",
+            )
+            return True, out, real, False
+        return False, out, real, not real
+
     async def _abuild_work_item(self, item: "work_streams.WorkItem") -> None:
         """ST-9/10/11: build ONE work item in its own git worktree, then merge.
 
@@ -5448,15 +5719,21 @@ class Pipeline:
         # O2: attribute every agent call made while building this item to it.
         # Isolated to this worker's Task context (see _BUILD_ITEM), so no reset.
         _BUILD_ITEM.set(item.id)
+        # WF-P1: a fresh attempt has not observed any real suite run yet.
+        self._empty_red.pop(item.id, None)
         target = self._item_target(item)
         subject = self._item_subject(item)
         target.status = subject.status = StoryStatus.IN_PROGRESS
         target.attempts = subject.attempts = subject.attempts + 1
+        # P1-C: dev ceiling of THIS item - dev_max_attempts plus the bonus try a
+        # high fan-out item earns. Resolved once so the recovery stamp, the logs
+        # and the requeue-vs-FAILED decision below can never disagree.
+        max_attempts = self._max_attempts_for(item)
         # B1: a retry (attempts > 1) re-entering the build is a recovery state.
         if target.attempts > 1:
             self._set_recovery(
                 target, "retry", attempt=target.attempts,
-                max_attempts=settings.dev_max_attempts, sync=False,
+                max_attempts=max_attempts, sync=False,
             )
         self._sync()
 
@@ -5501,6 +5778,21 @@ class Pipeline:
                     self._log(f"dev:{item.id}", f"Agent {label} assigné à {item.id} — {subject.title}")
                 dev_ran = True
                 ok, tail = await self._arun_item_dev(subject, worktree, pkg, is_frontend)
+
+            # WF-P1: a red where NOT ONE test executed is an environment failure,
+            # never a fault of the generated code. Repair the worktree env and
+            # replay once; a green replay merges like any green run, a replay that
+            # still executes nothing sets ``infra_red`` (dev attempt refunded).
+            infra_red = False
+            if not ok:
+                ok, tail, replayed, infra_red = await self._areplay_empty_red(
+                    item.id, worktree, is_frontend, tail, self._empty_red.get(item.id)
+                )
+                tail = tail[-2000:]
+                if replayed:
+                    self.state.green_tests = sorted(
+                        n for n, o in replayed.items() if o == "passed"
+                    )
 
             if ok:
                 # ST-10/11: commit in the worktree, then merge into the repo. The
@@ -5600,7 +5892,8 @@ class Pipeline:
                     # the green branch is PRESERVED (keep_branch) so the next
                     # scheduler pass resumes it — rebase on the now-updated HEAD,
                     # re-verify, merge — instead of regenerating the code. Bounded
-                    # by dev_max_attempts; a persistent conflict tries a finer
+                    # by requeue_max (P0-B: the fusion has its OWN budget, the dev
+                    # attempt is refunded); a persistent conflict tries a finer
                     # split (disjoint file zones) before ending FAILED.
                     # Separation loop: the branch's REAL touched files recalibrate
                     # the item's declared claims, the retry is scheduled STRICTLY
@@ -5611,13 +5904,24 @@ class Pipeline:
                         self.state.calibration_for().merge_requeues += 1  # §8
                         touched = await self._abranch_files(ws, branch)
                         self._register_merge_conflict(item, target, conflict_files, touched)
-                    if subject.attempts < settings.dev_max_attempts:
+                    # P0-B: this failure belongs to the FUSION, not to the code -
+                    # the branch was green on its own. Give the dev attempt back
+                    # (it will be re-consumed only if a dev really re-runs) and
+                    # spend the separate requeue budget instead.
+                    self._refund_dev_attempt(target, subject)
+                    self.state.calibration_for().requeue_refunds += 1  # §8
+                    # P1-C: a critical item (high transitive fan-out) is granted
+                    # one requeue MORE than a leaf, for the same reason it is
+                    # granted one dev attempt more: failing it strands its whole
+                    # subgraph. REQUEUE_MAX=0 stays terminal on a first conflict.
+                    requeue_ceiling = self._requeue_max_for(item)
+                    if self._consume_requeue_budget(target, subject, requeue_ceiling):
                         target.status = subject.status = StoryStatus.TODO
                         self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
                         self._log(
                             f"dev:{item.id}",
                             f"⚠️ Conflit de merge {item.id} — branche verte conservée, reprise "
-                            f"sur HEAD à jour (tentative {subject.attempts + 1}/{settings.dev_max_attempts}).",
+                            f"sur HEAD à jour (requeue {target.requeue_attempts}/{requeue_ceiling}).",
                         )
                     # A PERSISTENT conflict is a sizing smell: the unit claims file
                     # zones that keep colliding with its siblings. Try the adaptive
@@ -5638,9 +5942,39 @@ class Pipeline:
                 # l'erreur précédente en contexte) au lieu de tout régénérer.
                 await self._acommit_wip(worktree, item.id)
                 keep_branch = True
-                if subject.attempts < settings.dev_max_attempts:
+                if infra_red:
+                    # WF-P1: the repaired environment STILL executed no test - the
+                    # dev never had a verdict, so its attempt is refunded and the
+                    # separate infra budget is spent (as for an AgentError).
+                    self._refund_dev_attempt(target, subject)
+                    target.infra_attempts += 1
+                    self.state.calibration_for().infra_retries += 1  # §8
+                    if target.infra_attempts <= settings.infra_max_retries:
+                        target.status = subject.status = StoryStatus.TODO
+                        self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
+                        self._log(
+                            f"dev:{item.id}",
+                            f"⚡ Aucun test exécuté sur {item.id} (environnement) : "
+                            f"tentative dev remboursée, retry infra "
+                            f"{target.infra_attempts}/{settings.infra_max_retries}.",
+                        )
+                    else:
+                        target.last_error = (
+                            "infra : aucun test exécuté (environnement réparé puis "
+                            f"rejoué sans succès)\n{tail}"
+                        )
+                        target.status = subject.status = StoryStatus.FAILED
+                        self._set_stage(target, BuildStage.FAILED, sync=False)  # B1
+                elif subject.attempts < max_attempts:
+                    # P1-C: `max_attempts` is dev_max_attempts plus the bonus try
+                    # granted to a high fan-out item (0 otherwise).
                     target.status = StoryStatus.TODO
                     self._set_stage(target, BuildStage.QUEUED, sync=False)  # B1: requeue
+                    self._log(
+                        f"dev:{item.id}",
+                        f"🔁 Nouvelle tentative dev {subject.attempts + 1}/{max_attempts} "
+                        f"pour {item.id}.",
+                    )
                 # P6: attempts exhausted → try an adaptive FINER split before failing
                 # (the unit was likely too big for one agent session). If it splits,
                 # the new sub-tasks build on the next scheduler pass.
@@ -5699,6 +6033,7 @@ class Pipeline:
             )
             self._log(f"dev:{item.id}", f"⛔ Crash worker {item.id} isolé : {exc}")
         finally:
+            self._empty_red.pop(item.id, None)  # WF-P1: per-attempt marker
             if worktree is not None:
                 await self._aworktree_remove(ws, worktree, branch, keep_branch=keep_branch)
             # V3-F1: a TERMINAL item (DONE or FAILED — requeues are skipped
@@ -5810,6 +6145,7 @@ class Pipeline:
             ok, output, real = await self._arun_frontend_tests(ws=worktree)
         else:
             ok, output, real = await self._arun_pytest(ws=worktree)
+        self._note_suite_outcome(subject.id, ok, real)  # WF-P1
         tail = output[-2000:]
         self._apply_test_states(subject, reply.get("test_results", []), real)
         regs = regression.find_regressions(set(self.state.green_tests), real)
@@ -5998,7 +6334,16 @@ class Pipeline:
            signature d'outil), on force une purge de l'environnement et on rejoue
            UNE fois. Vert → c'était l'infra (``infra``, pas de revert). Toujours
            rouge, ou rouge avec des tests réellement en échec → ``semantic`` (le
-           merge est reverté par l'appelant)."""
+           merge est reverté par l'appelant).
+
+        P0-A (``canary_replay_on_empty``, ON) widens guard 2 to the UNKNOWN
+        environment failure: a red that executed ZERO test (``results == {}``)
+        WITHOUT any known signature is no evidence of a semantic conflict - the
+        suite never ran. It is repaired (venv purge on the backend, the frontend
+        runner's own ``npm ci`` heal) and replayed ONCE. Green on the replay =
+        ``infra`` (merge kept, ``infra_retries`` incremented); still red =
+        ``semantic`` as before, so a genuine project-level ``ModuleNotFoundError``
+        keeps reverting. Set the flag OFF for the historic behaviour."""
         if not self._setting("post_merge_canary"):
             return True, "green", ""
         run = self._arun_frontend_tests if is_frontend else self._arun_pytest
@@ -6035,6 +6380,11 @@ class Pipeline:
             )
             self.monitor.event("canary", item=item.id, verdict="infra_persistent")
             return False, "infra", output2[-1500:]
+        # P0-A: red with NO test executed and NO known signature. Repair and
+        # replay ONCE - a suite that never ran proves nothing about the code.
+        replayed = await self._acanary_replay_on_empty(item, is_frontend, output, results)
+        if replayed is not None:
+            return replayed
         # Des tests ont réellement échoué → vrai conflit sémantique.
         self._log(
             f"dev:{item.id}",
@@ -6043,6 +6393,70 @@ class Pipeline:
         )
         self.monitor.event("canary", item=item.id, verdict="semantic")
         return False, "semantic", output[-1500:]
+
+    async def _acanary_replay_on_empty(
+        self,
+        item: "work_streams.WorkItem",
+        is_frontend: bool,
+        output: str,
+        results: dict[str, str],
+    ) -> tuple[bool, str, str] | None:
+        """P0-A: repair + replay ONCE a canary red that executed ZERO test and
+        carries NO known infra signature, BEFORE believing a semantic verdict.
+
+        Returns the final ``(ok, kind, tail)`` when the replay settles the case
+        (green = ``infra``, or a replay red that DOES carry a known signature =
+        ``infra`` persistent), and ``None`` when the caller must keep its legacy
+        ``semantic`` path (flag off, tests actually ran, a known signature was
+        already handled upstream, or the replay is red for a real reason)."""
+        if results or not self._setting("canary_replay_on_empty"):
+            return None
+        known_signature = (
+            self._looks_like_frontend_infra_failure(output, results)
+            if is_frontend
+            else self._looks_like_infra_failure(output, results)
+        )
+        if known_signature:
+            return None  # handled by the (unchanged) signature path
+        self._log(
+            f"dev:{item.id}",
+            f"🐤 Canari ROUGE après {item.id} avec AUCUN test exécuté et aucune "
+            "signature connue - réparation de l'environnement puis UN rejeu "
+            "avant tout verdict sémantique.",
+        )
+        self.monitor.event("canary", item=item.id, verdict="empty_replay")
+        if is_frontend:
+            # The frontend runner carries its own `npm ci` auto-heal.
+            ok2, output2, results2 = await self._arun_frontend_tests()
+        else:
+            await asyncio.to_thread(self._purge_venv_dir, workspace_dir(self.state.id))
+            ok2, output2, results2 = await self._arun_pytest()
+        if ok2:
+            self.state.calibration_for().infra_retries += 1  # §8
+            self._log(
+                f"dev:{item.id}",
+                f"✅ Canari VERT au rejeu - le rouge de {item.id} venait de "
+                "l'environnement, PAS d'un conflit. Merge conservé.",
+            )
+            self.monitor.event("canary", item=item.id, verdict="infra_healed")
+            return True, "infra", output2[-1500:]
+        replay_signature = (
+            self._looks_like_frontend_infra_failure(output2, results2)
+            if is_frontend
+            else self._looks_like_infra_failure(output2, results2)
+        )
+        if replay_signature:
+            # The repair uncovered a NAMED toolchain outage: reverting repairs
+            # nothing, so keep the merge and shout (same contract as the
+            # signature path above).
+            self._log(
+                f"dev:{item.id}",
+                f"⛔ Canari toujours ROUGE au rejeu avec une signature d'infra - "
+                f"outillage indisponible, merge de {item.id} conservé.",
+            )
+            self.monitor.event("canary", item=item.id, verdict="infra_persistent")
+            return False, "infra", output2[-1500:]
+        return None  # still red for an unexplained reason → semantic (revert)
 
     async def _arevert_head_merge(self, repo, wid: str) -> bool:
         """Revert le commit de merge en tête de HEAD (celui de ``wid``), sous le
@@ -6395,9 +6809,10 @@ class Pipeline:
             await self._aensure_frontend_node_modules(
                 Path(worktree) / (stream.file_root or "frontend")
             )
-            ok, output, _ = await self._arun_frontend_tests(ws=worktree)
+            ok, output, real = await self._arun_frontend_tests(ws=worktree)
         else:
-            ok, output, _ = await self._arun_pytest(ws=worktree)
+            ok, output, real = await self._arun_pytest(ws=worktree)
+        self._note_suite_outcome(subject.id, ok, real)  # WF-P1
         if ok:
             subject.status = StoryStatus.GREEN
         return ok, output[-2000:]
@@ -6501,6 +6916,7 @@ class Pipeline:
         story.status = StoryStatus.TODO
         story.attempts = 0
         story.infra_attempts = 0
+        story.requeue_attempts = 0  # P0-B
         story.last_error = ""
         for t in story.test_plan:
             t.status = TestState.NONEXISTENT
@@ -6511,6 +6927,7 @@ class Pipeline:
             task.status = StoryStatus.TODO
             task.attempts = 0
             task.infra_attempts = 0
+            task.requeue_attempts = 0  # P0-B
             task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
@@ -6638,6 +7055,7 @@ class Pipeline:
             story.status = StoryStatus.TODO
             story.attempts = 0
             story.infra_attempts = 0
+            story.requeue_attempts = 0  # P0-B
             story.last_error = ""
             for t in story.test_plan:
                 t.status = TestState.NONEXISTENT
@@ -6646,6 +7064,7 @@ class Pipeline:
                     task.status = StoryStatus.TODO
                     task.attempts = 0
                     task.infra_attempts = 0
+                    task.requeue_attempts = 0  # P0-B
                     task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False
@@ -6814,6 +7233,7 @@ class Pipeline:
         task.status = StoryStatus.TODO
         task.attempts = 0
         task.infra_attempts = 0
+        task.requeue_attempts = 0  # P0-B
         task.last_error = ""
         self._stop_requested = False
         self._delivery_blocked = False

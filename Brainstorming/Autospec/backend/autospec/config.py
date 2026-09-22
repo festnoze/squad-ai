@@ -563,6 +563,14 @@ class Settings:
     resume_fallback_min: float = field(
         default_factory=lambda: _env_float("RESUME_FALLBACK_MIN", 60.0, minimum=1.0)
     )
+    # WORKFLOW_REVIEW P7 - the fallback above is deliberately conservative, so the
+    # real billing block often reopens much earlier and the pipeline sleeps for
+    # nothing. While waiting, re-probe ccusage every RESUME_REPROBE_MIN minutes
+    # and shorten the wait when a fresher estimate lands (the wait can only
+    # shrink, never grow). 0 = disabled: one single sleep (historical behaviour).
+    resume_reprobe_min: int = field(
+        default_factory=lambda: _env_int("RESUME_REPROBE_MIN", 30, minimum=0)
+    )
     # Tech-writer phase after each build (README + launch instructions for the
     # GENERATED project). OFF by default; also triggerable via POST /document.
     tech_writer_enabled: bool = field(
@@ -884,6 +892,59 @@ class Settings:
     # POST_MERGE_CANARY=0 si le coût d'une suite par merge est trop haut.
     post_merge_canary: bool = field(
         default_factory=lambda: _env_bool("POST_MERGE_CANARY", True)
+    )
+    # P0-A (GENERATION_FUSION_REVIEW): a RED canary that executed ZERO test and
+    # carries NO known infra signature used to be trusted as a semantic conflict
+    # and reverted a GREEN merge. With this ON, such a red is repaired (venv
+    # purge for the backend, the frontend runner's own npm heal) and replayed
+    # ONCE before the semantic verdict is believed. OFF = byte-identical legacy
+    # behaviour.
+    canary_replay_on_empty: bool = field(
+        default_factory=lambda: _env_bool("CANARY_REPLAY_ON_EMPTY", True)
+    )
+    # P0-B (GENERATION_FUSION_REVIEW) - budget SEPARATE from `dev_max_attempts`
+    # for the fusion requeues: merge conflict and post-merge canary revert. The
+    # item's own code is green (it passed in its worktree), so the collision with
+    # a sibling must never consume a dev re-generation attempt; it consumes this
+    # budget instead. Beyond it, the historic ending applies (split-on-failure,
+    # then FAILED). 0 = no requeue at all (a first conflict ends the item).
+    requeue_max: int = field(
+        default_factory=lambda: _env_int("REQUEUE_MAX", 3, minimum=0)
+    )
+    # WORKFLOW_REVIEW P1 - a RED verification that executed ZERO test never
+    # proves anything about the generated code (broken venv/toolchain). With this
+    # ON, the worktree environment is repaired and the suite replayed ONCE; a red
+    # that still runs no test refunds the dev attempt and consumes the infra
+    # budget instead. OFF = byte-identical legacy behaviour (a dev attempt burnt).
+    empty_red_is_infra: bool = field(
+        default_factory=lambda: _env_bool("EMPTY_RED_IS_INFRA", True)
+    )
+    # P1-C (GENERATION_FUSION_REVIEW) - schedule the READY items that block the
+    # most work first (critical path) instead of plain declaration order. This
+    # only ORDERS the picks: readiness, the independence floor and the
+    # parallelism cap are untouched, and the topological order stays the
+    # tie-break. OFF = byte-identical legacy order.
+    fanout_first_enabled: bool = field(
+        default_factory=lambda: _env_bool("FANOUT_FIRST", True)
+    )
+    # P1-C - an item that transitively blocks at least this many others is worth
+    # one dev attempt MORE than a leaf: its failure strands the whole subgraph,
+    # a leaf's failure costs only itself. The same bonus unit widens its FUSION
+    # requeue budget (`requeue_max`), unless that budget is disabled with 0.
+    # 0 = no bonus at all (legacy ceilings).
+    fanout_bonus_threshold: int = field(
+        default_factory=lambda: _env_int("FANOUT_BONUS_THRESHOLD", 5, minimum=0)
+    )
+    # P1-B (GENERATION_FUSION_REVIEW) - MERGE_WAIT / MERGING (and the post-merge
+    # canary that runs right after the merge) are serialized by the merge lock: a
+    # worker parked there is queueing, not generating code, yet it used to keep a
+    # dev slot busy and stall the whole build behind one merge. With this ON, the
+    # fill counter only counts the workers whose item is in a dev/verify stage,
+    # under a HARD ceiling of `max_parallel_devs + 1` workers in flight. The
+    # independence floor still sees EVERY in-flight worker (a merging item still
+    # touches files). OFF = byte-identical legacy behaviour.
+    slot_release_on_merge: bool = field(
+        default_factory=lambda: _env_bool("SLOT_RELEASE_ON_MERGE", True)
     )
     refine_max_rounds: int = field(
         default_factory=lambda: _env_int("REFINE_MAX_ROUNDS", 2, minimum=0)

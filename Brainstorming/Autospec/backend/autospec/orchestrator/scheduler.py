@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Mapping
+from typing import Any
+
 from ..models import StoryStatus, UserStory
+from .streams import WorkGraph, fanout
+
+# Sort key used when an item exposes no usable kanban priority: unknown
+# priorities rank AFTER any declared one, ties then falling back to the
+# topological position (so the ordering stays deterministic either way).
+_UNKNOWN_PRIORITY = 10**6
 
 
 def validate_dependencies(stories: list[UserStory]) -> list[str]:
@@ -79,6 +88,85 @@ def ready_stories(stories: list[UserStory]) -> list[UserStory]:
     ]
     order = {s.id: i for i, s in enumerate(stories)}
     return sorted(ready, key=lambda s: (s.priority, order[s.id]))
+
+
+def _priority_of(item: Any, priorities: Mapping[str, int] | None) -> int:
+    """The kanban priority to sort ``item`` by (1 = highest), or the unknown
+    sentinel. ``priorities`` (optional) maps a work-item id OR its story id to
+    a priority, which lets a caller feed the story-level priority of a task -
+    a ``Task`` has none of its own. An explicit mapping wins over the
+    attribute, and only a real ``int`` is accepted (``bool`` excluded)."""
+    if priorities:
+        for key in (getattr(item, "id", None), getattr(item, "story_id", None)):
+            if key is not None and key in priorities:
+                value = priorities[key]
+                if isinstance(value, int) and not isinstance(value, bool):
+                    return value
+    value = getattr(item, "priority", None)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    return _UNKNOWN_PRIORITY
+
+
+def rank_ready(
+    items: Iterable[Any],
+    graph: WorkGraph,
+    *,
+    fanout_counts: Mapping[str, int] | None = None,
+    priorities: Mapping[str, int] | None = None,
+) -> list[Any]:
+    """P1-C: order already-ready work items by criticality (pure function).
+
+    This ORDERS only - it never filters: readiness is the caller's job (see
+    ``streams.is_ready``), so every item handed in comes back out exactly once.
+
+    Sort key, in order:
+    1. transitive fan-out, DESCENDING (the item blocking the most work first -
+       the critical path);
+    2. declared kanban priority, ASCENDING (1 = highest), read off the item via
+       ``getattr`` or from the optional ``priorities`` mapping; items without a
+       priority sort last among equals;
+    3. the original topological position, i.e. the index in ``graph.order``
+       (declaration order), which keeps the legacy behaviour as the tie-break.
+
+    ``fanout_counts`` lets a caller reuse a fan-out map computed once for the
+    whole build instead of recomputing it per pick; when omitted it is derived
+    from ``graph`` with :func:`..streams.fanout`. An item missing from the
+    graph gets a fan-out of 0 and keeps its incoming relative position, after
+    every graph item. The sort is stable and deterministic.
+    """
+    counts = fanout(graph) if fanout_counts is None else fanout_counts
+    positions = {wid: index for index, wid in enumerate(graph.order)}
+    unknown_base = len(graph.order)
+
+    decorated: list[tuple[int, int, int, int, Any]] = []
+    for offset, item in enumerate(items):
+        wid = getattr(item, "id", None)
+        position = positions.get(wid, unknown_base + offset)
+        decorated.append(
+            (
+                -int(counts.get(wid, 0)),
+                _priority_of(item, priorities),
+                position,
+                offset,
+                item,
+            )
+        )
+    decorated.sort(key=lambda row: row[:4])
+    return [row[4] for row in decorated]
+
+
+def fanout_bonus_attempts(fanout: int, threshold: int) -> int:
+    """P1-C: the extra dev attempt granted to a high fan-out item.
+
+    Failing an item that transitively blocks ``threshold`` others costs the
+    whole iteration, so it is worth one more try than a leaf. Returns 1 when
+    ``fanout >= threshold`` and ``threshold > 0``, else 0 - a threshold of 0
+    (or below) disables the bonus entirely, which is the retro-compatible
+    default."""
+    if threshold <= 0:
+        return 0
+    return 1 if fanout >= threshold else 0
 
 
 def pending_stories(stories: list[UserStory]) -> list[UserStory]:

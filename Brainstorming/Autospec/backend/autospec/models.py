@@ -258,6 +258,10 @@ class Task(BaseModel):
     # Transient provider/CLI failures (AgentError hors usage-limit) consume THIS
     # budget, not `attempts`: infra flakiness alone can never FAIL an item.
     infra_attempts: int = 0
+    # P0-B: fusion requeues (merge conflict, post-merge canary revert) consume
+    # THIS budget, not `attempts`: the generated code is green on its own, so a
+    # collision with a sibling can never burn the dev re-generation budget.
+    requeue_attempts: int = 0
     last_error: str = ""
     files_hint: list[str] = Field(default_factory=list)   # files/zones it expects to touch
     split_depth: int = 0  # how many adaptive failure-splits produced/refined this task (bounds recursion)
@@ -292,6 +296,10 @@ class UserStory(BaseModel):
     # Transient provider/CLI failures (AgentError hors usage-limit) consume THIS
     # budget, not `attempts`: infra flakiness alone can never FAIL a story.
     infra_attempts: int = 0
+    # P0-B: fusion requeues (merge conflict, post-merge canary revert) consume
+    # THIS budget, not `attempts`: the generated code is green on its own, so a
+    # collision with a sibling can never burn the dev re-generation budget.
+    requeue_attempts: int = 0
     last_error: str = ""
     split_depth: int = 0  # adaptive failure-splits applied to this story (bounds re-decomposition)
     quality_score: int = -1  # last refinement score for this story's code (-1 = not run)
@@ -405,6 +413,7 @@ class PlanCalibration(BaseModel):
     p2b_resumes: int = 0         # preserved green branches merged WITHOUT a dev rebuild
     orphan_resets: int = 0       # mid-flight items reset to TODO after a crash/restart
     infra_retries: int = 0       # transient provider/CLI failures (never a sizing signal)
+    requeue_refunds: int = 0     # dev attempts given back on a fusion requeue (P0-B)
 
 
 class Finding(BaseModel):

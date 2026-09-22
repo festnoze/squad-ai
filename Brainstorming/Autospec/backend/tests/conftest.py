@@ -81,6 +81,36 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "skeleton_guard", "off")
     monkeypatch.setattr(settings, "import_guard", "off")
     monkeypatch.setattr(settings, "flaky_rerun_enabled", False)
+    # P0-A: the empty-canary replay adds a SECOND suite run (and a venv purge)
+    # whenever a canary is red with zero test executed - pin it OFF (its default
+    # is ON) so the existing canary tests keep their single-run flow; the tests
+    # that cover the replay opt in explicitly.
+    monkeypatch.setattr(settings, "canary_replay_on_empty", False)
+    # WF-P1: an empty red (a RED suite that executed ZERO test) is treated as an
+    # infra failure - it adds a venv purge + a SECOND suite run and refunds the
+    # dev attempt, which flips every test whose fake runner answers red with no
+    # parsed outcome. Pin it OFF (its default is ON); the tests covering it opt
+    # in explicitly.
+    monkeypatch.setattr(settings, "empty_red_is_infra", False)
+    # P0-B: the fusion requeue budget (merge conflict / canary revert) is pinned
+    # to its code default so a developer's REQUEUE_MAX cannot change how many
+    # times a conflicting item is re-queued in the tests.
+    monkeypatch.setattr(settings, "requeue_max", 3)
+    # P1-C: the critical-path pick order and the fan-out attempt bonus are pinned
+    # to their CODE defaults (they are on in production and the existing stream
+    # tests stay green with them), so a developer's FANOUT_FIRST /
+    # FANOUT_BONUS_THRESHOLD can never change the order items are built in.
+    monkeypatch.setattr(settings, "fanout_first_enabled", True)
+    monkeypatch.setattr(settings, "fanout_bonus_threshold", 5)
+    # P1-B: releasing the dev slot while an item merges lets a second worker
+    # start (up to cap + 1 in flight), which changes how many builds a stream
+    # test observes at once. Pin it to its CODE default (ON, what production
+    # does); the tests covering the release opt in or out explicitly.
+    monkeypatch.setattr(settings, "slot_release_on_merge", True)
+    # WF-P7: re-probing the usage window would shell out to ccusage (subprocess)
+    # from the resume timer. Pin it OFF (its default is 30 minutes) so every test
+    # keeps the historical single-sleep path.
+    monkeypatch.setattr(settings, "resume_reprobe_min", 0)
     monkeypatch.setattr(settings, "docker_delivery", False)
     # V3-F1: observations add an extractor LLM call per terminal work item — a
     # developer's .env enabling them must not change tests that don't opt in.

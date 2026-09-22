@@ -11,6 +11,10 @@ comes from, in order:
 3. a fallback delay (``RESUME_FALLBACK_MIN``) — if the window is still
    exhausted at resume time, the watchdog simply reschedules.
 
+Because the fallback estimate is deliberately conservative, ``await_window``
+can re-probe ccusage while waiting and resume as soon as a fresher (closer)
+estimate shows the window has already reopened.
+
 Compliance note: this is legitimate scheduling of the user's own subscription
 (no limit bypass, no account multiplexing) — the work just WAITS for the window
 to reset, exactly like a manual retry would, so the subscribed quota is used
@@ -25,6 +29,7 @@ import logging
 import re
 import subprocess
 import time
+from collections.abc import Awaitable, Callable
 from datetime import datetime
 
 from ..config import settings
@@ -116,3 +121,52 @@ async def anext_reset(error_text: str) -> float:
     if at is None or at <= now:
         at = now + settings.resume_fallback_min * 60
     return at
+
+
+async def await_window(
+    at: float,
+    *,
+    reprobe_s: float,
+    clock: Callable[[], float] = time.time,
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+    probe: Callable[[], Awaitable[float | None]] | None = None,
+) -> float:
+    """Sleep until a usage window is expected to reopen, re-probing on the way.
+
+    ``at`` is the current estimate (epoch, seconds). When the estimate came from
+    the conservative fallback (``RESUME_FALLBACK_MIN``) the real window often
+    reopens much earlier, so instead of one long sleep we wake every
+    ``reprobe_s`` seconds and ask ``probe`` (``aget_block_reset`` by default) for
+    a fresher estimate. An estimate is only accepted when it is STRICTLY closer
+    than the current target and still in the future: the wait can shrink, never
+    grow. Any probe failure is swallowed (watchdog only) and the current target
+    is kept.
+
+    ``reprobe_s <= 0`` disables re-probing and restores the historical
+    behaviour: a single sleep of the whole remaining delay.
+
+    Returns the effective resume epoch (the possibly shortened target).
+    """
+    if at - clock() <= 0:
+        return at
+    if reprobe_s <= 0:
+        await sleep(max(0.0, at - clock()))
+        return at
+
+    resolved_probe = probe if probe is not None else aget_block_reset
+    while True:
+        remaining = at - clock()
+        if remaining <= 0:
+            return at
+        await sleep(min(reprobe_s, remaining))
+        now = clock()
+        if now >= at:
+            return at
+        try:
+            fresher = await resolved_probe()
+        except Exception as exc:
+            logger.warning("usage-window reprobe failed: %s", exc)
+            continue
+        if fresher is not None and now < fresher < at:
+            logger.info("usage window reopens earlier than expected: %s -> %s", at, fresher)
+            at = fresher

@@ -32,6 +32,7 @@ __all__ = [
     "detect_cycle",
     "cycle_nodes",
     "transitive_dependents",
+    "fanout",
     "dependency_targets",
     "ready_items",
     "is_ready",
@@ -272,6 +273,23 @@ def transitive_dependents(graph: WorkGraph, roots: set[str]) -> set[str]:
             out.add(dependent)
             stack.append(dependent)
     return out
+
+
+def fanout(graph: WorkGraph) -> dict[str, int]:
+    """P1-C: how many items each work item blocks, transitively.
+
+    Returns ``{work_item_id: number of TRANSITIVE dependents}`` for every item
+    of ``graph``, in declaration order. The value is the size of the subgraph
+    that cannot start until this item is done, i.e. the cost of getting it
+    wrong: an item with a high fan-out sits on the critical path and should be
+    scheduled first (see :func:`..scheduler.rank_ready`).
+
+    Cycle-safe: it reuses :func:`transitive_dependents`, which never revisits a
+    node and always excludes the root itself, so a dependency loop yields a
+    finite count instead of hanging. Items are their own root, so an item never
+    counts itself.
+    """
+    return {wid: len(transitive_dependents(graph, {wid})) for wid in graph.order}
 
 
 def is_ready(
