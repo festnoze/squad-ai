@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // getIterations est appelé au montage (si onRollbackTo fourni) : on le mocke
 // pour éviter un fetch réseau, en gardant le reste du module ./api réel.
@@ -37,7 +37,122 @@ function story(overrides: Partial<UserStory> = {}): UserStory {
   };
 }
 
+/** Nom de l'onglet actif (les libellés sont en anglais par défaut). */
+function activeTab(): string {
+  const tabs = screen.getAllByRole("tab");
+  return tabs.find((b) => b.getAttribute("aria-selected") === "true")?.textContent ?? "";
+}
+
 describe("WorkspaceViews", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  // === R3 - lentille par defaut ============================================
+  it("R3 : build déjà passé (story done + stage) → Activité par défaut", () => {
+    render(
+      <WorkspaceViews
+        epics={[epic("E1", 1)]}
+        stories={[
+          story({ id: "S1", epic_id: "E1", status: "done", current_stage: "done" }),
+        ]}
+        projectId="r3-done"
+        phase="done"
+      />,
+    );
+    expect(activeTab()).toMatch(/Activity/);
+    expect(screen.queryByTestId("epic-E1")).not.toBeInTheDocument();
+  });
+
+  it("R3 : un stage différent de queued suffit, même en statut todo", () => {
+    render(
+      <WorkspaceViews
+        epics={[epic("E1", 1)]}
+        stories={[story({ id: "S1", epic_id: "E1", current_stage: "dev" })]}
+        projectId="r3-stage"
+        phase="needs_attention"
+      />,
+    );
+    expect(activeTab()).toMatch(/Activity/);
+  });
+
+  it("R3 : projet en spec sans aucun stage → Vision produit", () => {
+    render(
+      <WorkspaceViews
+        epics={[epic("E1", 1)]}
+        stories={[story({ id: "S1", epic_id: "E1", current_stage: "queued" })]}
+        projectId="r3-spec"
+        phase="spec"
+      />,
+    );
+    expect(activeTab()).toMatch(/Product vision/);
+    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
+  });
+
+  it("R3 : le choix explicite mémorisé prime sur le défaut au montage", () => {
+    localStorage.setItem("autospec-view:r3-mem", "vision");
+    render(
+      <WorkspaceViews
+        epics={[epic("E1", 1)]}
+        stories={[story({ id: "S1", epic_id: "E1", status: "done" })]}
+        projectId="r3-mem"
+        phase="done"
+      />,
+    );
+    // Le build a eu lieu (défaut = activity) mais le choix mémorisé gagne.
+    expect(activeTab()).toMatch(/Product vision/);
+    expect(screen.getByTestId("epic-E1")).toBeInTheDocument();
+  });
+
+  it("R3 : un clic sur un onglet est mémorisé par projet", () => {
+    render(
+      <WorkspaceViews
+        epics={[epic("E1", 1)]}
+        stories={[story({ id: "S1", epic_id: "E1" })]}
+        projectId="r3-click"
+        phase="spec"
+      />,
+    );
+    fireEvent.click(screen.getByRole("tab", { name: /Activity/ }));
+    expect(localStorage.getItem("autospec-view:r3-click")).toBe("activity");
+  });
+
+  it("R3 : une valeur illisible en storage retombe sur le défaut", () => {
+    localStorage.setItem("autospec-view:r3-junk", "bogus");
+    render(
+      <WorkspaceViews
+        epics={[epic("E1", 1)]}
+        stories={[story({ id: "S1", epic_id: "E1" })]}
+        projectId="r3-junk"
+        phase="spec"
+      />,
+    );
+    expect(activeTab()).toMatch(/Product vision/);
+  });
+
+  it("R3 : la transition vers build bascule sur Activité UNE seule fois", () => {
+    const props = {
+      epics: [epic("E1", 1)],
+      stories: [story({ id: "S1", epic_id: "E1" })],
+      projectId: "r3-transition",
+    };
+    const { rerender } = render(<WorkspaceViews {...props} phase="spec" />);
+    expect(activeTab()).toMatch(/Product vision/);
+
+    // La phase passe à build → bascule automatique.
+    rerender(<WorkspaceViews {...props} phase="build" />);
+    expect(activeTab()).toMatch(/Activity/);
+
+    // L'utilisateur revient explicitement sur la vision : la bascule ne doit
+    // plus se reproduire tant que la phase reste/redevient build.
+    fireEvent.click(screen.getByRole("tab", { name: /Product vision/ }));
+    rerender(<WorkspaceViews {...props} phase="build" />);
+    expect(activeTab()).toMatch(/Product vision/);
+    rerender(<WorkspaceViews {...props} phase="done" />);
+    rerender(<WorkspaceViews {...props} phase="build" />);
+    expect(activeTab()).toMatch(/Product vision/);
+  });
+
   it("une seule itération → pas de bascule (vision produit seule)", () => {
     render(
       <WorkspaceViews

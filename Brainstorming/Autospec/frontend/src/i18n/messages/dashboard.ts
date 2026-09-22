@@ -16,4 +16,14 @@ export const dashboard: Namespace = {
   avgCoverage: { en: "Avg. coverage", fr: "Couverture moy." },
   findings: { en: "Findings", fr: "Findings" },
   regressions: { en: "Regressions", fr: "Régressions" },
+  // P3 (GENERATION_FUSION_REVIEW) - cost of the merge/canary loop.
+  fusionTitle: { en: "Fusion loop", fr: "Boucle de fusion" },
+  fusionSuitesPerItem: { en: "Suites / delivered item", fr: "Suites / item livré" },
+  fusionItemsDelivered: { en: "Items delivered", fr: "Items livrés" },
+  fusionSuiteRuns: { en: "Suites run", fr: "Suites exécutées" },
+  fusionRequeues: { en: "Requeues / refunds", fr: "Requeues / remboursements" },
+  fusionCanaryReverts: { en: "Canary reverts", fr: "Reverts canari" },
+  fusionBatches: { en: "Batches / bisect reverts", fr: "Rafales / reverts bisect" },
+  fusionInfraRetries: { en: "Infra retries", fr: "Reprises infra" },
+  fusionVerdicts: { en: "Canary verdicts", fr: "Verdicts canari" },
 };

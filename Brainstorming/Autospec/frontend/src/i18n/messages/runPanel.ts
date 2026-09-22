@@ -75,6 +75,12 @@ export const runPanel: Namespace = {
     fr: "Tout effacer (code, epics, stories) SAUF le brief initial, puis relancer la planification PO et le build complet",
   },
   restartScratch: { en: "♻️ Restart from scratch", fr: "♻️ Relancer from scratch" },
+  // P5 (WORKFLOW_REVIEW) - replay the delivery gates on a dormant project.
+  verifyDeliveryTitle: {
+    en: "Replay the delivery gates (smoke, runtime, DoD, docker) without rebuilding anything",
+    fr: "Rejouer les gates de livraison (smoke, runtime, DoD, docker) sans rien reconstruire",
+  },
+  verifyDelivery: { en: "🔁 Re-verify delivery", fr: "🔁 Re-vérifier la livraison" },
   stopAppTitle: { en: "Stop the generated application", fr: "Arrêter l'application générée" },
   stopApp: { en: "■ Stop app", fr: "■ Arrêter l'app" },
   resumePipelineTitle: { en: "Resume the pipeline", fr: "Reprendre la pipeline" },

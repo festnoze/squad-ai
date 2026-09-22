@@ -63,6 +63,13 @@ export const app: Namespace = {
     en: "Docker build & container start launched — follow the progress on the run panel.",
     fr: "Build Docker & démarrage du conteneur lancés — suivez la progression sur le panneau d'exécution.",
   },
+  // P5 (WORKFLOW_REVIEW) - replay of the delivery gates on a dormant project.
+  verifyToastTitle: { en: "Delivery re-verified", fr: "Livraison re-vérifiée" },
+  verifyToastBody: {
+    en: "Gates replayed (smoke, runtime, DoD, docker). The result lands on the run panel.",
+    fr: "Gates rejouées (smoke, runtime, DoD, docker). Le résultat arrive sur le panneau d'exécution.",
+  },
+  verifyToastErrorTitle: { en: "Re-verification failed", fr: "Échec de la re-vérification" },
   commitToastTitle: { en: "Commit", fr: "Commit" },
   commitToastBody: { en: "Workspace committed: {commit}", fr: "Workspace commité : {commit}" },
   reconnecting: { en: "Reconnecting…", fr: "Reconnexion…" },

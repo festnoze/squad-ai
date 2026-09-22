@@ -19,4 +19,29 @@ describe("toast bus (Q0)", () => {
     notify("info", "Après désabonnement");
     expect(fn).toHaveBeenCalledTimes(1);
   });
+
+  it("R6 : l'action optionnelle est transmise telle quelle aux abonnés", () => {
+    const fn = vi.fn();
+    const onClick = vi.fn();
+    const off = subscribeToasts(fn);
+    notify("success", "Supprimée", "Corps", { label: "Annuler", onClick });
+    expect(fn).toHaveBeenCalledWith({
+      level: "success",
+      title: "Supprimée",
+      body: "Corps",
+      action: { label: "Annuler", onClick },
+    });
+    const ev = fn.mock.calls[0][0] as { action: { onClick: () => void } };
+    ev.action.onClick();
+    expect(onClick).toHaveBeenCalledTimes(1);
+    off();
+  });
+
+  it("R6 : sans action, l'évènement ne porte pas la clé `action`", () => {
+    const fn = vi.fn();
+    const off = subscribeToasts(fn);
+    notify("info", "Simple");
+    expect(fn.mock.calls[0][0]).not.toHaveProperty("action");
+    off();
+  });
 });

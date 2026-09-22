@@ -22,4 +22,5 @@ export const common: Namespace = {
   copy: { en: "Copy", fr: "Copier" },
   copied: { en: "Copied to clipboard", fr: "Copié dans le presse-papiers" },
   copyFailed: { en: "Copy failed", fr: "Échec de la copie" },
+  undo: { en: "Undo", fr: "Annuler" },
 };

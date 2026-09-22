@@ -82,6 +82,14 @@ async function dismissBrainstorm(page: Page) {
  * then.
  */
 async function gotoEpics(page: Page) {
+  // R3 : la lentille par défaut bascule sur « ⚡ Activité » dès qu'un build a
+  // démarré ; le board n'existe que sous l'onglet « 🗂 Vision produit ». Le clic
+  // est mémorisé par projet, donc la bascule automatique ne revient plus.
+  const vision = page.getByRole("tab", { name: "🗂 Vision produit" });
+  // Le clic est INCONDITIONNEL : cliquer un onglet deja actif memorise quand
+  // meme le choix, ce qui neutralise la bascule automatique vers « Activite »
+  // au demarrage du build (sinon le board disparaît en plein wait).
+  await vision.click();
   const crumb = page.getByRole("button", { name: "Épics" });
   if (await crumb.isEnabled().catch(() => false)) await crumb.click();
 }

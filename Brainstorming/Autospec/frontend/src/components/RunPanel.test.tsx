@@ -89,6 +89,7 @@ function renderPanel(
   onRun: (args: string) => void = vi.fn(),
   onRestartFromScratch: () => void = vi.fn(),
   onUndeploy: () => void = vi.fn(),
+  onVerifyDelivery: () => void = vi.fn(),
 ) {
   const utils = render(
     <RunPanel
@@ -110,9 +111,17 @@ function renderPanel(
       onReject={vi.fn()}
       onDeploy={vi.fn()}
       onUndeploy={onUndeploy}
+      onVerifyDelivery={onVerifyDelivery}
     />,
   );
-  return { ...utils, onRetryFailed, onRun, onRestartFromScratch, onUndeploy };
+  return {
+    ...utils,
+    onRetryFailed,
+    onRun,
+    onRestartFromScratch,
+    onUndeploy,
+    onVerifyDelivery,
+  };
 }
 
 describe("RunPanel", () => {
@@ -406,6 +415,51 @@ describe("RunPanel", () => {
     expect(
       screen.queryByRole("button", { name: /Retry failures/ }),
     ).not.toBeInTheDocument();
+  });
+
+  it("P5 : « Re-vérifier la livraison » visible quand dormant + au moins une story done, et clic", () => {
+    const { onVerifyDelivery } = renderPanel(
+      makeProject({
+        phase: "done",
+        stories: [makeStory({ status: "done" }), makeStory({ id: "S2", status: "todo" })],
+      }),
+    );
+    const btn = screen.getByTestId("verify-delivery");
+    expect(btn).toHaveTextContent("Re-verify delivery");
+    fireEvent.click(btn);
+    expect(onVerifyDelivery).toHaveBeenCalledTimes(1);
+  });
+
+  it("P5 : statut EFFECTIF - US multi-stream dont toutes les tâches sont done (status brut 'todo') : bouton présent", () => {
+    renderPanel(
+      makeProject({
+        phase: "needs_attention",
+        stories: [
+          makeStory({
+            status: "todo",
+            tasks: [
+              makeTask({ id: "T1", status: "done" }),
+              makeTask({ id: "T2", status: "done" }),
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(screen.getByTestId("verify-delivery")).toBeInTheDocument();
+  });
+
+  it("P5 : pas de bouton pendant le build (pipeline active)", () => {
+    renderPanel(
+      makeProject({ phase: "build", stories: [makeStory({ status: "done" })] }),
+    );
+    expect(screen.queryByTestId("verify-delivery")).not.toBeInTheDocument();
+  });
+
+  it("P5 : pas de bouton quand aucune story n'est done (rien à vérifier)", () => {
+    renderPanel(
+      makeProject({ phase: "stopped", stories: [makeStory({ status: "todo" })] }),
+    );
+    expect(screen.queryByTestId("verify-delivery")).not.toBeInTheDocument();
   });
 
   it("run : les arguments saisis sont transmis à onRun", () => {

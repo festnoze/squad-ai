@@ -131,6 +131,12 @@ def tmp_workspace(tmp_path, monkeypatch):
     # Pinned to its CODE default (ON, what production does) - the existing split
     # tests assert on the TS's id/contract/tasks, never on empty criteria.
     monkeypatch.setattr(settings, "ts_acceptance_criteria", True)
+    # R6: the story trash only ADDS an entry to `state.trash` on a delete - the
+    # story still leaves `state.stories` and its .feature file is still removed,
+    # so the existing delete tests are unaffected. Pinned to its CODE default
+    # (ON, what production does); the tests covering the hard-delete path opt
+    # out explicitly.
+    monkeypatch.setattr(settings, "soft_delete_stories", True)
     # P2-B: the shared npm cache only changes the `npm ci` argv (and creates one
     # cache dir under the workspace root). Pinned to its CODE default (ON), so a
     # developer's NPM_SHARED_CACHE cannot change what the frontend tests observe.

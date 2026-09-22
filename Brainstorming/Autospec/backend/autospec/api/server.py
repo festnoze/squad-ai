@@ -896,6 +896,35 @@ async def adelete_story(project_id: str, story_id: str) -> dict:
     return {"ok": True}
 
 
+@app.post("/api/projects/{project_id}/stories/{story_id}/restore")
+async def arestore_story(project_id: str, story_id: str) -> dict:
+    """R6: put a soft-deleted story back on the board (404 when it is not in the
+    trash, 409 while the pipeline is active or when the id is taken again)."""
+    pipeline = _pipeline(project_id)
+    await _acall_pipeline(
+        pipeline.arestore_story(story_id),
+        f"Story absente de la corbeille : {story_id}",
+    )
+    return {"ok": True, "state": pipeline.state.model_dump(mode="json")}
+
+
+@app.get("/api/projects/{project_id}/trash")
+async def atrash(project_id: str) -> dict:
+    """R6: the project's soft-deleted stories, most recently deleted first."""
+    state = _pipeline(project_id).state
+    return {
+        "items": [
+            {
+                "id": entry.story.id,
+                "title": entry.story.title,
+                "epic_id": entry.story.epic_id,
+                "deleted_at": entry.deleted_at,
+            }
+            for entry in reversed(state.trash)
+        ]
+    }
+
+
 @app.post("/api/projects/{project_id}/stories/{story_id}/chat")
 async def achat_story(project_id: str, story_id: str, req: ItemChatRequest) -> dict:
     """P10/B4: append a targeted directive to a story's guidance (injected into

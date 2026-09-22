@@ -36,6 +36,7 @@ import {
   stopProject,
   unarchiveProject,
   updateComponents,
+  verifyDelivery,
 } from "./api";
 import { ArchitecturePanel } from "./components/ArchitecturePanel";
 import { CommandPalette, paletteItems } from "./components/CommandPalette";
@@ -58,7 +59,7 @@ import { RunPanel } from "./components/RunPanel";
 import { SettingsModal } from "./components/SettingsModal";
 import { Logo } from "./components/Logo";
 import { useEscapeToClose } from "./hooks";
-import { subscribeToasts } from "./toast";
+import { subscribeToasts, ToastAction } from "./toast";
 import { useI18n } from "./i18n/i18n";
 import {
   EngineeringObservation,
@@ -69,6 +70,7 @@ import {
   ProjectTicks,
   ProviderInfo,
   Task,
+  toTrashInfo,
   UserStory,
   WsEvent,
 } from "./types";
@@ -121,6 +123,8 @@ interface NotifyToast {
   level: string;
   title: string;
   body: string;
+  /** R6 - optional inline action (undo). Keeps the toast on screen longer. */
+  action?: ToastAction;
 }
 
 /** V3-F7 (US-F7.5): upsert-by-id merge for the granular observation-loop
@@ -155,10 +159,19 @@ export default function App() {
   const [toasts, setToasts] = useState<NotifyToast[]>([]);
   const toastIdRef = useRef(0);
   // UI8 : retours d'action in-app (plus de window.alert / prompt natifs).
-  const pushToast = (level: NotifyToast["level"], title: string, body = "") => {
+  const pushToast = (
+    level: NotifyToast["level"],
+    title: string,
+    body = "",
+    action?: ToastAction,
+  ) => {
     const id = ++toastIdRef.current;
-    setToasts((prev) => [...prev.slice(-4), { id, level, title, body }]);
-    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 6000);
+    setToasts((prev) => [...prev.slice(-4), { id, level, title, body, action }]);
+    // R6 - an actionable toast (undo) stays 10s; a plain one keeps its 6s.
+    setTimeout(
+      () => setToasts((prev) => prev.filter((t) => t.id !== id)),
+      action ? 10000 : 6000,
+    );
   };
   // Q5 — connexion SSE coupée : pastille « Reconnexion… » dans le header.
   const [sseDown, setSseDown] = useState(false);
@@ -210,7 +223,7 @@ export default function App() {
   useEscapeToClose(showSetup, () => setShowSetup(false));
   // Q0 — toasts émis hors de App (copie, etc.) via le bus module-level.
   useEffect(
-    () => subscribeToasts((ev) => pushToast(ev.level, ev.title, ev.body)),
+    () => subscribeToasts((ev) => pushToast(ev.level, ev.title, ev.body, ev.action)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
@@ -600,6 +613,19 @@ export default function App() {
     pushToast("success", t("app.restartToastTitle"), t("app.restartToastBody"));
   };
 
+  // P5 (WORKFLOW_REVIEW) : rejouer les gates de livraison sur un projet dormant.
+  // Non destructif (aucun rebuild), donc pas de confirmation ; le retour est un
+  // toast succès/erreur, la progression réelle arrive par SSE.
+  const handleVerifyDelivery = async () => {
+    if (!project) return;
+    try {
+      await verifyDelivery(project.id);
+      pushToast("success", t("app.verifyToastTitle"), t("app.verifyToastBody"));
+    } catch (e) {
+      pushToast("error", t("app.verifyToastErrorTitle"), errorMessage(e));
+    }
+  };
+
   return (
     <div className="app">
       <header>
@@ -768,6 +794,21 @@ export default function App() {
                 <div className="toast-title">{toast.title}</div>
                 {toast.body && <div className="toast-body">{toast.body}</div>}
               </div>
+              {toast.action && (
+                <button
+                  type="button"
+                  className="toast-action"
+                  data-testid="toast-action"
+                  aria-label={toast.action.label}
+                  onClick={() => {
+                    const act = toast.action;
+                    setToasts((prev) => prev.filter((x) => x.id !== toast.id));
+                    void act?.onClick();
+                  }}
+                >
+                  {toast.action.label}
+                </button>
+              )}
               <button
                 type="button"
                 className="toast-close"
@@ -914,6 +955,7 @@ export default function App() {
               awaitingApproval={project.awaiting_approval}
               onApprove={guard(() => approveProject(project.id))}
               onReject={guard(() => rejectProject(project.id))}
+              trash={toTrashInfo(project.trash)}
             />
             <RunPanel
               project={project}
@@ -943,6 +985,7 @@ export default function App() {
                 );
               })}
               onUndeploy={guard(() => undeployProject(project.id))}
+              onVerifyDelivery={handleVerifyDelivery}
               onExportZip={() => window.open(exportZipUrl(project.id), "_blank")}
               onGitExport={guard(async () => {
                 const { commit } = await gitExportProject(project.id);

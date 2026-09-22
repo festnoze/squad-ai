@@ -1,7 +1,17 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
+
+// R6 : seules les routes delete/restore sont mockées, le reste de ./api reste réel.
+vi.mock("../api", async (importActual) => ({
+  ...(await importActual<typeof import("../api")>()),
+  deleteStory: vi.fn().mockResolvedValue(undefined),
+  restoreStory: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { Board } from "./Board";
-import { Epic, Stream, Task, UserStory } from "../types";
+import { deleteStory, restoreStory } from "../api";
+import { subscribeToasts, type ToastEvent } from "../toast";
+import { Epic, Stream, Task, TrashedStoryInfo, UserStory } from "../types";
 
 function makeStory(overrides: Partial<UserStory> = {}): UserStory {
   return {
@@ -428,5 +438,78 @@ describe("Board — recherche (Q4)", () => {
     fireEvent.change(screen.getByTestId("board-search"), { target: { value: "connexion" } });
     expect(screen.getByText("Connexion utilisateur")).toBeInTheDocument();
     expect(screen.queryByText("Réinitialiser le mot de passe")).not.toBeInTheDocument();
+  });
+});
+
+describe("Board - R6 : suppression annulable + corbeille", () => {
+  const EPIC: Epic = { id: "E1", title: "Mon epic", description: "", iteration: 1 };
+
+  it("supprimer une story emet un toast porteur d'une action Undo qui restaure", async () => {
+    vi.mocked(deleteStory).mockClear();
+    vi.mocked(restoreStory).mockClear();
+    const confirmSpy = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const events: ToastEvent[] = [];
+    const off = subscribeToasts((ev) => events.push(ev));
+
+    const story = makeStory({ epic_id: "E1", title: "Connexion utilisateur" });
+    render(<Board epics={[EPIC]} stories={[story]} projectId="p1" />);
+    fireEvent.click(screen.getByText("Mon epic"));
+    fireEvent.click(screen.getByText("Connexion utilisateur"));
+    fireEvent.click(screen.getByRole("button", { name: /Delete/i }));
+
+    await waitFor(() => expect(deleteStory).toHaveBeenCalledWith("p1", "S1"));
+    await waitFor(() => expect(events).toHaveLength(1));
+    const ev = events[0];
+    expect(ev.level).toBe("success");
+    expect(ev.body).toContain("Connexion utilisateur");
+    expect(ev.action?.label).toBe("Undo");
+
+    await ev.action?.onClick();
+    expect(restoreStory).toHaveBeenCalledWith("p1", "S1");
+    expect(events[1]?.level).toBe("success");
+
+    off();
+    confirmSpy.mockRestore();
+  });
+
+  it("l'echec de la restauration emet un toast d'erreur (pas de crash)", async () => {
+    vi.mocked(restoreStory).mockClear();
+    vi.mocked(restoreStory).mockRejectedValueOnce(new Error("409 pipeline active"));
+    const events: ToastEvent[] = [];
+    const off = subscribeToasts((ev) => events.push(ev));
+
+    const trash: TrashedStoryInfo[] = [
+      { id: "S9", title: "Story jetee", epic_id: "E1", deleted_at: 1_700_000_000 },
+    ];
+    render(<Board epics={[EPIC]} stories={[]} projectId="p1" trash={trash} />);
+    fireEvent.click(screen.getByRole("button", { name: /Trash/i }));
+    fireEvent.click(screen.getByTestId("trash-restore-S9"));
+
+    await waitFor(() => expect(events).toHaveLength(1));
+    expect(events[0].level).toBe("error");
+    off();
+  });
+
+  it("panneau corbeille : une entree listee, restauration au clic", async () => {
+    vi.mocked(restoreStory).mockClear();
+    const trash: TrashedStoryInfo[] = [
+      { id: "S9", title: "Story jetee", epic_id: "E1", deleted_at: 1_700_000_000 },
+    ];
+    render(<Board epics={[EPIC]} stories={[]} projectId="p1" trash={trash} />);
+
+    expect(screen.getByTestId("trash-panel")).toBeInTheDocument();
+    // Replie par defaut : on deplie pour voir l'entree.
+    fireEvent.click(screen.getByRole("button", { name: /Trash/i }));
+    expect(screen.getByText("Story jetee")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("trash-restore-S9"));
+    await waitFor(() => expect(restoreStory).toHaveBeenCalledWith("p1", "S9"));
+  });
+
+  it("pas de panneau corbeille quand la corbeille est vide ou absente", () => {
+    const { rerender } = render(<Board epics={[EPIC]} stories={[]} projectId="p1" />);
+    expect(screen.queryByTestId("trash-panel")).toBeNull();
+    rerender(<Board epics={[EPIC]} stories={[]} projectId="p1" trash={[]} />);
+    expect(screen.queryByTestId("trash-panel")).toBeNull();
   });
 });

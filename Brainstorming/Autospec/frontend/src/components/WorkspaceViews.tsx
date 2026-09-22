@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getIterations } from "../api";
 import { subscribeNav, type NavIntent } from "../navigation";
-import { Epic, ProjectTicks, Stream, Usage, UserStory } from "../types";
+import { Epic, ProjectTicks, Stream, TrashedStoryInfo, Usage, UserStory } from "../types";
 import { useI18n } from "../i18n/i18n";
 import { Activity } from "./Activity";
 import { Board } from "./Board";
@@ -9,6 +9,52 @@ import { IterationsView } from "./IterationsView";
 import { DepGraphPanel } from "./DepGraphPanel";
 
 type View = "vision" | "iterations" | "activity" | "graph";
+
+const VIEWS: readonly View[] = ["vision", "iterations", "activity", "graph"];
+
+/** R3: per-project localStorage key holding the last EXPLICIT tab choice. */
+const viewKey = (projectId: string) => `autospec-view:${projectId}`;
+
+/** Read the remembered tab for a project (null when absent/invalid/unavailable). */
+function readStoredView(projectId: string): View | null {
+  try {
+    const raw = localStorage.getItem(viewKey(projectId));
+    return VIEWS.includes(raw as View) ? (raw as View) : null;
+  } catch {
+    return null; // private mode / storage disabled
+  }
+}
+
+/** Persist an explicit tab choice; never throws. */
+function storeView(projectId: string, view: View): void {
+  try {
+    localStorage.setItem(viewKey(projectId), view);
+  } catch {
+    /* storage unavailable: the choice simply is not remembered */
+  }
+}
+
+/**
+ * R3: has this project ever entered (or is it in) a build? True when the phase
+ * is BUILD, or when any story/task left the initial state - a stage other than
+ * "queued", or a status other than "todo". A project still in spec/plan has
+ * nothing to show in the Activity lens, so it stays on the product vision.
+ */
+export function hasBuildActivity(phase: string | undefined, stories: UserStory[]): boolean {
+  if (phase === "build") return true;
+  const moved = (status: string | undefined, stage: string | undefined) =>
+    (status ?? "todo") !== "todo" || (stage ?? "queued") !== "queued";
+  return (stories ?? []).some(
+    (s) =>
+      moved(s.status, s.current_stage) ||
+      (s.tasks ?? []).some((t) => moved(t.status, t.current_stage)),
+  );
+}
+
+/** Initial lens: the remembered explicit choice wins, else the R3 default. */
+function initialView(projectId: string, phase: string | undefined, stories: UserStory[]): View {
+  return readStoredView(projectId) ?? (hasBuildActivity(phase, stories) ? "activity" : "vision");
+}
 
 /**
  * Conteneur des deux lentilles sur le même produit :
@@ -31,6 +77,7 @@ export function WorkspaceViews({
   awaitingApproval,
   onApprove,
   onReject,
+  trash,
 }: {
   epics: Epic[];
   stories: UserStory[];
@@ -50,11 +97,20 @@ export function WorkspaceViews({
   awaitingApproval?: string;
   onApprove?: () => void;
   onReject?: () => void;
+  /** R6: soft-deleted stories, forwarded to the Board trash panel. */
+  trash?: TrashedStoryInfo[];
 }) {
   const { t } = useI18n();
-  // P6/B-UX: Activité is the default lens during BUILD; Board + Iterations stay
-  // available. Outside build the historic "vision produit" remains the default.
-  const [view, setView] = useState<View>(phase === "build" ? "activity" : "vision");
+  // P6/B-UX/R3: Activité is the default lens as soon as a build has started or
+  // happened; Board + Iterations stay available. A project still in spec/plan
+  // keeps the historic "vision produit" default. An explicit tab click is
+  // remembered per project and wins over that default on mount.
+  const [view, setView] = useState<View>(() => initialView(projectId, phase, stories));
+  // True once the user picked a tab for THIS project (seeded from storage): it
+  // freezes the automatic switch on the BUILD transition.
+  const userPicked = useRef<boolean>(readStoredView(projectId) !== null);
+  const prevPhase = useRef<string | undefined>(phase);
+  const lastProject = useRef<string>(projectId);
   const [boardFocus, setBoardFocus] = useState<{ epicId: string; storyId?: string } | null>(
     null,
   );
@@ -98,6 +154,33 @@ export function WorkspaceViews({
       cancelled = true;
     };
   }, [projectId, iterCount, onRollbackTo]);
+
+  // R3: the component is not keyed by project in App, so switching projects
+  // re-runs the initial-lens decision (and re-seeds the per-project memory).
+  useEffect(() => {
+    if (lastProject.current === projectId) return;
+    lastProject.current = projectId;
+    prevPhase.current = phase;
+    userPicked.current = readStoredView(projectId) !== null;
+    setView(initialView(projectId, phase, stories));
+  }, [projectId, phase, stories]);
+
+  // R3: when the phase ENTERS build while the user is on another lens, switch
+  // to Activité once. An explicit tab choice for this project disables it.
+  useEffect(() => {
+    const was = prevPhase.current;
+    prevPhase.current = phase;
+    if (phase !== "build" || was === "build") return;
+    if (userPicked.current) return;
+    setView("activity");
+  }, [phase]);
+
+  /** Explicit tab click: switch lens AND remember it for this project. */
+  const selectView = (next: View) => {
+    userPicked.current = true;
+    storeView(projectId, next);
+    setView(next);
+  };
 
   const openIteration = (iter: number) => {
     setIterFocus(iter);
@@ -143,7 +226,7 @@ export function WorkspaceViews({
           role="tab"
           aria-selected={showActivity}
           className={showActivity ? "active" : ""}
-          onClick={() => setView("activity")}
+          onClick={() => selectView("activity")}
         >
           {t("workspaceViews.activity")}
         </button>
@@ -152,7 +235,7 @@ export function WorkspaceViews({
           role="tab"
           aria-selected={!showActivity && !showIterations && !showGraph}
           className={!showActivity && !showIterations && !showGraph ? "active" : ""}
-          onClick={() => setView("vision")}
+          onClick={() => selectView("vision")}
         >
           {t("workspaceViews.productVision")}
         </button>
@@ -162,7 +245,7 @@ export function WorkspaceViews({
             role="tab"
             aria-selected={showGraph}
             className={showGraph ? "active" : ""}
-            onClick={() => setView("graph")}
+            onClick={() => selectView("graph")}
           >
             {t("workspaceViews.graph")}
           </button>
@@ -173,7 +256,7 @@ export function WorkspaceViews({
             role="tab"
             aria-selected={showIterations}
             className={showIterations ? "active" : ""}
-            onClick={() => setView("iterations")}
+            onClick={() => selectView("iterations")}
           >
             {t("workspaceViews.iterations")}
           </button>
@@ -220,6 +303,7 @@ export function WorkspaceViews({
           focus={boardFocus}
           onFocusConsumed={() => setBoardFocus(null)}
           onOpenIteration={multiIter ? openIteration : undefined}
+          trash={trash}
         />
       )}
     </>

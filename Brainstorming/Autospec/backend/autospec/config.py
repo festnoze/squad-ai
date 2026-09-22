@@ -988,6 +988,17 @@ class Settings:
     ts_acceptance_criteria: bool = field(
         default_factory=lambda: _env_bool("TS_ACCEPTANCE_CRITERIA", True)
     )
+    # R6 (UX wave 3) - deleting a story used to destroy it (and the depends_on
+    # links its siblings had on it) with no way back: one misclick on the board
+    # and the work item, its criteria and its Gherkin were gone. With this ON the
+    # deleted story is moved to a bounded trash (ProjectState.trash) carrying the
+    # stripped dependencies, so POST .../stories/<id>/restore can put it back on
+    # the board exactly as it was. The story still leaves `state.stories` and its
+    # .feature file is still removed, so no state consumer changes behaviour.
+    # OFF = byte-identical legacy behaviour (hard delete, no trash).
+    soft_delete_stories: bool = field(
+        default_factory=lambda: _env_bool("SOFT_DELETE_STORIES", True)
+    )
     # WORKFLOW_REVIEW P1 - a RED verification that executed ZERO test never
     # proves anything about the generated code (broken venv/toolchain). With this
     # ON, the worktree environment is repaired and the suite replayed ONCE; a red

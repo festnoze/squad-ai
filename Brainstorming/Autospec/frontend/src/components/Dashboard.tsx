@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { errorMessage, getMetrics } from "../api";
-import { Metrics } from "../types";
+import { FusionMetrics, Metrics } from "../types";
 import { useEscapeToClose } from "../hooks";
 import { useI18n } from "../i18n/i18n";
 
@@ -10,6 +10,53 @@ function Stat({ label, value }: { label: string; value: string | number }) {
       <div className="metric-value">{value}</div>
       <div className="metric-label">{label}</div>
     </div>
+  );
+}
+
+/**
+ * P3 (GENERATION_FUSION_REVIEW): the cost of the merge/canary loop, read from
+ * the `fusion` block of GET /api/metrics. Rendered only when the backend serves
+ * that block (an older backend simply has no section). `suites_per_item` is the
+ * headline number: how many full test suites the factory burns to deliver one
+ * work item.
+ */
+function FusionSection({ fusion }: { fusion: FusionMetrics }) {
+  const { t } = useI18n();
+  const verdicts = Object.entries(fusion.canary_verdicts ?? {}).sort(
+    (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
+  );
+  return (
+    <section className="fusion-block" data-testid="dashboard-fusion">
+      <h3 className="fusion-title">{t("dashboard.fusionTitle")}</h3>
+      <div className="metrics-grid">
+        <Stat label={t("dashboard.fusionSuitesPerItem")} value={fusion.suites_per_item} />
+        <Stat label={t("dashboard.fusionItemsDelivered")} value={fusion.items_delivered} />
+        <Stat label={t("dashboard.fusionSuiteRuns")} value={fusion.suite_runs} />
+        <Stat
+          label={t("dashboard.fusionRequeues")}
+          value={`${fusion.merge_requeues} / ${fusion.requeue_refunds}`}
+        />
+        <Stat label={t("dashboard.fusionCanaryReverts")} value={fusion.canary_reverts} />
+        <Stat
+          label={t("dashboard.fusionBatches")}
+          value={`${fusion.canary_batches} / ${fusion.canary_bisect_reverts}`}
+        />
+        <Stat label={t("dashboard.fusionInfraRetries")} value={fusion.infra_retries} />
+      </div>
+      {verdicts.length > 0 && (
+        <>
+          <h4 className="fusion-subtitle">{t("dashboard.fusionVerdicts")}</h4>
+          <ul className="fusion-verdicts" data-testid="fusion-verdicts">
+            {verdicts.map(([verdict, count]) => (
+              <li key={verdict}>
+                <span className="fusion-verdict-key">{verdict}</span>
+                <span className="fusion-verdict-count">{count}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -60,6 +107,7 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
             <Stat label={t("dashboard.regressions")} value={metrics.regressions} />
           </div>
         )}
+        {metrics?.fusion && <FusionSection fusion={metrics.fusion} />}
       </div>
     </div>
   );

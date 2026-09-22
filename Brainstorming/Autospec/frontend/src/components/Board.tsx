@@ -9,6 +9,7 @@ import {
   rebuildStory,
   rebuildTask,
   reorderStories,
+  restoreStory,
   splitItem,
   storyDiff,
   taskDiff,
@@ -24,12 +25,15 @@ import {
   StoryStatus,
   Task,
   TestState,
+  TrashedStoryInfo,
   UserStory,
   usEffectiveStatus,
 } from "../types";
 import { copyText } from "../clipboard";
 import { useEscapeToClose } from "../hooks";
+import { notify } from "../toast";
 import { confirmAction } from "./ConfirmDialog";
+import { CollapsibleSection } from "./CollapsibleSection";
 import { LlmActivity } from "./LlmActivity";
 import { useI18n } from "../i18n/i18n";
 
@@ -826,6 +830,24 @@ function StoryDetail({
     try {
       await deleteStory(projectId, story.id);
       onDeleted();
+      // R6 - the story went to the trash: offer an inline undo in the toast.
+      // The board itself refreshes from the SSE state, as before.
+      notify(
+        "success",
+        t("board.deletedToastTitle"),
+        t("board.deletedToastBody", { title: story.title }),
+        {
+          label: t("common.undo"),
+          onClick: async () => {
+            try {
+              await restoreStory(projectId, story.id);
+              notify("success", t("board.restoredToast"), story.title);
+            } catch (err) {
+              notify("error", t("board.restoreFailed"), errorMessage(err));
+            }
+          },
+        },
+      );
     } catch (err) {
       setError(errorMessage(err));
     }
@@ -1649,6 +1671,62 @@ function EpicView({
   );
 }
 
+/**
+ * R6 - collapsible trash at the bottom of the board. Lists the soft-deleted
+ * stories still restorable; hidden entirely when the trash is empty (flag OFF
+ * or nothing deleted yet). The board refreshes from the SSE state after a
+ * restore, exactly like after a delete.
+ */
+function TrashPanel({
+  projectId,
+  trash,
+}: {
+  projectId: string;
+  trash: TrashedStoryInfo[];
+}) {
+  const { t } = useI18n();
+  const [busy, setBusy] = useState("");
+
+  const handleRestore = async (entry: TrashedStoryInfo) => {
+    setBusy(entry.id);
+    try {
+      await restoreStory(projectId, entry.id);
+      notify("success", t("board.restoredToast"), entry.title);
+    } catch (err) {
+      notify("error", t("board.restoreFailed"), errorMessage(err));
+    } finally {
+      setBusy("");
+    }
+  };
+
+  return (
+    <div className="board-trash-wrap" data-testid="trash-panel">
+      <CollapsibleSection
+        title={`${t("board.trashTitle")} (${trash.length})`}
+        className="board-trash"
+        defaultOpen={false}
+      >
+        <ul className="trash-list">
+          {trash.map((entry) => (
+            <li key={entry.id} className="trash-row">
+              <span className="trash-title">{entry.title}</span>
+              <button
+                type="button"
+                className="ghost"
+                data-testid={`trash-restore-${entry.id}`}
+                disabled={busy === entry.id}
+                onClick={() => void handleRestore(entry)}
+              >
+                {t("board.trashRestore")}
+              </button>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleSection>
+    </div>
+  );
+}
+
 type Nav = {
   level: "epics" | "epic" | "us" | "task";
   epicId?: string;
@@ -1670,6 +1748,8 @@ interface Props {
   onFocusConsumed?: () => void;
   /** Bascule vers la vue Itérations sur l'itération donnée (pastille « it. N »). */
   onOpenIteration?: (iter: number) => void;
+  /** R6: soft-deleted stories still restorable. Absent/empty = no trash panel. */
+  trash?: TrashedStoryInfo[];
 }
 
 const PLANNING_PHASES = ["spec", "analyze", "plan", "architect"];
@@ -1683,6 +1763,7 @@ export function Board({
   focus,
   onFocusConsumed,
   onOpenIteration,
+  trash,
 }: Props) {
   const { t } = useI18n();
   const [nav, setNav] = useState<Nav>({ level: "epics" });
@@ -1914,6 +1995,7 @@ export function Board({
           />
         </div>
       )}
+      {(trash?.length ?? 0) > 0 && <TrashPanel projectId={projectId} trash={trash!} />}
     </div>
   );
 }

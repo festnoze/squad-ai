@@ -213,4 +213,15 @@ export const board: Namespace = {
     en: "Incomplete spec — S2 fell back, skeleton kept (mono-pass on retry)",
     fr: "Spec incomplète — repli S2, squelette conservé (mono-passe au retry)",
   },
+
+  // R6 - soft delete + undo (trash).
+  deletedToastTitle: { en: "Story deleted", fr: "Story supprimée" },
+  deletedToastBody: {
+    en: "« {title} » moved to the trash.",
+    fr: "« {title} » a été placée dans la corbeille.",
+  },
+  restoredToast: { en: "Story restored", fr: "Story restaurée" },
+  restoreFailed: { en: "Restore failed", fr: "Échec de la restauration" },
+  trashTitle: { en: "Trash", fr: "Corbeille" },
+  trashRestore: { en: "Restore", fr: "Restaurer" },
 };

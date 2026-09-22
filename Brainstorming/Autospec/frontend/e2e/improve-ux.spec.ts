@@ -63,6 +63,8 @@ async function clearProjects(page: Page, request: APIRequestContext) {
 }
 
 test("improve_UX: Activité stepper + targeted chat + extend", async ({ page, request }) => {
+  // Vague 3 : le scenario attend en plus que la pipeline redevienne dormante.
+  test.setTimeout(420_000);
   // Les assertions de la spec sont en français ; l'app démarre en "en" par défaut.
   await page.addInitScript(() => localStorage.setItem("autospec.lang", "fr"));
   await page.goto("/");
@@ -75,12 +77,17 @@ test("improve_UX: Activité stepper + targeted chat + extend", async ({ page, re
   // Le board est hiérarchique (épics → US) ; on attend simplement que la
   // pipeline ait construit l'itération (US-1/US-2 verts → epic « Cœur applicatif »
   // 2/2 terminée(s)). C'est plus robuste que de drill-down dans le board.
+  // R3 : la lentille bascule seule sur « ⚡ Activité » quand le build démarre ;
+  // on fixe explicitement la vision produit (choix mémorisé) pour garder le
+  // board rendu pendant l'attente ci-dessous.
+  await page.getByRole("tab", { name: "🗂 Vision produit" }).click();
   await expect(
     page.locator(".epic-card", { hasText: "Cœur applicatif" }),
   ).toContainText("2/2 terminée(s)", { timeout: 60_000 });
 
   // === bascule sur la lentille « ⚡ Activité » ===============================
-  // Hors BUILD la vue par défaut est « Vision produit » ; on clique l'onglet.
+  // On a fixé la vision produit plus haut ; on repasse explicitement sur la
+  // lentille Activité (le choix est de nouveau mémorisé).
   await page.getByRole("tab", { name: "⚡ Activité" }).click();
   const activity = page.getByRole("region", { name: "Activité" });
   await expect(activity).toBeVisible();
@@ -115,7 +122,7 @@ test("improve_UX: Activité stepper + targeted chat + extend", async ({ page, re
   // restée TODO ; on récupère son id via l'API (en l'attendant, la pipeline
   // continue après US-1) pour cibler son affordance.
   type ApiStory = { id: string; status: string; acceptance_criteria?: unknown[] };
-  type ApiProject = { id: string; name: string; stories: ApiStory[] };
+  type ApiProject = { id: string; name: string; phase?: string; stories: ApiStory[] };
   // Le backend démo fait du vrai travail git/process pendant le build : une
   // requête peut tomber sur un event-loop momentanément occupé (ECONNRESET /
   // ETIMEDOUT). On retente quelques fois avant d'abandonner.
@@ -196,6 +203,64 @@ test("improve_UX: Activité stepper + targeted chat + extend", async ({ page, re
   await rail.click();
   await expect(page.locator(".col-left")).toBeVisible();
   await page.setViewportSize({ width: 1280, height: 800 });
+
+  // === vague 3 : on attend que la pipeline redevienne dormante ==============
+  // Les trois scenarios ci-dessous (undo de suppression, re-verification de la
+  // livraison, bloc « fusion » du dashboard) exigent un projet au repos :
+  // /restore repond 409 tant que la pipeline construit, et le bouton
+  // « Re-verifier la livraison » n'est rendu que sur une phase dormante.
+  const DORMANT = /^(done|stopped|needs_attention|error)$/;
+  await expect
+    .poll(async () => (await projectByName()).phase ?? "", {
+      timeout: 180_000,
+      message: "la pipeline doit redevenir dormante",
+    })
+    .toMatch(DORMANT);
+
+  // === R6 - suppression d'une US puis annulation (corbeille) ================
+  await page.getByRole("tab", { name: "\u{1F5C2} Vision produit" }).click();
+  await page.locator(".epic-card", { hasText: "Cœur applicatif" }).click();
+  const usCard = page.getByTestId("story-US-2");
+  await expect(usCard).toBeVisible({ timeout: 30_000 });
+  await usCard.click();
+  const storyDetail = page.locator(".story-detail");
+  await expect(storyDetail).toBeVisible();
+  await storyDetail.getByRole("button", { name: /Supprimer/ }).click();
+  // ConfirmDialog (Q0) : on accepte explicitement.
+  await page.getByTestId("confirm-accept").click();
+  // La suppression renvoie au niveau epic : la carte US-2 disparait du board.
+  await expect(page.getByTestId("story-US-2")).toHaveCount(0, { timeout: 30_000 });
+  // Le toast de succes porte le bouton d'annulation (R6).
+  const undo = page.getByTestId("toast-action");
+  await expect(undo).toBeVisible();
+  await expect(undo).toHaveText(/Annuler/);
+  // La corbeille du board liste desormais l'entree supprimee.
+  await expect(page.getByTestId("trash-panel")).toBeVisible();
+  await undo.click();
+  // La story revient dans le board via l'etat pousse en SSE.
+  await expect(page.getByTestId("story-US-2")).toBeVisible({ timeout: 30_000 });
+  // Cote API : la story est bien de retour dans le backlog.
+  await expect
+    .poll(async () => (await projectByName()).stories.some((s) => s.id === "US-2"), {
+      timeout: 30_000,
+    })
+    .toBe(true);
+
+  // === P5 - re-verification de la livraison sur un projet dormant ===========
+  const verify = page.getByTestId("verify-delivery");
+  await expect(verify).toBeVisible({ timeout: 30_000 });
+  await verify.click();
+  // En mode demo les gates sont court-circuitees : on verifie simplement que
+  // l'appel a abouti (toast de succes, pas de banniere d'erreur).
+  await expect(page.locator(".toast-success").last()).toBeVisible({ timeout: 30_000 });
+
+  // === P3 - bloc « boucle de fusion » du dashboard ==========================
+  await page.getByRole("button", { name: "Dashboard de l'usine" }).click();
+  const fusion = page.getByTestId("dashboard-fusion");
+  await expect(fusion).toBeVisible({ timeout: 30_000 });
+  await expect(fusion).toContainText("Boucle de fusion");
+  await page.keyboard.press("Escape");
+  await expect(fusion).toBeHidden();
 
   // === nettoyage ============================================================
   await request.delete(`/api/projects/${proj.id}`, { timeout: 10_000 }).catch(() => {});

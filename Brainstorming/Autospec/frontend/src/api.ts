@@ -13,6 +13,7 @@ import {
   ProviderInfo,
   StoryDiff,
   StoryPatch,
+  TrashedStoryInfo,
   Metrics,
   WsEvent,
 } from "./types";
@@ -259,6 +260,17 @@ export async function restartFromScratch(projectId: string): Promise<void> {
   await json(await fetch(`/api/projects/${projectId}/restart`, { method: "POST" }));
 }
 
+/**
+ * P5 (WORKFLOW_REVIEW): replay the delivery gates (smoke -> runtime -> DoD ->
+ * docker) on a DORMANT project, with no rebuild. The operator's exit from an
+ * infra park once the environment is fixed (freed port, restarted Docker
+ * daemon). 409 when the pipeline is still active, so it is NOT retried through
+ * `fetchIdempotent`.
+ */
+export async function verifyDelivery(projectId: string): Promise<void> {
+  await json(await fetch(`/api/projects/${projectId}/verify`, { method: "POST" }));
+}
+
 export async function splitItem(projectId: string, itemId: string): Promise<void> {
   await json(
     await fetch(`/api/projects/${projectId}/items/${itemId}/split`, { method: "POST" }),
@@ -302,6 +314,23 @@ export async function deleteStory(projectId: string, storyId: string): Promise<v
   await json(
     await fetch(`/api/projects/${projectId}/stories/${storyId}`, { method: "DELETE" }),
   );
+}
+
+/** R6 - restore a soft-deleted story from the project trash. */
+export async function restoreStory(projectId: string, storyId: string): Promise<void> {
+  await json(
+    await fetch(`/api/projects/${projectId}/stories/${storyId}/restore`, {
+      method: "POST",
+    }),
+  );
+}
+
+/** R6 - list the soft-deleted stories still recoverable for this project. */
+export async function getTrash(projectId: string): Promise<TrashedStoryInfo[]> {
+  const data = await json<{ items: TrashedStoryInfo[] }>(
+    await fetch(`/api/projects/${projectId}/trash`),
+  );
+  return data.items ?? [];
 }
 
 export async function rebuildStory(

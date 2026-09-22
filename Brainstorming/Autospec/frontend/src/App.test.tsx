@@ -49,6 +49,7 @@ vi.mock("./api", () => ({
 
 // Import APRÈS le vi.mock pour que App consomme la version mockée.
 import App from "./App";
+import { notify } from "./toast";
 
 const NEUTRAL_USAGE: Usage = {
   cost_usd: 0,
@@ -289,6 +290,29 @@ describe("App — gestion des évènements WebSocket", () => {
     });
 
     expect(await screen.findByText("Itération terminée")).toBeInTheDocument();
+  });
+
+  it("R6 : un toast porteur d'une action rend un bouton qui l'exécute et ferme le toast", async () => {
+    render(<App />);
+    await waitFor(() => expect(capturedOnEvent).not.toBeNull());
+
+    const onClick = vi.fn();
+    act(() => {
+      notify("success", "Story supprimée", "« S1 » dans la corbeille", {
+        label: "Annuler",
+        onClick,
+      });
+    });
+
+    const btn = await screen.findByTestId("toast-action");
+    expect(btn).toHaveAttribute("aria-label", "Annuler");
+    expect(btn).toHaveTextContent("Annuler");
+
+    fireEvent.click(btn);
+    expect(onClick).toHaveBeenCalledTimes(1);
+    // Le toast disparaît immédiatement au clic sur l'action.
+    await waitFor(() => expect(screen.queryByTestId("toast-action")).toBeNull());
+    expect(screen.queryByText("Story supprimée")).toBeNull();
   });
 });
 

@@ -562,3 +562,224 @@ la plus ancienne entrée d'une rafale ».
 20. **Toujours interdit** : `uv run ruff check` sans `--no-fix` sous
     `Brainstorming/` (le `pyproject.toml` parent pose `fix = true` et réécrit
     les fichiers en silence).
+
+### Vague 3 (2026-09-22)
+
+**Statut : livree et validee. Backend complet : 1328 passed, 0 failed
+(757,18 s, `uv run pytest -q -p no:cacheprovider`) ; vitest : 28 fichiers,
+264 passed, 0 failed ; `npx tsc --noEmit -p .` : exit 0 ; e2e Playwright :
+2 passed (39,4 s) ; e2e streams : 1 passed (13,1 s). UNE correction de gate a
+ete necessaire (voir plus bas) : la selection conditionnelle de l'onglet
+« Vision produit » introduite avec R3 ne memorisait pas le choix quand l'onglet
+etait deja actif, et le board disparaissait en plein `wait` de 60 s.**
+
+#### Items livres
+
+1. **R6 backend - corbeille de stories.** `DELETE /api/projects/{pid}/stories/{sid}`
+   ne perd plus la story quand `SOFT_DELETE_STORIES` est ON (defaut) : elle sort
+   toujours de `state.stories` et son `.feature` est toujours supprime, mais elle
+   est deposee dans `ProjectState.trash` (nouveau modele `TrashedStory` :
+   `story`, `deleted_at` epoch, `stripped_deps` = les `depends_on` retires chez
+   les autres stories, `feature_rel_path`). La corbeille est bornee a 20 entrees
+   (`pipeline.TRASH_MAX`), les plus anciennes purgees. Reponse inchangee. Flag
+   OFF = suppression dure historique, a l'octet pres.
+2. **R6 backend - restauration.** `Pipeline.arestore_story(sid)` remet la story
+   en TODO/QUEUED (attempts, infra, requeue remis a zero, taches reinitialisees
+   par `_reset_for_restore`), re-tisse les `depends_on` retires chez les stories
+   encore presentes, re-ecrit le `.feature` si gherkin, consomme l'entree de
+   corbeille et `_sync()`. Refus 409 pendant les phases
+   spec/analyze/plan/architect/build (`_BACKLOG_BUSY_PHASES`) ou si l'id est
+   repris ; 404 si la story n'est pas dans la corbeille.
+3. **R6 frontend - annuler une suppression.** Le bus de toasts porte desormais
+   une action optionnelle (`ToastAction`), rendue par App comme un bouton
+   (`data-testid="toast-action"`, duree portee a 10 s, toast ferme au clic).
+   Supprimer une US depuis son detail emet un toast de succes avec un bouton
+   « Annuler » / « Undo » qui appelle `restoreStory`. Un panneau repliable
+   « Corbeille » en bas du board liste `project.trash` avec un bouton
+   « Restaurer » par entree.
+4. **P5 frontend - re-verifier la livraison.** Nouveau bouton
+   `data-testid="verify-delivery"` dans la RunPanel, visible seulement sur une
+   phase dormante ET avec au moins une story au statut EFFECTIF `done`. Il
+   appelle `POST /api/projects/{pid}/verify` et rend le resultat par une paire
+   de toasts succes/erreur (pas la banniere d'erreur globale).
+5. **P3 frontend - boucle de fusion au dashboard.** Nouveau bloc
+   `data-testid="dashboard-fusion"` sous la grille existante, rendu uniquement
+   quand `GET /api/metrics` sert la cle `fusion` (ajoutee en vague 2) : 7 cartes
+   (suites par item livre, items livres, suites jouees, requeues / remboursements,
+   reverts canari, rafales / reverts bisect, retries infra) plus la liste des
+   verdicts canari triee par frequence (`data-testid="fusion-verdicts"`, masquee
+   si l'histogramme est vide).
+6. **R3 frontend - lentille initiale du workspace.** `WorkspaceViews` ne choisit
+   plus sa vue avec `phase === "build"` mais avec une regle a trois etages :
+   (1) le choix d'onglet explicite memorise par projet dans
+   `localStorage["autospec-view:<projectId>"]` gagne ; sinon (2) « Activite » des
+   qu'un build a commence ou eu lieu (`hasBuildActivity`) ; sinon (3) « Vision
+   produit ». Une bascule automatique UNIQUE vers Activite a l'entree en phase
+   build, desactivee des que l'operateur a choisi un onglet pour ce projet.
+
+#### Contrats exposes
+
+Backend :
+
+- `TrashedStory` (`autospec/models.py`) : `{story: UserStory, deleted_at: float,
+  stripped_deps: dict[str, list[str]], feature_rel_path: str}`.
+- `ProjectState.trash: list[TrashedStory]` - plus ancienne en tete, plafonnee a
+  20, serialisee sous la cle `trash` dans tout etat pousse (GET
+  `/api/projects/{pid}` et SSE).
+- `POST /api/projects/{pid}/stories/{sid}/restore` -> `{ok: true, state}` ;
+  404 « Story absente de la corbeille » ; 409 pipeline active ou id repris.
+- `GET /api/projects/{pid}/trash` -> `{items: [{id, title, epic_id, deleted_at}]}`,
+  ordonne de la suppression LA PLUS RECENTE a la plus ancienne (l'ordre inverse
+  de `state.trash`).
+- `Settings.soft_delete_stories` / env `SOFT_DELETE_STORIES` (defaut 1),
+  documente dans `backend/.env.example`, pose dans `backend/.env`, epingle dans
+  `tests/conftest.py::tmp_workspace`.
+- `Pipeline.arestore_story(sid) -> UserStory`, constantes `pipeline.TRASH_MAX`
+  et `pipeline._BACKLOG_BUSY_PHASES`, helper `pipeline._reset_for_restore`.
+
+Frontend :
+
+- `api.ts` : `restoreStory(projectId, storyId)`, `getTrash(projectId)`,
+  `verifyDelivery(projectId)`.
+- `types.ts` : `TrashedStoryInfo`, `ProjectState.trash?`, `toTrashInfo()`
+  (accepte la forme plate du endpoint ET la forme imbriquee de l'etat SSE),
+  `FusionMetrics`, `Metrics.fusion?`.
+- `toast.ts` : `ToastAction {label, onClick}`, `ToastEvent.action?`,
+  `notify(level, title, body, action?)`.
+- Props : `Board.trash?`, `WorkspaceViews.trash?`, `RunPanel.onVerifyDelivery`
+  (REQUISE).
+- `data-testid` : `toast-action`, `trash-panel`, `trash-restore-<storyId>`,
+  `verify-delivery`, `dashboard-fusion`, `fusion-verdicts`.
+- Cles i18n (en + fr) : `common.undo` ; `board.deletedToastTitle`,
+  `deletedToastBody`, `restoredToast`, `restoreFailed`, `trashTitle`,
+  `trashRestore` ; `runPanel.verifyDelivery`, `verifyDeliveryTitle` ;
+  `app.verifyToastTitle`, `verifyToastBody`, `verifyToastErrorTitle` ;
+  `dashboard.fusionTitle`, `fusionSuitesPerItem`, `fusionItemsDelivered`,
+  `fusionSuiteRuns`, `fusionRequeues`, `fusionCanaryReverts`, `fusionBatches`,
+  `fusionInfraRetries`, `fusionVerdicts`.
+- `localStorage["autospec-view:<projectId>"]` -> `vision | iterations | activity
+  | graph`, ecrit au clic d'onglet uniquement, lectures et ecritures en
+  try/catch, valeurs inconnues ignorees.
+- CSS (tokens existants uniquement, aucune animation, aucun nouveau canal
+  `--attention`) : `.toast-action`, `.board-trash-wrap`, `.board-trash`,
+  `.trash-list`, `.trash-row`, `.trash-title`, `.fusion-block`, `.fusion-title`,
+  `.fusion-subtitle`, `.fusion-verdicts`, `.fusion-verdict-key`,
+  `.fusion-verdict-count`.
+
+#### Fichiers modifies
+
+Backend : `autospec/models.py`, `autospec/config.py`,
+`autospec/orchestrator/pipeline.py`, `autospec/api/server.py`, `.env.example`,
+`.env`, `tests/conftest.py`, `tests/test_wave3_soft_delete.py` (nouveau).
+
+Frontend : `src/api.ts`, `src/types.ts`, `src/toast.ts`, `src/App.tsx`,
+`src/index.css`, `src/components/Board.tsx`, `src/components/WorkspaceViews.tsx`,
+`src/components/RunPanel.tsx`, `src/components/Dashboard.tsx`,
+`src/i18n/messages/common.ts`, `board.ts`, `runPanel.ts`, `app.ts`,
+`dashboard.ts`.
+
+Tests frontend : `src/toast.test.ts`, `src/App.test.tsx`,
+`src/components/Board.test.tsx`, `RunPanel.test.tsx`, `WorkspaceViews.test.tsx`,
+`Dashboard.test.tsx` (nouveau).
+
+E2E : `e2e/improve-ux.spec.ts`, `e2e/autospec.spec.ts`,
+`e2e-streams/streams.spec.ts`.
+
+#### Tests ajoutes
+
+- Backend : `tests/test_wave3_soft_delete.py`, 10 fonctions (mise en corbeille
+  avec `stripped_deps`, restauration en travail neuf, frere disparu entre-temps,
+  404 inconnu, 409 pendant le build, 409 id repris, corbeille bornee et purgee,
+  flag OFF = suppression dure, endpoint `/trash`, endpoint `/restore` et mapping
+  des erreurs).
+- Vitest : 7 tests R6 (bus de toasts avec action, toast Undo apres suppression,
+  echec de restauration, panneau corbeille, absence de panneau si vide, bouton
+  d'action rendu par App), 11 tests P5 + P3 (visibilite du bouton de
+  re-verification sur statut effectif, absence pendant le build, absence sans
+  story done, grille de base du dashboard, bloc fusion, verdicts tries, verdict
+  inconnu, histogramme vide, backend sans `fusion`, erreur de chargement),
+  7 tests R3 (lentille par defaut selon l'activite de build, stage suffisant,
+  projet en spec, choix memorise prioritaire, memorisation au clic, valeur
+  illisible, bascule unique a l'entree en build).
+- E2E `improve-ux.spec.ts` (3 scenarios ajoutes a la fin du parcours, apres une
+  attente de phase dormante) : (a) supprimer US-2 via le bouton « Supprimer » +
+  `confirm-accept`, verifier la disparition de la carte, le toast avec bouton
+  « Annuler », la presence de `trash-panel`, puis cliquer Annuler et verifier le
+  retour de la story dans le board ET dans l'API ; (b) `verify-delivery` visible
+  sur le projet dormant, clic, toast de succes ; (c) ouverture du dashboard et
+  presence de `dashboard-fusion` contenant « Boucle de fusion ». Le test unique
+  de cette spec passe a `test.setTimeout(420_000)` (attente de dormance).
+
+#### Comptes finaux
+
+| Gate | Commande | Resultat |
+| --- | --- | --- |
+| Backend | `uv run pytest -q -p no:cacheprovider` | 1328 passed, 0 failed (757,18 s) |
+| Types | `npx tsc --noEmit -p .` | exit 0, aucune sortie |
+| Vitest | `npx vitest run` | 28 fichiers, 264 passed, 0 failed (6,2 s) |
+| E2E | `npm run test:e2e` | 2 passed (39,4 s) |
+| E2E streams | `npm run test:e2e:streams` | 1 passed (13,1 s) |
+
+Rappel : la vague 2 finissait a 1318 tests backend et 239 tests vitest ; la
+vague 3 ajoute 10 tests backend et 25 tests vitest.
+
+#### Corrections de gate
+
+1. **`gotoEpics()` ne memorisait pas la lentille.** Premier run e2e :
+   `autospec.spec.ts` echouait a la ligne 157 (`story-US-1` + « Termine »,
+   element introuvable apres 60 s). Cause : R3 ne cliquait l'onglet « Vision
+   produit » que si `aria-selected !== "true"` ; au moment de `openEpic()` la
+   phase etait encore plan/architect, donc l'onglet Vision etait DEJA actif,
+   aucun clic n'etait emis, aucun choix n'etait memorise, et la bascule
+   automatique a l'entree en phase build deplacait le board sous la lentille
+   Activite en plein `wait`. Correctif : rendre le clic INCONDITIONNEL dans
+   `gotoEpics()` (cliquer un onglet deja actif passe quand meme par
+   `selectView()` et memorise le choix), applique a `e2e/autospec.spec.ts` et,
+   par symetrie, a `e2e-streams/streams.spec.ts`. Aucun code applicatif touche.
+2. **Coherence de contrat verifiee, aucun ecart.** Les routes appelees par
+   `api.ts` (`/verify`, `/stories/{sid}/restore`, `/trash`) correspondent
+   exactement a celles exposees par `server.py`, et `toTrashInfo()` couvrait
+   deja les deux formes possibles de `state.trash`. Rien a corriger.
+
+#### Points d'attention restants
+
+1. **Ordre de la corbeille : deux conventions.** `state.trash` va de la plus
+   ancienne a la plus recente, `GET /trash` renvoie l'inverse. Le panneau du
+   board lit `state.trash` : il liste donc la plus ancienne en premier.
+2. **`arestore_story` reinitialise aussi les TACHES de la story** (statut,
+   attempts, infra, requeue, stage, recovery), au-dela de la lettre du contrat :
+   sans cela une story decomposee en taches serait stockee TODO alors que
+   `effective_status()` la dirait encore DONE ou FAILED.
+3. **Flag OFF (`SOFT_DELETE_STORIES=0`) : le bouton « Annuler » est quand meme
+   rendu** apres une suppression (le detail de story ignore l'etat du flag). Le
+   clic part vers `/restore`, recoit un 404 et produit un toast d'erreur. Pour
+   l'eviter il faudrait faire descendre un booleen `softDelete` jusqu'au detail.
+4. **`getTrash()` est exporte mais non consomme** : le panneau est alimente par
+   l'etat SSE, comme specifie. Export mort tant que rien ne le sonde.
+5. **`RunPanel.onVerifyDelivery` est une prop REQUISE** : tout nouvel appelant de
+   `RunPanel` casse `tsc` tant qu'il ne la passe pas.
+6. **Le bouton de re-verification est plus strict que le backend** : il exige au
+   moins une story au statut effectif `done`, la ou le backend n'exige que la
+   dormance. Un projet dormant dont la livraison a echoue avant la premiere
+   story verte n'a donc pas d'affordance ; retirer la moitie
+   `effStatuses.some(done)` de `canVerifyDelivery` suffirait.
+7. **`fusion.p2b_resumes` et `fusion.orphan_resets` sont types mais pas
+   affiches** (7 cartes demandees, 7 cartes rendues). Deux lignes a ajouter si
+   on veut les voir.
+8. **Deux cartes du bloc fusion agregent deux compteurs** (« requeues /
+   remboursements » et « rafales / reverts bisect ») : un selecteur e2e doit les
+   lire comme une seule chaine.
+9. **Un choix d'onglet explicite neutralise definitivement la bascule
+   automatique** vers Activite pour ce projet (memorise en `localStorage`).
+   C'est ce qui rend les e2e deterministes ; si on veut que la bascule gagne
+   toujours, il faut retirer le garde `userPicked` ET trouver une autre
+   strategie pour les specs.
+10. **`hasBuildActivity()` lit le statut et le `current_stage` BRUTS** (pas
+    `effectiveStatus` ni le stage fusionne avec les `ticks`). Une story dont
+    l'etape n'existe que dans le heartbeat, encore `queued`/`todo` et hors phase
+    build, ne compterait pas ; en pratique la phase est `build` a ce moment-la.
+11. **Les messages 404/409 de R6 sont en francais**, comme les autres erreurs
+    remontees par `_acall_pipeline` : le frontend ne doit pas filtrer sur du
+    texte anglais.
+12. **`ruff check --no-fix` signale `arestore_story` en C901 (11 > 10)** ;
+    laisse tel quel, le fichier porte deja 28 C901 preexistants.

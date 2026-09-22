@@ -25,6 +25,7 @@ interface Props {
   onReject: () => void;
   onDeploy: () => void;
   onUndeploy: () => void;
+  onVerifyDelivery: () => void;
 }
 
 function formatTokens(n: number): string {
@@ -51,6 +52,7 @@ export function RunPanel({
   onReject,
   onDeploy,
   onUndeploy,
+  onVerifyDelivery,
 }: Props) {
   const { t } = useI18n();
   // Phase labels are built inside render so they re-translate on language change.
@@ -136,6 +138,13 @@ export function RunPanel({
   const canRestart =
     ["done", "stopped", "needs_attention", "error"].includes(project.phase) &&
     !!project.brief?.trim();
+  // P5 (WORKFLOW_REVIEW) : rejouer les gates de livraison (smoke -> runtime ->
+  // DoD -> docker) sans rien reconstruire. N'a de sens que sur une pipeline
+  // DORMANTE (le backend renvoie 409 sinon) ET quand il existe au moins une
+  // story effectivement terminée : sans code livré, il n'y a rien à vérifier.
+  const canVerifyDelivery =
+    ["done", "stopped", "needs_attention", "error"].includes(project.phase) &&
+    effStatuses.some((st) => st === "done");
 
   const agentCalls = project.usage?.agent_calls ?? 0;
   const costUsd = project.usage?.cost_usd ?? 0;
@@ -311,6 +320,16 @@ export function RunPanel({
               title={t("runPanel.restartScratchTitle")}
             >
               {t("runPanel.restartScratch")}
+            </button>
+          )}
+          {canVerifyDelivery && (
+            <button
+              className="action-btn"
+              data-testid="verify-delivery"
+              onClick={onVerifyDelivery}
+              title={t("runPanel.verifyDeliveryTitle")}
+            >
+              {t("runPanel.verifyDelivery")}
             </button>
           )}
           {project.running && (

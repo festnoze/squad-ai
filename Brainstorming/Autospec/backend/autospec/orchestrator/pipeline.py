@@ -61,6 +61,7 @@ from ..models import (
     StoryStatus,
     Task,
     TestState,
+    TrashedStory,
     Usage,
     UserStory,
     backend_stream_for,
@@ -97,6 +98,21 @@ logger = logging.getLogger(__name__)
 
 _REFINE_ROLE_TO_CHAT = {"critic": ChatRole.CRITIC, "judge": ChatRole.JUDGE}
 
+# R6: how many soft-deleted stories a project keeps. The trash is an undo
+# buffer for a misclick, not an archive: past this many entries the oldest ones
+# are purged so a long-lived project's state file cannot grow without bound.
+TRASH_MAX = 20
+
+# R6: phases during which agents are actively mutating the backlog - restoring a
+# story into the board under them would race the running run.
+_BACKLOG_BUSY_PHASES = (
+    PipelinePhase.SPEC,
+    PipelinePhase.ANALYZE,
+    PipelinePhase.PLAN,
+    PipelinePhase.ARCHITECT,
+    PipelinePhase.BUILD,
+)
+
 # State checkpoints are written off the event loop (BUG2): save_state does
 # blocking file I/O plus a retry sleep on Windows lock contention, and _sync()
 # fires on every state change during a build. Running it inline starves
@@ -115,6 +131,22 @@ _SAFE_ENV_KEYS = {
     "PROGRAMFILES(X86)", "NUMBER_OF_PROCESSORS", "OS",
     "PROCESSOR_ARCHITECTURE", "LANG", "LC_ALL", "USER",
 }
+
+
+def _reset_for_restore(item) -> None:
+    """R6: turn a restored work item (UserStory or Task) back into fresh work -
+    TODO, every retry budget refunded, no live stage/persona/recovery left over
+    from the run it went through before it was deleted."""
+    item.status = StoryStatus.TODO
+    item.attempts = 0
+    item.infra_attempts = 0
+    item.requeue_attempts = 0
+    item.solo_attempted = False
+    item.last_error = ""
+    item.current_stage = BuildStage.QUEUED
+    item.stage_started_at = 0.0
+    item.current_persona = ""
+    item.recovery = RecoveryState()
 
 
 def _minimal_env() -> dict[str, str]:
@@ -1547,21 +1579,83 @@ class Pipeline:
 
     async def adelete_story(self, sid: str) -> None:
         """Delete a story and scrub references to it. Raises KeyError if the
-        story is unknown, ValueError (-> 409) if it is being developed."""
+        story is unknown, ValueError (-> 409) if it is being developed.
+
+        R6: with ``soft_delete_stories`` ON the story is no longer LOST - it is
+        moved to ``state.trash`` (bounded to ``TRASH_MAX``) along with the
+        ``depends_on`` links this deletion strips from its siblings, so
+        :meth:`arestore_story` can put the board back exactly as it was. What
+        every other consumer observes is unchanged: the story still leaves
+        ``state.stories`` and its .feature file is still removed. OFF = the
+        historic hard delete (no trash at all)."""
         story = self.state.story(sid)  # KeyError if absent
         if story.status == StoryStatus.IN_PROGRESS:
             raise ValueError("story en cours de développement")
         self.state.stories = [s for s in self.state.stories if s.id != sid]
+        stripped: dict[str, list[str]] = {}
         for other in self.state.stories:
             if sid in other.depends_on:
                 other.depends_on = [d for d in other.depends_on if d != sid]
-        try:
-            (workspace_dir(self.state.id) / workspace.feature_rel_path(story)).unlink(
-                missing_ok=True
+                stripped[other.id] = [sid]
+        rel_path = workspace.feature_rel_path(story)
+        if settings.soft_delete_stories:
+            self.state.trash.append(
+                TrashedStory(
+                    story=story.model_copy(deep=True),
+                    deleted_at=time.time(),
+                    stripped_deps=stripped,
+                    feature_rel_path=rel_path,
+                )
             )
+            if len(self.state.trash) > TRASH_MAX:
+                del self.state.trash[: len(self.state.trash) - TRASH_MAX]
+        try:
+            (workspace_dir(self.state.id) / rel_path).unlink(missing_ok=True)
         except OSError:
             pass  # best-effort cleanup
         self._sync()
+
+    async def arestore_story(self, sid: str) -> UserStory:
+        """R6: put a soft-deleted story back on the board.
+
+        The story returns as fresh work (TODO, every retry budget reset, stage
+        QUEUED), the ``depends_on`` links the deletion stripped are re-woven on
+        the siblings that still exist, and its .feature file is rewritten when
+        it carries Gherkin. Raises KeyError (-> 404) when ``sid`` is not in the
+        trash, ValueError (-> 409) when the pipeline is actively working or a
+        story with that id is already on the board."""
+        entry = next((t for t in self.state.trash if t.story.id == sid), None)
+        if entry is None:
+            raise KeyError(sid)
+        if self.state.phase in _BACKLOG_BUSY_PHASES:
+            raise ValueError(
+                "la pipeline est active : arrête-la avant de restaurer une story"
+            )
+        if any(s.id == sid for s in self.state.stories):
+            raise ValueError(f"une story {sid} existe déjà dans le backlog")
+        story = entry.story.model_copy(deep=True)
+        _reset_for_restore(story)
+        for t in story.test_plan:
+            t.status = TestState.NONEXISTENT
+        # A task-decomposed story derives its status from its tasks, so they are
+        # reset too - otherwise the restored container would claim TODO while
+        # reporting DONE/FAILED through ``effective_status``.
+        for task in story.tasks:
+            _reset_for_restore(task)
+        self.state.stories.append(story)
+        for other_id, deps in entry.stripped_deps.items():
+            other = next((s for s in self.state.stories if s.id == other_id), None)
+            if other is None:
+                continue  # that sibling was deleted in the meantime
+            for dep in deps:
+                if dep not in other.depends_on:
+                    other.depends_on.append(dep)
+        scheduler.sanitize_dependencies(self.state.stories)
+        if story.gherkin.strip():
+            workspace.write_feature_files(self.state, [story])
+        self.state.trash = [t for t in self.state.trash if t.story.id != sid]
+        self._sync()
+        return story
 
     async def areorder_stories(self, priorities: list[dict]) -> None:
         """Bulk-update story priorities from a list of {id, priority} entries.

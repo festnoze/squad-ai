@@ -397,6 +397,22 @@ class UserStory(BaseModel):
         return TestState.NONEXISTENT
 
 
+class TrashedStory(BaseModel):
+    """R6: one story removed from the board by a soft delete.
+
+    The deleted story is kept verbatim (``story``) together with everything the
+    deletion destroyed elsewhere: ``stripped_deps`` maps the id of each sibling
+    that depended on it to the dependency ids removed from that sibling, and
+    ``feature_rel_path`` remembers where its .feature file lived so a restore
+    can rewrite it at the same place. The trash is bounded (oldest entries are
+    purged), so it never grows without limit."""
+
+    story: UserStory
+    deleted_at: float = Field(default_factory=time.time)  # epoch seconds
+    stripped_deps: dict[str, list[str]] = Field(default_factory=dict)
+    feature_rel_path: str = ""
+
+
 class Epic(BaseModel):
     id: str
     title: str
@@ -646,6 +662,9 @@ class ProjectState(BaseModel):
     components: list[Component] = Field(default_factory=list)
     epics: list[Epic] = Field(default_factory=list)
     stories: list[UserStory] = Field(default_factory=list)
+    # R6: soft-deleted stories (most recent last), bounded to TRASH_MAX entries.
+    # Legacy persisted states default to [] (nothing was ever soft-deleted).
+    trash: list[TrashedStory] = Field(default_factory=list)
     chat: list[ChatMessage] = Field(default_factory=list)
     feedback: list[str] = Field(default_factory=list)
     findings: list[Finding] = Field(default_factory=list)  # E6 evaluator observations

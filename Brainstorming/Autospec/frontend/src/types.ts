@@ -409,6 +409,52 @@ export interface Usage {
   agent_calls: number;
 }
 
+/**
+ * R6 - one entry of the project trash (soft-deleted story). The backend keeps
+ * the whole story plus restore metadata; the UI only reads what it displays.
+ */
+export interface TrashedStoryInfo {
+  id: string;
+  title: string;
+  epic_id: string;
+  /** Epoch seconds of the deletion. */
+  deleted_at: number;
+}
+
+/**
+ * R6 - normalize whatever the backend puts in `ProjectState.trash` into the flat
+ * summary the UI renders. The SSE state serializes the full trash entries
+ * (`{story, deleted_at, stripped_deps, feature_rel_path}`) while
+ * `GET /api/projects/{pid}/trash` already returns the flat shape: accept both so
+ * the panel never renders `undefined`.
+ */
+export function toTrashInfo(entries: unknown): TrashedStoryInfo[] {
+  if (!Array.isArray(entries)) return [];
+  const out: TrashedStoryInfo[] = [];
+  for (const raw of entries) {
+    if (!raw || typeof raw !== "object") continue;
+    const entry = raw as {
+      id?: unknown;
+      title?: unknown;
+      epic_id?: unknown;
+      deleted_at?: unknown;
+      story?: { id?: unknown; title?: unknown; epic_id?: unknown };
+    };
+    const nested = entry.story ?? {};
+    const id = typeof entry.id === "string" ? entry.id : nested.id;
+    if (typeof id !== "string" || id === "") continue;
+    const title = typeof entry.title === "string" ? entry.title : nested.title;
+    const epicId = typeof entry.epic_id === "string" ? entry.epic_id : nested.epic_id;
+    out.push({
+      id,
+      title: typeof title === "string" ? title : id,
+      epic_id: typeof epicId === "string" ? epicId : "",
+      deleted_at: typeof entry.deleted_at === "number" ? entry.deleted_at : 0,
+    });
+  }
+  return out;
+}
+
 export interface ProjectState {
   id: string;
   name: string;
@@ -430,6 +476,9 @@ export interface ProjectState {
   components?: ProductComponent[];
   epics: Epic[];
   stories: UserStory[];
+  /** R6 - soft-deleted stories still restorable (absent when the flag is OFF).
+   * Read through `toTrashInfo()`: the state carries the full entries. */
+  trash?: TrashedStoryInfo[];
   chat: ChatMessage[];
   feedback: string[];
   findings?: Finding[]; // E6 evaluator observations
@@ -694,6 +743,28 @@ export function blockedBy(
   return (dependsOn ?? []).filter((id) => !isDone(id));
 }
 
+/**
+ * P3 (GENERATION_FUSION_REVIEW): the fusion-loop counters served by
+ * GET /api/metrics, summed over every project AND every iteration. They expose
+ * the COST of the merge/canary loop: how many test suites were burnt per
+ * delivered item, how often a merge was requeued, how often a canary reverted.
+ * `canary_verdicts` is an open histogram (an unknown verdict just adds a key).
+ */
+export interface FusionMetrics {
+  suite_runs: number;
+  items_delivered: number;
+  suites_per_item: number;
+  canary_verdicts: Record<string, number>;
+  canary_reverts: number;
+  canary_batches: number;
+  canary_bisect_reverts: number;
+  merge_requeues: number;
+  requeue_refunds: number;
+  infra_retries: number;
+  p2b_resumes: number;
+  orphan_resets: number;
+}
+
 export interface Metrics {
   projects: number;
   total_cost_usd: number;
@@ -710,4 +781,6 @@ export interface Metrics {
   avg_coverage: number | null;
   findings: number;
   regressions: number;
+  /** Optional so a backend older than P3 (no fusion block) still parses. */
+  fusion?: FusionMetrics;
 }
