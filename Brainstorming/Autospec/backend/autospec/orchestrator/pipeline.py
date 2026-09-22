@@ -16,7 +16,9 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
+import threading
 import time
 from pathlib import Path
 
@@ -131,6 +133,11 @@ _SAFE_ENV_KEYS = {
     "PROGRAMFILES(X86)", "NUMBER_OF_PROCESSORS", "OS",
     "PROCESSOR_ARCHITECTURE", "LANG", "LC_ALL", "USER",
 }
+
+# W7: hard ceiling on what the evaluator keeps from the delivered app's stdout.
+# A chatty server (or a runaway loop) can emit megabytes per second; the
+# evaluator prompt only ever needs the startup output.
+_EVALUATOR_OUTPUT_CAP = 200_000
 
 
 def _reset_for_restore(item) -> None:
@@ -2564,8 +2571,18 @@ class Pipeline:
 
         The app is untrusted agent code: it runs with a minimal environment (no
         server secrets) and a wall-clock cap. A long-running server simply hits
-        the timeout — we keep whatever it printed at startup. Demo mode short-
-        circuits (no real process)."""
+        the timeout: we keep whatever it printed at startup. Demo mode short-
+        circuits (no real process).
+
+        W7 (supervised run drv-p3-9ae648a7): the cap MUST kill the whole process
+        TREE. ``subprocess.run(..., timeout=...)`` only kills the DIRECT child
+        (``uv.exe``); on Windows the grandchild (``python`` running uvicorn)
+        survives, keeps the inherited stdout pipe open, and the internal
+        ``communicate()`` then blocks until that grandchild dies. The evaluator
+        phase froze for 45 minutes and leaked a listening server. So: Popen, a
+        DAEMON reader thread with a bounded buffer, ``_kill_tree`` on timeout,
+        and NEVER a pipe read after the kill.
+        """
         if settings.fake_agents:
             return "mode démo : exécution réelle du produit court-circuitée"
         ws = workspace_dir(self.state.id)
@@ -2573,28 +2590,109 @@ class Pipeline:
         timeout = settings.evaluator_run_timeout_s
         run_cmd = toolchain.run_command(toolchain.normalize(self.state.backend_language.value))
         cmd = self._maybe_sandbox(run_cmd, ws)
+        expects_web = self._expects_web_app()
+        cap = _EVALUATOR_OUTPUT_CAP
 
-        def _run() -> str:
+        def _run() -> tuple[str, bool, bool, bool]:
+            """Returns (text, ok, timed_out, killed_tree)."""
+            popen_kwargs: dict = {}
+            if os.name != "nt":
+                # POSIX: own session so the whole group can be signalled.
+                popen_kwargs["start_new_session"] = True
             try:
-                proc = subprocess.run(
+                proc = subprocess.Popen(
                     cmd, cwd=str(ws),
                     stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                     env=env, text=True, encoding="utf-8", errors="replace",
-                    timeout=timeout,
-                )
-                return f"(processus terminé, code {proc.returncode})\n{proc.stdout}"
-            except subprocess.TimeoutExpired as exc:
-                out = exc.output or ""
-                if isinstance(out, bytes):
-                    out = out.decode("utf-8", errors="replace")
-                return (
-                    f"(toujours actif après {timeout:g}s — probablement un service de "
-                    f"longue durée)\n{out}"
+                    **popen_kwargs,
                 )
             except OSError as exc:
-                return f"(lancement impossible : {exc})"
+                return f"(lancement impossible : {exc})", False, False, False
 
-        return await asyncio.to_thread(_run)
+            chunks: list[str] = []
+            captured = 0
+
+            def _pump() -> None:
+                """Drain stdout into a BOUNDED buffer. Daemon thread: if the
+                grandchild outlives us it may keep the pipe open forever, and
+                that must never hold the interpreter (or this phase) hostage."""
+                nonlocal captured
+                stream = proc.stdout
+                if stream is None:
+                    return
+                try:
+                    while True:
+                        line = stream.readline(16384)
+                        if not line:
+                            break
+                        if captured < cap:
+                            chunks.append(line[: cap - captured])
+                            captured += len(line)
+                except (OSError, ValueError):  # pipe closed under us
+                    pass
+
+            reader = threading.Thread(target=_pump, daemon=True, name="evaluator-run")
+            reader.start()
+            try:
+                code = proc.wait(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                killed = self._kill_tree(proc)
+                if os.name != "nt":
+                    # POSIX: ``_kill_tree`` only signals the DIRECT child, which
+                    # would leave the grandchild (the actual server) alive. The
+                    # session opened above makes ``proc.pid`` the group leader,
+                    # so this reaps the descendants without ever touching a
+                    # process outside the one we started.
+                    try:
+                        os.killpg(proc.pid, signal.SIGKILL)
+                    except (OSError, AttributeError):
+                        pass
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+                if expects_web:
+                    # Last net, like the smoke gate: a uvicorn reload supervisor
+                    # can respawn a worker that still holds the port.
+                    try:
+                        self._kill_workspace_port_holders(
+                            self._resolve_web_port(ws), Path(settings.workspace_root)
+                        )
+                    except Exception:  # noqa: BLE001 - cleanup is best-effort
+                        pass
+                reader.join(timeout=2)
+                return (
+                    f"(toujours actif après {timeout:g}s — probablement un service de "
+                    f"longue durée)\n" + "".join(chunks),
+                    True, True, killed,
+                )
+            # The entry point exited: whatever it buffered is already in the
+            # pipe, so a short join is enough. A reader STILL blocked here means
+            # a detached grandchild inherited the pipe and keeps it open - we
+            # leave it to the daemon thread instead of waiting on it.
+            reader.join(timeout=2)
+            leaked = reader.is_alive()
+            if leaked and expects_web:
+                try:
+                    self._kill_workspace_port_holders(
+                        self._resolve_web_port(ws), Path(settings.workspace_root)
+                    )
+                except Exception:  # noqa: BLE001 - cleanup is best-effort
+                    pass
+            tail = (
+                "\n(sortie tronquée : un processus détaché garde le tube ouvert)"
+                if leaked else ""
+            )
+            return (
+                f"(processus terminé, code {code})\n" + "".join(chunks) + tail,
+                True, False, False,
+            )
+
+        text, ok, timed_out, killed_tree = await asyncio.to_thread(_run)
+        self.monitor.event(
+            "evaluator_run", ok=ok, timed_out=timed_out, killed_tree=killed_tree
+        )
+        return text
 
     async def _aevaluate_phase(self, force: bool = False) -> None:
         """Exercise the delivered product and turn the run into structured

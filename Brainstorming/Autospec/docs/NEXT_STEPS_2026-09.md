@@ -1097,3 +1097,127 @@ expliques : ils se replient sur 9 criteres canoniques (TS-1.AC-1..3 marques par
    equivalent dans la story.
 4. **`ac_traceability_enabled` est pinne a `False` dans `conftest.py`** : les
    tests de la vague le reactivent explicitement, comme les vagues precedentes.
+
+### Vague 7 (2026-09-22) - evaluateur : kill d'arbre au timeout
+
+**Statut : livree. Backend complet : 1359 passed, 0 failed (286,17 s)
+(`uv run pytest -q -p no:cacheprovider`, log `backend/logs/wave7_gate.log`),
+dont 9 nouveaux tests `tests/test_wave7_evaluator_tree_kill.py`
+(1350 avant la vague).**
+
+#### Defaut d'usine observe
+
+Meme run reel supervise du 2026-09-22, projet fullstack
+`workspace/drv-p3-9ae648a7`. La phase evaluateur (E6) demarre a 11:23:53
+(« Evaluation du produit livre (execution reelle) ») et ne rend JAMAIS la main :
+le pilote atteint son plafond de 2 h a 11:32 et la session ne se termine qu'apres
+un kill manuel du serveur genere a 12:08, soit 45 minutes de gel pour un timeout
+cense valoir quelques dizaines de secondes. Traces de processus : le wrapper
+`uv` (pid 37196) a bien disparu, mais le `python` petit-fils (pid 52764 puis
+26848) ecoutait toujours sur :8000 une heure plus tard.
+
+#### Cause
+
+`Pipeline._aexercise_product` lancait le produit livre avec :
+
+```python
+subprocess.run(cmd, stdout=PIPE, stderr=STDOUT, timeout=settings.evaluator_run_timeout_s)
+```
+
+ou `cmd` vaut `uv run python main.py` (`toolchain.run_command`). Au
+`TimeoutExpired`, `subprocess.run` tue seulement l'enfant DIRECT (`uv.exe`) puis
+rappelle `communicate()` pour recuperer la sortie. Sous Windows, le petit-fils
+`python` (uvicorn) survit a la mort de `uv` et garde le tube stdout HERITE
+ouvert : `communicate()` bloque jusqu'a la mort de ce petit-fils, le thread
+`asyncio.to_thread` ne revient jamais, la phase gele et le serveur fuit.
+
+Le piege etait deja connu et resolu ailleurs dans le meme fichier :
+`Pipeline._kill_tree` (`taskkill /T /F` sous Windows) pour `astop_app` /
+`adispose`, et le smoke web fait meme un double-tap via
+`_kill_workspace_port_holders`. L'evaluateur, lui, etait reste sur le raccourci
+`subprocess.run(timeout=...)`.
+
+Reproduction hors usine (3 lignes, ~30 s) : un `main.py` qui spawne
+`python -c "import time; time.sleep(30)"` avec stdout herite puis dort ;
+`subprocess.run(..., timeout=2)` ne revient qu'apres **30,2 s**, c'est-a-dire a
+la mort du petit-fils, pas au timeout. Avec un petit-fils immortel (un serveur),
+« 30 s » devient « jamais ».
+
+#### Fix
+
+`autospec/orchestrator/pipeline.py`, `_aexercise_product` (~l. 2570) reecrit
+autour de `subprocess.Popen` (memes `cwd` / env minimal / encodage utf-8) :
+
+1. **Lecture dans un thread DAEMON** : `readline(16384)` dans un buffer borne
+   par la nouvelle constante `_EVALUATOR_OUTPUT_CAP = 200 000` caracteres (une
+   app bavarde ne peut plus ni gonfler le prompt evaluateur ni saturer le tube).
+   Daemon : si le petit-fils garde le tube, le thread n'empeche ni la phase ni
+   le processus de se terminer.
+2. **`proc.wait(timeout)`** au lieu de `communicate(timeout)` : aucune lecture de
+   tube apres le timeout, donc plus rien a bloquer.
+3. **Au timeout** : `self._kill_tree(proc)` (arbre complet, `taskkill /T /F` sous
+   Windows), plus sous POSIX un `os.killpg(proc.pid, SIGKILL)` rendu sur par le
+   `start_new_session=True` du `Popen` (`_kill_tree` n'y signale que l'enfant
+   direct) ; puis `proc.wait(5)` best-effort.
+4. **Dernier filet web** : si le produit est web (`_expects_web_app()`),
+   `_kill_workspace_port_holders(_resolve_web_port(ws), workspace_root)`, comme
+   le smoke, pour le superviseur uvicorn reload qui respawne un worker.
+5. **Cas « le parent sort, le petit-fils garde le tube »** : `join(2)` puis on
+   rend la main en annotant la sortie
+   « (sortie tronquee : un processus detache garde le tube ouvert) » au lieu
+   d'attendre indefiniment.
+6. **Observabilite** : `monitor.event("evaluator_run", ok=, timed_out=,
+   killed_tree=)`.
+
+Messages inchanges (« (processus termine, code N) »,
+« (toujours actif apres Ns ...) », « (lancement impossible : ...) »),
+court-circuit demo (`fake_agents`) et `_maybe_sandbox` conserves.
+
+#### Tests
+
+`tests/test_wave7_evaluator_tree_kill.py`, 9 tests deterministes et
+multi-plateformes (aucune dependance a `uv` : `toolchain.run_command` est
+monkeypatche vers `[sys.executable, "main.py"]`, timeout evaluateur a 2 s) :
+
+1. timeout avec petit-fils vivant : retour en moins de 20 s, message
+   « toujours actif apres », sortie de demarrage conservee, et le **petit-fils
+   est mort** apres l'appel (pid ecrit par `main.py`, verifie par `tasklist /FO
+   CSV` sous Windows et `os.kill(pid, 0)` ailleurs - jamais `os.kill` sous
+   Windows, qui TUE la cible quel que soit le signal) ;
+2. parent qui sort en laissant un petit-fils sur le tube : retour immediat,
+   code 0, marqueur de troncature ;
+3. produit web : le balayage des tenanciers de port est bien appele ;
+4. produit CLI : il ne l'est pas (aucun PowerShell / lsof) ;
+5. cas nominal : code 0 + sortie capturee ;
+6. deluge de 1 Mo : capture bornee au plafond, sans blocage ni deadlock de tube ;
+7. commande introuvable : « (lancement impossible » et `ok=False` ;
+8. mode demo : aucun `Popen` ;
+9. `_kill_tree` passe bien par `taskkill /F /T` (Windows).
+
+Les tests 1 et 2 echouent sur l'ancienne implementation (retour apres la mort du
+petit-fils, soit 60 s ici, jamais en production).
+
+#### Points d'attention
+
+1. **Le meme piege subsiste dans la branche CLI du smoke**
+   (`_smoke_run_python`, ~l. 9558, et `_smoke_cli_help_run`, ~l. 9590) :
+   `subprocess.run([uv, run, python, main.py], stdout=PIPE, timeout=...)`. La
+   branche web du smoke est deja en `Popen` + `_terminate_tree` + double-tap,
+   mais la branche CLI garde le raccourci ; un `main.py` non web qui boucle ou
+   qui laisse un enfant vivant gele la gate exactement de la meme facon, alors
+   que son message (« boucle/serveur bloquant ? ») pretend justement couvrir ce
+   cas. Non corrige dans cette vague : `tests/test_smoke_run.py` et
+   `tests/test_wave2_smoke_cli.py` (9 tests) monkeypatchent `subprocess.run` sur
+   ce chemin, le passage en `Popen` demande donc de reecrire leurs helpers. A
+   faire en vague 8, avec le meme utilitaire partage.
+2. **`runtime_acceptance.py` (~l. 135)** lance `node scripts/runtime_acceptance.js`
+   avec `subprocess.run(..., timeout=timeout + 15)` et le script JS spawne
+   lui-meme backend et frontend : si le script deborde, seul `node` est tue et
+   ses serveurs petits-fils peuvent rejouer le meme blocage. Risque plus faible
+   (le script a sa propre discipline d'arret) mais meme classe.
+3. **Les autres `subprocess.run(..., timeout=)`** (pip-audit, pytest coverage,
+   npm install, setup_exec, docker) lancent des commandes qui TERMINENT, pas des
+   serveurs : hors perimetre.
+4. **`_EVALUATOR_OUTPUT_CAP` est un plafond de capture, pas de prompt** : la
+   sortie est ensuite passee telle quelle a `prompts.evaluator_probe`. Si le
+   prompt doit etre reduit, c'est un reglage separe.
