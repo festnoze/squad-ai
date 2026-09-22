@@ -1,5 +1,7 @@
 # Autospec — Backlog
 
+> **2026-09-22** : plan et journal des vagues 1-4 (economie du budget dev, fusion par rafale/solo, observabilite, frontend Phase 2) dans [docs/NEXT_STEPS_2026-09.md](docs/NEXT_STEPS_2026-09.md).
+
 Backlog vivant, priorisé (valeur V / complexité C, 1-5). Mis à jour entre chaque
 itération du loop de développement. Règle de délégation : tâches de complexité
 faible/moyenne → subagents Opus ; orchestration/intégration/conception complexe →
