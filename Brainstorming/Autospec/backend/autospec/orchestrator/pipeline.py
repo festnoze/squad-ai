@@ -5322,21 +5322,47 @@ class Pipeline:
                 self.state.stories if all_iterations
                 else self.state.stories_of_iteration(self.state.iteration)
             )
-            all_ac_ids = {
-                f"{s.id}.{c.id}" for s in stories for c in s.acceptance_criteria
-            }
-            if not all_ac_ids:
+            # Wave 6 (supervised run 2026-09-22): in a MULTI-STREAM build the
+            # build subject of an item is the TASK, and the dev_story prompt
+            # qualifies the AC marker with the item id, so generated tests carry
+            # `TS1-T1.AC-1` while only story-qualified ids were declared: every
+            # such marker was counted an orphan and its criterion uncovered
+            # (covered=0 uncovered=12 orphans=24 on drv-p3-9ae648a7). A task's
+            # criteria are a SUBSET of its story's under the SAME bare ids, so a
+            # task-qualified id is an ALIAS of the story-qualified one; a task id
+            # the story does not declare stands as a criterion of its own.
+            aliases: dict[str, str] = {}
+            for s in stories:
+                story_bare = {c.id for c in s.acceptance_criteria}
+                for c in s.acceptance_criteria:
+                    qualified = f"{s.id}.{c.id}"
+                    aliases[qualified] = qualified
+                for t in s.tasks:
+                    for c in t.acceptance_criteria:
+                        aliases[f"{t.id}.{c.id}"] = (
+                            f"{s.id}.{c.id}" if c.id in story_bare
+                            else f"{t.id}.{c.id}"
+                        )
+            if not aliases:
                 return
             ws = workspace_dir(self.state.id)
             sources = self._collect_test_sources(ws)
             # Les stories frontend sont vérifiées par Vitest : le matcher étant
             # du texte brut (regex), les .test.ts(x) se scannent tels quels.
             sources.update(self._collect_frontend_test_sources(ws))
-            report = traceability.coverage_report(all_ac_ids, sources)
+            # Declare BOTH id spaces, then fold the aliases back onto the
+            # canonical criteria so covered/uncovered/orphans stay counted on
+            # real criteria, whichever id the test marker used.
+            report = traceability.fold_aliases(
+                traceability.coverage_report(set(aliases), sources), aliases
+            )
             uncovered, orphans = report.get("uncovered", []), report.get("orphans", [])
             # Un marqueur NON qualifié (`AC: AC-2`, style legacy/ambigu) n'est
             # pas un test d'un critère inexistant : on ne le compte pas orphelin.
             declared_bare = {c.id for s in stories for c in s.acceptance_criteria}
+            declared_bare |= {
+                c.id for s in stories for t in s.tasks for c in t.acceptance_criteria
+            }
             orphans = [o for o in orphans if o not in declared_bare]
             self.monitor.event(
                 "traceability", covered=len(report.get("covered", [])),

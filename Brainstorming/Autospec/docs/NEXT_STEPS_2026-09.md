@@ -946,3 +946,154 @@ Suites ciblees rejouees vertes : `test_wave2_cli_scaffold.py`, `test_pipeline.py
 6. **Rien ne verifie a la livraison que la tache WEB a effectivement produit un
    serveur** : c'est toujours le smoke run qui tranche. La garde deplace le
    travail du rattrapage post-smoke vers le plan, elle ne remplace pas la gate.
+---
+
+### Vague 6 (2026-09-22) - tracabilite multi-stream
+
+**Statut : livree. Backend complet : 1350 passed, 0 failed (293,59 s)
+(`uv run pytest -q -p no:cacheprovider`, log `backend/logs/wave6_gate.log`),
+dont 9 nouveaux tests `tests/test_wave6_traceability_aliases.py`
+(1341 avant la vague).**
+
+#### Defaut d'usine observe
+
+Meme run reel supervise du 2026-09-22, meme projet
+(`workspace/drv-p3-9ae648a7`, streams backend + frontend, 3 stories TS-1 / US-1 /
+US-2, 8 taches). A la livraison, le monitor emet :
+
+```
+traceability covered=0 uncovered=12 orphans=24
+```
+
+et le journal affiche « 24 test(s) orphelin(s) referencent un AC inexistant
+(TS1-T1.AC-1, TS1-T1.AC-2, ...) ». Or les 24 tests generes sont corrects et
+portent un marqueur qualifie en bonne et due forme. Le rapport de tracabilite
+declarait donc, sur un build reussi, que rien n'etait couvert et que tout etait
+orphelin : un signal 100 % faux, qui pollue les `delivery_issues` et rend la
+gate advisory inexploitable des qu'un projet est multi-stream.
+
+#### Cause
+
+Deux espaces d'identifiants qui ne se rencontrent jamais.
+
+1. Le prompt `dev_story` demande le marqueur `# AC: {story.id}.{criterion.id}`.
+   En multi-stream, le **sujet de build** d'un item n'est pas la story mais la
+   **tache** : `{story.id}` vaut alors `TS1-T1`, et les tests generes portent
+   `TS1-T1.AC-1`.
+2. `Pipeline._report_traceability` ne declarait que les ids qualifies par
+   **story** : `f"{s.id}.{c.id}"` soit `TS-1.AC-1`. Aucun marqueur ne pouvait
+   matcher, d'ou `covered=0` ; et chaque marqueur, absent des ids declares,
+   tombait dans `orphans`.
+
+Le filtre anti-faux-positif existant (`declared_bare`, ajoute en juillet apres
+le premier defaut de deduplication globale des ids `AC-1..AC-n`) ne couvre que
+les marqueurs **nus** (`AC: AC-2`). Un marqueur qualifie par une tache n'est ni
+nu ni declare : il passait tout droit en orphelin.
+
+Fait structurant : les criteres d'une tache sont un **sous-ensemble** de ceux de
+sa story et portent les **memes ids nus** (`models.Task.acceptance_criteria` vs
+`UserStory.acceptance_criteria`). `TS1-T1.AC-1` et `TS-1.AC-1` designent donc le
+meme critere. Ce sont des alias, pas deux criteres.
+
+#### Fix
+
+1. **`autospec/orchestrator/traceability.py`** : nouvelle fonction pure
+   `fold_aliases(report, aliases)` (exportee dans `__all__`, aucune I/O). Elle
+   replie un rapport calcule sur un espace d'ids **aliase** vers les ids
+   **canoniques** : un critere canonique est couvert si l'un quelconque de ses
+   alias l'est ; `uncovered` = canoniques sans alias couvert ; `orphans` repris
+   tels quels (un orphelin n'est par construction pas un id declare, donc il n'a
+   pas de forme canonique).
+2. **`autospec/orchestrator/pipeline.py`**, `_report_traceability` (~l. 5325) :
+   construction d'un dictionnaire `alias -> canonique` avant l'appel :
+   - pour chaque story `s` et critere `c` : `f"{s.id}.{c.id}"` vers lui-meme ;
+   - pour chaque tache `t` de `s.tasks` et critere `c` de `t` :
+     `f"{t.id}.{c.id}"` vers `f"{s.id}.{c.id}"` si la story declare ce `c.id`,
+     sinon vers `f"{t.id}.{c.id}"` (critere a part entiere, declare tel quel).
+
+   `coverage_report` est appele avec **l'ensemble** des ids declares
+   (`set(aliases)`, story + tache), puis le resultat passe par `fold_aliases`.
+   Le filtre `declared_bare` est etendu aux ids nus des criteres de taches.
+   L'evenement monitor et les messages gardent leur forme exacte : les compteurs
+   `covered` / `uncovered` / `orphans` portent sur les **canoniques**.
+
+Les TS enfants (`parent_id`) n'ont pas eu besoin d'un traitement separe : une TS
+est une `UserStory` a part entiere de `state.stories`, donc deja couverte par la
+boucle sur les stories, et ses propres taches par la boucle imbriquee.
+
+#### Tests
+
+`backend/tests/test_wave6_traceability_aliases.py`, 9 tests. Deux unitaires purs
+sur `fold_aliases` (repli de deux alias sur un critere ; orphelins conserves et
+entrees vides tolerees), puis les cas (a) a (e) sur `_report_traceability`
+(monitor capture, `_collect_test_sources` / `_collect_frontend_test_sources`
+stubbes) :
+
+| Cas | Scenario | Attendu |
+| --- | --- | --- |
+| a | US-1 (AC-1, AC-2), taches US1-T1 (AC-1) / US1-T2 (AC-2), marqueurs qualifies par tache | covered 2, uncovered 0, orphans 0 |
+| b | marqueur qualifie par **story** (`US-1.AC-1`) | couvre toujours |
+| c | marqueur `US9-T9.AC-1` inconnu | orphelin (1) |
+| d | marqueur **nu** `AC-1` | ni couvert ni orphelin |
+| e | tache declarant `AC-7` que la story n'a pas | declare tel quel, couvert si marque ; `US1-T2.AC-8` non marque remonte en `uncovered` + `delivery_issues` |
+
+Plus la reproduction du run reel (3 stories, 8 taches, 24 marqueurs qualifies par
+tache) : `orphans == 0` et `covered == 11` (tous les canoniques atteignables
+depuis une tache), et un test-garde qui verifie que le rapport **brut** sur les
+seuls ids story affiche encore la signature du defaut
+(`covered=[]`, 11 uncovered, 24 orphans) : il prouve que c'est bien le repli qui
+corrige, pas une modification du corpus de test.
+
+Suites ciblees rejouees vertes : `test_wave6_traceability_aliases.py`,
+`test_traceability.py` (24 passed), `test_pipeline.py`, `test_delivery_gate.py`,
+`test_supervised_run_fixes.py` (91 passed).
+`ruff check --no-fix` sur les deux fichiers modifies : **zero nouveau
+signalement** (les 2 restants sur `traceability.py`, `RUF022` et `C901`, sont
+anterieurs et identiques sur la version HEAD).
+
+#### Verification hors-ligne sur le projet reel
+
+Script temporaire `backend/logs/wave6_offline_check.py` (hors depot) : il charge
+`workspace/drv-p3-9ae648a7/autospec-state.json`, rescanne les 34 fichiers de
+test de `tests/` et `frontend/src`, et rejoue le rapport avant / apres.
+
+```
+stories 3, taches 8, fichiers de test 34, marqueurs distincts 24
+
+AVANT (ids qualifies par story uniquement)
+  declares  : 12
+  covered   : 0
+  uncovered : 12
+  orphans   : 24
+
+APRES (story + tache, alias replies)
+  ids declares : 36 (criteres canoniques : 12)
+  covered   : 9
+  uncovered : 3  [US-1.AC-4, US-2.AC-4, US-2.AC-5]
+  orphans   : 0
+
+marqueurs ni declares ni nus : 0
+```
+
+L'avant reproduit **exactement** la signature observee en production
+(`covered=0 uncovered=12 orphans=24`). Apres le fix, les 24 marqueurs sont tous
+expliques : ils se replient sur 9 criteres canoniques (TS-1.AC-1..3 marques par
+4 taches, US-1.AC-1..3 par 2 taches, US-2.AC-1..3 par 2 taches).
+
+#### Points d'attention
+
+1. **Les 3 `uncovered` restants sont un vrai trou, pas un bug de tracabilite.**
+   `US-1.AC-4`, `US-2.AC-4` et `US-2.AC-5` sont des criteres de story qu'**aucune
+   tache ne reprend** : la decomposition en taches a perdu des criteres en
+   chemin. Le rapport les signale desormais correctement, et c'est le prochain
+   defaut d'usine a instruire (cote decomposition, pas cote tracabilite).
+2. **Le prompt `dev_story` n'a pas ete touche.** Le marqueur qualifie par la
+   tache reste ce que le worker produit ; on l'accepte au lieu de le combattre.
+   Corollaire : si le sujet de build change encore de nature, il faudra etendre
+   le dictionnaire d'alias, pas le prompt.
+3. **Un critere de tache absent de sa story est declare sous l'id de la tache.**
+   C'est volontaire (cas e) mais cela veut dire qu'un id nu invente par le
+   planificateur cree un critere canonique supplementaire dans le compte, sans
+   equivalent dans la story.
+4. **`ac_traceability_enabled` est pinne a `False` dans `conftest.py`** : les
+   tests de la vague le reactivent explicitement, comme les vagues precedentes.

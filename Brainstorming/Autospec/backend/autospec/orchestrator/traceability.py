@@ -47,6 +47,7 @@ __all__ = [
     "test_functions_with_acs",
     "map_acs_to_tests",
     "coverage_report",
+    "fold_aliases",
 ]
 
 # An AC marker: ``AC:`` (optionally ``# AC:``) followed by one or more
@@ -205,4 +206,43 @@ def coverage_report(all_ac_ids: set[str], test_sources: dict[str, str]) -> dict:
         "covered": sorted(declared & referenced),
         "uncovered": sorted(declared - referenced),
         "orphans": sorted(referenced - declared),
+    }
+
+
+def fold_aliases(report: dict, aliases: dict[str, str]) -> dict:
+    """Collapse a :func:`coverage_report` over ALIASED ids onto its canonical ids.
+
+    Context (multi-stream builds). The same acceptance criterion can be named by
+    two different qualified ids: a story-qualified one (``US-1.AC-1``) and a
+    task-qualified one (``US1-T1.AC-1``), because a task carries a SUBSET of its
+    story's criteria under the very same bare ids, and a worker building a task
+    marks its tests with the task id. Both markers verify the SAME criterion, so
+    a report computed over the union of both id spaces double-counts it (and
+    reports the task-qualified marker as an orphan when only story ids are
+    declared).
+
+    ``aliases`` maps every DECLARED id (story- and task-qualified alike) to the
+    canonical id it stands for; a canonical id maps to itself. ``report`` is the
+    raw :func:`coverage_report` computed over ``set(aliases)``. The fold returns
+    the same three sorted lists, expressed on canonical ids only:
+
+    - ``covered``   - a canonical id ANY of whose aliases is covered;
+    - ``uncovered`` - a canonical id NO alias of which is covered;
+    - ``orphans``   - carried over verbatim (an orphan is, by construction, not
+      a declared id, so it has no canonical form).
+
+    Pure: no I/O, no mutation of the inputs. An empty ``aliases`` yields the
+    report's orphans and nothing else. Never raises.
+    """
+    aliases = dict(aliases or {})
+    canonical = set(aliases.values())
+    covered = {
+        aliases[declared]
+        for declared in (report or {}).get("covered", ())
+        if declared in aliases
+    }
+    return {
+        "covered": sorted(covered),
+        "uncovered": sorted(canonical - covered),
+        "orphans": sorted((report or {}).get("orphans", ())),
     }
