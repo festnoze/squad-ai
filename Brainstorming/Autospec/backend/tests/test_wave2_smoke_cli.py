@@ -14,6 +14,7 @@ makes the stderr trap observable - a launcher writing its own progress lines to
 stderr must never make a mute CLI look talkative.
 """
 
+import io
 import os
 import subprocess
 import sys
@@ -27,7 +28,7 @@ from autospec.models import ProjectState, StoryStatus, UserStory
 from autospec.orchestrator.pipeline import Pipeline
 from autospec.storage import workspace_dir
 
-_REAL_RUN = subprocess.run
+_REAL_POPEN = subprocess.Popen
 
 MUTE_MAIN = "import sys\n\nraise SystemExit(0)\n"
 
@@ -77,6 +78,34 @@ def _scaffold(ws: Path, main_py: str) -> Path:
     return ws
 
 
+class _CannedProc:
+    """A process that exits 0 after writing canned text, for the tests that
+    probe the LAUNCH (argv, pipes) rather than the delivered program."""
+
+    pid = 4321
+    returncode = 0
+
+    def __init__(self, out: str, *, stderr=None, err: str = ""):
+        self.stdout = io.StringIO(out)
+        self.stderr = io.StringIO(err) if stderr is subprocess.PIPE else None
+
+    def wait(self, timeout=None): return self.returncode
+    def poll(self): return self.returncode
+
+
+class _NeutralProc:
+    """A launch that is not the delivered ``main.py``: answered with a neutral
+    success instead of being executed."""
+
+    pid = 4321
+    returncode = 0
+    stdout = None
+    stderr = None
+
+    def wait(self, timeout=None): return 0
+    def poll(self): return 0
+
+
 def _run_with_current_python(monkeypatch) -> list[list[str]]:
     """Replace ``uv run python main.py ...`` by ``<this python> main.py ...``.
 
@@ -84,18 +113,22 @@ def _run_with_current_python(monkeypatch) -> list[list[str]]:
     test can assert WHETHER the --help probe ran, not only what it concluded.
     Anything that is not a main.py launch (the workspace port killer, ...) is
     answered with a neutral success instead of being executed.
+
+    W8: the gate launches the CLI through ``Popen`` (the bounded launcher owns
+    the timeout and the tree kill), so the swap happens at that level - the
+    delivered entry point still runs FOR REAL.
     """
     launched: list[list[str]] = []
 
-    def runner(cmd, **kwargs):
+    def launcher(cmd, **kwargs):
         argv = [str(c) for c in cmd]
         if "main.py" not in argv:
-            return subprocess.CompletedProcess(args=argv, returncode=0, stdout="", stderr="")
+            return _NeutralProc()
         tail = argv[argv.index("main.py"):]
         launched.append(tail)
-        return _REAL_RUN([sys.executable, *tail], **kwargs)
+        return _REAL_POPEN([sys.executable, *tail], **kwargs)
 
-    monkeypatch.setattr(subprocess, "run", runner)
+    monkeypatch.setattr(subprocess, "Popen", launcher)
     return launched
 
 
@@ -189,17 +222,28 @@ def test_a_web_product_never_runs_the_help_probe(monkeypatch):
     listening port, and `--help` on a server would hang or lie."""
     monkeypatch.setattr(settings, "smoke_cli_help", True)
     monkeypatch.setattr(settings, "smoke_run_timeout_s", 1.0)
-    launched = _run_with_current_python(monkeypatch)
 
     class _DeadProc:
         pid = 4321
         returncode = 3
         stdout = None
+        stderr = None
 
         def poll(self):
             return self.returncode
 
-    monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: _DeadProc())
+        def wait(self, timeout=None):
+            return self.returncode
+
+    launched: list[list[str]] = []
+
+    def launcher(cmd, **_kwargs):
+        argv = [str(c) for c in cmd]
+        if "main.py" in argv:
+            launched.append(argv[argv.index("main.py"):])
+        return _DeadProc()
+
+    monkeypatch.setattr(subprocess, "Popen", launcher)
     monkeypatch.setattr(Pipeline, "_terminate_tree", staticmethod(lambda proc: None))
     monkeypatch.setattr(
         Pipeline, "_kill_workspace_port_holders", staticmethod(lambda port, ws: 0)
@@ -213,7 +257,10 @@ def test_a_web_product_never_runs_the_help_probe(monkeypatch):
 
     assert ok is False
     assert "ne démarre pas le serveur" in detail
-    assert launched == []                  # nothing went through the CLI branch
+    # The web branch boots main.py to watch its port, but the --help probe (the
+    # CLI-only contract) must NEVER be launched on a server.
+    assert launched == [["main.py"]]
+    assert all("--help" not in tail for tail in launched)
 
 
 def test_the_probe_relays_its_own_launcher(monkeypatch):
@@ -221,11 +268,11 @@ def test_the_probe_relays_its_own_launcher(monkeypatch):
     project launched through `uv run` keeps being launched through it."""
     seen: list[list[str]] = []
 
-    def runner(cmd, **kwargs):
+    def launcher(cmd, **kwargs):
         seen.append([str(c) for c in cmd])
-        return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="usage: x", stderr="")
+        return _CannedProc("usage: x", stderr=kwargs.get("stderr"))
 
-    monkeypatch.setattr(subprocess, "run", runner)
+    monkeypatch.setattr(subprocess, "Popen", launcher)
     monkeypatch.setattr(settings, "smoke_cli_help", True)
     state = _state("smoke-cli-argv")
     ws = _scaffold(workspace_dir(state.id), MUTE_MAIN)
@@ -243,18 +290,18 @@ def test_the_helper_is_a_pure_probe_of_stdout(monkeypatch, tmp_path):
     """Unit view of the probe itself: exit code and stdout are the only inputs."""
     calls: list[dict] = []
 
-    def runner(cmd, **kwargs):
+    def launcher(cmd, **kwargs):
         calls.append(kwargs)
-        return subprocess.CompletedProcess(
-            args=cmd, returncode=0, stdout="  usage: demo  ", stderr="noise"
-        )
+        return _CannedProc("  usage: demo  ", stderr=kwargs.get("stderr"), err="noise")
 
-    monkeypatch.setattr(subprocess, "run", runner)
+    monkeypatch.setattr(subprocess, "Popen", launcher)
     ok, detail = Pipeline._smoke_cli_help_run(
         tmp_path, ["uv", "run", "python", "main.py"], dict(os.environ), 5.0
     )
     assert ok is True and "--help" in detail
     # stdout and stderr MUST be two distinct pipes (the launcher-noise trap):
-    # capture_output gives exactly that, and stderr is never merged into stdout.
-    assert calls[0]["capture_output"] is True
-    assert calls[0].get("stderr") is not subprocess.STDOUT
+    # each stream gets its own bounded reader, and stderr is never merged into
+    # stdout.
+    assert calls[0]["stdout"] is subprocess.PIPE
+    assert calls[0]["stderr"] is subprocess.PIPE
+    assert calls[0]["stderr"] is not subprocess.STDOUT

@@ -53,7 +53,7 @@ replay canari sur rouge vide (aucun rouge d'infra).
 |---|---|---|---|
 | D1 | Smoke rouge : aucune tache n'a cree l'app FastAPI ni fait demarrer le serveur par `main.py` (jamais modifie depuis le scaffold, aucun `uvicorn` dans le projet) ; les features publiaient leurs routes dans une table en attendant un « mounter » que personne ne portait | Le bloc de planification disait qu'une feature cablee par convention « n'a besoin d'AUCUNE tache d'integration » : vrai pour les routes, faux pour l'amorcage du serveur ; la regle « main.py DOIT demarrer le serveur » n'existait que dans le prompt dev de la tache qui aurait main.py dans son perimetre | Vague 5 : garde deterministe `_ensure_web_wiring_task` (WEB_WIRING_TASK) qui ajoute une tache d'amorcage web (app factory + main.py + pyproject) en fin de chaine backend quand aucune unite ne declare main.py ; prompts plan/decompose/dev corriges ; docstring du scaffold |
 | D2 | Tracabilite covered=0, 24 « orphelins » alors que les tests portent de bons marqueurs | Les devs qualifient le marqueur par l'id de TACHE (`# AC: TS1-T1.AC-1`, leur sujet de build), le rapport ne declarait que les ids qualifies par STORY (`TS-1.AC-1`) | Vague 6 : `traceability.fold_aliases` + dictionnaire d'alias tache -> story dans `_report_traceability`. Rejoue hors ligne sur ce projet : covered 9, orphans 0, 3 criteres de story (US-1.AC-4, US-2.AC-4, US-2.AC-5) reellement portes par aucune tache (trou de decomposition, a traiter cote plan) |
-| D3 | Evaluateur gele 2 h, serveur genere fuite sur :8000 | `subprocess.run(uv run python main.py, timeout=20)` : au timeout seul `uv` est tue, le petit-fils uvicorn survit et tient le tube stdout, `communicate()` bloque | Vague 7 : Popen + thread lecteur daemon borne + `_kill_tree` au timeout + filet par port |
+| D3 | Evaluateur gele 2 h, serveur genere fuite sur :8000 | `subprocess.run(uv run python main.py, timeout=20)` : au timeout seul `uv` est tue, le petit-fils uvicorn survit et tient le tube stdout, `communicate()` bloque | Vague 7 : Popen + thread lecteur daemon borne + `_kill_tree` au timeout + filet par port. Vague 8 : le meme lanceur borne (`_run_capped_process`) sert aussi la branche CLI du smoke (`main.py` et `--help`) qui portait le meme piege |
 
 Suivis non bloquants notes : `suites_per_item` compte les sondes du scope gate
 (5 par tache ici), a distinguer ou documenter ; les stories techniques
@@ -62,3 +62,5 @@ repertoires de worktrees de juillet trainent dans `workspace/_worktrees/`
 (11 Mo, runs interrompus) : un balayage au demarrage, symetrique du balayage de
 process, les purgerait ; le plafond du pilote a ete atteint uniquement a cause
 de D3.
+
+Dernier endroit de cette classe encore non traite : `runtime_acceptance.py` (subprocess.run sur le script node qui spawne backend et frontend), candidat direct pour le lanceur borne partage.

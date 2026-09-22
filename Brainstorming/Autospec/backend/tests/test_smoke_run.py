@@ -3,6 +3,7 @@ delivered app and require it to actually start — a non-runnable build fails th
 iteration like a red test. These tests cover the gate contract and the
 runnability check without launching `uv` (the subprocess/socket are faked)."""
 
+import io
 import socket as socketmod
 import subprocess
 from pathlib import Path
@@ -41,6 +42,21 @@ class _FakeSock:
 class _FakeProc:
     def __init__(self, alive=True): self._alive = alive; self.pid = 4321; self.returncode = 7; self.stdout = None
     def poll(self): return None if self._alive else self.returncode
+
+
+class _FakeCliProc:
+    """A CLI launched by the W8 bounded launcher: it exits immediately with
+    ``code`` after printing ``out``. The launcher is a Popen user now (it must
+    own the timeout path), so the CLI branch is faked at that level."""
+
+    def __init__(self, code=0, out="", stderr=None):
+        self.pid = 4321
+        self.returncode = code
+        self.stdout = io.StringIO(out)
+        self.stderr = io.StringIO(out) if stderr is subprocess.PIPE else None
+
+    def wait(self, timeout=None): return self.returncode
+    def poll(self): return self.returncode
 
 
 # ----------------------------------------------------------------- gate contract
@@ -171,8 +187,10 @@ def test_smoke_web_expected_by_intent_without_framework_fails(monkeypatch):
 
 
 def test_smoke_python_cli_exit_zero_passes(monkeypatch):
-    completed = subprocess.CompletedProcess(args=[], returncode=0, stdout="done")
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed)
+    monkeypatch.setattr(
+        subprocess, "Popen",
+        lambda *a, **k: _FakeCliProc(0, "done", stderr=k.get("stderr")),
+    )
     state = _state_with_done_story("smoke-cli-ok")
     ws = _scaffold(workspace_dir(state.id), web=False)
     pipeline = Pipeline(state, ScriptedRunner())
@@ -182,8 +200,10 @@ def test_smoke_python_cli_exit_zero_passes(monkeypatch):
 
 
 def test_smoke_python_cli_nonzero_fails(monkeypatch):
-    completed = subprocess.CompletedProcess(args=[], returncode=1, stdout="boom")
-    monkeypatch.setattr(subprocess, "run", lambda *a, **k: completed)
+    monkeypatch.setattr(
+        subprocess, "Popen",
+        lambda *a, **k: _FakeCliProc(1, "boom", stderr=k.get("stderr")),
+    )
     state = _state_with_done_story("smoke-cli-ko")
     ws = _scaffold(workspace_dir(state.id), web=False)
     pipeline = Pipeline(state, ScriptedRunner())

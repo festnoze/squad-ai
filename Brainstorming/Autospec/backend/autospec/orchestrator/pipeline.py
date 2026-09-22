@@ -20,6 +20,7 @@ import signal
 import subprocess
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from ..agents import prompts
@@ -138,6 +139,170 @@ _SAFE_ENV_KEYS = {
 # A chatty server (or a runaway loop) can emit megabytes per second; the
 # evaluator prompt only ever needs the startup output.
 _EVALUATOR_OUTPUT_CAP = 200_000
+
+# W8: same ceiling for the smoke gate. A CLI that floods stdout must not turn
+# the gate detail into a multi-megabyte string; only the tail is ever reported.
+_SMOKE_OUTPUT_CAP = 100_000
+
+# W8: how long the launcher waits for a reader thread once the process is gone.
+# A detached grandchild can keep the inherited pipe open forever, so this join
+# is BOUNDED by construction and the thread is a daemon.
+_CAPPED_RUN_JOIN_S = 2.0
+
+
+@dataclass
+class CappedRun:
+    """Outcome of :func:`_run_capped_process` - never a live handle.
+
+    ``output``/``stderr_output`` are what the bounded readers managed to drain,
+    ``launch_error`` is non-empty when the process could not even start (and
+    then nothing else is meaningful), and ``pipe_leaked`` says a reader was
+    still blocked on the pipe when we gave up on it (a detached grandchild
+    inherited it), which means the capture is incomplete.
+    """
+
+    returncode: int | None = None
+    output: str = ""
+    stderr_output: str = ""
+    timed_out: bool = False
+    killed_tree: bool = False
+    truncated: bool = False
+    pipe_leaked: bool = False
+    launch_error: str = ""
+
+
+def _run_capped_process(
+    cmd: list,
+    *,
+    cwd,
+    env: dict,
+    timeout: float,
+    output_cap: int,
+    kill_tree,
+    stderr=subprocess.STDOUT,
+    on_timeout=None,
+    name: str = "capped-run",
+) -> CappedRun:
+    """Launch ``cmd``, capture a BOUNDED amount of its output, and come back
+    within ``timeout`` (plus a few seconds of best-effort cleanup) whatever the
+    launched program does.
+
+    W7/W8 - this is the one launcher the factory uses for untrusted generated
+    entry points (evaluator run, smoke CLI run, ``--help`` probe). The obvious
+    ``subprocess.run(..., timeout=...)`` is a trap: at the timeout it kills only
+    the DIRECT child (``uv.exe``) and then calls ``communicate()`` to collect
+    the output. On Windows the grandchild (the ``python`` that ``uv`` spawned)
+    survives and keeps the INHERITED stdout pipe open, so that read blocks
+    forever - a 45 minute freeze was observed in a supervised run. Hence:
+
+    * ``Popen`` (never ``run``), so we own the timeout path;
+    * DAEMON reader threads with a hard buffer cap, so a chatty app can neither
+      fill the pipe (deadlock) nor blow up memory;
+    * ``kill_tree`` at the timeout (``taskkill /T`` on Windows) plus, on POSIX,
+      a process-group kill - the ``start_new_session`` above makes ``proc.pid``
+      the group leader, so only our own descendants are signalled;
+    * a BOUNDED join afterwards, and NEVER a pipe read after the kill.
+
+    ``stderr`` selects how the second stream is handled: ``subprocess.STDOUT``
+    merges it into the captured output (the default), ``subprocess.PIPE`` drains
+    it into its own capped buffer (``stderr_output``, needed by the ``--help``
+    probe where launcher noise must not count as help), ``subprocess.DEVNULL``
+    drops it. ``on_timeout`` is a best-effort cleanup hook (port sweep) run
+    right after the tree kill.
+    """
+    popen_kwargs: dict = {}
+    if os.name != "nt":
+        # POSIX: own session so the whole group can be signalled at the timeout.
+        popen_kwargs["start_new_session"] = True
+    try:
+        proc = subprocess.Popen(
+            cmd, cwd=str(cwd),
+            stdout=subprocess.PIPE, stderr=stderr,
+            env=env, text=True, encoding="utf-8", errors="replace",
+            **popen_kwargs,
+        )
+    except OSError as exc:
+        return CappedRun(launch_error=str(exc))
+
+    buffers: dict[str, list[str]] = {"out": [], "err": []}
+    capped: dict[str, bool] = {"out": False, "err": False}
+
+    def _pump(stream, key: str) -> None:
+        """Drain one stream into a BOUNDED buffer. Daemon thread: if a detached
+        grandchild outlives us it may keep the pipe open forever, and that must
+        never hold this phase (or the interpreter) hostage."""
+        captured = 0
+        chunks = buffers[key]
+        try:
+            while True:
+                line = stream.readline(16384)
+                if not line:
+                    break
+                if captured >= output_cap:
+                    capped[key] = True
+                    continue
+                room = output_cap - captured
+                if len(line) > room:
+                    capped[key] = True
+                chunks.append(line[:room])
+                captured += len(line)
+        except (OSError, ValueError):  # pipe closed under us
+            pass
+
+    readers: list[threading.Thread] = []
+    for stream, key in ((proc.stdout, "out"), (proc.stderr, "err")):
+        if stream is None:
+            continue
+        thread = threading.Thread(
+            target=_pump, args=(stream, key), daemon=True, name=f"{name}-{key}",
+        )
+        thread.start()
+        readers.append(thread)
+
+    code: int | None = None
+    timed_out = False
+    killed = False
+    try:
+        code = proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        try:
+            killed = bool(kill_tree(proc))
+        except Exception:  # noqa: BLE001 - the kill is best-effort, never fatal
+            killed = False
+        if os.name != "nt":
+            # ``kill_tree`` only signals the DIRECT child on POSIX, which would
+            # leave the grandchild (the actual server) alive; the session opened
+            # above makes this group exactly our own descendants.
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (OSError, AttributeError):
+                pass
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
+        if on_timeout is not None:
+            try:
+                on_timeout()
+            except Exception:  # noqa: BLE001 - cleanup is best-effort
+                pass
+
+    # The process is gone: whatever it buffered is already in the pipe, so a
+    # short join is enough. A reader STILL blocked here means a detached
+    # grandchild inherited the pipe and keeps it open - we leave it to the
+    # daemon thread instead of waiting on it.
+    for thread in readers:
+        thread.join(timeout=_CAPPED_RUN_JOIN_S)
+    return CappedRun(
+        returncode=code,
+        output="".join(buffers["out"]),
+        stderr_output="".join(buffers["err"]),
+        timed_out=timed_out,
+        killed_tree=killed,
+        truncated=capped["out"] or capped["err"],
+        pipe_leaked=any(thread.is_alive() for thread in readers),
+    )
 
 
 def _reset_for_restore(item) -> None:
@@ -2582,6 +2747,9 @@ class Pipeline:
         phase froze for 45 minutes and leaked a listening server. So: Popen, a
         DAEMON reader thread with a bounded buffer, ``_kill_tree`` on timeout,
         and NEVER a pipe read after the kill.
+
+        W8: that launcher is now :func:`_run_capped_process`, shared with the
+        smoke CLI gate which carried the very same trap.
         """
         if settings.fake_agents:
             return "mode démo : exécution réelle du produit court-circuitée"
@@ -2593,98 +2761,44 @@ class Pipeline:
         expects_web = self._expects_web_app()
         cap = _EVALUATOR_OUTPUT_CAP
 
+        def _sweep_ports() -> None:
+            """Last net, like the smoke gate: a uvicorn reload supervisor can
+            respawn a worker that still holds the port. Web products only."""
+            if not expects_web:
+                return
+            try:
+                self._kill_workspace_port_holders(
+                    self._resolve_web_port(ws), Path(settings.workspace_root)
+                )
+            except Exception:  # noqa: BLE001 - cleanup is best-effort
+                pass
+
         def _run() -> tuple[str, bool, bool, bool]:
             """Returns (text, ok, timed_out, killed_tree)."""
-            popen_kwargs: dict = {}
-            if os.name != "nt":
-                # POSIX: own session so the whole group can be signalled.
-                popen_kwargs["start_new_session"] = True
-            try:
-                proc = subprocess.Popen(
-                    cmd, cwd=str(ws),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    env=env, text=True, encoding="utf-8", errors="replace",
-                    **popen_kwargs,
-                )
-            except OSError as exc:
-                return f"(lancement impossible : {exc})", False, False, False
-
-            chunks: list[str] = []
-            captured = 0
-
-            def _pump() -> None:
-                """Drain stdout into a BOUNDED buffer. Daemon thread: if the
-                grandchild outlives us it may keep the pipe open forever, and
-                that must never hold the interpreter (or this phase) hostage."""
-                nonlocal captured
-                stream = proc.stdout
-                if stream is None:
-                    return
-                try:
-                    while True:
-                        line = stream.readline(16384)
-                        if not line:
-                            break
-                        if captured < cap:
-                            chunks.append(line[: cap - captured])
-                            captured += len(line)
-                except (OSError, ValueError):  # pipe closed under us
-                    pass
-
-            reader = threading.Thread(target=_pump, daemon=True, name="evaluator-run")
-            reader.start()
-            try:
-                code = proc.wait(timeout=timeout)
-            except subprocess.TimeoutExpired:
-                killed = self._kill_tree(proc)
-                if os.name != "nt":
-                    # POSIX: ``_kill_tree`` only signals the DIRECT child, which
-                    # would leave the grandchild (the actual server) alive. The
-                    # session opened above makes ``proc.pid`` the group leader,
-                    # so this reaps the descendants without ever touching a
-                    # process outside the one we started.
-                    try:
-                        os.killpg(proc.pid, signal.SIGKILL)
-                    except (OSError, AttributeError):
-                        pass
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    pass
-                if expects_web:
-                    # Last net, like the smoke gate: a uvicorn reload supervisor
-                    # can respawn a worker that still holds the port.
-                    try:
-                        self._kill_workspace_port_holders(
-                            self._resolve_web_port(ws), Path(settings.workspace_root)
-                        )
-                    except Exception:  # noqa: BLE001 - cleanup is best-effort
-                        pass
-                reader.join(timeout=2)
+            run = _run_capped_process(
+                cmd, cwd=ws, env=env, timeout=timeout, output_cap=cap,
+                kill_tree=self._kill_tree, on_timeout=_sweep_ports,
+                name="evaluator-run",
+            )
+            if run.launch_error:
+                return f"(lancement impossible : {run.launch_error})", False, False, False
+            if run.timed_out:
                 return (
                     f"(toujours actif après {timeout:g}s — probablement un service de "
-                    f"longue durée)\n" + "".join(chunks),
-                    True, True, killed,
+                    f"longue durée)\n" + run.output,
+                    True, True, run.killed_tree,
                 )
-            # The entry point exited: whatever it buffered is already in the
-            # pipe, so a short join is enough. A reader STILL blocked here means
-            # a detached grandchild inherited the pipe and keeps it open - we
-            # leave it to the daemon thread instead of waiting on it.
-            reader.join(timeout=2)
-            leaked = reader.is_alive()
-            if leaked and expects_web:
-                try:
-                    self._kill_workspace_port_holders(
-                        self._resolve_web_port(ws), Path(settings.workspace_root)
-                    )
-                except Exception:  # noqa: BLE001 - cleanup is best-effort
-                    pass
+            # The entry point exited, but a reader still blocked on the pipe
+            # means a detached grandchild inherited it: report the truncation
+            # instead of hiding it, and sweep the port it may be holding.
+            if run.pipe_leaked:
+                _sweep_ports()
             tail = (
                 "\n(sortie tronquée : un processus détaché garde le tube ouvert)"
-                if leaked else ""
+                if run.pipe_leaked else ""
             )
             return (
-                f"(processus terminé, code {code})\n" + "".join(chunks) + tail,
+                f"(processus terminé, code {run.returncode})\n" + run.output + tail,
                 True, False, False,
             )
 
@@ -9555,24 +9669,39 @@ class Pipeline:
                 self._kill_workspace_port_holders(port, Path(settings.workspace_root))
 
         # CLI: must run to completion with exit code 0.
-        try:
-            proc = subprocess.run(
-                cmd, cwd=str(ws), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                env=env, text=True, encoding="utf-8", errors="replace", timeout=timeout,
+        #
+        # W8: the same bounded launcher as the evaluator (W7). The previous
+        # ``subprocess.run(..., timeout=...)`` claimed to cover the "loop or
+        # blocking server" case its own message names, but at the timeout it
+        # killed only the DIRECT child and then blocked on the pipe still held
+        # by the grandchild - a looping CLI froze the whole gate.
+        run = _run_capped_process(
+            cmd, cwd=ws, env=env, timeout=timeout, output_cap=_SMOKE_OUTPUT_CAP,
+            kill_tree=self._kill_tree, name="smoke-cli-run",
+        )
+        if run.launch_error:
+            return False, f"lancement impossible : {run.launch_error}"
+        if run.timed_out:
+            self.monitor.event(
+                "smoke_cli", probe="run", ok=False,
+                timed_out=True, killed_tree=run.killed_tree,
             )
-        except subprocess.TimeoutExpired:
             return False, f"le CLI n'a pas terminé en {timeout:.0f}s (boucle/serveur bloquant ?)"
-        except OSError as exc:
-            return False, f"lancement impossible : {exc}"
-        if proc.returncode != 0:
-            return False, f"sortie non nulle (code {proc.returncode}) : {(proc.stdout or '')[-300:].strip()}"
+        if run.returncode != 0:
+            self.monitor.event(
+                "smoke_cli", probe="run", ok=False, timed_out=False, killed_tree=False,
+            )
+            return False, f"sortie non nulle (code {run.returncode}) : {(run.output or '')[-300:].strip()}"
+        self.monitor.event(
+            "smoke_cli", probe="run", ok=True, timed_out=False, killed_tree=False,
+        )
         if not self._setting("smoke_cli_help"):
             return True, "CLI exécuté (code 0)"
-        return self._smoke_cli_help_run(ws, cmd, env, timeout)
+        return self._smoke_cli_help_run(ws, cmd, env, timeout, monitor=self.monitor)
 
     @staticmethod
     def _smoke_cli_help_run(
-        ws: Path, cmd: list[str], env: dict[str, str], timeout: float
+        ws: Path, cmd: list[str], env: dict[str, str], timeout: float, *, monitor=None,
     ) -> tuple[bool, str]:
         """FACTORY_IMPROVEMENTS #4: a non-web product must ANSWER, not just exit 0.
 
@@ -9582,33 +9711,48 @@ class Pipeline:
         AND writes a usable help message on stdout. stdout and stderr are
         captured SEPARATELY on purpose - the launcher (``uv run``) writes its own
         progress lines ("Creating virtual environment...") to stderr, and merging
-        them would make every mute CLI look talkative."""
-        try:
-            helped = subprocess.run(
-                [*cmd, "--help"], cwd=str(ws), capture_output=True,
-                env=env, text=True, encoding="utf-8",
-                errors="replace", timeout=timeout,
-            )
-        except subprocess.TimeoutExpired:
+        them would make every mute CLI look talkative.
+
+        W8: launched through :func:`_run_capped_process` (``stderr=PIPE``, its
+        own bounded reader), so a ``--help`` that waits for input or leaves a
+        grandchild behind is tree-killed instead of freezing the gate."""
+        run = _run_capped_process(
+            [*cmd, "--help"], cwd=ws, env=env, timeout=timeout,
+            output_cap=_SMOKE_OUTPUT_CAP, kill_tree=Pipeline._kill_tree,
+            stderr=subprocess.PIPE, name="smoke-cli-help",
+        )
+
+        def _event(ok: bool) -> None:
+            if monitor is not None:
+                monitor.event(
+                    "smoke_cli", probe="help", ok=ok,
+                    timed_out=run.timed_out, killed_tree=run.killed_tree,
+                )
+
+        if run.launch_error:
+            return False, f"lancement impossible : {run.launch_error}"
+        if run.timed_out:
+            _event(False)
             return False, (
                 f"`main.py --help` n'a pas terminé en {timeout:.0f}s "
                 "(le CLI attend une entrée ou boucle ?)"
             )
-        except OSError as exc:
-            return False, f"lancement impossible : {exc}"
-        out = (helped.stdout or "").strip()
-        err = (helped.stderr or "").strip()
-        if helped.returncode != 0:
+        out = (run.output or "").strip()
+        err = (run.stderr_output or "").strip()
+        if run.returncode != 0:
+            _event(False)
             return False, (
-                f"`main.py --help` sort en erreur (code {helped.returncode}) : "
+                f"`main.py --help` sort en erreur (code {run.returncode}) : "
                 f"{(out or err)[-300:]}"
             )
         if not out:
+            _event(False)
             return False, (
                 "CLI muet : `main.py --help` n'affiche RIEN sur la sortie standard "
                 "(code 0). Un produit en ligne de commande doit relayer argv à ses "
                 "features et afficher une aide utilisable."
             )
+        _event(True)
         return True, f"CLI exécuté (code 0) et `--help` documenté ({len(out)} car.)"
 
     # ------------------------------------------------- Frontend stream (ST-7)

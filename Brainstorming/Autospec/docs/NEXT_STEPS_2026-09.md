@@ -1221,3 +1221,132 @@ petit-fils, soit 60 s ici, jamais en production).
 4. **`_EVALUATOR_OUTPUT_CAP` est un plafond de capture, pas de prompt** : la
    sortie est ensuite passee telle quelle a `prompts.evaluator_probe`. Si le
    prompt doit etre reduit, c'est un reglage separe.
+
+### Vague 8 (2026-09-22) - smoke CLI : lanceur borne partage
+
+**Statut : livree. Backend complet : 1364 passed, 0 failed (318,02 s)
+(`uv run pytest -q -p no:cacheprovider`, log `backend/logs/wave8_gate.log`),
+dont 5 nouveaux tests `tests/test_wave8_smoke_cli_tree_kill.py`
+(1359 avant la vague).**
+
+#### Defaut d'usine
+
+Point d'attention n. 1 de la vague 7, confirme ici : le piege corrige dans
+l'evaluateur (E6) survivait tel quel dans la branche CLI de la gate smoke.
+
+- `Pipeline._smoke_run_python` (branche non web) :
+  `subprocess.run([uv, run, python, main.py], stdout=PIPE, stderr=STDOUT,
+  timeout=smoke_run_timeout_s)` ;
+- `Pipeline._smoke_cli_help_run` : `subprocess.run([*cmd, "--help"],
+  capture_output=True, timeout=...)`.
+
+Au `TimeoutExpired`, `subprocess.run` ne tue que l'enfant DIRECT (`uv.exe`) puis
+appelle `communicate()` pour recuperer la sortie. Sous Windows le petit-fils
+(`python`) survit avec le tube stdout HERITE : la lecture bloque jusqu'a sa
+mort. Le message de la gate (« le CLI n'a pas termine en Ns (boucle/serveur
+bloquant ?) ») pretendait couvrir exactement le cas qu'il ne survivait pas.
+
+Reproduction hors usine, machine de dev, `main.py` qui spawne
+`python -c "import time; time.sleep(60)"` avec stdout herite puis boucle :
+`subprocess.run(..., timeout=3)` n'avait toujours pas rendu la main **25 s plus
+tard** (verifie avant le fix). Avec un petit-fils immortel, c'est « jamais ».
+La branche WEB du smoke, elle, etait deja correcte (`Popen` +
+`_terminate_tree` + double-tap `_kill_workspace_port_holders`).
+
+#### Fix
+
+`autospec/orchestrator/pipeline.py`. Le lanceur de la vague 7 a ete EXTRAIT de
+`_aexercise_product` en une fonction de module reutilisable, puis branche sur
+les trois chemins qui lancent du code genere non fiable :
+
+1. **`_run_capped_process(cmd, *, cwd, env, timeout, output_cap, kill_tree,
+   stderr=subprocess.STDOUT, on_timeout=None, name=...) -> CappedRun`**
+   (~l. 150, dataclass `CappedRun` : `returncode`, `output`, `stderr_output`,
+   `timed_out`, `killed_tree`, `truncated`, `pipe_leaked`, `launch_error`).
+   Il encapsule tout le protocole de la vague 7 : `Popen` (jamais `run`),
+   `start_new_session` sous POSIX, un thread lecteur DAEMON par flux avec
+   buffer borne (`readline(16384)`), `proc.wait(timeout)` au lieu de
+   `communicate()`, au timeout `kill_tree(proc)` + `os.killpg(SIGKILL)` sous
+   POSIX + `proc.wait(5)` best-effort + hook `on_timeout()`, enfin un
+   `join(2)` BORNE par lecteur et `pipe_leaked` si un lecteur tient encore.
+   Aucune lecture de tube apres le kill.
+2. **`stderr` parametrable** : `subprocess.STDOUT` (fusion, cas evaluateur et
+   run CLI), `subprocess.PIPE` (lecteur dedie borne -> `stderr_output`, cas
+   `--help`), `subprocess.DEVNULL`. Le contrat « stdout seul compte » de
+   `SMOKE_CLI_HELP` est donc preserve : le bruit du lanceur (`uv run` ecrit
+   « Creating virtual environment... » sur stderr) ne peut toujours pas faire
+   passer un CLI muet pour bavard.
+3. **`_aexercise_product`** appelle le helper : comportement, messages et
+   evenement `evaluator_run` strictement inchanges (le balayage des tenanciers
+   de port passe par `on_timeout` pour le timeout, et reste appele a part quand
+   le parent sort en laissant un petit-fils sur le tube).
+4. **`_smoke_run_python`, branche CLI** : helper avec
+   `output_cap=_SMOKE_OUTPUT_CAP` (100 000 caracteres, nouvelle constante) et
+   `kill_tree=self._kill_tree`. Messages existants conserves
+   (« le CLI n'a pas termine en Ns (boucle/serveur bloquant ?) »,
+   « sortie non nulle (code N) : ... », « lancement impossible : ... »).
+5. **`_smoke_cli_help_run`** : helper avec `stderr=subprocess.PIPE`, meme
+   plafond, `kill_tree=Pipeline._kill_tree`. Messages inchanges
+   (« `main.py --help` n'a pas termine en Ns ... », « sort en erreur »,
+   « CLI muet »). Signature elargie d'un `monitor=None` mot-cle seul (reste une
+   staticmethod appelable telle quelle).
+6. **Observabilite** : `monitor.event("smoke_cli", probe="run"|"help", ok=,
+   timed_out=, killed_tree=)`, sur le modele d'`evaluator_run`. Le champ
+   `probe` distingue le run nominal de la sonde `--help`.
+
+#### Tests
+
+`tests/test_wave8_smoke_cli_tree_kill.py`, 5 tests deterministes et
+multi-plateformes (aucune dependance a `uv` : `Pipeline._resolve_cmd` est
+monkeypatche vers `[sys.executable, "main.py"]`, `smoke_run_timeout_s` a 3 s),
+memes techniques de verification que la vague 7 (pid du petit-fils ecrit par
+`main.py`, `tasklist /FO CSV` sous Windows, `os.kill(pid, 0)` ailleurs) :
+
+1. CLI qui boucle avec un petit-fils vivant : retour en moins de 20 s, KO avec
+   le message timeout, **petit-fils mort**, evenement
+   `smoke_cli{probe=run, ok=False, timed_out=True, killed_tree=True}` ;
+2. `main.py` qui sort 0 mais dont `--help` spawne un petit-fils et dort : la
+   sonde time out, tue l'arbre, **petit-fils mort**, et les deux evenements
+   sont emis dans l'ordre (`run` OK puis `help` KO) ;
+3. parent qui sort en laissant un petit-fils sur le tube : la gate rend la main
+   tout de suite en code 0 (moitie « lecture apres sortie » du piege) ;
+4. cas nominal : `--help` documente -> OK, `documente (N car.)` ;
+5. commande introuvable : « lancement impossible », pas de traceback.
+
+Tests existants adaptes sans perte de cas, parce qu'ils monkeypatchaient
+`subprocess.run` sur ce chemin :
+
+- `tests/test_smoke_run.py` : `test_smoke_python_cli_exit_zero_passes` et
+  `test_smoke_python_cli_nonzero_fails` passent a un faux `Popen`
+  (`_FakeCliProc`, stdout `io.StringIO`, `wait()` immediat) ;
+- `tests/test_wave2_smoke_cli.py` : le helper `_run_with_current_python`
+  substitue desormais `subprocess.Popen` (le `main.py` livre continue a tourner
+  POUR DE VRAI avec l'interpreteur courant) ; `test_the_probe_relays_its_own_launcher`
+  et `test_the_helper_is_a_pure_probe_of_stdout` utilisent un faux `Popen`
+  (`_CannedProc`) et verifient maintenant `stdout is PIPE` et
+  `stderr is PIPE` (et pas `STDOUT`) au lieu de `capture_output=True` - meme
+  intention, deux tubes distincts ; `test_a_web_product_never_runs_the_help_probe`
+  enregistre les lancements et exige qu'aucun ne porte `--help` (la branche web
+  boote bien `main.py`, mais jamais la sonde).
+
+Lot cible : `test_wave8_smoke_cli_tree_kill.py`,
+`test_wave7_evaluator_tree_kill.py`, `test_smoke_run.py`,
+`test_wave2_smoke_cli.py`, `test_evaluator.py`, `test_pipeline.py` = 114 passed.
+
+#### Points d'attention
+
+1. **`runtime_acceptance.py` (~l. 135)** garde le meme raccourci :
+   `subprocess.run(["node", "scripts/runtime_acceptance.js"],
+   timeout=timeout + 15)` alors que le script JS spawne lui-meme backend et
+   frontend. Seul `node` serait tue ; c'est le dernier endroit de l'usine ou un
+   petit-fils serveur peut rejouer le blocage. Candidat direct pour
+   `_run_capped_process`.
+2. **`docker_deploy` / `setup_exec` / `pip-audit` / `npm install`** lancent des
+   commandes qui TERMINENT : hors perimetre, comme en vague 7.
+3. **`CappedRun.truncated`** est expose mais pas encore consomme : l'evaluateur
+   signale la troncature via `pipe_leaked` (message « tube ouvert ») et le
+   smoke ne garde que les 300 derniers caracteres. A brancher si un jour un
+   rapport doit dire « sortie coupee au plafond ».
+4. **Deux lecteurs = jusqu'a 4 s de join** dans le pire cas (`--help` avec les
+   deux tubes tenus). Borne et acceptable, mais c'est le plancher de latence de
+   la sonde en cas de fuite.
