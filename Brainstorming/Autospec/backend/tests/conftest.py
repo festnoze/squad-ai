@@ -43,6 +43,19 @@ def tmp_workspace(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "skills_enabled", False)
     monkeypatch.setattr(settings, "decompose_enabled", False)
     monkeypatch.setattr(settings, "review_plan_enabled", False)
+    # The maker->critic->judge harness (REFINE / REFINE_PO / REFINE_DEV) adds
+    # judge+critic agent calls to the plan and build phases: a developer's .env
+    # turning it on consumed the canned QA/Dev replies of FakeRunner-driven tests
+    # (US-1 ended FAILED with "FakeRunner has no queued reply"). Pin OFF; the
+    # refine tests re-enable it explicitly.
+    monkeypatch.setattr(settings, "refine_enabled", False)
+    # Post-build best-effort phases (tech-writer README, product evaluator,
+    # security audit) each spend one agent reply; pin them to their code
+    # defaults (OFF) for the same hermeticity reason.
+    monkeypatch.setattr(settings, "tech_writer_enabled", False)
+    monkeypatch.setattr(settings, "evaluator_enabled", False)
+    monkeypatch.setattr(settings, "security_review_enabled", False)
+    monkeypatch.setattr(settings, "partial_delivery_enabled", False)
     monkeypatch.setattr(settings, "po_pipeline", "off")
     monkeypatch.setattr(settings, "split_on_failure_enabled", False)
     monkeypatch.setattr(settings, "setup_install", False)
