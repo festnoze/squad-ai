@@ -7,7 +7,7 @@ import subprocess
 import pytest
 
 from autospec.agents import runner
-from autospec.agents.file_broker import ExecutionContext, FileBroker, IsolationViolation, active_execution
+from autospec.agents.file_broker import ExecutionContext, FileBroker, IsolationViolation, active_execution, active_dependency_handler
 from autospec.agents.providers import _apply_tool, provider_capabilities
 
 
@@ -100,6 +100,8 @@ def test_hostile_requests_are_data_only_and_have_no_dispatch(tmp_path, tool):
 def _stub_cli(monkeypatch, replies):
     commands = []
     def execute(args, text, cwd, timeout):
+        assert "autospec-inference-" in cwd
+        assert not os.listdir(cwd), "The native CLI never starts inside generated code"
         commands.append((args, text, runner._agent_environment.get()))
         result, cost = replies.pop(0)
         return 0, json.dumps({"result": result, "total_cost_usd": cost,
@@ -141,6 +143,36 @@ async def test_budget_is_decremented_across_all_file_rounds(monkeypatch, tmp_pat
     assert result.cost_usd == pytest.approx(.5)
     caps = [float(args[args.index("--max-budget-usd") + 1]) for args, _, _ in commands]
     assert caps == pytest.approx([.8, .5])
+
+
+async def test_dependency_request_uses_trusted_task_and_coordinator(monkeypatch, tmp_path):
+    request = {"tool": "dependency_request", "task_id": "forged-other-task", "version": 1,
+               "ecosystem": "python", "package": "argon2-cffi", "constraint": ">=23",
+               "scope": "runtime", "manifest": "pyproject.toml", "lock": "uv.lock", "reason": "real hasher"}
+    _stub_cli(monkeypatch, [(json.dumps(request), .1), ('{"status":"blocked_dependency"}', .1)])
+    received = []
+    def handle(root, request):
+        received.append((root, request))
+        return {"status": "pending", "package": request["package"]}
+    execution = active_execution.set(ExecutionContext("run-a", tmp_path, task_id="AUTH-1"))
+    handler = active_dependency_handler.set(handle)
+    try:
+        result = await runner.ClaudeCliRunner().arun("p", "s", cwd=tmp_path)
+    finally:
+        active_dependency_handler.reset(handler)
+        active_execution.reset(execution)
+    assert json.loads(result.text)["status"] == "blocked_dependency"
+    assert received[0][0] == tmp_path and received[0][1]["task_id"] == "AUTH-1"
+    assert "tool" not in received[0][1]
+    assert not (tmp_path / "pyproject.toml").exists()  # model never installs anything
+
+
+async def test_missing_dependency_coordinator_is_explicit_not_a_fallback(monkeypatch, tmp_path):
+    _stub_cli(monkeypatch, [(json.dumps({"tool": "dependency_request", "package": "x"}), .1)])
+    with pytest.raises(runner.AgentError) as caught:
+        await runner.ClaudeCliRunner().arun("p", "s", cwd=tmp_path)
+    assert caught.value.code == "DEPENDENCY_COORDINATOR_UNAVAILABLE"
+    assert not list(tmp_path.iterdir())
 
 
 async def test_unknown_session_and_codex_fail_before_spawning(monkeypatch):

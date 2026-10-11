@@ -20,10 +20,11 @@ from __future__ import annotations
 
 import json
 import uuid
+import asyncio
 from pathlib import Path
 
 from ..config import settings
-from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for
+from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for, active_dependency_handler
 from .runner import (
     AgentError,
     AgentResult,
@@ -142,7 +143,18 @@ class _LangChainRunner:
                 break  # not JSON at all: final (prose) answer
             if "tool" not in call:
                 break  # final answer
-            result = _apply_tool(cwd, call)
+            if call["tool"] == "dependency_request":
+                handler = active_dependency_handler.get()
+                if handler is None:
+                    raise AgentError("DEPENDENCY_COORDINATOR_UNAVAILABLE: no trusted dependency handler",
+                                     code="DEPENDENCY_COORDINATOR_UNAVAILABLE")
+                context = context_for(cwd)
+                request = {key: value for key, value in call.items() if key not in {"tool", "task_id"}}
+                if context.task_id:
+                    request["task_id"] = context.task_id
+                result = json.dumps(await asyncio.to_thread(handler, cwd, request), ensure_ascii=False)
+            else:
+                result = _apply_tool(cwd, call)
             messages.append(HumanMessage(content=f"Résultat de l'outil :\n{result}"))
         else:
             # Tool-round cap reached with the model still asking for tools.

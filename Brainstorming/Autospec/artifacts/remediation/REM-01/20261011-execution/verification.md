@@ -29,3 +29,9 @@ Docker nominal probe used UID 65532 and wrote only a product result. Hostile cod
 5. Claude capabilities: restricted_tools, can_run_shell=false, supports_native_skills=false. Trusted prompt-injected skills may remain; native skills inaccessible. Codex host-shell backend refuses ISOLATION_UNAVAILABLE before spawn. Legacy native Claude sessions cannot resume; mediated history is in-memory/root-bound, so restart needs explicit coordinator recovery, not native resume.
 
 Limits: shared pipeline/bootstrap/deploy/config untouched. Until every generated-code path is connected, integrated factory is not qualified. Docker daemon/OS/kernel and installed CLI remain trusted infrastructure. No claim of VM-strength isolation against compromised infrastructure. Native provider inference intentionally not run to avoid paid usage; flags/init, broker dispatch and nominal subprocess protocol were validated independently.
+
+## Follow-up: dependency dispatch and trusted inference directory
+
+Same command replayed after adding `active_dependency_handler` and a temporary EMPTY inference cwd: **158 passed in 12.83s**, exit 0. Model-supplied task_id is discarded; trusted ExecutionContext.task_id is injected. Missing handler fails DEPENDENCY_COORDINATOR_UNAVAILABLE, pending remains pending and does not install manifests. Sync handler executes through asyncio.to_thread and its structured result is fed back to the model. Parent must call require_ready before accepting the task.
+
+CLI startup is now outside generated project source. This protects against cwd-based administrative startup commands while retaining OAuth in its original user profile; model file access remains solely broker-mediated. Sandbox preflight and cleanup also use the native command resolver, rejecting Windows shell-wrapper fallback.
