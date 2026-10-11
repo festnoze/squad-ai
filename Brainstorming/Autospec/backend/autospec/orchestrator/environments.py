@@ -59,12 +59,12 @@ def source_hash(root: Path) -> str:
     return hashlib.sha256(json.dumps(entries, separators=(",", ":")).encode()).hexdigest()
 
 
-_EXCLUDED = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "artifacts", ".claude", ".codex", ".agents", ".aws", ".ssh", ".npmrc", ".pypirc", ".netrc", "credentials", "credentials.json", "secrets", "auth.json", "tokens.json", "id_rsa", "id_ed25519"}
+_EXCLUDED = {".git", ".venv", "venv", "node_modules", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "artifacts", ".claude", ".codex", ".agents", ".aws", ".ssh", ".azure", ".npmrc", ".pypirc", ".netrc", "credentials", "credentials.json", ".credentials.json", "secrets", "auth.json", "tokens.json", "id_rsa", "id_ed25519", ".autospec", "autospec-state.json", "build-monitor.jsonl", "autospec-interactions.jsonl", "acceptance-contract.json", "contract-baseline.json", "independent-oracle", "verification-snapshot"}
 
 
 def _excluded(name: str) -> bool:
     name = name.lower()
-    return name in _EXCLUDED or name == ".env" or name.startswith(".env.") and name != ".env.example"
+    return name in _EXCLUDED or name.startswith(".env")
 
 
 @dataclass(frozen=True)
