@@ -153,7 +153,7 @@ async def test_skill_validation_failure_marks_delivery_issue_not_pipeline_crash(
 # ---------------------------------------------------------------- runner --add-dir
 
 @pytest.mark.asyncio
-async def test_claude_runner_adds_skills_dir_when_enabled(tmp_path, monkeypatch):
+async def test_claude_runner_never_grants_native_skills_even_when_enabled(tmp_path, monkeypatch):
     captured: dict = {}
 
     def _fake_run_tracked(args, input_text, cwd, timeout):
@@ -161,13 +161,15 @@ async def test_claude_runner_adds_skills_dir_when_enabled(tmp_path, monkeypatch)
         return 0, json.dumps({"result": "ok", "session_id": "s"}), ""
 
     monkeypatch.setattr(runner_mod, "_run_tracked", _fake_run_tracked)
+    monkeypatch.setattr(runner_mod, "_ensure_claude_isolation", lambda: None)
     ws = tmp_path / "ws"
     (ws / ".claude" / "skills").mkdir(parents=True)
 
     monkeypatch.setattr(settings, "skills_enabled", True)
     await ClaudeCliRunner().arun("p", "sys", cwd=ws)
-    assert "--add-dir" in captured["args"]
-    assert str(ws / ".claude" / "skills") in captured["args"]
+    assert "--add-dir" not in captured["args"]
+    assert "--disable-slash-commands" in captured["args"]
+    assert captured["args"][captured["args"].index("--tools") + 1] == ""
 
     monkeypatch.setattr(settings, "skills_enabled", False)
     await ClaudeCliRunner().arun("p", "sys", cwd=ws)

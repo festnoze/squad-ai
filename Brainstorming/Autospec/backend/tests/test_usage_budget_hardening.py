@@ -20,6 +20,7 @@ def cli_reply(monkeypatch, payload, code=0):
         commands.append(args)
         return code, json.dumps(payload), ""
     monkeypatch.setattr("autospec.agents.runner._run_tracked", run)
+    monkeypatch.setattr("autospec.agents.runner._ensure_claude_isolation", lambda: None)
     return commands
 
 

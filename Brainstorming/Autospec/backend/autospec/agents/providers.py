@@ -23,6 +23,7 @@ import uuid
 from pathlib import Path
 
 from ..config import settings
+from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for
 from .runner import (
     AgentError,
     AgentResult,
@@ -33,55 +34,25 @@ from .runner import (
     extract_json,
 )
 
-TOOL_PROTOCOL = """
-
---- FILE TOOL PROTOCOL (HIGHEST PRIORITY) ---
-You cannot run shell commands. To work on the project files of the current
-working directory, reply with EXACTLY ONE JSON object per turn:
-- {"tool": "read_files", "paths": ["relative/path.py", "..."]}
-- {"tool": "write_files", "files": [{"path": "relative/path.py", "content": "<full file content>"}]}
-The orchestrator executes the tool and sends you the result; then continue.
-When (and only when) you are done with the files, reply with the FINAL JSON
-object the task asked for (it must NOT contain a "tool" key). Never run tests
-yourself: the orchestrator runs pytest after you.
-"""
+TOOL_PROTOCOL = FILE_PROTOCOL
 
 _MAX_READ_CHARS = 30_000
 
 
 def _safe_path(cwd: Path, rel: str) -> Path:
     """Resolve ``rel`` inside ``cwd``; AgentError on traversal attempts."""
-    target = (cwd / rel).resolve()
-    if not target.is_relative_to(cwd.resolve()):
-        raise AgentError(f"Chemin hors du workspace refusé : {rel!r}")
-    return target
+    try:
+        return FileBroker(context_for(cwd)).path(rel)
+    except IsolationViolation as exc:
+        raise AgentError(str(exc), code=exc.code) from exc
 
 
 def _apply_tool(cwd: Path, call: dict) -> str:
     """Execute one read_files/write_files tool call; return the textual result."""
-    tool = call.get("tool")
-    if tool == "write_files":
-        written = []
-        for item in call.get("files") or []:
-            rel = str(item.get("path") or "")
-            if not rel:
-                continue
-            target = _safe_path(cwd, rel)
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(str(item.get("content") or ""), encoding="utf-8")
-            written.append(rel)
-        return f"OK — fichiers écrits : {json.dumps(written, ensure_ascii=False)}"
-    if tool == "read_files":
-        chunks = []
-        for rel in call.get("paths") or []:
-            target = _safe_path(cwd, str(rel))
-            if not target.is_file():
-                chunks.append(f"--- {rel} ---\n(fichier introuvable)")
-                continue
-            content = target.read_text(encoding="utf-8", errors="replace")[:_MAX_READ_CHARS]
-            chunks.append(f"--- {rel} ---\n{content}")
-        return "\n".join(chunks) or "(aucun fichier demandé)"
-    raise AgentError(f"Outil inconnu demandé par l'agent : {tool!r}")
+    try:
+        return FileBroker(context_for(cwd)).apply(call)
+    except IsolationViolation as exc:
+        raise AgentError(str(exc), code=exc.code) from exc
 
 
 def _content_text(content) -> str:
@@ -387,20 +358,20 @@ def provider_capabilities(provider: str) -> RunnerCapabilities:
     if normalized == "claude code":
         return RunnerCapabilities(
             can_edit_files=True,
-            can_run_shell=True,
-            supports_native_skills=True,
+            can_run_shell=False,
+            supports_native_skills=False,
             reliable_for_build=True,
-            execution_model="cli",
-            notes="Claude Code CLI: accès workspace + shell, skills natives via .claude/skills.",
+            execution_model="restricted_tools",
+            notes="Claude Code abonnement: outils natifs, shell, MCP et skills désactivés; fichiers médiés et tests isolés par Autospec.",
         )
     if normalized == "codex":
         return RunnerCapabilities(
-            can_edit_files=True,
-            can_run_shell=True,
+            can_edit_files=False,
+            can_run_shell=False,
             supports_native_skills=False,
-            reliable_for_build=True,
-            execution_model="cli",
-            notes="Codex CLI: accès workspace + shell; skills injectées via prompt/catalogue.",
+            reliable_for_build=False,
+            execution_model="unavailable",
+            notes="ISOLATION_UNAVAILABLE: backend Codex à shell hôte désactivé; aucune exécution sans frontière prouvée.",
         )
     if normalized in ("openai", "openrouter", "ollama", "claude", "anthropic"):
         return RunnerCapabilities(

@@ -11,14 +11,15 @@ def test_docker_run_cmd():
     cmd = docker_run_cmd(["uv", "run", "python", "main.py"], "/work", "python:3.12-slim")
     assert cmd[:3] == ["docker", "run", "--rm"]
     assert "--network" in cmd and "none" in cmd
-    assert "/work:/app" in cmd
-    assert cmd[-4:] == ["uv", "run", "python", "main.py"]
+    assert "/work:/app:rw" in cmd
+    assert cmd[cmd.index("--entrypoint") + 1] == "uv"
+    assert cmd[-3:] == ["run", "python", "main.py"]
 
 
 def test_docker_run_cmd_custom_binary():
     cmd = docker_run_cmd(["x"], "/w", "img", docker="podman")
     assert cmd[0] == "podman"
-    assert cmd[-1] == "x"
+    assert cmd[cmd.index("--entrypoint") + 1] == "x"
 
 
 def test_maybe_sandbox_passthrough_when_disabled(monkeypatch):
@@ -35,4 +36,5 @@ def test_maybe_sandbox_wraps_when_enabled(monkeypatch):
     wrapped = pipeline._maybe_sandbox(["echo", "hi"], "/w")
     assert wrapped[0] == "docker"
     assert "myimg" in wrapped
-    assert wrapped[-2:] == ["echo", "hi"]
+    assert wrapped[wrapped.index("--entrypoint") + 1] == "echo"
+    assert wrapped[-1] == "hi"

@@ -99,7 +99,7 @@ def test_flooded_stream_is_bounded_and_fails_explicitly(monkeypatch, tmp_path, f
     assert not any(t.name == "autospec-agent-io" for t in threading.enumerate())
 
 
-@pytest.mark.parametrize("cli_type", [runner.ClaudeCliRunner, runner.CodexCliRunner])
+@pytest.mark.parametrize("cli_type", [runner.ClaudeCliRunner])
 async def test_cli_task_cancellation_awaits_real_process_tree_cleanup(monkeypatch, tmp_path, cli_type):
     marker = tmp_path / "child.pid"
     parent_marker = tmp_path / "parent.pid"
@@ -110,6 +110,7 @@ async def test_cli_task_cancellation_awaits_real_process_tree_cleanup(monkeypatc
     real_run = runner._run_tracked
     monkeypatch.setattr(runner, "_run_tracked", lambda args, prompt, cwd, timeout:
                         real_run(_python(parent), "", cwd, timeout))
+    monkeypatch.setattr(runner, "_ensure_claude_isolation", lambda: None)
     registry = runner.ProcessRegistry()
     token = runner.active_processes.set(registry)
     task = asyncio.create_task(cli_type().arun("local test only", ""))
@@ -252,8 +253,8 @@ def test_failed_job_assignment_reaps_suspended_child(monkeypatch):
     assert processes[0].poll() is not None
 
 
-@pytest.mark.skipif(os.name != "nt", reason="Windows taskkill fallback")
-def test_taskkill_fallback_has_timeout_and_kills_direct_child(monkeypatch):
+@pytest.mark.skipif(os.name != "nt", reason="Windows retained-handle fallback")
+def test_unassigned_suspended_child_is_killed_without_pid_reopening(monkeypatch):
     class Proc:
         pid = 123456
         returncode = None
@@ -265,9 +266,7 @@ def test_taskkill_fallback_has_timeout_and_kills_direct_child(monkeypatch):
             self.returncode = -1
 
     def fail_taskkill(args, **kwargs):
-        assert args == ["taskkill", "/F", "/T", "/PID", "123456"]
-        assert 0 < kwargs["timeout"] <= 3
-        raise subprocess.TimeoutExpired(args, kwargs["timeout"])
+        pytest.fail("No taskkill or PID reopening is authorized")
 
     monkeypatch.setattr(runner.subprocess, "run", fail_taskkill)
     proc = Proc()
