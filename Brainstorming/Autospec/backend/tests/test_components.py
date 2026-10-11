@@ -84,6 +84,7 @@ async def test_setup_executor_creates_components_without_install():
     )
     await pipeline.asetup_components()
     await wait_until(lambda: pipeline._setup_task is not None and pipeline._setup_task.done())
+    await pipeline._setup_task  # surface background exceptions instead of a missing-file symptom
     ws = workspace_dir("proj-comp")
     assert (ws / "backend" / "pyproject.toml").exists()
     assert (ws / "backend" / "app" / "main.py").exists()
@@ -102,6 +103,25 @@ async def test_setup_requires_an_approved_component():
     pipeline = make_pipeline([])
     with pytest.raises(ValueError):
         await pipeline.asetup_components()
+
+
+async def test_setup_scaffold_failure_is_visible_and_background_task_is_handled(monkeypatch):
+    from unittest.mock import AsyncMock
+    from autospec.orchestrator import workspace
+
+    pipeline = make_pipeline([])
+    await pipeline.aset_components([{"id": "backend", "kind": "backend", "status": "approved"}])
+    def reject_scaffold(state):
+        raise ValueError("Chemin du scaffold hors du projet")
+    monkeypatch.setattr(workspace, "scaffold", reject_scaffold)
+    executor = AsyncMock()
+    monkeypatch.setattr(setup_exec, "aexecute", executor)
+    await pipeline.asetup_components()
+    await pipeline._setup_task
+    executor.assert_not_awaited()
+    assert any("Erreur du setup des composants" in message.content and "hors du projet" in message.content
+               for message in pipeline.state.chat)
+    assert pipeline.state.components[0].status == ComponentStatus.APPROVED
 
 
 def test_setup_executor_is_idempotent(tmp_path):

@@ -18,6 +18,11 @@ const PHASE_DOT: Record<string, string> = {
 /** Phases où des agents travaillent : la chip pulse et propose ⏹. */
 const ACTIVE_PHASES = ["spec", "analyze", "plan", "architect", "build"];
 
+function isActive(project: ProjectState): boolean {
+  return ACTIVE_PHASES.includes(project.phase) ||
+    ["preparing", "verifying"].includes(project.bootstrap_status ?? "");
+}
+
 /** Pastille de statut (texte) pour les <option> du sélecteur de projet. */
 const PHASE_BADGE: Record<string, string> = {
   idle: "⚪",
@@ -64,7 +69,7 @@ function pendingApprovals(p: ProjectState): number {
 
 /** Ordre d'affichage (UI3) : en cours → en pause → dormant → terminé. */
 function statusRank(p: ProjectState): number {
-  if (ACTIVE_PHASES.includes(p.phase)) return p.paused ? 1 : 0;
+  if (isActive(p)) return p.paused ? 1 : 0;
   if (["stopped", "needs_attention", "error"].includes(p.phase)) return 2;
   if (p.phase === "done") return 3;
   return 4;
@@ -109,7 +114,7 @@ export function ProjectBar({
   // UI3 : les chips se limitent aux projets qui travaillent (ou en pause) + le
   // projet courant ; le reste se commute via le sélecteur 🗂 (fini l'overflow).
   const chipProjects = sorted.filter(
-    (p) => ACTIVE_PHASES.includes(p.phase) || p.id === selectedId,
+    (p) => isActive(p) || p.id === selectedId,
   );
   const hiddenFromChips = visible.length - chipProjects.length;
 
@@ -137,7 +142,7 @@ export function ProjectBar({
         </label>
       )}
       {chipProjects.map((p) => {
-        const active = ACTIVE_PHASES.includes(p.phase);
+        const active = isActive(p);
         const working = active && !p.paused;
         // ▶ = reprendre la pipeline en pause, ou relancer le build des stories
         // restantes d'un projet dormant (logique partagée via work.ts).
@@ -193,12 +198,12 @@ export function ProjectBar({
                 title={
                   p.paused
                     ? t("projectBar.resumePipeline")
-                    : t("projectBar.resumeBuild")
+                    : t(p.bootstrap_status === "failed" ? "runPanel.retryBootstrapTitle" : "projectBar.resumeBuild")
                 }
                 aria-label={
                   p.paused
                     ? t("projectBar.resumePipeline")
-                    : t("projectBar.resumeBuild")
+                    : t(p.bootstrap_status === "failed" ? "runPanel.retryBootstrapTitle" : "projectBar.resumeBuild")
                 }
                 onClick={(e) => {
                   e.stopPropagation();

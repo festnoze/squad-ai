@@ -30,4 +30,19 @@ describe("LanguagePanel (L2)", () => {
     fireEvent.change(screen.getByLabelText("Backend language"), { target: { value: "rust" } });
     expect(onSet).toHaveBeenCalledWith("rust");
   });
+
+  it("Node.js explicite reste sélectionné après la pré-analyse", () => {
+    render(<LanguagePanel language="node" complexity={2} criticality={1} rationale="Node.js demandé par l'utilisateur." onSet={vi.fn()} />);
+    expect(screen.getByRole("combobox", { name: "Backend language" })).toHaveValue("node");
+    expect(screen.getByRole("option", { name: "Node.js" })).toHaveValue("node");
+    expect(screen.getByText("Node.js demandé par l'utilisateur.")).toBeVisible();
+  });
+
+  it("sélection Node.js transmet la valeur de contrat node au backend", () => {
+    const onSet = vi.fn();
+    render(<LanguagePanel language="python" complexity={1} criticality={1} onSet={onSet} />);
+    fireEvent.change(screen.getByRole("combobox", { name: "Backend language" }), { target: { value: "node" } });
+    expect(onSet).toHaveBeenCalledTimes(1);
+    expect(onSet).toHaveBeenCalledWith("node");
+  });
 });

@@ -59,6 +59,10 @@ describe("Dashboard", () => {
     render(<Dashboard onClose={vi.fn()} />);
     expect(await screen.findByText("Success rate")).toBeInTheDocument();
     expect(screen.getByText("80%")).toBeInTheDocument();
+    expect(screen.getByText("Total estimated cost")).toBeInTheDocument();
+    expect(screen.getByText("Estimated cost / story")).toBeInTheDocument();
+    expect(screen.getByText("About cost estimates")).toBeVisible();
+    expect(screen.getByText(/not invoices/)).toHaveTextContent("Interrupted calls");
   });
 
   it("P3: renders the fusion-loop block when the backend serves `fusion`", async () => {

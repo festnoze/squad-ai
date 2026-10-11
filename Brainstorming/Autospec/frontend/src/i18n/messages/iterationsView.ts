@@ -22,8 +22,8 @@ export const iterationsView: Namespace = {
   countsOne: { en: "{epics} epic · {done}/{total} US", fr: "{epics} épic · {done}/{total} US" },
   countsMany: { en: "{epics} epics · {done}/{total} US", fr: "{epics} épics · {done}/{total} US" },
   usageTitle: {
-    en: "Cost and tokens consumed during this iteration",
-    fr: "Coût et tokens consommés durant cette itération",
+    en: "Estimated cost and recorded tokens for this iteration, not an invoice; interrupted calls may be missing.",
+    fr: "Coût estimé et tokens enregistrés pour cette itération, pas une facture ; des appels interrompus peuvent manquer.",
   },
   usageOne: { en: "{calls} agent call", fr: "{calls} appel agent" },
   usageMany: { en: "{calls} agent calls", fr: "{calls} appels agent" },

@@ -3,6 +3,7 @@ import { errorMessage, getMetrics } from "../api";
 import { FusionMetrics, Metrics } from "../types";
 import { useEscapeToClose } from "../hooks";
 import { useI18n } from "../i18n/i18n";
+import { CostEstimateNote } from "./CostEstimateNote";
 
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
@@ -107,6 +108,7 @@ export function Dashboard({ onClose }: { onClose: () => void }) {
             <Stat label={t("dashboard.regressions")} value={metrics.regressions} />
           </div>
         )}
+        {metrics && <CostEstimateNote />}
         {metrics?.fusion && <FusionSection fusion={metrics.fusion} />}
       </div>
     </div>

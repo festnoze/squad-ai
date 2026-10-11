@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import shutil
 from dataclasses import dataclass, field
@@ -72,8 +73,11 @@ def _env_float(name: str, default: float, minimum: float | None = None) -> float
     if raw is not None and raw.strip():
         try:
             value = float(raw)
+            if not math.isfinite(value):
+                raise ValueError("non-finite number")
         except ValueError:
             logger.warning("Invalid number %s=%r, using default %s", name, raw, default)
+            value = default
     if minimum is not None and value < minimum:
         logger.warning("%s=%s below minimum, clamping to %s", name, value, minimum)
         value = minimum
@@ -249,9 +253,9 @@ class Settings:
     )
     claude_cmd: str = field(default_factory=_resolve_claude_cmd)
     # Default model of the Claude Code CLI harness ("claude code" provider):
-    # Opus 5 (the current Opus) unless CLAUDE_MODEL overrides it.
+    # Cost-conscious default; explicit CLAUDE_MODEL always wins.
     claude_model: str | None = field(
-        default_factory=lambda: os.environ.get("CLAUDE_MODEL") or "claude-opus-5"
+        default_factory=lambda: os.environ.get("CLAUDE_MODEL") or "sonnet"
     )
     # Codex CLI harness: the OpenAI counterpart of the Claude Code CLI, driven
     # headless via ``codex exec``.
@@ -856,13 +860,22 @@ class Settings:
     docker_cmd: str = field(
         default_factory=lambda: os.environ.get("DOCKER_CMD", "docker")
     )
-    # Docker delivery gate: after the delivery gates pass, build each web-facing
-    # project into a Docker image and deploy it to local Docker Desktop on a
+    # Docker delivery gate: after the delivery gates pass, package every new
+    # project into a Docker image and deploy web apps to local Docker Desktop on a
     # shared network (autospec-net), then verify boot health + cross-container
-    # reachability. OFF by default (requires Docker Desktop); driven by profile
+    # reachability. ON by default (requires Docker Desktop); driven by profile
     # overrides and this env var. Reuses docker_cmd and integration_fix_attempts.
     docker_delivery: bool = field(
-        default_factory=lambda: _env_bool("DOCKER_DELIVERY", False)
+        default_factory=lambda: _env_bool("DOCKER_DELIVERY", True)
+    )
+    project_bootstrap: bool = field(
+        default_factory=lambda: _env_bool("PROJECT_BOOTSTRAP", True)
+    )
+    bootstrap_timeout_s: float = field(
+        default_factory=lambda: _env_float("BOOTSTRAP_TIMEOUT_S", 180.0, minimum=10.0)
+    )
+    test_suite_timeout_s: float = field(
+        default_factory=lambda: _env_float("TEST_SUITE_TIMEOUT_S", 180.0, minimum=1.0)
     )
     docker_network: str = field(
         default_factory=lambda: os.environ.get("DOCKER_NETWORK", "autospec-net")

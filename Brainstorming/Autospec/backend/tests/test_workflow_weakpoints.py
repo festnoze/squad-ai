@@ -172,14 +172,14 @@ async def test_red_frontend_verify_carries_the_failure_digest(tmp_path, monkeypa
         }],
     }
 
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, *args, **kw):
         path = _report_arg(cmd)
         if path:  # le run vitest
             Path(path).write_text(json.dumps(payload), encoding="utf-8")
             return _FakeProc(1, f"JSON report written to {path}")
         return _FakeProc(0, "build ok")  # jamais atteint : tests rouges
 
-    monkeypatch.setattr("autospec.orchestrator.pipeline.subprocess.run", fake_run)
+    monkeypatch.setattr(pipeline, "_run_suite_process", fake_run)
 
     ok, output, results = await pipeline._arun_frontend_tests()
     assert ok is False
@@ -194,14 +194,14 @@ async def test_red_frontend_verify_names_an_empty_suite(tmp_path, monkeypatch):
     au moins le DIRE, pas rester muette."""
     pipeline = _fe_pipeline(tmp_path, monkeypatch, "wk-empty")
 
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, *args, **kw):
         path = _report_arg(cmd)
         if path:
             Path(path).write_text(json.dumps({"testResults": []}), encoding="utf-8")
             return _FakeProc(1, f"JSON report written to {path}")
         return _FakeProc(0, "build ok")
 
-    monkeypatch.setattr("autospec.orchestrator.pipeline.subprocess.run", fake_run)
+    monkeypatch.setattr(pipeline, "_run_suite_process", fake_run)
 
     ok, output, results = await pipeline._arun_frontend_tests()
     assert ok is False
@@ -224,7 +224,7 @@ async def test_frontend_startup_error_self_heals_and_replays(tmp_path, monkeypat
         }],
     }
 
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, *args, **kw):
         path = _report_arg(cmd)
         if path:
             calls["runs"] += 1
@@ -241,7 +241,7 @@ async def test_frontend_startup_error_self_heals_and_replays(tmp_path, monkeypat
         calls["installs"] += 1
         return True
 
-    monkeypatch.setattr("autospec.orchestrator.pipeline.subprocess.run", fake_run)
+    monkeypatch.setattr(pipeline, "_run_suite_process", fake_run)
     monkeypatch.setattr(pipeline, "_anpm_install_in", fake_install)
 
     ok, output, results = await pipeline._arun_frontend_tests()
@@ -265,7 +265,7 @@ async def test_frontend_real_red_does_not_trigger_the_heal(tmp_path, monkeypatch
     }
     calls = {"installs": 0}
 
-    def fake_run(cmd, **kw):
+    def fake_run(cmd, *args, **kw):
         path = _report_arg(cmd)
         if path:
             Path(path).write_text(json.dumps(payload), encoding="utf-8")
@@ -276,7 +276,7 @@ async def test_frontend_real_red_does_not_trigger_the_heal(tmp_path, monkeypatch
         calls["installs"] += 1
         return True
 
-    monkeypatch.setattr("autospec.orchestrator.pipeline.subprocess.run", fake_run)
+    monkeypatch.setattr(pipeline, "_run_suite_process", fake_run)
     monkeypatch.setattr(pipeline, "_anpm_install_in", fake_install)
 
     ok, _, _ = await pipeline._arun_frontend_tests()

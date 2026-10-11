@@ -2,11 +2,11 @@ import { CollapsibleSection } from "./CollapsibleSection";
 import { useI18n } from "../i18n/i18n";
 
 interface Props {
-  language?: "python" | "go" | "rust";
+  language?: "python" | "go" | "rust" | "node";
   complexity?: number;
   criticality?: number;
   rationale?: string;
-  onSet: (language: "python" | "go" | "rust") => void;
+  onSet: (language: "python" | "go" | "rust" | "node") => void;
 }
 
 /**
@@ -16,10 +16,11 @@ interface Props {
 export function LanguagePanel({ language, complexity, criticality, rationale, onSet }: Props) {
   const { t } = useI18n();
   // Keep value/emoji as-is; only the surrounding UI is translated.
-  const LANGS: { value: "python" | "go" | "rust"; label: string }[] = [
+  const LANGS: { value: "python" | "go" | "rust" | "node"; label: string }[] = [
     { value: "python", label: "🐍 Python" },
     { value: "go", label: "🐹 Go" },
     { value: "rust", label: "🦀 Rust" },
+    { value: "node", label: "Node.js" },
   ];
   const analyzed = (complexity ?? -1) >= 0 || (criticality ?? -1) >= 0;
   if (!analyzed || !language) return null;
@@ -40,7 +41,7 @@ export function LanguagePanel({ language, complexity, criticality, rationale, on
         <select
           aria-label={t("languagePanel.selectAriaLabel")}
           value={language}
-          onChange={(e) => onSet(e.target.value as "python" | "go" | "rust")}
+          onChange={(e) => onSet(e.target.value as "python" | "go" | "rust" | "node")}
         >
           {LANGS.map((l) => (
             <option key={l.value} value={l.value}>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useI18n } from "../i18n/i18n";
 
 interface Props {
@@ -14,6 +14,7 @@ export function ProjectSetup({ onCreate, busy }: Props) {
   const [budget, setBudget] = useState("");
   const [brief, setBrief] = useState("");
   const [brownfield, setBrownfield] = useState("");
+  const budgetHintId = useId();
 
   return (
     <div className="panel setup">
@@ -59,12 +60,14 @@ export function ProjectSetup({ onCreate, busy }: Props) {
       <input
         type="number"
         aria-label={t("projectSetup.budgetAriaLabel")}
+        aria-describedby={budgetHintId}
         min={0}
         step={0.1}
         placeholder={t("projectSetup.budgetPlaceholder")}
         value={budget}
         onChange={(e) => setBudget(e.target.value)}
       />
+      <p className="cost-estimate-hint" id={budgetHintId}>{t("common.budgetEstimateHint")}</p>
       <button
         className="primary"
         disabled={busy || !goal.trim()}

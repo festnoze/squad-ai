@@ -378,10 +378,14 @@ async def test_govern_phase_denies_creations_on_exhausted_budget(govern_on, monk
     monkeypatch.setattr(settings, "autonomy_backlog_changes", 5)
     state = _gov_state("pol-gov-deny")
     state.budget_usd, state.usage.cost_usd = 1.0, 2.0
-    pipeline = Pipeline(state, FakeRunner([GOVERN_REPLY]))
+    runner = FakeRunner([GOVERN_REPLY])
+    pipeline = Pipeline(state, runner)
     await pipeline._agovern_phase()
-    decision = state.governance_log[0]
-    assert decision.status == "rejected_by_policy"
+    # An exhausted execution budget now prevents even the proposal call. The
+    # policy.decide tests above still cover rejection of an existing proposal.
+    assert runner.calls == []
+    assert state.governance_log == []
+    assert pipeline._stop_requested
     assert [s.id for s in state.stories] == ["US-1"]  # rien créé
     assert state.observations[0].status == ObservationStatus.ROUTED  # intacte
 

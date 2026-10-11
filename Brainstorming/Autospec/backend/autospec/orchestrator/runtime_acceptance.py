@@ -4,9 +4,12 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import json
 import os
 import re
 import subprocess
+import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,6 +18,34 @@ from ..models import ProjectState, StoryStatus
 from . import toolchain, workspace
 
 logger = logging.getLogger(__name__)
+
+
+def _run_node(command: list[str], *, cancel_event: threading.Event, timeout: float,
+              **kwargs) -> subprocess.CompletedProcess[str]:
+    """Bound the Node gate and all servers it owns, including cancellation."""
+    from .docker_deploy import _kill_tree
+    process_options = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if os.name == "nt" else {"start_new_session": True}
+    proc = subprocess.Popen(command, **kwargs, **process_options)
+    deadline = time.monotonic() + timeout
+    finished = False
+    try:
+        while True:
+            if cancel_event.is_set():
+                raise subprocess.TimeoutExpired(command, timeout, output="runtime acceptance cancelled")
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise subprocess.TimeoutExpired(command, timeout)
+            try:
+                output, _ = proc.communicate(timeout=min(0.1, remaining))
+                finished = True
+                return subprocess.CompletedProcess(command, proc.returncode, stdout=output)
+            except subprocess.TimeoutExpired:
+                continue
+    finally:
+        if not finished or proc.poll() is None:
+            _kill_tree(proc)
+        if proc.stdout is not None:
+            proc.stdout.close()
 
 
 @dataclass(frozen=True)
@@ -66,6 +97,17 @@ def _frontend_root(state: ProjectState, ws: Path) -> Path | None:
 
 
 def _backend_web_candidate(ws: Path) -> bool:
+    for manifest in (ws / ".autospec-bootstrap.json", ws / ".autospec" / "bootstrap.json"):
+        if not manifest.is_file():
+            continue
+        try:
+            stack = json.loads(manifest.read_text(encoding="utf-8")).get("stack", {})
+            if stack.get("kind") in ("api", "fullstack"):
+                return True
+            if stack.get("kind") in ("frontend", "cli", "library"):
+                return False
+        except (OSError, ValueError):
+            pass
     main = ws / "main.py"
     if not main.exists():
         return False
@@ -102,7 +144,7 @@ async def arun_runtime_acceptance(
     # par ce gate (le script JS pilote un serveur python/node). On journalise un
     # AVERTISSEMENT plutôt que de bloquer silencieusement.
     lang = toolchain.normalize(state.backend_language.value)
-    if lang != "python" and _frontend_root(state, ws) is None:
+    if lang != "python" and not state.technical_stack and _frontend_root(state, ws) is None:
         logger.warning(
             "Runtime acceptance : backend %s non-python détecté sans frontend — "
             "vérification à l'exécution indisponible pour ce langage.",
@@ -119,9 +161,13 @@ async def arun_runtime_acceptance(
         return RuntimeAcceptanceResult(ok=False, detail=f"script introuvable : {script}")
 
     frontend = _frontend_root(state, ws)
-    backend_web = _backend_web_candidate(ws)
+    kind = (state.technical_stack or {}).get("kind", "")
+    backend_web = False if kind == "frontend" else (
+        kind in {"api", "fullstack"} or _backend_web_candidate(ws)
+    )
     node_path = PROJECT_DIR / "frontend" / "node_modules"
-    env = {k: v for k, v in os.environ.items() if k != "VIRTUAL_ENV"}
+    from .pipeline import _minimal_env
+    env = _minimal_env()
     timeout = settings.runtime_acceptance_timeout_s if timeout_s is None else timeout_s
     if node_path.exists():
         existing = env.get("NODE_PATH", "")
@@ -129,10 +175,17 @@ async def arun_runtime_acceptance(
     # Contrat JS #2/#3 : le port résolu (même source que le smoke) et le parcours
     # Gherkin des stories DONE sont passés par variable d'environnement.
     env["RUNTIME_BACKEND_PORT"] = str(resolve_web_port(ws))
+    env["PORT"] = env["RUNTIME_BACKEND_PORT"]
+    env["RUNTIME_BACKEND_COMMAND"] = json.dumps(toolchain.run_command(lang))
+    env["RUNTIME_BACKEND_LANGUAGE"] = lang
+    env["RUNTIME_NPM_COMMAND"] = settings.npm_cmd
     env["RUNTIME_JOURNEY"] = _done_journey(state)
+    if frontend is not None and backend_web:
+        env["AUTOSPEC_STATIC_DIR"] = str(frontend / "dist")
+    cancelled = threading.Event()
 
     def _run() -> subprocess.CompletedProcess[str]:
-        return subprocess.run(
+        return _run_node(
             [
                 settings.node_cmd,
                 str(script),
@@ -149,10 +202,19 @@ async def arun_runtime_acceptance(
             encoding="utf-8",
             errors="replace",
             timeout=timeout + 15,
+            cancel_event=cancelled,
         )
 
+    worker = asyncio.create_task(asyncio.to_thread(_run))
     try:
-        proc = await asyncio.to_thread(_run)
+        proc = await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        cancelled.set()
+        try:
+            await asyncio.shield(worker)
+        except (OSError, subprocess.TimeoutExpired):
+            pass
+        raise
     except (OSError, subprocess.TimeoutExpired) as exc:
         # Un lancement impossible (node/playwright absent) est une panne d'infra,
         # pas un bug de câblage réparable.

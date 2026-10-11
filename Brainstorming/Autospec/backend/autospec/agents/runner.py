@@ -10,13 +10,16 @@ from __future__ import annotations
 import asyncio
 import contextvars
 import json
+import math
 import os
 import re
+import shutil
 import subprocess
 import threading
+import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import Callable, Protocol
 
 from ..config import settings
 
@@ -28,7 +31,18 @@ class ProcessRegistry:
 
     def __init__(self) -> None:
         self._procs: set[subprocess.Popen] = set()
+        self._calls: set[threading.Event] = set()
         self._lock = threading.Lock()
+
+    def register_call(self, cancel: threading.Event) -> None:
+        # Register BEFORE scheduling/spawning: a stop must also reach calls whose
+        # worker has not started or whose Popen has not returned yet.
+        with self._lock:
+            self._calls.add(cancel)
+
+    def discard_call(self, cancel: threading.Event) -> None:
+        with self._lock:
+            self._calls.discard(cancel)
 
     def add(self, proc: subprocess.Popen) -> None:
         with self._lock:
@@ -42,6 +56,8 @@ class ProcessRegistry:
         """Hard-kill every still-running tracked process (whole tree). Returns the
         number killed. Safe to call repeatedly and from any thread."""
         with self._lock:
+            for cancel in self._calls:
+                cancel.set()
             procs = [p for p in self._procs if p.poll() is None]
         for proc in procs:
             _terminate_tree(proc)
@@ -53,9 +69,9 @@ class ProcessRegistry:
 
 
 # The registry an agent call should register its child process into, set by the
-# pipeline per call (via _UsageTracker). ``asyncio.to_thread`` copies the context
-# into the worker thread, so a value set on the event loop is visible where the
-# process is actually spawned. None = no tracking (tests / FakeRunner).
+# pipeline per call (via _UsageTracker). The async wrapper explicitly copies the
+# context into its worker, so event-loop values remain visible where the process
+# is spawned. None = no project-wide tracking (tests / FakeRunner).
 active_processes: contextvars.ContextVar[ProcessRegistry | None] = contextvars.ContextVar(
     "autospec_active_processes", default=None
 )
@@ -66,34 +82,226 @@ active_skills_enabled: contextvars.ContextVar[bool | None] = contextvars.Context
     "autospec_active_skills_enabled", default=None
 )
 
+# Estimated remaining project budget, never a billing-account limit. The
+# orchestrator serializes budgeted calls so parallel agents cannot each spend it.
+active_budget_usd: contextvars.ContextVar[float | None] = contextvars.ContextVar(
+    "autospec_active_budget_usd", default=None
+)
+
+
+_active_call_cancel: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
+    "autospec_agent_call_cancel", default=None
+)
+_MAX_OUTPUT_BYTES = 16 * 1024 * 1024  # per stream; never silently truncate JSON
+_PROCESS_CLEANUP_TIMEOUT = 3.0
+
+
+def _resolve_agent_command(args: list[str]) -> list[str]:
+    """Bypass npm batch/PowerShell shims: Windows can parse them as shell code.
+
+    Never interpret wrapper source. Only known harness names with matching npm
+    metadata may resolve to their package's native binary or Node entrypoint.
+    Custom native executables remain supported; arbitrary shell wrappers must
+    be replaced by an executable path in CLAUDE_CMD/CODEX_CMD.
+    """
+    if os.name != "nt" or not args:
+        return args
+    resolved = shutil.which(args[0]) or args[0]
+    shim = Path(resolved)
+    if shim.suffix.lower() not in {".cmd", ".bat", ".ps1"}:
+        return [resolved, *args[1:]]
+    packages = {"claude": "@anthropic-ai/claude-code", "codex": "@openai/codex"}
+    harness = shim.stem.lower()
+    package_name = packages.get(harness)
+    if package_name is None:
+        raise AgentError(
+            "Unsafe Windows agent wrapper: configure CLAUDE_CMD/CODEX_CMD with a native "
+            "executable, or install the standard Claude/Codex npm package"
+        )
+    package_dir = (shim.parent / "node_modules" / package_name).resolve()
+    manifest = package_dir / "package.json"
+    try:
+        if not shim.is_file():
+            raise ValueError("npm launcher was not found")
+        with manifest.open(encoding="utf-8") as handle:
+            raw = handle.read(131073)
+        if len(raw) > 131072:
+            raise ValueError("npm manifest too large")
+        metadata = json.loads(raw)
+        if not isinstance(metadata, dict) or metadata.get("name") != package_name:
+            raise ValueError("npm package name does not match the harness")
+        bins = metadata.get("bin")
+        entry = bins.get(harness) if isinstance(bins, dict) else bins
+        if not isinstance(entry, str) or not entry:
+            raise ValueError("npm package has no harness entrypoint")
+        target = (package_dir / entry).resolve()
+        if not target.is_relative_to(package_dir) or not target.is_file():
+            raise ValueError("npm entrypoint is missing or outside its package")
+        suffix = target.suffix.lower()
+        if suffix in {".exe", ".com"}:
+            return [str(target), *args[1:]]
+        if suffix not in {".js", ".cjs", ".mjs"}:
+            raise ValueError("npm entrypoint is not a native executable or Node script")
+        adjacent_node = shim.parent / "node.exe"
+        node = str(adjacent_node) if adjacent_node.is_file() else shutil.which("node.exe")
+        if not node:
+            raise ValueError("node.exe was not found")
+        return [node, str(target), *args[1:]]
+    except (OSError, ValueError) as exc:
+        raise AgentError(
+            f"Cannot safely resolve {harness} npm launcher ({exc}); install its standard "
+            "npm package or configure CLAUDE_CMD/CODEX_CMD with a native executable"
+        ) from exc
+
+
+class _WindowsJob:
+    """An owned, kill-on-close Windows job, including grandchildren.
+
+    Assign the child while suspended, then resume its primary thread. Unlike
+    taskkill's snapshot, the job still owns descendants after the CLI exits and
+    cannot miss a child spawned between creation and registration. Fail closed
+    if containment cannot be established; no third-party Windows dependency.
+    """
+
+    def __init__(self) -> None:
+        import ctypes
+        from ctypes import wintypes
+
+        class BasicLimits(ctypes.Structure):
+            _fields_ = [
+                ("process_time", ctypes.c_longlong), ("job_time", ctypes.c_longlong),
+                ("flags", wintypes.DWORD), ("min_ws", ctypes.c_size_t),
+                ("max_ws", ctypes.c_size_t), ("active", wintypes.DWORD),
+                ("affinity", ctypes.c_size_t), ("priority", wintypes.DWORD),
+                ("scheduling", wintypes.DWORD),
+            ]
+
+        class ExtendedLimits(ctypes.Structure):
+            _fields_ = [
+                ("basic", BasicLimits), ("io", ctypes.c_ulonglong * 6),
+                ("process_memory", ctypes.c_size_t), ("job_memory", ctypes.c_size_t),
+                ("peak_process_memory", ctypes.c_size_t), ("peak_job_memory", ctypes.c_size_t),
+            ]
+
+        self.api = ctypes.WinDLL("kernel32", use_last_error=True)
+        signatures = {
+            "CreateJobObjectW": ([ctypes.c_void_p, wintypes.LPCWSTR], wintypes.HANDLE),
+            "SetInformationJobObject": ([wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD], wintypes.BOOL),
+            "AssignProcessToJobObject": ([wintypes.HANDLE, wintypes.HANDLE], wintypes.BOOL),
+            "TerminateJobObject": ([wintypes.HANDLE, wintypes.UINT], wintypes.BOOL),
+            "CloseHandle": ([wintypes.HANDLE], wintypes.BOOL),
+            "OpenProcess": ([wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE),
+            "CreateToolhelp32Snapshot": ([wintypes.DWORD, wintypes.DWORD], wintypes.HANDLE),
+            "Thread32First": ([wintypes.HANDLE, ctypes.c_void_p], wintypes.BOOL),
+            "Thread32Next": ([wintypes.HANDLE, ctypes.c_void_p], wintypes.BOOL),
+            "OpenThread": ([wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE),
+            "ResumeThread": ([wintypes.HANDLE], wintypes.DWORD),
+        }
+        for name, (argtypes, restype) in signatures.items():
+            function = getattr(self.api, name)
+            function.argtypes, function.restype = argtypes, restype
+        self.handle = self.api.CreateJobObjectW(None, None)
+        if not self.handle:
+            raise ctypes.WinError(ctypes.get_last_error())
+        limits = ExtendedLimits()
+        limits.basic.flags = 0x2000  # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+        if not self.api.SetInformationJobObject(self.handle, 9, ctypes.byref(limits), ctypes.sizeof(limits)):
+            error = ctypes.WinError(ctypes.get_last_error())
+            self.close()
+            raise error
+
+    def assign_and_resume(self, proc: subprocess.Popen) -> None:
+        import ctypes
+        from ctypes import wintypes
+
+        # PROCESS_SET_QUOTA | PROCESS_TERMINATE is sufficient for assignment.
+        process = self.api.OpenProcess(0x0101, False, proc.pid)
+        if not process:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            if not self.api.AssignProcessToJobObject(self.handle, process):
+                raise ctypes.WinError(ctypes.get_last_error())
+        finally:
+            self.api.CloseHandle(process)
+
+        class ThreadEntry(ctypes.Structure):
+            _fields_ = [
+                ("size", wintypes.DWORD), ("usage", wintypes.DWORD),
+                ("tid", wintypes.DWORD), ("pid", wintypes.DWORD),
+                ("priority", wintypes.LONG), ("delta", wintypes.LONG),
+                ("flags", wintypes.DWORD),
+            ]
+
+        snapshot = self.api.CreateToolhelp32Snapshot(0x00000004, 0)  # TH32CS_SNAPTHREAD
+        if snapshot == ctypes.c_void_p(-1).value:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            entry = ThreadEntry()
+            entry.size = ctypes.sizeof(entry)
+            found = self.api.Thread32First(snapshot, ctypes.byref(entry))
+            while found:
+                if entry.pid == proc.pid:
+                    thread = self.api.OpenThread(0x0002, False, entry.tid)  # THREAD_SUSPEND_RESUME
+                    if not thread:
+                        raise ctypes.WinError(ctypes.get_last_error())
+                    try:
+                        if self.api.ResumeThread(thread) == 0xFFFFFFFF:
+                            raise ctypes.WinError(ctypes.get_last_error())
+                    finally:
+                        self.api.CloseHandle(thread)
+                    return
+                found = self.api.Thread32Next(snapshot, ctypes.byref(entry))
+            raise OSError("Cannot find the suspended agent's primary thread")
+        finally:
+            self.api.CloseHandle(snapshot)
+
+    def terminate(self) -> None:
+        import ctypes
+
+        if self.handle and not self.api.TerminateJobObject(self.handle, 1):
+            raise ctypes.WinError(ctypes.get_last_error())
+
+    def close(self) -> None:
+        if self.handle:
+            self.api.CloseHandle(self.handle)
+            self.handle = None
+
 
 def _terminate_tree(proc: subprocess.Popen) -> None:
-    """Kill a child process AND its descendants. The CLI agents (claude.cmd /
-    codex) spawn sub-processes (node, …); killing only the direct child would
-    orphan them — exactly the leak we must avoid. Windows: ``taskkill /T``;
-    POSIX: kill the process group (the child is a session leader). Best-effort."""
-    if proc.poll() is not None:
-        return
-    try:
-        if os.name == "nt":
-            subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False,
-            )
-        else:
-            import signal as _signal
-
-            # POSIX-only APIs (resolved dynamically: not present on Windows).
-            killpg = getattr(os, "killpg")
-            getpgid = getattr(os, "getpgid")
-            sigkill = getattr(_signal, "SIGKILL", _signal.SIGTERM)
-            killpg(getpgid(proc.pid), sigkill)
-    except (OSError, ValueError, subprocess.SubprocessError):
-        # Fall back to a plain kill of the direct child.
+    """Bounded, idempotent tree cleanup, even after the direct child exits."""
+    lock = getattr(proc, "_autospec_cleanup_lock", None) or threading.Lock()
+    with lock:
         try:
-            proc.kill()
-        except OSError:
-            pass
+            job = getattr(proc, "_autospec_job", None)
+            if job is not None:
+                job.terminate()
+            elif os.name == "nt":
+                if proc.poll() is None:
+                    result = subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                        check=False, timeout=_PROCESS_CLEANUP_TIMEOUT,
+                    )
+                    if result.returncode and proc.poll() is None:
+                        proc.kill()
+            else:
+                import signal
+
+                # Tracked POSIX children start new sessions. getpgid(pid) no
+                # longer works after parent exit, but its owned group may live.
+                os.killpg(proc.pid, signal.SIGKILL)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            try:
+                proc.kill()
+            except OSError:
+                pass
+        # Assignment itself may have failed, leaving a suspended child outside
+        # the job. Always clean the direct child as well as the container/group.
+        if proc.poll() is None:
+            try:
+                proc.kill()
+            except OSError:
+                pass
 
 
 def _run_tracked(
@@ -102,36 +310,176 @@ def _run_tracked(
     """Run a child process to completion, tracking it in the context's
     ProcessRegistry so it can be interrupted, and tree-killing it on timeout.
     Returns (returncode, stdout, stderr). Runs on a worker thread (blocking)."""
-    kwargs: dict = dict(
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        cwd=cwd,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-    )
-    if os.name != "nt":
-        # New session => child is its own process-group leader, so _terminate_tree
-        # can signal the whole group (the CLI + the node/python it spawns).
-        kwargs["start_new_session"] = True
-    proc = subprocess.Popen(args, **kwargs)
+    if not math.isfinite(timeout):
+        raise AgentError("Agent timeout must be finite")
+    registry = active_processes.get()
+    cancel = _active_call_cancel.get()
+    own_call = cancel is None
+    cancel = cancel if cancel is not None else threading.Event()
+    if registry is not None and own_call:
+        registry.register_call(cancel)
+    proc = None
+    job = None
+    io_threads: list[threading.Thread] = []
+    output = [bytearray(), bytearray()]
+    overflow = threading.Event()
+    deadline = time.monotonic() + timeout
+
+    def read_output(pipe, destination: bytearray) -> None:
+        try:
+            while chunk := pipe.read(65536):
+                remaining = _MAX_OUTPUT_BYTES - len(destination)
+                destination.extend(chunk[:max(0, remaining)])
+                if len(chunk) > remaining:
+                    overflow.set()
+                    return
+        except (OSError, ValueError):
+            pass  # pipe closed by cancellation/timeout cleanup
+        finally:
+            pipe.close()
+
+    def write_input(pipe) -> None:
+        try:
+            data = memoryview(input_text.encode("utf-8"))
+            while data and not cancel.is_set():
+                count = pipe.write(data[:65536])
+                if not count:
+                    break
+                data = data[count:]
+        except (BrokenPipeError, OSError, ValueError):
+            pass
+        finally:
+            pipe.close()
+
+    try:
+        if cancel.is_set():
+            return -1, "", "Agent execution cancelled before launch"
+        if timeout <= 0:
+            raise subprocess.TimeoutExpired(args, timeout)
+        command = _resolve_agent_command(args)
+        kwargs: dict = dict(
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+            cwd=cwd, bufsize=0,
+        )
+        if os.name == "nt":
+            job = _WindowsJob()
+            kwargs["creationflags"] = 0x00000004  # CREATE_SUSPENDED
+        else:
+            kwargs["start_new_session"] = True
+        proc = subprocess.Popen(command, **kwargs)
+        proc._autospec_cleanup_lock = threading.Lock()
+        proc._autospec_job = job
+        if cancel.is_set():
+            return -1, "", "Agent execution cancelled during launch"
+        if job is not None:
+            job.assign_and_resume(proc)
+        if registry is not None:
+            registry.add(proc)
+        for target, args_ in (
+            (read_output, (proc.stdout, output[0])),
+            (read_output, (proc.stderr, output[1])),
+            (write_input, (proc.stdin,)),
+        ):
+            thread = threading.Thread(target=target, args=args_, daemon=True, name="autospec-agent-io")
+            io_threads.append(thread)
+            thread.start()
+        exited_cleanup = False
+        while True:
+            if cancel.is_set():
+                _terminate_tree(proc)
+                return -1, "", "Agent execution cancelled"
+            if overflow.is_set():
+                raise AgentError(f"Agent output exceeded {_MAX_OUTPUT_BYTES} bytes per stream")
+            if proc.poll() is not None:
+                if not exited_cleanup:
+                    # CLI turns cannot leave background commands behind, even
+                    # when those commands inherited stdout and keep pipes open.
+                    _terminate_tree(proc)
+                    exited_cleanup = True
+                if all(not thread.is_alive() for thread in io_threads):
+                    break
+            if time.monotonic() >= deadline:
+                raise subprocess.TimeoutExpired(args, timeout)
+            cancel.wait(min(0.025, max(0, deadline - time.monotonic())))
+        if overflow.is_set():
+            raise AgentError(f"Agent output exceeded {_MAX_OUTPUT_BYTES} bytes per stream")
+        return proc.returncode, *(buffer.decode("utf-8", errors="replace") for buffer in output)
+    finally:
+        if proc is not None:
+            _terminate_tree(proc)
+            try:
+                proc.wait(timeout=_PROCESS_CLEANUP_TIMEOUT)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+            cleanup_deadline = time.monotonic() + _PROCESS_CLEANUP_TIMEOUT
+            for thread in io_threads:
+                thread.join(timeout=max(0, cleanup_deadline - time.monotonic()))
+            for pipe in (proc.stdin, proc.stdout, proc.stderr):
+                if pipe is not None:
+                    pipe.close()
+            if registry is not None:
+                registry.discard(proc)
+            with proc._autospec_cleanup_lock:
+                proc._autospec_job = None
+                if job is not None:
+                    job.close()
+        elif job is not None:
+            job.close()
+        if registry is not None and own_call:
+            registry.discard_call(cancel)
+
+
+async def _await_tracked(run: Callable[[], tuple[int, str, str]]) -> tuple[int, str, str]:
+    """Signal AND await cleanup; don't queue behind unrelated to_thread jobs."""
+    cancel = threading.Event()
     registry = active_processes.get()
     if registry is not None:
-        registry.add(proc)
-    try:
-        out, err = proc.communicate(input=input_text, timeout=timeout)
-    except subprocess.TimeoutExpired:
-        _terminate_tree(proc)
+        registry.register_call(cancel)
+    token = _active_call_cancel.set(cancel)
+    context = contextvars.copy_context()
+    loop = asyncio.get_running_loop()
+    worker = loop.create_future()
+
+    def deliver(result, error) -> None:
+        if not worker.done():
+            if error is None:
+                worker.set_result(result)
+            else:
+                worker.set_exception(error)
+
+    def invoke() -> None:
         try:
-            proc.communicate(timeout=5)
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+            result = context.run(run)
+        except BaseException as exc:
+            loop.call_soon_threadsafe(deliver, None, exc)
+        else:
+            loop.call_soon_threadsafe(deliver, result, None)
+
+    # The shared executor can be saturated by other long calls, including one
+    # from another project. A dedicated supervised worker makes cancellation
+    # independent of that queue; all contextvars still propagate explicitly.
+    thread = threading.Thread(target=invoke, daemon=True, name="autospec-agent-worker")
+    try:
+        thread.start()
+        return await asyncio.shield(worker)
+    except asyncio.CancelledError:
+        cancel.set()
+        while not worker.done():
+            try:
+                await asyncio.shield(worker)
+            except asyncio.CancelledError:
+                continue  # repeated stop/dispose still waits for tree cleanup
+            except Exception:
+                break
+        if not worker.cancelled():
+            # Retrieve any worker exception to avoid "never retrieved" warnings;
+            # the original caller cancellation is the outcome to propagate.
+            worker.exception()
         raise
     finally:
+        _active_call_cancel.reset(token)
         if registry is not None:
-            registry.discard(proc)
-    return proc.returncode, out, err
+            registry.discard_call(cancel)
 
 
 @dataclass
@@ -142,6 +490,7 @@ class AgentResult:
     input_tokens: int = 0
     output_tokens: int = 0
     duration_ms: int = 0
+    usage_reported: bool = True
 
 
 @dataclass(frozen=True)
@@ -157,7 +506,51 @@ class RunnerCapabilities:
 
 
 class AgentError(RuntimeError):
-    pass
+    def __init__(self, message: str = "", *, usage: AgentResult | None = None, budget_exhausted: bool = False):
+        super().__init__(message)
+        self.usage = usage
+        self.budget_exhausted = budget_exhausted
+
+
+def _usage_number(value, *, integer: bool = False):
+    """Untrusted provider telemetry must not poison totals with NaN/negatives."""
+    try:
+        number = float(value)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+    if not math.isfinite(number) or number < 0:
+        return 0
+    return int(number) if integer else number
+
+
+def _claude_result(payload: dict) -> AgentResult:
+    usage = payload.get("usage")
+    usage = usage if isinstance(usage, dict) else {}
+    reported = [usage[key] for key in (
+        "input_tokens", "output_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
+    ) if key in usage]
+    if "total_cost_usd" in payload:
+        reported.append(payload["total_cost_usd"])
+    try:
+        complete = (
+            "total_cost_usd" in payload
+            and "input_tokens" in usage and "output_tokens" in usage
+            and all(math.isfinite(float(value)) and float(value) >= 0 for value in reported)
+        )
+    except (TypeError, ValueError, OverflowError):
+        complete = False
+    return AgentResult(
+        text=str(payload.get("result") or ""),
+        session_id=payload.get("session_id"),
+        cost_usd=_usage_number(payload.get("total_cost_usd")),
+        # Anthropic reports uncached, cache-write and cache-read input separately.
+        input_tokens=sum(_usage_number(usage.get(key), integer=True) for key in (
+            "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens",
+        )),
+        output_tokens=_usage_number(usage.get("output_tokens"), integer=True),
+        duration_ms=_usage_number(payload.get("duration_ms"), integer=True),
+        usage_reported=complete,
+    )
 
 
 class AgentRunner(Protocol):
@@ -192,6 +585,11 @@ class ClaudeCliRunner:
         chosen_model = model or settings.claude_model
         if chosen_model:
             args += ["--model", chosen_model]
+        remaining = active_budget_usd.get()
+        if remaining is not None:
+            if not math.isfinite(remaining) or remaining <= 0:
+                raise AgentError("Budget estimatif disponible nul ou invalide.", budget_exhausted=True)
+            args += ["--max-budget-usd", str(remaining)]
         # SK-1: when skills are on, expose the workspace's seeded skill library so
         # the CLI's native Skill tool can load `.claude/skills/<name>/SKILL.md` on
         # demand (progressive disclosure). cwd's `.claude/skills` is auto-found,
@@ -216,7 +614,7 @@ class ClaudeCliRunner:
             )
 
         try:
-            returncode, out_raw, err_raw = await asyncio.to_thread(_run)
+            returncode, out_raw, err_raw = await _await_tracked(_run)
         except subprocess.TimeoutExpired:
             raise AgentError(f"Agent timed out after {settings.agent_timeout_s}s")
         except OSError as exc:
@@ -224,30 +622,23 @@ class ClaudeCliRunner:
             raise AgentError(f"Could not run claude CLI ({settings.claude_cmd}): {exc}")
 
         out = (out_raw or "").strip()
-        if returncode != 0:
-            err = (err_raw or "").strip()
-            raise AgentError(f"claude CLI exited with {returncode}: {err or out}")
-
         try:
             payload = json.loads(out)
         except json.JSONDecodeError:
             # --output-format json should always give JSON, but degrade gracefully
-            return AgentResult(text=out)
+            payload = None
+        result = _claude_result(payload) if isinstance(payload, dict) else None
+        exhausted = isinstance(payload, dict) and payload.get("subtype") == "error_max_budget_usd"
+        if returncode != 0:
+            err = (err_raw or "").strip()
+            raise AgentError(f"claude CLI exited with {returncode}: {err or out}", usage=result, budget_exhausted=exhausted)
         if not isinstance(payload, dict):
-            return AgentResult(text=out)
-        if payload.get("is_error"):
+            return AgentResult(text=out, usage_reported=False)
+        if payload.get("is_error") or exhausted:
             # Some failures (e.g. error_during_execution) exit 0 but flag the payload.
             detail = payload.get("result") or payload.get("subtype") or out[:500]
-            raise AgentError(f"claude CLI reported an error: {detail}")
-        usage = payload.get("usage") or {}
-        return AgentResult(
-            text=str(payload.get("result") or ""),
-            session_id=payload.get("session_id"),
-            cost_usd=float(payload.get("total_cost_usd", 0) or 0),
-            input_tokens=int(usage.get("input_tokens", 0) or 0),
-            output_tokens=int(usage.get("output_tokens", 0) or 0),
-            duration_ms=int(payload.get("duration_ms", 0) or 0),
-        )
+            raise AgentError(f"claude CLI reported an error: {detail}", usage=result, budget_exhausted=exhausted)
+        return result
 
 
 def _extract_codex_text(out: str) -> tuple[str, int, int]:
@@ -342,7 +733,7 @@ class CodexCliRunner:
             )
 
         try:
-            returncode, out_raw, err_raw = await asyncio.to_thread(_run)
+            returncode, out_raw, err_raw = await _await_tracked(_run)
         except subprocess.TimeoutExpired:
             raise AgentError(f"Agent timed out after {settings.agent_timeout_s}s")
         except OSError as exc:

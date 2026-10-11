@@ -207,6 +207,41 @@ function project(overrides: Partial<ProjectState> = {}): ProjectState {
 }
 
 describe("work — canResumeBuild (gating partagé RunPanel/ProjectBar)", () => {
+  it.each<PipelinePhase>(["done", "stopped", "needs_attention", "error"])(
+    "bootstrap échoué avant les stories en phase %s : reprise disponible",
+    (phase) => {
+      expect(canResumeBuild(project({ phase, stories: [], bootstrap_status: "failed" }))).toBe(true);
+    },
+  );
+
+  it.each<PipelinePhase>(["spec", "analyze", "plan", "architect", "build"])(
+    "bootstrap échoué mais pipeline active %s : pas de seconde reprise",
+    (phase) => {
+      expect(canResumeBuild(project({ phase, stories: [], bootstrap_status: "failed" }))).toBe(false);
+    },
+  );
+
+  it.each(["preparing", "verifying"] as const)(
+    "bootstrap %s : pas de build concurrent même avec stories en attente",
+    (bootstrap_status) => {
+      expect(canResumeBuild(project({ phase: "needs_attention", stories: [story({ status: "todo" })], bootstrap_status }))).toBe(false);
+    },
+  );
+
+  it.each(["building", "deploying", "verifying"])(
+    "Docker %s : la reprise du bootstrap attend la fin du déploiement",
+    (deploy_status) => {
+      expect(canResumeBuild(project({ phase: "needs_attention", bootstrap_status: "failed", deploy_status }))).toBe(false);
+    },
+  );
+
+  it.each([undefined, "", "ready", "skipped"] as const)(
+    "sans stories ni échec bootstrap (%s) : aucune reprise à proposer",
+    (bootstrap_status) => {
+      expect(canResumeBuild(project({ phase: "done", stories: [], bootstrap_status }))).toBe(false);
+    },
+  );
+
   it("DORMANT_PHASES inclut 'done' (régression snake) en plus de stopped/error", () => {
     expect(DORMANT_PHASES).toContain("done");
     expect(DORMANT_PHASES).toContain("stopped");

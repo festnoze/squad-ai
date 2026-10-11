@@ -1,298 +1,255 @@
-# Docker Delivery — build, deploy & network-verify every project (fix-until-green)
+# Livraison Docker et socle technique
 
-**Goal.** Autospec today ends a project's lifecycle at the delivery gates (green
-suite → smoke run → runtime acceptance → Definition of Done → `done`) and the
-generated app only ever runs as a local host process. `orchestrator/deploy.py`
-writes a Dockerfile but **never builds or runs an image**. This upgrade adds a
-final automatic pipeline step so each project is (1) **built into a Docker
-image**, (2) **deployed** to local Docker Desktop on a **common network
-`autospec-net`** shared by all Autospec projects, (3) **verified** — container
-boots healthy AND every deployed Autospec container reaches every other one over
-the network (container-name DNS, HTTP probes) — and (4) **repaired** in a
-fix-until-green loop reusing `_arepair_delivery`, with infra conditions (daemon
-down…) parking in `needs_attention` **without burning repair attempts**.
+Cette page décrit le contrat implémenté. Les tests unitaires vérifient la logique
+de la factory ; la compatibilité d'une image et de son application nécessite
+aussi un moteur Docker opérationnel et un véritable build/run.
 
-**Thesis.** Same discipline as the verified-swarm upgrade: every task ships with
-an *executed* check. A green pytest suite proves the code compiles and tests
-pass — it does **not** prove the app boots in a container, binds `0.0.0.0`,
-ships its `frontend/dist`, or is reachable by its siblings. The Docker delivery
-gate makes that runnability an executed truth, and a failed one is a *repairable*
-signal fed back to a Dev agent — never a self-report.
+## Avant les fonctionnalités : vérifier le socle
 
----
+`PROJECT_BOOTSTRAP=1` est activé par défaut. Après la pré-analyse et le brief,
+avant le PO, le contrat persistant `technical_stack` fixe le type de produit,
+le langage backend, le frontend et la base demandée. Les choix explicites de
+l'utilisateur sont prioritaires. Les templates disponibles couvrent
+Python/FastAPI, Go, Rust, Node.js et React/Vite/TypeScript ; un choix non supporté
+produit un diagnostic explicite plutôt qu'une substitution.
 
-## ✅ Confirmed decisions (user)
+Le bootstrap matérialise le socle de manière déterministe, installe ses
+dépendances, teste son démarrage et les accès HTTP. Pour un fullstack, le
+frontend doit atteindre le backend. Le template Python avec SQLite vérifie
+aussi un accès réel à la base. Les contrôles sont bornés par
+`BOOTSTRAP_TIMEOUT_S=180` et leur échec empêche d'engager les agents sur les
+stories. Une toolchain ou une dépendance indisponible doit être corrigée avant
+de reprendre. Le mode `FAKE_AGENTS` évite ces installations et exécutions réelles.
 
-These decisions are frozen and drive every task below:
+Pour un frontend seul, le socle crée uniquement le projet React : pas de backend
+Python, de `main.py` ou de virtualenv artificiel. Les tests frontend, le build
+et un accès HTTP au serveur de preview vérifient ce cas. Pour tout socle React,
+le préflight ouvre aussi le bundle de production dans **Chromium réel** : le
+conteneur `#root` doit être rendu et aucune erreur JavaScript ou requête échouée
+ne doit être observée. En fullstack, le composant initial doit confirmer son
+`fetch` frontend → API ; le contrôle API vérifie aussi SQLite quand elle est
+sélectionnée. Une simple réponse HTTP 200 ne suffit donc pas pour valider une UI.
 
-| Decision | Choice |
-|---|---|
-| Communication check | **Health + cross-container reachability only** (no app-level API coupling). |
-| Network topology | **One shared external network `autospec-net`** for all Autospec projects (container-name DNS). |
-| Scope | Web-facing projects: python web backends (`api`/`web-ssr`/`fullstack` or auto-detected) **plus frontend-only SPAs** (nginx static image). |
-| CLI / library projects | **Skip with an explicit warning** (`deploy_status="skipped"`), never auto-containerized. |
-| Repair loop | **Reuse `_arepair_delivery`** with its `INTEGRATION_FIX_ATTEMPTS` budget (no new `DOCKER_FIX_ATTEMPTS`). |
-| Fullstack packaging | **ONE image** (multi-stage: frontend built and served by the backend), matching the runtime-acceptance INTEGRATED model. |
-| Frontend-only packaging | **`nginx:alpine` static image** (multi-stage build → nginx serve, container port 80, SPA `try_files` fallback). |
-| Infra vs repairable | Infra (daemon absent, network un-creatable) **parks in `needs_attention` without burning attempts**; only failures attributable to the current project are repairable. |
-| Cross-project attribution | Only pairs **involving the current project** fail its gate; foreign pairs are warnings. |
+La découverte des features exclut les fichiers `.test.tsx`, `.spec.tsx` et
+`.d.tsx` dès le glob d'import. Une garde supplémentaire inspecte le graphe des
+modules du build et refuse les fichiers de tests ou Vitest dans le bundle de
+production. Une page blanche ou une erreur du navigateur bloque avant les agents
+métier. Si Playwright ou Chromium manque, le préflight remonte une panne
+d'infrastructure et reste bloqué. Préparer ces dépendances depuis la racine
+d'Autospec, avec les commandes PowerShell suivantes :
 
----
-
-## Design principles (invariants)
-
-1. **Executed runnability is non-negotiable.** The container must actually boot
-   and answer HTTP; reachability is proved by real `docker exec` probes between
-   containers, not by any agent's narrative.
-2. **Infra is parked, not repaired.** A missing daemon or un-creatable network is
-   an environment condition — it parks the delivery in `needs_attention` and
-   burns **zero** repair attempts (mirrors the runtime-acceptance exit-code `2`
-   contract).
-3. **Attribution is strict.** A failing reachability pair only fails the gate when
-   the **current** project is one of its endpoints; failures between two foreign
-   projects are surfaced as warnings and never consume the current project's
-   attempts.
-4. **Reuse-first.** The repair loop is the existing `_arepair_delivery` (git
-   snapshot, Dev agent, pytest guard + rollback, re-run gate); Docker only threads
-   a `prompt_builder` and a Docker-specific `averify`.
-5. **Flag-gated, default OFF.** `DOCKER_DELIVERY=0` ⇒ byte-identical legacy
-   behavior. Enabling requires Docker Desktop; it is **not** in the `verified`
-   preset (profile/env-driven only).
-6. **Autospec owns its Dockerfile, never the user's.** A `# autospec:managed`
-   marker on line 1 lets Autospec regenerate its own Dockerfile but never clobber
-   a hand-edited one.
-
----
-
-## Wave 1 — Settings, state & Dockerfile template
-
-**Outcome:** the configuration surface, persisted deploy state, and the
-image-build templates the daemon layer will consume — all additive, all
-default-off.
-
-### T1.1 — Settings (`backend/autospec/config.py`)
-Near the sandbox/docker block, same `_env_*` patterns:
-`docker_delivery` (`DOCKER_DELIVERY`, default `False`), `docker_network`
-(`DOCKER_NETWORK`, default `autospec-net`), `docker_build_timeout_s`
-(`DOCKER_BUILD_TIMEOUT_S`, `600.0`, min `30.0`), `docker_deploy_timeout_s`
-(`DOCKER_DEPLOY_TIMEOUT_S`, `60.0`, min `5.0`, health wait),
-`docker_host_port_base` (`DOCKER_HOST_PORT_BASE`, `18000`, min `1024`). Reuse the
-existing `docker_cmd` (`DOCKER_CMD`) and `integration_fix_attempts`. Document in
-`backend/.env.example`.
-
-### T1.2 — State (`models.py` + `orchestrator/delivery_state.py`)
-`ProjectState` after `delivery_partial`: `deploy_status`
-(`"" | building | deploying | verifying | deployed | failed | skipped`),
-`deployed_image`, `deployed_container`, `deploy_host_port` (stable, reused across
-redeploys), `deploy_detail` (~2000 chars). Defaults keep old persisted states
-loadable. `delivery_state.set_deploy(...)` is the single mutation point;
-`reset(...)` clears `deploy_status`/`deploy_detail` but keeps `deploy_host_port`
-and names (old container keeps running while the next iteration builds).
-
-### T1.3 — Dockerfile template (`orchestrator/deploy.py`)
-Replace `_DOCKERFILE` with `dockerfile_text(port, kind)`, `kind ∈ {backend,
-fullstack, frontend}`, first line `# autospec:managed`:
-- **backend** — current content + `EXPOSE {port}`.
-- **fullstack** — multi-stage `node:20-alpine AS fe` (`npm ci || npm install`,
-  `npm run build`) → python stage, `COPY --from=fe /fe/dist ./frontend/dist`,
-  `EXPOSE {port}` — ONE image, backend serves the SPA.
-- **frontend** — `node:20-alpine AS fe` build → `nginx:alpine`,
-  `COPY --from=fe /fe/dist /usr/share/nginx/html`, `EXPOSE 80`, minimal
-  `try_files` SPA-fallback nginx conf written alongside.
-`.dockerignore` adds `node_modules`/`**/node_modules`. New signature
-`write_deploy_artifacts(ws, *, port=None, kind="backend")`: Dockerfile (re)written
-when absent OR managed-marked and content differs; `.dockerignore`/`ci.yml` keep
-never-overwrite semantics.
-
-**Effort:** S. **Risk:** low — additive settings, backward-compatible state
-defaults, managed-marker guards user Dockerfiles.
-
----
-
-## Wave 2 — Daemon layer & deploy/verify entry point
-
-**Outcome:** `orchestrator/docker_deploy.py`, the single module that talks to the
-daemon and exposes one entry point (`deploy_and_verify`) used both by the pipeline
-phase and as the repair `averify`.
-
-### T2.1 — Module skeleton (`orchestrator/docker_deploy.py`)
-`DockerDeployResult(ok, detail, skipped=False, infra=False, image="",
-container="", host_port=0)`; labels `LABEL_PROJECT="autospec.project"`,
-`LABEL_PORT="autospec.port"`. `slug/image_name/container_name(project_id)` →
-`autospec/<slug>:latest`, `autospec-<slug>` (sanitize `[^a-z0-9-]`). All
-subprocess sync (mirrors `runtime_acceptance`), called via `asyncio.to_thread`.
-
-### T2.2 — Daemon primitives
-`_docker(args, *, timeout, cwd=None)` (OSError/Timeout → `(-1, str(exc))`);
-`docker_available()` (`docker version --format {{.Server.Version}}`);
-`looks_like_daemon_down(output)` (named-pipe / "cannot connect to the docker
-daemon" / "error during connect" / command-not-found → **infra**);
-`ensure_network(network)` (inspect, create if missing, tolerate "already exists");
-`build_image(ws, image, *, timeout, on_line=None)` (`Popen` streaming, returns
-`(rc==0, tail)`); `replace_container(...)` (`rm -f` old, then `run -d` with
-`--network`, `-p host:container`, `--label autospec.project/port`,
-`--restart unless-stopped`).
-
-### T2.3 — Health & reachability
-`wait_healthy(name, host_port, *, timeout)` polls 1 s: `docker inspect` state
-(`exited`/`dead` → fail fast with `docker logs`), HTTP GET on the host port —
-**any status (incl. 404) = healthy**; timeout → logs (repairable). `list_deployed()`
-via `docker ps --filter label`. `probe(src, dst, dst_port)` (`docker exec` python
-`urllib`, fallback busybox `wget`; `HTTPError` = reachable).
-`check_cross_reachability(own_container, deployed)` — full matrix; own-pair fail ⇒
-gate failure, foreign-pair fail ⇒ warning.
-
-### T2.4 — Lifecycle & entry point
-`undeploy(project_id)` (`rm -f` + best-effort `rmi`); `allocate_host_port(state)`
-(reuse persisted; else scan from `docker_host_port_base` skipping label-claimed,
-persisted-state and host-busy ports); `should_run(state, ws, *, enabled)` returns
-the deploy `kind` (fullstack/backend/frontend) or a skip reason.
-`deploy_and_verify(...)` — the **single entry point**: docker_available→infra;
-ensure_network→infra; build→repairable; replace_container→repairable;
-wait_healthy→repairable; cross-reachability→repairable for own pairs.
-
-**Effort:** M. **Risk:** medium — daemon interaction; all subprocess-faked in
-tests.
-
----
-
-## Wave 3 — Repair prompt, pipeline phase & profiles
-
-**Outcome:** the Docker gate wired into `_alifecycle` between DoD and document,
-with a dedicated repair prompt and profile overrides.
-
-### T3.1 — Repair prompt + hook (`agents/prompts.py`, `pipeline.py`)
-New `dev_fix_deploy(package_name, report, architecture="", attempt=1,
-max_attempts=1)` modeled on `dev_fix_integration`. Classic causes: app binds
-`127.0.0.1` not `0.0.0.0`; `main.py` port ≠ EXPOSE/label; `frontend/dist` missing
-from image; dep in `.venv` but absent from `pyproject.toml` (crashes under
-`uv sync --no-dev`); host-layout path assumptions. `_arepair_delivery` gains a
-keyword-only `prompt_builder=None` (call site becomes `(prompt_builder or
-prompts.dev_fix_integration)(...)`; existing callers untouched). Extend
-`_smoke_looks_like_infra` with daemon-down patterns so an infra-shaped report can
-never enter the repair loop.
-
-### T3.2 — Pipeline phase (`pipeline.py`)
-`_adocker_delivery_phase(self) -> bool` slotted between `_apply_definition_of_done`
-and `_adocument_phase`. Mirrors `_asmoke_phase`/`_aruntime_acceptance_phase`:
-`should_run` skip-with-warning; `monitor.phase("docker")`; regenerate artifacts;
-infra pre-check → `_apark_infra`; `allocate_host_port` → persist; `set_deploy`
-transitions building→deploying→verifying; `deploy_and_verify` via
-`asyncio.to_thread` streaming build lines; `result.infra` → park; repairable →
-`_arepair_delivery(..., prompt_builder=prompts.dev_fix_deploy)`; success →
-`deployed` + chat 🐳; failure → `failed` + `_block_delivery`. Rework
-`Pipeline.adeploy()` (background `_deploy_task`, gate flag bypassed but
-FAKE_AGENTS/web-candidate skips kept) and add `Pipeline.aundeploy()`.
-
-### T3.3 — Profiles (`orchestrator/profiles.py`)
-Add `"docker_delivery"` to overrides: **True** for `api`, `web-ssr`, `fullstack`;
-**False** for `library-fast`, `cli`, `brownfield` (never auto-containerize an
-existing repo). `auto` stays override-free → env decides.
-
-**Effort:** M. **Risk:** medium — touches the lifecycle hot path; guarded by the
-default-off flag and the byte-identical-when-off regression tests.
-
----
-
-## Wave 4 — API, frontend & tests
-
-**Outcome:** the HTTP surface, the RunPanel deploy chip, and the full test
-footprint (module + phase layers, no real docker).
-
-### T4.1 — API (`api/server.py`)
-`POST /api/projects/{id}/deploy` (same route) → `{"created": [...],
-"deploy_started": bool}`; new `POST /api/projects/{id}/undeploy` →
-`pipeline.aundeploy()` (404/409/200). Project delete endpoint: best-effort
-`docker_deploy.undeploy(project_id)` before wiping the workspace (no zombie
-containers). No new streaming plumbing: deploy fields ride `_sync()` → EventBus →
-SSE/WS; build lines ride `self._log("docker", …)`.
-
-### T4.2 — Frontend (`frontend/src`)
-`types.ts` deploy fields; `api.ts` `deployProject` return type + new
-`undeployProject`. `RunPanel.tsx` deploy chip (🐳 green link when `deployed`, red
-with `title=deploy_detail` when `failed`, pulsing while building/deploying/
-verifying, « Undeploy » action). i18n `{en, fr}` keys in `runPanel.ts`/`app.ts`.
-
-### T4.3 — Tests (`backend/tests/test_docker_delivery.py` + touched suites)
-Module layer (fake `subprocess.run`/`Popen`): daemon-down → infra; `ensure_network`
-idempotent; `wait_healthy` exited/404/timeout; `check_cross_reachability`
-own-vs-foreign; `allocate_host_port` reuse/collision/base; name sanitization.
-Phase layer (reuse `repair_env` + `FakeRunner` + queued `deploy_and_verify`): gate
-off / fake_agents / CLI → skipped, zero docker calls; daemon down → park, zero
-agent calls; build failure → repair → green (`dev_fix_deploy` wording); exhausted
-attempts → blocked; repair breaking pytest → rollback. Touched: `test_deploy.py`
-(three dockerfile variants, managed-marker), `test_profiles.py` (override per
-profile), `test_api.py` (deploy response, undeploy 404/409/200),
-`test_integration_repair.py` (`prompt_builder` routing).
-
-**Effort:** M. **Risk:** low — all docker calls monkeypatched; no real daemon in
-CI.
-
----
-
-## Key edge cases
-
-- **Windows Docker Desktop off** → `docker version` named-pipe connect error →
-  infra → park, zero attempts (matches exit-2 contract).
-- **Port collisions** → label scan + persisted-state scan + host bind-test +
-  stable persisted `deploy_host_port`; container-internal port always
-  `resolve_web_port(ws)` so gate, `EXPOSE` and probes agree.
-- **Stale containers of deleted projects** → best-effort undeploy on delete;
-  label-based `list_deployed` means orphans drop out of the matrix when they die.
-- **FAKE_AGENTS demo mode** → skipped in `should_run`; no real docker in demo or
-  unit tests.
-- **Cross-project attribution** → only pairs involving the current project fail
-  its gate; foreign failures are warnings.
-- **Probe tooling per image** → python images have no curl/wget, nginx:alpine has
-  no python: probe tries `python -c urllib` then falls back to busybox `wget`;
-  `HTTPError` = reachable.
-- **Frontend-only dist path (Angular vs Vite)** → Autospec scaffolds Vite
-  (`dist/`); an Angular-style output path breaks the `COPY --from=fe /fe/dist`
-  step → repairable build failure the `dev_fix_deploy` agent fixes.
-- **127.0.0.1 binding in-container** → fails health+reachability → repairable,
-  first cause in `dev_fix_deploy`.
-
----
-
-## Config additions (default OFF ⇒ byte-identical legacy behavior)
-
-| Env var | Setting | Wave | Purpose |
-|---|---|---|---|
-| `DOCKER_DELIVERY` | `docker_delivery` | 1 | Enable the build + deploy + network-verify gate. |
-| `DOCKER_NETWORK` | `docker_network` | 1 | Shared external network for all Autospec containers (default `autospec-net`). |
-| `DOCKER_BUILD_TIMEOUT_S` | `docker_build_timeout_s` | 1 | `docker build` timeout (default `600`, min `30`). |
-| `DOCKER_DEPLOY_TIMEOUT_S` | `docker_deploy_timeout_s` | 1 | Health-wait after container start (default `60`, min `5`). |
-| `DOCKER_HOST_PORT_BASE` | `docker_host_port_base` | 1 | Host-port scan base (default `18000`, min `1024`). |
-| `DOCKER_CMD` | `docker_cmd` | — | Docker binary (pre-existing, reused). |
-| *(reused)* | `integration_fix_attempts` | 3 | Repair-loop budget (shared with the integration gate; no new flag). |
-
----
-
-## Verification
-
-```
-cd backend
-uv run pytest tests/test_docker_delivery.py tests/test_deploy.py tests/test_profiles.py tests/test_api.py tests/test_integration_repair.py -q
-uv run pytest -q                 # full suite; no real docker (all monkeypatched)
-
-cd ../frontend
-npm run test -- --run            # Vitest incl. RunPanel deploy-chip cases
-npm run build                    # tsc + vite build stays green
+```powershell
+cd frontend
+npm ci
+npx playwright install chromium
+cd ..
 ```
 
-Manual E2E (real Docker Desktop): `DOCKER_DELIVERY=1`, run a `fullstack` project
-end-to-end; then `docker ps --filter label=autospec.project`,
-`docker network inspect autospec-net`, browse `http://localhost:<deploy_host_port>`;
-create a second project and confirm the cross-reachability matrix in the docker
-logs/chat.
+Le navigateur utilise les dépendances d'Autospec, sans ajouter Playwright au
+projet généré. Ce contrôle partage l'échéance globale du préflight et ses
+processus sont arrêtés lors d'une annulation. Les adaptateurs de base actuellement
+validés sont `none` et SQLite avec Python/FastAPI ; PostgreSQL et les autres bases
+ne sont pas implicitement assimilés à SQLite.
 
----
+Le provider par défaut reste le harness **Claude Code**, avec
+`CLAUDE_MODEL=sonnet`. `haiku` peut être choisi explicitement pour un modèle plus
+léger ; le bootstrap déterministe ne délègue pas l'écriture du socle à ce modèle.
 
-## Shipped-status table
+La sélection déterministe privilégie Go pour les services standards, Python
+pour les prototypes simples et SQLite, Rust pour une forte criticité.
+`LANGUAGE_SELECTOR=1` permet une proposition LLM complémentaire ; les choix
+explicites restent prioritaires. Une fois le socle vérifié, les prompts PO et
+architecte planifient uniquement le comportement demandé, sans nouvelle tâche
+de scaffolding, factory ou démarrage serveur. Un besoin minuscule reste limité
+à deux stories maximum, tests compris.
 
-| Wave | Shipped | Key modules / hooks |
+## Types d'images
+
+| Produit | Construction | Contrôle de livraison |
 |---|---|---|
-| 1 — settings, state, Dockerfile template | ☐ | `config.py` (`docker_*`), `models.py` + `delivery_state.set_deploy`, `deploy.dockerfile_text` (`# autospec:managed`) |
-| 2 — daemon layer & entry point | ☐ | `orchestrator/docker_deploy.py` (`docker_available`, `ensure_network`, `build_image`, `replace_container`, `wait_healthy`, `check_cross_reachability`, `deploy_and_verify`) |
-| 3 — repair prompt, phase & profiles | ☐ | `prompts.dev_fix_deploy`, `_arepair_delivery(prompt_builder=…)`, `_adocker_delivery_phase`, `Pipeline.adeploy/aundeploy`, `profiles.py` overrides |
-| 4 — API, frontend & tests | ☐ | `POST /deploy` + `/undeploy`, delete-endpoint undeploy, `RunPanel` deploy chip, `test_docker_delivery.py` + touched suites |
+| Backend Python | `uv sync --no-dev`, environnement intégré | Exécution de `main.py`, HTTP et réseau |
+| Backend Go | Compilation native du binaire | Démarrage, HTTP et réseau |
+| Backend Rust | Compilation release d'une cible binaire | Démarrage, HTTP et réseau |
+| Backend Node.js | Installation, build éventuel, dépendances de production | `npm start`, HTTP et réseau |
+| Frontend seul | React/Vite avec Node 22, nginx non-root | HTTP port interne 8080 et réseau |
+| Fullstack | Frontend compilé puis copié dans l'image backend | Backend servant `AUTOSPEC_STATIC_DIR`, HTTP et réseau |
+| CLI | Image de la toolchain retenue, point d'entrée natif | Commande `--help` sous timeout, sans réseau |
+| Bibliothèque | Package installé/compilé dans une image | Build du package, aucun service HTTP attendu |
+
+Les CLI et bibliothèques sont des images livrables ; elles ne créent pas un
+service permanent ni une URL. Le nom de l'image est `autospec/<slug>:latest`.
+Les services ont le nom `autospec-<slug>` et les labels `autospec.project` et
+`autospec.port`.
+
+Les templates sont exposés par :
+
+```python
+dockerfile_text(port, kind="backend", language="python", frontend_root="frontend")
+write_deploy_artifacts(ws, port=None, kind="backend", language="python", frontend_root="frontend")
+```
+
+`kind` vaut `backend`, `fullstack`, `frontend`, `cli` ou `library`. Un frontend
+peut se trouver dans un sous-répertoire déclaré ou à la racine (`frontend_root="."`).
+Les chemins absolus, remontées `..` et valeurs invalides sont rejetés avant écriture.
+Les projets hors contrat nécessitent un template adapté ; un backend Go/Rust ne
+doit jamais être classé frontend-only parce qu'il n'a pas de `main.py`.
+
+## Artefacts sûrs et conservés
+
+La première ligne du Dockerfile reste `# syntax=docker/dockerfile:1` pour
+BuildKit. Le marqueur `# autospec:managed` est suivi d'une empreinte SHA-256 du
+contenu généré. Autospec régénère seulement un artefact encore identique à sa
+version générée. Une correction manuelle ou d'agent reste donc conservée même
+si le marqueur est présent. Les anciens templates sont migrés uniquement si
+leur contenu complet est reconnu ; un marqueur seul ne donne aucun droit
+d'écrasement. La même protection s'applique à la CI et à la configuration nginx.
+
+`.dockerignore` exclut `.env`, `.env.*`, les clés, credentials, caches et
+environnements locaux. Les règles personnalisées sont conservées et une garde
+de secrets est ajoutée après les éventuelles règles de réinclusion. `.gitignore`
+ne protège pas à lui seul le contexte Docker.
+
+Quand un lockfile est présent, `npm ci`, `uv sync --frozen` ou
+`cargo build --locked` l'impose. Une installation échouée échoue immédiatement :
+aucun `|| true` ni repli après échec de `npm ci`. Le runtime n'effectue aucune
+synchronisation de dépendances. Les images tournent avec un utilisateur non-root
+et les applications disposent d'un répertoire `/app/data` inscriptible.
+
+La CI exportée correspond à la toolchain : pytest, `go test ./...`, `cargo test`
+ou `npm test`, et compilation du frontend pour les produits concernés. Un
+frontend-only ne reçoit pas un workflow Python.
+
+## Déploiement, annulation et rollback
+
+Après les gates de livraison, `docker_deploy.deploy_and_verify` construit une
+image candidate. Pour un service, un conteneur candidat démarre sur un port
+loopback éphémère et doit satisfaire son contrôle de santé avant de toucher au dernier
+conteneur livré. Le passage au port stable conserve l'ancien conteneur comme
+sauvegarde jusqu'à ce que les contrôles de santé et de réseau réussissent.
+Un échec restaure la sauvegarde ; une courte interruption pendant la bascule
+reste possible. Les erreurs de rollback ou nettoyage sont remontées.
+
+Pour un socle `api` ou `fullstack`, la santé exige un HTTP 200 sur
+`/api/health` et un objet JSON contenant `status="ok"`,
+`service="autospec-bootstrap"` et `database="ok"` si une base est prévue,
+sinon `database="none"`. Un frontend seul doit répondre en HTTP 2xx.
+Les projets historiques sans contrat gardent seulement leur contrôle de
+connectivité HTTP : une réponse 404/500 n'y démontre pas une application saine.
+
+Pour SQLite, le conteneur livré monte le volume nommé
+`autospec-<slug>-data` sur `/app/data`, avec
+`DATABASE_URL=sqlite:////app/data/app.db`. Le label `autospec.project` est
+vérifié avant réutilisation : un volume appartenant à un autre projet est
+refusé. Le candidat utilise un volume temporaire isolé, nettoyé ensuite ;
+ses vérifications ne modifient donc pas la base persistante du service livré.
+Le conteneur final retrouve ce volume lors des redéploiements et Undeploy le
+conserve volontairement. La suppression des données exige une action explicite.
+
+Le rollback restaure l'application précédente, pas les migrations déjà
+appliquées à la base par le conteneur final. Le contrôle sur une base candidate
+ne valide pas une migration des données de production ; celles-ci nécessitent
+une stratégie de migration et de sauvegarde adaptée.
+
+Le conteneur est publié sur `127.0.0.1:<port>`, avec `--cap-drop ALL`,
+`--security-opt no-new-privileges`, une limite de 512 Mio de mémoire, 1 CPU et
+256 processus. Le réseau commun `autospec-net` sert uniquement à vérifier la
+connectivité entre services. Ces restrictions ne remplacent pas une VM dédiée
+si l'on souhaite exécuter du code hostile dans un environnement isolé.
+
+Le timeout supervise le processus même s'il n'émet plus de logs. L'annulation
+est propagée au thread et aux processus Docker ; la suppression attend l'arrêt
+et le nettoyage avant de supprimer le workspace. Un `asyncio.Task.cancel()`
+seul ne suffit pas à arrêter un processus lancé dans un thread.
+
+Le port hôte précédent est réutilisé s'il est disponible ou appartient au
+conteneur du projet ; sinon un port est choisi depuis `DOCKER_HOST_PORT_BASE`.
+Une réservation verrouillée protège les déploiements concurrents de cette
+instance. Une course avec un programme externe au moment du bind reste possible
+et doit produire un échec explicite, jamais un faux succès.
+
+Seules les deux directions entre le service courant et les autres services
+sont sondées : `2 × (N−1)` contrôles, pas une matrice `N × N`. Une réponse
+HTTP 4xx/5xx à ces sondes inter-conteneurs prouve la connectivité, y compris via
+BusyBox `wget` ; elle ne satisfait pas le contrôle de santé strict du socle. Elle ne prouve
+pas qu'une fonctionnalité métier est correcte ; les tests fonctionnels et la
+runtime acceptance restent nécessaires.
+
+Un daemon arrêté, une toolchain absente ou une panne d'infrastructure produit
+un diagnostic et parque la pipeline en `needs_attention`. La classification
+infra est conservée pendant les nouvelles vérifications de réparation. Les
+défauts applicatifs sont réparés via la boucle existante et son budget
+`INTEGRATION_FIX_ATTEMPTS`.
+
+## Configuration et API
+
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `PROJECT_BOOTSTRAP` | `1` | Socle déterministe et préflight avant le PO |
+| `BOOTSTRAP_TIMEOUT_S` | `180` | Échéance du bootstrap |
+| `TEST_SUITE_TIMEOUT_S` | `180` | Échéance d'une suite backend/frontend native |
+| `CLAUDE_MODEL` | `sonnet` | Modèle du harness Claude Code |
+| `DOCKER_DELIVERY` | `1` | Tous les nouveaux projets, CLI/bibliothèques incluses ; brownfield sur activation explicite |
+| `DOCKER_NETWORK` | `autospec-net` | Réseau partagé des services |
+| `DOCKER_BUILD_TIMEOUT_S` | `600` | Timeout du build Docker |
+| `DOCKER_DEPLOY_TIMEOUT_S` | `60` | Délai de santé ou vérification de CLI |
+| `DOCKER_HOST_PORT_BASE` | `18000` | Début de la plage de ports hôtes |
+| `DOCKER_CMD` | `docker` | Exécutable Docker |
+
+Docker est activé par défaut pour les nouveaux projets : services web, frontend,
+CLI et bibliothèques. Les projets importés (`brownfield`) restent sur activation
+explicite. `DOCKER_DELIVERY=0` désactive le gate, même si le profil l'active ; une
+valeur explicite reste prioritaire. Le déploiement manuel
+`POST /api/projects/{id}/deploy` contourne volontairement ce flag, tout en
+conservant les contrôles d'éligibilité et le mode démo. La réponse
+`deploy_started` signifie qu'un travail de fond est parti, pas que le service
+est déjà sain : suivre `deploy_status`, `deploy_detail` et les logs.
+
+`POST /api/projects/{id}/undeploy` ne confirme le retrait qu'après réponse
+positive de Docker. Une erreur préserve le diagnostic et ne masque pas une
+ressource encore présente. Les champs de déploiement sont effacés explicitement
+après retrait réussi. Le chargement réconcilie l'état persisté avec Docker afin
+de ne pas afficher durablement une livraison disparue. Le volume SQLite persistant
+reste conservé après Undeploy ; cette API ne supprime pas implicitement les données.
+
+## Vérifications
+
+```powershell
+cd backend
+uv run pytest tests/test_deploy.py tests/test_deploy_templates.py tests/test_docker_delivery.py -q
+cd ../frontend
+npm run test:unit
+npm run build
+```
+
+Les tests d'intégration réels sont opt-in : ils installent des dépendances,
+compilent les toolchains et peuvent télécharger les images de base. Ils
+n'appellent aucun modèle. Depuis `backend`, avec Node/npm, uv, Go, Rust/Cargo,
+Chromium et Docker disponibles :
+
+```powershell
+$env:AUTOSPEC_REAL_BOOTSTRAP = "1"
+uv run pytest tests/test_bootstrap.py -q
+Remove-Item Env:AUTOSPEC_REAL_BOOTSTRAP
+$env:AUTOSPEC_REAL_DOCKER = "1"
+uv run pytest tests/test_bootstrap_docker.py -q
+Remove-Item Env:AUTOSPEC_REAL_DOCKER
+uv run python scripts/docker_transaction_smoke.py
+```
+
+Le premier groupe couvre aussi le rendu React réel, un bundle contenant des
+tests par erreur et une page blanche. Le deuxième construit les 17 variantes
+d'images : API, fullstack, CLI et bibliothèque pour Python, Go, Node et Rust,
+ainsi qu'un frontend seul. Les CLI sont exécutées avec `--help` par le véritable
+chemin de livraison ; les bibliothèques sont compilées/installées sans ouvrir
+de service. Les images sont contrôlées pour leur utilisateur non-root et
+l'exclusion des secrets. Le dernier scénario vérifie qu'une candidate invalide conserve le
+service précédent et que les données SQLite survivent au redéploiement et au
+retrait/recréation du conteneur. Les ressources Docker de test ont des noms
+uniques et leur nettoyage ne cible pas les projets utilisateur.
+
+Avec un moteur Docker opérationnel, générer un backend puis un fullstack,
+vérifier leur URL locale et leurs logs, puis lancer un second service pour
+exercer les deux directions du réseau. Tester aussi un build bloqué jusqu'au
+timeout, Stop pendant build, un redéploiement invalide conservant l'ancien
+service, et Undeploy moteur arrêté. Les tests simulant le CLI Docker ne
+remplacent pas ces builds et exécutions réels.

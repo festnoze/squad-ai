@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { getItemInteractions } from "../api";
 import { useI18n } from "../i18n/i18n";
 import { AgentInteraction } from "../types";
+import { CostEstimateNote } from "./CostEstimateNote";
 
 /** Agent role → icon + label translation key. Covers the build crew and the
  *  planning personas, so a call captured under "phase:spec" (pm) reads as nicely
@@ -96,7 +97,9 @@ function InteractionCard({
         )}
         {tok && <span className="llm-call-tokens">{tok}</span>}
         {it.cost_usd > 0 && (
-          <span className="llm-call-cost">${it.cost_usd.toFixed(4)}</span>
+          <span className="llm-call-cost" title={t("common.costEstimateHint")}>
+            {t("common.estimatedCost", { cost: it.cost_usd.toFixed(4) })}
+          </span>
         )}
         {it.duration_ms > 0 && (
           <span className="llm-call-dur">{(it.duration_ms / 1000).toFixed(1)}s</span>
@@ -210,6 +213,7 @@ export function LlmActivity({
         <span className="llm-activity-count">{items.length}</span>
       </div>
       {error && <div className="edit-error">{error}</div>}
+      {ordered.length > 0 && <CostEstimateNote />}
       {ordered.length === 0 ? (
         <p className="placeholder small">
           {unavailable

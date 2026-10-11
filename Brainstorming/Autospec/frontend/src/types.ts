@@ -403,10 +403,14 @@ export interface KnowledgeEntryPatch {
 }
 
 export interface Usage {
+  /** Usage estimate, not an invoice or a known account billing amount. */
   cost_usd: number;
   input_tokens: number;
   output_tokens: number;
   agent_calls: number;
+  /** Optional for compatibility with usage recorded by older backends. */
+  failed_calls?: number;
+  unreported_calls?: number;
 }
 
 /**
@@ -501,7 +505,11 @@ export interface ProjectState {
   plan_quality: number;
   plan_review_issues?: string[];
   plan_review_suggestions?: string[];
-  backend_language?: "python" | "go" | "rust";
+  backend_language?: "python" | "go" | "rust" | "node";
+  technical_stack?: Record<string, string>;
+  bootstrap_status?: "" | "preparing" | "verifying" | "ready" | "failed" | "skipped";
+  bootstrap_detail?: string;
+  bootstrap_fingerprint?: string;
   language_complexity?: number;
   language_criticality?: number;
   language_rationale?: string;

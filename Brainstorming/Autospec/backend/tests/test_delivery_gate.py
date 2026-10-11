@@ -85,6 +85,22 @@ def test_pipeline_delivery_gate_sets_serialized_state(monkeypatch):
     assert dumped["effective_status_value"] == "todo"
 
 
+def test_advisory_traceability_preserves_delivery_verdict(monkeypatch):
+    monkeypatch.setattr(settings, "definition_of_done_enabled", True)
+    monkeypatch.setattr(settings, "ac_traceability_enabled", True)
+    state = ProjectState(id="dod-traceability", name="n", goal="g", stories=[_green_story()])
+    pipeline = Pipeline(state, FakeRunner([]))
+    monkeypatch.setattr(pipeline, "_collect_test_sources", lambda ws: {})
+    monkeypatch.setattr(pipeline, "_collect_frontend_test_sources", lambda ws: {})
+    assert pipeline._apply_definition_of_done() is True
+    assert state.delivery_ready is True
+    assert any("Traçabilité" in issue for issue in state.delivery_issues)
+    # A warning must not promote an actually blocked delivery either.
+    state.stories[0].status = StoryStatus.TODO
+    assert pipeline._apply_definition_of_done() is False
+    assert state.delivery_ready is False
+
+
 async def test_delivery_gate_blocked_lifecycle_needs_attention(monkeypatch):
     monkeypatch.setattr(settings, "definition_of_done_enabled", True)
     state = ProjectState(id="dod-lifecycle", name="n", goal="g")
@@ -97,7 +113,8 @@ async def test_delivery_gate_blocked_lifecycle_needs_attention(monkeypatch):
 
     assert state.error == ""
     assert state.delivery_ready is False
-    assert any("Aucune user story" in issue for issue in state.delivery_issues)
+    # Empty plans now stop at planning, before any build or delivery gate.
+    assert any("aucune story exécutable" in issue for issue in state.delivery_issues)
 
 
 # ------------------------------------------------- P5: partial delivery

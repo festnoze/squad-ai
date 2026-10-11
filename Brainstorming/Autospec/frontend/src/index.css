@@ -1389,6 +1389,26 @@ button.action-btn.action-done {
   font-weight: 600;
 }
 
+.cost-estimate-note,
+.cost-estimate-hint {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.cost-estimate-note {
+  max-width: 70ch;
+}
+
+.cost-estimate-note summary {
+  cursor: pointer;
+}
+
+.cost-estimate-note p,
+.cost-estimate-hint {
+  margin: 6px 0;
+}
+
 /* M2 : reprise auto programmée (fenêtre d'usage Claude épuisée) */
 .resume-banner {
   display: inline-flex;

@@ -5,6 +5,7 @@ import { LogLine, ProjectState } from "../types";
 import { canResumeBuild, effectiveStatus } from "../work";
 import { useI18n } from "../i18n/i18n";
 import { VirtualList } from "./VirtualList";
+import { CostEstimateNote } from "./CostEstimateNote";
 
 interface Props {
   project: ProjectState;
@@ -114,10 +115,12 @@ export function RunPanel({
   // R1 — l'auto-scroll vers la dernière ligne est géré par VirtualList
   // (stickBottom), désactivé quand un filtre est actif (on lit un extrait).
 
-  const canRun = !["spec", "plan", "analyze", "architect", "build", "idle"].includes(
+  const bootstrapBusy = ["preparing", "verifying"].includes(project.bootstrap_status ?? "");
+  const retryBootstrap = project.bootstrap_status === "failed";
+  const canRun = !retryBootstrap && !bootstrapBusy && !["spec", "plan", "analyze", "architect", "build", "idle"].includes(
     project.phase,
   );
-  const loopActive = !["done", "stopped", "needs_attention", "error"].includes(project.phase);
+  const loopActive = bootstrapBusy || !["done", "stopped", "needs_attention", "error"].includes(project.phase);
   // Phase dormante (done/stopped/needs_attention/error) + au moins une story à construire (statut
   // EFFECTIF). Logique partagée avec ProjectBar via work.ts pour éviter toute
   // dérive (l'oubli de `done` ici était le bug « Continuer le build »).
@@ -131,11 +134,12 @@ export function RunPanel({
   // moins une story est en échec.
   const failedCount = effStatuses.filter((st) => st === "failed").length;
   const canRetryFailed =
-    ["done", "stopped", "needs_attention", "error"].includes(project.phase) && failedCount > 0;
+    !bootstrapBusy && ["done", "stopped", "needs_attention", "error"].includes(project.phase) && failedCount > 0;
   // « Relancer from scratch » : pipeline dormante + un brief existe. Efface tout
   // le code/plan (sauf le brief) et relance PO → build. Destructif → confirmation
   // côté App.
   const canRestart =
+    !bootstrapBusy &&
     ["done", "stopped", "needs_attention", "error"].includes(project.phase) &&
     !!project.brief?.trim();
   // P5 (WORKFLOW_REVIEW) : rejouer les gates de livraison (smoke -> runtime ->
@@ -143,6 +147,7 @@ export function RunPanel({
   // DORMANTE (le backend renvoie 409 sinon) ET quand il existe au moins une
   // story effectivement terminée : sans code livré, il n'y a rien à vérifier.
   const canVerifyDelivery =
+    !bootstrapBusy &&
     ["done", "stopped", "needs_attention", "error"].includes(project.phase) &&
     effStatuses.some((st) => st === "done");
 
@@ -192,6 +197,29 @@ export function RunPanel({
               ⛔ Livraison · {project.delivery_issues!.length}
             </span>
           ))}
+        {project.bootstrap_status && project.bootstrap_status !== "skipped" && (
+          <details
+            className={`deploy-chip${bootstrapBusy ? " deploy-chip-progress" : retryBootstrap ? " deploy-chip-failed" : " deploy-chip-ok"}`}
+            data-testid="bootstrap-status"
+            aria-busy={bootstrapBusy}
+            open={retryBootstrap}
+          >
+            <summary>{t(`runPanel.bootstrap_${project.bootstrap_status}`)}</summary>
+            <p>{project.technical_stack && Object.entries(project.technical_stack)
+              .filter(([key]) => ["backend", "frontend", "database"].includes(key))
+              .map(([key, value]) => `${key}: ${value}`).join(" · ")}</p>
+            <p>{project.bootstrap_detail}</p>
+          </details>
+        )}
+        {project.deploy_status === "packaged" && (
+          <span className="deploy-chip deploy-chip-ok" data-testid="deploy-chip" title={project.deploy_detail}>
+            {t("runPanel.dockerPackaged")}
+            {project.deployed_image && <code>{project.deployed_image}</code>}
+            <button className="small-btn" onClick={onUndeploy} title={t("runPanel.dockerRemoveImageTitle")}>
+              {t("runPanel.dockerUndeploy")}
+            </button>
+          </span>
+        )}
         {project.deploy_status === "deployed" && (
           <span className="deploy-chip deploy-chip-ok" data-testid="deploy-chip">
             <a
@@ -219,6 +247,15 @@ export function RunPanel({
             title={project.deploy_detail || t("runPanel.dockerFailed")}
           >
             {t("runPanel.dockerFailed")}
+            {(project.deployed_image || project.deployed_container) && (
+              <button
+                className="small-btn"
+                onClick={onUndeploy}
+                title={t(project.deployed_container ? "runPanel.dockerUndeployTitle" : "runPanel.dockerRemoveImageTitle")}
+              >
+                {t("runPanel.dockerUndeploy")}
+              </button>
+            )}
           </span>
         )}
         {["building", "deploying", "verifying"].includes(project.deploy_status ?? "") && (
@@ -259,12 +296,14 @@ export function RunPanel({
           </span>
         )}
         {agentCalls > 0 && (
-          <span className={`usage-meter${overBudget ? " over-budget" : ""}`}>
-            {budgetUsd > 0
-              ? `💸 $${costUsd.toFixed(4)} / $${budgetUsd.toFixed(2)}`
-              : `💸 $${costUsd.toFixed(4)}`}{" "}
+          <span className={`usage-meter${overBudget ? " over-budget" : ""}`} title={t("common.costEstimateHint")}>
+            {t("common.estimatedCost", { cost: costUsd.toFixed(4) })}
+            {budgetUsd > 0 && <> / {t("runPanel.estimatedBudget", { budget: budgetUsd.toFixed(2) })}</>}{" "}
             · {formatTokens(totalTokens)} {t("runPanel.usageTokens")} · {agentCalls} {t("runPanel.usageCalls")}
           </span>
+        )}
+        {(agentCalls > 0 || budgetUsd > 0 || (project.usage?.unreported_calls ?? 0) > 0) && (
+          <CostEstimateNote withBudget unreportedCalls={project.usage?.unreported_calls} />
         )}
         {pendingCount > 0 && forecastUsd > 0 && (
           <span
@@ -299,9 +338,9 @@ export function RunPanel({
             <button
               className="primary"
               onClick={onResumeBuild}
-              title={t("runPanel.resumeBuildTitle")}
+              title={t(retryBootstrap ? "runPanel.retryBootstrapTitle" : "runPanel.resumeBuildTitle")}
             >
-              {t("runPanel.resumeBuild")}
+              {t(retryBootstrap ? "runPanel.retryBootstrap" : "runPanel.resumeBuild")}
             </button>
           )}
           {canRetryFailed && (
