@@ -96,6 +96,36 @@ def test_runtime_dependency_only_in_dev_is_rejected(tmp_path):
     assert coordinator.resolve_pending("owner")[0]["status"] == "rejected"
 
 
+def test_rejected_resolver_restores_manifest_and_lock_pair(tmp_path):
+    root = tmp_path / "product"
+    python_project(root)
+    before = {name: (root / name).read_bytes() for name in ("pyproject.toml", "uv.lock")}
+    def partial(argv, *, cwd, env=None):
+        (cwd / "pyproject.toml").write_text('[project]\ndependencies=["malformed replacement"]\n', encoding="utf-8")
+        (cwd / "uv.lock").write_text("corrupt lock", encoding="utf-8")
+        return CompletedProcess(argv, 1, "", "")
+    coordinator = DependencyCoordinator(root, tmp_path / "state", partial)
+    coordinator.submit(request())
+    result = coordinator.resolve_pending("owner")[0]
+    assert result["status"] == "rejected" and result["rolled_back"]
+    assert {name: (root / name).read_bytes() for name in before} == before
+
+
+def test_rejected_resolution_removes_only_new_owned_lock(tmp_path):
+    root = tmp_path / "product"
+    python_project(root)
+    (root / "uv.lock").unlink()
+    manifest = (root / "pyproject.toml").read_bytes()
+    def partial(argv, *, cwd, env=None):
+        (cwd / "uv.lock").write_text("partial lock", encoding="utf-8")
+        return CompletedProcess(argv, 1, "", "")
+    coordinator = DependencyCoordinator(root, tmp_path / "state", partial)
+    coordinator.submit(request())
+    assert coordinator.resolve_pending("owner")[0]["status"] == "rejected"
+    assert not (root / "uv.lock").exists()
+    assert (root / "pyproject.toml").read_bytes() == manifest
+
+
 def test_node_manifest_lock_runtime_dev_and_ignore_scripts(tmp_path):
     root = tmp_path / "node"
     root.mkdir()

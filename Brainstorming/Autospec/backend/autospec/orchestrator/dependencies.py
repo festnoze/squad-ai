@@ -35,9 +35,12 @@ def canonical_path(value: str) -> str:
 
 
 def contained_path(root: Path, relative: str) -> Path:
-    path = (root / canonical_path(relative)).resolve()
+    candidate = root.resolve() / canonical_path(relative)
+    path = candidate.resolve()
     if not path.is_relative_to(root.resolve()):
         raise DependencyError("path escapes project root")
+    if path != candidate:
+        raise DependencyError("path aliases another file through a link")
     return path
 
 
@@ -88,6 +91,20 @@ def atomic_json(path: Path, data: dict) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             json.dump(data, fh, sort_keys=True, indent=2)
+            fh.flush()
+            os.fsync(fh.fileno())
+        os.replace(name, path)
+    finally:
+        if os.path.exists(name):
+            os.unlink(name)
+
+
+def atomic_bytes(path: Path, content: bytes) -> None:
+    """Restore only this owner's exact manifest/lock snapshot, never Git state."""
+    fd, name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}-")
+    try:
+        with os.fdopen(fd, "wb") as fh:
+            fh.write(content)
             fh.flush()
             os.fsync(fh.fileno())
         os.replace(name, path)
@@ -209,6 +226,7 @@ class DependencyCoordinator:
                 manifest, lock = contained_path(self.root, req.manifest), contained_path(self.root, req.lock)
                 cwd = manifest.parent
                 record["owner"] = owner
+                original = {path: path.read_bytes() if path.exists() else None for path in (manifest, lock)}
                 try:
                     before = declared_dependencies(manifest, req.ecosystem)
                     spec = req.package + req.constraint if req.ecosystem == "python" else req.package + ("@" + req.constraint if req.constraint else "")
@@ -236,7 +254,16 @@ class DependencyCoordinator:
                                 raise DependencyError("manifest/lock root dependencies inconsistent")
                     record.update(status="applied", reason="manifest and lock resolved", manifest_sha256=hashlib.sha256(manifest.read_bytes()).hexdigest(), lock_sha256=hashlib.sha256(lock.read_bytes()).hexdigest())
                 except (OSError, ValueError, KeyError, AttributeError, DependencyError, subprocess.SubprocessError) as exc:
-                    record.update(status="rejected", reason=str(exc))
+                    # An unsuccessful resolver may already have edited one or
+                    # both files. Restore the pair while still holding its sole
+                    # owner lock; otherwise later tasks could lose dependencies.
+                    for path, content in original.items():
+                        if content is None:
+                            if path.exists():
+                                path.unlink()
+                        else:
+                            atomic_bytes(path, content)
+                    record.update(status="rejected", reason=str(exc), rolled_back=True)
                 atomic_json(self.state_file, data)
             # A later serialized addition changes the same manifest/lock. All
             # previously applied requests are re-attested against the FINAL pair
