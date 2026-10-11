@@ -68,13 +68,14 @@ def _patch_cli(monkeypatch, *, stdout="", stderr="", returncode=0):
         return returncode, stdout, stderr
 
     monkeypatch.setattr("autospec.agents.runner._run_tracked", fake_run)
+    monkeypatch.setattr("autospec.agents.runner._ensure_claude_isolation", lambda: None)
 
 
 async def test_cli_runner_tolerates_missing_usage_and_cost(monkeypatch):
     _patch_cli(monkeypatch, stdout=json.dumps({"result": "ok", "session_id": "s1"}))
     res = await ClaudeCliRunner().arun("prompt", "system")
     assert res.text == "ok"
-    assert res.session_id == "s1"
+    assert res.session_id.startswith("restricted-")
     assert res.cost_usd == 0.0
     assert res.input_tokens == 0 and res.output_tokens == 0
 

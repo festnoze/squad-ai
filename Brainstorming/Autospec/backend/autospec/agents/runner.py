@@ -17,11 +17,14 @@ import shutil
 import subprocess
 import threading
 import time
+import uuid
+from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol
 
 from ..config import settings
+from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for
 
 
 class ProcessRegistry:
@@ -29,8 +32,10 @@ class ProcessRegistry:
     be interrupted (project switch / API shutdown). Populated from the worker
     thread that spawns the process; killed from the event-loop thread."""
 
-    def __init__(self) -> None:
+    def __init__(self, run_id: str | None = None) -> None:
+        self.run_id = run_id or uuid.uuid4().hex
         self._procs: set[subprocess.Popen] = set()
+        self._identities: dict[subprocess.Popen, str] = {}
         self._calls: set[threading.Event] = set()
         self._lock = threading.Lock()
 
@@ -46,11 +51,31 @@ class ProcessRegistry:
 
     def add(self, proc: subprocess.Popen) -> None:
         with self._lock:
+            self._identities[proc] = _process_identity(proc)
             self._procs.add(proc)
 
     def discard(self, proc: subprocess.Popen) -> None:
         with self._lock:
             self._procs.discard(proc)
+            self._identities.pop(proc, None)
+
+    def resources(self) -> list[dict]:
+        with self._lock:
+            return [{"version": 1, "kind": "process", "identifier": str(p.pid),
+                     "creation_identity": identity, "owner": self.run_id,
+                     "descendants": ("windows_job" if getattr(p, "_autospec_job", None) is not None
+                                     else "retained_handle" if os.name == "nt" else "process_group")}
+                    for p, identity in self._identities.items()]
+
+    def terminate(self, pid: int, creation_identity: str) -> bool:
+        """No PID-only stop: a stale/reused PID is not owned by this call."""
+        with self._lock:
+            selected = next((p for p, identity in self._identities.items()
+                             if p.pid == pid and identity == creation_identity), None)
+        if selected is None or _process_identity(selected) != creation_identity:
+            return False
+        close_owned_process(selected)
+        return True
 
     def terminate_all(self) -> int:
         """Hard-kill every still-running tracked process (whole tree). Returns the
@@ -58,14 +83,35 @@ class ProcessRegistry:
         with self._lock:
             for cancel in self._calls:
                 cancel.set()
-            procs = [p for p in self._procs if p.poll() is None]
-        for proc in procs:
-            _terminate_tree(proc)
+            procs = [(p, self._identities[p]) for p in self._procs
+                     if p.poll() is None or getattr(p, "_autospec_job", None) is not None]
+        for proc, identity in procs:
+            if _process_identity(proc) == identity:
+                close_owned_process(proc)
         return len(procs)
 
     def __len__(self) -> int:
         with self._lock:
             return len(self._procs)
+
+
+def _process_identity(proc: subprocess.Popen) -> str:
+    """Creation identity from the retained handle, never an opened PID."""
+    if os.name == "nt" and hasattr(proc, "_handle"):
+        import ctypes
+        from ctypes import wintypes
+        api = ctypes.WinDLL("kernel32", use_last_error=True)
+        api.GetProcessTimes.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
+        api.GetProcessTimes.restype = wintypes.BOOL
+        values = [wintypes.FILETIME() for _ in range(4)]
+        if not api.GetProcessTimes(int(proc._handle), *(ctypes.byref(v) for v in values)):
+            raise ctypes.WinError(ctypes.get_last_error())
+        return f"windows:{values[0].dwHighDateTime:08x}{values[0].dwLowDateTime:08x}"
+    identity = getattr(proc, "_autospec_creation_identity", None)
+    if identity is None:
+        identity = f"handle:{uuid.uuid4().hex}"
+        proc._autospec_creation_identity = identity
+    return identity
 
 
 # The registry an agent call should register its child process into, set by the
@@ -91,6 +137,9 @@ active_budget_usd: contextvars.ContextVar[float | None] = contextvars.ContextVar
 
 _active_call_cancel: contextvars.ContextVar[threading.Event | None] = contextvars.ContextVar(
     "autospec_agent_call_cancel", default=None
+)
+_agent_environment: contextvars.ContextVar[dict[str, str] | None] = contextvars.ContextVar(
+    "autospec_agent_environment", default=None,
 )
 _MAX_OUTPUT_BYTES = 16 * 1024 * 1024  # per stream; never silently truncate JSON
 _PROCESS_CLEANUP_TIMEOUT = 3.0
@@ -190,7 +239,6 @@ class _WindowsJob:
             "AssignProcessToJobObject": ([wintypes.HANDLE, wintypes.HANDLE], wintypes.BOOL),
             "TerminateJobObject": ([wintypes.HANDLE, wintypes.UINT], wintypes.BOOL),
             "CloseHandle": ([wintypes.HANDLE], wintypes.BOOL),
-            "OpenProcess": ([wintypes.DWORD, wintypes.BOOL, wintypes.DWORD], wintypes.HANDLE),
             "CreateToolhelp32Snapshot": ([wintypes.DWORD, wintypes.DWORD], wintypes.HANDLE),
             "Thread32First": ([wintypes.HANDLE, ctypes.c_void_p], wintypes.BOOL),
             "Thread32Next": ([wintypes.HANDLE, ctypes.c_void_p], wintypes.BOOL),
@@ -214,15 +262,10 @@ class _WindowsJob:
         import ctypes
         from ctypes import wintypes
 
-        # PROCESS_SET_QUOTA | PROCESS_TERMINATE is sufficient for assignment.
-        process = self.api.OpenProcess(0x0101, False, proc.pid)
-        if not process:
+        # Popen retains the original process handle; opening a PID here would
+        # unnecessarily reintroduce an identity/reuse race.
+        if not self.api.AssignProcessToJobObject(self.handle, int(proc._handle)):
             raise ctypes.WinError(ctypes.get_last_error())
-        try:
-            if not self.api.AssignProcessToJobObject(self.handle, process):
-                raise ctypes.WinError(ctypes.get_last_error())
-        finally:
-            self.api.CloseHandle(process)
 
         class ThreadEntry(ctypes.Structure):
             _fields_ = [
@@ -267,23 +310,32 @@ class _WindowsJob:
             self.handle = None
 
 
-def _terminate_tree(proc: subprocess.Popen) -> None:
+def _terminate_tree(proc: subprocess.Popen, *, grace_period: float = 0) -> None:
     """Bounded, idempotent tree cleanup, even after the direct child exits."""
     lock = getattr(proc, "_autospec_cleanup_lock", None) or threading.Lock()
     with lock:
         try:
+            if proc.poll() is None and grace_period > 0:
+                # EOF is the cooperative shutdown mechanism for headless CLI
+                # processes. A server may expose its own graceful callback;
+                # never signal arbitrary processes by executable name/PID.
+                if getattr(proc, "stdin", None) is not None:
+                    try:
+                        proc.stdin.close()
+                    except (OSError, ValueError):
+                        pass
+                try:
+                    proc.wait(timeout=min(grace_period, _PROCESS_CLEANUP_TIMEOUT))
+                except subprocess.TimeoutExpired:
+                    pass
             job = getattr(proc, "_autospec_job", None)
             if job is not None:
                 job.terminate()
             elif os.name == "nt":
                 if proc.poll() is None:
-                    result = subprocess.run(
-                        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                        check=False, timeout=_PROCESS_CLEANUP_TIMEOUT,
-                    )
-                    if result.returncode and proc.poll() is None:
-                        proc.kill()
+                    # Assignment failure: only the suspended direct child is
+                    # safe to stop via its retained handle. No taskkill fallback.
+                    proc.kill()
             else:
                 import signal
 
@@ -302,6 +354,59 @@ def _terminate_tree(proc: subprocess.Popen) -> None:
                 proc.kill()
             except OSError:
                 pass
+
+
+def spawn_owned_process(args: list[str], *, cancel: threading.Event | None = None, **kwargs) -> subprocess.Popen:
+    """Spawn trusted supervisor commands in an owned Job/session.
+
+    This is lifecycle ownership, NOT a sandbox for generated code. Generated
+    code must additionally use orchestrator.sandbox or fail closed.
+    """
+    job = None
+    proc = None
+    try:
+        if os.name == "nt":
+            flags = kwargs.get("creationflags", 0)
+            if flags & 0x01000000:  # CREATE_BREAKAWAY_FROM_JOB
+                raise AgentError("Owned processes cannot break away from their Windows job")
+            job = _WindowsJob()
+            kwargs["creationflags"] = flags | 0x00000004  # CREATE_SUSPENDED
+        else:
+            kwargs["start_new_session"] = True
+        proc = subprocess.Popen(_resolve_agent_command(args), **kwargs)
+        proc._autospec_cleanup_lock = threading.Lock()
+        proc._autospec_job = job
+        proc._autospec_creation_identity = _process_identity(proc)
+        if cancel is not None and cancel.is_set():
+            _terminate_tree(proc)
+            return proc
+        if job is not None:
+            job.assign_and_resume(proc)
+        return proc
+    except BaseException:
+        if proc is not None:
+            _terminate_tree(proc)
+            try:
+                proc.wait(timeout=_PROCESS_CLEANUP_TIMEOUT)
+            except (subprocess.TimeoutExpired, OSError):
+                pass
+        if job is not None:
+            job.close()
+        raise
+
+
+def close_owned_process(proc: subprocess.Popen, *, grace_period: float = 0.15) -> None:
+    """Idempotent bounded cleanup of this exact handle and all owned descendants."""
+    _terminate_tree(proc, grace_period=grace_period)
+    try:
+        proc.wait(timeout=_PROCESS_CLEANUP_TIMEOUT)
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    with proc._autospec_cleanup_lock:
+        job = proc._autospec_job
+        proc._autospec_job = None
+        if job is not None:
+            job.close()
 
 
 def _run_tracked(
@@ -356,23 +461,16 @@ def _run_tracked(
             return -1, "", "Agent execution cancelled before launch"
         if timeout <= 0:
             raise subprocess.TimeoutExpired(args, timeout)
-        command = _resolve_agent_command(args)
         kwargs: dict = dict(
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
             cwd=cwd, bufsize=0,
         )
-        if os.name == "nt":
-            job = _WindowsJob()
-            kwargs["creationflags"] = 0x00000004  # CREATE_SUSPENDED
-        else:
-            kwargs["start_new_session"] = True
-        proc = subprocess.Popen(command, **kwargs)
-        proc._autospec_cleanup_lock = threading.Lock()
-        proc._autospec_job = job
+        if _agent_environment.get() is not None:
+            kwargs["env"] = _agent_environment.get()
+        proc = spawn_owned_process(args, cancel=cancel, **kwargs)
+        job = proc._autospec_job
         if cancel.is_set():
             return -1, "", "Agent execution cancelled during launch"
-        if job is not None:
-            job.assign_and_resume(proc)
         if registry is not None:
             registry.add(proc)
         for target, args_ in (
@@ -506,10 +604,11 @@ class RunnerCapabilities:
 
 
 class AgentError(RuntimeError):
-    def __init__(self, message: str = "", *, usage: AgentResult | None = None, budget_exhausted: bool = False):
+    def __init__(self, message: str = "", *, usage: AgentResult | None = None, budget_exhausted: bool = False, code: str | None = None):
         super().__init__(message)
         self.usage = usage
         self.budget_exhausted = budget_exhausted
+        self.code = code
 
 
 def _usage_number(value, *, integer: bool = False):
@@ -564,44 +663,154 @@ class AgentRunner(Protocol):
     ) -> AgentResult: ...
 
 
-class ClaudeCliRunner:
-    """Runs one headless Claude Code turn. Pass session_id to continue a session."""
+_CLAUDE_ISOLATION_FLAGS = (
+    "--restricted", "--safe-mode", "--tools", "--strict-mcp-config",
+    "--disable-slash-commands", "--no-chrome", "--no-session-persistence", "--permission-prompts",
+)
 
-    async def arun(
+
+def _subscription_environment() -> dict[str, str]:
+    """Keep OS/auth locations; do not inherit keys, provider switches or preload code.
+
+    Existing OAuth is read by the trusted CLI in its normal user profile. It is
+    never serialized or copied into a product directory/container/prompt.
+    """
+    names = {"PATH", "PATHEXT", "SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP",
+             "HOME", "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "APPDATA", "LOCALAPPDATA",
+             "PROGRAMDATA", "PROGRAMFILES", "PROGRAMFILES(X86)", "LANG", "LC_ALL",
+             "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY", "SSL_CERT_FILE",
+             "SSL_CERT_DIR", "NODE_EXTRA_CA_CERTS"}
+    environment = {key: value for key, value in os.environ.items() if key.upper() in names}
+    environment.update({"CLAUDE_CODE_SAFE_MODE": "1", "ENABLE_CLAUDEAI_MCP_SERVERS": "false",
+                        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"})
+    return environment
+
+
+@lru_cache(maxsize=8)
+def _probe_claude_isolation(command: tuple[str, ...], stamps: tuple[int, ...]) -> None:
+    """Offline capability probe. No prompt/API/model call is made."""
+    try:
+        result = subprocess.run([*command, "--help"], stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE, timeout=10, check=False,
+                                encoding="utf-8", errors="replace", env=_subscription_environment())
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise AgentError(f"ISOLATION_UNAVAILABLE: Claude CLI capability probe failed: {exc}",
+                         code="ISOLATION_UNAVAILABLE") from exc
+    missing = [flag for flag in _CLAUDE_ISOLATION_FLAGS if flag not in result.stdout]
+    if result.returncode or missing:
+        raise AgentError(f"ISOLATION_UNAVAILABLE: Claude CLI lacks mandatory flags: {missing}",
+                         code="ISOLATION_UNAVAILABLE")
+
+
+def _ensure_claude_isolation() -> None:
+    command = tuple(_resolve_agent_command([settings.claude_cmd]))
+    # A replaced launcher/binary must not reuse old feature attestation.
+    stamps = tuple(Path(p).stat().st_mtime_ns if Path(p).is_file() else 0 for p in command)
+    _probe_claude_isolation(command, stamps)
+
+
+class ClaudeCliRunner:
+    """Subscription-authenticated inference, with no native execution tools.
+
+    Turns and filesystem requests are mediated by Autospec. Native --resume is
+    deliberately forbidden: a legacy transcript may contain previously granted
+    tools/settings and is not an isolation attestation.
+    """
+
+    def __init__(self) -> None:
+        self._sessions: dict[str, tuple[str | None, list[str]]] = {}
+
+    async def arun(self, prompt: str, system_prompt: str, cwd: Path | None = None,
+                   session_id: str | None = None, model: str | None = None) -> AgentResult:
+        remaining = active_budget_usd.get()
+        if remaining is not None and (not math.isfinite(remaining) or remaining <= 0):
+            raise AgentError("Budget estimatif disponible nul ou invalide.", budget_exhausted=True)
+        root = str(Path(cwd).absolute()) if cwd is not None else None
+        if session_id and session_id not in self._sessions:
+            raise AgentError("ISOLATION_UNAVAILABLE: legacy/unknown native session cannot be resumed; start a new mediated session",
+                             code="ISOLATION_UNAVAILABLE")
+        sid = session_id or f"restricted-{uuid.uuid4().hex}"
+        saved_root, previous = self._sessions.get(sid, (root, []))
+        if saved_root != root:
+            raise AgentError("Mediated session cannot move to another execution root", code="ISOLATION_VIOLATION")
+        history = [*previous, f"USER:\n{prompt}"]
+        try:
+            broker = FileBroker(context_for(cwd, sid)) if cwd is not None else None
+        except IsolationViolation as exc:
+            raise AgentError(str(exc), code=exc.code) from exc
+        total = AgentResult(text="", session_id=sid)
+        for _ in range(max(1, settings.provider_tool_rounds)):
+            transcript = "\n\n".join(history)
+            if len(transcript.encode("utf-8")) > 4_000_000:
+                raise AgentError("Mediated conversation size limit exceeded", usage=total)
+            try:
+                result = await self._turn(transcript, system_prompt + (FILE_PROTOCOL if broker else ""),
+                                          cwd, model, remaining)
+            except AgentError as exc:
+                if exc.usage:
+                    self._accumulate(total, exc.usage)
+                    exc.usage = total
+                raise
+            self._accumulate(total, result)
+            total.text = result.text
+            history.append(f"ASSISTANT:\n{result.text}")
+            try:
+                call = json.loads(result.text)
+            except (json.JSONDecodeError, TypeError):
+                call = None
+            if not isinstance(call, dict) or "tool" not in call:
+                self._sessions[sid] = (root, history)
+                return total
+            if broker is None:
+                raise AgentError("No filesystem capability for this call", usage=total, code="ISOLATION_VIOLATION")
+            if remaining is not None:
+                if not result.usage_reported:
+                    raise AgentError("Cannot continue mediated turns with unreported budget usage", usage=total)
+                remaining -= result.cost_usd
+                if remaining <= 0:
+                    raise AgentError("Mediated-turn budget exhausted", usage=total, budget_exhausted=True)
+            try:
+                response = broker.apply(call)
+            except IsolationViolation as exc:
+                raise AgentError(str(exc), usage=total, code=exc.code) from exc
+            history.append(f"TOOL RESULT:\n{response}")
+        raise AgentError(f"Agent did not conclude within {settings.provider_tool_rounds} mediated turns", usage=total)
+
+    @staticmethod
+    def _accumulate(total: AgentResult, result: AgentResult) -> None:
+        total.cost_usd += result.cost_usd
+        total.input_tokens += result.input_tokens
+        total.output_tokens += result.output_tokens
+        total.duration_ms += result.duration_ms
+        total.usage_reported = total.usage_reported and result.usage_reported
+
+    async def _turn(
         self,
         prompt: str,
         system_prompt: str,
         cwd: Path | None = None,
-        session_id: str | None = None,
         model: str | None = None,
+        remaining: float | None = None,
     ) -> AgentResult:
         args = [
             settings.claude_cmd,
             "-p",
             "--output-format", "json",
-            "--permission-mode", settings.permission_mode,
-            "--append-system-prompt", system_prompt,
+            "--restricted", "--safe-mode",
+            "--tools", "",
+            "--strict-mcp-config", "--disallowedTools", "*",
+            "--disable-slash-commands", "--no-chrome", "--no-session-persistence",
+            "--permission-mode", "dontAsk", "--permission-prompts", "none",
+            "--settings", '{"disableAllHooks":true,"syncClaudeAiSkills":false,"syncClaudeAiPlugins":false}',
+            "--system-prompt", system_prompt or "Reply to the user's request. No tools are available.",
         ]
         chosen_model = model or settings.claude_model
         if chosen_model:
             args += ["--model", chosen_model]
-        remaining = active_budget_usd.get()
         if remaining is not None:
             if not math.isfinite(remaining) or remaining <= 0:
                 raise AgentError("Budget estimatif disponible nul ou invalide.", budget_exhausted=True)
             args += ["--max-budget-usd", str(remaining)]
-        # SK-1: when skills are on, expose the workspace's seeded skill library so
-        # the CLI's native Skill tool can load `.claude/skills/<name>/SKILL.md` on
-        # demand (progressive disclosure). cwd's `.claude/skills` is auto-found,
-        # but the explicit --add-dir makes the grant unambiguous. No --allowedTools
-        # (it would otherwise RESTRICT the dev agent's file edits).
-        skills_enabled = active_skills_enabled.get()
-        if (settings.skills_enabled if skills_enabled is None else skills_enabled) and cwd is not None:
-            skills_path = Path(cwd) / ".claude" / "skills"
-            if skills_path.exists():
-                args += ["--add-dir", str(skills_path)]
-        if session_id:
-            args += ["--resume", session_id]
 
         # Run the child process in a worker thread via the blocking subprocess
         # API: asyncio's subprocess support is unavailable on Windows'
@@ -609,9 +818,14 @@ class ClaudeCliRunner:
         # create_subprocess_exec raises NotImplementedError. Staying off the
         # event loop for child processes keeps this working on every platform.
         def _run() -> tuple[int, str, str]:
-            return _run_tracked(
-                args, prompt, str(cwd) if cwd else None, settings.agent_timeout_s
-            )
+            _ensure_claude_isolation()
+            token = _agent_environment.set(_subscription_environment())
+            try:
+                return _run_tracked(
+                    args, prompt, str(cwd) if cwd else None, settings.agent_timeout_s
+                )
+            finally:
+                _agent_environment.reset(token)
 
         try:
             returncode, out_raw, err_raw = await _await_tracked(_run)
@@ -693,13 +907,7 @@ def _extract_codex_text(out: str) -> tuple[str, int, int]:
 
 
 class CodexCliRunner:
-    """Runs one headless OpenAI Codex turn via ``codex exec`` — the OpenAI
-    counterpart of :class:`ClaudeCliRunner`. Codex has no ``--append-system-prompt``
-    flag, so the system prompt is prepended to the user prompt; the combined
-    prompt is fed on stdin. Output is parsed from ``codex exec --json`` JSONL.
-
-    The exact codex flags are env-overridable (``CODEX_CMD``) so the
-    harness can adapt as the CLI evolves."""
+    """Compatibility selector for a backend whose isolation is unavailable."""
 
     async def arun(
         self,
@@ -709,43 +917,10 @@ class CodexCliRunner:
         session_id: str | None = None,
         model: str | None = None,
     ) -> AgentResult:
-        # Codex has no separate system-prompt channel: prepend it to the prompt.
-        combined = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
-        args = [
-            settings.codex_cmd,
-            "exec",
-            "--json",
-            # Headless, non-interactive autonomy — the codex equivalent of
-            # Claude's bypassPermissions (the orchestrator re-verifies anyway).
-            "--dangerously-bypass-approvals-and-sandbox",
-            "--skip-git-repo-check",
-        ]
-        chosen_model = model or settings.codex_model
-        if chosen_model:
-            args += ["--model", chosen_model]
-        # Read the prompt from stdin ('-') rather than argv (Windows argv length
-        # limits would truncate large BMAD prompts).
-        args.append("-")
-
-        def _run() -> tuple[int, str, str]:
-            return _run_tracked(
-                args, combined, str(cwd) if cwd else None, settings.agent_timeout_s
-            )
-
-        try:
-            returncode, out_raw, err_raw = await _await_tracked(_run)
-        except subprocess.TimeoutExpired:
-            raise AgentError(f"Agent timed out after {settings.agent_timeout_s}s")
-        except OSError as exc:
-            raise AgentError(f"Could not run codex CLI ({settings.codex_cmd}): {exc}")
-
-        out = (out_raw or "").strip()
-        if returncode != 0:
-            err = (err_raw or "").strip()
-            raise AgentError(f"codex CLI exited with {returncode}: {err or out}")
-
-        text, in_tok, out_tok = _extract_codex_text(out)
-        return AgentResult(text=text, input_tokens=in_tok, output_tokens=out_tok)
+        # The old backend disabled both approvals AND sandbox. Until a backend
+        # has an attested host boundary, fail before spawning or spending.
+        raise AgentError("ISOLATION_UNAVAILABLE: Codex host-shell backend is disabled; use restricted Claude file tools",
+                         code="ISOLATION_UNAVAILABLE")
 
 
 class FakeRunner:

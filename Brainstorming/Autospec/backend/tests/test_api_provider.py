@@ -42,8 +42,9 @@ async def test_get_provider_defaults(monkeypatch):
         assert "gpt-4.1" in data["models"]["openai"]
         assert data["models"]["codex"]  # codex has suggested models too
         assert data["models"]["openrouter"]  # OpenRouter has fallback suggestions
-        assert data["capabilities"]["execution_model"] == "cli"
-        assert data["capabilities"]["can_run_shell"] is True
+        assert data["capabilities"]["execution_model"] == "restricted_tools"
+        assert data["capabilities"]["can_run_shell"] is False
+        assert data["capabilities"]["supports_native_skills"] is False
 
 
 async def test_switch_claude_api_model(monkeypatch):
