@@ -95,7 +95,10 @@ Backend : routeurs/schémas, services, accès DB et configuration séparés.
     runner = FakeRunner([])  # Any unexpected LLM call fails: no canned responses.
     pipeline = Pipeline(state, runner)
     assert await pipeline._aselect_stack()
-    assert state.technical_stack == {**requested, "source": "explicit"}
+    assert {key: state.technical_stack[key] for key in (*requested, "source")} == {**requested, "source": "explicit"}
+    assert state.technical_stack["version"] == "1"
+    assert len(state.technical_stack["decision_sha256"]) == 64
+    assert state.technical_stack["rationale"]
     assert [stream.language for stream in state.streams] == ["python", "react"]
 
 

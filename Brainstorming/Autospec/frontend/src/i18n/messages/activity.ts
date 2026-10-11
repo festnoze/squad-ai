@@ -2,6 +2,11 @@ import type { Namespace } from "./index";
 
 // Filled during the i18n migration of the matching component.
 export const activity: Namespace = {
+  executionTitle: { en: "Agent execution", fr: "Exécution des agents" },
+  providerActive: { en: "{n} active provider calls", fr: "{n} appels provider actifs" },
+  waitingBudget: { en: "Waiting for estimated budget", fr: "En attente du budget estimatif" },
+  providerExecuting: { en: "Provider call in progress", fr: "Appel provider en cours" },
+  costIncomplete: { en: "Recorded cost is incomplete: an interrupted call has unreported usage.", fr: "Coût enregistré incomplet : un appel interrompu n'a pas remonté son usage." },
   personaDev: { en: "Dev", fr: "Dev" },
   personaQa: { en: "QA", fr: "QA" },
   personaCritic: { en: "Critic", fr: "Critique" },

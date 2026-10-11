@@ -142,8 +142,23 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
         if state.id in pipelines:
             continue
         changed = False
+        interrupted_phase = state.phase.value if state.phase in _INTERRUPTED_PHASES else ""
         if state.phase in _INTERRUPTED_PHASES:
             state.phase = PipelinePhase.STOPPED
+            state.delivery_ready = False
+            state.error = "Génération interrompue par l'arrêt du serveur ; reprise explicite nécessaire."
+            state.generation_checkpoint = {
+                **state.generation_checkpoint, "status": "interrupted",
+                "last_phase": interrupted_phase, "reason": "server_restart",
+                "recovered_at": time.time(),
+            }
+            # A watchdog timer from the dead worker must not silently spend
+            # again. Resume is a user action after reconciliation.
+            state.resume_at = 0.0
+            state.agent_activity = {}
+            if state.deploy_status in {"building", "deploying", "verifying"}:
+                state.deploy_status = "failed"
+                state.deploy_detail = "Livraison interrompue avant validation."
             changed = True
         if state.bootstrap_status in ("preparing", "verifying"):
             state.bootstrap_status = "failed"

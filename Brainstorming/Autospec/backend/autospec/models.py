@@ -657,6 +657,10 @@ class ProjectState(BaseModel):
     language_rationale: str = ""
     # A persisted decision made before scaffolding; agents build on this contract.
     technical_stack: dict[str, str] = Field(default_factory=dict)
+    # REM-03/22: durable latest checkpoint and bounded live activity metadata.
+    # Sidecar-compatible defaults keep earlier saved projects loadable.
+    generation_checkpoint: dict = Field(default_factory=dict)
+    agent_activity: dict[str, dict] = Field(default_factory=dict)
     bootstrap_status: str = ""  # preparing | verifying | ready | failed | skipped
     bootstrap_detail: str = ""
     bootstrap_fingerprint: str = ""

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AgentExecutionPanel } from "./components/AgentExecutionPanel";
 import {
   approveGovernanceDecision,
   archiveProject,
@@ -943,6 +944,7 @@ export default function App() {
             />
           </div>
           <div className="col-right">
+            <AgentExecutionPanel activities={project.agent_activity} incomplete={Boolean(project.usage?.unreported_calls)} />
             <WorkspaceViews
               epics={project.epics ?? []}
               stories={project.stories ?? []}

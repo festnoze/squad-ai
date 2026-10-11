@@ -20,6 +20,7 @@ import signal
 import subprocess
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -676,8 +677,11 @@ class _UsageTracker:
         self._budgeted_call = False
         self._idle = asyncio.Event()
         self._idle.set()
+        self._call_owners: set[str] = set()
 
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
+        item = _BUILD_ITEM.get() or f"phase:{self.pipeline.state.phase.value}"
+        waiting_since = time.time()
         # Count every call, including ones admitted before a user added a cap.
         # New budgeted calls must wait until ALL earlier usage is accounted for.
         # These checks and updates have no await: admission is atomic on the
@@ -685,20 +689,43 @@ class _UsageTracker:
         while self._active_calls and (
             self._budgeted_call or self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
         ):
-            await self._idle.wait()
+            self.pipeline.state.agent_activity[item] = {
+                "version": 1, "phase": "waiting_budget", "since": waiting_since,
+                "owner": sorted(self._call_owners), "active_provider_calls": self._active_calls,
+                "cost_incomplete": bool(self.pipeline.state.usage.unreported_calls),
+            }
+            self.pipeline._sync()
+            try:
+                await self._idle.wait()
+            except BaseException:
+                self.pipeline.state.agent_activity.pop(item, None)
+                self.pipeline._sync()
+                raise
         self._active_calls += 1
         self._budgeted_call = self._budgeted_call or bool(
             self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
         )
         self._idle.clear()
+        self._call_owners.add(item)
+        self.pipeline.state.agent_activity[item] = {
+            "version": 1, "phase": "provider", "since": time.time(),
+            "active_provider_calls": self._active_calls,
+            "cost_incomplete": bool(self.pipeline.state.usage.unreported_calls),
+        }
+        self.pipeline._sync()
         try:
             return await self._arun(prompt, system_prompt, cwd, session_id, model)
         finally:
             # Synchronous release cannot itself be interrupted by cancellation.
             self._active_calls -= 1
+            self._call_owners.discard(item)
+            self.pipeline.state.agent_activity.pop(item, None)
+            for activity in self.pipeline.state.agent_activity.values():
+                activity["active_provider_calls"] = self._active_calls
             if not self._active_calls:
                 self._budgeted_call = False
                 self._idle.set()
+            self.pipeline._sync()
 
     def _account(self, result, role: str, iteration: int, *, failed: bool = False) -> float:
         tier = settings.tier_for_role(role) or "unrouted"
@@ -766,6 +793,12 @@ class _UsageTracker:
                      if self.pipeline.state.budget_usd else None)
         budget_token = active_budget_usd.set(remaining)
         try:
+            # Drain preceding checkpoint writes before launching a tool-capable
+            # provider. A hard exit cannot leave this call wholly unrecorded.
+            await asyncio.get_running_loop().run_in_executor(
+                _PERSIST_EXECUTOR, save_state_payload, self.pipeline.state.id,
+                self.pipeline.state.model_dump_json(indent=2),
+            )
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
@@ -1228,6 +1261,19 @@ class Pipeline:
     # ------------------------------------------------------------- events
 
     def _sync(self) -> None:
+        if self.state.phase.value in {"spec", "analyze", "plan", "architect", "build", "govern"}:
+            self.state.generation_checkpoint = {
+                **self.state.generation_checkpoint,
+                "version": 1,
+                "run_id": self.state.generation_checkpoint.get("run_id") or uuid.uuid4().hex,
+                "owner_pid": os.getpid(), "status": "active",
+                "last_phase": self.state.phase.value, "at": time.time(),
+            }
+        elif self.state.generation_checkpoint.get("status") == "active":
+            self.state.generation_checkpoint = {
+                **self.state.generation_checkpoint, "status": self.state.phase.value,
+                "at": time.time(),
+            }
         self._persist()
         bus.publish(
             {
@@ -2350,7 +2396,9 @@ class Pipeline:
             return True
         try:
             await self._aselect_language()
-            self.state.technical_stack = stack_selection.resolve(self.state)
+            self.state.technical_stack = stack_selection.freeze(
+                stack_selection.resolve(self.state), rationale=self.state.language_rationale,
+            )
         except ValueError as exc:
             self.state.bootstrap_status = "failed"
             self.state.bootstrap_detail = str(exc)

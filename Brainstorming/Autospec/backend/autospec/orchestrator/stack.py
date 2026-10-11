@@ -2,12 +2,55 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from pathlib import PurePosixPath, PureWindowsPath
 
 from ..models import ProjectState
 
 BACKENDS = {"python": "fastapi", "go": "net/http", "rust": "axum", "node": "node:http"}
+_DECISION_FIELDS = ("backend", "framework", "frontend", "database", "kind")
+
+
+def freeze(decision: dict[str, str], *, rationale: str = "") -> dict[str, str]:
+    """Seal the already validated architect decision, separately from prose."""
+    result = dict(decision)
+    payload = {key: result[key] for key in _DECISION_FIELDS}
+    result["version"] = "1"
+    result["decision_sha256"] = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    result["rationale"] = rationale or result.get("rationale") or (
+        "Contraintes explicites prioritaires ; catalogue de templates validés."
+        if result.get("source") == "explicit" else
+        "Choix de l'architecte ; Python simple ou backend typé, React pour interface."
+    )
+    return result
+
+
+def _sealed(requested: dict[str, str]) -> dict[str, str] | None:
+    if not requested.get("decision_sha256"):
+        return None
+    if requested.get("version") != "1" or any(key not in requested for key in _DECISION_FIELDS):
+        raise ValueError("Décision de stack persistée incomplète ou de version inconnue.")
+    if freeze(requested)["decision_sha256"] != requested["decision_sha256"]:
+        raise ValueError("Décision de stack modifiée : résoudre explicitement un nouveau contrat avant bootstrap.")
+    backend, kind = requested["backend"], requested["kind"]
+    supported = (
+        kind == "frontend" and backend == requested["framework"] == requested["database"] == "none"
+        and requested["frontend"] == "react"
+    ) or (
+        kind in {"api", "fullstack", "cli", "library"} and backend in BACKENDS
+        and requested["framework"] == BACKENDS[backend]
+        and requested["frontend"] in {"none", "react"}
+        and requested["database"] in {"none", "sqlite"}
+        and (requested["database"] != "sqlite" or backend == "python")
+        and (kind != "fullstack" or requested["frontend"] == "react")
+    )
+    if not supported:
+        raise ValueError("Décision de stack persistée hors du catalogue pris en charge.")
+    return dict(requested)
 
 
 def _affirmative_constraints(text: str) -> str:
@@ -126,8 +169,16 @@ def resolve(state: ProjectState) -> dict[str, str]:
     """
     requested = dict(state.technical_stack)
     _validate_stream_roots(state)
+    # A completed pre-analysis is immutable across resume and new prose. Only
+    # an explicit new decision may change the scaffold, never another parse.
+    sealed = _sealed(requested)
+    if sealed is not None:
+        return sealed
     text = f"{state.goal}\n{state.brief}".lower()
     affirmative = _affirmative_constraints(text)
+    prose_backend = explicit_backend(text)
+    if requested.get("backend") and prose_backend and requested["backend"] != prose_backend:
+        raise ValueError("Contraintes de stack contradictoires entre le brief et le choix structuré.")
     unsupported_language = _unsupported_backend_language(affirmative)
     if unsupported_language:
         raise ValueError(

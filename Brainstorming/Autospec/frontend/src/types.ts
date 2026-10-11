@@ -507,6 +507,8 @@ export interface ProjectState {
   plan_review_suggestions?: string[];
   backend_language?: "python" | "go" | "rust" | "node";
   technical_stack?: Record<string, string>;
+  agent_activity?: Record<string, AgentExecution>;
+  generation_checkpoint?: { status?: string; last_phase?: string; at?: number; reason?: string };
   bootstrap_status?: "" | "preparing" | "verifying" | "ready" | "failed" | "skipped";
   bootstrap_detail?: string;
   bootstrap_fingerprint?: string;
@@ -603,6 +605,15 @@ export type StallReason = string;
 /** B-UX: the live heartbeat snapshot for ONE project, as stored client-side.
  * `items` is keyed by work-item id (story or task). `state` stays authoritative
  * for rich data; this only carries between-snapshot item-level liveness. */
+export interface AgentExecution {
+  version: number;
+  phase: string;
+  since: number;
+  owner?: string[];
+  active_provider_calls: number;
+  cost_incomplete: boolean;
+}
+
 export interface ProjectTicks {
   ts: number;
   items: Record<string, TickItem>;
