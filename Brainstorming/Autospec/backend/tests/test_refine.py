@@ -124,8 +124,30 @@ async def test_rejected_revision_is_rolled_back(refine_on):
     assert state["rolled_back"] is True
 
 
-async def test_unparseable_judge_treated_as_pass(refine_on):
-    # Judge returns garbage -> treated as threshold -> stop (no infinite loop).
+async def test_unparseable_judge_is_fail_closed(refine_on):
+    # Judge returns garbage -> bounded failure, not the success threshold.
     outcome, _ = await run(FakeRunner(["pas un json"]))
-    assert outcome.stopped_reason == "threshold"
-    assert outcome.score == 80
+    assert outcome.stopped_reason == "judge_error"
+    assert outcome.score == -1
+
+
+@pytest.mark.parametrize("reply", ["{}", '{"score": true}', '{"score": "80"}',
+                                 '{"score": 999}', '{"score": -1}', '{"score": null}'])
+async def test_invalid_judge_scores_never_reach_threshold(refine_on, reply):
+    outcome, _ = await run(FakeRunner([reply]))
+    assert outcome.stopped_reason == "judge_error"
+    assert outcome.score == -1
+
+
+async def test_unavailable_judge_never_passes(refine_on):
+    outcome, _ = await run(FakeRunner([]))
+    assert outcome.stopped_reason == "judge_error"
+
+
+async def test_high_score_cannot_compensate_constraint_violation(refine_on):
+    async def admission(text):
+        return False
+    runner = FakeRunner([judge(99)])
+    outcome, _ = await run(runner, admission=admission)
+    assert outcome.stopped_reason == "constraint_rejected"
+    assert runner.replies  # deterministic refusal occurs before a paid judge

@@ -33,8 +33,10 @@ from ..agents import prompts
 from ..agents.personas import persona
 from ..agents.runner import AgentError, AgentRunner, extract_json
 from ..config import settings
+from ..contracts import AcceptanceContract
 from ..models import AcceptanceCriterion, ProjectState, StreamKind, UserStory
 from . import independence, refine
+from .plan_gates import PlanAdmission, PlanFinding, PlanPolicy, admit_plan, plan_contract_prompt
 
 LogFn = Callable[[str, str], None]
 
@@ -48,6 +50,14 @@ _LOG_SRC = "po-pipeline"
 class PlanPipelineError(Exception):
     """S1 could not produce a valid skeleton: the caller falls back to the
     legacy mono-pass PO (a stage exception never abandons the plan)."""
+
+
+class PlanAdmissionError(Exception):
+    """Contract admission failed. MUST NOT trigger a permissive legacy fallback."""
+
+    def __init__(self, admission: PlanAdmission):
+        self.admission = admission
+        super().__init__("Plan refused: " + "; ".join(admission.errors))
 
 
 # ------------------------------------------------------------ stage artifacts
@@ -67,6 +77,8 @@ class S1Task(BaseModel):
     estimated_files: int = 1
     file_globs: list[str] = Field(default_factory=list)
     area: str = ""
+    requirement_ids: list[str] = Field(default_factory=list)
+    uses_contracts: list[str] = Field(default_factory=list)
 
     @field_validator("complexity")
     @classmethod
@@ -86,6 +98,8 @@ class S1Story(BaseModel):
     estimated_files: int = 1
     file_globs: list[str] = Field(default_factory=list)
     area: str = ""
+    requirement_ids: list[str] = Field(default_factory=list)
+    uses_contracts: list[str] = Field(default_factory=list)
     tasks: list[S1Task] = Field(default_factory=list)
 
     @field_validator("complexity")
@@ -108,6 +122,12 @@ class S1Epic(BaseModel):
 
 class S1Skeleton(BaseModel):
     epics: list[S1Epic] = Field(default_factory=list)
+    lot_definition: str = ""
+    lots: list[dict] = Field(default_factory=list)
+    milestones: dict = Field(default_factory=dict)
+    shared_contracts: list[dict] = Field(default_factory=list)
+    contract_facts: dict = Field(default_factory=dict)
+    technical_stack: dict = Field(default_factory=dict)
 
     def stories(self) -> list[S1Story]:
         return [s for e in self.epics for s in e.stories]
@@ -166,6 +186,8 @@ class PlanPipelineReport:
     cross_issues: list[str] = field(default_factory=list)
     degradations: list[str] = field(default_factory=list)   # "S2:US-1 — reason"
     warnings: list[str] = field(default_factory=list)
+    admission: PlanAdmission | None = None
+    review_errors: list[str] = field(default_factory=list)
 
 
 # ------------------------------------------------------ deterministic checks
@@ -570,6 +592,9 @@ async def _arun_s1(
     repo_files: list[str] | None,
     log: LogFn,
     report: PlanPipelineReport,
+    contract: AcceptanceContract | None = None,
+    plan_policy: PlanPolicy | None = None,
+    workspace_root: Path | None = None,
 ) -> S1Skeleton:
     """S1: maker + deterministic validation (1 repair retry), then ONE
     critic-first structure review whose every revision is re-validated
@@ -587,14 +612,23 @@ async def _arun_s1(
         for w in warnings:
             if w not in report.warnings:
                 report.warnings.append(w)
+        if contract is not None:
+            report.admission = admit_plan(skel.model_dump(), contract, plan_policy,
+                                         project_root=workspace_root, stream_roots=stream_roots)
+            errors.extend(report.admission.errors)
         return errors
 
     parse = _parse_model(S1Skeleton, _validate)
     prompt = prompts.po_structure(state, pkg, repo_files)
+    if contract is not None:
+        prompt += plan_contract_prompt(contract, plan_policy)
     skeleton, error = await amake_validated(
         runner, prompt=prompt, system_prompt=persona("po-structure"), parse=parse
     )
     if skeleton is None:
+        if contract is not None:
+            raise PlanAdmissionError(PlanAdmission("fail", contract.contract_hash,
+                                     (f"S1 invalid after bounded repair: {error}",)))
         raise PlanPipelineError(f"S1 : squelette invalide après réparation — {error}")
 
     # Critic-first structure review (no opening judge; a failed critic call is
@@ -626,6 +660,7 @@ async def _arun_s1(
         accept=_accept,
     )
     if outcome.stopped_reason == "critic_error":
+        report.review_errors.append("S1 structure critic unavailable")
         log(_LOG_SRC, "S1 : critique structure INDISPONIBLE (échec d'appel) — squelette conservé tel quel.")
     else:
         log(
@@ -857,6 +892,7 @@ async def _across_review(
         )
         reply = extract_json(res.text)
     except AgentError as exc:
+        report.review_errors.append("S2 cross critic unavailable")
         log(_LOG_SRC, f"S2 : critique transversal EN ÉCHEC ({exc}) — revue inter-stories sautée (distinct d'un critique satisfait).")
         return
     report.cross_issues = [str(i) for i in reply.get("issues") or []]
@@ -990,6 +1026,8 @@ def _merge_plan(
                         "depends_on": list(t.depends_on),
                         "complexity": t.complexity,
                         "estimated_files": t.estimated_files,
+                        "requirement_ids": list(t.requirement_ids),
+                        "uses_contracts": list(t.uses_contracts),
                     }
                 )
             stories_out.append(
@@ -1009,6 +1047,9 @@ def _merge_plan(
                     "complexity": story.complexity,
                     "estimated_files": story.estimated_files,
                     "spec_incomplete": _spec_is_fallback(spec, report),
+                    "file_globs": list(story.file_globs),
+                    "requirement_ids": list(story.requirement_ids),
+                    "uses_contracts": list(story.uses_contracts),
                 }
             )
         epics_out.append(
@@ -1019,7 +1060,12 @@ def _merge_plan(
                 "stories": stories_out,
             }
         )
-    return {"epics": epics_out}
+    plan = {"epics": epics_out}
+    if skeleton.lot_definition:
+        plan.update(lot_definition=skeleton.lot_definition, lots=skeleton.lots,
+                    milestones=skeleton.milestones, shared_contracts=skeleton.shared_contracts,
+                    contract_facts=skeleton.contract_facts, technical_stack=skeleton.technical_stack)
+    return plan
 
 
 async def arun_po_pipeline(
@@ -1029,6 +1075,10 @@ async def arun_po_pipeline(
     *,
     workspace_root: Path | None = None,
     log: LogFn | None = None,
+    contract: AcceptanceContract | None = None,
+    plan_policy: PlanPolicy | None = None,
+    findings: tuple[PlanFinding, ...] = (),
+    dependency_requests: tuple[Any, ...] = (),
 ) -> tuple[dict, PlanPipelineReport]:
     """Run the full PO pipeline and return ``(plan_dict, report)``.
 
@@ -1039,6 +1089,11 @@ async def arun_po_pipeline(
     skeleton (the caller then falls back to the legacy mono-pass PO)."""
     log = log or (lambda _src, _line: None)
     report = PlanPipelineReport()
+    if contract is not None and plan_policy is None:
+        raise ValueError("contract-aware planning requires an explicit PlanPolicy")
+    if contract is not None and not contract.facts:
+        raise PlanAdmissionError(PlanAdmission("not_verified", contract.contract_hash,
+                                 ("reviewed formal source facts are missing",)))
 
     repo_files: list[str] | None = None
     if state.iteration >= 2 and workspace_root is not None:
@@ -1047,7 +1102,8 @@ async def arun_po_pipeline(
 
     # ---- S1 : structure + complexity (sequential)
     skeleton = await _arun_s1(
-        runner, state, pkg, repo_files=repo_files, log=log, report=report
+        runner, state, pkg, repo_files=repo_files, log=log, report=report,
+        contract=contract, plan_policy=plan_policy, workspace_root=workspace_root,
     )
     report.leaves = len(skeleton.leaves())
 
@@ -1114,6 +1170,14 @@ async def arun_po_pipeline(
         gherkins = dict(zip(ordered, texts))
 
     plan = _merge_plan(skeleton, specs, gherkins, report)
+    if contract is not None:
+        report.admission = admit_plan(
+            plan, contract, plan_policy, findings=findings, project_root=workspace_root,
+            stream_roots=_stream_roots(state), dependency_requests=dependency_requests,
+            provider_available=not report.review_errors,
+        )
+        if report.admission.status != "pass":
+            raise PlanAdmissionError(report.admission)
     if report.degradations:
         log(
             _LOG_SRC,
