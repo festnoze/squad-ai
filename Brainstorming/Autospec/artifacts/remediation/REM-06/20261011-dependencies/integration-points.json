@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "dependencies": {
+    "submit": "DependencyCoordinator(project_root, supervisor_state_root, runner).submit(DependencyRequest(**validated_payload))",
+    "resolve": "DependencyCoordinator.resolve_pending(manifest_owner)",
+    "admission": "DependencyCoordinator.require_ready(task_id) before task GREEN and merge; unresolved -> waiting_dependency; rejected -> repair reason",
+    "scope": "manifest/lock claims belong only to the serialized resolver owner"
+  },
+  "tests": {
+    "baseline": "capture_baseline(root, critical_paths_including_support, trusted_collected_ids) BEFORE producer work; save_baseline outside producer writable root",
+    "prepare": "CleanEnvironmentManager(supervisor_cache_root, runner).prepare(project_root, ecosystem='python'|'node', mode='tests')",
+    "snapshot": "environment.stage_project(project_root, new_disposable_run_root)",
+    "command": "toolchain.clean_test_command(environment, report_path, frontend=is_frontend)",
+    "evidence": "toolchain.suite_evidence(language, stdout, report_path, exit_code) before report deletion",
+    "gate": "evaluate_run(baseline, staged_root, evidence, allowances=reviewed_exact_exceptions); GREEN only if integrity.green and environment.verify() succeeds",
+    "persist": "evidence/counts/findings + environment fingerprint/inputs + source_hash(staged_root) in supervisor artifacts"
+  },
+  "runtime": "prepare(mode='runtime') independently, never rely on test-only packages",
+  "isolation": "Windows venv/cache is not Linux evidence. Container validation must build/cache Linux dependencies or report BLOCKED_ENV. No fallback to host product execution."
+}

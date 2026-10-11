@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "task": "REM-05",
+  "status": "review",
+  "verified_source_revision": "c3701d171e0d93a910aac37bf6706559548d49a6",
+  "tools": {"python": "3.14.6", "uv": "0.6.4", "node": "24.18.0", "npm": "11.6.4", "platform": "Windows AMD64"},
+  "tests": {"exit_code": 0, "passed": 86, "failed": 0, "skipped": 0, "duration_s": 22.43},
+  "log": "artifacts/remediation/REM-06/20261011-dependencies/pytest-hardened.log",
+  "checks": ["agent venv enrichment is not copied to validation", "absent Argon2 fails clean runtime import", "declared Argon2 performs real hash+verify", "runtime has Argon2 but not dev pytest", "lock/tool/platform/mode changes invalidate cache", "manual package injection invalidates attested cache", "Node producer node_modules never reused", "secret/metadata/oracle paths and hardlinks excluded/refused"],
+  "resolved_failure": "Real uv install initially failed on Windows MAX_PATH; compact cache directory now retains full fingerprint in attestation.",
+  "limits": ["Windows-native proof is not Linux container proof", "REM-01 must prevent producer writes to cache", "Linux validation requires Linux-built dependencies", "non-wheel Python builds and npm lifecycle scripts refused"]
+}
