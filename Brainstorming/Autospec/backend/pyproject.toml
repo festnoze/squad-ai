@@ -26,6 +26,7 @@ dev = [
     # (--json-report) dans CE venv — sans cette dépendance déclarée, tout
     # checkout frais (CI, worktree) échoue alors que le venv historique passe.
     "pytest-json-report>=1.5",
+    "argon2-cffi>=23.1",
 ]
 
 [build-system]
