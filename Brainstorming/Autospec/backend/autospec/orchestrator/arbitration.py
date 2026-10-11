@@ -34,12 +34,15 @@ become a wrong ruling.
 
 from __future__ import annotations
 
+import asyncio
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Optional
 
 from ..agents.personas import persona
 from ..agents.runner import AgentError  # re-exported intent: let it propagate
 from .schema import arun_json
+from .claims import CanonicalClaim, ClaimError, canonical_claim, claims_conflict, path_matches
 
 # Verdict vocabulary — kept as module constants so callers (pipeline, recovery)
 # can branch on them without stringly-typed duplication.
@@ -181,4 +184,110 @@ __all__ = [
     "build_prompt",
     "aarbitrate_test",
     "AgentError",
+    "ClaimDecision",
+    "ClaimArbiter",
 ]
+
+
+@dataclass(frozen=True)
+class ClaimDecision:
+    status: str
+    owner: str
+    blockers: tuple[str, ...] = ()
+    attempt: int = 0
+    reason: str = ""
+
+
+class ClaimArbiter:
+    """Atomic reservations/expansions BEFORE write, not a post-merge detector.
+
+    One instance belongs to one run/workspace. The worker tool backend must
+    consult its reservation on every write. Waiting never grants a claim and
+    never silently edits dependencies. A wait-cycle produces a bounded replan
+    decision: the caller stops/releases that worker and preserves any already
+    integrated changes before requeueing it. No worker waits while holding this
+    short central lock.
+    """
+
+    def __init__(self, *, max_attempts: int = 3, project_root: Path | None = None):
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be positive")
+        self.max_attempts = max_attempts
+        self._lock = asyncio.Lock()
+        self._active: dict[str, tuple[CanonicalClaim, ...]] = {}
+        self._waiting: dict[str, tuple[str, ...]] = {}
+        self._attempts: dict[str, int] = {}
+        self._project_root = str(Path(project_root).resolve()) if project_root is not None else ""
+
+    async def reserve(self, owner: str, claims: list[CanonicalClaim], *, expand: bool = False) -> ClaimDecision:
+        if not claims or any(c.owner != owner for c in claims):
+            raise ClaimError("a reservation needs claims belonging to its owner")
+        async with self._lock:
+            roots = {c.project_root for c in claims}
+            if len(roots) != 1 or "" in roots:
+                raise ClaimError("claims must identify one resolved workspace")
+            root = next(iter(roots))
+            if self._project_root and root != self._project_root:
+                raise ClaimError("claim belongs to another workspace")
+            self._project_root = root
+            if expand and owner not in self._active:
+                return ClaimDecision("rejected", owner, reason="expansion requires an active reservation")
+            if owner in self._active and not expand:
+                return ClaimDecision("rejected", owner, reason="owner is already active; use expansion")
+            wanted = tuple(dict.fromkeys(self._active.get(owner, ()) + tuple(claims)))
+            blockers = tuple(sorted(other for other, held in self._active.items() if other != owner and
+                any(claims_conflict(a, b) for a in wanted for b in held)))
+            if not blockers:
+                self._active[owner] = wanted
+                self._waiting.pop(owner, None)
+                self._attempts.pop(owner, None)
+                return ClaimDecision("granted", owner)
+            attempt = self._attempts.get(owner, 0) + 1
+            self._attempts[owner] = attempt
+            self._waiting[owner] = blockers
+
+            def reaches(node: str, target: str, seen: set[str]) -> bool:
+                if node == target:
+                    return True
+                if node in seen:
+                    return False
+                seen.add(node)
+                return any(reaches(dep, target, seen) for dep in self._waiting.get(node, ()))
+
+            cycle = any(reaches(other, owner, set()) for other in blockers)
+            if cycle or attempt >= self.max_attempts:
+                self._waiting.pop(owner, None)
+                return ClaimDecision("replan", owner, blockers, attempt,
+                    "claim wait cycle; release worker before requeue" if cycle else "claim retry limit reached")
+            return ClaimDecision("waiting_claim", owner, blockers, attempt, "active writer owns requested path")
+
+    async def release(self, owner: str) -> None:
+        async with self._lock:
+            self._active.pop(owner, None)
+            self._waiting.pop(owner, None)
+            # Preserve the retry cap across a release/requeue. A successful
+            # reservation resets it; releasing a failed worker must not.
+
+    async def owns_write(self, owner: str, claim: CanonicalClaim) -> bool:
+        """Exact reserved pattern membership; concrete writes use claims scope matching."""
+        async with self._lock:
+            return claim.owner == owner and claim.mode == "exclusive" and claim in self._active.get(owner, ())
+
+    async def authorize_write(self, owner: str, path: str, *, project_root: Path,
+                              windows: bool | None = None) -> bool:
+        """Pre-write tool hook for concrete paths, with traversal/junction checks."""
+        try:
+            target = canonical_claim(path, project_root=project_root, owner=owner, windows=windows)
+        except ClaimError:
+            return False
+        async with self._lock:
+            if target.project_root != self._project_root:
+                return False
+            return any(c.mode == "exclusive" and path_matches(target.path, c.path)
+                       for c in self._active.get(owner, ()))
+
+    async def snapshot(self) -> dict:
+        async with self._lock:
+            return {"version": 1,
+                    "active": {owner: [c.path for c in claims] for owner, claims in self._active.items()},
+                    "waiting": dict(self._waiting), "attempts": dict(self._attempts)}

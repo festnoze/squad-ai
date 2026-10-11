@@ -31,7 +31,7 @@ class RefineOutcome:
     text: str            # final artifact text (maker output)
     rounds: int          # number of revise rounds actually performed
     score: int           # final judge score 0-100 (-1 if not judged)
-    stopped_reason: str  # threshold | max_rounds | critic_empty | rejected | disabled
+    stopped_reason: str  # threshold | max_rounds | critic_empty | rejected | disabled | judge_error | constraint_rejected
     issues: list[str] = field(default_factory=list)       # critic-flagged problems (accumulated, deduped)
     suggestions: list[str] = field(default_factory=list)  # critic-proposed improvements
 
@@ -82,7 +82,6 @@ async def _acritique_strict(
 async def _ajudge(
     runner: AgentRunner, kind: str, artifact: str, criteria: str, cwd: Path | None, emit: EmitFn | None
 ) -> int:
-    threshold = settings.refine_quality_threshold
     try:
         res = await runner.arun(
             prompts.judge_quality(kind, artifact, criteria),
@@ -91,12 +90,14 @@ async def _ajudge(
         )
         data = extract_json(res.text)
     except AgentError:
-        return threshold  # judge unavailable -> treat as pass, stop the loop
-    try:
-        score = int(data.get("score", threshold))
-    except (TypeError, ValueError):
-        score = threshold
-    score = max(0, min(100, score))
+        if emit:
+            emit("judge", "Juge indisponible — aucune admission implicite.")
+        return -1
+    score = data.get("score")
+    if type(score) is not int or not 0 <= score <= 100:
+        if emit:
+            emit("judge", "Score du juge invalide — aucune admission implicite.")
+        return -1
     if emit:
         emit("judge", f"Score qualité {score}/100 — {data.get('verdict', '')}".strip())
     return score
@@ -112,10 +113,13 @@ async def arefine(
     revise: Callable[[str, str], Awaitable[str]],
     accept: Callable[[str], Awaitable[bool]] | None = None,
     rollback: Callable[[], Awaitable[None]] | None = None,
+    admission: Callable[[str], Awaitable[bool]] | None = None,
     cwd: Path | None = None,
     emit: EmitFn | None = None,
 ) -> RefineOutcome:
     """Run the refinement loop for `initial_text`. Returns the final artifact."""
+    if admission is not None and not await admission(initial_text):
+        return RefineOutcome(initial_text, rounds=0, score=-1, stopped_reason="constraint_rejected")
     if not settings.refine_for(role):
         return RefineOutcome(initial_text, rounds=0, score=-1, stopped_reason="disabled")
 
@@ -136,13 +140,16 @@ async def arefine(
 
     score = await _ajudge(runner, kind, current, criteria, cwd, emit)
     rounds = 0
+    if score < 0:
+        return RefineOutcome(current, rounds, score, "judge_error", all_issues, all_suggestions)
     while score < threshold and rounds < max_rounds:
         critique, issues, suggestions = await _acritique(runner, kind, current, criteria, cwd, emit)
         _accumulate(issues, suggestions)
         if not critique:
             return RefineOutcome(current, rounds, score, "critic_empty", all_issues, all_suggestions)
         revised = await revise(current, critique)
-        if accept is not None and not await accept(revised):
+        valid = (admission is None or await admission(revised)) and (accept is None or await accept(revised))
+        if not valid:
             if rollback is not None:
                 await rollback()
             if emit:
@@ -151,6 +158,8 @@ async def arefine(
         current = revised
         rounds += 1
         score = await _ajudge(runner, kind, current, criteria, cwd, emit)
+        if score < 0:
+            return RefineOutcome(current, rounds, score, "judge_error", all_issues, all_suggestions)
 
     reason = "threshold" if score >= threshold else "max_rounds"
     return RefineOutcome(current, rounds, score, reason, all_issues, all_suggestions)
