@@ -9289,118 +9289,124 @@ class Pipeline:
         if reason := ledger.denied_reason():
             self._log(source, f"Réparation non admise : {reason}.")
             return False, detail
-        # Finding 4 : une panne d'INFRA (lancement impossible, port tenu par un
-        # tiers) ne se répare pas par un agent — on ne gaspille aucune tentative.
-        if self._smoke_looks_like_infra(report):
-            self._log(source, "Échec de forme infra — aucune tentative de réparation dépensée.")
-            return False, detail
-        ws = workspace_dir(self.state.id)
-        if not await self._agit_snapshot(ws, f"pre integration-fix ({source})"):
-            self._log(source, "Réparation impossible (git indisponible) — gate en échec.")
-            return False, detail
-        pkg = workspace.package_name(self.state)
-        for attempt in range(1, attempts + 1):
-            await self._checkpoint()
-            if self._stop_requested:
-                return False, detail
-            if reason := ledger.denied_reason():
-                self.monitor.event("repair_stopped", source=source, reason=reason,
-                                   attempts=ledger.attempts, fingerprint=ledger.failures[-1].fingerprint)
-                self._log(source, f"Réparation arrêtée : {reason}.")
-                return False, detail
-            ledger.admit()
-            repairs = list(self.state.generation_checkpoint.get("repairs", []))
-            repairs.append({"source": source, "attempt": attempt, "at": time.time(),
-                            "category": ledger.failures[-1].category,
-                            "fingerprint": ledger.failures[-1].fingerprint})
-            self.state.generation_checkpoint["repairs"] = repairs[-50:]
-            self._sync()
-            self._log(
-                source,
-                f"🔧 Réparation du câblage par un agent Dev (tentative {attempt}/{attempts})…",
-            )
-            self._chat(
-                ChatRole.SYSTEM,
-                f"🔧 Gate {source} en échec — agent Dev dépêché pour réparer "
-                f"(tentative {attempt}/{attempts}).",
-            )
-            self.monitor.event(
-                # QUEUE du rapport, pas la tête : la tête d'un log de gate n'est
-                # que du bruit de démarrage (warnings npm/node), l'erreur réelle
-                # est à la FIN (D9, run supervisé 2026-07-20).
-                "integration_fix", source=source, attempt=attempt, detail=detail[-600:]
-            )
-            try:
-                await self._tracked.arun(
-                    (prompt_builder or prompts.dev_fix_integration)(
-                        pkg,
-                        detail,
-                        architecture=self.state.architecture,
-                        attempt=attempt,
-                        max_attempts=attempts,
-                        # V3-F4.3: the primary stream's component memory ("" when
-                        # KNOWLEDGE and GOVERNANCE are off — prompt byte-identical).
-                        knowledge=prompts.knowledge_context(
-                            self.state,
-                            stream=self.state.primary_stream_id,
-                            audience="dev",
-                        ),
-                    ) + repair_policy.REPAIR_INVARIANTS,
-                    system_prompt=persona("dev"),
-                    cwd=ws,
-                )
-            except AgentError as exc:
-                self._log(source, f"Agent de réparation indisponible : {exc}")
-                return False, detail
-            green, pytest_out, _ = await self._arun_pytest()
-            suite_out, suite_name = pytest_out, "pytest"
-            # Finding 3 : le filet de sécurité ne doit pas être backend-only. Si le
-            # projet a un frontend, sa suite Vitest + build doit AUSSI rester verte,
-            # sinon la réparation a pu casser l'UI sans qu'un test backend le voie.
-            if green and self._has_frontend():
-                fe_green, fe_out, _ = await self._arun_frontend_tests()
-                if not fe_green:
-                    green, suite_out, suite_name = False, fe_out, "frontend (Vitest + build)"
-            if not green:
-                await self._agit(ws, "reset", "--hard", "HEAD")
-                await self._agit(ws, "clean", "-fd")
-                self._log(source, f"La réparation a cassé la suite {suite_name} — rollback.")
-                detail = (
-                    f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
-                    f"(rollback effectué). Sortie {suite_name} :\n{suite_out[-1500:]}"
-                )
-                ledger.observe(suite_out)
-                continue
-            await self._agit(ws, "add", "-A")
-            await self._agit(ws, "commit", "-m", f"integration fix {source} #{attempt}", "--allow-empty")
-            ok, new_detail = await averify()
-            self.monitor.event(
-                "integration_fix_verify",
-                source=source, attempt=attempt, ok=ok, detail=(new_detail or "")[-600:],
-            )
-            # Bascule tardive vers l'INFRA (D10b) : un verdict de re-vérification
-            # de forme infra (port tenu par un tiers, daemon down, marqueur
-            # __INFRA__ du gate JS) ne se répare pas par un agent - on interrompt
-            # la boucle SANS dépenser les tentatives restantes ; l'appelant gare.
-            if not ok:
-                shaped = str(new_detail or "")
-                if shaped.startswith("__INFRA__") or self._smoke_looks_like_infra(shaped):
+        try:
+            async with asyncio.timeout(ledger.remaining_seconds):
+                # Finding 4 : une panne d'INFRA (lancement impossible, port tenu par un
+                # tiers) ne se répare pas par un agent — on ne gaspille aucune tentative.
+                if self._smoke_looks_like_infra(report):
+                    self._log(source, "Échec de forme infra — aucune tentative de réparation dépensée.")
+                    return False, detail
+                ws = workspace_dir(self.state.id)
+                if not await self._agit_snapshot(ws, f"pre integration-fix ({source})"):
+                    self._log(source, "Réparation impossible (git indisponible) — gate en échec.")
+                    return False, detail
+                pkg = workspace.package_name(self.state)
+                for attempt in range(1, attempts + 1):
+                    await self._checkpoint()
+                    if self._stop_requested:
+                        return False, detail
+                    if reason := ledger.denied_reason():
+                        self.monitor.event("repair_stopped", source=source, reason=reason,
+                                           attempts=ledger.attempts, fingerprint=ledger.failures[-1].fingerprint)
+                        self._log(source, f"Réparation arrêtée : {reason}.")
+                        return False, detail
+                    ledger.admit()
+                    repairs = list(self.state.generation_checkpoint.get("repairs", []))
+                    repairs.append({"source": source, "attempt": attempt, "at": time.time(),
+                                    "category": ledger.failures[-1].category,
+                                    "fingerprint": ledger.failures[-1].fingerprint})
+                    self.state.generation_checkpoint["repairs"] = repairs[-50:]
+                    self._sync()
                     self._log(
                         source,
-                        "Échec de forme infra au re-verify - boucle de réparation "
-                        "interrompue (aucune tentative supplémentaire dépensée).",
+                        f"🔧 Réparation du câblage par un agent Dev (tentative {attempt}/{attempts})…",
                     )
-                    return False, shaped or detail
-            if ok:
-                self._log(source, f"✅ Câblage réparé (tentative {attempt}) — gate {source} vert.")
-                self._chat(
-                    ChatRole.SYSTEM,
-                    f"🔧 Gate {source} réparé et revalidé (tentative {attempt}).",
-                )
-                return True, new_detail
-            detail = new_detail or detail
-            ledger.observe(detail)
-        return False, detail
+                    self._chat(
+                        ChatRole.SYSTEM,
+                        f"🔧 Gate {source} en échec — agent Dev dépêché pour réparer "
+                        f"(tentative {attempt}/{attempts}).",
+                    )
+                    self.monitor.event(
+                        # QUEUE du rapport, pas la tête : la tête d'un log de gate n'est
+                        # que du bruit de démarrage (warnings npm/node), l'erreur réelle
+                        # est à la FIN (D9, run supervisé 2026-07-20).
+                        "integration_fix", source=source, attempt=attempt, detail=detail[-600:]
+                    )
+                    try:
+                        await self._tracked.arun(
+                            (prompt_builder or prompts.dev_fix_integration)(
+                                pkg,
+                                detail,
+                                architecture=self.state.architecture,
+                                attempt=attempt,
+                                max_attempts=attempts,
+                                # V3-F4.3: the primary stream's component memory ("" when
+                                # KNOWLEDGE and GOVERNANCE are off — prompt byte-identical).
+                                knowledge=prompts.knowledge_context(
+                                    self.state,
+                                    stream=self.state.primary_stream_id,
+                                    audience="dev",
+                                ),
+                            ) + repair_policy.REPAIR_INVARIANTS,
+                            system_prompt=persona("dev"),
+                            cwd=ws,
+                        )
+                    except AgentError as exc:
+                        self._log(source, f"Agent de réparation indisponible : {exc}")
+                        return False, detail
+                    green, pytest_out, _ = await self._arun_pytest()
+                    suite_out, suite_name = pytest_out, "pytest"
+                    # Finding 3 : le filet de sécurité ne doit pas être backend-only. Si le
+                    # projet a un frontend, sa suite Vitest + build doit AUSSI rester verte,
+                    # sinon la réparation a pu casser l'UI sans qu'un test backend le voie.
+                    if green and self._has_frontend():
+                        fe_green, fe_out, _ = await self._arun_frontend_tests()
+                        if not fe_green:
+                            green, suite_out, suite_name = False, fe_out, "frontend (Vitest + build)"
+                    if not green:
+                        await self._agit(ws, "reset", "--hard", "HEAD")
+                        await self._agit(ws, "clean", "-fd")
+                        self._log(source, f"La réparation a cassé la suite {suite_name} — rollback.")
+                        detail = (
+                            f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
+                            f"(rollback effectué). Sortie {suite_name} :\n{suite_out[-1500:]}"
+                        )
+                        ledger.observe(suite_out)
+                        continue
+                    await self._agit(ws, "add", "-A")
+                    await self._agit(ws, "commit", "-m", f"integration fix {source} #{attempt}", "--allow-empty")
+                    ok, new_detail = await averify()
+                    self.monitor.event(
+                        "integration_fix_verify",
+                        source=source, attempt=attempt, ok=ok, detail=(new_detail or "")[-600:],
+                    )
+                    # Bascule tardive vers l'INFRA (D10b) : un verdict de re-vérification
+                    # de forme infra (port tenu par un tiers, daemon down, marqueur
+                    # __INFRA__ du gate JS) ne se répare pas par un agent - on interrompt
+                    # la boucle SANS dépenser les tentatives restantes ; l'appelant gare.
+                    if not ok:
+                        shaped = str(new_detail or "")
+                        if shaped.startswith("__INFRA__") or self._smoke_looks_like_infra(shaped):
+                            self._log(
+                                source,
+                                "Échec de forme infra au re-verify - boucle de réparation "
+                                "interrompue (aucune tentative supplémentaire dépensée).",
+                            )
+                            return False, shaped or detail
+                    if ok:
+                        self._log(source, f"✅ Câblage réparé (tentative {attempt}) — gate {source} vert.")
+                        self._chat(
+                            ChatRole.SYSTEM,
+                            f"🔧 Gate {source} réparé et revalidé (tentative {attempt}).",
+                        )
+                        return True, new_detail
+                    detail = new_detail or detail
+                    ledger.observe(detail)
+                return False, detail
+        except TimeoutError:
+            self.monitor.event("repair_stopped", source=source, reason="deadline", attempts=ledger.attempts)
+            self._log(source, "Réparation arrêtée : délai global atteint, appel et ressources annulés.")
+            return False, detail + "\nREPAIR_DEADLINE_EXCEEDED"
 
     # ------------------------------------------------- Smoke-run gate (runnability)
 

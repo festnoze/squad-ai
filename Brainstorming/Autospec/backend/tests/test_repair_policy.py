@@ -13,6 +13,10 @@ from autospec.orchestrator.repair_policy import RepairLedger, classify_failure
     ("CLAIM_CONFLICT: errors.py", "conflict", False),
     ("runtime timeout", "timeout", True),
     ("POST /api/login returned 500", "contract", True),
+    ("ENVIRONMENT_DRIFT: wheel changed", "environment", False),
+    ("CACHE_INCOMPLETE", "environment", False),
+    ("CLEAN_INSTALL_FAILED: registry unavailable", "environment", False),
+    ("DEPENDENCY_UNRESOLVED: argon2", "dependency_waiting", False),
 ])
 def test_classification(detail, category, repairable):
     result = classify_failure(detail)

@@ -46,3 +46,14 @@ def test_comparison_is_not_a_mandatory_second_backend():
     state = ProjectState(id="choice", name="app", goal="Comparer Python ou Rust pour le backend",
                          technical_stack={"backend": "python"})
     assert stack.resolve(state)["backend"] == "python"
+
+
+def test_unrelated_or_in_brief_does_not_hide_stack_conflict():
+    state = ProjectState(id="conflict-filter", name="app", goal="Backend en Python et backend en Rust. Filtrer les tickets par nom ou tags.")
+    with pytest.raises(ValueError, match="contradictoires"):
+        stack.resolve(state)
+
+
+def test_node_toolchain_is_not_a_second_required_backend():
+    state = ProjectState(id="node-tools", name="app", goal="API en Python, React construit avec Node.js", technical_stack={"backend": "python"})
+    assert stack.resolve(state)["backend"] == "python"

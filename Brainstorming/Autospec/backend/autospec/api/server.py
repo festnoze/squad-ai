@@ -104,6 +104,7 @@ _INTERRUPTED_PHASES = {
     PipelinePhase.ARCHITECT,
     PipelinePhase.PLAN,
     PipelinePhase.BUILD,
+    PipelinePhase.GOVERN,
 }
 
 
@@ -144,6 +145,12 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
         changed = False
         interrupted_phase = state.phase.value if state.phase in _INTERRUPTED_PHASES else ""
         if state.phase in _INTERRUPTED_PHASES:
+            providers = [a for a in state.agent_activity.values() if a.get("phase") == "provider"]
+            if providers:
+                # The lost CLI's final usage was never accounted for. Preserve
+                # that uncertainty before clearing volatile activity; capped
+                # runs must not spend the same unknown balance on resume.
+                state.usage.unreported_calls += len(providers)
             state.phase = PipelinePhase.STOPPED
             state.delivery_ready = False
             state.error = "Génération interrompue par l'arrêt du serveur ; reprise explicite nécessaire."
@@ -151,6 +158,8 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
                 **state.generation_checkpoint, "status": "interrupted",
                 "last_phase": interrupted_phase, "reason": "server_restart",
                 "recovered_at": time.time(),
+                "cost_incomplete": bool(state.usage.unreported_calls),
+                "interrupted_provider_calls": len(providers),
             }
             # A watchdog timer from the dead worker must not silently spend
             # again. Resume is a user action after reconciliation.

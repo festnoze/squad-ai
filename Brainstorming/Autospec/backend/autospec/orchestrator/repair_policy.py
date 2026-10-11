@@ -22,9 +22,13 @@ def classify_failure(detail: str) -> Failure:
     if any(marker in low for marker in (
         "__infra__", "isolation_unavailable", "docker indisponible", "cannot connect to the docker daemon",
         "daemon lost", "process externe", "lancement impossible", "playwright manquant", "disk unavailable",
+        "environment_drift", "cache_incomplete", "cache_attestation_invalid", "clean_install_failed",
+        "dependency_coordinator_unavailable", "registry unavailable",
     )):
         category = "environment"
-    elif any(marker in low for marker in ("modulenotfounderror", "no module named", "cannot find module", "dependency_pending", "lockfile")):
+    elif any(marker in low for marker in ("dependency_unresolved", "dependency_pending")):
+        category = "dependency_waiting"
+    elif any(marker in low for marker in ("modulenotfounderror", "no module named", "cannot find module", "lockfile")):
         category = "dependency"
     elif any(marker in low for marker in ("provider_error", "agent de réparation indisponible", "authentication required", "rate limit")):
         category = "provider"
@@ -44,7 +48,7 @@ def classify_failure(detail: str) -> Failure:
     canonical = re.sub(r"\b0x[0-9a-f]+\b", "<address>", canonical, flags=re.I)
     canonical = re.sub(r"(attempt|tentative)\s*#?\s*\d+", r"\1 <n>", canonical, flags=re.I)
     digest = hashlib.sha256((category + "\n" + canonical).encode()).hexdigest()
-    return Failure(category, digest, category not in {"environment", "provider", "conflict"}, canonical)
+    return Failure(category, digest, category not in {"environment", "provider", "conflict", "dependency_waiting"}, canonical)
 
 
 @dataclass
@@ -83,6 +87,10 @@ class RepairLedger:
         if reason:
             raise ValueError(reason)
         self.attempts += 1
+
+    @property
+    def remaining_seconds(self) -> float:
+        return max(0.0, self.deadline - time.monotonic())
 
 
 REPAIR_INVARIANTS = """
