@@ -9,6 +9,7 @@ import contextvars
 import json
 import os
 import stat
+from typing import Callable
 from dataclasses import dataclass
 from pathlib import Path, PureWindowsPath
 
@@ -24,6 +25,7 @@ class ExecutionContext:
     backend: str = "restricted_tools"
     version: int = 1
     protected_paths: tuple[str, ...] = ()
+    task_id: str | None = None
 
     def __post_init__(self):
         if self.version != 1 or self.backend != "restricted_tools" or not self.run_id:
@@ -43,6 +45,9 @@ class ExecutionContext:
 active_execution: contextvars.ContextVar[ExecutionContext | None] = contextvars.ContextVar(
     "autospec_execution_context", default=None,
 )
+active_dependency_handler: contextvars.ContextVar[Callable[[Path, dict], object] | None] = contextvars.ContextVar(
+    "autospec_dependency_handler", default=None,
+)
 
 FILE_PROTOCOL = """
 --- MEDIATED FILE PROTOCOL ---
@@ -52,6 +57,11 @@ Reply with exactly one JSON object to request one of these operations:
 {"tool":"list_files"}
 {"tool":"read_files","paths":["relative/path.py"]}
 {"tool":"write_files","files":[{"path":"relative/path.py","content":"full file content"}]}
+{"tool":"dependency_request","version":1,"ecosystem":"python|node","package":"name",
+ "constraint":">=version","scope":"runtime|dev","manifest":"relative/manifest",
+ "lock":"relative/lock","reason":"why required"}
+Dependency requests go to a trusted coordinator; do not supply or invent a task
+identity. Pending requests are NOT installed and are NOT evidence of success.
 Wait for the tool result before continuing. Tests and installs are performed
 separately by the trusted orchestrator. Do not claim you ran them. Once done,
 return the requested final answer WITHOUT a "tool" key.
@@ -59,7 +69,7 @@ return the requested final answer WITHOUT a "tool" key.
 
 _PROTECTED = {".git", ".claude", ".codex", ".agents", ".aws", ".ssh", ".azure",
               ".npmrc", ".pypirc", ".netrc", "credentials.json", ".credentials.json",
-              ".autospec", "autospec-state.json", "build-monitor.jsonl", "acceptance-contract.json",
+              ".autospec", "autospec-state.json", "build-monitor.jsonl", "autospec-interactions.jsonl", "acceptance-contract.json",
               "contract-baseline.json", "independent-oracle", "verification-snapshot"}
 _DEVICE = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
            *(f"lpt{i}" for i in range(1, 10))}
@@ -84,7 +94,7 @@ class FileBroker:
         if (PureWindowsPath(relative).is_absolute() or PureWindowsPath(relative).drive
                 or relative.startswith(("/", "\\")) or any(
                     p in {"", ".", ".."} or p != p.rstrip(" .") or ":" in p
-                    or any(ord(c) < 32 for c in p) or p.split(".")[0].lower() in _DEVICE
+                    or any(ord(c) < 32 or c in '<>"|?*' for c in p) or p.split(".")[0].lower() in _DEVICE
                     for p in parts)):
             raise IsolationViolation(f"Chemin hors du workspace ou ambigu refusé : {relative!r}")
         canonical = "/".join(parts).lower()

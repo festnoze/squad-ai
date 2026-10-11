@@ -18,13 +18,14 @@ import subprocess
 import threading
 import time
 import uuid
+import tempfile
 from functools import lru_cache
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, Protocol
 
 from ..config import settings
-from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for
+from .file_broker import FILE_PROTOCOL, FileBroker, IsolationViolation, context_for, active_dependency_handler
 
 
 class ProcessRegistry:
@@ -770,7 +771,19 @@ class ClaudeCliRunner:
                 if remaining <= 0:
                     raise AgentError("Mediated-turn budget exhausted", usage=total, budget_exhausted=True)
             try:
-                response = broker.apply(call)
+                if call["tool"] == "dependency_request":
+                    handler = active_dependency_handler.get()
+                    if handler is None:
+                        raise AgentError("DEPENDENCY_COORDINATOR_UNAVAILABLE: no trusted dependency handler",
+                                         code="DEPENDENCY_COORDINATOR_UNAVAILABLE", usage=total)
+                    request = {key: value for key, value in call.items() if key not in {"tool", "task_id"}}
+                    if broker.context.task_id:
+                        request["task_id"] = broker.context.task_id
+                    response = json.dumps(await asyncio.to_thread(handler, broker.root, request), ensure_ascii=False)
+                    if len(response.encode("utf-8")) > 256_000:
+                        raise AgentError("Dependency coordinator response size exceeded", usage=total)
+                else:
+                    response = broker.apply(call)
             except IsolationViolation as exc:
                 raise AgentError(str(exc), usage=total, code=exc.code) from exc
             history.append(f"TOOL RESULT:\n{response}")
@@ -821,9 +834,11 @@ class ClaudeCliRunner:
             _ensure_claude_isolation()
             token = _agent_environment.set(_subscription_environment())
             try:
-                return _run_tracked(
-                    args, prompt, str(cwd) if cwd else None, settings.agent_timeout_s
-                )
+                # CLI startup/managed policy runs in a trusted EMPTY directory,
+                # never in generated source. OAuth stays in its original user
+                # profile. Product data reaches the model only via mediation.
+                with tempfile.TemporaryDirectory(prefix="autospec-inference-") as inference_root:
+                    return _run_tracked(args, prompt, inference_root, settings.agent_timeout_s)
             finally:
                 _agent_environment.reset(token)
 

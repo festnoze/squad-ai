@@ -13,11 +13,17 @@ import uuid
 from pathlib import Path
 
 from ..agents.file_broker import ExecutionContext, FileBroker, IsolationViolation
-from ..agents.runner import AgentError, _await_tracked, _run_tracked
+from ..agents.runner import AgentError, _await_tracked, _run_tracked, _resolve_agent_command
 
 
 def _unavailable(message: str) -> AgentError:
     return AgentError(f"ISOLATION_UNAVAILABLE: {message}", code="ISOLATION_UNAVAILABLE")
+
+
+def _docker_call(args: list[str], **kwargs):
+    # Apply the same native-command policy to preflight/cleanup as execution;
+    # Windows must not reinterpret an arbitrary batch shim as a host shell.
+    return subprocess.run(_resolve_agent_command(args), **kwargs)
 
 
 def docker_run_cmd(inner_cmd: list[str], ws: str, image: str, docker: str = "docker",
@@ -60,11 +66,11 @@ def require_sandbox(ws: str | Path, image: str, *, docker: str = "docker") -> Pa
             broker.path(path.relative_to(context.project_root).as_posix())
             if not path.is_file() and not path.is_dir():
                 raise IsolationViolation("Special files cannot be mounted")
-        result = subprocess.run([docker, "info", "--format", "{{.OSType}}"],
+        result = _docker_call([docker, "info", "--format", "{{.OSType}}"],
                                 capture_output=True, text=True, timeout=10, check=False)
         if result.returncode or result.stdout.strip() != "linux":
             raise _unavailable("A reachable Linux Docker engine is required")
-        result = subprocess.run([docker, "image", "inspect", image, "--format", "{{.Id}} {{.Os}}"],
+        result = _docker_call([docker, "image", "inspect", image, "--format", "{{.Id}} {{.Os}}"],
                                 capture_output=True, text=True, timeout=10, check=False)
         if result.returncode or not re.fullmatch(r"sha256:[a-f0-9]{64} linux\s*", result.stdout):
             raise _unavailable("Sandbox image must already exist locally and target Linux")
@@ -76,7 +82,7 @@ def require_sandbox(ws: str | Path, image: str, *, docker: str = "docker") -> Pa
 
 
 def _container_identity(docker: str, name: str, run_id: str, timeout: float = 3) -> str | None:
-    inspected = subprocess.run([docker, "container", "inspect", name, "--format", "{{json .}}"],
+    inspected = _docker_call([docker, "container", "inspect", name, "--format", "{{json .}}"],
                                capture_output=True, text=True, timeout=timeout, check=False)
     if inspected.returncode:
         diagnostic = inspected.stderr.lower()
@@ -103,7 +109,7 @@ def _cleanup_container(docker: str, name: str, run_id: str) -> None:
         return
     deadline = time.monotonic() + 5
     for action in (["stop", "--time", "1"], ["rm", "--force"]):
-        result = subprocess.run([docker, "container", *action, identifier],
+        result = _docker_call([docker, "container", *action, identifier],
                                 capture_output=True, text=True,
                                 timeout=max(.1, deadline - time.monotonic()), check=False)
         if result.returncode and _container_identity(docker, name, run_id) is not None:
