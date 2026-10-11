@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "task": "REM-04",
+  "status": "review",
+  "base_revision": "ac42b9b2627449af627f32acfe5469ce514ba959",
+  "verified_source_revision": "c3701d171e0d93a910aac37bf6706559548d49a6",
+  "tests": {"exit_code": 0, "passed": 86, "failed": 0, "skipped": 0},
+  "log": "artifacts/remediation/REM-06/20261011-dependencies/pytest-hardened.log",
+  "junit": "artifacts/remediation/REM-06/20261011-dependencies/junit-hardened.xml",
+  "checks": ["pending/rejected requests refuse admission", "two concurrent requests survive serialized owner resolution", "runtime dependency cannot be dev-only", "Python real argon2-cffi request resolves manifest+uv.lock", "Node real is-number request resolves package+package-lock", "rejected partial resolver restores the exact original manifest/lock pair"],
+  "limits": ["requires coordinator pipeline and prompt wiring", "uv+pyproject/uv.lock and npm+package/package-lock only", "no paid LLM; historical snapshot unchanged"]
+}
