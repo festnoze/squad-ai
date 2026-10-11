@@ -101,7 +101,7 @@ async def test_runtime_gate_blocks_after_exhausted_attempts(monkeypatch, repair_
 
     assert await pipeline._aruntime_acceptance_phase() is False
     assert pipeline._delivery_blocked is True
-    assert len(runner.calls) == 2  # every attempt consumed before giving up
+    assert len(runner.calls) == 1  # unchanged failure twice: no second paid repair
     assert any("Runtime acceptance échoué" in issue for issue in state.delivery_issues)
 
 

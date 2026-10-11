@@ -74,6 +74,10 @@ _SAVE_RETRIES = 5
 _SAVE_BACKOFF_S = 0.05
 
 
+class PersistenceError(OSError):
+    """A required generation checkpoint could not be made durable."""
+
+
 def save_state(state: ProjectState) -> None:
     """Persist a project state synchronously (serialize + atomic write).
 
@@ -93,7 +97,12 @@ def save_state_payload(project_id: str, payload: str) -> None:
     save_project_file(project_id, STATE_FILENAME, payload)
 
 
-def save_project_file(project_id: str, filename: str, payload: str) -> None:
+def save_state_checkpoint(project_id: str, payload: str) -> None:
+    """Fail closed before spending or executing when state cannot be saved."""
+    save_project_file(project_id, STATE_FILENAME, payload, required=True)
+
+
+def save_project_file(project_id: str, filename: str, payload: str, *, required: bool = False) -> None:
     """Atomically write one pre-serialized sidecar ``payload`` into a project's
     workspace (state, knowledge base…): same temp-file + os.replace + retry
     pattern for every per-project JSON artifact."""
@@ -116,6 +125,8 @@ def save_project_file(project_id: str, filename: str, payload: str) -> None:
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as fh:
                 fh.write(payload)
+                fh.flush()
+                os.fsync(fh.fileno())
             os.replace(tmp_name, final)
             return
         except OSError as exc:
@@ -129,6 +140,8 @@ def save_project_file(project_id: str, filename: str, payload: str) -> None:
         "Could not persist %s for project %s after %d retries: %s",
         filename, project_id, _SAVE_RETRIES, last_exc,
     )
+    if required:
+        raise PersistenceError(f"Checkpoint non persisté pour {project_id}: {filename}") from last_exc
 
 
 INTERACTIONS_FILENAME = "autospec-interactions.jsonl"

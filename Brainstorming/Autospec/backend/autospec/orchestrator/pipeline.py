@@ -73,7 +73,7 @@ from ..models import (
     new_id,
 )
 from ..language_selector import recommend_language
-from ..storage import append_interaction, force_delete_workspace, load_interactions, save_state_payload, workspace_dir
+from ..storage import append_interaction, force_delete_workspace, load_interactions, save_state_checkpoint, save_state_payload, workspace_dir
 from .interactions import InteractionStore
 from . import delivery_state, independence, mutation, profiles, refine, runtime_acceptance, scheduler, session_monitor, setup_exec, skill_validation, skills as skill_lib, streams as work_streams, toolchain, workspace
 from . import guards, signatures  # W0.5 anti-cheating detectors + failure signatures
@@ -98,6 +98,7 @@ from . import docker_deploy
 from . import stack as stack_selection
 from . import brownfield
 from . import sandbox
+from . import repair_policy
 from .events import bus
 
 logger = logging.getLogger(__name__)
@@ -681,6 +682,9 @@ class _UsageTracker:
 
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
         item = _BUILD_ITEM.get() or f"phase:{self.pipeline.state.phase.value}"
+        # Planning can issue concurrent calls with the same phase label. Keep
+        # every call visible rather than overwriting/removing a sibling's row.
+        activity_key = item if item not in self.pipeline.state.agent_activity else f"{item}#{uuid.uuid4().hex[:8]}"
         waiting_since = time.time()
         # Count every call, including ones admitted before a user added a cap.
         # New budgeted calls must wait until ALL earlier usage is accounted for.
@@ -689,7 +693,7 @@ class _UsageTracker:
         while self._active_calls and (
             self._budgeted_call or self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
         ):
-            self.pipeline.state.agent_activity[item] = {
+            self.pipeline.state.agent_activity[activity_key] = {
                 "version": 1, "phase": "waiting_budget", "since": waiting_since,
                 "owner": sorted(self._call_owners), "active_provider_calls": self._active_calls,
                 "cost_incomplete": bool(self.pipeline.state.usage.unreported_calls),
@@ -698,7 +702,7 @@ class _UsageTracker:
             try:
                 await self._idle.wait()
             except BaseException:
-                self.pipeline.state.agent_activity.pop(item, None)
+                self.pipeline.state.agent_activity.pop(activity_key, None)
                 self.pipeline._sync()
                 raise
         self._active_calls += 1
@@ -706,8 +710,8 @@ class _UsageTracker:
             self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
         )
         self._idle.clear()
-        self._call_owners.add(item)
-        self.pipeline.state.agent_activity[item] = {
+        self._call_owners.add(activity_key)
+        self.pipeline.state.agent_activity[activity_key] = {
             "version": 1, "phase": "provider", "since": time.time(),
             "active_provider_calls": self._active_calls,
             "cost_incomplete": bool(self.pipeline.state.usage.unreported_calls),
@@ -718,8 +722,8 @@ class _UsageTracker:
         finally:
             # Synchronous release cannot itself be interrupted by cancellation.
             self._active_calls -= 1
-            self._call_owners.discard(item)
-            self.pipeline.state.agent_activity.pop(item, None)
+            self._call_owners.discard(activity_key)
+            self.pipeline.state.agent_activity.pop(activity_key, None)
             for activity in self.pipeline.state.agent_activity.values():
                 activity["active_provider_calls"] = self._active_calls
             if not self._active_calls:
@@ -796,7 +800,7 @@ class _UsageTracker:
             # Drain preceding checkpoint writes before launching a tool-capable
             # provider. A hard exit cannot leave this call wholly unrecorded.
             await asyncio.get_running_loop().run_in_executor(
-                _PERSIST_EXECUTOR, save_state_payload, self.pipeline.state.id,
+                _PERSIST_EXECUTOR, save_state_checkpoint, self.pipeline.state.id,
                 self.pipeline.state.model_dump_json(indent=2),
             )
             res = await self.pipeline.runner.arun(
@@ -1262,13 +1266,17 @@ class Pipeline:
 
     def _sync(self) -> None:
         if self.state.phase.value in {"spec", "analyze", "plan", "architect", "build", "govern"}:
+            previous = self.state.generation_checkpoint
+            new_run = previous.get("status") != "active"
             self.state.generation_checkpoint = {
-                **self.state.generation_checkpoint,
+                **previous,
                 "version": 1,
-                "run_id": self.state.generation_checkpoint.get("run_id") or uuid.uuid4().hex,
+                "run_id": uuid.uuid4().hex if new_run else previous.get("run_id") or uuid.uuid4().hex,
                 "owner_pid": os.getpid(), "status": "active",
                 "last_phase": self.state.phase.value, "at": time.time(),
             }
+            if new_run and previous.get("run_id"):
+                self.state.generation_checkpoint["previous_run_id"] = previous["run_id"]
         elif self.state.generation_checkpoint.get("status") == "active":
             self.state.generation_checkpoint = {
                 **self.state.generation_checkpoint, "status": self.state.phase.value,
@@ -2705,6 +2713,7 @@ class Pipeline:
             await self._adelivery_gates()
         except Exception as exc:  # never leave the pipeline in a broken state
             self._chat(ChatRole.SYSTEM, f"Erreur lors de la re-vérification : {exc}")
+            self._block_delivery(f"Vérification interrompue : {str(exc) or type(exc).__name__}", source="verification")
         finally:
             if self._stop_requested:
                 self.state.phase = PipelinePhase.STOPPED
@@ -9271,6 +9280,15 @@ class Pipeline:
         attempts = int(self._setting("integration_fix_attempts") or 0)
         if attempts <= 0 or settings.fake_agents:
             return False, detail
+        ledger = repair_policy.RepairLedger(
+            attempts, time.monotonic() + min(900.0, max(1.0, settings.agent_timeout_s) * attempts),
+        )
+        first_failure = ledger.observe(detail)
+        self.monitor.event("repair_diagnostic", source=source, category=first_failure.category,
+                           fingerprint=first_failure.fingerprint, repairable=first_failure.repairable)
+        if reason := ledger.denied_reason():
+            self._log(source, f"Réparation non admise : {reason}.")
+            return False, detail
         # Finding 4 : une panne d'INFRA (lancement impossible, port tenu par un
         # tiers) ne se répare pas par un agent — on ne gaspille aucune tentative.
         if self._smoke_looks_like_infra(report):
@@ -9285,6 +9303,18 @@ class Pipeline:
             await self._checkpoint()
             if self._stop_requested:
                 return False, detail
+            if reason := ledger.denied_reason():
+                self.monitor.event("repair_stopped", source=source, reason=reason,
+                                   attempts=ledger.attempts, fingerprint=ledger.failures[-1].fingerprint)
+                self._log(source, f"Réparation arrêtée : {reason}.")
+                return False, detail
+            ledger.admit()
+            repairs = list(self.state.generation_checkpoint.get("repairs", []))
+            repairs.append({"source": source, "attempt": attempt, "at": time.time(),
+                            "category": ledger.failures[-1].category,
+                            "fingerprint": ledger.failures[-1].fingerprint})
+            self.state.generation_checkpoint["repairs"] = repairs[-50:]
+            self._sync()
             self._log(
                 source,
                 f"🔧 Réparation du câblage par un agent Dev (tentative {attempt}/{attempts})…",
@@ -9315,7 +9345,7 @@ class Pipeline:
                             stream=self.state.primary_stream_id,
                             audience="dev",
                         ),
-                    ),
+                    ) + repair_policy.REPAIR_INVARIANTS,
                     system_prompt=persona("dev"),
                     cwd=ws,
                 )
@@ -9339,6 +9369,7 @@ class Pipeline:
                     f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
                     f"(rollback effectué). Sortie {suite_name} :\n{suite_out[-1500:]}"
                 )
+                ledger.observe(suite_out)
                 continue
             await self._agit(ws, "add", "-A")
             await self._agit(ws, "commit", "-m", f"integration fix {source} #{attempt}", "--allow-empty")
@@ -9368,6 +9399,7 @@ class Pipeline:
                 )
                 return True, new_detail
             detail = new_detail or detail
+            ledger.observe(detail)
         return False, detail
 
     # ------------------------------------------------- Smoke-run gate (runnability)

@@ -2,10 +2,58 @@ import asyncio
 
 import pytest
 
-from autospec.agents.runner import AgentResult
+from autospec.agents.runner import AgentResult, FakeRunner
 from autospec.models import PipelinePhase, ProjectState
 from autospec.orchestrator.pipeline import Pipeline, _BUILD_ITEM
 from autospec import storage
+
+
+async def test_checkpoint_failure_prevents_provider_spend(monkeypatch):
+    from autospec.orchestrator import pipeline as module
+    class Forbidden:
+        async def arun(self, *args, **kwargs):
+            pytest.fail("provider must not be called without a durable checkpoint")
+    pipeline = Pipeline(ProjectState(id="checkpoint-error", name="test", goal="demo",
+                                    phase=PipelinePhase.BUILD, budget_usd=1), Forbidden())
+    def fail(*args, **kwargs):
+        raise storage.PersistenceError("disk unavailable")
+    monkeypatch.setattr(module, "save_state_checkpoint", fail)
+    with pytest.raises(storage.PersistenceError):
+        await pipeline._tracked.arun("p", "s")
+    assert pipeline.state.usage.agent_calls == 0
+    assert pipeline.state.agent_activity == {}
+
+
+async def test_same_phase_calls_have_distinct_activity_rows():
+    release, started = asyncio.Event(), asyncio.Event()
+    class Pending:
+        async def arun(self, *args, **kwargs):
+            started.set()
+            await release.wait()
+            return AgentResult("ok", cost_usd=.1)
+    pipeline = Pipeline(ProjectState(id="activity-phase", name="test", goal="demo",
+                                    phase=PipelinePhase.PLAN, budget_usd=1), Pending())
+    first = asyncio.create_task(pipeline._tracked.arun("p", "s"))
+    await started.wait()
+    second = asyncio.create_task(pipeline._tracked.arun("p", "s"))
+    await asyncio.sleep(0)
+    assert len(pipeline.state.agent_activity) == 2
+    assert sorted(row["phase"] for row in pipeline.state.agent_activity.values()) == ["provider", "waiting_budget"]
+    release.set()
+    await asyncio.gather(first, second)
+    assert pipeline.state.agent_activity == {}
+
+
+def test_explicit_resume_starts_new_run_identity():
+    pipeline = Pipeline(ProjectState(id="resume-identity", name="test", goal="demo",
+                                    phase=PipelinePhase.BUILD,
+                                    generation_checkpoint={"run_id": "old", "status": "interrupted"}), FakeRunner([]))
+    pipeline._sync()
+    assert pipeline.state.generation_checkpoint["run_id"] != "old"
+    assert pipeline.state.generation_checkpoint["previous_run_id"] == "old"
+    identity = pipeline.state.generation_checkpoint["run_id"]
+    pipeline._sync()
+    assert pipeline.state.generation_checkpoint["run_id"] == identity
 
 
 async def test_waiting_budget_visible_and_checkpoint_durable_before_provider():

@@ -26,6 +26,7 @@ def freeze(decision: dict[str, str], *, rationale: str = "") -> dict[str, str]:
         if result.get("source") == "explicit" else
         "Choix de l'architecte ; Python simple ou backend typé, React pour interface."
     )
+    result["template_catalog_version"] = "1"
     return result
 
 
@@ -34,6 +35,8 @@ def _sealed(requested: dict[str, str]) -> dict[str, str] | None:
         return None
     if requested.get("version") != "1" or any(key not in requested for key in _DECISION_FIELDS):
         raise ValueError("Décision de stack persistée incomplète ou de version inconnue.")
+    if requested.get("template_catalog_version", "1") != "1":
+        raise ValueError("Version du catalogue de templates inconnue.")
     if freeze(requested)["decision_sha256"] != requested["decision_sha256"]:
         raise ValueError("Décision de stack modifiée : résoudre explicitement un nouveau contrat avant bootstrap.")
     backend, kind = requested["backend"], requested["kind"]
@@ -135,8 +138,7 @@ def _validate_stream_roots(state: ProjectState) -> None:
             raise ValueError(f"Chemin du stream {stream.id!r} hors du projet : {root!r}")
 
 
-def explicit_backend(text: str) -> str:
-    """Respect an unambiguous requested language (never substring-match 'go')."""
+def _backend_candidates(text: str) -> list[str]:
     patterns = {
         "python": r"\b(?:python|fastapi)\b",
         "go": r"\bgolang\b|\b(?:en|in|using|avec|langage|language|backend|stack)\s+go\b|\bgo\s+(?:backend|api|language|langage)\b",
@@ -155,8 +157,12 @@ def explicit_backend(text: str) -> str:
     )
     if javascript_backend and "node" not in found:
         found.append("node")
-    # Ambiguous comparisons are left to the architect instead of picking the
-    # first language mentioned in a discussion of alternatives.
+    return found
+
+
+def explicit_backend(text: str) -> str:
+    """Respect an unambiguous requested language (never substring-match 'go')."""
+    found = _backend_candidates(text)
     return found[0] if len(found) == 1 else ""
 
 
@@ -176,6 +182,10 @@ def resolve(state: ProjectState) -> dict[str, str]:
         return sealed
     text = f"{state.goal}\n{state.brief}".lower()
     affirmative = _affirmative_constraints(text)
+    candidates = _backend_candidates(text)
+    alternatives = re.search(r"\b(?:ou|or|alternatives?|comparer|compare|comparaison|versus|vs|préférer|prefer)\b", affirmative)
+    if len(candidates) > 1 and not alternatives:
+        raise ValueError("Contraintes de backend contradictoires : plusieurs langages exigés sans choix d'alternative.")
     prose_backend = explicit_backend(text)
     if requested.get("backend") and prose_backend and requested["backend"] != prose_backend:
         raise ValueError("Contraintes de stack contradictoires entre le brief et le choix structuré.")

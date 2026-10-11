@@ -34,3 +34,15 @@ def test_unknown_frozen_version_is_not_silently_accepted():
     state.technical_stack["version"] = "99"
     with pytest.raises(ValueError, match="version"):
         stack.resolve(state)
+
+
+def test_two_required_backends_fail_before_scaffold():
+    state = ProjectState(id="conflict", name="app", goal="Backend Python obligatoire. Backend Rust obligatoire.")
+    with pytest.raises(ValueError, match="contradictoires"):
+        stack.resolve(state)
+
+
+def test_comparison_is_not_a_mandatory_second_backend():
+    state = ProjectState(id="choice", name="app", goal="Comparer Python ou Rust pour le backend",
+                         technical_stack={"backend": "python"})
+    assert stack.resolve(state)["backend"] == "python"

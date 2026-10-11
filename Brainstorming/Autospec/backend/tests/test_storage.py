@@ -106,6 +106,16 @@ def test_save_state_swallows_persistent_lock(monkeypatch):
     assert list(settings.workspace_root.rglob("*.tmp")) == []
 
 
+def test_required_checkpoint_rejects_persistent_lock(monkeypatch):
+    def locked(src, dst):
+        raise PermissionError("locked")
+    monkeypatch.setattr(storage.os, "replace", locked)
+    monkeypatch.setattr(storage.time, "sleep", lambda *_: None)
+    with pytest.raises(storage.PersistenceError, match="Checkpoint non persisté"):
+        storage.save_state_checkpoint("required", "{}")
+    assert list(settings.workspace_root.rglob("*.tmp")) == []
+
+
 def test_atomic_write_temp_lives_outside_the_workspace(monkeypatch):
     """Regression: the atomic-write temp must NOT be created inside the project
     workspace. A transient ``autospec-state.json.*.tmp`` there leaks into
