@@ -237,11 +237,9 @@ async def _arecover_projects() -> None:
     event loop, so M2 resume timers are armed and `pipelines` is mutated
     race-free (recover_projects is synchronous — atomic w.r.t. other loop tasks).
 
-    Between the two, the workspace orphan sweep (ORPHAN_SWEEP_ON_BOOT) reaps the
-    process trees a previous backend leaked, BEFORE any recovered project can
-    re-arm a resume timer and meet a port those orphans still hold."""
+    An unknown legacy process is never killed by path or port. Interrupted
+    workers are reconciled without restarting provider calls or other projects."""
     states = await asyncio.to_thread(list_states)
-    await _asweep_workspace_orphans()
     recover_projects(states)
     for pipeline in list(pipelines.values()):
         if pipeline.state.deployed_container or pipeline.state.deploy_status:

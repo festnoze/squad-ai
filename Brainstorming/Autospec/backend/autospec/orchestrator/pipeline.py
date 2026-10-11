@@ -9455,21 +9455,8 @@ class Pipeline:
             if self._port_is_free(port):
                 return True, ""
             await asyncio.sleep(0.5)
-        # Le port est tenu : si c'est par un orphelin de l'USINE — n'importe quel
-        # process lancé depuis ``workspace/`` (smoke-run fuité d'un AUTRE projet
-        # inclus, finding 13), jamais un vrai tiers — on le tue et on re-teste.
-        killed = await asyncio.to_thread(
-            self._kill_workspace_port_holders, port, Path(settings.workspace_root)
-        )
-        if killed:
-            self._log(
-                source,
-                f"♻️ {killed} processus orphelin(s) du workspace tué(s) sur :{port}.",
-            )
-            for _ in range(6):
-                if self._port_is_free(port):
-                    return True, ""
-                await asyncio.sleep(0.5)
+        # A path, port or executable name does not prove ownership. Owned
+        # handles/jobs were stopped above; never sweep an unknown listener.
         detail = (
             f"port :{port} déjà occupé par un process externe — "
             f"vérification impossible"
@@ -9507,180 +9494,23 @@ class Pipeline:
 
     @staticmethod
     def _kill_workspace_port_holders(port: int, ws: Path) -> int:
-        """Kill the process TREES of this workspace that hold ``port`` — from
-        their topmost workspace ancestor (supervisor included), never a third
-        party. By construction a process whose command line points inside ``ws``
-        is this project's own orphan (leaked smoke run, uvicorn reload
-        supervisor…). Returns the number of trees killed. Best-effort, never
-        raises."""
-        needle = str(ws).lower()
-        killed = 0
-        try:
-            if os.name == "nt":
-                script = (
-                    f"$l = Get-NetTCPConnection -LocalPort {int(port)} -State Listen "
-                    "-ErrorAction SilentlyContinue | "
-                    "Select-Object -ExpandProperty OwningProcess -Unique; "
-                    "'LISTEN:' + ($l -join ','); "
-                    "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
-                    "Where-Object { $_.CommandLine -and "
-                    f"$_.CommandLine.ToLower().Contains('{needle}') }} | "
-                    "ForEach-Object { \"$($_.ProcessId)|$($_.ParentProcessId)\" }"
-                )
-                proc = subprocess.run(
-                    ["powershell", "-NoProfile", "-Command", script],
-                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                    text=True, encoding="utf-8", errors="replace", timeout=25,
-                )
-                listeners: list[int] = []
-                workspace_procs: dict[int, int] = {}
-                for line in (proc.stdout or "").splitlines():
-                    line = line.strip()
-                    if line.startswith("LISTEN:"):
-                        listeners = [
-                            int(p) for p in line[len("LISTEN:"):].split(",")
-                            if p.strip().isdigit()
-                        ]
-                    elif "|" in line:
-                        pid_s, _, ppid_s = line.partition("|")
-                        if pid_s.strip().isdigit() and ppid_s.strip().isdigit():
-                            workspace_procs[int(pid_s)] = int(ppid_s)
-                for top in Pipeline._topmost_workspace_ancestors(listeners, workspace_procs):
-                    subprocess.run(
-                        ["taskkill", "/PID", str(top), "/T", "/F"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                        check=False, timeout=15,
-                    )
-                    killed += 1
-            else:
-                lsof = subprocess.run(
-                    ["lsof", "-ti", f"tcp:{int(port)}", "-sTCP:LISTEN"],
-                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                    text=True, timeout=20,
-                )
-                listeners = [int(p) for p in (lsof.stdout or "").split() if p.isdigit()]
-                ps = subprocess.run(
-                    ["ps", "-eo", "pid=,ppid=,command="],
-                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                    text=True, timeout=20,
-                )
-                workspace_procs = {}
-                for line in (ps.stdout or "").splitlines():
-                    parts = line.split(None, 2)
-                    if len(parts) == 3 and parts[0].isdigit() and parts[1].isdigit() \
-                            and needle in parts[2].lower():
-                        workspace_procs[int(parts[0])] = int(parts[1])
-                for top in Pipeline._topmost_workspace_ancestors(listeners, workspace_procs):
-                    # Kill the whole subtree: children first via pkill -P, then top.
-                    subprocess.run(["pkill", "-9", "-P", str(top)], check=False, timeout=10)
-                    subprocess.run(["kill", "-9", str(top)], check=False, timeout=10)
-                    killed += 1
-        except Exception:  # noqa: BLE001 — cleanup must never break a gate
-            return killed
-        return killed
+        """Port/path matching is not process ownership. Never terminate unknown PIDs.
+
+        Compatibility no-op for legacy callers. New workers own suspended
+        process handles/jobs or labeled containers; only those may be stopped.
+        Unknown legacy orphans are reported as infra and require explicit action.
+        """
+        return 0
 
     @staticmethod
     def _sweep_workspace_orphans(ws_root: Path) -> int:
-        """Kill every leftover factory process whose command line points INSIDE
-        ``ws_root``, starting from its TOPMOST workspace ancestor (supervisors
-        included). Returns the number of trees killed.
+        """A server restart must reconcile state, not kill other projects by path.
 
-        This completes fixes #10/#13 (FACTORY_IMPROVEMENTS). The port-scoped
-        killer only reaps what holds the ONE port a gate is about to use, so a
-        backend that died, or a repair agent that bypassed its own cleanup,
-        leaves smoke runs, uvicorn reload supervisors and dev servers behind.
-        They resurface much later as an "infra" park on an unrelated project.
-        Called at boot, when nothing of ours is running yet: anything under the
-        workspace root is an orphan by construction.
-
-        Safety, in this order:
-
-        * only a process whose command line CONTAINS the resolved workspace root
-          is ever a candidate (never a third party);
-        * the current process AND its whole ancestor chain are removed from the
-          candidate map first, so the sweep can never kill the backend running
-          it (nor the shell or IDE that launched it) even if their command line
-          happens to mention the workspace;
-        * the remaining candidates are collapsed to their topmost workspace
-          ancestor, so a reload supervisor cannot respawn a worker we just
-          killed.
-
-        Best-effort: any failure returns what was already killed, never raises.
+        Compatibility no-op for legacy callers. New workers own suspended
+        process handles/jobs or labeled containers; only those may be stopped.
+        Unknown legacy orphans are reported as infra and require explicit action.
         """
-        # os.path (not pathlib) on purpose: the needle must be resolvable with
-        # the HOST's path flavour even when the caller passed a relative root.
-        needle = os.path.realpath(str(ws_root)).lower()
-        killed = 0
-        try:
-            parents: dict[int, int] = {}
-            workspace_procs: dict[int, int] = {}
-            if os.name == "nt":
-                quoted = needle.replace("'", "''")
-                script = (
-                    "Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | "
-                    "ForEach-Object { $c = $_.CommandLine; $w = 0; "
-                    f"if ($c -and $c.ToLower().Contains('{quoted}')) {{ $w = 1 }}; "
-                    '"$($_.ProcessId)|$($_.ParentProcessId)|$w" }'
-                )
-                proc = subprocess.run(
-                    ["powershell", "-NoProfile", "-Command", script],
-                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                    text=True, encoding="utf-8", errors="replace", timeout=40,
-                )
-                for line in (proc.stdout or "").splitlines():
-                    parts = line.strip().split("|")
-                    if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
-                        continue
-                    pid, ppid = int(parts[0]), int(parts[1])
-                    parents[pid] = ppid
-                    if parts[2].strip() == "1":
-                        workspace_procs[pid] = ppid
-            else:
-                ps = subprocess.run(
-                    ["ps", "-eo", "pid=,ppid=,command="],
-                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                    text=True, timeout=30,
-                )
-                for line in (ps.stdout or "").splitlines():
-                    parts = line.split(None, 2)
-                    if len(parts) != 3 or not parts[0].isdigit() or not parts[1].isdigit():
-                        continue
-                    pid, ppid = int(parts[0]), int(parts[1])
-                    parents[pid] = ppid
-                    if needle in parts[2].lower():
-                        workspace_procs[pid] = ppid
-            protected = {os.getpid()}
-            cursor = os.getpid()
-            while True:
-                parent = parents.get(cursor)
-                if parent is None or parent in protected:
-                    break
-                protected.add(parent)
-                cursor = parent
-            workspace_procs = {
-                pid: ppid for pid, ppid in workspace_procs.items()
-                if pid not in protected
-            }
-            if not workspace_procs:
-                return 0
-            tops = Pipeline._topmost_workspace_ancestors(
-                sorted(workspace_procs), workspace_procs
-            )
-            for top in tops:
-                if os.name == "nt":
-                    subprocess.run(
-                        ["taskkill", "/PID", str(top), "/T", "/F"],
-                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                        check=False, timeout=15,
-                    )
-                else:
-                    # SIGTERM the subtree (children first, then the supervisor).
-                    subprocess.run(["pkill", "-15", "-P", str(top)], check=False, timeout=10)
-                    subprocess.run(["kill", "-15", str(top)], check=False, timeout=10)
-                killed += 1
-        except Exception:  # noqa: BLE001 - a boot sweep must never break startup
-            return killed
-        return killed
+        return 0
 
     async def _asmoke_phase(self) -> bool:
         """Deterministic runnability gate (``SMOKE_RUN``): once the suite

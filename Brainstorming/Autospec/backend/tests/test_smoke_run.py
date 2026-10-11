@@ -283,11 +283,8 @@ def test_topmost_workspace_ancestors_walks_to_supervisor():
     assert Pipeline._topmost_workspace_ancestors([10], {10: 11, 11: 10}) == [11]
 
 
-async def test_port_held_by_own_orphan_is_killed_and_freed(monkeypatch):
-    """Finding 10 : un orphelin de NOTRE workspace (smoke-run fuité, superviseur
-    uvicorn reload) qui tient le port est tué et le gate continue — il n'est
-    jamais classé « process externe » (l'infra-park était systématique sous
-    Windows pour les projets web)."""
+async def test_unknown_port_holder_is_preserved_and_blocks_gate(monkeypatch):
+    """A matching workspace path does not prove creation-time ownership."""
     state = _state_with_done_story("smoke-own-orphan")
     _scaffold(workspace_dir(state.id), web=True)
 
@@ -300,11 +297,7 @@ async def test_port_held_by_own_orphan_is_killed_and_freed(monkeypatch):
         return free_after_kill["killed"]
 
     def _kill(port, ws):
-        # Finding 13 : la needle couvre TOUT le workspace root de l'usine —
-        # l'orphelin d'un AUTRE projet doit aussi être nettoyé.
-        assert str(ws) == str(Path(settings.workspace_root))
-        free_after_kill["killed"] = True
-        return 1
+        pytest.fail("never kill another project by workspace path")
 
     monkeypatch.setattr(Pipeline, "astop_app", _stop)
     monkeypatch.setattr(Pipeline, "_port_is_free", staticmethod(_port_is_free))
@@ -312,8 +305,8 @@ async def test_port_held_by_own_orphan_is_killed_and_freed(monkeypatch):
     pipeline = Pipeline(state, ScriptedRunner())
 
     free, detail = await pipeline._aensure_own_port_free("smoke", 8000)
-    assert free is True and detail == ""
-    assert free_after_kill["killed"] is True
+    assert free is False and "process externe" in detail
+    assert free_after_kill["killed"] is False
 
 
 async def test_smoke_launch_impossible_is_infra_not_repair(monkeypatch):
