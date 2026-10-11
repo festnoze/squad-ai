@@ -48,7 +48,6 @@ from __future__ import annotations
 
 import ast
 import re
-import sys
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -111,12 +110,12 @@ def build_prompt(*, brief: str, project_name: str = "", max_rules: int = 8) -> s
         "  - kind=test: provide `check_code` = a self-contained, runnable pytest "
         "module (at least one `test_*` function or `Test*` class) that FAILS when "
         "the rule is violated. It must import only what it needs and run standalone.\n"
-        "    INCREMENTAL-BUILD CONTRACT: the test runs from the very FIRST build "
-        "task on an almost-empty workspace. While its target (app, module, "
-        "endpoint) does not exist yet it must SKIP cleanly (pytest.skip / "
-        "pytest.importorskip), NEVER fail: a failure must always mean a genuine "
-        "VIOLATION, not a missing precondition. Never raise (RuntimeError etc.) "
-        "when a dynamic import fails - skip instead.\n"
+        "    FAIL-CLOSED CONTRACT: a missing required module/dependency is a "
+        "failed precondition, NEVER evidence of conformance. Do not use "
+        "pytest.importorskip or convert ImportError into a skip to hide a "
+        "required dependency. The coordinator schedules these tests after "
+        "their declared prerequisites are built. Legitimate platform skips "
+        "require an explicit independently reviewed allowance.\n"
         "  - kind=command: provide `check_cmd` = a shell command that must exit 0 "
         "when the rule holds.\n"
         "  - kind=advisory: only when the rule genuinely cannot be made executable.\n"
@@ -198,60 +197,14 @@ async def aderive_constitution(
 _TESTS_DIR = "tests/constitution"
 _SANITIZE_RE = re.compile(r"[^a-z0-9]+")
 
-#: Deterministic skip valve seeded NEXT TO the compiled tests (D1/D3, run
-#: supervisé 2026-07-20). The compiled tests assert END-STATE properties but ride
-#: the suite from the very first incremental task: while the target app/module
-#: does not exist yet, an import-rooted failure is a MISSING PRECONDITION, never
-#: a violation. The ``importorskip`` guard only covers static third-party
-#: imports - a dynamic ``importlib`` helper that wraps the miss in RuntimeError
-#: (the observed ``test_api_namespace`` pattern) falls through and dooms the
-#: first tasks to red, which both wastes dev attempts and INCENTIVIZES the dev
-#: to fake the end state. This conftest converts any constitution-test failure
-#: rooted in ImportError/ModuleNotFoundError (chained OR embedded in the
-#: message) into a clean SKIP. Real violations (AssertionError…) still fail.
+#: Keep a protected support file for existing state/path compatibility, but
+#: REM-06 removes the historical automatic ImportError-to-SKIP conversion.
 CONFTEST_PATH = f"{_TESTS_DIR}/conftest.py"
 CONFTEST_CONTENT = '''\
 # Constitution support - auto-compiled: do NOT edit or delete (W2/W5 protected).
-# Soupape d'incrémentalité : tant que la cible d'un test constitution n'existe
-# pas encore (app/module pas construit à ce stade du build), un échec enraciné
-# dans un import manquant devient un SKIP propre. Une vraie violation
-# (AssertionError…) reste un échec.
-
-import pytest
-
-
-def _import_rooted(exc: BaseException | None) -> bool:
-    seen: set[int] = set()
-    while exc is not None and id(exc) not in seen:
-        seen.add(id(exc))
-        if isinstance(exc, ImportError):
-            return True
-        exc = exc.__cause__ or exc.__context__
-    return False
-
-
-@pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item, call):
-    outcome = yield
-    report = outcome.get_result()
-    if report.when not in ("setup", "call") or not report.failed:
-        return
-    excinfo = call.excinfo
-    if excinfo is None:
-        return
-    value = excinfo.value
-    message = str(value)
-    rooted = _import_rooted(value) or (
-        "modulenotfounderror" in message.lower() or "importerror" in message.lower()
-    )
-    if rooted:
-        report.outcome = "skipped"
-        report.longrepr = (
-            str(getattr(item, "fspath", "")),
-            0,
-            "SKIP constitution : précondition pas encore construite "
-            f"(import impossible - {message[:120]})",
-        )
+# REM-06: never turn missing required imports into green/skipped evidence.
+# Prerequisite scheduling and reviewed platform allowances belong to the
+# supervisor's integrity gate, not to an exception-masking pytest hook.
 '''
 
 
@@ -259,7 +212,8 @@ def is_runnable_pytest(source: str) -> bool:
     """Whether ``source`` is real, runnable pytest.
 
     Requires the source to parse (no ``SyntaxError``) AND to contain at least one
-    ``test_*`` function (module-level or nested in a class) or a ``Test*`` class.
+    module-level ``test_*`` function or such a method in a ``Test*`` class.
+    This is a syntax filter, not a replacement for real trusted collection.
     Empty / non-string / syntactically broken source → ``False``.
     """
     if not source or not isinstance(source, str) or not source.strip():
@@ -269,10 +223,13 @@ def is_runnable_pytest(source: str) -> bool:
     except SyntaxError:
         return False
 
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test"):
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("test_"):
             return True
-        if isinstance(node, ast.ClassDef) and node.name.startswith("Test"):
+        if isinstance(node, ast.ClassDef) and node.name.startswith("Test") and any(
+            isinstance(method, (ast.FunctionDef, ast.AsyncFunctionDef)) and method.name.startswith("test_")
+            for method in node.body
+        ):
             return True
     return False
 
@@ -281,37 +238,6 @@ def _sanitize_id(rule_id: str) -> str:
     """Turn a rule id into a safe file stem, e.g. ``No SQL Injection!`` → ``no_sql_injection``."""
     slug = _SANITIZE_RE.sub("_", str(rule_id).strip().lower()).strip("_")
     return slug or "rule"
-
-
-def _thirdparty_roots(source: str) -> list[str]:
-    """Every imported root module of ``source`` that is neither stdlib nor
-    ``pytest`` — wherever the import lives (top-level OR nested in a helper /
-    fixture / test body: the agent often writes ``def _client(): from
-    fastapi.testclient import TestClient`` and a nested import raises at RUN
-    time instead of collection time — same red suite, same cascade).
-
-    A constitution test is compiled right after SPEC, BEFORE any story has added
-    its dependencies to the workspace ``pyproject.toml``. Every third-party root
-    found gets a module-level ``pytest.importorskip`` guard: the whole invariant
-    file SKIPS until the dependency lands, then activates automatically."""
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return []
-    stdlib = getattr(sys, "stdlib_module_names", frozenset())
-    roots: list[str] = []
-    for node in ast.walk(tree):  # ALL imports, nested included
-        if isinstance(node, ast.Import):
-            names = [alias.name for alias in node.names]
-        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-            names = [node.module]
-        else:
-            continue
-        for name in names:
-            root = name.split(".")[0]
-            if root and root not in stdlib and root != "pytest" and root not in roots:
-                roots.append(root)
-    return roots
 
 
 def render_pytest_file(rule: dict) -> "tuple[str, str] | None":
@@ -336,18 +262,7 @@ def render_pytest_file(rule: dict) -> "tuple[str, str] | None":
         f"# {statement}\n"
         "# Auto-compiled — immutable: do NOT edit or delete (W2/W5 protected).\n\n"
     )
-    guard = ""
-    roots = _thirdparty_roots(check_code)
-    if roots:
-        skips = "\n".join(f'pytest.importorskip("{root}")' for root in roots)
-        guard = (
-            "import pytest\n\n"
-            "# Dépendances potentiellement pas encore livrées à ce stade du build :\n"
-            "# SKIP propre (pas d'échec de collecte) — l'invariant s'active dès\n"
-            "# qu'elles arrivent dans le pyproject du workspace.\n"
-            f"{skips}\n\n"
-        )
-    content = header + guard + check_code.rstrip() + "\n"
+    content = header + check_code.rstrip() + "\n"
     return path, content
 
 
@@ -360,7 +275,7 @@ def compile_rules(rules: list[dict]) -> dict:
             "tests":    [(path, content), ...],   # kind=test, runnable
             "commands": [(id, cmd), ...],          # kind=command with a check_cmd
             "advisory": [rule, ...],               # kind=advisory + DEMOTED tests
-            "support":  [(path, content), ...],   # skip-valve conftest (with tests)
+            "support":  [(path, content), ...],   # protected support (with tests)
         }
 
     A ``kind=test`` rule whose ``check_code`` is not runnable pytest is **demoted**
@@ -393,7 +308,7 @@ def compile_rules(rules: list[dict]) -> dict:
             # kind=advisory (and any unexpected kind) → advisory guidance.
             advisory.append(rule)
 
-    # The skip valve only ships when there ARE compiled tests to guard.
+    # The compatibility support file only ships when compiled tests exist.
     support: list[tuple[str, str]] = (
         [(CONFTEST_PATH, CONFTEST_CONTENT)] if tests else []
     )

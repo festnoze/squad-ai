@@ -92,11 +92,33 @@ def parse_results(language: str, stdout: str, report_path: str) -> dict[str, str
     if lang == "rust":
         return _parse_rust(stdout)
     if lang == "node":
-        return {
-            m.group(2).strip(): "failed" if m.group(1) else "passed"
-            for m in re.finditer(r"^\s*(not )?ok \d+ - (.+)$", stdout, re.MULTILINE)
-        }
+        from .test_integrity import tap_evidence
+        return tap_evidence(stdout, 0).outcomes
     return pytest_report.parse(report_path)
+
+
+def suite_evidence(language: str, stdout: str, report_path: str, exit_code: int):
+    """REM-06: full collection/skip evidence, not just exit status.
+
+    Feed this into test_integrity.evaluate_run with a supervisor-owned baseline
+    before allowing GREEN. Python and Node/Vitest have strict report adapters;
+    other stacks retain results but still require an explicit critical baseline.
+    """
+    from .test_integrity import SuiteEvidence, pytest_evidence, tap_evidence, vitest_evidence
+    if is_frontend(language):
+        return vitest_evidence(report_path, exit_code)
+    lang = normalize(language)
+    if lang == "python":
+        return pytest_evidence(report_path, exit_code)
+    if lang == "node":
+        return tap_evidence(stdout, exit_code)
+    results = parse_results(language, stdout, report_path)
+    return SuiteEvidence(results, len(results), exit_code, report_valid=bool(results))
+
+
+def clean_test_command(environment, report_path: str, *, frontend: bool = False) -> list[str]:
+    """Use only the attested environment; never ``uv run`` or online npm exec."""
+    return environment.test_command(report_path, frontend=frontend, node_cmd=settings.node_cmd)
 
 
 # --------------------------------------------------------- Frontend (ST-6)

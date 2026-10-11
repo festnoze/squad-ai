@@ -59,10 +59,8 @@ def test_render_pytest_file_valid_rule():
     assert "def test_no_raw_sql():" in content
 
 
-def test_render_pytest_file_guards_thirdparty_imports():
-    """A check_code with hard third-party imports gets pytest.importorskip guards
-    BEFORE the imports: compiled right after SPEC, the dependency may not have
-    been delivered yet — the invariant must SKIP, not break suite collection."""
+def test_render_pytest_file_does_not_mask_required_thirdparty_imports():
+    """Required dependencies stay required; missing imports must not prove GREEN."""
     rule = {
         "id": "health-contract",
         "statement": "GET /api/health returns 200.",
@@ -78,21 +76,13 @@ def test_render_pytest_file_guards_thirdparty_imports():
     result = C.render_pytest_file(rule)
     assert result is not None
     _, content = result
-    guard_fastapi = content.index('pytest.importorskip("fastapi")')
-    guard_httpx = content.index('pytest.importorskip("httpx")')
-    real_import = content.index("from fastapi.testclient import TestClient")
-    assert guard_fastapi < real_import
-    assert guard_httpx < real_import
-    # stdlib and pytest itself are never guarded.
-    assert 'importorskip("importlib")' not in content
-    assert 'importorskip("pytest")' not in content
+    assert "from fastapi.testclient import TestClient" in content
+    assert "import httpx" in content
+    assert "importorskip" not in content
 
 
-def test_render_pytest_file_guards_nested_imports_too():
-    """The agent often nests the third-party import in a helper (``def _client():
-    from fastapi.testclient import TestClient``): it then raises at RUN time
-    instead of collection time — same red suite. Nested imports must also
-    trigger the module-level importorskip guard."""
+def test_render_pytest_file_does_not_mask_nested_imports():
+    """A nested required import retains its real runtime failure."""
     rule = {
         "id": "title-required",
         "statement": "422 on missing title.",
@@ -109,9 +99,8 @@ def test_render_pytest_file_guards_nested_imports_too():
     result = C.render_pytest_file(rule)
     assert result is not None
     _, content = result
-    assert 'pytest.importorskip("fastapi")' in content
-    # Guard sits at module level, BEFORE the function defs.
-    assert content.index('importorskip("fastapi")') < content.index("def _client")
+    assert "from fastapi.testclient import TestClient" in content
+    assert "importorskip" not in content
 
 
 def test_render_pytest_file_stdlib_only_has_no_guard():
@@ -220,19 +209,17 @@ def test_conftest_valve_is_valid_python():
     import ast as _ast
 
     _ast.parse(C.CONFTEST_CONTENT)
-    assert "pytest_runtest_makereport" in C.CONFTEST_CONTENT
+    assert "pytest_runtest_makereport" not in C.CONFTEST_CONTENT
 
 
-def test_build_prompt_states_incremental_skip_contract():
+def test_build_prompt_states_fail_closed_contract():
     prompt = C.build_prompt(brief="a web app")
-    assert "INCREMENTAL-BUILD CONTRACT" in prompt
-    assert "SKIP" in prompt
+    assert "FAIL-CLOSED CONTRACT" in prompt
+    assert "failed precondition" in prompt
 
 
-def test_conftest_valve_converts_import_rooted_failure_to_skip(tmp_path):
-    """Functional proof: a constitution-style test that wraps a missing-module
-    error in RuntimeError (the observed ``test_api_namespace`` pattern) SKIPS
-    under the valve, while a genuine violation (AssertionError) still FAILS."""
+def test_conftest_does_not_convert_import_failure_to_skip(tmp_path):
+    """Both missing preconditions and violated invariants remain non-green."""
     import subprocess
     import sys
 
@@ -260,7 +247,7 @@ def test_conftest_valve_converts_import_rooted_failure_to_skip(tmp_path):
         cwd=str(tmp_path),
     )
     out = proc.stdout + proc.stderr
-    assert "1 failed" in out and "1 skipped" in out, out
+    assert "2 failed" in out and "skipped" not in out, out
 
 
 # --------------------------------------------------------------------------- #
