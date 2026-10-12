@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="2" time="183.343" timestamp="2026-10-12T12:53:46.301585+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_bootstrap_browser_real" name="test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser[frontend]" time="95.895"><failure message="AssertionError: Préflight isolé : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm error Cannot read properties of null (reading 'edgesOut')&#10;  npm notice&#10;  npm notice New major version of npm available! 10.9.9 -&gt; 12.2.0&#10;  npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0&#10;  npm notice To update run: npm install -g npm@12.2.0&#10;  npm notice&#10;  npm error A complete log of this run can be found in: /tmp/.npm/_logs/2026-10-12T10_53_55_267Z-debug-0.log&#10;  &#10;assert False&#10; +  where False = BootstrapResult(ok=False, detail=&quot;Préflight isolé : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm err...&quot;, skipped=False, infra=True, fingerprint='54207a011159a5eaab67f6b99d65f42f890c5fd2ee6869fe590a27658b885258', files=()).ok">tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-rem-dependencies/squad-ai/Brainstorming/Autospec/artifacts/remediation/REM-04/20261012-frontend-upgrade/native-work-v1/test_real_frontend_bootstrap_r0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000002679884C510&gt;
+kind = 'frontend'
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_DOCKER_BOOTSTRAP_BROWSER")!="1",reason="explicit real frontend bootstrap opt-in")
+    @pytest.mark.parametrize("kind",["frontend","fullstack"])
+    async def test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser(tmp_path,monkeypatch,kind):
+        state=SimpleNamespace(id="isolated-browser-bootstrap",name="Isolated frontend bootstrap",streams=[],
+            brownfield_path="",product_profile="auto",backend_language=SimpleNamespace(value="python"),
+            technical_stack=dict(backend="none" if kind=="frontend" else "python",framework="none" if kind=="frontend" else "fastapi",
+                frontend="react",database="none" if kind=="frontend" else "sqlite",kind=kind))
+        monkeypatch.setattr(workspace,"workspace_dir",lambda _:tmp_path)
+        workspace.scaffold(state,streams_enabled=False,ui_tests_enabled=False)
+        result=bootstrap.prepare(state,tmp_path);assert result.ok,result.detail
+        receipts=[]
+        original=PlaywrightHarness.close
+        async def retained_close(self):
+            receipt=dict(self.browser_environment)
+            await original(self)
+            receipts.append(receipt)
+        monkeypatch.setattr(PlaywrightHarness,"close",retained_close)
+        verified=await bootstrap.verify(state,tmp_path,timeout_s=300)
+&gt;       assert verified.ok,verified.detail
+E       AssertionError: Préflight isolé : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm error Cannot read properties of null (reading 'edgesOut')
+E         npm notice
+E         npm notice New major version of npm available! 10.9.9 -&gt; 12.2.0
+E         npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+E         npm notice To update run: npm install -g npm@12.2.0
+E         npm notice
+E         npm error A complete log of this run can be found in: /tmp/.npm/_logs/2026-10-12T10_53_55_267Z-debug-0.log
+E         
+E       assert False
+E        +  where False = BootstrapResult(ok=False, detail="Préflight isolé : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm err...", skipped=False, infra=True, fingerprint='54207a011159a5eaab67f6b99d65f42f890c5fd2ee6869fe590a27658b885258', files=()).ok
+
+tests\test_bootstrap_browser_real.py:31: AssertionError</failure></testcase><testcase classname="tests.test_bootstrap_browser_real" name="test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser[fullstack]" time="84.493"><failure message="AssertionError: Préflight isolé : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm error Cannot read properties of null (reading 'edgesOut')&#10;  npm notice&#10;  npm notice New major version of npm available! 10.9.9 -&gt; 12.2.0&#10;  npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0&#10;  npm notice To update run: npm install -g npm@12.2.0&#10;  npm notice&#10;  npm error A complete log of this run can be found in: /tmp/.npm/_logs/2026-10-12T10_55_35_298Z-debug-0.log&#10;  &#10;assert False&#10; +  where False = BootstrapResult(ok=False, detail=&quot;Préflight isolé : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm err...&quot;, skipped=False, infra=True, fingerprint='2a8c50db70023f4d1db7d608679c94c410e1ce0bed33ecc8ff398dcaa10c222f', files=()).ok">tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-rem-dependencies/squad-ai/Brainstorming/Autospec/artifacts/remediation/REM-04/20261012-frontend-upgrade/native-work-v1/test_real_frontend_bootstrap_r1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000026799AAED50&gt;
+kind = 'fullstack'
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_DOCKER_BOOTSTRAP_BROWSER")!="1",reason="explicit real frontend bootstrap opt-in")
+    @pytest.mark.parametrize("kind",["frontend","fullstack"])
+    async def test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser(tmp_path,monkeypatch,kind):
+        state=SimpleNamespace(id="isolated-browser-bootstrap",name="Isolated frontend bootstrap",streams=[],
+            brownfield_path="",product_profile="auto",backend_language=SimpleNamespace(value="python"),
+            technical_stack=dict(backend="none" if kind=="frontend" else "python",framework="none" if kind=="frontend" else "fastapi",
+                frontend="react",database="none" if kind=="frontend" else "sqlite",kind=kind))
+        monkeypatch.setattr(workspace,"workspace_dir",lambda _:tmp_path)
+        workspace.scaffold(state,streams_enabled=False,ui_tests_enabled=False)
+        result=bootstrap.prepare(state,tmp_path);assert result.ok,result.detail
+        receipts=[]
+        original=PlaywrightHarness.close
+        async def retained_close(self):
+            receipt=dict(self.browser_environment)
+            await original(self)
+            receipts.append(receipt)
+        monkeypatch.setattr(PlaywrightHarness,"close",retained_close)
+        verified=await bootstrap.verify(state,tmp_path,timeout_s=300)
+&gt;       assert verified.ok,verified.detail
+E       AssertionError: Préflight isolé : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm error Cannot read properties of null (reading 'edgesOut')
+E         npm notice
+E         npm notice New major version of npm available! 10.9.9 -&gt; 12.2.0
+E         npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+E         npm notice To update run: npm install -g npm@12.2.0
+E         npm notice
+E         npm error A complete log of this run can be found in: /tmp/.npm/_logs/2026-10-12T10_55_35_298Z-debug-0.log
+E         
+E       assert False
+E        +  where False = BootstrapResult(ok=False, detail="Préflight isolé : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm err...", skipped=False, infra=True, fingerprint='2a8c50db70023f4d1db7d608679c94c410e1ce0bed33ecc8ff398dcaa10c222f', files=()).ok
+
+tests\test_bootstrap_browser_real.py:31: AssertionError</failure></testcase></testsuite></testsuites>
