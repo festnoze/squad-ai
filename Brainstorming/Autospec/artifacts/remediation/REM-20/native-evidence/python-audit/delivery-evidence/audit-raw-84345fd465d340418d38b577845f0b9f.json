@@ -1,0 +1,95 @@
+{
+  "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "snapshot_hash": "bb4f8eb1770409b1c3186fdce800c03c01420b54061f0fe213577f4821ee8f47",
+  "value": {
+    "builder_argv": [
+      "docker",
+      "build",
+      "--pull=false",
+      "--network=default",
+      "--no-cache",
+      "-t",
+      "autospec/dependency-audit:2586e547900b4354bfee39645bb86def",
+      "."
+    ],
+    "builder_return_code": 0,
+    "context_files": {
+      "Dockerfile": "63bd5a20dbb6a798c8bd3841be0c7039ceb34a5dafba5fd3109dd152eed9590e",
+      "requirements.txt": "34dad040ccf17e7a72283685d2d61004ff408264b507cf11c426cadb92b86a6e",
+      "runner.py": "a3b69018530d6e341db2518fa9953e3426ba198d073c3c6df2e16b4518640307"
+    },
+    "declared_network": "manifest-only registry advisory query; no product code",
+    "ecosystem": "python",
+    "export_argv": [
+      "docker",
+      "run",
+      "--rm",
+      "--name",
+      "autospec-sandbox-1dbb21f6b0ee42d08cb89fb984a88920",
+      "--label",
+      "autospec.run_id=5ef49d0fda9a4a74ac253f5019e6dec9",
+      "--label",
+      "autospec.kind=sandbox",
+      "--pull",
+      "never",
+      "--network",
+      "none",
+      "--read-only",
+      "--cap-drop",
+      "ALL",
+      "--security-opt",
+      "no-new-privileges=true",
+      "--user",
+      "65532:65532",
+      "--pids-limit",
+      "32",
+      "--memory",
+      "128m",
+      "--workdir",
+      "/tmp",
+      "--entrypoint",
+      "/usr/local/bin/python",
+      "sha256:48986ebe25e339630f84893a55e750646111213ff2cb15c12ef25ca1579bfdfa",
+      "-I",
+      "-c",
+      "from pathlib import Path;print(Path('/audit/result.json').read_text())"
+    ],
+    "export_return_code": 0,
+    "image_id": "sha256:48986ebe25e339630f84893a55e750646111213ff2cb15c12ef25ca1579bfdfa",
+    "inputs": [
+      [
+        "idna",
+        "3.10"
+      ]
+    ],
+    "lock_sha256": "fa04cdb6fd3bf3f2d5cb05dc413691454e894c1c6dcef96e20da82e78a9b8c2a",
+    "manifest_sha256": "a34e3baab98685d350c221ac360c85462d7068085f71c5b2c0bc0bb6012f2da2",
+    "recipe_sha256": "2e6201e75bae78abbe322f2c25fb1d91b597eabc135f456eee604069a7f93608",
+    "run": {
+      "argv": [
+        "/opt/auditor/bin/python",
+        "-I",
+        "-m",
+        "pip_audit",
+        "--no-deps",
+        "--disable-pip",
+        "--strict",
+        "--progress-spinner",
+        "off",
+        "--format",
+        "json",
+        "--requirement",
+        "/audit/requirements.txt"
+      ],
+      "date": "2026-10-12T09:13:02.209627+00:00",
+      "return_code": 1,
+      "seconds": 1.546814811998047,
+      "stderr": "WARNING:pip_audit._cli:--no-deps is supported, but users are encouraged to fully hash their pinned dependencies\nWARNING:pip_audit._cli:Consider using a tool like `pip-compile`: https://pip-tools.readthedocs.io/en/latest/#using-hashes\nFound 2 known vulnerabilities in 1 package\n",
+      "stdout": "{\"dependencies\": [{\"name\": \"idna\", \"version\": \"3.10\", \"vulns\": [{\"id\": \"PYSEC-2026-215\", \"fix_versions\": [\"3.15\"], \"aliases\": [\"GHSA-65pc-fj4g-8rjx\", \"CVE-2026-45409\"], \"description\": \"This is the same issue as CVE-2024-3651, however the original remediation in 2024 was not a complete fix. Payloads such as `\\\"\\\\u0660\\\" * N` or `\\\"\\\\u30fb\\\" * N + \\\"\\\\u6f22\\\"` utilize the `valid_contexto` function prior to length rejection, and for high values of `N` will take a long time to process.  ### Impact A specially crafted argument to the `idna.encode()` function could consume significant resources. This may lead to a denial-of-service.  ### Patches Starting in version 3.14, the function rejects long inputs as soon as practicable prior to any further processing to minimize resource consumption. In version 3.15, this approach was extended to lesser used alternate functions (i.e. per-label conversions and codec support).  ### Workarounds Domain names cannot exceed 253 characters in length, if this length limit is enforced prior to passing the domain to the `idna.encode()` function it should no longer consume significant resources. This is triggered by arbitrarily large inputs that would not occur in normal usage, but may be passed to the library assuming there is no preliminary input validation by the higher-level application.\"}, {\"id\": \"PYSEC-2026-215\", \"fix_versions\": [\"3.15\"], \"aliases\": [\"GHSA-65pc-fj4g-8rjx\", \"CVE-2026-45409\"], \"description\": \"Internationalized Domain Names in Applications (IDNA) for Python provides support for Internationalized Domain Names in Applications (IDNA) and Unicode IDNA Compatibility Processing. In versions prior to 3.15, payloads such as `\\\"\\\\u0660\\\" * N` or `\\\"\\\\u30fb\\\" * N + \\\"\\\\u6f22\\\"` utilize the `valid_contexto` function prior to length rejection, and for high values of `N` will take a long time to process. This is the same issue as CVE-2024-3651, however the original remediation in 2024 was not a complete fix. A specially crafted argument to the `idna.encode()` function could consume significant resources. This may lead to a denial-of-service. Starting in version 3.14, the function rejects long inputs as soon as practicable prior to any further processing to minimize resource consumption. In version 3.15, this approach was extended to lesser used alternate functions (i.e. per-label conversions and codec support). A workaround is available. Domain names cannot exceed 253 characters in length. If this length limit is enforced prior to passing the domain to the `idna.encode()` function, it should no longer consume significant resources. This is triggered by arbitrarily large inputs that would not occur in normal usage, but may be passed to the library assuming there is no preliminary input validation by the higher-level application.\"}]}], \"fixes\": []}\n",
+      "tool": "pip-audit==2.10.1"
+    },
+    "scope": "backend",
+    "toolchain_digest": "ghcr.io/astral-sh/uv@sha256:e5b65587bce7de595f299855d7385fe7fca39b8a74baa261ba1b7147afa78e58",
+    "toolchain_image": "sha256:08337aba8295f5652056fbd3e6f64cb908e8ce2624990ce147995aa34e24a7b1"
+  }
+}

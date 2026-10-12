@@ -1,0 +1,20 @@
+{
+  "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "observations": {
+    "docs_audit": [
+      {
+        "checks": [
+          "OBS:docs_audit"
+        ],
+        "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "detail": "",
+        "passed": true,
+        "path": "C:\\Users\\e.millerioux\\AppData\\Local\\Temp\\pytest-of-e.millerioux\\pytest-3238\\test_real_readme_collects_isol0\\supervisor\\native-observations\\docs_audit-3082d03d1f4a410dbe729b0424be481e.json",
+        "sha256": "403d8c8d174b98c038a3f52b251b4b80399a45088008658ba9231fbcc28cf870",
+        "snapshot_hash": "ad6fda1124e69c5b7149abf402be888f7cc69c003a0a8b1b81b80e91ab32a2f6",
+        "type": "X"
+      }
+    ]
+  },
+  "snapshot_hash": "ad6fda1124e69c5b7149abf402be888f7cc69c003a0a8b1b81b80e91ab32a2f6"
+}
