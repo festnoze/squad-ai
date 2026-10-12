@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "/usr/local/bin/python",
+    "-I",
+    "-S",
+    "-c",
+    "import sys,os,importlib\nfrom pathlib import Path\nif not sys.flags.isolated or not sys.flags.no_site:\n    raise RuntimeError(\"FACTORY_PYTEST_STARTUP_NOT_ISOLATED\")\nreporters=Path(\"/opt/reporters\")\ndependencies=Path(\"/opt/venv/lib/python%d.%d/site-packages\" % sys.version_info[:2])\n# -I -S suppresses cwd, PYTHONPATH and installed .pth/startup hooks. Admit only\n# explicit immutable image directories before loading the test machinery.\nsys.path[:0]=[str(reporters),str(dependencies)]\ndef owned(module,root):\n    file=Path(module.__file__).resolve()\n    if not file.is_relative_to(root.resolve()):\n        raise RuntimeError(\"FACTORY_PYTEST_MODULE_ORIGIN_DIFFER: \"+module.__name__)\n    return module\npytest=owned(importlib.import_module(\"pytest\"),dependencies)\nconfiguration=owned(importlib.import_module(\"_pytest.config\"),dependencies)\nfor name in configuration.default_plugins:\n    owned(importlib.import_module(\"_pytest.\"+name),dependencies)\nplugins=[(\"pytest_jsonreport\",owned(importlib.import_module(\"pytest_jsonreport.plugin\"),reporters)),\n         (\"pytest_cov\",owned(importlib.import_module(\"pytest_cov.plugin\"),reporters))]\nowned(importlib.import_module(\"coverage\"),reporters)\n# Preserve reviewed asynchronous suites when this locked image has asyncio.\n# No implicit install or arbitrary producer entrypoint autoload is allowed.\nif importlib.util.find_spec(\"pytest_asyncio\") is not None:\n    plugins.append((\"asyncio\",owned(importlib.import_module(\"pytest_asyncio.plugin\"),dependencies)))\nos.environ[\"PYTEST_DISABLE_PLUGIN_AUTOLOAD\"]=\"1\"\nos.environ.pop(\"PYTEST_PLUGINS\",None)\nos.environ.pop(\"PYTEST_ADDOPTS\",None)\nclass FactoryPlugins:\n    @pytest.hookimpl\n    def pytest_addhooks(self,pluginmanager):\n        for name,plugin in plugins:\n            pluginmanager.register(plugin,name)\n# Product imports are needed by tests, but may never outrank the image-owned\n# runner/reporters. This is launcher provenance, NOT an in-process Python TEE.\nsys.path.append(\"/app\")\nraise SystemExit(pytest.main(sys.argv[1:],plugins=[FactoryPlugins()]))\n",
+    "--json-report",
+    "--json-report-file=suite-report.json",
+    "--collect-only",
+    "-q",
+    "-o",
+    "addopts=",
+    "--import-mode=append"
+  ],
+  "environment_fingerprint": "ca79f36f835c8ff56ab8bd5ca2e2d016846c4520e83fffc46069c7f12b529759",
+  "environment_preparation": {
+    "ended_at": "2026-10-12T12:52:25.012911+00:00",
+    "phase": "install",
+    "scope": "actual elapsed supervisor action, including attestation/cache checks",
+    "seconds": 9.669013200036716,
+    "started_at": "2026-10-12T12:52:15.344012+00:00"
+  },
+  "image_id": "sha256:6bc10bdb0efed41d371aa6f0448cdb628be8762f6b7a7d3e298afbf9d7a15679",
+  "return_code": 0,
+  "scope": "actual container inner argv and observed return code",
+  "source_fingerprint": "9289bfd2116f2f3a99595d193391018859be209ee795344bae2354335b3d8fcc",
+  "timing": {
+    "ended_at": "2026-10-12T12:52:27.300868+00:00",
+    "phase": "tests",
+    "scope": "actual elapsed supervisor action, including attestation/cache checks",
+    "seconds": 2.2021328000118956,
+    "started_at": "2026-10-12T12:52:25.098760+00:00"
+  }
+}
