@@ -1112,7 +1112,7 @@ class OwnedProductHarnessSession:
             raise AdapterUnavailable("instrumented session requires reviewed ASGI bindings")
         self.runtime=RuntimeSession(stage,image,command,port=self.bindings.internal_port,
             docker=self.docker,application_origin=True,local_cookie_mode=self.bindings.local_cookie_mode,persistent_database=True,
-            mount_stage=self.image_id is None)
+            mount_stage=self.image_id is None,use_image_command=self.image_id is not None)
         try:
             await asyncio.to_thread(self.runtime.__enter__)
             self.harness=ProductHarness(self.runtime,self.bindings,snapshot_root=stage,

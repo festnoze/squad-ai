@@ -20,6 +20,8 @@ class FakeDocker:
         self.volume = None
         self.calls = []
         self.counter = 0
+        self.baked_command = ['python','main.py']
+        self.baked_entrypoint = None
 
     def tracked(self, argv, stdin, cwd, timeout):
         self.calls.append((argv, stdin, cwd, timeout))
@@ -34,8 +36,9 @@ class FakeDocker:
             name = argv[argv.index('--name') + 1]
             owner = next(value.split('=', 1)[1] for value in argv if value.startswith('autospec.run_id='))
             self.containers[identifier] = {'Id': identifier, 'Name': name,
-                'Image': argv[argv.index('--entrypoint')+2], 'State': {'Running': True},
-                'Config': {'Labels': {'autospec.run_id': owner, 'autospec.kind': 'sandbox'}, 'User': '65532:65532'},
+                'Image': argv[argv.index('--entrypoint')+2] if '--entrypoint' in argv else next(a for a in argv if a.startswith('sha256:')), 'State': {'Running': True},
+                'Config': {'Labels': {'autospec.run_id': owner, 'autospec.kind': 'sandbox'}, 'User': '65532:65532',
+                    'Cmd':self.baked_command,'Entrypoint':self.baked_entrypoint},
                 'HostConfig': {'ReadonlyRootfs':True,'CapDrop':['ALL'],'Privileged':False,
                     'SecurityOpt':['no-new-privileges=true'],'NetworkMode':'none','PortBindings':{}},'Mounts':[]}
             return 0, identifier + '\n', ''
@@ -44,6 +47,9 @@ class FakeDocker:
     def call(self, argv, **kwargs):
         self.calls.append((argv, None, None, None))
         if argv[1:3] == ['image', 'inspect']:
+            if argv[-1]=='{{json .}}':
+                return SimpleNamespace(returncode=0,stdout=json.dumps({'Id':argv[3],
+                    'Config':{'WorkingDir':'/app','Cmd':self.baked_command,'Entrypoint':self.baked_entrypoint}}),stderr='')
             return SimpleNamespace(returncode=0, stdout=argv[3]+' /app', stderr='')
         if argv[1:3] == ['volume', 'inspect']:
             return SimpleNamespace(returncode=0 if self.volume else 1,
