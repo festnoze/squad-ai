@@ -1,0 +1,41 @@
+{
+  "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "snapshot_hash": "6545e114b2dd06c7e2346db5231b71cc469ac082d43755d36d3565677cb58f7b",
+  "value": {
+    "argv": [
+      "npm",
+      "ci",
+      "--ignore-scripts",
+      "--no-audit",
+      "--no-fund",
+      "--userconfig=/dev/null",
+      "--globalconfig=/tmp/autospec-empty-global-npmrc",
+      "--include=dev"
+    ],
+    "ended_at": "2026-10-12T10:01:35.987013+00:00",
+    "environment_fingerprint": "3f59b3d9c06cf3c46c9f7af062f1316a3ab5e05ffbbf6b7038078851c7519988",
+    "execution": "attested-cache",
+    "image_id": "sha256:8f22a7d457c129b08a3928013c4a535dbfad9d78cd87c6c12f51c480b2a994a8",
+    "native_clock_path": "frontend_build.dependency.timing",
+    "native_kind": "frontend_install",
+    "phase": "install",
+    "return_code": null,
+    "scope": "exact native delivery subclock; cache/layer preparation is not a new install rc; no enclosing total included",
+    "seconds": 0.6205899000051431,
+    "source_proofs": [
+      {
+        "checks": [
+          "OBS:delivery_build"
+        ],
+        "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "detail": "",
+        "passed": true,
+        "path": "C:\\Users\\e.millerioux\\AppData\\Local\\Temp\\pytest-of-e.millerioux\\pytest-3279\\test_real_delivery_receipt_fou0\\supervisor\\delivery-evidence\\delivery-clock-metatest-e44d4feaf55e4c749bbfbcf7ccb42eb0.json",
+        "sha256": "a58048cbdfa94cc5e47ce2bcf7f0ccc641c65cd228985d12b4bc956433a1835f",
+        "snapshot_hash": "6545e114b2dd06c7e2346db5231b71cc469ac082d43755d36d3565677cb58f7b",
+        "type": "X"
+      }
+    ],
+    "started_at": "2026-10-12T10:01:35.366435+00:00"
+  }
+}
