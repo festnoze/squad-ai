@@ -1,0 +1,3 @@
+main.py -text
+pyproject.toml -text
+uv.lock -text
