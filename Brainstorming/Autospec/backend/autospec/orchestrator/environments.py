@@ -122,7 +122,11 @@ class CleanEnvironment:
         if self.mode != "tests":
             raise EnvironmentError("runtime environment cannot attest a test suite")
         if self.ecosystem == "python":
-            return [str(self.python), "-m", "pytest", "-q", "--json-report", f"--json-report-file={report_path}"]
+            # Baselines use paths relative to the disposable run root. Without
+            # an explicit root and discovery path, ancestor repository config
+            # (or the report plugin's external path) can change collected IDs.
+            # Never repair those IDs by stripping an arbitrary prefix later.
+            return [str(self.python), "-m", "pytest", "-q", "--rootdir=.", "--json-report", f"--json-report-file={report_path}", "."]
         if frontend:
             return [node_cmd, "node_modules/vitest/vitest.mjs", "run", "--reporter=default", "--reporter=json", f"--outputFile.json={report_path}"]
         return [node_cmd, "--test", "--test-reporter=tap"]

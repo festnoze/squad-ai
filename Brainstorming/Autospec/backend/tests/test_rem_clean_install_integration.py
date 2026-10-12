@@ -9,12 +9,23 @@ import shutil
 import subprocess
 import sys
 
+import pytest
+
 from autospec.orchestrator.dependencies import DependencyCoordinator, DependencyRequest, run_command
 from autospec.orchestrator.environments import CleanEnvironmentManager, minimal_environment
 from autospec.orchestrator.test_integrity import capture_baseline, evaluate_run, pytest_evidence, tap_evidence
 
 
-def test_real_argon2_runtime_request_and_clean_lock_validation(tmp_path):
+@pytest.mark.parametrize("nested_repository", [False, True])
+def test_real_argon2_runtime_request_and_clean_lock_validation(tmp_path, nested_repository):
+    if nested_repository:
+        # A distinct ancestor config is sufficient to reproduce pytest's root
+        # discovery in a nested repository. No Git command or hostile hook runs.
+        ancestor = tmp_path / "repo"
+        ancestor.mkdir()
+        (ancestor / "pytest.ini").write_text("[pytest]\n", encoding="utf-8")
+        tmp_path = ancestor / "run"
+        tmp_path.mkdir()
     root = tmp_path / "product"
     root.mkdir()
     (root / "pyproject.toml").write_text('[project]\nname="argon2-fixture"\nversion="0.1.0"\nrequires-python=">=3.12"\ndependencies=[]\n[project.optional-dependencies]\ndev=["pytest>=8", "pytest-json-report>=1.5"]\n', encoding="utf-8")
@@ -49,7 +60,18 @@ def test_real_argon2_runtime_request_and_clean_lock_validation(tmp_path):
     report = tmp_path / "good-report.json"
     native = run_command(good.test_command(str(report)), cwd=good_run, env=minimal_environment())
     assert native.returncode == 0, native.stdout + native.stderr
-    assert evaluate_run(baseline, good_run, pytest_evidence(report, native.returncode)).green
+    observed = pytest_evidence(report, native.returncode)
+    assert set(observed.outcomes) == set(baseline.expected_test_ids)
+    assert Path(json.loads(report.read_text())["root"]).resolve() == good_run.resolve()
+    assert evaluate_run(baseline, good_run, observed).green
+    # Explicitly synthetic negative report: a matching basename/suffix is not
+    # a collected independent test. Keep the strict evaluator/parser unchanged.
+    foreign = json.loads(report.read_text())
+    for test in foreign["tests"]:
+        test["nodeid"] = "foreign-root/" + test["nodeid"]
+    foreign_report = tmp_path / "foreign-id-metatest-report.json"
+    foreign_report.write_text(json.dumps(foreign), encoding="utf-8")
+    assert not evaluate_run(baseline, good_run, pytest_evidence(foreign_report, 0)).green
     runtime = manager.prepare(root, "python", "runtime")
     primitive = run_command([str(runtime.python), "-c", 'from argon2 import PasswordHasher; p=PasswordHasher(); assert p.verify(p.hash("fixture secret"), "fixture secret"); print("real Argon2 OK")'], cwd=root, env=minimal_environment())
     assert primitive.returncode == 0 and "real Argon2 OK" in primitive.stdout, primitive.stdout + primitive.stderr
