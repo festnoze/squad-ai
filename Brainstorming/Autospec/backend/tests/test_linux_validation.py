@@ -78,6 +78,12 @@ def test_suite_cannot_admit_missing_or_malformed_report(tmp_path,monkeypatch,rep
     monkeypatch.setattr(isolated_validation,'run_isolated',run)
     result=IsolatedValidator(tmp_path/'cache',manager=manager).run_suite(root,'python','test',tmp_path/'evidence.json')
     assert result.evidence.exit_code==0 and not result.evidence.report_valid
+    executed=json.loads((tmp_path/'evidence.execution.json').read_bytes())
+    assert executed==result.execution_receipt
+    assert executed['return_code']==0 and executed['argv'][:3]==['/opt/venv/bin/python','-m','pytest']
+    assert executed['timing']['phase']=='tests' and executed['timing']['seconds']>=0
+    assert executed['environment_preparation']['phase']=='install'
+    assert executed['image_id']=='attested' and executed['source_fingerprint']==result.source_fingerprint
 
 
 def test_collection_refuses_incomplete_custom_items(tmp_path,monkeypatch):
@@ -124,6 +130,9 @@ def test_real_python_locked_suite_and_net_none_runtime(tmp_path):
     assert result.evidence.exit_code == 0, result.output
     assert result.evidence.outcomes == {"test_nominal.py::test_isolated": "passed"}
     assert result.fingerprint and result.image.startswith("sha256:")
+    executed=json.loads((tmp_path/'report.execution.json').read_bytes())
+    assert executed==result.execution_receipt and executed['return_code']==0
+    assert executed['timing']['seconds']>0 and executed['environment_preparation']['seconds']>0
     first = validator.manager.prepare(product, "python", "test")
     assert first.image == result.image
     stage = snapshot_product(product, tmp_path / "runtime-stage")
