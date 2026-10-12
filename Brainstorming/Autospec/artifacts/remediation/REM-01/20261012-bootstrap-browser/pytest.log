@@ -1,0 +1,12 @@
+Locked factory-env Python, PYTHONPATH=<isolated worktree>/backend.
+
+python -m pytest tests/test_bootstrap_browser_boundary.py tests/test_bootstrap_processes.py tests/test_bootstrap.py tests/test_docker_browser.py -q
+107 passed, 15 skipped, 1 warning in 4.47s
+Warning: trusted fixture FastAPI TestClient uses httpx legacy transport, not product campaign auth.
+
+AUTOSPEC_DOCKER_BOOTSTRAP_BROWSER=1
+python -m pytest tests/test_bootstrap_browser_real.py -q --junitxml=../artifacts/remediation/REM-01/20261012-bootstrap-browser/real-junit.xml
+..                                                                       [100%]
+2 passed in 96.52s (0:01:36)
+
+Both frontend-only and FastAPI/SQLite/React render in separate factory Chromium containers sharing the actual owned NETNONE runtime. No host Chromium or generated JS on host.

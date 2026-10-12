@@ -1,0 +1,36 @@
+{
+  "scope": "real deterministic bootstrap fixture, not generated-product conformity",
+  "result": "React: isolated tests/build OK\nisolated HTTP OK\nChromium Docker: production UI rendered; exact NETNONE parent ae03cb392e70add7463d1f1f1a869cf7cf535a1df53f81384a97108492481e03",
+  "bootstrap_fingerprint": "d9e4b3c30dafd02627460c328a66bd187d533f618e30c1417fd6419dfde50020",
+  "browser": {
+    "base_image_id": "sha256:2c1f4e0fd6450f43ddb46d60c2a6df30855a8588e165b1f2559fb0eda8d7ff35",
+    "image_id": "sha256:08a9c65535afbd50473448e3119ef6701b1880059f8ff53444aa55eab1f6cc6f",
+    "recipe_sha256": "b20b61565994e276b437142226815a797fe7caab34a0b1c4b7a710d8b16f11f5",
+    "playwright": "1.63.0",
+    "package_integrity": "sha512-+7ziBLidS4NaNCdt57SUDT+wYmmd5fmiQejUic/kb+YsYSCPyOOE9sebzMjNmQrsnNpDJqd4WHvV/8lfKfUDUg==",
+    "core_integrity": "sha512-rYCsBF/M5HjUch52bbtVONEFjv6Xu8sm8h72dNlR5bzIE1fvC/bxgspzkjSfU+MweEMmPM8KJebG6nnyxo5mCg==",
+    "source_free": true,
+    "install_hooks": false,
+    "container_id": "ff6ff363ebaa7b7827e0678a0ae004c9632c8b8ac5da72e9074158c2985c0f8e",
+    "parent_id": "ae03cb392e70add7463d1f1f1a869cf7cf535a1df53f81384a97108492481e03",
+    "network_mode": "container:ae03cb392e70add7463d1f1f1a869cf7cf535a1df53f81384a97108492481e03",
+    "parent_network_mode": "none",
+    "published_ports": {},
+    "user": "65532:65532",
+    "read_only": true,
+    "cap_drop": [
+      "ALL"
+    ],
+    "security_opt": [
+      "no-new-privileges=true"
+    ],
+    "binds": [],
+    "database_mount": false,
+    "client_network_exposed": false,
+    "host_chromium": false,
+    "relay_port": 63212,
+    "control_token_published": false,
+    "qualified": true
+  },
+  "bootstrap_observer_sha256": "dadb7fcb26e301c310c4304dcc0a308c6da3b676eeadd62c558d989d90f11971"
+}
