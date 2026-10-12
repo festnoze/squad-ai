@@ -158,7 +158,7 @@ class SQLiteSupportSubject:
         if options.get("search_scenario"):
             con.execute("INSERT INTO messages VALUES(?,?,?,?,?,?)",(str(uuid4()),tickets["alice_open"],accounts["camille"].id,"INTERNAL_ONLY","internal",self.timestamp()))
         con.commit(); con.close()
-        metadata={"dashboard_expected":{}}
+        metadata={"dashboard_expected":{},"independent_fixture":True}
         for actor in ("alice","camille"):
             rows=all_rows if actor=="camille" else [r for r in all_rows if r["owner_id"]==accounts[actor].id]
             metadata["dashboard_expected"][actor]={"total":len(rows),**{s:sum(r["status"]==s for r in rows) for s in STATES}}
