@@ -114,3 +114,34 @@ async def test_rejected_review_cannot_publish_configuration(tmp_path,problem):
         atomic_json(response_path,response)
     with pytest.raises(AdapterUnavailable):await ensure_reviewed_configuration(contract,source,snapshot,control)
     assert not (control/"product-bindings.json").exists()
+
+
+async def test_final_quality_profile_requires_a_distinct_approved_exact_plan(tmp_path):
+    from tests.fixtures.browser.app import browser_contract
+    from tests.test_review_plans import candidate as quality_candidate
+    from autospec.validation.review_plans import load_reviewed_quality_plan
+    source,snapshot,_,control,proposal,review=setup(tmp_path)
+    contract=browser_contract()
+    contract=import_contract(contract.brief,contract.reference,reviewed_by="offline plan mechanics",
+        facts=[*contract.facts,ContractFact.create("explicit-auth","vertical_profile",{"auth":True},["SEC-01"],contract.brief)])
+    cases={"VERTICAL":{},**{r.id:{} for r in contract.requirements},**{f"E2E-{n:02d}":{} for n in range(1,7)}}
+    proposal["fixtures"]["cases"]=cases
+    proposal["quality_plan"]=quality_candidate()
+    proposal["quality_plan"]["requirements_mapping"]={"TST-01":[{"suite":"backend","test":"test_login.py::test_login",
+        "assertion":"synthetic offline approval mechanics, never real test qualification"}]}
+    await admit_proposal(source,snapshot,contract,control,proposal)
+    packet=json.loads((control/"source-reviews"/snapshot/"review-request.json").read_bytes())
+    assert packet["packet"]["quality_proposal"]["package"]["plan_hash"]
+    review["quality"]={"approved":True,"citations":review["bindings"]["citations"],"findings":[]}
+    review["requirements"]=[{"id":r.id,"status":"NOT_VERIFIED","citations":[],
+        "reason":"synthetic source mechanics only; no real product inspected"} for r in contract.requirements]
+    review["test_mapping"]=proposal["quality_plan"]["requirements_mapping"]
+    external_response(control,snapshot,contract,"independent-response.json",review,"offline-distinct-reviewer")
+    await ensure_reviewed_configuration(contract,source,snapshot,control)
+    sealed=load_reviewed_quality_plan(contract,source,snapshot,control)
+    assert sealed["review"].type=="R"
+    index=json.loads((control/"proofs.json").read_bytes())
+    assert all(p["type"]=="R" for values in index["proofs"].values() for p in values)
+    # Merely retaining a final-review.json cannot bypass a changed plan.
+    sealed["mapping_path"].write_text("{}")
+    with pytest.raises(AdapterUnavailable):load_reviewed_quality_plan(contract,source,snapshot,control)
