@@ -45,7 +45,7 @@ async def test_delete_uses_both_owned_journals_before_workspace_removal(monkeypa
         calls.append("workspace")
         return True
     monkeypatch.setattr(server,"_force_delete_workspace",remove)
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app),base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app),base_url="http://127.0.0.1") as client:
         assert (await client.delete("/api/projects/"+state.id)).status_code==200
     expected = ["packages","publication"] if kind=="cli" else ["publication","packages"]
     assert calls==(["dispose"] if live else [])+expected+["workspace"]
@@ -67,7 +67,7 @@ async def test_delete_absence_only_safe_when_no_resource_claimed(monkeypatch, cl
         return SimpleNamespace(ok=False,detail=detail if "publication_root" in options else "PACKAGE_NOT_REGISTERED")
     monkeypatch.setattr(server.docker_deploy,"undeploy",stop)
     safe=not claimed and detail=="PUBLICATION_NOT_REGISTERED"
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app),base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app),base_url="http://127.0.0.1") as client:
         response=await client.delete("/api/projects/"+state.id)
     assert response.status_code==(200 if safe else 409)
     assert bool(removed)==safe

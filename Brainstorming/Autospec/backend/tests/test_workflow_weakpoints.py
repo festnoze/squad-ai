@@ -114,7 +114,7 @@ async def test_health_exposes_loaded_vs_on_disk_source_stamps():
     from autospec.api import server
 
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         data = (await client.get("/api/health")).json()
     assert data["ok"] is True
     assert data["source_stamp"]  # figé à l'import

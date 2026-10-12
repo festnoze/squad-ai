@@ -55,7 +55,7 @@ def _feature_path(state: ProjectState, story: UserStory):
 
 def _client() -> httpx.AsyncClient:
     transport = httpx.ASGITransport(app=server.app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
+    return httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1")
 
 
 async def test_delete_trashes_the_story_and_records_stripped_deps():

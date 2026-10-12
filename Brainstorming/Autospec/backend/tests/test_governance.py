@@ -559,7 +559,7 @@ async def test_reject_dismisses_the_source_observation(govern_on):
 
 def _client() -> httpx.AsyncClient:
     transport = httpx.ASGITransport(app=server.app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
+    return httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1")
 
 
 def _persisted_project(pid: str) -> ProjectState:

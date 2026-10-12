@@ -201,7 +201,7 @@ def test_non_memory_destinations_write_nothing():
 
 def _client() -> httpx.AsyncClient:
     transport = httpx.ASGITransport(app=server.app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
+    return httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1")
 
 
 async def test_get_knowledge_endpoint_returns_the_base():

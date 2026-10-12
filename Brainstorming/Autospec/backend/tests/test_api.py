@@ -24,7 +24,7 @@ def make_client(replies: list[str]) -> httpx.AsyncClient:
     server.pipelines.clear()
     server.set_runner(FakeRunner(replies))
     transport = httpx.ASGITransport(app=server.app)
-    return httpx.AsyncClient(transport=transport, base_url="http://test")
+    return httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1")
 
 
 # Real owned Git bookkeeping is retained in these API integration tests.
@@ -560,7 +560,7 @@ async def test_recovered_project_is_controllable():
     server.recover_projects()
 
     transport = httpx.ASGITransport(app=server.app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=transport, base_url="http://127.0.0.1") as client:
         # Previously these actions would 404 because the pipeline was only on disk.
         assert (await client.get("/api/projects/proj-recover")).status_code == 200
         resp = await client.post(

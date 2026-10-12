@@ -47,7 +47,7 @@ async def test_api_freezes_complete_sources_outside_product_and_no_model(monkeyp
     source = oracle("POST /books; title 2..12\n" + "detail\n" * 4000)
     payload = {"goal": "Books", "brief": source.brief, "acceptance_reference": source.reference,
         "acceptance_reviewed_by": source.reviewed_by, "acceptance_facts": source.payload()["facts"]}
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://127.0.0.1") as client:
         response = await client.post("/api/projects", json=payload)
         assert response.status_code == 200
         state = started[0].state
@@ -67,7 +67,7 @@ async def test_oracle_persistence_failure_never_starts_pipeline(monkeypatch):
     monkeypatch.setattr(Pipeline, "start", lambda self: started.append(self))
     monkeypatch.setattr("autospec.contracts.ContractStore.save", lambda *a: (_ for _ in ()).throw(OSError("unavailable")))
     source = oracle()
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://127.0.0.1") as client:
         response = await client.post("/api/projects", json={"goal": "Books", "brief": source.brief,
             "acceptance_reference": source.reference, "acceptance_reviewed_by": source.reviewed_by})
     assert response.status_code == 503 and not started
@@ -84,7 +84,7 @@ async def test_api_plan_limit_drift_never_persists_or_starts(monkeypatch, submit
         "| BOOK-01 | B / X | Nominal API |", reviewed_by="source-only reviewer",
         facts=[ContractFact.create("lot-limit", "plan_limits", {"max_lots": 4},
             ["BOOK-01"], "at most four lots")])
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://127.0.0.1") as client:
         response = await client.post("/api/projects", json={"goal": "Books", "brief": source.brief,
             "acceptance_reference": source.reference, "acceptance_reviewed_by": source.reviewed_by,
             "acceptance_facts": source.payload()["facts"], "acceptance_max_lots": submitted})
@@ -101,7 +101,7 @@ async def test_api_exact_source_plan_limit_is_persisted_before_start(monkeypatch
         "| BOOK-01 | B / X | Nominal API |", reviewed_by="source-only reviewer",
         facts=[ContractFact.create("lot-limit", "plan_limits", {"max_lots": 4},
             ["BOOK-01"], "at most four lots")])
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://test") as client:
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://127.0.0.1") as client:
         response = await client.post("/api/projects", json={"goal": "Books", "brief": source.brief,
             "acceptance_reference": source.reference, "acceptance_reviewed_by": source.reviewed_by,
             "acceptance_facts": source.payload()["facts"], "acceptance_max_lots": 4})
