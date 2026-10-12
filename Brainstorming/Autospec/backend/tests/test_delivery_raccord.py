@@ -170,6 +170,8 @@ async def test_pipeline_calls_native_collection_before_independent_final_gate(tm
     assert await pipeline._aindependent_acceptance_phase()
     assert order==first+(first if cache_change else ["review"]+(["image"] if requires_image else []))
     assert len(list(reports_path.parent.glob("verification-reports-prior-*.json")))==int(bool(cache_change))
+    assert json.loads((reports_path.parent/"final-admission.json").read_bytes())["status"] == "PASS"
+    assert len(list(reports_path.parent.glob("final-admission-prior-*.json"))) == 1
 
 
 @pytest.mark.parametrize("qualifies,publish_enabled",[(True,True),(True,False),(False,True)])

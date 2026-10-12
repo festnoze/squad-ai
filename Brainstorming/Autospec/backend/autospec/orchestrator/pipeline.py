@@ -4507,8 +4507,16 @@ class Pipeline:
         self.state.delivery_ready = False
         self.state.agent_activity["independent-acceptance"] = self._activity("tests")
         self._sync()
+        current_admission_path = None
         try:
             snapshot, source = await asyncio.to_thread(freeze_snapshot, workspace_dir(self.state.id), supervisor / "snapshots")
+            current_admission_path = supervisor / "reports" / snapshot.digest / "final-admission.json"
+            if current_admission_path.exists():
+                current_admission_path.replace(current_admission_path.with_name(
+                    "final-admission-prior-" + uuid.uuid4().hex + ".json"))
+            atomic_json(current_admission_path, {"version": 1, "status": "NOT_VERIFIED",
+                "contract_hash": contract.contract_hash, "snapshot_hash": snapshot.digest,
+                "requirements": [], "findings": ["Current verification in progress; historical reports are not current readiness."]})
             # Revalidate source review even when all old report proofs survive.
             # An old PASS cannot bypass a changed protocol/engine/seal.
             await self._await_reviewed_configuration(contract, source, snapshot.digest, phase="final")
@@ -4560,13 +4568,14 @@ class Pipeline:
                 atomic_json(context_path, {"context":context,
                     "reports_sha256":hashlib.sha256(reports_path.read_bytes()).hexdigest()})
             admission = admit_reports(contract, reports, snapshot_hash=snapshot.digest, evidence_root=supervisor)
-            atomic_json(supervisor / "reports" / snapshot.digest / "final-admission.json", admission.payload())
-            self.state.acceptance_result = {"status": admission.status, "contract_hash": contract.contract_hash,
+            result = {"status": admission.status, "contract_hash": contract.contract_hash,
                 "snapshot_hash": snapshot.digest, "report": str(reports_path),
                 "counts": {status: sum(row["status"] == status for row in admission.requirements)
                            for status in ("PASS", "FAIL", "NOT_VERIFIED")}}
-            self.monitor.event("independent_acceptance", **self.state.acceptance_result)
             if not admission.ready:
+                atomic_json(current_admission_path, admission.payload())
+                self.state.acceptance_result = result
+                self.monitor.event("independent_acceptance", **result)
                 mandatory = [row["id"] for row in admission.requirements if row["gate"] in {"B", "M"} and row["status"] != "PASS"]
                 self._block_delivery("Acceptation indépendante bloquée : " + ", ".join(mandatory), source="acceptance")
                 return False
@@ -4574,8 +4583,7 @@ class Pipeline:
             # if all individual probes returned green on their frozen copy.
             from ..validation.final_gate import source_snapshot
             if (await asyncio.to_thread(source_snapshot, workspace_dir(self.state.id))).digest != snapshot.digest:
-                self._block_delivery("Code modifié pendant la vérification indépendante.", source="acceptance")
-                return False
+                raise ValueError("Code modifié pendant la vérification indépendante.")
             if any(row.id in {"OPS-01", "OPS-02", "OPS-03", "OPS-04"}
                    for row in contract.requirements):
                 # Historical X/R/V survive loss or replacement of a Docker
@@ -4584,12 +4592,19 @@ class Pipeline:
                 # This is inspection only: never rebuild or spend to repair it.
                 from ..validation.delivery_raccord import load_qualified_delivery_image
                 await load_qualified_delivery_image(contract, source, supervisor)
+            atomic_json(current_admission_path, admission.payload())
+            self.state.acceptance_result = result
+            self.monitor.event("independent_acceptance", **result)
             delivery_state.mark_ready(self.state)
             return True
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             self.state.acceptance_result = {"status": "NOT_VERIFIED", "detail": f"{type(exc).__name__}: {exc}"}
+            if current_admission_path is not None:
+                atomic_json(current_admission_path, {"version": 1, "status": "NOT_VERIFIED",
+                    "contract_hash": contract.contract_hash, "snapshot_hash": snapshot.digest,
+                    "requirements": [], "findings": [self.state.acceptance_result["detail"]]})
             self._block_delivery("Acceptation indépendante non vérifiée : " + str(exc), source="acceptance")
             return False
         finally:
