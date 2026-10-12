@@ -437,10 +437,15 @@ def _quality_seal(store,seal,source_root):
     if len({suite.name for suite in suites})!=len(suites):
         raise AdapterUnavailable("distinct native suite names required")
     mutation=AuthorizationMutationSpec(**data["mutation"]) if data.get("mutation") else None
-    digest=native_quality_plan_hash(suites,mapping,mutation)
+    mode=data.get("e2e_mode")
+    if not isinstance(mode,str) or mode not in {"native","supervisor_browser"}:
+        raise AdapterUnavailable("explicit reviewed native E2E mode required")
+    digest=native_quality_plan_hash(suites,mapping,mutation,e2e_mode=mode)
     if digest!=data["plan_hash"]: raise AdapterUnavailable("quality plan content/fingerprint mismatch")
     proof=store._proof(seal["review"],"QUALITY:plan:"+digest)
     if proof.type!="R" or not proof.passed: raise AdapterUnavailable("quality plan independent R missing")
+    if mode=="supervisor_browser" and "QUALITY:e2e:supervisor_browser" not in proof.checks:
+        raise AdapterUnavailable("supervisor browser mode needs its exact independent R tag")
     root=Path(source_root).resolve()
     for suite in suites:
         suite_root=(root/suite.root).resolve()
