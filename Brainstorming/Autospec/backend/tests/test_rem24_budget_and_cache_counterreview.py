@@ -4,6 +4,7 @@ All provider ports are scripted. RED means the blocking invariant is currently
 violated, never that a real provider was contacted or a product was accepted.
 """
 import hashlib
+import json
 
 import pytest
 
@@ -119,3 +120,48 @@ async def test_final_report_cache_must_revalidate_current_review_engine(monkeypa
     assert not admitted and not state.delivery_ready, 'final cache bypassed current review-engine revalidation'
     assert len(revalidation) == 1
     assert runner.calls == 0
+
+
+async def test_actual_review_context_refusal_cannot_be_bypassed_by_final_cache(tmp_path, monkeypatch):
+    """Real local seal/context checker; no mocked review refusal or inference.
+
+    The independently labelled reviewer/proposer are synthetic mechanical
+    fixtures, not evidence that the copied inert product meets its contract.
+    """
+    from autospec.orchestrator import pipeline as pipeline_module
+    from autospec.validation.coordinator import SupervisorEvidenceStore
+    from autospec.validation.source_reviewer import ensure_reviewed_configuration, ReviewPending
+    from tests.test_source_reviewer import setup, admit_proposal, external_response
+
+    source, snapshot, contract, control, proposal, review = setup(tmp_path)
+    await admit_proposal(source, snapshot, contract, control, proposal)
+    external_response(control, snapshot, contract, 'independent-response.json', review, 'offline-independent-reviewer')
+    assert (await ensure_reviewed_configuration(contract, source, snapshot, control))['status'] == 'REVIEWED'
+    context_path = control/'source-reviews'/snapshot/'review-context.json'
+    stale = json.loads(context_path.read_bytes())
+    stale['review_engine_hashes']['source_reviewer.py'] = '0'*64
+    atomic_json(context_path, stale)
+    with pytest.raises(ReviewPending):
+        await ensure_reviewed_configuration(contract, source, snapshot, control)
+
+    requirement = contract.requirements[0]
+    path = control/'synthetic-runtime.json'
+    atomic_json(path, {'scope': 'mechanical only, no runtime executed'})
+    native = dict(type='X', path=str(path), sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+        snapshot_hash=snapshot, contract_hash=contract.contract_hash, checks=[requirement.id+':mechanism'], passed=True)
+    source_proofs = await SupervisorEvidenceStore(control, snapshot, contract.contract_hash).proofs(requirement.id)
+    row = dict(id=requirement.id, gate=requirement.gate, expected=requirement.expected, status='PASS',
+        observed='synthetic cache admission only', reproduction=['offline'], impact='', limits=[],
+        proofs=[native] + [proof.__dict__ for proof in source_proofs])
+    atomic_json(control/'reports'/snapshot/'verification-reports.json',
+        [dict(contract_hash=contract.contract_hash, snapshot_hash=snapshot, requirements=[row])])
+    monkeypatch.setattr(settings, 'external_review_wait_seconds', 0)
+    monkeypatch.setattr(acceptance, 'supervisor_root', lambda _id: control)
+    monkeypatch.setattr(pipeline_module, 'workspace_dir', lambda _id: source)
+    state = ProjectState(id='actual-context', name='Review context', goal='Offline only', brief=contract.brief,
+        acceptance_contract_hash=contract.contract_hash)
+    acceptance.contract_store(state.id).save(contract)
+    runner = OfflineReceiptRunner()
+    pipeline = Pipeline(state, runner)
+    assert not await pipeline._aindependent_acceptance_phase(), 'a genuinely rejected review context was bypassed'
+    assert not state.delivery_ready and runner.calls == 0

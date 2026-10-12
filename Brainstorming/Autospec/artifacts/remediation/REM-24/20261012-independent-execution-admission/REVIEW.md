@@ -63,6 +63,13 @@ retourne néanmoinsTrue, `delivery_ready=True`, sans appeler ce port. Le test
 d'invariant attendu échoue dans `counterexamples-v1.xml`. Les reçus de ce test
 sont explicitement synthétiques et ne prouvent aucun livre ni produit réel.
 
+Le contre-testv3 renforce cette preuve sans mock de refus : il installe deux
+réponses locales de reviewer/proposer synthétiques, altère l'empreinte engine
+du contexte, puis le VRAI `ensure_reviewed_configuration` rejette ce contexte
+avec `ReviewPending`. La gate finale admet encore le cache et passe ready.
+`counterexamples-v3.xml` : **6 FAIL /1 PASS /1.69s**, quatre budget et deux cache.
+Les sources de fixture sont seulement copiées/lues, jamais importées/exécutées.
+
 Impact : une correction des prédicats de sécurité/admission ou du protocole
 de review ne rend pas périmé le vieux PASS si le code produit reste identique.
 Les SHA des fichiers de preuves restent intacts mais ne disent pas quel
@@ -98,9 +105,10 @@ rapports comme histoire, sans les écraser en une prétendue preuve fraîche.
   pas verdictPASS ; échecs/couverture rouge restent dans les valeurs ; six
   parcours×deux modes ; mutation sur copie distincte exacte, original intact,
   vrais checksX nécessaires pour nominal/mutant. RevueR n'émet jamaisX/V.
-- Source-review est exclusivement un paquet local pour deux agentsGPT distincts,
+- Le nouveau chemin `source_reviewer` est exclusivement un paquet local pour deux agentsGPT distincts,
   lié request_hash/stage/phase/propositions/audit. Aucun `_tracked.arun` Claude
-  de review n'a été trouvé. Même snapshot ne suffit pas à changer son sujet.
+  n'est appelé depuis ce module. Même snapshot ne suffit pas à changer son sujet.
+  Cette propriété NE s'étend PAS automatiquement aux options legacy ci-dessous.
 - `final_gate` contrôle IDs exacts/duplicates, attendu/gate du contrat, SHA,
   snapshot/contrat, scopes de checks, racine superviseur et typesX/R/V requis ;
   mandatoryFAIL demeureFAIL, NOT_VERIFIED ne se transforme pas enPASS.
@@ -169,6 +177,17 @@ pas une signature cryptographique d'identité de reviewer. Le tracingLangfuse,
 si activé par la configuration trustée, transmet prompt/réponse complets :
 il doit rester désactivé pour cette campagne sans autorisation distincte ; les
 événements activité/cost examinés sont métadonnées, pas ce tracing opt-in.
+
+Attention politique de campagne : `_arefine_code` (`pipeline.py:5005`) transmet
+un diff réel au critic/judge du runner configuré siREFINE est activé ;
+`_asecurity_phase` (`pipeline.py:3471`) et `_aevaluate_phase` (`pipeline.py:3370`)
+emploient aussi `_tracked` avec cwd/broker de lecture (flag ou endpointforce).
+Ces capacités génériques existent même si leurs defaults sontOFF ; elles ne
+sont pas transformées en GPT externe par le nouveau source_reviewer. Aucun
+de ces appels n'a été invoqué ici. Si la politique « génération seuleClaude,
+revuesGPT » vaut pour la campagne support, pinner ces optionsOFF et refuser
+ces voies sur son contexte (ou les router au protocole GPT externe) avant
+lancement. Un flag/commentaire n'est pas une preuve de politique durable.
 
 ## Correctif d'auteur séparé — pas une revue indépendante
 
