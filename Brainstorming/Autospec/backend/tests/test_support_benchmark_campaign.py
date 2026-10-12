@@ -99,7 +99,7 @@ def test_complete_payload(setup):
     assert len(body['acceptance_facts'][0]['requirement_ids']) == 57
     assert body['brief'] == (ROOT/list(c.HASHES)[0]).read_bytes().decode('utf-8')
     assert body['acceptance_reference'] == (ROOT/list(c.HASHES)[1]).read_bytes().decode('utf-8')
-    assert body['technical_stack'] == dict(backend='Python/FastAPI',database='SQLite',frontend='React/TypeScript/Vite')
+    assert body['technical_stack'] == dict(backend='python',framework='fastapi',database='sqlite',frontend='react',kind='fullstack',source='explicit')
 
 def test_creation_exactly_once_and_unknown_never_retries(tmp_path):
     calls = []
