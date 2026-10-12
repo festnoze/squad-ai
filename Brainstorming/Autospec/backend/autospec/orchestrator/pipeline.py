@@ -712,6 +712,11 @@ class _UsageTracker:
 
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
         from .budget_reservations import BudgetReservationError, BudgetReservations
+        admission = getattr(self.pipeline.runner, "validate_call", None)
+        if admission is not None:
+            chosen = model or _FORCE_MODEL.get() or settings.model_for_role(
+                _persona_role(system_prompt), self.pipeline.state.phase.value)
+            admission(system_prompt, chosen)
         # A new cap, resume, feedback or changed provider cannot turn an
         # interrupted call into known/free usage. Reject before activity,
         # reservation, dispatch checkpoint or any provider invocation.

@@ -424,6 +424,11 @@ def provider_capabilities(provider: str) -> RunnerCapabilities:
 def make_runner(provider: str) -> AgentRunner:
     """Build the agent backend for a provider name (AGENT_PROVIDER)."""
     normalized = (provider or "claude code").strip().lower()
+    if settings.generation_only_agents:
+        if normalized not in ("", "claude code"):
+            raise ValueError("GENERATION_ONLY: seul Claude Code abonnement est autorisé, pas une API directe.")
+        from .generation_policy import GenerationOnlyRunner
+        return GenerationOnlyRunner(ClaudeCliRunner(), model="sonnet")
     if normalized == "openai":
         return OpenAiRunner()
     if normalized == "openrouter":
