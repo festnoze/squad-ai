@@ -1,0 +1,80 @@
+FF                                                                       [100%]
+================================== FAILURES ===================================
+_ test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser[frontend] _
+
+tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-rem-dependencies/squad-ai/Brainstorming/Autospec/artifacts/remediation/REM-04/20261012-frontend-upgrade/native-work-v1/test_real_frontend_bootstrap_r0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x000002679884C510>
+kind = 'frontend'
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_DOCKER_BOOTSTRAP_BROWSER")!="1",reason="explicit real frontend bootstrap opt-in")
+    @pytest.mark.parametrize("kind",["frontend","fullstack"])
+    async def test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser(tmp_path,monkeypatch,kind):
+        state=SimpleNamespace(id="isolated-browser-bootstrap",name="Isolated frontend bootstrap",streams=[],
+            brownfield_path="",product_profile="auto",backend_language=SimpleNamespace(value="python"),
+            technical_stack=dict(backend="none" if kind=="frontend" else "python",framework="none" if kind=="frontend" else "fastapi",
+                frontend="react",database="none" if kind=="frontend" else "sqlite",kind=kind))
+        monkeypatch.setattr(workspace,"workspace_dir",lambda _:tmp_path)
+        workspace.scaffold(state,streams_enabled=False,ui_tests_enabled=False)
+        result=bootstrap.prepare(state,tmp_path);assert result.ok,result.detail
+        receipts=[]
+        original=PlaywrightHarness.close
+        async def retained_close(self):
+            receipt=dict(self.browser_environment)
+            await original(self)
+            receipts.append(receipt)
+        monkeypatch.setattr(PlaywrightHarness,"close",retained_close)
+        verified=await bootstrap.verify(state,tmp_path,timeout_s=300)
+>       assert verified.ok,verified.detail
+E       AssertionError: Pr�flight isol� : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm error Cannot read properties of null (reading 'edgesOut')
+E         npm notice
+E         npm notice New major version of npm available! 10.9.9 -> 12.2.0
+E         npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+E         npm notice To update run: npm install -g npm@12.2.0
+E         npm notice
+E         npm error A complete log of this run can be found in: /tmp/.npm/_logs/2026-10-12T10_53_55_267Z-debug-0.log
+E         
+E       assert False
+E        +  where False = BootstrapResult(ok=False, detail="Pr�flight isol� : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm err...", skipped=False, infra=True, fingerprint='54207a011159a5eaab67f6b99d65f42f890c5fd2ee6869fe590a27658b885258', files=()).ok
+
+tests\test_bootstrap_browser_real.py:31: AssertionError
+_ test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser[fullstack] _
+
+tmp_path = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-rem-dependencies/squad-ai/Brainstorming/Autospec/artifacts/remediation/REM-04/20261012-frontend-upgrade/native-work-v1/test_real_frontend_bootstrap_r1')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000026799AAED50>
+kind = 'fullstack'
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_DOCKER_BOOTSTRAP_BROWSER")!="1",reason="explicit real frontend bootstrap opt-in")
+    @pytest.mark.parametrize("kind",["frontend","fullstack"])
+    async def test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser(tmp_path,monkeypatch,kind):
+        state=SimpleNamespace(id="isolated-browser-bootstrap",name="Isolated frontend bootstrap",streams=[],
+            brownfield_path="",product_profile="auto",backend_language=SimpleNamespace(value="python"),
+            technical_stack=dict(backend="none" if kind=="frontend" else "python",framework="none" if kind=="frontend" else "fastapi",
+                frontend="react",database="none" if kind=="frontend" else "sqlite",kind=kind))
+        monkeypatch.setattr(workspace,"workspace_dir",lambda _:tmp_path)
+        workspace.scaffold(state,streams_enabled=False,ui_tests_enabled=False)
+        result=bootstrap.prepare(state,tmp_path);assert result.ok,result.detail
+        receipts=[]
+        original=PlaywrightHarness.close
+        async def retained_close(self):
+            receipt=dict(self.browser_environment)
+            await original(self)
+            receipts.append(receipt)
+        monkeypatch.setattr(PlaywrightHarness,"close",retained_close)
+        verified=await bootstrap.verify(state,tmp_path,timeout_s=300)
+>       assert verified.ok,verified.detail
+E       AssertionError: Pr�flight isol� : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm error Cannot read properties of null (reading 'edgesOut')
+E         npm notice
+E         npm notice New major version of npm available! 10.9.9 -> 12.2.0
+E         npm notice Changelog: https://github.com/npm/cli/releases/tag/v12.2.0
+E         npm notice To update run: npm install -g npm@12.2.0
+E         npm notice
+E         npm error A complete log of this run can be found in: /tmp/.npm/_logs/2026-10-12T10_55_35_298Z-debug-0.log
+E         
+E       assert False
+E        +  where False = BootstrapResult(ok=False, detail="Pr�flight isol� : ISOLATION_UNAVAILABLE: Dependency lock resolution failed:  npm err...", skipped=False, infra=True, fingerprint='2a8c50db70023f4d1db7d608679c94c410e1ce0bed33ecc8ff398dcaa10c222f', files=()).ok
+
+tests\test_bootstrap_browser_real.py:31: AssertionError
+=========================== short test summary info ===========================
+FAILED tests/test_bootstrap_browser_real.py::test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser[frontend]
+FAILED tests/test_bootstrap_browser_real.py::test_real_frontend_bootstrap_renders_only_in_owned_netnone_browser[fullstack]
+2 failed, 3 deselected in 183.35s (0:03:03)
