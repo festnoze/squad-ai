@@ -38,7 +38,7 @@ async def test_delete_contract_uses_external_journal_even_before_state_flush(
         return SimpleNamespace(ok=True, detail="mock exact journal withdrawal")
     monkeypatch.setattr(server.docker_deploy, "undeploy", undeploy)
     async with httpx.AsyncClient(
-        transport=httpx.ASGITransport(app=server.app), base_url="http://trusted-test"
+        transport=httpx.ASGITransport(app=server.app), base_url="http://127.0.0.1"
     ) as client:
         response = await client.delete("/api/projects/" + project)
     assert response.status_code == 200, response.text

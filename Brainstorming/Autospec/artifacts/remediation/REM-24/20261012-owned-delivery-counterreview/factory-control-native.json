@@ -1,0 +1,65 @@
+{
+  "boundary_sha256": "19c1a073297971b8acebaa79f3956ad25f1d310817c3cc88f3d6ec216c594901",
+  "callback_count": 3,
+  "limits": [
+    "GUI request headers exercised through real TCP; no new React visual E2E claimed",
+    "No product code, browser JS, real Docker withdrawal or paid provider ran"
+  ],
+  "listener_port": 61430,
+  "listener_released": true,
+  "observations": [
+    {
+      "callback_delta": 1,
+      "case": "CLI",
+      "host": "127.0.0.1:61430",
+      "origin": null,
+      "status_code": 200
+    },
+    {
+      "callback_delta": 1,
+      "case": "served GUI same origin",
+      "host": "127.0.0.1:61430",
+      "origin": "http://127.0.0.1:61430",
+      "status_code": 200
+    },
+    {
+      "callback_delta": 1,
+      "case": "exact Vite dev proxy",
+      "host": "localhost:5183",
+      "origin": "http://localhost:5183",
+      "status_code": 200
+    },
+    {
+      "callback_delta": 0,
+      "case": "product origin",
+      "host": "127.0.0.1:61430",
+      "origin": "http://127.0.0.1:19533",
+      "status_code": 403
+    },
+    {
+      "callback_delta": 0,
+      "case": "opaque origin",
+      "host": "127.0.0.1:61430",
+      "origin": "null",
+      "status_code": 403
+    },
+    {
+      "callback_delta": 0,
+      "case": "DNS rebinding",
+      "host": "rebinding.example:61430",
+      "origin": null,
+      "status_code": 403
+    },
+    {
+      "case": "rebinding GET without Origin",
+      "status_code": 403
+    },
+    {
+      "case": "exact dev preflight",
+      "status_code": 200
+    }
+  ],
+  "scope": "trusted factory TCP controller only; pipeline callback inert; NOT product acceptance",
+  "server_sha256": "d36601ddfadc9db56e7710aeeb950a83f82c892a28793d32b6ce1f4b0c6943ff",
+  "server_thread_stopped": true
+}
