@@ -15,7 +15,9 @@ import socketserver
 import subprocess
 import tempfile
 import threading
+import time
 import uuid
+from datetime import datetime, timezone
 from dataclasses import dataclass, replace
 import hashlib
 import ipaddress
@@ -38,6 +40,20 @@ class IsolatedSuiteResult:
     image: str
     source_fingerprint: str = ""
     coverage: dict | None = None
+    execution_receipt: dict | None = None
+
+
+def _timed_call(receipt, phase, operation):
+    """Clock the actual factory action; never reconstruct a fictitious rc."""
+    tick = time.monotonic()
+    start = datetime.now(timezone.utc).isoformat()
+    try:
+        return operation()
+    finally:
+        if receipt is not None:
+            receipt["timing"] = {"phase": phase, "seconds": time.monotonic()-tick,
+                "started_at": start, "ended_at": datetime.now(timezone.utc).isoformat(),
+                "scope": "actual elapsed supervisor action, including attestation/cache checks"}
 
 
 def _node_command(command: list[str], *, report: bool = False, dist: bool = False,
@@ -183,7 +199,8 @@ class IsolatedValidator:
             coveragepath = Path(coveragepath).absolute()
             if ecosystem not in {"python", "node"} or coveragepath.resolve().is_relative_to(root.resolve()):
                 raise _unavailable("Coverage evidence must be outside producer root")
-        environment = self.manager.prepare(root, ecosystem, mode)
+        preparation = {}
+        environment = _timed_call(preparation, "install", lambda: self.manager.prepare(root, ecosystem, mode))
         with tempfile.TemporaryDirectory(prefix="autospec-suite-") as temporary:
             stage = snapshot_product(root, Path(temporary) / "product")
             stale = FileBroker(ExecutionContext("suite-report-freshness", stage)).path("suite-report.json")
@@ -235,7 +252,12 @@ class IsolatedValidator:
                     parser = None
                     coverage_directory = None
                 command = _node_command(command, report=has_vitest, coverage_directory=coverage_directory)
-            rc, out, err = run_isolated(command, stage, environment.image, docker=self.docker, timeout=self.timeout)
+            executed = {}
+            rc, out, err = _timed_call(executed, "tests", lambda: run_isolated(command, stage, environment.image, docker=self.docker, timeout=self.timeout))
+            executed.update(argv=command, return_code=rc, environment_fingerprint=environment.fingerprint,
+                image_id=environment.image, environment_preparation=preparation["timing"],
+                source_fingerprint=source_fingerprint, scope="actual container inner argv and observed return code")
+            atomic_json(reportpath.with_suffix(".execution.json"), executed)
             output = out + err
             if parser is None:
                 evidence = tap_evidence(output, rc)
@@ -277,7 +299,7 @@ class IsolatedValidator:
                     evidence = replace(evidence, report_valid=False)
                     output += "\nCOVERAGE_EVIDENCE_INVALID: missing/invalid fresh coverage report"
                     atomic_json(coveragepath, {"invalid_report": True})
-            return IsolatedSuiteResult(evidence, output, environment.fingerprint, environment.image, source_fingerprint, coverage)
+            return IsolatedSuiteResult(evidence, output, environment.fingerprint, environment.image, source_fingerprint, coverage, executed)
 
     def collect_python(self, root: Path, reportpath: Path) -> tuple[tuple[str, ...], IsolatedSuiteResult]:
         """Trusted pytest JSON collection, not regex/static source discovery.
@@ -347,7 +369,8 @@ class IsolatedValidator:
         if receipt is not None:
             receipt.clear()
             receipt.update(version=1, dependency=dependency_receipt, argv=None, rc=None)
-        environment = self.manager.prepare(Path(root), "node", "test", receipt=dependency_receipt) if receipt is not None else self.manager.prepare(Path(root), "node", "test")
+        environment = _timed_call(dependency_receipt if receipt is not None else None, "install",
+            lambda: self.manager.prepare(Path(root), "node", "test", receipt=dependency_receipt) if receipt is not None else self.manager.prepare(Path(root), "node", "test"))
         with tempfile.TemporaryDirectory(prefix="autospec-vite-") as temporary:
             stage = snapshot_product(Path(root), Path(temporary) / "product")
             stale_dist = stage / "dist"
@@ -370,7 +393,7 @@ class IsolatedValidator:
                                components=["typecheck", "frontend_build"] if (stage / "tsconfig.json").is_file() else ["frontend_build"],
                                argv=command, rc=None, environment_fingerprint=environment.fingerprint,
                                image_id=environment.image, isolated=True)
-            rc, out, err = run_isolated(command, stage, environment.image, docker=self.docker, timeout=self.timeout)
+            rc, out, err = _timed_call(receipt, "build", lambda: run_isolated(command, stage, environment.image, docker=self.docker, timeout=self.timeout))
             if receipt is not None:
                 receipt.update(rc=rc, output_tail=(out + err)[-16000:])
             result = Path(tempfile.mkdtemp(prefix="autospec-dist-"))
@@ -447,7 +470,8 @@ def _build_delivery_image(root: Path, image: str, *, docker: str = "docker", tim
     dependency_receipt = {}
     if receipt is not None:
         receipt["backend_dependency"] = dependency_receipt
-    environment = manager.prepare(root, ecosystem, "runtime", receipt=dependency_receipt) if receipt is not None else manager.prepare(root, ecosystem, "runtime")
+    environment = _timed_call(dependency_receipt if receipt is not None else None, "install",
+        lambda: manager.prepare(root, ecosystem, "runtime", receipt=dependency_receipt) if receipt is not None else manager.prepare(root, ecosystem, "runtime"))
     if receipt is not None:
         manifest, lock = (root / "pyproject.toml", root / "uv.lock") if ecosystem == "python" else (root / "package.json", root / "package-lock.json")
         receipt["locks_sha256"][lock.relative_to(root).as_posix()] = hashlib.sha256(lock.read_bytes()).hexdigest()
@@ -493,7 +517,7 @@ def _build_delivery_image(root: Path, image: str, *, docker: str = "docker", tim
                                "recipe_sha256": hashlib.sha256(recipe.encode()).hexdigest()}
             if receipt is not None:
                 receipt["commands"].append(command_receipt)
-            rc, out, err = _run_tracked(argv, "", str(context), timeout)
+            rc, out, err = _timed_call(command_receipt if receipt is not None else None, "docker", lambda: _run_tracked(argv, "", str(context), timeout))
             command_receipt.update(rc=rc, output_tail=(out + err)[-16000:])
             if receipt is not None and rc == 0:
                 baked = manager._image(image)
