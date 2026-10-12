@@ -54,6 +54,7 @@ def incident(tmp_path,monkeypatch):
     # state hash; these metatests never alter/read the actual campaign state.
     monkeypatch.setattr(c,'RECOVERY_STATE_SHA256',c.digest(state_path.read_bytes()))
     (project/'build-monitor.jsonl').write_bytes(b'bootstrap failed before provider\n')
+    monkeypatch.setattr(c,'RECOVERY_MONITOR_SHA256',c.digest((project/'build-monitor.jsonl').read_bytes()))
     (campaign/'factory.log').write_bytes(b'first factory log bytes\n')
     (campaign/'factory-identity.json').write_bytes(c.canonical(dict(factory_commit=c.RECOVERY_COMMIT,pid=123,started_at=4,source_stamp='old')))
     return campaign,state,state_path
@@ -193,7 +194,7 @@ def test_metadata_invariant_tamper_blocks_resume(incident,field,value):
     calls = []
     request = api(incident,calls,tamper=lambda state:state.update({field:value}))
     with pytest.raises(c.AdmissionError): c.recover_once(incident[0],'http://127.0.0.1:8130',recovery,request=request)
-    assert [row[0] for row in calls] == ['GET','PUT','GET']
+    assert [row[0] for row in calls] == ['GET','PUT']
     assert 'RECOVERY_OUTCOME_UNKNOWN' in (incident[0]/'supervisor.jsonl').read_text()
 
 
@@ -292,3 +293,61 @@ def test_owned_recovery_finally_and_stop_intent_no_real_process(incident,monkeyp
     log = (campaign/'supervisor.jsonl').read_text()
     assert 'SUPERVISOR_STOPPED' in log
     assert ('STOP_INTENT_OBSERVED' in log) is not ambiguous
+
+
+@pytest.mark.parametrize('mode',['delayed','timeout','corrupt','api_drift','oracle_drift','new_file'])
+def test_async_metadata_persistence_only_known_original_disk_may_lag(incident,monkeypatch,mode):
+    campaign,state,path = incident
+    recovery,_ = reserved(incident)
+    calls = []
+    old_bytes = path.read_bytes()
+    clock = [0.0]
+    monkeypatch.setattr(c.time,'monotonic',lambda:clock[0])
+    def sleep(seconds):
+        assert seconds == 0.05
+        clock[0] += 1  # No real wait. A read-only atomic writer settles later.
+        if clock[0] == 2 and mode == 'delayed': path.write_bytes(c.canonical(state))
+        if clock[0] == 1 and mode == 'corrupt': path.write_bytes(b'{"unknown_partial_state":true}')
+        if clock[0] == 1 and mode == 'api_drift': state['usage']['unreported_calls'] = 1
+        if clock[0] == 1 and mode == 'oracle_drift':
+            oracle = campaign/'projects'/'.autospec-supervisor'/c.RECOVERY_PROJECT/'contracts'/(c.RECOVERY_CONTRACT+'.json')
+            oracle.write_bytes(oracle.read_bytes()+b'changed')
+        if clock[0] == 1 and mode == 'new_file': (path.parent/'main.py').write_bytes(b'not allowed before resume')
+    monkeypatch.setattr(c.time,'sleep',sleep)
+    normal = api(incident,calls)
+    def asynchronous(method,url,body=None):
+        result = normal(method,url,body)
+        if method == 'PUT': path.write_bytes(old_bytes)
+        return result
+    if mode == 'delayed':
+        assert c.recover_once(campaign,'http://127.0.0.1:8130',recovery,request=asynchronous) == c.RECOVERY_PROJECT
+        assert clock[0] == 2
+        assert [row[0] for row in calls] == ['GET','PUT','GET','GET','GET','POST']
+    else:
+        with pytest.raises(c.AdmissionError): c.recover_once(campaign,'http://127.0.0.1:8130',recovery,request=asynchronous)
+        assert not any(row[0] == 'POST' for row in calls)
+        assert clock[0] <= 5
+        with pytest.raises(FileExistsError): c.recover_once(campaign,'http://127.0.0.1:8130',recovery,request=asynchronous)
+    assert sum(row[0] == 'PUT' for row in calls) == 1
+
+
+def test_prior_agent_or_unknown_usage_build_monitor_refused(incident):
+    campaign,state,path = incident
+    monitor = path.parent/'build-monitor.jsonl'
+    monitor.write_bytes(monitor.read_bytes()+b'{"kind":"agent","usage":null}\n')
+    with pytest.raises(c.AdmissionError,match='build-monitor'): snapshot(incident)
+    assert not (campaign/'recovery-attempt.json').exists()
+
+
+@pytest.mark.parametrize('field,value',[('id','other'),('budget_usd',80),('acceptance_contract_hash','c'*64)])
+def test_contradictory_put_receipt_blocks_even_when_get_and_disk_good(incident,field,value):
+    campaign,*_ = incident
+    recovery,_ = reserved(incident)
+    calls = []
+    normal = api(incident,calls)
+    def contradictory(method,url,body=None):
+        result = normal(method,url,body)
+        if method == 'PUT': result['state'][field] = value
+        return result
+    with pytest.raises(c.AdmissionError): c.recover_once(campaign,'http://127.0.0.1:8130',recovery,request=contradictory)
+    assert [row[0] for row in calls] == ['GET','PUT']

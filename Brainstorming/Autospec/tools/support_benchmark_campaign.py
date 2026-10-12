@@ -42,6 +42,7 @@ RECOVERY_COMMIT = '312cc2d38dc1a8ce7125243e4b3f36ac5ca03395'
 RECOVERY_PAYLOAD_SHA256 = 'b0d4fea581030338244aaa62e8df0b794047d702cc39b3cbdd1a6ddd8696ebaf'
 RECOVERY_STATE_SHA256 = 'b3e78ec1f96e1d3fa2f097965099a210182d3e713735c049d6325c2cda673256'
 RECOVERY_JOURNAL_SHA256 = 'ebee209c9703c16ff2e1e060da4a9b410d57c5febbfc00ff0530701425a66a68'
+RECOVERY_MONITOR_SHA256 = '3ab11c157021604040b1e44fd13aa31642a5fbde408217e6c0c7abab961d91d1'
 RECOVERY_CONTRACT = 'b6850a3f3486afaa97816567e26ae79705464d2703ac204c0ca3440acf9e3bc6'
 RECOVERY_ORACLE_SHA256 = '06fef2a5c08632e6dd6f398c6d54d4e8a30963055d601b5c002be83a4d0bdb80'
 RECOVERY_ERROR = "'Python/FastAPI' is not a valid BackendLanguage"
@@ -226,6 +227,8 @@ def recovery_snapshot(root,campaign,project):
     expected = payload({'sources':sources},campaign) | {'technical_stack':LEGACY_STACK}
     if body != expected or digest(files[oracle_path]) != RECOVERY_ORACLE_SHA256:
         raise AdmissionError('original brief/budget/oracle changed')
+    if digest(files[f'projects/{project}/build-monitor.jsonl']) != RECOVERY_MONITOR_SHA256:
+        raise AdmissionError('known pre-LLM build-monitor history required')
     state = _json(files[state_path])
     usage = state.get('usage',{})
     if (state.get('id') != project or state.get('name') != campaign.name or state.get('phase') != 'needs_attention' or
@@ -256,7 +259,7 @@ def reserve_recovery(campaign,recovery,receipt):
     runtime.mkdir(parents=True,exist_ok=False)
     return runtime
 
-def verify_recovery_invariants(campaign,recovery,state,*,language_changed=False):
+def verify_recovery_invariants(campaign,recovery,state,*,language_changed=False,allow_original_disk=False):
     expected = dict(recovery['state'])
     if language_changed:
         expected['technical_stack'] = dict(backend='python',source='explicit')
@@ -271,11 +274,14 @@ def verify_recovery_invariants(campaign,recovery,state,*,language_changed=False)
         if digest((campaign/name).read_bytes()) != sha:
             raise AdmissionError('recovery immutable evidence changed')
     disk_state = _json(files[recovery['state_path'].removeprefix('projects/')])
-    if canonical(disk_state) != canonical(expected):
+    persisted = canonical(disk_state) == canonical(expected)
+    if not persisted and not (language_changed and allow_original_disk and
+                             canonical(disk_state) == canonical(recovery['state'])):
         raise AdmissionError('persisted recovery state differs from API state')
     with (campaign/'supervisor.jsonl').open('rb') as original:
         if digest(original.read(recovery['journal_bytes'])) != recovery['files_sha256']['supervisor.jsonl']:
             raise AdmissionError('original journal bytes changed')
+    return persisted
 
 def recover_once(campaign,url,recovery,*,request=None):
     request = request or http
@@ -293,7 +299,18 @@ def recover_once(campaign,url,recovery,*,request=None):
         result = request('PUT',endpoint+'/language',{'language':'python'})
         if result.get('ok') is not True:
             raise AdmissionError('language metadata was not acknowledged')
-        verify_recovery_invariants(campaign,recovery,request('GET',endpoint),language_changed=True)
+        verify_recovery_invariants(campaign,recovery,result.get('state'),
+                                   language_changed=True,allow_original_disk=True)
+        # _sync schedules atomic persistence on a factory executor. Only its
+        # exactly-known old disk state may lag the already-correct API state.
+        # Recheck all invariants each time; never retry PUT or tolerate partial
+        # writes, API drift, new files, changed source/oracle or unknown usage.
+        deadline = time.monotonic()+5
+        while not verify_recovery_invariants(campaign,recovery,request('GET',endpoint),
+                                            language_changed=True,allow_original_disk=True):
+            if time.monotonic() >= deadline:
+                raise AdmissionError('metadata persistence timeout; no resume')
+            time.sleep(0.05)
         journal(campaign,'RESUME_ATTEMPT',project_id=project,outcome='UNKNOWN',retry_permitted=False)
         # Never repeat this request, including ambiguous timeout/connection loss.
         if request('POST',endpoint+'/resume-build').get('ok') is not True:
