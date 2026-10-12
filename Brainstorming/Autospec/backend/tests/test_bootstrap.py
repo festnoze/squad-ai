@@ -268,151 +268,69 @@ def test_frontend_only_does_not_create_unused_backend(tmp_path, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_failed_dependency_install_stops_before_server(tmp_path, monkeypatch):
-    project = state()
-    scaffold(tmp_path, monkeypatch, project)
-    calls = []
-    async def command(argv, *_):
-        calls.append(argv)
-        raise bootstrap.BootstrapFailure("offline index")
-    monkeypatch.setattr(bootstrap, "_command", command)
-    result = await bootstrap.verify(project, tmp_path)
-    assert not result.ok and result.infra
-    assert len(calls) == 1
-    assert "offline index" in result.detail
+    project=state(); scaffold(tmp_path,monkeypatch,project)
+    def fail(*_): raise bootstrap.BootstrapFailure("offline index",infra=True)
+    monkeypatch.setattr(bootstrap,"_isolated_preflight",fail)
+    result=await bootstrap.verify(project,tmp_path)
+    assert not result.ok and result.infra and "offline index" in result.detail
 
 
 @pytest.mark.asyncio
 async def test_generated_processes_never_inherit_server_credentials(tmp_path, monkeypatch):
-    project = state()
-    scaffold(tmp_path, monkeypatch, project)
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "must-not-reach-generated-code")
-    monkeypatch.setenv("DATABASE_URL", "postgres://private:secret@internal")
-    monkeypatch.setenv("NODE_OPTIONS", "--import=/private/injected.js")
-    monkeypatch.setenv("NPM_CONFIG_CACHE", str(tmp_path / "npm-cache"))
-    async def command(argv, root, env, *_):
-        assert "ANTHROPIC_API_KEY" not in env
-        assert "DATABASE_URL" not in env
-        assert "NODE_OPTIONS" not in env
-        assert env["NPM_CONFIG_CACHE"] == str(tmp_path / "npm-cache")
-        raise bootstrap.BootstrapFailure("stop before install")
-    monkeypatch.setattr(bootstrap, "_command", command)
-    result = await bootstrap.verify(project, tmp_path)
-    assert not result.ok
+    project=state(); scaffold(tmp_path,monkeypatch,project)
+    monkeypatch.setenv("ANTHROPIC_API_KEY","must-not-reach-code")
+    called=[]
+    def isolated(state,root,timeout,runtime_only):
+        called.append((root,runtime_only)); return "isolated"
+    async def forbidden(*_): pytest.fail("host legacy API called")
+    monkeypatch.setattr(bootstrap,"_isolated_preflight",isolated)
+    monkeypatch.setattr(bootstrap,"_spawn",forbidden)
+    monkeypatch.setattr(bootstrap,"_command",forbidden)
+    assert (await bootstrap.verify(project,tmp_path)).ok
+    assert called==[(tmp_path,False)]
 
 
 @pytest.mark.asyncio
-async def test_runtime_http_and_sqlite_with_real_process(tmp_path, monkeypatch):
-    """Exercise the exact generated app with the test environment's dependencies.
-
-    Installation is intentionally bypassed here; the subprocess, health route,
-    SELECT 1, strict HTTP response and shutdown are all real.
-    """
-    project = state()
-    scaffold(tmp_path, monkeypatch, project)
-    monkeypatch.setattr(bootstrap, "_command", _successful_command)
-    original_spawn = bootstrap._spawn
-    children = []
-    async def spawn(argv, cwd, env):
-        if argv[0] == settings.uv_cmd:
-            argv = [sys.executable, "main.py"]
-        child = await original_spawn(argv, cwd, env)
-        children.append(child)
-        return child
-    monkeypatch.setattr(bootstrap, "_spawn", spawn)
-    result = await bootstrap.verify(project, tmp_path, timeout_s=15)
-    assert result.ok, result.detail
-    assert "SELECT 1 OK" in result.detail
-    assert (tmp_path / ".autospec/bootstrap.db").exists()
-    assert children and all(child.returncode is not None for child in children)
+async def test_runtime_delegates_to_isolated_boundary(tmp_path, monkeypatch):
+    project=state(); scaffold(tmp_path,monkeypatch,project)
+    monkeypatch.setattr(bootstrap,"_isolated_preflight",lambda *args: "API → SQLite : SELECT 1 OK")
+    result=await bootstrap.verify(project,tmp_path)
+    assert result.ok and "SELECT 1 OK" in result.detail
+    assert not (tmp_path/".venv").exists() and not (tmp_path/".autospec/bootstrap.db").exists()
 
 
 @pytest.mark.asyncio
 async def test_runtime_only_never_regenerates_or_installs(tmp_path, monkeypatch):
-    project = state()
-    scaffold(tmp_path, monkeypatch, project)
-    assert bootstrap.prepare(project, tmp_path).ok
-    python = tmp_path / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-    python.parent.mkdir(parents=True)
-    python.write_bytes(b"placeholder; mapped to the test interpreter")
-    def forbidden_prepare(*_):
-        raise AssertionError("Runtime must not call prepare")
-    monkeypatch.setattr(bootstrap, "prepare", forbidden_prepare)
-    async def forbidden_command(*_):
-        raise AssertionError("Python runtime must not install or run pytest")
-    monkeypatch.setattr(bootstrap, "_command", forbidden_command)
-    original_spawn = bootstrap._spawn
-    async def spawn(argv, cwd, env):
-        assert argv == [str(python), "main.py"]
-        return await original_spawn([sys.executable, "main.py"], cwd, env)
-    monkeypatch.setattr(bootstrap, "_spawn", spawn)
-    result = await bootstrap.verify_runtime(project, tmp_path, timeout_s=10)
-    assert result.ok, result.detail
-    assert "SELECT 1" in result.detail
+    project=state(); scaffold(tmp_path,monkeypatch,project)
+    assert bootstrap.prepare(project,tmp_path).ok
+    monkeypatch.setattr(bootstrap,"prepare",lambda *_:pytest.fail("no prepare"))
+    calls=[]
+    def isolated(*args): calls.append(args[-1]); return "isolated runtime"
+    monkeypatch.setattr(bootstrap,"_isolated_preflight",isolated)
+    assert (await bootstrap.verify_runtime(project,tmp_path)).ok
+    assert calls==[True]
 
 
 @pytest.mark.asyncio
-async def test_resume_repairs_missing_venv_without_recreating_business_sources(tmp_path, monkeypatch):
-    project = state()
-    scaffold(tmp_path, monkeypatch, project)
-    assert bootstrap.prepare(project, tmp_path).ok
-    feature = tmp_path / "demo/features/hello.py"
-    source = 'def register(app):\n    @app.get("/api/hello")\n    def hello():\n        return {"hello": "world"}\n'
-    feature.write_text(source)
-    assert not (tmp_path / ".venv").exists()
-    commands = []
-    async def command(argv, *_):
-        commands.append(argv)
-        return ""
-    monkeypatch.setattr(bootstrap, "_command", command)
-    original_spawn = bootstrap._spawn
-    async def spawn(argv, cwd, env):
-        assert argv[:3] == [settings.uv_cmd, "run", "--frozen"]
-        return await original_spawn([sys.executable, "main.py"], cwd, env)
-    monkeypatch.setattr(bootstrap, "_spawn", spawn)
-    monkeypatch.setattr(bootstrap, "prepare", lambda *_: pytest.fail("A resumed product must never be scaffolded"))
-    checked = await bootstrap.verify_runtime(project, tmp_path, timeout_s=10, repair_dependencies=True)
-    assert checked.ok, checked.detail
-    assert any(argv[1:3] == ["sync", "--locked"] for argv in commands)
-    assert "SELECT 1" in checked.detail
-    assert feature.read_text() == source
+async def test_resume_repairs_linux_environment_without_recreating_sources(tmp_path, monkeypatch):
+    project=state(); scaffold(tmp_path,monkeypatch,project); assert bootstrap.prepare(project,tmp_path).ok
+    feature=tmp_path/"demo/features/hello.py"; feature.write_text("# business source")
+    monkeypatch.setattr(bootstrap,"prepare",lambda *_:pytest.fail("no prepare"))
+    monkeypatch.setattr(bootstrap,"_isolated_preflight",lambda *_:"clean Linux cache ready")
+    assert (await bootstrap.verify_runtime(project,tmp_path,repair_dependencies=True)).ok
+    assert feature.read_text()=="# business source" and not (tmp_path/".venv").exists()
 
 
 @pytest.mark.asyncio
-async def test_repaired_fullstack_does_not_require_the_initial_demo_screen(tmp_path, monkeypatch):
-    project = state(kind="fullstack", frontend="react")
-    scaffold(tmp_path, monkeypatch, project)
-    assert bootstrap.prepare(project, tmp_path).ok
-    feature = tmp_path / "frontend/src/features/Greeting.tsx"
-    source = 'export default function Greeting() { return <h1>Bonjour</h1>; }\n'
-    feature.write_text(source)
-    commands, health_checks = [], []
-    async def command(argv, *_):
-        commands.append(argv)
-        return "Chromium : application visible"
-    async def spawn(*_):
-        stdout = asyncio.StreamReader()
-        stdout.feed_eof()
-        return SimpleNamespace(stdout=stdout, returncode=None)
-    async def stop(process):
-        process.returncode = 0
-    async def health(*args):
-        health_checks.append(args)
-    async def get(*_):
-        return 200, b'<div id="root"></div><script src="/assets/app.js"></script>'
-    monkeypatch.setattr(bootstrap, "_command", command)
-    monkeypatch.setattr(bootstrap, "_spawn", spawn)
-    monkeypatch.setattr(bootstrap, "_stop", stop)
-    monkeypatch.setattr(bootstrap, "_wait_health", health)
-    monkeypatch.setattr(bootstrap, "_get", get)
-    monkeypatch.setattr(bootstrap, "prepare", lambda *_: pytest.fail("No source rewrite on resume"))
-    checked = await bootstrap.verify_runtime(project, tmp_path, repair_dependencies=True)
-    assert checked.ok, checked.detail
-    assert any(argv[1:3] == ["sync", "--locked"] for argv in commands)
-    assert any(argv[1] == "ci" for argv in commands)
-    browser = next(argv for argv in commands if "bootstrap_browser_check.js" in argv[1])
-    assert browser[-1] == "0"  # still renders Chromium, but no initial probe label
-    assert len(health_checks) == 2  # direct API and frontend proxy remain mandatory
-    assert feature.read_text() == source
+async def test_repaired_fullstack_preserves_runtime_only_contract(tmp_path, monkeypatch):
+    project=state(kind="fullstack",frontend="react"); scaffold(tmp_path,monkeypatch,project)
+    assert bootstrap.prepare(project,tmp_path).ok
+    calls=[]
+    def isolated(*args): calls.append(args[-1]); return "Chromium rendered"
+    monkeypatch.setattr(bootstrap,"_isolated_preflight",isolated)
+    monkeypatch.setattr(bootstrap,"prepare",lambda *_:pytest.fail("no prepare"))
+    result=await bootstrap.verify_runtime(project,tmp_path,repair_dependencies=True)
+    assert result.ok and calls==[True]
 
 
 async def _successful_command(*_):
@@ -437,27 +355,16 @@ async def test_wrong_http_body_is_not_accepted():
 
 
 @pytest.mark.asyncio
-async def test_timeout_interrupts_silent_process(tmp_path):
-    with pytest.raises(bootstrap.BootstrapFailure, match="délai"):
-        await bootstrap._command([sys.executable, "-c", "import time; time.sleep(30)"], tmp_path, dict(os.environ), bootstrap.time.monotonic() + 0.25, None)
+async def test_legacy_host_command_is_fail_closed(tmp_path):
+    with pytest.raises(bootstrap.BootstrapFailure,match="ISOLATION_UNAVAILABLE"):
+        await bootstrap._command([sys.executable,"-c","import time;time.sleep(30)"],tmp_path,dict(os.environ),bootstrap.time.monotonic()+1,None)
 
 
 @pytest.mark.asyncio
-async def test_task_cancellation_kills_process(tmp_path, monkeypatch):
-    original_spawn = bootstrap._spawn
-    children = []
-    async def spawn(*args):
-        process = await original_spawn(*args)
-        children.append(process)
-        return process
-    monkeypatch.setattr(bootstrap, "_spawn", spawn)
-    task = asyncio.create_task(bootstrap._command([sys.executable, "-c", "import time; time.sleep(30)"], tmp_path, dict(os.environ), bootstrap.time.monotonic() + 60, None))
-    while not children:
-        await asyncio.sleep(0.02)
-    task.cancel()
+async def test_cancelled_preflight_never_launches_legacy_host_process(tmp_path):
+    cancel=asyncio.Event();cancel.set()
     with pytest.raises(asyncio.CancelledError):
-        await task
-    assert all(child.returncode is not None for child in children)
+        await bootstrap._command([sys.executable,"-c","print('no')"],tmp_path,dict(os.environ),bootstrap.time.monotonic()+60,cancel)
 
 
 def test_fastapi_feature_register_receives_application(tmp_path, monkeypatch):

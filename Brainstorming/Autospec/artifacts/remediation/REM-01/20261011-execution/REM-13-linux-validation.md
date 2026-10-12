@@ -1,0 +1,49 @@
+# REM-13 / REM-02 — qualification Linux réelle
+
+2026-10-12, branche codex/rem-execution, base intégrée 5e512724.
+
+## Preuves exécutées
+
+Interpréteur de la fabrique (pas du produit) :
+`C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/factory-env/Scripts/python.exe`.
+Depuis worktree/backend, `PYTHONPATH=(Get-Location).Path`.
+
+- `AUTOSPEC_REAL_LINUX_VALIDATION=1 pytest tests/test_linux_validation.py` : première preuve Python **8 passed / 40.26s**. Installation uv verrouillée Linux, pytest avec rapport structuré, UID65532, aucun secret provider/socket Docker, socket Internet impossible, API FastAPI/SQLite SELECT1 par proxylocalhost, port/conteneur nettoyés.
+- `... pytest tests/test_linux_validation.py -k dependency_resolver` : **2 passed / 15.48s**. uv add/no-sync/no-build et npm lock-only/ignore-scripts effectifs, scripts npm qui auraient échoué ignorés, code produit et .env absents du builder, exports manifest+lock seulement.
+- `... pytest tests/test_linux_validation.py -k fullstack` : **1 passed / 216.57s**. Socle exact Python/FastAPI+pytest, React+Vitest+build, Chromium réel, frontend→API→SQLite SELECT1. Reprise runtime réussie sans venv/node_modules hôte, sans modification du source/verrou.
+- Régressions bootstrap/runtime/deploy/prompts/validation sans opt-in : **132 passed, 19 skipped / 9.97s**. Les skips concernent les anciennes preuves opt-in; aucune preuve skip n'est revendiquée comme passée.
+- Runtime/lifecycle Windows : **48 passed, 2 skipped / 10.40s** (test_owned_execution + test_runner_processes + runtime). Descendants/identité/sentinelles réelles restent couverts par les tests REM-01/02 intégrés.
+- Brokers/validation après exclusion instructions harness : **49 passed, 5 skipped / 5.49s**.
+
+Les erreurs détectées puis corrigées par les preuves réelles : npm refuse userconfig et globalconfig tous deux `/dev/null`; BuildKit traite `FROM sha256:<ID>` comme un faux repository; un lien /app/node_modules dans un bind Windows ne garantit pas un lien Linux fonctionnel. Le code utilise maintenant un digest de registre FROM, deux chemins npm distincts, et source/cache Node dans tmpfs Linux. Dépendances image-owned `/opt`, non raw-montées.
+
+## Frontière et API
+
+`LinuxEnvironmentManager(cache_root external,docker,timeout).ensure_lock(root,ecosystem)` pour bootstrap initial seulement; `.prepare(root,ecosystem,mode)` retourne `LinuxEnvironment(ecosystem,mode,fingerprint,image,attestation)`. Le fingerprint porte manifests+verrous+imageID/digest toolchain+platform Linux+mode+recette/reporters. Cache supprimé : rebuild depuis verrous; aucune restauration native.
+
+`dependency_resolver(argv,*,cwd,env=None)` façade de DependencyCoordinator. Seuls ses uv add/lock --check et npm install lock-only sont admis. Stage de manifests/verrous uniquement, registres publics sans credentials, scripts/builds source désactivés. Aucun environnement supplied n'entre dans le conteneur. Export précisément manifests/verrous, coordinateur possède sérialisation et rollback.
+
+`IsolatedValidator(cache_root external,docker,timeout).run_suite(root,ecosystem,'test',reportpath external,test_args=()) -> IsolatedSuiteResult(evidence:SuiteEvidence,output,fingerprint,image)`. Python : pytest-json-report; Node : Vitest JSON ou TAP natif. Les rapports préexistants sont supprimés du stage. Rapports absents/invalides ne sont jamais SUCCESS. `build_frontend(root)` compile via Vite directement dans Docker et retourne un dossier temporaire supervisor contenant dist uniquement; caller doit le supprimer. `run_command` ne synchronise pas librement les modifications.
+
+`RuntimeSession(filtered_stage,image,command,port=8000,ecosystem='python'|'node',docker,env)` contextmanager. `origin` est le proxy TCP127.0.0.1 possédé, `host_port`, `identifier` ID immuable, `.logs()`, `.close()`. Le container garde **network=none**, nonroot, RO rootfs, capsdrop, no-new-privileges, tmpfs, limites process/mémoire/CPU; aucun port Docker publié ou réseau partagé. Le proxy utilise docker exec vers le container exact et un port interne fixe. Le driver trusted utilise Chromium frais, serviceworkers/WebSockets bloqués, origine HTTP unique, aucun source/commande produit sur host.
+
+Bootstrap _spawn/_command historiques refusent ISOLATION_UNAVAILABLE; verify/verify_runtime utilisent uniquement l'environnement Linux, le runtime net-none et le driver trusted. Runtime acceptance ne lance plus runtime_acceptance.js (ancien lanceur de produit host). Docker delivery build utilise une recette factory nouvelle, un contexte filtré et dependencies image, jamais le Dockerfile/.dockerignore produit.
+
+## Sources primaires / provisioning
+
+Images officielles provisionnées explicitement, puis digest/ID vérifiés localement :
+- ghcr.io/astral-sh/uv:python3.12-bookworm-slim, digest sha256:e5b65587bce7de595f299855d7385fe7fca39b8a74baa261ba1b7147afa78e58.
+- node:22-bookworm-slim, digest sha256:c3de60bf2f9dd0ac6370e6117950ff62d6e339527e7472301c9c78a017978392.
+
+Documentation officielle : https://docs.astral.sh/uv/guides/integration/docker/ ; https://docs.astral.sh/uv/reference/cli/ ; https://docs.docker.com/engine/network/port-publishing/ . Docker confirme qu'un bridge --internal permet encore l'accès aux services de l'hôte sur l'adresse bridge; le runtime de validation n'utilise donc aucun bridge, mais le proxy exec/net-none.
+
+## Limites explicites
+
+- Toolchains isolées Python/Node seulement. Go/Rust refusent infra plutôt que fallback host ou skip success.
+- Registres publics PyPI/npm seulement; sources locales/git/URL/workspaces/custom indexes refusés.
+- Le builder réseau ne reçoit que des manifests/verrous admis. Il ne sert jamais à exécuter le source produit. Le Docker engine et les images officielles provisionnées sont dans le périmètre trusted.
+- Les rapports tests restent des sorties du produit, soumis à l'intégrité/oracle/admission supervisée du parent. Un exit0/rapport JSON n'est pas seul une preuve d'acceptation métier.
+- Chromium prouve rendu/probe initial, pas tous les parcours métier Gherkin : contrat/journeys restent du ressort de l'admission parent.
+- API collect/coverage à renforcer en patch suivant; seul pytest-json-report est actuellement le reporter supervisor injecté.
+- Delivery image build trusted est raccordé; nominal livraison/persistance inter-projets relève des preuves REM-20/21 du parent, pas du test fullstack décrit ci-dessus.
+- Aucun appel de modèle payant n'a été lancé.
