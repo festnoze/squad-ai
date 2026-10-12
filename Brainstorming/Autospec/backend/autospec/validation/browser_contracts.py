@@ -372,7 +372,10 @@ class BrowserVerifier:
                 await route.fetch()  # real backend commits; only delivery is lost
                 # A blackholed response tests the application's actual HTTP
                 # timeout, not a harness-imposed immediate failure.
-                await asyncio.sleep(self.profile["timeout_ms"]/1000+3)
+                try:
+                    await p.wait_for_event("requestfailed",predicate=lambda r:r.url==route.request.url and r.method=="POST",
+                                           timeout=self.profile["timeout_ms"]+3000)
+                except Exception:pass
                 try: await route.abort("failed")
                 except Exception: pass
             else: await route.continue_()
