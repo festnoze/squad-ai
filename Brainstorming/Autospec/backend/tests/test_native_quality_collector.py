@@ -179,7 +179,7 @@ async def test_exact_mutation_copy_is_executed_over_real_http_and_original_remai
     # R can correctly reject the deliberately weakened source, but that is
     # not a runtime mutation kill when native X and observations stay green.
     source_only=json.loads(json.dumps(result))
-    source_only["mutated_results"]=source_only["original_results"]
+    source_only["mutated_results"]=json.loads(json.dumps(source_only["original_results"]))
     for rid,item in source_only["mutated_results"].items():
         item["status"]="FAIL"
         for p in item["proofs"]:p["snapshot_hash"]=source_only["mutation_snapshot_hash"]
