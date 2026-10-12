@@ -81,6 +81,40 @@ async def test_snapshot_without_ops_does_not_build_an_unrequested_image(tmp_path
     assert (await module.collect_native_delivery_build(contract,source,snapshot,root))["status"]=="NOT_REQUIRED"
 
 
+@pytest.mark.parametrize("gap", ["clock", "provenance", "cancelled"])
+async def test_build_clock_gap_preserves_actual_x_but_not_provenance_or_cancellation(tmp_path, monkeypatch, gap):
+    import asyncio
+    from types import SimpleNamespace
+    from autospec.validation import product_harness
+    source,snapshot,contract,root=roots(tmp_path)
+    atomic_json(root/"product-bindings.json",{})
+    binding=SimpleNamespace(snapshot_hash=snapshot,contract_hash=contract.contract_hash,
+        runtime_command=("/opt/venv/bin/python","main.py"),validate=lambda _: None)
+    monkeypatch.setattr(product_harness,"ReviewedProductBindings",
+        SimpleNamespace(from_dict=lambda _: binding))
+    def build(_,tag,**options):
+        atomic_json(options["evidence_root"]/"delivery-build.json",dict(version=1,status="PASS",
+            snapshot_hash=snapshot,image_id="sha256:"+"a"*64,commands=[]))
+        return True,"synthetic clock protocol only"
+    monkeypatch.setattr(module,"build_delivery_image",build)
+    monkeypatch.setattr(module,"delivery_build_checks",lambda *args: [{"passed":True}])
+    class Recorder:
+        def ingest_delivery(self,*args,**kwargs):
+            if gap=="clock": raise module.NativeTimingUnavailable("clock absent")
+            if gap=="provenance": raise AdapterUnavailable("contradictory raw proof")
+            raise asyncio.CancelledError()
+    if gap=="clock":
+        result=await module.collect_native_delivery_build(contract,source,snapshot,root,timing_recorder=Recorder())
+        assert result["status"]=="PARTIAL" and result["limits"]
+        assert result["receipt"]["status"]=="PASS" and result["proof"]["type"]=="X"
+    else:
+        with pytest.raises(AdapterUnavailable if gap=="provenance" else asyncio.CancelledError):
+            await module.collect_native_delivery_build(contract,source,snapshot,root,timing_recorder=Recorder())
+    observed=await module.SupervisorEvidenceStore(root,snapshot,contract.contract_hash).observe("delivery_build")
+    assert observed["status"]=="PASS"  # actual native fact, not acceptance
+    assert source_snapshot(source).digest==snapshot
+
+
 async def test_pipeline_calls_native_collection_before_independent_final_gate(tmp_path,monkeypatch):
     from autospec.agents.runner import FakeRunner
     from autospec.config import settings

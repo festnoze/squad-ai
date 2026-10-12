@@ -16,7 +16,8 @@ from ..config import settings
 from ..orchestrator.dependencies import atomic_json
 from ..orchestrator.isolated_validation import build_delivery_image
 from .coordinator import SupervisorEvidenceStore, _context
-from .delivery_evidence import NativeDeliveryCollector, NativeTimingRecorder, delivery_build_checks
+from .delivery_evidence import (NativeDeliveryCollector, NativeTimingRecorder,
+                               NativeTimingUnavailable, delivery_build_checks)
 from .final_gate import source_snapshot
 from .native_quality_raccord import collect_native_quality
 from .review_delivery import delivery_required, load_reviewed_delivery_plan
@@ -64,8 +65,16 @@ async def collect_native_delivery_build(contract, source, snapshot, root, *, tim
     if timing_recorder is not None and ok:
         ingest=getattr(timing_recorder,"ingest_delivery",None)
         if ingest is None: limits.append("split native build timing ingestion unavailable")
-        else: ingest(receipt,proof,source_root=source)
-    return dict(status="OBTAINED",receipt=receipt,proof=asdict(proof),checks=checks,limits=limits)
+        else:
+            try:
+                ingest(receipt,proof,source_root=source)
+            except NativeTimingUnavailable:
+                # The actual operation's X is retained. A diagnostic clock gap
+                # cannot erase it or fabricate OPS-06; provenance contradictions
+                # and source/image drift deliberately remain fatal.
+                limits.append("usable native build subclocks unavailable")
+    return dict(status="PARTIAL" if limits else "OBTAINED",receipt=receipt,
+                proof=asdict(proof),checks=checks,limits=limits)
 
 
 async def collect_native_final_facts(state,contract,source,snapshot,root,*,build=None,timing_recorder=None):
@@ -77,7 +86,8 @@ async def collect_native_final_facts(state,contract,source,snapshot,root,*,build
     root,source=Path(root).resolve(),Path(source).resolve()
     if root.is_relative_to(source) or source_snapshot(source).digest!=snapshot:
         raise AdapterUnavailable("final native facts require exact frozen external roots")
-    result={"snapshot_hash":snapshot,"contract_hash":contract.contract_hash,"limits":[]}
+    result={"snapshot_hash":snapshot,"contract_hash":contract.contract_hash,
+            "limits":list(build.get("limits",[])) if build else []}
     quality={}
     if quality_required(contract):
         try:
