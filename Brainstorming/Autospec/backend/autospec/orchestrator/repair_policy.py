@@ -2,9 +2,143 @@
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 import time
 from dataclasses import dataclass, field
+from enum import Enum
+
+
+class PlanCorrectionKind(str, Enum):
+    """Assigned at deterministic gate sites, NEVER inferred from error prose."""
+
+    STRUCTURE = "structure"
+    CONSTRAINT = "constraint"
+    INDEPENDENT_REVIEW = "independent_review"
+    PROVIDER = "provider"
+    ENVIRONMENT = "environment"
+    COST = "cost"
+    UNCLASSIFIED = "unclassified"
+
+
+@dataclass(frozen=True)
+class PlanCorrectionIssue:
+    kind: PlanCorrectionKind
+    message: str
+
+
+@dataclass(frozen=True)
+class PlanCorrectionContext:
+    """Supervisor facts for a rejected PLAN, not producer-supplied authority.
+
+    The caller verifies the immutable receipt and current sealed contract. A
+    pure policy cannot verify a filesystem, reserve money or lock a lifecycle.
+    Unknown facts must remain false/unclassified, never receive nominal defaults.
+    """
+
+    admission_status: str
+    issues: tuple[PlanCorrectionIssue, ...]
+    contract_hash: str
+    response_sha256: str
+    rejection_receipt_sha256: str
+    response_bytes: int
+    capture_complete: bool
+    rejection_persisted: bool
+    independent_major_finding: bool
+    usage_complete: bool
+    unreported_calls: int
+    budget_remaining_usd: float
+
+
+@dataclass(frozen=True)
+class PlanCorrectionDecision:
+    """Permission for ONE maker attempt, never plan approval or review R."""
+
+    allowed: bool
+    reason: str
+    next_attempt: int | None = None
+    contract_hash: str = ""
+    response_sha256: str = ""
+    rejection_receipt_sha256: str = ""
+    issues: tuple[PlanCorrectionIssue, ...] = ()
+    version: int = 1
+
+
+MAX_PLAN_CORRECTION_BYTES = 1024 * 1024
+
+
+def decide_plan_maker_correction(
+    context: PlanCorrectionContext, *, revision_limit: int = 0, attempts_used: int = 0,
+) -> PlanCorrectionDecision:
+    """Fail-closed, side-effect-free opt-in for a legacy PLAN maker correction.
+
+    Only typed STRUCTURE/CONSTRAINT issues are eligible; every issue must be
+    eligible, so a mixed provider/review/cost failure cannot be reclassified by
+    a matching substring. There is no runner, critic, judge, loop or mutation.
+
+    Before dispatch the caller MUST durably consume next_attempt (including
+    UNKNOWN/interrupted invocations), then use the existing tracked provider
+    budget/isolation boundary. Positive remaining budget is not a reservation
+    or a claim that the provider has a hard financial cap. The corrected reply
+    goes through the complete unchanged gate; rejection ends this attempt.
+    """
+    if type(revision_limit) is not int or revision_limit not in (0, 1):
+        return PlanCorrectionDecision(False, "INVALID_REVISION_LIMIT")
+    if type(attempts_used) is not int or attempts_used < 0:
+        return PlanCorrectionDecision(False, "INVALID_ATTEMPT_COUNT")
+    if revision_limit == 0:
+        return PlanCorrectionDecision(False, "CORRECTION_DISABLED")
+    if attempts_used >= revision_limit:
+        return PlanCorrectionDecision(False, "CORRECTION_ALREADY_CONSUMED")
+    if type(context) is not PlanCorrectionContext:
+        return PlanCorrectionDecision(False, "INVALID_CORRECTION_CONTEXT")
+    hashes = (context.contract_hash, context.response_sha256, context.rejection_receipt_sha256)
+    flags = (context.capture_complete, context.rejection_persisted,
+             context.independent_major_finding, context.usage_complete)
+    budget = context.budget_remaining_usd
+    try:
+        finite_budget = type(budget) in (int, float) and math.isfinite(budget)
+    except OverflowError:
+        finite_budget = False
+    if (
+        type(context.admission_status) is not str
+        or context.admission_status not in {"pass", "fail", "not_verified"}
+        or any(type(value) is not str or re.fullmatch(r"[a-f0-9]{64}", value) is None for value in hashes)
+        or any(type(value) is not bool for value in flags)
+        or type(context.response_bytes) is not int or context.response_bytes < 0
+        or type(context.unreported_calls) is not int or context.unreported_calls < 0
+        or not finite_budget
+        or type(context.issues) is not tuple or not context.issues
+        or any(type(issue) is not PlanCorrectionIssue
+               or type(issue.kind) is not PlanCorrectionKind
+               or type(issue.message) is not str or not issue.message.strip()
+               for issue in context.issues)
+    ):
+        return PlanCorrectionDecision(False, "INVALID_CORRECTION_CONTEXT")
+
+    def decision(allowed: bool, reason: str) -> PlanCorrectionDecision:
+        return PlanCorrectionDecision(
+            allowed, reason, 1 if allowed else None,
+            context.contract_hash, context.response_sha256,
+            context.rejection_receipt_sha256, context.issues,
+        )
+
+    if context.admission_status != "fail":
+        return decision(False, "PLAN_NOT_DETERMINISTICALLY_REJECTED")
+    if context.independent_major_finding:
+        return decision(False, "INDEPENDENT_FINDING_BLOCKS_CORRECTION")
+    if any(issue.kind not in {PlanCorrectionKind.STRUCTURE, PlanCorrectionKind.CONSTRAINT}
+           for issue in context.issues):
+        return decision(False, "NON_MAKER_FAILURE_BLOCKS_CORRECTION")
+    if not context.rejection_persisted:
+        return decision(False, "REJECTION_NOT_DURABLY_RECORDED")
+    if not context.capture_complete or context.response_bytes > MAX_PLAN_CORRECTION_BYTES:
+        return decision(False, "REJECTED_RESPONSE_NOT_FULLY_CAPTURED")
+    if not context.usage_complete or context.unreported_calls:
+        return decision(False, "COST_RECONCILIATION_REQUIRED")
+    if budget <= 0:
+        return decision(False, "BUDGET_EXHAUSTED")
+    return decision(True, "ONE_MAKER_CORRECTION_ADMITTED")
 
 
 @dataclass(frozen=True)
