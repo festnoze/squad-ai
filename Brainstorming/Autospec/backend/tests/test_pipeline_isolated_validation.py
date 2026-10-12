@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from autospec.agents.runner import FakeRunner
+from autospec.agents.file_broker import IsolationViolation
 from autospec.config import settings
 from autospec.models import ProjectState, PipelinePhase, BackendLanguage
 from autospec.orchestrator import pipeline_validation
@@ -44,6 +45,28 @@ def test_native_baseline_admits_initial_green_and_refuses_checker_edit(tmp_path,
     (root / "test_critical.py").write_text("def test_critical():\n pass\n")
     result = pipeline_validation.run_native(root, "python", tmp_path / "supervisor", **arguments)
     assert not result[0] and "CRITICAL_TEST_CHANGED_UNREVIEWED" in result[1]
+
+
+@pytest.mark.parametrize("ecosystem,filename",[("python","business_test.py"),("python","check_business.py"),("node","custom_checks.ts")])
+def test_actual_collection_seals_custom_named_assertion_files(tmp_path,monkeypatch,ecosystem,filename):
+    root=product(tmp_path);(root/filename).write_text("# original assertion data\n")
+    proof=SuiteEvidence({filename+"::business constraint":"passed"},1,0)
+    validator(monkeypatch,proof)
+    supervisor=tmp_path/"supervisor"
+    args=dict(owner="custom",project_root=root,docker="docker",timeout=30)
+    assert pipeline_validation.run_native(root,ecosystem,supervisor,**args)[0]
+    protected=json.loads((supervisor/"protected-test-files.json").read_bytes())["files"]
+    assert filename in protected
+    (root/filename).write_text("# assertion removed but ID unchanged\n")
+    ok,output,_=pipeline_validation.run_native(root,ecosystem,supervisor,**args)
+    assert not ok and "CRITICAL_TEST_CHANGED_UNREVIEWED" in output
+
+
+@pytest.mark.parametrize("node",["missing.py::x","../outside.py::x","unsourced-name"])
+def test_unsourced_or_unconfined_collected_checker_cannot_be_frozen(tmp_path,monkeypatch,node):
+    root=product(tmp_path);validator(monkeypatch,SuiteEvidence({node:"passed"},1,0))
+    with pytest.raises((ValueError,IsolationViolation)):pipeline_validation.run_native(root,"python",tmp_path/"supervisor",
+        owner="bad",project_root=root,docker="docker",timeout=30)
 
 
 def test_coverage_isolated_and_bound_to_unchanged_baseline(tmp_path, monkeypatch):

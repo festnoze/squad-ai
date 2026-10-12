@@ -185,10 +185,14 @@ def locked_dependencies(lock: Path, ecosystem: str) -> set[str]:
 
 
 class DependencyCoordinator:
-    def __init__(self, project_root: Path, state_root: Path, runner: Callable = run_command, *, uv_cmd: str = "uv", npm_cmd: str = "npm"):
+    def __init__(self, project_root: Path, state_root: Path, runner: Callable | None = None, *, uv_cmd: str = "uv", npm_cmd: str = "npm"):
         self.root, self.state_root = Path(project_root).resolve(), Path(state_root).resolve()
         if self.state_root.is_relative_to(self.root):
             raise DependencyError("dependency state must be outside producer writable root")
+        # No host subprocess/PATH/environment fallback. A supervisor must inject
+        # its manifest-only Linux dependency_resolver (or an explicit test port).
+        if runner is None or not callable(runner):
+            raise DependencyError("explicit isolated dependency runner required; host fallback is disabled")
         self.runner, self.uv_cmd, self.npm_cmd = runner, uv_cmd, npm_cmd
         self.state_file = self.state_root / "dependencies.json"
         self.lock_file = self.state_root / "dependencies.lock"

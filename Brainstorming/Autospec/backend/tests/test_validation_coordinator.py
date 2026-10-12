@@ -53,6 +53,57 @@ async def test_native_observation_requires_exact_intact_external_payload(tmp_pat
 
 
 @pytest.mark.asyncio
+async def test_multiple_native_scopes_are_exact_and_ambiguous_scopes_rejected(tmp_path):
+    from dataclasses import asdict
+    snapshot="a"*64;store=SupervisorEvidenceStore(tmp_path,snapshot,CONTRACT)
+    path=tmp_path/"actual-metatest-native-output.json"
+    write_json(path,{"scope":"actual protocol unit output only; not product secret scan"})
+    raw=Proof("X",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot,CONTRACT,("METATEST:native_output",))
+    with pytest.raises(AdapterUnavailable): await store.record_native_observation("secret_scan",{},parameters={"scope":"missing"})
+    first=await store.record_native_observation("secret_scan",{"findings":["negative metatest"]},
+        parameters={"scope":"source_image_logs"},source_proofs=(raw,))
+    await store.record_native_observation("secret_scan",{"findings":[]},parameters={"scope":"logs_artifacts"},source_proofs=(raw,))
+    assert await store.observe("secret_scan",scope="source_image_logs")=={"findings":["negative metatest"]}
+    assert await store.observe("secret_scan",scope="logs_artifacts")=={"findings":[]}
+    with pytest.raises(AdapterUnavailable): await store.observe("secret_scan")
+    index=store._read(tmp_path/"observations.json")
+    index["observations"]["secret_scan"].append(asdict(first));write_json(tmp_path/"observations.json",index)
+    with pytest.raises(AdapterUnavailable): await store.observe("secret_scan",scope="source_image_logs")
+
+
+@pytest.mark.asyncio
+async def test_e2e_coordinator_executes_both_modes_and_preserves_missing_capability(tmp_path,monkeypatch):
+    # Only protocol wiring is unit-replaced. These receipts explicitly say NV,
+    # do not claim a real UI/API/DB and cannot award quality or product PASS.
+    from autospec.validation.coordinator import _execute_e2e
+    import autospec.validation.browser_contracts as browser_module
+    reference="## 8. Six parcours E2E minimum\n"+"\n".join(f"{i}. Source scenario {i}" for i in range(1,7))+"\n## 9. End"
+    contract=SimpleNamespace(reference=reference,contract_hash=CONTRACT)
+    store=SupervisorEvidenceStore(tmp_path,"a"*64,CONTRACT);calls=[]
+    monkeypatch.setattr(browser_module,"PlaywrightHarness",lambda *a,**k:None)
+    class ProtocolOnlyVerifier:
+        def __init__(self,*a): pass
+        async def verify_e2e(self,snapshot_hash,*,mode,scenario_ids):
+            calls.append((mode,scenario_ids));rows=[]
+            for sid in scenario_ids:
+                path=tmp_path/(sid+"-"+mode+".json");write_json(path,{"actual":"missing protocol-only port"})
+                p=Proof("X",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot_hash,CONTRACT,(),False)
+                rows.append(dict(id=sid,expected="Source scenario "+str(int(sid[-2:])),mode=mode,
+                    status="NOT_VERIFIED",proofs=[asdict(p)],snapshot_hash=snapshot_hash,contract_hash=CONTRACT,
+                    real_ui_api_db=False,nominal_mocks=False,limits=["unit-only missing port"]))
+            return dict(snapshot_hash=snapshot_hash,contract_hash=CONTRACT,scenarios=rows)
+    from dataclasses import asdict
+    monkeypatch.setattr(browser_module,"BrowserVerifier",ProtocolOnlyVerifier)
+    harness=SimpleNamespace(adapter=None,bindings=SimpleNamespace(browser_bindings={},browser_routes={}))
+    rows=await _execute_e2e(contract,harness,store,"a"*64)
+    assert [mode for mode,_ in calls]==["alone"]*6+["together"] and len(rows)==12
+    assert all(len(ids)==1 for _,ids in calls[:6]) and len(calls[-1][1])==6
+    assert {r["status"] for r in rows}=={"NOT_VERIFIED"} and not store.contributions["TST-05"]
+    import json
+    assert await store.observe("browser_e2e")==json.loads(json.dumps(rows))
+
+
+@pytest.mark.asyncio
 async def test_binding_proposal_can_be_reviewed_then_used_without_manual_plugin(tmp_path):
     from dataclasses import asdict
     from autospec.validation.final_gate import source_snapshot
@@ -138,3 +189,23 @@ async def test_real_coordinator_vertical_public_api_nominal(linux_fixture_source
     assert all(s["passed"] for s in receipt["stages"])
     assert all(Path(p["path"]).is_relative_to(tmp_path/"vertical"/context.bindings.snapshot_hash/"evidence")
                for s in receipt["stages"] for p in s["proofs"])
+
+
+@REAL
+@pytest.mark.asyncio
+async def test_real_quality_sqlite_probe_transactions_restart_and_cleanup(linux_fixture_source,tmp_path):
+    from autospec.validation.coordinator import sqlite_quality_probe
+    context=session(linux_fixture_source,tmp_path)
+    contract=SimpleNamespace(contract_hash=CONTRACT,facts=[SimpleNamespace(kind="security_profile")])
+    value=await sqlite_quality_probe(SimpleNamespace(id="independent-sqlite-quality-fixture"),contract,
+        context.source_root,context.bindings.snapshot_hash,tmp_path)
+    assert value["isolated"] and value["restart_verified"] and value["cleanup_owned_only"],value
+    path=Path(value["database_path"])
+    assert path.is_relative_to(Path(value["isolated_root"])) and path.read_bytes().startswith(b"SQLite format 3\x00")
+    assert hashlib.sha256(path.read_bytes()).hexdigest()==value["database_sha256"]
+    assert len(set(value["connection_ids"]))>=2
+    store=SupervisorEvidenceStore(tmp_path,context.bindings.snapshot_hash,CONTRACT)
+    assert await store.observe("real_sqlite_test_environment")==value
+    proofs=await store.proofs("TST-04")
+    assert len(proofs)>=2 and all(p.type=="X" and p.passed and p.intact(
+        snapshot_hash=context.bindings.snapshot_hash,contract_hash=CONTRACT) for p in proofs)

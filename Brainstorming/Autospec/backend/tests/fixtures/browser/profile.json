@@ -1,0 +1,14 @@
+{
+  "browser": {
+    "timeout_ms": 15000, "desktop_width": 1280, "mobile_width": 390,
+    "client_ticket_count": 6, "staff_ticket_count": 12,
+    "search_a": "ASCII", "search_b": "Unicode",
+    "search_a_marker": "ASCII marker shared", "search_b_marker": "Unicode Éclair",
+    "french_action_labels": {"create":"Créer un ticket","ticket_nav":"Tickets","admin_nav":"Administration","dashboard_nav":"Tableau de bord","logout":"Se déconnecter","submit":"Envoyer","send":"Publier"}
+  },
+  "quality": {
+    "required_suites": ["backend", "frontend", "e2e"],
+    "coverage": {"backend": {"lines": 80, "branches": 70}, "frontend": {"lines": 70}},
+    "coverage_domains": {"backend": ["auth", "services", "permissions"], "frontend": ["auth", "tickets", "users", "http"]}
+  }
+}

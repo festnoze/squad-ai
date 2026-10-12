@@ -15,6 +15,8 @@ from ..agents.file_broker import ExecutionContext, FileBroker
 from ..orchestrator.dependencies import atomic_json
 from .final_gate import source_snapshot
 from .support_adapter import AdapterUnavailable, Proof
+from .review_plans import (quality_required, prepare_quality_plan,
+                          seal_quality_plan, load_reviewed_quality_plan)
 
 
 def source_bundle(root, snapshot_hash, *, max_chars=600_000):
@@ -77,7 +79,7 @@ def _proof(root, filename, payload, snapshot, oracle, checks, passed=True):
 def _protocol():
     root = Path(__file__).parent
     return {name: (root/name).read_text(encoding="utf-8") for name in (
-        "product_harness.py", "security_contracts.py", "business_contracts.py", "architecture_contracts.py", "browser_contracts.py")}
+        "product_harness.py", "security_contracts.py", "business_contracts.py", "architecture_contracts.py", "browser_contracts.py", "quality_contracts.py")}
 
 
 class ReviewPending(AdapterUnavailable):
@@ -110,6 +112,7 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
     from .product_harness import ReviewedProductBindings, ReviewedFixtureFactory
     root, source = Path(supervisor_root).resolve(), Path(snapshot_root).resolve()
     if root.is_relative_to(source): raise AdapterUnavailable("review store inside product")
+    needs_quality = phase == "final" and quality_required(contract)
     try:
         binding = ReviewedProductBindings.from_dict(json.loads((root/"product-bindings.json").read_bytes()))
         if (binding.snapshot_hash, binding.contract_hash) != (snapshot_hash, contract.contract_hash): raise AdapterUnavailable("stale review")
@@ -117,6 +120,7 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         fixture = ReviewedFixtureFactory(root/"reviewed-fixtures.json", snapshot_hash=snapshot_hash, contract_hash=contract.contract_hash, source_root=source)
         if fixture.fingerprint != binding.fixture_fingerprint: raise AdapterUnavailable("reviewed pair drift")
         if phase != "final" or (root/"source-reviews"/snapshot_hash/"final-review.json").is_file():
+            if needs_quality: load_reviewed_quality_plan(contract, source, snapshot_hash, root)
             return {"status": "REVIEWED", "cached": True, "snapshot_hash": snapshot_hash}
     except (OSError, ValueError, TypeError, AdapterUnavailable): pass
     bundle = source_bundle(source, snapshot_hash)
@@ -135,6 +139,17 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         "reference, not a hardcoded template: actors, deterministic tickets, IDs/dates/counts, public/internal conversations and exact "
         "case variants/metadata used by trusted packs. Password '$generated' and '$ref' avoid stored credentials. "
         "Nominal login/API/persistence cannot be mocked. Missing capabilities stay absent, not a default success.")
+    if needs_quality:
+        proposer += (
+            " Add quality_plan:{suites:[{name:backend|frontend,root:canonical relative path,ecosystem:python|node,"
+            "source_inventory:[all business source relative to suite root, including never executed files],"
+            "domains:[source-defined coverage domains],test_args:[native selectors],coverage_source:relative path}],"
+            "requirements_mapping:{RID:[{suite:backend|frontend|e2e,test:actual collected nodeid,assertion:exact inspected assertion}]},"
+            "nominal_security_db_mocks:boolean,e2e_mode:supervisor_browser,mutation:{path:relative product path,"
+            "original_sha256:exact supplied hash,before:unique actual authorization anchor,after:one intentionally broken authorization replacement}}."
+            " Mutation is ONLY a supervisor-owned experimental copy. No fabricated native IDs, coverage inventory, assertions or mock declarations."
+            " E2E IDs are supervisor_browser::E2E-01[alone] through E2E-06[together], exactly the trusted six source scenarios."
+            " Missing assertions/mappings remain absent and will fail acceptance; do not invent them.")
     review_root = root/"source-reviews"/snapshot_hash
     request_path = review_root/"review-request.json"
     response = _external_response(review_root/"proposal-response.json", snapshot=snapshot_hash, oracle=contract.contract_hash)
@@ -144,21 +159,35 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
             "scope":"local packet; no generation-provider call or source export performed"})
         raise ReviewPending(request_path,"operational_proposal")
     answer = response["answer"]
-    if not isinstance(answer, dict) or set(answer) != {"candidate", "fixtures"}: raise AdapterUnavailable("malformed proposal")
+    if not isinstance(answer, dict) or set(answer) != ({"candidate", "fixtures", "quality_plan"} if needs_quality else {"candidate", "fixtures"}): raise AdapterUnavailable("malformed proposal")
     fixtures = expand_fixture_inputs(answer["fixtures"], cases)
     proposal = await prepare_binding_proposal(answer["candidate"], fixtures, contract=contract, snapshot_root=source, snapshot_hash=snapshot_hash)
     atomic_json(review_root/"proposal.json", proposal)
+    quality = None
+    if needs_quality:
+        quality = await prepare_quality_plan(answer["quality_plan"], candidate=answer["candidate"], fixtures=fixtures,
+            contract=contract, source=source, snapshot=snapshot_hash, destination=review_root/"quality")
+        packet["quality_proposal"] = quality
     reviewer = (
         "You are an INDEPENDENT tool-free exact-source/fixture reviewer. Do not trust proposer/product comments. "
         "Never adjust frozen expectations to generated code. Approve bindings only when every command/selector/table/symbol "
         "is source-justified, confined and cannot substitute business/auth logic. Approve fixtures only when reference data, "
         "expected counts/IDs and variants are correct; nominal seed is not a universal fallback. "
         "Return JSON {bindings:{approved:boolean,citations:[],findings:[]},fixtures:{approved:boolean,citations:[],findings:[]}, "
-        "requirements:[{id,status:PASS|FAIL|NOT_VERIFIED,citations:[],reason:string}],test_mapping:{RID:{backend:[nodeids],frontend:[native IDs]}}}. "
+        "requirements:[{id,status:PASS|FAIL|NOT_VERIFIED,citations:[],reason:string}],test_mapping:{RID:[{suite,test,assertion}]}}. "
         "Citation={file,start,end,reason}, exact supplied source, 1-based. Final phase covers every requirement exactly once; "
         "vertical phase requirements/test_mapping are empty. Verdicts cover SOURCE REVIEW ONLY, not runtime/browser success. "
         "PASS needs substantive source citations; contradiction is FAIL; uncertainty NOT_VERIFIED. Mapping links actual "
         "test assertions to frozen requirements but never proves execution. No X/V, no overall-ready flag, no source changes.")
+    if needs_quality:
+        reviewer += (
+            " Add quality:{approved:boolean,citations:[],findings:[]}. This separately approves the EXACT quality_proposal,"
+            " including complete business-source inventories, no hidden nominal auth/DB mocks, actual assertion mapping,"
+            " six supervisor E2E scenarios, and the deliberately broken authorization anchor."
+            " Inspect mutation_configuration bindings/fixtures on the exact supplied changed source and real mutant hash;"
+            " the quality approval also covers that operational/fixture pair, NOT its business correctness."
+            " test_mapping must exactly equal quality_proposal.candidate.requirements_mapping; reject instead of silently correcting."
+            " Never approve missing critical suites, uninspected helper/assertion files or a mutation unrelated to authorization.")
     reviewed = _external_response(review_root/"independent-response.json", snapshot=snapshot_hash,
         oracle=contract.contract_hash,different_agent=response["agent_id"])
     if reviewed is None:
@@ -167,8 +196,8 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
             "proposer_agent":response["agent_id"],"scope":"local packet; independent second agent required"})
         raise ReviewPending(request_path,"independent_review")
     review = reviewed["answer"]
-    if not isinstance(review, dict) or set(review) != {"bindings","fixtures","requirements","test_mapping"}: raise AdapterUnavailable("malformed independent review")
-    for name in ("bindings", "fixtures"):
+    if not isinstance(review, dict) or set(review) != ({"bindings","fixtures","requirements","test_mapping","quality"} if needs_quality else {"bindings","fixtures","requirements","test_mapping"}): raise AdapterUnavailable("malformed independent review")
+    for name in (("bindings", "fixtures", "quality") if needs_quality else ("bindings", "fixtures")):
         if not isinstance(review[name],dict) or review[name].get("approved") is not True:
             atomic_json(review_root/"rejected-review.json", review)
             raise AdapterUnavailable("independent "+name+" review rejected")
@@ -181,11 +210,17 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         if row.get("status") not in {"PASS","FAIL","NOT_VERIFIED"} or not isinstance(row.get("reason"),str) or not row["reason"].strip(): raise AdapterUnavailable("invalid review verdict")
         if row["status"] in {"PASS","FAIL"}: validate_citations(row.get("citations"), bundle)
     if not isinstance(review["test_mapping"],dict) or set(review["test_mapping"])-expected: raise AdapterUnavailable("unknown test mapping requirement")
+    if needs_quality and review["test_mapping"] != quality["candidate"]["requirements_mapping"]:
+        raise AdapterUnavailable("independent mapping changed the proposed exact quality subject")
     if source_snapshot(source).digest!=snapshot_hash: raise AdapterUnavailable("source drift during review")
     atomic_json(review_root/("final-review.json" if phase=="final" else "vertical-review.json"),review)
     def receipt(name):
         return _proof(review_root,name+"-review.json",{"subject":proposal[name],"review":review[name]},snapshot_hash,contract.contract_hash,proposal[name[:-1]+"_checks"] if name=="fixtures" else proposal["binding_checks"])
     result = await install_reviewed_configuration(proposal,binding_review=receipt("bindings"),fixture_review=receipt("fixtures"),supervisor_root=root,snapshot_root=source)
+    quality_proof = None
+    if needs_quality:
+        quality_proof = await seal_quality_plan(quality, review["quality"], contract=contract, source=source,
+            snapshot=snapshot_hash, supervisor_root=root)
     if phase=="final":
         proofs={}
         for row in rows:
@@ -193,6 +228,10 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
             payload={"review":row,"source_hashes":{c["file"]:bundle["files"][c["file"]]["sha256"] for c in row["citations"]}}
             proof=_proof(review_root,row["id"]+"-source.json",payload,snapshot_hash,contract.contract_hash,[row["id"]],row["status"]=="PASS")
             proofs[row["id"]]=[asdict(proof)]
+        if quality_proof:
+            for rid in expected:
+                if rid.startswith("TST-") and any(c == rid or c.startswith(rid+":") for c in quality_proof.checks):
+                    proofs.setdefault(rid, []).append(asdict(quality_proof))
         atomic_json(root/"proofs.json",{"snapshot_hash":snapshot_hash,"contract_hash":contract.contract_hash,"proofs":proofs})
         mapping=_proof(review_root,"test-mapping.json",{"mapping":review["test_mapping"]},snapshot_hash,contract.contract_hash,["PRODUCT:test_mapping","TST-02"])
         atomic_json(root/"reviewed-test-mapping.json",{"mapping":review["test_mapping"],"review":asdict(mapping)})

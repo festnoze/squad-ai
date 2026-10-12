@@ -16,7 +16,7 @@ from .test_integrity import capture_baseline, evaluate_run, load_baseline, save_
 from .toolchain import frontend_failure_digest
 
 
-def critical_test_files(root: Path, ecosystem: str) -> list[str]:
+def critical_test_files(root: Path, ecosystem: str, *, collected_ids=()) -> list[str]:
     broker = FileBroker(ExecutionContext("critical-native-tests", root))
     files = []
     ignored = {".git", ".venv", "venv", "node_modules", "dist", "build", "__pycache__"}
@@ -25,7 +25,7 @@ def critical_test_files(root: Path, ecosystem: str) -> list[str]:
         for name in names:
             relative = (Path(parent) / name).relative_to(root).as_posix()
             python_test = (name in {"conftest.py", "pytest.ini", ".coveragerc", "setup.cfg", "tox.ini"}
-                           or name.startswith("test_") and name.endswith(".py"))
+                           or name.endswith(".py") and (name.startswith("test_") or name.endswith("_test.py")))
             node_test = (".test." in name or ".spec." in name or
                          name.startswith(("vitest.config.", "vite.config.", "tsconfig")) or
                          name.casefold().startswith(("setuptests.", "testsetup.")))
@@ -33,7 +33,16 @@ def critical_test_files(root: Path, ecosystem: str) -> list[str]:
             if (python_test if ecosystem == "python" else node_test) or support:
                 broker.path(relative)
                 files.append(relative)
-    return sorted(files)
+    # The actual independent collection is authoritative for custom selectors
+    # (pytest python_files, Vitest include). Names alone cannot seal assertions.
+    for node in collected_ids:
+        if not isinstance(node,str) or "::" not in node:
+            raise ValueError("collected checker lacks exact source filename")
+        relative=node.split("::",1)[0].replace("\\","/").removeprefix("/app/").removeprefix("/tmp/product/")
+        path=broker.path(relative)
+        if not path.is_file():raise ValueError("collected checker source absent")
+        files.append(relative)
+    return sorted(set(files))
 
 
 def run_native(root: Path, ecosystem: str, supervisor: Path, *, owner: str,
@@ -75,7 +84,7 @@ def run_native(root: Path, ecosystem: str, supervisor: Path, *, owner: str,
                 or collected_ids is not None and set(result.evidence.outcomes) != set(collected_ids)
                 or collection is not None and collection.source_fingerprint != result.source_fingerprint):
             return False, output + "\nNATIVE_BASELINE_UNAVAILABLE: no reliable collection", result.evidence.outcomes
-        paths = critical_test_files(root, ecosystem)
+        paths = critical_test_files(root, ecosystem,collected_ids=collected_ids or result.evidence.outcomes)
         baseline = capture_baseline(root, paths, list(collected_ids or result.evidence.outcomes))
         save_baseline(baseline, baseline_path, root)
         # Physical worktree paths change; the protected paths use logical roots.

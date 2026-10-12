@@ -36,7 +36,9 @@ def test_real_argon2_runtime_request_and_clean_lock_validation(tmp_path):
     assert not evaluate_run(baseline, bad_run, evidence).green
     assert run_command([str(bad.python), "-c", "import argon2"], cwd=bad_run, env=minimal_environment()).returncode != 0
 
-    coordinator = DependencyCoordinator(root, tmp_path / "supervisor/requests")
+    # This historical tool-only integration fixture explicitly opts into a
+    # minimal host environment. Production defaults never select this runner.
+    coordinator = DependencyCoordinator(root, tmp_path / "supervisor/requests", lambda argv, **kw: run_command(argv, **kw, env=minimal_environment()))
     coordinator.submit(DependencyRequest("AUTH", "python", "argon2-cffi", ">=23", "runtime", "pyproject.toml", "uv.lock", "real password hashing"))
     records = coordinator.resolve_pending("manifest-owner")
     assert records[0]["status"] == "applied", records
@@ -75,7 +77,7 @@ def test_real_node_clean_install_cannot_reuse_product_modules(tmp_path):
     result = run_command(clean.test_command(""), cwd=run, env=minimal_environment())
     assert result.returncode != 0, result.stdout + result.stderr
     assert tap_evidence(result.stdout, result.returncode).outcomes["required package"] == "failed"
-    coordinator = DependencyCoordinator(root, tmp_path / "supervisor/requests")
+    coordinator = DependencyCoordinator(root, tmp_path / "supervisor/requests", lambda argv, **kw: run_command(argv, **kw, env=minimal_environment()))
     coordinator.submit(DependencyRequest("NODE", "node", "is-number", "^7", "runtime", "package.json", "package-lock.json", "small registry dependency fixture"))
     records = coordinator.resolve_pending("node-manifest-owner")
     assert records[0]["status"] == "applied", records
