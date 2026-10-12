@@ -17,6 +17,7 @@ import threading
 import uuid
 from dataclasses import dataclass, replace
 import hashlib
+import ipaddress
 from pathlib import Path
 
 from ..agents.file_broker import ExecutionContext, FileBroker
@@ -55,6 +56,60 @@ def _node_command(command: list[str], *, report: bool = False, dist: bool = Fals
     return ["/bin/sh", "-c", script, "autospec", *command]
 
 
+def _coverage_inventory(stage: Path, source: str) -> dict[str, str]:
+    if source == ".":
+        location = stage
+    elif isinstance(source, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*(?:[./][A-Za-z_][A-Za-z0-9_]*)*", source):
+        relative = source.replace(".", "/")
+        broker = FileBroker(ExecutionContext("coverage-source", stage))
+        location = broker.path(relative)
+        if not location.exists():
+            location = broker.path(relative + ".py")
+    else:
+        raise _unavailable("Coverage requires an explicit contained Python source/module")
+    files = location.rglob("*.py") if location.is_dir() else [location]
+    inventory = {}
+    for path in files:
+        if (not path.is_file() or path.suffix != ".py" or path.name == "conftest.py" or
+            path.name.startswith("test_") or path.name.endswith("_test.py") or
+            any(part in {"tests", "test", "__pycache__"} for part in path.relative_to(stage).parts)):
+            continue
+        inventory[path.relative_to(stage).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    if not inventory:
+        raise _unavailable("Coverage has no admitted production source inventory")
+    return inventory
+
+
+def _admit_source_coverage(data: dict, inventory: dict[str, str], source: str,
+                           source_fingerprint: str, environment: LinuxEnvironment) -> dict:
+    wanted = {}
+    for path, value in data["files"].items():
+        normal = path.replace("\\", "/").removeprefix("/app/")
+        if normal in inventory:
+            if normal in wanted:
+                raise ValueError("Duplicate coverage source identity")
+            wanted[normal] = value
+    if set(wanted) != set(inventory):
+        raise ValueError("Coverage omitted admitted source files")
+    counts = {key: 0 for key in ("covered_lines", "num_statements", "missing_lines", "num_branches", "covered_branches")}
+    for value in wanted.values():
+        summary = value["summary"]
+        for key in counts:
+            if type(summary[key]) is not int or summary[key] < 0:
+                raise ValueError("Invalid per-source coverage counts")
+            counts[key] += summary[key]
+        if (summary["covered_lines"] > summary["num_statements"] or
+            summary["missing_lines"] != summary["num_statements"] - summary["covered_lines"] or
+            summary["covered_branches"] > summary["num_branches"]):
+            raise ValueError("Inconsistent per-source coverage counts")
+    total = counts["num_statements"] + counts["num_branches"]
+    counts["percent_covered"] = 100 * (counts["covered_lines"] + counts["covered_branches"]) / total if total else 0
+    return {**data, "files": wanted, "totals": counts,
+            "autospec_inventory": {"version": 1, "source": source, "files": inventory,
+                "source_fingerprint": source_fingerprint, "environment_fingerprint": environment.fingerprint,
+                "image": environment.image}}
+
+
 class IsolatedValidator:
     def __init__(self, cache_root: Path, *, docker: str = "docker", timeout: float = 300,
                  manager: LinuxEnvironmentManager | None = None):
@@ -87,10 +142,12 @@ class IsolatedValidator:
             source_files = {file.relative_to(stage).as_posix(): hashlib.sha256(file.read_bytes()).hexdigest()
                             for file in sorted(stage.rglob("*")) if file.is_file()}
             source_fingerprint = hashlib.sha256(json.dumps(source_files,sort_keys=True).encode()).hexdigest()
+            coverage_inventory = _coverage_inventory(stage, coverage_source) if coveragepath is not None else None
             if ecosystem == "python":
                 command = ["/opt/venv/bin/python", "-m", "pytest", "--json-report", "--json-report-file=suite-report.json", *test_args]
+                command += ["-o", "addopts="]  # no product config can disable/redirect the factory recipe
                 if coveragepath is not None:
-                    command += [f"--cov={coverage_source}", "--cov-branch", "--cov-report=json:suite-coverage.json", "--cov-report="]
+                    command += [f"--cov={coverage_source}", "--cov-config=/dev/null", "--cov-branch", "--cov-report=json:suite-coverage.json", "--cov-report="]
                 parser = pytest_evidence
             else:
                 package = json.loads((stage / "package.json").read_text(encoding="utf-8"))
@@ -133,6 +190,8 @@ class IsolatedValidator:
                             raise ValueError("invalid coverage counts")
                     if not isinstance(coverage["files"], dict):
                         raise ValueError("invalid coverage files")
+                    coverage = _admit_source_coverage(coverage, coverage_inventory, coverage_source,
+                                                     source_fingerprint, environment)
                     atomic_json(coveragepath, coverage)
                 except (OSError, KeyError, TypeError, ValueError):
                     coverage = None
@@ -331,6 +390,7 @@ class RuntimeSession:
         self.capacity = threading.BoundedSemaphore(64)
         self.closed = False
         self.transition = True
+        self.detached = False
         self.persistent_database = persistent_database
         self.mount_stage = mount_stage
         self.volume_name = "autospec-validation-" + uuid.uuid4().hex if persistent_database else None
@@ -356,6 +416,10 @@ class RuntimeSession:
             self.env["DATABASE_URL"] = self.DATABASE_URL
 
     def __enter__(self):
+        with self.operation_lock:
+            return self._enter_owned()
+
+    def _enter_owned(self):
         if self.closed or self.thread is not None:
             raise _unavailable("RuntimeSession is closed or already started")
         try:
@@ -516,6 +580,12 @@ class RuntimeSession:
     def restart(self) -> "RuntimeSession":
         """Same origin/owned DB, new independently attested container identity."""
         with self.operation_lock:
+            self.detach()
+            return self.attach()
+
+    def detach(self) -> dict:
+        """Remove this container only, preserve owned DB until attach/close."""
+        with self.operation_lock:
             identifier = self._assert_owned()
             if self.persistent_database:
                 self._assert_volume()
@@ -523,14 +593,52 @@ class RuntimeSession:
             self._disconnect()
             _cleanup_container(self.docker, identifier, self.owner)
             self.identifier = None
+            self.detached = True
+            return {"version": 1, "container_id": identifier, "origin": self.origin,
+                    "volume": json.loads(json.dumps(self.volume_identity)), "database_url": self.database_url}
+
+    def attach(self) -> "RuntimeSession":
+        with self.operation_lock:
+            if self.closed or not self.detached or self.thread is None:
+                raise _unavailable("Runtime attach requires an owned detached session")
+            if self.persistent_database:
+                self._assert_volume()
             self.name = "autospec-sandbox-" + uuid.uuid4().hex
             try:
                 require_sandbox(self.stage, self.image, docker=self.docker)
                 self._launch()
+                self.detached = False
             except BaseException:
                 self.close()
                 raise
             return self
+
+    def inspect_configuration(self) -> dict:
+        """Fresh owned exact-ID configuration, no secret env/source contents."""
+        with self.operation_lock:
+            identifier = self._assert_owned()
+            if self.persistent_database:
+                self._assert_volume()
+            result = _docker_call([self.docker, "container", "inspect", identifier],
+                                  capture_output=True, text=True, timeout=3, check=False)
+            try:
+                data = json.loads(result.stdout)[0]
+                labels = data["Config"]["Labels"]
+                if result.returncode or data["Id"] != identifier or labels.get("autospec.run_id") != self.owner or labels.get("autospec.kind") != "sandbox":
+                    raise ValueError("Container identity changed")
+                if self.image.startswith("sha256:") and data["Image"] != self.image:
+                    raise ValueError("Runtime image differs")
+                config = data["HostConfig"]
+                return {"version": 1, "container_id": identifier, "owner": self.owner, "image_id": data["Image"],
+                        "running": data["State"]["Running"], "user": data["Config"]["User"],
+                        "read_only": config["ReadonlyRootfs"], "cap_drop": config["CapDrop"],
+                        "privileged": config["Privileged"], "security_opt": config["SecurityOpt"],
+                        "network_mode": config["NetworkMode"], "published_ports": config.get("PortBindings") or {},
+                        "mounts": [{"type": mount["Type"], "destination": mount["Destination"], "rw": mount["RW"],
+                                    "name": mount.get("Name"), "source": mount["Source"]} for mount in data["Mounts"]],
+                        "volume": json.loads(json.dumps(self.volume_identity))}
+            except (KeyError, TypeError, ValueError, IndexError) as exc:
+                raise _unavailable("Owned runtime configuration cannot be attested") from exc
 
     def _forward(self, connection: socket.socket) -> None:
         if not self.capacity.acquire(blocking=False):
@@ -540,10 +648,13 @@ class RuntimeSession:
         with self.lock:
             self.sockets.add(connection)
         try:
+            peer = str(ipaddress.IPv4Address(connection.getpeername()[0]))
+            if not ipaddress.IPv4Address(peer).is_loopback:
+                raise _unavailable("Runtime ingress must have a kernel-attested IPv4 loopback peer")
             # No host code from the product: argv and forwarding program are
             # factory constants, aimed at an immutable attested container ID.
             if self.ecosystem == "python":
-                code = ("import socket,sys,threading; s=socket.create_connection(('127.0.0.1'," + str(self.port) + "),2); "
+                code = ("import socket,sys,threading; s=socket.create_connection(('127.0.0.1'," + str(self.port) + "),2,source_address=(" + repr(peer) + ",0)); "
                         "exec(\"def upload():\\n try:\\n  while True:\\n   b=sys.stdin.buffer.read1(65536)\\n   if not b: break\\n   s.sendall(b)\\n except OSError: pass\\n finally:\\n  try: s.shutdown(socket.SHUT_WR)\\n  except OSError: pass\\n\"); "
                         "threading.Thread(target=upload,daemon=True).start(); "
                         "exec(\"while True:\\n b=s.recv(65536)\\n if not b: break\\n sys.stdout.buffer.write(b); sys.stdout.buffer.flush()\\n\")")
@@ -551,7 +662,7 @@ class RuntimeSession:
                 # or site customization cannot replace the ingress transport.
                 bridge = ["/usr/local/bin/python", "-I", "-u", "-c", code]
             else:
-                bridge = ["node", "-e", f"const s=require('net').connect({self.port},'127.0.0.1');s.on('connect',()=>{{process.stdin.pipe(s);s.pipe(process.stdout);}});s.on('error',()=>process.exit(1));s.on('close',()=>process.exit());"]
+                bridge = ["node", "-e", f"const s=require('net').connect({{port:{self.port},host:'127.0.0.1',localAddress:{json.dumps(peer)}}});s.on('connect',()=>{{process.stdin.pipe(s);s.pipe(process.stdout);}});s.on('error',()=>process.exit(1));s.on('close',()=>process.exit());"]
             with self.operation_lock:
                 identifier = self._assert_owned()
                 process = spawn_owned_process([self.docker, "exec", "--workdir", "/tmp", "-i", identifier, *bridge],
@@ -604,6 +715,10 @@ class RuntimeSession:
             return (result.stdout + result.stderr)[-12000:]
 
     def close(self):
+        with self.operation_lock:
+            self._close_owned()
+
+    def _close_owned(self):
         if self.thread is not None and self.server is not None:
             self.server.shutdown()
             self.thread.join(timeout=2)
