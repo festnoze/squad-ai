@@ -33,6 +33,23 @@ def test_old_oracle_marker_fields_do_not_supply_missing_reviewed_fixture_metadat
         verifier.operational_probe("search_a")
 
 
+@pytest.mark.parametrize("kind,field",[("browser_profile","search_a"),("browser_profile","french_action_labels"),
+    ("security_profile","min_token_chars"),("security_profile","db_fault")])
+def test_generation_rejects_deprecated_operational_or_invented_oracle_fields(kind,field):
+    from autospec.contracts import ContractFact, import_contract
+    original=browser_contract() if kind=="browser_profile" else security_contract()
+    facts=[]
+    for fact in original.facts:
+        expected=fact.expected
+        if fact.kind==kind:
+            target=expected["session"] if field=="min_token_chars" else expected["statuses"] if field=="db_fault" else expected
+            target[field]="deprecated"
+        facts.append(ContractFact.create(fact.id,fact.kind,expected,fact.requirement_ids,fact.source_excerpt))
+    contract=import_contract(original.brief,original.reference,reviewed_by="meta-test",facts=facts)
+    with pytest.raises(AdapterUnavailable):
+        (browser_generation_requirements if kind=="browser_profile" else security_generation_requirements)(contract)
+
+
 async def test_guards_can_be_installed_before_first_navigation_without_weakening_defaults():
     owner,browser,case,checks,events=harness()
     await owner.page(case,1280,auto_navigate=False)
@@ -44,6 +61,22 @@ async def test_guards_can_be_installed_before_first_navigation_without_weakening
         owner,browser,case,checks,events=harness()
         with pytest.raises(ValueError):await owner.page(case,1280,auto_navigate=value)
         assert events==[]
+
+
+async def test_old_connected_browser_is_closed_and_never_adopts_restarted_namespace():
+    owner,browser,case,checks,events=harness()
+    closed=[]
+    class OldNamespace:
+        @property
+        def endpoint(self): raise AdapterUnavailable("pinned parent identity changed")
+        def close(self): closed.append("container")
+    owner.docker_browser=OldNamespace()
+    with pytest.raises(AdapterUnavailable,match="namespace adoption"):
+        await owner.page(case,1280)
+    assert "context" not in events and closed==["container"] and owner.browser is None
+    assert owner.browser_environment==dict(qualified=False,runtime_changed=True)
+    with pytest.raises(AdapterUnavailable):await owner.page(case,1280)
+    assert "context" not in events and owner._runtime_invalidated is True
 
 
 @pytest.mark.parametrize("rid", ["UX-01","UX-06"])
