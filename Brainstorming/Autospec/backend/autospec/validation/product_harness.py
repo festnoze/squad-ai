@@ -627,6 +627,7 @@ class ProductHarness:
         self._security_outputs=[]
         self._security_output_bytes=0
         self._security_output_overflow=False
+        self._security_child_logs=[]
         import httpx
         self.adapter = SecurityObservedAdapter(known_secrets=self._security_secrets,
             negative_output=lambda raw:self._security_output("artifacts","negative-http-response",raw),
@@ -954,6 +955,7 @@ class ProductHarness:
             if kind=="logs" or scope=="logs_artifacts":
                 scanner.scan(io.BytesIO(raw),scope=kind,name=label+"-"+str(index))
         provenance["logs"]=log_identity
+        provenance["cookie_mode_logs"]=list(self._security_child_logs)
         if scope=="source_image_logs":
             if image_id is None: raise AdapterUnavailable("qualified immutable delivery image is required, not the dependency runtime image")
             scanner.scan_tree(self.snapshot_root,scope="source")
@@ -1006,8 +1008,12 @@ class ProductHarness:
                 account=child.manifest.accounts[binding.actor]
                 self._security_secrets.add(account.password)
                 observed=await child._exec(("/usr/local/bin/python","-I","-c",COOKIE_MODE_REQUEST),dict(
-                    tls=mode.tls,port=self.bindings.internal_port,path=self.bindings.auth_path,cookie_name=binding.cookie_name,
+                    tls=mode.tls,port=self.bindings.internal_port,path=self.bindings.auth_path,cookie_name=binding.cookie_name,csrf_field=self.bindings.csrf_field,
                     origin=runtime.env["APP_ORIGIN"],credentials=dict(email=account.email,password=account.password)),timeout=20)
+                private=observed.pop("_probe_secrets",None)
+                if not isinstance(private,list) or any(not isinstance(s,str) for s in private):
+                    raise AdapterUnavailable("private observer auth-secret trace unavailable")
+                self._security_secrets.update(private)
                 if observed.get("status")!=200 or not observed.get("cookie_present") or (mode.tls and not observed.get("tls_version")):
                     raise AdapterUnavailable("real reviewed cookie mode login/header evidence unavailable")
                 configuration=await asyncio.to_thread(runtime.inspect_configuration)
@@ -1022,8 +1028,23 @@ class ProductHarness:
                 proofs.append(Proof("X",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),self.bindings.snapshot_hash,
                     self.bindings.contract_hash,("SEC-05:cookie_mode:"+name,),True,"obtained real isolated header; oracle decides secure attribute"))
             finally:
-                if child: await child.adapter.close()
-                await asyncio.to_thread(runtime.close)
+                try:
+                    if child:
+                        self._security_secrets.update(child._security_secrets)
+                        if child._security_output_overflow: self._security_output_overflow=True
+                        for kind,label,raw in child._security_outputs:
+                            self._security_output(kind,"cookie-mode-"+name+":"+label,raw)
+                        try:
+                            raw,identity=await asyncio.to_thread(runtime.capture_security_logs)
+                            self._security_output("logs","cookie-mode-"+name,raw)
+                            self._security_child_logs.append(dict(mode=name,**identity))
+                        except Exception:
+                            # Missing a removed container's log cannot become
+                            # a later clean SEC-15 observation.
+                            self._security_output_overflow=True
+                finally:
+                    if child: await child.adapter.close()
+                    await asyncio.to_thread(runtime.close)
         await self._identity()
         return rows,proofs
 

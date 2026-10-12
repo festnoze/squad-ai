@@ -84,6 +84,15 @@ def test_full_pem_crosses_chunk_and_maximum_body_without_losing_begin(body_limit
     assert any(f['kind']=='private_key' for f in scanner.findings)
 
 
+@pytest.mark.parametrize('spacing',[b'',b' ',b'\r\n',b' '*128])
+def test_complete_noncanonical_pem_does_not_require_linefeed_wrappers(spacing):
+    canonical=fictional_pem()
+    header,body,footer=canonical.splitlines()
+    scanner=BoundedSecretScanner(set())
+    scanner.scan(io.BytesIO(header+spacing+body+spacing+footer),scope='image',name='layer:opt/vendor/cache/key')
+    assert len(scanner.findings)==1 and scanner.findings[0]['kind']=='private_key'
+
+
 def test_artifact_scan_rejects_alias_and_foreign_scope(tmp_path):
     root=tmp_path/'scope';root.mkdir();foreign=tmp_path/'foreign';foreign.write_text('not read')
     link=root/'alias'
@@ -115,7 +124,7 @@ def native_source(tmp_path_factory):
     return base,source,source_snapshot(source).digest
 
 
-def context(native, root, *, bad=False):
+def context(native, root, *, bad=False, bug=None):
     base,source,snapshot=native
     binding=make_bindings(root,source,snapshot)
     binding=replace(binding,security_observations=observations())
@@ -123,6 +132,7 @@ def context(native, root, *, bad=False):
         checks=('PRODUCT:bindings','PRODUCT:bindings:'+binding.fingerprint())))
     definition=fixture_definition()
     if bad: definition['commands']['seed']['payload']['bug']='insecure-production'
+    if bug: definition['commands']['seed']['payload']['bug']=bug
     fixtures=reviewed_fixture_file(root,source,snapshot,definition)
     async def source_hash():return snapshot
     async def contract_hash():return CONTRACT
@@ -147,6 +157,21 @@ async def test_real_cookie_headers_three_modes_tls_and_insecure_counterexample(n
         assert len(proofs)==3 and all(p.intact(snapshot_hash=native_source[2],contract_hash=CONTRACT) for p in proofs)
         for account in h.manifest.accounts.values():
             assert all(account.password not in Path(p.path).read_text() for p in proofs)
+
+
+@REAL
+async def test_prod_only_child_cookie_and_csrf_leak_is_not_lost_after_close(native_source,tmp_path):
+    async with context(native_source,tmp_path,bug='production-log') as h:
+        await h.adapter.prepare_case('VERTICAL')
+        rows,proofs=await h.collect_security_observation('cookie_modes')
+        assert len(rows)==3 and len(h._security_child_logs)==3
+        value,scan=await h.collect_security_observation('secret_scan',scope='logs_artifacts')
+        assert scan[0].passed is False
+        assert any(f['kind']=='known_probe_secret' and f['file'].startswith('cookie-mode-https') for f in value['findings'])
+        serialized=Path(scan[0].path).read_text()
+        assert all(secret not in serialized for secret in h._security_secrets)
+        h._security_output('logs','bounded-child-fixture',b'x'*(4*1024*1024+1))
+        with pytest.raises(AdapterUnavailable):await h.collect_security_observation('secret_scan',scope='logs_artifacts')
 
 
 @REAL
@@ -182,13 +207,29 @@ async def test_real_image_layer_scan_exact_digest_and_source_label(native_source
         value,proofs=await h.collect_security_observation('secret_scan',scope='source_image_logs',image_id=image)
         assert set(value['scopes'])=={'source','image','logs'}
         assert value['complete'] and proofs[0].intact(snapshot_hash=snapshot,contract_hash=CONTRACT)
-        # After the independently retained v3/raw ten-candidate observation,
-        # exact public source vectors are classified with exact vendor bytes.
+        # Independently source-proven public vectors are classified only with
+        # exact vendor bytes. Every detected candidate remains in the receipt.
         # This narrow metatest is NOT SEC01 acceptance/source R for a product.
         assert value['findings']==[] and proofs[0].passed is True
         assert len(value['detector_candidates'])==len(value['public_non_credentials'])==10
         assert all(f['kind']=='private_key' and f['file_sha256']=='750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3'
                    for f in value['public_non_credentials'])
+        # Independent public source tag3.7.9, SHA c3d79122e072177f55dc30a98f68b949c0f36f6159a363aae9512a22a9280ed0,
+        # crypto-selftests-pk.c. Raw PEM match excludes terminal LF, no contents
+        # copied here. This locks the four noncanonical EC regression too.
+        expected={
+            'a4d138d7ef9748464117b44fb9c0a4b5b85a1599a127d02690abaa96d03c16e6',
+            'fa0b06a72461ec0a963dcfccb8d5b61bd88a6074fc7271573bff68ab86b8c1af',
+            'ef237ea8db4f2ae9ee100e8ced96d29b5dceb0e6a948443e6b8a00b1791f9ec9',
+            'f8766749b0c6f9b5661364568226af0ba7ae8d87c0073df24e440de4417521cd',
+            '293216817f0d585f0b54f225582f59e7b2e2a795b5f8002e2d71c5e3d49ce9b0',
+            'a0b9679665e29ac220dfb0b366317e1b9dd5fe31e9def8b2e511669a041389ae',
+            '934b3e9bfd9936c5e30c7f0ed7d36a05e2044f755c0aa433e1d6bef6a68d1391',
+            '91ea1699ff6b1a34b4a1d500a9c75a808441e47b9ea68da6fb0195e01ce1dc61',
+            'd039c8119a029ab9f9c83c04d67002d887b6bc6026c4264402ab27cdf24cf138',
+            '7c4c63ee462e0e700cd9e29c8e0f730b3f1b484c4abdd83f1e69fcd477c061fa',
+        }
+        assert {f['value_sha256'] for f in value['detector_candidates']}==expected
         assert any(item['scope']=='image' for item in json.loads(Path(proofs[0].path).read_text())['inventory'])
         with pytest.raises(Exception): await __import__('asyncio').to_thread(h.runtime.scan_security_image,image,'0'*64,lambda *a:pytest.fail('foreign image was scanned'))
         # Independent deliberately bad image derivative, never a delivery
@@ -198,16 +239,27 @@ async def test_real_image_layer_scan_exact_digest_and_source_label(native_source
         build=tmp_path/'negative-layer';build.mkdir()
         (build/'canary').write_bytes(secret.encode()+b'\n'+fictional_pem())
         identity=uuid4().hex
-        (build/'Dockerfile').write_text('FROM '+image+'\nCOPY canary /opt/vendor/cache/native-canary\nLABEL autospec.security_metatest="'+identity+'"\n')
-        result=_docker_call(['docker','build','--network=none','--pull=false','-q',str(build)],capture_output=True,text=True,timeout=30)
-        assert result.returncode==0
-        bad_image=result.stdout.strip().splitlines()[-1]
+        tag='autospec/security-native-base:'+identity
+        tagged=_docker_call(['docker','image','tag',image,tag],capture_output=True,text=True,timeout=5)
+        assert tagged.returncode==0
+        current=_docker_call(['docker','image','inspect',tag,'--format','{{.Id}}'],capture_output=True,text=True,timeout=5)
+        assert current.returncode==0 and current.stdout.strip()==image
+        (build/'Dockerfile').write_text('FROM '+tag+'\nCOPY canary /opt/vendor/cache/native-canary\nLABEL autospec.security_metatest="'+identity+'"\n')
+        bad_image=None
         try:
+            result=_docker_call(['docker','build','--network=none','--pull=false','-q',str(build)],capture_output=True,text=True,timeout=30)
+            assert result.returncode==0
+            current=_docker_call(['docker','image','inspect',tag,'--format','{{.Id}}'],capture_output=True,text=True,timeout=5)
+            assert current.returncode==0 and current.stdout.strip()==image
+            bad_image=result.stdout.strip().splitlines()[-1]
             h._security_secrets.add(secret)
             bad,proofs=await h.collect_security_observation('secret_scan',scope='source_image_logs',image_id=bad_image)
             assert proofs[0].passed is False
             assert {'known_probe_secret','private_key'} <= {f['kind'] for f in bad['findings'] if '/opt/vendor/cache/' in f['file'] or ':opt/vendor/cache/' in f['file']}
             assert secret not in Path(proofs[0].path).read_text()
         finally:
-            removed=_docker_call(['docker','image','rm',bad_image],capture_output=True,text=True,timeout=15)
+            if bad_image:
+                removed=_docker_call(['docker','image','rm',bad_image],capture_output=True,text=True,timeout=15)
+                assert removed.returncode==0
+            removed=_docker_call(['docker','image','rm',tag],capture_output=True,text=True,timeout=15)
             assert removed.returncode==0

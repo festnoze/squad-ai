@@ -61,6 +61,9 @@ async def login(request: Request):
     response = JSONResponse({'csrf_token': csrf})
     secure = os.environ.get('SESSION_COOKIE_SECURE', 'true') == 'true'
     if bug and bug[0] == 'insecure-production': secure = False
+    if bug and bug[0] == 'production-log' and secure:
+        print(token, flush=True)
+        print(csrf, flush=True)
     response.set_cookie('sid', token, secure=secure, httponly=True, samesite='lax', path='/')
     return response
 

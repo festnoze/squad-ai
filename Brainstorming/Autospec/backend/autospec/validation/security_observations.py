@@ -89,7 +89,7 @@ class BoundedSecretScanner:
     MAX_FILES = 60000
     _patterns = (
         ("argon2_hash", re.compile(rb"\$argon2(?:id|i|d)\$v=\d+\$m=\d+,t=\d+,p=\d+\$[A-Za-z0-9+/]+\$[A-Za-z0-9+/]+")),
-        ("private_key", re.compile(rb"-----BEGIN ((?:RSA |DSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY)-----\r?\n([A-Za-z0-9+/=\t \r\n]{64,32768})\r?\n-----END \1-----")),
+        ("private_key", re.compile(rb"-----BEGIN ((?:RSA |DSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY)-----[\t \r\n]{0,128}([A-Za-z0-9+/=\t \r\n]{64,32768})[\t \r\n]{0,128}-----END \1-----")),
         ("credential_assignment", re.compile(rb"(?i)(?:password|api[_-]?key|client[_-]?secret)\s*[=:]\s*['\"]([^'\"\r\n]{8,256})['\"]")),
     )
 
@@ -97,7 +97,7 @@ class BoundedSecretScanner:
         self.secrets = sorted({s.encode() for s in secrets if isinstance(s, str) and len(s) >= 8})
         if len(self.secrets)>2048 or sum(map(len,self.secrets))>1024*1024:
             raise AdapterUnavailable("known probe-secret inventory exceeds bounded complete scan")
-        self._carry=max([33000,*map(len,self.secrets)])
+        self._carry=max([33536,*map(len,self.secrets)])
         self.bytes = 0
         self.files = 0
         self.findings = []
@@ -258,5 +258,12 @@ result={'status':r.status,'tls_version':tls_version,'cookie_present':m is not No
 if m:result.update(secure=bool(m['secure']),httponly=bool(m['httponly']),samesite=m['samesite'],path=m['path'],token_sha256=hashlib.sha256(m.value.encode()).hexdigest())
 raw=r.read(1048577)
 if len(raw)>1048576:raise RuntimeError('cookie probe response exceeds complete bound')
+# Private observer transport only; caller removes these fictitious auth
+# values before ANY evidence serialization, retaining them in memory for scans.
+result['_probe_secrets']=[m.value] if m else []
+try:
+ body=json.loads(raw);csrf=body.get(q['csrf_field'])
+ if isinstance(csrf,str) and csrf:result['_probe_secrets'].append(csrf)
+except (ValueError,AttributeError):pass
 c.close();print(json.dumps(result))
 '''
