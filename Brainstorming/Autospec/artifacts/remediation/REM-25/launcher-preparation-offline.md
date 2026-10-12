@@ -74,6 +74,19 @@ An initial sandbox pytest run could not create its default temp directory;
 no tests ran. Reruns used explicit dedicated temp roots and approved file writes.
 Raw historical receipts are retained; they do not describe product failures.
 
+Parent WIP review corrections (v7): RETRO/KNOWLEDGE/SHARED_LESSONS also OFF;
+external review wait 7200 seconds. Preflight requires all eight mandatory
+restricted CLI flags used by the existing runner. After importing config but
+before make_runner/server, settings and fullstack profile composition are
+checked, including flags/provider/models/workspace/review wait/serialization.
+Windows venv redirectors may have a different actual interpreter PID: readiness
+is tied to health started_at/source stamp; the reported interpreter handle must
+be a member of the exact retained Job via IsProcessInJob. Its creation identity
+is journaled before POST; unrelated process membership fails closed.
+v6: 32 PASS after these parent review corrections; v7: 43 PASS in 0.72 s,
+including effective settings, all eight missing mandatory flags, and simulated
+exact Job membership checks. Current command uses launcher-offline-v7.xml.
+
 Needs independent source review, actual fresh admission by the parent, and an
 explicit parent --launch AFTER qualification. No acceptance verdict or current
 Claude Team authentication is claimed by these offline tests.

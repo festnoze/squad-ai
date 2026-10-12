@@ -24,7 +24,10 @@ HASHES = {
 OFF = ('FAKE_AGENTS', 'REFINE', 'REFINE_PO', 'REFINE_DEV', 'REVIEW_PLAN',
  'SECURITY_REVIEW', 'EVALUATOR', 'INDEPENDENCE', 'LANGFUSE', 'ROLE_ROUTING',
  'ESCALATE_ON_RETRY', 'DISPUTE_ESCALATION', 'CONCURRENT_BUDGET_RESERVATIONS',
- 'PARTIAL_DELIVERY', 'GOVERNANCE', 'OBSERVATIONS', 'ORPHAN_SWEEP_ON_BOOT', 'NPM_SHARED_CACHE')
+ 'PARTIAL_DELIVERY', 'GOVERNANCE', 'OBSERVATIONS', 'ORPHAN_SWEEP_ON_BOOT', 'NPM_SHARED_CACHE',
+ 'RETRO', 'KNOWLEDGE', 'SHARED_LESSONS')
+CLI_FLAGS = ('--restricted','--safe-mode','--tools','--strict-mcp-config',
+ '--disable-slash-commands','--no-chrome','--no-session-persistence','--permission-prompts')
 MODELS = tuple('MODEL_'+p for p in ('SPEC','ANALYZE','PLAN','ARCHITECT','BUILD','DONE','BOSS','WORKER','CHECKER'))
 AUTH_KEYS = ('loggedIn','authMethod','apiProvider','subscriptionType')
 
@@ -46,7 +49,7 @@ def environment(base,campaign,port):
     env.update(GENERATION_ONLY_AGENTS='true',AGENT_PROVIDER='claude code',
         CLAUDE_MODEL='sonnet',CONSTITUTION_MODEL='sonnet',MODEL_LADDER='',
         PRESET='',MAX_PARALLEL_DEVS='1',SANDBOX='true',PO_PIPELINE='off',
-        WORKSPACE_ROOT=str(campaign/'projects'),EXTERNAL_REVIEW_WAIT_SECONDS='3600',
+        WORKSPACE_ROOT=str(campaign/'projects'),EXTERNAL_REVIEW_WAIT_SECONDS='7200',
         AUTOSPEC_CONTROL_HOSTS=json.dumps([f'127.0.0.1:{port}']),AUTOSPEC_CONTROL_ORIGINS='[]')
     return env
 
@@ -100,7 +103,7 @@ def preflight(root,campaign,port,expected_commit,env,*,run=command,port_check=ch
         raise AdmissionError('Docker Linux required')
     cli = env.get('CLAUDE_CMD','claude')
     help_text = run([cli,'--help'],cwd=root,env=env)
-    if '--model' not in help_text or 'auth' not in help_text:
+    if any(flag not in help_text for flag in (*CLI_FLAGS,'--model','auth')):
         raise AdmissionError('Claude CLI interface unavailable')
     raw = json.loads(run([cli,'auth','status','--json'],cwd=root,env=env))
     auth = {k:raw.get(k) for k in AUTH_KEYS}
@@ -170,6 +173,9 @@ def factory(root,port):
     if any(digest((root/name).read_bytes()) != sha for name,sha in HASHES.items()):
         raise AdmissionError('source changed before factory import')
     trusted_imports(root,env)
+    from autospec.config import settings
+    from autospec.orchestrator.profiles import PROFILES
+    validate_settings(settings,PROFILES['fullstack'].overrides,Path(env['WORKSPACE_ROOT']))
     from autospec.agents.generation_policy import GenerationOnlyRunner
     from autospec.api.server import app, _runner, _SERVER_STARTED_AT, _LOADED_SOURCE_STAMP
     if not isinstance(_runner,GenerationOnlyRunner):
@@ -182,6 +188,48 @@ def factory(root,port):
         os.fsync(f.fileno())
     import uvicorn
     uvicorn.run(app,host='127.0.0.1',port=port,reload=False,access_log=False)
+
+def validate_settings(settings,overrides,workspace):
+    off = ('fake_agents','refine_enabled','refine_po','refine_dev','review_plan_enabled',
+        'security_review_enabled','evaluator_enabled','independence_enabled','langfuse_enabled',
+        'role_routing_enabled','escalate_on_retry_enabled','dispute_escalation_enabled',
+        'concurrent_budget_reservations','partial_delivery_enabled','governance_enabled',
+        'observations_enabled','orphan_sweep_on_boot','npm_shared_cache','retro_enabled',
+        'knowledge_enabled','shared_lessons_enabled')
+    for name in off:
+        if getattr(settings,name,None) is not False or overrides.get(name,False) is not False:
+            raise AdmissionError('effective setting/profile mismatch: '+name)
+    if (settings.agent_provider != 'claude code' or settings.claude_model != 'sonnet' or
+        not settings.generation_only_agents or not settings.sandbox_enabled or
+        settings.workspace_root != workspace or settings.external_review_wait_seconds != 7200 or
+        settings.max_parallel_devs != 1 or settings.model_ladder or
+        any(v != 'sonnet' for v in [*settings.phase_models.values(),*settings.model_tiers.values()])):
+        raise AdmissionError('effective provider/model/workspace/budget composition mismatch')
+
+def job_member_identity(job,pid):
+    # A Windows venv redirector may own a different actual interpreter PID.
+    # Accept that PID ONLY after acquiring its handle and proving membership
+    # in this exact retained Job. Never trust PID/command line alone.
+    import ctypes
+    from ctypes import wintypes
+    api = ctypes.WinDLL('kernel32',use_last_error=True)
+    api.OpenProcess.argtypes = [wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
+    api.OpenProcess.restype = wintypes.HANDLE
+    api.IsProcessInJob.argtypes = [wintypes.HANDLE,wintypes.HANDLE,ctypes.POINTER(wintypes.BOOL)]
+    api.IsProcessInJob.restype = wintypes.BOOL
+    api.CloseHandle.argtypes = [wintypes.HANDLE]
+    handle = api.OpenProcess(0x1000,False,pid)
+    if not handle:
+        raise AdmissionError('actual interpreter handle unavailable')
+    try:
+        member = wintypes.BOOL()
+        if not api.IsProcessInJob(handle,job.handle,ctypes.byref(member)) or not member.value:
+            raise AdmissionError('actual interpreter not in owned factory Job')
+        from autospec.agents.runner import _process_identity
+        from types import SimpleNamespace
+        return _process_identity(SimpleNamespace(_handle=handle))
+    finally:
+        api.CloseHandle(handle)
 
 def supervise(root,campaign,port,env,receipt):
     if os.name != 'nt':
@@ -208,9 +256,11 @@ def supervise(root,campaign,port,env,receipt):
                     identity_path = campaign/'factory-identity.json'
                     if identity_path.exists():
                         identity = json.loads(identity_path.read_text())
-                        if (health.get('ok') and identity['pid'] == proc.pid and
+                        if (health.get('ok') and
                             health.get('started_at') == identity['started_at'] and
                             health.get('source_stamp') == identity['source_stamp'] == health.get('source_stamp_now')):
+                            actual = job_member_identity(job,identity['pid'])
+                            journal(campaign,'INTERPRETER_OWNED',pid=identity['pid'],creation_identity=actual)
                             break
                 except OSError:
                     pass

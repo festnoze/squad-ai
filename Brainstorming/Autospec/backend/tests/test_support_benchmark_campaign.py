@@ -20,7 +20,7 @@ def setup(tmp_path):
         if args[:2] == ['git','rev-parse']: return SHA
         if args[:2] == ['git','status']: return ''
         if args[0] == 'docker': return 'linux'
-        if args[1:] == ['--help']: return '--model auth'
+        if args[1:] == ['--help']: return '--model auth '+' '.join(c.CLI_FLAGS)
         if args[1:] == ['auth','status','--json']:
             return json.dumps(dict(loggedIn=True,authMethod='claude.ai',apiProvider='firstParty',subscriptionType='team',email='never-store'))
         raise AssertionError(args)
@@ -160,6 +160,7 @@ def test_supervisor_owned_job_and_readiness_offline(setup,monkeypatch,wrong_iden
     monkeypatch.setattr(runner,'_WindowsJob',Job)
     monkeypatch.setattr(runner,'_process_identity',lambda p: 'owned-handle')
     monkeypatch.setattr(c,'trusted_imports',lambda *a: None)
+    monkeypatch.setattr(c,'job_member_identity',lambda job,pid: 'owned-interpreter')
     spawned = []
     def spawn(*a,**kw):
         spawned.append(kw)
@@ -190,3 +191,45 @@ def test_supervisor_owned_job_and_readiness_offline(setup,monkeypatch,wrong_iden
     log = (campaign/'supervisor.jsonl').read_text()
     assert 'SUPERVISOR_STOPPED' in log
     if not wrong_identity: assert 'EXTERNAL_REVIEW_REQUIRED' in log
+
+def test_effective_settings_and_profile_offline(setup,monkeypatch):
+    from autospec.config import Settings
+    from autospec.orchestrator.profiles import PROFILES
+    campaign,env,*_ = setup
+    for key,value in env.items(): monkeypatch.setenv(key,value)
+    settings = Settings()
+    c.validate_settings(settings,PROFILES['fullstack'].overrides,campaign/'projects')
+    settings.retro_enabled = True
+    with pytest.raises(c.AdmissionError,match='retro'): c.validate_settings(settings,{},campaign/'projects')
+    settings.retro_enabled = False
+    with pytest.raises(c.AdmissionError,match='refine'): c.validate_settings(settings,{'refine_enabled':True},campaign/'projects')
+
+@pytest.mark.parametrize('flag',c.CLI_FLAGS)
+def test_mandatory_cli_flag_missing_refused(setup,flag):
+    campaign,env,calls,run,check = setup
+    def missing(args,**kwargs):
+        if args[1:] == ['--help']: return '--model auth '+' '.join(f for f in c.CLI_FLAGS if f != flag)
+        return run(args,**kwargs)
+    with pytest.raises(c.AdmissionError,match='interface'): check(run=missing)
+
+@pytest.mark.parametrize('member',[True,False])
+def test_interpreter_exact_job_membership_no_real_os_call(monkeypatch,member):
+    import ctypes
+    from types import SimpleNamespace
+    from autospec.agents import runner
+    calls = []
+    class Function:
+        def __init__(self,fn): self.fn = fn
+        def __call__(self,*args): return self.fn(*args)
+    def is_member(handle,job,out):
+        assert (handle,job) == (99,77)
+        out._obj.value = member
+        return True
+    api = SimpleNamespace(OpenProcess=Function(lambda *a:99),
+        IsProcessInJob=Function(is_member),CloseHandle=Function(lambda h:calls.append(h)))
+    monkeypatch.setattr(ctypes,'WinDLL',lambda *a,**k:api)
+    monkeypatch.setattr(runner,'_process_identity',lambda p:'actual-process-created-at')
+    if member: assert c.job_member_identity(SimpleNamespace(handle=77),123) == 'actual-process-created-at'
+    else:
+        with pytest.raises(c.AdmissionError,match='not in owned'): c.job_member_identity(SimpleNamespace(handle=77),123)
+    assert calls == [99]
