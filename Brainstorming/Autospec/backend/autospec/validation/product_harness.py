@@ -135,6 +135,8 @@ class ReviewedProductBindings:
             data["commands"]={k:CommandBinding(tuple(v["argv"]),tuple(v.get("parameters",())),v.get("timeout",30)) for k,v in data["commands"].items()}
             data["runtime_command"]=tuple(data["runtime_command"])
             if data.get("instrumentation"):
+                if "proxy_headers" not in data["instrumentation"]:
+                    raise ValueError("source-reviewed proxy-header mode must be explicit")
                 data["instrumentation"]=InstrumentationBinding(**data["instrumentation"])
             return cls(**data)
         except (KeyError,TypeError,ValueError) as exc:
@@ -831,7 +833,23 @@ class ProductHarness:
         if type(enabled) is not bool: raise ValueError("fault flag must be boolean")
         await self._control("fault",point=point,enabled=enabled)
     async def restart(self):
-        await self._identity(); await asyncio.to_thread(self.runtime.restart); await self._identity()
+        await self._identity(); await asyncio.to_thread(self.runtime.restart)
+        await self.wait_ready(); await self._identity()
+
+    async def wait_ready(self):
+        """GET-only transport prerequisite after every new server process.
+
+        A live SQLite volume does not establish ASGI readiness. Never retry an
+        acceptance mutation here and never award a requirement from this GET.
+        """
+        import httpx
+        deadline=time.monotonic()+15
+        async with httpx.AsyncClient(timeout=10,limits=httpx.Limits(max_keepalive_connections=0)) as client:
+            while time.monotonic()<deadline:
+                try:
+                    await client.get(self.runtime.origin+"/"); return
+                except httpx.HTTPError: await asyncio.sleep(.1)
+        raise AdapterUnavailable("isolated runtime did not become HTTP-ready within 15s")
     async def proofs(self, requirement_id):
         return [] if self._proof_provider is None else await self._proof_provider(requirement_id)
 
@@ -990,6 +1008,7 @@ class ProductHarness:
         await asyncio.to_thread(detach)
         detached_volume=self.runtime.volume_name
         await asyncio.to_thread(attach)
+        await self.wait_ready()
         # No host import/route injection; readiness before API replay is only a
         # transport prerequisite, never an acceptance check.
         for _ in range(20):
@@ -997,24 +1016,38 @@ class ProductHarness:
                 after=(await self._database())["rows"];break
             except AdapterUnavailable: await asyncio.sleep(.1)
         else: raise AdapterUnavailable("live SQLite unavailable after owned redeploy")
-        replies=[]
-        replay=await self.adapter.request(client,"POST","/api/tickets",json=payload)
-        replies.append(dict(kind="ticket",status=replay.status_code,id=replay.json().get("id"),expected_id=ticket))
-        for actor,body,expected_id in messages:
-            replay=await self.adapter.request(actor,"POST",path,json=body)
-            replies.append(dict(kind=body["visibility"],status=replay.status_code,id=replay.json().get("id"),expected_id=expected_id))
+        replies=[];limits=[]
+        # An observed destructive startup already contradicts persistence.
+        # Do not lose this FAIL to a subsequent login port becoming unavailable
+        # because the same defective process also deleted its accounts.
+        durable=before==restarted==after
+        committed=(sum(r["id"]==ticket for r in before["tickets"])==1
+            and all(sum(r["id"]==mid for r in before["messages"])==1 for _,_,mid in messages)
+            and sum(r["ticket_id"]==ticket for r in before["ticket_events"])>=3
+            and all(any(r["result_id"]==mid for r in before["idempotency_keys"]) for mid in (ticket,*(m[2] for m in messages))))
+        if durable and committed:
+            replay=await self.adapter.request(client,"POST","/api/tickets",json=payload)
+            replies.append(dict(kind="ticket",status=replay.status_code,id=replay.json().get("id"),expected_id=ticket))
+            for actor,body,expected_id in messages:
+                replay=await self.adapter.request(actor,"POST",path,json=body)
+                replies.append(dict(kind=body["visibility"],status=replay.status_code,id=replay.json().get("id"),expected_id=expected_id))
+        else:
+            limits.append("replay not executed after observed missing committed record or destructive lifecycle")
         replayed=(await self._database())["rows"]
-        passed=(before==restarted==after==replayed and ids_before["volume"]==detached_volume==self.runtime.volume_name
+        passed=(committed and durable and before==replayed and ids_before["volume"]==detached_volume==self.runtime.volume_name
             and ids_before["origin"]==self.runtime.origin and ids_before["container"]!=self.runtime.identifier
-            and all(r["status"]==200 and r["id"]==r["expected_id"] for r in replies))
+            and len(replies)==3 and all(r["status"]==200 and r["id"]==r["expected_id"] for r in replies))
         from dataclasses import replace
         proof=self._proof("ops_persistence",dict(ticket_id=ticket,identities_before=ids_before,
             identities_after=dict(container=self.runtime.identifier,volume=self.runtime.volume_name,origin=self.runtime.origin),
             database_digests=[hashlib.sha256(json.dumps(r,sort_keys=True).encode()).hexdigest() for r in (before,restarted,after,replayed)],
-            counts={t:len(rows) for t,rows in before.items()},replays=replies),passed,snapshot_hash,contract_hash)
+            counts={t:len(rows) for t,rows in before.items()},initial_records_committed=committed,
+            lifecycle_rows_preserved=durable,replays=replies),passed,snapshot_hash,contract_hash)
         proof=replace(proof,checks=("OPS-04","OPS-04:ticket_response_note_restart_undeploy_replay"))
-        return dict(status="PASS" if passed else "FAIL",proofs=[asdict(proof)],limits=[],
-            observed=[dict(check="ticket_response_note_restart_undeploy_replay",passed=passed,replays=replies,volume_preserved=ids_before["volume"]==self.runtime.volume_name)],
+        return dict(status="PASS" if passed else "FAIL",proofs=[asdict(proof)],limits=limits,
+            observed=[dict(check="ticket_response_note_restart_undeploy_replay",passed=passed,replays=replies,
+                initial_records_committed=committed,lifecycle_rows_preserved=durable,
+                volume_preserved=ids_before["volume"]==self.runtime.volume_name)],
             reproduction=["create real ticket/public response/internal note; compare every DB row after recreate and volume-preserving undeploy; replay same three keys"])
 
 
@@ -1092,16 +1125,7 @@ class OwnedProductHarnessSession:
             raise
 
     async def wait_ready(self):
-        import httpx
-        deadline=time.monotonic()+15
-        async with httpx.AsyncClient(timeout=10) as client:
-            while time.monotonic()<deadline:
-                try:
-                    await client.get(self.runtime.origin+"/")
-                    return  # readiness only; never acceptance proof
-                except httpx.HTTPError:
-                    await asyncio.sleep(.1)
-        raise AdapterUnavailable("isolated runtime did not become HTTP-ready within 15s")
+        await self.harness.wait_ready()
 
     async def __aexit__(self,*args):
         if self.harness: await self.harness.adapter.close()

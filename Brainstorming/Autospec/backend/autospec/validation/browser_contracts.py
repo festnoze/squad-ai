@@ -20,16 +20,6 @@ from .support_adapter import AdapterUnavailable, Proof
 from .quality_contracts import source_e2e_scenarios
 
 BROWSER_IDS = tuple(f"UX-{i:02d}" for i in range(1, 9)) + ("SEC-10", "SEC-12", "FUN-02", "FUN-06", "FUN-12")
-PREPARATION_LIMITS = {
-    "UX-01":"role navigation/action-language matrix is not yet completely exercised",
-    "UX-02":"separate API500 recovery and full failure-state matrix remain to exercise",
-    "UX-03":"non-modal logical tab order and visual focus/label review remain to exercise",
-    "UX-04":"long-word/status/non-color and clipped-action visual matrix remains to exercise",
-    "UX-05":"admin transient display and all previous-account cache surfaces remain to exercise",
-    "UX-06":"all filter/page URL and reset-to-page1 combinations remain to exercise",
-    "UX-07":"double-click and form reuse after each failure remain to exercise",
-    "UX-08":"full public/internal structural-style matrix remains to exercise",
-}
 
 
 async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *, title, description, viewport_width=1280):
@@ -144,15 +134,15 @@ class PlaywrightHarness:
         allowed = (origin.scheme, origin.netloc)
         async def confined(route):
             target = urlsplit(route.request.url)
-            if target.scheme in {"http", "https"} and (target.scheme,target.netloc) != allowed:
+            if target.scheme not in {"http", "https", "data", "blob", "about"} or (target.scheme in {"http", "https"} and (target.scheme,target.netloc) != allowed):
                 case.check("external_request_blocked", target.scheme+"://"+target.netloc, origin.scheme+"://"+origin.netloc)
                 await route.abort()
             else: await route.continue_()
         await context.route("**/*", confined)
         page = await context.new_page()
         page.set_default_timeout(2500)
-        page.on("pageerror", lambda error: case.console_errors.append(str(error)))
-        page.on("console", lambda message: case.console_errors.append(message.text) if
+        page.on("pageerror", lambda error: case.console_errors.append(self.redact(str(error))))
+        page.on("console", lambda message: case.console_errors.append(self.redact(message.text)) if
                 message.type == "error" and "Failed to load resource" not in message.text else None)
         def request(request):
             path = urlsplit(request.url).path
@@ -160,18 +150,20 @@ class PlaywrightHarness:
             try: payload = request.post_data_json
             except Exception: payload = None
             if path.startswith("/api/auth/"): payload = "[AUTH_INPUT_REDACTED]"
-            def redact(value):
-                if isinstance(value, dict):
-                    return {k:"[REDACTED]" if any(s in k.lower() for s in ["password","cookie","csrf","token","hash"]) else redact(v) for k,v in value.items()}
-                if isinstance(value, list): return [redact(v) for v in value]
-                if isinstance(value, str):
-                    for account in self.adapter.manifest.accounts.values(): value=value.replace(account.password,"[REDACTED]")
-                return value
-            case.requests.append({"method": request.method, "path": path, "payload": redact(payload),
-                                  "query": redact(parse_qs(urlsplit(request.url).query))})
+            case.requests.append({"method": request.method, "path": path, "payload": self.redact(payload),
+                                  "query": self.redact(parse_qs(urlsplit(request.url).query))})
         page.on("request", request)
         await page.goto(self.adapter.base_url + self.routes["home"])
         return page
+
+    def redact(self, value):
+        if isinstance(value, dict):
+            return {k:"[REDACTED]" if any(s in k.lower() for s in ["password","cookie","csrf","token","hash"]) else self.redact(v) for k,v in value.items()}
+        if isinstance(value, list): return [self.redact(v) for v in value]
+        if isinstance(value, str):
+            for account in self.adapter.manifest.accounts.values():
+                if account.password: value=value.replace(account.password,"[REDACTED]")
+        return value
 
 
 class _BrowserCase:
@@ -181,7 +173,7 @@ class _BrowserCase:
         self.pages = []
 
     def check(self, tag, observed, expected=True):
-        self.checks.append({"check": self.rid + ":" + tag, "observed": observed, "expected": expected, "passed": observed == expected})
+        self.checks.append({"check": self.rid + ":" + tag, "observed": self.v.harness.redact(observed), "expected": self.v.harness.redact(expected), "passed": observed == expected})
 
     async def page(self):
         page = await self.v.harness.page(self, self.v.profile["desktop_width"])
@@ -210,6 +202,7 @@ class BrowserVerifier:
     def __init__(self, contract, harness):
         self.contract, self.harness = contract, harness
         self.contract_hash, self.snapshot = contract.contract_hash, ""
+        self.created_titles={}
         facts = [f for f in contract.facts if f.kind == "browser_profile"]
         self.profile = facts[0].expected if len(facts) == 1 and set(BROWSER_IDS) <= set(facts[0].requirement_ids) else None
 
@@ -243,8 +236,6 @@ class BrowserVerifier:
                     for page in case.pages:
                         try: await case.capture(page, "final")
                         except Exception: limits.append("browser screenshot unavailable")
-                if rid in PREPARATION_LIMITS:
-                    limits.append("independent preparation: " + PREPARATION_LIMITS[rid])
                 await self._identity()
                 if case.checks:
                     root = self.harness.adapter.evidence_root
@@ -274,6 +265,7 @@ class BrowserVerifier:
                     "status": "FAIL" if failed else "NOT_VERIFIED" if limits or not case.checks else "PASS",
                     "expected": requirements[rid].expected if rid in requirements else "source unavailable",
                     "observed": case.checks, "proofs": [p.__dict__ for p in proofs], "limits": limits,
+                    "reproduction":case.requests,"impact":"UI source invariant violated" if failed else "",
                     "contract_hash": self.contract_hash, "snapshot_hash": self.snapshot, "layer": "browser"})
                 await self.harness.close()
             await self._identity()
@@ -287,16 +279,23 @@ class BrowserVerifier:
     def ui(self, page, name): return self.harness.control(page, name)
 
     async def detail_ready(self, page):
-        await self.ui(page, "detail_title").filter(has_text=re.compile(r"\S")).wait_for()
+        expected=self.created_titles.get(page)
+        pattern=re.compile("^"+re.escape(expected)+"$") if expected else re.compile(r"\S")
+        await self.ui(page, "detail_title").filter(has_text=pattern).wait_for()
 
     async def login(self, case, page, actor):
         account = self.harness.adapter.manifest.accounts[actor]
         await self.ui(page, "email").fill(account.email)
         await self.ui(page, "password").fill(account.password)
-        await self.ui(page, "login").click()
-        case.check("real_login_" + actor, await case.visible(page, "ticket_list"))
+        async with page.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path=="/api/auth/login") as response:
+            await self.ui(page, "login").click()
+        case.check("real_login_http_"+actor,(await response.value).status,200)
+        # A zero-ticket client has a genuine authenticated empty state. An
+        # empty zero-height result container is not a failed authentication.
+        case.check("real_login_" + actor, await case.visible(page, "ticket_nav"))
 
     async def create(self, case, page, title):
+        self.created_titles[page]=title
         await self.ui(page, "create").click()
         await self.ui(page, "title").fill(title)
         await self.ui(page, "description").fill("Independent browser probe description long enough")
@@ -313,6 +312,20 @@ class BrowserVerifier:
         await self.ui(p, "send").click()
         await self.ui(p, "messages").get_by_text("Browser public response", exact=True).wait_for()
         c.check("response_confirmation", True)
+        c.check("french_document",await p.evaluate("document.documentElement.lang.startsWith('fr')"))
+        labels=self.profile.get("french_action_labels")
+        if not isinstance(labels,dict) or not labels:
+            raise AdapterUnavailable("independently reviewed French action label profile missing")
+        for name, expected in labels.items():
+            c.check("french_action_"+name,(await self.ui(p,name).inner_text()).strip(),expected)
+        for actor in ["camille","emma"]:
+            q=await c.page();await self.login(c,q,actor)
+            c.check(actor+"_cannot_create",not await self.ui(q,"create").is_visible())
+            c.check(actor+"_admin_navigation",await self.ui(q,"admin_nav").is_visible(),actor=="emma")
+            await self.ui(q,"dashboard_nav").click()
+            await self.ui(q,"dashboard_total").filter(has_text=re.compile(r"\S")).wait_for()
+            c.check(actor+"_staff_scope",int(await self.ui(q,"dashboard_total").inner_text()),self.profile["staff_ticket_count"]+1)
+            await c.capture(q,"role-"+actor)
 
     async def _ux02(self, c):
         p = await c.page(); await self.login(c, p, "alice")
@@ -320,7 +333,35 @@ class BrowserVerifier:
         await self.ui(p, "search").fill("nothing-" + uuid4().hex)
         c.check("slow_loading", await c.visible(p, "loading"))
         c.check("empty_state", await c.visible(p, "empty"))
+        await c.capture(p,"slow-empty")
         await p.unroute("**/api/tickets?*")
+        async def server_error(route):
+            await route.fulfill(status=500,json={"error":{"code":"CONTROLLED_FAILURE","message":"Erreur contrôlée"}})
+        await p.route("**/api/tickets?*",server_error)
+        await self.ui(p,"refresh").click()
+        c.check("api500_recoverable",await c.visible(p,"error"))
+        await self.ui(p,"loading").wait_for(state="hidden")
+        c.check("api500_not_empty",not await self.ui(p,"empty").is_visible())
+        await c.capture(p,"api500")
+        await p.unroute("**/api/tickets?*")
+        await p.context.set_offline(True);await self.ui(p,"refresh").click()
+        c.check("network_failure_explicit",await c.visible(p,"error"))
+        await p.context.set_offline(False)
+        await self.ui(p,"search").fill("");await self.ui(p,"refresh").click()
+        await self.ui(p,"total").get_by_text(str(self.profile["client_ticket_count"]),exact=True).wait_for()
+        c.check("read_reusable_after_failure",await c.visible(p,"ticket_list"))
+        refused_title="KNOWN_REFUSAL_"+uuid4().hex
+        async def refuse_once(route):
+            await route.fulfill(status=422,json={"error":{"code":"VALIDATION_ERROR","message":"Refus contrôlé"}})
+        await p.route("**/api/tickets",refuse_once)
+        async with p.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path=="/api/tickets") as refused:
+            await self.create(c,p,refused_title)
+        c.check("known_refusal_status",(await refused.value).status,422)
+        c.check("known_refusal_draft_conserved",await self.ui(p,"title").input_value(),refused_title)
+        c.check("known_refusal_editable",not await self.ui(p,"title").is_disabled())
+        c.check("known_refusal_no_object",await self.harness.adapter.observe("browser_operation_count",title=refused_title),0)
+        await p.unroute("**/api/tickets")
+        await p.keyboard.press("Escape")
         title = "Uncertain " + uuid4().hex
         lost = False
         async def loss(route):
@@ -328,27 +369,57 @@ class BrowserVerifier:
             if route.request.method == "POST" and not lost:
                 lost = True
                 await route.fetch()  # real backend commits; only delivery is lost
-                await route.abort("failed")
+                # A blackholed response tests the application's actual HTTP
+                # timeout, not a harness-imposed immediate failure.
+                await asyncio.sleep(self.profile["timeout_ms"]/1000+3)
+                try: await route.abort("failed")
+                except Exception: pass
             else: await route.continue_()
         await p.route("**/api/tickets", loss)
         started = time.monotonic()
         await self.create(c, p, title)
-        c.check("recoverable_uncertainty", await c.visible(p, "retry"))
+        try:
+            await self.ui(p,"retry").wait_for(state="visible",timeout=self.profile["timeout_ms"]+1000)
+            uncertain=True
+        except Exception: uncertain=False
+        c.check("recoverable_uncertainty", uncertain)
         c.check("bounded_timeout", (time.monotonic()-started)*1000 <= self.profile["timeout_ms"] + 1000)
         c.check("uncertain_payload_frozen", await self.ui(p, "title").is_disabled())
         await self.ui(p, "retry").click()
         c.check("retry_completed", await c.visible(p, "reply"))
-        submitted = [r["payload"] for r in c.requests if r["method"] == "POST" and r["path"] == "/api/tickets"]
+        submitted = [r["payload"] for r in c.requests if r["method"] == "POST" and r["path"] == "/api/tickets" and r["payload"]["title"]==title]
         c.check("retry_same_payload_uuid", len(submitted) == 2 and submitted[0] == submitted[1])
         counts = await self.harness.adapter.observe("browser_operation_count", title=title)
         c.check("retry_no_duplicate", counts, 1)
+        await self.detail_ready(p)
+        tid=urlsplit(p.url).path.rsplit("/",1)[-1]
+        message="MESSAGE_UNCERTAINTY_"+uuid4().hex
+        message_lost=False
+        async def lost_message(route):
+            nonlocal message_lost
+            if route.request.method=="POST" and not message_lost:
+                message_lost=True;await route.fetch();await route.abort("failed")
+            else:await route.continue_()
+        await p.route("**/api/tickets/*/messages",lost_message)
+        await self.ui(p,"reply").fill(message);await self.ui(p,"send").click()
+        c.check("message_uncertain_replay",await c.visible(p,"reply_retry"))
+        c.check("message_uncertain_frozen",await self.ui(p,"reply").is_disabled())
+        await self.ui(p,"reply_retry").click()
+        await self.ui(p,"messages").get_by_text(message,exact=True).wait_for()
+        submitted=[r["payload"] for r in c.requests if r["method"]=="POST" and r["path"]==f"/api/tickets/{tid}/messages"]
+        c.check("message_same_payload_uuid",len(submitted)==2 and submitted[0]==submitted[1])
+        c.check("message_retry_no_duplicate",await self.harness.adapter.observe("browser_message_count",ticket_id=tid,content=message),1)
+        c.check("message_form_reusable",not await self.ui(p,"reply").is_disabled())
 
     async def _slow_read(self, route, seconds):
         response = await route.fetch(); await asyncio.sleep(seconds); await route.fulfill(response=response)
 
     async def _ux03(self, c):
         p = await c.page(); await self.login(c, p, "alice")
-        await self.ui(p, "create").focus(); await p.keyboard.press("Enter")
+        await p.keyboard.press("Tab");await self.ui(p, "create").focus()
+        c.check("focus_visible",await self.ui(p,"create").evaluate("e=>{const s=getComputedStyle(e);return s.outlineStyle!=='none'&&parseFloat(s.outlineWidth)>0}"))
+        await c.capture(p,"keyboard-focus")
+        await p.keyboard.press("Enter")
         c.check("modal_keyboard_open", await c.visible(p, "modal"))
         modal = self.harness.bindings["modal"]
         for _ in range(9):
@@ -359,17 +430,28 @@ class BrowserVerifier:
         c.check("focus_return", await self.ui(p, "create").evaluate("e=>e===document.activeElement"))
         await self.ui(p, "create").click(); await self.ui(p, "submit").click()
         c.check("field_error_associated", await self.ui(p, "title").evaluate("e=>e.getAttribute('aria-invalid')==='true' && !!document.getElementById(e.getAttribute('aria-describedby'))"))
+        for name in ["title","description","email","password"]:
+            c.check("accessible_label_"+name,await self.ui(p,name).evaluate("e=>e.labels?.length>0"))
+        await p.keyboard.press("Escape");await self.ui(p,"logout").focus();await p.keyboard.press("Enter")
+        await self.ui(p,"email").wait_for();await self.ui(p,"email").focus();await p.keyboard.press("Tab")
+        c.check("login_logical_tab",await self.ui(p,"password").evaluate("e=>e===document.activeElement"))
 
     async def _ux04(self, c):
         p = await c.page(); await self.login(c, p, "alice")
+        await self.create(c,p,"MOTLONG"*15);await self.detail_ready(p)
         for width in [self.profile["desktop_width"], self.profile["mobile_width"]]:
             await p.set_viewport_size({"width": width, "height": 900})
             c.check("no_global_overflow_"+str(width), await p.evaluate("document.documentElement.scrollWidth<=window.innerWidth"))
             c.check("actions_visible_"+str(width), await self.ui(p, "create").is_visible())
+            c.check("actions_not_clipped_"+str(width),await self.ui(p,"create").evaluate("e=>{let r=e.getBoundingClientRect();return r.left>=0&&r.right<=innerWidth&&r.top>=0&&r.bottom<=innerHeight}"))
+            c.check("status_not_color_only_"+str(width),bool((await self.ui(p,"detail_status").inner_text()).strip()))
             await c.capture(p, "viewport-"+str(width))
 
     async def _ux05(self, c):
         p = await c.page(); await self.login(c, p, "alice")
+        private_title="ALICE_PRIVATE_TICKET_"+uuid4().hex
+        await self.create(c,p,private_title);await self.detail_ready(p)
+        await self.ui(p,"reply").fill("ALICE_PRIVATE_REPLY_DRAFT")
         await self.ui(p, "create").click()
         marker = "ALICE_PRIVATE_DRAFT_" + uuid4().hex
         await self.ui(p, "title").fill(marker)
@@ -377,15 +459,22 @@ class BrowserVerifier:
         await self.ui(p, "logout").click()
         c.check("logout_login_screen", await c.visible(p, "email"))
         await self.login(c, p, "bob")
-        c.check("role_switch_no_residue", await self._private_clean(p, [marker]))
+        c.check("role_switch_no_residue", await self._private_clean(p, [marker,private_title,"ALICE_PRIVATE_REPLY_DRAFT"]))
         await self.ui(p, "logout").click(); await self.login(c, p, "alice")
         await self.harness.adapter.command("expire_actor", actor="alice")
         await self.ui(p, "refresh").click()
         c.check("real_401_routes_login", await c.visible(p, "email"))
         c.check("401_purges_private", await self._private_clean(p, [marker]))
+        await self.login(c,p,"alice")
+        admin_email=self.harness.adapter.manifest.accounts["emma"].email
+        await p.add_init_script("window.__private_transient=false;new MutationObserver(()=>{if(document.body?.innerText.includes("+json.dumps(admin_email)+"))window.__private_transient=true}).observe(document,{subtree:true,childList:true})")
+        await p.goto(self.harness.adapter.base_url+self.harness.routes["admin"])
+        c.check("admin_route_refused",await c.visible(p,"error"))
+        c.check("admin_no_transient",await p.evaluate("window.__private_transient===false"))
+        c.check("admin_no_private_cache",await self._private_clean(p,[admin_email]))
 
     async def _private_clean(self, p, markers):
-        return await p.evaluate("ms=>ms.every(m=>!document.body.innerText.includes(m) && !JSON.stringify(localStorage).includes(m) && !JSON.stringify(sessionStorage).includes(m))", markers)
+        return await p.evaluate("ms=>{const data=document.documentElement.outerHTML+document.body.innerText+[...document.querySelectorAll('input,textarea,select')].map(e=>e.value).join('|')+JSON.stringify(localStorage)+JSON.stringify(sessionStorage);return ms.every(m=>!data.includes(m))}", markers)
 
     async def _ux06(self, c):
         p = await c.page(); await self.login(c, p, "alice")
@@ -413,8 +502,29 @@ class BrowserVerifier:
         c.check("late_a_cannot_replace_b", self.profile["search_b_marker"] in text and self.profile["search_a_marker"] not in text)
         c.check("search_in_url", parse_qs(urlsplit(p.url).query).get("q"), [b])
         await p.reload(); c.check("search_survives_reload", await self.ui(p, "search").input_value(), b)
+        await self.ui(p,"search").fill("")
+        await self.ui(p,"total").get_by_text(str(self.profile["client_ticket_count"]),exact=True).wait_for()
+        await self.ui(p,"page_next").click()
+        await p.wait_for_function("new URLSearchParams(location.search).get('page')==='2'")
+        await p.reload()
+        c.check("page_survives_reload",parse_qs(urlsplit(p.url).query).get("page"),["2"])
+        await self.ui(p,"priority_filter").select_option("high")
+        await p.wait_for_function("new URLSearchParams(location.search).get('priority')==='high'")
+        c.check("filter_resets_page1",parse_qs(urlsplit(p.url).query).get("page"),["1"])
+        await p.reload();c.check("filter_survives_reload",await self.ui(p,"priority_filter").input_value(),"high")
+        await self.ui(p,"status_filter").select_option("closed")
+        await p.wait_for_function("new URLSearchParams(location.search).get('status')==='closed'")
+        c.check("status_resets_page1",parse_qs(urlsplit(p.url).query).get("page"),["1"])
+        await p.reload();c.check("status_survives_reload",await self.ui(p,"status_filter").input_value(),"closed")
+        staff=await c.page();await self.login(c,staff,"camille")
+        for mode,param in [("mine","assigned_to_me"),("unassigned","unassigned")]:
+            await self.ui(staff,"page_next").click()
+            await self.ui(staff,"assignment_filter").select_option(mode)
+            await staff.wait_for_function("p=>new URLSearchParams(location.search).get(p)==='true'",arg=param)
+            c.check("assignment_resets_page1_"+mode,parse_qs(urlsplit(staff.url).query).get("page"),["1"])
+            await staff.reload();c.check("assignment_survives_reload_"+mode,await self.ui(staff,"assignment_filter").input_value(),mode)
 
-    async def _ux07(self, c):
+    async def _ux07(self, c, *, doubleclick=True):
         p = await c.page(); await self.login(c, p, "camille")
         q = await c.page(); await self.login(c, q, "dylan")
         path = self.harness.routes["ticket"].format(id=self.harness.adapter.manifest.tickets["alice_open"])
@@ -436,6 +546,16 @@ class BrowserVerifier:
         c.check("reload_conserves_draft", await self.ui(q, "reply").input_value(), draft)
         state = await self.harness.adapter.observe("ticket_state", ticket_id=self.harness.adapter.manifest.tickets["alice_open"])
         c.check("no_automatic_reapplication", state["priority"], "high")
+        await self.ui(q,"send").click()
+        await self.ui(q,"messages").get_by_text(draft,exact=True).wait_for()
+        c.check("form_reusable_after_conflict",await self.harness.adapter.observe("browser_message_count",ticket_id=self.harness.adapter.manifest.tickets["alice_open"],content=draft),1)
+        if doubleclick:
+            client=await c.page();await self.login(c,client,"alice")
+            title="DOUBLE_CLICK_"+uuid4().hex
+            await self.ui(client,"create").click();await self.ui(client,"title").fill(title)
+            await self.ui(client,"description").fill("Independent double click description long enough")
+            await self.ui(client,"submit").dblclick();await self.detail_ready(client)
+            c.check("doubleclick_one_object",await self.harness.adapter.observe("browser_operation_count",title=title),1)
 
     async def _ux08(self, c):
         p = await c.page(); await self.login(c, p, "camille")
@@ -447,6 +567,9 @@ class BrowserVerifier:
         await self.ui(p, "send").click()
         await self.ui(p, "messages").get_by_text("INTERNAL_BROWSER_PROBE", exact=True).wait_for()
         c.check("note_label_not_color_only", "interne" in (await self.ui(p, "messages").inner_text()).lower())
+        internal=self.ui(p,"messages").locator(self.harness.bindings["internal_note"])
+        c.check("internal_structure",await internal.count()>0)
+        c.check("internal_distinct_not_color_only",await internal.first.evaluate("e=>parseFloat(getComputedStyle(e).borderLeftWidth)>0"))
         q = await c.page(); await self.login(c, q, "alice"); await q.goto(self.harness.adapter.base_url+path)
         await self.ui(q, "visibility").wait_for(state="hidden")
         c.check("client_visibility_absent", not await self.ui(q, "visibility").is_visible())
@@ -458,19 +581,61 @@ class BrowserVerifier:
                 raise AdapterUnavailable("bundle/source scan snapshot stale")
 
     async def _sec10(self, c):
-        await self._ux08(c)
-        for page in c.pages[1:]:
-            c.check("internal_dom_absent", await self._private_clean(page, ["INTERNAL_BROWSER_PROBE"]))
-        raise AdapterUnavailable("mixed/internal-only pagination and account-switch browser contribution requires reviewed fixture markers")
+        p=await c.page();await self.login(c,p,"alice")
+        markers=self.harness.adapter.manifest.metadata["internal_markers"]
+        markers=markers+[self.harness.adapter.manifest.metadata["internal_author_id"]]
+        for key in ["alice_mixed","alice_internal_only"]:
+            tid=self.harness.adapter.manifest.tickets[key]
+            await p.goto(self.harness.adapter.base_url+self.harness.routes["ticket"].format(id=tid));await self.detail_ready(p)
+            async with p.expect_response(lambda r:urlsplit(r.url).path.endswith("/messages")) as messages:
+                await self.ui(p,"refresh").click()
+            body=await(await messages.value).json()
+            c.check(key+"_json_private_absent",not any(m in json.dumps(body) for m in markers))
+            c.check(key+"_dom_private_absent",await self._private_clean(p,markers))
+            c.check(key+"_no_internal_selector",not await self.ui(p,"visibility").is_visible())
+            # Network response samples include each pagination boundary, not a
+            # React-side filtered list inferred from the DOM.
+            for page in [1,2]:
+                response=await p.request.get(self.harness.adapter.base_url+f"/api/tickets/{tid}/messages?page={page}&page_size=1")
+                data=await response.json();c.check(key+"_page"+str(page)+"_private_absent",not any(m in json.dumps(data) for m in markers))
+                c.requests.append({"method":"GET","path":f"/api/tickets/{tid}/messages","query":{"page":page,"page_size":1},"status":response.status})
+            history=await p.request.get(self.harness.adapter.base_url+f"/api/tickets/{tid}/history?page_size=50")
+            history_text=await history.text()
+            c.check(key+"_events_absent",not any(m in history_text for m in markers))
+        await self.ui(p,"ticket_nav").click()
+        for marker in self.harness.adapter.manifest.metadata["internal_markers"]:
+            await self.ui(p,"search").fill(marker)
+            await self.ui(p,"total").get_by_text("0",exact=True).wait_for()
+            c.check("internal_search_zero",await self.ui(p,"total").inner_text(),"0")
+        await self.ui(p,"logout").click();await self.ui(p,"email").wait_for();await self.login(c,p,"bob")
+        c.check("account_switch_private_absent",await self._private_clean(p,markers))
 
     async def _sec12(self, c):
-        p = await c.page(); await self.login(c, p, "alice")
-        title = "<img src=x onerror=window.__security_probe=1>"
-        await self.create(c, p, title)
-        await self.detail_ready(p)
-        c.check("literal_title", title in await self.ui(p, "detail").inner_text())
-        c.check("xss_not_executed", await p.evaluate("window.__security_probe===undefined"))
-        raise AdapterUnavailable("full public/internal message/account-name browser matrix still required")
+        p=await c.page();await self.login(c,p,"alice")
+        staff=await c.page();await self.login(c,staff,"camille")
+        admin=await c.page();await self.login(c,admin,"emma")
+        for payload in ["<script>window.__security_probe=1</script>","<img src=x onerror=window.__security_probe=1>","O'Reilly %_ ' OR 1=1 --"]:
+            await self.create(c,p,payload);await self.detail_ready(p)
+            c.check("literal_title",payload in await self.ui(p,"detail").inner_text())
+            tid=urlsplit(p.url).path.rsplit("/",1)[-1]
+            for page,visibility in [(p,"public"),(staff,"internal")]:
+                if page is staff:
+                    await page.goto(self.harness.adapter.base_url+self.harness.routes["ticket"].format(id=tid));await self.detail_ready(page)
+                    await self.ui(page,"visibility").select_option(visibility)
+                await self.ui(page,"reply").fill(payload)
+                async with page.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path==f"/api/tickets/{tid}/messages") as sent:
+                    await self.ui(page,"send").click()
+                c.check("literal_http_"+visibility,(await sent.value).status,201)
+                messages=self.ui(page,"messages")
+                if visibility=="internal":messages=messages.locator(self.harness.bindings["internal_note"])
+                await messages.get_by_text(payload,exact=True).wait_for()
+                c.check("literal_"+visibility,await messages.get_by_text(payload,exact=True).is_visible())
+                c.check("no_js_"+visibility,await page.evaluate("window.__security_probe===undefined"))
+                c.check("one_literal_db_message_"+visibility,await self.harness.adapter.observe("browser_message_count",ticket_id=tid,content=payload),1 if visibility=="public" else 2)
+            uid=await self._create_account_ui(c,admin,role="agent",actor="xss_actor",display_name=payload)
+            await self.ui(admin,"users").get_by_text(re.compile(re.escape(payload))).wait_for()
+            c.check("literal_account_name",payload in await self.ui(admin,"users").inner_text())
+            c.check("no_js_name",await admin.evaluate("window.__security_probe===undefined"))
 
     async def _fun02(self, c):
         p = await c.page(); await self.login(c, p, "alice")
@@ -486,13 +651,23 @@ class BrowserVerifier:
 
     async def _fun12(self, c):
         p = await c.page(); await self.login(c, p, "alice")
+        expected=self.harness.adapter.manifest.metadata["dashboard_expected"]["alice"]
         await self.ui(p, "dashboard_nav").click()
         await self.ui(p, "dashboard_total").filter(has_text=re.compile(r"\S")).wait_for()
         c.check("scoped_dashboard", await self.ui(p, "dashboard_total").inner_text(), str(self.profile["client_ticket_count"]))
+        await self._dashboard_check(c,p,expected)
         await p.reload()
         await self.ui(p, "dashboard_total").filter(has_text=re.compile(r"\S")).wait_for()
         c.check("dashboard_reload", await self.ui(p, "dashboard_total").inner_text(), str(self.profile["client_ticket_count"]))
-        raise AdapterUnavailable("post-mutation counters and zero-state fixture browser contribution still required")
+        await self.create(c,p,"COUNTER_MUTATION_"+uuid4().hex);await self.detail_ready(p)
+        await self.ui(p,"dashboard_nav").click()
+        await self._dashboard_check(c,p,{**expected,"total":expected["total"]+1,"open":expected["open"]+1})
+        await p.reload();await self._dashboard_check(c,p,{**expected,"total":expected["total"]+1,"open":expected["open"]+1})
+        admin=await c.page();await self.login(c,admin,"emma")
+        created=await self._create_account_ui(c,admin,role="client",actor="empty_client",display_name="Client sans ticket")
+        empty=await c.page();await self.login(c,empty,"empty_client")
+        await self.ui(empty,"dashboard_nav").click()
+        await self._dashboard_check(c,empty,{"total":0,"open":0,"in_progress":0,"resolved":0,"closed":0})
 
     async def verify_e2e(self, snapshot_hash, *, mode, scenario_ids=None):
         """Execute source-defined scenarios separately on freshly prepared DBs.
@@ -531,8 +706,10 @@ class BrowserVerifier:
                 runs.append({"id":sid,"expected":expected[sid],"mode":mode,"status":"FAIL" if failed else
                     "NOT_VERIFIED" if limits or not case.checks else "PASS","observed":case.checks,"limits":limits,
                     "proofs":[p.__dict__ for p in case.proofs],"fixture_reset_before":reset,
+                    "reproduction":case.requests,"impact":"E2E source scenario violated" if failed else "",
                     "real_ui_api_db":bool(case.requests) and reset,"nominal_mocks":False,
-                    "unhandled_console_errors":case.console_errors,"nonblank":bool(case.pages),
+                    "unhandled_console_errors":case.console_errors,
+                    "nonblank":bool(case.pages) and all([bool((await p.locator("body").inner_text()).strip()) for p in case.pages]),
                     "contract_hash":self.contract_hash,"snapshot_hash":self.snapshot})
                 await self.harness.close()
         finally:
@@ -551,6 +728,7 @@ class BrowserVerifier:
         await self.ui(p,"ticket_nav").click();await self.ui(p,"search").fill(title)
         await self.ui(p,"ticket_list").get_by_text(title,exact=True).click();await self.detail_ready(p)
         await p.reload();await self.detail_ready(p)
+        await self.ui(p,"messages").get_by_text(reply,exact=True).wait_for()
         c.check("reload_public_response",await self.ui(p,"messages").get_by_text(reply,exact=True).is_visible())
         c.check("one_db_ticket",await self.harness.adapter.observe("browser_operation_count",title=title),1)
 
@@ -580,52 +758,49 @@ class BrowserVerifier:
 
     async def _e2e03(self,c):
         p=await c.page();await self.login(c,p,"bob")
+        before=await self.harness.adapter.observe("business_state")
         tid=self.harness.adapter.manifest.tickets["alice_open"]
         async with p.expect_response(lambda r:r.request.method=="GET" and urlsplit(r.url).path=="/api/tickets/"+tid) as denied:
             await p.goto(self.harness.adapter.base_url+self.harness.routes["ticket"].format(id=tid))
         c.check("foreign_ticket_404",(await denied.value).status,404)
         await self.ui(p,"error").wait_for();c.check("foreign_detail_cleared",not await self.ui(p,"reply").is_visible())
         await p.goto(self.harness.adapter.base_url+self.harness.routes["admin"])
+        c.check("admin_route_denied",await c.visible(p,"error"))
         c.check("admin_client_no_private",await self._private_clean(p,[self.harness.adapter.manifest.accounts["emma"].email]))
+        c.check("denied_reads_no_business_db_effect",await self.harness.adapter.observe("business_state")==before)
         await self.harness.adapter.command("deactivate_fixture_account",actor="dylan")
         q=await c.page();actor=self.harness.adapter.manifest.accounts["dylan"]
         await self.ui(q,"email").fill(actor.email);await self.ui(q,"password").fill(actor.password)
         async with q.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path=="/api/auth/login") as inactive:
             await self.ui(q,"login").click()
         c.check("inactive_login_401",(await inactive.value).status,401)
-        raise AdapterUnavailable("full client-admin transient-display refusal proof remains to exercise")
 
     async def _e2e04(self,c):
-        await self._ux07(c)
+        await self._ux07(c,doubleclick=False)
         await self._ux02(c)
 
     async def _e2e05(self,c):
         p=await c.page();await self.login(c,p,"emma")
-        await self.ui(p,"admin_nav").click()
-        # All these controls must be independently bound; never fabricate a
-        # successful administration journey from role/button presence.
-        await self.ui(p,"new_email").fill("e2e-new-agent@example.test")
-        await self.ui(p,"new_name").fill("Agent E2E")
-        await self.ui(p,"new_password").fill("Independent E2E password 2026")
-        await self.ui(p,"new_role").select_option("agent")
-        async with p.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path=="/api/users") as created:
-            await self.ui(p,"create_user").click()
-        response=await created.value;c.check("agent_created",response.status,201)
-        uid=(await response.json())["id"]
-        await self.harness.adapter.command("register_actor",actor="new_agent",id=uid,email="e2e-new-agent@example.test",
-            password="Independent E2E password 2026",role="agent")
+        uid=await self._create_account_ui(c,p,role="agent",actor="new_agent",display_name="Agent E2E")
         q=await c.page();await self.login(c,q,"new_agent")
         tid=self.harness.adapter.manifest.tickets["alice_open"]
         await p.goto(self.harness.adapter.base_url+self.harness.routes["ticket"].format(id=tid));await self.detail_ready(p)
         await self._patch_ui(c,p,assignee=uid)
         await self.ui(p,"admin_nav").click()
         toggle=p.locator(self.harness.bindings["user_toggle"].format(id=uid))
-        await toggle.click()
-        if await self.ui(p,"confirm").is_visible(): await self.ui(p,"confirm").click()
+        async with p.expect_response(lambda r:r.request.method=="PATCH" and urlsplit(r.url).path=="/api/users/"+uid) as disabled:
+            await toggle.click()
+            if await self.ui(p,"confirm").is_visible(): await self.ui(p,"confirm").click()
+        c.check("agent_deactivated",(await disabled.value).status,200)
         await self.ui(q,"refresh").click();c.check("old_session_revoked",await c.visible(q,"email"))
         state=await self.harness.adapter.observe("ticket_state",ticket_id=tid);c.check("db_unassigned",state["assignee_id"],None)
-        await toggle.click()
-        await self.ui(q,"refresh").click();c.check("reactivation_old_session_still_revoked",await c.visible(q,"email"))
+        async with p.expect_response(lambda r:r.request.method=="PATCH" and urlsplit(r.url).path=="/api/users/"+uid) as activated:
+            await toggle.click()
+        c.check("agent_reactivated",(await activated.value).status,200)
+        async with q.expect_response(lambda r:r.request.method=="GET" and urlsplit(r.url).path=="/api/auth/me") as old:
+            await q.reload()
+        c.check("reactivation_old_session_http401",(await old.value).status,401)
+        c.check("reactivation_old_session_still_revoked",await c.visible(q,"email"))
         await self.login(c,q,"new_agent")
         admin=self.harness.adapter.manifest.accounts["emma"].id
         async with p.expect_response(lambda r:r.request.method=="PATCH" and urlsplit(r.url).path=="/api/users/"+admin) as last:
@@ -633,7 +808,52 @@ class BrowserVerifier:
             if await self.ui(p,"confirm").is_visible():await self.ui(p,"confirm").click()
         c.check("last_admin_409",(await last.value).status,409)
 
+    async def _create_account_ui(self,c,p,*,role,actor,display_name):
+        await self.ui(p,"admin_nav").click()
+        # All these controls must be independently bound; never fabricate a
+        # successful administration journey from role/button presence.
+        email="browser-"+uuid4().hex+"@example.test"
+        await self.ui(p,"new_email").fill(email)
+        await self.ui(p,"new_name").fill(display_name)
+        await self.ui(p,"new_password").fill("Independent E2E password 2026")
+        await self.ui(p,"new_role").select_option(role)
+        async with p.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path=="/api/users") as created:
+            await self.ui(p,"create_user").click()
+        response=await created.value;c.check("account_created_"+role,response.status,201)
+        uid=(await response.json())["id"]
+        await self.harness.adapter.command("register_actor",actor=actor,id=uid,email=email,
+            password="Independent E2E password 2026",role=role)
+        return uid
+
     async def _e2e06(self,c):
-        await self._ux03(c);await self._ux04(c);await self._ux05(c);await self._ux06(c)
-        await self._fun12(c)
-        raise AdapterUnavailable("full filters/pagination/post-mutation dashboard source matrix still required")
+        await self._ux06(c);await self._ux03(c)
+        p=await c.page();await self.login(c,p,"alice")
+        expected=self.harness.adapter.manifest.metadata["dashboard_expected"]["alice"]
+        await self.ui(p,"dashboard_nav").click();await self._dashboard_check(c,p,expected)
+        await self.ui(p,"create").click();title="MOTLONG"*15
+        await self.ui(p,"title").fill(title);await self.ui(p,"description").fill("E2E dashboard mutation description long enough")
+        await self.ui(p,"submit").click();await self.detail_ready(p)
+        for width in [self.profile["desktop_width"],self.profile["mobile_width"]]:
+            await p.set_viewport_size({"width":width,"height":900})
+            c.check("e2e_no_overflow_"+str(width),await p.evaluate("document.documentElement.scrollWidth<=innerWidth"))
+            await c.capture(p,"e2e-viewport-"+str(width))
+        updated={**expected,"total":expected["total"]+1,"open":expected["open"]+1}
+        await self.ui(p,"dashboard_nav").click();await self._dashboard_check(c,p,updated)
+        await p.reload();await self._dashboard_check(c,p,updated)
+        async def slow(route):await self._slow_read(route,.3)
+        await p.route("**/api/tickets?*",slow);await self.ui(p,"ticket_nav").click()
+        c.check("e2e_slow_loading",await c.visible(p,"loading"));await self.ui(p,"total").get_by_text(str(updated["total"]),exact=True).wait_for()
+        await p.unroute("**/api/tickets?*");await p.context.set_offline(True);await self.ui(p,"refresh").click()
+        c.check("e2e_network_failure",await c.visible(p,"error"));await p.context.set_offline(False)
+        await self.ui(p,"refresh").click();await self.ui(p,"total").get_by_text(str(updated["total"]),exact=True).wait_for()
+        await self.ui(p,"logout").click();await self.ui(p,"email").wait_for();await self.login(c,p,"bob")
+        c.check("e2e_switch_no_alice",await self._private_clean(p,[title]))
+
+    async def _dashboard_check(self,c,p,expected):
+        await self.ui(p,"dashboard_total").filter(has_text=re.compile(r"\S")).wait_for()
+        c.check("dashboard_total",int(await self.ui(p,"dashboard_total").inner_text()),expected["total"])
+        observed=[]
+        for state in ["open","in_progress","resolved","closed"]:
+            value=int(await self.ui(p,"dashboard_"+state).inner_text());observed.append(value)
+            c.check("dashboard_"+state,value,expected[state])
+        c.check("dashboard_sum",sum(observed),expected["total"])
