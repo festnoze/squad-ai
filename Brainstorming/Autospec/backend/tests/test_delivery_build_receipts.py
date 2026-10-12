@@ -113,6 +113,13 @@ def test_delivery_receipt_has_exact_snapshot_locks_dist_and_real_composite_rc(tm
     assert [(c['kind'],c['argv']) for c in receipt['commands'] if c['rc'] is not None]==[
         ('typecheck_frontend_build',commands[0][1]),('image_build',commands[1][1])]
     assert not (root/'frontend/dist').exists()
+    assert receipt['backend_dependency']['timing']['phase']=='install'
+    assert receipt['frontend_build']['dependency']['timing']['phase']=='install'
+    assert receipt['frontend_build']['timing']['phase']=='build'
+    assert receipt['commands'][-1]['timing']['phase']=='docker'
+    assert all(t['seconds']>=0 and t['started_at'] and t['ended_at'] for t in (
+        receipt['backend_dependency']['timing'],receipt['frontend_build']['dependency']['timing'],
+        receipt['frontend_build']['timing'],receipt['commands'][-1]['timing']))
 
 
 def test_frontend_failure_is_preserved_without_claiming_image_build(tmp_path,fake_delivery):
