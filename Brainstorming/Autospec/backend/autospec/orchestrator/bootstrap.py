@@ -758,7 +758,6 @@ async def _verify(state: Any, ws: Path, *, timeout_s: float, cancel: asyncio.Eve
 def _isolated_preflight(state: Any, ws: Path, timeout_s: float, runtime_only: bool) -> str:
     import tempfile
     import urllib.request
-    from ..agents.runner import _run_tracked, AgentError
     from .isolated_validation import IsolatedValidator, RuntimeSession
     from .validation_environment import snapshot_product
 
@@ -861,20 +860,96 @@ def _isolated_preflight(state: Any, ws: Path, timeout_s: float, runtime_only: bo
                 steps.append("API → SQLite : SELECT 1 OK" if stack.get("database") == "sqlite" else "isolated HTTP OK")
                 if frontend:
                     budget()
-                    # Trusted installed driver from factory, never generated cwd.
-                    browser_env = {k:v for k,v in os.environ.items() if k.upper() in {"PATH","SYSTEMROOT","WINDIR","TEMP","TMP","LOCALAPPDATA"}}
-                    browser_env["NODE_PATH"] = str(PROJECT_DIR / "frontend" / "node_modules")
-                    driver = Path(__file__).with_name("isolated_browser.cjs")
-                    from ..agents.runner import _agent_environment
-                    context = _agent_environment.set(browser_env)
-                    try:
-                        rc, out, err = _run_tracked([settings.node_cmd, str(driver), session.origin, str(int(min(15, budget())*1000)), "1" if backend != "none" and not runtime_only else "0"], "", temporary, budget())
-                    finally:
-                        _agent_environment.reset(context)
-                    if rc:
-                        raise BootstrapFailure(out + err, infra=rc == 2, exit_code=rc)
-                    steps.append(out.strip())
+                    # Separate browser container: same exact NETNONE network
+                    # namespace, no source/DB mount, host launch or client network.
+                    steps.append(asyncio.run(_browser_preflight(session,timeout_s=budget(),
+                        require_api=backend!="none" and not runtime_only,
+                        expected_health=expected if backend!="none" and not runtime_only else None)))
             return "\n".join(steps)
     finally:
         if dist is not None:
             shutil.rmtree(dist)
+
+
+async def _browser_preflight(session, *, timeout_s: float, require_api: bool, expected_health: dict | None = None) -> str:
+    """Actual UI rendering on the exact owned runtime, never host Chromium."""
+    from types import SimpleNamespace
+    from .isolated_validation import RuntimeSession
+    from ..validation.browser_contracts import PlaywrightHarness
+
+    if not isinstance(session,RuntimeSession):
+        raise BootstrapFailure("ISOLATION_UNAVAILABLE: actual owned browser runtime required",infra=True)
+    if type(timeout_s) not in {int,float} or not 0 < timeout_s <= 3600 or type(require_api) is not bool:
+        raise BootstrapFailure("ISOLATION_UNAVAILABLE: bounded browser preflight required",infra=True)
+    if require_api and (not isinstance(expected_health,dict) or set(expected_health)!={"status","service","database","probe"}
+            or expected_health.get("status")!="ok" or expected_health.get("service")!="autospec-bootstrap"
+            or expected_health.get("database") not in {"ok","none"}
+            or not isinstance(expected_health.get("probe"),str) or not expected_health["probe"]):
+        raise BootstrapFailure("ISOLATION_UNAVAILABLE: supervisor nonce-bound API response required",infra=True)
+    parent=session._assert_owned()
+    actual=session.inspect_configuration()
+    if actual["container_id"]!=parent or actual["network_mode"]!="none" or actual["running"] is not True or actual["published_ports"]:
+        raise BootstrapFailure("ISOLATION_UNAVAILABLE: exact active NETNONE browser parent required",infra=True)
+    # Supervisor capability; no flag or namespace comes from model output.
+    adapter=SimpleNamespace(base_url=session.origin,supervised_runtime=session,manifest=SimpleNamespace(accounts={}))
+    harness=PlaywrightHarness(adapter,bindings={},routes={"home":"/"})
+    checks=[]
+    case=SimpleNamespace(console_errors=[],requests=[],check=lambda tag,observed,expected:checks.append(observed==expected))
+    stage="open_page"
+    async def render():
+        nonlocal stage
+        page=await harness.page(case,1280,auto_navigate=False)
+        stage="configure_page"
+        page.set_default_timeout(max(1,min(15000,int(timeout_s*1000))))
+        errors=[]
+        page.on("console",lambda message:errors.append(True) if message.type=="error" else None)
+        if require_api:
+            from urllib.parse import urlsplit
+            origin=urlsplit(session.origin)
+            def api_response(response):
+                url=urlsplit(response.url)
+                return (url.scheme,url.netloc,url.path)==(origin.scheme,origin.netloc,"/api/health") and response.request.method=="GET"
+            # The application itself must fetch its API during this navigation.
+            # A supervisor request or a hardcoded "OK" string is not that chain.
+            async with page.expect_response(api_response,timeout=max(1,int(timeout_s*1000))) as observed:
+                stage="navigate_for_api"
+                response=await page.goto(session.origin,wait_until="networkidle")
+                stage="observe_api"
+            health=await observed.value
+            stage="read_api_json"
+            if health.status!=200 or await health.json()!=expected_health:
+                raise BootstrapFailure("Actual frontend API response differs from supervisor nonce-bound health")
+        else:
+            stage="navigate"
+            response=await page.goto(session.origin,wait_until="networkidle")
+        if response is None or response.status!=200:
+            raise BootstrapFailure("Browser entrypoint does not return HTTP 200")
+        stage="render_root"
+        await page.wait_for_function("""() => {
+            const root=document.getElementById('root');
+            return root && root.childElementCount>0 && (root.innerText.trim() || root.querySelector('canvas,svg,img'));
+        }""")
+        if require_api:
+            stage="render_api_status"
+            await page.wait_for_function("() => /Frontend → API(?: → base de données)? : OK/.test(document.body.innerText)")
+        if errors or case.console_errors or not all(checks):
+            raise BootstrapFailure("Browser console/page/network violation observed (untrusted text withheld)")
+        stage="attest_browser"
+        environment=harness.browser_environment
+        current=session.inspect_configuration()
+        if (environment.get("host_chromium") is not False or environment.get("parent_id")!=parent
+                or environment.get("network_mode")!="container:"+parent or environment.get("client_network_exposed") is not False
+                or session._assert_owned()!=parent or current["container_id"]!=parent or current["network_mode"]!="none"
+                or current["running"] is not True or current["published_ports"]):
+            raise BootstrapFailure("ISOLATION_UNAVAILABLE: actual Docker browser receipt absent",infra=True)
+        return "Chromium Docker: production UI rendered" + (" ; frontend → API probe OK" if require_api else "") + "; exact NETNONE parent " + parent
+    try:
+        return await asyncio.wait_for(render(),timeout=timeout_s)
+    except asyncio.TimeoutError as exc:
+        raise BootstrapFailure("Isolated browser preflight deadline exceeded",infra=True) from exc
+    except BootstrapFailure:
+        raise
+    except Exception as exc:
+        raise BootstrapFailure("ISOLATION_UNAVAILABLE: Docker browser preflight unavailable ("+stage+": "+type(exc).__name__+"; private driver output withheld)",infra=True) from None
+    finally:
+        await harness.close()

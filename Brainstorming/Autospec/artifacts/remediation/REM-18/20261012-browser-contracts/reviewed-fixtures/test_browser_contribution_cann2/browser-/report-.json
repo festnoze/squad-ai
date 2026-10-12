@@ -1,0 +1,175 @@
+{
+  "pack": "browser",
+  "status": "NOT_VERIFIED",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "requirements": [
+    {
+      "id": "FUN-02",
+      "gate": "M",
+      "status": "NOT_VERIFIED",
+      "expected": "Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant => 404 ; aucune fiche précédente encore affichée.",
+      "observed": [
+        {
+          "check": "FUN-02:real_login_http_alice",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "FUN-02:real_login_alice",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "FUN-02:client_count",
+          "observed": "6",
+          "expected": "6",
+          "passed": true
+        },
+        {
+          "check": "FUN-02:known_detail",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "FUN-02:missing_clears_previous_detail",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "FUN-02:missing_error",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "FUN-02:unhandled_page_errors",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_browser_contribution_cann2\\browser-\\FUN-02-final-b4e4ff38ef4949bcbd69282dddf4105f.png",
+          "sha256": "25a9a385cda0199a0ab685478ce518d811f9045cdc3dcb27b363373c1f708a65",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "FUN-02:final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_browser_contribution_cann2\\browser-\\FUN-02-f266e82558b04675b6720d4191dde7b9.json",
+          "sha256": "f5bade535f9294ba55d72aaa4ae084f871336bff586c3a64c076f9d304c3d65d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "FUN-02:real_login_http_alice",
+            "FUN-02:real_login_alice",
+            "FUN-02:client_count",
+            "FUN-02:known_detail",
+            "FUN-02:missing_clears_previous_detail",
+            "FUN-02:missing_error",
+            "FUN-02:unhandled_page_errors"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [
+        "browser contribution only: independent backend probes still required"
+      ],
+      "reproduction": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/32164122-c694-4de3-bc67-ea8c2a21da08",
+          "payload": null,
+          "query": {}
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+      "layer": "browser"
+    }
+  ],
+  "environment_limits": [
+    "HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."
+  ],
+  "browser_environment": {
+    "qualified": false,
+    "host_chromium": true,
+    "trusted_fixture_only": true
+  },
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": ""
+}

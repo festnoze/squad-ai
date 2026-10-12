@@ -78,7 +78,8 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
     return {"status":"FAIL" if failed else "NOT_VERIFIED" if limits or not ticket_id else "PASS",
             "scope":"vertical browser login/create only, not product acceptance", "ticket_id":ticket_id,
             "proofs":case.proofs,"limits":limits,"contract_hash":contract_hash,"snapshot_hash":snapshot_hash,
-            "environment_limits":BROWSER_NETWORK_LIMITS}
+            "environment_limits":harness.environment_limits,
+            "browser_environment":harness.browser_environment}
 
 
 def browser_generation_requirements(contract):
@@ -98,39 +99,84 @@ def browser_generation_requirements(contract):
 
 
 class PlaywrightHarness:
-    """Browser HTTP/SW/WS guards only; never an OS/network isolation claim."""
-    def __init__(self, adapter, *, bindings: dict, routes: dict, executable_path=None):
+    """Remote NETNONE browser for products; explicit local trusted-fixture only."""
+    def __init__(self, adapter, *, bindings: dict, routes: dict, executable_path=None,
+                 trusted_fixture_local_browser=False):
         origin = urlsplit(adapter.base_url)
         if origin.scheme not in {"http", "https"} or origin.hostname not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError("isolated loopback browser origin required")
         self.adapter, self.bindings, self.routes = adapter, bindings, routes
         self.executable_path = executable_path
+        if type(trusted_fixture_local_browser) is not bool:
+            raise ValueError("explicit trusted-fixture browser flag required")
+        self.trusted_fixture_local_browser=trusted_fixture_local_browser
         self.playwright = self.browser = None
+        self.docker_browser=None
+        self.browser_environment={"qualified":False}
         self.contexts = []
+
+    @property
+    def environment_limits(self):
+        if self.browser_environment.get("host_chromium") is False:
+            return ["Docker Linux kernel/daemon and constant factory image are trusted; Chromium's internal sandbox is not attested.",
+                "Browser shares only the exact product NETNONE network namespace: product/control loopback remains reachable, no host/client network exposure."]
+        return BROWSER_NETWORK_LIMITS
 
     async def start(self):
         try:
+            self.browser_environment={"qualified":False}
+            runtime=getattr(self.adapter,"supervised_runtime",None)
+            if runtime is None and (getattr(self.adapter,"live_sqlite",False) or not self.trusted_fixture_local_browser):
+                raise AdapterUnavailable("product browser requires an exact supervised NETNONE runtime; no host fallback")
+            if runtime is not None:
+                if self.executable_path is not None:
+                    raise AdapterUnavailable("host Chromium override forbidden for supervised product browser")
+                from .docker_browser import DockerBrowserSession
+                self.docker_browser=DockerBrowserSession(runtime,origin=self.adapter.base_url)
+                await asyncio.to_thread(self.docker_browser.start)
             from playwright.async_api import async_playwright
             self.playwright = await async_playwright().start()
-            self.browser = await self.playwright.chromium.launch(headless=True, executable_path=self.executable_path)
-        except Exception as exc:
+            if self.docker_browser is not None:
+                # Empty exposure explicitly denies the connecting host's network.
+                self.browser=await self.playwright.chromium.connect(self.docker_browser.endpoint,timeout=10000,expose_network="")
+                self.browser_environment=dict(self.docker_browser.receipt,qualified=True)
+            else:
+                self.browser=await self.playwright.chromium.launch(headless=True, executable_path=self.executable_path)
+                self.browser_environment={"qualified":False,"host_chromium":True,"trusted_fixture_only":True}
+        except BaseException as exc:
             await self.close()
-            raise AdapterUnavailable("locked Playwright/Chromium unavailable") from exc
+            if not isinstance(exc,Exception): raise
+            # The underlying driver's connection error can contain the private
+            # WS capability. Do not publish it through exception chaining/logs.
+            raise AdapterUnavailable("locked isolated Playwright/Chromium unavailable; no host fallback") from None
 
     async def close(self):
-        for context in self.contexts:
-            await context.close()
-        self.contexts.clear()
-        if self.browser: await self.browser.close()
-        if self.playwright: await self.playwright.stop()
-        self.browser = self.playwright = None
+        failure=None
+        try:
+            if self.contexts:
+                try:
+                    results=await asyncio.wait_for(asyncio.gather(*(c.close() for c in self.contexts),return_exceptions=True),5)
+                    failure=next((x for x in results if isinstance(x,Exception)),None)
+                except Exception as exc: failure=exc
+            if self.browser:
+                try: await asyncio.wait_for(self.browser.close(),5)
+                except Exception as exc: failure=exc
+        finally:
+            self.contexts.clear()
+            try:
+                if self.docker_browser: await asyncio.to_thread(self.docker_browser.close)
+            finally:
+                if self.playwright: await asyncio.wait_for(self.playwright.stop(),5)
+                self.browser=self.playwright=None
+        if failure: raise AdapterUnavailable("owned browser channel cleanup failed") from failure
 
     def control(self, page, name):
         if name not in self.bindings:
             raise AdapterUnavailable("reviewed UI binding missing: " + name)
         return page.locator(self.bindings[name])
 
-    async def page(self, case, viewport):
+    async def page(self, case, viewport, *, auto_navigate=True):
+        if type(auto_navigate) is not bool: raise ValueError("explicit browser navigation flag required")
         if self.browser is None: await self.start()
         context = await self.browser.new_context(viewport={"width": viewport, "height": 900},service_workers="block")
         self.contexts.append(context)
@@ -165,7 +211,7 @@ class PlaywrightHarness:
             case.requests.append({"method": request.method, "path": path, "payload": self.redact(payload),
                                   "query": self.redact(parse_qs(urlsplit(request.url).query))})
         page.on("request", request)
-        await page.goto(self.adapter.base_url + self.routes["home"])
+        if auto_navigate: await page.goto(self.adapter.base_url + self.routes["home"])
         return page
 
     async def guard_probe_route(self,route,case):
@@ -295,7 +341,8 @@ class BrowserVerifier:
         return {"pack": "browser", "status": "FAIL" if any(r["status"] == "FAIL" for r in results) else
                 "PASS" if all(r["status"] == "PASS" for r in results) else "NOT_VERIFIED",
                 "contract_hash": self.contract_hash, "snapshot_hash": self.snapshot, "requirements": results,
-                "environment_limits":BROWSER_NETWORK_LIMITS}
+                "environment_limits":self.harness.environment_limits,
+                "browser_environment":self.harness.browser_environment}
 
     def ui(self, page, name): return self.harness.control(page, name)
 
@@ -748,7 +795,8 @@ class BrowserVerifier:
         return {"pack":"browser_e2e","status":"FAIL" if any(r["status"]=="FAIL" for r in runs) else
                 "PASS" if runs and all(r["status"]=="PASS" for r in runs) else "NOT_VERIFIED",
                 "contract_hash":self.contract_hash,"snapshot_hash":self.snapshot,"scenarios":runs,
-                "environment_limits":BROWSER_NETWORK_LIMITS}
+                "environment_limits":self.harness.environment_limits,
+                "browser_environment":self.harness.browser_environment}
 
     async def _e2e01(self,c):
         p=await c.page();await self.login(c,p,"alice")

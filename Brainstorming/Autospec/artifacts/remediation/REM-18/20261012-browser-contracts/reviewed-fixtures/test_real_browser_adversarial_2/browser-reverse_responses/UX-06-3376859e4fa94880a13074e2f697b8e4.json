@@ -1,0 +1,484 @@
+{
+  "id": "UX-06",
+  "snapshot_hash": "f023647f7e593797f2fca686bb87fb73dd6d9f00ebc931cdfee6a7e13b574431",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "checks": [
+    {
+      "check": "UX-06:real_login_http_alice",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "UX-06:real_login_alice",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "UX-06:late_a_cannot_replace_b",
+      "observed": false,
+      "expected": true,
+      "passed": false
+    },
+    {
+      "check": "UX-06:search_in_url",
+      "observed": [
+        "Unicode"
+      ],
+      "expected": [
+        "Unicode"
+      ],
+      "passed": true
+    },
+    {
+      "check": "UX-06:search_survives_reload",
+      "observed": "Unicode",
+      "expected": "Unicode",
+      "passed": true
+    },
+    {
+      "check": "UX-06:page_survives_reload",
+      "observed": [
+        "2"
+      ],
+      "expected": [
+        "2"
+      ],
+      "passed": true
+    },
+    {
+      "check": "UX-06:filter_resets_page1",
+      "observed": [
+        "1"
+      ],
+      "expected": [
+        "1"
+      ],
+      "passed": true
+    },
+    {
+      "check": "UX-06:filter_survives_reload",
+      "observed": "high",
+      "expected": "high",
+      "passed": true
+    },
+    {
+      "check": "UX-06:status_resets_page1",
+      "observed": [
+        "1"
+      ],
+      "expected": [
+        "1"
+      ],
+      "passed": true
+    },
+    {
+      "check": "UX-06:status_survives_reload",
+      "observed": "closed",
+      "expected": "closed",
+      "passed": true
+    },
+    {
+      "check": "UX-06:real_login_http_camille",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "UX-06:real_login_camille",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "UX-06:assignment_resets_page1_mine",
+      "observed": [
+        "1"
+      ],
+      "expected": [
+        "1"
+      ],
+      "passed": true
+    },
+    {
+      "check": "UX-06:assignment_survives_reload_mine",
+      "observed": "mine",
+      "expected": "mine",
+      "passed": true
+    },
+    {
+      "check": "UX-06:assignment_resets_page1_unassigned",
+      "observed": [
+        "1"
+      ],
+      "expected": [
+        "1"
+      ],
+      "passed": true
+    },
+    {
+      "check": "UX-06:assignment_survives_reload_unassigned",
+      "observed": "unassigned",
+      "expected": "unassigned",
+      "passed": true
+    },
+    {
+      "check": "UX-06:unhandled_page_errors",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "q": [
+          "ASCII"
+        ],
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "q": [
+          "Unicode"
+        ],
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "q": [
+          "Unicode"
+        ],
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "2"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "2"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "priority": [
+          "high"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "priority": [
+          "high"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "priority": [
+          "high"
+        ],
+        "status": [
+          "closed"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "priority": [
+          "high"
+        ],
+        "status": [
+          "closed"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "2"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "assigned_to_me": [
+          "true"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "assigned_to_me": [
+          "true"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "2"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "assigned_to_me": [
+          "true"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "unassigned": [
+          "true"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ],
+        "unassigned": [
+          "true"
+        ]
+      }
+    }
+  ],
+  "console_errors": []
+}
