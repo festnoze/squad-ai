@@ -1,0 +1,13 @@
+Locked factory-env Python, PYTHONPATH=<isolated worktree>/backend.
+AUTOSPEC_DOCKER_BROWSER_TESTS=1; AUTOSPEC_REAL_PRODUCT_HARNESS=1.
+
+python -m pytest tests/test_docker_browser.py tests/test_docker_browser_real.py tests/test_product_harness.py::test_real_linux_vertical_and_owned_volume_persistence tests/test_container_tunnel.py -q --junitxml=../artifacts/remediation/REM-01/20261012-docker-browser/checkpoint-junit.xml
+.....................................................                    [100%]
+53 passed in 38.91s
+
+After strict factory argv/env checks and cancellation/private-token counter-tests:
+python -m pytest tests/test_docker_browser.py tests/test_docker_browser_real.py tests/test_container_tunnel.py -q --junitxml=../artifacts/remediation/REM-01/20261012-docker-browser/final-boundary-junit.xml
+..........................................................               [100%]
+58 passed in 8.20s
+
+Scope: real independent observer fixture and narrow nominal product-harness smoke only, not generated-product acceptance.
