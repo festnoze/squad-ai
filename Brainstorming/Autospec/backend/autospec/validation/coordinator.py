@@ -37,13 +37,23 @@ def binding_proposal_schema()->dict:
            "properties":{"name":identifier,"columns":mapping(identifier)}}
     command={"type":"object","additionalProperties":False,"required":["argv","parameters","timeout"],
              "properties":{"argv":argv,"parameters":{"type":"array","items":identifier},"timeout":{"type":"number","exclusiveMinimum":0,"maximum":120}}}
+    cookie_mode={"type":"object","additionalProperties":False,"required":["environment","tls"],
+        "properties":{"environment":mapping({"type":"string"}),"tls":{"type":"boolean"}}}
+    security_observations={"type":["object","null"],"additionalProperties":False,
+        "required":["cookie_name","fixture_case","actor","app_module","app_attribute","modes","artifact_roots"],
+        "properties":{"cookie_name":{"type":"string"},"fixture_case":{"type":"string"},"actor":identifier,
+            "app_module":{"type":"string"},"app_attribute":identifier,
+            "modes":{"type":"object","additionalProperties":False,
+                "required":["https","http_local_explicit","http_without_exception"],
+                "properties":{name:cookie_mode for name in ("https","http_local_explicit","http_without_exception")}},
+            "artifact_roots":{"type":"array","minItems":1,"uniqueItems":True,"items":{"type":"string"}}}}
     fields={"database_path":{"type":"string","const":"/var/lib/autospec-validation/support.sqlite"},
         "tables":mapping(table),"commands":mapping(command),"runtime_command":argv,
         "auth_path":{"type":"string"},"csrf_field":identifier,"ticket_path":{"type":"string"},
         "auth_required":{"type":"boolean"},"internal_port":{"type":"integer","minimum":1,"maximum":65535},
         "local_cookie_mode":{"type":"boolean"},"browser_bindings":mapping({"type":"string"}),
         "browser_routes":mapping({"type":"string"}),"query_plans":mapping({"type":"array","minItems":2,"maxItems":2}),
-        "instrumentation":{"type":["object","null"]}}
+        "instrumentation":{"type":["object","null"]},"security_observations":security_observations}
     return {"type":"object","additionalProperties":False,"required":["source_files","bindings"],
         "properties":{"source_files":{"type":"array","minItems":1,"uniqueItems":True,"items":{"type":"string"}},
             "bindings":{"type":"object","additionalProperties":False,"required":list(fields),"properties":fields}}}

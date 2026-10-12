@@ -81,7 +81,9 @@ def _proof(root, filename, payload, snapshot, oracle, checks, passed=True):
 def _protocol():
     root = Path(__file__).parent
     return {name: (root/name).read_text(encoding="utf-8") for name in (
-        "product_harness.py", "entropy_protocol.py", "security_contracts.py", "business_contracts.py", "architecture_contracts.py", "browser_contracts.py", "quality_contracts.py", "delivery_evidence.py")}
+        "product_harness.py", "entropy_protocol.py", "security_contracts.py", "security_observations.py", "public_crypto_fixtures.py",
+        "business_contracts.py", "architecture_contracts.py", "architecture_browser.py", "browser_contracts.py",
+        "evidence_join.py", "quality_contracts.py", "delivery_evidence.py")}
 
 
 def _entropy_source_subject(review, proposal, bundle):
@@ -234,6 +236,20 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         "case variants/metadata used by trusted packs. Password '$generated' and '$ref' avoid stored credentials. "
         "Nominal login/API/persistence cannot be mocked. Missing capabilities stay absent, not a default success.")
     proposer += (
+        " security_observations is null when source capabilities are absent; never invent a deployment switch."
+        " Otherwise bind exact cookie_name, fixture_case, actor, app_module, app_attribute (real source ASGI),"
+        " modes:{https:{environment:{source-defined env key:value},tls:true},"
+        " http_local_explicit:{environment:{...},tls:false},http_without_exception:{environment:{...},tls:false}},"
+        " and artifact_roots:[relative paths under the supervisor harness evidence root, '.' for that whole owned root]."
+        " These three environments represent real deployment conditions, not desired assertions."
+        " Values are bounded non-secret booleans or production/development; no PATH/DB/APP_ORIGIN override,"
+        " credentials, import hooks or product code replacement. HTTPS is real factory TLS, not a forged Origin."
+        " For ARC-06, source-bind browser_bindings.current_user_name and existing error/email/password/login/ticket_nav"
+        " plus browser_routes.ticket containing {id}. Each ARC-06 fixture metadata.browser_probes.architecture_client"
+        " maps identity_pointer=/display_name or /user/display_name, error_presentation=server_message or code_mapping;"
+        " code_mapping requires exact source error_messages:{code:displayed text}. These are operational facts,"
+        " not rewritten API expectations. Missing selectors/DTO usage remains absent, not a claimed successful client.")
+    proposer += (
         " If the real session generator imports a captured stdlib CSPRNG, map instrumentation.entropy_module,"
         " entropy_attribute and entropy_primitive to that exact source symbol (secrets.token_urlsafe/token_hex/token_bytes"
         " or os.urandom). All three are absent together if unsupported. Do not declare bits, infer them from token length,"
@@ -294,6 +310,14 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         "vertical phase requirements/test_mapping are empty. Verdicts cover SOURCE REVIEW ONLY, not runtime/browser success. "
         "PASS needs substantive source citations; contradiction is FAIL; uncertainty NOT_VERIFIED. Mapping links actual "
         "test assertions to frozen requirements but never proves execution. No X/V, no overall-ready flag, no source changes.")
+    reviewer += (
+        " Independently inspect security_observations: exact source ASGI/cookie, actor/fixture, actual deployment"
+        " switches for HTTPS, explicit local HTTP exception and HTTP without it, bounded non-secret env values,"
+        " and confined artifact_roots. Null capability stays unverified, not a source success default."
+        " Inspect ARC-06 current_user_name locator, actual display_name DTO pointer and actual server error presentation"
+        " (literal message or source code mapping) in fixtures.browser_probes.architecture_client."
+        " Do not infer native/browser completion from these source bindings. Vendor/examples cannot be declared"
+        " non-credential solely because of location; a public-material classification needs exact primary provenance.")
     if needs_entropy:
         reviewer += (
             " Add entropy:{status:PASS|FAIL|NOT_VERIFIED,citations:[],reason:string}, separate from bindings and SEC-05."
