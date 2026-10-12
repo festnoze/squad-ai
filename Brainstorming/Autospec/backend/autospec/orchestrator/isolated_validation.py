@@ -564,7 +564,8 @@ class RuntimeSession:
                  ecosystem: str = "python", docker: str = "docker", env: dict[str, str] | None = None,
                  connection_timeout: float = 15, application_origin: bool = False,
                  local_cookie_mode: bool = False, persistent_database: bool = False,
-                 mount_stage: bool = True,use_image_command: bool = False):
+                 mount_stage: bool = True,use_image_command: bool = False,
+                 host_port: int = 0, preserve_database: bool = False):
         if not 1 <= port <= 65535 or ecosystem not in {"python", "node"}:
             raise _unavailable("Invalid runtime port/ecosystem")
         if not math.isfinite(connection_timeout) or connection_timeout <= 0:
@@ -576,6 +577,8 @@ class RuntimeSession:
             raise _unavailable("Baked runtime requires an immutable local image ID")
         if type(use_image_command) is not bool or use_image_command and mount_stage:
             raise _unavailable('Plain image command requires a baked immutable runtime, without source mount')
+        if type(host_port) is not int or not 0 <= host_port <= 65535 or type(preserve_database) is not bool:
+            raise _unavailable('Invalid factory-owned ingress port/database retention mode')
         self.stage, self.image, self.command = Path(stage), image, command
         self.port, self.ecosystem, self.docker = port, ecosystem, docker
         self.env = dict(env or {})
@@ -606,6 +609,7 @@ class RuntimeSession:
         self.transition = True
         self.detached = False
         self.persistent_database = persistent_database
+        self.preserve_database = preserve_database
         self.mount_stage = mount_stage
         self.use_image_command = use_image_command
         self.volume_name = "autospec-validation-" + uuid.uuid4().hex if persistent_database else None
@@ -620,7 +624,7 @@ class RuntimeSession:
         class Server(socketserver.ThreadingTCPServer):
             daemon_threads = True
             allow_reuse_address = False
-        self.server = Server(("127.0.0.1", 0), Handler)
+        self.server = Server(("127.0.0.1", host_port), Handler)
         self.host_port = self.server.server_address[1]
         self.origin = f"http://127.0.0.1:{self.host_port}"
         if application_origin:
@@ -642,7 +646,10 @@ class RuntimeSession:
             if self.use_image_command:
                 self._attest_image_command()
             if self.persistent_database:
-                self._create_volume()
+                if self.volume_identity is None:
+                    self._create_volume()
+                else:
+                    self._assert_volume()
             self._launch()
             self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
             self.thread.start()
@@ -666,6 +673,66 @@ class RuntimeSession:
             return {key: data[key] for key in ("Name", "Driver", "CreatedAt", "Labels")}
         except (KeyError, TypeError, ValueError) as exc:
             raise _unavailable("Validation volume identity cannot be verified") from exc
+
+    def restore_owned_database(self, owner: str, identity: dict) -> None:
+        """Restore an externally journaled volume, never discover/adopt by PID.
+
+        A supervisor must additionally validate its publication journal and
+        container configuration. This API is not available to model tools.
+        """
+        if self.closed or self.thread is not None or not self.persistent_database or self.volume_requested:
+            raise _unavailable('Database restoration requires a new retained session')
+        if (not isinstance(owner, str) or not re.fullmatch(r'[a-f0-9]{32}', owner) or
+            not isinstance(identity, dict) or set(identity) != {'Name','Driver','CreatedAt','Labels'} or
+            not isinstance(identity['Name'],str) or not re.fullmatch(r'autospec-validation-[a-f0-9]{32}',identity['Name']) or
+            identity['Driver'] != 'local' or not isinstance(identity['CreatedAt'],str) or not identity['CreatedAt'] or
+            identity['Labels'] != {'autospec.run_id':owner,'autospec.kind':'validation-state'}):
+            raise _unavailable('Invalid externally owned database identity')
+        self.owner = owner
+        self.volume_name = identity['Name']
+        self.volume_identity = json.loads(json.dumps(identity))
+        self.volume_requested = True
+        self._assert_volume()
+
+    def restore_owned_container(self, identifier: str) -> "RuntimeSession":
+        """Attach ingress to an exact journal-owned hardened running container."""
+        with self.operation_lock:
+            if self.closed or self.thread is not None or not self.use_image_command or not self.volume_identity:
+                raise _unavailable('Container restoration requires a new immutable retained session')
+            if not isinstance(identifier,str) or not re.fullmatch(r'[a-f0-9]{64}',identifier):
+                raise _unavailable('Invalid externally owned container ID')
+            self._attest_image_command()
+            self.identifier, self.transition = identifier, False
+            info = self.inspect_configuration()
+            expected_mount = {'type':'volume','destination':self.DATABASE_DIRECTORY,'rw':True,
+                              'name':self.volume_name}
+            if (not info['running'] or info['user'] != '65532:65532' or not info['read_only'] or
+                info['cap_drop'] != ['ALL'] or info['privileged'] or
+                info['security_opt'] != ['no-new-privileges=true'] or info['network_mode'] != 'none' or
+                info['published_ports'] or info['runtime_command'] != self.command or info['runtime_entrypoint'] not in (None,[]) or
+                len(info['mounts']) != 1 or any(info['mounts'][0].get(k) != v for k,v in expected_mount.items())):
+                self.identifier, self.transition = None, True
+                raise _unavailable('Journal-owned container is not the hardened immutable publication')
+            self.thread = threading.Thread(target=self.server.serve_forever,daemon=True)
+            self.thread.start()
+            return self
+
+    def release_ingress(self) -> None:
+        """Factory handoff: close owned host relays, retain daemon resources.
+
+        The external registry must retain exact identities BEFORE this call.
+        This is not a product stop or an authorization to adopt foreign state.
+        """
+        with self.operation_lock:
+            self.transition = True
+            self._disconnect()
+            if self.thread is not None and self.server is not None:
+                self.server.shutdown()
+                self.thread.join(timeout=2)
+            if self.server is not None:
+                self.server.server_close()
+            self.thread = self.server = None
+            self.closed = True
 
     def _assert_volume(self) -> None:
         if self.volume_identity is None or self._volume_attestation() != self.volume_identity:
@@ -961,11 +1028,13 @@ class RuntimeSession:
             result = _docker_call([self.docker, "logs", "--tail", "100", identifier], capture_output=True, text=True, timeout=3, check=False)
             return (result.stdout + result.stderr)[-12000:]
 
-    def close(self):
+    def close(self, *, preserve_database: bool | None = None):
         with self.operation_lock:
-            self._close_owned()
+            if preserve_database is not None and type(preserve_database) is not bool:
+                raise _unavailable('Database retention requires an explicit boolean')
+            self._close_owned(self.preserve_database if preserve_database is None else preserve_database)
 
-    def _close_owned(self):
+    def _close_owned(self, preserve_database: bool = False):
         if self.thread is not None and self.server is not None:
             self.server.shutdown()
             self.thread.join(timeout=2)
@@ -979,7 +1048,7 @@ class RuntimeSession:
             self.transition = True
             self._disconnect()
             _cleanup_container(self.docker, self.identifier or self.name, self.owner)
-            if self.volume_requested:
+            if self.volume_requested and not preserve_database:
                 current = self._volume_attestation()
                 if current is not None:
                     # Creation may have reached the daemon before cancellation
