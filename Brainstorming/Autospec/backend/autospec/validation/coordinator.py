@@ -243,6 +243,31 @@ class EvidenceAdapter:
     def __getattr__(self,name): return getattr(self.native,name)
     async def proofs(self,rid): return await self.store.proofs(rid)
     async def observe(self,name,**params):
+        if name in {"secret_scan","cookie_modes"}:
+            # These are live per-case observations, notably after SEC-15's
+            # actual negative requests. No older external receipt substitutes
+            # a missing native capability or a different lifecycle/context.
+            callback=getattr(self.native,"native_security_observation",None)
+            if not callable(callback): raise AdapterUnavailable("dynamic native security observation port absent")
+            options=dict(params)
+            if name=="secret_scan" and params.get("scope")=="source_image_logs":
+                from .delivery_evidence import delivery_build_checks
+                import asyncio
+                source=getattr(self.native,"security_snapshot_root",None)
+                if source is None: raise AdapterUnavailable("native security source identity absent")
+                build=await self.store.observe("delivery_build")
+                checks=await asyncio.to_thread(delivery_build_checks,build,Path(source),self.store.snapshot)
+                if not checks or not all(row.get("passed") is True for row in checks):
+                    raise AdapterUnavailable("secret scan requires qualified exact-source delivery image")
+                options["image_id"]=build["image_id"]
+            value,proofs=await callback(name,**options)
+            if not proofs: raise AdapterUnavailable("native security observation lacks obtained X artifacts")
+            await self.store.record_native_observation(name,value,parameters=params,source_proofs=proofs)
+            for proof in proofs:
+                for rid in ("SEC-01","SEC-05","SEC-15"):
+                    if any(tag==rid or tag.startswith(rid+":") for tag in proof.checks):
+                        await self.store.publish_native_proof(rid,proof)
+            return value
         return await self.store.observe(name,**params) if name in EXTERNAL_OBSERVATIONS else await self.native.observe(name,**params)
 
 
