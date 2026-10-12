@@ -62,7 +62,7 @@ def _node_command(command: list[str], *, report: bool = False, dist: bool = Fals
     # Native Linux tmpfs source avoids broken cross-filesystem symlinks in
     # Docker Desktop Windows binds. Deps stay image-owned /opt read-only, with
     # only Vite's cache redirected to /tmp. Export only selected report/dist.
-    setup = 'mkdir -p /tmp/product /tmp/vite-cache; cp -r /app/. /tmp/product/; ln -s /opt/node_modules /tmp/product/node_modules; cd /tmp/product; '
+    setup = 'mkdir -p /tmp/product /tmp/vite-cache /tmp/vite-config-cache; cp -r /app/. /tmp/product/; ln -s /opt/node_modules /tmp/product/node_modules; cd /tmp/product; '
     if coverage_directory is not None and not re.fullmatch(r"/tmp/autospec-coverage-[a-f0-9]{32}", coverage_directory):
         raise _unavailable("Coverage export requires a fresh factory-owned directory")
     if not report and not dist and coverage_directory is None:
@@ -140,7 +140,8 @@ def _coverage_inventory(stage: Path, source: str, ecosystem: str = "python") -> 
     return inventory
 
 
-def _istanbul_coverage(data: dict, inventory: dict[str, str], line_counts: dict[str, int]) -> dict:
+def _istanbul_coverage(data: dict, inventory: dict[str, str], line_counts: dict[str, int],
+                       *, v4_implicit_else: bool = False) -> dict:
     """Normalize executable-line and branch-arm counts, including untouched files.
 
     Source-only totals are recalculated later. Test/native/helper files cannot
@@ -169,9 +170,21 @@ def _istanbul_coverage(data: dict, inventory: dict[str, str], line_counts: dict[
             locations = branch_maps[key]["locations"]
             if not isinstance(branch, list) or not isinstance(locations, list) or len(branch) != len(locations):
                 raise ValueError("Incomplete Istanbul branch arms")
-            for location in locations:
+            for index,location in enumerate(locations):
+                # Vitest4's AST-based V8 remapper emits an unlocated implicit
+                # else arm for `if (...) statement` with no explicit else.
+                # Its ACTUAL counter is retained, not replaced by a fake zero
+                # or invented position. Only this exact observed v4 shape is
+                # admitted; the enclosing source-bound if location is required.
+                if location=={'start':{},'end':{}}:
+                    enclosing=branch_maps[key]
+                    if (not v4_implicit_else or index!=1 or len(locations)!=2 or enclosing.get('type')!='if' or
+                        enclosing.get('loc')!=locations[0] or
+                        enclosing.get('line')!=locations[0].get('start',{}).get('line')):
+                        raise ValueError('Unqualified unlocated Istanbul branch arm')
+                    continue
                 for point in ("start", "end"):
-                    line = location[point]["line"]
+                    line = location.get(point,{}).get('line')
                     if type(line) is not int or not 1 <= line <= line_counts[normal]:
                         raise ValueError("Invalid Istanbul branch source")
             arms.extend(branch)
@@ -312,8 +325,10 @@ class IsolatedValidator:
                     if report.stat().st_size > 20_000_000:
                         raise ValueError("coverage exceeds limit")
                     coverage = json.loads(report.read_text(encoding="utf-8"))
+                    atomic_json(coveragepath.with_suffix('.raw.json'),coverage)
                     if ecosystem == "node":
-                        coverage = _istanbul_coverage(coverage, coverage_inventory, coverage_line_counts)
+                        coverage = _istanbul_coverage(coverage, coverage_inventory, coverage_line_counts,
+                            v4_implicit_else=version=='4.1.11' if has_vitest else False)
                     else:
                         totals = coverage["totals"]
                         for key in ("covered_lines", "num_statements", "missing_lines", "num_branches", "covered_branches"):
@@ -324,10 +339,10 @@ class IsolatedValidator:
                     coverage = _admit_source_coverage(coverage, coverage_inventory, coverage_source,
                                                      source_fingerprint, environment)
                     atomic_json(coveragepath, coverage)
-                except (OSError, KeyError, TypeError, ValueError):
+                except (OSError, KeyError, TypeError, ValueError) as exc:
                     coverage = None
                     evidence = replace(evidence, report_valid=False)
-                    output += "\nCOVERAGE_EVIDENCE_INVALID: missing/invalid fresh coverage report"
+                    output += "\nCOVERAGE_EVIDENCE_INVALID: missing/invalid fresh coverage report: " + str(exc)[:1000]
                     atomic_json(coveragepath, {"invalid_report": True})
             return IsolatedSuiteResult(evidence, output, environment.fingerprint, environment.image, source_fingerprint, coverage, executed)
 
