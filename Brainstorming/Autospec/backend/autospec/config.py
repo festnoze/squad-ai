@@ -465,6 +465,8 @@ class Settings:
     # Claude CLI. demo_delay_s slows scripted agents so UI transitions (and
     # pause/stop) are observable.
     fake_agents: bool = field(default_factory=lambda: _env_bool("FAKE_AGENTS", False))
+    # Campaign-only authority: no paid source-review calls or direct API provider.
+    generation_only_agents: bool = field(default_factory=lambda: _env_bool("GENERATION_ONLY_AGENTS", False))
     demo_delay_s: float = field(
         default_factory=lambda: _env_float("DEMO_DELAY_S", 0.0, minimum=0.0)
     )
