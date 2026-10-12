@@ -203,7 +203,7 @@ class PublicationRegistry:
                 not re.fullmatch(r'autospec-validation-[a-f0-9]{32}',row['volume_name']) or
                 type(row['host_port']) is not int or not 1<=row['host_port']<=65535 or
                 row['origin']!=f"http://127.0.0.1:{row['host_port']}" or
-                row['status'] not in {'creating','running','stopped','failed','uncertain','destroyed'} or
+                row['status'] not in {'creating','running','stopping','stopped','failed','uncertain','destroyed'} or
                 row['migration'] not in {'none','not_started','pending','completed','failed'} or
                 not isinstance(row['reason'],str) or len(row['reason'])>4096 or
                 row['container_id'] is not None and not _SHA.fullmatch(row['container_id']) or
@@ -284,7 +284,10 @@ class PublicationRegistry:
             if previous is not None and previous['status']!='destroyed':
                 if previous['spec']!=spec.payload():
                     raise PublicationError('PUBLICATION_UPDATE_REQUIRES_MIGRATION_POLICY: existing service unchanged')
-                return self._recover(previous,spec,timeout,cancel_event)
+                def source_guard():
+                    if source_snapshot(source).digest!=spec.snapshot_hash:
+                        raise PublicationError('PUBLICATION_SOURCE_CHANGED_DURING_REUSE: previous service preserved')
+                return self._recover(previous,spec,timeout,cancel_event,source_guard=source_guard)
             # Reserve ingress BEFORE launch: APP_ORIGIN is exact even on first
             # start, and a foreign listener fails without touching Docker state.
             session=RuntimeSession(self.stage,spec.image_id,list(spec.runtime_command),port=spec.internal_port,
@@ -317,7 +320,7 @@ class PublicationRegistry:
                     raise PublicationError('PUBLICATION_SOURCE_CHANGED_DURING_LAUNCH')
                 row['status']='running';self._write(row)
                 _LIVE[self._key(project_id)]=session
-                return json.loads(json.dumps(row))
+                return {**json.loads(json.dumps(row)),'created_this_call':True}
             except BaseException as exc:
                 self._failed(row,session,exc)
                 raise
@@ -335,14 +338,18 @@ class PublicationRegistry:
             except Exception:pass
             raise
 
-    def _recover(self,row,spec,timeout,cancel_event):
-        if row['status'] in {'destroyed','uncertain'} or row['migration'] in {'pending','failed','not_started'}:
+    def _recover(self,row,spec,timeout,cancel_event,*,source_guard=None):
+        if row['status'] in {'stopping','destroyed','uncertain'} or row['migration'] in {'pending','failed','not_started'}:
             raise PublicationError('PUBLICATION_RECOVERY_BLOCKED: unresolved data/journal operation')
         current=_LIVE.get(self._key(row['project_id']))
         if current is not None and not current.closed:
-            self._capture(row,spec)
-            self._healthy(current,spec,timeout,cancel_event)
-            return json.loads(json.dumps(row))
+            actual=self._capture(row,spec)
+            if (actual and current.identifier==actual[0]['Id'] and current.owner==row['owner'] and
+                current.image==spec.image_id and current.volume_identity==row['volume_identity']):
+                self._healthy(current,spec,timeout,cancel_event)
+                if source_guard is not None:source_guard()
+                return {**json.loads(json.dumps(row)),'created_this_call':False}
+            current.release_ingress();_LIVE.pop(self._key(row['project_id']),None)
         _image(self.docker,spec)
         volume=_volume(self.docker,row)
         if volume is None:
@@ -353,8 +360,10 @@ class PublicationRegistry:
         else:row['volume_identity']=volume
         actual=_container(self.docker,row,spec)
         session=self._session(row,spec)  # reserve recorded port before mutation
+        adopted_existing=False
         try:
             if actual and actual[0].get('State',{}).get('Running') is True:
+                adopted_existing=True
                 data,fingerprint=actual
                 row.update(container_id=data['Id'],container_created=data['Created'],container_fingerprint=fingerprint)
                 session.restore_owned_container(data['Id'])
@@ -365,11 +374,16 @@ class PublicationRegistry:
                 session.__enter__()
             self._capture(row,spec)
             self._healthy(session,spec,timeout,cancel_event)
+            if source_guard is not None:source_guard()
             row['status']='running';row['reason']='';self._write(row)
             _LIVE[self._key(row['project_id'])]=session
-            return json.loads(json.dumps(row))
+            return {**json.loads(json.dumps(row)),'created_this_call':not adopted_existing}
         except BaseException as exc:
-            self._failed(row,session,exc)
+            if adopted_existing:
+                # Cancel/refuse this new ingress, not a surviving previously
+                # qualified daemon app or DB. Explicit stop is separate authority.
+                session.release_ingress()
+            else:self._failed(row,session,exc)
             raise
 
     def recover(self,project_id,*,timeout=30,cancel_event=None):
@@ -384,17 +398,19 @@ class PublicationRegistry:
         with file_lock(lock),_LIVE_LOCK:
             row=self._read(project_id)
             if row is None:return {'registered':False,'running':False,'ingress_attached':False}
-            if row['status']=='destroyed':return {**row,'registered':True,'running':False,'ingress_attached':False}
+            if row['status'] in {'stopped','destroyed'}:
+                return {**row,'registered':True,'running':False,'ingress_attached':False}
             spec=PublicationSpec(**row['spec']);_image(self.docker,spec)
             if _volume(self.docker,row) is None and row['volume_identity'] is not None:
                 raise PublicationError('PUBLICATION_OWNED_VOLUME_MISSING')
             actual=_container(self.docker,row,spec)
             current=_LIVE.get(self._key(project_id))
-            attached=current is not None and not current.closed and current.thread is not None
+            attached=(current is not None and not current.closed and current.thread is not None and actual is not None and
+                      current.identifier==actual[0]['Id'] and current.owner==row['owner'] and current.volume_identity==row['volume_identity'])
             return {**row,'registered':True,'running':bool(actual and actual[0].get('State',{}).get('Running')),
                     'ingress_attached':attached}
 
-    def stop(self,project_id):
+    def stop(self,project_id,*,expected_container_id:str|None=None):
         _,lock=self._paths(project_id)
         with file_lock(lock),_LIVE_LOCK:
             row=self._read(project_id)
@@ -405,15 +421,30 @@ class PublicationRegistry:
             volume=_volume(self.docker,row)
             if row['volume_identity'] is not None and volume is None:raise PublicationError('PUBLICATION_OWNED_VOLUME_MISSING')
             actual=_container(self.docker,row,spec)
+            if expected_container_id is not None and (
+                (actual is not None and actual[0]['Id']!=expected_container_id) or
+                (actual is None and not (row['status']=='stopping' and row['container_id']==expected_container_id))):
+                raise PublicationError('PUBLICATION_CLEANUP_RECEIPT_IDENTITY_DIFFER: replacement is not this operation resource')
+            migration=None
             if row['migration_container_name'] is not None:
                 if spec.migration_command is None:raise PublicationError('PUBLICATION_MIGRATION_IDENTITY_INVALID')
                 temporary={**row,'container_name':row['migration_container_name'],'container_id':None,
                     'container_created':None,'container_fingerprint':None}
                 migration=_container(self.docker,temporary,replace(spec,runtime_command=spec.migration_command,migration_command=None),migration=True)
-                if migration:_cleanup_container(self.docker,migration[0]['Id'],row['owner'])
+            # Persist deliberate stop BEFORE any relay/daemon mutation. If
+            # cleanup or its terminal flush fails, startup must never recreate
+            # the service. Only another explicit stop may finish this intent.
+            row['status']='stopping';row['reason']='';self._write(row)
+            if migration is not None:
+                _cleanup_container(self.docker,migration[0]['Id'],row['owner'])
+            if row['migration_container_name'] is not None:
                 row['migration_container_name']=None
             current=_LIVE.pop(self._key(project_id),None)
-            if current is not None and not current.closed:current.close(preserve_database=True)
+            if current is not None and not current.closed:
+                if actual and current.identifier==actual[0]['Id']:current.close(preserve_database=True)
+                else:
+                    current.release_ingress()
+                    if actual:_cleanup_container(self.docker,actual[0]['Id'],row['owner'])
             elif actual:_cleanup_container(self.docker,actual[0]['Id'],row['owner'])
             row.update(status='stopped',container_id=None,container_created=None,container_fingerprint=None,volume_identity=volume)
             self._write(row)

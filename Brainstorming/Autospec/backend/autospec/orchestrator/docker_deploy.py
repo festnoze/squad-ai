@@ -47,6 +47,7 @@ class DockerDeployResult:
     cancelled: bool = False
     packaged: bool = False
     created_package_alias: str = ""  # this exact call only; empty for reuse/recovery
+    created_publication_container: str = ""  # exact CID from this publish call, not state differences
 
 
 class DockerRuntimeError(RuntimeError):
@@ -502,7 +503,8 @@ def check_cross_reachability(own_container: str, deployed: list[dict]) -> tuple[
 
 def undeploy(project_id: str, *, publication_root: Path | None = None,
              packaging_root: Path | None = None, expected_package_alias: str | None = None,
-             expected_package_image_id: str | None = None) -> DockerDeployResult:
+             expected_package_image_id: str | None = None,
+             expected_publication_container: str | None = None) -> DockerDeployResult:
     """Remove owned resources, reporting every actual failure to the caller."""
     if packaging_root is not None:
         if publication_root is not None:return DockerDeployResult(False,'Ambiguous package/publication cleanup authority',infra=True)
@@ -517,7 +519,7 @@ def undeploy(project_id: str, *, publication_root: Path | None = None,
     if publication_root is not None:
         from .owned_publication import PublicationRegistry
         try:
-            record=PublicationRegistry(publication_root).stop(project_id)
+            record=PublicationRegistry(publication_root).stop(project_id,expected_container_id=expected_publication_container)
             release_host_port(project_id)
             return DockerDeployResult(True,'Owned NETNONE publication stopped; database retained',
                 image=record['spec']['image_id'],host_port=record['host_port'])
@@ -681,11 +683,11 @@ def inspect_deployment(project_id: str, *, publication_root: Path | None = None)
         from .owned_publication import PublicationRegistry
         try:
             record=PublicationRegistry(publication_root).status(project_id)
-            active=record['running'] and record['ingress_attached']
+            active=record.get('status')=='running' and record['running'] and record['ingress_attached']
             return DockerDeployResult(active,'Owned NETNONE ingress active' if active else
                 'Owned publication stopped or ingress recovery required',
                 image=record.get('spec',{}).get('image_id',''),container=record.get('container_id') or '',
-                host_port=record.get('host_port',0),skipped=not record.get('registered'))
+                host_port=record.get('host_port',0),skipped=not record.get('registered') or record.get('status') in {'stopped','destroyed'})
         except (OSError,RuntimeError,ValueError) as exc:
             return DockerDeployResult(False,str(exc),infra=True)
     name = container_name(project_id)
@@ -719,7 +721,8 @@ def inspect_packaged_image(project_id: str, *, packaging_root: Path | None = Non
             if packaging_root is not None:
                 record=PackageRegistry(packaging_root).inspect(project_id,expected=spec)
                 return DockerDeployResult(bool(record['packaged']),'Exact qualified package alias present' if record['packaged'] else 'Owned package absent/detached',
-                    image=record.get('spec',{}).get('image_id',''),packaged=True,skipped=not record.get('registered'))
+                    image=record.get('spec',{}).get('image_id',''),packaged=True,
+                    skipped=not record.get('registered') or record.get('status')=='detached')
             attest_package_image(spec)
             return DockerDeployResult(True,'Qualified immutable image freshly re-attested; no alias removal authority',image=spec.image_id,packaged=True)
         except (OSError,RuntimeError,ValueError,TypeError) as exc:
@@ -734,7 +737,7 @@ def inspect_packaged_image(project_id: str, *, packaging_root: Path | None = Non
 
 
 def recover_publication(project_id: str, publication_root: Path, *, timeout: float = 30,
-                        intended_active_only: bool = False) -> DockerDeployResult:
+                        intended_active_only: bool = False, cancel_event=None) -> DockerDeployResult:
     """Explicit factory-start recovery; status inspection never adopts state."""
     from .owned_publication import PublicationRegistry
     try:
@@ -745,7 +748,7 @@ def recover_publication(project_id: str, publication_root: Path, *, timeout: flo
                 return DockerDeployResult(False,'Intentional stopped/absent publication was not restarted',skipped=True)
             if status.get('status') not in {'running','creating'}:
                 return DockerDeployResult(False,'Publication journal is not intended active; explicit disposition required',infra=True)
-        record=registry.recover(project_id,timeout=timeout)
+        record=registry.recover(project_id,timeout=timeout,cancel_event=cancel_event)
         return DockerDeployResult(True,'Owned NETNONE ingress recovered without rebuild or source overlay',
             image=record['spec']['image_id'],container=record['container_id'],host_port=record['host_port'])
     except (OSError,RuntimeError,ValueError) as exc:
@@ -914,7 +917,8 @@ def deploy_and_verify(
                 record=PublicationRegistry(publication_root).publish(state.id,ws,spec,
                     host_port=host_port,timeout=deploy_timeout,cancel_event=cancel_event)
                 return DockerDeployResult(True,'Qualified immutable image published through owned NETNONE ingress',
-                    image=qualified_image_id,container=record['container_id'],host_port=record['host_port'])
+                    image=qualified_image_id,container=record['container_id'],host_port=record['host_port'],
+                    created_publication_container=record['container_id'] if record['created_this_call'] else '')
             except (OSError,RuntimeError,ValueError,TypeError) as exc:
                 return DockerDeployResult(False,str(exc),image=qualified_image_id or '',infra=True,
                     cancelled=cancel_event is not None and cancel_event.is_set())

@@ -120,6 +120,8 @@ def test_facade_qualified_package_is_inspected_by_sha_and_detached_without_legac
     assert inspect.ok and inspect.image==spec.image_id
     assert docker_deploy.undeploy('project',packaging_root=registry.root).ok
     assert not fake.aliases
+    stopped=docker_deploy.inspect_packaged_image('project',packaging_root=registry.root)
+    assert stopped.skipped and not stopped.ok  # startup does not turn deliberate detach into failure
 
 
 def test_late_cancel_receipt_cannot_detach_newer_package_journal(tmp_path,monkeypatch):
@@ -145,6 +147,32 @@ def test_facade_reuse_has_no_new_creation_receipt_even_without_state_flush(tmp_p
         expected_runtime_command=spec.runtime_command,packaging_root=registry.root)
     assert result.ok and not result.created_package_alias and first['alias'] in fake.aliases
     registry.detach('project')
+
+
+def test_uncertain_or_missing_live_package_does_not_become_intentional_skip(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.package('project',source,spec)
+    fake.aliases.pop(first['alias'])
+    missing=docker_deploy.inspect_packaged_image('project',packaging_root=registry.root)
+    assert not missing.ok and not missing.skipped
+    row=registry._read('project');row['status']='uncertain';registry._write(row)
+    uncertain=docker_deploy.inspect_packaged_image('project',packaging_root=registry.root)
+    assert not uncertain.ok and uncertain.infra and not uncertain.skipped
+    registry.detach('project')
+
+
+def test_source_edit_during_cached_alias_inspection_refused_preserving_old_package(tmp_path,monkeypatch):
+    source,spec,fake,registry=setup(tmp_path,monkeypatch);row=registry.package('project',source,spec)
+    original=fake.call
+    def edit(argv,**kwargs):
+        result=original(argv,**kwargs)
+        if argv[1:3]==['image','inspect'] and argv[3]==row['alias']:
+            (source/'main.py').write_text('# concurrent factory-side source edit\n')
+        return result
+    monkeypatch.setattr(packages,'_docker_call',edit);before=len(fake.calls)
+    with pytest.raises(PackageError,match='SOURCE_CHANGED_DURING_REUSE'):registry.package('project',source,spec)
+    assert row['alias'] in fake.aliases
+    assert not any(a[1]=='tag' or a[1:3]==['image','rm'] for a in fake.calls[before:])
+    monkeypatch.setattr(packages,'_docker_call',original);registry.detach('project')
 
 
 @pytest.mark.skipif(os.environ.get('AUTOSPEC_REAL_LINUX_VALIDATION')!='1',reason='Opt-in actual image alias/shared identity proof; product not executed')
