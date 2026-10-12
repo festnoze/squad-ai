@@ -6,6 +6,7 @@ port publishing. The product keeps network=none: no host/LAN/registry egress.
 from __future__ import annotations
 
 import json
+import base64
 import math
 import re
 import shutil
@@ -77,6 +78,39 @@ def _node_command(command: list[str], *, report: bool = False, dist: bool = Fals
             script += f'if [ -f {file} ] && [ ! -L {file} ]; then cp {file} /app/suite-coverage.json; fi; '
         script += 'exit "$status"'
     return ["/bin/sh", "-c", script, "autospec", *command]
+
+
+def _qualified_vitest(stage: Path, *, coverage: bool) -> str:
+    """Only recipes proven for these exact locked versions are admitted.
+
+    npm ci verifies package bytes against SRI in the attested dependency image.
+    This preflight additionally forbids an implicit/runtime provider install or
+    mixing CLI/provider versions. Manifest ranges are not silently qualified.
+    """
+    try:
+        package=json.loads((stage/'package.json').read_text(encoding='utf-8'))
+        locked=json.loads((stage/'package-lock.json').read_text(encoding='utf-8'))
+        deps={**package.get('dependencies',{}),**package.get('devDependencies',{})}
+        packages=locked['packages']
+        version=packages['node_modules/vitest']['version']
+        if version not in {'2.1.9','4.1.11'} or deps.get('vitest')!=version:
+            raise ValueError('unqualified CLI/version range')
+        names=['vitest','@vitest/coverage-v8'] if coverage else ['vitest']
+        for name in names:
+            record=packages['node_modules/'+name]
+            distribution=name.rsplit('/',1)[-1]
+            expected=f'https://registry.npmjs.org/{name}/-/{distribution}-{version}.tgz'
+            integrity=record['integrity']
+            if not isinstance(integrity,str) or not integrity.startswith('sha512-'):
+                raise ValueError('sha512 SRI required')
+            digest=base64.b64decode(integrity.removeprefix('sha512-'),validate=True)
+            if (len(digest)!=64 or integrity!='sha512-'+base64.b64encode(digest).decode() or
+                record.get('link') or record.get('resolved')!=expected or record.get('version')!=version or deps.get(name)!=version):
+                raise ValueError('manifest/lock/provider/SRI identity differs')
+        return version
+    except (OSError,TypeError,ValueError,KeyError) as exc:
+        raise _unavailable('Node suite/coverage needs admitted locked vitest and matching explicit provider/SRI '
+            '(2.1.9 or 4.1.11); request missing dependencies through the coordinator') from exc
 
 
 def _coverage_inventory(stage: Path, source: str, ecosystem: str = "python") -> dict[str, str]:
@@ -228,19 +262,15 @@ class IsolatedValidator:
                 package = json.loads((stage / "package.json").read_text(encoding="utf-8"))
                 has_vitest = "vitest" in {**package.get("dependencies", {}), **package.get("devDependencies", {})}
                 if has_vitest:
-                    command = ["node", "/opt/node_modules/vitest/vitest.mjs", "run", "--reporter=json", "--outputFile=suite-report.json", "--maxWorkers=2", "--minWorkers=1", *test_args]
+                    version = _qualified_vitest(stage,coverage=coveragepath is not None)
+                    workers = ['--maxWorkers=1','--fileParallelism=false'] if version=='4.1.11' else ['--maxWorkers=2','--minWorkers=1']
+                    command = ["node", "/opt/node_modules/vitest/vitest.mjs", "run", "--reporter=json", "--outputFile=suite-report.json", *workers, *test_args]
                     parser = vitest_evidence
                     coverage_directory = None
                     if coveragepath is not None:
-                        deps = {**package.get("dependencies", {}), **package.get("devDependencies", {})}
-                        locked = json.loads((stage / "package-lock.json").read_text(encoding="utf-8"))["packages"]
-                        version = locked["node_modules/vitest"]["version"]
-                        if ("@vitest/coverage-v8" not in deps or version != "2.1.9" or
-                            locked.get("node_modules/@vitest/coverage-v8", {}).get("version") != version):
-                            raise _unavailable("Node coverage needs locked vitest/@vitest/coverage-v8 2.1.9; request it through the dependency coordinator")
                         coverage_directory = "/tmp/autospec-coverage-" + uuid.uuid4().hex
                         include = ("" if coverage_source == "." else coverage_source + "/") + "**/*.{js,jsx,cjs,mjs,ts,tsx,cts,mts}"
-                        command += ["--coverage.enabled", "--coverage.provider=v8", "--coverage.all=true",
+                        command += ["--coverage.enabled", "--coverage.provider=v8", *(['--coverage.all=true'] if version=='2.1.9' else []),
                                     f"--coverage.include={include}", "--coverage.exclude=**/*.{test,spec,config}.*",
                                     "--coverage.exclude=**/{test,tests,__tests__}/**", "--coverage.exclude=**/*.d.ts",
                                     "--coverage.exclude=**/{setupTests,testSetup}.*", "--coverage.reporter=json",
