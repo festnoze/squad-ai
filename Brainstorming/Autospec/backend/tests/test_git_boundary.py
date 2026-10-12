@@ -104,3 +104,37 @@ def test_symbolic_revert_is_pinned_to_observed_commit_before_mutation(tmp_path,m
     monkeypatch.setattr(runner,"_run_tracked",tracked)
     assert run_git(tmp_path,["revert","-m","1","--no-edit","HEAD"])[0]==0
     assert calls[-1][-5:]==["revert","-m","1","--no-edit",commit]
+
+
+@pytest.mark.parametrize("relative",["refs/heads","objects/pack","logs/refs/heads"])
+def test_metadata_descendant_alias_refused_before_git_dispatch(tmp_path,monkeypatch,relative):
+    from autospec.agents import runner
+    import subprocess
+    product=tmp_path/"product";metadata=product/".git";metadata.mkdir(parents=True)
+    foreign=tmp_path/"foreign-owned-fixture";foreign.mkdir();sentinel=foreign/"sentinel";sentinel.write_bytes(b"unchanged")
+    alias=metadata/relative;alias.parent.mkdir(parents=True,exist_ok=True)
+    assert alias.parent.resolve().is_relative_to(tmp_path.resolve()) and foreign.resolve().is_relative_to(tmp_path.resolve())
+    if os.name=="nt":
+        # Create only an owned test junction; no Git command ever traverses it.
+        result=subprocess.run(["cmd","/c","mklink","/J",str(alias),str(foreign)],capture_output=True,text=True)
+        assert result.returncode==0,(result.stdout,result.stderr)
+    else:alias.symlink_to(foreign,target_is_directory=True)
+    monkeypatch.setattr(runner,"_run_tracked",lambda *a:pytest.fail("metadata alias must never reach Git"))
+    try:
+        with pytest.raises(GitConfigurationRefused,match="descendant link/reparse"):
+            run_git(product,["commit","-m","never-dispatched"])
+        assert sentinel.read_bytes()==b"unchanged" and sorted(p.name for p in foreign.iterdir())==["sentinel"]
+    finally:
+        if os.name=="nt":alias.rmdir()  # remove the junction only, never its target
+        else:alias.unlink()
+
+
+def test_git_metadata_hardlink_refused_before_subprocess(tmp_path,monkeypatch):
+    from autospec.agents import runner
+    refs=tmp_path/"product/.git/refs/heads";refs.mkdir(parents=True)
+    foreign=tmp_path/"foreign-ref-fixture";foreign.write_bytes(b"a"*40+b"\n")
+    os.link(foreign,refs/"main")
+    monkeypatch.setattr(runner,"_run_tracked",lambda *a:pytest.fail("hardlink must never reach Git"))
+    with pytest.raises(GitConfigurationRefused,match="descendant hardlink"):
+        run_git(tmp_path/"product",["reset","--hard","HEAD"])
+    assert foreign.read_bytes()==b"a"*40+b"\n"

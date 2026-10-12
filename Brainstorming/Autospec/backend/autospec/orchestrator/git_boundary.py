@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import json
 import re
+import stat
 import tempfile
 from pathlib import Path
 
@@ -96,6 +97,33 @@ def _validate_config(path,*,expected_workspace=None):
             if target.resolve()!=expected_workspace.resolve():raise GitConfigurationRefused("Git local worktree redirected")
 
 
+def _metadata_preflight(directories,*,max_entries=200_000):
+    """Reject aliases throughout metadata before Git can create any lock/ref.
+
+    Checking only config and the marker is insufficient: refs/objects/logs may
+    independently redirect filesystem writes. Inspect with lstat/no-follow and
+    never recurse into a link, junction or special file. Linked worktrees keep
+    their genuine backlink/common directories; those entire trees are checked.
+    """
+    pending=list(dict.fromkeys(Path(p).resolve() for p in directories));seen=set();count=0
+    while pending:
+        directory=pending.pop()
+        if directory in seen:continue
+        seen.add(directory);_regular(directory)
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                count+=1
+                if count>max_entries:raise GitConfigurationRefused("Git metadata tree exceeds inspection bound")
+                # Windows DirEntry's cached stat may report st_nlink=0 for
+                # ordinary files. Fetch a fresh no-follow stat for NTFS links.
+                info=os.stat(entry.path,follow_symlinks=False)
+                if stat.S_ISLNK(info.st_mode) or getattr(info,"st_file_attributes",0)&0x400:
+                    raise GitConfigurationRefused("Git metadata descendant link/reparse refused")
+                if stat.S_ISDIR(info.st_mode):pending.append(Path(entry.path))
+                elif not stat.S_ISREG(info.st_mode) or info.st_nlink!=1:
+                    raise GitConfigurationRefused("Git metadata descendant hardlink/special file refused")
+
+
 def git_invocation(workspace,args):
     root=Path(workspace).absolute()
     if any(os.environ.get(k) for k in _REDIRECT):raise GitConfigurationRefused("Git environment redirect refused")
@@ -117,6 +145,7 @@ def git_invocation(workspace,args):
         if not (abort or commit):
             raise GitConfigurationRefused("Only the factory no-edit merge-commit revert or abort is admitted")
     metadata_dirs=_metadata(root)
+    _metadata_preflight(metadata_dirs)
     for metadata in metadata_dirs:
         for name in ("config","config.worktree"):
             _validate_config(metadata/name,expected_workspace=root if (root/".git").is_dir() or name=="config.worktree" else None)
