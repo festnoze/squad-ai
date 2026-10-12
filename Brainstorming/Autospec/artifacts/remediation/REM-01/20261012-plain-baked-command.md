@@ -49,3 +49,12 @@ after final independent source review, before passing argv to the builder.
 The delivery-evidence owner separately verifies the exact recipe/CMD against
 current Docker inspect and rejects legacy-default. No task closes before those
 raccords and global regression are integrated/counter-reviewed.
+
+Compatibility follow-up: 62 PASS/10 explicit opt-in SKIP/105.47s. The owned baked
+ProductHarness probe was then enabled separately and really passed
+1 test/113.44s: exact image/no overlay, actual Argon2/HTTP/SQLite and trusted
+fixture browser, owned-volume restart/detach/attach persistence; intentionally
+lost notes and reset-on-start subjects were correctly detected FAIL. JUnit
+`20261012-plain-baked-harness.xml`. This fixture browser is trusted explicitly;
+it does not prove confinement for generated JavaScript. That separate browser
+boundary is owned by the browser remediation agent.

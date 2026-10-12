@@ -1,10 +1,12 @@
-"""Docker delivery: build, deploy & network-verify a project on a shared network.
+"""Docker artifact delivery; reviewed contracts never use the legacy bridge.
 
 Talks to the local Docker daemon (``deploy.py`` stays the artifact writer). Every
 subprocess call here is synchronous, mirroring ``runtime_acceptance`` — the
 pipeline drives the heavy work through ``asyncio.to_thread``. OSError /
 TimeoutExpired are trapped everywhere and, when they look like a daemon-down /
 docker-absent condition, classified as *infra* (park, don't burn repair attempts).
+Qualified contract images are immutable packages until owned NETNONE publication
+exists; the shared-network rebuild/deploy path is legacy without a contract only.
 """
 
 from __future__ import annotations
@@ -680,6 +682,97 @@ def inspect_packaged_image(project_id: str) -> DockerDeployResult:
     return DockerDeployResult(True, "Image Docker disponible", image=image, packaged=True)
 
 
+def _qualified_image_facts(identifier: str, snapshot: str, runtime_command) -> dict:
+    """Fresh inspection of an already admitted immutable artifact, never rebuild."""
+    if (not isinstance(identifier,str) or not re.fullmatch(r'sha256:[a-f0-9]{64}',identifier) or
+        not isinstance(snapshot,str) or not re.fullmatch(r'[a-f0-9]{64}',snapshot) or
+        not isinstance(runtime_command,(list,tuple)) or not 1<=len(runtime_command)<=200 or
+        any(not isinstance(arg,str) or len(arg)>4096 or '\x00' in arg for arg in runtime_command) or
+        not runtime_command[0] or runtime_command[0].startswith('-')):
+        raise DockerRuntimeError('QUALIFIED_IMAGE_FACTS_REQUIRED: immutable ID, snapshot and exact reviewed argv')
+    rc,out=_docker(['image','inspect',identifier],timeout=15)
+    if rc:
+        raise DockerRuntimeError('QUALIFIED_IMAGE_INSPECTION_UNAVAILABLE: '+out)
+    try:
+        values=json.loads(out)
+        if not isinstance(values,list) or len(values)!=1:raise ValueError('one exact image required')
+        info=values[0];config=info['Config']
+        if (info['Id']!=identifier or info.get('Os')!='linux' or
+            config.get('Labels',{}).get('autospec.snapshot')!=snapshot or config.get('WorkingDir')!='/app' or
+            config.get('Cmd')!=list(runtime_command) or config.get('Entrypoint') not in (None,[])):
+            raise ValueError('actual immutable image/source/default command differs')
+        return info
+    except (ValueError,KeyError,TypeError) as exc:
+        raise DockerRuntimeError('QUALIFIED_IMAGE_FACTS_DIFFER: actual image, source, CMD or entrypoint') from exc
+
+
+def _package_qualified_image(state,ws,*,identifier,snapshot,runtime_command,kind,on_stage=None,cancel_event=None):
+    """Keep qualified artifacts, refuse publication without host isolation.
+
+    Docker --internal still permits gateway/host services. A dedicated bridge
+    is therefore NOT an admitted host boundary. No network/foreign container is
+    probed or changed; a future owned NETNONE publication port is required.
+    """
+    from ..validation.final_gate import source_snapshot
+    alias=image_name(state.id).removesuffix(':latest')+':qualified-'+uuid.uuid4().hex
+    previous=getattr(_operation,'cancel_event',None);_operation.cancel_event=cancel_event
+    tag_requested=keep_tag=False
+    try:
+        if _cancelled():raise DockerRuntimeError('Docker operation cancelled')
+        root=Path(ws).absolute()
+        if root.resolve()!=root or not root.is_dir():
+            raise DockerRuntimeError('QUALIFIED_SOURCE_REFUSED: canonical existing source required')
+        # Do not query a daemon or mutate tags without complete source facts.
+        if not isinstance(snapshot,str) or not re.fullmatch(r'[a-f0-9]{64}',snapshot) or source_snapshot(root).digest!=snapshot:
+            raise DockerRuntimeError('QUALIFIED_SOURCE_REFUSED: exact source snapshot differs')
+        _qualified_image_facts(identifier,snapshot,runtime_command)
+        if _cancelled():raise DockerRuntimeError('Docker operation cancelled')
+        rc,out=_docker(['image','inspect',alias],timeout=15)
+        if not rc or not any(marker in out.lower() for marker in ('no such image','no such object')):
+            raise DockerRuntimeError('QUALIFIED_IMAGE_ALIAS_OCCUPIED_OR_UNAVAILABLE')
+        if on_stage is not None:
+            try:on_stage('packaging')
+            except Exception:pass
+        tag_requested=True
+        rc,out=_docker(['tag',identifier,alias],timeout=15)
+        if rc:raise DockerRuntimeError('QUALIFIED_IMAGE_TAG_UNAVAILABLE: '+out)
+        # Inspect the alias freshly, then the immutable ID. A tag alone cannot
+        # confer qualification or substitute another project's artifact.
+        rc,out=_docker(['image','inspect',alias],timeout=15)
+        try:
+            if rc or json.loads(out)[0]['Id']!=identifier:raise ValueError('alias identity differs')
+        except (ValueError,KeyError,IndexError,TypeError) as exc:
+            raise DockerRuntimeError('QUALIFIED_IMAGE_TAG_IDENTITY_DIFFER') from exc
+        _qualified_image_facts(identifier,snapshot,runtime_command)
+        if source_snapshot(root).digest!=snapshot:
+            raise DockerRuntimeError('QUALIFIED_SOURCE_REFUSED: source changed while packaging')
+        if _cancelled():raise DockerRuntimeError('Docker operation cancelled')
+        keep_tag=True
+        if kind in {'cli','library'}:
+            return DockerDeployResult(True,'Qualified immutable artifact packaged without rebuild; alias '+alias,
+                image=identifier,packaged=True)
+        return DockerDeployResult(False,'PUBLICATION_ISOLATION_UNAVAILABLE: qualified image packaged, NOT deployed; '
+            'an owned NETNONE ingress is required (internal bridge permits host gateway access); alias '+alias,
+            image=identifier,packaged=True,infra=True)
+    except (DockerRuntimeError,OSError,RuntimeError,ValueError) as exc:
+        return DockerDeployResult(False,str(exc),image=identifier or '',cancelled=_cancelled(),
+            infra='UNAVAILABLE' in str(exc),packaged=False)
+    finally:
+        _operation.cancel_event=None  # owned cleanup is allowed after cancellation
+        try:
+            if tag_requested and not keep_tag:
+                # Only our preflight-absent UUID alias with the exact expected ID.
+                # A replacement/unknown daemon state is not deletion authority.
+                try:
+                    rc,out=_docker(['image','inspect',alias],timeout=15)
+                    if not rc and json.loads(out)[0]['Id']==identifier:
+                        _docker(['image','rm',alias],timeout=15)
+                except (OSError,RuntimeError,ValueError,KeyError,IndexError,TypeError):
+                    pass  # no identity/daemon capability: never remove a foreign tag
+        finally:
+            _operation.cancel_event=previous
+
+
 def deploy_and_verify(
     state: ProjectState,
     ws: Path,
@@ -692,6 +785,9 @@ def deploy_and_verify(
     on_line=None,
     on_stage=None,
     cancel_event: threading.Event | None = None,
+    qualified_image_id: str | None = None,
+    expected_snapshot: str | None = None,
+    expected_runtime_command: list[str] | tuple[str, ...] | None = None,
 ) -> DockerDeployResult:
     """Build and verify a candidate before replacing the last working delivery.
 
@@ -701,6 +797,12 @@ def deploy_and_verify(
     restores it. Cancellation cooperatively stops CLI processes and performs the
     same rollback, so callers must await thread completion before teardown.
     """
+    if qualified_image_id is not None or getattr(state,'acceptance_contract_hash',''):
+        # Contract publication never enters the legacy rebuild/shared-network
+        # route, even when a caller forgot the independently qualified facts.
+        return _package_qualified_image(state,ws,identifier=qualified_image_id,
+            snapshot=expected_snapshot,runtime_command=expected_runtime_command,kind=kind,
+            on_stage=on_stage,cancel_event=cancel_event)
     if not kind:
         _, _, kind = should_run(state, ws, enabled=True)
     container_port = 8080 if kind == "frontend" else resolve_web_port(ws)
