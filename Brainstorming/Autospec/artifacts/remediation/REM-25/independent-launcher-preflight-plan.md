@@ -8,6 +8,11 @@ est corrigé dans a79ce3b9 : AFTER 91 PASS, deux RED inchangés désormais PASS,
 fallback générique et garde avant cache également vérifiés offline. Le launcher
 concret reste absent ; son chemin/SHA final devra être fourni pour une revue
 indépendante et les contre-tests offline avant démarrage.
+Complément cible96af8140 : les deuxURLs ASGI de la revue utilisent désormais
+le Host loopback admis, sans exception production. Le replay91 passe mais
+un nouveau P1 à index de routage froid fait échouer le premier QA autorisé
+(test existant seul :1FAIL) ; voir `20261012-independent-generation-policy/ORIGIN-AND-COLD-CACHE.md`.
+Ce défaut doit être corrigé et rejoué avant qualification du launcher.
 
 ## Prérequis d'admission à relire
 
