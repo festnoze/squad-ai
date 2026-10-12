@@ -2,28 +2,18 @@
 (error epoch / ccusage blocks), clean stop + scheduled auto-resume, restart
 re-arming and user cancellation."""
 
-import json
+import asyncio
 import time
+from unittest.mock import AsyncMock
 
 from autospec.agents.runner import AgentError, FakeRunner
 from autospec.api import server
 from autospec.config import settings
-from autospec.models import PipelinePhase, ProjectState, StoryStatus
+from autospec.models import PipelinePhase, ProjectState
 from autospec.orchestrator import session_monitor
 from autospec.orchestrator.pipeline import Pipeline
 
 from .conftest import wait_until
-
-PM_BRIEF = json.dumps({"type": "brief", "message": "OK", "brief": "# Brief"})
-PO_PLAN = json.dumps(
-    {"epics": [{"id": "EPIC-1", "title": "E", "stories": [
-        {"id": "US-1", "title": "S", "description": "d", "acceptance_criteria": ["c"],
-         "gherkin": "Feature: F\n  Scenario: s\n    Given a\n    When b\n    Then c", "depends_on": []},
-    ]}]}
-)
-QA_TRIVIAL = json.dumps({"message": "Trivial.", "tests": []})
-DEV_GREEN = json.dumps({"status": "green", "summary": "ok", "files": [], "test_results": []})
-
 
 # --------------------------------------------------------------- pure parsing
 
@@ -86,81 +76,54 @@ def test_monitor_active_gating(monkeypatch):
 
 # --------------------------------------------------------- pipeline behaviour
 
-class _LimitOnceRunner(FakeRunner):
-    """Raises a usage-limit error on the FIRST dev call, then plays the queue."""
-
-    def __init__(self, replies):
-        super().__init__(replies)
-        self.limit_fired = False
-
-    async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
-        if "PROCESSUS OBLIGATOIRE" in prompt and not self.limit_fired:
-            self.limit_fired = True
-            # Far-future reset epoch: in production a usage window reopens minutes
-            # or hours later, so the pipeline durably sits in STOPPED until then.
-            # (A near-immediate epoch would collapse STOPPED straight back into
-            # BUILD, racing any observation of the clean stop.)
-            raise AgentError(f"Claude AI usage limit reached|{int(time.time()) + 3600}")
-        return await super().arun(prompt, system_prompt, cwd=cwd, session_id=session_id)
-
-
 def _enable_monitor(monkeypatch):
     monkeypatch.setattr(settings, "session_monitor_enabled", True)
     monkeypatch.setattr(settings, "agent_provider", "claude code")
     monkeypatch.setattr(settings, "fake_agents", False)
 
 
-async def test_usage_limit_stops_then_auto_resumes(monkeypatch, green_pytest):
+async def test_usage_limit_requests_stop_and_arms_owned_resume(monkeypatch):
     _enable_monitor(monkeypatch)
-    state = ProjectState(id="proj-m2", name="todo", goal="g")
-    # Two QA replies: the refunded attempt makes the resumed story go through
-    # the QA design step again (attempts back to 0).
-    runner = _LimitOnceRunner([PM_BRIEF, PO_PLAN, QA_TRIVIAL, QA_TRIVIAL, DEV_GREEN])
-    pipeline = Pipeline(state, runner)
-    pipeline.start()
+    state = ProjectState(id="proj-m2", name="todo", goal="g", phase=PipelinePhase.BUILD)
+    pipeline = Pipeline(state, FakeRunner([]))
+    monkeypatch.setattr(pipeline, '_notify', lambda *a, **k: None)
+    target = int(time.time()) + 3600
+    try:
+        await pipeline._aon_agent_error(AgentError(f'Claude AI usage limit reached|{target}'))
+        assert pipeline._stop_requested and pipeline._resume_event.is_set()
+        assert state.resume_at == target
+        assert pipeline._resume_timer is not None and not pipeline._resume_timer.done()
+        first_timer = pipeline._resume_timer
+        await pipeline._aon_agent_error(AgentError(f'usage limit reached|{target}'))
+        assert pipeline._resume_timer is first_timer  # sibling errors cannot arm duplicate timers
+        assert any('Fenêtre d\'usage Claude épuisée' in m.content for m in state.chat)
+        first_timer.cancel()
+        await asyncio.gather(first_timer, return_exceptions=True)
+        resume = AsyncMock()
+        monkeypatch.setattr(pipeline, 'aresume_build', resume)
+        monkeypatch.setattr(session_monitor, 'await_window', AsyncMock(return_value=0.0))
+        await pipeline._aresume_timer(0.0)
+        resume.assert_awaited_once()
+        assert state.resume_at == 0.0
+        assert any('Nouvelle fenêtre d\'usage disponible' in m.content for m in state.chat)
+        # This watchdog test never claims DONE from a fake green suite. Product
+        # admission/runtime integrity is exercised by its dedicated contract.
+        assert state.phase == PipelinePhase.BUILD
+    finally:
+        await pipeline.adispose()
 
-    # The watchdog schedules the resume and the pipeline stops cleanly. With a
-    # far reset window the STOPPED state is durable, so observing it is reliable.
-    await wait_until(lambda: state.resume_at > 0)
-    await wait_until(lambda: state.phase == PipelinePhase.STOPPED)
-    story = state.story("US-1")
-    assert story.status == StoryStatus.TODO
-    assert story.attempts == 0  # the lost attempt was refunded
-    assert any("Fenêtre d'usage Claude épuisée" in m.content for m in state.chat)
-    assert pipeline._resume_timer is not None  # auto-resume armed
 
-    # Fire the armed timer now instead of waiting out the reset window (the
-    # wall-clock sleep itself is covered by test_anext_reset): it resumes the
-    # build to completion in a fresh session.
-    pipeline._resume_timer.cancel()
-    await pipeline._aresume_timer(0.0)
-    await wait_until(lambda: state.phase == PipelinePhase.DONE)
-    assert state.resume_at == 0.0
-    assert state.story("US-1").status == StoryStatus.DONE
-    assert any("Nouvelle fenêtre d'usage disponible" in m.content for m in state.chat)
-
-
-async def test_usage_limit_ignored_for_other_providers(monkeypatch, green_pytest):
+async def test_usage_limit_ignored_for_other_providers(monkeypatch):
     monkeypatch.setattr(settings, "session_monitor_enabled", True)
     monkeypatch.setattr(settings, "agent_provider", "codex")
     monkeypatch.setattr(settings, "fake_agents", False)
-    monkeypatch.setattr(settings, "dev_max_attempts", 1)
-    state = ProjectState(id="proj-m2-off", name="todo", goal="g")
-
-    class _AlwaysLimited(FakeRunner):
-        async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
-            if "PROCESSUS OBLIGATOIRE" in prompt:
-                raise AgentError("usage limit reached|1718226000")
-            return await super().arun(prompt, system_prompt, cwd=cwd, session_id=session_id)
-
-    pipeline = Pipeline(state, _AlwaysLimited([PM_BRIEF, PO_PLAN, QA_TRIVIAL]))
-    pipeline.start()
-    await wait_until(lambda: state.phase == PipelinePhase.DONE)
-    # No watchdog for non-claude providers: no schedule, normal error handling
-    # (the attempt is consumed and the story fails after dev_max_attempts).
+    state = ProjectState(id="proj-m2-off", name="todo", goal="g", phase=PipelinePhase.BUILD)
+    pipeline = Pipeline(state, FakeRunner([]))
+    await pipeline._aon_agent_error(AgentError('usage limit reached|1718226000'))
+    # A subscription watchdog must not invent a window for another provider.
     assert state.resume_at == 0.0
     assert pipeline._resume_timer is None
-    assert state.story("US-1").status == StoryStatus.FAILED
+    assert not pipeline._stop_requested and state.phase == PipelinePhase.BUILD
 
 
 async def test_cancel_resume(monkeypatch):

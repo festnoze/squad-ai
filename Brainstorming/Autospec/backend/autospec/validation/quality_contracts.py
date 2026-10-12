@@ -13,13 +13,24 @@ import asyncio
 import inspect
 import tempfile
 from dataclasses import asdict, dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from .support_adapter import AdapterUnavailable, Proof
 
 QUALITY_IDS = tuple(f"TST-{i:02d}" for i in range(1, 7))
 E2E_IDS = tuple(f"E2E-{i:02d}" for i in range(1, 7))
+
+
+def _canonical_relative(value, *, allow_dot=False):
+    return (isinstance(value,str) and bool(value) and len(value)<=4096 and "\\" not in value and ":" not in value
+        and not PurePosixPath(value).is_absolute() and ".." not in PurePosixPath(value).parts
+        and PurePosixPath(value).as_posix()==value and (value!="." or allow_dot))
+
+
+def _link(path):
+    return path.is_symlink() or (path.exists() and (getattr(path,"is_junction",lambda:False)()
+        or bool(getattr(path.lstat(),"st_file_attributes",0)&0x400)))
 
 
 @dataclass(frozen=True)
@@ -32,6 +43,18 @@ class NativeSuiteSpec:
     test_args: tuple[str, ...] = ()
     coverage_source: str = "."
 
+    def __post_init__(self):
+        if self.name not in {"backend","frontend","e2e"} or self.ecosystem not in {"python","node"}:
+            raise ValueError("fixed native suite name and Python/Node ecosystem required")
+        if not _canonical_relative(self.root,allow_dot=True) or not _canonical_relative(self.coverage_source,allow_dot=True):
+            raise ValueError("canonical relative suite/coverage root required")
+        if (not isinstance(self.source_inventory,tuple) or not 1<=len(self.source_inventory)<=20000
+                or len(set(self.source_inventory))!=len(self.source_inventory)
+                or not all(_canonical_relative(p) for p in self.source_inventory)):
+            raise ValueError("bounded unique canonical source inventory required")
+        if not isinstance(self.test_args,tuple) or len(self.test_args)>200 or any(not isinstance(a,str) or len(a)>4096 or "\x00" in a for a in self.test_args):
+            raise ValueError("bounded native test selectors required")
+
 
 @dataclass(frozen=True)
 class AuthorizationMutationSpec:
@@ -41,17 +64,28 @@ class AuthorizationMutationSpec:
     before: str
     after: str
 
+    def __post_init__(self):
+        if (not _canonical_relative(self.path) or not re.fullmatch(r"[a-f0-9]{64}",self.original_sha256)
+                or not isinstance(self.before,str) or not isinstance(self.after,str) or not self.before
+                or not self.after or len(self.before)>2_000_000 or len(self.after)>2_000_000 or self.before==self.after):
+            raise ValueError("bounded exact mutation path/hash/anchor required")
 
-def native_quality_plan_hash(suites, mapping_path, mutation=None):
+
+def supervisor_e2e_test_id(sid,mode):
+    if sid not in E2E_IDS or mode not in {"alone","together"}:raise ValueError("exact source E2E and mode required")
+    return "supervisor_browser::"+sid+"["+mode+"]"
+
+
+def native_quality_plan_hash(suites, mapping_path, mutation=None, *, e2e_mode="native"):
     """Canonical digest reviewed independently, with the mapping's exact bytes."""
     return hashlib.sha256(json.dumps({"suites":[asdict(s) for s in suites],
         "mapping_sha256":hashlib.sha256(Path(mapping_path).read_bytes()).hexdigest(),
-        "mutation":asdict(mutation) if mutation else None},sort_keys=True).encode()).hexdigest()
+        "mutation":asdict(mutation) if mutation else None,"e2e_mode":e2e_mode},sort_keys=True).encode()).hexdigest()
 
 
 def write_quality_review_package(contract, *, product_root, destination, snapshot_hash,
                                  suites, requirements_mapping, mutation=None,
-                                 nominal_security_db_mocks=None):
+                                 nominal_security_db_mocks=None,e2e_mode="native"):
     """Prepare a local review package, never approve it or call an LLM.
 
     ``requirements_mapping`` is RID -> [{suite,test,assertion}]. Assertions and
@@ -63,7 +97,8 @@ def write_quality_review_package(contract, *, product_root, destination, snapsho
     destination.mkdir(parents=True,exist_ok=True)
     ids={r.id for r in contract.requirements}
     if not set(requirements_mapping)<=ids:raise ValueError("unknown requirement in test mapping")
-    names={s.name for s in suites}
+    if e2e_mode not in {"native","supervisor_browser"}:raise ValueError("explicit E2E mode required")
+    names={s.name for s in suites}|({"e2e"} if e2e_mode=="supervisor_browser" else set())
     for rows in requirements_mapping.values():
         if not isinstance(rows,list) or not rows or any(not {"suite","test","assertion"}<=set(r)
                 or r["suite"] not in names or not isinstance(r["test"],str) or not r["test"]
@@ -79,15 +114,18 @@ def write_quality_review_package(contract, *, product_root, destination, snapsho
         if not source_root.is_relative_to(root):raise ValueError("suite root escaped product")
         inventory[suite.name]={path:hashlib.sha256(NativeQualityCollector._source(source_root,path).read_bytes()).hexdigest()
                               for path in suite.source_inventory}
-    digest=native_quality_plan_hash(suites,mapping,mutation)
+    digest=native_quality_plan_hash(suites,mapping,mutation,e2e_mode=e2e_mode)
     checks=["QUALITY:plan:"+digest,"TST-01:native_review","TST-02:mapping","TST-03:inventory"]
     if mutation:checks.append("TST-06:mutation")
+    if e2e_mode=="supervisor_browser":checks.append("QUALITY:e2e:supervisor_browser")
     plan=destination/"quality-review-package.json"
     plan.write_text(json.dumps({"version":1,"status":"AWAITING_INDEPENDENT_REVIEW","snapshot_hash":snapshot_hash,
         "contract_hash":contract.contract_hash,"brief_hash":contract.brief_hash,"reference_hash":contract.reference_hash,
         "suites":[asdict(s) for s in suites],"source_inventory":inventory,"mapping_path":str(mapping),
         "mapping_sha256":hashlib.sha256(mapping.read_bytes()).hexdigest(),"mutation":asdict(mutation) if mutation else None,
-        "plan_hash":digest,"required_review_checks":checks,
+        "plan_hash":digest,"required_review_checks":checks,"e2e_mode":e2e_mode,
+        "supervisor_e2e_tests":[{"test":supervisor_e2e_test_id(s["id"],mode),"scenario":s["id"],"mode":mode,"expected":s["expected"]}
+            for mode in ["alone","together"] for s in source_e2e_scenarios(contract)] if e2e_mode=="supervisor_browser" else [],
         "requirements":[{"id":r.id,"expected":r.expected,"gate":r.gate} for r in contract.requirements],
         "instructions":["Inspect assertions and fixtures, not only test names.",
             "Review omitted business files, critical skips/xfail and service/DB mocks.",
@@ -114,22 +152,28 @@ class NativeQualityCollector:
     def __init__(self, contract, adapter, validator, *, product_root, evidence_root,
                  suites: tuple[NativeSuiteSpec, ...], mapping_path, review: Proof,
                  browser_factory=None, sqlite_probe=None, mutation=None,
-                 mutation_probe=None, copy_product=None):
+                 mutation_probe=None, copy_product=None,e2e_mode="native"):
         self.contract,self.adapter,self.validator=contract,adapter,validator
         self.product_root=Path(product_root).resolve()
         self.evidence_root=Path(evidence_root).resolve()
         if self.evidence_root.is_relative_to(self.product_root):
             raise ValueError("quality evidence must be outside producer writable root")
         self.suites,self.mapping_path,self.review=suites,Path(mapping_path).resolve(),review
+        if not isinstance(suites,tuple) or not 1<=len(suites)<=3 or len({s.name for s in suites})!=len(suites):
+            raise ValueError("one to three uniquely named reviewed native suites required")
+        if e2e_mode not in {"native","supervisor_browser"} or (e2e_mode=="supervisor_browser" and any(s.name=="e2e" for s in suites)):
+            raise ValueError("choose native E2E suite OR explicit supervisor browser E2E, never both")
+        self.e2e_mode=e2e_mode
         if self.mapping_path.is_relative_to(self.product_root):
             raise ValueError("independent test mapping must be outside product root")
         self.browser_factory,self.sqlite_probe=browser_factory,sqlite_probe
         self.mutation,self.mutation_probe,self.copy_product=mutation,mutation_probe,copy_product
+        self.source_snapshotter=None  # production default is final_gate.source_snapshot
         self.records,self.errors,self.extra_proofs={}, {}, {}
 
     @property
     def plan_hash(self):
-        return native_quality_plan_hash(self.suites,self.mapping_path,self.mutation)
+        return native_quality_plan_hash(self.suites,self.mapping_path,self.mutation,e2e_mode=self.e2e_mode)
 
     async def _identity(self,snapshot):
         if await self.adapter.snapshot_hash()!=snapshot or await self.adapter.contract_hash()!=self.contract.contract_hash:
@@ -143,7 +187,8 @@ class NativeQualityCollector:
         self._pinned_plan=self.plan_hash
         if (not self.review.passed or self.review.type!="R" or not self.review.intact(
                 snapshot_hash=snapshot_hash,contract_hash=self.contract.contract_hash) or
-                "QUALITY:plan:"+self.plan_hash not in self.review.checks):
+                "QUALITY:plan:"+self.plan_hash not in self.review.checks or
+                (self.e2e_mode=="supervisor_browser" and "QUALITY:e2e:supervisor_browser" not in self.review.checks)):
             raise AdapterUnavailable("exact native plan/mapping/mutation independent review missing")
         mapping=json.loads(self.mapping_path.read_text(encoding="utf-8"))
         if (mapping.get("snapshot_hash"),mapping.get("contract_hash"))!=(snapshot_hash,self.contract.contract_hash):
@@ -152,8 +197,10 @@ class NativeQualityCollector:
         suites,coverage,outcomes=[],{},{}
         for spec in self.suites:
             try:
-                root=(self.product_root/spec.root).resolve()
-                if not root.is_relative_to(self.product_root) or root.is_symlink() or spec.ecosystem not in {"python","node"}:
+                candidate=self.product_root/spec.root
+                root=candidate.resolve()
+                if (not root.is_relative_to(self.product_root) or _link(candidate) or not root.is_dir()
+                        or any(_link(p) for p in candidate.parents if p.is_relative_to(self.product_root))):
                     raise ValueError("invalid reviewed suite root/ecosystem")
                 inventory={path:hashlib.sha256(self._source(root,path).read_bytes()).hexdigest() for path in spec.source_inventory}
                 report=self.evidence_root/(spec.name+"-"+uuid4().hex+"-suite.json")
@@ -207,18 +254,51 @@ class NativeQualityCollector:
                         runs.extend(report["scenarios"])
                         self.extra_proofs.setdefault("TST-05",[]).extend(Proof(**p) for r in report["scenarios"] for p in r["proofs"])
                 self.records["browser_e2e"]=runs
+                if self.e2e_mode=="supervisor_browser":
+                    suite=self._browser_suite(runs,snapshot_hash)
+                    suites.append(suite);outcomes["e2e"]=suite["outcomes"]
             except Exception as exc:self.errors["browser_e2e"]=[type(exc).__name__]
         try:self.records["authorization_mutation"]=await self._mutation(snapshot_hash)
         except Exception as exc:self.errors["authorization_mutation"]=[type(exc).__name__]
+        # E2E node IDs become known only after the actual browser execution.
+        self.records["requirement_test_mapping"]={rid:[dict(row,executed=outcomes.get(row["suite"],{}).get(row["test"])=="passed",
+            execution_status=outcomes.get(row["suite"],{}).get(row["test"]),assertion_reviewed=True) for row in rows]
+            for rid,rows in mapping["requirements"].items()}
         await self._identity(snapshot_hash)
         return self
+
+    def _browser_suite(self,runs,snapshot):
+        expected={(sid,mode) for sid in E2E_IDS for mode in ["alone","together"]}
+        if len(runs)!=12 or {(r["id"],r["mode"]) for r in runs}!=expected:
+            raise AdapterUnavailable("supervisor E2E aggregation requires twelve exact source runs")
+        scenarios={s["id"]:s["expected"] for s in source_e2e_scenarios(self.contract)}
+        for row in runs:
+            if row["status"]!="PASS":continue  # never turn FAIL/NV into successful native tests
+            if (row.get("expected")!=scenarios[row["id"]] or not row.get("observed") or not row.get("reproduction")
+                    or row.get("limits")!=[] or row.get("nonblank") is not True or row.get("real_ui_api_db") is not True
+                    or row.get("nominal_mocks") is not False or row.get("fixture_reset_before") is not True):
+                raise AdapterUnavailable("supervisor E2E PASS lacks actual source-defined observations")
+            proofs=[Proof(**p) for p in row.get("proofs",[])]
+            scoped=[p for p in proofs if p.passed and p.intact(snapshot_hash=snapshot,contract_hash=self.contract.contract_hash)
+                    and any(t.startswith("TST-05:"+row["id"]+":") for t in p.checks)]
+            if not {"X","V"}<={p.type for p in scoped}:raise AdapterUnavailable("supervisor E2E PASS lacks exact X/V")
+        outcomes={supervisor_e2e_test_id(r["id"],r["mode"]):{"PASS":"passed","FAIL":"failed","NOT_VERIFIED":"not_verified"}[r["status"]] for r in runs}
+        path=self.evidence_root/("e2e-"+uuid4().hex+"-suite.json")
+        path.write_text(json.dumps({"scope":"supervisor independent browser assertions, not product native tests",
+            "source_reference_hash":self.contract.reference_hash,"snapshot_hash":snapshot,"contract_hash":self.contract.contract_hash,
+            "outcomes":outcomes,"scenarios":runs},ensure_ascii=False,indent=2),encoding="utf-8")
+        passed=sum(v=="passed" for v in outcomes.values());failed=sum(v=="failed" for v in outcomes.values());nv=12-passed-failed
+        return dict(name="e2e",scope="supervisor_browser",collected=12,passed=passed,failed=failed,not_verified=nv,
+            skipped=0,xfail=0,critical_skipped=0,critical_xfail=0,nominal_security_db_mocks=False,assertions_reviewed=True,
+            return_code=1 if failed else None if nv else 0,report_valid=True,collection_errors=[],raw_report=self._artifact(path),
+            outcomes=outcomes,source_reference_hash=self.contract.reference_hash,snapshot_hash=snapshot,contract_hash=self.contract.contract_hash)
 
     @staticmethod
     def _source(root,path):
         candidate=root/path
         source=candidate.resolve()
-        if (not source.is_relative_to(root) or candidate.is_symlink() or not source.is_file()
-                or source.stat().st_nlink!=1 or any(p.is_symlink() for p in candidate.parents if p!=root and p.is_relative_to(root))):
+        if (not _canonical_relative(path) or not source.is_relative_to(root) or _link(candidate) or not source.is_file()
+                or source.stat().st_nlink!=1 or any(_link(p) for p in candidate.parents if p.is_relative_to(root))):
             raise ValueError("source inventory must contain confined regular files")
         return source
 
@@ -261,11 +341,18 @@ class NativeQualityCollector:
             copier=snapshot_product
         nominal=await self.mutation_probe(self.product_root,snapshot,self.contract.contract_hash)
         with tempfile.TemporaryDirectory(prefix="autospec-owned-auth-mutation-") as temporary:
-            root=copier(self.product_root,Path(temporary)/"product")
-            target=self._source(Path(root).resolve(),spec.path)
-            target.write_text(original.decode("utf-8").replace(spec.before,spec.after,1),encoding="utf-8")
+            pinned_target=Path(temporary).resolve()/"product"
+            root=Path(copier(self.product_root,pinned_target)).resolve()
+            if root!=pinned_target or root.is_relative_to(self.product_root) or _link(root):
+                raise ValueError("mutation copier did not return the distinct pinned owned stage")
+            target=self._source(root,spec.path)
+            target.write_bytes(original.decode("utf-8").replace(spec.before,spec.after,1).encode("utf-8"))
             mutated_file=self._artifact(target)
-            mutation_hash=hashlib.sha256((snapshot+mutated_file["sha256"]+self.plan_hash).encode()).hexdigest()
+            snapshotter=self.source_snapshotter
+            if snapshotter is None:
+                from .final_gate import source_snapshot
+                snapshotter=source_snapshot
+            mutation_hash=snapshotter(root).digest
             mutated=await self.mutation_probe(root,mutation_hash,self.contract.contract_hash)
             # Persist only the reviewed changed source file, never a DB/cookie.
             retained=self.evidence_root/("mutation-"+uuid4().hex+".txt")
@@ -279,8 +366,8 @@ class NativeQualityCollector:
                         snapshot_hash=identity,contract_hash=self.contract.contract_hash) for p in row.get("proofs",[])):
                     raise AdapterUnavailable("mutation outcome without intact executed X proof: "+rid)
         after=hashlib.sha256(source.read_bytes()).hexdigest()
-        nominal_status="FAIL" if any(r["status"]=="FAIL" for r in nominal.values()) else "PASS" if all(r["status"]=="PASS" for r in nominal.values()) else "NOT_VERIFIED"
-        mutated_status="FAIL" if any(r["status"]=="FAIL" for r in mutated.values()) else "PASS" if all(r["status"]=="PASS" for r in mutated.values()) else "NOT_VERIFIED"
+        nominal_status="PASS" if all(_runtime_probe_passed(r,rid,snapshot,self.contract.contract_hash) for rid,r in nominal.items()) else "FAIL"
+        mutated_status="FAIL" if any(_runtime_probe_failed(r,rid,mutation_hash,self.contract.contract_hash) for rid,r in mutated.items()) else "PASS"
         if "NOT_VERIFIED" in {nominal_status,mutated_status}:raise AdapterUnavailable("mutation experiment lacks an executed original/copy verdict")
         return dict(temporary_copy=True,original_before_sha256=before,original_after_sha256=after,
             original_file=self._artifact(source),mutated_file=mutated_file,mutated_sha256=mutated_file["sha256"],
@@ -299,6 +386,18 @@ class NativeQualityCollector:
 
     async def snapshot_hash(self):return await self.adapter.snapshot_hash()
     async def contract_hash(self):return await self.adapter.contract_hash()
+
+
+def _runtime_probe_passed(row,rid,snapshot,contract):
+    return bool(row.get("observed")) and all(c.get("passed") is True for c in row["observed"]) and any(
+        (p:=Proof(**raw)).type=="X" and p.passed is True and p.intact(snapshot_hash=snapshot,contract_hash=contract)
+        and any(t==rid or t.startswith(rid+":") for t in p.checks) for raw in row.get("proofs",[]))
+
+
+def _runtime_probe_failed(row,rid,snapshot,contract):
+    return any(c.get("passed") is False for c in row.get("observed",[])) and any(
+        (p:=Proof(**raw)).type=="X" and p.passed is False and p.intact(snapshot_hash=snapshot,contract_hash=contract)
+        and any(t==rid or t.startswith(rid+":") for t in p.checks) for raw in row.get("proofs",[]))
 
 
 def source_e2e_scenarios(contract):
@@ -399,6 +498,8 @@ class QualityVerifier:
         suites = await self._suites()
         for suite in suites:
             name = suite["name"]
+            if suite.get("not_verified",0)>0 and not suite.get("failed",0):
+                raise AdapterUnavailable("supervisor E2E has genuinely unverified scenarios")
             check(name + "_exit", suite["return_code"], 0)
             check(name+"_no_failures",suite["failed"],0)
             check(name + "_collected", type(suite["collected"]) is int and suite["collected"] > 0, True)
@@ -417,6 +518,8 @@ class QualityVerifier:
         check("all_mandatory_ids_mapped", expected <= set(mapping), True)
         for rid in sorted(expected):
             rows = mapping.get(rid, [])
+            if any(row.get("execution_status")=="not_verified" for row in rows):
+                raise AdapterUnavailable("reviewed mapped E2E did not execute successfully")
             check(rid + "_assertions", bool(rows) and all(row.get("executed") is True and row.get("assertion_reviewed") is True
                    and bool(row.get("test")) and bool(row.get("assertion")) for row in rows), True)
 
@@ -505,8 +608,11 @@ class QualityVerifier:
                         snapshot_hash=identity,contract_hash=self.contract_hash) and any(t==rid or t.startswith(rid+":") for t in Proof(**p).checks)
                         for p in row.get("proofs",[])):
                     raise AdapterUnavailable("missing exact mutation execution proof: "+rid)
-        check("actual_original_probe_outcomes",all(r["status"]=="PASS" for r in mutation["original_results"].values()),True)
-        check("actual_mutation_probe_outcomes",any(r["status"]=="FAIL" for r in mutation["mutated_results"].values()),True)
+        original_snapshot=await self.adapter.snapshot_hash()
+        check("actual_original_probe_outcomes",all(_runtime_probe_passed(r,rid,original_snapshot,self.contract_hash)
+              for rid,r in mutation["original_results"].items()),True)
+        check("actual_mutation_probe_outcomes",any(_runtime_probe_failed(r,rid,mutation["mutation_snapshot_hash"],self.contract_hash)
+              for rid,r in mutation["mutated_results"].items()),True)
 
     def _artifact_intact(self,ref):
         path=Path(ref["path"]).resolve()

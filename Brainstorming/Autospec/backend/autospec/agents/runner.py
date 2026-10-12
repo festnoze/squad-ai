@@ -20,7 +20,7 @@ import time
 import uuid
 import tempfile
 from functools import lru_cache
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Awaitable, Callable, Protocol
 
@@ -758,19 +758,36 @@ class ClaudeCliRunner:
             transcript = "\n\n".join(history)
             if len(transcript.encode("utf-8")) > 4_000_000:
                 raise AgentError("Mediated conversation size limit exceeded", usage=total)
+            turn_entered = turn_complete = False
             try:
                 await observe_provider(True)
                 try:
+                    turn_entered = True
                     result = await self._turn(transcript, system_prompt + (FILE_PROTOCOL if broker else ""),
                                               cwd, model, remaining)
+                    # Account the returned paid receipt BEFORE the observer's
+                    # cleanup: a persistence/observer error must not erase it.
+                    self._accumulate(total, result)
+                    turn_complete = True
                 finally:
                     await observe_provider(False)
             except AgentError as exc:
-                if exc.usage:
+                if not turn_complete and exc.usage:
                     self._accumulate(total, exc.usage)
-                    exc.usage = total
+                elif turn_entered and not turn_complete:
+                    total.usage_reported = False  # latest paid turn has no final receipt
+                exc.usage = replace(total)
                 raise
-            self._accumulate(total, result)
+            except asyncio.CancelledError as exc:
+                if turn_entered and not turn_complete:
+                    total.usage_reported = False
+                exc.usage = replace(total)
+                raise
+            except Exception as exc:
+                if turn_entered and not turn_complete:
+                    total.usage_reported = False
+                raise AgentError(f"Mediated provider turn failed: {exc}", usage=replace(total),
+                                 code="PROVIDER_TURN_FAILED") from exc
             total.text = result.text
             history.append(f"ASSISTANT:\n{result.text}")
             try:
@@ -805,6 +822,18 @@ class ClaudeCliRunner:
                     response = await asyncio.to_thread(broker.apply, call)
             except IsolationViolation as exc:
                 raise AgentError(str(exc), usage=total, code=exc.code) from exc
+            except AgentError as exc:
+                # A coordinator/tool failure did not launch another model turn.
+                # Preserve all already-observed inference costs, not unrelated
+                # callback usage nor a fabricated unknown/zero provider call.
+                exc.usage = replace(total)
+                raise
+            except asyncio.CancelledError as exc:
+                exc.usage = replace(total)
+                raise
+            except Exception as exc:
+                raise AgentError(f"Mediated tool failed: {exc}", usage=replace(total),
+                                 code="MEDIATED_TOOL_FAILED") from exc
             history.append(f"TOOL RESULT:\n{response}")
         raise AgentError(f"Agent did not conclude within {settings.provider_tool_rounds} mediated turns", usage=total)
 

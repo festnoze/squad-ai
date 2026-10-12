@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from autospec.agents.runner import FakeRunner
+from autospec.agents.file_broker import IsolationViolation
 from autospec.config import settings
 from autospec.models import ProjectState, PipelinePhase, BackendLanguage
 from autospec.orchestrator import pipeline_validation
@@ -25,6 +26,9 @@ def validator(monkeypatch, evidence):
     class Validator:
         def __init__(self, *a, **kw):
             pass
+        def collect_python(self, root, report):
+            return tuple(evidence.outcomes), SimpleNamespace(evidence=evidence, output="collected",
+                source_fingerprint="c"*64)
         def run_suite(self, root, ecosystem, mode, report, **kwargs):
             return SimpleNamespace(evidence=evidence, output="executed", fingerprint="a"*64, image="sha256:"+"b"*64,
                 source_fingerprint="c"*64, coverage={"totals": {"num_statements": 4, "num_branches": 2,
@@ -41,6 +45,28 @@ def test_native_baseline_admits_initial_green_and_refuses_checker_edit(tmp_path,
     (root / "test_critical.py").write_text("def test_critical():\n pass\n")
     result = pipeline_validation.run_native(root, "python", tmp_path / "supervisor", **arguments)
     assert not result[0] and "CRITICAL_TEST_CHANGED_UNREVIEWED" in result[1]
+
+
+@pytest.mark.parametrize("ecosystem,filename",[("python","business_test.py"),("python","check_business.py"),("node","custom_checks.ts")])
+def test_actual_collection_seals_custom_named_assertion_files(tmp_path,monkeypatch,ecosystem,filename):
+    root=product(tmp_path);(root/filename).write_text("# original assertion data\n")
+    proof=SuiteEvidence({filename+"::business constraint":"passed"},1,0)
+    validator(monkeypatch,proof)
+    supervisor=tmp_path/"supervisor"
+    args=dict(owner="custom",project_root=root,docker="docker",timeout=30)
+    assert pipeline_validation.run_native(root,ecosystem,supervisor,**args)[0]
+    protected=json.loads((supervisor/"protected-test-files.json").read_bytes())["files"]
+    assert filename in protected
+    (root/filename).write_text("# assertion removed but ID unchanged\n")
+    ok,output,_=pipeline_validation.run_native(root,ecosystem,supervisor,**args)
+    assert not ok and "CRITICAL_TEST_CHANGED_UNREVIEWED" in output
+
+
+@pytest.mark.parametrize("node",["missing.py::x","../outside.py::x","unsourced-name"])
+def test_unsourced_or_unconfined_collected_checker_cannot_be_frozen(tmp_path,monkeypatch,node):
+    root=product(tmp_path);validator(monkeypatch,SuiteEvidence({node:"passed"},1,0))
+    with pytest.raises((ValueError,IsolationViolation)):pipeline_validation.run_native(root,"python",tmp_path/"supervisor",
+        owner="bad",project_root=root,docker="docker",timeout=30)
 
 
 def test_coverage_isolated_and_bound_to_unchanged_baseline(tmp_path, monkeypatch):
@@ -68,6 +94,17 @@ def test_custom_frontend_zone_protects_logical_not_physical_paths(tmp_path, monk
         logical_prefix="web/client", docker="docker", timeout=30)[0]
     protected = json.loads((supervisor / "protected-test-files.json").read_text())["files"]
     assert "web/client/src/setupTests.ts" in protected and "web/client/src/page.test.ts" in protected
+
+
+def test_partial_collection_never_freezes_a_baseline(tmp_path, monkeypatch):
+    root = product(tmp_path)
+    validator(monkeypatch, SuiteEvidence({"test_critical.py::test_critical": "passed"}, 1, 0,
+        collection_errors=("test_auth_import.py",)))
+    supervisor = tmp_path / "supervisor"
+    result = pipeline_validation.run_native(root, "python", supervisor, owner="T1", project_root=root,
+        docker="docker", timeout=30)
+    assert not result[0] and "incomplete collection" in result[1]
+    assert not list((supervisor / "native-baselines").glob("*.json"))
 
 
 def test_unowned_process_is_never_killed_by_pid(monkeypatch):

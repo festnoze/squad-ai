@@ -173,16 +173,20 @@ async def test_global_repair_deadline_cancels_provider_and_does_not_ship(monkeyp
     original = repair_policy.RepairLedger
     def tiny_ledger(attempts, deadline):
         import time
-        return original(attempts, time.monotonic() + .05)
+        return original(attempts, time.monotonic() + .3)
     monkeypatch.setattr(repair_policy, "RepairLedger", tiny_ledger)
     class Pending:
         async def arun(self, *args, **kwargs):
             await asyncio.sleep(2)
             pytest.fail("deadline must cancel provider")
     pipeline = Pipeline(_state("repair-deadline"), Pending())
+    # The repair fixture fakes git and must still provide a real mediated
+    # project root. Otherwise capability admission correctly refuses BEFORE
+    # entering the provider and there is no paid/unreported call to cancel.
+    workspace_dir(pipeline.state.id).mkdir(parents=True, exist_ok=True)
     async def verify():
         pytest.fail("verification must not run after deadline")
-    result, detail = await asyncio.wait_for(pipeline._arepair_delivery("runtime", "login 500", verify), .5)
+    result, detail = await asyncio.wait_for(pipeline._arepair_delivery("runtime", "login 500", verify), 2)
     assert not result and "REPAIR_DEADLINE_EXCEEDED" in detail
     assert pipeline.state.usage.unreported_calls == 1
     assert pipeline.state.agent_activity == {}

@@ -14,7 +14,7 @@ from uuid import uuid4
 
 import pytest
 
-from autospec.validation.quality_contracts import NativeQualityCollector, NativeSuiteSpec, AuthorizationMutationSpec, QualityVerifier, write_quality_review_package
+from autospec.validation.quality_contracts import NativeQualityCollector, NativeSuiteSpec, AuthorizationMutationSpec, QualityVerifier, write_quality_review_package, supervisor_e2e_test_id
 from autospec.validation.support_adapter import AdapterUnavailable, Proof
 from tests.fixtures.browser.app import BrowserSubject,browser_contract
 
@@ -96,6 +96,38 @@ async def test_missing_coverage_inventory_file_is_never_removed_from_denominator
     assert "never_run.py" not in result["files"]
 
 
+@pytest.mark.parametrize("field,value",[("name","../escaped"),("name","x:y"),("root","../product"),("root","C:relative"),
+    ("root","backend//src"),("source_inventory",("auth.py","auth.py")),("source_inventory",("../auth.py",)),
+    ("source_inventory",("auth.py:stream",))])
+def test_native_profile_rejects_unreviewable_structural_paths(field,value):
+    fields=dict(name="backend",root="backend",ecosystem="python",source_inventory=("auth.py",),domains=("auth",))
+    fields[field]=value
+    with pytest.raises(ValueError):NativeSuiteSpec(**fields)
+
+
+def test_collector_rejects_duplicate_suite_names_before_any_execution(tmp_path):
+    collector,subject,runner=plan(tmp_path)
+    with pytest.raises(ValueError):NativeQualityCollector(collector.contract,subject.adapter,runner,
+        product_root=collector.product_root,evidence_root=tmp_path/"new-evidence",suites=collector.suites*2,
+        mapping_path=collector.mapping_path,review=collector.review)
+
+
+def test_supervisor_e2e_aggregation_preserves_fail_and_not_verified_without_fake_native_pass(tmp_path):
+    collector,subject,_=plan(tmp_path);collector.evidence_root.mkdir()
+    runs=[dict(id=f"E2E-{i:02d}",mode=mode,status="NOT_VERIFIED") for mode in ["alone","together"] for i in range(1,7)]
+    runs[0]["status"]="FAIL";runs[1]["status"]="NOT_VERIFIED"
+    suite=collector._browser_suite(runs,subject.snapshot)
+    assert suite["scope"]=="supervisor_browser"
+    assert suite["collected"]==12 and suite["passed"]==0 and suite["failed"]==1 and suite["not_verified"]==11
+    assert suite["return_code"]==1
+    assert suite["outcomes"][supervisor_e2e_test_id("E2E-01","alone")]=="failed"
+    assert suite["outcomes"][supervisor_e2e_test_id("E2E-02","alone")]=="not_verified"
+    runs[0]["status"]="NOT_VERIFIED"
+    assert collector._browser_suite(runs,subject.snapshot)["return_code"] is None
+    runs[0]["status"]="PASS"
+    with pytest.raises(AdapterUnavailable):collector._browser_suite(runs,subject.snapshot)
+
+
 async def test_exact_mutation_copy_is_executed_over_real_http_and_original_remains_intact(tmp_path):
     collector,subject,_=plan(tmp_path)
     policy=collector.product_root/"authorization-policy.json"
@@ -128,6 +160,8 @@ async def test_exact_mutation_copy_is_executed_over_real_http_and_original_remai
             return rows
         finally:await case.adapter.close();case.stop_http()
     collector.mutation_probe=probe
+    collector.source_snapshotter=lambda root:SimpleNamespace(digest=hashlib.sha256(json.dumps({"version":1,
+        "files":{p.relative_to(root).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(Path(root).rglob('*')) if p.is_file()}},sort_keys=True,separators=(',',':')).encode()).hexdigest())
     collector.copy_product=lambda source,target:Path(shutil.copytree(source,target)) # trusted fixture only; no links exist
     result=await collector._mutation(subject.snapshot)
     assert result["original_status"]=="PASS",result
@@ -142,3 +176,13 @@ async def test_exact_mutation_copy_is_executed_over_real_http_and_original_remai
     report=await QualityVerifier(collector.contract,collector).verify(subject.snapshot)
     row=next(r for r in report["requirements"] if r["id"]=="TST-06")
     assert row["status"]=="PASS",row
+    # R can correctly reject the deliberately weakened source, but that is
+    # not a runtime mutation kill when native X and observations stay green.
+    source_only=json.loads(json.dumps(result))
+    source_only["mutated_results"]=json.loads(json.dumps(source_only["original_results"]))
+    for rid,item in source_only["mutated_results"].items():
+        item["status"]="FAIL"
+        for p in item["proofs"]:p["snapshot_hash"]=source_only["mutation_snapshot_hash"]
+    collector.records["authorization_mutation"]=source_only
+    false_claim=await QualityVerifier(collector.contract,collector).verify(subject.snapshot)
+    assert next(r for r in false_claim["requirements"] if r["id"]=="TST-06")["status"]=="FAIL"

@@ -20,11 +20,15 @@ async def test_explicit_language_does_not_need_an_agent(language, goal, monkeypa
     monkeypatch.setattr(settings, "fake_agents", False)
     state = ProjectState(id="explicit", name="app", goal=goal, product_profile="api")
     pipeline = Pipeline(state, FakeRunner([]))
-    assert await pipeline._aselect_stack()
-    assert state.backend_language.value == language
+    assert await pipeline._aselect_stack() is (language in {"python", "node"})
     assert state.technical_stack["backend"] == language
     assert state.technical_stack["source"] == "explicit"
-    assert len(state.streams) == 1
+    if language in {"python", "node"}:
+        assert state.backend_language.value == language
+        assert len(state.streams) == 1
+    else:
+        assert "aucun profil Linux" in state.bootstrap_detail
+        assert not state.streams and not state.delivery_ready
 
 
 def test_unsupported_explicit_framework_is_not_silently_replaced():
@@ -258,11 +262,11 @@ async def test_frontend_only_has_no_backend_stream(monkeypatch, goal, technical_
 async def test_partial_streams_are_reconciled_with_stack(monkeypatch):
     monkeypatch.setattr(settings, "project_bootstrap", True)
     monkeypatch.setattr(settings, "fake_agents", False)
-    state = ProjectState(id="streams", name="app", goal="API Rust avec interface React",
+    state = ProjectState(id="streams", name="app", goal="API Node.js avec interface React",
                          streams=[Stream(id="backend", kind=StreamKind.BACKEND, language="python", primary=True)])
     pipeline = Pipeline(state, FakeRunner([]))
     assert await pipeline._aselect_stack()
-    assert [s.language for s in state.streams] == ["rust", "react"]
+    assert [s.language for s in state.streams] == ["node", "react"]
 
 
 def test_interrupted_bootstrap_is_recoverable(monkeypatch):
@@ -303,7 +307,7 @@ async def test_bootstrap_failure_stops_before_plan(monkeypatch):
     ("API Python et frontend React", "frontend/src/features"),
     ("API Python", "app"),
     ("API Python", "tests/steps"),
-    ("API Rust", "src"),
+    ("API Python", "tests"),
 ])
 async def test_lifecycle_scaffold_rejects_nested_external_junction_before_bootstrap(
     goal, link_relative, monkeypatch, tmp_path,
@@ -419,6 +423,8 @@ async def test_only_a_successful_first_gate_marks_bootstrap_verified(monkeypatch
     pipeline = Pipeline(state, FakeRunner([]))
     monkeypatch.setattr(bootstrap, "prepare", lambda *_: bootstrap.BootstrapResult(True, "existing", fingerprint="b" * 64))
     initial = AsyncMock(return_value=bootstrap.BootstrapResult(ok, "first result", skipped=skipped, fingerprint="b" * 64))
+    native = AsyncMock(return_value=(True, "native baseline admitted", {"foundation": "passed"}))
+    monkeypatch.setattr(pipeline, "_arun_pytest", native)
     runtime = AsyncMock()
     monkeypatch.setattr(bootstrap, "verify", initial)
     monkeypatch.setattr(bootstrap, "verify_runtime", runtime)
@@ -426,6 +432,7 @@ async def test_only_a_successful_first_gate_marks_bootstrap_verified(monkeypatch
     assert state.bootstrap_verified_once is (ok and not skipped)
     initial.assert_awaited_once()
     runtime.assert_not_awaited()
+    assert native.await_count == int(ok and not skipped)
 
 
 def test_restart_recovery_retains_successful_bootstrap_history(monkeypatch):
@@ -496,15 +503,15 @@ async def test_preflight_cancellation_is_wired_to_stop(monkeypatch):
     assert not await asyncio.wait_for(task, 5)
 
 
-def test_generated_suite_is_bounded_and_kills_on_timeout(monkeypatch, tmp_path):
+def test_unlocked_generated_suite_refuses_before_host_execution(monkeypatch, tmp_path):
     import sys
     import time
     monkeypatch.setattr(settings, "test_suite_timeout_s", 0.2)
     pipeline = Pipeline(ProjectState(id="timeout", name="app", goal="CLI"), FakeRunner([]))
     started = time.monotonic()
-    result = pipeline._run_suite_process([sys.executable, "-c", "import time; time.sleep(30)"], tmp_path, {})
-    assert result.returncode != 0
-    assert "timeout" in result.stdout
+    from autospec.agents.runner import AgentError
+    with pytest.raises(AgentError, match="ISOLATION_UNAVAILABLE"):
+        pipeline._run_suite_process([sys.executable, "-c", "import time; time.sleep(30)"], tmp_path, {})
     assert time.monotonic() - started < 10
 
 
@@ -516,12 +523,14 @@ async def test_generated_tests_do_not_inherit_server_secrets(monkeypatch, tmp_pa
     pipeline = Pipeline(ProjectState(id="secret", name="app", goal="CLI"), FakeRunner([]))
     captured = {}
 
-    def run(cmd, cwd, env):
-        captured.update(env)
-        return subprocess.CompletedProcess(cmd, 0, stdout="")
+    from autospec.orchestrator import pipeline_validation
+    def run(root, ecosystem, supervisor, **kwargs):
+        captured.update(kwargs)
+        return True, "isolated", {"native": "passed"}
 
-    monkeypatch.setattr(pipeline, "_run_suite_process", run)
-    await pipeline._arun_pytest(ws=tmp_path)
+    monkeypatch.setattr(pipeline_validation, "run_native", run)
+    assert (await pipeline._arun_pytest(ws=tmp_path))[0]
+    assert captured and "env" not in captured
     assert "ANTHROPIC_API_KEY" not in captured
     assert "DATABASE_URL" not in captured
 
@@ -547,8 +556,9 @@ def test_recovered_react_contract_keeps_stream_routing_enabled(monkeypatch):
     assert Pipeline(state, FakeRunner([]))._setting("streams_enabled")
 
 
-async def test_frontend_only_run_uses_preview_not_python(monkeypatch):
+async def test_demo_never_launches_stale_product_source_on_host(monkeypatch):
     from unittest.mock import Mock
+    monkeypatch.setattr(settings, "fake_agents", True)
     state = ProjectState(id="fe-run", name="app", goal="React", technical_stack={"kind": "frontend"},
                          streams=[Stream(id="frontend", kind=StreamKind.FRONTEND, language="react", file_root="frontend", primary=True)])
     pipeline = Pipeline(state, FakeRunner([]))
@@ -556,8 +566,8 @@ async def test_frontend_only_run_uses_preview_not_python(monkeypatch):
     monkeypatch.setattr(pipeline, "_stream_preview_output", preview)
     monkeypatch.setattr(pipeline, "_stream_run_output", backend)
     await pipeline.arun_app()
-    await pipeline._stream_task
-    preview.assert_called_once()
+    assert pipeline._stream_task is None and state.running is False
+    preview.assert_not_called()
     backend.assert_not_called()
 
 

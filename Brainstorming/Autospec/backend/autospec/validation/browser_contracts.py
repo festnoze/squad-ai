@@ -20,6 +20,8 @@ from .support_adapter import AdapterUnavailable, Proof
 from .quality_contracts import source_e2e_scenarios
 
 BROWSER_IDS = tuple(f"UX-{i:02d}" for i in range(1, 9)) + ("SEC-10", "SEC-12", "FUN-02", "FUN-06", "FUN-12")
+BROWSER_NETWORK_LIMITS = ["HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."]
 
 
 async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *, title, description, viewport_width=1280):
@@ -75,7 +77,8 @@ async def browser_smoke(harness, snapshot_hash, contract_hash, actor_fixture, *,
     failed = any(not x["passed"] for x in case.checks)
     return {"status":"FAIL" if failed else "NOT_VERIFIED" if limits or not ticket_id else "PASS",
             "scope":"vertical browser login/create only, not product acceptance", "ticket_id":ticket_id,
-            "proofs":case.proofs,"limits":limits,"contract_hash":contract_hash,"snapshot_hash":snapshot_hash}
+            "proofs":case.proofs,"limits":limits,"contract_hash":contract_hash,"snapshot_hash":snapshot_hash,
+            "environment_limits":BROWSER_NETWORK_LIMITS}
 
 
 def browser_generation_requirements(contract):
@@ -95,6 +98,7 @@ def browser_generation_requirements(contract):
 
 
 class PlaywrightHarness:
+    """Browser HTTP/SW/WS guards only; never an OS/network isolation claim."""
     def __init__(self, adapter, *, bindings: dict, routes: dict, executable_path=None):
         origin = urlsplit(adapter.base_url)
         if origin.scheme not in {"http", "https"} or origin.hostname not in {"127.0.0.1", "localhost", "::1"}:
@@ -128,7 +132,7 @@ class PlaywrightHarness:
 
     async def page(self, case, viewport):
         if self.browser is None: await self.start()
-        context = await self.browser.new_context(viewport={"width": viewport, "height": 900})
+        context = await self.browser.new_context(viewport={"width": viewport, "height": 900},service_workers="block")
         self.contexts.append(context)
         origin = urlsplit(self.adapter.base_url)
         allowed = (origin.scheme, origin.netloc)
@@ -138,7 +142,15 @@ class PlaywrightHarness:
                 case.check("external_request_blocked", target.scheme+"://"+target.netloc, origin.scheme+"://"+origin.netloc)
                 await route.abort()
             else: await route.continue_()
-        await context.route("**/*", confined)
+        async def denied_websocket(ws):
+            case.check("websocket_attempt_blocked",ws.url,"no WebSocket channel permitted by trusted harness")
+            await ws.close(code=1008,reason="trusted harness WebSocket deny policy")
+        try:
+            await context.route("**/*", confined)
+            await context.route_web_socket("**",denied_websocket)
+        except Exception as exc:
+            await context.close();self.contexts.remove(context)
+            raise AdapterUnavailable("HTTP/ServiceWorker/WebSocket guards unavailable before page creation") from exc
         page = await context.new_page()
         page.set_default_timeout(2500)
         page.on("pageerror", lambda error: case.console_errors.append(self.redact(str(error))))
@@ -155,6 +167,13 @@ class PlaywrightHarness:
         page.on("request", request)
         await page.goto(self.adapter.base_url + self.routes["home"])
         return page
+
+    async def guard_probe_route(self,route,case):
+        target,origin=urlsplit(route.request.url),urlsplit(self.adapter.base_url)
+        if (target.scheme,target.netloc)!=(origin.scheme,origin.netloc):
+            case.check("negative_probe_external_request_blocked",target.scheme+"://"+target.netloc,origin.scheme+"://"+origin.netloc)
+            await route.abort();return False
+        return True
 
     def redact(self, value):
         if isinstance(value, dict):
@@ -190,7 +209,8 @@ class _BrowserCase:
     async def capture(self, page, tag):
         root = self.v.harness.adapter.evidence_root
         root.mkdir(parents=True, exist_ok=True)
-        path = root / (self.rid + "-" + tag + "-" + uuid4().hex + ".png")
+        # RID:sous-probe remains a proof tag, never an NTFS alternate stream.
+        path = root / (self.rid.replace(":","-") + "-" + tag + "-" + uuid4().hex + ".png")
         masks = [page.locator("input[type=password]")] + [page.get_by_text(a.password, exact=False)
                  for a in self.v.harness.adapter.manifest.accounts.values()]
         await page.screenshot(path=str(path), full_page=True, mask=masks)
@@ -274,7 +294,8 @@ class BrowserVerifier:
             await self.harness.adapter.close()
         return {"pack": "browser", "status": "FAIL" if any(r["status"] == "FAIL" for r in results) else
                 "PASS" if all(r["status"] == "PASS" for r in results) else "NOT_VERIFIED",
-                "contract_hash": self.contract_hash, "snapshot_hash": self.snapshot, "requirements": results}
+                "contract_hash": self.contract_hash, "snapshot_hash": self.snapshot, "requirements": results,
+                "environment_limits":BROWSER_NETWORK_LIMITS}
 
     def ui(self, page, name): return self.harness.control(page, name)
 
@@ -329,13 +350,14 @@ class BrowserVerifier:
 
     async def _ux02(self, c):
         p = await c.page(); await self.login(c, p, "alice")
-        await p.route("**/api/tickets?*", lambda route: self._slow_read(route, .3))
+        await p.route("**/api/tickets?*", lambda route: self._slow_read(route, .3,c))
         await self.ui(p, "search").fill("nothing-" + uuid4().hex)
         c.check("slow_loading", await c.visible(p, "loading"))
         c.check("empty_state", await c.visible(p, "empty"))
         await c.capture(p,"slow-empty")
         await p.unroute("**/api/tickets?*")
         async def server_error(route):
+            if not await self.harness.guard_probe_route(route,c):return
             await route.fulfill(status=500,json={"error":{"code":"CONTROLLED_FAILURE","message":"Erreur contrôlée"}})
         await p.route("**/api/tickets?*",server_error)
         await self.ui(p,"refresh").click()
@@ -352,6 +374,7 @@ class BrowserVerifier:
         c.check("read_reusable_after_failure",await c.visible(p,"ticket_list"))
         refused_title="KNOWN_REFUSAL_"+uuid4().hex
         async def refuse_once(route):
+            if not await self.harness.guard_probe_route(route,c):return
             await route.fulfill(status=422,json={"error":{"code":"VALIDATION_ERROR","message":"Refus contrôlé"}})
         await p.route("**/api/tickets",refuse_once)
         async with p.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path=="/api/tickets") as refused:
@@ -366,12 +389,16 @@ class BrowserVerifier:
         lost = False
         async def loss(route):
             nonlocal lost
+            if not await self.harness.guard_probe_route(route,c):return
             if route.request.method == "POST" and not lost:
                 lost = True
-                await route.fetch()  # real backend commits; only delivery is lost
+                await route.fetch(max_redirects=0)  # real commit, no host-side redirected fetch
                 # A blackholed response tests the application's actual HTTP
                 # timeout, not a harness-imposed immediate failure.
-                await asyncio.sleep(self.profile["timeout_ms"]/1000+3)
+                try:
+                    await p.wait_for_event("requestfailed",predicate=lambda r:r.url==route.request.url and r.method=="POST",
+                                           timeout=self.profile["timeout_ms"]+3000)
+                except Exception:pass
                 try: await route.abort("failed")
                 except Exception: pass
             else: await route.continue_()
@@ -397,8 +424,9 @@ class BrowserVerifier:
         message_lost=False
         async def lost_message(route):
             nonlocal message_lost
+            if not await self.harness.guard_probe_route(route,c):return
             if route.request.method=="POST" and not message_lost:
-                message_lost=True;await route.fetch();await route.abort("failed")
+                message_lost=True;await route.fetch(max_redirects=0);await route.abort("failed")
             else:await route.continue_()
         await p.route("**/api/tickets/*/messages",lost_message)
         await self.ui(p,"reply").fill(message);await self.ui(p,"send").click()
@@ -411,8 +439,9 @@ class BrowserVerifier:
         c.check("message_retry_no_duplicate",await self.harness.adapter.observe("browser_message_count",ticket_id=tid,content=message),1)
         c.check("message_form_reusable",not await self.ui(p,"reply").is_disabled())
 
-    async def _slow_read(self, route, seconds):
-        response = await route.fetch(); await asyncio.sleep(seconds); await route.fulfill(response=response)
+    async def _slow_read(self, route, seconds,case):
+        if not await self.harness.guard_probe_route(route,case):return
+        response = await route.fetch(max_redirects=0); await asyncio.sleep(seconds); await route.fulfill(response=response)
 
     async def _ux03(self, c):
         p = await c.page(); await self.login(c, p, "alice")
@@ -481,7 +510,8 @@ class BrowserVerifier:
         delivered_a = asyncio.Event(); release_a = asyncio.Event(); completed_a = asyncio.Event()
         a, b = self.profile["search_a"], self.profile["search_b"]
         async def reverse(route):
-            response = await route.fetch()
+            if not await self.harness.guard_probe_route(route,c):return
+            response = await route.fetch(max_redirects=0)
             if parse_qs(urlsplit(route.request.url).query).get("q") == [a]:
                 delivered_a.set(); await release_a.wait()
             try: await route.fulfill(response=response)
@@ -596,10 +626,10 @@ class BrowserVerifier:
             # Network response samples include each pagination boundary, not a
             # React-side filtered list inferred from the DOM.
             for page in [1,2]:
-                response=await p.request.get(self.harness.adapter.base_url+f"/api/tickets/{tid}/messages?page={page}&page_size=1")
+                response=await p.request.get(self.harness.adapter.base_url+f"/api/tickets/{tid}/messages?page={page}&page_size=1",max_redirects=0)
                 data=await response.json();c.check(key+"_page"+str(page)+"_private_absent",not any(m in json.dumps(data) for m in markers))
                 c.requests.append({"method":"GET","path":f"/api/tickets/{tid}/messages","query":{"page":page,"page_size":1},"status":response.status})
-            history=await p.request.get(self.harness.adapter.base_url+f"/api/tickets/{tid}/history?page_size=50")
+            history=await p.request.get(self.harness.adapter.base_url+f"/api/tickets/{tid}/history?page_size=50",max_redirects=0)
             history_text=await history.text()
             c.check(key+"_events_absent",not any(m in history_text for m in markers))
         await self.ui(p,"ticket_nav").click()
@@ -717,7 +747,8 @@ class BrowserVerifier:
         await self._identity()
         return {"pack":"browser_e2e","status":"FAIL" if any(r["status"]=="FAIL" for r in runs) else
                 "PASS" if runs and all(r["status"]=="PASS" for r in runs) else "NOT_VERIFIED",
-                "contract_hash":self.contract_hash,"snapshot_hash":self.snapshot,"scenarios":runs}
+                "contract_hash":self.contract_hash,"snapshot_hash":self.snapshot,"scenarios":runs,
+                "environment_limits":BROWSER_NETWORK_LIMITS}
 
     async def _e2e01(self,c):
         p=await c.page();await self.login(c,p,"alice")
@@ -840,7 +871,7 @@ class BrowserVerifier:
         updated={**expected,"total":expected["total"]+1,"open":expected["open"]+1}
         await self.ui(p,"dashboard_nav").click();await self._dashboard_check(c,p,updated)
         await p.reload();await self._dashboard_check(c,p,updated)
-        async def slow(route):await self._slow_read(route,.3)
+        async def slow(route):await self._slow_read(route,.3,c)
         await p.route("**/api/tickets?*",slow);await self.ui(p,"ticket_nav").click()
         c.check("e2e_slow_loading",await c.visible(p,"loading"));await self.ui(p,"total").get_by_text(str(updated["total"]),exact=True).wait_for()
         await p.unroute("**/api/tickets?*");await p.context.set_offline(True);await self.ui(p,"refresh").click()
@@ -850,7 +881,8 @@ class BrowserVerifier:
         c.check("e2e_switch_no_alice",await self._private_clean(p,[title]))
 
     async def _dashboard_check(self,c,p,expected):
-        await self.ui(p,"dashboard_total").filter(has_text=re.compile(r"\S")).wait_for()
+        try:await self.ui(p,"dashboard_total").filter(has_text=re.compile("^"+str(expected["total"])+"$")).wait_for()
+        except Exception:pass  # record the actual mismatching counter below
         c.check("dashboard_total",int(await self.ui(p,"dashboard_total").inner_text()),expected["total"])
         observed=[]
         for state in ["open","in_progress","resolved","closed"]:

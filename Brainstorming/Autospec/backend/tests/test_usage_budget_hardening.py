@@ -226,7 +226,8 @@ async def test_budget_added_in_flight_waits_for_all_previously_unbudgeted_calls(
     p = Pipeline(ProjectState(id="new-budget", name="n", goal="g"), runner)
     first = asyncio.create_task(p._tracked.arun("one", "s"))
     second = asyncio.create_task(p._tracked.arun("two", "s"))
-    await asyncio.wait_for(asyncio.gather(*(event.wait() for event in runner.started)), 2)
+    # This tests admission ordering, not cold Windows checkpoint I/O latency.
+    await asyncio.wait_for(asyncio.gather(*(event.wait() for event in runner.started)), 30)
     p.state.budget_usd = 1
     p._enforce_budget()  # same update as the budget API
     queued = asyncio.create_task(p._tracked.arun("three", "s"))
@@ -237,7 +238,7 @@ async def test_budget_added_in_flight_waits_for_all_previously_unbudgeted_calls(
     await asyncio.sleep(0)
     assert runner.allowances == [None, None]
     runner.release[1].set()
-    await asyncio.wait_for(asyncio.gather(second, queued), 2)
+    await asyncio.wait_for(asyncio.gather(second, queued), 30)
     assert runner.allowances == [None, None, pytest.approx(.4)]
     assert p.state.usage.cost_usd == pytest.approx(1)
     assert p._tracked._active_calls == 0 and p._tracked._idle.is_set()

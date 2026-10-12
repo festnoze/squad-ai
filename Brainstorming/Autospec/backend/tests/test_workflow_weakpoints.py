@@ -10,6 +10,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -17,6 +18,8 @@ from autospec.agents.scripted import ScriptedRunner
 from autospec.config import settings
 from autospec.models import ProjectState, StoryStatus, Stream, StreamKind, UserStory
 from autospec.orchestrator import scheduler
+from autospec.orchestrator import pipeline_validation
+from autospec.orchestrator.test_integrity import vitest_evidence
 from autospec.orchestrator.pipeline import Pipeline
 from autospec.storage import workspace_dir
 
@@ -141,12 +144,33 @@ def _fe_pipeline(tmp_path, monkeypatch, pid: str) -> Pipeline:
     monkeypatch.setattr(settings, "workspace_root", tmp_path)
     pipeline = Pipeline(_fe_state(pid), ScriptedRunner())
     (workspace_dir(pid) / "frontend").mkdir(parents=True, exist_ok=True)
+    root = workspace_dir(pid) / "frontend"
+    (root / "src").mkdir()
+    (root / "src/check.test.ts").write_text("test('critical', () => expect(1).toBe(1));")
 
     async def _noop(root):
         return None
 
     monkeypatch.setattr(pipeline, "_aensure_frontend_node_modules", _noop)
     return pipeline
+
+
+def _isolated_node_suite(monkeypatch, payload, returncode, output="executed"):
+    """Mock only the Docker boundary, retaining report parsing and admission."""
+    calls = []
+    class Validator:
+        def __init__(self, *args, **kwargs): pass
+        def run_suite(self, root, ecosystem, mode, report, **kwargs):
+            assert ecosystem == "node" and mode == "test"
+            calls.append((root, ecosystem, mode))
+            report.parent.mkdir(parents=True, exist_ok=True)
+            report.write_text(json.dumps(payload), encoding="utf-8")
+            return SimpleNamespace(evidence=vitest_evidence(report, returncode), output=output,
+                fingerprint="a"*64, source_fingerprint="b"*64, image="sha256:"+"c"*64)
+        def build_frontend(self, root):
+            pytest.fail("no build is admitted after a red native suite")
+    monkeypatch.setattr(pipeline_validation, "IsolatedValidator", Validator)
+    return calls
 
 
 def _report_arg(cmd) -> str | None:
@@ -161,7 +185,12 @@ async def test_red_frontend_verify_carries_the_failure_digest(tmp_path, monkeypa
     le digest du rapport (nom du test + message) doit être dans la sortie —
     c'est ce vide qui a fait tourner T5-S1-S1 en aveugle."""
     pipeline = _fe_pipeline(tmp_path, monkeypatch, "wk-digest")
+    # The native collected ID must point to an actual inspected checker; an
+    # arbitrary JSON report may not manufacture source test identity.
+    (workspace_dir("wk-digest") / "frontend/src/tokenStorage.test.ts").write_text(
+        "test('persiste les jetons', () => expect(2).toBe(3));", encoding="utf-8")
     payload = {
+        "numTotalTests": 1,
         "testResults": [{
             "name": "src/tokenStorage.test.ts",
             "assertionResults": [{
@@ -179,7 +208,8 @@ async def test_red_frontend_verify_carries_the_failure_digest(tmp_path, monkeypa
             return _FakeProc(1, f"JSON report written to {path}")
         return _FakeProc(0, "build ok")  # jamais atteint : tests rouges
 
-    monkeypatch.setattr(pipeline, "_run_suite_process", fake_run)
+    calls = _isolated_node_suite(monkeypatch, payload, 1)
+    monkeypatch.setattr(pipeline, "_run_suite_process", lambda *a, **k: pytest.fail("no host suite"))
 
     ok, output, results = await pipeline._arun_frontend_tests()
     assert ok is False
@@ -187,6 +217,7 @@ async def test_red_frontend_verify_carries_the_failure_digest(tmp_path, monkeypa
     assert "expected 2 to be 3" in output
     assert "tokenStorage > persiste les jetons" in output
     assert results["src/tokenStorage.test.ts::tokenStorage > persiste les jetons"] == "failed"
+    assert len(calls) == 1
 
 
 async def test_red_frontend_verify_names_an_empty_suite(tmp_path, monkeypatch):
@@ -201,7 +232,7 @@ async def test_red_frontend_verify_names_an_empty_suite(tmp_path, monkeypatch):
             return _FakeProc(1, f"JSON report written to {path}")
         return _FakeProc(0, "build ok")
 
-    monkeypatch.setattr(pipeline, "_run_suite_process", fake_run)
+    _isolated_node_suite(monkeypatch, {"numTotalTests": 0, "testResults": []}, 1)
 
     ok, output, results = await pipeline._arun_frontend_tests()
     assert ok is False
@@ -209,10 +240,8 @@ async def test_red_frontend_verify_names_an_empty_suite(tmp_path, monkeypatch):
     assert "SANS test collecté" in output
 
 
-async def test_frontend_startup_error_self_heals_and_replays(tmp_path, monkeypatch):
-    """Le mode d'échec exact de messagerie2 : vitest meurt au chargement de la
-    config (node_modules cassé). Le harnais doit réinstaller puis rejouer UNE
-    fois — et rendre VERT sans consommer de tentative dev."""
+async def test_frontend_startup_error_cannot_install_on_host_or_claim_green(tmp_path, monkeypatch):
+    """Missing isolated dependencies require a classified failure, not host repair."""
     pipeline = _fe_pipeline(tmp_path, monkeypatch, "wk-heal")
     calls = {"runs": 0, "installs": 0}
     green = {
@@ -241,13 +270,14 @@ async def test_frontend_startup_error_self_heals_and_replays(tmp_path, monkeypat
         calls["installs"] += 1
         return True
 
-    monkeypatch.setattr(pipeline, "_run_suite_process", fake_run)
+    native_calls = _isolated_node_suite(monkeypatch, {"numTotalTests": 0, "testResults": []}, 1,
+        "ISOLATED_DEPENDENCY_FAILED: Cannot find package 'vite'")
     monkeypatch.setattr(pipeline, "_anpm_install_in", fake_install)
 
     ok, output, results = await pipeline._arun_frontend_tests()
-    assert ok is True
-    assert calls == {"runs": 2, "installs": 1}  # une réparation, un replay
-    assert results["src/App.test.tsx::App > renders"] == "passed"
+    assert ok is False and "Cannot find package 'vite'" in output
+    assert calls == {"runs": 0, "installs": 0}
+    assert len(native_calls) == 1 and results == {}
 
 
 async def test_frontend_real_red_does_not_trigger_the_heal(tmp_path, monkeypatch):
@@ -255,6 +285,7 @@ async def test_frontend_real_red_does_not_trigger_the_heal(tmp_path, monkeypatch
     réinstallation : l'auto-réparation est réservée aux pannes d'environnement."""
     pipeline = _fe_pipeline(tmp_path, monkeypatch, "wk-noheal")
     payload = {
+        "numTotalTests": 1,
         "testResults": [{
             "name": "src/x.test.ts",
             "assertionResults": [
@@ -276,7 +307,7 @@ async def test_frontend_real_red_does_not_trigger_the_heal(tmp_path, monkeypatch
         calls["installs"] += 1
         return True
 
-    monkeypatch.setattr(pipeline, "_run_suite_process", fake_run)
+    _isolated_node_suite(monkeypatch, payload, 1)
     monkeypatch.setattr(pipeline, "_anpm_install_in", fake_install)
 
     ok, _, _ = await pipeline._arun_frontend_tests()

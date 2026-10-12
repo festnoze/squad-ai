@@ -721,6 +721,16 @@ class RuntimeSession:
             raise _unavailable("Runtime immutable container identity is no longer owned")
         return self.identifier
 
+    def open_control_port(self, target_port: int):
+        """Factory-only browser control ingress; never exposed to model tools."""
+        from .container_tunnel import OwnedControlTunnel
+        tunnel = OwnedControlTunnel(self, target_port)
+        try:
+            return tunnel.__enter__()
+        except BaseException:
+            tunnel.close()
+            raise
+
     def exec(self, argv: list[str], *, stdin: str = "", timeout: float = 30) -> tuple[int, str, str]:
         """Execute source-reviewed supervisor argv, only in the owned container.
 

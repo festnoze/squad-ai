@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import contextvars
+import contextlib
 import copy
 import fnmatch
 import json
@@ -679,8 +680,43 @@ class _UsageTracker:
         self._idle = asyncio.Event()
         self._idle.set()
         self._call_owners: set[str] = set()
+        self._reservation_pool = None
+
+    def _concurrent_proof(self):
+        from .budget_reservations import BudgetReservationError, ProviderBudgetProof
+        state = self.pipeline.state
+        durable_lane = (acceptance.supervisor_root(state.id) / "budget-reservations.json").exists()
+        eligible = (settings.concurrent_budget_reservations and state.budget_usd > 0
+                    and not state.budget_tokens)
+        provider = getattr(self.pipeline.runner, "budget_provider_id", settings.agent_provider)
+        entry = settings.concurrent_budget_provider_proofs.get(provider) if eligible else None
+        if entry:
+            try:
+                proof = ProviderBudgetProof(provider, Path(entry["path"]), entry["sha256"])
+                proof.verify(workspace_dir(state.id))
+                return proof
+            except (KeyError, TypeError, BudgetReservationError):
+                if self._reservation_pool is not None or durable_lane:
+                    raise BudgetReservationError("LANE_CHANGED", "Active durable lane cannot lose its reviewed provider bound")
+        if self._reservation_pool is not None or durable_lane:
+            raise BudgetReservationError("LANE_CHANGED", "Reconcile the existing lane before changing provider, cap kind or configuration")
+        return None
+
+    def _budget_lane_blocked(self, exc):
+        self.pipeline._stop_requested = True
+        self.pipeline._resume_event.set()
+        self.pipeline._chat(ChatRole.SYSTEM, f"💰 Réservation budgétaire bloquée : {exc}. Aucun fallback hors journal.")
+        self.pipeline._sync()
+        return AgentError(str(exc), code=getattr(exc, "code", "BUDGET_LEDGER_FAILED"))
 
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
+        from .budget_reservations import BudgetReservationError, BudgetReservations
+        try:
+            proof = self._concurrent_proof()
+        except BudgetReservationError as exc:
+            raise self._budget_lane_blocked(exc) from exc
+        concurrent = proof is not None
+        reservation = envelope = None
         item = _BUILD_ITEM.get() or f"phase:{self.pipeline.state.phase.value}"
         # Planning can issue concurrent calls with the same phase label. Keep
         # every call visible rather than overwriting/removing a sibling's row.
@@ -691,7 +727,8 @@ class _UsageTracker:
         # These checks and updates have no await: admission is atomic on the
         # owning event loop. A wakeup rechecks the cap and current occupancy.
         while self._active_calls and (
-            self._budgeted_call or self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
+            self._budgeted_call or (concurrent and self._reservation_pool is None) or (not concurrent and (
+                self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens))
         ):
             self.pipeline.state.agent_activity[activity_key] = {
                 "version": 1, "phase": "waiting_budget", "since": waiting_since,
@@ -705,10 +742,47 @@ class _UsageTracker:
                 self.pipeline.state.agent_activity.pop(activity_key, None)
                 self.pipeline._sync()
                 raise
+        if concurrent:
+            state = self.pipeline.state
+            try:
+                if self._reservation_pool is None:
+                    journal = acceptance.supervisor_root(state.id) / "budget-reservations.json"
+                    self._reservation_pool = BudgetReservations(state.budget_usd, journal=journal,
+                        budget_id=state.id, enabled=True, producer_root=workspace_dir(state.id),
+                        initial_cost_usd=state.usage.cost_usd if not journal.exists() else None,
+                        historical_unreported=state.usage.unreported_calls)
+                self._reservation_pool.update_cap(state.budget_usd)
+                while True:
+                    snapshot = self._reservation_pool.snapshot()
+                    amount = min(settings.concurrent_budget_call_usd, float(snapshot["available_usd"]))
+                    if snapshot["blocked_reasons"]:
+                        raise BudgetReservationError(snapshot["blocked_reasons"][0], "Unresolved durable budget ledger")
+                    if amount > 0:
+                        reservation = self._reservation_pool.acquire(uuid.uuid4().hex, amount, proof)
+                        envelope = self._reservation_pool.envelope(reservation)
+                        break
+                    if not self._active_calls:
+                        raise BudgetReservationError("BUDGET_RESERVED", "No USD allowance remains after reconciliation")
+                    self.pipeline.state.agent_activity[activity_key] = {
+                        "version": 1, "phase": "waiting_budget", "since": waiting_since,
+                        "owner": sorted(self._call_owners), "active_provider_calls": self._provider_calls,
+                        "cost_incomplete": False, "budget_reservations": snapshot,
+                    }
+                    self.pipeline._sync()
+                    await self._idle.wait()
+                    self._reservation_pool.update_cap(state.budget_usd)
+            except BaseException as exc:
+                if reservation is not None:
+                    self._reservation_pool.cancel(reservation, cost_usd=0, complete=True)
+                self.pipeline.state.agent_activity.pop(activity_key, None)
+                if isinstance(exc, asyncio.CancelledError):
+                    self.pipeline._sync()
+                    raise
+                raise self._budget_lane_blocked(exc) from exc
         self._active_calls += 1
-        self._budgeted_call = self._budgeted_call or bool(
+        self._budgeted_call = self._budgeted_call or (not concurrent and bool(
             self.pipeline.state.budget_usd or self.pipeline.state.budget_tokens
-        )
+        ))
         self._idle.clear()
         self._call_owners.add(activity_key)
         self.pipeline.state.agent_activity[activity_key] = {
@@ -740,10 +814,19 @@ class _UsageTracker:
                 )
 
         observer_token = active_provider_observer.set(provider_turn)
+        dispatched = {"entered": False}
+        reported = None
         try:
-            if not getattr(self.pipeline.runner, "reports_provider_turns", False):
-                await provider_turn(True)
-            return await self._arun(prompt, system_prompt, cwd, session_id, model)
+            with envelope.bind() if envelope is not None else contextlib.nullcontext():
+                reported = await self._arun(prompt, system_prompt, cwd, session_id, model,
+                    dispatched=dispatched, reserved=envelope is not None)
+                return reported
+        except AgentError as exc:
+            reported = exc.usage
+            raise
+        except asyncio.CancelledError as exc:
+            reported = getattr(exc, "usage", None)
+            raise
         finally:
             # Synchronous release cannot itself be interrupted by cancellation.
             active_provider_observer.reset(observer_token)
@@ -757,6 +840,19 @@ class _UsageTracker:
             if not self._active_calls:
                 self._budgeted_call = False
                 self._idle.set()
+            if reservation is not None:
+                try:
+                    if not dispatched["entered"]:
+                        snapshot = self._reservation_pool.cancel(reservation, cost_usd=0, complete=True)
+                    elif reported is not None:
+                        snapshot = self._reservation_pool.reconcile(reservation, reported.cost_usd,
+                            complete=reported.usage_reported)
+                    else:
+                        snapshot = self._reservation_pool.cancel(reservation)
+                    if snapshot["blocked_reasons"]:
+                        self._budget_lane_blocked(BudgetReservationError(snapshot["blocked_reasons"][0], "Call costs remain unresolved"))
+                except BaseException as exc:
+                    self._budget_lane_blocked(exc)
             self.pipeline._sync()
 
     def _account(self, result, role: str, iteration: int, *, failed: bool = False) -> float:
@@ -800,7 +896,7 @@ class _UsageTracker:
         self.pipeline._sync()
         return cost
 
-    async def _arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
+    async def _arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None, *, dispatched=None, reserved=False):
         self.pipeline._enforce_budget()
         if self.pipeline._stop_requested:
             raise AgentError("Appel agent non lancé : pipeline arrêtée ou budget estimatif atteint.")
@@ -823,7 +919,9 @@ class _UsageTracker:
         skills_token = active_skills_enabled.set(bool(self.pipeline._setting("skills_enabled")))
         remaining = (max(0.0, self.pipeline.state.budget_usd - self.pipeline.state.usage.cost_usd)
                      if self.pipeline.state.budget_usd else None)
-        budget_token = active_budget_usd.set(remaining)
+        budget_token = None if reserved else active_budget_usd.set(remaining)
+        provider_entered = False
+        known_usage = None
         tool_tokens = []
         transient_claim = False
         try:
@@ -856,15 +954,25 @@ class _UsageTracker:
                 _PERSIST_EXECUTOR, save_state_checkpoint, self.pipeline.state.id,
                 self.pipeline.state.model_dump_json(indent=2),
             )
+            if not getattr(self.pipeline.runner, "reports_provider_turns", False):
+                await active_provider_observer.get()(True)
+            if dispatched is not None:
+                dispatched["entered"] = True
+            provider_entered = True
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
+            # A returned receipt is already paid/known. Account it before any
+            # cancellable claim cleanup can replace the successful result.
+            known_usage = res
+            effective_cost = self._account(res, role, iteration)
         except IsolationViolation as exc:
             # Capability setup failed BEFORE entering the provider. Do not
             # fabricate an unreported paid call or consume a dev retry.
             raise AgentError(str(exc), code=exc.code) from exc
         except AgentError as exc:
-            effective_cost = self._account(exc.usage, role, iteration, failed=True)
+            known_usage = exc.usage
+            effective_cost = self._account(exc.usage, role, iteration, failed=True) if provider_entered else 0.0
             if exc.budget_exhausted:
                 self.pipeline._stop_requested = True
                 self.pipeline._resume_event.set()
@@ -889,24 +997,42 @@ class _UsageTracker:
             if not self.pipeline._stop_requested:
                 await self.pipeline._aon_agent_error(exc)
             raise
-        except asyncio.CancelledError:
-            self._account(None, role, iteration, failed=True)
+        except asyncio.CancelledError as exc:
+            usage = getattr(exc, "usage", None)
+            known_usage = usage
+            effective_cost = 0.0
+            if provider_entered:
+                effective_cost = self._account(usage, role, iteration, failed=True)
             self.pipeline._record_interaction(
                 item_id=item_id, phase=phase, persona=role, prompt=prompt,
                 response="", ok=False, error="Appel interrompu ; usage non remonté.", model=chosen or "",
+                input_tokens=usage.input_tokens if usage else 0,
+                output_tokens=usage.output_tokens if usage else 0,
+                cost_usd=effective_cost,
             )
             raise
         finally:
             for variable, token in reversed(tool_tokens):
                 variable.reset(token)
-            if transient_claim:
-                await self.pipeline._claim_arbiter.release(item_id)
-                self.pipeline._notify_claims_changed()
-                self.pipeline._claim_roots.pop(item_id, None)
-            active_skills_enabled.reset(skills_token)
-            active_processes.reset(process_token)
-            active_budget_usd.reset(budget_token)
-        effective_cost = self._account(res, role, iteration)
+            try:
+                if transient_claim:
+                    await self.pipeline._claim_arbiter.release(item_id)
+                    self.pipeline._notify_claims_changed()
+                    self.pipeline._claim_roots.pop(item_id, None)
+            except asyncio.CancelledError as cleanup:
+                # Preserve a complete receipt or an incomplete paid prefix for
+                # the outer durable reservation reconciliation, without double
+                # accounting in the project/iteration ledgers.
+                cleanup.usage = known_usage
+                raise
+            except Exception as cleanup:
+                raise AgentError('Supervisor claim cleanup failed: '+str(cleanup),
+                    code='SUPERVISOR_CLEANUP_FAILED', usage=known_usage) from cleanup
+            finally:
+                active_skills_enabled.reset(skills_token)
+                active_processes.reset(process_token)
+                if budget_token is not None:
+                    active_budget_usd.reset(budget_token)
         # Optional Langfuse trace (O1): one generation per agent call. Best-effort
         # and env-gated — never affects the pipeline if tracing fails or is off.
         observability.trace_agent_call(
@@ -966,6 +1092,7 @@ class Pipeline:
         self._claim_roots: dict[str, str] = {}
         self._claims_changed = asyncio.Event()
         self._dependency_lock = asyncio.Lock()
+        self._qa_provenance_lock = asyncio.Lock()
         try:
             for rec in load_interactions(state.id):
                 self.interactions.add_existing(AgentInteraction.model_validate(rec))
@@ -2512,6 +2639,15 @@ class Pipeline:
             self._block_delivery(str(exc), source="bootstrap")
             return False
         frontend_only = self.state.technical_stack["kind"] == "frontend"
+        if not frontend_only and self.state.technical_stack["backend"] not in {"python", "node"}:
+            requested = self.state.technical_stack["backend"]
+            detail = (f"ISOLATION_UNAVAILABLE: stack {requested} demandée conservée ; "
+                      "aucun profil Linux attesté de validation n'est disponible. "
+                      "Aucun fichier ni appel de développement ne sera lancé ; choisir explicitement une stack prise en charge.")
+            self.state.bootstrap_status = "failed"
+            self.state.bootstrap_detail = detail
+            self._block_delivery(detail, source="stack-capability")
+            return False
         if not frontend_only:
             self.state.backend_language = BackendLanguage(self.state.technical_stack["backend"])
         # Before any file is written the streams must agree with the resolved
@@ -2579,7 +2715,7 @@ class Pipeline:
             if not result.ok:
                 self._block_delivery(f"Socle technique non opérationnel : {result.detail}", source="bootstrap")
                 return False
-            if not result.skipped and self.state.backend_language == BackendLanguage.PYTHON:
+            if not result.skipped and self.state.backend_language in {BackendLanguage.PYTHON, BackendLanguage.NODE}:
                 ok, native, _ = await self._arun_pytest(ws=ws)
                 if not ok:
                     self.state.bootstrap_status = "failed"
@@ -3177,60 +3313,6 @@ class Pipeline:
                                      timeout_s=settings.evaluator_run_timeout_s)
         self.monitor.event("evaluator_run", ok=probe.ok, isolated=True)
         return probe.detail
-        ws = workspace_dir(self.state.id)
-        env = _minimal_env()
-        timeout = settings.evaluator_run_timeout_s
-        run_cmd = toolchain.run_command(toolchain.normalize(self.state.backend_language.value))
-        cmd = self._maybe_sandbox(run_cmd, ws)
-        expects_web = self._expects_web_app()
-        cap = _EVALUATOR_OUTPUT_CAP
-
-        def _sweep_ports() -> None:
-            """Last net, like the smoke gate: a uvicorn reload supervisor can
-            respawn a worker that still holds the port. Web products only."""
-            if not expects_web:
-                return
-            try:
-                self._kill_workspace_port_holders(
-                    self._resolve_web_port(ws), Path(settings.workspace_root)
-                )
-            except Exception:  # noqa: BLE001 - cleanup is best-effort
-                pass
-
-        def _run() -> tuple[str, bool, bool, bool]:
-            """Returns (text, ok, timed_out, killed_tree)."""
-            run = _run_capped_process(
-                cmd, cwd=ws, env=env, timeout=timeout, output_cap=cap,
-                kill_tree=self._kill_tree, on_timeout=_sweep_ports,
-                name="evaluator-run",
-            )
-            if run.launch_error:
-                return f"(lancement impossible : {run.launch_error})", False, False, False
-            if run.timed_out:
-                return (
-                    f"(toujours actif après {timeout:g}s — probablement un service de "
-                    f"longue durée)\n" + run.output,
-                    True, True, run.killed_tree,
-                )
-            # The entry point exited, but a reader still blocked on the pipe
-            # means a detached grandchild inherited it: report the truncation
-            # instead of hiding it, and sweep the port it may be holding.
-            if run.pipe_leaked:
-                _sweep_ports()
-            tail = (
-                "\n(sortie tronquée : un processus détaché garde le tube ouvert)"
-                if run.pipe_leaked else ""
-            )
-            return (
-                f"(processus terminé, code {run.returncode})\n" + run.output + tail,
-                True, False, False,
-            )
-
-        text, ok, timed_out, killed_tree = await asyncio.to_thread(_run)
-        self.monitor.event(
-            "evaluator_run", ok=ok, timed_out=timed_out, killed_tree=killed_tree
-        )
-        return text
 
     async def _aevaluate_phase(self, force: bool = False) -> None:
         """Exercise the delivered product and turn the run into structured
@@ -4241,8 +4323,47 @@ class Pipeline:
             self._block_delivery(f"Oracle d'acceptation indisponible ou altéré ({type(exc).__name__}).", source="contract")
             raise DeliveryBlocked() from exc
 
+    async def _await_reviewed_configuration(self, contract, snapshot_root, snapshot_hash, *, phase):
+        """Publish a local request, never send generated sources to Claude.
+
+        External agents may provide the two independently identified receipts.
+        Waiting is bounded, interruptible, visible and consumes no provider call.
+        """
+        from ..validation.source_reviewer import ensure_reviewed_configuration, ReviewPending
+        from ..validation.support_adapter import AdapterUnavailable
+        timeout = min(7200.0, max(0.0, settings.external_review_wait_seconds))
+        deadline = time.monotonic() + timeout
+        activity_key = "external-source-review"
+        last_stage = None
+        try:
+            while True:
+                if self._stop_requested:
+                    raise AdapterUnavailable("EXTERNAL_REVIEW_REQUIRED: supervisor interrupted")
+                try:
+                    return await ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash,
+                        acceptance.supervisor_root(self.state.id), phase=phase)
+                except ReviewPending as pending:
+                    self.state.agent_activity[activity_key] = {
+                        **self._activity("awaiting_external_review"), "stage": pending.stage,
+                        "request_path": pending.request_path, "snapshot_hash": snapshot_hash,
+                        "model": "gpt-6.1-sol", "reasoning": "medium"}
+                    if pending.stage != last_stage:
+                        last_stage = pending.stage
+                        self.monitor.event("external_source_review_required", stage=pending.stage,
+                            request_path=pending.request_path, snapshot_hash=snapshot_hash,
+                            contract_hash=contract.contract_hash, phase=phase)
+                        self._sync()
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise
+                    await asyncio.sleep(min(2.0, remaining))
+        finally:
+            self.state.agent_activity.pop(activity_key, None)
+            self._sync()
+
     async def _avertical_probe(self, contract, snapshot_root, snapshot_hash):
         from ..validation.coordinator import verify_vertical
+        await self._await_reviewed_configuration(contract, snapshot_root, snapshot_hash, phase="vertical")
         return await verify_vertical(self.state, contract, snapshot_root, snapshot_hash,
                                      acceptance.supervisor_root(self.state.id))
 
@@ -4302,6 +4423,24 @@ class Pipeline:
                 cached = None
             if cached is None or not cached.ready:
                 from ..validation.coordinator import verify_project
+                from ..validation.delivery_raccord import (native_timing_recorder,
+                    collect_native_delivery_build,collect_native_final_facts)
+                timing_recorder=native_timing_recorder(contract,snapshot.digest,supervisor)
+                try:
+                    native_build=await collect_native_delivery_build(contract,source,snapshot.digest,
+                        supervisor,timing_recorder=timing_recorder)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    native_build={"status":"NOT_VERIFIED","receipt":None,
+                        "limits":["native delivery build unavailable: "+type(exc).__name__]}
+                    self.monitor.event("native_delivery_build_unavailable",snapshot_hash=snapshot.digest,
+                        category=type(exc).__name__)
+                await self._await_reviewed_configuration(contract, source, snapshot.digest, phase="final")
+                facts=await collect_native_final_facts(self.state,contract,source,snapshot.digest,
+                    supervisor,build=native_build,timing_recorder=timing_recorder)
+                self.monitor.event("native_final_facts",status=facts["status"],
+                    snapshot_hash=snapshot.digest,limits=facts["limits"])
                 reports = await verify_project(self.state, contract, source, snapshot.digest, supervisor)
                 atomic_json(reports_path, reports)
             admission = admit_reports(contract, reports, snapshot_hash=snapshot.digest, evidence_root=supervisor)
@@ -4387,6 +4526,14 @@ class Pipeline:
             raise ClaimViolation(str(exc)) from exc
         if not await self._claim_arbiter.authorize_batch(owner, paths, project_root=workspace_dir(self.state.id)):
             raise ClaimViolation("CLAIM_REPLAN: write not reserved; request claim_expand BEFORE mutation")
+        if role == "qa":
+            # Supervisor-authenticated conservative write intent, before any
+            # batch mutation. Actual byte hashes are frozen only by native
+            # admission, including helpers outside test filename conventions.
+            # Producer JSON cannot invent an author/role or edit this journal.
+            from .qa_provenance import record_qa_write_intent
+            async with self._qa_provenance_lock:
+                await asyncio.to_thread(record_qa_write_intent,acceptance.supervisor_root(self.state.id),paths)
 
     async def _aexpand_agent_claim(self, owner: str, call: dict, role: str):
         if role not in self._FILE_WRITERS or call.get("task_id") != owner:
@@ -4833,8 +4980,7 @@ class Pipeline:
             return ok
 
         async def _rollback() -> None:
-            await self._agit(ws, "reset", "--hard", "HEAD")
-            await self._agit(ws, "clean", "-fd")
+            await self._areset_workspace(ws, "HEAD")
 
         # W5.3 checker independence: give the critic the ACTUAL changes (the last
         # commit's diff), not the dev's self-narrative, so its review targets what
@@ -4951,13 +5097,9 @@ class Pipeline:
     async def _agit(self, ws, *args: str) -> tuple[int, str]:
         def _run() -> tuple[int, str]:
             try:
-                proc = subprocess.run(
-                    ["git", *args], cwd=str(ws),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, encoding="utf-8", errors="replace",
-                )
-                return proc.returncode, proc.stdout
-            except OSError as exc:
+                from .git_boundary import run_git
+                return run_git(ws, args)
+            except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
                 return 127, str(exc)
 
         return await asyncio.to_thread(_run)
@@ -5216,6 +5358,15 @@ class Pipeline:
                 found.add(int(m.group(1)))
         return sorted(found)
 
+    async def _areset_workspace(self, ws: Path, commit: str) -> None:
+        """Never announce rollback success after a refused/failed Git step."""
+        if not await self._ahas_workspace_git(ws):
+            raise ValueError("rollback refusé : aucun dépôt propre au workspace")
+        for args in (("reset", "--hard", commit), ("clean", "-fd")):
+            code, _ = await self._agit(ws, *args)
+            if code != 0:
+                raise ValueError("rollback incomplet : étape Git " + args[0] + " refusée ou échouée")
+
     async def arollback(self, iteration: int) -> None:
         """R2: hard-reset the workspace to an iteration's snapshot commit. Raises
         ValueError (-> 409) while the pipeline is active or when the snapshot is
@@ -5234,8 +5385,7 @@ class Pipeline:
         commit = out.strip()
         if code != 0 or not commit:
             raise ValueError(f"aucun snapshot pour l'itération {iteration}")
-        await self._agit(ws, "reset", "--hard", commit)
-        await self._agit(ws, "clean", "-fd")
+        await self._areset_workspace(ws, commit)
         self._chat(
             ChatRole.SYSTEM, f"⏪ Workspace revenu au snapshot de l'itération {iteration}."
         )
@@ -8633,8 +8783,7 @@ class Pipeline:
             # ensuite le merge. Repli PAR FICHIER : chaque retrait est testé
             # individuellement, les verts sont conservés, seuls les porteurs
             # restent (et sont déclarés).
-            await self._agit(worktree, "reset", "--hard", tip)
-            await self._agit(worktree, "clean", "-fd")
+            await self._areset_workspace(worktree, tip)
             removed: list[str] = []
             kept: list[str] = list(out[4:])  # au-delà du budget de runs : déclarés
             for f in out[:4]:
@@ -9723,69 +9872,11 @@ class Pipeline:
         if self.state.technical_stack.get("kind") == "frontend":
             return True, "frontend seul : pas de suite backend", {}
         return await self._arun_isolated_native(
-            workspace_dir(self.state.id) if ws is None else Path(ws), "python",
-        ) if self.state.backend_language == BackendLanguage.PYTHON else (
+            workspace_dir(self.state.id) if ws is None else Path(ws),
+            "python" if self.state.backend_language == BackendLanguage.PYTHON else "node",
+        ) if self.state.backend_language in {BackendLanguage.PYTHON, BackendLanguage.NODE} else (
             False, "ISOLATION_UNAVAILABLE: this language has no attested Linux validation profile", {}
         )
-        self._count_suite_run()  # P3: one REAL suite execution, whoever asked for it
-        # Run in a worker thread via subprocess: asyncio's subprocess support is
-        # unavailable on Windows' SelectorEventLoop (used by uvicorn), so we stay
-        # off the event loop entirely for child processes.
-        lang = toolchain.normalize(self.state.backend_language.value)
-        ws = workspace_dir(self.state.id) if ws is None else ws
-        env = _minimal_env()
-        shared = self._is_shared_ws(ws)
-
-        def _run() -> tuple[bool, str, dict[str, str]]:
-            import tempfile
-
-            report_path = ""
-            if toolchain.needs_report_file(lang):
-                fd, report_path = tempfile.mkstemp(suffix=".json", prefix="autospec-report-")
-                os.close(fd)
-            try:
-                cmd = self._maybe_sandbox(toolchain.test_command(lang, report_path), ws)
-                proc = self._run_suite_process(cmd, ws, env)
-                results = toolchain.parse_results(lang, proc.stdout, report_path)
-                return proc.returncode == 0, proc.stdout, results
-            finally:
-                if report_path:
-                    try:
-                        os.remove(report_path)
-                    except OSError:
-                        pass
-
-        # Shared workspace: purge a broken `.venv` first (so `uv run` rebuilds a
-        # valid one) and serialize the whole run so no sibling suite mutates the
-        # shared venv underneath it. Worktree runs are isolated → no lock.
-        if shared:
-            async with self._shared_suite_lock:
-                self._guard_shared_venv(ws)
-                ok, output, results = await asyncio.to_thread(_run)
-        else:
-            ok, output, results = await asyncio.to_thread(_run)
-        # W0.5-T08: flaky-check quarantine. A red suite is rerun once; if it now
-        # passes, the failure was non-deterministic (a flake), not real — we keep
-        # the green result and record the flake so the recovery ladder (W1) never
-        # escalates a model over a test that just needed a second run. A suite that
-        # stays red is a real failure and is returned untouched.
-        if not ok and settings.flaky_rerun_enabled:
-            if shared:
-                async with self._shared_suite_lock:
-                    self._guard_shared_venv(ws)
-                    ok2, output2, results2 = await asyncio.to_thread(_run)
-            else:
-                ok2, output2, results2 = await asyncio.to_thread(_run)
-            if ok2:
-                item = _BUILD_ITEM.get() or f"phase:{self.state.phase.value}"
-                self.monitor.event("flaky", item=item, note="red suite passed on rerun")
-                self._log(item, "⚠️ Suite rouge devenue verte au 2ᵉ passage — flaky (non comptée comme échec).")
-                ok, output, results = ok2, output2, results2
-        self.monitor.pytest(
-            item_id=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",
-            ok=ok, summary=(output or "")[-500:],
-        )
-        return ok, output, results
 
     # ------------------------------- Integration repair loop (fix-until-green)
 
@@ -9887,8 +9978,7 @@ class Pipeline:
                         if not fe_green:
                             green, suite_out, suite_name = False, fe_out, "frontend (Vitest + build)"
                     if not green:
-                        await self._agit(ws, "reset", "--hard", "HEAD")
-                        await self._agit(ws, "clean", "-fd")
+                        await self._areset_workspace(ws, "HEAD")
                         self._log(source, f"La réparation a cassé la suite {suite_name} — rollback.")
                         detail = (
                             f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
@@ -10058,21 +10148,11 @@ class Pipeline:
         if self.state.technical_stack and self.state.bootstrap_status == "ready":
             return await self._asmoke_bootstrapped(ws)
         if lang != "python" or not (ws / "main.py").exists() or not (ws / "pyproject.toml").exists():
-            # Finding 6 : un backend web NON-python saute les deux gates de boot.
-            # Ce n'est pas un skip silencieux : on AVERTIT que la vérification à
-            # l'exécution est indisponible pour ce langage (sans hard-bloquer).
-            if lang != "python" and self._expects_web_app():
-                warn = (
-                    f"⚠️ Vérification à l'exécution indisponible pour un backend "
-                    f"{lang} — le smoke/runtime gate ne pilote que python. "
-                    f"La runnabilité de cette app n'est PAS vérifiée."
-                )
-                self._log("smoke", warn)
-                self._chat(ChatRole.SYSTEM, warn)
-                self.monitor.event("smoke", ok=True, skipped=True, lang=lang)
-            else:
-                self._log("smoke", f"Smoke run ignoré (langage {lang} non supporté ou pas de main.py).")
-            return True
+            detail = (f"ISOLATION_UNAVAILABLE: vérification à l'exécution indisponible pour {lang} "
+                      "sans socle isolé attesté ou point d'entrée déclaré ; runnabilité NON VÉRIFIÉE.")
+            self.monitor.event("smoke", ok=False, skipped=True, lang=lang)
+            self._apark_infra("smoke", detail)
+            return False
         self.monitor.phase("smoke")
         # Finding 1 : arrête l'app PROPRE du projet et vérifie que le port est
         # libre AVANT de booter, sinon le gate validerait un serveur périmé/tiers.
@@ -10465,114 +10545,28 @@ class Pipeline:
         return fe.exists()
 
     def _smoke_run_python(self, ws: Path) -> tuple[bool, str]:
-        """Boot a Python project's entry point and check it is runnable.
-
-        Web/API app (its pyproject declares a web framework, OR the project
-        INTENT is web — profile/frontend stream): ``uv run python main.py``
-        must open a listening TCP port within the timeout. CLI: it must
-        exit 0 within the timeout AND, with ``SMOKE_CLI_HELP`` on, answer
-        ``--help`` with a non-empty stdout (see :meth:`_smoke_cli_help_run`).
-        Returns (ok, human-readable detail)."""
+        """Run the declared CLI in NETNONE; web requires the async HTTP/DB gate."""
         # Web probes are performed by bootstrap/runtime acceptance, including
         # actual HTTP+DB, rather than finding a possibly unrelated host port.
         from .isolated_validation import IsolatedValidator
-        if self._expects_web_app():
+        if self._expects_web_app() or runtime_acceptance._backend_web_candidate(ws):
             return False, "ISOLATION_UNAVAILABLE: web smoke requires the asynchronous isolated runtime gate"
         validator = IsolatedValidator(acceptance.supervisor_root(self.state.id) / "environments",
                                       docker=settings.docker_cmd, timeout=settings.smoke_run_timeout_s)
-        code, output, _ = validator.run_command(ws, "python", ["/opt/venv/bin/python", "main.py"], mode="runtime")
+        try:
+            code, output, errors, _ = validator.run_captured(ws, "python", ["/opt/venv/bin/python", "main.py"], mode="runtime")
+        except (AgentError, IsolationViolation, OSError, ValueError, subprocess.TimeoutExpired) as exc:
+            return False, f"ISOLATION_UNAVAILABLE: CLI isolé non vérifié : {exc}"
         if code:
-            return False, f"CLI isolé en échec ({code}): {output[-2000:]}"
+            return False, f"CLI isolé : sortie non nulle ({code}): {(output + errors)[-2000:]}"
         if self._setting("smoke_cli_help"):
-            code, help_output, _ = validator.run_command(ws, "python", ["/opt/venv/bin/python", "main.py", "--help"], mode="runtime")
-            return code == 0 and bool(help_output.strip()), help_output[-2000:]
-        return True, output[-2000:]
-        import socket
-
-        pyproject = (ws / "pyproject.toml").read_text(encoding="utf-8", errors="replace").lower()
-        has_framework = any(
-            fw in pyproject
-            for fw in ("fastapi", "flask", "starlette", "uvicorn", "aiohttp", "django")
-        )
-        is_web = has_framework or self._expects_web_app()
-        no_fw_hint = (
-            "" if has_framework
-            else " (aucun framework web déclaré dans pyproject.toml — l'API n'a "
-            "probablement jamais été câblée)"
-        )
-        env = _minimal_env()
-        cmd = self._resolve_cmd([settings.uv_cmd, "run", "python", "main.py"])
-        timeout = settings.smoke_run_timeout_s
-
-        if is_web:
-            port = self._resolve_web_port(ws)
-            try:
-                proc = spawn_owned_process(
-                    cmd, cwd=str(ws), stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    env=env, text=True, encoding="utf-8", errors="replace",
-                )
-            except OSError as exc:
-                return False, f"lancement impossible : {exc}"
-            try:
-                deadline = time.monotonic() + timeout
-                while time.monotonic() < deadline:
-                    if proc.poll() is not None:
-                        out = (proc.stdout.read() if proc.stdout else "") or ""
-                        return False, (
-                            f"le process s'est arrêté (code {proc.returncode}) sans écouter "
-                            f"sur 127.0.0.1:{port} — main.py ne démarre pas le serveur ?"
-                            f"{no_fw_hint} {out[-300:].strip()}"
-                        )
-                    with socket.socket() as s:
-                        s.settimeout(1.0)
-                        if s.connect_ex(("127.0.0.1", port)) == 0:
-                            return True, f"serveur à l'écoute sur 127.0.0.1:{port}"
-                    time.sleep(0.5)
-                return False, (
-                    f"aucun serveur à l'écoute sur 127.0.0.1:{port} après "
-                    f"{timeout:.0f}s{no_fw_hint}"
-                )
-            finally:
-                self._terminate_tree(proc)
-                # Double-tap (finding 13) : un superviseur uvicorn reload peut
-                # survivre au taskkill du wrapper uv et respawner un worker —
-                # tue tout arbre de l'usine encore accroché au port.
-                self._kill_workspace_port_holders(port, Path(settings.workspace_root))
-
-        # CLI: must run to completion with exit code 0.
-        #
-        # W8: the same bounded launcher as the evaluator (W7). The previous
-        # ``subprocess.run(..., timeout=...)`` claimed to cover the "loop or
-        # blocking server" case its own message names, but at the timeout it
-        # killed only the DIRECT child and then blocked on the pipe still held
-        # by the grandchild - a looping CLI froze the whole gate.
-        run = _run_capped_process(
-            cmd, cwd=ws, env=env, timeout=timeout, output_cap=_SMOKE_OUTPUT_CAP,
-            kill_tree=self._kill_tree, name="smoke-cli-run",
-        )
-        if run.launch_error:
-            return False, f"lancement impossible : {run.launch_error}"
-        if run.timed_out:
-            self.monitor.event(
-                "smoke_cli", probe="run", ok=False,
-                timed_out=True, killed_tree=run.killed_tree,
-            )
-            return False, f"le CLI n'a pas terminé en {timeout:.0f}s (boucle/serveur bloquant ?)"
-        if run.returncode != 0:
-            self.monitor.event(
-                "smoke_cli", probe="run", ok=False, timed_out=False, killed_tree=False,
-            )
-            return False, f"sortie non nulle (code {run.returncode}) : {(run.output or '')[-300:].strip()}"
-        self.monitor.event(
-            "smoke_cli", probe="run", ok=True, timed_out=False, killed_tree=False,
-        )
-        if not self._setting("smoke_cli_help"):
-            return True, "CLI exécuté (code 0)"
-        return self._smoke_cli_help_run(ws, cmd, env, timeout, monitor=self.monitor)
+            return self._smoke_cli_help_run(ws, [], {}, settings.smoke_run_timeout_s, monitor=self.monitor,
+                                            validator=validator)
+        return True, "CLI exécuté (code 0)"
 
     @staticmethod
     def _smoke_cli_help_run(
-        ws: Path, cmd: list[str], env: dict[str, str], timeout: float, *, monitor=None,
+        ws: Path, cmd: list[str], env: dict[str, str], timeout: float, *, monitor=None, validator=None,
     ) -> tuple[bool, str]:
         """FACTORY_IMPROVEMENTS #4: a non-web product must ANSWER, not just exit 0.
 
@@ -10584,36 +10578,39 @@ class Pipeline:
         progress lines ("Creating virtual environment...") to stderr, and merging
         them would make every mute CLI look talkative.
 
-        W8: launched through :func:`_run_capped_process` (``stderr=PIPE``, its
-        own bounded reader), so a ``--help`` that waits for input or leaves a
-        grandchild behind is tree-killed instead of freezing the gate."""
-        run = _run_capped_process(
-            [*cmd, "--help"], cwd=ws, env=env, timeout=timeout,
-            output_cap=_SMOKE_OUTPUT_CAP, kill_tree=Pipeline._kill_tree,
-            stderr=subprocess.PIPE, name="smoke-cli-help",
-        )
+        Docker owns the whole NETNONE process tree and the timeout. Legacy host
+        argv and env arguments are retained only for API compatibility."""
+        # Never relay a legacy host argv/environment to untrusted code. The
+        # trusted runtime recipe, image dependencies and NETNONE container own
+        # the launch. Keep stdout separate: stderr noise is not usable help.
+        from .isolated_validation import IsolatedValidator
+        temporary = None
+        try:
+            if validator is None:
+                import tempfile
+                temporary = tempfile.TemporaryDirectory(prefix="autospec-cli-help-")
+                validator = IsolatedValidator(Path(temporary.name) / "environments",
+                    docker=settings.docker_cmd, timeout=timeout)
+            code, out, err, _ = validator.run_captured(ws, "python",
+                ["/opt/venv/bin/python", "main.py", "--help"], mode="runtime")
+        except (AgentError, IsolationViolation, OSError, ValueError, subprocess.TimeoutExpired) as exc:
+            return False, f"ISOLATION_UNAVAILABLE: aide CLI non vérifiée : {exc}"
+        finally:
+            if temporary is not None:
+                temporary.cleanup()
 
         def _event(ok: bool) -> None:
             if monitor is not None:
                 monitor.event(
                     "smoke_cli", probe="help", ok=ok,
-                    timed_out=run.timed_out, killed_tree=run.killed_tree,
+                    isolated=True,
                 )
 
-        if run.launch_error:
-            return False, f"lancement impossible : {run.launch_error}"
-        if run.timed_out:
+        out, err = out.strip(), err.strip()
+        if code != 0:
             _event(False)
             return False, (
-                f"`main.py --help` n'a pas terminé en {timeout:.0f}s "
-                "(le CLI attend une entrée ou boucle ?)"
-            )
-        out = (run.output or "").strip()
-        err = (run.stderr_output or "").strip()
-        if run.returncode != 0:
-            _event(False)
-            return False, (
-                f"`main.py --help` sort en erreur (code {run.returncode}) : "
+                f"`main.py --help` sort en erreur (code {code}) : "
                 f"{(out or err)[-300:]}"
             )
         if not out:
@@ -10740,29 +10737,6 @@ class Pipeline:
         # Dependencies are image-owned. A dev call only reads/writes through
         # mediation; installing a product tree on the host is never necessary.
         return
-        if settings.fake_agents or self._node_modules_usable(root):
-            return
-        stream = next(iter(workspace.frontend_streams(self.state)), None)
-        if stream is None:
-            return
-        main_root = workspace.stream_root(self.state, stream)
-        if not (main_root / "package.json").exists():
-            return
-        if root.resolve() == main_root.resolve():
-            # Shared root: install once, serialized (siblings contend on it).
-            async with self._npm_lock:
-                if not self._node_modules_usable(main_root):
-                    self._log("streams", "📦 npm install (frontend) — racine partagée…")
-                    await self._anpm_install_in(main_root, use_ci=False)
-            return
-        # Worktree: real install. Detach any junction left by an older build
-        # first — npm must never write through it into the shared install.
-        await asyncio.to_thread(self._unlink_node_modules_junctions, root)
-        self._log(
-            "streams",
-            f"📦 npm ci (frontend) — install réel (hermétique) dans {root.name}…",
-        )
-        await self._anpm_install_in(root, use_ci=True)
 
     async def _arun_frontend_tests(self, ws=None) -> tuple[bool, str, dict[str, str]]:
         """Run the frontend stream's Vitest suite AND the production build
@@ -10784,89 +10758,6 @@ class Pipeline:
             rel = root.relative_to(workspace_dir(self.state.id))
             root = ws / rel
         return await self._arun_isolated_native(root, "node", build=True, logical_prefix=stream.file_root or "")
-        # Safety net: the verify step also needs node_modules (idempotent — the
-        # dev step usually installed/linked it already).
-        await self._aensure_frontend_node_modules(root)
-        env = _minimal_env()
-        shared = ws is None
-
-        def _run() -> tuple[bool, str, dict[str, str]]:
-            import tempfile
-
-            fd, report_path = tempfile.mkstemp(suffix=".json", prefix="autospec-vitest-")
-            os.close(fd)
-            try:
-                test_cmd = self._resolve_cmd(self._maybe_sandbox(
-                    toolchain.frontend_test_command(report_path), root
-                ))
-                try:
-                    test_proc = self._run_suite_process(test_cmd, root, env)
-                except OSError as exc:
-                    # A missing toolchain (no node/npm) must fail THIS story, not
-                    # crash the whole pipeline with an unhandled OSError.
-                    return False, f"toolchain frontend indisponible : {exc}", {}
-                results = toolchain.parse_frontend_results(test_proc.stdout, report_path)
-                tests_ok = test_proc.returncode == 0
-                output = test_proc.stdout
-                if not tests_ok:
-                    # The json reporter keeps stdout terse: without this digest a
-                    # red run's tail can be as useless as "JSON report written
-                    # to …" — the dev retry prompt then carries zero signal.
-                    digest = toolchain.frontend_failure_digest(report_path)
-                    if digest:
-                        output += "\n--- échecs Vitest (rapport JSON) ---\n" + digest
-                    elif not results:
-                        output += (
-                            "\n(vitest s'est terminé en erreur SANS test collecté : "
-                            "crash de config/setup, suite vide ou reporter muet)"
-                        )
-                    return False, output, results
-                # Tests green → the build (tsc && vite build) gates "green" too.
-                build_cmd = self._resolve_cmd(
-                    self._maybe_sandbox(toolchain.frontend_build_command(), root)
-                )
-                try:
-                    build_proc = self._run_suite_process(build_cmd, root, env)
-                except OSError as exc:
-                    return False, output + f"\n--- build indisponible : {exc}", results
-                if build_proc.returncode != 0:
-                    errs = toolchain.parse_build_errors(build_proc.stdout)
-                    return False, output + "\n--- build ---\n" + errs, results
-                return True, output + "\n--- build OK ---", results
-            finally:
-                try:
-                    os.remove(report_path)
-                except OSError:
-                    pass
-
-        # Shared workspace: serialize so no sibling suite races on the shared
-        # frontend tree / node_modules. Worktree runs are isolated → no lock.
-        async def _arun_once() -> tuple[bool, str, dict[str, str]]:
-            if shared:
-                async with self._shared_suite_lock:
-                    return await asyncio.to_thread(_run)
-            return await asyncio.to_thread(_run)
-
-        ok, output, results = await _arun_once()
-        if not ok and self._looks_like_frontend_infra_failure(output, results):
-            # Mirror of the shared-venv guard: a red with ZERO test executed and
-            # a module-resolution signature is a broken node_modules, not code.
-            # Reinstall and replay once instead of burning a dev attempt.
-            self._log(
-                "streams",
-                "🩹 Suite frontend rouge SANS test exécuté — node_modules "
-                "suspect, réinstallation puis nouvel essai.",
-            )
-            self.monitor.event("env_repair", scope="frontend", reason="node_modules")
-            async with self._npm_lock:
-                await self._anpm_install_in(root, use_ci=True)
-            ok, output, results = await _arun_once()
-        self.monitor.event(
-            "frontend_verify",
-            item=_BUILD_ITEM.get() or f"phase:{self.state.phase.value}",
-            ok=ok, summary=(output or "")[-500:],
-        )
-        return ok, output, results
 
     async def _arun_isolated_native(self, root: Path, ecosystem: str, *, build: bool = False, logical_prefix: str = ""):
         from .pipeline_validation import run_native
@@ -11006,6 +10897,13 @@ class Pipeline:
     # ------------------------------------------------------------ RUN app
 
     async def arun_app(self, args: str = "") -> None:
+        if settings.fake_agents:
+            # Demo is not an execution capability. A project may contain source
+            # from a real previous run: never execute it on the host via fake mode.
+            self.state.running = False
+            self._sync()
+            self._log("run", "Mode démo : aucun code produit exécuté ; preview réelle réservée au runtime isolé.")
+            return
         if not settings.fake_agents:
             if self._preview_pending is not None:
                 self._log("run", "Lancement isolé déjà en cours.")
@@ -11042,124 +10940,25 @@ class Pipeline:
             self._log("run", f"▶ Application isolée : {self._isolated_preview.origin} (base jetable de preview)")
             self._preview_watch_task = asyncio.create_task(self._awatch_isolated_preview(self._isolated_preview))
             return
-        if self._run_proc and self._run_proc.poll() is None:
-            self._log("run", "L'application tourne déjà.")
-            return
-        ws = workspace_dir(self.state.id)
-        # The generated app is untrusted agent code — give it OS essentials only,
-        # never the server's full environment (which may hold secrets).
-        env = _minimal_env()
-        # Optional CLI arguments forwarded to the generated app (e.g. a
-        # subcommand for a CLI app that prints usage when launched bare).
-        run_args = shlex.split(args) if args else []
-        self.state.running = True
-        self._sync()
-        hint = f" ({args})" if args else ""
-        self._log("run", f"▶ Lancement de l'application générée{hint}…")
-        # Stream the child's output from a worker thread, marshaling each line
-        # back onto the event loop (asyncio subprocesses are unsupported on the
-        # Windows SelectorEventLoop that uvicorn runs).
-        loop = asyncio.get_running_loop()
-        if self.state.technical_stack.get("kind") == "frontend":
-            stream = next(iter(workspace.frontend_streams(self.state)), None)
-            if stream is None:
-                self.state.running = False
-                self._sync()
-                raise ValueError("Aucun frontend déclaré dans le socle technique.")
-            root = workspace.stream_root(self.state, stream)
-            self._stream_task = asyncio.create_task(asyncio.to_thread(
-                self._stream_preview_output, root, env, loop, f"run:{stream.id}", True,
-            ))
-            return
-        self._stream_task = asyncio.create_task(
-            asyncio.to_thread(self._stream_run_output, ws, env, loop, run_args)
-        )
-        # ST-8: a multi-stream project launches its frontend preview alongside
-        # the backend, with logs tagged per stream. Gated behind streams_enabled;
-        # demo mode never spawns a real vite.
-        if self._setting("streams_enabled") and not settings.fake_agents:
-            self._start_frontend_previews(env, loop)
 
     def _start_frontend_previews(self, env, loop: asyncio.AbstractEventLoop) -> None:
         """ST-8: launch `vite preview` for each frontend stream in its own
         worker thread, tagging logs with `run:<stream-id>`. Best-effort and
         gated by the caller; a missing build/node surfaces as a run log line."""
-        for stream in workspace.frontend_streams(self.state):
-            root = workspace.stream_root(self.state, stream)
-            source = f"run:{stream.id}"
-            self._log(source, f"▶ Lancement du preview frontend ({stream.id})…")
-            # BUG9 : garder une référence forte (asyncio ne garde que des weak refs).
-            self._frontend_stream_tasks.append(
-                asyncio.create_task(
-                    asyncio.to_thread(
-                        self._stream_preview_output, root, env, loop, source
-                    )
-                )
-            )
+        raise AgentError("ISOLATION_UNAVAILABLE: legacy host preview retired; use arun_app isolated runtime",
+                         code="ISOLATION_UNAVAILABLE")
 
     def _stream_preview_output(
         self, root, env, loop: asyncio.AbstractEventLoop, source: str, primary: bool = False
     ) -> None:
         """Run `vite preview` in ``root`` and stream its output under ``source``
         (ST-8). Mirrors ``_stream_run_output`` but for a frontend stream."""
-        cmd = self._resolve_cmd(toolchain.frontend_run_command())
-        try:
-            proc = spawn_owned_process(
-                cmd, cwd=str(root),
-                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                env=env, text=True, encoding="utf-8", errors="replace",
-            )
-        except OSError as exc:
-            loop.call_soon_threadsafe(self._log, source, f"■ Échec du lancement : {exc}")
-            if primary:
-                loop.call_soon_threadsafe(self._on_run_finished, -1, str(exc))
-            return
-        if primary:
-            self._run_proc = proc
-        else:
-            self._frontend_procs.append(proc)
-        assert proc.stdout
-        for line in proc.stdout:
-            loop.call_soon_threadsafe(self._log, source, line.rstrip())
-        code = proc.wait()
-        loop.call_soon_threadsafe(self._log, source, f"■ Preview frontend terminé (code {code}).")
-        if primary:
-            loop.call_soon_threadsafe(self._on_run_finished, code)
+        raise AgentError("ISOLATION_UNAVAILABLE: host product preview prohibited", code="ISOLATION_UNAVAILABLE")
 
     def _stream_run_output(
         self, ws, env, loop: asyncio.AbstractEventLoop, run_args: list[str] | None = None
     ) -> None:
-        import sys
-
-        # In demo mode a Python project runs with the current interpreter
-        # (hermetic, no uv venv build); otherwise dispatch to the language's run
-        # command (uv run / go run / cargo run) — L2g.
-        lang = toolchain.normalize(self.state.backend_language.value)
-        run_args = run_args or []
-        if settings.fake_agents and lang == "python":
-            cmd = [sys.executable, "main.py", *run_args]
-        else:
-            cmd = toolchain.run_command(lang, run_args)
-        try:
-            proc = spawn_owned_process(
-                cmd,
-                cwd=str(ws),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                env=env,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
-        except OSError as exc:
-            loop.call_soon_threadsafe(self._on_run_finished, -1, str(exc))
-            return
-        self._run_proc = proc
-        assert proc.stdout
-        for line in proc.stdout:
-            loop.call_soon_threadsafe(self._log, "run", line.rstrip())
-        code = proc.wait()
-        loop.call_soon_threadsafe(self._on_run_finished, code, "")
+        raise AgentError("ISOLATION_UNAVAILABLE: host product execution prohibited", code="ISOLATION_UNAVAILABLE")
 
     @staticmethod
     def _kill_tree(proc) -> bool:
