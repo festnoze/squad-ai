@@ -1,0 +1,53 @@
+{
+  "status": "REVIEW_REQUIRED",
+  "scope": "Source-only candidate facts, not product observations. Parent must independently review before freezing acceptance_facts.",
+  "sources": {
+    "01_specification.md": "0a99950df5ee132253fa5aefb1a8f6e4f7a4b64c1436072564be6d28195fb0f3",
+    "02_requirements_verification.md": "efdab8ea54208557f01abcb5324172e42b9c5cf88536611d64ba65b92564cbf4"
+  },
+  "acceptance_facts": [
+    {
+      "id": "support-security-v02-source", "kind": "security_profile",
+      "requirement_ids": ["SEC-01", "SEC-02", "SEC-03", "SEC-04", "SEC-05", "SEC-06", "SEC-07", "SEC-08", "SEC-09", "SEC-10", "SEC-11", "SEC-12", "SEC-13", "SEC-14", "SEC-15"],
+      "source_excerpt": "Session serveur opaque : jeton cryptographiquement aléatoire d'au moins 256 bits, condensat en DB ; cookie `HttpOnly`, `SameSite=Lax`, `Path=/`. Expiration absolue à 8 h, jeton neuf à chaque login, compte actif vérifié par requête. Aucun secret de session dans localStorage/URL/logs.",
+      "expected": {
+        "api": {"login": "/api/auth/login", "logout": "/api/auth/logout", "me": "/api/auth/me", "users": "/api/users", "user": "/api/users/{id}", "assignees": "/api/assignees", "tickets": "/api/tickets", "ticket": "/api/tickets/{id}", "messages": "/api/tickets/{id}/messages", "history": "/api/tickets/{id}/history", "dashboard": "/api/dashboard", "health": "/api/health"},
+        "statuses": {"ok": 200, "created": 201, "no_content": 204, "unauthorized": 401, "forbidden": 403, "invisible": 404, "conflict": 409, "invalid": 422, "rate_limited": 429, "db_busy": 503},
+        "password": {"min": 14, "max": 128, "memory_kib": 19456, "iterations": 2, "parallelism": 1},
+        "rate": {"failures": 10, "window_seconds": 60},
+        "session": {"absolute_seconds": 28800, "min_entropy_bits": 256, "modes": {"https": true, "http_local_explicit": false, "http_without_exception": true}},
+        "browser_required": ["SEC-10", "SEC-12"]
+      }
+    },
+    {
+      "id": "support-browser-v02-source", "kind": "browser_profile",
+      "requirement_ids": ["UX-01", "UX-02", "UX-03", "UX-04", "UX-05", "UX-06", "UX-07", "UX-08", "SEC-10", "SEC-12", "FUN-02", "FUN-06", "FUN-12"],
+      "source_excerpt": "Clavier, focus visible, labels/erreurs liés aux champs, tabulation logique ; modale avec focus confiné, Échap et retour au déclencheur. Statuts non fondés seulement sur la couleur. Bureau 1280 px et mobile 390 px sans débordement global. Pas de pixel-perfect ni bibliothèque UI imposée.",
+      "expected": {"timeout_ms": 15000, "desktop_width": 1280, "mobile_width": 390, "client_ticket_count": 6, "staff_ticket_count": 12}
+    },
+    {
+      "id": "support-quality-v02-source", "kind": "quality_profile",
+      "requirement_ids": ["TST-01", "TST-02", "TST-03", "TST-04", "TST-05", "TST-06"],
+      "source_excerpt": "Cibles après installation : tests hors navigateur <2 min, six parcours E2E <3 min sur machine documentée ; diagnostics, pas seuils éliminatoires. Couverture : backend ≥80% lignes/70% branches, frontend ≥70% lignes métier, fichiers non exécutés inclus, exclusions justifiées. Mapping requirements → tests explicite. Matrices API paramétrées ; pas toute la combinatoire en navigateur.",
+      "expected": {"required_suites": ["backend", "frontend", "e2e"], "coverage": {"backend": {"lines": 80, "branches": 70}, "frontend": {"lines": 70}}, "coverage_domains": {"backend": ["auth", "services", "permissions"], "frontend": ["auth", "tickets", "users", "http"]}}
+    }
+  ],
+  "anchors": [
+    {"document": "01_specification.md", "section": "3 — Comptes", "fields": ["security_profile.password"], "ids": ["SEC-03"], "verbatim": "Mot de passe : 14 à 128 caractères ; espaces et Unicode acceptés ; ne jamais le tronquer ni le normaliser silencieusement. Hachage Argon2id par une bibliothèque maintenue, sel par mot de passe ; ni clair, ni chiffrement réversible. Minimum du profil retenu : mémoire 19 Mio, 2 itérations, parallélisme 1.", "derivation": "19 Mio = 19456 Kio."},
+    {"document": "01_specification.md", "section": "3 — Sessions", "fields": ["security_profile.session.absolute_seconds", "security_profile.session.min_entropy_bits"], "ids": ["SEC-05"], "verbatim": "Session serveur opaque : jeton cryptographiquement aléatoire d'au moins 256 bits, condensat en DB ; cookie `HttpOnly`, `SameSite=Lax`, `Path=/`. Expiration absolue à 8 h, jeton neuf à chaque login, compte actif vérifié par requête.", "derivation": "8 h = 28800 s. Entropy is not a 43-character token requirement."},
+    {"document": "01_specification.md", "section": "3 — Sessions", "fields": ["security_profile.session.modes"], "ids": ["SEC-05", "SEC-15"], "verbatim": "`Secure=true` en configuration HTTPS ; exception explicite uniquement pour le développement HTTP loopback. Les routes métier ne deviennent pas publiques dans cette exception. Les données privées et réponses d'authentification portent `Cache-Control: no-store`.", "derivation": "Mode keys describe source conditions, not product config names. Refused non-exception HTTP configuration is not a defect; missing executable mode evidence stays NOT_VERIFIED."},
+    {"document": "01_specification.md", "section": "3 — Sessions", "fields": ["security_profile.rate"], "ids": ["SEC-04"], "verbatim": "Dix échecs/IP dans une fenêtre de 60 s depuis le premier échec ; tentative suivante => `429`/`Retry-After`. Succès ne remet pas ce compteur à zéro."},
+    {"document": "01_specification.md", "section": "7 — API", "fields": ["security_profile.api"], "ids": ["SEC-06", "SEC-07", "SEC-08", "SEC-09", "SEC-10", "SEC-11", "SEC-12", "SEC-14"], "verbatim": "Préfixe métier `/api`. Routes minimales ; les variantes non listées ne sont pas nécessaires :", "derivation": "Concatenate prefix with the exact route table in this section; no generated route remapping."},
+    {"document": "01_specification.md", "section": "7 — API", "fields": ["security_profile.statuses"], "ids": ["SEC-01", "SEC-02", "SEC-03", "SEC-06", "SEC-07", "SEC-08", "SEC-09", "SEC-11", "SEC-13", "SEC-14", "SEC-15"], "verbatim": "Lecture/PATCH : 200 ; création : 201 ; logout : 204. Erreurs JSON `{error:{code,message,fields?}}`, codes stables/message français : 422 validation, 401 session, 403 capacité/CSRF/origine, 404 ticket absent/invisible, 409 invariant/version/doublon, 429 login. Verrou SQLite : attente maximale 5 s puis 503 `DB_BUSY`, aucun faux succès. Pas de stacktrace/SQL/secret dans les erreurs.", "derivation": "Only DB_BUSY has fixed 503; no invented 500/503 choice for other DB faults."},
+    {"document": "01_specification.md", "section": "8 — Livraison", "fields": ["security_profile.api.health"], "ids": ["SEC-08", "OPS-03"], "verbatim": "Conserver diagnostics du socle, dont `/api/health` et DB : publics, sans données privées."},
+    {"document": "01_specification.md", "section": "6 — UX", "fields": ["browser_profile.timeout_ms"], "ids": ["UX-02"], "verbatim": "Timeout HTTP frontend de 15 s maximum avec reprise explicite.", "derivation": "15 s = 15000 ms, explicitly specified, not imported from fixture defaults."},
+    {"document": "01_specification.md", "section": "6 — UX", "fields": ["browser_profile.desktop_width", "browser_profile.mobile_width"], "ids": ["UX-04"], "verbatim": "Bureau 1280 px et mobile 390 px sans débordement global."},
+    {"document": "02_requirements_verification.md", "section": "4 — FUN-02", "fields": ["browser_profile.client_ticket_count", "browser_profile.staff_ticket_count"], "ids": ["FUN-02", "UX-01", "FUN-12"], "verbatim": "Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants."},
+    {"document": "02_requirements_verification.md", "section": "2 — Protocole", "fields": ["quality_profile.required_suites"], "ids": ["TST-01", "TST-02", "TST-05"], "verbatim": "Commandes attendues du futur produit : une commande documentée par suite backend, frontend, E2E, couverture, migration et Docker.", "derivation": "Suite categories, not forced script names/frameworks."},
+    {"document": "02_requirements_verification.md", "section": "7 — TST-03", "fields": ["quality_profile.coverage", "quality_profile.coverage_domains"], "ids": ["TST-03"], "verbatim": "Backend : ≥80% lignes et ≥70% branches, auth/services/permissions inclus. Frontend : ≥70% lignes des domaines et client HTTP. Fichiers non exécutés inclus."},
+    {"document": "01_specification.md", "section": "8 — Frontend", "fields": ["quality_profile.coverage_domains.frontend"], "ids": ["TST-03", "ARC-09"], "verbatim": "Frontend par domaines auth/tickets/users ; client HTTP commun pour cookies/CSRF/erreurs/annulation ; formulaires/DTO typés.", "derivation": "Semantic domain scope, not forced source directory paths."},
+    {"document": "02_requirements_verification.md", "section": "6 — UX-01", "fields": [], "ids": ["UX-01"], "verbatim": "Navigation par rôle, actions en français, retours clairs après mutation.", "derivation": "No exact wording. Resolved action labels belong only in reviewed fixture/binding metadata."}
+  ],
+  "excluded_operational_fields": ["search_a", "search_b", "search_a_marker", "search_b_marker", "french_action_labels", "CSS selectors", "Python/SQL bindings", "test nodeids", "runtime commands", "fixture passwords", "min_token_chars", "generic_db_fault_status_list"],
+  "remaining_requirements": "FUN, ARC and OPS expected strings remain the 57 exact source rows imported from the reference. Business/architecture verifiers consume those source rows directly, without product-derived expectation facts. Six E2E scenarios remain exact reference section 8."
+}
