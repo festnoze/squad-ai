@@ -1009,7 +1009,11 @@ class FakeRunner:
              "session_id": session_id, "model": model}
         )
         if not self.replies:
-            raise AgentError("FakeRunner has no queued reply")
+            # This deterministic stand-in never invokes a provider. Exhausting
+            # its fixture queue therefore has an attested zero receipt, unlike
+            # a real interrupted/failed call whose missing usage must block.
+            raise AgentError("FakeRunner has no queued reply",
+                             usage=AgentResult(text="", usage_reported=True))
         return AgentResult(text=self.replies.pop(0), session_id="fake-session")
 
 

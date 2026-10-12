@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="3" time="0.296" timestamp="2026-10-12T16:02:25.889569+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_fake_runner_accounted_failure" name="test_empty_fake_runner_has_an_explicit_known_zero_receipt" time="0.017"><failure message="assert None is not None">async def test_empty_fake_runner_has_an_explicit_known_zero_receipt():
+        with pytest.raises(AgentError) as caught:
+            await FakeRunner([]).arun("local fixture only", "local fixture only")
+        result = caught.value.usage
+&gt;       assert result is not None
+E       assert None is not None
+
+backend\tests\test_fake_runner_accounted_failure.py:13: AssertionError</failure></testcase><testcase classname="tests.test_fake_runner_accounted_failure" name="test_fixture_failure_does_not_block_next_known_inert_reply" time="0.024"><failure message="AssertionError: assert 1 == 0&#10; +  where 1 = Usage(cost_usd=0.0, input_tokens=0, output_tokens=0, agent_calls=1, failed_calls=1, unreported_calls=1, cost_by_tier={...ted': 0.0}, input_tokens_by_tier={'unrouted': 0}, output_tokens_by_tier={'unrouted': 0}, calls_by_tier={'unrouted': 1}).unreported_calls&#10; +    where Usage(cost_usd=0.0, input_tokens=0, output_tokens=0, agent_calls=1, failed_calls=1, unreported_calls=1, cost_by_tier={...ted': 0.0}, input_tokens_by_tier={'unrouted': 0}, output_tokens_by_tier={'unrouted': 0}, calls_by_tier={'unrouted': 1}) = ProjectState(id='known-inert-failure', name='Fixture', goal='Local only', auto_spec=False, product_profile='auto', spe...eployed_image='', deployed_container='', deploy_host_port=0, deploy_detail='', error='', created_at=1791813746.1386611).usage&#10; +      where ProjectState(id='known-inert-failure', name='Fixture', goal='Local only', auto_spec=False, product_profile='auto', spe...eployed_image='', deployed_container='', deploy_host_port=0, deploy_detail='', error='', created_at=1791813746.1386611) = &lt;autospec.orchestrator.pipeline.Pipeline object at 0x000001DF92CA4980&gt;.state">async def test_fixture_failure_does_not_block_next_known_inert_reply():
+        runner = FakeRunner([])
+        pipeline = Pipeline(ProjectState(id="known-inert-failure", name="Fixture", goal="Local only",
+                                         phase=PipelinePhase.BUILD, budget_usd=1), runner)
+        with pytest.raises(AgentError, match="no queued reply"):
+            await pipeline._tracked.arun("inert", "inert")
+&gt;       assert pipeline.state.usage.unreported_calls == 0
+E       AssertionError: assert 1 == 0
+E        +  where 1 = Usage(cost_usd=0.0, input_tokens=0, output_tokens=0, agent_calls=1, failed_calls=1, unreported_calls=1, cost_by_tier={...ted': 0.0}, input_tokens_by_tier={'unrouted': 0}, output_tokens_by_tier={'unrouted': 0}, calls_by_tier={'unrouted': 1}).unreported_calls
+E        +    where Usage(cost_usd=0.0, input_tokens=0, output_tokens=0, agent_calls=1, failed_calls=1, unreported_calls=1, cost_by_tier={...ted': 0.0}, input_tokens_by_tier={'unrouted': 0}, output_tokens_by_tier={'unrouted': 0}, calls_by_tier={'unrouted': 1}) = ProjectState(id='known-inert-failure', name='Fixture', goal='Local only', auto_spec=False, product_profile='auto', spe...eployed_image='', deployed_container='', deploy_host_port=0, deploy_detail='', error='', created_at=1791813746.1386611).usage
+E        +      where ProjectState(id='known-inert-failure', name='Fixture', goal='Local only', auto_spec=False, product_profile='auto', spe...eployed_image='', deployed_container='', deploy_host_port=0, deploy_detail='', error='', created_at=1791813746.1386611) = &lt;autospec.orchestrator.pipeline.Pipeline object at 0x000001DF92CA4980&gt;.state
+
+backend\tests\test_fake_runner_accounted_failure.py:24: AssertionError</failure></testcase><testcase classname="tests.test_fake_runner_accounted_failure" name="test_unattested_real_style_failure_remains_blocking" time="0.017" /></testsuite></testsuites>
