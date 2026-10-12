@@ -921,6 +921,7 @@ class _UsageTracker:
                      if self.pipeline.state.budget_usd else None)
         budget_token = None if reserved else active_budget_usd.set(remaining)
         provider_entered = False
+        known_usage = None
         tool_tokens = []
         transient_claim = False
         try:
@@ -961,11 +962,16 @@ class _UsageTracker:
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
+            # A returned receipt is already paid/known. Account it before any
+            # cancellable claim cleanup can replace the successful result.
+            known_usage = res
+            effective_cost = self._account(res, role, iteration)
         except IsolationViolation as exc:
             # Capability setup failed BEFORE entering the provider. Do not
             # fabricate an unreported paid call or consume a dev retry.
             raise AgentError(str(exc), code=exc.code) from exc
         except AgentError as exc:
+            known_usage = exc.usage
             effective_cost = self._account(exc.usage, role, iteration, failed=True) if provider_entered else 0.0
             if exc.budget_exhausted:
                 self.pipeline._stop_requested = True
@@ -993,6 +999,7 @@ class _UsageTracker:
             raise
         except asyncio.CancelledError as exc:
             usage = getattr(exc, "usage", None)
+            known_usage = usage
             effective_cost = 0.0
             if provider_entered:
                 effective_cost = self._account(usage, role, iteration, failed=True)
@@ -1007,15 +1014,25 @@ class _UsageTracker:
         finally:
             for variable, token in reversed(tool_tokens):
                 variable.reset(token)
-            if transient_claim:
-                await self.pipeline._claim_arbiter.release(item_id)
-                self.pipeline._notify_claims_changed()
-                self.pipeline._claim_roots.pop(item_id, None)
-            active_skills_enabled.reset(skills_token)
-            active_processes.reset(process_token)
-            if budget_token is not None:
-                active_budget_usd.reset(budget_token)
-        effective_cost = self._account(res, role, iteration)
+            try:
+                if transient_claim:
+                    await self.pipeline._claim_arbiter.release(item_id)
+                    self.pipeline._notify_claims_changed()
+                    self.pipeline._claim_roots.pop(item_id, None)
+            except asyncio.CancelledError as cleanup:
+                # Preserve a complete receipt or an incomplete paid prefix for
+                # the outer durable reservation reconciliation, without double
+                # accounting in the project/iteration ledgers.
+                cleanup.usage = known_usage
+                raise
+            except Exception as cleanup:
+                raise AgentError('Supervisor claim cleanup failed: '+str(cleanup),
+                    code='SUPERVISOR_CLEANUP_FAILED', usage=known_usage) from cleanup
+            finally:
+                active_skills_enabled.reset(skills_token)
+                active_processes.reset(process_token)
+                if budget_token is not None:
+                    active_budget_usd.reset(budget_token)
         # Optional Langfuse trace (O1): one generation per agent call. Best-effort
         # and env-gated — never affects the pipeline if tracing fails or is off.
         observability.trace_agent_call(
@@ -1075,6 +1092,7 @@ class Pipeline:
         self._claim_roots: dict[str, str] = {}
         self._claims_changed = asyncio.Event()
         self._dependency_lock = asyncio.Lock()
+        self._qa_provenance_lock = asyncio.Lock()
         try:
             for rec in load_interactions(state.id):
                 self.interactions.add_existing(AgentInteraction.model_validate(rec))
@@ -4405,7 +4423,27 @@ class Pipeline:
                 cached = None
             if cached is None or not cached.ready:
                 from ..validation.coordinator import verify_project
+                from ..validation.delivery_raccord import (native_timing_recorder,
+                    collect_native_delivery_build,collect_native_final_facts)
+                timing_recorder=native_timing_recorder(contract,snapshot.digest,supervisor)
+                # The baked command is a reviewed operational fact. Advisory
+                # collection precedes review; final-image construction follows
+                # it, so verification cannot silently repair CMD by overriding.
                 await self._await_reviewed_configuration(contract, source, snapshot.digest, phase="final")
+                try:
+                    native_build=await collect_native_delivery_build(contract,source,snapshot.digest,
+                        supervisor,timing_recorder=timing_recorder)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as exc:
+                    native_build={"status":"NOT_VERIFIED","receipt":None,
+                        "limits":["native delivery build unavailable: "+type(exc).__name__]}
+                    self.monitor.event("native_delivery_build_unavailable",snapshot_hash=snapshot.digest,
+                        category=type(exc).__name__)
+                facts=await collect_native_final_facts(self.state,contract,source,snapshot.digest,
+                    supervisor,build=native_build,timing_recorder=timing_recorder)
+                self.monitor.event("native_final_facts",status=facts["status"],
+                    snapshot_hash=snapshot.digest,limits=facts["limits"])
                 reports = await verify_project(self.state, contract, source, snapshot.digest, supervisor)
                 atomic_json(reports_path, reports)
             admission = admit_reports(contract, reports, snapshot_hash=snapshot.digest, evidence_root=supervisor)
@@ -4491,6 +4529,14 @@ class Pipeline:
             raise ClaimViolation(str(exc)) from exc
         if not await self._claim_arbiter.authorize_batch(owner, paths, project_root=workspace_dir(self.state.id)):
             raise ClaimViolation("CLAIM_REPLAN: write not reserved; request claim_expand BEFORE mutation")
+        if role == "qa":
+            # Supervisor-authenticated conservative write intent, before any
+            # batch mutation. Actual byte hashes are frozen only by native
+            # admission, including helpers outside test filename conventions.
+            # Producer JSON cannot invent an author/role or edit this journal.
+            from .qa_provenance import record_qa_write_intent
+            async with self._qa_provenance_lock:
+                await asyncio.to_thread(record_qa_write_intent,acceptance.supervisor_root(self.state.id),paths)
 
     async def _aexpand_agent_claim(self, owner: str, call: dict, role: str):
         if role not in self._FILE_WRITERS or call.get("task_id") != owner:

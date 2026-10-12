@@ -25,6 +25,9 @@ def _item(wid: str = "US-1") -> WorkItem:
 def _pipeline(pid: str, monkeypatch) -> tuple[Pipeline, list[tuple[str, dict]]]:
     """A pipeline whose monitor events are captured (the timeline is the only
     place the canary verdict is recorded)."""
+    # This file retains the explicitly fake legacy replay state machine. Real
+    # execution must never purge/reinstall a shared host environment.
+    monkeypatch.setattr(settings, "fake_agents", True)
     state = ProjectState(id=pid, name="canary", goal="g")
     state.epics.append(Epic(id="EPIC-1", title="E"))
     state.streams = [
@@ -225,3 +228,30 @@ async def test_frontend_empty_red_twice_is_semantic(tmp_path, monkeypatch):
     assert (ok, kind) == (False, "semantic")
     assert len(calls) == 2
     assert _verdicts(events) == ["empty_replay", "semantic"]
+
+
+async def test_real_empty_failure_never_runs_legacy_host_repair(tmp_path, monkeypatch):
+    pipeline, events = _pipeline("canary-real-empty-boundary", monkeypatch)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    calls = []
+    async def run(ws=None):
+        calls.append(1)
+        return False, "ISOLATION_UNAVAILABLE: Docker pipe unreachable", {}
+    monkeypatch.setattr(pipeline, "_arun_pytest", run)
+    monkeypatch.setattr(Pipeline, "_purge_venv_dir", staticmethod(lambda ws: (_ for _ in ()).throw(
+        AssertionError("legacy host purge forbidden in real execution"))))
+    ok, kind, tail = await pipeline._apost_merge_canary(_item(), False)
+    assert (ok, kind) == (False, "infra") and len(calls) == 1
+    assert "ISOLATION_UNAVAILABLE" in tail and _verdicts(events) == ["infra_persistent"]
+
+
+async def test_real_product_collection_error_is_not_a_toolchain_outage(tmp_path, monkeypatch):
+    pipeline, events = _pipeline("canary-real-collection-boundary", monkeypatch)
+    monkeypatch.setattr(settings, "fake_agents", False)
+    calls = []
+    async def run(ws=None):
+        calls.append(1)
+        return False, "SyntaxError: invalid product syntax during collection", {}
+    monkeypatch.setattr(pipeline, "_arun_pytest", run)
+    assert (await pipeline._apost_merge_canary(_item(), False))[:2] == (False, "semantic")
+    assert len(calls) == 1 and _verdicts(events) == ["semantic"]

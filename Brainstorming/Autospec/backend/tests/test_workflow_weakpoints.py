@@ -185,6 +185,10 @@ async def test_red_frontend_verify_carries_the_failure_digest(tmp_path, monkeypa
     le digest du rapport (nom du test + message) doit être dans la sortie —
     c'est ce vide qui a fait tourner T5-S1-S1 en aveugle."""
     pipeline = _fe_pipeline(tmp_path, monkeypatch, "wk-digest")
+    # The native collected ID must point to an actual inspected checker; an
+    # arbitrary JSON report may not manufacture source test identity.
+    (workspace_dir("wk-digest") / "frontend/src/tokenStorage.test.ts").write_text(
+        "test('persiste les jetons', () => expect(2).toBe(3));", encoding="utf-8")
     payload = {
         "numTotalTests": 1,
         "testResults": [{

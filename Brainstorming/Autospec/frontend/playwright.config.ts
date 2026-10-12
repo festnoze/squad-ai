@@ -10,7 +10,8 @@ import { defineConfig, devices } from "@playwright/test";
 const BACKEND_PORT = 8123;
 // Relative to the backend cwd below.
 const PYTHON =
-  process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python";
+  process.env.AUTOSPEC_TEST_PYTHON ??
+  (process.platform === "win32" ? ".venv\\Scripts\\python.exe" : ".venv/bin/python");
 
 export default defineConfig({
   testDir: "./e2e",
@@ -27,7 +28,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    command: `${PYTHON} -m uvicorn autospec.api.server:app --port ${BACKEND_PORT}`,
+    command: `"${PYTHON}" -m uvicorn autospec.api.server:app --port ${BACKEND_PORT}`,
     cwd: "../backend",
     env: {
       FAKE_AGENTS: "1",

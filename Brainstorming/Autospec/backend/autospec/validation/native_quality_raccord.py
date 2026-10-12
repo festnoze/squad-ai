@@ -63,8 +63,9 @@ def _native_proof(path, store, checks):
 
 class _ReceiptValidator:
     """Retain provider-observed argv/rc, never reconstruct a likely command."""
-    def __init__(self, validator, store, output):
+    def __init__(self, validator, store, output, timing_recorder=None):
         self.validator, self.store, self.output = validator, store, output
+        self.timing_recorder = timing_recorder
         self.receipts, self.timings, self.limits = {}, [], []
 
     def run_suite(self, root, ecosystem, mode, reportpath, **options):
@@ -98,6 +99,8 @@ class _ReceiptValidator:
                     self.limits.append(name+': actual '+phase+' timing unavailable')
                 else:
                     self.timings.append(dict(clock, proofs=[asdict(proof)]))
+                    if self.timing_recorder is not None:
+                        self.timing_recorder.ingest(phase,clock,proof)
         except AdapterUnavailable as exc:
             self.limits.append(Path(reportpath).name+': '+str(exc))
         return result
@@ -198,17 +201,24 @@ def _mutation_callback(contract, source, snapshot, control, plan):
 
 
 class _BrowserRun:
-    def __init__(self, contract, source, snapshot, control, timings):
+    def __init__(self, contract, source, snapshot, control, timings, timing_recorder=None):
         self.contract,self.source,self.snapshot,self.control = contract,source,snapshot,control
         self.timings = timings
+        self.timing_recorder = timing_recorder
     async def verify_e2e(self, snapshot, *, mode, scenario_ids):
         if snapshot != self.snapshot:
             raise AdapterUnavailable('native browser snapshot changed')
         context, store = coordinator._context(self.contract,self.source,snapshot,self.control,phase='quality-browser')
         async with context as harness:
             tick, started = time.monotonic(), datetime.now(timezone.utc).isoformat()
-            runs = await coordinator._execute_e2e(self.contract,harness,store,snapshot,
-                modes=(mode,),scenario_ids=scenario_ids)
+            async def execute():
+                return await coordinator._execute_e2e(self.contract,harness,store,snapshot,
+                    modes=(mode,),scenario_ids=scenario_ids)
+            if self.timing_recorder is None:
+                runs = await execute()
+            else:
+                runs = await self.timing_recorder.measure('browser',execute,
+                    lambda rows:[Proof(**p) for row in rows for p in row.get('proofs',[]) if p.get('type') in {'X','V'}])
             self.timings.append(dict(phase='browser',seconds=time.monotonic()-tick,started_at=started,
                 ended_at=datetime.now(timezone.utc).isoformat(),scope='actual Playwright API verification; no CLI argv claimed',
                 proofs=[p for row in runs for p in row.get('proofs',[]) if p.get('type') in {'X','V'}]))
@@ -237,12 +247,15 @@ async def _publish_collection(collector, store, output_root):
     return published
 
 
-async def collect_native_quality(state, contract, source_root, snapshot_hash, supervisor_root, *, validator=None):
+async def collect_native_quality(state, contract, source_root, snapshot_hash, supervisor_root, *, validator=None, timing_recorder=None):
     """Publish measured quality observations from a sealed independently reviewed plan.
 
     Return OBTAINED/PARTIAL/NOT_VERIFIED, never acceptance PASS. Missing plan,
     fixtures, browser, SQL tracing or native mutation remain explicit limits.
     Model/provider calls and producer-supplied callbacks are not accepted.
+    An optional factory-owned shared NativeTimingRecorder retains the precise
+    install/tests clocks and measures browser API calls separately. Its caller
+    owns subsequent build/docker timing and complete diagnostic publication.
     """
     if not isinstance(snapshot_hash, str) or not re.fullmatch(r'[0-9a-f]{64}', snapshot_hash):
         raise AdapterUnavailable('canonical source identity required')
@@ -265,12 +278,12 @@ async def collect_native_quality(state, contract, source_root, snapshot_hash, su
     async def sqlite_probe(adapter,snapshot,oracle):
         if oracle!=contract.contract_hash:raise AdapterUnavailable('SQLite oracle differs')
         return await coordinator.sqlite_quality_probe(state,contract,source,snapshot,control)
-    captured = _ReceiptValidator(validator,store,output)
+    captured = _ReceiptValidator(validator,store,output,timing_recorder)
     browser_timings = []
     collector = NativeQualityCollector(contract,identity,captured,product_root=source,evidence_root=output,
         suites=plan['suites'],mapping_path=plan['mapping_path'],review=plan['review'],e2e_mode=plan['e2e_mode'],
         mutation=plan['mutation'],mutation_probe=_mutation_callback(contract,source,snapshot_hash,control,plan),
-        sqlite_probe=sqlite_probe,browser_factory=lambda:_BrowserRun(contract,source,snapshot_hash,control,browser_timings))
+        sqlite_probe=sqlite_probe,browser_factory=lambda:_BrowserRun(contract,source,snapshot_hash,control,browser_timings,timing_recorder))
     await collector.collect(snapshot_hash)
     if source_snapshot(source).digest != snapshot_hash:
         raise AdapterUnavailable('quality source changed before publication')
@@ -279,18 +292,14 @@ async def collect_native_quality(state, contract, source_root, snapshot_hash, su
     if captured.receipts:
         path = output/'native-receipts.json'
         atomic_json(path,dict(snapshot_hash=snapshot_hash,contract_hash=contract.contract_hash,value=captured.receipts))
-        if 'native_receipts' in coordinator.EXTERNAL_OBSERVATIONS:
-            await store.record_native_observation('native_receipts',captured.receipts,
-                source_proofs=[_native_proof(path,store,('OBS:native_receipts',))])
-        else:
-            limits.append('native CLI receipt publication port unavailable')
     if 'browser_e2e' in published:
         publisher = getattr(coordinator,'publish_reviewed_e2e',None)
         if publisher is None:
             limits.append('sealed E2E cache publication port unavailable')
         else:
             await publisher(store,collector.records['browser_e2e'],
-                control/'source-reviews'/snapshot_hash/'quality'/'quality-review-package.json',plan['review'],source)
+                plan_path=control/'source-reviews'/snapshot_hash/'quality'/'quality-review-package.json',
+                review=plan['review'],source_root=source)
     receipt = dict(version=1,status='PARTIAL' if limits else 'OBTAINED',snapshot_hash=snapshot_hash,
         contract_hash=contract.contract_hash,observations=published,limits=limits,
         native_receipts=captured.receipts,timings=captured.timings+browser_timings,

@@ -42,3 +42,21 @@ observation ports are maintained by the coordinator owner. All browser execution
 must use its confined Linux driver in production; trusted local fixture browser
 tests do not prove confinement of generated JavaScript. No remediation task is
 closed by this checkpoint alone.
+
+Follow-up after coordinator checkpoint `c9e762e0`: the E2E handoff now uses its
+keyword-only `plan_path`, `review`, `source_root` API. Pass a factory-owned
+`timing_recorder=NativeTimingRecorder(...)` shared with later build/docker
+phases: native split clocks are admitted by `ingest` against the raw exact
+execution X; browser is timed through `measure('browser', ...)` with its actual
+X/V, not a shell wrapper. The caller must add real build/docker phases before
+`publish()`; publication refuses a partial set. Forward
+`collection['native_receipts']` to `NativeDeliveryCollector.collect`; receipts
+are not an invented observation name or an equivalence to README commands.
+
+Follow-up regression: **89 PASS in 20.66 seconds** with real Linux collection
+active. Included raccord (22 tests), exact reviewed plans, hermetic Git,
+known-prefix runner accounting, durable tracker reservations and native quality
+collector tests. JUnit: `20261012-native-quality-raccord-v2.xml`. This also proves
+separate native install/test clock ingestion and refusal of incomplete overall
+timing publication. The Git and collector fixture probes remain scoped trusted
+metatests, never generated hostile code executed on Windows.

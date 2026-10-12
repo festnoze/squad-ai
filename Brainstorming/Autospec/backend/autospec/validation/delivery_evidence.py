@@ -24,6 +24,14 @@ from .support_adapter import AdapterUnavailable, Proof
 REQUIRED_DOC_OBLIGATIONS=frozenset({"install","tests","coverage","e2e","launch","seed","migration","backup","restore"})
 
 
+class NativeTimingUnavailable(AdapterUnavailable):
+    """An admitted native operation has no usable diagnostic subclock.
+
+    This never denotes a stale/contradictory source, receipt, recipe or image.
+    A collector may retain the operation X and report PARTIAL/NOT_VERIFIED.
+    """
+
+
 def _sha(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
@@ -144,10 +152,20 @@ def delivery_build_checks(receipt: dict, source_root: Path, snapshot_hash: str,
     if not isinstance(argv, list) or len(argv) != 7 or argv[1:] != ["build", "--pull=false", "--network=none", "-t", receipt.get("image_tag"), "."] or type(command.get("rc")) is not int:
         raise AdapterUnavailable("actual confined final-image builder required")
     base = "autospec/clean-env:" + commands["backend_install"]["environment_fingerprint"]
-    runtime = ["/opt/venv/bin/python", "main.py"] if ecology == "python" else ["node", "main.js"]
-    recipe = f'FROM {base}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\nENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nCMD {json.dumps(runtime)}\nLABEL autospec.snapshot={snapshot_hash}\n'
+    runtime=receipt.get("runtime_command")
+    if (receipt.get("runtime_command_mode")!="explicit-factory" or not isinstance(runtime,list)
+            or not 1<=len(runtime)<=200 or any(not isinstance(arg,str) or "\x00" in arg or len(arg)>4096 for arg in runtime)
+            or runtime[0]!=("/opt/venv/bin/python" if ecology=="python" else "node")):
+        raise AdapterUnavailable("explicit source-reviewed factory runtime argv required; legacy launcher is not acceptance")
+    node_link="USER 0:0\nRUN ln -s /opt/node_modules /node_modules\n" if ecology=="node" else ""
+    recipe = f'FROM {base}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\n{node_link}ENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nENTRYPOINT []\nCMD {json.dumps(runtime)}\nLABEL autospec.snapshot={snapshot_hash}\n'
     check("image_builder", command["rc"] == 0 and command.get("isolated") is True and command.get("recipe_sha256") == _sha(recipe.encode()), dict(argv=argv, rc=command["rc"], recipe_sha256=command.get("recipe_sha256")))
     actual = image_lookup(receipt["image_id"])
+    config=actual.get("Config",{})
+    # Docker JSON may omit an actually empty ENTRYPOINT (Go templates expose
+    # null). Fresh image inspection + exact recipe/Cmd still attest absence.
+    check("baked_runtime_command",config.get("Cmd")==runtime and config.get("Entrypoint") in (None,[]),
+          dict(expected=runtime,cmd=config.get("Cmd"),entrypoint=config.get("Entrypoint"),mode=receipt["runtime_command_mode"]))
     check("current_delivery_image", actual.get("Id") == receipt["image_id"] and actual.get("Config", {}).get("Labels", {}).get("autospec.snapshot") == snapshot_hash,
           dict(image_id=actual.get("Id"), snapshot_label=actual.get("Config", {}).get("Labels", {}).get("autospec.snapshot")))
     return rows
@@ -331,6 +349,54 @@ def audit_review_subject(audit:dict) -> str:
     return _sha(json.dumps(audit,sort_keys=True,ensure_ascii=True).encode())
 
 
+def audit_risk_subject(finding:dict,snapshot_hash:str,contract_hash:str) -> str:
+    """Exact raw advisory + source/oracle scope for an externally supplied waiver."""
+    return _sha(json.dumps(dict(finding=finding,snapshot_hash=snapshot_hash,
+        contract_hash=contract_hash),sort_keys=True,ensure_ascii=True).encode())
+
+
+def audit_arbitration_schema() -> dict:
+    """Reviewer protocol only: never generate an approval or waiver from this."""
+    return dict(required=["decision","owner","rationale","date","disposition","approved"],
+        dispositions=["accepted_risk","rejected","pending"],
+        approval="Existing externally provided Proof R required only for accepted_risk/approved=true; never manufacture one.",
+        approval_check="OPS-05:accepted_risk:<audit_risk_subject(raw_finding,snapshot_hash,contract_hash)>",
+        approval_body=dict(version=1,kind="audit_risk_acceptance",authority="human",subject="<exact risk subject SHA256>",
+            snapshot_hash="<exact source SHA256>",contract_hash="<exact oracle SHA256>",approved=True,
+            authorized_by="<existing approving human authority>",rationale="<existing explicit justification>",date="<zoned ISO date>"),
+        scope="Audit advisories only; no business requirement override. No waiver exists unless supplied independently.")
+
+
+def _audit_risk_approval(arbitration,finding,*,root,snapshot_hash,contract_hash):
+    from ..agents.file_broker import ExecutionContext,FileBroker
+    raw=arbitration.get("approval")
+    if not isinstance(raw,dict) or not {"type","path","sha256","snapshot_hash","contract_hash","checks","passed"}<=raw.keys():
+        raise AdapterUnavailable("accepted audit risk needs an existing dedicated external R approval")
+    try:proof=Proof(**raw)
+    except (TypeError,ValueError) as exc:raise AdapterUnavailable("dedicated audit risk approval malformed") from exc
+    subject=audit_risk_subject(finding,snapshot_hash,contract_hash)
+    path=Path(proof.path).absolute()
+    if (path.resolve()!=path or not path.is_relative_to(root) or proof.type!="R" or proof.passed is not True
+            or not isinstance(proof.checks,(list,tuple)) or any(not isinstance(check,str) for check in proof.checks)
+            or "OPS-05:accepted_risk:"+subject not in proof.checks or not proof.intact(snapshot_hash=snapshot_hash,contract_hash=contract_hash)):
+        raise AdapterUnavailable("dedicated audit risk approval is stale, unscoped or outside supervisor")
+    path=FileBroker(ExecutionContext("audit-risk-approval",root)).path(path.relative_to(root).as_posix())
+    if path.stat().st_size>256_000:raise AdapterUnavailable("bounded audit risk approval exceeded")
+    data=json.loads(path.read_bytes())
+    required={"version","kind","authority","subject","snapshot_hash","contract_hash","approved","authorized_by","rationale","date"}
+    if (not isinstance(data,dict) or set(data)!=required or type(data["version"]) is not int or data["version"]!=1
+            or data["kind"]!="audit_risk_acceptance" or data["authority"]!="human"
+            or (data["subject"],data["snapshot_hash"],data["contract_hash"])!=(subject,snapshot_hash,contract_hash)
+            or data["approved"] is not True
+            or any(not isinstance(data[k],str) or not data[k].strip() for k in ("authorized_by","rationale","date"))):
+        raise AdapterUnavailable("existing human audit risk approval has no exact affirmative disposition")
+    try:
+        date=datetime.fromisoformat(data["date"].replace("Z","+00:00"))
+        if date.tzinfo is None:raise ValueError("timezone absent")
+    except ValueError as exc:raise AdapterUnavailable("human audit risk approval needs its actual zoned date") from exc
+    return proof
+
+
 def apply_audit_review(audit:dict, review:Proof, *, evidence_root, snapshot_hash, contract_hash) -> dict:
     """Install GPT/local independent severity/exploitability arbitration, not R."""
     root=Path(evidence_root).resolve();subject=audit_review_subject(audit)
@@ -350,14 +416,44 @@ def apply_audit_review(audit:dict, review:Proof, *, evidence_root, snapshot_hash
         if arbitration is not None and (not isinstance(arbitration,dict) or not {"decision","owner","rationale","date"}<=arbitration.keys() or any(not isinstance(arbitration[k],str) or not arbitration[k].strip() for k in ("decision","owner","rationale","date"))):
             raise AdapterUnavailable("audit arbitration needs dated accountable decision")
         if arbitration is not None:
+            if arbitration.get("disposition") not in {"accepted_risk","rejected","pending"} or type(arbitration.get("approved")) is not bool:
+                raise AdapterUnavailable("typed audit disposition and explicit approval required")
             try:
                 date=datetime.fromisoformat(arbitration["date"].replace("Z","+00:00"))
                 if date.tzinfo is None: raise ValueError("timezone absent")
             except ValueError as exc: raise AdapterUnavailable("audit arbitration date must be actual zoned ISO date") from exc
+            if (arbitration["disposition"]=="accepted_risk" and arbitration["approved"] is True
+                    and arbitration["decision"] not in {"deny_release","fix_required"}):
+                _audit_risk_approval(arbitration,finding,root=root,snapshot_hash=snapshot_hash,contract_hash=contract_hash)
         result["findings"].append(dict(finding,severity=assessment["severity"],exploitable=assessment["exploitable"],arbitration=arbitration,rationale=assessment["rationale"]))
     result["assessment_review"]=asdict(review)
     result["raw_audit"]=audit
     return result
+
+
+def audit_disposition_checks(audit,*,evidence_root,snapshot_hash,contract_hash) -> list[dict]:
+    """Revalidate assessment/waiver bytes and gate only exact audit advisories.
+
+    Unknown/malformed permission evidence is NOT_VERIFIED (AdapterUnavailable).
+    A known unresolved/declined high exploitable advisory yields a false check.
+    Classification approval alone is never authority to accept a known risk.
+    """
+    try:
+        if audit.get("status")!="AVAILABLE":raise AdapterUnavailable("native audit unavailable")
+        raw=audit["raw_audit"];review=Proof(**audit["assessment_review"])
+        recomputed=apply_audit_review(raw,review,evidence_root=evidence_root,snapshot_hash=snapshot_hash,contract_hash=contract_hash)
+        if recomputed!=audit:raise AdapterUnavailable("classified audit differs from exact independent assessment")
+    except (TypeError,KeyError,ValueError) as exc:raise AdapterUnavailable("typed independently assessed audit absent") from exc
+    blocked=[];accepted=[]
+    for finding in audit["findings"]:
+        if finding["severity"] not in {"critical","high"} or finding["exploitable"] is not True:continue
+        arbitration=finding["arbitration"]
+        if (arbitration is not None and arbitration["disposition"]=="accepted_risk" and arbitration["approved"] is True
+                and arbitration["decision"] not in {"deny_release","fix_required"}):accepted.append(finding)
+        else:blocked.append(finding)
+    return [dict(check="audit_no_unresolved_exploitable_high",passed=not blocked,
+        observed=dict(blocking=blocked,accepted_with_external_human_R=accepted,
+            scope="exact dependency advisories only; no business waiver"))]
 
 
 @dataclass(frozen=True)
@@ -616,6 +712,7 @@ class NativeTimingRecorder:
         self.root,self.snapshot,self.contract=Path(evidence_root).resolve(),snapshot_hash,contract_hash
         self.docker=docker;self.phases=[]
         self.lock=threading.Lock()
+        self._ingested=set()
 
     def _record(self,phase,started,elapsed,proofs):
         if not proofs: raise AdapterUnavailable("measured phase has no native operation artifacts")
@@ -662,9 +759,77 @@ class NativeTimingRecorder:
         if not _image_id(value.get("image_id")) or not re.fullmatch(r"[a-f0-9]{64}",value.get("environment_fingerprint","")):
             raise AdapterUnavailable("timing is not tied to an actual isolated environment")
         row=dict(timing,source_proofs=[asdict(source_proof)],scope="native split-clock receipt, not total operation estimate")
-        proof=_native_proof(self.root,"timing",row,self.snapshot,self.contract,checks=("OPS-06:"+phase,))
-        with self.lock:self.phases.append((row,proof))
+        key=("execution",_sha(json.dumps(value,sort_keys=True,ensure_ascii=True).encode()),phase)
+        with self.lock:
+            if key in self._ingested: raise AdapterUnavailable("native execution clock already ingested")
+            proof=_native_proof(self.root,"timing",row,self.snapshot,self.contract,checks=("OPS-06:"+phase,))
+            self.phases.append((row,proof));self._ingested.add(key)
         return proof
+
+    def ingest_delivery(self,receipt,source_proof:Proof,*,source_root):
+        """Retain exact native build subclocks once, without measuring the total.
+
+        Fresh source/image/manifest/lock/recipe admission is required. The two
+        install clocks measure environment preparation, including cache checks;
+        they do not invent uv/npm executions. Frontend build and final Docker
+        build clocks are separate, not the enclosing build_delivery_image call.
+        A frontend receipt contributes four clocks; a backend-only one, two.
+        Do not additionally measure_sync('build', build_delivery_image, ...).
+        """
+        import math
+        from ..agents.file_broker import ExecutionContext,FileBroker
+        if not isinstance(source_proof,Proof) or source_proof.type!="X" or source_proof.passed is not True or not source_proof.intact(snapshot_hash=self.snapshot,contract_hash=self.contract):
+            raise AdapterUnavailable("intact native delivery receipt required")
+        path=Path(source_proof.path).absolute()
+        if path.resolve()!=path or not path.is_relative_to(self.root):
+            raise AdapterUnavailable("native delivery receipt outside unaliased supervisor root")
+        FileBroker(ExecutionContext("delivery-clock-proof",self.root)).path(path.relative_to(self.root).as_posix())
+        payload=json.loads(path.read_bytes());actual=payload.get("value",payload)
+        if actual!=receipt: raise AdapterUnavailable("delivery clocks differ from exact native raw receipt")
+        checks=delivery_build_checks(receipt,Path(source_root),self.snapshot)
+        if not checks or any(row.get("passed") is not True for row in checks):
+            raise AdapterUnavailable("native delivery source/image/recipe admission failed")
+        commands={c["kind"]:c for c in receipt["commands"]}
+        backend=receipt.get("backend_dependency")
+        if backend!=commands["backend_install"]["builder"]:
+            raise AdapterUnavailable("backend preparation clock differs from admitted builder")
+        jobs=[("backend_dependency.timing","install",backend,commands["backend_install"])]
+        if "frontend_install" in commands:
+            frontend=receipt.get("frontend_build")
+            if not isinstance(frontend,dict) or frontend.get("dependency")!=commands["frontend_install"]["builder"] or {k:v for k,v in frontend.items() if k!="dependency"}!=commands["typecheck_frontend_build"]:
+                raise AdapterUnavailable("frontend preparation/build clocks differ from admitted commands")
+            jobs.extend([
+                ("frontend_build.dependency.timing","install",frontend["dependency"],commands["frontend_install"]),
+                ("frontend_build.timing","build",frontend,commands["typecheck_frontend_build"])])
+        jobs.append(("commands.image_build.timing","docker",commands["image_build"],commands["image_build"]))
+        digest=_sha(json.dumps(receipt,sort_keys=True,ensure_ascii=True).encode());pending=[]
+        for native_path,phase,container,command in jobs:
+            clock=container.get("timing")
+            if not isinstance(clock,dict) or clock.get("phase")!=phase:
+                raise NativeTimingUnavailable("exact native delivery subclock absent: "+native_path)
+            seconds=clock.get("seconds")
+            if isinstance(seconds,bool) or not isinstance(seconds,(int,float)) or not math.isfinite(seconds) or seconds<0:
+                raise NativeTimingUnavailable("invalid measured delivery seconds")
+            try:
+                start=datetime.fromisoformat(clock["started_at"].replace("Z","+00:00"));end=datetime.fromisoformat(clock["ended_at"].replace("Z","+00:00"))
+                if start.tzinfo is None or end.tzinfo is None or end<start: raise ValueError("invalid clock bounds")
+            except (ValueError,KeyError,TypeError) as exc:
+                raise NativeTimingUnavailable("native zoned delivery clock bounds absent") from exc
+            row=dict(clock,native_clock_path=native_path,native_kind=command["kind"],
+                image_id=receipt["image_id"] if phase=="docker" else command["image_id"],
+                environment_fingerprint=commands["backend_install"]["environment_fingerprint"] if phase=="docker" else command["environment_fingerprint"],
+                execution=command.get("execution","observed-command"),argv=command["argv"],return_code=command["rc"],
+                source_proofs=[asdict(source_proof)],scope="exact native delivery subclock; cache/layer preparation is not a new install rc; no enclosing total included")
+            pending.append((("delivery",digest,native_path),row))
+        # All clocks are validated before publication: a bad fourth clock must
+        # not leave three apparently complete phases behind.
+        with self.lock:
+            if any(key in self._ingested for key,_ in pending):
+                raise AdapterUnavailable("native delivery subclock already ingested")
+            proofs=[_native_proof(self.root,"timing",row,self.snapshot,self.contract,checks=("OPS-06:"+row["phase"],)) for _,row in pending]
+            self.phases.extend((row,proof) for (_,row),proof in zip(pending,proofs))
+            self._ingested.update(key for key,_ in pending)
+        return proofs
 
     async def measure(self,phase,operation,proof_provider):
         import time

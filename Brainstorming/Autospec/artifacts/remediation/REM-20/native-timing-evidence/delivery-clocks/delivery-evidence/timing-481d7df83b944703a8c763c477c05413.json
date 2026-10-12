@@ -1,0 +1,40 @@
+{
+  "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "snapshot_hash": "6545e114b2dd06c7e2346db5231b71cc469ac082d43755d36d3565677cb58f7b",
+  "value": {
+    "argv": [
+      "docker",
+      "build",
+      "--pull=false",
+      "--network=none",
+      "-t",
+      "autospec/delivery-clocks:6a046dc9fc4f43a8bb7e1ce2fe8d254b",
+      "."
+    ],
+    "ended_at": "2026-10-12T09:36:33.951179+00:00",
+    "environment_fingerprint": "e6a5ef709e01c96dc73b281e0fc62cd109577bcb8f208ffc698999bc18ec84e6",
+    "execution": "observed-command",
+    "image_id": "sha256:784ffd6e39f126954a6663deb355c9afbf85cec198afa7902fa5a59560702bad",
+    "native_clock_path": "commands.image_build.timing",
+    "native_kind": "image_build",
+    "phase": "docker",
+    "return_code": 0,
+    "scope": "exact native delivery subclock; cache/layer preparation is not a new install rc; no enclosing total included",
+    "seconds": 0.749303599994164,
+    "source_proofs": [
+      {
+        "checks": [
+          "OBS:delivery_build"
+        ],
+        "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+        "detail": "",
+        "passed": true,
+        "path": "C:\\Users\\e.millerioux\\AppData\\Local\\Temp\\pytest-of-e.millerioux\\pytest-3254\\test_real_delivery_receipt_fou0\\supervisor\\delivery-evidence\\delivery-clock-metatest-b59779227d564fbba16b6e3e13925428.json",
+        "sha256": "78d96574ba2423ff7059a6cd48db61126f4d47de58222fc09f87adae66ac5306",
+        "snapshot_hash": "6545e114b2dd06c7e2346db5231b71cc469ac082d43755d36d3565677cb58f7b",
+        "type": "X"
+      }
+    ],
+    "started_at": "2026-10-12T09:36:33.201890+00:00"
+  }
+}

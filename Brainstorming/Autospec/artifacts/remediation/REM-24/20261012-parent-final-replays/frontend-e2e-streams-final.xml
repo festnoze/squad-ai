@@ -1,0 +1,6 @@
+<testsuites id="" name="" tests="1" failures="0" skipped="0" errors="0" time="78.30750200000001">
+<testsuite name="streams.spec.ts" timestamp="2026-10-12T10:01:44.973Z" hostname="chromium" tests="1" failures="0" skipped="0" time="75.072" errors="0">
+<testcase name="multi-stream: badges, tasks and cross-stream delivery" classname="streams.spec.ts" time="75.072">
+</testcase>
+</testsuite>
+</testsuites>

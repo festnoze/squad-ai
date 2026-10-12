@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 import json
 import re
+import stat
 import tempfile
 from pathlib import Path
 
@@ -20,7 +21,8 @@ _REDIRECT = {"GIT_DIR","GIT_WORK_TREE","GIT_COMMON_DIR","GIT_INDEX_FILE",
              "GIT_OBJECT_DIRECTORY","GIT_ALTERNATE_OBJECT_DIRECTORIES"}
 _COMMANDS = {"init","config","rev-parse","add","commit","rm","log","show","diff",
              "status","worktree","branch","merge","rebase","reset","checkout",
-             "restore","ls-files","rev-list","check-ignore","ls-tree","cat-file","clean"}
+             "restore","ls-files","rev-list","check-ignore","ls-tree","cat-file","clean",
+             "merge-base","revert"}
 _SAFE_SECTIONS = {"core","user","remote","branch","init","safe","extensions"}
 _CORE = {"repositoryformatversion","filemode","bare","logallrefupdates","symlinks",
          "ignorecase","autocrlf","eol","precomposeunicode","worktree","sharedrepository",
@@ -95,6 +97,33 @@ def _validate_config(path,*,expected_workspace=None):
             if target.resolve()!=expected_workspace.resolve():raise GitConfigurationRefused("Git local worktree redirected")
 
 
+def _metadata_preflight(directories,*,max_entries=200_000):
+    """Reject aliases throughout metadata before Git can create any lock/ref.
+
+    Checking only config and the marker is insufficient: refs/objects/logs may
+    independently redirect filesystem writes. Inspect with lstat/no-follow and
+    never recurse into a link, junction or special file. Linked worktrees keep
+    their genuine backlink/common directories; those entire trees are checked.
+    """
+    pending=list(dict.fromkeys(Path(p).resolve() for p in directories));seen=set();count=0
+    while pending:
+        directory=pending.pop()
+        if directory in seen:continue
+        seen.add(directory);_regular(directory)
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                count+=1
+                if count>max_entries:raise GitConfigurationRefused("Git metadata tree exceeds inspection bound")
+                # Windows DirEntry's cached stat may report st_nlink=0 for
+                # ordinary files. Fetch a fresh no-follow stat for NTFS links.
+                info=os.stat(entry.path,follow_symlinks=False)
+                if stat.S_ISLNK(info.st_mode) or getattr(info,"st_file_attributes",0)&0x400:
+                    raise GitConfigurationRefused("Git metadata descendant link/reparse refused")
+                if stat.S_ISDIR(info.st_mode):pending.append(Path(entry.path))
+                elif not stat.S_ISREG(info.st_mode) or info.st_nlink!=1:
+                    raise GitConfigurationRefused("Git metadata descendant hardlink/special file refused")
+
+
 def git_invocation(workspace,args):
     root=Path(workspace).absolute()
     if any(os.environ.get(k) for k in _REDIRECT):raise GitConfigurationRefused("Git environment redirect refused")
@@ -102,7 +131,21 @@ def git_invocation(workspace,args):
         raise GitConfigurationRefused("Only bounded local Git bookkeeping is allowed")
     if args[0] == "clean" and list(args) != ["clean", "-fd"]:
         raise GitConfigurationRefused("Only the factory local non-ignored rollback cleanup is admitted")
+    if args[0] == "merge-base":
+        def local_ref(value):
+            return (re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_./-]{0,199}",value) is not None
+                and ".." not in value and not value.endswith(("/",".lock"))
+                and all(part not in {"","."} for part in value.split("/")))
+        if len(args)!=3 or not all(local_ref(ref) for ref in args[1:]):
+            raise GitConfigurationRefused("Only two explicit local merge-base refs are admitted")
+    if args[0] == "revert":
+        abort=list(args)==["revert","--abort"]
+        commit=(len(args)==5 and list(args[1:4])==["-m","1","--no-edit"]
+            and (args[4]=="HEAD" or re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}",args[4]) is not None))
+        if not (abort or commit):
+            raise GitConfigurationRefused("Only the factory no-edit merge-commit revert or abort is admitted")
     metadata_dirs=_metadata(root)
+    _metadata_preflight(metadata_dirs)
     for metadata in metadata_dirs:
         for name in ("config","config.worktree"):
             _validate_config(metadata/name,expected_workspace=root if (root/".git").is_dir() or name=="config.worktree" else None)
@@ -128,6 +171,14 @@ def run_git(workspace,args,*,timeout=120):
     argv,env=git_invocation(workspace,args)
     token=_agent_environment.set(env)
     try:
+        if list(args)==["revert","-m","1","--no-edit","HEAD"]:
+            # The factory holds its merge lock. Pin its symbolic HEAD before
+            # dispatch so the actual mutating argv names one immutable commit.
+            rc,out,_=_run_tracked(argv[:-5]+["rev-parse","--verify","HEAD^{commit}"],"",str(workspace),timeout)
+            commit=out.strip()
+            if rc or re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}",commit) is None:
+                raise GitConfigurationRefused("Current merge commit could not be identified")
+            argv[-1]=commit
         rc,out,err=_run_tracked(argv,"",str(workspace),timeout)
         return rc,out+err
     finally:_agent_environment.reset(token)

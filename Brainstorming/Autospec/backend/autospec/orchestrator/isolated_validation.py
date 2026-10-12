@@ -403,7 +403,8 @@ class IsolatedValidator:
 
 
 def build_delivery_image(root: Path, image: str, *, docker: str = "docker", timeout: float = 300,
-                         evidence_root: Path | None = None, snapshot_hash: str | None = None) -> tuple[bool, str]:
+                         evidence_root: Path | None = None, snapshot_hash: str | None = None,
+                         runtime_command: list[str] | tuple[str, ...] | None = None) -> tuple[bool, str]:
     """Compatible build tuple plus optional supervisor-owned snapshot receipt.
 
     Exact dependency caches/layers are attested, not falsely described as fresh
@@ -413,7 +414,7 @@ def build_delivery_image(root: Path, image: str, *, docker: str = "docker", time
     if evidence_root is None:
         if snapshot_hash is not None:
             raise _unavailable("Snapshot build receipts require an external evidence root")
-        return _build_delivery_image(root, image, docker=docker, timeout=timeout)
+        return _build_delivery_image(root, image, docker=docker, timeout=timeout,runtime_command=runtime_command)
     from ..validation.final_gate import source_snapshot
     root, evidence_root = Path(root).absolute(), Path(evidence_root).absolute()
     if (evidence_root.resolve().is_relative_to(root.resolve()) or
@@ -426,7 +427,7 @@ def build_delivery_image(root: Path, image: str, *, docker: str = "docker", time
                "image_id": None, "image_tag": image, "isolated": True, "no_host_dependencies": True,
                "manifest_only_install": True, "locks_sha256": {}, "commands": [], "frontend_files": {}}
     try:
-        ok, output = _build_delivery_image(root, image, docker=docker, timeout=timeout, receipt=receipt)
+        ok, output = _build_delivery_image(root, image, docker=docker, timeout=timeout, receipt=receipt,runtime_command=runtime_command)
         if source_snapshot(root).digest != snapshot_hash:
             raise _unavailable("Delivery source changed during build; no matching receipt")
         receipt["status"] = "PASS" if ok else "FAIL"
@@ -451,8 +452,16 @@ def _dependency_command_receipt(manager, root: Path, environment: LinuxEnvironme
             "attestation": environment.attestation, "builder": observed}
 
 
+def _runtime_argv(command):
+    if (not isinstance(command,(list,tuple)) or not 1 <= len(command) <= 200 or
+        any(not isinstance(arg,str) or len(arg)>4096 or '\x00' in arg for arg in command) or
+        not command[0] or command[0].startswith('-')):
+        raise _unavailable('Explicit bounded Linux runtime argv required')
+    return list(command)
+
+
 def _build_delivery_image(root: Path, image: str, *, docker: str = "docker", timeout: float = 300,
-                          receipt: dict | None = None) -> tuple[bool, str]:
+                          receipt: dict | None = None,runtime_command=None) -> tuple[bool, str]:
     """Bake filtered source into a trusted recipe, never the product Dockerfile.
 
     Dependency installs/builds remain in separate confined phases. The final
@@ -467,6 +476,10 @@ def _build_delivery_image(root: Path, image: str, *, docker: str = "docker", tim
     ecosystem = "python" if (root / "pyproject.toml").is_file() else "node" if (root / "package.json").is_file() else ""
     if not ecosystem:
         raise _unavailable("Delivery requires an isolated Python or Node lockfile")
+    command = _runtime_argv(runtime_command) if runtime_command is not None else (
+        ["/opt/venv/bin/python", "main.py"] if ecosystem == "python" else ["node", "main.js"])
+    if receipt is not None:
+        receipt.update(runtime_command=command,runtime_command_mode='explicit-factory' if runtime_command is not None else 'legacy-default')
     dependency_receipt = {}
     if receipt is not None:
         receipt["backend_dependency"] = dependency_receipt
@@ -507,8 +520,10 @@ def _build_delivery_image(root: Path, image: str, *, docker: str = "docker", tim
             base = "autospec/clean-env:" + environment.fingerprint
             if manager._image(base)["Id"] != environment.image:
                 raise _unavailable("Dependency image tag changed identity")
-            command = ["/opt/venv/bin/python", "main.py"] if ecosystem == "python" else ["node", "main.js"]
-            recipe = f"FROM {base}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\nENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nCMD {json.dumps(command)}\n"
+            # Global dependency search belongs to the immutable factory image,
+            # never a source bind/overlay. ESM ignores NODE_PATH.
+            node_dependencies = 'USER 0:0\nRUN ln -s /opt/node_modules /node_modules\n' if ecosystem == 'node' else ''
+            recipe = f"FROM {base}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\n{node_dependencies}ENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nENTRYPOINT []\nCMD {json.dumps(command)}\n"
             if receipt is not None:
                 recipe += f'LABEL autospec.snapshot={receipt["snapshot_hash"]}\n'
             (context / "Dockerfile").write_text(recipe, encoding="utf-8")
@@ -519,12 +534,15 @@ def _build_delivery_image(root: Path, image: str, *, docker: str = "docker", tim
                 receipt["commands"].append(command_receipt)
             rc, out, err = _timed_call(command_receipt if receipt is not None else None, "docker", lambda: _run_tracked(argv, "", str(context), timeout))
             command_receipt.update(rc=rc, output_tail=(out + err)[-16000:])
-            if receipt is not None and rc == 0:
+            if rc == 0:
                 baked = manager._image(image)
                 if (not re.fullmatch(r"sha256:[a-f0-9]{64}", baked["Id"]) or
-                    baked.get("Config", {}).get("Labels", {}).get("autospec.snapshot") != receipt["snapshot_hash"]):
-                    raise _unavailable("Delivery image snapshot identity cannot be attested")
-                receipt["image_id"] = baked["Id"]
+                    baked.get('Config',{}).get('Cmd') != command or
+                    baked.get('Config',{}).get('Entrypoint') not in (None,[]) or
+                    receipt is not None and baked.get("Config", {}).get("Labels", {}).get("autospec.snapshot") != receipt["snapshot_hash"]):
+                    raise _unavailable("Delivery image snapshot/entrypoint/command identity cannot be attested")
+                if receipt is not None:
+                    receipt["image_id"] = baked["Id"]
             return rc == 0, out + err
     finally:
         if dist is not None:
@@ -546,17 +564,18 @@ class RuntimeSession:
                  ecosystem: str = "python", docker: str = "docker", env: dict[str, str] | None = None,
                  connection_timeout: float = 15, application_origin: bool = False,
                  local_cookie_mode: bool = False, persistent_database: bool = False,
-                 mount_stage: bool = True):
+                 mount_stage: bool = True,use_image_command: bool = False):
         if not 1 <= port <= 65535 or ecosystem not in {"python", "node"}:
             raise _unavailable("Invalid runtime port/ecosystem")
         if not math.isfinite(connection_timeout) or connection_timeout <= 0:
             raise _unavailable("Invalid runtime connection timeout")
-        if not command or any(not isinstance(value, str) or "\x00" in value for value in command):
-            raise _unavailable("Invalid runtime command")
+        command = _runtime_argv(command)
         if local_cookie_mode and not application_origin:
             raise _unavailable("Local cookie mode requires the controlled application origin")
         if type(mount_stage) is not bool or not mount_stage and not re.fullmatch(r"sha256:[a-f0-9]{64}", image):
             raise _unavailable("Baked runtime requires an immutable local image ID")
+        if type(use_image_command) is not bool or use_image_command and mount_stage:
+            raise _unavailable('Plain image command requires a baked immutable runtime, without source mount')
         self.stage, self.image, self.command = Path(stage), image, command
         self.port, self.ecosystem, self.docker = port, ecosystem, docker
         self.env = dict(env or {})
@@ -588,6 +607,7 @@ class RuntimeSession:
         self.detached = False
         self.persistent_database = persistent_database
         self.mount_stage = mount_stage
+        self.use_image_command = use_image_command
         self.volume_name = "autospec-validation-" + uuid.uuid4().hex if persistent_database else None
         self.volume_identity = None
         self.volume_requested = False
@@ -619,6 +639,8 @@ class RuntimeSession:
             raise _unavailable("RuntimeSession is closed or already started")
         try:
             require_sandbox(self.stage, self.image, docker=self.docker)
+            if self.use_image_command:
+                self._attest_image_command()
             if self.persistent_database:
                 self._create_volume()
             self._launch()
@@ -687,12 +709,14 @@ class RuntimeSession:
         return f"type=volume,source={self.volume_name},target={self.DATABASE_DIRECTORY},volume-nocopy"
 
     def _launch(self) -> None:
-        if not self.mount_stage:
+        if self.use_image_command:
+            self._attest_image_command()
+        elif not self.mount_stage:
             result = _docker_call([self.docker, "image", "inspect", self.image, "--format", "{{.Id}} {{.Config.WorkingDir}}"],
                                   capture_output=True, text=True, timeout=3, check=False)
             if result.returncode or result.stdout.strip() != self.image + " /app":
                 raise _unavailable("Baked runtime image identity/working directory differs")
-        command = _node_command(self.command) if self.ecosystem == "node" else self.command
+        command = _node_command(self.command) if self.ecosystem == "node" and not self.use_image_command else self.command
         argv = docker_run_cmd(command, str(self.stage), self.image, self.docker, run_id=self.owner, container_name=self.name)
         argv.remove("--rm")  # retain exit/log evidence until owned explicit cleanup
         argv.insert(2, "-d")
@@ -706,6 +730,11 @@ class RuntimeSession:
         if self.persistent_database:
             at = argv.index("--entrypoint")
             argv[at:at] = ["--mount", self._volume_mount()]
+        if self.use_image_command:
+            at = argv.index('--entrypoint')
+            del argv[at:at+2]
+            at = argv.index(self.image)
+            del argv[at+1:]  # no argv override, wrapper, producer Dockerfile or correction overlay
         rc, out, err = _run_tracked(argv, "", None, 15)
         if rc:
             raise _unavailable(f"Runtime container failed: {out} {err}")
@@ -713,6 +742,18 @@ class RuntimeSession:
         if self.identifier is None or out.strip() != self.identifier:
             raise _unavailable("Runtime container launch identity absent or mismatched")
         self.transition = False
+
+    def _attest_image_command(self):
+        result = _docker_call([self.docker,'image','inspect',self.image,'--format','{{json .}}'],
+            capture_output=True,text=True,timeout=3,check=False)
+        try:
+            value = json.loads(result.stdout)
+            config = value['Config']
+            if (result.returncode or value['Id'] != self.image or config.get('WorkingDir') != '/app' or
+                config.get('Entrypoint') not in (None,[]) or config.get('Cmd') != self.command):
+                raise ValueError('immutable image command differs')
+        except (ValueError,KeyError,TypeError) as exc:
+            raise _unavailable('Baked command/entrypoint differs from the exact reviewed runtime argv') from exc
 
     def _assert_owned(self) -> str:
         if self.closed or self.transition or self.identifier is None:
@@ -836,6 +877,7 @@ class RuntimeSession:
                 config = data["HostConfig"]
                 return {"version": 1, "container_id": identifier, "owner": self.owner, "image_id": data["Image"],
                         "running": data["State"]["Running"], "user": data["Config"]["User"],
+                        "runtime_command": data['Config'].get('Cmd'), "runtime_entrypoint": data['Config'].get('Entrypoint'),
                         "read_only": config["ReadonlyRootfs"], "cap_drop": config["CapDrop"],
                         "privileged": config["Privileged"], "security_opt": config["SecurityOpt"],
                         "network_mode": config["NetworkMode"], "published_ports": config.get("PortBindings") or {},

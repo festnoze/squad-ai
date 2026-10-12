@@ -77,7 +77,8 @@ def fake_delivery(tmp_path,monkeypatch):
         def _image(self,name):
             if name.startswith('autospec/clean-env:'):
                 return {'Id':'sha256:'+('f' if conditions['tag_drift'] else 'c')*64}
-            return {'Id':'sha256:'+'f'*64,'Config':{'Labels':{'autospec.snapshot':'0'*64 if conditions['wrong_image'] else snapshot}}}
+            return {'Id':'sha256:'+'f'*64,'Config':{'Labels':{'autospec.snapshot':'0'*64 if conditions['wrong_image'] else snapshot},
+                'Cmd':['/opt/venv/bin/python','main.py'],'Entrypoint':None}}
     def isolated(argv,stage,image,**kwargs):
         commands.append(('frontend',argv))
         if conditions['frontend_rc']==0:

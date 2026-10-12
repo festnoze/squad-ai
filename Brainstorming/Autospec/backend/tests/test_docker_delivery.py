@@ -570,10 +570,15 @@ def deploy_env(monkeypatch):
 
     async def _agit_snapshot(self, ws, label):
         git_calls.append(("snapshot", label))
+        # The mocked checkpoint owns a repository marker and the Git read
+        # below returns this exact workspace, not an enclosing checkout.
+        (ws / ".git").mkdir(parents=True, exist_ok=True)
         return True
 
     async def _agit(self, ws, *args):
         git_calls.append(args)
+        if args == ("rev-parse", "--show-toplevel"):
+            return 0, str(ws.resolve())
         return 0, ""
 
     async def _arun_pytest(self, ws=None):
@@ -777,5 +782,6 @@ async def test_phase_repair_rolls_back_when_fix_breaks_suite(monkeypatch, deploy
 
     assert await pipeline._adocker_delivery_phase() is False
     assert pipeline._delivery_blocked is True
+    assert ("rev-parse", "--show-toplevel") in git_calls
     assert ("reset", "--hard", "HEAD") in git_calls
     assert ("clean", "-fd") in git_calls
