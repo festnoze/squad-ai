@@ -104,6 +104,57 @@ async def test_e2e_coordinator_executes_both_modes_and_preserves_missing_capabil
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("fault",[None,"duplicate","image_scope","unreviewed","changed_raw_mode","changed_source","changed_mapping","narrated_pass"])
+async def test_e2e_reuse_requires_exact_native_12_mode_source_and_review_seal(tmp_path,fault):
+    # Protocol-only fixtures: no assertion of real benchmark UI/API execution.
+    # Their scoped JSON artifacts test cached receipt validation, not app PASS.
+    import json
+    from dataclasses import asdict,replace
+    from autospec.validation.coordinator import publish_reviewed_e2e,_reuse_reviewed_e2e
+    from autospec.validation.quality_contracts import write_quality_review_package,NativeSuiteSpec
+    from autospec.validation.final_gate import source_snapshot
+    source=tmp_path/"source";source.mkdir();(source/"main.py").write_bytes(b"# protocol receipt fixture only")
+    snapshot=source_snapshot(source).digest;root=tmp_path/"supervisor";root.mkdir()
+    contract=SimpleNamespace(contract_hash=CONTRACT,brief_hash="b"*64,reference_hash="d"*64,
+        reference="## 8. Six parcours E2E minimum\n"+"\n".join(f"{i}. Source scenario {i}" for i in range(1,7))+"\n## 9. End",
+        requirements=[SimpleNamespace(id="TST-05",expected="source exact scenarios",gate="B")])
+    package=write_quality_review_package(contract,product_root=source,destination=root/"quality",snapshot_hash=snapshot,
+        suites=(NativeSuiteSpec("backend",".","python",("main.py",),("metatest",)),),
+        requirements_mapping={"TST-05":[dict(suite="backend",test="metatest::receipt",assertion="protocol-only receipt validation")]},nominal_security_db_mocks=False)
+    review_path=root/"review.json";write_json(review_path,dict(scope="independent protocol-only review"))
+    review=Proof("R",str(review_path),hashlib.sha256(review_path.read_bytes()).hexdigest(),snapshot,CONTRACT,tuple(package["required_review_checks"]))
+    store=SupervisorEvidenceStore(root,snapshot,CONTRACT);rows=[]
+    for mode in ("alone","together"):
+        for index in range(1,7):
+            eid=f"E2E-{index:02d}";expected=f"Source scenario {index}";observed=[dict(check="protocol_receipt",passed=True)]
+            path=root/(mode+eid+".json")
+            write_json(path,dict(mode=mode,source_expected=expected,checks=observed,scope="protocol-only, not real product execution"))
+            x=Proof("X",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot,CONTRACT,("TST-05:"+eid+":protocol",))
+            vpath=root/(mode+eid+"-V.json");write_json(vpath,dict(scope="protocol stand-in, no browser proof issued"))
+            v=Proof("V",str(vpath),hashlib.sha256(vpath.read_bytes()).hexdigest(),snapshot,CONTRACT,("TST-05:"+eid+":protocol",))
+            rows.append(dict(id=eid,expected=expected,mode=mode,status="PASS",observed=observed,proofs=[asdict(x),asdict(v)],
+                snapshot_hash=snapshot,contract_hash=CONTRACT,real_ui_api_db=True,nominal_mocks=False,fixture_reset_before=True,
+                nonblank=True,unhandled_console_errors=[]))
+    sealed=await publish_reviewed_e2e(store,rows,plan_path=package["plan_path"],review=review,source_root=source)
+    if fault=="duplicate":sealed[-1]=sealed[0]
+    elif fault=="image_scope":sealed[0]["image_id"]="sha256:"+"f"*64
+    elif fault=="unreviewed":sealed[0]["quality_plan"]["review"]["passed"]=False
+    elif fault=="changed_raw_mode":
+        path=Path(sealed[0]["proofs"][0]["path"]);value=json.loads(path.read_bytes());value["mode"]="together";write_json(path,value)
+        sealed[0]["proofs"][0]["sha256"]=hashlib.sha256(path.read_bytes()).hexdigest()
+    elif fault=="changed_source":(source/"main.py").write_bytes(b"# source changed")
+    elif fault=="changed_mapping":Path(package["mapping_path"]).write_bytes(b"{}")
+    elif fault=="narrated_pass":sealed[0]["observed"]=[]
+    proofs=[Proof(**p) for row in sealed for p in row["proofs"]]
+    await store.record_native_observation("browser_e2e",sealed,source_proofs=proofs)
+    if fault is None:
+        reused=await _reuse_reviewed_e2e(contract,store,source)
+        assert len(reused)==12 and len(store.contributions["TST-05"])==24
+    else:
+        with pytest.raises(AdapterUnavailable):await _reuse_reviewed_e2e(contract,store,source)
+
+
+@pytest.mark.asyncio
 async def test_binding_proposal_can_be_reviewed_then_used_without_manual_plugin(tmp_path):
     from dataclasses import asdict
     from autospec.validation.final_gate import source_snapshot
@@ -159,7 +210,9 @@ async def test_operations_docs_audit_never_compensated_by_health_or_fixture(tmp_
         return Proof(kind,str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot,CONTRACT,checks)
     audit=raw("raw-audit",{"actual":"meta unit fixture raw audit"},checks=("OBS:audit_raw",))
     value=dict(readme=dict(path="README.md",sha256=hashlib.sha256((source/"README.md").read_bytes()).hexdigest()),
-        documented_commands=[dict(argv=["/opt/venv/bin/python","main.py","migrate"],return_code=0)],
+        # Typed schema-admission protocol only, not a benchmark execution.
+        documented_commands=[dict(obligation=name,argv=["fixture-protocol",name],return_code=0)
+            for name in ("install","tests","coverage","e2e","launch","seed","migration","backup","restore")],
         configuration=[dict(path="config.py",source_sha256=hashlib.sha256((source/"config.py").read_bytes()).hexdigest(),secrets_found=[])],
         fixtures_explicit=True,accounts_before_fixture=0,
         audit=dict(status="UNAVAILABLE" if finding=="unavailable" else "AVAILABLE",date="2026-10-12T00:00:00Z",tool="independent fixture audit",

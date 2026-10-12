@@ -1,0 +1,289 @@
+"""Independent delivery receipt predicates; protocol fixtures are not app PASS."""
+import copy
+import hashlib
+import json
+import os
+import uuid
+
+import pytest
+
+from autospec.validation.delivery_evidence import delivery_build_checks
+from autospec.validation.final_gate import source_snapshot
+from autospec.validation.support_adapter import AdapterUnavailable
+from autospec.orchestrator.validation_environment import LinuxEnvironmentManager, RECIPE_VERSION
+from autospec.orchestrator.isolated_validation import _node_command, build_delivery_image
+
+
+@pytest.fixture
+def receipt_fixture(tmp_path):
+    root = tmp_path / "source"; root.mkdir()
+    (root / "pyproject.toml").write_text('[project]\nname="receipt-meta"\nversion="1"\ndependencies=[]\n')
+    (root / "uv.lock").write_text('version=1\nrevision=3\n')
+    (root / "main.py").write_text('# NEVER execute product code on host\n')
+    front=root / "frontend"; front.mkdir()
+    (front / "package.json").write_text('{"name":"receipt-meta-front"}')
+    (front / "package-lock.json").write_text('{"lockfileVersion":3,"packages":{}}')
+    (front / "tsconfig.json").write_text('{"compilerOptions":{"strict":true}}')
+    snapshot=source_snapshot(root).digest
+    images={}; commands=[]
+    for kind, path, eco, mode, char in (("backend_install",root,"python","runtime","a"),("frontend_install",front,"node","test","b")):
+        manifest=path / ("pyproject.toml" if eco=="python" else "package.json")
+        lock=path / ("uv.lock" if eco=="python" else "package-lock.json")
+        digest="factory/base@sha256:"+"e"*64
+        sha=lambda data:hashlib.sha256(data).hexdigest()
+        inputs=dict(version=RECIPE_VERSION,ecosystem=eco,mode=mode,manifest=sha(manifest.read_bytes()),lock=sha(lock.read_bytes()),
+            toolchain_image="sha256:"+"c"*64,platform="linux/amd64",supervisor_reporter="native",toolchain_digest=digest,
+            recipe_template_sha256=sha(LinuxEnvironmentManager._recipe(digest,eco,mode,"FINGERPRINT",manifest).encode()))
+        fingerprint=sha(json.dumps(inputs,sort_keys=True).encode())
+        recipe=LinuxEnvironmentManager._recipe(digest,eco,mode,fingerprint,manifest)
+        image="sha256:"+char*64;attestation=dict(inputs=inputs,image=image,recipe_sha256=sha(recipe.encode()))
+        builder=dict(inputs=inputs,fingerprint=fingerprint,attestation=attestation,image_id=image,status="cache_attested",rc=None,argv=None)
+        import shlex
+        install=next(line[4:] for line in recipe.splitlines() if line.startswith(("RUN uv sync ","RUN npm ci ")))
+        commands.append(dict(kind=kind,argv=shlex.split(install),rc=None,execution="attested-cache",environment_fingerprint=fingerprint,
+            image_id=image,attestation=attestation,builder=builder))
+        images[image]=dict(Id=image,Config=dict(Labels={"autospec.environment":fingerprint}))
+    commands.append(dict(kind="typecheck_frontend_build",components=["typecheck","frontend_build"],rc=0,isolated=True,
+        image_id=commands[1]["image_id"],environment_fingerprint=commands[1]["environment_fingerprint"],
+        argv=_node_command(["/bin/sh","-c","node /opt/node_modules/typescript/bin/tsc -b --pretty false && exec node /opt/node_modules/vite/bin/vite.js build"],dist=True)))
+    image="sha256:"+"d"*64
+    recipe=f'FROM autospec/clean-env:{commands[0]["environment_fingerprint"]}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\nENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nCMD ["/opt/venv/bin/python", "main.py"]\nLABEL autospec.snapshot={snapshot}\n'
+    commands.append(dict(kind="image_build",rc=0,isolated=True,argv=["docker","build","--pull=false","--network=none","-t","meta/image","."],recipe_sha256=hashlib.sha256(recipe.encode()).hexdigest()))
+    images[image]=dict(Id=image,Config=dict(Labels={"autospec.snapshot":snapshot}))
+    receipt=dict(version=1,status="PASS",snapshot_hash=snapshot,image_id=image,image_tag="meta/image",isolated=True,
+        no_host_dependencies=True,manifest_only_install=True,locks_sha256={"uv.lock":hashlib.sha256((root/"uv.lock").read_bytes()).hexdigest(),
+        "frontend/package-lock.json":hashlib.sha256((front/"package-lock.json").read_bytes()).hexdigest()},commands=commands,
+        frontend_files={"frontend/dist/index.html":"f"*64})
+    return root,snapshot,receipt,images
+
+
+def test_attested_cache_does_not_need_or_manufacture_install_rc0(receipt_fixture):
+    root,snapshot,receipt,images=receipt_fixture
+    before=copy.deepcopy(receipt)
+    rows=delivery_build_checks(receipt,root,snapshot,image_lookup=images.__getitem__)
+    assert rows and all(row["passed"] for row in rows)
+    assert receipt==before and all(c["rc"] is None for c in receipt["commands"][:2])
+
+
+def test_native_layer_builder_is_observed_not_install_exit_code(receipt_fixture):
+    root,snapshot,receipt,images=receipt_fixture
+    command=receipt["commands"][0];fingerprint=command["environment_fingerprint"]
+    command["execution"]="attested-layer"
+    command["builder"].update(status="build_attested",rc=0,recipe_sha256=command["attestation"]["recipe_sha256"],
+        argv=["docker","build","--pull=false","--network=default","--label","autospec.environment="+fingerprint,"-t","autospec/clean-env:"+fingerprint,"."])
+    assert all(r["passed"] for r in delivery_build_checks(receipt,root,snapshot,image_lookup=images.__getitem__))
+    assert command["rc"] is None
+    command["builder"]["rc"]=1
+    assert not all(r["passed"] for r in delivery_build_checks(receipt,root,snapshot,image_lookup=images.__getitem__))
+
+
+@pytest.mark.parametrize("fault",["fictional_install_rc","missing_inputs","wrong_lock","wrong_manifest","wrong_recipe","duplicate","missing_typecheck","failed_tsc","wrong_image","wrong_snapshot_label","drift_source"])
+def test_faulty_receipt_never_admitted(receipt_fixture,fault):
+    root,snapshot,receipt,images=receipt_fixture
+    command=receipt["commands"][0]
+    if fault=="fictional_install_rc":command["rc"]=0
+    elif fault=="missing_inputs":command["attestation"]["inputs"].pop("platform")
+    elif fault=="wrong_lock":receipt["locks_sha256"]["uv.lock"]="0"*64
+    elif fault=="wrong_manifest":command["attestation"]["inputs"]["manifest"]="0"*64
+    elif fault=="wrong_recipe":command["attestation"]["recipe_sha256"]="0"*64
+    elif fault=="duplicate":receipt["commands"].append(copy.deepcopy(command))
+    elif fault=="missing_typecheck":receipt["commands"][2]["kind"]="frontend_build"
+    elif fault=="failed_tsc":receipt["commands"][2]["rc"]=2
+    elif fault=="wrong_image":images[command["image_id"]]["Id"]="sha256:"+"0"*64
+    elif fault=="wrong_snapshot_label":images[receipt["image_id"]]["Config"]["Labels"]["autospec.snapshot"]="0"*64
+    elif fault=="drift_source":(root/"main.py").write_bytes(b"# changed after build")
+    try: rows=delivery_build_checks(receipt,root,snapshot,image_lookup=images.__getitem__)
+    except AdapterUnavailable: return
+    assert any(r["passed"] is False for r in rows),fault
+
+
+def test_failed_build_without_image_is_failure_not_missing_capability(receipt_fixture):
+    root,snapshot,receipt,images=receipt_fixture
+    receipt.update(status="FAIL",image_id=None,commands=[],frontend_files={})
+    assert delivery_build_checks(receipt,root,snapshot,image_lookup=images.__getitem__)==[
+        dict(check="native_build_status",passed=False,observed=dict(status="FAIL",error=None))]
+
+
+@pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_LINUX_VALIDATION")!="1",reason="Explicit opt-in native locked Linux install/tsc/Vite/image/cache validation")
+def test_real_build_and_current_image_attestations_admitted(tmp_path):
+    from tests.test_delivery_build_receipts import _source
+    from autospec.orchestrator.sandbox import _docker_call
+    root=tmp_path/"source";_source(root,True)
+    (root/"uv.lock").unlink();(root/"frontend/package-lock.json").unlink()
+    manager=LinuxEnvironmentManager(tmp_path/"locks",timeout=600)
+    manager.ensure_lock(root,"python");manager.ensure_lock(root/"frontend","node")
+    snapshot=source_snapshot(root).digest
+    tag="autospec/delivery-check:"+uuid.uuid4().hex
+    try:
+        ok,output=build_delivery_image(root,tag,evidence_root=tmp_path/"evidence",snapshot_hash=snapshot,timeout=600)
+        assert ok,output
+        receipt=json.loads((tmp_path/"evidence/delivery-build.json").read_text())
+        rows=delivery_build_checks(receipt,root,snapshot)
+        assert all(r["passed"] for r in rows),rows
+        assert not (root/".venv").exists() and not (root/"frontend/node_modules").exists()
+    finally:
+        _docker_call(["docker","image","rm",tag],capture_output=True,text=True,timeout=10)
+
+
+@pytest.mark.parametrize("fault",[None,"missing_dependency","skipped_dependency","status_contradiction","error","invalid_json"])
+def test_raw_pip_audit_parser_requires_exact_complete_lock_inventory(fault):
+    from autospec.validation.delivery_evidence import _audit_findings
+    report=dict(dependencies=[dict(name="idna",version="3.10",vulns=[])])
+    run=dict(return_code=0,stdout=json.dumps(report))
+    if fault=="missing_dependency":run["stdout"]='{"dependencies":[]}'
+    elif fault=="skipped_dependency":report["dependencies"][0]["skip_reason"]="not on platform";run["stdout"]=json.dumps(report)
+    elif fault=="status_contradiction":run["return_code"]=1
+    elif fault=="error":run["return_code"]=2
+    elif fault=="invalid_json":run["stdout"]="network unavailable"
+    if fault is None: assert _audit_findings("python",run,[("idna","3.10")])==[]
+    else:
+        with pytest.raises((AdapterUnavailable,ValueError)): _audit_findings("python",run,[("idna","3.10")])
+
+
+def test_advisory_is_not_inferred_to_be_exploitable_without_exact_review(tmp_path):
+    from autospec.validation.delivery_evidence import apply_audit_review,audit_review_subject
+    from autospec.validation.support_adapter import Proof
+    from dataclasses import asdict,replace
+    snapshot,contract="a"*64,"c"*64
+    raw=dict(status="AVAILABLE",findings=[dict(scope="frontend",package="dev-tool",id="npm:123",severity="high",exploitable=None,arbitration=None)],artifacts=[])
+    path=tmp_path/"independent-audit-review.json"
+    assessment=dict(scope="frontend",package="dev-tool",id="npm:123",severity="high",exploitable=False,arbitration=None,rationale="Independent fixture review: build-only package, no delivered runtime route imports it.")
+    path.write_text(json.dumps(dict(assessments=[assessment])))
+    proof=Proof("R",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),snapshot,contract,("OPS-05:audit:"+audit_review_subject(raw),))
+    reviewed=apply_audit_review(raw,proof,evidence_root=tmp_path,snapshot_hash=snapshot,contract_hash=contract)
+    assert reviewed["findings"][0]["exploitable"] is False
+    assert raw["findings"][0]["exploitable"] is None
+    for bad in (replace(proof,passed=False),replace(proof,checks=("OPS-05:audit",)),replace(proof,snapshot_hash="f"*64)):
+        with pytest.raises(AdapterUnavailable):apply_audit_review(raw,bad,evidence_root=tmp_path,snapshot_hash=snapshot,contract_hash=contract)
+    path.write_text('{"assessments":[]}')
+    with pytest.raises(AdapterUnavailable):apply_audit_review(raw,proof,evidence_root=tmp_path,snapshot_hash=snapshot,contract_hash=contract)
+
+
+def _delivery_plan(source,root,snapshot,fixture_fingerprint,*,negative=False):
+    from autospec.validation.delivery_evidence import ReviewedDeliveryPlan
+    from autospec.validation.support_adapter import Proof
+    readme=source/"README.md";config=source/"config.py"
+    commands=[dict(label="migration",obligation="migration",execution="runtime",documented_text="/opt/venv/bin/python main.py migrate_fresh",
+        argv=["/opt/venv/bin/python","main.py","migrate_fresh"],action="migrate_fresh",parameters={})]
+    if negative:commands.append(dict(label="negative",obligation="negative",execution="runtime",documented_text="/opt/venv/bin/python main.py reject",
+        argv=["/opt/venv/bin/python","main.py","reject"],action="reject",parameters={}))
+    data=dict(version=1,snapshot_hash=snapshot,contract_hash="c"*64,
+        readme=dict(path="README.md",sha256=hashlib.sha256(readme.read_bytes()).hexdigest()),
+        configuration=[dict(path="config.py",sha256=hashlib.sha256(config.read_bytes()).hexdigest())],commands=commands,
+        migration_label="migration",fixture_case="VERTICAL",fixtures_fingerprint=fixture_fingerprint)
+    review_path=root/"delivery-review.json";review_path.parent.mkdir(parents=True,exist_ok=True)
+    review_path.write_text(json.dumps(dict(scope="Independent delivery fixture review only; not benchmark acceptance",
+        configuration_assessments={"config.py":dict(source_sha256=data["configuration"][0]["sha256"],secrets_found=[])})))
+    proof=Proof("R",str(review_path),hashlib.sha256(review_path.read_bytes()).hexdigest(),snapshot,"c"*64,())
+    plan=ReviewedDeliveryPlan(data,proof)
+    from dataclasses import replace
+    return replace(plan,review=replace(proof,checks=("PRODUCT:delivery:"+plan.fingerprint,"OPS-05:README","OPS-05:config")))
+
+
+def test_delivery_plan_pins_real_readme_commands_and_config_review(tmp_path):
+    import shutil
+    from pathlib import Path
+    source=tmp_path/"source";source.mkdir();root=tmp_path/"supervisor"
+    for path in (Path(__file__).parent/"fixtures/delivery").iterdir():shutil.copyfile(path,source/path.name)
+    snapshot=source_snapshot(source).digest
+    plan=_delivery_plan(source,root,snapshot,"e"*64)
+    with pytest.raises(AdapterUnavailable,match="obligations absent"):plan.validate(source,root,snapshot,"c"*64)
+    plan.validate(source,root,snapshot,"c"*64,required_obligations={"migration"})
+    assert "PASS" not in plan.data.values()
+    plan.data["commands"][0]["argv"]=["python","evil.py"]
+    with pytest.raises(AdapterUnavailable):plan.validate(source,root,snapshot,"c"*64)
+
+
+@pytest.mark.asyncio
+async def test_timing_requires_native_artifacts_and_all_phases(tmp_path):
+    from autospec.validation.delivery_evidence import NativeTimingRecorder,_native_proof
+    timer=NativeTimingRecorder(evidence_root=tmp_path,snapshot_hash="a"*64,contract_hash="c"*64)
+    async def operation():return {"actual":"protocol measurement, not a product execution"}
+    with pytest.raises(AdapterUnavailable): await timer.measure("tests",operation,lambda result:[])
+    proof=_native_proof(tmp_path,"measured-protocol",dict(protocol_only=True),"a"*64,"c"*64,checks=("METATEST:timing",))
+    assert await timer.measure("tests",operation,lambda result:[proof])==await operation()
+    assert timer.phases[0][0]["seconds"]>=0
+    with pytest.raises(AdapterUnavailable):await timer.publish()
+
+
+def test_native_split_clock_ingest_does_not_invent_or_double_count_install(tmp_path):
+    from autospec.validation.delivery_evidence import NativeTimingRecorder,_native_proof
+    timer=NativeTimingRecorder(evidence_root=tmp_path,snapshot_hash="a"*64,contract_hash="c"*64)
+    install=dict(phase="install",seconds=2.0,started_at="2026-10-12T10:00:00Z",ended_at="2026-10-12T10:00:02Z")
+    tests=dict(phase="tests",seconds=1.0,started_at="2026-10-12T10:00:02Z",ended_at="2026-10-12T10:00:03Z")
+    receipt=dict(argv=["protocol-fixture"],return_code=0,image_id="sha256:"+"b"*64,environment_fingerprint="d"*64,
+        timing=tests,environment_preparation=install)
+    proof=_native_proof(tmp_path,"split-clocks",receipt,"a"*64,"c"*64,checks=("METATEST:split_clock",))
+    timer.ingest("install",install,proof);timer.ingest("tests",tests,proof)
+    assert [(row["phase"],row["seconds"]) for row,_ in timer.phases]==[("install",2.0),("tests",1.0)]
+    with pytest.raises(AdapterUnavailable):timer.ingest("tests",dict(tests,seconds=3.0),proof)
+    with pytest.raises(AdapterUnavailable):timer.ingest("install",tests,proof)
+
+
+@pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_LINUX_VALIDATION")!="1",reason="Explicit opt-in real advisory networking, locked public package facts only")
+@pytest.mark.asyncio
+async def test_real_manifest_only_python_audit_never_imports_product(tmp_path,monkeypatch):
+    from autospec.validation.delivery_evidence import collect_manifest_audit
+    source=tmp_path/"source";source.mkdir()
+    (source/"pyproject.toml").write_text('[project]\nname="audit-native-fixture"\nversion="1"\nrequires-python=">=3.12"\ndependencies=["idna==3.10"]\n')
+    (source/"main.py").write_bytes(b'raise RuntimeError("MUST NEVER execute while audit has network")')
+    (source/"socket.py").write_bytes(b'raise RuntimeError("must never shadow audit stdlib")')
+    monkeypatch.setenv("AUTOSPEC_SENTINEL_SECRET","must-not-enter-advisory-query")
+    manager=LinuxEnvironmentManager(tmp_path/"cache",timeout=600);manager.ensure_lock(source,"python")
+    snapshot=source_snapshot(source).digest
+    raw=await collect_manifest_audit(source,snapshot,"c"*64,tmp_path/"evidence",timeout=600)
+    assert raw["status"]=="AVAILABLE" and raw["report_valid"],raw
+    assert raw["reports"] and raw["artifacts"]
+    for proof in raw["artifacts"]:
+        path=__import__("pathlib").Path(proof["path"])
+        assert hashlib.sha256(path.read_bytes()).hexdigest()==proof["sha256"]
+        assert b"must-not-enter-advisory-query" not in path.read_bytes()
+        observed=json.loads(path.read_bytes())["value"]
+        assert set(observed["context_files"])=={"requirements.txt","runner.py","Dockerfile"}
+        assert observed["run"]["tool"]=="pip-audit==2.10.1"
+    assert source_snapshot(source).digest==snapshot
+
+
+@pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_PRODUCT_HARNESS")!="1",reason="Explicit opt-in real Linux README CLI+SQLite fixture and negative rc")
+@pytest.mark.asyncio
+@pytest.mark.parametrize("negative",[False,True])
+async def test_real_readme_collects_isolated_cli_defaults_and_negative_rc(tmp_path,negative):
+    # Deliberately narrow fixture obligations. Production default additionally
+    # requires install/coverage/E2E/backup/restore and cannot award OPS05 from
+    # this four-command fixture. All executed source is inside Linux NETNONE.
+    import shutil
+    from pathlib import Path
+    from autospec.validation.delivery_evidence import NativeDeliveryCollector,ReviewedDeliveryPlan
+    from autospec.validation.support_adapter import Proof
+    from tests.test_product_harness import ROOT,session
+    from dataclasses import replace
+    source=tmp_path/"source";source.mkdir();root=tmp_path/"supervisor";root.mkdir()
+    for path in ROOT.iterdir():
+        if path.is_file():shutil.copyfile(path,source/path.name)
+    for path in (Path(__file__).parent/"fixtures/delivery").iterdir():shutil.copyfile(path,source/path.name)
+    manifest=source/"pyproject.toml"
+    manifest.write_text(manifest.read_text()+'\n[project.optional-dependencies]\ndev=["pytest==8.4.2"]\n')
+    (source/"test_readme.py").write_text('import sqlite3\ndef test_actual_sqlite_file(tmp_path):\n p=tmp_path/"actual.sqlite"\n c=sqlite3.connect(p)\n c.execute("CREATE TABLE check_table(id INTEGER PRIMARY KEY)")\n c.execute("INSERT INTO check_table VALUES(1)")\n c.commit()\n c.close()\n with sqlite3.connect(p) as d: assert d.execute("SELECT count(*) FROM check_table").fetchone()[0]==1\n')
+    readme=source/"README.md";readme.write_text(readme.read_text()+"\nReal isolated CLI: pytest -q\nLauncher: /opt/venv/bin/python main.py\nExplicit seed: /opt/venv/bin/python main.py seed\n")
+    manager=LinuxEnvironmentManager(root/"cache",timeout=600);manager.regenerate_lock(source,"python")
+    snapshot=source_snapshot(source).digest
+    context=session((root,source,snapshot),root)
+    binding=replace(context.bindings,fixture_fingerprint=context.factory.fingerprint)
+    context.bindings=replace(binding,review=replace(binding.review,checks=("PRODUCT:bindings","PRODUCT:bindings:"+binding.fingerprint())))
+    plan=_delivery_plan(source,root,snapshot,context.bindings.fixture_fingerprint,negative=negative)
+    plan.data["commands"].extend([
+        dict(label="tests",obligation="tests",execution="isolated_command",documented_text="pytest -q",argv=["pytest","-q"],root=".",ecosystem="python"),
+        dict(label="launch",obligation="launch",execution="runtime_launch",documented_text="/opt/venv/bin/python main.py",argv=["/opt/venv/bin/python","main.py"]),
+        dict(label="seed",obligation="seed",execution="fixture_provisioning",action="seed",documented_text="/opt/venv/bin/python main.py seed",argv=["/opt/venv/bin/python","main.py","seed"])])
+    plan=replace(plan,review=replace(plan.review,checks=("PRODUCT:delivery:"+plan.fingerprint,"OPS-05:README","OPS-05:config")))
+    collector=NativeDeliveryCollector(plan,source_root=source,evidence_root=root,snapshot_hash=snapshot,contract_hash="c"*64,
+        required_obligations={"migration","tests","launch","seed"})
+    audit=dict(status="UNAVAILABLE",date="2026-10-12T00:00:00Z",tool="not run in this README fixture",report_valid=False,return_code=None,findings=[],artifacts=[])
+    async with context as harness:
+        value=await collector.collect(harness,audit=audit)
+    assert value["accounts_before_fixture"]==0 and value["fixtures_explicit"] is True
+    tests=next(c for c in value["documented_commands"] if c["label"]=="tests")
+    assert tests["argv"]==["pytest","-q"] and tests["return_code"]==0 and tests["isolated"] is True and tests["mode"]=="test"
+    assert any(c.get("return_code")==9 for c in value["documented_commands"]) is negative
+    # Unavailable audit remains unavailable despite real README success.
+    assert value["audit"]["status"]=="UNAVAILABLE"
