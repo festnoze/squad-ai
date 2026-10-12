@@ -622,9 +622,14 @@ class BrowserVerifier:
                 if page is staff:
                     await page.goto(self.harness.adapter.base_url+self.harness.routes["ticket"].format(id=tid));await self.detail_ready(page)
                     await self.ui(page,"visibility").select_option(visibility)
-                await self.ui(page,"reply").fill(payload);await self.ui(page,"send").click()
-                await self.ui(page,"messages").get_by_text(payload,exact=True).wait_for()
-                c.check("literal_"+visibility,await self.ui(page,"messages").get_by_text(payload,exact=True).is_visible())
+                await self.ui(page,"reply").fill(payload)
+                async with page.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path==f"/api/tickets/{tid}/messages") as sent:
+                    await self.ui(page,"send").click()
+                c.check("literal_http_"+visibility,(await sent.value).status,201)
+                messages=self.ui(page,"messages")
+                if visibility=="internal":messages=messages.locator(self.harness.bindings["internal_note"])
+                await messages.get_by_text(payload,exact=True).wait_for()
+                c.check("literal_"+visibility,await messages.get_by_text(payload,exact=True).is_visible())
                 c.check("no_js_"+visibility,await page.evaluate("window.__security_probe===undefined"))
                 c.check("one_literal_db_message_"+visibility,await self.harness.adapter.observe("browser_message_count",ticket_id=tid,content=payload),1 if visibility=="public" else 2)
             uid=await self._create_account_ui(c,admin,role="agent",actor="xss_actor",display_name=payload)

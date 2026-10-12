@@ -400,6 +400,7 @@ class QualityVerifier:
         for suite in suites:
             name = suite["name"]
             check(name + "_exit", suite["return_code"], 0)
+            check(name+"_no_failures",suite["failed"],0)
             check(name + "_collected", type(suite["collected"]) is int and suite["collected"] > 0, True)
             check(name + "_accounted", suite["passed"] + suite["failed"] + suite["skipped"] + suite["xfail"], suite["collected"])
             check(name + "_critical_skip", suite["critical_skipped"] + suite["critical_xfail"], 0)
@@ -426,9 +427,11 @@ class QualityVerifier:
             self._artifact_intact(report["raw_report"])
             inventory = report["source_inventory"]
             files = report["files"]
-            check(suite + "_complete_inventory", bool(inventory) and set(inventory) == set(files), True)
+            check(suite + "_complete_inventory", bool(inventory) and len(inventory)==len(set(inventory)) and set(inventory) == set(files), True)
             check(suite + "_business_exclusions", report["business_excluded"], [])
             for metric, threshold in metrics.items():
+                check(suite+metric+"_valid_file_counts",all(type(row[metric]["total"]) is int and type(row[metric]["covered"]) is int
+                    and 0<=row[metric]["covered"]<=row[metric]["total"] for row in files.values()),True)
                 included = sum(row[metric]["total"] for row in files.values())
                 covered = sum(row[metric]["covered"] for row in files.values())
                 check(suite + metric + "_denominator", report[metric]["total"], included)
@@ -448,10 +451,13 @@ class QualityVerifier:
 
     async def _tst05(self, check):
         runs = await self.adapter.observe("browser_e2e")
-        expected = {s["id"] for s in source_e2e_scenarios(self.contract)}
+        scenarios={s["id"]:s["expected"] for s in source_e2e_scenarios(self.contract)}
+        expected = set(scenarios)
         for mode in ["alone", "together"]:
             rows = [r for r in runs if r["mode"] == mode]
             check(mode + "_exact_six", len(rows) == 6 and {r["id"] for r in rows} == expected, True)
+        for mode in ["alone", "together"]:
+            rows = [r for r in runs if r["mode"] == mode]
             for row in rows:
                 if row["status"] not in {"PASS","FAIL"}:
                     raise AdapterUnavailable("E2E scenario was not verified: " + row["id"])
@@ -460,6 +466,21 @@ class QualityVerifier:
                 check(mode + row["id"] + "_console", row["unhandled_console_errors"], [])
                 check(mode + row["id"] + "_not_blank", row["nonblank"], True)
                 check(mode + row["id"] + "_isolated_fixture", row["fixture_reset_before"], True)
+                scoped=[]
+                for raw in row.get("proofs",[]):
+                    proof=Proof(**raw)
+                    if proof.intact(snapshot_hash=await self.adapter.snapshot_hash(),contract_hash=self.contract_hash) and any(
+                            tag.startswith("TST-05:"+row["id"]+":") for tag in proof.checks):scoped.append(proof)
+                if not {"X","V"}<={p.type for p in scoped}:
+                    raise AdapterUnavailable("each E2E needs exact intact X/V, not one generic screenshot")
+                check(mode+row["id"]+"_proofs_passed",all(p.passed is True for p in scoped),True)
+                executed=[]
+                for proof in scoped:
+                    if proof.type=="X":
+                        body=json.loads(Path(proof.path).read_text(encoding="utf-8"))
+                        if body.get("mode")==mode and body.get("source_expected")==scenarios[row["id"]] and body.get("checks")==row.get("observed"):
+                            executed.append(proof)
+                if not executed:raise AdapterUnavailable("E2E X proof belongs to another mode/source scenario")
 
     async def _tst06(self, check):
         mutation = await self.adapter.observe("authorization_mutation")
@@ -475,6 +496,17 @@ class QualityVerifier:
         check("original_pass", mutation["original_status"], "PASS")
         check("mutation_detected", mutation["mutated_status"], "FAIL")
         check("independent_probes", {"SEC-09", "SEC-10", "FUN-06"} <= set(mutation["independent_probes"]), True)
+        for key,identity in [("original_results",await self.adapter.snapshot_hash()),("mutated_results",mutation.get("mutation_snapshot_hash"))]:
+            rows=mutation.get(key)
+            if not isinstance(rows,dict) or set(rows)!={"SEC-09","SEC-10","FUN-06"}:
+                raise AdapterUnavailable("authorization mutation needs three real executed probe receipts on each version")
+            for rid,row in rows.items():
+                if not row.get("observed") or not any(Proof(**p).type=="X" and Proof(**p).intact(
+                        snapshot_hash=identity,contract_hash=self.contract_hash) and any(t==rid or t.startswith(rid+":") for t in Proof(**p).checks)
+                        for p in row.get("proofs",[])):
+                    raise AdapterUnavailable("missing exact mutation execution proof: "+rid)
+        check("actual_original_probe_outcomes",all(r["status"]=="PASS" for r in mutation["original_results"].values()),True)
+        check("actual_mutation_probe_outcomes",any(r["status"]=="FAIL" for r in mutation["mutated_results"].values()),True)
 
     def _artifact_intact(self,ref):
         path=Path(ref["path"]).resolve()

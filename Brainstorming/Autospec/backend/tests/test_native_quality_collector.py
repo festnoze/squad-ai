@@ -136,3 +136,9 @@ async def test_exact_mutation_copy_is_executed_over_real_http_and_original_remai
     assert policy.read_bytes()==original
     assert result["original_before_sha256"]==result["original_after_sha256"]==original_hash
     assert result["mutated_sha256"]!=original_hash
+    collector.records["authorization_mutation"]=result
+    collector.review=replace(collector.review,checks=collector.review.checks+("TST-06:mutation",))
+    collector.evidence_root=tmp_path
+    report=await QualityVerifier(collector.contract,collector).verify(subject.snapshot)
+    row=next(r for r in report["requirements"] if r["id"]=="TST-06")
+    assert row["status"]=="PASS",row

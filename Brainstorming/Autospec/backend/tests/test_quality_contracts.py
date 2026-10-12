@@ -72,6 +72,10 @@ class QualityFixture:
         elif bug=="mutation_undetected": self.observations["authorization_mutation"]["mutated_status"]="PASS"
         elif bug=="stale_report":self.observations["native_suites"][0]["raw_report"]["sha256"]="0"*64
         elif bug=="missing_coverage_report":self.observations["coverage"]["backend"].pop("raw_report")
+        elif bug=="false_green_failure":self.observations["native_suites"][0].update(passed=9,failed=1,return_code=0)
+        elif bug=="impossible_file_coverage":
+            self.observations["coverage"]["backend"]["files"]["auth.py"]["lines"]["covered"]=160
+            self.observations["coverage"]["backend"]["files"]["permissions.py"]["lines"]["covered"]=0
 
     async def contract_hash(self): return self.contract.contract_hash
     async def snapshot_hash(self): return self.snapshot
@@ -89,12 +93,14 @@ async def test_good_quality_admission_fixture_cannot_fabricate_browser_visual_ev
     report=await QualityVerifier(contract,fixture).verify(fixture.snapshot)
     results={r["id"]:r for r in report["requirements"]}
     assert results["TST-05"]["status"]=="NOT_VERIFIED"
-    assert all(r["status"]=="PASS" for rid,r in results.items() if rid!="TST-05")
+    assert results["TST-06"]["status"]=="NOT_VERIFIED"
+    assert all(r["status"]=="PASS" for rid,r in results.items() if rid not in {"TST-05","TST-06"})
 
 
 @pytest.mark.parametrize("bug,rid",[("zero_collect","TST-01"),("critical_skip","TST-01"),("auth_mock","TST-01"),
     ("missing_mapping","TST-02"),("coverage_omission","TST-03"),("coverage_low","TST-03"),
-    ("single_connection","TST-04"),("e2e_missing","TST-05"),("mutation_undetected","TST-06")])
+    ("single_connection","TST-04"),("e2e_missing","TST-05"),("mutation_undetected","TST-06"),
+    ("false_green_failure","TST-01"),("impossible_file_coverage","TST-03")])
 async def test_defective_quality_observation_is_rejected(tmp_path,bug,rid):
     contract=browser_contract(); fixture=QualityFixture(tmp_path/"fixture",contract,bug)
     report=await QualityVerifier(contract,fixture).verify(fixture.snapshot)
@@ -148,4 +154,10 @@ async def test_TST_05_admits_twelve_actual_browser_runs_and_intact_visual_proofs
         assert result["status"]=="PASS",result
         assert {"X","V"}<={p["type"] for p in result["proofs"]}
         assert len(runs)==12 and all(r["nonblank"] and r["unhandled_console_errors"]==[] for r in runs)
+        retain_browser_fixture_report(report,subject)
+        first=next(r for r in runs if r["id"]=="E2E-01" and r["mode"]=="alone")
+        other=next(r for r in runs if r["id"]=="E2E-01" and r["mode"]=="together")
+        first["proofs"]=other["proofs"]
+        swapped=await QualityVerifier(contract,fixture).verify(subject.snapshot)
+        assert next(r for r in swapped["requirements"] if r["id"]=="TST-05")["status"]=="NOT_VERIFIED"
     finally:subject.stop_http()
