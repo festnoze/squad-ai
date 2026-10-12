@@ -202,6 +202,7 @@ class BrowserVerifier:
     def __init__(self, contract, harness):
         self.contract, self.harness = contract, harness
         self.contract_hash, self.snapshot = contract.contract_hash, ""
+        self.created_titles={}
         facts = [f for f in contract.facts if f.kind == "browser_profile"]
         self.profile = facts[0].expected if len(facts) == 1 and set(BROWSER_IDS) <= set(facts[0].requirement_ids) else None
 
@@ -278,16 +279,23 @@ class BrowserVerifier:
     def ui(self, page, name): return self.harness.control(page, name)
 
     async def detail_ready(self, page):
-        await self.ui(page, "detail_title").filter(has_text=re.compile(r"\S")).wait_for()
+        expected=self.created_titles.get(page)
+        pattern=re.compile("^"+re.escape(expected)+"$") if expected else re.compile(r"\S")
+        await self.ui(page, "detail_title").filter(has_text=pattern).wait_for()
 
     async def login(self, case, page, actor):
         account = self.harness.adapter.manifest.accounts[actor]
         await self.ui(page, "email").fill(account.email)
         await self.ui(page, "password").fill(account.password)
-        await self.ui(page, "login").click()
-        case.check("real_login_" + actor, await case.visible(page, "ticket_list"))
+        async with page.expect_response(lambda r:r.request.method=="POST" and urlsplit(r.url).path=="/api/auth/login") as response:
+            await self.ui(page, "login").click()
+        case.check("real_login_http_"+actor,(await response.value).status,200)
+        # A zero-ticket client has a genuine authenticated empty state. An
+        # empty zero-height result container is not a failed authentication.
+        case.check("real_login_" + actor, await case.visible(page, "ticket_nav"))
 
     async def create(self, case, page, title):
+        self.created_titles[page]=title
         await self.ui(page, "create").click()
         await self.ui(page, "title").fill(title)
         await self.ui(page, "description").fill("Independent browser probe description long enough")
@@ -592,7 +600,8 @@ class BrowserVerifier:
                 data=await response.json();c.check(key+"_page"+str(page)+"_private_absent",not any(m in json.dumps(data) for m in markers))
                 c.requests.append({"method":"GET","path":f"/api/tickets/{tid}/messages","query":{"page":page,"page_size":1},"status":response.status})
             history=await p.request.get(self.harness.adapter.base_url+f"/api/tickets/{tid}/history?page_size=50")
-            c.check(key+"_events_absent",not any(m in await history.text() for m in markers))
+            history_text=await history.text()
+            c.check(key+"_events_absent",not any(m in history_text for m in markers))
         await self.ui(p,"ticket_nav").click()
         for marker in self.harness.adapter.manifest.metadata["internal_markers"]:
             await self.ui(p,"search").fill(marker)
