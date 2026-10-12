@@ -9,6 +9,7 @@ import json
 import math
 import re
 import shutil
+import shlex
 import socket
 import socketserver
 import subprocess
@@ -336,13 +337,17 @@ class IsolatedValidator:
                                        stage, environment.image, docker=self.docker, timeout=self.timeout)
             return rc, out, err, environment
 
-    def build_frontend(self, root: Path) -> tuple[int, str, Path, LinuxEnvironment]:
+    def build_frontend(self, root: Path, *, receipt: dict | None = None) -> tuple[int, str, Path, LinuxEnvironment]:
         """Vite builds inside Docker; returns a supervisor-owned temporary dist.
 
         Caller owns the returned directory. It contains dist only, never source,
         credentials, dependency links, or changes to generated project files.
         """
-        environment = self.manager.prepare(Path(root), "node", "test")
+        dependency_receipt = {}
+        if receipt is not None:
+            receipt.clear()
+            receipt.update(version=1, dependency=dependency_receipt, argv=None, rc=None)
+        environment = self.manager.prepare(Path(root), "node", "test", receipt=dependency_receipt) if receipt is not None else self.manager.prepare(Path(root), "node", "test")
         with tempfile.TemporaryDirectory(prefix="autospec-vite-") as temporary:
             stage = snapshot_product(Path(root), Path(temporary) / "product")
             stale_dist = stage / "dist"
@@ -360,14 +365,71 @@ class IsolatedValidator:
             if (stage / "tsconfig.json").is_file():
                 build = ["/bin/sh", "-c", "node /opt/node_modules/typescript/bin/tsc -b --pretty false && exec node /opt/node_modules/vite/bin/vite.js build"]
             command = _node_command(build, dist=True)
+            if receipt is not None:
+                receipt.update(kind="typecheck_frontend_build" if (stage / "tsconfig.json").is_file() else "frontend_build",
+                               components=["typecheck", "frontend_build"] if (stage / "tsconfig.json").is_file() else ["frontend_build"],
+                               argv=command, rc=None, environment_fingerprint=environment.fingerprint,
+                               image_id=environment.image, isolated=True)
             rc, out, err = run_isolated(command, stage, environment.image, docker=self.docker, timeout=self.timeout)
+            if receipt is not None:
+                receipt.update(rc=rc, output_tail=(out + err)[-16000:])
             result = Path(tempfile.mkdtemp(prefix="autospec-dist-"))
             if rc == 0:
                 snapshot_product(stage / "dist", result / "dist")
             return rc, out + err, result, environment
 
 
-def build_delivery_image(root: Path, image: str, *, docker: str = "docker", timeout: float = 300) -> tuple[bool, str]:
+def build_delivery_image(root: Path, image: str, *, docker: str = "docker", timeout: float = 300,
+                         evidence_root: Path | None = None, snapshot_hash: str | None = None) -> tuple[bool, str]:
+    """Compatible build tuple plus optional supervisor-owned snapshot receipt.
+
+    Exact dependency caches/layers are attested, not falsely described as fresh
+    uv/npm executions. An installation's rc is None unless it was observed.
+    The Docker builder and combined tsc/Vite argv retain their real exit codes.
+    """
+    if evidence_root is None:
+        if snapshot_hash is not None:
+            raise _unavailable("Snapshot build receipts require an external evidence root")
+        return _build_delivery_image(root, image, docker=docker, timeout=timeout)
+    from ..validation.final_gate import source_snapshot
+    root, evidence_root = Path(root).absolute(), Path(evidence_root).absolute()
+    if (evidence_root.resolve().is_relative_to(root.resolve()) or
+        evidence_root.resolve() != evidence_root or not isinstance(snapshot_hash, str) or
+        not re.fullmatch(r"[a-f0-9]{64}", snapshot_hash)):
+        raise _unavailable("Delivery build evidence requires an external unaliased root and exact snapshot SHA")
+    if source_snapshot(root).digest != snapshot_hash:
+        raise _unavailable("Delivery source differs from the requested snapshot")
+    receipt = {"version": 1, "status": "FAIL", "snapshot_hash": snapshot_hash,
+               "image_id": None, "image_tag": image, "isolated": True, "no_host_dependencies": True,
+               "manifest_only_install": True, "locks_sha256": {}, "commands": [], "frontend_files": {}}
+    try:
+        ok, output = _build_delivery_image(root, image, docker=docker, timeout=timeout, receipt=receipt)
+        if source_snapshot(root).digest != snapshot_hash:
+            raise _unavailable("Delivery source changed during build; no matching receipt")
+        receipt["status"] = "PASS" if ok else "FAIL"
+        return ok, output
+    except BaseException as exc:
+        receipt.update(status="FAIL", error=f"{type(exc).__name__}: {exc}")
+        raise
+    finally:
+        atomic_json(evidence_root / "delivery-build.json", receipt)
+
+
+def _dependency_command_receipt(manager, root: Path, environment: LinuxEnvironment, observed: dict, kind: str) -> dict:
+    inputs = environment.attestation["inputs"]
+    manifest = root / ("pyproject.toml" if environment.ecosystem == "python" else "package.json")
+    recipe = manager._recipe(inputs["toolchain_digest"], environment.ecosystem, environment.mode, environment.fingerprint, manifest)
+    if hashlib.sha256(recipe.encode()).hexdigest() != environment.attestation["recipe_sha256"]:
+        raise _unavailable("Dependency recipe differs from its immutable attestation")
+    install = next(line[4:] for line in recipe.splitlines() if line.startswith(("RUN uv sync ", "RUN npm ci ")))
+    return {"kind": kind, "argv": shlex.split(install), "rc": None,
+            "execution": "attested-cache" if observed.get("status") == "cache_attested" else "attested-layer",
+            "environment_fingerprint": environment.fingerprint, "image_id": environment.image,
+            "attestation": environment.attestation, "builder": observed}
+
+
+def _build_delivery_image(root: Path, image: str, *, docker: str = "docker", timeout: float = 300,
+                          receipt: dict | None = None) -> tuple[bool, str]:
     """Bake filtered source into a trusted recipe, never the product Dockerfile.
 
     Dependency installs/builds remain in separate confined phases. The final
@@ -382,14 +444,31 @@ def build_delivery_image(root: Path, image: str, *, docker: str = "docker", time
     ecosystem = "python" if (root / "pyproject.toml").is_file() else "node" if (root / "package.json").is_file() else ""
     if not ecosystem:
         raise _unavailable("Delivery requires an isolated Python or Node lockfile")
-    environment = manager.prepare(root, ecosystem, "runtime")
+    dependency_receipt = {}
+    if receipt is not None:
+        receipt["backend_dependency"] = dependency_receipt
+    environment = manager.prepare(root, ecosystem, "runtime", receipt=dependency_receipt) if receipt is not None else manager.prepare(root, ecosystem, "runtime")
+    if receipt is not None:
+        manifest, lock = (root / "pyproject.toml", root / "uv.lock") if ecosystem == "python" else (root / "package.json", root / "package-lock.json")
+        receipt["locks_sha256"][lock.relative_to(root).as_posix()] = hashlib.sha256(lock.read_bytes()).hexdigest()
+        receipt["commands"].append(_dependency_command_receipt(manager, root, environment, dependency_receipt, "backend_install"))
     frontend = root / "frontend" if (root / "frontend/package.json").is_file() else None
     dist = None
     try:
         if frontend:
-            rc, output, dist, _ = validator.build_frontend(frontend)
+            frontend_receipt = {}
+            if receipt is not None:
+                receipt["frontend_build"] = frontend_receipt
+            rc, output, dist, frontend_environment = validator.build_frontend(frontend, receipt=frontend_receipt) if receipt is not None else validator.build_frontend(frontend)
+            if receipt is not None:
+                receipt["locks_sha256"]["frontend/package-lock.json"] = hashlib.sha256((frontend / "package-lock.json").read_bytes()).hexdigest()
+                receipt["commands"].append(_dependency_command_receipt(manager, frontend, frontend_environment, frontend_receipt["dependency"], "frontend_install"))
+                receipt["commands"].append({key: value for key, value in frontend_receipt.items() if key != "dependency"})
             if rc:
                 return False, output
+            if receipt is not None:
+                receipt["frontend_files"] = {"frontend/dist/" + file.relative_to(dist / "dist").as_posix(): hashlib.sha256(file.read_bytes()).hexdigest()
+                    for file in sorted((dist / "dist").rglob("*")) if file.is_file()}
         with tempfile.TemporaryDirectory(prefix="autospec-delivery-") as temporary:
             context = Path(temporary).resolve()
             stage = snapshot_product(root, context / "product")
@@ -406,8 +485,22 @@ def build_delivery_image(root: Path, image: str, *, docker: str = "docker", time
                 raise _unavailable("Dependency image tag changed identity")
             command = ["/opt/venv/bin/python", "main.py"] if ecosystem == "python" else ["node", "main.js"]
             recipe = f"FROM {base}\nWORKDIR /app\nCOPY --chown=65532:65532 product/ /app/\nENV HOME=/tmp PYTHONDONTWRITEBYTECODE=1\nUSER 65532:65532\nCMD {json.dumps(command)}\n"
+            if receipt is not None:
+                recipe += f'LABEL autospec.snapshot={receipt["snapshot_hash"]}\n'
             (context / "Dockerfile").write_text(recipe, encoding="utf-8")
-            rc, out, err = _run_tracked([docker, "build", "--pull=false", "--network=none", "-t", image, "."], "", str(context), timeout)
+            argv = [docker, "build", "--pull=false", "--network=none", "-t", image, "."]
+            command_receipt = {"kind": "image_build", "argv": argv, "rc": None, "isolated": True,
+                               "recipe_sha256": hashlib.sha256(recipe.encode()).hexdigest()}
+            if receipt is not None:
+                receipt["commands"].append(command_receipt)
+            rc, out, err = _run_tracked(argv, "", str(context), timeout)
+            command_receipt.update(rc=rc, output_tail=(out + err)[-16000:])
+            if receipt is not None and rc == 0:
+                baked = manager._image(image)
+                if (not re.fullmatch(r"sha256:[a-f0-9]{64}", baked["Id"]) or
+                    baked.get("Config", {}).get("Labels", {}).get("autospec.snapshot") != receipt["snapshot_hash"]):
+                    raise _unavailable("Delivery image snapshot identity cannot be attested")
+                receipt["image_id"] = baked["Id"]
             return rc == 0, out + err
     finally:
         if dist is not None:
