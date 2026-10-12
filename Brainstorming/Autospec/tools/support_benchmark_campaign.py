@@ -206,6 +206,27 @@ def validate_settings(settings,overrides,workspace):
         any(v != 'sonnet' for v in [*settings.phase_models.values(),*settings.model_tiers.values()])):
         raise AdmissionError('effective provider/model/workspace/budget composition mismatch')
 
+class RetainedInterpreter(str):
+    """Creation identity plus the exact live OS handle; owner closes in finally."""
+    def __new__(cls,identity,api,handle):
+        obj = str.__new__(cls,identity)
+        obj.api,obj.handle = api,handle
+        return obj
+
+    def assert_alive(self):
+        import ctypes
+        from ctypes import wintypes
+        self.api.GetExitCodeProcess.argtypes = [wintypes.HANDLE,ctypes.POINTER(wintypes.DWORD)]
+        self.api.GetExitCodeProcess.restype = wintypes.BOOL
+        code = wintypes.DWORD()
+        if not self.handle or not self.api.GetExitCodeProcess(self.handle,ctypes.byref(code)) or code.value != 259:
+            raise AdmissionError('owned actual interpreter no longer alive')
+
+    def close(self):
+        if self.handle:
+            handle,self.handle = self.handle,None
+            self.api.CloseHandle(handle)
+
 def job_member_identity(job,pid):
     # A Windows venv redirector may own a different actual interpreter PID.
     # Accept that PID ONLY after acquiring its handle and proving membership
@@ -227,9 +248,17 @@ def job_member_identity(job,pid):
             raise AdmissionError('actual interpreter not in owned factory Job')
         from autospec.agents.runner import _process_identity
         from types import SimpleNamespace
-        return _process_identity(SimpleNamespace(_handle=handle))
-    finally:
+        return RetainedInterpreter(_process_identity(SimpleNamespace(_handle=handle)),api,handle)
+    except BaseException:
         api.CloseHandle(handle)
+        raise
+
+def monitor_state(state):
+    summary = {k:state.get(k) for k in ('phase','running','paused','error','budget_usd',
+        'acceptance_result','delivery_ready','generation_checkpoint')}
+    usage = state.get('usage') or {}
+    summary.update({k:usage.get(k) for k in ('cost_usd','unreported_calls','agent_calls')})
+    return summary
 
 def supervise(root,campaign,port,env,receipt):
     if os.name != 'nt':
@@ -238,7 +267,7 @@ def supervise(root,campaign,port,env,receipt):
     trusted_imports(root,env)
     from autospec.agents.runner import _WindowsJob, _process_identity
     job = _WindowsJob()
-    proc = None
+    proc,actual = None,None
     try:
         with (campaign/'factory.log').open('xb') as log:
             proc = subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--factory','--port',str(port)],
@@ -263,15 +292,21 @@ def supervise(root,campaign,port,env,receipt):
                             journal(campaign,'INTERPRETER_OWNED',pid=identity['pid'],creation_identity=actual)
                             break
                 except OSError:
+                    if actual is not None:
+                        raise  # Do not swallow ownership/journal failures and leak retained handles.
                     pass
                 if time.monotonic() >= deadline:
                     raise AdmissionError('readiness timeout; no POST')
                 time.sleep(0.5)
+            if isinstance(actual,RetainedInterpreter):
+                actual.assert_alive()
             project = create_once(campaign,url,payload(receipt,campaign))
             seen,last = set(),None
             while proc.poll() is None:
+                if isinstance(actual,RetainedInterpreter):
+                    actual.assert_alive()
                 state = http('GET',url+'/api/projects/'+project)
-                summary = {k:state.get(k) for k in ('phase','status','budget_usd','cost_usd','acceptance_verdict')}
+                summary = monitor_state(state)
                 if summary != last:
                     journal(campaign,'STATE',state=summary)
                     print(json.dumps(summary),flush=True)
@@ -287,9 +322,34 @@ def supervise(root,campaign,port,env,receipt):
                 time.sleep(5)
             raise AdmissionError('owned factory exited')
     finally:
-        job.close()  # Only owned tree, never global/path-based stop.
-        if proc is not None:
-            proc.wait(timeout=30)
+        # A suspended child may not have been assigned when assignment fails.
+        # Its Popen process handle is still ours: terminate exactly that child,
+        # never resolve/kill a PID, name or workspace path. Cleanup errors are
+        # journaled without masking the original assignment/admission exception.
+        errors = []
+        try:
+            job.close()
+        except Exception as exc:
+            errors.append(type(exc).__name__)
+        try:
+            if proc is not None:
+                if proc.poll() is None:
+                    try:
+                        proc.terminate()
+                    except OSError as exc:
+                        errors.append(type(exc).__name__)
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+                    proc.wait(timeout=10)
+        except Exception as exc:
+            errors.append(type(exc).__name__)
+        finally:
+            if isinstance(actual,RetainedInterpreter):
+                actual.close()
+        if errors:
+            journal(campaign,'OWNED_CLEANUP_ERROR',errors=errors)
         journal(campaign,'SUPERVISOR_STOPPED',product_mutated=False)
 
 def main(argv=None):

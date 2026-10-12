@@ -153,6 +153,7 @@ def test_supervisor_owned_job_and_readiness_offline(setup,monkeypatch,wrong_iden
     class Process:
         pid = 42
         def poll(self): return None
+        def terminate(self): events.append('terminated')
         def wait(self,timeout): events.append('wait')
     class Job:
         def assign_and_resume(self,p): events.append('assigned')
@@ -185,7 +186,7 @@ def test_supervisor_owned_job_and_readiness_offline(setup,monkeypatch,wrong_iden
     monkeypatch.setattr(c.time,'sleep',lambda s: (_ for _ in ()).throw(KeyboardInterrupt()))
     with pytest.raises(c.AdmissionError if wrong_identity else KeyboardInterrupt):
         c.supervise(ROOT,campaign,8130,env,receipt)
-    assert events == ['assigned','closed','wait']
+    assert events == ['assigned','closed','terminated','wait']
     assert len(spawned) == 1
     assert sum(m == 'POST' for m,u in requests) == (0 if wrong_identity else 1)
     log = (campaign/'supervisor.jsonl').read_text()
@@ -229,7 +230,54 @@ def test_interpreter_exact_job_membership_no_real_os_call(monkeypatch,member):
         IsProcessInJob=Function(is_member),CloseHandle=Function(lambda h:calls.append(h)))
     monkeypatch.setattr(ctypes,'WinDLL',lambda *a,**k:api)
     monkeypatch.setattr(runner,'_process_identity',lambda p:'actual-process-created-at')
-    if member: assert c.job_member_identity(SimpleNamespace(handle=77),123) == 'actual-process-created-at'
+    if member:
+        identity = c.job_member_identity(SimpleNamespace(handle=77),123)
+        assert identity == 'actual-process-created-at'
+        assert calls == []
+        identity.close()
     else:
         with pytest.raises(c.AdmissionError,match='not in owned'): c.job_member_identity(SimpleNamespace(handle=77),123)
     assert calls == [99]
+
+def test_retained_handle_alive_and_closed_exactly_once():
+    from types import SimpleNamespace
+    calls = []
+    class Function:
+        def __init__(self,fn): self.fn = fn
+        def __call__(self,*args): return self.fn(*args)
+    alive = [True]
+    def status(handle,out):
+        assert handle == 99
+        calls.append('alive')
+        out._obj.value = 259 if alive[0] else 0
+        return True
+    api = SimpleNamespace(GetExitCodeProcess=Function(status),
+        CloseHandle=Function(lambda h:calls.append(('closed',h))))
+    actual = c.RetainedInterpreter('created-at',api,99)
+    actual.assert_alive()
+    assert calls == ['alive']
+    alive[0] = False
+    with pytest.raises(c.AdmissionError,match='no longer alive'): actual.assert_alive()
+    actual.close()
+    actual.close()
+    assert calls == ['alive','alive',('closed',99)]
+
+def test_real_monitor_schema_tracks_unreported_checkpoint_and_delivery():
+    from autospec.models import ProjectState
+    state = ProjectState(id='p',name='inert',goal='offline')
+    state.usage.cost_usd = 7
+    state.usage.unreported_calls = 2
+    state.usage.agent_calls = 3
+    state.paused = True
+    state.error = 'COST_UNREPORTED'
+    state.generation_checkpoint = {'status':'blocked'}
+    state.acceptance_result = {'verdict':'NOT_VERIFIED'}
+    summary = c.monitor_state(state.model_dump(mode='json'))
+    assert summary['cost_usd'] == 7
+    assert summary['unreported_calls'] == 2
+    assert summary['agent_calls'] == 3
+    assert summary['paused'] is True
+    assert summary['error'] == 'COST_UNREPORTED'
+    assert summary['generation_checkpoint'] == {'status':'blocked'}
+    assert summary['acceptance_result'] == {'verdict':'NOT_VERIFIED'}
+    assert summary['delivery_ready'] is False
