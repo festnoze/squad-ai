@@ -230,7 +230,11 @@ def test_timeout_kills_child_and_grandchild(tmp_path):
     child = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-u','-c',{grandchild!r}]); time.sleep(60)"
     parent = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-u','-c',{child!r}]); time.sleep(60)"
     with pytest.raises(subprocess.TimeoutExpired):
-        runner._run_tracked(_python(parent), "", None, 5)
+        # Three Windows venv redirectors plus Job-assignment/startup must all
+        # reach the real grandchild marker under concurrent Docker builds.
+        # Keep the marker/death assertions; an early pre-start timeout is not
+        # evidence that descendant cleanup worked. Every node sleeps 60s.
+        runner._run_tracked(_python(parent), "", None, 15)
     assert marker.exists()
     _assert_dead(int(marker.read_text()))
 
