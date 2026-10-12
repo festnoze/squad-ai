@@ -24,7 +24,8 @@ def critical_test_files(root: Path, ecosystem: str) -> list[str]:
         dirs[:] = [name for name in dirs if name not in ignored and not name.startswith(".autospec")]
         for name in names:
             relative = (Path(parent) / name).relative_to(root).as_posix()
-            python_test = name == "conftest.py" or name.startswith("test_") and name.endswith(".py")
+            python_test = (name in {"conftest.py", "pytest.ini", ".coveragerc", "setup.cfg", "tox.ini"}
+                           or name.startswith("test_") and name.endswith(".py"))
             node_test = (".test." in name or ".spec." in name or
                          name.startswith(("vitest.config.", "vite.config.", "tsconfig")) or
                          name.casefold().startswith(("setuptests.", "testsetup.")))
@@ -49,6 +50,16 @@ def run_native(root: Path, ecosystem: str, supervisor: Path, *, owner: str,
     validator = IsolatedValidator(supervisor / "environments", docker=docker, timeout=timeout)
     identity = hashlib.sha256(f"{owner}:{ecosystem}".encode()).hexdigest()[:24]
     report = supervisor / "native" / identity / (uuid.uuid4().hex + ".json")
+    baseline_path = supervisor / "native-baselines" / (identity + ".json")
+    collected_ids = None
+    collection = None
+    if not baseline_path.exists() and ecosystem == "python":
+        collected_ids, collection = validator.collect_python(root, report.with_suffix(".collection.json"))
+        if (not collection.evidence.report_valid or collection.evidence.exit_code
+                or collection.evidence.collection_errors or not collected_ids
+                or len(set(collected_ids)) != len(collected_ids)
+                or collection.evidence.collected != len(collected_ids)):
+            return False, collection.output + "\nNATIVE_BASELINE_UNAVAILABLE: incomplete collection", {}
     result = validator.run_suite(root, ecosystem, "test", report)
     output = result.output
     if ecosystem == "node" and result.evidence.exit_code:
@@ -57,12 +68,15 @@ def run_native(root: Path, ecosystem: str, supervisor: Path, *, owner: str,
             output += "\n--- échecs Vitest (rapport JSON) ---\n" + digest
     if not result.evidence.collected:
         output += "\nSANS test collecté : aucune preuve native admissible"
-    baseline_path = supervisor / "native-baselines" / (identity + ".json")
     if not baseline_path.exists():
-        if not result.evidence.report_valid or result.evidence.collected == 0 or not result.evidence.outcomes:
+        if (not result.evidence.report_valid or result.evidence.collection_errors
+                or result.evidence.collected == 0 or not result.evidence.outcomes
+                or result.evidence.collected != len(result.evidence.outcomes)
+                or collected_ids is not None and set(result.evidence.outcomes) != set(collected_ids)
+                or collection is not None and collection.source_fingerprint != result.source_fingerprint):
             return False, output + "\nNATIVE_BASELINE_UNAVAILABLE: no reliable collection", result.evidence.outcomes
         paths = critical_test_files(root, ecosystem)
-        baseline = capture_baseline(root, paths, list(result.evidence.outcomes))
+        baseline = capture_baseline(root, paths, list(collected_ids or result.evidence.outcomes))
         save_baseline(baseline, baseline_path, root)
         # Physical worktree paths change; the protected paths use logical roots.
         prefix = logical_prefix.strip("/") + "/" if logical_prefix else ""

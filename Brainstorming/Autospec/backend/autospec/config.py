@@ -860,6 +860,22 @@ class Settings:
     docker_cmd: str = field(
         default_factory=lambda: os.environ.get("DOCKER_CMD", "docker")
     )
+    # Optional concurrent USD lane. No production provider is qualified merely
+    # because its CLI accepts an estimated max-budget flag. Registry entries
+    # are administrator-owned, external reviewed receipts pinned by SHA-256.
+    concurrent_budget_reservations: bool = field(
+        default_factory=lambda: _env_bool("CONCURRENT_BUDGET_RESERVATIONS", False)
+    )
+    concurrent_budget_call_usd: float = field(
+        default_factory=lambda: _env_float("CONCURRENT_BUDGET_CALL_USD", 0.5, minimum=0.01)
+    )
+    concurrent_budget_provider_proofs: dict[str, dict[str, str]] = field(default_factory=dict)
+    # External GPT source-review handoff only. Zero waits fail closed quickly;
+    # an orchestrated campaign may opt into a bounded asynchronous wait. This
+    # never authorizes a source review through the generation provider.
+    external_review_wait_seconds: float = field(
+        default_factory=lambda: _env_float("EXTERNAL_REVIEW_WAIT_SECONDS", 0.0, minimum=0.0)
+    )
     # Docker delivery gate: after the delivery gates pass, package every new
     # project into a Docker image and deploy web apps to local Docker Desktop on a
     # shared network (autospec-net), then verify boot health + cross-container

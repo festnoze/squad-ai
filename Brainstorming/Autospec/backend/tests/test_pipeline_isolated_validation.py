@@ -25,6 +25,9 @@ def validator(monkeypatch, evidence):
     class Validator:
         def __init__(self, *a, **kw):
             pass
+        def collect_python(self, root, report):
+            return tuple(evidence.outcomes), SimpleNamespace(evidence=evidence, output="collected",
+                source_fingerprint="c"*64)
         def run_suite(self, root, ecosystem, mode, report, **kwargs):
             return SimpleNamespace(evidence=evidence, output="executed", fingerprint="a"*64, image="sha256:"+"b"*64,
                 source_fingerprint="c"*64, coverage={"totals": {"num_statements": 4, "num_branches": 2,
@@ -68,6 +71,17 @@ def test_custom_frontend_zone_protects_logical_not_physical_paths(tmp_path, monk
         logical_prefix="web/client", docker="docker", timeout=30)[0]
     protected = json.loads((supervisor / "protected-test-files.json").read_text())["files"]
     assert "web/client/src/setupTests.ts" in protected and "web/client/src/page.test.ts" in protected
+
+
+def test_partial_collection_never_freezes_a_baseline(tmp_path, monkeypatch):
+    root = product(tmp_path)
+    validator(monkeypatch, SuiteEvidence({"test_critical.py::test_critical": "passed"}, 1, 0,
+        collection_errors=("test_auth_import.py",)))
+    supervisor = tmp_path / "supervisor"
+    result = pipeline_validation.run_native(root, "python", supervisor, owner="T1", project_root=root,
+        docker="docker", timeout=30)
+    assert not result[0] and "incomplete collection" in result[1]
+    assert not list((supervisor / "native-baselines").glob("*.json"))
 
 
 def test_unowned_process_is_never_killed_by_pid(monkeypatch):

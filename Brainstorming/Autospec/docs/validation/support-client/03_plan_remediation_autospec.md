@@ -347,6 +347,8 @@ Le coordinateur vérifie l'intégration, assigne un relecteur, puis met à jour 
 | 2026-10-11 | REM-01..13 | Trois lots préparatoires mergés ; modules testés ≠ tâches closes tant que les raccordements réels ne sont pas vérifiés | Coordinateur | b648511c, c3701d17, ff6c372c ; artefacts par ID |
 | 2026-10-11 | REM-03, REM-07, REM-08 | Cinq défauts de contre-revue corrigés : coût incomplet au restart, phase GOVERN, conflit stack, délai réel, environnement non réparable | Coordinateur | a247e332 ; 63 tests ciblés PASS dans environnement verrouillé |
 | 2026-10-12 | REM-09..12, REM-21..22 | Import immuable API, admission du plan, claims avant écriture et admission des preuves raccordés/préparés ; attentes de médiation distinctes du provider | Coordinateur | 72 tests ciblés PASS ; JUnit root-raccord.xml ; modules seuls ne valent pas clôture |
+| 2026-10-12 | REM-14, REM-19, REM-21 | L’utilisateur refuse les appels de revue des sources via Claude Code : génération seule dans Claude ; proposition opérationnelle puis revue indépendante dans deux sous-agents GPT 6.1 sol medium. Paquets locaux, snapshot exact, attente bornée/interrompable et aucune preuve X/V fabriquée | Coordinateur | tests/test_source_reviewer.py ; 28 tests locaux revue/budget PASS ; raccord attente en vérification |
+| 2026-10-12 | REM-23 | Option concurrente testée mais OFF pour Claude : aucun cap financier dur qualifié. Journal durable reste bloquant après restart, changement de provider ou désactivation de l’option ; revue du raccord par rem_execution | Coordinateur | e0fe824c ; tests/test_budget_tracker_reservations.py ; contre-revue du 12 octobre |
 
 ## 8. Condition de clôture du programme
 

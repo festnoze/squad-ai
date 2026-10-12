@@ -158,15 +158,17 @@ def test_abrupt_owned_worker_is_reconciled_on_restart(tmp_path, monkeypatch, sta
         f"save_state(ProjectState(id='worker',name='worker',goal='demo',phase=PipelinePhase.BUILD,"
         f"generation_checkpoint={{'run_id':'one','stage':{stage!r}}})); time.sleep(30)"
     )
-    child = subprocess.Popen([sys.executable, "-c", program])
+    from autospec.agents.runner import spawn_owned_process, close_owned_process
+    child = spawn_owned_process([sys.executable, "-c", program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     try:
-        deadline = time.monotonic() + 5
+        deadline = time.monotonic() + 30
         while not (root / "worker/autospec-state.json").exists() and time.monotonic() < deadline:
+            if child.poll() is not None:
+                pytest.fail("owned worker exited before checkpoint: " + child.stdout.read().decode("utf-8", "replace"))
             time.sleep(.02)
         assert (root / "worker/autospec-state.json").exists()
     finally:
-        child.kill()  # exact owned handle, no descendants or name matching
-        child.wait(timeout=5)
+        close_owned_process(child)  # exact owned Job, including descendants
     monkeypatch.setattr(settings, "workspace_root", root)
     monkeypatch.setattr(server, "pipelines", {})
     server.recover_projects()
