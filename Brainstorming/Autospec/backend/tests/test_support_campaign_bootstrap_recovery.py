@@ -351,3 +351,76 @@ def test_contradictory_put_receipt_blocks_even_when_get_and_disk_good(incident,f
         return result
     with pytest.raises(c.AdmissionError): c.recover_once(campaign,'http://127.0.0.1:8130',recovery,request=contradictory)
     assert [row[0] for row in calls] == ['GET','PUT']
+
+
+def publication_root(incident):
+    return incident[0]/'projects'/'.autospec-supervisor'/c.RECOVERY_PROJECT/'publication'
+
+
+def create_owned_startup_artifacts(incident):
+    root = publication_root(incident)
+    (root/'empty-runtime-stage').mkdir(parents=True)
+    (root/(c.RECOVERY_PROJECT+'.lock')).write_bytes(b'0')
+    return root
+
+
+def test_real_trusted_registry_status_creates_only_exact_startup_artifacts(incident,monkeypatch):
+    from autospec.orchestrator import owned_publication
+    recovery,_ = reserved(incident)
+    monkeypatch.setattr(owned_publication,'_docker_call',lambda *a,**k:pytest.fail('absent publication must not probe Docker'))
+    root = publication_root(incident)
+    result = owned_publication.PublicationRegistry(root).status(c.RECOVERY_PROJECT)
+    assert result == dict(registered=False,running=False,ingress_attached=False)
+    assert set(p.name for p in root.iterdir()) == {'empty-runtime-stage',c.RECOVERY_PROJECT+'.lock'}
+    assert not list((root/'empty-runtime-stage').iterdir())
+    assert (root/(c.RECOVERY_PROJECT+'.lock')).read_bytes() == b'0'
+    assert c.verify_recovery_invariants(incident[0],recovery,incident[1],after_startup=True)
+    with pytest.raises(c.AdmissionError): c.verify_recovery_invariants(incident[0],recovery,incident[1])
+    calls = []
+    assert c.recover_once(incident[0],'http://127.0.0.1:8130',recovery,request=api(incident,calls)) == c.RECOVERY_PROJECT
+    assert [row[0] for row in calls] == ['GET','PUT','GET','POST']
+
+
+def test_initial_admission_still_refuses_known_startup_artifacts(incident):
+    create_owned_startup_artifacts(incident)
+    with pytest.raises(c.AdmissionError): snapshot(incident)
+    assert not (incident[0]/'recovery-attempt.json').exists()
+
+
+@pytest.mark.parametrize('bad',['wrong_lock_name','wrong_project','wrong_lock_content','empty_lock','long_lock',
+    'nonempty_stage','stage_file','lock_directory','journal','extra_empty_directory','lock_hardlink','stage_symlink'])
+def test_post_startup_all_other_paths_contents_and_aliases_fail_closed(incident,bad):
+    campaign,state,path = incident
+    recovery,_ = reserved(incident)
+    root = create_owned_startup_artifacts(incident)
+    lock = root/(c.RECOVERY_PROJECT+'.lock')
+    if bad == 'wrong_lock_name': lock.rename(root/'other.lock')
+    elif bad == 'wrong_project':
+        other = root.parent.parent/'other-project'/'publication'
+        other.mkdir(parents=True)
+        (other/'other-project.lock').write_bytes(b'0')
+    elif bad == 'wrong_lock_content': lock.write_bytes(b'1')
+    elif bad == 'empty_lock': lock.write_bytes(b'')
+    elif bad == 'long_lock': lock.write_bytes(b'00')
+    elif bad == 'nonempty_stage': (root/'empty-runtime-stage'/'main.py').write_bytes(b'not empty')
+    elif bad == 'stage_file':
+        (root/'empty-runtime-stage').rmdir()
+        (root/'empty-runtime-stage').write_bytes(b'0')
+    elif bad == 'lock_directory': lock.unlink(); lock.mkdir()
+    elif bad == 'journal': (root/(c.RECOVERY_PROJECT+'.json')).write_bytes(b'{}')
+    elif bad == 'extra_empty_directory': (root/'extra-empty').mkdir()
+    elif bad == 'lock_hardlink':
+        import os
+        os.link(lock,campaign/'owned-lock-link')
+    elif bad == 'stage_symlink':
+        (root/'empty-runtime-stage').rmdir()
+        try: (root/'empty-runtime-stage').symlink_to(path.parent,target_is_directory=True)
+        except OSError:
+            # Pure trusted fixture setup; no generated code or Git is run.
+            import subprocess
+            subprocess.run(['cmd','/c','mklink','/J',str(root/'empty-runtime-stage'),str(path.parent)],
+                           check=True,capture_output=True)
+    calls = []
+    with pytest.raises(c.AdmissionError):
+        c.recover_once(campaign,'http://127.0.0.1:8130',recovery,request=api(incident,calls))
+    assert [row[0] for row in calls] == ['GET']

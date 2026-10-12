@@ -157,18 +157,22 @@ def _regular(path):
         raise AdmissionError('recovery path alias/special file forbidden')
     return info
 
-def _inventory(campaign,allowed_files=None):
+def _inventory(campaign,allowed_files=None,*,allowed_empty_dirs=()):
     files,total = {},0
     def visit(path):
         nonlocal total
         info = _regular(path)
         if stat.S_ISDIR(info.st_mode):
             relative = path.relative_to(campaign).as_posix()
+            children = list(path.iterdir())
+            if relative in allowed_empty_dirs and children:
+                raise AdmissionError('owned startup stage must remain empty')
             if (allowed_files is not None and relative != '.' and
                 relative not in ('projects/.autospec-tmp','.autospec-tmp') and
-                not any(name.startswith(relative+'/') for name in allowed_files)):
+                relative not in allowed_empty_dirs and
+                not any(name.startswith(relative+'/') for name in (*allowed_files,*allowed_empty_dirs))):
                 raise AdmissionError('unexpected campaign/product directory')
-            for child in path.iterdir(): visit(child)
+            for child in children: visit(child)
         else:
             total += info.st_size
             if total > 16*1024*1024:
@@ -259,14 +263,24 @@ def reserve_recovery(campaign,recovery,receipt):
     runtime.mkdir(parents=True,exist_ok=False)
     return runtime
 
-def verify_recovery_invariants(campaign,recovery,state,*,language_changed=False,allow_original_disk=False):
+def verify_recovery_invariants(campaign,recovery,state,*,language_changed=False,allow_original_disk=False,after_startup=False):
     expected = dict(recovery['state'])
     if language_changed:
         expected['technical_stack'] = dict(backend='python',source='explicit')
     if canonical(state) != canonical(expected):
         raise AdmissionError('recovery metadata changed immutable state/usage/budget')
     expected_project = {k.removeprefix('projects/'):v for k,v in recovery['files_sha256'].items() if k.startswith('projects/')}
-    files = _inventory(campaign/'projects',expected_project)
+    # Known side effects of trusted factory startup only: publication.status()
+    # creates an empty registry stage and the exact file_lock byte, without a
+    # publication journal/resource. Initial recovery_snapshot stays unchanged.
+    publication = f'.autospec-supervisor/{recovery["project_id"]}/publication'
+    lock = publication+'/'+recovery['project_id']+'.lock'
+    startup_files = {lock} if after_startup else set()
+    startup_dirs = {publication+'/empty-runtime-stage'} if after_startup else set()
+    files = _inventory(campaign/'projects',set(expected_project)|startup_files,allowed_empty_dirs=startup_dirs)
+    if lock in files:
+        if not after_startup or files.pop(lock) != b'0':
+            raise AdmissionError('owned startup lock must be exactly one factory byte')
     if set(files) != set(expected_project):
         raise AdmissionError('product files appeared before resume')
     for name,sha in recovery['files_sha256'].items():
@@ -295,19 +309,19 @@ def recover_once(campaign,url,recovery,*,request=None):
         out.write(canonical(dict(project_id=project,outcome='UNKNOWN',retry_permitted=False)))
         out.flush(); os.fsync(out.fileno())
     try:
-        verify_recovery_invariants(campaign,recovery,request('GET',endpoint))
+        verify_recovery_invariants(campaign,recovery,request('GET',endpoint),after_startup=True)
         result = request('PUT',endpoint+'/language',{'language':'python'})
         if result.get('ok') is not True:
             raise AdmissionError('language metadata was not acknowledged')
         verify_recovery_invariants(campaign,recovery,result.get('state'),
-                                   language_changed=True,allow_original_disk=True)
+                                   language_changed=True,allow_original_disk=True,after_startup=True)
         # _sync schedules atomic persistence on a factory executor. Only its
         # exactly-known old disk state may lag the already-correct API state.
         # Recheck all invariants each time; never retry PUT or tolerate partial
         # writes, API drift, new files, changed source/oracle or unknown usage.
         deadline = time.monotonic()+5
         while not verify_recovery_invariants(campaign,recovery,request('GET',endpoint),
-                                            language_changed=True,allow_original_disk=True):
+                                            language_changed=True,allow_original_disk=True,after_startup=True):
             if time.monotonic() >= deadline:
                 raise AdmissionError('metadata persistence timeout; no resume')
             time.sleep(0.05)
