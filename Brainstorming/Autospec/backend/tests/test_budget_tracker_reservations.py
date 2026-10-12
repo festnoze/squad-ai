@@ -122,6 +122,27 @@ async def test_disabling_active_lane_is_a_decision_not_a_bypass(tmp_path, monkey
     assert pipeline.state.usage.agent_calls == 1
 
 
+@pytest.mark.parametrize("complete", [False, True])
+async def test_cancelled_call_preserves_reported_prefix_in_state_and_durable_ledger(tmp_path, monkeypatch, complete):
+    configure(tmp_path, monkeypatch)
+    class Bounded:
+        budget_provider_id = "bounded-fake"
+        async def arun(self, *args, **kwargs):
+            exc = asyncio.CancelledError()
+            exc.usage = AgentResult("known prefix", cost_usd=.2, input_tokens=20,
+                                    output_tokens=5, usage_reported=complete)
+            raise exc
+    pipeline = Pipeline(state(), Bounded())
+    with pytest.raises(asyncio.CancelledError): await pipeline._tracked.arun("p", "s")
+    ledger = pipeline._tracked._reservation_pool.snapshot()
+    assert Decimal(ledger["recorded_usd"]) == Decimal(".2")
+    assert pipeline.state.usage.cost_usd == pytest.approx(.2)
+    assert pipeline.state.usage.input_tokens == 20 and pipeline.state.usage.output_tokens == 5
+    assert pipeline.state.usage.failed_calls == 1
+    assert pipeline.state.usage.unreported_calls == int(not complete)
+    assert bool(ledger["blocked_reasons"]) is (not complete)
+
+
 @pytest.mark.parametrize("problem", ["off", "provider_absent", "tokens"])
 async def test_restart_cannot_bypass_existing_durable_lane(tmp_path, monkeypatch, problem):
     configure(tmp_path, monkeypatch)

@@ -34,7 +34,7 @@ async def test_missing_review_publishes_request_and_cannot_call_generation_provi
 async def test_async_wait_changes_stage_and_accepts_external_receipt_only(monkeypatch,tmp_path):
     from autospec.validation import source_reviewer
     p=pipeline();calls=[]
-    monkeypatch.setattr(settings,"external_review_wait_seconds",.1)
+    monkeypatch.setattr(settings,"external_review_wait_seconds",5)
     async def supplied(*args,**kwargs):
         calls.append(kwargs["phase"])
         if len(calls)==1: raise ReviewPending(tmp_path/"request.json","independent_review")
@@ -47,7 +47,7 @@ async def test_async_wait_changes_stage_and_accepts_external_receipt_only(monkey
 async def test_stop_interrupts_review_without_provider_dispatch(monkeypatch,tmp_path):
     from autospec.validation import source_reviewer
     p=pipeline();entered=asyncio.Event()
-    monkeypatch.setattr(settings,"external_review_wait_seconds",.1)
+    monkeypatch.setattr(settings,"external_review_wait_seconds",5)
     async def pending(*args,**kwargs):
         entered.set()
         raise ReviewPending(tmp_path/"request.json","operational_proposal")

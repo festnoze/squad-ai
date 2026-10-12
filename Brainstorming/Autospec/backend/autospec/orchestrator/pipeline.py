@@ -824,6 +824,9 @@ class _UsageTracker:
         except AgentError as exc:
             reported = exc.usage
             raise
+        except asyncio.CancelledError as exc:
+            reported = getattr(exc, "usage", None)
+            raise
         finally:
             # Synchronous release cannot itself be interrupted by cancellation.
             active_provider_observer.reset(observer_token)
@@ -988,12 +991,17 @@ class _UsageTracker:
             if not self.pipeline._stop_requested:
                 await self.pipeline._aon_agent_error(exc)
             raise
-        except asyncio.CancelledError:
+        except asyncio.CancelledError as exc:
+            usage = getattr(exc, "usage", None)
+            effective_cost = 0.0
             if provider_entered:
-                self._account(None, role, iteration, failed=True)
+                effective_cost = self._account(usage, role, iteration, failed=True)
             self.pipeline._record_interaction(
                 item_id=item_id, phase=phase, persona=role, prompt=prompt,
                 response="", ok=False, error="Appel interrompu ; usage non remonté.", model=chosen or "",
+                input_tokens=usage.input_tokens if usage else 0,
+                output_tokens=usage.output_tokens if usage else 0,
+                cost_usd=effective_cost,
             )
             raise
         finally:
@@ -4929,8 +4937,7 @@ class Pipeline:
             return ok
 
         async def _rollback() -> None:
-            await self._agit(ws, "reset", "--hard", "HEAD")
-            await self._agit(ws, "clean", "-fd")
+            await self._areset_workspace(ws, "HEAD")
 
         # W5.3 checker independence: give the critic the ACTUAL changes (the last
         # commit's diff), not the dev's self-narrative, so its review targets what
@@ -5047,13 +5054,9 @@ class Pipeline:
     async def _agit(self, ws, *args: str) -> tuple[int, str]:
         def _run() -> tuple[int, str]:
             try:
-                proc = subprocess.run(
-                    ["git", *args], cwd=str(ws),
-                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                    text=True, encoding="utf-8", errors="replace",
-                )
-                return proc.returncode, proc.stdout
-            except OSError as exc:
+                from .git_boundary import run_git
+                return run_git(ws, args)
+            except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
                 return 127, str(exc)
 
         return await asyncio.to_thread(_run)
@@ -5312,6 +5315,15 @@ class Pipeline:
                 found.add(int(m.group(1)))
         return sorted(found)
 
+    async def _areset_workspace(self, ws: Path, commit: str) -> None:
+        """Never announce rollback success after a refused/failed Git step."""
+        if not await self._ahas_workspace_git(ws):
+            raise ValueError("rollback refusé : aucun dépôt propre au workspace")
+        for args in (("reset", "--hard", commit), ("clean", "-fd")):
+            code, _ = await self._agit(ws, *args)
+            if code != 0:
+                raise ValueError("rollback incomplet : étape Git " + args[0] + " refusée ou échouée")
+
     async def arollback(self, iteration: int) -> None:
         """R2: hard-reset the workspace to an iteration's snapshot commit. Raises
         ValueError (-> 409) while the pipeline is active or when the snapshot is
@@ -5330,8 +5342,7 @@ class Pipeline:
         commit = out.strip()
         if code != 0 or not commit:
             raise ValueError(f"aucun snapshot pour l'itération {iteration}")
-        await self._agit(ws, "reset", "--hard", commit)
-        await self._agit(ws, "clean", "-fd")
+        await self._areset_workspace(ws, commit)
         self._chat(
             ChatRole.SYSTEM, f"⏪ Workspace revenu au snapshot de l'itération {iteration}."
         )
@@ -8729,8 +8740,7 @@ class Pipeline:
             # ensuite le merge. Repli PAR FICHIER : chaque retrait est testé
             # individuellement, les verts sont conservés, seuls les porteurs
             # restent (et sont déclarés).
-            await self._agit(worktree, "reset", "--hard", tip)
-            await self._agit(worktree, "clean", "-fd")
+            await self._areset_workspace(worktree, tip)
             removed: list[str] = []
             kept: list[str] = list(out[4:])  # au-delà du budget de runs : déclarés
             for f in out[:4]:
@@ -9925,8 +9935,7 @@ class Pipeline:
                         if not fe_green:
                             green, suite_out, suite_name = False, fe_out, "frontend (Vitest + build)"
                     if not green:
-                        await self._agit(ws, "reset", "--hard", "HEAD")
-                        await self._agit(ws, "clean", "-fd")
+                        await self._areset_workspace(ws, "HEAD")
                         self._log(source, f"La réparation a cassé la suite {suite_name} — rollback.")
                         detail = (
                             f"{detail}\n\n⚠️ Ta tentative précédente a CASSÉ la suite {suite_name} "
