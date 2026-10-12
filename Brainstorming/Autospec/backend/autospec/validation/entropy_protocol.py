@@ -29,6 +29,22 @@ _entropy_csprng_getrandbits=_entropy_secrets._sysrand.getrandbits
 _entropy_csprng_randbytes=_entropy_secrets._sysrand.randbytes
 _entropy_csprng_urandom=__import__('random')._urandom
 _entropy_codes={_k:getattr(_v,'__code__',None) for _k,_v in _entropy_originals.items()}
+_entropy_globals=_entropy_csprng_bytes.__globals__
+_entropy_sysrand=_entropy_globals['_sysrand']
+_entropy_method_type=type(_entropy_csprng_randbytes)
+_entropy_method_codes={_k:_v.__func__.__code__ for _k,_v in
+ {'getrandbits':_entropy_csprng_getrandbits,'randbytes':_entropy_csprng_randbytes}.items()}
+_entropy_random_globals=_entropy_csprng_randbytes.__func__.__globals__
+_entropy_encoders={'urlsafe_b64encode':_entropy_b64.urlsafe_b64encode,'b64encode':_entropy_b64.b64encode}
+_entropy_encoder_codes={_k:_v.__code__ for _k,_v in _entropy_encoders.items()}
+_entropy_encoder_globals=_entropy_b64.b64encode.__globals__
+_entropy_binascii=_entropy_encoder_globals['binascii']
+_entropy_b2a_base64=_entropy_binascii.b2a_base64
+_entropy_translation=_entropy_encoder_globals['_urlsafe_encode_translation']
+_entropy_sha256=_entropy_hash.sha256
+def _entropy_method_intact(value,original,code):
+ return (type(value) is _entropy_method_type and value.__self__ is original.__self__ and
+  value.__func__ is original.__func__ and value.__func__.__code__ is code)
 '''
 
 ENTROPY_INSTALL = r'''
@@ -50,13 +66,18 @@ if b.get('entropy_module'):
   # Source can mutate secrets/random after import; reject rather than claiming
   # a cryptographic source from a function name alone. Check after call too.
   def _intact():
-   return (_entropy_secrets._sysrand.getrandbits==_entropy_csprng_getrandbits and
-    _entropy_secrets._sysrand.randbytes==_entropy_csprng_randbytes and
-    __import__('random')._urandom is _entropy_csprng_urandom and
+   return (_entropy_globals['_sysrand'] is _entropy_sysrand and
+    _entropy_method_intact(_entropy_sysrand.getrandbits,_entropy_csprng_getrandbits,_entropy_method_codes['getrandbits']) and
+    _entropy_method_intact(_entropy_sysrand.randbytes,_entropy_csprng_randbytes,_entropy_method_codes['randbytes']) and
+    _entropy_random_globals['_urandom'] is _entropy_csprng_urandom and
     (_entropy_primitive=='os.urandom' or os.urandom is _entropy_originals['os.urandom']) and
-    _entropy_secrets.DEFAULT_ENTROPY==_entropy_default and type(_entropy_secrets.DEFAULT_ENTROPY) is int and
+    _entropy_globals['DEFAULT_ENTROPY']==_entropy_default and type(_entropy_globals['DEFAULT_ENTROPY']) is int and
     all(getattr(_v,'__code__',None) is _entropy_codes[_k] for _k,_v in _entropy_originals.items()) and
-    (_entropy_primitive=='secrets.token_bytes' or _entropy_secrets.token_bytes is _entropy_csprng_bytes))
+    (_entropy_primitive=='secrets.token_bytes' or _entropy_globals['token_bytes'] is _entropy_csprng_bytes) and
+    _entropy_globals['base64'] is _entropy_b64 and
+    all(_entropy_encoder_globals[_k] is _v and _v.__code__ is _entropy_encoder_codes[_k] for _k,_v in _entropy_encoders.items()) and
+    _entropy_encoder_globals['binascii'] is _entropy_binascii and _entropy_binascii.b2a_base64 is _entropy_b2a_base64 and
+    _entropy_encoder_globals['_urlsafe_encode_translation'] is _entropy_translation)
   if not _intact(): raise RuntimeError('captured entropy dependency was replaced')
   _value=_entropy_original(*args,**kw)
   if not _intact(): raise RuntimeError('captured entropy dependency changed during invocation')
@@ -65,9 +86,10 @@ if b.get('entropy_module'):
    _encoded={'hex':_value.hex().encode('ascii'),'base64':_entropy_b64.b64encode(_value),
     'base64url':_entropy_b64.urlsafe_b64encode(_value),'base64url-nopad':_entropy_b64.urlsafe_b64encode(_value).rstrip(b'=')}
   else: raise RuntimeError('captured entropy return type cannot be correlated')
+  if not _intact(): raise RuntimeError('captured entropy encoding dependency changed during correlation')
   _record={'generator':_entropy_primitive,'nbytes':_n,'default_argument':_default,
    'entropy_bits':8*_n,'cryptographic':True,
-   'encoded_sha256':{_k:_entropy_hash.sha256(_v).hexdigest() for _k,_v in _encoded.items()}}
+   'encoded_sha256':{_k:_entropy_sha256(_v).hexdigest() for _k,_v in _encoded.items()}}
   with guard:
    if len(state['session_entropy'])>=4096: raise RuntimeError('bounded entropy observation journal full')
    state['session_entropy'].append(_record)
