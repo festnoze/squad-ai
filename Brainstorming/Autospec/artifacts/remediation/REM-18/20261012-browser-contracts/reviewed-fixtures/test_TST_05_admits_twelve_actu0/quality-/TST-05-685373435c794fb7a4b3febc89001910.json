@@ -1,0 +1,451 @@
+{
+  "id": "TST-05",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "checks": [
+    {
+      "check": "TST-05:alone_exact_six",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:together_exact_six",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-01_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-01_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-01_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-01_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-01_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-01_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-02_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-02_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-02_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-02_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-02_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-02_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-03_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-03_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-03_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-03_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-03_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-03_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-04_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-04_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-04_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-04_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-04_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-04_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-05_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-05_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-05_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-05_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-05_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-05_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-06_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-06_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-06_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-06_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-06_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:aloneE2E-06_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-01_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-01_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-01_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-01_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-01_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-01_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-02_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-02_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-02_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-02_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-02_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-02_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-03_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-03_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-03_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-03_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-03_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-03_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-04_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-04_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-04_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-04_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-04_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-04_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-05_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-05_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-05_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-05_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-05_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-05_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-06_executed",
+      "observed": "PASS",
+      "expected": "PASS",
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-06_nominal",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-06_console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-06_not_blank",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-06_isolated_fixture",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:togetherE2E-06_proofs_passed",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    }
+  ]
+}

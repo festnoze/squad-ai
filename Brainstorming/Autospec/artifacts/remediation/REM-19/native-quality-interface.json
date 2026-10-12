@@ -1,0 +1,23 @@
+{
+  "status":"REVIEW",
+  "api":"NativeQualityCollector(contract, adapter, validator, product_root, evidence_root, suites, mapping_path, review, browser_factory, sqlite_probe, mutation, mutation_probe, e2e_mode='supervisor_browser'); await collect(snapshot_hash); await QualityVerifier(contract, collector).verify(snapshot_hash)",
+  "no_manual_observations":"Collector runs actual IsolatedValidator suites, actual twelve BrowserVerifier scenarios, an owned SQLite lifecycle probe and a copied authorization mutation. Missing ports are NOT_VERIFIED, never fabricated observations",
+  "suite_schema":{"name":"backend|frontend|e2e, unique","root":"canonical relative directory, no symlink/junction","ecosystem":"python|node","source_inventory":"unique canonical relative regular files, 1..20000, no links/hardlinks","domains":"independently source-reviewed semantic coverage domains","test_args":"bounded tuple passed to isolated native runner","coverage_source":"canonical relative directory"},
+  "mapping_file":{"contract_hash":"exact immutable contract hash","snapshot_hash":"exact canonical source_snapshot.digest","nominal_security_db_mocks":false,"requirements":{"RID":[{"suite":"backend|frontend|e2e","test":"exact native test identity or supervisor_browser::E2E-01[alone]","assertion":"reviewed actual assertion description, nonempty"}]}},
+  "review_helper":"write_quality_review_package creates reviewed-test-mapping.json plus AWAITING_INDEPENDENT_REVIEW quality-review-package.json. It does not approve its own inputs or call an LLM",
+  "plan_hash":"native_quality_plan_hash hashes asdict suite specs, exact mapping file SHA, mutation spec and explicit e2e_mode",
+  "required_R_checks":["QUALITY:plan:<exact digest>","TST-01:native_review","TST-02:mapping","TST-03:inventory","TST-06:mutation when mutation present","QUALITY:e2e:supervisor_browser when this mode is chosen"],
+  "observation_ports":{
+    "native_suites":"list of actual native row counts/exit/report_valid/critical skip-xfail/source_files/source_fingerprint/image_id/environment_fingerprint/raw_report(path,sha256)/output(path,sha256)",
+    "requirement_test_mapping":"RID -> reviewed assertion rows augmented from actual outcomes with executed bool and execution_status",
+    "coverage":"backend/frontend -> exact inventory + executable line/branch counters + domain mappings + fresh raw_report(path,sha256); omitted unexecuted source cannot be dropped from denominators",
+    "real_sqlite_test_environment":"isolated=True, isolated_root, supervisor-exported database_path, >=2 actual connection_ids, restart_verified and cleanup_owned_only measured by closing a separate owned diagnostic runtime",
+    "browser_e2e":"12 exact source-defined scenario rows, six alone + six together; actual X/V receipts and matching mode/source/check observations. Aggregated e2e suite preserves FAIL and NOT_VERIFIED, collected=12; no product Playwright suite is pretended",
+    "authorization_mutation":"temporary_copy, original_before/after SHA, physical original_file/mutated_file artifacts, canonical mutation_snapshot_hash, nominal and mutant SEC-09/SEC-10/FUN-06 observed checks + scoped intact X proofs. At least one actual observed false and X passed=False is required to detect mutation; R-only failure does not count"
+  },
+  "sqlite_callback":"async sqlite_probe(adapter,snapshot_hash,contract_hash); root can bind coordinator.sqlite_quality_probe(state,contract,snapshot_root,snapshot_hash,evidence_root) through a closure",
+  "mutation_callback":"async mutation_probe(copy_root,snapshot_hash,contract_hash); nominal root and canonical frozen mutant are run independently on real HTTP/API/DB/browser. Source review/profile on mutant must explicitly match its canonical digest",
+  "mutant_copy":"One exact reviewed authorization replacement on distinct filtered stage, original never changed. write_bytes preserves CRLF. No product config/scripts/imports execute on host",
+  "source_expectations":"Frozen reference coverage thresholds and six E2E section-8 scenarios unchanged; generator fragments are source exact",
+  "limits":["Prepared collector interfaces and executable meta-tests are not a full generated-product conformity campaign","External independent GPT6.1 medium source/profile reviews remain required; no Claude review call","Product Chromium needs DockerBrowserSession exact NETNONE capability; local fixture opt-in is not campaign authority"]
+}

@@ -1,0 +1,171 @@
+{
+  "id": "SEC-12",
+  "snapshot_hash": "0aba6b90841ce98d7a09b16e425c557078fd15dee0b657823900087b671ad535",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "checks": [
+    {
+      "check": "SEC-12:real_login_http_alice",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "SEC-12:real_login_alice",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "SEC-12:real_login_http_camille",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "SEC-12:real_login_camille",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "SEC-12:real_login_http_emma",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "SEC-12:real_login_emma",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "SEC-12:interaction_failed",
+      "observed": "TimeoutError",
+      "expected": "completed",
+      "passed": false
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/tickets",
+      "payload": {
+        "title": "<script>window.__security_probe=1</script>",
+        "description": "Independent browser probe description long enough",
+        "client_request_id": "74de5ef4-9a18-4c5b-9302-e8cbf275a92f"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/1c4a457e-36a5-4fd2-a7c5-592514856092",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/1c4a457e-36a5-4fd2-a7c5-592514856092/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    }
+  ],
+  "console_errors": []
+}

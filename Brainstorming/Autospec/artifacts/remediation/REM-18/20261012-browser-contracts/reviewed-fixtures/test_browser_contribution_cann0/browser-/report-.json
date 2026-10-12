@@ -1,0 +1,421 @@
+{
+  "pack": "browser",
+  "status": "NOT_VERIFIED",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "requirements": [
+    {
+      "id": "SEC-10",
+      "gate": "B",
+      "status": "NOT_VERIFIED",
+      "expected": "Notes internes absentes du JSON/HTML/état client : contenu, auteurs, événements, compteurs et recherche. Version/date globale du ticket peuvent changer : exception assumée, pas une fuite de contenu. Tester ticket mixte, uniquement notes internes, pagination et changement de compte dans le navigateur. Aucun filtrage uniquement côté React.",
+      "observed": [
+        {
+          "check": "SEC-10:real_login_http_alice",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:real_login_alice",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_mixed_json_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_mixed_dom_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_mixed_no_internal_selector",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_mixed_page1_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_mixed_page2_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_mixed_events_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_internal_only_json_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_internal_only_dom_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_internal_only_no_internal_selector",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_internal_only_page1_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_internal_only_page2_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:alice_internal_only_events_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:internal_search_zero",
+          "observed": "0",
+          "expected": "0",
+          "passed": true
+        },
+        {
+          "check": "SEC-10:internal_search_zero",
+          "observed": "0",
+          "expected": "0",
+          "passed": true
+        },
+        {
+          "check": "SEC-10:real_login_http_bob",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:real_login_bob",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:account_switch_private_absent",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "SEC-10:unhandled_page_errors",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_browser_contribution_cann0\\browser-\\SEC-10-final-c070eeb7365c42b2b1f88e72651e1506.png",
+          "sha256": "529c7df5417fd91ba4f5060ab3f571f1376f35c22b477611ba9a619f76ee1bbb",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "SEC-10:final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_browser_contribution_cann0\\browser-\\SEC-10-8164f40411e24cb79480f3ad48edc579.json",
+          "sha256": "a0487664eb231bef45d51a95548dc49a3d26124085b34801615b4c25e1ea6477",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "SEC-10:real_login_http_alice",
+            "SEC-10:real_login_alice",
+            "SEC-10:alice_mixed_json_private_absent",
+            "SEC-10:alice_mixed_dom_private_absent",
+            "SEC-10:alice_mixed_no_internal_selector",
+            "SEC-10:alice_mixed_page1_private_absent",
+            "SEC-10:alice_mixed_page2_private_absent",
+            "SEC-10:alice_mixed_events_absent",
+            "SEC-10:alice_internal_only_json_private_absent",
+            "SEC-10:alice_internal_only_dom_private_absent",
+            "SEC-10:alice_internal_only_no_internal_selector",
+            "SEC-10:alice_internal_only_page1_private_absent",
+            "SEC-10:alice_internal_only_page2_private_absent",
+            "SEC-10:alice_internal_only_events_absent",
+            "SEC-10:internal_search_zero",
+            "SEC-10:internal_search_zero",
+            "SEC-10:real_login_http_bob",
+            "SEC-10:real_login_bob",
+            "SEC-10:account_switch_private_absent",
+            "SEC-10:unhandled_page_errors"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [
+        "browser contribution only: independent backend probes still required",
+        "missing proof types: R"
+      ],
+      "reproduction": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000065",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000065/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000065",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000065/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000065/messages",
+          "query": {
+            "page": 1,
+            "page_size": 1
+          },
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000065/messages",
+          "query": {
+            "page": 2,
+            "page_size": 1
+          },
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000068",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000068/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000068",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000068/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000068/messages",
+          "query": {
+            "page": 1,
+            "page_size": 1
+          },
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000068/messages",
+          "query": {
+            "page": 2,
+            "page_size": 1
+          },
+          "status": 200
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "q": [
+              "INTERNAL_SEED_MIXED"
+            ],
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "q": [
+              "INTERNAL_SEED_ONLY"
+            ],
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/logout",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+      "layer": "browser"
+    }
+  ],
+  "environment_limits": [
+    "HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."
+  ],
+  "browser_environment": {
+    "qualified": false,
+    "host_chromium": true,
+    "trusted_fixture_only": true
+  },
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": ""
+}

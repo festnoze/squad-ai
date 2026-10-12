@@ -1,0 +1,752 @@
+{
+  "pack": "browser_e2e",
+  "status": "PASS",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "scenarios": [
+    {
+      "id": "E2E-04",
+      "expected": "**Conflit et retry** : deux contextes du personnel ouvrent la même version ; une modification réussit, l'autre reçoit un conflit et conserve son brouillon. Rejouer une création après perte de réponse => un objet. Liens : FUN-06/07/13, UX-07.",
+      "mode": "alone",
+      "status": "PASS",
+      "observed": [
+        {
+          "check": "TST-05:E2E-04:real_login_http_camille",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:real_login_camille",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:real_login_http_dylan",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:real_login_dylan",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:first_patch_success",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:conflict_is_explicit",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:draft_conserved",
+          "observed": "CONFLICT_DRAFT_2ea0580718a84d6287e4bad99101a05d",
+          "expected": "CONFLICT_DRAFT_2ea0580718a84d6287e4bad99101a05d",
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:reload_conserves_draft",
+          "observed": "CONFLICT_DRAFT_2ea0580718a84d6287e4bad99101a05d",
+          "expected": "CONFLICT_DRAFT_2ea0580718a84d6287e4bad99101a05d",
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:no_automatic_reapplication",
+          "observed": "high",
+          "expected": "high",
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:form_reusable_after_conflict",
+          "observed": 1,
+          "expected": 1,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:real_login_http_alice",
+          "observed": 200,
+          "expected": 200,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:real_login_alice",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:slow_loading",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:empty_state",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:api500_recoverable",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:api500_not_empty",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:network_failure_explicit",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:read_reusable_after_failure",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:known_refusal_status",
+          "observed": 422,
+          "expected": 422,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:known_refusal_draft_conserved",
+          "observed": "KNOWN_REFUSAL_cfa7ee5a0d1841668b3710afe577110e",
+          "expected": "KNOWN_REFUSAL_cfa7ee5a0d1841668b3710afe577110e",
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:known_refusal_editable",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:known_refusal_no_object",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:recoverable_uncertainty",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:bounded_timeout",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:uncertain_payload_frozen",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:retry_completed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:retry_same_payload_uuid",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:retry_no_duplicate",
+          "observed": 1,
+          "expected": 1,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:message_uncertain_replay",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:message_uncertain_frozen",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:message_same_payload_uuid",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:message_retry_no_duplicate",
+          "observed": 1,
+          "expected": 1,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:message_form_reusable",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:E2E-04:console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        }
+      ],
+      "limits": [],
+      "proofs": [
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in3\\browser_e2e-\\TST-05-E2E-04-slow-empty-2cd2da75ed9546dfbf377db1f8786a2d.png",
+          "sha256": "cf9b58a789ded5be58ea94c46a64fb315a19fbbfa3ead96adcf9efc9729e9047",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:slow-empty"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in3\\browser_e2e-\\TST-05-E2E-04-api500-f40d0e91aebc40b58397c384f8156076.png",
+          "sha256": "b88a4c766453692f84fa192e156adeea1d5accf020c79acf93132cae11ecf2a0",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:api500"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in3\\browser_e2e-\\TST-05-E2E-04-scenario-final-52f442f12157457ca3582c3eb25be836.png",
+          "sha256": "f6aca57d5cc0622600bd80aa499bf81da7eb257d32e7555b73932549afa59e5d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in3\\browser_e2e-\\TST-05-E2E-04-scenario-final-abca7d00b6c946bc9715d3b92c66835c.png",
+          "sha256": "e6e91023c055251477a6f6c6df915a579c015ed94697013dc0137e1262e8ff45",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in3\\browser_e2e-\\TST-05-E2E-04-scenario-final-57a8f82b519041f9bf56e9778bdea5c1.png",
+          "sha256": "8bb123d3110d39c1be943f48e002be3d4b725bc9283657447f0c7ff02483fcde",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_six_source_e2e_execute_in3\\browser_e2e-\\E2E-04-alone-8e43d003342044ccb66d8c04ccb1a727.json",
+          "sha256": "56c3639244d92ffa4d9703ce68f4b70e0224377a1aad8fc5676e83e04557b1af",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:real_login_http_camille",
+            "TST-05:E2E-04:real_login_camille",
+            "TST-05:E2E-04:real_login_http_dylan",
+            "TST-05:E2E-04:real_login_dylan",
+            "TST-05:E2E-04:first_patch_success",
+            "TST-05:E2E-04:conflict_is_explicit",
+            "TST-05:E2E-04:draft_conserved",
+            "TST-05:E2E-04:reload_conserves_draft",
+            "TST-05:E2E-04:no_automatic_reapplication",
+            "TST-05:E2E-04:form_reusable_after_conflict",
+            "TST-05:E2E-04:real_login_http_alice",
+            "TST-05:E2E-04:real_login_alice",
+            "TST-05:E2E-04:slow_loading",
+            "TST-05:E2E-04:empty_state",
+            "TST-05:E2E-04:api500_recoverable",
+            "TST-05:E2E-04:api500_not_empty",
+            "TST-05:E2E-04:network_failure_explicit",
+            "TST-05:E2E-04:read_reusable_after_failure",
+            "TST-05:E2E-04:known_refusal_status",
+            "TST-05:E2E-04:known_refusal_draft_conserved",
+            "TST-05:E2E-04:known_refusal_editable",
+            "TST-05:E2E-04:known_refusal_no_object",
+            "TST-05:E2E-04:recoverable_uncertainty",
+            "TST-05:E2E-04:bounded_timeout",
+            "TST-05:E2E-04:uncertain_payload_frozen",
+            "TST-05:E2E-04:retry_completed",
+            "TST-05:E2E-04:retry_same_payload_uuid",
+            "TST-05:E2E-04:retry_no_duplicate",
+            "TST-05:E2E-04:message_uncertain_replay",
+            "TST-05:E2E-04:message_uncertain_frozen",
+            "TST-05:E2E-04:message_same_payload_uuid",
+            "TST-05:E2E-04:message_retry_no_duplicate",
+            "TST-05:E2E-04:message_form_reusable",
+            "TST-05:E2E-04:console"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "fixture_reset_before": true,
+      "reproduction": [
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": {
+            "expected_version": 1,
+            "priority": "high",
+            "status": "open",
+            "assignee_id": null
+          },
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "PATCH",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": {
+            "expected_version": 1,
+            "priority": "low",
+            "status": "open",
+            "assignee_id": null
+          },
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": {
+            "content": "CONFLICT_DRAFT_2ea0580718a84d6287e4bad99101a05d",
+            "visibility": "public",
+            "client_request_id": "1f0c9c18-3b01-4957-a997-2ab79049466a"
+          },
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/assignees",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/auth/login",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/auth/me",
+          "payload": "[AUTH_INPUT_REDACTED]",
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "q": [
+              "nothing-8d9543d3cbda4904a9f79bafc0be5e44"
+            ],
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "q": [
+              "nothing-8d9543d3cbda4904a9f79bafc0be5e44"
+            ],
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "q": [
+              "nothing-8d9543d3cbda4904a9f79bafc0be5e44"
+            ],
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets",
+          "payload": null,
+          "query": {
+            "page": [
+              "1"
+            ],
+            "page_size": [
+              "2"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tickets",
+          "payload": {
+            "title": "KNOWN_REFUSAL_cfa7ee5a0d1841668b3710afe577110e",
+            "description": "Independent browser probe description long enough",
+            "client_request_id": "7851ec66-3d14-46e2-a4e0-5d8f7c273d40"
+          },
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/tickets",
+          "payload": {
+            "title": "Uncertain 04f89ff345da4c48aa28299da0ead037",
+            "description": "Independent browser probe description long enough",
+            "client_request_id": "1391ef2b-cb5d-4ec5-b2f5-b85853fba083"
+          },
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/tickets",
+          "payload": {
+            "title": "Uncertain 04f89ff345da4c48aa28299da0ead037",
+            "description": "Independent browser probe description long enough",
+            "client_request_id": "1391ef2b-cb5d-4ec5-b2f5-b85853fba083"
+          },
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/220702ce-c7e6-4cc2-a4bc-4bd84525e5c1",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/220702ce-c7e6-4cc2-a4bc-4bd84525e5c1/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        },
+        {
+          "method": "POST",
+          "path": "/api/tickets/220702ce-c7e6-4cc2-a4bc-4bd84525e5c1/messages",
+          "payload": {
+            "content": "MESSAGE_UNCERTAINTY_90484f27c8a54cec949bd0c29e25a85b",
+            "visibility": "public",
+            "client_request_id": "eac00d78-fe0c-4e93-be09-5f974a2f94d5"
+          },
+          "query": {}
+        },
+        {
+          "method": "POST",
+          "path": "/api/tickets/220702ce-c7e6-4cc2-a4bc-4bd84525e5c1/messages",
+          "payload": {
+            "content": "MESSAGE_UNCERTAINTY_90484f27c8a54cec949bd0c29e25a85b",
+            "visibility": "public",
+            "client_request_id": "eac00d78-fe0c-4e93-be09-5f974a2f94d5"
+          },
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/220702ce-c7e6-4cc2-a4bc-4bd84525e5c1",
+          "payload": null,
+          "query": {}
+        },
+        {
+          "method": "GET",
+          "path": "/api/tickets/220702ce-c7e6-4cc2-a4bc-4bd84525e5c1/messages",
+          "payload": null,
+          "query": {
+            "page_size": [
+              "50"
+            ]
+          }
+        }
+      ],
+      "impact": "",
+      "real_ui_api_db": true,
+      "nominal_mocks": false,
+      "unhandled_console_errors": [],
+      "nonblank": true,
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df"
+    }
+  ],
+  "environment_limits": [
+    "HTTP(S) interception, blocked Service Workers and denied WebSockets are browser API guards, not an OS sandbox.",
+    "WebRTC/UDP and other non-HTTP transports are not qualified; hostile browser code needs an external OS/network boundary."
+  ],
+  "browser_environment": {
+    "qualified": false,
+    "host_chromium": true,
+    "trusted_fixture_only": true
+  },
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": ""
+}

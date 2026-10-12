@@ -1,0 +1,346 @@
+{
+  "source_expected": "**Traitement complet** : partir du ticket Alice-open non assigné du manifest, sans dépendre du parcours 1. Camille l'affecte, passe en cours, ajoute note interne puis réponse publique, résout et ferme ; Alice ne voit que les éléments publics. Liens : FUN-03/04/05, SEC-10, UX-08.",
+  "mode": "alone",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "c3e14ba95c21d28bd7ffb27dffe610203417d95563a1a8ddff8e1a0c8bac6606",
+  "checks": [
+    {
+      "check": "TST-05:E2E-02:real_login_http_camille",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-02:real_login_camille",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-02:patch_assignee_status",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-02:patch_status",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-02:patch_status",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-02:real_login_http_alice",
+      "observed": 200,
+      "expected": 200,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-02:real_login_alice",
+      "observed": true,
+      "expected": true,
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-02:client_public_only",
+      "observed": false,
+      "expected": true,
+      "passed": false
+    },
+    {
+      "check": "TST-05:E2E-02:db_closed",
+      "observed": "closed",
+      "expected": "closed",
+      "passed": true
+    },
+    {
+      "check": "TST-05:E2E-02:console",
+      "observed": [],
+      "expected": [],
+      "passed": true
+    }
+  ],
+  "requests": [
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/assignees",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": {
+        "expected_version": 1,
+        "priority": "normal",
+        "status": "in_progress",
+        "assignee_id": "00000000-0000-0000-0000-000000000003"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/assignees",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": {
+        "content": "E2E_PRIVATE_NOTE",
+        "visibility": "internal",
+        "client_request_id": "d42b27ef-8ced-4cd1-8aa7-87b5dbc8d86a"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/assignees",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": {
+        "content": "E2E_PUBLIC_RESPONSE",
+        "visibility": "public",
+        "client_request_id": "c57c961e-488a-49ad-a591-e4ad060a5cfb"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/assignees",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": {
+        "expected_version": 4,
+        "priority": "normal",
+        "status": "resolved",
+        "assignee_id": "00000000-0000-0000-0000-000000000003"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/assignees",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": {
+        "expected_version": 5,
+        "priority": "normal",
+        "status": "closed",
+        "assignee_id": "00000000-0000-0000-0000-000000000003"
+      },
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/assignees",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "POST",
+      "path": "/api/auth/login",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets",
+      "payload": null,
+      "query": {
+        "page": [
+          "1"
+        ],
+        "page_size": [
+          "2"
+        ]
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/api/auth/me",
+      "payload": "[AUTH_INPUT_REDACTED]",
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064",
+      "payload": null,
+      "query": {}
+    },
+    {
+      "method": "GET",
+      "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+      "payload": null,
+      "query": {
+        "page_size": [
+          "50"
+        ]
+      }
+    }
+  ],
+  "limits": []
+}

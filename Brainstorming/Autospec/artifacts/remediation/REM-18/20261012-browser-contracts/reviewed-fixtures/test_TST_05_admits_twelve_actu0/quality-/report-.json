@@ -1,0 +1,3235 @@
+{
+  "pack": "quality",
+  "status": "NOT_VERIFIED",
+  "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+  "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+  "requirements": [
+    {
+      "id": "TST-01",
+      "gate": "B",
+      "status": "PASS",
+      "expected": "Exécuter les tests, inspecter assertions/fixtures. Aucun skip/xfail critique masquant un échec ; intégration sans remplacement du service+DB par mocks ; zéro test collecté => FAIL.",
+      "observed": [
+        {
+          "check": "TST-01:backend_exit",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:backend_no_failures",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:backend_collected",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:backend_accounted",
+          "observed": 10,
+          "expected": 10,
+          "passed": true
+        },
+        {
+          "check": "TST-01:backend_critical_skip",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:backend_nominal_mocks",
+          "observed": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "check": "TST-01:backend_assertions_reviewed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:backend_report_valid",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:backend_collection_errors",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_exit",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_no_failures",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_collected",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_accounted",
+          "observed": 10,
+          "expected": 10,
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_critical_skip",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_nominal_mocks",
+          "observed": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_assertions_reviewed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_report_valid",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:frontend_collection_errors",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_exit",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_no_failures",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_collected",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_accounted",
+          "observed": 10,
+          "expected": 10,
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_critical_skip",
+          "observed": 0,
+          "expected": 0,
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_nominal_mocks",
+          "observed": false,
+          "expected": false,
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_assertions_reviewed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_report_valid",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-01:e2e_collection_errors",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-01:required_suites",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-01-13c6dfdce45d4cf3b21c98efb3c0ce6c.json",
+          "sha256": "499e965694e028ffdd056bea0d598fc9de9a4f4477cd0addb0c1189f7bea00d4",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-01:backend_exit",
+            "TST-01:backend_no_failures",
+            "TST-01:backend_collected",
+            "TST-01:backend_accounted",
+            "TST-01:backend_critical_skip",
+            "TST-01:backend_nominal_mocks",
+            "TST-01:backend_assertions_reviewed",
+            "TST-01:backend_report_valid",
+            "TST-01:backend_collection_errors",
+            "TST-01:frontend_exit",
+            "TST-01:frontend_no_failures",
+            "TST-01:frontend_collected",
+            "TST-01:frontend_accounted",
+            "TST-01:frontend_critical_skip",
+            "TST-01:frontend_nominal_mocks",
+            "TST-01:frontend_assertions_reviewed",
+            "TST-01:frontend_report_valid",
+            "TST-01:frontend_collection_errors",
+            "TST-01:e2e_exit",
+            "TST-01:e2e_no_failures",
+            "TST-01:e2e_collected",
+            "TST-01:e2e_accounted",
+            "TST-01:e2e_critical_skip",
+            "TST-01:e2e_nominal_mocks",
+            "TST-01:e2e_assertions_reviewed",
+            "TST-01:e2e_report_valid",
+            "TST-01:e2e_collection_errors",
+            "TST-01:required_suites"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "R",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-01-fixture-review.json",
+          "sha256": "964a174a69fedf6675ea945cc2c6053295257eb4a4d0bc4c5ed4e6a96b7e116f",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-01"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "probe": "TST-01:backend_exit",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:backend_no_failures",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:backend_collected",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:backend_accounted",
+          "observed": 10
+        },
+        {
+          "probe": "TST-01:backend_critical_skip",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:backend_nominal_mocks",
+          "observed": false
+        },
+        {
+          "probe": "TST-01:backend_assertions_reviewed",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:backend_report_valid",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:backend_collection_errors",
+          "observed": []
+        },
+        {
+          "probe": "TST-01:frontend_exit",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:frontend_no_failures",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:frontend_collected",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:frontend_accounted",
+          "observed": 10
+        },
+        {
+          "probe": "TST-01:frontend_critical_skip",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:frontend_nominal_mocks",
+          "observed": false
+        },
+        {
+          "probe": "TST-01:frontend_assertions_reviewed",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:frontend_report_valid",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:frontend_collection_errors",
+          "observed": []
+        },
+        {
+          "probe": "TST-01:e2e_exit",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:e2e_no_failures",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:e2e_collected",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:e2e_accounted",
+          "observed": 10
+        },
+        {
+          "probe": "TST-01:e2e_critical_skip",
+          "observed": 0
+        },
+        {
+          "probe": "TST-01:e2e_nominal_mocks",
+          "observed": false
+        },
+        {
+          "probe": "TST-01:e2e_assertions_reviewed",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:e2e_report_valid",
+          "observed": true
+        },
+        {
+          "probe": "TST-01:e2e_collection_errors",
+          "observed": []
+        },
+        {
+          "probe": "TST-01:required_suites",
+          "observed": true
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df"
+    },
+    {
+      "id": "TST-02",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Matrices rôles/routes/transitions et limites couvertes. Tableau requirement → tests, avec IDs dans noms/markers ou mapping explicite. Inspecter les assertions, pas seulement les noms.",
+      "observed": [
+        {
+          "check": "TST-02:all_mandatory_ids_mapped",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-01_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-02_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-03_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-04_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-05_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-06_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-07_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-08_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:ARC-09_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-01_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-02_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-03_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-04_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-05_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-06_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-07_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-08_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-09_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-10_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-11_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-12_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:FUN-13_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:OPS-01_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:OPS-02_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:OPS-03_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:OPS-04_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:OPS-05_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-01_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-02_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-03_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-04_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-05_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-06_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-07_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-08_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-09_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-10_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-11_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-12_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-13_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-14_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:SEC-15_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:TST-01_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:TST-02_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:TST-03_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:TST-04_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:TST-05_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:TST-06_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:UX-01_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:UX-02_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:UX-03_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:UX-04_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:UX-05_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:UX-06_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:UX-07_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-02:UX-08_assertions",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-02-71eb674e2a6d4942826acc4599cdd1a6.json",
+          "sha256": "96ccd7fc98caa77d3bb843739139b52efa07115fd8c1cb5936660bc0bdb4c42b",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-02:all_mandatory_ids_mapped",
+            "TST-02:ARC-01_assertions",
+            "TST-02:ARC-02_assertions",
+            "TST-02:ARC-03_assertions",
+            "TST-02:ARC-04_assertions",
+            "TST-02:ARC-05_assertions",
+            "TST-02:ARC-06_assertions",
+            "TST-02:ARC-07_assertions",
+            "TST-02:ARC-08_assertions",
+            "TST-02:ARC-09_assertions",
+            "TST-02:FUN-01_assertions",
+            "TST-02:FUN-02_assertions",
+            "TST-02:FUN-03_assertions",
+            "TST-02:FUN-04_assertions",
+            "TST-02:FUN-05_assertions",
+            "TST-02:FUN-06_assertions",
+            "TST-02:FUN-07_assertions",
+            "TST-02:FUN-08_assertions",
+            "TST-02:FUN-09_assertions",
+            "TST-02:FUN-10_assertions",
+            "TST-02:FUN-11_assertions",
+            "TST-02:FUN-12_assertions",
+            "TST-02:FUN-13_assertions",
+            "TST-02:OPS-01_assertions",
+            "TST-02:OPS-02_assertions",
+            "TST-02:OPS-03_assertions",
+            "TST-02:OPS-04_assertions",
+            "TST-02:OPS-05_assertions",
+            "TST-02:SEC-01_assertions",
+            "TST-02:SEC-02_assertions",
+            "TST-02:SEC-03_assertions",
+            "TST-02:SEC-04_assertions",
+            "TST-02:SEC-05_assertions",
+            "TST-02:SEC-06_assertions",
+            "TST-02:SEC-07_assertions",
+            "TST-02:SEC-08_assertions",
+            "TST-02:SEC-09_assertions",
+            "TST-02:SEC-10_assertions",
+            "TST-02:SEC-11_assertions",
+            "TST-02:SEC-12_assertions",
+            "TST-02:SEC-13_assertions",
+            "TST-02:SEC-14_assertions",
+            "TST-02:SEC-15_assertions",
+            "TST-02:TST-01_assertions",
+            "TST-02:TST-02_assertions",
+            "TST-02:TST-03_assertions",
+            "TST-02:TST-04_assertions",
+            "TST-02:TST-05_assertions",
+            "TST-02:TST-06_assertions",
+            "TST-02:UX-01_assertions",
+            "TST-02:UX-02_assertions",
+            "TST-02:UX-03_assertions",
+            "TST-02:UX-04_assertions",
+            "TST-02:UX-05_assertions",
+            "TST-02:UX-06_assertions",
+            "TST-02:UX-07_assertions",
+            "TST-02:UX-08_assertions"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "R",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-02-fixture-review.json",
+          "sha256": "e65f483ce2da80fc10672f40534eae178053b5ad5288d7b2eee298faf8c3c63d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-02"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "probe": "TST-02:all_mandatory_ids_mapped",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-01_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-02_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-03_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-04_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-05_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-06_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-07_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-08_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:ARC-09_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-01_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-02_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-03_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-04_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-05_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-06_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-07_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-08_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-09_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-10_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-11_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-12_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:FUN-13_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:OPS-01_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:OPS-02_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:OPS-03_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:OPS-04_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:OPS-05_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-01_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-02_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-03_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-04_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-05_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-06_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-07_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-08_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-09_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-10_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-11_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-12_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-13_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-14_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:SEC-15_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:TST-01_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:TST-02_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:TST-03_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:TST-04_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:TST-05_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:TST-06_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:UX-01_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:UX-02_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:UX-03_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:UX-04_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:UX-05_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:UX-06_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:UX-07_assertions",
+          "observed": true
+        },
+        {
+          "probe": "TST-02:UX-08_assertions",
+          "observed": true
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df"
+    },
+    {
+      "id": "TST-03",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Backend : ≥80% lignes et ≥70% branches, auth/services/permissions inclus. Frontend : ≥70% lignes des domaines et client HTTP. Fichiers non exécutés inclus. Conserver numérateurs/dénominateurs, rapport brut/configuration ; exclusions générées/types/tiers justifiées, aucun retrait de code métier.",
+      "observed": [
+        {
+          "check": "TST-03:backend_complete_inventory",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backend_business_exclusions",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendbranches_valid_file_counts",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendbranches_denominator",
+          "observed": 300,
+          "expected": 300,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendbranches_numerator",
+          "observed": 210,
+          "expected": 210,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendbranches_nonzero",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendbranches_threshold",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendlines_valid_file_counts",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendlines_denominator",
+          "observed": 300,
+          "expected": 300,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendlines_numerator",
+          "observed": 240,
+          "expected": 240,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendlines_nonzero",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backendlines_threshold",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:backend_auth_services_http_present",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:frontend_complete_inventory",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:frontend_business_exclusions",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-03:frontendlines_valid_file_counts",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:frontendlines_denominator",
+          "observed": 400,
+          "expected": 400,
+          "passed": true
+        },
+        {
+          "check": "TST-03:frontendlines_numerator",
+          "observed": 320,
+          "expected": 320,
+          "passed": true
+        },
+        {
+          "check": "TST-03:frontendlines_nonzero",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:frontendlines_threshold",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-03:frontend_auth_services_http_present",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-03-c4efbe5a812a4dcfa05e3d710ec321f1.json",
+          "sha256": "e5ee616daa48bf020a06bf8b61632489c3946b4deb98dfefd86b6c7708d57663",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-03:backend_complete_inventory",
+            "TST-03:backend_business_exclusions",
+            "TST-03:backendbranches_valid_file_counts",
+            "TST-03:backendbranches_denominator",
+            "TST-03:backendbranches_numerator",
+            "TST-03:backendbranches_nonzero",
+            "TST-03:backendbranches_threshold",
+            "TST-03:backendlines_valid_file_counts",
+            "TST-03:backendlines_denominator",
+            "TST-03:backendlines_numerator",
+            "TST-03:backendlines_nonzero",
+            "TST-03:backendlines_threshold",
+            "TST-03:backend_auth_services_http_present",
+            "TST-03:frontend_complete_inventory",
+            "TST-03:frontend_business_exclusions",
+            "TST-03:frontendlines_valid_file_counts",
+            "TST-03:frontendlines_denominator",
+            "TST-03:frontendlines_numerator",
+            "TST-03:frontendlines_nonzero",
+            "TST-03:frontendlines_threshold",
+            "TST-03:frontend_auth_services_http_present"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "R",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-03-fixture-review.json",
+          "sha256": "fedab61b1b827705354d1ab6ce8be9ac218baaf07168440b9cc42a33b925eb76",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-03"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "probe": "TST-03:backend_complete_inventory",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:backend_business_exclusions",
+          "observed": []
+        },
+        {
+          "probe": "TST-03:backendbranches_valid_file_counts",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:backendbranches_denominator",
+          "observed": 300
+        },
+        {
+          "probe": "TST-03:backendbranches_numerator",
+          "observed": 210
+        },
+        {
+          "probe": "TST-03:backendbranches_nonzero",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:backendbranches_threshold",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:backendlines_valid_file_counts",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:backendlines_denominator",
+          "observed": 300
+        },
+        {
+          "probe": "TST-03:backendlines_numerator",
+          "observed": 240
+        },
+        {
+          "probe": "TST-03:backendlines_nonzero",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:backendlines_threshold",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:backend_auth_services_http_present",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:frontend_complete_inventory",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:frontend_business_exclusions",
+          "observed": []
+        },
+        {
+          "probe": "TST-03:frontendlines_valid_file_counts",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:frontendlines_denominator",
+          "observed": 400
+        },
+        {
+          "probe": "TST-03:frontendlines_numerator",
+          "observed": 320
+        },
+        {
+          "probe": "TST-03:frontendlines_nonzero",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:frontendlines_threshold",
+          "observed": true
+        },
+        {
+          "probe": "TST-03:frontend_auth_services_http_present",
+          "observed": true
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df"
+    },
+    {
+      "id": "TST-04",
+      "gate": "B",
+      "status": "PASS",
+      "expected": "SQLite réelle sur fichier temporaire, connexions distinctes pour transactions/concurrence/restart. Nettoyage limité aux ressources du test, jamais à une base utilisateur.",
+      "observed": [
+        {
+          "check": "TST-04:temporary_owned_database",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-04:real_sqlite_header",
+          "observed": "53514c69746520666f726d6174203300",
+          "expected": "53514c69746520666f726d6174203300",
+          "passed": true
+        },
+        {
+          "check": "TST-04:distinct_connections",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-04:restart_exercised",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-04:cleanup_owned_only",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-04-080645e646724c7ba4af2bf68c539494.json",
+          "sha256": "103ad582573412ab5b9f0887a40189c3e535f7bcac5faf8ead65d2d0b6663be1",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-04:temporary_owned_database",
+            "TST-04:real_sqlite_header",
+            "TST-04:distinct_connections",
+            "TST-04:restart_exercised",
+            "TST-04:cleanup_owned_only"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "R",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-04-fixture-review.json",
+          "sha256": "6b5b676802f1cd3dabf0074b6cf57de0f50cce0532e1d5e8226a19f3823e419d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-04"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "probe": "TST-04:temporary_owned_database",
+          "observed": true
+        },
+        {
+          "probe": "TST-04:real_sqlite_header",
+          "observed": "53514c69746520666f726d6174203300"
+        },
+        {
+          "probe": "TST-04:distinct_connections",
+          "observed": true
+        },
+        {
+          "probe": "TST-04:restart_exercised",
+          "observed": true
+        },
+        {
+          "probe": "TST-04:cleanup_owned_only",
+          "observed": true
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df"
+    },
+    {
+      "id": "TST-05",
+      "gate": "B",
+      "status": "PASS",
+      "expected": "Six parcours du §8 sur vrais front/API/DB, sans mocks nominaux ; aucune erreur console non traitée ou page blanche. Simulation réseau admise pour les cas négatifs distincts.",
+      "observed": [
+        {
+          "check": "TST-05:alone_exact_six",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:together_exact_six",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-01_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-01_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-01_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-01_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-01_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-01_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-02_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-02_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-02_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-02_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-02_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-02_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-03_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-03_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-03_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-03_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-03_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-03_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-04_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-04_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-04_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-04_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-04_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-04_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-05_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-05_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-05_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-05_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-05_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-05_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-06_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-06_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-06_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-06_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-06_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:aloneE2E-06_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-01_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-01_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-01_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-01_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-01_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-01_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-02_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-02_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-02_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-02_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-02_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-02_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-03_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-03_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-03_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-03_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-03_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-03_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-04_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-04_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-04_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-04_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-04_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-04_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-05_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-05_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-05_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-05_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-05_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-05_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-06_executed",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-06_nominal",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-06_console",
+          "observed": [],
+          "expected": [],
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-06_not_blank",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-06_isolated_fixture",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-05:togetherE2E-06_proofs_passed",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-685373435c794fb7a4b3febc89001910.json",
+          "sha256": "9c251d0a35bf154e1b869e95f7f086be0ee633688bf0f18ae548ad211bab4d5d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:alone_exact_six",
+            "TST-05:together_exact_six",
+            "TST-05:aloneE2E-01_executed",
+            "TST-05:aloneE2E-01_nominal",
+            "TST-05:aloneE2E-01_console",
+            "TST-05:aloneE2E-01_not_blank",
+            "TST-05:aloneE2E-01_isolated_fixture",
+            "TST-05:aloneE2E-01_proofs_passed",
+            "TST-05:aloneE2E-02_executed",
+            "TST-05:aloneE2E-02_nominal",
+            "TST-05:aloneE2E-02_console",
+            "TST-05:aloneE2E-02_not_blank",
+            "TST-05:aloneE2E-02_isolated_fixture",
+            "TST-05:aloneE2E-02_proofs_passed",
+            "TST-05:aloneE2E-03_executed",
+            "TST-05:aloneE2E-03_nominal",
+            "TST-05:aloneE2E-03_console",
+            "TST-05:aloneE2E-03_not_blank",
+            "TST-05:aloneE2E-03_isolated_fixture",
+            "TST-05:aloneE2E-03_proofs_passed",
+            "TST-05:aloneE2E-04_executed",
+            "TST-05:aloneE2E-04_nominal",
+            "TST-05:aloneE2E-04_console",
+            "TST-05:aloneE2E-04_not_blank",
+            "TST-05:aloneE2E-04_isolated_fixture",
+            "TST-05:aloneE2E-04_proofs_passed",
+            "TST-05:aloneE2E-05_executed",
+            "TST-05:aloneE2E-05_nominal",
+            "TST-05:aloneE2E-05_console",
+            "TST-05:aloneE2E-05_not_blank",
+            "TST-05:aloneE2E-05_isolated_fixture",
+            "TST-05:aloneE2E-05_proofs_passed",
+            "TST-05:aloneE2E-06_executed",
+            "TST-05:aloneE2E-06_nominal",
+            "TST-05:aloneE2E-06_console",
+            "TST-05:aloneE2E-06_not_blank",
+            "TST-05:aloneE2E-06_isolated_fixture",
+            "TST-05:aloneE2E-06_proofs_passed",
+            "TST-05:togetherE2E-01_executed",
+            "TST-05:togetherE2E-01_nominal",
+            "TST-05:togetherE2E-01_console",
+            "TST-05:togetherE2E-01_not_blank",
+            "TST-05:togetherE2E-01_isolated_fixture",
+            "TST-05:togetherE2E-01_proofs_passed",
+            "TST-05:togetherE2E-02_executed",
+            "TST-05:togetherE2E-02_nominal",
+            "TST-05:togetherE2E-02_console",
+            "TST-05:togetherE2E-02_not_blank",
+            "TST-05:togetherE2E-02_isolated_fixture",
+            "TST-05:togetherE2E-02_proofs_passed",
+            "TST-05:togetherE2E-03_executed",
+            "TST-05:togetherE2E-03_nominal",
+            "TST-05:togetherE2E-03_console",
+            "TST-05:togetherE2E-03_not_blank",
+            "TST-05:togetherE2E-03_isolated_fixture",
+            "TST-05:togetherE2E-03_proofs_passed",
+            "TST-05:togetherE2E-04_executed",
+            "TST-05:togetherE2E-04_nominal",
+            "TST-05:togetherE2E-04_console",
+            "TST-05:togetherE2E-04_not_blank",
+            "TST-05:togetherE2E-04_isolated_fixture",
+            "TST-05:togetherE2E-04_proofs_passed",
+            "TST-05:togetherE2E-05_executed",
+            "TST-05:togetherE2E-05_nominal",
+            "TST-05:togetherE2E-05_console",
+            "TST-05:togetherE2E-05_not_blank",
+            "TST-05:togetherE2E-05_isolated_fixture",
+            "TST-05:togetherE2E-05_proofs_passed",
+            "TST-05:togetherE2E-06_executed",
+            "TST-05:togetherE2E-06_nominal",
+            "TST-05:togetherE2E-06_console",
+            "TST-05:togetherE2E-06_not_blank",
+            "TST-05:togetherE2E-06_isolated_fixture",
+            "TST-05:togetherE2E-06_proofs_passed"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "R",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-fixture-review.json",
+          "sha256": "50007e9188ac49c9cfc4dd140de00b28b633f11c6ebd64bf1685b8af9968ed43",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-01-scenario-final-b009b8c2734341b6961a1090083950d7.png",
+          "sha256": "297698e47765ef3334c5ed63f0c71dd2f4a09999f1cf0457dedd1f282506a8fa",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-01:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-01-alone-ad277082d3804b09a7b4d043384d0a6a.json",
+          "sha256": "4f4f6052e4a2d8f55e47896fd33a14037c992ed40e70f0dfba235d075116d89e",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-01:real_login_http_alice",
+            "TST-05:E2E-01:real_login_alice",
+            "TST-05:E2E-01:reload_public_response",
+            "TST-05:E2E-01:one_db_ticket",
+            "TST-05:E2E-01:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-02-scenario-final-f77f2baf05a9435c9a0163ee6f28bfc7.png",
+          "sha256": "88355408a2fe2eae300c646d3c3f3e1531b4bd5d5eb421c6b162f3155157c1c0",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-02:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-02-scenario-final-b0c46576f8494b4fa795ddaeeb05ba09.png",
+          "sha256": "622096d35dd8795d52a98ad56fd9c32223ba4d5410c95b4e972c75007881ed79",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-02:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-02-alone-174516fc6b5a4de09a7d25502a111d4b.json",
+          "sha256": "6a31ffd1a2f5957f6412104e1cbf623f85d379f87066d7432b1833980c3f8b70",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-02:real_login_http_camille",
+            "TST-05:E2E-02:real_login_camille",
+            "TST-05:E2E-02:patch_assignee_status",
+            "TST-05:E2E-02:patch_status",
+            "TST-05:E2E-02:patch_status",
+            "TST-05:E2E-02:real_login_http_alice",
+            "TST-05:E2E-02:real_login_alice",
+            "TST-05:E2E-02:client_public_only",
+            "TST-05:E2E-02:db_closed",
+            "TST-05:E2E-02:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-03-scenario-final-a8e50eb2a6724c22afc2deeffd57b4fa.png",
+          "sha256": "55b8f1b409971152cf4d97efea1bc919f2f9b22a93c49877b31e62fc808b4347",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-03-scenario-final-3089922a4a6a47518d737b5477bc6981.png",
+          "sha256": "1442ad1e3757de6def38bd9e781c24a7a21c641c7a3a18d9fdb5c41cd195c7de",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-03-alone-041e4564d7b84b66bac682c9170d6215.json",
+          "sha256": "aff5217488fd82686b51a9b3eda8875a1eabae2e51ba7cf850729679021fc6a7",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:real_login_http_bob",
+            "TST-05:E2E-03:real_login_bob",
+            "TST-05:E2E-03:foreign_ticket_404",
+            "TST-05:E2E-03:foreign_detail_cleared",
+            "TST-05:E2E-03:admin_route_denied",
+            "TST-05:E2E-03:admin_client_no_private",
+            "TST-05:E2E-03:denied_reads_no_business_db_effect",
+            "TST-05:E2E-03:inactive_login_401",
+            "TST-05:E2E-03:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-slow-empty-41cecfa13bbd49ac842ffccbbcc52cab.png",
+          "sha256": "2185fc86fd89d4e50dab680991efe4b1d67443c6df73494ebd7220a17f1c4f0f",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:slow-empty"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-api500-851edd39dfa44ca3ad819087d026005b.png",
+          "sha256": "bc542d06f3205fd56aa2eeaba5a96dd0da8d231c02b722b8dd57017e538d1d2b",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:api500"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-scenario-final-92152be38bec479281cf1c8664fb51fa.png",
+          "sha256": "f6aca57d5cc0622600bd80aa499bf81da7eb257d32e7555b73932549afa59e5d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-scenario-final-9e4ae05a13014210b9d63f4ced1ecb7a.png",
+          "sha256": "f3825473bc87cc3e4617a87aea9b3c962913f449f181ec038e2bad68372f619b",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-scenario-final-02650e0018d44ea0b8f9c308e955e5df.png",
+          "sha256": "f82ac931870a07d7c1acd64fde1a12ed5b5dc8d278e9ce7d1ddbcf0bbc252e53",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-04-alone-29d3d3f02def49989329ae33a38afa9b.json",
+          "sha256": "55632a2731cf543a515821367482f11ec35ccf839e8047283b8fec12ad964e8b",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:real_login_http_camille",
+            "TST-05:E2E-04:real_login_camille",
+            "TST-05:E2E-04:real_login_http_dylan",
+            "TST-05:E2E-04:real_login_dylan",
+            "TST-05:E2E-04:first_patch_success",
+            "TST-05:E2E-04:conflict_is_explicit",
+            "TST-05:E2E-04:draft_conserved",
+            "TST-05:E2E-04:reload_conserves_draft",
+            "TST-05:E2E-04:no_automatic_reapplication",
+            "TST-05:E2E-04:form_reusable_after_conflict",
+            "TST-05:E2E-04:real_login_http_alice",
+            "TST-05:E2E-04:real_login_alice",
+            "TST-05:E2E-04:slow_loading",
+            "TST-05:E2E-04:empty_state",
+            "TST-05:E2E-04:api500_recoverable",
+            "TST-05:E2E-04:api500_not_empty",
+            "TST-05:E2E-04:network_failure_explicit",
+            "TST-05:E2E-04:read_reusable_after_failure",
+            "TST-05:E2E-04:known_refusal_status",
+            "TST-05:E2E-04:known_refusal_draft_conserved",
+            "TST-05:E2E-04:known_refusal_editable",
+            "TST-05:E2E-04:known_refusal_no_object",
+            "TST-05:E2E-04:recoverable_uncertainty",
+            "TST-05:E2E-04:bounded_timeout",
+            "TST-05:E2E-04:uncertain_payload_frozen",
+            "TST-05:E2E-04:retry_completed",
+            "TST-05:E2E-04:retry_same_payload_uuid",
+            "TST-05:E2E-04:retry_no_duplicate",
+            "TST-05:E2E-04:message_uncertain_replay",
+            "TST-05:E2E-04:message_uncertain_frozen",
+            "TST-05:E2E-04:message_same_payload_uuid",
+            "TST-05:E2E-04:message_retry_no_duplicate",
+            "TST-05:E2E-04:message_form_reusable",
+            "TST-05:E2E-04:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-05-scenario-final-25e83082fd20401288d25ce0379baa42.png",
+          "sha256": "048f466c2b859a402f1fcabafc69a9880099a502f522363db25c897890c06ee8",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-05:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-05-scenario-final-1fe9f9408a3040b2aaeb70b7fe8f6881.png",
+          "sha256": "eea17b0b8ba480b13658c5be57cfdd2ea23b17df9dc42f806db0047c95bc670d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-05:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-05-alone-ecc28fab4971476dbca258485c3b7250.json",
+          "sha256": "395971ee556af6e569639120389dcded1e6ebfcc6506a2d35744f17133b49dca",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-05:real_login_http_emma",
+            "TST-05:E2E-05:real_login_emma",
+            "TST-05:E2E-05:account_created_agent",
+            "TST-05:E2E-05:real_login_http_new_agent",
+            "TST-05:E2E-05:real_login_new_agent",
+            "TST-05:E2E-05:patch_assignee",
+            "TST-05:E2E-05:agent_deactivated",
+            "TST-05:E2E-05:old_session_revoked",
+            "TST-05:E2E-05:db_unassigned",
+            "TST-05:E2E-05:agent_reactivated",
+            "TST-05:E2E-05:reactivation_old_session_http401",
+            "TST-05:E2E-05:reactivation_old_session_still_revoked",
+            "TST-05:E2E-05:real_login_http_new_agent",
+            "TST-05:E2E-05:real_login_new_agent",
+            "TST-05:E2E-05:last_admin_409",
+            "TST-05:E2E-05:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-keyboard-focus-f73f388da7be45b8939301034ff3307c.png",
+          "sha256": "d2d2c2fb1f42321b62523d94c286a31256b88575e41ae15dd507c3a7f1b0a340",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:keyboard-focus"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-e2e-viewport-1280-ff29ec5ea9bb4bbd83946b7eab8d3aa5.png",
+          "sha256": "116c60f4abecbae5b6c1709c113a34db8ef8080b1c3aabb5776b7a3ca8d41c33",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:e2e-viewport-1280"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-e2e-viewport-390-039ba9494fda4aba9544a2121205a052.png",
+          "sha256": "892841eb69d12819dc4331ef8bb63dbb25685b2157df1cd3015f69fe682aec49",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:e2e-viewport-390"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-scenario-final-8b97b778d96f42999f1f4c68e9d1f6eb.png",
+          "sha256": "6cd47afbbaab1072df6695b6764222ff33a74edbab489052d5dbe54023c30cc3",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-scenario-final-35e289ee82944f6e9e031c71d8681ec1.png",
+          "sha256": "68b46c3136c842a95d8ebf69f9e0d22d41d68e83f0111d28fa32be75d36ce1fe",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-scenario-final-9c0ff255c2c947d3a2ba25a1410c665e.png",
+          "sha256": "64186c51f6b4b8b78ed332e51c4230f11f1abdd8f10da05738f4f771a613bfe2",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-scenario-final-5eca81509def44bbb4aff82023438efd.png",
+          "sha256": "2df6a172a37a31b25552e55ecb6558a0bcc8a3cf2dc3b943ab8078dd1e2fcb96",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-06-alone-5283cc92a0de484d9c8c81742f3d162c.json",
+          "sha256": "6d6976cda07fbbdc10c8298ae32137dbd297ec0037cbbd4084b7d229f88a0348",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:real_login_http_alice",
+            "TST-05:E2E-06:real_login_alice",
+            "TST-05:E2E-06:late_a_cannot_replace_b",
+            "TST-05:E2E-06:search_in_url",
+            "TST-05:E2E-06:search_survives_reload",
+            "TST-05:E2E-06:page_survives_reload",
+            "TST-05:E2E-06:filter_resets_page1",
+            "TST-05:E2E-06:filter_survives_reload",
+            "TST-05:E2E-06:status_resets_page1",
+            "TST-05:E2E-06:status_survives_reload",
+            "TST-05:E2E-06:real_login_http_camille",
+            "TST-05:E2E-06:real_login_camille",
+            "TST-05:E2E-06:assignment_resets_page1_mine",
+            "TST-05:E2E-06:assignment_survives_reload_mine",
+            "TST-05:E2E-06:assignment_resets_page1_unassigned",
+            "TST-05:E2E-06:assignment_survives_reload_unassigned",
+            "TST-05:E2E-06:real_login_http_alice",
+            "TST-05:E2E-06:real_login_alice",
+            "TST-05:E2E-06:focus_visible",
+            "TST-05:E2E-06:modal_keyboard_open",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:escape_closes",
+            "TST-05:E2E-06:focus_return",
+            "TST-05:E2E-06:field_error_associated",
+            "TST-05:E2E-06:accessible_label_title",
+            "TST-05:E2E-06:accessible_label_description",
+            "TST-05:E2E-06:accessible_label_email",
+            "TST-05:E2E-06:accessible_label_password",
+            "TST-05:E2E-06:login_logical_tab",
+            "TST-05:E2E-06:real_login_http_alice",
+            "TST-05:E2E-06:real_login_alice",
+            "TST-05:E2E-06:dashboard_total",
+            "TST-05:E2E-06:dashboard_open",
+            "TST-05:E2E-06:dashboard_in_progress",
+            "TST-05:E2E-06:dashboard_resolved",
+            "TST-05:E2E-06:dashboard_closed",
+            "TST-05:E2E-06:dashboard_sum",
+            "TST-05:E2E-06:e2e_no_overflow_1280",
+            "TST-05:E2E-06:e2e_no_overflow_390",
+            "TST-05:E2E-06:dashboard_total",
+            "TST-05:E2E-06:dashboard_open",
+            "TST-05:E2E-06:dashboard_in_progress",
+            "TST-05:E2E-06:dashboard_resolved",
+            "TST-05:E2E-06:dashboard_closed",
+            "TST-05:E2E-06:dashboard_sum",
+            "TST-05:E2E-06:dashboard_total",
+            "TST-05:E2E-06:dashboard_open",
+            "TST-05:E2E-06:dashboard_in_progress",
+            "TST-05:E2E-06:dashboard_resolved",
+            "TST-05:E2E-06:dashboard_closed",
+            "TST-05:E2E-06:dashboard_sum",
+            "TST-05:E2E-06:e2e_slow_loading",
+            "TST-05:E2E-06:e2e_network_failure",
+            "TST-05:E2E-06:real_login_http_bob",
+            "TST-05:E2E-06:real_login_bob",
+            "TST-05:E2E-06:e2e_switch_no_alice",
+            "TST-05:E2E-06:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-01-scenario-final-2e2b6ff80c434b9bb6ca424f96e0459c.png",
+          "sha256": "315be938d081c5be5b8dbaa4ce707a55654e2ebf4412fb0ddf185b308e600d07",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-01:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-01-together-e28ece970fac486199531d49448c194d.json",
+          "sha256": "d8e1190cd38e2009ccb19c86d5ede2176a28152dea16dcc9dc160507f9e6fb32",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-01:real_login_http_alice",
+            "TST-05:E2E-01:real_login_alice",
+            "TST-05:E2E-01:reload_public_response",
+            "TST-05:E2E-01:one_db_ticket",
+            "TST-05:E2E-01:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-02-scenario-final-360d5e6230f242a8aa6be962c35c9d09.png",
+          "sha256": "46b79ebcf31d47044136d2962961d9fa86239eaf35b913924bf451dda6a02f99",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-02:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-02-scenario-final-575b4890702240c1994f4fe9ac2d3c2c.png",
+          "sha256": "622096d35dd8795d52a98ad56fd9c32223ba4d5410c95b4e972c75007881ed79",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-02:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-02-together-9243bb7f2faf4eed9bb942eb57ee2679.json",
+          "sha256": "4c876f44cfddff6c60b45bf0eaa9751ce02a32120c031b5e5ebcf67847a8b4df",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-02:real_login_http_camille",
+            "TST-05:E2E-02:real_login_camille",
+            "TST-05:E2E-02:patch_assignee_status",
+            "TST-05:E2E-02:patch_status",
+            "TST-05:E2E-02:patch_status",
+            "TST-05:E2E-02:real_login_http_alice",
+            "TST-05:E2E-02:real_login_alice",
+            "TST-05:E2E-02:client_public_only",
+            "TST-05:E2E-02:db_closed",
+            "TST-05:E2E-02:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-03-scenario-final-3fa441d3c58c48cc84ed0a7ab942d2c1.png",
+          "sha256": "55b8f1b409971152cf4d97efea1bc919f2f9b22a93c49877b31e62fc808b4347",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-03-scenario-final-a7a4409a9796494e843a3a2e0ba632af.png",
+          "sha256": "1442ad1e3757de6def38bd9e781c24a7a21c641c7a3a18d9fdb5c41cd195c7de",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-03-together-73072d120a24491f978ac2ace5d9be14.json",
+          "sha256": "4f7bc106f3c76e848b6880a8a4daf7fdcc368bbc1f993213d1a81abdaf43c42b",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-03:real_login_http_bob",
+            "TST-05:E2E-03:real_login_bob",
+            "TST-05:E2E-03:foreign_ticket_404",
+            "TST-05:E2E-03:foreign_detail_cleared",
+            "TST-05:E2E-03:admin_route_denied",
+            "TST-05:E2E-03:admin_client_no_private",
+            "TST-05:E2E-03:denied_reads_no_business_db_effect",
+            "TST-05:E2E-03:inactive_login_401",
+            "TST-05:E2E-03:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-slow-empty-361d1280d1b84d6b82a20b15cc62443c.png",
+          "sha256": "0ec9fb583fd60ca3eb7764c8790d77451795c6f56b92f41f6a18c42bb2600fbf",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:slow-empty"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-api500-bef1b60849054359a24eb3ad952b3b61.png",
+          "sha256": "571bd9ccd6e007972cc0289bbdb28935d31f015ccebb2c77d07da0eeda4fe614",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:api500"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-scenario-final-c40e8814dc7b4e0ab839c25eb3427b3f.png",
+          "sha256": "f6aca57d5cc0622600bd80aa499bf81da7eb257d32e7555b73932549afa59e5d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-scenario-final-8140feb5c91744efbb51fb47a9283d4e.png",
+          "sha256": "01d1734b51b47cec94350b57162336be2494a709737053491741b83767cb986f",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-04-scenario-final-0d11c9fd63ab4896bcf3a81405e1c408.png",
+          "sha256": "b7797ba6be9571fd890e7f84f988e83b98e479005bceaca7ac211ee69c382276",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-04-together-ca058db924ef486e84feca1d6864d6d5.json",
+          "sha256": "9bd3a4076c86428d9fa0b2edfe6106fcdc3fdf5cc4f7c5bcb628bbec57660c38",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-04:real_login_http_camille",
+            "TST-05:E2E-04:real_login_camille",
+            "TST-05:E2E-04:real_login_http_dylan",
+            "TST-05:E2E-04:real_login_dylan",
+            "TST-05:E2E-04:first_patch_success",
+            "TST-05:E2E-04:conflict_is_explicit",
+            "TST-05:E2E-04:draft_conserved",
+            "TST-05:E2E-04:reload_conserves_draft",
+            "TST-05:E2E-04:no_automatic_reapplication",
+            "TST-05:E2E-04:form_reusable_after_conflict",
+            "TST-05:E2E-04:real_login_http_alice",
+            "TST-05:E2E-04:real_login_alice",
+            "TST-05:E2E-04:slow_loading",
+            "TST-05:E2E-04:empty_state",
+            "TST-05:E2E-04:api500_recoverable",
+            "TST-05:E2E-04:api500_not_empty",
+            "TST-05:E2E-04:network_failure_explicit",
+            "TST-05:E2E-04:read_reusable_after_failure",
+            "TST-05:E2E-04:known_refusal_status",
+            "TST-05:E2E-04:known_refusal_draft_conserved",
+            "TST-05:E2E-04:known_refusal_editable",
+            "TST-05:E2E-04:known_refusal_no_object",
+            "TST-05:E2E-04:recoverable_uncertainty",
+            "TST-05:E2E-04:bounded_timeout",
+            "TST-05:E2E-04:uncertain_payload_frozen",
+            "TST-05:E2E-04:retry_completed",
+            "TST-05:E2E-04:retry_same_payload_uuid",
+            "TST-05:E2E-04:retry_no_duplicate",
+            "TST-05:E2E-04:message_uncertain_replay",
+            "TST-05:E2E-04:message_uncertain_frozen",
+            "TST-05:E2E-04:message_same_payload_uuid",
+            "TST-05:E2E-04:message_retry_no_duplicate",
+            "TST-05:E2E-04:message_form_reusable",
+            "TST-05:E2E-04:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-05-scenario-final-7a57db883e664cb3bd27c135eb5fa6e4.png",
+          "sha256": "dd98043b6c704bf4ad039eda9d49166f132e50f0edf3a24d42d2c9dcb11221b3",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-05:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-05-scenario-final-c9cf901ca15e4a8e8c79ba3fe289572a.png",
+          "sha256": "eea17b0b8ba480b13658c5be57cfdd2ea23b17df9dc42f806db0047c95bc670d",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-05:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-05-together-f7f46571ae764fc4a399b7b0a65d1836.json",
+          "sha256": "b32c49a41d99780ec76c45914b5ff4c8b6200840bafcb7a62025666d0d4f094a",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-05:real_login_http_emma",
+            "TST-05:E2E-05:real_login_emma",
+            "TST-05:E2E-05:account_created_agent",
+            "TST-05:E2E-05:real_login_http_new_agent",
+            "TST-05:E2E-05:real_login_new_agent",
+            "TST-05:E2E-05:patch_assignee",
+            "TST-05:E2E-05:agent_deactivated",
+            "TST-05:E2E-05:old_session_revoked",
+            "TST-05:E2E-05:db_unassigned",
+            "TST-05:E2E-05:agent_reactivated",
+            "TST-05:E2E-05:reactivation_old_session_http401",
+            "TST-05:E2E-05:reactivation_old_session_still_revoked",
+            "TST-05:E2E-05:real_login_http_new_agent",
+            "TST-05:E2E-05:real_login_new_agent",
+            "TST-05:E2E-05:last_admin_409",
+            "TST-05:E2E-05:console"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-keyboard-focus-024642fa8047426fb1f29db8c1c72cfb.png",
+          "sha256": "d2d2c2fb1f42321b62523d94c286a31256b88575e41ae15dd507c3a7f1b0a340",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:keyboard-focus"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-e2e-viewport-1280-1372fd92b5ac43939b9ea390302a8c94.png",
+          "sha256": "116c60f4abecbae5b6c1709c113a34db8ef8080b1c3aabb5776b7a3ca8d41c33",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:e2e-viewport-1280"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-e2e-viewport-390-b424f5a96c68411686d769be70120a1e.png",
+          "sha256": "892841eb69d12819dc4331ef8bb63dbb25685b2157df1cd3015f69fe682aec49",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:e2e-viewport-390"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-scenario-final-c7ee9902b45642d3b28ef3efe7802f88.png",
+          "sha256": "6cd47afbbaab1072df6695b6764222ff33a74edbab489052d5dbe54023c30cc3",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-scenario-final-f79c0b48b99f46ab8e09959c735f23d5.png",
+          "sha256": "68b46c3136c842a95d8ebf69f9e0d22d41d68e83f0111d28fa32be75d36ce1fe",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-scenario-final-215ba9459ee74265a1b22e2e4ad46ece.png",
+          "sha256": "64186c51f6b4b8b78ed332e51c4230f11f1abdd8f10da05738f4f771a613bfe2",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "V",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-05-E2E-06-scenario-final-77be6b9cd4e54fe58591b924911e2f64.png",
+          "sha256": "2df6a172a37a31b25552e55ecb6558a0bcc8a3cf2dc3b943ab8078dd1e2fcb96",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:scenario-final"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\E2E-06-together-7f33eb4fe4334564938dd27a0ce55244.json",
+          "sha256": "bbebd16d71a9219d4815fdec2ddaf19f94be22cca6bc2855c68ce6b87dc74568",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-05:E2E-06:real_login_http_alice",
+            "TST-05:E2E-06:real_login_alice",
+            "TST-05:E2E-06:late_a_cannot_replace_b",
+            "TST-05:E2E-06:search_in_url",
+            "TST-05:E2E-06:search_survives_reload",
+            "TST-05:E2E-06:page_survives_reload",
+            "TST-05:E2E-06:filter_resets_page1",
+            "TST-05:E2E-06:filter_survives_reload",
+            "TST-05:E2E-06:status_resets_page1",
+            "TST-05:E2E-06:status_survives_reload",
+            "TST-05:E2E-06:real_login_http_camille",
+            "TST-05:E2E-06:real_login_camille",
+            "TST-05:E2E-06:assignment_resets_page1_mine",
+            "TST-05:E2E-06:assignment_survives_reload_mine",
+            "TST-05:E2E-06:assignment_resets_page1_unassigned",
+            "TST-05:E2E-06:assignment_survives_reload_unassigned",
+            "TST-05:E2E-06:real_login_http_alice",
+            "TST-05:E2E-06:real_login_alice",
+            "TST-05:E2E-06:focus_visible",
+            "TST-05:E2E-06:modal_keyboard_open",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:focus_confined",
+            "TST-05:E2E-06:escape_closes",
+            "TST-05:E2E-06:focus_return",
+            "TST-05:E2E-06:field_error_associated",
+            "TST-05:E2E-06:accessible_label_title",
+            "TST-05:E2E-06:accessible_label_description",
+            "TST-05:E2E-06:accessible_label_email",
+            "TST-05:E2E-06:accessible_label_password",
+            "TST-05:E2E-06:login_logical_tab",
+            "TST-05:E2E-06:real_login_http_alice",
+            "TST-05:E2E-06:real_login_alice",
+            "TST-05:E2E-06:dashboard_total",
+            "TST-05:E2E-06:dashboard_open",
+            "TST-05:E2E-06:dashboard_in_progress",
+            "TST-05:E2E-06:dashboard_resolved",
+            "TST-05:E2E-06:dashboard_closed",
+            "TST-05:E2E-06:dashboard_sum",
+            "TST-05:E2E-06:e2e_no_overflow_1280",
+            "TST-05:E2E-06:e2e_no_overflow_390",
+            "TST-05:E2E-06:dashboard_total",
+            "TST-05:E2E-06:dashboard_open",
+            "TST-05:E2E-06:dashboard_in_progress",
+            "TST-05:E2E-06:dashboard_resolved",
+            "TST-05:E2E-06:dashboard_closed",
+            "TST-05:E2E-06:dashboard_sum",
+            "TST-05:E2E-06:dashboard_total",
+            "TST-05:E2E-06:dashboard_open",
+            "TST-05:E2E-06:dashboard_in_progress",
+            "TST-05:E2E-06:dashboard_resolved",
+            "TST-05:E2E-06:dashboard_closed",
+            "TST-05:E2E-06:dashboard_sum",
+            "TST-05:E2E-06:e2e_slow_loading",
+            "TST-05:E2E-06:e2e_network_failure",
+            "TST-05:E2E-06:real_login_http_bob",
+            "TST-05:E2E-06:real_login_bob",
+            "TST-05:E2E-06:e2e_switch_no_alice",
+            "TST-05:E2E-06:console"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [],
+      "reproduction": [
+        {
+          "probe": "TST-05:alone_exact_six",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:together_exact_six",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-01_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:aloneE2E-01_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-01_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:aloneE2E-01_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-01_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-01_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-02_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:aloneE2E-02_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-02_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:aloneE2E-02_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-02_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-02_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-03_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:aloneE2E-03_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-03_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:aloneE2E-03_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-03_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-03_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-04_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:aloneE2E-04_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-04_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:aloneE2E-04_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-04_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-04_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-05_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:aloneE2E-05_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-05_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:aloneE2E-05_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-05_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-05_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-06_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:aloneE2E-06_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-06_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:aloneE2E-06_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-06_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:aloneE2E-06_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-01_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:togetherE2E-01_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-01_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:togetherE2E-01_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-01_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-01_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-02_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:togetherE2E-02_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-02_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:togetherE2E-02_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-02_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-02_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-03_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:togetherE2E-03_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-03_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:togetherE2E-03_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-03_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-03_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-04_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:togetherE2E-04_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-04_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:togetherE2E-04_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-04_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-04_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-05_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:togetherE2E-05_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-05_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:togetherE2E-05_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-05_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-05_proofs_passed",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-06_executed",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-05:togetherE2E-06_nominal",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-06_console",
+          "observed": []
+        },
+        {
+          "probe": "TST-05:togetherE2E-06_not_blank",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-06_isolated_fixture",
+          "observed": true
+        },
+        {
+          "probe": "TST-05:togetherE2E-06_proofs_passed",
+          "observed": true
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df"
+    },
+    {
+      "id": "TST-06",
+      "gate": "M",
+      "status": "NOT_VERIFIED",
+      "expected": "Probes indépendantes IDOR, note interne et conflit concurrent. Sur copie temporaire seulement, neutraliser un contrôle d'autorisation et constater l'échec du test pertinent. Identifier séparément hashes original/mutation et résultats : l'échec volontaire appartient à la copie, jamais à la livraison originale. Aucun outil complet de mutation imposé.",
+      "observed": [
+        {
+          "check": "TST-06:actual_original_sha256",
+          "observed": "20b211c16854d3b8995569043e5679081721947375925ae16b3ccd2f31f3fd95",
+          "expected": "20b211c16854d3b8995569043e5679081721947375925ae16b3ccd2f31f3fd95",
+          "passed": true
+        },
+        {
+          "check": "TST-06:actual_mutation_sha256",
+          "observed": "acd62659e11a79b438dbcf3669c184259311e747ab758b5db68491b2867c141a",
+          "expected": "acd62659e11a79b438dbcf3669c184259311e747ab758b5db68491b2867c141a",
+          "passed": true
+        },
+        {
+          "check": "TST-06:isolated_mutation",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-06:original_unchanged",
+          "observed": "20b211c16854d3b8995569043e5679081721947375925ae16b3ccd2f31f3fd95",
+          "expected": "20b211c16854d3b8995569043e5679081721947375925ae16b3ccd2f31f3fd95",
+          "passed": true
+        },
+        {
+          "check": "TST-06:mutation_distinct",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        },
+        {
+          "check": "TST-06:original_pass",
+          "observed": "PASS",
+          "expected": "PASS",
+          "passed": true
+        },
+        {
+          "check": "TST-06:mutation_detected",
+          "observed": "FAIL",
+          "expected": "FAIL",
+          "passed": true
+        },
+        {
+          "check": "TST-06:independent_probes",
+          "observed": true,
+          "expected": true,
+          "passed": true
+        }
+      ],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-06-ac871d9432f74dbca26469dbe98a47e1.json",
+          "sha256": "9db992954309b07fdf2a75dbacbfc859e7bcfc718a2fb83d2cd7886079ad846c",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-06:actual_original_sha256",
+            "TST-06:actual_mutation_sha256",
+            "TST-06:isolated_mutation",
+            "TST-06:original_unchanged",
+            "TST-06:mutation_distinct",
+            "TST-06:original_pass",
+            "TST-06:mutation_detected",
+            "TST-06:independent_probes"
+          ],
+          "passed": true,
+          "detail": ""
+        },
+        {
+          "type": "R",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-contracts\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-18\\20261012-browser-contracts\\reviewed-fixtures\\test_TST_05_admits_twelve_actu0\\quality-\\TST-06-fixture-review.json",
+          "sha256": "77162adee8d16485bf43e3facc7a5808b19a6ffeec7c1088b809574fd298e585",
+          "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df",
+          "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+          "checks": [
+            "TST-06"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "limits": [
+        "required quality observation unavailable: AdapterUnavailable"
+      ],
+      "reproduction": [
+        {
+          "probe": "TST-06:actual_original_sha256",
+          "observed": "20b211c16854d3b8995569043e5679081721947375925ae16b3ccd2f31f3fd95"
+        },
+        {
+          "probe": "TST-06:actual_mutation_sha256",
+          "observed": "acd62659e11a79b438dbcf3669c184259311e747ab758b5db68491b2867c141a"
+        },
+        {
+          "probe": "TST-06:isolated_mutation",
+          "observed": true
+        },
+        {
+          "probe": "TST-06:original_unchanged",
+          "observed": "20b211c16854d3b8995569043e5679081721947375925ae16b3ccd2f31f3fd95"
+        },
+        {
+          "probe": "TST-06:mutation_distinct",
+          "observed": true
+        },
+        {
+          "probe": "TST-06:original_pass",
+          "observed": "PASS"
+        },
+        {
+          "probe": "TST-06:mutation_detected",
+          "observed": "FAIL"
+        },
+        {
+          "probe": "TST-06:independent_probes",
+          "observed": true
+        }
+      ],
+      "impact": "",
+      "contract_hash": "1927b56d74f0e21631b7ce365b55a7cdc3670760b326d9cb48870a705345b534",
+      "snapshot_hash": "93f6b196bacf92ba020fbfa58b2890aeb940c32675b44438f4ee74d0cb6e00df"
+    }
+  ],
+  "scope": "independent observer fixture meta-test, not generated-product conformity",
+  "fixture_fault": ""
+}
