@@ -182,10 +182,13 @@ async def test_real_image_layer_scan_exact_digest_and_source_label(native_source
         value,proofs=await h.collect_security_observation('secret_scan',scope='source_image_logs',image_id=image)
         assert set(value['scopes'])=={'source','image','logs'}
         assert value['complete'] and proofs[0].intact(snapshot_hash=snapshot,contract_hash=CONTRACT)
-        # Actual stock image contains full PEM vectors in GnuTLS. These are
-        # unresolved observations, not a blanket "vendor" exclusion or PASS.
-        assert value['findings'] and proofs[0].passed is False
-        assert all(f['kind']=='private_key' and 'libgnutls.so.30.34.3' in f['file'] for f in value['findings'])
+        # After the independently retained v3/raw ten-candidate observation,
+        # exact public source vectors are classified with exact vendor bytes.
+        # This narrow metatest is NOT SEC01 acceptance/source R for a product.
+        assert value['findings']==[] and proofs[0].passed is True
+        assert len(value['detector_candidates'])==len(value['public_non_credentials'])==10
+        assert all(f['kind']=='private_key' and f['file_sha256']=='750be5c0ce95061563e1561019e382823eb1e011ffe7980e9e005eeafd82efa3'
+                   for f in value['public_non_credentials'])
         assert any(item['scope']=='image' for item in json.loads(Path(proofs[0].path).read_text())['inventory'])
         with pytest.raises(Exception): await __import__('asyncio').to_thread(h.runtime.scan_security_image,image,'0'*64,lambda *a:pytest.fail('foreign image was scanned'))
         # Independent deliberately bad image derivative, never a delivery

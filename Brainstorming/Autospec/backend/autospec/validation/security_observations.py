@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 from .support_adapter import AdapterUnavailable, Proof
+from .public_crypto_fixtures import classify_public_vendor_material
 
 
 def validate_security_environment(environment):
@@ -183,10 +184,27 @@ class BoundedSecretScanner:
     def receipt(self, root, *, scopes, snapshot, contract, provenance):
         root = Path(root)
         root.mkdir(parents=True, exist_ok=True)
-        value = dict(findings=self.findings, scopes=scopes, complete=True,
+        # Do not silently discard detector results. Only independently reviewed
+        # PUBLIC bytes in one byte-identical vendor file are non-credentials;
+        # known probe secrets and application copies can never take this path.
+        inventory = {}
+        for item in self.inventory:
+            inventory.setdefault((item["scope"], item["file"]), []).append(item["sha256"])
+        findings, public_material = [], []
+        for finding in self.findings:
+            hashes = inventory.get((finding["scope"], finding["file"]), ())
+            classified = (classify_public_vendor_material(finding, file_sha256=hashes[0])
+                          if len(hashes) == 1 else None)
+            if classified is None:
+                findings.append(finding)
+            else:
+                public_material.append(classified)
+        value = dict(findings=findings, detector_candidates=self.findings,
+            public_non_credentials=public_material, scopes=scopes, complete=True,
             scanned_files=self.files, scanned_bytes=self.bytes,
             limits=["known probe secrets and structurally complete PEM material across every byte/layer; assignment and Argon2 heuristics limited to application/source/logs/artifacts",
-                "not universal discovery of unknown vendor secrets; independent source/image R remains mandatory"])
+                "not universal discovery of unknown vendor secrets; independent source/image R remains mandatory",
+                "public self-test material classification is exact file/key identity, not supply-chain approval or permission to use public keys as application credentials"])
         payload = dict(snapshot_hash=snapshot, contract_hash=contract, observed=value,
             inventory=self.inventory, provenance=provenance)
         path = root / ("security-scan-" + uuid4().hex + ".json")
@@ -194,7 +212,7 @@ class BoundedSecretScanner:
         value["artifacts"] = [{"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}]
         tags = ("SEC-01:secret_scan",) if scopes == ["source", "image", "logs"] else ("SEC-15:secret_scan",)
         proof = Proof("X", str(path), value["artifacts"][0]["sha256"], snapshot, contract, tags,
-            passed=not self.findings, detail="native complete bounded scope; finding contents withheld")
+            passed=not findings, detail="native complete bounded scope; all candidates and exact public classifications retained, contents withheld")
         return value, proof
 
 

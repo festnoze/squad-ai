@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="46" time="1.419" timestamp="2026-10-12T15:56:03.301652+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_support_benchmark_campaign" name="test_preflight_nominal_is_read_only" time="0.020" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[AGENT_PROVIDER-anthropic]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[CLAUDE_MODEL-opus]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[MODEL_CHECKER-haiku]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[GENERATION_ONLY_AGENTS-false]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[FAKE_AGENTS-true]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[REFINE-true]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[ROLE_ROUTING-true]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[LANGFUSE-true]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[CONCURRENT_BUDGET_RESERVATIONS-true]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[SANDBOX-false]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[ANTHROPIC_API_KEY-secret]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_forbidden_port[18004]" time="0.008" /><testcase classname="tests.test_support_benchmark_campaign" name="test_forbidden_port[8126]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_forbidden_port[0]" time="0.010" /><testcase classname="tests.test_support_benchmark_campaign" name="test_forbidden_port[65536]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_old_campaign_refused" time="0.007" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[commit]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[dirty]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[docker]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[auth]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[help]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_hash_tamper[docs/validation/support-client/01_specification.md]" time="0.009" /><testcase classname="tests.test_support_benchmark_campaign" name="test_hash_tamper[docs/validation/support-client/02_requirements_verification.md]" time="0.010" /><testcase classname="tests.test_support_benchmark_campaign" name="test_hash_tamper[artifacts/remediation/REM-25/source-facts-v02.json]" time="0.010" /><testcase classname="tests.test_support_benchmark_campaign" name="test_complete_payload" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_creation_exactly_once_and_unknown_never_retries" time="0.009" /><testcase classname="tests.test_support_benchmark_campaign" name="test_nominal_creation_inert" time="0.008" /><testcase classname="tests.test_support_benchmark_campaign" name="test_main_modes_offline[--preflight]" time="0.012" /><testcase classname="tests.test_support_benchmark_campaign" name="test_main_modes_offline[--launch]" time="0.014" /><testcase classname="tests.test_support_benchmark_campaign" name="test_supervisor_owned_job_and_readiness_offline[False]" time="0.024" /><testcase classname="tests.test_support_benchmark_campaign" name="test_supervisor_owned_job_and_readiness_offline[True]" time="0.013" /><testcase classname="tests.test_support_benchmark_campaign" name="test_effective_settings_and_profile_offline" time="0.128" /><testcase classname="tests.test_support_benchmark_campaign" name="test_mandatory_cli_flag_missing_refused[--restricted]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_mandatory_cli_flag_missing_refused[--safe-mode]" time="0.007" /><testcase classname="tests.test_support_benchmark_campaign" name="test_mandatory_cli_flag_missing_refused[--tools]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_mandatory_cli_flag_missing_refused[--strict-mcp-config]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_mandatory_cli_flag_missing_refused[--disable-slash-commands]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_mandatory_cli_flag_missing_refused[--no-chrome]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_mandatory_cli_flag_missing_refused[--no-session-persistence]" time="0.007" /><testcase classname="tests.test_support_benchmark_campaign" name="test_mandatory_cli_flag_missing_refused[--permission-prompts]" time="0.006" /><testcase classname="tests.test_support_benchmark_campaign" name="test_interpreter_exact_job_membership_no_real_os_call[True]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_interpreter_exact_job_membership_no_real_os_call[False]" time="0.005" /><testcase classname="" name="test_actual_interpreter_handle_retained_until_supervisor_cleanup" time="0.001"><failure message="AssertionError: actual interpreter handle closed before admission POST&#10;assert [99] == []&#10;  &#10;  Left contains one more item: 99&#10;  Use -v to get more diff">monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000027A4D796270&gt;
+
+    def test_actual_interpreter_handle_retained_until_supervisor_cleanup(monkeypatch):
+        from autospec.agents import runner
+        closed = []
+        class Function:
+            def __init__(self, fn): self.fn = fn
+            def __call__(self, *args): return self.fn(*args)
+        def member(handle, job, out):
+            out._obj.value = True
+            return True
+        api = SimpleNamespace(OpenProcess=Function(lambda *a: 99),
+            IsProcessInJob=Function(member), CloseHandle=Function(closed.append))
+        monkeypatch.setattr(ctypes, 'WinDLL', lambda *a, **k: api)
+        monkeypatch.setattr(runner, '_process_identity', lambda p: 'created-at')
+        c.job_member_identity(SimpleNamespace(handle=77), 42)
+&gt;       assert closed == [], 'actual interpreter handle closed before admission POST'
+E       AssertionError: actual interpreter handle closed before admission POST
+E       assert [99] == []
+E         
+E         Left contains one more item: 99
+E         Use -v to get more diff
+
+C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\launcher-independent\test_counterreview.py:28: AssertionError</failure></testcase><testcase classname="" name="test_assignment_failure_terminates_owned_suspended_child" time="0.011"><failure message="AssertionError: ['closed', 'wait']&#10;assert False&#10; +  where False = any(&lt;generator object test_assignment_failure_terminates_owned_suspended_child.&lt;locals&gt;.&lt;genexpr&gt; at 0x0000027A4D785D20&gt;)">tmp_path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/launcher-independent/temp-red-final/test_assignment_failure_termin0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000027A4D7C9320&gt;
+
+    def test_assignment_failure_terminates_owned_suspended_child(tmp_path, monkeypatch):
+        campaign, env, receipt, events = supervisor_fixture(tmp_path, monkeypatch, assignment_failure=True)
+        with pytest.raises(OSError): c.supervise(ROOT, campaign, 8130, env, receipt)
+&gt;       assert any(e.startswith('owned-child-') for e in events), events
+E       AssertionError: ['closed', 'wait']
+E       assert False
+E        +  where False = any(&lt;generator object test_assignment_failure_terminates_owned_suspended_child.&lt;locals&gt;.&lt;genexpr&gt; at 0x0000027A4D785D20&gt;)
+
+C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\launcher-independent\test_counterreview.py:72: AssertionError</failure></testcase><testcase classname="" name="test_real_project_state_cost_pause_error_and_verdict_are_monitored" time="0.018"><failure message="AssertionError: cost/paused/error/verdict change silently dropped&#10;assert 1 == 2&#10; +  where 1 = len([{'acceptance_verdict': None, 'budget_usd': 40.0, 'cost_usd': None, 'phase': 'idle', ...}])">tmp_path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/launcher-independent/temp-red-final/test_real_project_state_cost_p0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000027A4D7C9860&gt;
+
+    def test_real_project_state_cost_pause_error_and_verdict_are_monitored(tmp_path, monkeypatch):
+        from autospec.models import ProjectState
+        first = ProjectState(id='p', name='inert', goal='offline monitor probe', budget_usd=40)
+        first.usage.cost_usd = 1
+        second = first.model_copy(deep=True)
+        second.usage.cost_usd = 7
+        second.paused = True
+        second.error = 'COST_UNREPORTED'
+        second.acceptance_result = {'verdict': 'NOT_VERIFIED'}
+        campaign, env, receipt, events = supervisor_fixture(tmp_path, monkeypatch,
+            states=[first.model_dump(mode='json'), second.model_dump(mode='json')])
+        with pytest.raises(KeyboardInterrupt): c.supervise(ROOT, campaign, 8130, env, receipt)
+        records = [json.loads(line) for line in (campaign / 'supervisor.jsonl').read_text().splitlines()]
+        observed = [r['state'] for r in records if r['event'] == 'STATE']
+&gt;       assert len(observed) == 2, 'cost/paused/error/verdict change silently dropped'
+E       AssertionError: cost/paused/error/verdict change silently dropped
+E       assert 1 == 2
+E        +  where 1 = len([{'acceptance_verdict': None, 'budget_usd': 40.0, 'cost_usd': None, 'phase': 'idle', ...}])
+
+C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\launcher-independent\test_counterreview.py:88: AssertionError</failure></testcase></testsuite></testsuites>

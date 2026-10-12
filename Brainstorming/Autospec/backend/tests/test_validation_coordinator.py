@@ -155,8 +155,9 @@ async def test_e2e_reuse_requires_exact_native_12_mode_source_and_review_seal(tm
 
 
 @pytest.mark.asyncio
-async def test_binding_proposal_can_be_reviewed_then_used_without_manual_plugin(tmp_path):
-    from dataclasses import asdict
+@pytest.mark.parametrize("security_observations", [False, True])
+async def test_binding_proposal_can_be_reviewed_then_used_without_manual_plugin(tmp_path, security_observations):
+    from dataclasses import asdict, replace
     from autospec.validation.final_gate import source_snapshot
     from autospec.validation.product_harness import OwnedProductHarnessSession
     source=tmp_path/"source";source.mkdir();(source/"main.py").write_bytes(b"# reviewed source, never imported")
@@ -165,6 +166,12 @@ async def test_binding_proposal_can_be_reviewed_then_used_without_manual_plugin(
     bindings=make_bindings(root,source,snapshot)
     candidate=asdict(bindings)
     for k in ("review","snapshot_hash","contract_hash","source_files","fixture_fingerprint"): candidate.pop(k)
+    if security_observations:
+        candidate["security_observations"] = dict(cookie_name="sid",fixture_case="VERTICAL",actor="alice",
+            app_module="main",app_attribute="app",artifact_roots=["."],modes={
+                "https":dict(environment={"SESSION_COOKIE_SECURE":"true"},tls=True),
+                "http_local_explicit":dict(environment={"SESSION_COOKIE_SECURE":"false"},tls=False),
+                "http_without_exception":dict(environment={"SESSION_COOKIE_SECURE":"true"},tls=False)})
     assert set(candidate)==set(binding_proposal_schema()["properties"]["bindings"]["required"])
     contract=SimpleNamespace(contract_hash=CONTRACT,facts=[SimpleNamespace(kind="security_profile")])
     proposal=await prepare_binding_proposal(dict(source_files=["main.py"],bindings=candidate),
@@ -184,6 +191,15 @@ async def test_binding_proposal_can_be_reviewed_then_used_without_manual_plugin(
     context=OwnedProductHarnessSession.from_bindings(root/"product-bindings.json",source_root=source,
         fixtures_path=root/"reviewed-fixtures.json",stage_root=root/"stage",evidence_root=root/"proofs",
         cache_root=root/"cache",snapshot_hash=identity,contract_hash=oracle)
+    assert (context.bindings.security_observations is not None) is security_observations
+    if security_observations:
+        assert context.bindings.security_observations.modes["https"].tls is True
+        # Altering an observed deployment fact invalidates the independently
+        # bound review, rather than inheriting R or silently disabling scans.
+        altered = replace(context.bindings,
+            security_observations=replace(
+                context.bindings.security_observations,cookie_name="other_sid"))
+        with pytest.raises(AdapterUnavailable): altered.validate(source)
     assert context.factory.fingerprint==context.bindings.fixture_fingerprint
     manifest,payload=await context.factory("VERTICAL")
     assert len(manifest.accounts)==5 and len(payload["seed"]["payload"]["tickets"])==12
@@ -192,9 +208,15 @@ async def test_binding_proposal_can_be_reviewed_then_used_without_manual_plugin(
         await install_reviewed_configuration(proposal,binding_review=Proof(**bad),fixture_review=reviews[1],
             supervisor_root=root,snapshot_root=source)
     candidate["auth_required"]=False
-    with pytest.raises(AdapterUnavailable):
+    with pytest.raises(ValueError if security_observations else AdapterUnavailable):
         await prepare_binding_proposal(dict(source_files=["main.py"],bindings=candidate),dict(cases={"VERTICAL":fixture_definition()}),
             contract=contract,snapshot_root=source,snapshot_hash=snapshot)
+    if security_observations:
+        candidate["auth_required"] = True
+        candidate["security_observations"]["modes"].pop("http_without_exception")
+        with pytest.raises(ValueError,match="all three"):
+            await prepare_binding_proposal(dict(source_files=["main.py"],bindings=candidate),
+                dict(cases={"VERTICAL":fixture_definition()}),contract=contract,snapshot_root=source,snapshot_hash=snapshot)
 
 
 @pytest.mark.asyncio

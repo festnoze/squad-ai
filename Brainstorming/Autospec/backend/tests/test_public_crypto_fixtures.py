@@ -37,3 +37,25 @@ def test_other_surface_candidate_path_or_known_secret_remains_finding(field, val
 def test_changed_vendor_binary_cannot_inherit_public_material_classification():
     assert classify_public_vendor_material(finding(next(iter(PUBLIC_PEM_SYMBOLS))),
                                           file_sha256="f" * 64) is None
+
+
+@pytest.mark.parametrize("fault,expected", [(None,True), ("hash",False),
+    ("missing",False), ("ambiguous",False), ("application",False), ("known_secret",False)])
+def test_scanner_receipt_retains_candidates_and_only_measured_exact_classification(tmp_path, fault, expected):
+    from autospec.validation.security_observations import BoundedSecretScanner
+    candidate = finding(next(iter(PUBLIC_PEM_SYMBOLS)))
+    if fault == "application": candidate["file"] = "layer:app/copied-public-key.pem"
+    if fault == "known_secret": candidate["kind"] = "known_probe_secret"
+    scanner = BoundedSecretScanner(set())
+    scanner.findings = [candidate]  # Typed receipt metatest; not a real scan.
+    item = dict(scope=candidate["scope"],file=candidate["file"],
+                sha256="f"*64 if fault == "hash" else LIBRARY_SHA256)
+    scanner.inventory = [] if fault == "missing" else [item]
+    if fault == "ambiguous": scanner.inventory.append(dict(item))
+    value, proof = scanner.receipt(tmp_path, scopes=["source","image","logs"],
+        snapshot="a"*64,contract="b"*64,provenance={"scope":"typed supervisor receipt metatest only"})
+    assert proof.passed is expected
+    assert value["detector_candidates"] == [candidate]
+    assert len(value["public_non_credentials"]) == int(expected)
+    assert len(value["findings"]) == int(not expected)
+    assert proof.intact(snapshot_hash="a"*64,contract_hash="b"*64)

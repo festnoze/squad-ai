@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="5" skipped="0" tests="19" time="2.153" timestamp="2026-10-12T16:30:10.726860+02:00" hostname="635ROM-IT-L157"><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_fresh_complete_native_replay_consumes_exact_ui_tag_and_retains_both_proofs" time="0.198"><failure message="autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs">tmp_path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/launcher-independent/join-temp-v2/test_fresh_complete_native_rep0')
+contract = AcceptanceContract(brief="# Support client — spécification produit et technique\n\nVersion : 0.2, après critique crois...ont effectivement rapportés.", required_evidence=('X',))), facts=(), reviewed_by='independent fixture test', version=1)
+
+    async def test_fresh_complete_native_replay_consumes_exact_ui_tag_and_retains_both_proofs(tmp_path, contract):
+        subject,store,previous = await native(tmp_path,contract)
+        try:
+            assert previous['status']=='NOT_VERIFIED' and previous['native_complete'] is True
+            assert await publish_backend_receipt(store,previous) is True
+            browser = ui_row(tmp_path,store)
+            await publish_browser_receipts(store,[browser])
+            current, = (await BusinessContractVerifier(subject.adapter,contract).verify(subject.snapshot,ids=['FUN-02']))['requirements']
+&gt;           joined = join_rechecked_native(previous,current,browser)
+                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\launcher-independent\test_join_counterreview.py:51: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+previous = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+current = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+browser = {'contract_hash': 'f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd', 'id': 'FUN-02', 'limits': [], 'native_complete': False, ...}
+
+    def join_rechecked_native(previous, current, browser=None):
+        """Only a fresh native replay can consume newly collected UI checks/types.
+    
+        Original native FAIL or missing native execution is never erased. A
+        browser PASS alone cannot promote NV. Current native execution is mandatory.
+        """
+        from .coordinator import _merge
+        identity = (previous["id"], previous.get("snapshot_hash"), previous.get("contract_hash"))
+        if (not all(identity) or identity != (current["id"], current.get("snapshot_hash"), current.get("contract_hash"))
+                or (browser is not None and identity != (browser["id"], browser.get("snapshot_hash"), browser.get("contract_hash")))):
+&gt;           raise AdapterUnavailable("cross-layer requirement/snapshot/oracle identity differs")
+E           autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs
+
+backend\autospec\validation\evidence_join.py:67: AdapterUnavailable</failure></testcase><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_backend_marker_needs_current_exact_native_artifact[missing]" time="0.082" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_backend_marker_needs_current_exact_native_artifact[tampered]" time="0.083" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_backend_marker_needs_current_exact_native_artifact[wrong_snapshot]" time="0.086" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_backend_marker_needs_current_exact_native_artifact[wrong_contract]" time="0.083" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_backend_marker_needs_current_exact_native_artifact[mismatched_observed]" time="0.093" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_backend_marker_needs_current_exact_native_artifact[false_completion]" time="0.084" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_nonexact_browser_alias_cannot_satisfy_ui_check[missing_clears_previous_detail]" time="0.169"><failure message="autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs">tmp_path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/launcher-independent/join-temp-v2/test_nonexact_browser_alias_ca0')
+contract = AcceptanceContract(brief="# Support client — spécification produit et technique\n\nVersion : 0.2, après critique crois...ont effectivement rapportés.", required_evidence=('X',))), facts=(), reviewed_by='independent fixture test', version=1)
+tag = 'missing_clears_previous_detail'
+
+    @pytest.mark.parametrize('tag',['missing_clears_previous_detail','ui_clear_typo'])
+    async def test_nonexact_browser_alias_cannot_satisfy_ui_check(tmp_path,contract,tag):
+        subject,store,previous=await native(tmp_path,contract)
+        try:
+            await publish_backend_receipt(store,previous)
+            browser=ui_row(tmp_path,store,tag=tag)
+            await publish_browser_receipts(store,[browser])
+            current,=(await BusinessContractVerifier(subject.adapter,contract).verify(subject.snapshot,ids=['FUN-02']))['requirements']
+&gt;           assert join_rechecked_native(previous,current,browser)['status']=='NOT_VERIFIED'
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\launcher-independent\test_join_counterreview.py:85: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+previous = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+current = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+browser = {'contract_hash': 'f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd', 'id': 'FUN-02', 'limits': [], 'native_complete': False, ...}
+
+    def join_rechecked_native(previous, current, browser=None):
+        """Only a fresh native replay can consume newly collected UI checks/types.
+    
+        Original native FAIL or missing native execution is never erased. A
+        browser PASS alone cannot promote NV. Current native execution is mandatory.
+        """
+        from .coordinator import _merge
+        identity = (previous["id"], previous.get("snapshot_hash"), previous.get("contract_hash"))
+        if (not all(identity) or identity != (current["id"], current.get("snapshot_hash"), current.get("contract_hash"))
+                or (browser is not None and identity != (browser["id"], browser.get("snapshot_hash"), browser.get("contract_hash")))):
+&gt;           raise AdapterUnavailable("cross-layer requirement/snapshot/oracle identity differs")
+E           autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs
+
+backend\autospec\validation\evidence_join.py:67: AdapterUnavailable</failure></testcase><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_nonexact_browser_alias_cannot_satisfy_ui_check[ui_clear_typo]" time="0.156"><failure message="autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs">tmp_path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/launcher-independent/join-temp-v2/test_nonexact_browser_alias_ca1')
+contract = AcceptanceContract(brief="# Support client — spécification produit et technique\n\nVersion : 0.2, après critique crois...ont effectivement rapportés.", required_evidence=('X',))), facts=(), reviewed_by='independent fixture test', version=1)
+tag = 'ui_clear_typo'
+
+    @pytest.mark.parametrize('tag',['missing_clears_previous_detail','ui_clear_typo'])
+    async def test_nonexact_browser_alias_cannot_satisfy_ui_check(tmp_path,contract,tag):
+        subject,store,previous=await native(tmp_path,contract)
+        try:
+            await publish_backend_receipt(store,previous)
+            browser=ui_row(tmp_path,store,tag=tag)
+            await publish_browser_receipts(store,[browser])
+            current,=(await BusinessContractVerifier(subject.adapter,contract).verify(subject.snapshot,ids=['FUN-02']))['requirements']
+&gt;           assert join_rechecked_native(previous,current,browser)['status']=='NOT_VERIFIED'
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\launcher-independent\test_join_counterreview.py:85: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+previous = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+current = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+browser = {'contract_hash': 'f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd', 'id': 'FUN-02', 'limits': [], 'native_complete': False, ...}
+
+    def join_rechecked_native(previous, current, browser=None):
+        """Only a fresh native replay can consume newly collected UI checks/types.
+    
+        Original native FAIL or missing native execution is never erased. A
+        browser PASS alone cannot promote NV. Current native execution is mandatory.
+        """
+        from .coordinator import _merge
+        identity = (previous["id"], previous.get("snapshot_hash"), previous.get("contract_hash"))
+        if (not all(identity) or identity != (current["id"], current.get("snapshot_hash"), current.get("contract_hash"))
+                or (browser is not None and identity != (browser["id"], browser.get("snapshot_hash"), browser.get("contract_hash")))):
+&gt;           raise AdapterUnavailable("cross-layer requirement/snapshot/oracle identity differs")
+E           autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs
+
+backend\autospec\validation\evidence_join.py:67: AdapterUnavailable</failure></testcase><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_tampered_ui_artifact_cannot_publish_or_promote" time="0.137"><failure message="autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs">tmp_path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/launcher-independent/join-temp-v2/test_tampered_ui_artifact_cann0')
+contract = AcceptanceContract(brief="# Support client — spécification produit et technique\n\nVersion : 0.2, après critique crois...ont effectivement rapportés.", required_evidence=('X',))), facts=(), reviewed_by='independent fixture test', version=1)
+
+    async def test_tampered_ui_artifact_cannot_publish_or_promote(tmp_path,contract):
+        subject,store,previous=await native(tmp_path,contract)
+        try:
+            browser=ui_row(tmp_path,store)
+            Path(browser['proofs'][0]['path']).write_text('tampered')
+            with pytest.raises(AdapterUnavailable): await publish_browser_receipts(store,[browser])
+            current,=(await BusinessContractVerifier(subject.adapter,contract).verify(subject.snapshot,ids=['FUN-02']))['requirements']
+&gt;           assert join_rechecked_native(previous,current)['status']=='NOT_VERIFIED'
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\launcher-independent\test_join_counterreview.py:96: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+previous = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+current = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+browser = None
+
+    def join_rechecked_native(previous, current, browser=None):
+        """Only a fresh native replay can consume newly collected UI checks/types.
+    
+        Original native FAIL or missing native execution is never erased. A
+        browser PASS alone cannot promote NV. Current native execution is mandatory.
+        """
+        from .coordinator import _merge
+        identity = (previous["id"], previous.get("snapshot_hash"), previous.get("contract_hash"))
+        if (not all(identity) or identity != (current["id"], current.get("snapshot_hash"), current.get("contract_hash"))
+                or (browser is not None and identity != (browser["id"], browser.get("snapshot_hash"), browser.get("contract_hash")))):
+&gt;           raise AdapterUnavailable("cross-layer requirement/snapshot/oracle identity differs")
+E           autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs
+
+backend\autospec\validation\evidence_join.py:67: AdapterUnavailable</failure></testcase><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_failed_ui_stays_failed" time="0.148"><failure message="autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs">tmp_path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/launcher-independent/join-temp-v2/test_failed_ui_stays_failed0')
+contract = AcceptanceContract(brief="# Support client — spécification produit et technique\n\nVersion : 0.2, après critique crois...ont effectivement rapportés.", required_evidence=('X',))), facts=(), reviewed_by='independent fixture test', version=1)
+
+    async def test_failed_ui_stays_failed(tmp_path,contract):
+        subject,store,previous=await native(tmp_path,contract)
+        try:
+            await publish_backend_receipt(store,previous)
+            browser=ui_row(tmp_path,store,passed=False)
+            await publish_browser_receipts(store,[browser])
+            current,=(await BusinessContractVerifier(subject.adapter,contract).verify(subject.snapshot,ids=['FUN-02']))['requirements']
+            assert current['status']=='FAIL'
+&gt;           assert join_rechecked_native(previous,current,browser)['status']=='FAIL'
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\launcher-independent\test_join_counterreview.py:108: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+previous = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...re affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'no observed counterexample; coverage must remain complete', ...}
+current = {'expected': 'Client : ses 6 tickets de fixture ; personnel : les 12. Compteurs/total concordants. Ticket inexistant =...ucune fiche précédente encore affichée.', 'gate': 'M', 'id': 'FUN-02', 'impact': 'contractual invariant violated', ...}
+browser = {'contract_hash': 'f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd', 'id': 'FUN-02', 'limits': [], 'native_complete': False, ...}
+
+    def join_rechecked_native(previous, current, browser=None):
+        """Only a fresh native replay can consume newly collected UI checks/types.
+    
+        Original native FAIL or missing native execution is never erased. A
+        browser PASS alone cannot promote NV. Current native execution is mandatory.
+        """
+        from .coordinator import _merge
+        identity = (previous["id"], previous.get("snapshot_hash"), previous.get("contract_hash"))
+        if (not all(identity) or identity != (current["id"], current.get("snapshot_hash"), current.get("contract_hash"))
+                or (browser is not None and identity != (browser["id"], browser.get("snapshot_hash"), browser.get("contract_hash")))):
+&gt;           raise AdapterUnavailable("cross-layer requirement/snapshot/oracle identity differs")
+E           autospec.validation.support_adapter.AdapterUnavailable: cross-layer requirement/snapshot/oracle identity differs
+
+backend\autospec\validation\evidence_join.py:67: AdapterUnavailable</failure></testcase><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_join_cannot_erase_failure_or_incomplete_native_execution[FAIL-True-PASS-True-FAIL]" time="0.001" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_join_cannot_erase_failure_or_incomplete_native_execution[NOT_VERIFIED-False-PASS-True-NOT_VERIFIED]" time="0.001" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_join_cannot_erase_failure_or_incomplete_native_execution[NOT_VERIFIED-True-PASS-False-NOT_VERIFIED]" time="0.001" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_join_cannot_erase_failure_or_incomplete_native_execution[NOT_VERIFIED-True-FAIL-True-FAIL]" time="0.001" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_join_refuses_cross_identity[id]" time="0.001" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_join_refuses_cross_identity[snapshot_hash]" time="0.001" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_join_refuses_cross_identity[contract_hash]" time="0.001" /><testcase classname="Autospec.workspace.remediation-20261011.launcher-independent.test_join_counterreview" name="test_arc_contribution_alone_never_replaces_full_architecture_verification" time="0.102" /></testsuite></testsuites>
