@@ -499,8 +499,17 @@ def check_cross_reachability(own_container: str, deployed: list[dict]) -> tuple[
     return ok, "\n".join(lines)
 
 
-def undeploy(project_id: str) -> DockerDeployResult:
+def undeploy(project_id: str, *, publication_root: Path | None = None) -> DockerDeployResult:
     """Remove owned resources, reporting every actual failure to the caller."""
+    if publication_root is not None:
+        from .owned_publication import PublicationRegistry
+        try:
+            record=PublicationRegistry(publication_root).stop(project_id)
+            release_host_port(project_id)
+            return DockerDeployResult(True,'Owned NETNONE publication stopped; database retained',
+                image=record['spec']['image_id'],host_port=record['host_port'])
+        except (OSError,RuntimeError,ValueError) as exc:
+            return DockerDeployResult(False,str(exc),infra=True)
     name = container_name(project_id)
     image = image_name(project_id)
     try:
@@ -653,8 +662,19 @@ def _published_port(info: dict, container_port: int) -> int:
     raise DockerRuntimeError("Aucune publication loopback retournée par Docker")
 
 
-def inspect_deployment(project_id: str) -> DockerDeployResult:
+def inspect_deployment(project_id: str, *, publication_root: Path | None = None) -> DockerDeployResult:
     """Reconcile persisted deployment against Docker without changing resources."""
+    if publication_root is not None:
+        from .owned_publication import PublicationRegistry
+        try:
+            record=PublicationRegistry(publication_root).status(project_id)
+            active=record['running'] and record['ingress_attached']
+            return DockerDeployResult(active,'Owned NETNONE ingress active' if active else
+                'Owned publication stopped or ingress recovery required',
+                image=record.get('spec',{}).get('image_id',''),container=record.get('container_id') or '',
+                host_port=record.get('host_port',0),skipped=not record.get('registered'))
+        except (OSError,RuntimeError,ValueError) as exc:
+            return DockerDeployResult(False,str(exc),infra=True)
     name = container_name(project_id)
     try:
         info = _inspect_container(name)
@@ -680,6 +700,27 @@ def inspect_packaged_image(project_id: str) -> DockerDeployResult:
         return DockerDeployResult(False, out.strip(), skipped=absent,
                                   infra=not absent, packaged=True)
     return DockerDeployResult(True, "Image Docker disponible", image=image, packaged=True)
+
+
+def recover_publication(project_id: str, publication_root: Path, *, timeout: float = 30) -> DockerDeployResult:
+    """Explicit factory-start recovery; status inspection never adopts state."""
+    from .owned_publication import PublicationRegistry
+    try:
+        record=PublicationRegistry(publication_root).recover(project_id,timeout=timeout)
+        return DockerDeployResult(True,'Owned NETNONE ingress recovered without rebuild or source overlay',
+            image=record['spec']['image_id'],container=record['container_id'],host_port=record['host_port'])
+    except (OSError,RuntimeError,ValueError) as exc:
+        return DockerDeployResult(False,str(exc),infra=True)
+
+
+def destroy_publication_data(project_id: str, publication_root: Path) -> DockerDeployResult:
+    """Irreversible explicit cleanup, not an implicit part of undeploy/stop."""
+    from .owned_publication import PublicationRegistry
+    try:
+        record=PublicationRegistry(publication_root).destroy_data(project_id)
+        return DockerDeployResult(True,'Exact owned publication database destroyed',image=record['spec']['image_id'])
+    except (OSError,RuntimeError,ValueError) as exc:
+        return DockerDeployResult(False,str(exc),infra=True)
 
 
 def _qualified_image_facts(identifier: str, snapshot: str, runtime_command) -> dict:
@@ -788,6 +829,13 @@ def deploy_and_verify(
     qualified_image_id: str | None = None,
     expected_snapshot: str | None = None,
     expected_runtime_command: list[str] | tuple[str, ...] | None = None,
+    publication_root: Path | None = None,
+    publication_contract_hash: str | None = None,
+    publication_internal_port: int | None = None,
+    publication_local_cookie_mode: bool | None = None,
+    publication_database_path: str | None = None,
+    publication_health_path: str | None = None,
+    publication_migration_command: list[str] | tuple[str,...] | None = None,
 ) -> DockerDeployResult:
     """Build and verify a candidate before replacing the last working delivery.
 
@@ -800,6 +848,25 @@ def deploy_and_verify(
     if qualified_image_id is not None or getattr(state,'acceptance_contract_hash',''):
         # Contract publication never enters the legacy rebuild/shared-network
         # route, even when a caller forgot the independently qualified facts.
+        if publication_root is not None and kind not in {'cli','library'}:
+            from .owned_publication import PublicationRegistry,PublicationSpec
+            try:
+                if publication_contract_hash!=getattr(state,'acceptance_contract_hash',''):
+                    raise DockerRuntimeError('PUBLICATION_CONTRACT_IDENTITY_DIFFER')
+                spec=PublicationSpec(qualified_image_id,expected_snapshot,publication_contract_hash,
+                    expected_runtime_command,publication_internal_port,publication_local_cookie_mode,
+                    publication_database_path,publication_health_path,publication_migration_command)
+                # Release only this supervisor's retained allocator socket.
+                # Registry binds the selected loopback port before daemon work;
+                # an externally occupied port is refused, never swept/killed.
+                _release_port_socket(state.id)
+                record=PublicationRegistry(publication_root).publish(state.id,ws,spec,
+                    host_port=host_port,timeout=deploy_timeout,cancel_event=cancel_event)
+                return DockerDeployResult(True,'Qualified immutable image published through owned NETNONE ingress',
+                    image=qualified_image_id,container=record['container_id'],host_port=record['host_port'])
+            except (OSError,RuntimeError,ValueError,TypeError) as exc:
+                return DockerDeployResult(False,str(exc),image=qualified_image_id or '',infra=True,
+                    cancelled=cancel_event is not None and cancel_event.is_set())
         return _package_qualified_image(state,ws,identifier=qualified_image_id,
             snapshot=expected_snapshot,runtime_command=expected_runtime_command,kind=kind,
             on_stage=on_stage,cancel_event=cancel_event)

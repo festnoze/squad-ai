@@ -173,15 +173,16 @@ def test_ingress_bridge_uses_isolated_base_python_not_product_import_path(tmp_pa
         captured.append(argv)
         raise OSError('fixture stops before spawning any host process')
     monkeypatch.setattr(runtime_module, 'spawn_owned_process', spawn)
-    left, right = socket.socketpair()
-    try:
-        with RuntimeSession(tmp_path, 'attested', ['python']) as session:
-            session._forward(left)
-            argv = captured[0]
-            assert argv[:7] == ['docker', 'exec', '--workdir', '/tmp', '-i', session.identifier, '/usr/local/bin/python']
-            assert argv[7:10] == ['-I', '-u', '-c']
-    finally:
-        left.close(); right.close()
+    class KernelTcpPeer:
+        # socketpair is AF_UNIX on Linux, TCP on Windows. The ingress accepts
+        # an actual IPv4 transport, not an AF_UNIX pathname or forged header.
+        def settimeout(self,*args):pass
+        def getpeername(self):return ('127.0.0.1',4321)
+    with RuntimeSession(tmp_path, 'attested', ['python']) as session:
+        session._forward(KernelTcpPeer())
+        argv = captured[0]
+        assert argv[:7] == ['docker', 'exec', '--workdir', '/tmp', '-i', session.identifier, '/usr/local/bin/python']
+        assert argv[7:10] == ['-I', '-u', '-c']
 
 
 def test_loopback_kernel_peer_is_used_as_native_source_address(tmp_path,docker_fake,monkeypatch):
