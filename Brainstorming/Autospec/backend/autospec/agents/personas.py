@@ -248,7 +248,7 @@ FALLBACK_PERSONAS = {
 
 
 @lru_cache(maxsize=None)
-def persona(agent: str) -> str:
+def _cached_persona(agent: str) -> str:
     """Return the system prompt for a BMAD agent (any FALLBACK_PERSONAS key).
 
     Prefers the installed BMAD persona file when present, falls back to the
@@ -260,3 +260,20 @@ def persona(agent: str) -> str:
     else:
         body = FALLBACK_PERSONAS.get(agent, FALLBACK_PERSONAS["dev"])
     return body + PROGRAMMATIC_OVERRIDE
+
+
+def persona(agent: str) -> str:
+    # The generic fallback is intentional, but an unknown campaign role must
+    # not inherit dev authority. Check the NAME before even a pre-warmed cache.
+    if settings.generation_only_agents:
+        from .generation_policy import GENERATION_ROLES
+        from .runner import AgentError, AgentResult
+        if agent not in GENERATION_ROLES:
+            raise AgentError("GENERATION_ONLY: rôle de campagne inconnu ou de revue non autorisé.",
+                             code="GENERATION_ONLY", usage=AgentResult("", usage_reported=True))
+    return _cached_persona(agent)
+
+
+# Preserve the useful cache maintenance API without caching admission itself.
+persona.cache_clear = _cached_persona.cache_clear
+persona.cache_info = _cached_persona.cache_info

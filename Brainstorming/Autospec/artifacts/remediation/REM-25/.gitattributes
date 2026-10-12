@@ -1,2 +1,2 @@
-*.json -text
 *.xml -text
+*.log -text

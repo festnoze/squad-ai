@@ -4576,6 +4576,14 @@ class Pipeline:
             if (await asyncio.to_thread(source_snapshot, workspace_dir(self.state.id))).digest != snapshot.digest:
                 self._block_delivery("Code modifié pendant la vérification indépendante.", source="acceptance")
                 return False
+            if any(row.id in {"OPS-01", "OPS-02", "OPS-03", "OPS-04"}
+                   for row in contract.requirements):
+                # Historical X/R/V survive loss or replacement of a Docker
+                # artifact. Current READY additionally requires the qualified
+                # immutable image, baked argv and source binding to still exist.
+                # This is inspection only: never rebuild or spend to repair it.
+                from ..validation.delivery_raccord import load_qualified_delivery_image
+                await load_qualified_delivery_image(contract, source, supervisor)
             delivery_state.mark_ready(self.state)
             return True
         except asyncio.CancelledError:

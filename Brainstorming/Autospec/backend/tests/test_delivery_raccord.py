@@ -116,7 +116,8 @@ async def test_build_clock_gap_preserves_actual_x_but_not_provenance_or_cancella
 
 
 @pytest.mark.parametrize("cache_change", [None,"missing_context","seal","engine","report_bytes"])
-async def test_pipeline_calls_native_collection_before_independent_final_gate(tmp_path,monkeypatch,cache_change):
+@pytest.mark.parametrize("requires_image", [False, True])
+async def test_pipeline_calls_native_collection_before_independent_final_gate(tmp_path,monkeypatch,cache_change,requires_image):
     from autospec.agents.runner import FakeRunner
     from autospec.config import settings
     from autospec.orchestrator.pipeline import Pipeline
@@ -125,7 +126,8 @@ async def test_pipeline_calls_native_collection_before_independent_final_gate(tm
     from autospec.storage import workspace_dir
     from autospec.validation import coordinator
     from tests.test_milestone_delivery_raccord import proof
-    contract=import_contract("Stored book.","| BOOK-01 | B / X | Stored book. |",reviewed_by="offline ordering metatest")
+    criterion = "OPS-01" if requires_image else "BOOK-01"
+    contract=import_contract("Stored book.",f"| {criterion} | B / X | Stored book. |",reviewed_by="offline ordering metatest")
     state=ProjectState(id="ordering-native",name="Books",goal=contract.brief,brief=contract.brief,acceptance_contract_hash=contract.contract_hash)
     acceptance.contract_store(state.id).save(contract)
     source=workspace_dir(state.id);source.mkdir(parents=True)
@@ -135,17 +137,25 @@ async def test_pipeline_calls_native_collection_before_independent_final_gate(tm
     async def build(*args,**kwargs): order.append("build");return {"receipt":None}
     async def review(*args,**kwargs): order.append("review");return {"status":"REVIEWED"}
     async def facts(*args,**kwargs): order.append("native");return {"status":"PARTIAL","limits":["synthetic observation port"]}
+    async def image(observed_contract, frozen, root):
+        order.append("image")
+        assert observed_contract.contract_hash == contract.contract_hash
+        assert source_snapshot(frozen).digest == source_snapshot(source).digest
+        assert root == acceptance.supervisor_root(state.id)
+        return {"scope": "inert successful current-image inspection, not product proof"}
     async def verify(state,contract,frozen,snapshot,root):
         order.append("judge")
         return [dict(contract_hash=contract.contract_hash,snapshot_hash=snapshot,requirements=[dict(
-            id="BOOK-01",gate="B",expected=contract.requirements[0].expected,status="PASS",observed="synthetic ordering only",
-            reproduction=["offline mocked port"],impact="none",limits=[],proofs=[proof(root,"X","BOOK-01:actual",snapshot,contract)])])]
+            id=criterion,gate="B",expected=contract.requirements[0].expected,status="PASS",observed="synthetic ordering only",
+            reproduction=["offline mocked port"],impact="none",limits=[],proofs=[proof(root,"X",criterion+":actual",snapshot,contract)])])]
     monkeypatch.setattr(module,"collect_native_delivery_build",build)
     monkeypatch.setattr(module,"collect_native_final_facts",facts)
+    monkeypatch.setattr(module,"load_qualified_delivery_image",image)
     monkeypatch.setattr(pipeline,"_await_reviewed_configuration",review)
     monkeypatch.setattr(coordinator,"verify_project",verify)
     assert await pipeline._aindependent_acceptance_phase()
-    assert order==["review","build","native","judge"] and not pipeline.runner.calls
+    first = ["review","build","native","judge"] + (["image"] if requires_image else [])
+    assert order==first and not pipeline.runner.calls
     supervisor=acceptance.supervisor_root(state.id)
     digest=source_snapshot(source).digest
     reports_path=supervisor/"reports"/digest/"verification-reports.json"
@@ -158,7 +168,7 @@ async def test_pipeline_calls_native_collection_before_independent_final_gate(tm
     elif cache_change=="report_bytes":reports_path.write_bytes(reports_path.read_bytes()+b"\n")
     # Revalidate source-review engine/seals FIRST, even for an intact cache.
     assert await pipeline._aindependent_acceptance_phase()
-    assert order==["review","build","native","judge"]+(["review","build","native","judge"] if cache_change else ["review"])
+    assert order==first+(first if cache_change else ["review"]+(["image"] if requires_image else []))
     assert len(list(reports_path.parent.glob("verification-reports-prior-*.json")))==int(bool(cache_change))
 
 
