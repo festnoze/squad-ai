@@ -1,9 +1,34 @@
 # Factory frontend and bootstrap dependency check
 
-The factory frontend upgrade passes. The Linux bootstrap upgrade is not yet
-qualified: the first two native probes failed at npm lock resolution, before
-tests/build/browser, as retained in `bootstrap-browser.xml` / `.log`. This is
-not production security acceptance or an audit-risk waiver.
+The factory frontend upgrade and both React Linux bootstrap probes now pass.
+The first two native probes failed at npm lock resolution, before
+tests/build/browser, as retained in `bootstrap-browser.xml` / `.log`; those
+historical failures are not overwritten. This is not production security
+acceptance or an audit-risk waiver.
+
+Coherent replay after root600fc760 (Vitest4 runner and tmpfs config cache):
+**2 PASS / 3 deselected / 238.38s**, `bootstrap-browser-v2.xml` / `.log`.
+Frontend-only and fullstack/API/SQLite fixtures use real Docker Chromium in
+the owned NETNONE namespace, without host product/browser execution. Their
+receipts are under `native-browser-v2`; their exact generated manifest/lock
+pairs under `bootstrap-locks-v2` were each audited: rc0, zero vulnerabilities,
+225 dependencies. These two complete bootstrap probes predate the coverage
+provider addition and do not claim its full-browser replay.
+
+Scaffold provider code `46e00746` pins `@vitest/coverage-v8` exactly4.1.11,
+matching Vitest, and adds the native reproducible `test:coverage` script.
+Primary registry metadata including exact peers/SRI is saved in
+`npm-provider-metadata.json`. Template/metatest replay: **62 PASS / 16 native
+opt-in SKIP / 1.94s**, `coverage-scaffold-unit.xml`. Fresh Linux manifest-only
+resolution, image preparation, script execution and independent normalized
+collection: **3 PASS / 151.74s**, `coverage-scaffold-native-v1.xml` / `.log`.
+The exact new provider lock audited rc0 / zero vulnerabilities across238
+dependencies. `coverage-native-v1` retains the manifest/lock, raw script
+coverage, normalized collector coverage, suite and execution receipts.
+Dependencies remain read-only and no provider is downloaded at test runtime.
+Observed scaffold coverage is **47.0588235294%** (8/17 combined measured
+lines/branches): this proves the collection capability, **not** TST03's70%
+acceptance threshold. Source requirements and the final threshold are unchanged.
 
 Follow-up npm profile: `22c5ca78`, with strict tool provisioning instead of a
 peer bypass. Node22 remains immutable. A fixed npm11.6.4 tarball from the public
@@ -25,7 +50,7 @@ Vitest4 CLI/provider qualification. The first native npm receipt predates this
 link and is explicitly a checkpoint for npm provisioning, not a new-template
 delivery attestation. Unit profile/cache/lock/checker replay: 105 PASS / 16
 explicit native SKIP / 3.81s; link follow-up: 90 PASS / 15 SKIP / 1.07s.
-Complete React bootstrap nominal probes remain pending the coherent runner.
+The coherent runner's successful React replay is recorded above.
 
 Chosen direct versions, verified on the public npm registry: Vite 6.4.4,
 Vitest 4.1.11, React plugin 4.7.0. The combination fits their real peer ranges.
