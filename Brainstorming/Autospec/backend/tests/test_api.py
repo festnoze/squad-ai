@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 
 import httpx
 import pytest
@@ -26,7 +27,10 @@ def make_client(replies: list[str]) -> httpx.AsyncClient:
     return httpx.AsyncClient(transport=transport, base_url="http://test")
 
 
-async def wait_until_async(apredicate, timeout=20.0):
+# Real owned Git bookkeeping is retained in these API integration tests.
+# Windows launches cost 0.3–0.6s each (REM-24 diagnostic), so this is a finite
+# harness deadline, not a product latency target or a relaxed assertion.
+async def wait_until_async(apredicate, timeout=90.0 if os.name=="nt" else 20.0):
     deadline = asyncio.get_event_loop().time() + timeout
     while not await apredicate():
         if asyncio.get_event_loop().time() > deadline:

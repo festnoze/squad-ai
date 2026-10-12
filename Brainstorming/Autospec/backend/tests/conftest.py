@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 from autospec.config import settings
@@ -220,7 +222,10 @@ def green_pytest(monkeypatch):
     monkeypatch.setattr(Pipeline, "_arun_pytest", _arun_pytest)
 
 
-async def wait_until(predicate, timeout=20.0, interval=0.01):
+# Native Windows tests retain actual owned Git launches. A finite longer outer
+# deadline prevents cancelling valid rollups; callers' explicit deadlines and
+# all terminal-status/business assertions remain unchanged.
+async def wait_until(predicate, timeout=90.0 if os.name=="nt" else 20.0, interval=0.01):
     import asyncio
 
     deadline = asyncio.get_event_loop().time() + timeout

@@ -224,7 +224,7 @@ export function RunPanel({
           <span className="deploy-chip deploy-chip-ok" data-testid="deploy-chip">
             <a
               className="deploy-chip-link"
-              href={`http://localhost:${project.deploy_host_port ?? 0}`}
+              href={`http://127.0.0.1:${project.deploy_host_port ?? 0}`}
               target="_blank"
               rel="noreferrer"
               title={t("runPanel.dockerDeployedTitle", { port: project.deploy_host_port ?? 0 })}

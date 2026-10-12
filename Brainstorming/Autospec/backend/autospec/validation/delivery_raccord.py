@@ -66,7 +66,23 @@ async def load_qualified_delivery_image(contract, source, root):
         raise AdapterUnavailable("qualified baked command differs from reviewed command")
     if source_snapshot(source).digest != snapshot:
         raise AdapterUnavailable("product changed while re-admitting publication")
-    return dict(image_id=receipt["image_id"], snapshot_hash=snapshot, runtime_command=command)
+    # Operational ports remain independently source-reviewed bindings, not
+    # artifact guesses. A source-only oracle route is usable only when its
+    # literal is present in the frozen brief; never synthesize a health URL.
+    health = binding.browser_routes.get("health")
+    if not health:
+        for fact in contract.facts:
+            if fact.kind == "security_profile":
+                candidate = fact.expected.get("api", {}).get("health")
+                if isinstance(candidate, str) and candidate in contract.brief:
+                    health = candidate
+    migration = binding.commands.get("migrate_fresh")
+    if migration is not None and migration.parameters:
+        raise AdapterUnavailable("publication migration needs literal reviewed argv, not fixture stdin")
+    return dict(image_id=receipt["image_id"], snapshot_hash=snapshot, runtime_command=command,
+        internal_port=binding.internal_port, local_cookie_mode=binding.local_cookie_mode,
+        database_path=binding.database_path, health_path=health,
+        migration_command=list(migration.argv) if migration is not None else None)
 
 
 async def collect_native_delivery_build(contract, source, snapshot, root, *, timing_recorder=None):

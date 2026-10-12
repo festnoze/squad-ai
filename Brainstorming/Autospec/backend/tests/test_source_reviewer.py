@@ -5,6 +5,7 @@ Fake review responses test admission mechanics, never attest a real product.
 import hashlib
 import json
 import shutil
+from pathlib import Path
 from dataclasses import asdict
 
 import pytest
@@ -164,6 +165,7 @@ async def test_final_quality_profile_requires_a_distinct_approved_exact_plan(tmp
     review["quality"]={"approved":True,"citations":review["bindings"]["citations"],"findings":[]}
     review["requirements"]=[{"id":r.id,"status":"NOT_VERIFIED","citations":[],
         "reason":"synthetic source mechanics only; no real product inspected"} for r in contract.requirements]
+    review["entropy"]={"status":"NOT_VERIFIED","citations":[],"reason":"Synthetic metatest has no source propagation review"}
     review["test_mapping"]=proposal["quality_plan"]["requirements_mapping"]
     external_response(control,snapshot,contract,"independent-response.json",review,"offline-distinct-reviewer")
     await ensure_reviewed_configuration(contract,source,snapshot,control)
@@ -174,3 +176,62 @@ async def test_final_quality_profile_requires_a_distinct_approved_exact_plan(tmp
     # Merely retaining a final-review.json cannot bypass a changed plan.
     sealed["mapping_path"].write_text("{}")
     with pytest.raises(AdapterUnavailable):load_reviewed_quality_plan(contract,source,snapshot,control)
+
+
+@pytest.mark.parametrize("status", ["PASS", "FAIL", "NOT_VERIFIED"])
+async def test_dedicated_entropy_review_is_distinct_from_generic_bindings(tmp_path, status):
+    from autospec.validation.coordinator import SupervisorEvidenceStore
+    source,snapshot,_,control,proposal,review=setup(tmp_path)
+    contract=import_contract("Session randomness source review.",
+        "| SEC-05 | B / X+R | CSPRNG invocation and full cookie propagation |",reviewed_by="offline entropy mechanics",
+        facts=[ContractFact.create("synthetic-auth","vertical_profile",{"auth":True},["SEC-05"],"Session randomness source review.")])
+    proposal["fixtures"]["cases"]={"VERTICAL":{},"SEC-05":{},**{f"E2E-{n:02d}":{} for n in range(1,7)}}
+    proposal["candidate"]["bindings"]["instrumentation"].update(
+        entropy_module="main",entropy_attribute="token_urlsafe",entropy_primitive="secrets.token_urlsafe")
+    review["requirements"]=[{"id":"SEC-05","status":"NOT_VERIFIED","citations":[],"reason":"No source-wide security claim"}]
+    review["test_mapping"]={}
+    review["entropy"]={"status":status,"citations":review["bindings"]["citations"] if status!="NOT_VERIFIED" else [],
+        "reason":"Synthetic source propagation review, not a real generated product or runtime claim"}
+    packet=await admit_proposal(source,snapshot,contract,control,proposal)
+    assert "complete propagation" in packet["system_prompt"] and "entropy_protocol.py" in packet["packet"]["trusted_protocol"]
+    external_response(control,snapshot,contract,"independent-response.json",review,"offline-distinct-entropy-reviewer")
+    await ensure_reviewed_configuration(contract,source,snapshot,control)
+    proofs=await SupervisorEvidenceStore(control,snapshot,contract.contract_hash).proofs("SEC-05")
+    assert len(proofs)==(0 if status=="NOT_VERIFIED" else 1)
+    if proofs:
+        proof=proofs[0]
+        assert proof.checks==["SEC-05:entropy"] and proof.type=="R" and proof.passed is (status=="PASS")
+        payload=json.loads(Path(proof.path).read_bytes())
+        assert payload["instrumentation"]["entropy_primitive"]=="secrets.token_urlsafe"
+        assert payload["reviewer_agent"]=="offline-distinct-entropy-reviewer"
+    # A generic old final-review marker cannot suppress the newly required R.
+    cached_path=control/"source-reviews"/snapshot/"final-review.json"
+    old=json.loads(cached_path.read_bytes());old.pop("entropy")
+    atomic_json(cached_path,old)
+    with pytest.raises(ReviewPending) as pending:
+        await ensure_reviewed_configuration(contract,source,snapshot,control)
+    assert pending.value.stage=="operational_proposal"
+    assert list(cached_path.parent.glob("retained-*-independent-response.json"))
+    external_response(control,snapshot,contract,"proposal-response.json",proposal,"fresh-offline-proposer")
+    with pytest.raises(ReviewPending) as pending:
+        await ensure_reviewed_configuration(contract,source,snapshot,control)
+    assert pending.value.stage=="independent_review"
+    external_response(control,snapshot,contract,"independent-response.json",review,"fresh-offline-reviewer")
+    assert (await ensure_reviewed_configuration(contract,source,snapshot,control))["status"]=="REVIEWED"
+    assert (await ensure_reviewed_configuration(contract,source,snapshot,control))["cached"]
+
+
+@pytest.mark.parametrize("problem", ["no_symbol", "invalid_primitive", "missing_citations", "foreign_citation", "untyped_citations"])
+def test_entropy_propagation_cannot_be_auto_approved_from_general_binding(tmp_path, problem):
+    from autospec.validation.source_reviewer import _entropy_source_subject
+    source,snapshot,_,_,proposal,review=setup(tmp_path)
+    hook=proposal["candidate"]["bindings"]["instrumentation"]
+    hook.update(entropy_module="main",entropy_attribute="token_urlsafe",entropy_primitive="secrets.token_urlsafe")
+    entropy={"status":"PASS","citations":review["bindings"]["citations"],"reason":"Synthetic metatest only"}
+    if problem=="no_symbol":hook["entropy_attribute"]=""
+    elif problem=="invalid_primitive":hook["entropy_primitive"]="random.random"
+    elif problem=="missing_citations":entropy["citations"]=[]
+    elif problem=="foreign_citation":entropy["citations"][0]["file"]="uninspected.py"
+    else:entropy["citations"]=None
+    with pytest.raises(AdapterUnavailable):
+        _entropy_source_subject(entropy,{"bindings":proposal["candidate"]["bindings"]},source_bundle(source,snapshot))

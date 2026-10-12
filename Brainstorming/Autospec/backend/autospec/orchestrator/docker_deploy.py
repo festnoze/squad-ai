@@ -702,11 +702,19 @@ def inspect_packaged_image(project_id: str) -> DockerDeployResult:
     return DockerDeployResult(True, "Image Docker disponible", image=image, packaged=True)
 
 
-def recover_publication(project_id: str, publication_root: Path, *, timeout: float = 30) -> DockerDeployResult:
+def recover_publication(project_id: str, publication_root: Path, *, timeout: float = 30,
+                        intended_active_only: bool = False) -> DockerDeployResult:
     """Explicit factory-start recovery; status inspection never adopts state."""
     from .owned_publication import PublicationRegistry
     try:
-        record=PublicationRegistry(publication_root).recover(project_id,timeout=timeout)
+        registry=PublicationRegistry(publication_root)
+        if intended_active_only:
+            status=registry.status(project_id)
+            if not status.get('registered') or status.get('status') in {'stopped','destroyed'}:
+                return DockerDeployResult(False,'Intentional stopped/absent publication was not restarted',skipped=True)
+            if status.get('status') not in {'running','creating'}:
+                return DockerDeployResult(False,'Publication journal is not intended active; explicit disposition required',infra=True)
+        record=registry.recover(project_id,timeout=timeout)
         return DockerDeployResult(True,'Owned NETNONE ingress recovered without rebuild or source overlay',
             image=record['spec']['image_id'],container=record['container_id'],host_port=record['host_port'])
     except (OSError,RuntimeError,ValueError) as exc:
