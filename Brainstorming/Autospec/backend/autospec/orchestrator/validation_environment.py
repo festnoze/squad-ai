@@ -300,7 +300,11 @@ class LinuxEnvironmentManager:
             finally:
                 _cleanup_container(self.docker, name, owner)
 
-    def prepare(self, root: Path, ecosystem: str, mode: str = "test") -> LinuxEnvironment:
+    def prepare(self, root: Path, ecosystem: str, mode: str = "test", *, receipt: dict | None = None) -> LinuxEnvironment:
+        if receipt is not None:
+            receipt.clear()
+            receipt.update(version=1, status="preparing", ecosystem=ecosystem, mode=mode,
+                           argv=None, rc=None)
         if mode not in {"test", "runtime"}:
             raise _unavailable("Validation mode must be test or runtime")
         root = Path(root).absolute()
@@ -320,6 +324,8 @@ class LinuxEnvironmentManager:
         identity["recipe_template_sha256"] = hashlib.sha256(
             self._recipe(digests[0], ecosystem, mode, "FINGERPRINT", manifest).encode()).hexdigest()
         fingerprint = hashlib.sha256(json.dumps(identity, sort_keys=True).encode()).hexdigest()
+        if receipt is not None:
+            receipt.update(inputs=identity, fingerprint=fingerprint)
         self.cache_root.mkdir(parents=True, exist_ok=True)
         cache = self.cache_root / fingerprint
         cache.mkdir(exist_ok=True)
@@ -333,6 +339,8 @@ class LinuxEnvironmentManager:
                 except AgentError:
                     image = None  # explicit repair rebuilds a lost local image
                 if image is not None and saved.get("inputs") == identity and image.get("Config", {}).get("Labels", {}).get("autospec.environment") == fingerprint:
+                    if receipt is not None:
+                        receipt.update(status="cache_attested", image_id=image["Id"], attestation=saved)
                     return LinuxEnvironment(ecosystem, mode, fingerprint, image["Id"], saved)
             # Context consists ONLY of these manifests plus factory-owned recipe.
             with tempfile.TemporaryDirectory(prefix="autospec-image-") as temporary:
@@ -341,12 +349,19 @@ class LinuxEnvironmentManager:
                 shutil.copyfile(lock, context / lock.name)
                 recipe = self._recipe(digests[0], ecosystem, mode, fingerprint, manifest)
                 (context / "Dockerfile").write_text(recipe, encoding="utf-8")
-                rc, out, err = _run_tracked([self.docker, "build", "--pull=false", "--network=default", "--label", f"autospec.environment={fingerprint}", "-t", tag, "."], "", str(context), self.timeout)
+                argv = [self.docker, "build", "--pull=false", "--network=default", "--label", f"autospec.environment={fingerprint}", "-t", tag, "."]
+                if receipt is not None:
+                    receipt.update(status="builder_invoked", argv=argv, recipe_sha256=hashlib.sha256(recipe.encode()).hexdigest())
+                rc, out, err = _run_tracked(argv, "", str(context), self.timeout)
+                if receipt is not None:
+                    receipt.update(rc=rc, output_tail=(out + err)[-16000:])
                 if rc:
                     raise _unavailable(f"Clean Linux dependency image failed: {out[-3000:]} {err[-3000:]}")
             image = self._image(tag)
             saved = {"inputs": identity, "image": image["Id"], "recipe_sha256": hashlib.sha256(recipe.encode()).hexdigest()}
             atomic_json(attestation, saved)
+            if receipt is not None:
+                receipt.update(status="build_attested", image_id=image["Id"], attestation=saved)
             return LinuxEnvironment(ecosystem, mode, fingerprint, image["Id"], saved)
 
     @staticmethod
