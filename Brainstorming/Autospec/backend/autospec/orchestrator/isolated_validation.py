@@ -801,6 +801,46 @@ class RuntimeSession:
         finally:
             _cleanup_container(self.docker, init_name, self.owner)
 
+    def prepare_owned_database(self) -> None:
+        """Attest/initialize the owned volume before product PID1 starts."""
+        with self.operation_lock:
+            if self.closed or self.thread is not None or self.identifier is not None or not self.persistent_database or not self.use_image_command:
+                raise _unavailable('Prelaunch database preparation requires a new immutable retained session')
+            require_sandbox(self.stage,self.image,docker=self.docker)
+            self._attest_image_command()
+            if self.volume_identity is None:self._create_volume()
+            else:self._assert_volume()
+
+    def run_database_command(self,command: list[str],*,container_name: str,timeout: float = 30) -> dict:
+        """Exact reviewed migration in a TEMPORARY NETNONE image/DB container.
+
+        No app PID1, host source, credentials or fixture seed is involved. The
+        caller journals the UUID and pending operation BEFORE invoking this.
+        Never available to agent tools. Daemon-side cleanup is exact-owned even
+        after the native Docker client is cancelled or times out.
+        """
+        with self.operation_lock:
+            command=_runtime_argv(command)
+            if (self.closed or self.thread is not None or self.identifier is not None or not self.volume_identity or
+                not self.use_image_command or not re.fullmatch(r'autospec-sandbox-[a-f0-9]{32}',container_name) or
+                not math.isfinite(timeout) or timeout<=0):
+                raise _unavailable('Migration requires an attested prelaunch database and bounded owned UUID')
+            self._attest_image_command();self._assert_volume()
+            argv=docker_run_cmd(command,str(self.stage),self.image,self.docker,run_id=self.owner,container_name=container_name)
+            argv.remove('--rm')  # retain exact exit identity until supervised cleanup
+            at=argv.index('-v');del argv[at:at+2]
+            at=argv.index('--entrypoint')
+            argv[at:at]=['--mount',self._volume_mount(),*[part for key,value in self.env.items() for part in ('--env',f'{key}={value}')]]
+            try:
+                rc,out,err=_run_tracked(argv,'',None,timeout)
+                identifier=_container_identity(self.docker,container_name,self.owner)
+                if identifier is None:raise _unavailable('Migration container exit identity could not be attested')
+                return {'argv':command,'return_code':rc,'container_id':identifier,'container_name':container_name,
+                        'image_id':self.image,'owner':self.owner,'volume':json.loads(json.dumps(self.volume_identity)),
+                        'stdout_sha256':hashlib.sha256(out.encode()).hexdigest(),'stderr_sha256':hashlib.sha256(err.encode()).hexdigest()}
+            finally:
+                _cleanup_container(self.docker,container_name,self.owner)
+
     def _volume_mount(self) -> str:
         self._assert_volume()
         return f"type=volume,source={self.volume_name},target={self.DATABASE_DIRECTORY},volume-nocopy"
