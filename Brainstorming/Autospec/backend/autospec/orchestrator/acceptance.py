@@ -32,13 +32,47 @@ def load_contract(state: ProjectState) -> AcceptanceContract | None:
     contract = store.load(store.root / f"{digest}.json")
     if state.brief != contract.brief:
         raise ContractError("editable brief differs from the frozen acceptance source")
+    validate_plan_limits(contract, state.acceptance_max_lots)
     return contract
+
+
+def source_plan_max_lots(contract: AcceptanceContract) -> int | None:
+    """Explicit reviewed source fact only; never parse/reinterpret brief prose.
+
+    This is a global plan constraint, not an additional acceptance verdict.
+    No fact preserves legacy opt-in behavior. A fact cannot be supplied twice,
+    silently extended or mapped to only some requirements.
+    """
+    facts = [fact for fact in contract.facts if fact.kind == "plan_limits"]
+    if not facts:
+        return None
+    if len(facts) != 1:
+        raise ContractError("plan_limits must be a unique frozen source fact")
+    fact = facts[0]
+    expected = fact.expected
+    if (not isinstance(expected, dict) or set(expected) != {"max_lots"} or
+            type(expected["max_lots"]) is not int or expected["max_lots"] < 1):
+        raise ContractError("plan_limits requires exactly one positive strict-integer max_lots")
+    ids = tuple(fact.requirement_ids)
+    if len(ids) != len(set(ids)) or set(ids) != {row.id for row in contract.requirements}:
+        raise ContractError("global plan_limits must map every frozen requirement exactly once")
+    return expected["max_lots"]
+
+
+def validate_plan_limits(contract: AcceptanceContract, max_lots: int) -> int:
+    """Also callable by the API before persistence, pipeline or provider work."""
+    frozen = source_plan_max_lots(contract)
+    if frozen is None:
+        return max_lots
+    if type(max_lots) is not int or max_lots != frozen:
+        raise ContractError("mutable max_lots differs from the frozen source plan_limits")
+    return frozen
 
 
 def plan_policy(state: ProjectState, contract: AcceptanceContract) -> PlanPolicy:
     shared = tuple(str(f.expected["name"]) for f in contract.facts
                    if f.kind == "shared_contract" and isinstance(f.expected, dict)
                    and isinstance(f.expected.get("name"), str))
-    return PlanPolicy(max_lots=state.acceptance_max_lots,
+    return PlanPolicy(max_lots=validate_plan_limits(contract, state.acceptance_max_lots),
                       required_shared_contracts=shared,
                       expected_stack_sha256=state.technical_stack.get("decision_sha256", ""))
