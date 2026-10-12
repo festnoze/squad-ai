@@ -81,7 +81,32 @@ def _proof(root, filename, payload, snapshot, oracle, checks, passed=True):
 def _protocol():
     root = Path(__file__).parent
     return {name: (root/name).read_text(encoding="utf-8") for name in (
-        "product_harness.py", "security_contracts.py", "business_contracts.py", "architecture_contracts.py", "browser_contracts.py", "quality_contracts.py", "delivery_evidence.py")}
+        "product_harness.py", "entropy_protocol.py", "security_contracts.py", "business_contracts.py", "architecture_contracts.py", "browser_contracts.py", "quality_contracts.py", "delivery_evidence.py")}
+
+
+def _entropy_source_subject(review, proposal, bundle):
+    """Dedicated independent propagation review, not generic binding approval.
+
+    The native observer measures the argument and whole-cookie digest. This R
+    separately reviews where that value goes; neither half substitutes for the
+    other. An absent/unestablished mechanism stays NOT_VERIFIED.
+    """
+    from .entropy_protocol import ENTROPY_PRIMITIVES
+    if (not isinstance(review, dict) or set(review) != {"status", "citations", "reason"} or
+            review.get("status") not in {"PASS", "FAIL", "NOT_VERIFIED"} or
+            not isinstance(review.get("reason"), str) or not review["reason"].strip()):
+        raise AdapterUnavailable("dedicated source entropy review malformed")
+    if not isinstance(review["citations"], list):
+        raise AdapterUnavailable("dedicated entropy citations must be an explicit list")
+    if review["status"] in {"PASS", "FAIL"} or review["citations"]:
+        validate_citations(review["citations"], bundle)
+    hook = proposal["bindings"].get("instrumentation") or {}
+    subject = {k: hook.get(k, "") for k in ("entropy_module", "entropy_attribute", "entropy_primitive")}
+    if review["status"] == "PASS" and (not subject["entropy_module"] or
+            not subject["entropy_attribute"] or subject["entropy_primitive"] not in ENTROPY_PRIMITIVES):
+        raise AdapterUnavailable("positive entropy review needs exact captured CSPRNG binding")
+    return {"instrumentation": subject, "review": review,
+        "source_hashes": {c["file"]: bundle["files"][c["file"]]["sha256"] for c in review["citations"]}}
 
 
 class ReviewPending(AdapterUnavailable):
@@ -126,6 +151,15 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
     if root.is_relative_to(source): raise AdapterUnavailable("review store inside product")
     needs_quality = phase == "final" and quality_required(contract)
     needs_delivery = phase == "final" and delivery_required(contract)
+    needs_entropy = phase == "final" and any(r.id == "SEC-05" for r in contract.requirements)
+    protocol = _protocol()
+    context = {"version": 2, "snapshot_hash": snapshot_hash, "contract_hash": contract.contract_hash,
+        "protocol_hash": hashlib.sha256(json.dumps(protocol,sort_keys=True,ensure_ascii=True).encode()).hexdigest(),
+        "review_engine_hashes": {name:hashlib.sha256((Path(__file__).parent/name).read_bytes()).hexdigest()
+            for name in ("source_reviewer.py","coordinator.py","review_plans.py","review_delivery.py")}}
+    review_root = root/"source-reviews"/snapshot_hash
+    review_file = review_root/("final-review.json" if phase=="final" else "vertical-review.json")
+    cache_revalidation = False
     try:
         binding = ReviewedProductBindings.from_dict(json.loads((root/"product-bindings.json").read_bytes()))
         if (binding.snapshot_hash, binding.contract_hash) != (snapshot_hash, contract.contract_hash): raise AdapterUnavailable("stale review")
@@ -133,15 +167,56 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         fixture = ReviewedFixtureFactory(root/"reviewed-fixtures.json", snapshot_hash=snapshot_hash, contract_hash=contract.contract_hash, source_root=source)
         if fixture.fingerprint != binding.fixture_fingerprint: raise AdapterUnavailable("reviewed pair drift")
         if phase != "final" or (root/"source-reviews"/snapshot_hash/"final-review.json").is_file():
+            broker = FileBroker(ExecutionContext("cached-source-review",root))
+            context_path = broker.path(str((review_root/"review-context.json").relative_to(root)))
+            if (not context_path.is_file() or context_path.stat().st_size > 16_384 or
+                    json.loads(context_path.read_bytes()) != context):
+                cache_revalidation = True
+                raise AdapterUnavailable("cached review protocol changed; new independent review required")
+            if needs_entropy:
+                cached_path = broker.path(str(review_file.relative_to(root)))
+                if not cached_path.is_file() or cached_path.stat().st_size > 16_000_000:
+                    cache_revalidation = True
+                    raise AdapterUnavailable("bounded dedicated cached entropy review absent")
+                cached_review = json.loads(cached_path.read_bytes())
+                if "entropy" not in cached_review:
+                    cache_revalidation = True
+                    raise AdapterUnavailable("cached generic approval cannot replace dedicated entropy review")
+                try:
+                    _entropy_source_subject(cached_review["entropy"], {"bindings":asdict(binding)}, source_bundle(source,snapshot_hash))
+                    if cached_review["entropy"]["status"] == "PASS":
+                        from .coordinator import SupervisorEvidenceStore
+                        proofs = await SupervisorEvidenceStore(root,snapshot_hash,contract.contract_hash).proofs("SEC-05")
+                        if not any(p.type=="R" and p.passed is True and "SEC-05:entropy" in p.checks for p in proofs):
+                            raise AdapterUnavailable("cached positive entropy review lacks its dedicated receipt")
+                except (AdapterUnavailable,KeyError,TypeError,ValueError):
+                    cache_revalidation = True
+                    raise AdapterUnavailable("cached dedicated entropy review requires revalidation")
             if needs_quality: load_reviewed_quality_plan(contract, source, snapshot_hash, root)
             if needs_delivery: load_reviewed_delivery_plan(contract, source, snapshot_hash, root)
             return {"status": "REVIEWED", "cached": True, "snapshot_hash": snapshot_hash}
     except (OSError, ValueError, TypeError, AdapterUnavailable): pass
+    if cache_revalidation:
+        # Preserve old approvals as audit data, but never let their presence
+        # suppress the new external request or approve a changed protocol.
+        broker = FileBroker(ExecutionContext("review-cache-revalidation",root))
+        marker = broker.path(str((review_root/"review-revalidation.json").relative_to(root)))
+        marker_value = {**context,"phase":phase}
+        established = (marker.is_file() and marker.stat().st_size<=16_384 and
+            json.loads(marker.read_bytes())==marker_value)
+        if not established:
+            for name in ("proposal-response.json", "independent-response.json"):
+                old = broker.path(str((review_root/name).relative_to(root)))
+                if old.is_file():
+                    from uuid import uuid4
+                    retained = broker.path(str((review_root/("retained-"+uuid4().hex+"-"+name)).relative_to(root)))
+                    old.replace(retained)
+            atomic_json(marker,marker_value)
     bundle = source_bundle(source, snapshot_hash)
     cases = {"VERTICAL"}
     if phase == "final": cases |= {r.id for r in contract.requirements} | {f"E2E-{n:02d}" for n in range(1,7)}
     packet = {"oracle": contract.payload(), "untrusted_source": bundle, "binding_schema": binding_proposal_schema(),
-              "trusted_protocol": _protocol(), "required_cases": sorted(cases), "phase": phase}
+              "trusted_protocol": protocol, "required_cases": sorted(cases), "phase": phase}
     if needs_delivery:
         from .delivery_evidence import delivery_candidate_schema, audit_arbitration_schema
         packet["delivery_candidate_schema"] = delivery_candidate_schema()
@@ -158,6 +233,11 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         "reference, not a hardcoded template: actors, deterministic tickets, IDs/dates/counts, public/internal conversations and exact "
         "case variants/metadata used by trusted packs. Password '$generated' and '$ref' avoid stored credentials. "
         "Nominal login/API/persistence cannot be mocked. Missing capabilities stay absent, not a default success.")
+    proposer += (
+        " If the real session generator imports a captured stdlib CSPRNG, map instrumentation.entropy_module,"
+        " entropy_attribute and entropy_primitive to that exact source symbol (secrets.token_urlsafe/token_hex/token_bytes"
+        " or os.urandom). All three are absent together if unsupported. Do not declare bits, infer them from token length,"
+        " or replace the generator. Native instrumentation measures the actual invocation and lossless cookie correlation.")
     if needs_quality:
         proposer += (
             " Add quality_plan:{suites:[{name:backend|frontend,root:canonical relative path,ecosystem:python|node,"
@@ -214,6 +294,15 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         "vertical phase requirements/test_mapping are empty. Verdicts cover SOURCE REVIEW ONLY, not runtime/browser success. "
         "PASS needs substantive source citations; contradiction is FAIL; uncertainty NOT_VERIFIED. Mapping links actual "
         "test assertions to frozen requirements but never proves execution. No X/V, no overall-ready flag, no source changes.")
+    if needs_entropy:
+        reviewer += (
+            " Add entropy:{status:PASS|FAIL|NOT_VERIFIED,citations:[],reason:string}, separate from bindings and SEC-05."
+            " Inspect the EXACT proposed CSPRNG module:symbol, actual nbytes argument or captured stdlib default,"
+            " and complete propagation to the server session cookie. PASS needs citations for import/call/propagation"
+            " with no truncation, low-entropy substitution or lossy transformation; hex/base64/url-safe whole encodings"
+            " are admissible. Do not infer entropy from cookie length or merely approve operational instrumentation."
+            " This dedicated source R attests propagation only; actual bits and cookie correlation require separate native X."
+            " Unsupported or unestablished mechanism is NOT_VERIFIED, never a fabricated PASS.")
     if needs_quality:
         reviewer += (
             " Add quality:{approved:boolean,citations:[],findings:[]}. This separately approves the EXACT quality_proposal,"
@@ -247,6 +336,7 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
         raise ReviewPending(request_path,"independent_review")
     review = reviewed["answer"]
     review_keys = {"bindings", "fixtures", "requirements", "test_mapping"} | ({"quality"} if needs_quality else set()) | ({"delivery", "audit"} if needs_delivery else set())
+    if needs_entropy: review_keys.add("entropy")
     if not isinstance(review, dict) or set(review) != review_keys: raise AdapterUnavailable("malformed independent review")
     approval_keys = ["bindings", "fixtures"] + (["quality"] if needs_quality else []) + (["delivery", "audit"] if needs_delivery else [])
     for name in approval_keys:
@@ -265,6 +355,7 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
     if needs_quality and review["test_mapping"] != quality["candidate"]["requirements_mapping"]:
         raise AdapterUnavailable("independent mapping changed the proposed exact quality subject")
     if source_snapshot(source).digest!=snapshot_hash: raise AdapterUnavailable("source drift during review")
+    entropy_subject = _entropy_source_subject(review["entropy"], proposal, bundle) if needs_entropy else None
     atomic_json(review_root/("final-review.json" if phase=="final" else "vertical-review.json"),review)
     def receipt(name):
         return _proof(review_root,name+"-review.json",{"subject":proposal[name],"review":review[name],
@@ -291,7 +382,13 @@ async def ensure_reviewed_configuration(contract, snapshot_root, snapshot_hash, 
                     proofs.setdefault(rid, []).append(asdict(quality_proof))
         if delivery_sealed:
             proofs.setdefault("OPS-05", []).extend(asdict(p) for p in delivery_sealed["proofs"])
+        if entropy_subject is not None and review["entropy"]["status"] != "NOT_VERIFIED":
+            entropy_subject.update(request_hash=independent_request["request_hash"], reviewer_agent=reviewed["agent_id"])
+            entropy_proof = _proof(review_root, "SEC-05-entropy-source.json", entropy_subject,
+                snapshot_hash, contract.contract_hash, ["SEC-05:entropy"], review["entropy"]["status"] == "PASS")
+            proofs.setdefault("SEC-05", []).append(asdict(entropy_proof))
         atomic_json(root/"proofs.json",{"snapshot_hash":snapshot_hash,"contract_hash":contract.contract_hash,"proofs":proofs})
         mapping=_proof(review_root,"test-mapping.json",{"mapping":review["test_mapping"]},snapshot_hash,contract.contract_hash,["PRODUCT:test_mapping","TST-02"])
         atomic_json(root/"reviewed-test-mapping.json",{"mapping":review["test_mapping"],"review":asdict(mapping)})
+    atomic_json(review_root/"review-context.json", context)
     return result

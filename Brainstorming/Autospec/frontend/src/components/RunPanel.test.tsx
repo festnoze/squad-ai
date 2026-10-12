@@ -294,7 +294,9 @@ describe("RunPanel", () => {
       onUndeploy,
     );
     const link = screen.getByRole("link", { name: /Deployed/ });
-    expect(link).toHaveAttribute("href", "http://localhost:18001");
+    // Exact IPv4 loopback matches the owned ingress and APP_ORIGIN; a
+    // localhost alias would change browser Origin and fail legitimate CSRF.
+    expect(link).toHaveAttribute("href", "http://127.0.0.1:18001");
     const undeploy = screen.getByRole("button", { name: "Undeploy" });
     fireEvent.click(undeploy);
     expect(onUndeploy).toHaveBeenCalledTimes(1);

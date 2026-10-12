@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="3" skipped="0" tests="95" time="14.822" timestamp="2026-10-12T13:10:23.245311+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_source_reviewer" name="test_source_bundle_hash_bound_and_never_truncated" time="0.051" /><testcase classname="tests.test_source_reviewer" name="test_positive_source_review_cannot_cite_absent_or_unsupplied_text[citation0]" time="0.026" /><testcase classname="tests.test_source_reviewer" name="test_positive_source_review_cannot_cite_absent_or_unsupplied_text[citation1]" time="0.026" /><testcase classname="tests.test_source_reviewer" name="test_positive_source_review_cannot_cite_absent_or_unsupplied_text[citation2]" time="0.029" /><testcase classname="tests.test_source_reviewer" name="test_positive_source_review_cannot_cite_absent_or_unsupplied_text[citation3]" time="0.036" /><testcase classname="tests.test_source_reviewer" name="test_positive_source_review_cannot_cite_absent_or_unsupplied_text[citation4]" time="0.031" /><testcase classname="tests.test_source_reviewer" name="test_unknown_fixture_case_has_no_nominal_fallback" time="0.004" /><testcase classname="tests.test_source_reviewer" name="test_two_different_external_agents_install_only_intact_reviewed_facts" time="0.273" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[rejected]" time="0.168" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[self_approve]" time="0.190" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[bad_citation]" time="0.165" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[unknown_id]" time="0.207" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[missing_id]" time="0.176" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[source_drift]" time="0.243" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[wrong_model]" time="0.640" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[wrong_reasoning]" time="0.395" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[wrong_packet]" time="0.164" /><testcase classname="tests.test_source_reviewer" name="test_rejected_review_cannot_publish_configuration[wrong_stage]" time="0.173" /><testcase classname="tests.test_source_reviewer" name="test_old_independent_approval_cannot_approve_new_proposal_same_snapshot" time="0.198" /><testcase classname="tests.test_source_reviewer" name="test_final_quality_profile_requires_a_distinct_approved_exact_plan" time="2.773" /><testcase classname="tests.test_source_reviewer" name="test_dedicated_entropy_review_is_distinct_from_generic_bindings[PASS]" time="0.259"><failure message="autospec.validation.support_adapter.AdapterUnavailable: explicit frozen vertical auth fact absent">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3336/test_dedicated_entropy_review_0')
+status = 'PASS'
+
+    @pytest.mark.parametrize("status", ["PASS", "FAIL", "NOT_VERIFIED"])
+    async def test_dedicated_entropy_review_is_distinct_from_generic_bindings(tmp_path, status):
+        from autospec.validation.coordinator import SupervisorEvidenceStore
+        source,snapshot,_,control,proposal,review=setup(tmp_path)
+        contract=import_contract("Session randomness source review.",
+            "| SEC-05 | B / X+R | CSPRNG invocation and full cookie propagation |",reviewed_by="offline entropy mechanics")
+        proposal["fixtures"]["cases"]={"VERTICAL":{},"SEC-05":{},**{f"E2E-{n:02d}":{} for n in range(1,7)}}
+        proposal["candidate"]["bindings"]["instrumentation"].update(
+            entropy_module="main",entropy_attribute="token_urlsafe",entropy_primitive="secrets.token_urlsafe")
+        review["requirements"]=[{"id":"SEC-05","status":"NOT_VERIFIED","citations":[],"reason":"No source-wide security claim"}]
+        review["test_mapping"]={}
+        review["entropy"]={"status":status,"citations":review["bindings"]["citations"] if status!="NOT_VERIFIED" else [],
+            "reason":"Synthetic source propagation review, not a real generated product or runtime claim"}
+&gt;       packet=await admit_proposal(source,snapshot,contract,control,proposal)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_source_reviewer.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_source_reviewer.py:82: in admit_proposal
+    await ensure_reviewed_configuration(contract,source,snapshot,control)
+autospec\validation\source_reviewer.py:224: in ensure_reviewed_configuration
+    proposal = await prepare_binding_proposal(answer["candidate"], fixtures, contract=contract, snapshot_root=source, snapshot_hash=snapshot_hash)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\validation\coordinator.py:83: in prepare_binding_proposal
+    if binding.auth_required!=_auth(contract): raise AdapterUnavailable("candidate auth differs from frozen contract")
+                              ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+contract = AcceptanceContract(brief='Session randomness source review.', reference='| SEC-05 | B / X+R | CSPRNG invocation and fu...ull cookie propagation', required_evidence=('X', 'R')),), facts=(), reviewed_by='offline entropy mechanics', version=1)
+
+    def _auth(contract):
+        if any(f.kind=="security_profile" for f in contract.facts): return True
+        profiles=[f.expected for f in contract.facts if f.kind=="vertical_profile"]
+        if len(profiles)!=1 or not isinstance(profiles[0],dict) or type(profiles[0].get("auth")) is not bool:
+&gt;           raise AdapterUnavailable("explicit frozen vertical auth fact absent")
+E           autospec.validation.support_adapter.AdapterUnavailable: explicit frozen vertical auth fact absent
+
+autospec\validation\coordinator.py:243: AdapterUnavailable</failure></testcase><testcase classname="tests.test_source_reviewer" name="test_dedicated_entropy_review_is_distinct_from_generic_bindings[FAIL]" time="0.498"><failure message="autospec.validation.support_adapter.AdapterUnavailable: explicit frozen vertical auth fact absent">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3336/test_dedicated_entropy_review_1')
+status = 'FAIL'
+
+    @pytest.mark.parametrize("status", ["PASS", "FAIL", "NOT_VERIFIED"])
+    async def test_dedicated_entropy_review_is_distinct_from_generic_bindings(tmp_path, status):
+        from autospec.validation.coordinator import SupervisorEvidenceStore
+        source,snapshot,_,control,proposal,review=setup(tmp_path)
+        contract=import_contract("Session randomness source review.",
+            "| SEC-05 | B / X+R | CSPRNG invocation and full cookie propagation |",reviewed_by="offline entropy mechanics")
+        proposal["fixtures"]["cases"]={"VERTICAL":{},"SEC-05":{},**{f"E2E-{n:02d}":{} for n in range(1,7)}}
+        proposal["candidate"]["bindings"]["instrumentation"].update(
+            entropy_module="main",entropy_attribute="token_urlsafe",entropy_primitive="secrets.token_urlsafe")
+        review["requirements"]=[{"id":"SEC-05","status":"NOT_VERIFIED","citations":[],"reason":"No source-wide security claim"}]
+        review["test_mapping"]={}
+        review["entropy"]={"status":status,"citations":review["bindings"]["citations"] if status!="NOT_VERIFIED" else [],
+            "reason":"Synthetic source propagation review, not a real generated product or runtime claim"}
+&gt;       packet=await admit_proposal(source,snapshot,contract,control,proposal)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_source_reviewer.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_source_reviewer.py:82: in admit_proposal
+    await ensure_reviewed_configuration(contract,source,snapshot,control)
+autospec\validation\source_reviewer.py:224: in ensure_reviewed_configuration
+    proposal = await prepare_binding_proposal(answer["candidate"], fixtures, contract=contract, snapshot_root=source, snapshot_hash=snapshot_hash)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\validation\coordinator.py:83: in prepare_binding_proposal
+    if binding.auth_required!=_auth(contract): raise AdapterUnavailable("candidate auth differs from frozen contract")
+                              ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+contract = AcceptanceContract(brief='Session randomness source review.', reference='| SEC-05 | B / X+R | CSPRNG invocation and fu...ull cookie propagation', required_evidence=('X', 'R')),), facts=(), reviewed_by='offline entropy mechanics', version=1)
+
+    def _auth(contract):
+        if any(f.kind=="security_profile" for f in contract.facts): return True
+        profiles=[f.expected for f in contract.facts if f.kind=="vertical_profile"]
+        if len(profiles)!=1 or not isinstance(profiles[0],dict) or type(profiles[0].get("auth")) is not bool:
+&gt;           raise AdapterUnavailable("explicit frozen vertical auth fact absent")
+E           autospec.validation.support_adapter.AdapterUnavailable: explicit frozen vertical auth fact absent
+
+autospec\validation\coordinator.py:243: AdapterUnavailable</failure></testcase><testcase classname="tests.test_source_reviewer" name="test_dedicated_entropy_review_is_distinct_from_generic_bindings[NOT_VERIFIED]" time="0.416"><failure message="autospec.validation.support_adapter.AdapterUnavailable: explicit frozen vertical auth fact absent">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3336/test_dedicated_entropy_review_2')
+status = 'NOT_VERIFIED'
+
+    @pytest.mark.parametrize("status", ["PASS", "FAIL", "NOT_VERIFIED"])
+    async def test_dedicated_entropy_review_is_distinct_from_generic_bindings(tmp_path, status):
+        from autospec.validation.coordinator import SupervisorEvidenceStore
+        source,snapshot,_,control,proposal,review=setup(tmp_path)
+        contract=import_contract("Session randomness source review.",
+            "| SEC-05 | B / X+R | CSPRNG invocation and full cookie propagation |",reviewed_by="offline entropy mechanics")
+        proposal["fixtures"]["cases"]={"VERTICAL":{},"SEC-05":{},**{f"E2E-{n:02d}":{} for n in range(1,7)}}
+        proposal["candidate"]["bindings"]["instrumentation"].update(
+            entropy_module="main",entropy_attribute="token_urlsafe",entropy_primitive="secrets.token_urlsafe")
+        review["requirements"]=[{"id":"SEC-05","status":"NOT_VERIFIED","citations":[],"reason":"No source-wide security claim"}]
+        review["test_mapping"]={}
+        review["entropy"]={"status":status,"citations":review["bindings"]["citations"] if status!="NOT_VERIFIED" else [],
+            "reason":"Synthetic source propagation review, not a real generated product or runtime claim"}
+&gt;       packet=await admit_proposal(source,snapshot,contract,control,proposal)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_source_reviewer.py:194: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+tests\test_source_reviewer.py:82: in admit_proposal
+    await ensure_reviewed_configuration(contract,source,snapshot,control)
+autospec\validation\source_reviewer.py:224: in ensure_reviewed_configuration
+    proposal = await prepare_binding_proposal(answer["candidate"], fixtures, contract=contract, snapshot_root=source, snapshot_hash=snapshot_hash)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\validation\coordinator.py:83: in prepare_binding_proposal
+    if binding.auth_required!=_auth(contract): raise AdapterUnavailable("candidate auth differs from frozen contract")
+                              ^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+contract = AcceptanceContract(brief='Session randomness source review.', reference='| SEC-05 | B / X+R | CSPRNG invocation and fu...ull cookie propagation', required_evidence=('X', 'R')),), facts=(), reviewed_by='offline entropy mechanics', version=1)
+
+    def _auth(contract):
+        if any(f.kind=="security_profile" for f in contract.facts): return True
+        profiles=[f.expected for f in contract.facts if f.kind=="vertical_profile"]
+        if len(profiles)!=1 or not isinstance(profiles[0],dict) or type(profiles[0].get("auth")) is not bool:
+&gt;           raise AdapterUnavailable("explicit frozen vertical auth fact absent")
+E           autospec.validation.support_adapter.AdapterUnavailable: explicit frozen vertical auth fact absent
+
+autospec\validation\coordinator.py:243: AdapterUnavailable</failure></testcase><testcase classname="tests.test_source_reviewer" name="test_entropy_propagation_cannot_be_auto_approved_from_general_binding[no_symbol]" time="0.108" /><testcase classname="tests.test_source_reviewer" name="test_entropy_propagation_cannot_be_auto_approved_from_general_binding[invalid_primitive]" time="0.103" /><testcase classname="tests.test_source_reviewer" name="test_entropy_propagation_cannot_be_auto_approved_from_general_binding[missing_citations]" time="0.088" /><testcase classname="tests.test_source_reviewer" name="test_entropy_propagation_cannot_be_auto_approved_from_general_binding[foreign_citation]" time="0.115" /><testcase classname="tests.test_source_reviewer" name="test_entropy_propagation_cannot_be_auto_approved_from_general_binding[untyped_citations]" time="0.108" /><testcase classname="tests.test_delivery_raccord" name="test_actual_failed_build_is_published_without_fake_image_or_acceptance" time="0.133" /><testcase classname="tests.test_delivery_raccord" name="test_fact_collection_retains_unknown_native_ports_without_fabricating_success" time="0.057" /><testcase classname="tests.test_delivery_raccord" name="test_cancelled_native_collection_propagates" time="0.047" /><testcase classname="tests.test_delivery_raccord" name="test_source_drift_never_builds_or_publishes_native_facts" time="0.043" /><testcase classname="tests.test_delivery_raccord" name="test_snapshot_without_ops_does_not_build_an_unrequested_image" time="0.042" /><testcase classname="tests.test_delivery_raccord" name="test_build_clock_gap_preserves_actual_x_but_not_provenance_or_cancellation[clock]" time="0.079" /><testcase classname="tests.test_delivery_raccord" name="test_build_clock_gap_preserves_actual_x_but_not_provenance_or_cancellation[provenance]" time="0.101" /><testcase classname="tests.test_delivery_raccord" name="test_build_clock_gap_preserves_actual_x_but_not_provenance_or_cancellation[cancelled]" time="0.135" /><testcase classname="tests.test_delivery_raccord" name="test_pipeline_calls_native_collection_before_independent_final_gate" time="0.289" /><testcase classname="tests.test_delivery_raccord" name="test_current_contract_qualifies_before_any_publication_or_legacy_repair[True-True]" time="0.019" /><testcase classname="tests.test_delivery_raccord" name="test_current_contract_qualifies_before_any_publication_or_legacy_repair[True-False]" time="0.021" /><testcase classname="tests.test_delivery_raccord" name="test_current_contract_qualifies_before_any_publication_or_legacy_repair[False-True]" time="0.011" /><testcase classname="tests.test_delivery_raccord" name="test_publication_re_admits_fresh_reports_and_exact_baked_command[None]" time="0.084" /><testcase classname="tests.test_delivery_raccord" name="test_publication_re_admits_fresh_reports_and_exact_baked_command[failed_reports]" time="0.070" /><testcase classname="tests.test_delivery_raccord" name="test_publication_re_admits_fresh_reports_and_exact_baked_command[failed_image]" time="0.058" /><testcase classname="tests.test_delivery_raccord" name="test_publication_re_admits_fresh_reports_and_exact_baked_command[wrong_command]" time="0.205" /><testcase classname="tests.test_delivery_raccord" name="test_publication_re_admits_fresh_reports_and_exact_baked_command[stale_binding]" time="0.098" /><testcase classname="tests.test_delivery_raccord" name="test_publication_re_admits_fresh_reports_and_exact_baked_command[source_drift]" time="0.116" /><testcase classname="tests.test_deploy" name="test_write_deploy_artifacts" time="0.038" /><testcase classname="tests.test_deploy" name="test_write_deploy_idempotent" time="0.039" /><testcase classname="tests.test_deploy" name="test_dockerfile_backend_exposes_port" time="0.015" /><testcase classname="tests.test_deploy" name="test_dockerfile_fullstack_is_multi_stage_one_image" time="0.018" /><testcase classname="tests.test_deploy" name="test_dockerfile_frontend_only_serves_via_unprivileged_nginx" time="0.015" /><testcase classname="tests.test_deploy" name="test_managed_dockerfile_is_regenerated_on_drift" time="0.281" /><testcase classname="tests.test_deploy" name="test_unknown_legacy_marker_does_not_authorize_overwrite" time="0.157" /><testcase classname="tests.test_deploy" name="test_user_owned_dockerfile_is_preserved" time="0.027" /><testcase classname="tests.test_deploy" name="test_dockerignore_ignores_node_modules" time="0.033" /><testcase classname="tests.test_deploy" name="test_adeploy_creates_artifacts" time="0.131" /><testcase classname="tests.test_deploy" name="test_adeploy_rejected_while_building" time="0.024" /><testcase classname="tests.test_docker_delivery" name="test_docker_available_false_on_file_not_found" time="0.207" /><testcase classname="tests.test_docker_delivery" name="test_docker_available_false_on_named_pipe_daemon_down" time="0.019" /><testcase classname="tests.test_docker_delivery" name="test_looks_like_daemon_down_negative_on_ordinary_error" time="0.023" /><testcase classname="tests.test_docker_delivery" name="test_ensure_network_idempotent_when_inspect_ok" time="0.010" /><testcase classname="tests.test_docker_delivery" name="test_ensure_network_creates_when_missing" time="0.032" /><testcase classname="tests.test_docker_delivery" name="test_ensure_network_tolerates_already_exists_race" time="0.032" /><testcase classname="tests.test_docker_delivery" name="test_ensure_network_daemon_down_is_reported" time="0.015" /><testcase classname="tests.test_docker_delivery" name="test_wait_healthy_fails_fast_when_container_exited" time="0.009" /><testcase classname="tests.test_docker_delivery" name="test_wait_healthy_404_is_healthy" time="0.012" /><testcase classname="tests.test_docker_delivery" name="test_wait_healthy_timeout_with_logs" time="0.021" /><testcase classname="tests.test_docker_delivery" name="test_cross_reachability_own_pair_failure_blocks" time="0.005" /><testcase classname="tests.test_docker_delivery" name="test_cross_reachability_own_pair_recovers_on_retry" time="0.006" /><testcase classname="tests.test_docker_delivery" name="test_cross_reachability_foreign_probe_budget" time="0.007" /><testcase classname="tests.test_docker_delivery" name="test_cross_reachability_foreign_pair_is_warning_only" time="0.007" /><testcase classname="tests.test_docker_delivery" name="test_allocate_host_port_reuses_persisted" time="0.009" /><testcase classname="tests.test_docker_delivery" name="test_allocate_host_port_returns_base_when_free" time="0.020" /><testcase classname="tests.test_docker_delivery" name="test_allocate_host_port_skips_collisions" time="0.023" /><testcase classname="tests.test_docker_delivery" name="test_allocate_claims_published_ports_even_without_state_file" time="0.023" /><testcase classname="tests.test_docker_delivery" name="test_allocate_ignores_container_internal_port_label" time="0.021" /><testcase classname="tests.test_docker_delivery" name="test_parse_host_ports_ipv4_and_ipv6" time="0.015" /><testcase classname="tests.test_docker_delivery" name="test_parse_host_ports_empty_and_unpublished" time="0.017" /><testcase classname="tests.test_docker_delivery" name="test_list_deployed_parses_ports_column" time="0.016" /><testcase classname="tests.test_docker_delivery" name="test_slug_image_and_container_name_sanitisation" time="0.014" /><testcase classname="tests.test_docker_delivery" name="test_should_run_backend_only" time="0.026" /><testcase classname="tests.test_docker_delivery" name="test_should_run_fullstack_when_frontend_present" time="0.034" /><testcase classname="tests.test_docker_delivery" name="test_should_run_frontend_only_is_nginx_port80" time="0.035" /><testcase classname="tests.test_docker_delivery" name="test_should_run_packages_cli" time="0.025" /><testcase classname="tests.test_docker_delivery" name="test_should_run_skips_when_disabled_or_demo" time="0.023" /><testcase classname="tests.test_docker_delivery" name="test_should_run_non_python_backend_supported" time="0.024" /><testcase classname="tests.test_docker_delivery" name="test_probe_wget_fallback_for_nginx_source" time="0.010" /><testcase classname="tests.test_docker_delivery" name="test_probe_python_success_no_fallback" time="0.015" /><testcase classname="tests.test_docker_delivery" name="test_phase_skips_when_gate_off" time="0.020" /><testcase classname="tests.test_docker_delivery" name="test_phase_skips_in_fake_agents_demo" time="0.038" /><testcase classname="tests.test_docker_delivery" name="test_phase_packages_cli_project" time="0.070" /><testcase classname="tests.test_docker_delivery" name="test_phase_daemon_down_parks_infra" time="0.058" /><testcase classname="tests.test_docker_delivery" name="test_phase_build_failure_repairs_until_green" time="0.178" /><testcase classname="tests.test_docker_delivery" name="test_phase_blocks_after_exhausted_attempts" time="0.241" /><testcase classname="tests.test_docker_delivery" name="test_phase_repair_rolls_back_when_fix_breaks_suite" time="0.193" /></testsuite></testsuites>

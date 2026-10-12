@@ -73,6 +73,45 @@ async def test_oracle_persistence_failure_never_starts_pipeline(monkeypatch):
     assert response.status_code == 503 and not started
 
 
+@pytest.mark.parametrize("submitted", [3, 5, 7, 100, True, "4", 4.0])
+async def test_api_plan_limit_drift_never_persists_or_starts(monkeypatch, submitted):
+    stored, started = [], []
+    runner = FakeRunner([])
+    monkeypatch.setattr(server, "_runner", runner)
+    monkeypatch.setattr(Pipeline, "start", lambda self: started.append(self))
+    monkeypatch.setattr("autospec.contracts.ContractStore.save", lambda *args: stored.append(args))
+    source = import_contract("Books: at most four lots.",
+        "| BOOK-01 | B / X | Nominal API |", reviewed_by="source-only reviewer",
+        facts=[ContractFact.create("lot-limit", "plan_limits", {"max_lots": 4},
+            ["BOOK-01"], "at most four lots")])
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://test") as client:
+        response = await client.post("/api/projects", json={"goal": "Books", "brief": source.brief,
+            "acceptance_reference": source.reference, "acceptance_reviewed_by": source.reviewed_by,
+            "acceptance_facts": source.payload()["facts"], "acceptance_max_lots": submitted})
+    assert response.status_code == 422
+    assert not stored and not started and not runner.calls
+
+
+async def test_api_exact_source_plan_limit_is_persisted_before_start(monkeypatch):
+    started = []
+    runner = FakeRunner([])
+    monkeypatch.setattr(server, "_runner", runner)
+    monkeypatch.setattr(Pipeline, "start", lambda self: started.append(self))
+    source = import_contract("Books: at most four lots.",
+        "| BOOK-01 | B / X | Nominal API |", reviewed_by="source-only reviewer",
+        facts=[ContractFact.create("lot-limit", "plan_limits", {"max_lots": 4},
+            ["BOOK-01"], "at most four lots")])
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url="http://test") as client:
+        response = await client.post("/api/projects", json={"goal": "Books", "brief": source.brief,
+            "acceptance_reference": source.reference, "acceptance_reviewed_by": source.reviewed_by,
+            "acceptance_facts": source.payload()["facts"], "acceptance_max_lots": 4})
+    assert response.status_code == 200 and len(started) == 1
+    state = started[0].state
+    assert state.acceptance_max_lots == 4 and acceptance.load_contract(state) == source
+    assert not runner.calls
+    server.pipelines.pop(state.id, None)
+
+
 async def test_source_only_contract_refused_before_any_paid_plan_call():
     state, source = state_with_oracle()
     source = import_contract(source.brief, source.reference, reviewed_by="reviewer")

@@ -3,6 +3,7 @@ dev attempts is re-analyzed and split into FINER sub-tasks instead of failing
 (counters the « unit too big for one agent session » problem)."""
 
 import asyncio
+import os
 
 import pytest
 
@@ -18,6 +19,8 @@ from autospec.models import (
     UserStory,
 )
 from autospec.orchestrator.pipeline import Pipeline
+
+_NATIVE_SCHEDULER_DEADLINE = 90 if os.name=="nt" else 40
 
 
 def _streams_state(stories, project_id="split-proj"):
@@ -190,7 +193,7 @@ async def test_auto_split_on_failure_then_subtasks_build_green(streams_on, monke
         return ("-S" in subject.id), ("" if "-S" in subject.id else "red")
 
     monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
-    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=_NATIVE_SCHEDULER_DEADLINE)
 
     story = state.story("US-1")
     assert story.tasks, "US-1 should have been split into finer sub-tasks"
@@ -209,7 +212,7 @@ async def test_no_split_when_max_depth_zero_keeps_failed(streams_on, monkeypatch
         return False, "red"
 
     monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
-    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=_NATIVE_SCHEDULER_DEADLINE)
 
     story = state.story("US-1")
     assert story.tasks == []                       # never split

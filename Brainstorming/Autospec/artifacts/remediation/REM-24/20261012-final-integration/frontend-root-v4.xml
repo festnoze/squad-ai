@@ -1,0 +1,679 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<testsuites name="vitest tests" tests="308" failures="0" errors="0" time="7.9475177">
+    <testsuite name="src/api.test.ts" timestamp="2026-10-12T11:26:15.364Z" hostname="635ROM-IT-L157" tests="17" failures="0" errors="0" skipped="0" time="1.1091843">
+        <testcase classname="src/api.test.ts" name="api — retry des appels idempotents (provider) &gt; setProvider réessaie un 502 transitoire du proxy puis réussit" time="0.1603621">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — retry des appels idempotents (provider) &gt; setProvider abandonne après épuisement des retries (502 persistant)" time="0.461665">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — retry des appels idempotents (provider) &gt; getProvider réessaie aussi un 502 transitoire" time="0.1568206">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — retry des appels idempotents (provider) &gt; discoverModels appelle l&apos;endpoint de découverte et renvoie models+source" time="0.0013245">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — retry des appels idempotents (provider) &gt; createProject (NON idempotent) ne réessaie PAS un 502 — pas de double création" time="0.0007417">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — directives ciblées idempotentes (chat/extend) &gt; storyChat envoie un entry_id client-généré et le réutilise au retry (502 -&gt; ok)" time="0.1632394">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — directives ciblées idempotentes (chat/extend) &gt; storyChat honore un entry_id fourni explicitement" time="0.0004441">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — directives ciblées idempotentes (chat/extend) &gt; taskChat poste sur la route task avec un entry_id" time="0.0004792">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — directives ciblées idempotentes (chat/extend) &gt; extendStory renvoie l&apos;état complet et réessaie un 502 transitoire" time="0.1532505">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — directives ciblées idempotentes (chat/extend) &gt; clientUuid renvoie des ids non vides et distincts" time="0.0007212">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="connectEvents — statut de connexion (Q5) &gt; onStatus(true) à l&apos;ouverture, onStatus(false) sur erreur" time="0.0007228">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — gouvernance &amp; mémoire logicielle (US-F7.1) &gt; getGovernance extrait la liste des décisions" time="0.001256">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — gouvernance &amp; mémoire logicielle (US-F7.1) &gt; approveGovernanceDecision poste sur /approve et renvoie la décision" time="0.0024756">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — gouvernance &amp; mémoire logicielle (US-F7.1) &gt; rejectGovernanceDecision poste le motif sur /reject" time="0.000736">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — gouvernance &amp; mémoire logicielle (US-F7.1) &gt; getKnowledge renvoie la base telle quelle (GET idempotent)" time="0.000567">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — gouvernance &amp; mémoire logicielle (US-F7.1) &gt; patchKnowledgeEntry PATCHe les champs et renvoie l&apos;entrée" time="0.0005332">
+        </testcase>
+        <testcase classname="src/api.test.ts" name="api — gouvernance &amp; mémoire logicielle (US-F7.1) &gt; deleteKnowledgeEntry supprime l&apos;entrée (DELETE)" time="0.0006268">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/App.test.tsx" timestamp="2026-10-12T11:26:15.370Z" hostname="635ROM-IT-L157" tests="11" failures="0" errors="0" skipped="0" time="0.5129717">
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; un event &apos;state&apos; fait apparaître le projet (dans le sélecteur)" time="0.1558022">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; un second &apos;state&apos; pour le même id met à jour sans dupliquer (upsert)" time="0.0534246">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; un event &apos;deleted&apos; fait disparaître le projet" time="0.0307367">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; anti-résurrection : un &apos;state&apos; retardé après &apos;deleted&apos; ne ressuscite pas le projet" time="0.0396119">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; un event &apos;tick&apos; n&apos;écrase pas l&apos;état projet (titre conservé)" time="0.0449964">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; un &apos;tick&apos; pour un projet inconnu ne crée pas de projet fantôme" time="0.0108625">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; un event &apos;governance_decision&apos; alimente le badge ⚖ en live (US-F7.5)" time="0.0511389">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; un &apos;governance_decision&apos; pour un projet inconnu est ignoré (pas de fantôme)" time="0.0095089">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; un event &apos;notify&apos; affiche un toast (U3)" time="0.0204586">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — gestion des évènements WebSocket &gt; R6 : un toast porteur d&apos;une action rend un bouton qui l&apos;exécute et ferme le toast" time="0.0313338">
+        </testcase>
+        <testcase classname="src/App.test.tsx" name="App — popup de création au démarrage &gt; la popup s&apos;ouvre sans projet mais reste FERMABLE (pas de création forcée)" time="0.0612032">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/clipboard.test.ts" timestamp="2026-10-12T11:26:15.371Z" hostname="635ROM-IT-L157" tests="2" failures="0" errors="0" skipped="0" time="0.0083307">
+        <testcase classname="src/clipboard.test.ts" name="copyText (Q7) &gt; copie via navigator.clipboard et émet un toast succès" time="0.0056411">
+        </testcase>
+        <testcase classname="src/clipboard.test.ts" name="copyText (Q7) &gt; échec de copie → toast erreur et false" time="0.0007558">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/criterionState.test.ts" timestamp="2026-10-12T11:26:15.372Z" hostname="635ROM-IT-L157" tests="5" failures="0" errors="0" skipped="0" time="0.0038498">
+        <testcase classname="src/criterionState.test.ts" name="criterionState &gt; retourne &apos;green&apos; quand la story est &apos;done&apos;, peu importe les tests" time="0.0015421">
+        </testcase>
+        <testcase classname="src/criterionState.test.ts" name="criterionState &gt; retourne &apos;green&apos; quand tous les tests du critère sont verts" time="0.0003507">
+        </testcase>
+        <testcase classname="src/criterionState.test.ts" name="criterionState &gt; retourne &apos;red&apos; dès qu&apos;un test du critère est rouge" time="0.0002375">
+        </testcase>
+        <testcase classname="src/criterionState.test.ts" name="criterionState &gt; retourne &apos;nonexistent&apos; quand aucun test n&apos;est rattaché au critère" time="0.0001593">
+        </testcase>
+        <testcase classname="src/criterionState.test.ts" name="criterionState &gt; retourne &apos;nonexistent&apos; pour un mélange vert + critère sans test (story non done)" time="0.0001264">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/graph.test.ts" timestamp="2026-10-12T11:26:15.372Z" hostname="635ROM-IT-L157" tests="5" failures="0" errors="0" skipped="0" time="0.0263582">
+        <testcase classname="src/graph.test.ts" name="computeDagView (modèle hiérarchique du graphe) &gt; tout replié par défaut : un nœud par epic, arête agrégée epic→epic" time="0.0141789">
+        </testcase>
+        <testcase classname="src/graph.test.ts" name="computeDagView (modèle hiérarchique du graphe) &gt; déplier les epics expose les US et l&apos;arête au niveau US" time="0.0029236">
+        </testcase>
+        <testcase classname="src/graph.test.ts" name="computeDagView (modèle hiérarchique du graphe) &gt; une US décomposée reste un conteneur repliable de ses tâches" time="0.0038631">
+        </testcase>
+        <testcase classname="src/graph.test.ts" name="computeDagView (modèle hiérarchique du graphe) &gt; focus sur une US : la dépendance externe apparaît en fantôme + breadcrumb" time="0.0018758">
+        </testcase>
+        <testcase classname="src/graph.test.ts" name="computeDagView (modèle hiérarchique du graphe) &gt; un focus inconnu retombe sur la vue projet" time="0.0013067">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/toast.test.ts" timestamp="2026-10-12T11:26:15.373Z" hostname="635ROM-IT-L157" tests="4" failures="0" errors="0" skipped="0" time="0.0077971">
+        <testcase classname="src/toast.test.ts" name="toast bus (Q0) &gt; notifie les abonnés avec level/title/body" time="0.0038663">
+        </testcase>
+        <testcase classname="src/toast.test.ts" name="toast bus (Q0) &gt; body vide par défaut, et désabonnement effectif" time="0.0004606">
+        </testcase>
+        <testcase classname="src/toast.test.ts" name="toast bus (Q0) &gt; R6 : l&apos;action optionnelle est transmise telle quelle aux abonnés" time="0.0004466">
+        </testcase>
+        <testcase classname="src/toast.test.ts" name="toast bus (Q0) &gt; R6 : sans action, l&apos;évènement ne porte pas la clé `action`" time="0.0008012">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/work.test.ts" timestamp="2026-10-12T11:26:15.374Z" hostname="635ROM-IT-L157" tests="45" failures="0" errors="0" skipped="0" time="0.0166857">
+        <testcase classname="src/work.test.ts" name="work — effectiveStatus &gt; US sans tâches : statut stocké" time="0.0022355">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — effectiveStatus &gt; préférer le statut effectif sérialisé par le backend" time="0.0003625">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — effectiveStatus &gt; US décomposée : toutes tâches done → done" time="0.0002755">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — effectiveStatus &gt; US décomposée : une tâche active → in_progress" time="0.0002478">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — effectiveStatus &gt; US décomposée : une tâche failed (et aucune active) → failed" time="0.0002473">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — work graph + blockedBy &gt; tâche bloquée par sa dépendance non done" time="0.0014121">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — work graph + blockedBy &gt; dépendance US→US décomposée se résout vers toutes ses tâches" time="0.000419">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — mergeState + hasMultiStream &gt; done → mergé ; failed+conflit → conflict ; sinon null" time="0.0003936">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — mergeState + hasMultiStream &gt; hasMultiStream : &gt;1 stream OU présence de tâches" time="0.0004413">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — stage tracker helpers &gt; STAGE_ORDER : ordre canonique, done en terminal" time="0.0011303">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — stage tracker helpers &gt; stageIndex : failed → slot terminal, inconnu → 0" time="0.000388">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — stage tracker helpers &gt; isStageDone / isStageActive" time="0.0004154">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — stage tracker helpers &gt; elapsedLabel : formats + cas limites" time="0.0003326">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué avant les stories en phase done : reprise disponible" time="0.0003163">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué avant les stories en phase stopped : reprise disponible" time="0.0001061">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué avant les stories en phase needs_attention : reprise disponible" time="0.0000849">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué avant les stories en phase error : reprise disponible" time="0.0000662">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué mais pipeline active spec : pas de seconde reprise" time="0.0001122">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué mais pipeline active analyze : pas de seconde reprise" time="0.000066">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué mais pipeline active plan : pas de seconde reprise" time="0.0000693">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué mais pipeline active architect : pas de seconde reprise" time="0.0000576">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap échoué mais pipeline active build : pas de seconde reprise" time="0.0000589">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap preparing : pas de build concurrent même avec stories en attente" time="0.0001661">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; bootstrap verifying : pas de build concurrent même avec stories en attente" time="0.000078">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; Docker building : la reprise du bootstrap attend la fin du déploiement" time="0.0001247">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; Docker deploying : la reprise du bootstrap attend la fin du déploiement" time="0.0000593">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; Docker verifying : la reprise du bootstrap attend la fin du déploiement" time="0.0000565">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; sans stories ni échec bootstrap (undefined) : aucune reprise à proposer" time="0.0000989">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; sans stories ni échec bootstrap () : aucune reprise à proposer" time="0.0000564">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; sans stories ni échec bootstrap (ready) : aucune reprise à proposer" time="0.0000599">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; sans stories ni échec bootstrap (skipped) : aucune reprise à proposer" time="0.0000507">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; DORMANT_PHASES inclut &apos;done&apos; (régression snake) en plus de stopped/error" time="0.000353">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; phase &apos;done&apos; avec story &apos;todo&apos; restante → true (le cas snake : 5/9 faites)" time="0.0001571">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; phase dormante &apos;stopped&apos; avec story todo → true" time="0.0001314">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; phase dormante &apos;error&apos; avec story todo → true" time="0.0000745">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; phase active (build) même avec story todo → false (pipeline en cours)" time="0.0000986">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; phase &apos;done&apos; mais toutes les stories done → false" time="0.0000965">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; statut EFFECTIF : US multi-stream à moitié faite (tasks [done, todo], status brut &apos;done&apos;) → true" time="0.0001848">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; orphelin dormant (story &apos;in_progress&apos; sans worker) → true (le backend le reset à la reprise)" time="0.0001117">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — canResumeBuild (gating partagé RunPanel/ProjectBar) &gt; orphelin dormant (story &apos;green&apos; sans worker) → true (le backend le reset à la reprise)" time="0.0000691">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — deriveItemView &gt; sans tick : retombe sur les champs persistés" time="0.0003583">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — deriveItemView &gt; avec tick : le tick gagne pour stage/persona/status, guidance reste de l&apos;état" time="0.0007528">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — deriveItemView &gt; task → kind task" time="0.0002003">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — computeGraphLayout (vue graphe DAG) &gt; couches topologiques + chemin critique + parallélisme max" time="0.0008032">
+        </testcase>
+        <testcase classname="src/work.test.ts" name="work — computeGraphLayout (vue graphe DAG) &gt; buildWorkGraph résout les tâches d&apos;une TS-enfant (parent_id)" time="0.0003043">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/Activity.test.tsx" timestamp="2026-10-12T11:26:15.378Z" hostname="635ROM-IT-L157" tests="15" failures="0" errors="0" skipped="0" time="0.4508921">
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; rend la région Activité avec un stepper par item" time="0.1075135">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; en-tête : compteurs + chip à-traiter persistant + stall reason" time="0.0206637">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; région « à traiter » épinglée pour un item failed" time="0.0134157">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; BUG11 : un item épinglé n&apos;est PAS dupliqué dans la liste principale" time="0.0197176">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; le tick live est fusionné dans le stepper (étape active depuis le tick)" time="0.0141063">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; les chips de compteurs filtrent les items par statut (toggle + tous)" time="0.0852441">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; le chip « à traiter » filtre sur les items failed/bloqués" time="0.0216405">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; chat ciblé par item : envoie une consigne via storyChat" time="0.0442015">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; liste les consignes avec leur statut de livraison" time="0.0150138">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; affordance « étendre les critères » sur un item TODO appelle extendStory" time="0.0243049">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; bannière d&apos;approbation visible avec la gate string + bouton approuver" time="0.0123539">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; menu d&apos;action par item : Relancer appelle rebuildStory" time="0.0296187">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; Q5 : item failed avec last_error → CTA « Voir l&apos;erreur » ouvre le tiroir avec l&apos;erreur" time="0.0120481">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; Q5 : pas de CTA d&apos;erreur sans last_error ou hors échec" time="0.0056552">
+        </testcase>
+        <testcase classname="src/components/Activity.test.tsx" name="Activity &gt; Q1 : Escape ferme le menu d&apos;actions d&apos;un item" time="0.0213102">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/AgentExecutionPanel.test.tsx" timestamp="2026-10-12T11:26:15.380Z" hostname="635ROM-IT-L157" tests="3" failures="0" errors="0" skipped="0" time="0.0818259">
+        <testcase classname="src/components/AgentExecutionPanel.test.tsx" name="distinguishes one provider call from the worker waiting for budget" time="0.0693149">
+        </testcase>
+        <testcase classname="src/components/AgentExecutionPanel.test.tsx" name="keeps incomplete cost visible after calls have disappeared" time="0.0042965">
+        </testcase>
+        <testcase classname="src/components/AgentExecutionPanel.test.tsx" name="never labels file/test/merge waits as provider execution" time="0.0059715">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/Board.test.tsx" timestamp="2026-10-12T11:26:15.380Z" hostname="635ROM-IT-L157" tests="28" failures="0" errors="0" skipped="0" time="0.654694">
+        <testcase classname="src/components/Board.test.tsx" name="Board &gt; affiche un état vide actionnable quand il n&apos;y a pas d&apos;epic" time="0.046881">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board &gt; UI6 : pendant la planification, l&apos;état vide montre un spinner" time="0.0134949">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board &gt; navigation hiérarchique : épics → epic → story (drill-down)" time="0.0507836">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board &gt; Technical Story : badge 🔧 + contrat + lignée affichés (RFC technical-stories)" time="0.022248">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board &gt; Pipeline PO : badge complexité, kind des critères et spec incomplète" time="0.0321566">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board &gt; carte epic : avancement (barre + compteur) au niveau racine" time="0.0093566">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board &gt; US en cours : epic mis en valeur (spinner + classe working) + compteur" time="0.0092027">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board &gt; US en cours : la story porte la classe status-in_progress (halo)" time="0.0141322">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — vision produit à plat + pastille itération &gt; plusieurs itérations → grille à plat (pas de regroupement par itération)" time="0.0095444">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — vision produit à plat + pastille itération &gt; la pastille « it. N » est un lien quand onOpenIteration est fourni" time="0.0135229">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — vision produit à plat + pastille itération &gt; focus externe : navigue directement vers la US ciblée" time="0.010322">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — relance d&apos;une story bloquée (US todo en erreur) &gt; pipeline dormante : une US todo tentée/en erreur est relançable" time="0.1389746">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — relance d&apos;une story bloquée (US todo en erreur) &gt; pipeline active : pas de relance par story (le build tourne)" time="0.0258459">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — multi-stream (ST-12/13/14) &gt; ST-12 : badge stream sur une US non-défaut + filtre par stream visible" time="0.0137424">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — multi-stream (ST-12/13/14) &gt; ST-12 : les tâches d&apos;une US sont dépliables avec leur badge stream" time="0.0173492">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — multi-stream (ST-12/13/14) &gt; ST-12 : le statut d&apos;une US conteneur est dérivé de ses tâches (in_progress)" time="0.0081952">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — multi-stream (ST-12/13/14) &gt; ST-14 : une tâche todo dont la dépendance n&apos;est pas done affiche « bloquée par »" time="0.0082811">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — multi-stream (ST-12/13/14) &gt; ST-14 : une tâche failed sur conflit de merge affiche l&apos;indice de conflit" time="0.0108662">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — multi-stream (ST-12/13/14) &gt; ST-13 : ouvrir une tâche montre son détail + actions par tâche (relance)" time="0.0407929">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — multi-stream (ST-12/13/14) &gt; legacy (aucun stream/tâche) : rendu inchangé, pas de filtre ni badge stream" time="0.0109862">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — recherche (Q4) &gt; niveau épics : seuls les épics avec une story qui matche restent visibles" time="0.0096418">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — recherche (Q4) &gt; insensible aux diacritiques (« reinitialiser » matche « Réinitialiser »)" time="0.0102877">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — recherche (Q4) &gt; aucun résultat : placeholder avec écho de la requête" time="0.0051127">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board — recherche (Q4) &gt; niveau epic : la liste des stories est filtrée, la recherche se compose avec le drill-down" time="0.0170803">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board - R6 : suppression annulable + corbeille &gt; supprimer une story emet un toast porteur d&apos;une action Undo qui restaure" time="0.0439734">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board - R6 : suppression annulable + corbeille &gt; l&apos;echec de la restauration emet un toast d&apos;erreur (pas de crash)" time="0.0288865">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board - R6 : suppression annulable + corbeille &gt; panneau corbeille : une entree listee, restauration au clic" time="0.0225513">
+        </testcase>
+        <testcase classname="src/components/Board.test.tsx" name="Board - R6 : suppression annulable + corbeille &gt; pas de panneau corbeille quand la corbeille est vide ou absente" time="0.0040239">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/ChatPanel.test.tsx" timestamp="2026-10-12T11:26:15.383Z" hostname="635ROM-IT-L157" tests="4" failures="0" errors="0" skipped="0" time="0.1025728">
+        <testcase classname="src/components/ChatPanel.test.tsx" name="ChatPanel — brainstorming offer (B-IDEA) &gt; n&apos;affiche pas l&apos;offre de brainstorming par défaut" time="0.0338316">
+        </testcase>
+        <testcase classname="src/components/ChatPanel.test.tsx" name="ChatPanel — brainstorming offer (B-IDEA) &gt; affiche l&apos;offre + les techniques quand une idée vague est détectée" time="0.0055732">
+        </testcase>
+        <testcase classname="src/components/ChatPanel.test.tsx" name="ChatPanel — brainstorming offer (B-IDEA) &gt; « Oui » résout l&apos;offre avec accept=true" time="0.0518719">
+        </testcase>
+        <testcase classname="src/components/ChatPanel.test.tsx" name="ChatPanel — brainstorming offer (B-IDEA) &gt; « Non » résout l&apos;offre avec accept=false (mode autonome)" time="0.0085961">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/CommandPalette.test.tsx" timestamp="2026-10-12T11:26:15.384Z" hostname="635ROM-IT-L157" tests="7" failures="0" errors="0" skipped="0" time="0.2674391">
+        <testcase classname="src/components/CommandPalette.test.tsx" name="fuzzyScore &gt; renvoie -1 sans match, l&apos;index sinon (diacritiques ignorés)" time="0.0030516">
+        </testcase>
+        <testcase classname="src/components/CommandPalette.test.tsx" name="CommandPalette (R2) &gt; filtre les commandes et lance une commande immédiate" time="0.084978">
+        </testcase>
+        <testcase classname="src/components/CommandPalette.test.tsx" name="CommandPalette (R2) &gt; verbe ciblé : « Retry » affiche un chip cible puis relance l&apos;item choisi" time="0.0291577">
+        </testcase>
+        <testcase classname="src/components/CommandPalette.test.tsx" name="CommandPalette (R2) &gt; verbe destructif « Force done » passe par la confirmation" time="0.105748">
+        </testcase>
+        <testcase classname="src/components/CommandPalette.test.tsx" name="CommandPalette (R2) &gt; « Aller au prochain échec » dispatche une navigation vers l&apos;item failed" time="0.0138377">
+        </testcase>
+        <testcase classname="src/components/CommandPalette.test.tsx" name="CommandPalette (R2) &gt; navigation clavier : ↓ puis Entrée lance la 2e commande sélectionnée" time="0.0183425">
+        </testcase>
+        <testcase classname="src/components/CommandPalette.test.tsx" name="CommandPalette (R2) &gt; sans projet : seules les commandes app sont proposées" time="0.0082848">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/ComponentsPanel.test.tsx" timestamp="2026-10-12T11:26:15.384Z" hostname="635ROM-IT-L157" tests="5" failures="0" errors="0" skipped="0" time="0.2186529">
+        <testcase classname="src/components/ComponentsPanel.test.tsx" name="ComponentsPanel (E3/E4) &gt; ne rend rien sans composants" time="0.0187359">
+        </testcase>
+        <testcase classname="src/components/ComponentsPanel.test.tsx" name="ComponentsPanel (E3/E4) &gt; liste les composants avec leur statut" time="0.0372524">
+        </testcase>
+        <testcase classname="src/components/ComponentsPanel.test.tsx" name="ComponentsPanel (E3/E4) &gt; ✓ approuve un composant proposé (onUpdate reçoit la liste à jour)" time="0.0234728">
+        </testcase>
+        <testcase classname="src/components/ComponentsPanel.test.tsx" name="ComponentsPanel (E3/E4) &gt; le bouton de setup est désactivé sans composant approuvé" time="0.1095804">
+        </testcase>
+        <testcase classname="src/components/ComponentsPanel.test.tsx" name="ComponentsPanel (E3/E4) &gt; le bouton de setup appelle onSetup quand un composant est approuvé" time="0.0256625">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/ConfirmDialog.test.tsx" timestamp="2026-10-12T11:26:15.385Z" hostname="635ROM-IT-L157" tests="4" failures="0" errors="0" skipped="0" time="0.1646945">
+        <testcase classname="src/components/ConfirmDialog.test.tsx" name="ConfirmDialog (Q2) &gt; affiche titre/corps et résout true sur Confirmer" time="0.0839916">
+        </testcase>
+        <testcase classname="src/components/ConfirmDialog.test.tsx" name="ConfirmDialog (Q2) &gt; résout false sur Annuler (bouton autofocus)" time="0.0243645">
+        </testcase>
+        <testcase classname="src/components/ConfirmDialog.test.tsx" name="ConfirmDialog (Q2) &gt; résout false sur Escape" time="0.0362157">
+        </testcase>
+        <testcase classname="src/components/ConfirmDialog.test.tsx" name="ConfirmDialog (Q2) &gt; résout true sur Entrée dans le dialogue" time="0.0166875">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/CostEstimateNote.test.tsx" timestamp="2026-10-12T11:26:15.386Z" hostname="635ROM-IT-L157" tests="3" failures="0" errors="0" skipped="0" time="0.079887">
+        <testcase classname="src/components/CostEstimateNote.test.tsx" name="CostEstimateNote &gt; keeps an accessible general caveat for older records without completeness metadata" time="0.0626825">
+        </testcase>
+        <testcase classname="src/components/CostEstimateNote.test.tsx" name="CostEstimateNote &gt; opens a specific incomplete-usage warning when calls are unreported" time="0.0081126">
+        </testcase>
+        <testcase classname="src/components/CostEstimateNote.test.tsx" name="CostEstimateNote &gt; explains estimation, missing usage and the guardrail in French too" time="0.0052518">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/Dashboard.test.tsx" timestamp="2026-10-12T11:26:15.386Z" hostname="635ROM-IT-L157" tests="7" failures="0" errors="0" skipped="0" time="0.366216">
+        <testcase classname="src/components/Dashboard.test.tsx" name="Dashboard &gt; renders the base metric grid once the metrics have loaded" time="0.1530264">
+        </testcase>
+        <testcase classname="src/components/Dashboard.test.tsx" name="Dashboard &gt; P3: renders the fusion-loop block when the backend serves `fusion`" time="0.0301203">
+        </testcase>
+        <testcase classname="src/components/Dashboard.test.tsx" name="Dashboard &gt; P3: the canary verdicts are listed key by key, busiest first" time="0.045909">
+        </testcase>
+        <testcase classname="src/components/Dashboard.test.tsx" name="Dashboard &gt; P3: an unknown verdict key is rendered too (open histogram)" time="0.0393869">
+        </testcase>
+        <testcase classname="src/components/Dashboard.test.tsx" name="Dashboard &gt; P3: no verdict list when the histogram is empty, but the block stays" time="0.0298456">
+        </testcase>
+        <testcase classname="src/components/Dashboard.test.tsx" name="Dashboard &gt; P3: no fusion block at all against an older backend (no `fusion` key)" time="0.0353934">
+        </testcase>
+        <testcase classname="src/components/Dashboard.test.tsx" name="Dashboard &gt; surfaces a load error instead of the grid" time="0.0284501">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/DepGraphPanel.test.tsx" timestamp="2026-10-12T11:26:15.387Z" hostname="635ROM-IT-L157" tests="6" failures="0" errors="0" skipped="0" time="0.4762696">
+        <testcase classname="src/components/DepGraphPanel.test.tsx" name="DepGraphPanel (vue graphe hiérarchique React Flow) &gt; ne rend rien sans éléments" time="0.0228341">
+        </testcase>
+        <testcase classname="src/components/DepGraphPanel.test.tsx" name="DepGraphPanel (vue graphe hiérarchique React Flow) &gt; tout est replié par défaut : l&apos;epic est visible, pas ses US" time="0.1105404">
+        </testcase>
+        <testcase classname="src/components/DepGraphPanel.test.tsx" name="DepGraphPanel (vue graphe hiérarchique React Flow) &gt; « tout déplier » montre les US, « tout replier » les cache" time="0.1538292">
+        </testcase>
+        <testcase classname="src/components/DepGraphPanel.test.tsx" name="DepGraphPanel (vue graphe hiérarchique React Flow) &gt; le chevron déplie/replie un seul conteneur" time="0.0779286">
+        </testcase>
+        <testcase classname="src/components/DepGraphPanel.test.tsx" name="DepGraphPanel (vue graphe hiérarchique React Flow) &gt; double-clic sur une US ouvre la vision produit ; sur une epic, l&apos;epic" time="0.0469502">
+        </testcase>
+        <testcase classname="src/components/DepGraphPanel.test.tsx" name="DepGraphPanel (vue graphe hiérarchique React Flow) &gt; focus sur une epic puis retour à la vue projet" time="0.060191">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/GovernancePanel.test.tsx" timestamp="2026-10-12T11:26:15.388Z" hostname="635ROM-IT-L157" tests="13" failures="0" errors="0" skipped="0" time="0.2824371">
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="decisionDiffLine — diff lisible du backlog (US-F7.3) &gt; create_story → « + US “titre” dans EPIC »" time="0.0019821">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="decisionDiffLine — diff lisible du backlog (US-F7.3) &gt; create_story technique → TS" time="0.0004329">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="decisionDiffLine — diff lisible du backlog (US-F7.3) &gt; create_task → tâche rattachée à la story cible" time="0.0003415">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="decisionDiffLine — diff lisible du backlog (US-F7.3) &gt; create_epic" time="0.000336">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="decisionDiffLine — diff lisible du backlog (US-F7.3) &gt; enrich_criteria → nombre d&apos;AC ajoutés à la cible" time="0.0003195">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="decisionDiffLine — diff lisible du backlog (US-F7.3) &gt; update_story → champs modifiés" time="0.0002633">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="decisionDiffLine — diff lisible du backlog (US-F7.3) &gt; defer / persist / dismiss" time="0.0003287">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="GovernancePanel (US-F7.3) &gt; ne rend rien sans décision (flag OFF → panneau invisible)" time="0.018068">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="GovernancePanel (US-F7.3) &gt; décision proposée : diff, rationale, observation source et actions" time="0.1241956">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="GovernancePanel (US-F7.3) &gt; Approuver appelle onApprove avec l&apos;id de la décision" time="0.0247325">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="GovernancePanel (US-F7.3) &gt; Rejeter demande un motif puis appelle onReject(id, motif)" time="0.059327">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="GovernancePanel (US-F7.3) &gt; annuler le rejet referme la saisie sans appeler onReject" time="0.0358371">
+        </testcase>
+        <testcase classname="src/components/GovernancePanel.test.tsx" name="GovernancePanel (US-F7.3) &gt; journal : les décisions traitées affichent statut final et rationale" time="0.0124044">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/KnowledgePanel.test.tsx" timestamp="2026-10-12T11:26:15.389Z" hostname="635ROM-IT-L157" tests="8" failures="0" errors="0" skipped="0" time="0.5031193">
+        <testcase classname="src/components/KnowledgePanel.test.tsx" name="KnowledgePanel (US-F7.4) &gt; base vide → panneau invisible (flag OFF, pas de crash)" time="0.0252631">
+        </testcase>
+        <testcase classname="src/components/KnowledgePanel.test.tsx" name="KnowledgePanel (US-F7.4) &gt; erreur de chargement → panneau muet (backend sans l&apos;endpoint)" time="0.0117893">
+        </testcase>
+        <testcase classname="src/components/KnowledgePanel.test.tsx" name="KnowledgePanel (US-F7.4) &gt; affiche les onglets avec compteurs et l&apos;onglet ADRs par défaut" time="0.1780091">
+        </testcase>
+        <testcase classname="src/components/KnowledgePanel.test.tsx" name="KnowledgePanel (US-F7.4) &gt; change d&apos;onglet : Dette puis Notes &amp; mémoire composant" time="0.0939944">
+        </testcase>
+        <testcase classname="src/components/KnowledgePanel.test.tsx" name="KnowledgePanel (US-F7.4) &gt; lien vers l&apos;observation source (résumé inline quand connue)" time="0.0168359">
+        </testcase>
+        <testcase classname="src/components/KnowledgePanel.test.tsx" name="KnowledgePanel (US-F7.4) &gt; édition d&apos;une entrée → PATCH avec les champs modifiés puis rechargement" time="0.0818377">
+        </testcase>
+        <testcase classname="src/components/KnowledgePanel.test.tsx" name="KnowledgePanel (US-F7.4) &gt; suppression d&apos;une entrée → DELETE puis rechargement" time="0.0634714">
+        </testcase>
+        <testcase classname="src/components/KnowledgePanel.test.tsx" name="KnowledgePanel (US-F7.4) &gt; refreshKey déclenche un refetch (mise à jour live US-F7.5)" time="0.0279215">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/LanguagePanel.test.tsx" timestamp="2026-10-12T11:26:15.390Z" hostname="635ROM-IT-L157" tests="5" failures="0" errors="0" skipped="0" time="0.0993216">
+        <testcase classname="src/components/LanguagePanel.test.tsx" name="LanguagePanel (L2) &gt; ne s&apos;affiche pas tant que l&apos;analyse n&apos;est pas faite" time="0.011287">
+        </testcase>
+        <testcase classname="src/components/LanguagePanel.test.tsx" name="LanguagePanel (L2) &gt; affiche langage recommandé + scores + rationale" time="0.0212526">
+        </testcase>
+        <testcase classname="src/components/LanguagePanel.test.tsx" name="LanguagePanel (L2) &gt; override : choisir un autre langage appelle onSet" time="0.0074151">
+        </testcase>
+        <testcase classname="src/components/LanguagePanel.test.tsx" name="LanguagePanel (L2) &gt; Node.js explicite reste sélectionné après la pré-analyse" time="0.047124">
+        </testcase>
+        <testcase classname="src/components/LanguagePanel.test.tsx" name="LanguagePanel (L2) &gt; sélection Node.js transmet la valeur de contrat node au backend" time="0.0082983">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/LlmActivity.test.tsx" timestamp="2026-10-12T11:26:15.390Z" hostname="635ROM-IT-L157" tests="5" failures="0" errors="0" skipped="0" time="0.2846965">
+        <testcase classname="src/components/LlmActivity.test.tsx" name="LlmActivity &gt; liste les appels (récents en premier) et affiche le rôle d&apos;agent" time="0.1200504">
+        </testcase>
+        <testcase classname="src/components/LlmActivity.test.tsx" name="LlmActivity &gt; révèle prompt et réponse au clic sur un appel replié" time="0.0555588">
+        </testcase>
+        <testcase classname="src/components/LlmActivity.test.tsx" name="LlmActivity &gt; montre un état vide explicite" time="0.0122168">
+        </testcase>
+        <testcase classname="src/components/LlmActivity.test.tsx" name="LlmActivity &gt; marque un appel en échec" time="0.0196397">
+        </testcase>
+        <testcase classname="src/components/LlmActivity.test.tsx" name="LlmActivity &gt; labels per-call amounts as estimates and discloses potentially missing usage" time="0.069669">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/MobileNav.test.tsx" timestamp="2026-10-12T11:26:15.391Z" hostname="635ROM-IT-L157" tests="2" failures="0" errors="0" skipped="0" time="0.0348867">
+        <testcase classname="src/components/MobileNav.test.tsx" name="MobileNav (R5) &gt; reflète le volet actif via aria-selected" time="0.0247052">
+        </testcase>
+        <testcase classname="src/components/MobileNav.test.tsx" name="MobileNav (R5) &gt; un clic sur un onglet notifie le changement de volet" time="0.0076623">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/ObservationsPanel.test.tsx" timestamp="2026-10-12T11:26:15.391Z" hostname="635ROM-IT-L157" tests="6" failures="0" errors="0" skipped="0" time="0.2143961">
+        <testcase classname="src/components/ObservationsPanel.test.tsx" name="ObservationsPanel (US-F7.2) &gt; ne rend rien sans observation (flag OFF → panneau invisible)" time="0.0225985">
+        </testcase>
+        <testcase classname="src/components/ObservationsPanel.test.tsx" name="ObservationsPanel (US-F7.2) &gt; liste les observations avec badge d&apos;urgence et statut" time="0.0579272">
+        </testcase>
+        <testcase classname="src/components/ObservationsPanel.test.tsx" name="ObservationsPanel (US-F7.2) &gt; filtre par type" time="0.0347503">
+        </testcase>
+        <testcase classname="src/components/ObservationsPanel.test.tsx" name="ObservationsPanel (US-F7.2) &gt; filtre par statut, stream et itération" time="0.0419927">
+        </testcase>
+        <testcase classname="src/components/ObservationsPanel.test.tsx" name="ObservationsPanel (US-F7.2) &gt; aucun résultat → état vide silencieux (pas de crash)" time="0.0204738">
+        </testcase>
+        <testcase classname="src/components/ObservationsPanel.test.tsx" name="ObservationsPanel (US-F7.2) &gt; le détail extensible expose preuves, impact, recommandations et décision liée" time="0.0323979">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/PlanReviewPanel.test.tsx" timestamp="2026-10-12T11:26:15.392Z" hostname="635ROM-IT-L157" tests="4" failures="0" errors="0" skipped="0" time="0.0447067">
+        <testcase classname="src/components/PlanReviewPanel.test.tsx" name="PlanReviewPanel (Revue du plan) &gt; ne rend rien tant que la revue n&apos;a pas tourné" time="0.0131217">
+        </testcase>
+        <testcase classname="src/components/PlanReviewPanel.test.tsx" name="PlanReviewPanel (Revue du plan) &gt; affiche le score, les problèmes et les suggestions du critic" time="0.0222823">
+        </testcase>
+        <testcase classname="src/components/PlanReviewPanel.test.tsx" name="PlanReviewPanel (Revue du plan) &gt; score bon sans problème → état propre" time="0.0026094">
+        </testcase>
+        <testcase classname="src/components/PlanReviewPanel.test.tsx" name="PlanReviewPanel (Revue du plan) &gt; §8 : la calibration aval s&apos;affiche même sans revue LLM" time="0.0041308">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/ProjectBar.test.tsx" timestamp="2026-10-12T11:26:15.393Z" hostname="635ROM-IT-L157" tests="15" failures="0" errors="0" skipped="0" time="0.3352529">
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; bootstrap échoué sans story : reprise explicite disponible depuis la barre" time="0.1371627">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; bootstrap preparing : visible et stoppable même sans sélection" time="0.038092">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; bootstrap verifying : visible et stoppable même sans sélection" time="0.0213002">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; projet en build : indicateur pulsant + bouton ⏹ qui stoppe" time="0.0076036">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; projet stoppé avec stories restantes : bouton ▶ qui relance le build" time="0.0063085">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; projet en pause : ▶ reprend, pas de pulse" time="0.0074787">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; projet terminé sans story restante : ni ▶ ni ⏹, progression visible" time="0.0133466">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; UI3 : projets inactifs masqués des chips, indiqués « +N dans 🗂 »" time="0.0375865">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — surveillance multi-projets (U1) &gt; plusieurs projets actifs en parallèle : chaque chip a son état" time="0.0068792">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — compteur d&apos;approbations en attente (US-F7.5) &gt; affiche ⚖ N pour les décisions « proposed » (badge pulsant)" time="0.0074347">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — compteur d&apos;approbations en attente (US-F7.5) &gt; aucune décision en attente → pas de badge" time="0.0047548">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — compteur d&apos;approbations en attente (US-F7.5) &gt; journal absent (état legacy) → pas de badge ni de crash" time="0.0044779">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — sélecteur de projet &gt; liste tous les projets et reflète le projet courant" time="0.0190845">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — sélecteur de projet &gt; changer la sélection appelle onSelect avec l&apos;id choisi" time="0.0090306">
+        </testcase>
+        <testcase classname="src/components/ProjectBar.test.tsx" name="ProjectBar — sélecteur de projet &gt; inclut le projet courant même s&apos;il est archivé et les archivés masqués" time="0.0101467">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/ProjectSetup.test.tsx" timestamp="2026-10-12T11:26:15.395Z" hostname="635ROM-IT-L157" tests="3" failures="0" errors="0" skipped="0" time="0.2302358">
+        <testcase classname="src/components/ProjectSetup.test.tsx" name="ProjectSetup (Q6 — labels a11y) &gt; tous les champs ont un nom accessible" time="0.0495106">
+        </testcase>
+        <testcase classname="src/components/ProjectSetup.test.tsx" name="ProjectSetup (Q6 — labels a11y) &gt; soumission désactivée sans objectif, active dès qu&apos;il est rempli" time="0.1390559">
+        </testcase>
+        <testcase classname="src/components/ProjectSetup.test.tsx" name="ProjectSetup (Q6 — labels a11y) &gt; describes the budget as an estimated guardrail and preserves its numeric value" time="0.0381115">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/RunPanel.test.tsx" timestamp="2026-10-12T11:26:15.395Z" hostname="635ROM-IT-L157" tests="52" failures="0" errors="0" skipped="0" time="0.81345">
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; phase &apos;done&apos; : bouton « Lancer » activé, pas de bouton « Stopper »" time="0.1348867">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; phase &apos;build&apos; : bouton « Stopper » présent" time="0.0251608">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; phase &apos;spec&apos; : bouton « Lancer » désactivé (canRun faux)" time="0.0207519">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; paused=true (phase build) : bouton « Reprendre » présent, pas « Pause »" time="0.0170333">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; running=true : bouton « Arrêter l&apos;app » présent, libellé primaire « En cours… »" time="0.024436">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; phase &apos;stopped&apos; avec story &apos;todo&apos; : bouton « Continuer le build » présent" time="0.0125867">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; REGRESSION (snake) : phase &apos;done&apos; avec stories &apos;todo&apos; restantes : bouton « Continuer le build » présent" time="0.0174544">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; BUG3 : phase &apos;stopped&apos; avec US multi-stream à moitié faite (tasks [done, todo], status brut &apos;done&apos;) : bouton « Continuer le build » présent" time="0.023423">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; phase &apos;stopped&apos; sans story todo/red : pas de bouton « Continuer le build »" time="0.0172443">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; usage-meter visible quand agent_calls &gt; 0" time="0.0126331">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; usage-meter absent quand agent_calls = 0" time="0.0063214">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; labels recorded cost and budget as estimates, not a bill or guaranteed spending cap" time="0.0167641">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; warns about unreported usage even when the recorded estimate is zero" time="0.014753">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; delivery_issues : affiche une bannière de livraison bloquée" time="0.0047896">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; delivery_partial : bannière 📦 (avertissement) au lieu de ⛔" time="0.0061285">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; deploy_status &apos;deployed&apos; : chip 🐳 avec lien vers le port + action Undeploy" time="0.0384305">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; deploy_status &apos;failed&apos; : chip rouge avec le détail en title" time="0.0045544">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; deploy_status &apos;building&apos; : chip en cours (pulsant)" time="0.0057088">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; resume_at &gt; 0 : bannière de reprise auto + bouton annuler (M2)" time="0.0488923">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; resume_at absent : pas de bannière de reprise" time="0.0047256">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; UI4 : sans logs, le panneau est replié et n&apos;affiche pas la boîte de logs" time="0.0073683">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; UI4 : avec des logs, la boîte s&apos;affiche + compteur, panneau non replié" time="0.0243482">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; UI7 : actions de livraison repliées dans un menu ⋯, déployées au clic" time="0.0347124">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; UI7 : pas de menu Livraison tant qu&apos;aucun build n&apos;existe (phase build)" time="0.0105224">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; retry-failed : bouton « Relancer les échecs (N) » + clic, quand dormant" time="0.0186222">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; BUG5 : retry-failed compte le statut EFFECTIF (US multi-stream tasks [failed, done], status brut &apos;todo&apos;) : « Relancer les échecs (1) »" time="0.0109413">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; retry-failed : pas de bouton sans story en échec" time="0.011461">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; restart : bouton « Relancer from scratch » quand dormant + brief, et clic" time="0.0145602">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; restart : pas de bouton sans brief" time="0.0095491">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; restart : pas de bouton si la pipeline est active (build)" time="0.0104299">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; retry-failed : pas de bouton si la pipeline est active (build)" time="0.0113251">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; P5 : « Re-vérifier la livraison » visible quand dormant + au moins une story done, et clic" time="0.0057711">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; P5 : statut EFFECTIF - US multi-stream dont toutes les tâches sont done (status brut &apos;todo&apos;) : bouton présent" time="0.0035338">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; P5 : pas de bouton pendant le build (pipeline active)" time="0.0027271">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; P5 : pas de bouton quand aucune story n&apos;est done (rien à vérifier)" time="0.003469">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; run : les arguments saisis sont transmis à onRun" time="0.0154074">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel &gt; run : pas de champ d&apos;arguments quand on ne peut pas lancer (phase build)" time="0.0028821">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — filtres de logs (Q3) &gt; filtre par texte libre + compteur affiché/total" time="0.0139948">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — filtres de logs (Q3) &gt; filtre par source (tag dev:US-n / qa:US-n)" time="0.0168337">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — filtres de logs (Q3) &gt; « erreurs seulement » (heuristique ❌/⚠️)" time="0.0229274">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — filtres de logs (Q3) &gt; sans filtre actif : toutes les lignes, pas de compteur" time="0.0088838">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; preparing : le statut est visible et les contrôles concurrents sont bloqués" time="0.0166211">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; verifying : le statut est visible et les contrôles concurrents sont bloqués" time="0.0183384">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; échec sans story : ouvre le diagnostic et propose de reprendre l&apos;initialisation" time="0.0136848">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; socle vérifié : pas de reprise initiale fictive et lancement disponible" time="0.0095643">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; statut socle undefined : aucun indicateur trompeur" time="0.0030837">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; statut socle  : aucun indicateur trompeur" time="0.0022482">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; statut socle skipped : aucun indicateur trompeur" time="0.0025343">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; image CLI/bibliothèque : nom et retrait disponibles, sans lien localhost" time="0.0080036">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; retrait échoué : conserve une action de nettoyage ()" time="0.0076445">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; retrait échoué : conserve une action de nettoyage (autospec-project)" time="0.0060011">
+        </testcase>
+        <testcase classname="src/components/RunPanel.test.tsx" name="RunPanel — socle technique et images sans service HTTP &gt; build Docker échoué sans ressource : aucun retrait fictif" time="0.0026256">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/Stepper.test.tsx" timestamp="2026-10-12T11:26:15.400Z" hostname="635ROM-IT-L157" tests="7" failures="0" errors="0" skipped="0" time="0.0832595">
+        <testcase classname="src/components/Stepper.test.tsx" name="Stepper &gt; marque l&apos;étape courante active et les précédentes done" time="0.0387481">
+        </testcase>
+        <testcase classname="src/components/Stepper.test.tsx" name="Stepper &gt; statut done : toutes les cellules done" time="0.0085476">
+        </testcase>
+        <testcase classname="src/components/Stepper.test.tsx" name="Stepper &gt; statut failed : la cellule terminale est failed" time="0.0102235">
+        </testcase>
+        <testcase classname="src/components/Stepper.test.tsx" name="Stepper &gt; affiche l&apos;elapsed sur l&apos;étape active" time="0.0068828">
+        </testcase>
+        <testcase classname="src/components/Stepper.test.tsx" name="Stepper &gt; sous-ligne recovery quand kind défini" time="0.0064517">
+        </testcase>
+        <testcase classname="src/components/Stepper.test.tsx" name="Stepper &gt; grise (stale) quand le tick a plus de 25s" time="0.0049222">
+        </testcase>
+        <testcase classname="src/components/Stepper.test.tsx" name="Stepper &gt; pas stale quand le tick est récent" time="0.0042616">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/VirtualList.test.tsx" timestamp="2026-10-12T11:26:15.400Z" hostname="635ROM-IT-L157" tests="4" failures="0" errors="0" skipped="0" time="0.0399468">
+        <testcase classname="src/components/VirtualList.test.tsx" name="windowSlice (R1) &gt; fenêtre autour du scroll avec overscan et calcule les cales" time="0.0012588">
+        </testcase>
+        <testcase classname="src/components/VirtualList.test.tsx" name="windowSlice (R1) &gt; borne le début à 0 et la fin au total" time="0.0003291">
+        </testcase>
+        <testcase classname="src/components/VirtualList.test.tsx" name="VirtualList (R1) &gt; rend TOUS les items en deçà du seuil (chemin sûr, jsdom)" time="0.0249318">
+        </testcase>
+        <testcase classname="src/components/VirtualList.test.tsx" name="VirtualList (R1) &gt; en jsdom (clientHeight 0), rend tout même au-dessus du seuil" time="0.0109146">
+        </testcase>
+    </testsuite>
+    <testsuite name="src/components/WorkspaceViews.test.tsx" timestamp="2026-10-12T11:26:15.401Z" hostname="635ROM-IT-L157" tests="13" failures="0" errors="0" skipped="0" time="0.4334873">
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; R3 : build déjà passé (story done + stage) → Activité par défaut" time="0.1268321">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; R3 : un stage différent de queued suffit, même en statut todo" time="0.0276513">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; R3 : projet en spec sans aucun stage → Vision produit" time="0.0218091">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; R3 : le choix explicite mémorisé prime sur le défaut au montage" time="0.014768">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; R3 : un clic sur un onglet est mémorisé par projet" time="0.039595">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; R3 : une valeur illisible en storage retombe sur le défaut" time="0.0125238">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; R3 : la transition vers build bascule sur Activité UNE seule fois" time="0.0624951">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; une seule itération → pas de bascule (vision produit seule)" time="0.0107996">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; ≥2 itérations → bascule visible ; on passe à la chronologie" time="0.0228339">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; lien croisé : pastille « it. N » du Board → chronologie focalisée" time="0.0147227">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; lien croisé retour : clic sur une US de la chronologie → Board sur la US" time="0.0297269">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; affiche le coût/tokens par itération dans la chronologie" time="0.0162908">
+        </testcase>
+        <testcase classname="src/components/WorkspaceViews.test.tsx" name="WorkspaceViews &gt; bouton rollback par itération (snapshot dispo) → appelle onRollbackTo" time="0.0288705">
+        </testcase>
+    </testsuite>
+</testsuites>

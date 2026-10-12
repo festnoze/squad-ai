@@ -215,16 +215,11 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
 
 
 async def _asweep_workspace_orphans() -> int:
-    """FACTORY_IMPROVEMENTS (completes fixes #10/#13): at boot, reap every
-    process a previous backend left behind under ``workspace_root`` (a leaked
-    smoke run, a uvicorn reload supervisor, a repair-agent child). Nothing of
-    ours runs there yet, so whatever is found is an orphan; the sweep never
-    leaves the workspace root and never touches this process or its ancestors.
+    """Compatibility hook, now a no-op: paths cannot establish ownership.
 
-    Offloaded to a thread (it shells out to PowerShell/ps) and strictly
-    best-effort: startup must never fail because a cleanup did. Returns the
-    number of process trees killed (0 when the flag is off or in fake-agents
-    mode, where no real process is ever spawned)."""
+    Recovery uses retained handles and external resource journals. Unknown
+    legacy processes are not swept by path, executable name or listening port.
+    """
     if not settings.orphan_sweep_on_boot or settings.fake_agents:
         return 0
     try:
@@ -255,8 +250,9 @@ async def _arecover_projects() -> None:
     states = await asyncio.to_thread(list_states)
     recover_projects(states)
     for pipeline in list(pipelines.values()):
-        if pipeline.state.deployed_container or pipeline.state.deploy_status:
+        if pipeline.state.deployed_container or pipeline.state.deploy_status or pipeline.state.acceptance_contract_hash:
             try:
+                await pipeline.arecover_publication()
                 await pipeline.areconcile_deploy()
             except Exception as exc:
                 pipeline.state.deploy_status = "failed"
@@ -330,7 +326,7 @@ class CreateProjectRequest(BaseModel):
     acceptance_reference: str = ""
     acceptance_facts: list[AcceptanceFactInput] = Field(default_factory=list)
     acceptance_reviewed_by: str = ""
-    acceptance_max_lots: int = Field(default=7, ge=1, le=100)
+    acceptance_max_lots: int = Field(default=7, strict=True, ge=1, le=100)
 
 
 class MessageRequest(BaseModel):
@@ -586,6 +582,7 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
             contract = import_contract(req.brief, req.acceptance_reference,
                 reviewed_by=req.acceptance_reviewed_by,
                 facts=[ContractFact.create(**fact.model_dump()) for fact in req.acceptance_facts])
+            acceptance.validate_plan_limits(contract, req.acceptance_max_lots)
         except (ContractError, ValueError, TypeError) as exc:
             raise HTTPException(422, f"Contrat d'acceptation invalide : {exc}") from exc
     state = ProjectState(
