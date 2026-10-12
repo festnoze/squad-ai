@@ -34,7 +34,10 @@ class FakeDocker:
             name = argv[argv.index('--name') + 1]
             owner = next(value.split('=', 1)[1] for value in argv if value.startswith('autospec.run_id='))
             self.containers[identifier] = {'Id': identifier, 'Name': name,
-                'Config': {'Labels': {'autospec.run_id': owner, 'autospec.kind': 'sandbox'}}}
+                'Image': argv[argv.index('--entrypoint')+2], 'State': {'Running': True},
+                'Config': {'Labels': {'autospec.run_id': owner, 'autospec.kind': 'sandbox'}, 'User': '65532:65532'},
+                'HostConfig': {'ReadonlyRootfs':True,'CapDrop':['ALL'],'Privileged':False,
+                    'SecurityOpt':['no-new-privileges=true'],'NetworkMode':'none','PortBindings':{}},'Mounts':[]}
             return 0, identifier + '\n', ''
         return 0, 'owned-output', ''
 
@@ -52,6 +55,8 @@ class FakeDocker:
             found = next((data for identifier, data in self.containers.items() if argv[3] in {identifier, data['Name']}), None)
             if found and argv[-1] == '{{json .State}}':
                 return SimpleNamespace(returncode=0, stdout=json.dumps({'Running': True}), stderr='')
+            if found and '--format' not in argv:
+                return SimpleNamespace(returncode=0, stdout=json.dumps([found]), stderr='')
             return SimpleNamespace(returncode=0 if found else 1, stdout=json.dumps(found) if found else '',
                                    stderr='' if found else 'no such container')
         if argv[1:3] == ['container', 'rm']:
@@ -173,6 +178,19 @@ def test_ingress_bridge_uses_isolated_base_python_not_product_import_path(tmp_pa
         left.close(); right.close()
 
 
+def test_loopback_kernel_peer_is_used_as_native_source_address(tmp_path,docker_fake,monkeypatch):
+    captured=[]
+    def spawn(argv,**kwargs):
+        captured.append(argv);raise OSError('no host process in fixture')
+    monkeypatch.setattr(runtime_module,'spawn_owned_process',spawn)
+    class KernelPeer:
+        def settimeout(self,*args):pass
+        def getpeername(self):return ('127.0.0.2',4321)
+    with RuntimeSession(tmp_path,'attested',['python']) as session:
+        session._forward(KernelPeer())
+    assert "source_address=('127.0.0.2',0)" in captured[0][-1]
+
+
 def test_baked_runtime_refuses_mutable_tag_and_mounts_no_host_source(tmp_path, docker_fake):
     with pytest.raises(RuntimeError, match='immutable local image ID'):
         RuntimeSession(tmp_path, 'mutable:tag', ['python'], mount_stage=False)
@@ -183,6 +201,24 @@ def test_baked_runtime_refuses_mutable_tag_and_mounts_no_host_source(tmp_path, d
         assert len(launches)==2 and all('-v' not in command and '--mount' not in command for command in launches)
         assert all(command[command.index('-w')+1]=='/app' for command in launches)
         assert all(identifier in command for command in launches)
+        config=session.inspect_configuration()
+        assert config['image_id']==identifier and config['user']=='65532:65532'
+        assert config['network_mode']=='none' and config['published_ports']=={} and config['mounts']==[]
+
+
+def test_detach_attach_keeps_only_owned_volume_and_refuses_nonloopback_ingress(tmp_path,docker_fake,monkeypatch):
+    with RuntimeSession(tmp_path,'attested',['python'],persistent_database=True) as session:
+        old=session.identifier
+        detached=session.detach()
+        assert detached['container_id']==old and detached['volume']==docker_fake.volume
+        assert old not in docker_fake.containers and docker_fake.volume is not None and not session.is_running()
+        session.attach()
+        assert session.identifier!=old and session.origin==detached['origin']
+        class NonLoopback:
+            def settimeout(self,*args): pass
+            def getpeername(self):return ('192.0.2.10',123)
+        monkeypatch.setattr(runtime_module,'spawn_owned_process',lambda *args,**kwargs:pytest.fail('nonloopback must not forward'))
+        session._forward(NonLoopback())
 
 
 @pytest.mark.parametrize('options', [
@@ -214,7 +250,7 @@ with sqlite3.connect(path) as db:
 class Handler(BaseHTTPRequestHandler):
  def do_GET(self):
   with sqlite3.connect(path) as db: value=db.execute('select value from counter').fetchone()[0]
-  body=json.dumps({'value':value,'origin':os.environ['APP_ORIGIN'],'cookie':os.environ['SESSION_COOKIE_SECURE'],'uid':os.getuid()}).encode()
+  body=json.dumps({'value':value,'origin':os.environ['APP_ORIGIN'],'cookie':os.environ['SESSION_COOKIE_SECURE'],'uid':os.getuid(),'peer':self.client_address[0]}).encode()
   self.send_response(200);self.end_headers();self.wfile.write(body)
  def do_POST(self):
   if self.headers.get('Origin')!=os.environ['APP_ORIGIN']:
@@ -248,7 +284,21 @@ HTTPServer(('0.0.0.0',8000),Handler).serve_forever()
         unrelated_port = unrelated.getsockname()[1]
         with session:
             assert session.is_running()
-            assert ready() == {'value': 0, 'origin': origin, 'cookie': 'false', 'uid': 65532}
+            assert ready() == {'value': 0, 'origin': origin, 'cookie': 'false', 'uid': 65532,'peer':'127.0.0.1'}
+            # Windows on this host cannot connect from 127.0.0.2 to127.1
+            # without OS network changes; do NOT fake it with XFF. The public
+            # ingress forwards actual127.1; a trusted Linux exec verifies a
+            # genuine second native loopback source against standard app HTTP.
+            request=urllib.request.Request(origin,headers={'X-Forwarded-For':'198.51.100.55'})
+            with urllib.request.urlopen(request,timeout=10) as response:
+                assert json.load(response)['peer']=='127.0.0.1'
+            native_peer="import http.client; c=http.client.HTTPConnection('127.0.0.1',8000,timeout=3,source_address=('127.0.0.2',0)); c.request('GET','/',headers={'X-Forwarded-For':'198.51.100.55'}); r=c.getresponse(); assert r.status==200; print(r.read().decode()); c.close()"
+            rc,out,err=session.exec(['/usr/local/bin/python','-I','-c',native_peer],timeout=10)
+            assert rc==0 and json.loads(out)['peer']=='127.0.0.2',err
+            configuration=session.inspect_configuration()
+            assert configuration['container_id']==session.identifier and configuration['image_id']==environment.image
+            assert configuration['user']=='65532:65532' and configuration['read_only'] and not configuration['privileged']
+            assert configuration['network_mode']=='none' and configuration['published_ports']=={}
             # Factory injects a shadow module after the app's stdlib imports.
             # A non-isolated bridge started from /app would execute this product
             # file; the trusted transport must ignore it. Never imported host.
@@ -283,7 +333,12 @@ print('safe')
 '''
             rc, out, err = session.exec(['/opt/venv/bin/python', '-c', probe], timeout=5)
             assert rc == 0 and out.strip() == 'safe', err
-            session.restart()
+            detached=session.detach()
+            assert detached['container_id']==first and detached['volume']['Name']==volume
+            assert not session.is_running()
+            assert _docker_call(['docker','container','inspect',first],capture_output=True,text=True,timeout=10).returncode!=0
+            assert _docker_call(['docker','volume','inspect',volume],capture_output=True,text=True,timeout=10).returncode==0
+            session.attach()
             assert session.identifier != first and session.origin == origin and session.volume_name == volume
             assert ready()['value'] == 1
             observer = "import sqlite3,json; print(json.dumps(sqlite3.connect('/var/lib/autospec-validation/support.sqlite').execute('select value from counter').fetchone()))"

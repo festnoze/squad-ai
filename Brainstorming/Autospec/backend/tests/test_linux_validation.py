@@ -93,6 +93,24 @@ def test_collection_refuses_incomplete_custom_items(tmp_path,monkeypatch):
         validator.collect_python(tmp_path/'product',report)
 
 
+def test_coverage_requires_full_source_inventory_and_ignores_foreign_totals(tmp_path):
+    from autospec.orchestrator.isolated_validation import _coverage_inventory,_admit_source_coverage
+    (tmp_path/'business.py').write_text('value=1\n')
+    (tmp_path/'critical.py').write_text('def security():return False\n')
+    (tmp_path/'test_business.py').write_text('assert True\n')
+    inventory=_coverage_inventory(tmp_path,'.')
+    assert set(inventory)=={'business.py','critical.py'}
+    environment=SimpleNamespace(fingerprint='env',image='image')
+    covered={'summary':{'covered_lines':1,'num_statements':1,'missing_lines':0,'num_branches':0,'covered_branches':0}}
+    missing={'summary':{'covered_lines':0,'num_statements':1,'missing_lines':1,'num_branches':0,'covered_branches':0}}
+    with pytest.raises(ValueError,match='omitted'):
+        _admit_source_coverage({'files':{'business.py':covered}},inventory,'.','source',environment)
+    result=_admit_source_coverage({'files':{'business.py':covered,'critical.py':missing,'test_business.py':covered},
+        'totals':{'percent_covered':100000}},inventory,'.','source',environment)
+    assert result['totals']['percent_covered']==50
+    assert set(result['files'])==set(inventory) and result['autospec_inventory']['files']==inventory
+
+
 @pytest.mark.skipif(os.environ.get("AUTOSPEC_REAL_LINUX_VALIDATION") != "1", reason="Opt-in real Linux Docker dependency/network proof")
 def test_real_python_locked_suite_and_net_none_runtime(tmp_path):
     product = tmp_path / "product"
@@ -192,6 +210,8 @@ def test_real_pytest_collection_and_coverage_are_structured(tmp_path):
     (root/'pyproject.toml').write_text('[project]\nname="coverage-proof"\nversion="0.1.0"\nrequires-python=">=3.12"\ndependencies=["pytest==9.0.3"]\n')
     (root/'business.py').write_text('def choose(value):\n if value:\n  return 1\n return 0\n')
     (root/'test_business.py').write_text('import pytest\nfrom business import choose\n@pytest.mark.parametrize("value",[True,False])\ndef test_choose(value):\n assert choose(value)==int(value)\n')
+    (root/'.coveragerc').write_text('[run]\nomit=business.py\n')
+    (root/'pytest.ini').write_text('[pytest]\naddopts=--no-cov --json-report-file=forged.json\n')
     validator=IsolatedValidator(tmp_path/'cache')
     validator.manager.ensure_lock(root,'python')
     ids,collected=validator.collect_python(root,tmp_path/'collection.json')
@@ -206,3 +226,4 @@ def test_real_pytest_collection_and_coverage_are_structured(tmp_path):
     assert result.coverage['totals']['covered_branches']==2
     assert json.loads((tmp_path/'coverage.json').read_text())==result.coverage
     assert result.source_fingerprint==collected.source_fingerprint
+    assert result.coverage['autospec_inventory']['files'].keys()=={'business.py'}
