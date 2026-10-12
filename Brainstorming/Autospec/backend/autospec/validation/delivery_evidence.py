@@ -349,6 +349,54 @@ def audit_review_subject(audit:dict) -> str:
     return _sha(json.dumps(audit,sort_keys=True,ensure_ascii=True).encode())
 
 
+def audit_risk_subject(finding:dict,snapshot_hash:str,contract_hash:str) -> str:
+    """Exact raw advisory + source/oracle scope for an externally supplied waiver."""
+    return _sha(json.dumps(dict(finding=finding,snapshot_hash=snapshot_hash,
+        contract_hash=contract_hash),sort_keys=True,ensure_ascii=True).encode())
+
+
+def audit_arbitration_schema() -> dict:
+    """Reviewer protocol only: never generate an approval or waiver from this."""
+    return dict(required=["decision","owner","rationale","date","disposition","approved"],
+        dispositions=["accepted_risk","rejected","pending"],
+        approval="Existing externally provided Proof R required only for accepted_risk/approved=true; never manufacture one.",
+        approval_check="OPS-05:accepted_risk:<audit_risk_subject(raw_finding,snapshot_hash,contract_hash)>",
+        approval_body=dict(version=1,kind="audit_risk_acceptance",authority="human",subject="<exact risk subject SHA256>",
+            snapshot_hash="<exact source SHA256>",contract_hash="<exact oracle SHA256>",approved=True,
+            authorized_by="<existing approving human authority>",rationale="<existing explicit justification>",date="<zoned ISO date>"),
+        scope="Audit advisories only; no business requirement override. No waiver exists unless supplied independently.")
+
+
+def _audit_risk_approval(arbitration,finding,*,root,snapshot_hash,contract_hash):
+    from ..agents.file_broker import ExecutionContext,FileBroker
+    raw=arbitration.get("approval")
+    if not isinstance(raw,dict) or not {"type","path","sha256","snapshot_hash","contract_hash","checks","passed"}<=raw.keys():
+        raise AdapterUnavailable("accepted audit risk needs an existing dedicated external R approval")
+    try:proof=Proof(**raw)
+    except (TypeError,ValueError) as exc:raise AdapterUnavailable("dedicated audit risk approval malformed") from exc
+    subject=audit_risk_subject(finding,snapshot_hash,contract_hash)
+    path=Path(proof.path).absolute()
+    if (path.resolve()!=path or not path.is_relative_to(root) or proof.type!="R" or proof.passed is not True
+            or not isinstance(proof.checks,(list,tuple)) or any(not isinstance(check,str) for check in proof.checks)
+            or "OPS-05:accepted_risk:"+subject not in proof.checks or not proof.intact(snapshot_hash=snapshot_hash,contract_hash=contract_hash)):
+        raise AdapterUnavailable("dedicated audit risk approval is stale, unscoped or outside supervisor")
+    path=FileBroker(ExecutionContext("audit-risk-approval",root)).path(path.relative_to(root).as_posix())
+    if path.stat().st_size>256_000:raise AdapterUnavailable("bounded audit risk approval exceeded")
+    data=json.loads(path.read_bytes())
+    required={"version","kind","authority","subject","snapshot_hash","contract_hash","approved","authorized_by","rationale","date"}
+    if (not isinstance(data,dict) or set(data)!=required or type(data["version"]) is not int or data["version"]!=1
+            or data["kind"]!="audit_risk_acceptance" or data["authority"]!="human"
+            or (data["subject"],data["snapshot_hash"],data["contract_hash"])!=(subject,snapshot_hash,contract_hash)
+            or data["approved"] is not True
+            or any(not isinstance(data[k],str) or not data[k].strip() for k in ("authorized_by","rationale","date"))):
+        raise AdapterUnavailable("existing human audit risk approval has no exact affirmative disposition")
+    try:
+        date=datetime.fromisoformat(data["date"].replace("Z","+00:00"))
+        if date.tzinfo is None:raise ValueError("timezone absent")
+    except ValueError as exc:raise AdapterUnavailable("human audit risk approval needs its actual zoned date") from exc
+    return proof
+
+
 def apply_audit_review(audit:dict, review:Proof, *, evidence_root, snapshot_hash, contract_hash) -> dict:
     """Install GPT/local independent severity/exploitability arbitration, not R."""
     root=Path(evidence_root).resolve();subject=audit_review_subject(audit)
@@ -368,14 +416,44 @@ def apply_audit_review(audit:dict, review:Proof, *, evidence_root, snapshot_hash
         if arbitration is not None and (not isinstance(arbitration,dict) or not {"decision","owner","rationale","date"}<=arbitration.keys() or any(not isinstance(arbitration[k],str) or not arbitration[k].strip() for k in ("decision","owner","rationale","date"))):
             raise AdapterUnavailable("audit arbitration needs dated accountable decision")
         if arbitration is not None:
+            if arbitration.get("disposition") not in {"accepted_risk","rejected","pending"} or type(arbitration.get("approved")) is not bool:
+                raise AdapterUnavailable("typed audit disposition and explicit approval required")
             try:
                 date=datetime.fromisoformat(arbitration["date"].replace("Z","+00:00"))
                 if date.tzinfo is None: raise ValueError("timezone absent")
             except ValueError as exc: raise AdapterUnavailable("audit arbitration date must be actual zoned ISO date") from exc
+            if (arbitration["disposition"]=="accepted_risk" and arbitration["approved"] is True
+                    and arbitration["decision"] not in {"deny_release","fix_required"}):
+                _audit_risk_approval(arbitration,finding,root=root,snapshot_hash=snapshot_hash,contract_hash=contract_hash)
         result["findings"].append(dict(finding,severity=assessment["severity"],exploitable=assessment["exploitable"],arbitration=arbitration,rationale=assessment["rationale"]))
     result["assessment_review"]=asdict(review)
     result["raw_audit"]=audit
     return result
+
+
+def audit_disposition_checks(audit,*,evidence_root,snapshot_hash,contract_hash) -> list[dict]:
+    """Revalidate assessment/waiver bytes and gate only exact audit advisories.
+
+    Unknown/malformed permission evidence is NOT_VERIFIED (AdapterUnavailable).
+    A known unresolved/declined high exploitable advisory yields a false check.
+    Classification approval alone is never authority to accept a known risk.
+    """
+    try:
+        if audit.get("status")!="AVAILABLE":raise AdapterUnavailable("native audit unavailable")
+        raw=audit["raw_audit"];review=Proof(**audit["assessment_review"])
+        recomputed=apply_audit_review(raw,review,evidence_root=evidence_root,snapshot_hash=snapshot_hash,contract_hash=contract_hash)
+        if recomputed!=audit:raise AdapterUnavailable("classified audit differs from exact independent assessment")
+    except (TypeError,KeyError,ValueError) as exc:raise AdapterUnavailable("typed independently assessed audit absent") from exc
+    blocked=[];accepted=[]
+    for finding in audit["findings"]:
+        if finding["severity"] not in {"critical","high"} or finding["exploitable"] is not True:continue
+        arbitration=finding["arbitration"]
+        if (arbitration is not None and arbitration["disposition"]=="accepted_risk" and arbitration["approved"] is True
+                and arbitration["decision"] not in {"deny_release","fix_required"}):accepted.append(finding)
+        else:blocked.append(finding)
+    return [dict(check="audit_no_unresolved_exploitable_high",passed=not blocked,
+        observed=dict(blocking=blocked,accepted_with_external_human_R=accepted,
+            scope="exact dependency advisories only; no business waiver"))]
 
 
 @dataclass(frozen=True)
