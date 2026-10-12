@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="21.505" timestamp="2026-10-12T12:26:11.205918+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_bootstrap_independent_counterprobe" name="test_native_current_bootstrap_probe_accepts_literal_ok_without_api" time="20.225"><failure message="autospec.orchestrator.bootstrap.BootstrapFailure: ISOLATION_UNAVAILABLE: Docker browser preflight unavailable (private driver output withheld)">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3292/test_native_current_bootstrap_0')
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_BOOTSTRAP_COUNTERPROOF")!="1",reason="Explicit real NETNONE static-OK counterexample opt-in")
+    @pytest.mark.asyncio
+    async def test_native_current_bootstrap_probe_accepts_literal_ok_without_api(tmp_path):
+        inspected=_docker_call(["docker","image","inspect","ghcr.io/astral-sh/uv:python3.12-bookworm-slim","--format","{{.Id}}"],
+            capture_output=True,text=True,timeout=5,check=False)
+        assert inspected.returncode==0,"pre-existing official factory image required"
+        source=tmp_path/"empty-stage";source.mkdir()
+        runtime=RuntimeSession(source,inspected.stdout.strip(),["/usr/local/bin/python","-I","-u","-c",SERVER],application_origin=True)
+        try:
+            runtime.__enter__()
+&gt;           detail=await bootstrap._browser_preflight(runtime,timeout_s=60,require_api=True)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+..\..\..\..\..\autospec-rem-dependencies\squad-ai\Brainstorming\Autospec\backend\tests\test_bootstrap_independent_counterprobe.py:41: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+session = &lt;autospec.orchestrator.isolated_validation.RuntimeSession object at 0x0000019FAA5802F0&gt;
+
+    async def _browser_preflight(session, *, timeout_s: float, require_api: bool) -&gt; str:
+        """Actual UI rendering on the exact owned runtime, never host Chromium."""
+        from types import SimpleNamespace
+        from .isolated_validation import RuntimeSession
+        from ..validation.browser_contracts import PlaywrightHarness
+    
+        if not isinstance(session,RuntimeSession):
+            raise BootstrapFailure("ISOLATION_UNAVAILABLE: actual owned browser runtime required",infra=True)
+        if type(timeout_s) not in {int,float} or not 0 &lt; timeout_s &lt;= 3600 or type(require_api) is not bool:
+            raise BootstrapFailure("ISOLATION_UNAVAILABLE: bounded browser preflight required",infra=True)
+        parent=session._assert_owned()
+        actual=session.inspect_configuration()
+        if actual["container_id"]!=parent or actual["network_mode"]!="none" or actual["running"] is not True or actual["published_ports"]:
+            raise BootstrapFailure("ISOLATION_UNAVAILABLE: exact active NETNONE browser parent required",infra=True)
+        # Supervisor capability; no flag or namespace comes from model output.
+        adapter=SimpleNamespace(base_url=session.origin,supervised_runtime=session,manifest=SimpleNamespace(accounts={}))
+        harness=PlaywrightHarness(adapter,bindings={},routes={"home":"/"})
+        checks=[]
+        case=SimpleNamespace(console_errors=[],requests=[],check=lambda tag,observed,expected:checks.append(observed==expected))
+        async def render():
+            page=await harness.page(case,1280)
+            page.set_default_timeout(max(1,min(15000,int(timeout_s*1000))))
+            errors=[]
+            page.on("console",lambda message:errors.append(True) if message.type=="error" else None)
+            response=await page.goto(session.origin,wait_until="networkidle")
+            if response is None or response.status!=200:
+                raise BootstrapFailure("Browser entrypoint does not return HTTP 200")
+            await page.wait_for_function("""() =&gt; {
+                const root=document.getElementById('root');
+                return root &amp;&amp; root.childElementCount&gt;0 &amp;&amp; (root.innerText.trim() || root.querySelector('canvas,svg,img'));
+            }""")
+            if require_api:
+                await page.wait_for_function("() =&gt; /Frontend → API(?: → base de données)? : OK/.test(document.body.innerText)")
+            if errors or case.console_errors or not all(checks):
+                raise BootstrapFailure("Browser console/page/network violation observed (untrusted text withheld)")
+            environment=harness.browser_environment
+            current=session.inspect_configuration()
+            if (environment.get("host_chromium") is not False or environment.get("parent_id")!=parent
+                    or environment.get("network_mode")!="container:"+parent or environment.get("client_network_exposed") is not False
+                    or session._assert_owned()!=parent or current["container_id"]!=parent or current["network_mode"]!="none"
+                    or current["running"] is not True or current["published_ports"]):
+                raise BootstrapFailure("ISOLATION_UNAVAILABLE: actual Docker browser receipt absent",infra=True)
+            return "Chromium Docker: production UI rendered" + (" ; frontend → API probe OK" if require_api else "") + "; exact NETNONE parent " + parent
+        try:
+            return await asyncio.wait_for(render(),timeout=timeout_s)
+        except asyncio.TimeoutError as exc:
+            raise BootstrapFailure("Isolated browser preflight deadline exceeded",infra=True) from exc
+        except BootstrapFailure:
+            raise
+        except Exception:
+&gt;           raise BootstrapFailure("ISOLATION_UNAVAILABLE: Docker browser preflight unavailable (private driver output withheld)",infra=True) from None
+E           autospec.orchestrator.bootstrap.BootstrapFailure: ISOLATION_UNAVAILABLE: Docker browser preflight unavailable (private driver output withheld)
+
+autospec\orchestrator\bootstrap.py:923: BootstrapFailure</failure></testcase></testsuite></testsuites>
