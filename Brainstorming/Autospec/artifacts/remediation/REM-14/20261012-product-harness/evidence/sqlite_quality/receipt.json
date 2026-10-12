@@ -1,0 +1,32 @@
+{
+  "snapshot_hash": "f1dbddc3d00f8104ceec79fe6acefbf64934128d79c2cbe4602bdfe351acf866",
+  "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+  "proofs": [
+    {
+      "checks": [
+        "TST-04:real_restart",
+        "VERTICAL:persistence"
+      ],
+      "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "detail": "",
+      "passed": true,
+      "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-14\\20261012-product-harness\\evidence\\sqlite_quality\\vertical-persistence-c9b2645c2ee749b1ae7fadeb44a365ff.json",
+      "sha256": "0cca123ba2f61bdbfdf256f6feba3a7c94bbad06045c38b70d01a8fb5b2e89d5",
+      "snapshot_hash": "f1dbddc3d00f8104ceec79fe6acefbf64934128d79c2cbe4602bdfe351acf866",
+      "type": "X"
+    },
+    {
+      "checks": [
+        "TST-04:real_sqlite_connections_restart_cleanup"
+      ],
+      "contract_hash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+      "detail": "",
+      "passed": true,
+      "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-14\\20261012-product-harness\\evidence\\sqlite_quality\\TST-04-74c0dd3bf1364ea7a86edc0c52fd4118.json",
+      "sha256": "e1162c515fb7279e809b6460f2f3b242a4649677a194cedc5d4ad5c3fd2cad50",
+      "snapshot_hash": "f1dbddc3d00f8104ceec79fe6acefbf64934128d79c2cbe4602bdfe351acf866",
+      "type": "X"
+    }
+  ],
+  "scope": "Native TST04 port metatest, not benchmark acceptance; DB export deliberately not bundled"
+}
