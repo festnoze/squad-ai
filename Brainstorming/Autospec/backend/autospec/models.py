@@ -666,6 +666,7 @@ class ProjectState(BaseModel):
     # sources and formal facts live in a supervisor-owned external oracle.
     acceptance_contract_hash: str = ""
     acceptance_max_lots: int = 7
+    acceptance_result: dict = Field(default_factory=dict)
     plan_admission: dict = Field(default_factory=dict)
     plan_findings: list[dict] = Field(default_factory=list)
     # REM-03/22: durable latest checkpoint and bounded live activity metadata.

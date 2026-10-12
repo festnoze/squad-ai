@@ -399,8 +399,10 @@ async def test_successful_legacy_bootstrap_survives_failed_resume_and_reload(mon
 
     reloaded = ProjectState.model_validate_json(state.model_dump_json())
     resumed = Pipeline(reloaded, FakeRunner([]))
+    monkeypatch.setattr(resumed, "_arun_pytest", AsyncMock(return_value=(True, "native baseline admitted", {"foundation": "passed"})))
     runtime = AsyncMock(return_value=bootstrap.BootstrapResult(True, "recovered", fingerprint="a" * 64))
     monkeypatch.setattr(bootstrap, "verify_runtime", runtime)
+    monkeypatch.setattr(pipeline, "_arun_pytest", AsyncMock(return_value=(True, "native baseline admitted", {"foundation": "passed"})))
     assert await resumed._abootstrap_phase()
     assert runtime.await_args.kwargs["repair_dependencies"] is True
     assert reloaded.bootstrap_status == "ready" and reloaded.bootstrap_verified_once

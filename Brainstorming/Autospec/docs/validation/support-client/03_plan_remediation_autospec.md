@@ -76,7 +76,7 @@ Definition of Done commune :
 | REM-02 | P0 | Cycle de vie des processus possédés | Exécution | REM-01 | IN_PROGRESS | rem_execution + coordinateur | Handles Windows/Job validés ; sweeps globaux supprimés ; raccord runtime en cours |
 | REM-03 | P0 | État durable et récupération après interruption | Orchestration | REM-02 | IN_PROGRESS | Coordinateur | 27f42178, eec74191, a247e332 ; interruption réelle et coût incomplet testés |
 | REM-04 | P0 | Dépendances et manifests dans le workflow | Reproductibilité | REM-00 | IN_PROGRESS | rem_dependencies + coordinateur | 7eb7c767, c3701d17 ; Argon2 réel, 86 tests ; raccord broker en cours |
-| REM-05 | P0 | Validation dans un environnement propre | Reproductibilité | REM-04 | IN_PROGRESS | rem_dependencies + rem_execution | Cache attesté Windows validé ; variante Linux isolée en cours |
+| REM-05 | P0 | Validation dans un environnement propre | Reproductibilité | REM-04 | IN_PROGRESS | rem_dependencies + rem_execution + coordinateur | 31b9df46 ; recette Linux V4, locks régénérés atomiquement ; raccord suite globale en cours |
 | REM-06 | P0 | Interdire les preuves de tests affaiblies | Qualité | REM-05 | IN_PROGRESS | rem_dependencies + coordinateur | Baseline/collecte/skip/xfail validés ; raccord avant dev en cours |
 | REM-07 | P0 | Réparations bornées et classifiées | Orchestration | REM-03, REM-06 | IN_PROGRESS | Coordinateur | eec74191, a247e332 ; délai réel et répétition testés ; canaris à raccorder |
 | REM-08 | P1 | Décision de stack structurée | Fondation | REM-00 | REVIEW | Coordinateur | 199 tests stack/fondation, a247e332 ; reprise scellée et contradictions |
@@ -85,16 +85,16 @@ Definition of Done commune :
 | REM-11 | P1 | Claims normalisés et dépendances communes | Planification | REM-04, REM-10 | IN_PROGRESS | rem_contracts_plan + coordinateur | ff6c372c ; racines/globs/contrats partagés testés ; raccord en cours |
 | REM-12 | P1 | Conflits dynamiques de propriété des fichiers | Ordonnancement | REM-11 | IN_PROGRESS | rem_contracts_plan + coordinateur | ff6c372c ; arbiter pré-écriture testé ; raccord broker/ordonnanceur en cours |
 | REM-13 | P0 | Socle déterministe et sondes initiales | Fondation | REM-05, REM-08 | IN_PROGRESS | rem_execution + coordinateur | 2 sondes réelles Python/React PASS ; lancement Linux isolé en cours |
-| REM-14 | P0 | Première tranche métier réellement fonctionnelle | Acceptation | REM-06, REM-09, REM-13 | TODO | — | — |
+| REM-14 | P0 | Première tranche métier réellement fonctionnelle | Acceptation | REM-06, REM-09, REM-13 | IN_PROGRESS | rem_dependencies + coordinateur | Jalon bloquant raccordé ; nominal Linux/Chromium/API/SQLite + restart PASS chez agent ; coordinateur en intégration |
 | REM-15 | P1 | Pack de contrats sécurité et comptes | Contrats sécurité | REM-09 | IN_PROGRESS | rem_contracts_plan + coordinateur | 7d15803a livré pour contre-revue ; 128 tests ; raccord runtime à faire |
-| REM-16 | P1 | Pack de contrats métier et concurrence | Contrats métier | REM-09 | IN_PROGRESS | rem_dependencies | Pack FUN + fixtures HTTP/SQLite en cours |
-| REM-17 | P1 | Pack DB, API et cohérence frontend/backend | Contrats architecture | REM-09 | IN_PROGRESS | rem_dependencies | Pack ARC + preuves source/API/DB en cours |
+| REM-16 | P1 | Pack de contrats métier et concurrence | Contrats métier | REM-09 | IN_PROGRESS | rem_dependencies | 53a9ced1, 2327fb64 ; 9 métatests FUN réels PASS, 138 preuves hashées ; raccord Linux réel en cours |
+| REM-17 | P1 | Pack DB, API et cohérence frontend/backend | Contrats architecture | REM-09 | IN_PROGRESS | rem_dependencies | 53a9ced1, 2327fb64 ; 7 métatests ARC PASS ; SQLtrace, fault rollback, horloge et CAS Linux PASS ; ports live en cours |
 | REM-18 | P1 | Pack UX, session et erreurs réseau | Contrats frontend | REM-09 | IN_PROGRESS | rem_contracts_plan | Profils et fixtures navigateur réels en préparation |
 | REM-19 | P1 | Suites complètes, couverture et six E2E | Qualité | REM-14, REM-15, REM-16, REM-17, REM-18 | IN_PROGRESS | rem_contracts_plan + coordinateur | Playwright superviseur verrouillé f411f188 ; préparation indépendante |
-| REM-20 | P1 | Image finale, persistance et documentation | Livraison | REM-14, REM-19 | TODO | — | — |
-| REM-21 | P1 | Gate finale indépendante et traçabilité | Acceptation | REM-19, REM-20 | IN_PROGRESS | Coordinateur | Admission et snapshot immuables : 21 tests ; exécution des packs à raccorder |
+| REM-20 | P1 | Image finale, persistance et documentation | Livraison | REM-14, REM-19 | IN_PROGRESS | rem_dependencies + coordinateur | Harness Linux nominal : données conservées après remplacement du conteneur ; image finale/ports OPS en cours |
+| REM-21 | P1 | Gate finale indépendante et traçabilité | Acceptation | REM-19, REM-20 | IN_PROGRESS | Coordinateur | artifacts/remediation/REM-21/20261012-linux-milestones : 87 PASS/2 SKIP ; snapshot/jalon/rapport final fail-closed ; raccord packs en cours |
 | REM-22 | P1 | Télémétrie des attentes, coûts et phases | Observabilité | REM-00 | IN_PROGRESS | Coordinateur | Tours provider distincts des outils/attentes ; 72 tests ciblés, UI 3 tests/build PASS |
-| REM-23 | P2 | Réservation budgétaire concurrente, optionnelle | Optimisation | REM-07, REM-22 | TODO | — | — |
+| REM-23 | P2 | Réservation budgétaire concurrente, optionnelle | Optimisation | REM-07, REM-22 | IN_PROGRESS | rem_execution + coordinateur | Réservations atomiques en préparation, OFF par défaut ; abonnement Claude reste sérialisé faute de cap financier dur attesté |
 | REM-24 | P1 | Contre-revue intégrée de la fabrique | Intégration | Toutes P0/P1 REM-00 à REM-22 | TODO | — | — |
 | REM-25 | P1 | Nouvelle campagne et comparaison indépendante | Qualification | REM-24 + autorisation de lancement | TODO | — | — |
 

@@ -272,11 +272,12 @@ async def test_missing_frontend_toolchain_fails_story_not_pipeline(streams_on, m
 
     def _boom(*a, **k):
         raise OSError(2, "Le fichier spécifié est introuvable")
-    monkeypatch.setattr(pipeline, "_run_suite_process", _boom)
+    from autospec.orchestrator import pipeline_validation
+    monkeypatch.setattr(pipeline_validation, "run_native", _boom)
 
     ok, output, results = await pipeline._arun_frontend_tests(ws=workspace_dir(state.id))
     assert ok is False
-    assert "indisponible" in output
+    assert "ISOLATED_VALIDATION_FAILED" in output and "introuvable" in output
     assert results == {}
 
 

@@ -30,6 +30,7 @@ class ExecutionContext:
     version: int = 1
     protected_paths: tuple[str, ...] = ()
     task_id: str | None = None
+    readonly_paths: tuple[str, ...] = ()
 
     def __post_init__(self):
         if self.version != 1 or self.backend != "restricted_tools" or not self.run_id:
@@ -102,7 +103,7 @@ class FileBroker:
         self.context = context
         self.root = context.project_root
 
-    def path(self, relative: str) -> Path:
+    def path(self, relative: str, *, writing: bool = False) -> Path:
         if not isinstance(relative, str) or not relative or len(relative) > 1024:
             raise IsolationViolation("Invalid relative path")
         parts = relative.replace("\\", "/").split("/")
@@ -118,6 +119,9 @@ class FileBroker:
         if any(canonical == p.lower().rstrip("/") or canonical.startswith(p.lower().rstrip("/") + "/")
                for p in self.context.protected_paths):
             raise IsolationViolation("Independent oracle or protected path is inaccessible")
+        if writing and any(canonical == p.lower().rstrip("/") or canonical.startswith(p.lower().rstrip("/") + "/")
+                           for p in self.context.readonly_paths):
+            raise IsolationViolation("Coordinator-owned manifest or native checker is read-only")
         target = self.root
         # Reject ALL links/reparse points, not merely links currently resolving
         # outside the root. There is no model capability to race this broker by
@@ -129,6 +133,13 @@ class FileBroker:
                 info = target.lstat()
                 if _is_link(info) or (stat.S_ISREG(info.st_mode) and info.st_nlink != 1):
                     raise IsolationViolation("Linked files and reparse points are inaccessible")
+            # NTFS short names are not links, but resolve to a different long
+            # spelling. Admit only the canonical spelling so neither protected
+            # paths nor ownership claims can be bypassed with an 8.3 alias.
+            # Checking prefixes also protects a not-yet-existing child below
+            # an aliased directory. WindowsPath equality is case-insensitive.
+            if target.resolve() != target:
+                raise IsolationViolation("Non-canonical filesystem aliases are inaccessible")
         if not target.resolve().is_relative_to(self.root):
             raise IsolationViolation("Path escaped execution root")
         return target
@@ -166,7 +177,7 @@ class FileBroker:
                 size += len(data)
                 if len(data) > MAX_FILE_BYTES or size > MAX_TOTAL_BYTES:
                     raise IsolationViolation("File batch size limit exceeded")
-                prepared.append((self.path(item.get("path")), data))
+                prepared.append((self.path(item.get("path"), writing=True), data))
             # Validate the entire batch before any mutation (traversal late in
             # a request cannot leave an apparently successful partial edit).
             authorizer = active_write_authorizer.get()
@@ -174,7 +185,7 @@ class FileBroker:
                 authorizer(tuple(target.relative_to(self.root).as_posix() for target, _ in prepared))
             for target, data in prepared:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                self.path(target.relative_to(self.root).as_posix())
+                self.path(target.relative_to(self.root).as_posix(), writing=True)
                 target.write_bytes(data)
             return "OK — fichiers écrits : " + json.dumps([str(p.relative_to(self.root)) for p, _ in prepared])
         if tool == "read_files":

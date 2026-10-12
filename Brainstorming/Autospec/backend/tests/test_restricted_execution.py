@@ -88,6 +88,62 @@ def test_oracle_is_unavailable_and_context_cannot_move(tmp_path):
     assert not context.public()["host_shell"]
 
 
+def test_native_checkers_and_manifests_are_readable_but_batch_writes_are_atomic(tmp_path):
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='original'\n")
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests/test_auth.py").write_text("def test_auth(): assert True\n")
+    broker = FileBroker(ExecutionContext("run-a", tmp_path,
+        readonly_paths=("pyproject.toml", "tests/test_auth.py")))
+    result = broker.apply({"tool": "read_files", "paths": ["pyproject.toml", "tests/test_auth.py"]})
+    assert "original" in result and "test_auth" in result
+    assert "pyproject.toml" in broker.apply({"tool": "list_files"})
+    for path in ("pyproject.toml", "tests/test_auth.py", "TESTS/test_AUTH.py"):
+        with pytest.raises(IsolationViolation, match="read-only"):
+            broker.apply({"tool": "write_files", "files": [
+                {"path": "main.py", "content": "must not be written"}, {"path": path, "content": "altered"}]})
+    assert not (tmp_path / "main.py").exists()
+    assert "original" in (tmp_path / "pyproject.toml").read_text()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="NTFS short-name security boundary")
+def test_ntfs_short_alias_cannot_bypass_readonly_protected_or_claim_paths(tmp_path):
+    import ctypes
+    from ctypes import wintypes
+
+    protected = tmp_path / "independent-oracle"
+    protected.mkdir()
+    secret = protected / "expected-contract.json"
+    secret.write_text("private oracle")
+    checker = tmp_path / "isolated_validation.py"
+    checker.write_text("trusted checker")
+    get_short = ctypes.windll.kernel32.GetShortPathNameW
+    get_short.argtypes = [wintypes.LPCWSTR, wintypes.LPWSTR, wintypes.DWORD]
+    get_short.restype = wintypes.DWORD
+
+    def alias(path):
+        buffer = ctypes.create_unicode_buffer(32768)
+        assert get_short(str(path), buffer, len(buffer)) > 0
+        return buffer.value
+
+    checker_alias = os.path.basename(alias(checker))
+    oracle_alias = os.path.basename(alias(protected))
+    if checker_alias.casefold() == checker.name.casefold() or oracle_alias.casefold() == protected.name.casefold():
+        pytest.skip("8.3 aliases disabled on this test volume")
+    broker = FileBroker(ExecutionContext("short-name-boundary", tmp_path,
+        readonly_paths=(checker.name,)))
+    for path, writing in ((checker_alias, True), (oracle_alias + "/expected-contract.json", False),
+                          (oracle_alias + "/new-file.json", True)):
+        with pytest.raises(IsolationViolation, match="Non-canonical"):
+            broker.path(path, writing=writing)
+    with pytest.raises(IsolationViolation):
+        broker.apply({"tool": "write_files", "files": [
+            {"path": "nominal.py", "content": "must not be written"},
+            {"path": checker_alias, "content": "altered"}]})
+    assert not (tmp_path / "nominal.py").exists()
+    assert checker.read_text() == "trusted checker"
+    assert secret.read_text() == "private oracle"
+
+
 @pytest.mark.parametrize("tool", ["Bash", "PowerShell", "shell", "mcp", "execute", "delete_files"])
 def test_hostile_requests_are_data_only_and_have_no_dispatch(tmp_path, tool):
     sentinel = tmp_path.parent / "sentinel.txt"

@@ -52,7 +52,7 @@ def _state(pid: str) -> ProjectState:
             gherkin=_GHERKIN,
             tasks=[
                 Task(id=tid, story_id="US-1", stream="backend", title=tid,
-                     gherkin=_GHERKIN)
+                     gherkin=_GHERKIN, claimed_paths=[f"{tid.lower()}.py"])
                 for tid in _IDS
             ],
         )

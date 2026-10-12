@@ -96,6 +96,9 @@ def test_freeze_preserves_code_identity_excludes_runtime_and_never_repairs_sourc
     (root / "main.py").write_text("print('support')")
     (root / "pyproject.toml").write_text("[project]\nname='support'\nversion='0.1.0'\n")
     (root / "autospec-state.json").write_text("private harness state")
+    (root / ".autospec-bootstrap.json").write_text('{"template":"fastapi-sqlite-react"}')
+    (root / ".autospec-environment.json").write_text("private environment receipt")
+    (root / "acceptance-contract.json").write_text("private oracle")
     (root / "data.db").write_bytes(b"fictitious isolated runtime database")
     (root / ".env").write_text("SENTINEL_SECRET=value")
     (root / ".claude").mkdir()
@@ -104,6 +107,8 @@ def test_freeze_preserves_code_identity_excludes_runtime_and_never_repairs_sourc
     snapshot, frozen = freeze_snapshot(root, tmp_path / "supervisor")
     assert snapshot == before and source_snapshot(frozen).digest == snapshot.digest
     assert not (frozen / ".env").exists() and not (frozen / "data.db").exists()
+    assert not (frozen / ".autospec-bootstrap.json").exists()
+    assert not (frozen / "acceptance-contract.json").exists()
     assert (root / ".env").read_text() == "SENTINEL_SECRET=value"
     assert (root / "main.py").read_text() == "print('support')"
     (frozen / "main.py").write_text("altered")

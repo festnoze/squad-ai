@@ -128,22 +128,18 @@ def _run_install(args: list[str], cwd: Path) -> tuple[bool, str]:
     # Dependency installers execute package lifecycle/build hooks. Give those
     # hooks the same secret-free environment and bounded process-tree runner as
     # generated tests, including npm's direct JS launcher on Windows.
-    from .bootstrap import _argv, BootstrapFailure
-    from .docker_deploy import _kill_tree
-    from .pipeline import _minimal_env, _run_capped_process
-
+    from .validation_environment import LinuxEnvironmentManager
+    from .acceptance import supervisor_root
+    from ..agents.runner import AgentError
+    import tempfile
     try:
-        proc = _run_capped_process(
-            _argv(args), cwd=cwd, env=_minimal_env(),
-            timeout=min(180, settings.agent_timeout_s), output_cap=20000,
-            kill_tree=_kill_tree, name="component-install",
-        )
-        if proc.launch_error:
-            return False, proc.launch_error
-        if proc.timed_out or proc.pipe_leaked:
-            return False, "Installation interrompue : délai dépassé ou sous-processus non terminé"
-        return proc.returncode == 0, proc.output[-1000:]
-    except (OSError, BootstrapFailure) as exc:
+        ecosystem = "python" if (cwd / "pyproject.toml").is_file() else "node"
+        manager = LinuxEnvironmentManager(Path(tempfile.gettempdir()) / "autospec-linux-environments",
+                                           docker=settings.docker_cmd, timeout=min(180, settings.agent_timeout_s))
+        manager.ensure_lock(cwd, ecosystem)
+        prepared = manager.prepare(cwd, ecosystem, "test")
+        return True, f"Image de dépendances isolée : {prepared.fingerprint}"
+    except (OSError, AgentError, ValueError) as exc:
         return False, str(exc)
 
 

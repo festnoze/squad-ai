@@ -104,7 +104,8 @@ async def test_tampered_oracle_fails_closed_before_plan(tamper):
 
 async def test_legacy_po_path_is_admitted_and_preserves_milestones_mapping():
     state, source = state_with_oracle()
-    state.stories = [UserStory(id="S-1", epic_id="old", title="Old", tasks=[Task(id="T-0", story_id="S-1")])]
+    state.stories = [UserStory(id="S-1", epic_id="old", title="Old", iteration=0,
+                              tasks=[Task(id="T-0", story_id="S-1", status=StoryStatus.DONE)])]
     state.stories[0].status = StoryStatus.DONE
     runner = FakeRunner([json.dumps(admitted_plan())])
     pipeline = Pipeline(state, runner)

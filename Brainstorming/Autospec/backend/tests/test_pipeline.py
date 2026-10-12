@@ -105,14 +105,15 @@ def test_signal_stop_kills_in_flight_agent_process():
     import time
 
     pipeline, _ = make_pipeline([])
-    proc = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+    from autospec.agents.runner import spawn_owned_process
+    proc = spawn_owned_process([sys.executable, "-c", "import time; time.sleep(30)"])
     pipeline._agent_procs.add(proc)
 
     killed = pipeline._signal_stop()
 
     assert killed == 1
     assert pipeline._stop_requested is True
-    for _ in range(300):  # the kill (taskkill on Windows) is near-immediate
+    for _ in range(300):  # creation-time owned handle cleanup is near-immediate
         if proc.poll() is not None:
             break
         time.sleep(0.01)
@@ -201,13 +202,15 @@ async def test_full_pipeline_with_interview(green_pytest):
     assert "UT-1" in dev_prompts[0] and "London school" in dev_prompts[0]
     assert any(m.role == ChatRole.QA for m in pipeline.state.chat)
 
-    # Acceptance criteria are structured (AC-x) and their tests are linked + green.
+    # The model's criterion report and a planned native check are distinct.
     from autospec.models import TestState
     crit = us1.acceptance_criteria[0]
     assert crit.id == "AC-1"
     assert {t.id for t in us1.tests_for_criterion("AC-1")} == {"UT-1", "UT-2"}
     assert us1.criterion_state("AC-1") == TestState.GREEN
-    assert all(t.status == TestState.GREEN for t in us1.test_plan)
+    assert all(t.status == TestState.NONEXISTENT for t in us1.test_plan)
+    # The mocked suite has no executed node IDs, so planned checks cannot be
+    # promoted to GREEN merely because the model says it finished.
 
 
 async def test_feature_files_written(green_pytest, tmp_workspace):
