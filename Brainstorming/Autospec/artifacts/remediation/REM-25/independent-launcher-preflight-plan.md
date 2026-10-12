@@ -12,7 +12,10 @@ Complément cible96af8140 : les deuxURLs ASGI de la revue utilisent désormais
 le Host loopback admis, sans exception production. Le replay91 passe mais
 un nouveau P1 à index de routage froid fait échouer le premier QA autorisé
 (test existant seul :1FAIL) ; voir `20261012-independent-generation-policy/ORIGIN-AND-COLD-CACHE.md`.
-Ce défaut doit être corrigé et rejoué avant qualification du launcher.
+Ce défaut historique est corrigé dans d9b89375 : mêmes91 IDs PASS, QA seul
+processus frais1PASS, transitions/atomicité7PASS ; voir le rapport indépendant
+`20261012-independent-generation-policy/COLD-CACHE-AFTER.md`. Aucun lancement
+ou auth n'a été fait ; le launcher concret reste à qualifier en lecture seule.
 
 ## Prérequis d'admission à relire
 
