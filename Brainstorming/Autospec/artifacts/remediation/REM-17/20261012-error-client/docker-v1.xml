@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="1" time="5.513" timestamp="2026-10-12T16:12:28.176686+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_architecture_browser_docker" name="test_real_owned_netnone_architecture_client_transport" time="5.004"><failure message="AttributeError: 'RuntimeSession' object has no attribute 'attest'">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3413/test_real_owned_netnone_archit0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000002456C6B8FC0&gt;
+
+    @pytest.mark.skipif(os.environ.get("AUTOSPEC_ARC_BROWSER_DOCKER") != "1", reason="explicit single ARC-06 NETNONE transport proof")
+    async def test_real_owned_netnone_architecture_client_transport(tmp_path, monkeypatch):
+        contract = browser_contract()
+        monkeypatch.setattr(fixture, "CONTRACT", contract.contract_hash)
+        source = tmp_path / "source"
+        source.mkdir()
+        for name in ("pyproject.toml", "uv.lock"):
+            shutil.copyfile(fixture.ROOT / name, source / name)
+        # Materialize a constant independent fixture copy; no historical product is
+        # repaired and no application package/config/script executes on the host.
+        text = (fixture.ROOT / "main.py").read_text(encoding="utf-8")
+        before = 'return e or {"id":a["id"],"role":a["role"]}'
+        assert text.count(before) == 1
+        text = text.replace(before, 'return e or {"id":a["id"],"role":a["role"],"display_name":a["email"].split("@")[0].capitalize()}')
+        begin, end = text.index("HTML='''"), text.index('@app.get("/",response_class=HTMLResponse)')
+        text = text[:begin] + 'from pathlib import Path\nHTML=Path(__file__).with_name("architecture_native.html").read_text(encoding="utf-8")\n' + text[end:]
+        (source / "main.py").write_bytes(text.encode())
+        shutil.copyfile(Path(__file__).parent / "fixtures/browser/architecture_native.html", source / "architecture_native.html")
+        snapshot = source_snapshot(source).digest
+        definition = fixture.fixture_definition()
+        definition["metadata"]["browser_probes"] = {"architecture_client": {
+            "identity_pointer": "/display_name", "error_presentation": "server_message"}}
+        fixtures_path = fixture.reviewed_fixture_file(tmp_path, source, snapshot, definition)
+        content = json.loads(fixtures_path.read_bytes())
+        content.pop("review")
+        content["cases"] = {"ARC-06": definition}
+        fingerprint = hashlib.sha256(json.dumps(content, sort_keys=True, ensure_ascii=True).encode()).hexdigest()
+        review_path = tmp_path / "fixture-review.json"
+        fixture.write_json(review_path, {"scope": "trusted isolated transport metatest, not GPT/product review", "fingerprint": fingerprint})
+        review = Proof("R", str(review_path), hashlib.sha256(review_path.read_bytes()).hexdigest(), snapshot,
+                      contract.contract_hash, ("PRODUCT:fixtures", "PRODUCT:fixtures:" + fingerprint))
+        fixture.write_json(fixtures_path, {**content, "review": asdict(review)})
+        bindings = fixture.make_bindings(tmp_path, source, snapshot)
+        bindings = replace(bindings, browser_bindings={"email": "#email", "password": "#password", "login": "#login",
+            "ticket_nav": "#ticket-nav", "current_user_name": "#current-user-name", "error": "#error"}, fixture_fingerprint=fingerprint)
+        bindings = replace(bindings, review=replace(bindings.review, checks=("PRODUCT:bindings", "PRODUCT:bindings:" + bindings.fingerprint())))
+        async def identity(): return source_snapshot(source).digest
+        async def oracle(): return contract.contract_hash
+        async with OwnedProductHarnessSession(bindings, source_root=source, stage_root=tmp_path / "stage",
+                evidence_root=tmp_path / "evidence", cache_root=tmp_path / "cache", fixtures_path=fixtures_path,
+                snapshot_hash=identity, contract_hash=oracle) as subject:
+&gt;           runtime_identity = subject.runtime.attest()
+                               ^^^^^^^^^^^^^^^^^^^^^^
+E           AttributeError: 'RuntimeSession' object has no attribute 'attest'
+
+tests\test_architecture_browser_docker.py:62: AttributeError</failure></testcase></testsuite></testsuites>
