@@ -1,0 +1,294 @@
+{
+  "requirement_id": "FUN-07",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "retry",
+      "passed": true,
+      "observed": {
+        "first": 201,
+        "retry": 200,
+        "same_state": true
+      },
+      "reproduction": "same user/UUID/normalized ticket payload replay",
+      "evidence": "X"
+    },
+    {
+      "check": "retry",
+      "passed": true,
+      "observed": {
+        "ticket_delta": 1,
+        "audit_delta": 1
+      },
+      "reproduction": "ticket create and replay materialize exactly one ticket/event",
+      "evidence": "X"
+    },
+    {
+      "check": "retry",
+      "passed": true,
+      "observed": {
+        "status": 200
+      },
+      "reproduction": "same normalized ticket payload with outer whitespace replays",
+      "evidence": "X"
+    },
+    {
+      "check": "conflicts",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "d9a28a1922ac82a562f6fdfacd2657ea9703941c3b0acd0875b7be3c429afa1a",
+        "after_digest": "d9a28a1922ac82a562f6fdfacd2657ea9703941c3b0acd0875b7be3c429afa1a"
+      },
+      "reproduction": "same idempotency key changed title",
+      "evidence": "X"
+    },
+    {
+      "check": "users",
+      "passed": true,
+      "observed": {
+        "status": 201
+      },
+      "reproduction": "same key isolated per user",
+      "evidence": "X"
+    },
+    {
+      "check": "rights",
+      "passed": true,
+      "observed": {
+        "status": 403
+      },
+      "reproduction": "rights checked before key replay",
+      "evidence": "X"
+    },
+    {
+      "check": "users",
+      "passed": true,
+      "observed": {
+        "status": 201
+      },
+      "reproduction": "same user UUID isolated per operation type (ticket vs message)",
+      "evidence": "X"
+    },
+    {
+      "check": "rights",
+      "passed": true,
+      "observed": {
+        "status": 201
+      },
+      "reproduction": "prepare genuine Alice-owned message key",
+      "evidence": "X"
+    },
+    {
+      "check": "rights",
+      "passed": true,
+      "observed": {
+        "status": 404,
+        "body": {
+          "error": {
+            "code": "NOT_FOUND",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "7d2bdba0c0e88cd423695e53ddf9004316d93e7c5c7ce0c31f966e8f010fd853",
+        "after_digest": "7d2bdba0c0e88cd423695e53ddf9004316d93e7c5c7ce0c31f966e8f010fd853"
+      },
+      "reproduction": "existing Alice key targeting inaccessible Bob ticket checks authorization before replay/conflict",
+      "evidence": "X"
+    },
+    {
+      "check": "simultaneous",
+      "passed": true,
+      "observed": {
+        "statuses": [
+          200,
+          201
+        ]
+      },
+      "reproduction": "simultaneous same-key ticket creation returns one ID",
+      "evidence": "X"
+    },
+    {
+      "check": "simultaneous",
+      "passed": true,
+      "observed": {
+        "ticket_delta": 1
+      },
+      "reproduction": "distinct-connection simultaneous ticket retry creates one row/event",
+      "evidence": "X"
+    },
+    {
+      "check": "retry",
+      "passed": true,
+      "observed": {
+        "first": 201,
+        "retry": 200
+      },
+      "reproduction": "message retry one row/event/version",
+      "evidence": "X"
+    },
+    {
+      "check": "simultaneous",
+      "passed": true,
+      "observed": {
+        "statuses": [
+          201,
+          200
+        ],
+        "before": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 4,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 3,
+          "message_count": 3
+        },
+        "after": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 5,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 4,
+          "message_count": 4
+        }
+      },
+      "reproduction": "synchronized distinct-connection message retry one row/event/version",
+      "evidence": "X"
+    },
+    {
+      "check": "conflicts",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "67d7a143d2f072b96754cda601558029c87ace81700fee818d3af0a71d8e056f",
+        "after_digest": "67d7a143d2f072b96754cda601558029c87ace81700fee818d3af0a71d8e056f"
+      },
+      "reproduction": "same message key different content/visibility/target",
+      "evidence": "X"
+    },
+    {
+      "check": "conflicts",
+      "passed": true,
+      "observed": {
+        "error": {
+          "code": "IDEMPOTENCY_CONFLICT",
+          "message": "Requête refusée"
+        }
+      },
+      "reproduction": "stable IDEMPOTENCY_CONFLICT code",
+      "evidence": "X"
+    },
+    {
+      "check": "conflicts",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "67d7a143d2f072b96754cda601558029c87ace81700fee818d3af0a71d8e056f",
+        "after_digest": "67d7a143d2f072b96754cda601558029c87ace81700fee818d3af0a71d8e056f"
+      },
+      "reproduction": "same message key different content/visibility/target",
+      "evidence": "X"
+    },
+    {
+      "check": "conflicts",
+      "passed": true,
+      "observed": {
+        "error": {
+          "code": "IDEMPOTENCY_CONFLICT",
+          "message": "Requête refusée"
+        }
+      },
+      "reproduction": "stable IDEMPOTENCY_CONFLICT code",
+      "evidence": "X"
+    },
+    {
+      "check": "conflicts",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "IDEMPOTENCY_CONFLICT",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "67d7a143d2f072b96754cda601558029c87ace81700fee818d3af0a71d8e056f",
+        "after_digest": "67d7a143d2f072b96754cda601558029c87ace81700fee818d3af0a71d8e056f"
+      },
+      "reproduction": "same message key different content/visibility/target",
+      "evidence": "X"
+    },
+    {
+      "check": "conflicts",
+      "passed": true,
+      "observed": {
+        "error": {
+          "code": "IDEMPOTENCY_CONFLICT",
+          "message": "Requête refusée"
+        }
+      },
+      "reproduction": "stable IDEMPOTENCY_CONFLICT code",
+      "evidence": "X"
+    },
+    {
+      "check": "restart",
+      "passed": true,
+      "observed": {
+        "status": 200
+      },
+      "reproduction": "real server restart, same harness-retained key",
+      "evidence": "X"
+    },
+    {
+      "check": "closed_replay",
+      "passed": true,
+      "observed": {
+        "retry": 200,
+        "new": 409
+      },
+      "reproduction": "existing message replay allowed after closure, new key forbidden",
+      "evidence": "X"
+    },
+    {
+      "check": "rights",
+      "passed": true,
+      "observed": {
+        "status": 401,
+        "unchanged": true
+      },
+      "reproduction": "disabled user cannot replay existing key through old real cookie",
+      "evidence": "X"
+    }
+  ]
+}

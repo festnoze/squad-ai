@@ -1,0 +1,195 @@
+{
+  "requirement_id": "FUN-01",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "creation",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "ticket": {
+          "id": "2ceaf510-45be-4dee-a80f-c32cbe8fed05",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Titre valide",
+          "description": "Description valide Description valide",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": null,
+          "version": 1,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00"
+        }
+      },
+      "reproduction": "Alice POST /api/tickets; inspect server defaults",
+      "evidence": "X"
+    },
+    {
+      "check": "roles",
+      "passed": false,
+      "observed": {
+        "status": 201,
+        "body": {
+          "id": "730dfb3a-a525-4d82-a4af-167c8020057f",
+          "owner_id": "00000000-0000-0000-0000-000000000003",
+          "title": "Titre valide",
+          "description": "Description valide Description valide",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": null,
+          "version": 1,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00"
+        },
+        "before_digest": "9fe9a7cbde57931e6e7981a2c85a9ee90049f750df7391433e11a008f1744cf3",
+        "after_digest": "af1cec00306fffcceab15605bf60000e0192b1b9912a023932ccb5e03f7d4860"
+      },
+      "reproduction": "camille POST /api/tickets is forbidden",
+      "evidence": "X"
+    },
+    {
+      "check": "roles",
+      "passed": false,
+      "observed": {
+        "status": 201,
+        "body": {
+          "id": "2f137a8c-276f-4edf-bbbe-cdb1f7fd966b",
+          "owner_id": "00000000-0000-0000-0000-000000000005",
+          "title": "Titre valide",
+          "description": "Description valide Description valide",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": null,
+          "version": 1,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00"
+        },
+        "before_digest": "af1cec00306fffcceab15605bf60000e0192b1b9912a023932ccb5e03f7d4860",
+        "after_digest": "eb1d9427bd16f805875adf987db4c7e5ed17cd1415c9dfb9baefd1d6bb201f89"
+      },
+      "reproduction": "emma POST /api/tickets is forbidden",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "title_len": 4,
+        "description_len": 20
+      },
+      "reproduction": "POST title length 4, description length 20; expected 422",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "title_len": 5,
+        "description_len": 20
+      },
+      "reproduction": "POST title length 5, description length 20; expected 201",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "title_len": 120,
+        "description_len": 20
+      },
+      "reproduction": "POST title length 120, description length 20; expected 201",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "title_len": 121,
+        "description_len": 20
+      },
+      "reproduction": "POST title length 121, description length 20; expected 422",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "title_len": 5,
+        "description_len": 19
+      },
+      "reproduction": "POST title length 5, description length 19; expected 422",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "title_len": 5,
+        "description_len": 20
+      },
+      "reproduction": "POST title length 5, description length 20; expected 201",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "title_len": 5,
+        "description_len": 5000
+      },
+      "reproduction": "POST title length 5, description length 5000; expected 201",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "title_len": 5,
+        "description_len": 5001
+      },
+      "reproduction": "POST title length 5, description length 5001; expected 422",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "title_len": 4,
+        "description_len": 20
+      },
+      "reproduction": "POST title length 4, description length 20; expected 422",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "title_len": 5,
+        "description_len": 80
+      },
+      "reproduction": "POST title length 5, description length 80; expected 422",
+      "evidence": "X"
+    },
+    {
+      "check": "bounds",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "title_len": 9,
+        "description_len": 20
+      },
+      "reproduction": "POST title length 9, description length 20; expected 201",
+      "evidence": "X"
+    }
+  ]
+}

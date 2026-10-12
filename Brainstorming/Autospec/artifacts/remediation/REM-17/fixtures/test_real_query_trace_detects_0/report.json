@@ -1,0 +1,2020 @@
+{
+  "pack": "architecture",
+  "status": "FAIL",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "requirements": [
+    {
+      "id": "ARC-01",
+      "gate": "M",
+      "status": "NOT_VERIFIED",
+      "expected": "Cartographier route → autorisation → service → DB et composant → client HTTP → API. Localiser les règles ; ne pas compter les dossiers. Justifier les abstractions non triviales.",
+      "observed": [],
+      "reproduction": [],
+      "proofs": [],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "independent source review required",
+        "ARC-01:backend_map (R)",
+        "ARC-01:frontend_map (R)",
+        "ARC-01:rules (R)",
+        "ARC-01:abstractions (R)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "ARC-02",
+      "gate": "B",
+      "status": "NOT_VERIFIED",
+      "expected": "FK actives par connexion SQLite, unicité email/idempotence, NOT NULL et domaines/versions protégés. Référence orpheline ou doublon inséré directement en DB => échec ; schéma lisible.",
+      "observed": [
+        {
+          "check": "foreign_keys",
+          "passed": true,
+          "observed": {
+            "enabled": 1
+          },
+          "reproduction": "each distinct app SQLite connection enables FK",
+          "evidence": "X"
+        },
+        {
+          "check": "foreign_keys",
+          "passed": true,
+          "observed": {
+            "enabled": 1
+          },
+          "reproduction": "each distinct app SQLite connection enables FK",
+          "evidence": "X"
+        },
+        {
+          "check": "null_ids",
+          "passed": true,
+          "observed": {
+            "table": "users",
+            "mutated_fields": {
+              "id": null,
+              "email": "null-b7a879f8-7aa8-4d76-9ce4-7c07e0878fc2@example.test",
+              "email_normalized": "null-b7a879f8-7aa8-4d76-9ce4-7c07e0878fc2@example.test"
+            },
+            "integrity_error": "NOT NULL constraint failed: users.id"
+          },
+          "reproduction": "direct INSERT users, fixed mutation {'id': None, 'email': 'null-b7a879f8-7aa8-4d76-9ce4-7c07e0878fc2@example.test', 'email_normalized': 'null-b7a879f8-7aa8-4d76-9ce4-7c07e0878fc2@example.test'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "null_ids",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.id"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "integer_versions",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "49694cc8-1b21-4130-be11-5ea093098dba",
+              "version": 1.5
+            },
+            "integrity_error": "CHECK constraint failed: version>=1 AND typeof(version)='integer'"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': '49694cc8-1b21-4130-be11-5ea093098dba', 'version': 1.5}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "integer_versions",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "7e7e000b-6b16-43a9-bcf3-3d722b0bb8e1",
+              "version": 0
+            },
+            "integrity_error": "CHECK constraint failed: version>=1 AND typeof(version)='integer'"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': '7e7e000b-6b16-43a9-bcf3-3d722b0bb8e1', 'version': 0}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "10b8280a-e091-4e57-8bb2-2566d4c4ca49",
+              "owner_id": "0cef2dc9-759c-4726-b08c-04b1637c635c"
+            },
+            "integrity_error": "FOREIGN KEY constraint failed"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': '10b8280a-e091-4e57-8bb2-2566d4c4ca49', 'owner_id': '0cef2dc9-759c-4726-b08c-04b1637c635c'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "e911a86f-04d9-45c9-a5b3-eabf94f3dbf6",
+              "status": "invalid"
+            },
+            "integrity_error": "CHECK constraint failed: status IN('open','in_progress','resolved','closed')"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': 'e911a86f-04d9-45c9-a5b3-eabf94f3dbf6', 'status': 'invalid'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "8a9f8c88-81bb-4ad3-b094-fe7b07d1bb54",
+              "priority": "urgent"
+            },
+            "integrity_error": "CHECK constraint failed: priority IN('low','normal','high')"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': '8a9f8c88-81bb-4ad3-b094-fe7b07d1bb54', 'priority': 'urgent'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "bdbcb295-f3c7-4037-9216-34a6341e42dc",
+              "owner_id": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.owner_id"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': 'bdbcb295-f3c7-4037-9216-34a6341e42dc', 'owner_id': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "users",
+            "mutated_fields": {
+              "id": "b629fab6-ab46-4c67-b8bc-18a98c8be760"
+            },
+            "integrity_error": "UNIQUE constraint failed: users.email_normalized"
+          },
+          "reproduction": "direct INSERT users, fixed mutation {'id': 'b629fab6-ab46-4c67-b8bc-18a98c8be760'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "idempotency_keys",
+            "mutated_fields": {},
+            "integrity_error": "UNIQUE constraint failed: idempotency_keys.user_id, idempotency_keys.kind, idempotency_keys.key"
+          },
+          "reproduction": "direct INSERT idempotency_keys, fixed mutation {}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "users",
+            "mutated_fields": {
+              "id": "2a29500a-07c9-4c58-8039-2f496e2afbf5",
+              "email": "role-b7a879f8-7aa8-4d76-9ce4-7c07e0878fc2@example.test",
+              "email_normalized": "role-b7a879f8-7aa8-4d76-9ce4-7c07e0878fc2@example.test",
+              "role": "superadmin"
+            },
+            "integrity_error": "CHECK constraint failed: role IN ('client','agent','admin')"
+          },
+          "reproduction": "direct INSERT users, fixed mutation {'id': '2a29500a-07c9-4c58-8039-2f496e2afbf5', 'email': 'role-b7a879f8-7aa8-4d76-9ce4-7c07e0878fc2@example.test', 'email_normalized': 'role-b7a879f8-7aa8-4d76-9ce4-7c07e0878fc2@example.test', 'role': 'superadmin'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "1633ab3f-4328-4129-8626-2e633154816f",
+              "title": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.title"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': '1633ab3f-4328-4129-8626-2e633154816f', 'title': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "c65b5891-cc0c-44ef-b34a-25dc540b8761",
+              "description": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.description"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': 'c65b5891-cc0c-44ef-b34a-25dc540b8761', 'description': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "e31afc7b-6462-4c09-b146-69db55d0dc4a",
+              "status": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.status"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': 'e31afc7b-6462-4c09-b146-69db55d0dc4a', 'status': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "fe999dc5-a884-4141-9a7e-d1b5e9bfd386",
+              "priority": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.priority"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': 'fe999dc5-a884-4141-9a7e-d1b5e9bfd386', 'priority': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "7ab90252-269c-48cc-804b-d541b8ddb41e",
+              "version": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.version"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': '7ab90252-269c-48cc-804b-d541b8ddb41e', 'version': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "f9371abd-50b1-456e-b883-eafca59f0efc",
+              "created_at": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.created_at"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': 'f9371abd-50b1-456e-b883-eafca59f0efc', 'created_at': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "tickets",
+            "mutated_fields": {
+              "id": "ccbfbace-d985-470b-ae51-5e77aeff20f2",
+              "updated_at": null
+            },
+            "integrity_error": "NOT NULL constraint failed: tickets.updated_at"
+          },
+          "reproduction": "direct INSERT tickets, fixed mutation {'id': 'ccbfbace-d985-470b-ae51-5e77aeff20f2', 'updated_at': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "messages",
+            "mutated_fields": {
+              "id": "41bfa0f3-19a9-422a-a4bb-2beb04eb7a96",
+              "ticket_id": "112af175-4c6f-408b-b7d6-70df9a1d7240"
+            },
+            "integrity_error": "FOREIGN KEY constraint failed"
+          },
+          "reproduction": "direct INSERT messages, fixed mutation {'id': '41bfa0f3-19a9-422a-a4bb-2beb04eb7a96', 'ticket_id': '112af175-4c6f-408b-b7d6-70df9a1d7240'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "messages",
+            "mutated_fields": {
+              "id": "f33ee0eb-c595-4a20-bd32-475f185810be",
+              "visibility": "private"
+            },
+            "integrity_error": "CHECK constraint failed: visibility IN('public','internal')"
+          },
+          "reproduction": "direct INSERT messages, fixed mutation {'id': 'f33ee0eb-c595-4a20-bd32-475f185810be', 'visibility': 'private'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "messages",
+            "mutated_fields": {
+              "id": "b1be4199-61a9-4110-b8a0-307c29bfbcf2",
+              "author_id": null
+            },
+            "integrity_error": "NOT NULL constraint failed: messages.author_id"
+          },
+          "reproduction": "direct INSERT messages, fixed mutation {'id': 'b1be4199-61a9-4110-b8a0-307c29bfbcf2', 'author_id': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "table": "sessions",
+            "mutated_fields": {
+              "token_hash": "6604da76-9f03-4c34-8c50-8bbf61d791aa",
+              "user_id": "5b683cee-bb5e-4a6d-9dd0-16c09eb2ec8b"
+            },
+            "integrity_error": "FOREIGN KEY constraint failed"
+          },
+          "reproduction": "direct INSERT sessions, fixed mutation {'token_hash': '6604da76-9f03-4c34-8c50-8bbf61d791aa', 'user_id': '5b683cee-bb5e-4a6d-9dd0-16c09eb2ec8b'}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "null_ids",
+          "passed": true,
+          "observed": {
+            "table": "messages",
+            "mutated_fields": {
+              "id": null
+            },
+            "integrity_error": "NOT NULL constraint failed: messages.id"
+          },
+          "reproduction": "direct INSERT messages, fixed mutation {'id': None}; required DB constraint must reject",
+          "evidence": "X"
+        },
+        {
+          "check": "foreign_keys",
+          "passed": true,
+          "observed": {
+            "actual_app_connections": [
+              {
+                "connection_id": 11,
+                "foreign_keys": 1,
+                "busy_timeout_ms": 80
+              },
+              {
+                "connection_id": 12,
+                "foreign_keys": 1,
+                "busy_timeout_ms": 80
+              }
+            ]
+          },
+          "reproduction": "independent instrumentation verifies FK on actual HTTP handler connections, not only direct harness connections",
+          "evidence": "X"
+        },
+        {
+          "check": "constraints",
+          "passed": true,
+          "observed": {
+            "before_digest": "c61ce78519b8922292227359619c86cdb68fa2c4cb08645b89a0698a05cbfe5f",
+            "after_digest": "c61ce78519b8922292227359619c86cdb68fa2c4cb08645b89a0698a05cbfe5f"
+          },
+          "reproduction": "all direct constraint probes roll back; full business DB preserved",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-17\\fixtures\\test_real_query_trace_detects_0\\ARC-02.json",
+          "sha256": "0c5a57eb01334b32cc02bf821ee186811f40d37f634dc5ae4fd80a07f3f03f15",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "ARC-02:foreign_keys",
+            "ARC-02:null_ids",
+            "ARC-02:integer_versions",
+            "ARC-02:constraints"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "ARC-02:schema_review (R)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "ARC-03",
+      "gate": "B",
+      "status": "NOT_VERIFIED",
+      "expected": "Transactions protégeant les invariants, pas seulement des locks JS/async locaux. Deux connexions SQLite distinctes. Attente du verrou ≤5 s puis 503 DB_BUSY ; distinguer attente configurée et faible surcoût HTTP mesuré. Pas de retry infini ni écriture partielle.",
+      "observed": [
+        {
+          "check": "distinct_connections",
+          "passed": true,
+          "observed": {
+            "different_objects": true
+          },
+          "reproduction": "two actual SQLite connections, not an asyncio lock",
+          "evidence": "X"
+        },
+        {
+          "check": "busy",
+          "passed": true,
+          "observed": {
+            "status": 503,
+            "body": {
+              "error": {
+                "code": "DB_BUSY",
+                "message": "Requête refusée"
+              }
+            },
+            "elapsed_seconds": 0.18076379998819903,
+            "configured_timeout_ms": 80
+          },
+          "reproduction": "hold BEGIN IMMEDIATE on independent connection; real PATCH bounded wait <=5s (+0.5s measured HTTP overhead), 503 DB_BUSY",
+          "evidence": "X"
+        },
+        {
+          "check": "rollback",
+          "passed": true,
+          "observed": {
+            "before_digest": "7f3a9b97257728251917681b0548533736eeaeb68715b00e78a1bbaacab80448",
+            "after_digest": "7f3a9b97257728251917681b0548533736eeaeb68715b00e78a1bbaacab80448"
+          },
+          "reproduction": "busy refusal leaves ticket/audit/idempotency full DB unchanged",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-17\\fixtures\\test_real_query_trace_detects_0\\ARC-03.json",
+          "sha256": "caf4a408ab92596bf76a37d847e442d8a2dec127eb3655e49d34e49423aad2cf",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "ARC-03:distinct_connections",
+            "ARC-03:busy",
+            "ARC-03:rollback"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "ARC-03:transactions (R)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "ARC-04",
+      "gate": "B",
+      "status": "PASS",
+      "expected": "Migration sur base vierge puis rejeu sur base peuplée : données conservées, version de schéma visible. Pas de drop/recreate automatique.",
+      "observed": [
+        {
+          "check": "fresh_migration",
+          "passed": true,
+          "observed": {
+            "runner": {
+              "exit_code": 0,
+              "command": "migrate_fresh",
+              "fixture_only": true
+            },
+            "tables": [
+              "idempotency_keys",
+              "messages",
+              "sessions",
+              "ticket_events",
+              "tickets",
+              "users"
+            ]
+          },
+          "reproduction": "reviewed migration command on disposable empty DB",
+          "evidence": "X"
+        },
+        {
+          "check": "schema_version",
+          "passed": true,
+          "observed": {
+            "version": 1
+          },
+          "reproduction": "schema migration version visible independently",
+          "evidence": "X"
+        },
+        {
+          "check": "replay",
+          "passed": true,
+          "observed": {
+            "runner": {
+              "exit_code": 0,
+              "command": "migrate_replay",
+              "fixture_only": true
+            },
+            "before_digest": "1b3d4bec42b9f24b806b479cf9bc0f3e582b21f995a2490ce82a703253d1dea0",
+            "after_digest": "1b3d4bec42b9f24b806b479cf9bc0f3e582b21f995a2490ce82a703253d1dea0"
+          },
+          "reproduction": "rerun migration with all table rows/sessions/keys retained, no drop/reseed",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-17\\fixtures\\test_real_query_trace_detects_0\\ARC-04.json",
+          "sha256": "eaf977ac0ebc5c90ca684575fe46a3fd2ca50266c0f0fda8e9f66951e119f32e",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "ARC-04:fresh_migration",
+            "ARC-04:schema_version",
+            "ARC-04:replay"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    },
+    {
+      "id": "ARC-05",
+      "gate": "M",
+      "status": "FAIL",
+      "expected": "Index motivés par les listes/messages. Comparer nombre de requêtes pour 1 puis 50 tickets ; une requête liée par ticket déclenche un constat N+1 documenté. Examiner plan/requêtes et impact, sans imposer un nombre arbitraire de couches/index ni un temps absolu dépendant de la machine.",
+      "observed": [
+        {
+          "check": "query_counts",
+          "passed": true,
+          "observed": {
+            "ticket_count": 1,
+            "select_count": 3,
+            "queries": [
+              "SELECT users.*,sessions.csrf,sessions.expires,sessions.revoked FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash='[bound]'",
+              "SELECT * FROM tickets ORDER BY updated_at DESC,id DESC",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'"
+            ]
+          },
+          "reproduction": "compare actual SQL requests for one vs fifty fixture tickets (bound literals redacted)",
+          "evidence": "X"
+        },
+        {
+          "check": "query_counts",
+          "passed": true,
+          "observed": {
+            "ticket_count": 50,
+            "select_count": 52,
+            "queries": [
+              "SELECT users.*,sessions.csrf,sessions.expires,sessions.revoked FROM sessions JOIN users ON users.id=sessions.user_id WHERE token_hash='[bound]'",
+              "SELECT * FROM tickets ORDER BY updated_at DESC,id DESC",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'",
+              "SELECT id FROM messages WHERE ticket_id='[bound]'"
+            ]
+          },
+          "reproduction": "compare actual SQL requests for one vs fifty fixture tickets (bound literals redacted)",
+          "evidence": "X"
+        },
+        {
+          "check": "query_counts",
+          "passed": false,
+          "observed": {
+            "counts_1_50": [
+              3,
+              52
+            ],
+            "scaled_related_queries": [
+              "select id from messages where ticket_id='[bound]'"
+            ]
+          },
+          "reproduction": "same related-ticket SELECT shape executed once for one row and >=50 times for fifty rows: concrete N+1, no arbitrary total-query/time threshold",
+          "evidence": "X"
+        },
+        {
+          "check": "query_plan",
+          "passed": true,
+          "observed": {
+            "query_plan": [
+              [
+                5,
+                0,
+                224,
+                "SCAN tickets USING INDEX ticket_list"
+              ]
+            ]
+          },
+          "reproduction": "real EXPLAIN QUERY PLAN for list/messages, reviewed query symbols",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [
+        "same related-ticket SELECT shape executed once for one row and >=50 times for fifty rows: concrete N+1, no arbitrary total-query/time threshold"
+      ],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-17\\fixtures\\test_real_query_trace_detects_0\\ARC-05.json",
+          "sha256": "c041cfa0f81f5c425cfd5f5f93c077aa21a0a5ef686703efafe8baaf50928c6e",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "ARC-05:query_counts",
+            "ARC-05:query_plan"
+          ],
+          "passed": false,
+          "detail": ""
+        }
+      ],
+      "impact": "contractual invariant violated",
+      "limits": [
+        "ARC-05:index_rationale (R)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "ARC-06",
+      "gate": "M",
+      "status": "FAIL",
+      "expected": "OpenAPI/schémas conformes à l'API réelle ; validation, DTO publics distincts des entités DB, erreurs stables exploitables par le frontend.",
+      "observed": [
+        {
+          "check": "openapi",
+          "passed": false,
+          "observed": {
+            "status": 200,
+            "missing": {
+              "/api/auth/me": [
+                "get"
+              ],
+              "/api/users": [
+                "get",
+                "post"
+              ],
+              "/api/users/{id}": [
+                "patch"
+              ],
+              "/api/assignees": [
+                "get"
+              ],
+              "/api/tickets": [
+                "get",
+                "post"
+              ],
+              "/api/tickets/{id}": [
+                "get",
+                "patch"
+              ],
+              "/api/tickets/{id}/messages": [
+                "get",
+                "post"
+              ],
+              "/api/tickets/{id}/history": [
+                "get"
+              ],
+              "/api/dashboard": [
+                "get"
+              ]
+            },
+            "schema_names": [
+              "HTTPValidationError",
+              "ValidationError"
+            ]
+          },
+          "reproduction": "actual OpenAPI GET; required routes/methods and concrete schemas",
+          "evidence": "X"
+        },
+        {
+          "check": "validation",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "fields": [
+              "owner_id"
+            ]
+          },
+          "reproduction": "strict creation schema rejects unknown/server fields",
+          "evidence": "X"
+        },
+        {
+          "check": "error_dto",
+          "passed": true,
+          "observed": {
+            "error": {
+              "code": "VALIDATION_ERROR",
+              "message": "Requête refusée"
+            }
+          },
+          "reproduction": "errors shaped {error:{code,message,fields?}}",
+          "evidence": "X"
+        },
+        {
+          "check": "validation",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "fields": [
+              "unexpected"
+            ]
+          },
+          "reproduction": "strict creation schema rejects unknown/server fields",
+          "evidence": "X"
+        },
+        {
+          "check": "error_dto",
+          "passed": true,
+          "observed": {
+            "error": {
+              "code": "VALIDATION_ERROR",
+              "message": "Requête refusée"
+            }
+          },
+          "reproduction": "errors shaped {error:{code,message,fields?}}",
+          "evidence": "X"
+        },
+        {
+          "check": "validation",
+          "passed": true,
+          "observed": {
+            "status": 422,
+            "fields": [
+              "version"
+            ]
+          },
+          "reproduction": "strict creation schema rejects unknown/server fields",
+          "evidence": "X"
+        },
+        {
+          "check": "error_dto",
+          "passed": true,
+          "observed": {
+            "error": {
+              "code": "VALIDATION_ERROR",
+              "message": "Requête refusée"
+            }
+          },
+          "reproduction": "errors shaped {error:{code,message,fields?}}",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [
+        "actual OpenAPI GET; required routes/methods and concrete schemas"
+      ],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-17\\fixtures\\test_real_query_trace_detects_0\\ARC-06.json",
+          "sha256": "d01238de460736efc7e67da2227e4f658fa4e062fd54a7cee2233047b616f837",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "ARC-06:openapi",
+            "ARC-06:validation",
+            "ARC-06:error_dto"
+          ],
+          "passed": false,
+          "detail": ""
+        }
+      ],
+      "impact": "contractual invariant violated",
+      "limits": [
+        "ARC-06:public_dto (R)",
+        "ARC-06:frontend_errors (R)",
+        "ARC-06:error_client (X)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "ARC-07",
+      "gate": "M",
+      "status": "PASS",
+      "expected": "Toutes listes bornées, annuaire compris ; paramètres hors limites => 422, détail sans collection non bornée. Tris/totaux conformes au brief ; aucun secret sérialisé ni effet d'une requête refusée.",
+      "observed": [
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "params": {
+              "page": 0
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "params": {
+              "page_size": 51
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "params": {
+              "page": 1,
+              "page_size": 1
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [
+              {
+                "id": "00000000-0000-0000-0000-000000000001",
+                "email": "alice@example.test",
+                "email_normalized": "alice@example.test",
+                "role": "client",
+                "active": true
+              }
+            ],
+            "total": 5,
+            "page": 1,
+            "page_size": 1
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "keys": [
+              [
+                "alice@example.test",
+                "00000000-0000-0000-0000-000000000001"
+              ]
+            ]
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "params": {
+              "page_size": 50
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [
+              {
+                "id": "00000000-0000-0000-0000-000000000001",
+                "email": "alice@example.test",
+                "email_normalized": "alice@example.test",
+                "role": "client",
+                "active": true
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000002",
+                "email": "bob@example.test",
+                "email_normalized": "bob@example.test",
+                "role": "client",
+                "active": true
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000003",
+                "email": "camille@example.test",
+                "email_normalized": "camille@example.test",
+                "role": "agent",
+                "active": true
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000004",
+                "email": "dylan@example.test",
+                "email_normalized": "dylan@example.test",
+                "role": "agent",
+                "active": true
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000005",
+                "email": "emma@example.test",
+                "email_normalized": "emma@example.test",
+                "role": "admin",
+                "active": true
+              }
+            ],
+            "total": 5,
+            "page": 1,
+            "page_size": 50
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "keys": [
+              [
+                "alice@example.test",
+                "00000000-0000-0000-0000-000000000001"
+              ],
+              [
+                "bob@example.test",
+                "00000000-0000-0000-0000-000000000002"
+              ],
+              [
+                "camille@example.test",
+                "00000000-0000-0000-0000-000000000003"
+              ],
+              [
+                "dylan@example.test",
+                "00000000-0000-0000-0000-000000000004"
+              ],
+              [
+                "emma@example.test",
+                "00000000-0000-0000-0000-000000000005"
+              ]
+            ]
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/users",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "params": {
+              "page": 0
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "params": {
+              "page_size": 51
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "params": {
+              "page": 1,
+              "page_size": 1
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [
+              {
+                "id": "00000000-0000-0000-0000-000000000003",
+                "email": "camille@example.test",
+                "email_normalized": "camille@example.test",
+                "role": "agent",
+                "active": true
+              }
+            ],
+            "total": 3,
+            "page": 1,
+            "page_size": 1
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "keys": [
+              [
+                "camille@example.test",
+                "00000000-0000-0000-0000-000000000003"
+              ]
+            ]
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "params": {
+              "page_size": 50
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [
+              {
+                "id": "00000000-0000-0000-0000-000000000003",
+                "email": "camille@example.test",
+                "email_normalized": "camille@example.test",
+                "role": "agent",
+                "active": true
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000004",
+                "email": "dylan@example.test",
+                "email_normalized": "dylan@example.test",
+                "role": "agent",
+                "active": true
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000005",
+                "email": "emma@example.test",
+                "email_normalized": "emma@example.test",
+                "role": "admin",
+                "active": true
+              }
+            ],
+            "total": 3,
+            "page": 1,
+            "page_size": 50
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "keys": [
+              [
+                "camille@example.test",
+                "00000000-0000-0000-0000-000000000003"
+              ],
+              [
+                "dylan@example.test",
+                "00000000-0000-0000-0000-000000000004"
+              ],
+              [
+                "emma@example.test",
+                "00000000-0000-0000-0000-000000000005"
+              ]
+            ]
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/assignees",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "params": {
+              "page": 0
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "params": {
+              "page_size": 51
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "params": {
+              "page": 1,
+              "page_size": 1
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [
+              {
+                "id": "00000000-0000-0000-0000-00000000006f",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 011",
+                "description": "Description fixture ticket 011",
+                "status": "closed",
+                "priority": "low",
+                "assignee_id": null,
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              }
+            ],
+            "total": 12,
+            "page": 1,
+            "page_size": 1
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "keys": [
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-00000000006f"
+              ]
+            ]
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "params": {
+              "page_size": 50
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [
+              {
+                "id": "00000000-0000-0000-0000-00000000006f",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 011",
+                "description": "Description fixture ticket 011",
+                "status": "closed",
+                "priority": "low",
+                "assignee_id": null,
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006e",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 010",
+                "description": "Description fixture ticket 010",
+                "status": "resolved",
+                "priority": "high",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006d",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 009",
+                "description": "Description fixture ticket 009",
+                "status": "in_progress",
+                "priority": "normal",
+                "assignee_id": null,
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006c",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 008",
+                "description": "Description fixture ticket 008",
+                "status": "open",
+                "priority": "low",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006b",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 007",
+                "description": "Description fixture ticket 007",
+                "status": "closed",
+                "priority": "high",
+                "assignee_id": null,
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-00000000006a",
+                "owner_id": "00000000-0000-0000-0000-000000000002",
+                "title": "Ticket 006",
+                "description": "Description fixture ticket 006",
+                "status": "resolved",
+                "priority": "normal",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000069",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 005",
+                "description": "Description fixture ticket 005",
+                "status": "in_progress",
+                "priority": "low",
+                "assignee_id": null,
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000068",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 004",
+                "description": "Description fixture ticket 004",
+                "status": "open",
+                "priority": "high",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000067",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 003",
+                "description": "Description fixture ticket 003",
+                "status": "closed",
+                "priority": "normal",
+                "assignee_id": null,
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000066",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 002",
+                "description": "Description fixture ticket 002",
+                "status": "resolved",
+                "priority": "low",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000065",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 001",
+                "description": "Description fixture ticket 001",
+                "status": "in_progress",
+                "priority": "high",
+                "assignee_id": null,
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              },
+              {
+                "id": "00000000-0000-0000-0000-000000000064",
+                "owner_id": "00000000-0000-0000-0000-000000000001",
+                "title": "Ticket 000",
+                "description": "Description fixture ticket 000",
+                "status": "open",
+                "priority": "normal",
+                "assignee_id": "00000000-0000-0000-0000-000000000003",
+                "version": 1,
+                "created_at": "2027-01-15T08:00:00+00:00",
+                "updated_at": "2027-01-15T08:00:00+00:00"
+              }
+            ],
+            "total": 12,
+            "page": 1,
+            "page_size": 50
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "keys": [
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-00000000006f"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-00000000006e"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-00000000006d"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-00000000006c"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-00000000006b"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-00000000006a"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-000000000069"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-000000000068"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-000000000067"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-000000000066"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-000000000065"
+              ],
+              [
+                "2027-01-15T08:00:00+00:00",
+                "00000000-0000-0000-0000-000000000064"
+              ]
+            ]
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "params": {
+              "page": 0
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "params": {
+              "page_size": 51
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "params": {
+              "page": 1,
+              "page_size": 1
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [],
+            "total": 0,
+            "page": 1,
+            "page_size": 1
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "keys": []
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "params": {
+              "page_size": 50
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [],
+            "total": 0,
+            "page": 1,
+            "page_size": 50
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "keys": []
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/messages",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "params": {
+              "page": 0
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "params": {
+              "page_size": 51
+            },
+            "status": 422
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "refused_unchanged",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "unchanged": true
+          },
+          "reproduction": "refused list query has no business DB effect",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "params": {
+              "page": 1,
+              "page_size": 1
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [],
+            "total": 0,
+            "page": 1,
+            "page_size": 1
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "keys": []
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "bounds",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "params": {
+              "page_size": 50
+            },
+            "status": 200
+          },
+          "reproduction": "all lists including directories enforce page bounds",
+          "evidence": "X"
+        },
+        {
+          "check": "totals",
+          "passed": true,
+          "observed": {
+            "items": [],
+            "total": 0,
+            "page": 1,
+            "page_size": 50
+          },
+          "reproduction": "bounded list envelope exact page/size/total",
+          "evidence": "X"
+        },
+        {
+          "check": "sorts",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "keys": []
+          },
+          "reproduction": "email ASC / messages+history created ASC / tickets updated DESC, ID tie-break",
+          "evidence": "X"
+        },
+        {
+          "check": "no_secrets",
+          "passed": true,
+          "observed": {
+            "path": "/api/tickets/00000000-0000-0000-0000-000000000064/history",
+            "secret_fields": []
+          },
+          "reproduction": "public list DTO has no password/hash/session/token fields",
+          "evidence": "X"
+        },
+        {
+          "check": "detail",
+          "passed": true,
+          "observed": {
+            "status": 200,
+            "collection_lengths": {}
+          },
+          "reproduction": "ticket detail has no observed unbounded embedded messages/events",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-17\\fixtures\\test_real_query_trace_detects_0\\ARC-07.json",
+          "sha256": "1266fc97c3781df670e594f7947520684d45d25a66435c805e14a461ffb3a659",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "ARC-07:bounds",
+            "ARC-07:refused_unchanged",
+            "ARC-07:totals",
+            "ARC-07:sorts",
+            "ARC-07:no_secrets",
+            "ARC-07:detail"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": []
+    },
+    {
+      "id": "ARC-08",
+      "gate": "M",
+      "status": "NOT_VERIFIED",
+      "expected": "UTC explicite, tri stable aux horodatages égaux, expiration testable par horloge contrôlée. Tests indépendants du fuseau local.",
+      "observed": [
+        {
+          "check": "utc",
+          "passed": true,
+          "observed": {
+            "status": 201,
+            "created_at": "2027-01-15T08:00:00+00:00"
+          },
+          "reproduction": "actual server timestamp explicitly UTC",
+          "evidence": "X"
+        },
+        {
+          "check": "ties",
+          "passed": true,
+          "observed": {
+            "expected": [
+              "00000000-0000-0000-0000-00000000006f",
+              "00000000-0000-0000-0000-00000000006e",
+              "00000000-0000-0000-0000-00000000006d",
+              "00000000-0000-0000-0000-00000000006c",
+              "00000000-0000-0000-0000-00000000006b",
+              "00000000-0000-0000-0000-00000000006a",
+              "00000000-0000-0000-0000-000000000069",
+              "00000000-0000-0000-0000-000000000068",
+              "00000000-0000-0000-0000-000000000067",
+              "00000000-0000-0000-0000-000000000066",
+              "00000000-0000-0000-0000-000000000065",
+              "00000000-0000-0000-0000-000000000064"
+            ],
+            "observed": [
+              "00000000-0000-0000-0000-00000000006f",
+              "00000000-0000-0000-0000-00000000006e",
+              "00000000-0000-0000-0000-00000000006d",
+              "00000000-0000-0000-0000-00000000006c",
+              "00000000-0000-0000-0000-00000000006b",
+              "00000000-0000-0000-0000-00000000006a",
+              "00000000-0000-0000-0000-000000000069",
+              "00000000-0000-0000-0000-000000000068",
+              "00000000-0000-0000-0000-000000000067",
+              "00000000-0000-0000-0000-000000000066",
+              "00000000-0000-0000-0000-000000000065",
+              "00000000-0000-0000-0000-000000000064"
+            ]
+          },
+          "reproduction": "same timestamps sort by UUID DESC independent of insert order",
+          "evidence": "X"
+        },
+        {
+          "check": "clock",
+          "passed": true,
+          "observed": {
+            "before": 200,
+            "at_8h": 401
+          },
+          "reproduction": "injectable clock: absolute 8h expiration without activity extension",
+          "evidence": "X"
+        }
+      ],
+      "reproduction": [],
+      "proofs": [
+        {
+          "type": "X",
+          "path": "C:\\Users\\e.millerioux\\.codex\\worktrees\\autospec-rem-dependencies\\squad-ai\\Brainstorming\\Autospec\\artifacts\\remediation\\REM-17\\fixtures\\test_real_query_trace_detects_0\\ARC-08.json",
+          "sha256": "5235228541a4fcacab2e5f22b547e98953ebda872ebdbb1892026dc03476e05a",
+          "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+          "checks": [
+            "ARC-08:utc",
+            "ARC-08:ties",
+            "ARC-08:clock"
+          ],
+          "passed": true,
+          "detail": ""
+        }
+      ],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "ARC-08:timezone_independent (R)",
+        "evidence type R"
+      ]
+    },
+    {
+      "id": "ARC-09",
+      "gate": "M",
+      "status": "NOT_VERIFIED",
+      "expected": "Domaines frontend auth/tickets/users, HTTP/CSRF/erreurs centralisés, DTO typés sans `any` généralisé. Pour un défaut, citer règles dupliquées et risque ou DTO métier non typés et effet ; taille d'un fichier/préférence de bibliothèque seules ne justifient pas FAIL.",
+      "observed": [],
+      "reproduction": [],
+      "proofs": [],
+      "impact": "no observed counterexample; coverage must remain complete",
+      "limits": [
+        "independent source review required",
+        "ARC-09:domains (R)",
+        "ARC-09:http_csrf_errors (R)",
+        "ARC-09:typed_dto (R)",
+        "ARC-09:duplication_risk (R)",
+        "evidence type R"
+      ]
+    }
+  ],
+  "limits": [
+    "bounded contract probes, not an exhaustive arbitrary assertion verifier",
+    "historic PASS is not reused; every current native probe is executed"
+  ],
+  "kind": "independent-pack fixture meta-test, not generated-product conformity",
+  "fixture_fault": "n_plus_one"
+}

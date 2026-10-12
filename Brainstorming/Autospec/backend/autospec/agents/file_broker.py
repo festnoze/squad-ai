@@ -18,6 +18,10 @@ class IsolationViolation(RuntimeError):
     code = "ISOLATION_VIOLATION"
 
 
+class ClaimViolation(IsolationViolation):
+    code = "CLAIM_REPLAN"
+
+
 @dataclass(frozen=True)
 class ExecutionContext:
     run_id: str
@@ -26,6 +30,7 @@ class ExecutionContext:
     version: int = 1
     protected_paths: tuple[str, ...] = ()
     task_id: str | None = None
+    readonly_paths: tuple[str, ...] = ()
 
     def __post_init__(self):
         if self.version != 1 or self.backend != "restricted_tools" or not self.run_id:
@@ -48,6 +53,12 @@ active_execution: contextvars.ContextVar[ExecutionContext | None] = contextvars.
 active_dependency_handler: contextvars.ContextVar[Callable[[Path, dict], object] | None] = contextvars.ContextVar(
     "autospec_dependency_handler", default=None,
 )
+active_write_authorizer: contextvars.ContextVar[Callable[[tuple[str, ...]], None] | None] = contextvars.ContextVar(
+    "autospec_write_authorizer", default=None,
+)
+active_claim_handler: contextvars.ContextVar[Callable[[Path, dict], object] | None] = contextvars.ContextVar(
+    "autospec_claim_handler", default=None,
+)
 
 FILE_PROTOCOL = """
 --- MEDIATED FILE PROTOCOL ---
@@ -65,12 +76,17 @@ identity. Pending requests are NOT installed and are NOT evidence of success.
 Wait for the tool result before continuing. Tests and installs are performed
 separately by the trusted orchestrator. Do not claim you ran them. Once done,
 return the requested final answer WITHOUT a "tool" key.
+File ownership is enforced before every write. To add a path to your reserved
+scope, request {"tool":"claim_expand","paths":["relative/path"],"reason":"why"}
+BEFORE writing. A refusal grants no permission; keep existing work and stop.
 """
 
 _PROTECTED = {".git", ".claude", ".codex", ".agents", ".aws", ".ssh", ".azure",
               ".npmrc", ".pypirc", ".netrc", "credentials.json", ".credentials.json",
               ".autospec", "autospec-state.json", "build-monitor.jsonl", "autospec-interactions.jsonl", "acceptance-contract.json",
-              "contract-baseline.json", "independent-oracle", "verification-snapshot"}
+              "contract-baseline.json", "independent-oracle", "verification-snapshot",
+              ".autospec-bootstrap.json", ".autospec-environment.json", ".mcp.json",
+              "claude.md", "agents.md", "gemini.md"}
 _DEVICE = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)),
            *(f"lpt{i}" for i in range(1, 10))}
 MAX_FILES = 100
@@ -87,7 +103,7 @@ class FileBroker:
         self.context = context
         self.root = context.project_root
 
-    def path(self, relative: str) -> Path:
+    def path(self, relative: str, *, writing: bool = False) -> Path:
         if not isinstance(relative, str) or not relative or len(relative) > 1024:
             raise IsolationViolation("Invalid relative path")
         parts = relative.replace("\\", "/").split("/")
@@ -103,6 +119,9 @@ class FileBroker:
         if any(canonical == p.lower().rstrip("/") or canonical.startswith(p.lower().rstrip("/") + "/")
                for p in self.context.protected_paths):
             raise IsolationViolation("Independent oracle or protected path is inaccessible")
+        if writing and any(canonical == p.lower().rstrip("/") or canonical.startswith(p.lower().rstrip("/") + "/")
+                           for p in self.context.readonly_paths):
+            raise IsolationViolation("Coordinator-owned manifest or native checker is read-only")
         target = self.root
         # Reject ALL links/reparse points, not merely links currently resolving
         # outside the root. There is no model capability to race this broker by
@@ -114,6 +133,13 @@ class FileBroker:
                 info = target.lstat()
                 if _is_link(info) or (stat.S_ISREG(info.st_mode) and info.st_nlink != 1):
                     raise IsolationViolation("Linked files and reparse points are inaccessible")
+            # NTFS short names are not links, but resolve to a different long
+            # spelling. Admit only the canonical spelling so neither protected
+            # paths nor ownership claims can be bypassed with an 8.3 alias.
+            # Checking prefixes also protects a not-yet-existing child below
+            # an aliased directory. WindowsPath equality is case-insensitive.
+            if target.resolve() != target:
+                raise IsolationViolation("Non-canonical filesystem aliases are inaccessible")
         if not target.resolve().is_relative_to(self.root):
             raise IsolationViolation("Path escaped execution root")
         return target
@@ -151,12 +177,15 @@ class FileBroker:
                 size += len(data)
                 if len(data) > MAX_FILE_BYTES or size > MAX_TOTAL_BYTES:
                     raise IsolationViolation("File batch size limit exceeded")
-                prepared.append((self.path(item.get("path")), data))
+                prepared.append((self.path(item.get("path"), writing=True), data))
             # Validate the entire batch before any mutation (traversal late in
             # a request cannot leave an apparently successful partial edit).
+            authorizer = active_write_authorizer.get()
+            if authorizer is not None:
+                authorizer(tuple(target.relative_to(self.root).as_posix() for target, _ in prepared))
             for target, data in prepared:
                 target.parent.mkdir(parents=True, exist_ok=True)
-                self.path(target.relative_to(self.root).as_posix())
+                self.path(target.relative_to(self.root).as_posix(), writing=True)
                 target.write_bytes(data)
             return "OK — fichiers écrits : " + json.dumps([str(p.relative_to(self.root)) for p, _ in prepared])
         if tool == "read_files":

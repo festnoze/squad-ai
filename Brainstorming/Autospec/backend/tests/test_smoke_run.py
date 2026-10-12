@@ -7,6 +7,9 @@ import io
 import socket as socketmod
 import subprocess
 from pathlib import Path
+import pytest
+
+from autospec.orchestrator.isolated_validation import IsolatedValidator
 
 from autospec.agents.scripted import ScriptedRunner
 from autospec.config import settings
@@ -114,10 +117,10 @@ def test_smoke_python_web_not_listening_fails(monkeypatch):
     pipeline = Pipeline(state, ScriptedRunner())
 
     ok, detail = pipeline._smoke_run_python(ws)
-    assert ok is False and "aucun serveur" in detail
+    assert ok is False and "ISOLATION_UNAVAILABLE" in detail
 
 
-def test_smoke_python_web_listening_passes(monkeypatch):
+def test_smoke_python_host_port_never_proves_web_readiness(monkeypatch):
     monkeypatch.setattr(settings, "smoke_run_timeout_s", 5.0)
     monkeypatch.setattr(subprocess, "Popen", lambda *a, **k: _FakeProc(alive=True))
     monkeypatch.setattr(socketmod, "socket", lambda *a, **k: _FakeSock(listening=True))
@@ -127,7 +130,7 @@ def test_smoke_python_web_listening_passes(monkeypatch):
     pipeline = Pipeline(state, ScriptedRunner())
 
     ok, detail = pipeline._smoke_run_python(ws)
-    assert ok is True and "8000" in detail
+    assert ok is False and "asynchronous isolated runtime" in detail
 
 
 def test_smoke_python_web_process_exits_without_listening_fails(monkeypatch):
@@ -140,7 +143,7 @@ def test_smoke_python_web_process_exits_without_listening_fails(monkeypatch):
     pipeline = Pipeline(state, ScriptedRunner())
 
     ok, detail = pipeline._smoke_run_python(ws)
-    assert ok is False and "ne démarre pas le serveur" in detail
+    assert ok is False and "ISOLATION_UNAVAILABLE" in detail
 
 
 def test_expects_web_app_by_profile_and_streams():
@@ -182,14 +185,14 @@ def test_smoke_web_expected_by_intent_without_framework_fails(monkeypatch):
 
     ok, detail = pipeline._smoke_run_python(ws)
     assert ok is False
-    assert "ne démarre pas le serveur" in detail
-    assert "aucun framework web déclaré" in detail
+    assert "ISOLATION_UNAVAILABLE" in detail
 
 
 def test_smoke_python_cli_exit_zero_passes(monkeypatch):
+    monkeypatch.setattr(settings, "smoke_cli_help", False)
     monkeypatch.setattr(
-        subprocess, "Popen",
-        lambda *a, **k: _FakeCliProc(0, "done", stderr=k.get("stderr")),
+        IsolatedValidator, "run_captured",
+        lambda *a, **k: (0, "done", "", None),
     )
     state = _state_with_done_story("smoke-cli-ok")
     ws = _scaffold(workspace_dir(state.id), web=False)
@@ -201,8 +204,8 @@ def test_smoke_python_cli_exit_zero_passes(monkeypatch):
 
 def test_smoke_python_cli_nonzero_fails(monkeypatch):
     monkeypatch.setattr(
-        subprocess, "Popen",
-        lambda *a, **k: _FakeCliProc(1, "boom", stderr=k.get("stderr")),
+        IsolatedValidator, "run_captured",
+        lambda *a, **k: (1, "", "boom", None),
     )
     state = _state_with_done_story("smoke-cli-ko")
     ws = _scaffold(workspace_dir(state.id), web=False)
@@ -331,8 +334,7 @@ async def test_smoke_launch_impossible_is_infra_not_repair(monkeypatch):
 
 
 async def test_smoke_non_python_web_warns_not_silent(monkeypatch):
-    """Finding 6 : un backend web non-python n'est pas skippé silencieusement —
-    un WARNING est journalisé et le gate ne hard-bloque pas."""
+    """An unsupported runtime is NOT_VERIFIED, never a successful skip."""
     from autospec.models import BackendLanguage
 
     monkeypatch.setattr(settings, "smoke_run", True)
@@ -344,6 +346,6 @@ async def test_smoke_non_python_web_warns_not_silent(monkeypatch):
     monkeypatch.setattr(Pipeline, "_log", lambda self, src, line: logs.append(line))
     pipeline = Pipeline(state, ScriptedRunner())
 
-    assert await pipeline._asmoke_phase() is True  # pas de hard-block
-    assert pipeline._delivery_blocked is False
+    assert await pipeline._asmoke_phase() is False
+    assert pipeline._delivery_blocked is True
     assert any("indisponible" in line and "go" in line.lower() for line in logs)

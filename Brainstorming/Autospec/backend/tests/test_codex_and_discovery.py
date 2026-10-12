@@ -1,4 +1,4 @@
-"""Codex CLI provider (mirrors Claude) + live per-provider model discovery."""
+"""Codex parsing remains compatible, but the unconfined backend fails closed."""
 
 import json
 
@@ -35,43 +35,15 @@ def test_extract_codex_text_plain_text_passthrough():
 # --------------------------------------------------------- CodexCliRunner
 
 
-def _patch_codex(monkeypatch, *, stdout="", stderr="", returncode=0):
-    # The runners spawn via _run_tracked(args, input_text, cwd, timeout) → it
-    # returns (returncode, stdout, stderr); patch that seam.
-    def fake_run(args, input_text, cwd, timeout):
-        # Sanity: we drive `codex exec` headless and feed the prompt on stdin.
-        assert args[0] == settings.codex_cmd
-        assert "exec" in args and args[-1] == "-"
-        assert "system" in (input_text or "")  # system prompt prepended
-        return returncode, stdout, stderr
-
-    monkeypatch.setattr("autospec.agents.runner._run_tracked", fake_run)
-
-
-async def test_codex_runner_parses_jsonl(monkeypatch):
-    out = json.dumps({"msg": {"type": "agent_message", "message": '{"status":"green"}'}})
-    _patch_codex(monkeypatch, stdout=out)
-    res = await CodexCliRunner().arun("prompt", "system")
-    assert json.loads(res.text)["status"] == "green"
-
-
-async def test_codex_runner_passes_model(monkeypatch):
-    captured = {}
-
-    def fake_run(args, input_text, cwd, timeout):
-        captured["args"] = args
-        return 0, "hello", ""
-
-    monkeypatch.setattr("autospec.agents.runner._run_tracked", fake_run)
-    await CodexCliRunner().arun("p", "s", model="gpt-5.3-codex")
-    assert "--model" in captured["args"]
-    assert "gpt-5.3-codex" in captured["args"]
-
-
-async def test_codex_runner_nonzero_exit_raises(monkeypatch):
-    _patch_codex(monkeypatch, stdout="", stderr="boom", returncode=2)
-    with pytest.raises(AgentError, match="exited with 2"):
-        await CodexCliRunner().arun("prompt", "system")
+@pytest.mark.parametrize('options', [{}, {'model': 'offline-model'}, {'session_id': 'previous-session'}])
+async def test_codex_runner_refuses_before_spawn_or_charge(monkeypatch, tmp_path, options):
+    def forbidden(*args, **kwargs):
+        pytest.fail('An unqualified Codex shell must never be spawned, including model/session options')
+    monkeypatch.setattr('autospec.agents.runner._run_tracked', forbidden)
+    monkeypatch.setattr('autospec.agents.runner.spawn_owned_process', forbidden)
+    with pytest.raises(AgentError, match='ISOLATION_UNAVAILABLE') as error:
+        await CodexCliRunner().arun('prompt', 'system', cwd=tmp_path, **options)
+    assert error.value.code == 'ISOLATION_UNAVAILABLE' and error.value.usage is None
 
 
 # --------------------------------------------------------- model discovery

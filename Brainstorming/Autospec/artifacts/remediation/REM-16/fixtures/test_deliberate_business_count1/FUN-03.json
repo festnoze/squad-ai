@@ -1,0 +1,265 @@
+{
+  "requirement_id": "FUN-03",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "priority",
+      "passed": true,
+      "observed": {
+        "status": 200,
+        "body": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "low",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 2,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00"
+        }
+      },
+      "reproduction": "staff PATCH priority low",
+      "evidence": "X"
+    },
+    {
+      "check": "priority",
+      "passed": true,
+      "observed": {
+        "status": 200,
+        "body": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 3,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00"
+        }
+      },
+      "reproduction": "staff PATCH priority normal",
+      "evidence": "X"
+    },
+    {
+      "check": "priority",
+      "passed": true,
+      "observed": {
+        "status": 200,
+        "body": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "high",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 4,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00"
+        }
+      },
+      "reproduction": "staff PATCH priority high",
+      "evidence": "X"
+    },
+    {
+      "check": "priority",
+      "passed": true,
+      "observed": {
+        "status": 403,
+        "body": {
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "5d16bc2282f9b30ee01bb94fe9037a57a63d042a74aa08cab8631bfb0256acdc",
+        "after_digest": "5d16bc2282f9b30ee01bb94fe9037a57a63d042a74aa08cab8631bfb0256acdc"
+      },
+      "reproduction": "reject priority high by alice",
+      "evidence": "X"
+    },
+    {
+      "check": "priority",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "5d16bc2282f9b30ee01bb94fe9037a57a63d042a74aa08cab8631bfb0256acdc",
+        "after_digest": "5d16bc2282f9b30ee01bb94fe9037a57a63d042a74aa08cab8631bfb0256acdc"
+      },
+      "reproduction": "reject priority urgent by camille",
+      "evidence": "X"
+    },
+    {
+      "check": "assignment",
+      "passed": true,
+      "observed": {
+        "status": 200
+      },
+      "reproduction": "assign active camille or null",
+      "evidence": "X"
+    },
+    {
+      "check": "assignment",
+      "passed": true,
+      "observed": {
+        "status": 200
+      },
+      "reproduction": "assign active emma or null",
+      "evidence": "X"
+    },
+    {
+      "check": "assignment",
+      "passed": true,
+      "observed": {
+        "status": 200
+      },
+      "reproduction": "assign active None or null",
+      "evidence": "X"
+    },
+    {
+      "check": "assignment",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "7bc401893d35e1e8775a432203a6f414039d471fd9a6b10dd3c396eb91884958",
+        "after_digest": "7bc401893d35e1e8775a432203a6f414039d471fd9a6b10dd3c396eb91884958"
+      },
+      "reproduction": "reject client/inactive/missing assignable",
+      "evidence": "X"
+    },
+    {
+      "check": "assignment",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "7bc401893d35e1e8775a432203a6f414039d471fd9a6b10dd3c396eb91884958",
+        "after_digest": "7bc401893d35e1e8775a432203a6f414039d471fd9a6b10dd3c396eb91884958"
+      },
+      "reproduction": "reject client/inactive/missing assignable",
+      "evidence": "X"
+    },
+    {
+      "check": "assignment",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "7bc401893d35e1e8775a432203a6f414039d471fd9a6b10dd3c396eb91884958",
+        "after_digest": "7bc401893d35e1e8775a432203a6f414039d471fd9a6b10dd3c396eb91884958"
+      },
+      "reproduction": "reject client/inactive/missing assignable",
+      "evidence": "X"
+    },
+    {
+      "check": "assignment",
+      "passed": true,
+      "observed": {
+        "status": 403,
+        "body": {
+          "error": {
+            "code": "FORBIDDEN",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "7bc401893d35e1e8775a432203a6f414039d471fd9a6b10dd3c396eb91884958",
+        "after_digest": "7bc401893d35e1e8775a432203a6f414039d471fd9a6b10dd3c396eb91884958"
+      },
+      "reproduction": "client cannot assign/unassign own ticket",
+      "evidence": "X"
+    },
+    {
+      "check": "closed",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "INVALID_TRANSITION",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "1733d8991a34891dd91249334edafc75a12e613a97259648cd537ce153f6d33c",
+        "after_digest": "1733d8991a34891dd91249334edafc75a12e613a97259648cd537ce153f6d33c"
+      },
+      "reproduction": "manual unassignment of closed ticket",
+      "evidence": "X"
+    },
+    {
+      "check": "closed",
+      "passed": true,
+      "observed": {
+        "status": 200
+      },
+      "reproduction": "priority change remains allowed on closed ticket",
+      "evidence": "X"
+    },
+    {
+      "check": "disable_exception",
+      "passed": true,
+      "observed": {
+        "status": 200,
+        "state": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "closed",
+          "priority": "high",
+          "assignee_id": null,
+          "version": 3,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 2,
+          "message_count": 0
+        }
+      },
+      "reproduction": "disable assigned account clears even closed assignment",
+      "evidence": "X"
+    },
+    {
+      "check": "closed",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "INVALID_TRANSITION",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "cbe02c7317f5422890c1a05a40f8fa1ed2e4c85fa11719df788edebe52a4618b",
+        "after_digest": "cbe02c7317f5422890c1a05a40f8fa1ed2e4c85fa11719df788edebe52a4618b"
+      },
+      "reproduction": "effective manual assignment change with resulting closed state is forbidden atomically",
+      "evidence": "X"
+    }
+  ]
+}

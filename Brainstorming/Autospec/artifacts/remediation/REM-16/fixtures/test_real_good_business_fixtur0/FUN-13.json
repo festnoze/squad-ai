@@ -1,0 +1,186 @@
+{
+  "requirement_id": "FUN-13",
+  "snapshot_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "contract_hash": "f6cfe2257d93295e0bda89d39d840ee407f238b9ab8c8ff8d57d39194ed8d0bd",
+  "observed": [
+    {
+      "check": "noop",
+      "passed": true,
+      "observed": {
+        "status": 200,
+        "before_digest": "fc76e6a6cd2d64020db2ec7cb4ef2e7c75862a9dfc2361cfad04c948f594fbaf",
+        "after_digest": "fc76e6a6cd2d64020db2ec7cb4ef2e7c75862a9dfc2361cfad04c948f594fbaf"
+      },
+      "reproduction": "same-version no-op leaves all business bytes unchanged",
+      "evidence": "X"
+    },
+    {
+      "check": "stale_noop",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "VERSION_CONFLICT",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7",
+        "after_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7"
+      },
+      "reproduction": "stale expected_version rejected even for current identical value",
+      "evidence": "X"
+    },
+    {
+      "check": "stale_noop",
+      "passed": true,
+      "observed": {
+        "error": {
+          "code": "VERSION_CONFLICT",
+          "message": "Requête refusée"
+        }
+      },
+      "reproduction": "stable VERSION_CONFLICT code",
+      "evidence": "X"
+    },
+    {
+      "check": "atomic_patch",
+      "passed": true,
+      "observed": {
+        "status": 409,
+        "body": {
+          "error": {
+            "code": "INVALID_TRANSITION",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7",
+        "after_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7"
+      },
+      "reproduction": "invalid final workflow + valid priority must not partially apply",
+      "evidence": "X"
+    },
+    {
+      "check": "atomic_patch",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7",
+        "after_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7"
+      },
+      "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+      "evidence": "X"
+    },
+    {
+      "check": "atomic_patch",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7",
+        "after_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7"
+      },
+      "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+      "evidence": "X"
+    },
+    {
+      "check": "atomic_patch",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7",
+        "after_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7"
+      },
+      "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+      "evidence": "X"
+    },
+    {
+      "check": "atomic_patch",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7",
+        "after_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7"
+      },
+      "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+      "evidence": "X"
+    },
+    {
+      "check": "atomic_patch",
+      "passed": true,
+      "observed": {
+        "status": 422,
+        "body": {
+          "error": {
+            "code": "VALIDATION_ERROR",
+            "message": "Requête refusée"
+          }
+        },
+        "before_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7",
+        "after_digest": "d6e5ed36a8a6608c66e18b177ecd4e4759381e1fff07c906c7c8fd8a67f6fdc7"
+      },
+      "reproduction": "PATCH requires integer expected_version >=1 and a permitted mutable field only",
+      "evidence": "X"
+    },
+    {
+      "check": "message_version",
+      "passed": true,
+      "observed": {
+        "status": 201,
+        "before": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 2,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 1,
+          "message_count": 1
+        },
+        "after": {
+          "id": "00000000-0000-0000-0000-000000000064",
+          "owner_id": "00000000-0000-0000-0000-000000000001",
+          "title": "Ticket 000",
+          "description": "Description fixture ticket 000",
+          "status": "open",
+          "priority": "normal",
+          "assignee_id": "00000000-0000-0000-0000-000000000003",
+          "version": 3,
+          "created_at": "2027-01-15T08:00:00+00:00",
+          "updated_at": "2027-01-15T08:00:00+00:00",
+          "audit_count": 2,
+          "message_count": 2
+        }
+      },
+      "reproduction": "one effective message -> one version and one event",
+      "evidence": "X"
+    }
+  ]
+}

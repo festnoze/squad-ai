@@ -8,6 +8,58 @@ from autospec.orchestrator.pipeline import Pipeline, _BUILD_ITEM
 from autospec import storage
 
 
+async def test_mediated_tool_wait_is_not_counted_as_a_provider_call():
+    from autospec.agents.runner import observe_provider
+    tool_wait, release = asyncio.Event(), asyncio.Event()
+    class Mediated:
+        reports_provider_turns = True
+        async def arun(self, *args, **kwargs):
+            await observe_provider(True)
+            assert pipeline._tracked._provider_calls == 1
+            await observe_provider(False)
+            tool_wait.set()
+            await release.wait()
+            await observe_provider(True)
+            assert pipeline._tracked._provider_calls == 1
+            await observe_provider(False)
+            return AgentResult("ok", cost_usd=.1)
+    pipeline = Pipeline(ProjectState(id="mediated-activity", name="test", goal="demo",
+                                    phase=PipelinePhase.BUILD, budget_usd=1), Mediated())
+    active = asyncio.create_task(pipeline._tracked.arun("p", "s"))
+    await asyncio.wait_for(tool_wait.wait(), 2)
+    row = next(iter(pipeline.state.agent_activity.values()))
+    assert row["phase"] == "mediated_tools"
+    assert row["logical_call_active"] is True
+    assert row["active_provider_calls"] == 0
+    assert pipeline._tracked._active_calls == 1  # budget remains reserved
+    waiting = asyncio.create_task(pipeline._tracked.arun("p", "s"))
+    await asyncio.sleep(0)
+    assert any(a["phase"] == "waiting_budget" and a["active_provider_calls"] == 0
+               for a in pipeline.state.agent_activity.values())
+    waiting.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await waiting
+    release.set()
+    await active
+    assert pipeline._tracked._provider_calls == 0
+    assert pipeline.state.agent_activity == {}
+
+
+def test_restart_between_mediated_turns_preserves_usage_uncertainty(monkeypatch, tmp_path):
+    from autospec.config import settings
+    from autospec.api import server
+    monkeypatch.setattr(settings, "workspace_root", tmp_path)
+    monkeypatch.setattr(server, "pipelines", {})
+    storage.save_state(ProjectState(id="tool-interrupted", name="test", goal="demo",
+        phase=PipelinePhase.BUILD, agent_activity={"T1": {
+            "phase": "mediated_tools", "logical_call_active": True,
+            "active_provider_calls": 0}}))
+    server.recover_projects()
+    state = storage.load_state("tool-interrupted")
+    assert state.usage.unreported_calls == 1
+    assert state.generation_checkpoint["cost_incomplete"] is True
+
+
 async def test_checkpoint_failure_prevents_provider_spend(monkeypatch):
     from autospec.orchestrator import pipeline as module
     class Forbidden:
@@ -106,15 +158,17 @@ def test_abrupt_owned_worker_is_reconciled_on_restart(tmp_path, monkeypatch, sta
         f"save_state(ProjectState(id='worker',name='worker',goal='demo',phase=PipelinePhase.BUILD,"
         f"generation_checkpoint={{'run_id':'one','stage':{stage!r}}})); time.sleep(30)"
     )
-    child = subprocess.Popen([sys.executable, "-c", program])
+    from autospec.agents.runner import spawn_owned_process, close_owned_process
+    child = spawn_owned_process([sys.executable, "-c", program], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     try:
-        deadline = time.monotonic() + 5
+        deadline = time.monotonic() + 30
         while not (root / "worker/autospec-state.json").exists() and time.monotonic() < deadline:
+            if child.poll() is not None:
+                pytest.fail("owned worker exited before checkpoint: " + child.stdout.read().decode("utf-8", "replace"))
             time.sleep(.02)
         assert (root / "worker/autospec-state.json").exists()
     finally:
-        child.kill()  # exact owned handle, no descendants or name matching
-        child.wait(timeout=5)
+        close_owned_process(child)  # exact owned Job, including descendants
     monkeypatch.setattr(settings, "workspace_root", root)
     monkeypatch.setattr(server, "pipelines", {})
     server.recover_projects()

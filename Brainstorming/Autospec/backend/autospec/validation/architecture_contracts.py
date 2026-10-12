@@ -45,6 +45,8 @@ class ArchitectureContractVerifier(ProbePack):
     ui_checks = {"error_client"}
 
     def connect(self):
+        if self.adapter.manifest.metadata.get("independent_fixture") is not True:
+            raise AdapterUnavailable("host SQLite fallback is for an explicitly independent fixture only; exported DB is not live")
         fn=getattr(self.adapter,"connect_db",None)
         if fn is None: raise AdapterUnavailable("true SQLite connection port absent")
         connection=fn()
@@ -85,38 +87,47 @@ class ArchitectureContractVerifier(ProbePack):
 
     async def _ARC02(self):
         await self.prepare(); before=await self.state()
-        connections=[self.connect(),self.connect()]
+        live=getattr(self.adapter,"live_sqlite",False) is True
+        connections=[] if live else [self.connect(),self.connect()]
         try:
             for con in connections:
                 self.check("foreign_keys",con.execute("PRAGMA foreign_keys").fetchone()[0]==1,
                            {"enabled":con.execute("PRAGMA foreign_keys").fetchone()[0]},"each distinct app SQLite connection enables FK")
-            con=connections[0]; users=self.table("users"); tickets=self.table("tickets"); keys=self.table("idempotency_keys")
+            con=connections[0] if connections else None
+            async def probe(logical,changes,name):
+                if not live:
+                    return self.insert_counterexample(con,self.table(logical),changes,name)
+                result=await self.adapter.command("constraint_probe",table=logical,changes=changes)
+                if not isinstance(result,dict) or type(result.get("rejected")) is not bool or result.get("rolled_back") is not True or result.get("foreign_keys")!=1 or not result.get("connection_id"):
+                    raise AdapterUnavailable("real live SQLite rollback/constraint observation absent")
+                self.check(name,result["rejected"],{"table":logical,"mutated_fields":changes,"actual_result":result},
+                    f"owned live SQLite INSERT {logical}, fixed invariant mutation {changes}; rollback in independent connection")
             await self.create()  # populate messages/events through actual API, not fabricated constraint results
             await self.message()
             # Compare preservation after these deliberate seed writes, before direct SQL probes.
             before=await self.state()
             suffix=str(uuid4())
             # SQLite TEXT PRIMARY KEY alone famously permits NULL; explicit NOT NULL required.
-            self.insert_counterexample(con,users,{"id":None,"email":f"null-{suffix}@example.test","email_normalized":f"null-{suffix}@example.test"},"null_ids")
-            self.insert_counterexample(con,tickets,{"id":None},"null_ids")
-            self.insert_counterexample(con,tickets,{"id":str(uuid4()),"version":1.5},"integer_versions")
-            self.insert_counterexample(con,tickets,{"id":str(uuid4()),"version":0},"integer_versions")
-            self.insert_counterexample(con,tickets,{"id":str(uuid4()),"owner_id":str(uuid4())},"constraints")
-            self.insert_counterexample(con,tickets,{"id":str(uuid4()),"status":"invalid"},"constraints")
-            self.insert_counterexample(con,tickets,{"id":str(uuid4()),"priority":"urgent"},"constraints")
-            self.insert_counterexample(con,tickets,{"id":str(uuid4()),"owner_id":None},"constraints")
-            self.insert_counterexample(con,users,{"id":str(uuid4())},"constraints")
-            self.insert_counterexample(con,keys,{},"constraints")
-            self.insert_counterexample(con,users,{"id":str(uuid4()),"email":f"role-{suffix}@example.test",
+            await probe("users",{"id":None,"email":f"null-{suffix}@example.test","email_normalized":f"null-{suffix}@example.test"},"null_ids")
+            await probe("tickets",{"id":None},"null_ids")
+            await probe("tickets",{"id":str(uuid4()),"version":1.5},"integer_versions")
+            await probe("tickets",{"id":str(uuid4()),"version":0},"integer_versions")
+            await probe("tickets",{"id":str(uuid4()),"owner_id":str(uuid4())},"constraints")
+            await probe("tickets",{"id":str(uuid4()),"status":"invalid"},"constraints")
+            await probe("tickets",{"id":str(uuid4()),"priority":"urgent"},"constraints")
+            await probe("tickets",{"id":str(uuid4()),"owner_id":None},"constraints")
+            await probe("users",{"id":str(uuid4())},"constraints")
+            await probe("idempotency_keys",{},"constraints")
+            await probe("users",{"id":str(uuid4()),"email":f"role-{suffix}@example.test",
                 "email_normalized":f"role-{suffix}@example.test","role":"superadmin"},"constraints")
             for column in ("title","description","status","priority","version","created_at","updated_at"):
-                self.insert_counterexample(con,tickets,{"id":str(uuid4()),column:None},"constraints")
+                await probe("tickets",{"id":str(uuid4()),column:None},"constraints")
             for logical,changes in (("messages",{"id":str(uuid4()),"ticket_id":str(uuid4())}),
                 ("messages",{"id":str(uuid4()),"visibility":"private"}),
                 ("messages",{"id":str(uuid4()),"author_id":None}),
                 ("sessions",{"token_hash":str(uuid4()),"user_id":str(uuid4())})):
-                self.insert_counterexample(con,self.table(logical),changes,"constraints")
-            self.insert_counterexample(con,self.table("messages"),{"id":None},"null_ids")
+                await probe(logical,changes,"constraints")
+            await probe("messages",{"id":None},"null_ids")
             pragmas=await self.adapter.observe("app_connection_pragmas")
             if not isinstance(pragmas,list) or len(pragmas)<2:
                 raise AdapterUnavailable("actual API SQLite connection PRAGMA instrumentation absent")
@@ -130,31 +141,50 @@ class ArchitectureContractVerifier(ProbePack):
     async def _ARC03(self):
         await self.prepare(); await self.adapter.login("camille")
         before=await self.state(); version=(await self.ticket_state(self.ticket()))["version"]
-        holder=self.connect(); other=self.connect()
+        live=getattr(self.adapter,"live_sqlite",False) is True
+        holder=other=None
         try:
-            self.check("distinct_connections",holder is not other,{"different_objects":holder is not other},"two actual SQLite connections, not an asyncio lock")
-            other.close(); holder.execute("BEGIN IMMEDIATE")
+            if live:
+                lock=await self.adapter.command("hold_write_lock")
+                pragmas=await self.adapter.observe("app_connection_pragmas")
+                if lock.get("held") is not True or not lock.get("connection_id") or not pragmas:
+                    raise AdapterUnavailable("owned live SQLite write-lock observation absent")
+                ids={p["connection_id"] for p in pragmas}
+                self.check("distinct_connections",lock["connection_id"] not in ids,
+                    {"lock_connection":lock["connection_id"],"app_connections":sorted(ids)},"actual separate live-volume connection holds BEGIN IMMEDIATE; no exported copy lock")
+            else:
+                holder=self.connect();other=self.connect()
+                self.check("distinct_connections",holder is not other,{"different_objects":holder is not other},"two actual independent-fixture SQLite connections")
+                other.close(); holder.execute("BEGIN IMMEDIATE")
             start=time.monotonic()
             response=await self.patch({"priority":"high","expected_version":version})
             elapsed=time.monotonic()-start
             configured=await self.adapter.observe("db_busy_timeout_ms")
+            waits=await self.adapter.observe("db_busy_waits") if live else []
+            measured=max((p["elapsed_seconds"] for p in waits),default=elapsed)
+            if live and not waits: raise AdapterUnavailable("actual SQLite busy wait timing absent")
             self.check("busy",response.status_code==503 and self.error(response,"DB_BUSY") and
-                0 <= configured <=5000 and elapsed<=5.5,
-                {"status":response.status_code,"body":self.body(response),"elapsed_seconds":elapsed,"configured_timeout_ms":configured},
+                0 <= configured <=5000 and measured<=5.5,
+                {"status":response.status_code,"body":self.body(response),"http_elapsed_seconds":elapsed,"sqlite_busy_elapsed_seconds":measured,"configured_timeout_ms":configured},
                 "hold BEGIN IMMEDIATE on independent connection; real PATCH bounded wait <=5s (+0.5s measured HTTP overhead), 503 DB_BUSY")
         finally:
-            holder.rollback(); holder.close()
+            if live: await self.adapter.command("release_write_lock")
+            elif holder is not None: holder.rollback();holder.close()
         after=await self.state()
         self.check("rollback",before==after,{"before_digest":digest(before),"after_digest":digest(after)},"busy refusal leaves ticket/audit/idempotency full DB unchanged")
 
     async def _ARC04(self):
         await self.prepare(migration_scenario=True)
         fresh=await self.adapter.command("migrate_fresh")
-        con=self.connect()
-        try:
-            present={r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-            version=con.execute("PRAGMA user_version").fetchone()[0]
-        finally: con.close()
+        if getattr(self.adapter,"live_sqlite",False) is True:
+            schema=await self.adapter.observe("schema")
+            present={r["name"] for r in schema["tables"]};version=schema["user_version"]
+        else:
+            con=self.connect()
+            try:
+                present={r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                version=con.execute("PRAGMA user_version").fetchone()[0]
+            finally: con.close()
         self.check("fresh_migration",fresh.get("exit_code")==0 and
             {self.table(t) for t in ("users","sessions","tickets","messages","ticket_events","idempotency_keys")}<=present,
             {"runner":fresh,"tables":sorted(present)},"reviewed migration command on disposable empty DB")

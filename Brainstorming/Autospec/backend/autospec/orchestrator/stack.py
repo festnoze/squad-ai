@@ -183,8 +183,11 @@ def resolve(state: ProjectState) -> dict[str, str]:
     text = f"{state.goal}\n{state.brief}".lower()
     affirmative = _affirmative_constraints(text)
     candidates = _backend_candidates(text)
-    alternatives = re.search(r"\b(?:ou|or|alternatives?|comparer|compare|comparaison|versus|vs|préférer|prefer)\b", affirmative)
-    if len(candidates) > 1 and not alternatives:
+    technology = r"(?:python|fastapi|rust|axum|golang|go|node(?:\.js|js)?)"
+    assignment = r"\b(?:back[- ]?end|api|serveur|server|langage|language)\s*[:=]?\s*(?:(?:en|in|using|avec|with|écrit|written)\s+){0,3}(" + technology + r")\b"
+    assigned = _backend_candidates("\n".join(m[0] for m in re.finditer(assignment, affirmative, re.I)))
+    alternatives = re.search(r"\b" + technology + r"\s+(?:(?:ou|or|versus|vs)(?:\s+bien)?)\s+" + technology + r"\b", affirmative, re.I)
+    if len(candidates) > 1 and len(assigned) > 1 and not alternatives:
         raise ValueError("Contraintes de backend contradictoires : plusieurs langages exigés sans choix d'alternative.")
     prose_backend = explicit_backend(text)
     if requested.get("backend") and prose_backend and requested["backend"] != prose_backend:

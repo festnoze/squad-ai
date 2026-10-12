@@ -269,6 +269,8 @@ class Task(BaseModel):
     solo_attempted: bool = False
     last_error: str = ""
     files_hint: list[str] = Field(default_factory=list)   # files/zones it expects to touch
+    requirement_ids: list[str] = Field(default_factory=list)
+    uses_contracts: list[str] = Field(default_factory=list)
     split_depth: int = 0  # how many adaptive failure-splits produced/refined this task (bounds recursion)
     # PO pipeline (S1): complexity is a first-order JUDGMENT produced at plan
     # time ("trivial" | "standard" | "complex", "" = legacy/not estimated) and
@@ -330,6 +332,9 @@ class UserStory(BaseModel):
     # status is DERIVED from its tasks (see ``effective_status``).
     stream: str = ""
     tasks: list[Task] = Field(default_factory=list)
+    files_hint: list[str] = Field(default_factory=list)
+    requirement_ids: list[str] = Field(default_factory=list)
+    uses_contracts: list[str] = Field(default_factory=list)
     # Technical Story (TS, RFC technical-stories): a non-functional CONTAINER born
     # from splitting a too-big task into finer sub-tasks. ``technical`` flips the
     # node kind (no functional Gherkin → a technical ``contract``); ``parent_id`` is
@@ -657,6 +662,13 @@ class ProjectState(BaseModel):
     language_rationale: str = ""
     # A persisted decision made before scaffolding; agents build on this contract.
     technical_stack: dict[str, str] = Field(default_factory=dict)
+    # Only identities are stored with editable product state. Full, reviewed
+    # sources and formal facts live in a supervisor-owned external oracle.
+    acceptance_contract_hash: str = ""
+    acceptance_max_lots: int = 7
+    acceptance_result: dict = Field(default_factory=dict)
+    plan_admission: dict = Field(default_factory=dict)
+    plan_findings: list[dict] = Field(default_factory=list)
     # REM-03/22: durable latest checkpoint and bounded live activity metadata.
     # Sidecar-compatible defaults keep earlier saved projects loadable.
     generation_checkpoint: dict = Field(default_factory=dict)

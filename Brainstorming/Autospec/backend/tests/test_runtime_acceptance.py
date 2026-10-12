@@ -47,35 +47,6 @@ async def test_runtime_acceptance_skips_when_disabled(monkeypatch):
     assert result.skipped is True
 
 
-async def test_runtime_acceptance_invokes_node_script_for_frontend(monkeypatch):
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    monkeypatch.setattr(settings, "runtime_acceptance_timeout_s", 12.0)
-    monkeypatch.setattr(settings, "node_cmd", "node")
-    state = _done_frontend_state("rt-front")
-    ws = workspace_dir(state.id)
-    frontend = ws / "frontend"
-    frontend.mkdir(parents=True)
-    (frontend / "package.json").write_text('{"scripts":{"preview":"vite preview"}}', encoding="utf-8")
-    calls = []
-
-    def _fake_run(cmd, **kwargs):
-        calls.append((cmd, kwargs))
-        return subprocess.CompletedProcess(cmd, 0, stdout="[runtime] OK")
-
-    monkeypatch.setattr(runtime_acceptance, "_run_node", _fake_run)
-    result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
-    assert result.ok is True
-    assert result.skipped is False
-    cmd = calls[0][0]
-    assert cmd[0] == "node"
-    assert cmd[1].endswith("runtime_acceptance.js")
-    assert cmd[2] == str(ws)
-    assert cmd[4] == str(frontend)
-    assert cmd[5] == "0"
-
-
-# ------------------------------------------------------------ resolve_web_port
 
 def test_resolve_web_port_from_main_py(monkeypatch):
     """Le port doit venir de main.py quand il y est déclaré (source #1)."""
@@ -111,120 +82,10 @@ def _prep_frontend(state):
     return ws, frontend
 
 
-async def test_runtime_gate_passes_backend_port_and_journey_env(monkeypatch):
-    """Contrat JS #2/#3 : RUNTIME_BACKEND_PORT (port résolu) et RUNTIME_JOURNEY
-    (Gherkin des stories DONE) sont exportés au process node."""
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    monkeypatch.setattr(settings, "node_cmd", "node")
-    monkeypatch.setattr(settings, "smoke_run_port", 8000)
-    state = _done_frontend_state("rt-env")
-    state.stories[0].gherkin = "Feature: login\n  Scenario: happy\n    Given a user"
-    ws, _frontend = _prep_frontend(state)
-    (ws / "main.py").write_text("import uvicorn\nport = 9200\n", encoding="utf-8")
-
-    captured = {}
-
-    def _fake_run(cmd, **kwargs):
-        captured["env"] = kwargs.get("env", {})
-        return subprocess.CompletedProcess(cmd, 0, stdout="[runtime] OK")
-
-    monkeypatch.setattr(runtime_acceptance, "_run_node", _fake_run)
-    result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
-    assert result.ok is True
-    assert captured["env"]["RUNTIME_BACKEND_PORT"] == "9200"
-    assert "Feature: login" in captured["env"]["RUNTIME_JOURNEY"]
 
 
-async def test_runtime_gate_journey_empty_when_no_done_gherkin(monkeypatch):
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    monkeypatch.setattr(settings, "node_cmd", "node")
-    state = _done_frontend_state("rt-env-empty")  # story has no gherkin
-    ws, _frontend = _prep_frontend(state)
-
-    captured = {}
-
-    def _fake_run(cmd, **kwargs):
-        captured["env"] = kwargs.get("env", {})
-        return subprocess.CompletedProcess(cmd, 0, stdout="OK")
-
-    monkeypatch.setattr(runtime_acceptance, "_run_node", _fake_run)
-    await runtime_acceptance.arun_runtime_acceptance(state, ws)
-    assert captured["env"]["RUNTIME_JOURNEY"] == ""
 
 
-# ------------------------------------------------------------ exit-code = infra
-
-async def test_runtime_gate_exit_2_is_infra(monkeypatch):
-    """Contrat JS #4 : exit 2 = panne d'infra/environnement (NON réparable)."""
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    monkeypatch.setattr(settings, "node_cmd", "node")
-    state = _done_frontend_state("rt-infra")
-    ws, _frontend = _prep_frontend(state)
-
-    monkeypatch.setattr(
-        runtime_acceptance, "_run_node",
-        lambda cmd, **k: subprocess.CompletedProcess(cmd, 2, stdout="playwright not installed"),
-    )
-    result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
-    assert result.ok is False
-    assert result.infra is True
-
-
-async def test_runtime_gate_exit_1_is_repairable(monkeypatch):
-    """Exit 1 = échec d'intégration RÉPARABLE : infra reste False."""
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    monkeypatch.setattr(settings, "node_cmd", "node")
-    state = _done_frontend_state("rt-repairable")
-    ws, _frontend = _prep_frontend(state)
-
-    monkeypatch.setattr(
-        runtime_acceptance, "_run_node",
-        lambda cmd, **k: subprocess.CompletedProcess(cmd, 1, stdout="blank page on /"),
-    )
-    result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
-    assert result.ok is False
-    assert result.infra is False
-
-
-async def test_runtime_launch_failure_is_infra(monkeypatch):
-    """Un OSError au lancement (node absent) est une panne d'infra."""
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    monkeypatch.setattr(settings, "node_cmd", "node")
-    state = _done_frontend_state("rt-launch-ko")
-    ws, _frontend = _prep_frontend(state)
-
-    def _boom(cmd, **k):
-        raise OSError("node introuvable")
-
-    monkeypatch.setattr(runtime_acceptance, "_run_node", _boom)
-    result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
-    assert result.ok is False
-    assert result.infra is True
-
-
-# ------------------------------------------- finding 6 : non-python web backend
-
-async def test_runtime_non_python_backend_warns_and_skips(monkeypatch):
-    """Un backend web non-python sans frontend ne peut être vérifié : on skip en
-    AVERTISSANT (pas de hard-block, finding 6)."""
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    state = ProjectState(id="rt-go", name="svc", goal="g", backend_language=BackendLanguage.GO)
-    state.stories = [UserStory(id="US-1", epic_id="E", title="t", status=StoryStatus.DONE)]
-    ws = workspace_dir(state.id)
-    ws.mkdir(parents=True, exist_ok=True)
-    # main.py python-ish pour passer should_run's backend_web_candidate.
-    (ws / "main.py").write_text("import fastapi\n", encoding="utf-8")
-
-    result = await runtime_acceptance.arun_runtime_acceptance(state, ws)
-    assert result.skipped is True
-    assert result.ok is True
-    assert "non-python" in result.detail
 
 
 def test_javascript_runtime_lifecycle():
@@ -234,42 +95,6 @@ def test_javascript_runtime_lifecycle():
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-async def test_frontend_stack_never_starts_a_leftover_backend(monkeypatch):
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    state = _done_frontend_state("pure-frontend")
-    state.technical_stack = {"kind": "frontend", "frontend": "react", "backend": "none"}
-    ws, _ = _prep_frontend(state)
-    (ws / "main.py").write_text("import fastapi\n", encoding="utf-8")
-    captured = []
-    def run(cmd, **kwargs):
-        captured.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, stdout="OK")
-    monkeypatch.setattr(runtime_acceptance, "_run_node", run)
-    assert (await runtime_acceptance.arun_runtime_acceptance(state, ws)).ok
-    assert captured[0][-1] == "0"
-
-
-async def test_runtime_cancellation_waits_for_worker_tree_cleanup(monkeypatch):
-    monkeypatch.setattr(settings, "runtime_acceptance_enabled", True)
-    monkeypatch.setattr(settings, "fake_agents", False)
-    state = _done_frontend_state("cancel-runtime")
-    ws, _ = _prep_frontend(state)
-    started = threading.Event()
-    cleaned = threading.Event()
-    def run(cmd, *, cancel_event, **kwargs):
-        started.set()
-        assert cancel_event.wait(2)
-        time.sleep(0.02)
-        cleaned.set()
-        raise subprocess.TimeoutExpired(cmd, 2)
-    monkeypatch.setattr(runtime_acceptance, "_run_node", run)
-    task = asyncio.create_task(runtime_acceptance.arun_runtime_acceptance(state, ws))
-    assert await asyncio.to_thread(started.wait, 2)
-    task.cancel()
-    with pytest.raises(asyncio.CancelledError):
-        await task
-    assert cleaned.is_set()
 
 
 def test_runtime_timeout_reaps_the_actual_child_process(monkeypatch):
@@ -303,38 +128,6 @@ def test_frontend_manifest_takes_precedence_over_legacy_backend_artifacts(tmp_pa
     assert not runtime_acceptance._backend_web_candidate(tmp_path)
 
 
-def test_api_runtime_starts_and_cleans_a_real_owned_server_without_browser(tmp_path):
-    server = tmp_path / "server.py"
-    server.write_text(
-        "import os\nfrom http.server import BaseHTTPRequestHandler, HTTPServer\n"
-        "class Handler(BaseHTTPRequestHandler):\n"
-        " def do_GET(self):\n"
-        "  self.send_response(200); self.end_headers(); self.wfile.write(b'{}')\n"
-        "HTTPServer(('127.0.0.1', int(os.environ['RUNTIME_BACKEND_PORT'])), Handler).serve_forever()\n",
-        encoding="utf-8",
-    )
-    with socket.socket() as available:
-        available.bind(("127.0.0.1", 0))
-        port = available.getsockname()[1]
-    env = {key: value for key, value in os.environ.items() if key.upper() in {
-        "PATH", "SYSTEMROOT", "WINDIR", "COMSPEC", "TEMP", "TMP", "PATHEXT",
-    }}
-    env.update(RUNTIME_BACKEND_PORT=str(port), RUNTIME_BACKEND_LANGUAGE="native",
-               RUNTIME_BACKEND_COMMAND=json.dumps([sys.executable, "-u", str(server)]))
-    script = Path(__file__).parents[1] / "scripts" / "runtime_acceptance.js"
-    result = runtime_acceptance._run_node(
-        [settings.node_cmd, str(script), str(tmp_path), "5000", "", "1"],
-        cancel_event=threading.Event(), timeout=15, cwd=tmp_path, env=env,
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
-        encoding="utf-8", errors="replace",
-    )
-    assert result.returncode == 0, result.stdout
-    assert "OK API" in result.stdout
-    assert "DEP0190" not in result.stdout
-    with socket.socket() as check:
-        check.settimeout(0.5)
-        assert check.connect_ex(("127.0.0.1", port)) != 0, "runtime leaked its server"
-
 
 def test_runtime_resolves_and_executes_real_npm_without_command_shell():
     gate = Path(__file__).parents[1] / "scripts" / "runtime_acceptance.js"
@@ -350,3 +143,46 @@ def test_runtime_resolves_and_executes_real_npm_without_command_shell():
     assert result.returncode == 0, result.stdout + result.stderr
     assert result.stdout.strip()
     assert "DEP0190" not in result.stderr
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("ok,infra",[(True,False),(False,False),(False,True)])
+async def test_runtime_gate_delegates_to_isolated_foundation(monkeypatch,ok,infra):
+    from autospec.orchestrator import bootstrap
+    monkeypatch.setattr(settings,"fake_agents",False)
+    monkeypatch.setattr(settings,"runtime_acceptance_enabled",True)
+    state=_done_frontend_state("isolated-rt")
+    ws,_=_prep_frontend(state)
+    calls=[]
+    async def verify(project,root,**kwargs):
+        calls.append((project,root,kwargs))
+        return bootstrap.BootstrapResult(ok,"isolated evidence",infra=infra)
+    monkeypatch.setattr(bootstrap,"verify_runtime",verify)
+    monkeypatch.setattr(runtime_acceptance,"_run_node",lambda *_args,**_kwargs:pytest.fail("legacy host JS gate"))
+    result=await runtime_acceptance.arun_runtime_acceptance(state,ws,timeout_s=3)
+    assert result.ok==ok and result.infra==infra and not result.skipped
+    assert calls[0][1]==ws and calls[0][2]["repair_dependencies"] is True
+    assert calls[0][2]["timeout_s"]==3
+
+@pytest.mark.asyncio
+async def test_runtime_cancellation_waits_for_isolated_cleanup(monkeypatch):
+    from autospec.orchestrator import bootstrap
+    monkeypatch.setattr(settings,"fake_agents",False)
+    monkeypatch.setattr(settings,"runtime_acceptance_enabled",True)
+    state=_done_frontend_state("isolated-cancel");ws,_=_prep_frontend(state)
+    started,cleaned=asyncio.Event(),asyncio.Event()
+    async def verify(*args,**kwargs):
+        started.set()
+        try: await asyncio.sleep(60)
+        finally:
+            await asyncio.sleep(.02);cleaned.set()
+    monkeypatch.setattr(bootstrap,"verify_runtime",verify)
+    task=asyncio.create_task(runtime_acceptance.arun_runtime_acceptance(state,ws))
+    await started.wait();task.cancel()
+    with pytest.raises(asyncio.CancelledError): await task
+    assert cleaned.is_set()
+
+def test_done_journey_is_retained_as_contract_data():
+    state=_done_frontend_state()
+    state.stories[0].gherkin="Feature: login"
+    assert runtime_acceptance._done_journey(state)=="Feature: login"

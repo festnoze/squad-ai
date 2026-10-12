@@ -392,20 +392,13 @@ def map_fingerprint(workspace_path: Path | str) -> str:
         return ""
     if (ws / ".git").exists():
         try:
-            head = subprocess.run(
-                ["git", "-C", str(ws), "rev-parse", "HEAD"],
-                capture_output=True, text=True, timeout=20,
-            )
-            if head.returncode == 0:
-                status = subprocess.run(
-                    ["git", "-C", str(ws), "status", "--porcelain"],
-                    capture_output=True, text=True, timeout=20,
-                )
-                raw = head.stdout.strip() + "\n" + (
-                    status.stdout if status.returncode == 0 else "?"
-                )
+            from .git_boundary import run_git
+            head_rc,head=run_git(ws,["rev-parse","HEAD"],timeout=20)
+            if head_rc == 0:
+                status_rc,status=run_git(ws,["status","--porcelain"],timeout=20)
+                raw = head.strip() + "\n" + (status if status_rc == 0 else "?")
                 return "git:" + hashlib.sha1(raw.encode("utf-8")).hexdigest()[:16]
-        except (OSError, subprocess.SubprocessError) as exc:
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
             logger.warning("Cartographer git fingerprint failed for %s: %s", ws, exc)
     digest = hashlib.sha1()
     count = 0

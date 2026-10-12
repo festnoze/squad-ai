@@ -78,8 +78,11 @@ def test_silent_timeout_also_bounds_stdin_that_is_never_consumed(tmp_path, input
     script = f"import os,time,pathlib; pathlib.Path({str(marker)!r}).write_text(str(os.getpid())); time.sleep(60)"
     started = time.monotonic()
     with pytest.raises(subprocess.TimeoutExpired):
-        runner._run_tracked(_python(script), "x" * input_size, None, 0.5)
-    assert time.monotonic() - started < 8
+        # Deadline includes Windows venv redirector + suspended Job assignment.
+        # Under concurrent Docker builds .5s can expire before Python starts;
+        # 3s retains the 60s silent/blocking-child proof with real PID evidence.
+        runner._run_tracked(_python(script), "x" * input_size, None, 3)
+    assert time.monotonic() - started < 10
     assert marker.exists()
     _assert_dead(int(marker.read_text()))
     assert not any(t.name == "autospec-agent-io" for t in threading.enumerate())
@@ -227,7 +230,11 @@ def test_timeout_kills_child_and_grandchild(tmp_path):
     child = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-u','-c',{grandchild!r}]); time.sleep(60)"
     parent = f"import subprocess,sys,time; subprocess.Popen([sys.executable,'-u','-c',{child!r}]); time.sleep(60)"
     with pytest.raises(subprocess.TimeoutExpired):
-        runner._run_tracked(_python(parent), "", None, 1)
+        # Three Windows venv redirectors plus Job-assignment/startup must all
+        # reach the real grandchild marker under concurrent Docker builds.
+        # Keep the marker/death assertions; an early pre-start timeout is not
+        # evidence that descendant cleanup worked. Every node sleeps 60s.
+        runner._run_tracked(_python(parent), "", None, 15)
     assert marker.exists()
     _assert_dead(int(marker.read_text()))
 

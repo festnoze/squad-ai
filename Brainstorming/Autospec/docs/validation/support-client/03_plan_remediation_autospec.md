@@ -1,6 +1,6 @@
 # Autospec — backlog de fiabilisation après Relais Support
 
-Version 1.0 — 9 octobre 2026. Document de travail pour un coordinateur et des agents parallèles.
+Version 1.1 — état d'intégration mis à jour le 12 octobre 2026. Document de travail pour un coordinateur et des agents parallèles.
 
 **État : implémentation démarrée le 11 octobre 2026 sur demande utilisateur `/goal`.** Worktrees et merges autorisés, jusqu'à cinq agents souhaités ; trois sous-agents simultanés disponibles dans cette session en plus du coordinateur. Les statuts font autorité dans le tableau. La demande autorise l'exécution des 26 tâches, y compris une nouvelle qualification avec les paramètres Claude Code abonnement/Sonnet et un plafond conservateur de 40 USD estimés ; aucune activation de crédits additionnels ou API directe.
 
@@ -31,8 +31,8 @@ Distinctions à conserver :
 
 | Statut | Signification | Transition autorisée |
 |---|---|---|
-| TODO | Non commencé ; l'éligibilité dépend du graphe | IN_PROGRESS après attribution et dépendances DONE |
-| IN_PROGRESS | Un propriétaire, un périmètre et une base de travail identifiés | REVIEW ou BLOCKED |
+| TODO | Non commencé ; l'éligibilité dépend du graphe | IN_PROGRESS après attribution ; préparation indépendante permise, intégration/libération soumise aux dépendances DONE |
+| IN_PROGRESS | Un propriétaire, un périmètre et une base de travail identifiés ; préparation de module ≠ raccord complet | REVIEW après raccord et dépendances DONE, ou BLOCKED |
 | BLOCKED | Obstacle documenté, décision/prérequis précis attendu | TODO après résolution ; jamais assimilé à DONE |
 | REVIEW | Implémentation et preuves remises, intégration à contrôler | DONE après revue ; sinon IN_PROGRESS |
 | DONE | Intégré et vérifié sur la révision cible | Réouverture explicite si régression |
@@ -72,30 +72,30 @@ Definition of Done commune :
 | ID | Priorité | Tâche | Lot / compétence | Dépendances | Statut | Propriétaire | Preuve / révision |
 |---|---|---|---|---|---|---|---|
 | REM-00 | P0 | Contrats d'interface et plan d'intégration | Coordination | — | DONE | Coordinateur | 04_interfaces_remediation.md ; interfaces et exemples revus |
-| REM-01 | P0 | Confinement réel des agents | Exécution | REM-00 | TODO | — | — |
-| REM-02 | P0 | Cycle de vie des processus possédés | Exécution | REM-01 | TODO | — | — |
-| REM-03 | P0 | État durable et récupération après interruption | Orchestration | REM-02 | TODO | — | — |
-| REM-04 | P0 | Dépendances et manifests dans le workflow | Reproductibilité | REM-00 | TODO | — | — |
-| REM-05 | P0 | Validation dans un environnement propre | Reproductibilité | REM-04 | TODO | — | — |
-| REM-06 | P0 | Interdire les preuves de tests affaiblies | Qualité | REM-05 | TODO | — | — |
-| REM-07 | P0 | Réparations bornées et classifiées | Orchestration | REM-03, REM-06 | TODO | — | — |
-| REM-08 | P1 | Décision de stack structurée | Fondation | REM-00 | TODO | — | — |
-| REM-09 | P1 | Contrat exécutable indépendant du code produit | Contrats | REM-00 | TODO | — | — |
-| REM-10 | P1 | Admission du plan par contraintes et findings | Planification | REM-08, REM-09 | TODO | — | — |
-| REM-11 | P1 | Claims normalisés et dépendances communes | Planification | REM-04, REM-10 | TODO | — | — |
-| REM-12 | P1 | Conflits dynamiques de propriété des fichiers | Ordonnancement | REM-11 | TODO | — | — |
-| REM-13 | P0 | Socle déterministe et sondes initiales | Fondation | REM-05, REM-08 | TODO | — | — |
-| REM-14 | P0 | Première tranche métier réellement fonctionnelle | Acceptation | REM-06, REM-09, REM-13 | TODO | — | — |
-| REM-15 | P1 | Pack de contrats sécurité et comptes | Contrats sécurité | REM-09 | TODO | — | — |
-| REM-16 | P1 | Pack de contrats métier et concurrence | Contrats métier | REM-09 | TODO | — | — |
-| REM-17 | P1 | Pack DB, API et cohérence frontend/backend | Contrats architecture | REM-09 | TODO | — | — |
-| REM-18 | P1 | Pack UX, session et erreurs réseau | Contrats frontend | REM-09 | TODO | — | — |
-| REM-19 | P1 | Suites complètes, couverture et six E2E | Qualité | REM-14, REM-15, REM-16, REM-17, REM-18 | TODO | — | — |
-| REM-20 | P1 | Image finale, persistance et documentation | Livraison | REM-14, REM-19 | TODO | — | — |
-| REM-21 | P1 | Gate finale indépendante et traçabilité | Acceptation | REM-19, REM-20 | TODO | — | — |
-| REM-22 | P1 | Télémétrie des attentes, coûts et phases | Observabilité | REM-00 | TODO | — | — |
-| REM-23 | P2 | Réservation budgétaire concurrente, optionnelle | Optimisation | REM-07, REM-22 | TODO | — | — |
-| REM-24 | P1 | Contre-revue intégrée de la fabrique | Intégration | Toutes P0/P1 REM-00 à REM-22 | TODO | — | — |
+| REM-01 | P0 | Confinement réel des agents | Exécution | REM-00 | IN_PROGRESS | rem_execution + coordinateur | 93775c31, 68c963e0, 955f38ef ; 120 PASS exécution, Git hermétique et resolver host refusé ; garde navigateur en contre-revue |
+| REM-02 | P0 | Cycle de vie des processus possédés | Exécution | REM-01 | IN_PROGRESS | rem_execution + coordinateur | Jobs Windows et lifetimes runtime intégrés ; migrations tests legacy 120 PASS ; cleanup réel SQLite run13 ; contre-revue commune requise |
+| REM-03 | P0 | État durable et récupération après interruption | Orchestration | REM-02 | IN_PROGRESS | Coordinateur | 27f42178, eec74191, a247e332 ; interruption réelle et coût incomplet testés |
+| REM-04 | P0 | Dépendances et manifests dans le workflow | Reproductibilité | REM-00 | IN_PROGRESS | rem_dependencies + coordinateur | 7eb7c767, c3701d17 ; Argon2 réel, 86 tests ; raccord broker en cours |
+| REM-05 | P0 | Validation dans un environnement propre | Reproductibilité | REM-04 | IN_PROGRESS | rem_dependencies + rem_execution + coordinateur | Recette Linux V4 et locks atomiques intégrés ; reçus cache/layer f4169348 sans rc d'installation inventé ; deuxième suite globale lancée |
+| REM-06 | P0 | Interdire les preuves de tests affaiblies | Qualité | REM-05 | IN_PROGRESS | rem_dependencies + coordinateur | 68c963e0 protège aussi les fichiers aux noms personnalisés réellement collectés ; baseline/skip/xfail intégrés ; helpers QA à contre-revoir |
+| REM-07 | P0 | Réparations bornées et classifiées | Orchestration | REM-03, REM-06 | IN_PROGRESS | Coordinateur | eec74191, a247e332 ; délai réel et répétition testés ; canaris à raccorder |
+| REM-08 | P1 | Décision de stack structurée | Fondation | REM-00 | REVIEW | Coordinateur | 199 tests stack/fondation, a247e332 ; reprise scellée et contradictions |
+| REM-09 | P1 | Contrat exécutable indépendant du code produit | Contrats | REM-00 | IN_PROGRESS | rem_contracts_plan + coordinateur | ff6c372c ; sources immuables/57 IDs ; import API en cours |
+| REM-10 | P1 | Admission du plan par contraintes et findings | Planification | REM-08, REM-09 | IN_PROGRESS | rem_contracts_plan + coordinateur | ff6c372c ; admission déterministe testée ; raccord planification en cours |
+| REM-11 | P1 | Claims normalisés et dépendances communes | Planification | REM-04, REM-10 | IN_PROGRESS | rem_contracts_plan + coordinateur | ff6c372c ; racines/globs/contrats partagés testés ; raccord en cours |
+| REM-12 | P1 | Conflits dynamiques de propriété des fichiers | Ordonnancement | REM-11 | IN_PROGRESS | rem_contracts_plan + coordinateur | ff6c372c ; arbiter pré-écriture testé ; raccord broker/ordonnanceur en cours |
+| REM-13 | P0 | Socle déterministe et sondes initiales | Fondation | REM-05, REM-08 | IN_PROGRESS | rem_execution + coordinateur | 2 sondes réelles Python/React PASS ; lancement Linux isolé en cours |
+| REM-14 | P0 | Première tranche métier réellement fonctionnelle | Acceptation | REM-06, REM-09, REM-13 | IN_PROGRESS | rem_dependencies + coordinateur | Jalon bloquant raccordé ; nominal Linux/Chromium/API/SQLite + restart PASS chez agent ; coordinateur en intégration |
+| REM-15 | P1 | Pack de contrats sécurité et comptes | Contrats sécurité | REM-09 | IN_PROGRESS | rem_contracts_plan + coordinateur | 7d15803a livré pour contre-revue ; 128 tests ; raccord runtime à faire |
+| REM-16 | P1 | Pack de contrats métier et concurrence | Contrats métier | REM-09 | IN_PROGRESS | rem_dependencies | 53a9ced1, 2327fb64 ; 9 métatests FUN réels PASS, 138 preuves hashées ; raccord Linux réel en cours |
+| REM-17 | P1 | Pack DB, API et cohérence frontend/backend | Contrats architecture | REM-09 | IN_PROGRESS | rem_dependencies | 53a9ced1, 2327fb64 ; 7 métatests ARC PASS ; SQLtrace, fault rollback, horloge et CAS Linux PASS ; ports live en cours |
+| REM-18 | P1 | Pack UX, session et erreurs réseau | Contrats frontend | REM-09 | IN_PROGRESS | rem_contracts_plan + coordinateur | 12716659 intégré : 64 tests navigateur natifs PASS, dont UX et six E2E ; dernier replay portable et contre-revue réseau en cours |
+| REM-19 | P1 | Suites complètes, couverture et six E2E | Qualité | REM-14, REM-15, REM-16, REM-17, REM-18 | IN_PROGRESS | rem_execution + rem_contracts_plan + coordinateur | 68c963e0 : plan exact scellé par GPT distinct, vrais hashes des copies ; 8dec6b1b/96d046af exigent kill X réel ; collecte native automatique en raccord |
+| REM-20 | P1 | Image finale, persistance et documentation | Livraison | REM-14, REM-19 | IN_PROGRESS | rem_dependencies + coordinateur | 6644e03d/2011041f : image baked sans bind source, vertical et persistance run12 2 PASS ; f4169348 reçus build ; docs/audit natif en raccord |
+| REM-21 | P1 | Gate finale indépendante et traçabilité | Acceptation | REM-19, REM-20 | IN_PROGRESS | Coordinateur | artifacts/remediation/REM-21/20261012-review-boundaries : 100 PASS/1 SKIP, 67 PASS/1 SKIP, 24 PASS ; 25 PASS revue complète mécanique supplémentaire ; aucun PASS produit induit |
+| REM-22 | P1 | Télémétrie des attentes, coûts et phases | Observabilité | REM-00 | IN_PROGRESS | Coordinateur | Tours provider distincts des outils/attentes ; 72 tests ciblés, UI 3 tests/build PASS |
+| REM-23 | P2 | Réservation budgétaire concurrente, optionnelle | Optimisation | REM-07, REM-22 | IN_PROGRESS | rem_execution + coordinateur | 165deea8/68c963e0 conservent coût/tokens connus sur erreur et cancellation, journal durable bloque l'incertitude ; OFF pour Claude faute de cap dur qualifié |
+| REM-24 | P1 | Contre-revue intégrée de la fabrique | Intégration | Toutes P0/P1 REM-00 à REM-22 | IN_PROGRESS | Trois agents + coordinateur | Préparation seulement : défauts Git/default resolver/mutation corrigés ; navigateur en correction ; full-regression-second.xml en cours, ne libère pas REM-25 |
 | REM-25 | P1 | Nouvelle campagne et comparaison indépendante | Qualification | REM-24 + autorisation de lancement | TODO | — | — |
 
 ### Vagues suggérées, sans contourner les dépendances
@@ -278,7 +278,7 @@ Les statuts/propriétaires restent uniquement dans le tableau précédent. Chaqu
 
 ### REM-25 — Nouvelle génération, puis évaluation indépendante
 
-- **Prérequis externe :** reconfirmer avant lancement le provider, modèle, authentification abonnement, plafond et autorisation pour la nouvelle campagne. Les 40 USD étaient autorisés pour la campagne historique ; ne pas les réutiliser implicitement. Aucun crédit additionnel ni API directe activés.
+- **Autorisation de lancement :** la demande explicite du 11 octobre d'exécuter les 26 tâches jusqu'à validation inclut cette nouvelle campagne. Conserver Claude Code connecté via abonnement claude.ai Team, modèle Sonnet, plafond conservateur de 40 USD estimés pour ce nouveau run ; vérifier ces paramètres avant lancement. Aucun crédit additionnel ni API directe activés. Un changement de provider, d'authentification ou une hausse du plafond demande une nouvelle autorisation.
 - **Travail :** nouveau dossier/run, même brief v0.2 et hashes ; aucune réparation manuelle du résultat entre génération et verdict. Mesurer jalon fondation, tranche verticale, durée, retries/collisions et usage réellement rapporté. Après arrêt, snapshot et revue indépendante par sous-agents GPT-6.1 Sol medium selon la demande initiale.
 - **Validation :** les 57 critères sont réévalués, y compris les 17 anciens PASS ; 13 NOT_VERIFIED explicitement repris. JSON/Markdown complets et comparaison avant/après (statuts, preuves, durée, coût estimé et appels manquants). Tous les 56 B/M doivent être PASS pour déclarer la cible conforme ; OPS-06 séparé. Si échec, rapport livré et nouvelles tâches documentées, jamais auto-déclaration de succès ni boucle payante illimitée.
 
@@ -344,6 +344,12 @@ Le coordinateur vérifie l'intégration, assigne un relecteur, puis met à jour 
 |---|---|---|---|---|
 | 2026-10-09 | Toutes | Backlog initial préparé ; aucune implémentation ni nouvelle génération lancée | Coordinateur | Rapports de campagne référencés en §1 |
 | 2026-10-11 | REM-00 | Démarrage autorisé par l'utilisateur ; interfaces minimales gelées, propriété des fichiers partagés au coordinateur, snapshot de travail dans worktree d'intégration | Coordinateur | 04_interfaces_remediation.md |
+| 2026-10-11 | REM-01..13 | Trois lots préparatoires mergés ; modules testés ≠ tâches closes tant que les raccordements réels ne sont pas vérifiés | Coordinateur | b648511c, c3701d17, ff6c372c ; artefacts par ID |
+| 2026-10-11 | REM-03, REM-07, REM-08 | Cinq défauts de contre-revue corrigés : coût incomplet au restart, phase GOVERN, conflit stack, délai réel, environnement non réparable | Coordinateur | a247e332 ; 63 tests ciblés PASS dans environnement verrouillé |
+| 2026-10-12 | REM-09..12, REM-21..22 | Import immuable API, admission du plan, claims avant écriture et admission des preuves raccordés/préparés ; attentes de médiation distinctes du provider | Coordinateur | 72 tests ciblés PASS ; JUnit root-raccord.xml ; modules seuls ne valent pas clôture |
+| 2026-10-12 | REM-14, REM-19, REM-21 | L’utilisateur refuse les appels de revue des sources via Claude Code : génération seule dans Claude ; proposition opérationnelle puis revue indépendante dans deux sous-agents GPT 6.1 sol medium. Paquets locaux, snapshot exact, attente bornée/interrompable et aucune preuve X/V fabriquée | Coordinateur | tests/test_source_reviewer.py ; 28 tests locaux revue/budget PASS ; raccord attente en vérification |
+| 2026-10-12 | REM-23 | Option concurrente testée mais OFF pour Claude : aucun cap financier dur qualifié. Journal durable reste bloquant après restart, changement de provider ou désactivation de l’option ; revue du raccord par rem_execution | Coordinateur | e0fe824c ; tests/test_budget_tracker_reservations.py ; contre-revue du 12 octobre |
+| 2026-10-12 | REM-01, REM-06, REM-19, REM-23, REM-24 | Git local ne peut plus hériter de hooks/filtres/config globale ; cleanup borné et codes retour vérifiés ; vrais fichiers collectés protégés ; coût connu conservé après interruption ; plan qualité et profils mutation scellés par revue GPT externe distincte | Coordinateur | 68c963e0, 165deea8, 955f38ef ; README et JUnit review-boundaries ; dernier full replay lancé, pas encore de nouvelle génération |
 
 ## 8. Condition de clôture du programme
 
