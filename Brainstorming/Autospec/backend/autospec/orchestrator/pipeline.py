@@ -921,6 +921,7 @@ class _UsageTracker:
                      if self.pipeline.state.budget_usd else None)
         budget_token = None if reserved else active_budget_usd.set(remaining)
         provider_entered = False
+        known_usage = None
         tool_tokens = []
         transient_claim = False
         try:
@@ -961,11 +962,16 @@ class _UsageTracker:
             res = await self.pipeline.runner.arun(
                 prompt, system_prompt, cwd=cwd, session_id=session_id, model=chosen
             )
+            # A returned receipt is already paid/known. Account it before any
+            # cancellable claim cleanup can replace the successful result.
+            known_usage = res
+            effective_cost = self._account(res, role, iteration)
         except IsolationViolation as exc:
             # Capability setup failed BEFORE entering the provider. Do not
             # fabricate an unreported paid call or consume a dev retry.
             raise AgentError(str(exc), code=exc.code) from exc
         except AgentError as exc:
+            known_usage = exc.usage
             effective_cost = self._account(exc.usage, role, iteration, failed=True) if provider_entered else 0.0
             if exc.budget_exhausted:
                 self.pipeline._stop_requested = True
@@ -993,6 +999,7 @@ class _UsageTracker:
             raise
         except asyncio.CancelledError as exc:
             usage = getattr(exc, "usage", None)
+            known_usage = usage
             effective_cost = 0.0
             if provider_entered:
                 effective_cost = self._account(usage, role, iteration, failed=True)
@@ -1007,15 +1014,25 @@ class _UsageTracker:
         finally:
             for variable, token in reversed(tool_tokens):
                 variable.reset(token)
-            if transient_claim:
-                await self.pipeline._claim_arbiter.release(item_id)
-                self.pipeline._notify_claims_changed()
-                self.pipeline._claim_roots.pop(item_id, None)
-            active_skills_enabled.reset(skills_token)
-            active_processes.reset(process_token)
-            if budget_token is not None:
-                active_budget_usd.reset(budget_token)
-        effective_cost = self._account(res, role, iteration)
+            try:
+                if transient_claim:
+                    await self.pipeline._claim_arbiter.release(item_id)
+                    self.pipeline._notify_claims_changed()
+                    self.pipeline._claim_roots.pop(item_id, None)
+            except asyncio.CancelledError as cleanup:
+                # Preserve a complete receipt or an incomplete paid prefix for
+                # the outer durable reservation reconciliation, without double
+                # accounting in the project/iteration ledgers.
+                cleanup.usage = known_usage
+                raise
+            except Exception as cleanup:
+                raise AgentError('Supervisor claim cleanup failed: '+str(cleanup),
+                    code='SUPERVISOR_CLEANUP_FAILED', usage=known_usage) from cleanup
+            finally:
+                active_skills_enabled.reset(skills_token)
+                active_processes.reset(process_token)
+                if budget_token is not None:
+                    active_budget_usd.reset(budget_token)
         # Optional Langfuse trace (O1): one generation per agent call. Best-effort
         # and env-gated — never affects the pipeline if tracing fails or is off.
         observability.trace_agent_call(
