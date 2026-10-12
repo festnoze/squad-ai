@@ -1,6 +1,6 @@
 {
-  "status": "REVIEW_REQUIRED",
-  "scope": "Source-only candidate facts, not product observations. Parent must independently review before freezing acceptance_facts.",
+  "status": "REVIEWED_SOURCE_ONLY",
+  "scope": "Four source-only facts independently reviewed by the parent against the complete immutable v0.2 documents on 2026-10-12. No product observation or acceptance verdict is implied; operational bindings still need their separate exact-snapshot proposer and reviewer.",
   "sources": {
     "01_specification.md": "0a99950df5ee132253fa5aefb1a8f6e4f7a4b64c1436072564be6d28195fb0f3",
     "02_requirements_verification.md": "efdab8ea54208557f01abcb5324172e42b9c5cf88536611d64ba65b92564cbf4"

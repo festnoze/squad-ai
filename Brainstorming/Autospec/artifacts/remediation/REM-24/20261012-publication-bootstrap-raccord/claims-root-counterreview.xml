@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="45" time="112.737" timestamp="2026-10-12T12:42:16.500242+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_canonical_claims" name="test_absolute_traversal_drives_and_ads_refused[../clock.py]" time="0.022" /><testcase classname="tests.test_canonical_claims" name="test_absolute_traversal_drives_and_ads_refused[src/../errors.py]" time="0.007" /><testcase classname="tests.test_canonical_claims" name="test_absolute_traversal_drives_and_ads_refused[/tmp/file.py]" time="0.006" /><testcase classname="tests.test_canonical_claims" name="test_absolute_traversal_drives_and_ads_refused[C:\\project\\a.py]" time="0.007" /><testcase classname="tests.test_canonical_claims" name="test_absolute_traversal_drives_and_ads_refused[C:relative.py]" time="0.006" /><testcase classname="tests.test_canonical_claims" name="test_absolute_traversal_drives_and_ads_refused[\\\\server\\share\\a.py]" time="0.005" /><testcase classname="tests.test_canonical_claims" name="test_absolute_traversal_drives_and_ads_refused[file.py:secret]" time="0.006" /><testcase classname="tests.test_canonical_claims" name="test_absolute_traversal_drives_and_ads_refused[\x00bad]" time="0.007" /><testcase classname="tests.test_canonical_claims" name="test_platform_case_separators_and_future_globs" time="0.029" /><testcase classname="tests.test_canonical_claims" name="test_real_scaffold_root_and_wrong_synthetic_backend_prefix" time="0.011" /><testcase classname="tests.test_canonical_claims" name="test_symlink_escape_is_refused_before_future_file_write" time="0.011" /><testcase classname="tests.test_canonical_claims" name="test_cross_stream_paths_and_read_claims" time="0.017" /><testcase classname="tests.test_canonical_claims" name="test_two_synchronized_expansions_have_only_one_writer_and_requeue" time="0.045" /><testcase classname="tests.test_canonical_claims" name="test_wait_cycle_replans_and_retries_are_bounded" time="0.026" /><testcase classname="tests.test_canonical_claims" name="test_claim_expansion_is_all_or_nothing" time="0.021" /><testcase classname="tests.test_canonical_claims" name="test_first_segment_wildcard_cannot_claim_a_false_literal_directory[test*.py-test_auth.py]" time="0.007" /><testcase classname="tests.test_canonical_claims" name="test_first_segment_wildcard_cannot_claim_a_false_literal_directory[[ab]*.py-auth.py]" time="0.006" /><testcase classname="tests.test_canonical_claims" name="test_first_segment_wildcard_cannot_claim_a_false_literal_directory[foo?/x-foo1/x]" time="0.007" /><testcase classname="tests.test_canonical_claims" name="test_first_segment_wildcard_cannot_claim_a_false_literal_directory[src/test*.py-src/test_auth.py]" time="0.008" /><testcase classname="tests.test_canonical_claims" name="test_first_segment_wildcard_cannot_claim_a_false_literal_directory[foo*/x-foobar/x]" time="0.009" /><testcase classname="tests.test_canonical_claims" name="test_literal_distinct_ancestors_remain_provably_disjoint[src/test*.py-other/test_auth.py]" time="0.006" /><testcase classname="tests.test_canonical_claims" name="test_literal_distinct_ancestors_remain_provably_disjoint[literal.py-different.py]" time="0.006" /><testcase classname="tests.test_canonical_claims" name="test_literal_distinct_ancestors_remain_provably_disjoint[foo/*.py-bar/*.py]" time="0.008" /><testcase classname="tests.test_canonical_claims" name="test_literal_distinct_ancestors_remain_provably_disjoint[one/a?-two/a1]" time="0.007" /><testcase classname="tests.test_canonical_claims" name="test_active_root_glob_writer_blocks_literal_owner_before_any_batch[test*.py-test_auth.py]" time="0.023" /><testcase classname="tests.test_canonical_claims" name="test_active_root_glob_writer_blocks_literal_owner_before_any_batch[[ab]*.py-auth.py]" time="0.019" /><testcase classname="tests.test_canonical_claims" name="test_active_root_glob_writer_blocks_literal_owner_before_any_batch[foo?/x-foo1/x]" time="0.022" /><testcase classname="tests.test_canonical_claims" name="test_simultaneous_root_glob_and_literal_reservations_have_one_writer" time="0.015" /><testcase classname="tests.test_canonical_claims" name="test_readers_may_share_root_glob_but_writer_still_waits" time="0.016" /><testcase classname="tests.test_canonical_claims" name="test_active_wildcard_claim_refuses_entire_real_broker_batch_before_mutation" time="1.094" /><testcase classname="tests.test_independence" name="test_globs_overlap_and_disjoint" time="0.008" /><testcase classname="tests.test_independence" name="test_analyze_reproduces_todo_list_2_serializes_app_tsx" time="0.007" /><testcase classname="tests.test_independence" name="test_analyze_keeps_disjoint_components_parallel" time="0.009" /><testcase classname="tests.test_independence" name="test_analyze_empty_globs_serialized_and_warned" time="0.009" /><testcase classname="tests.test_independence" name="test_cross_stream_same_real_file_is_serialized" time="0.007" /><testcase classname="tests.test_independence" name="test_cross_stream_disjoint_paths_stay_parallel" time="0.010" /><testcase classname="tests.test_independence" name="test_cross_stream_empty_claims_presumed_disjoint" time="0.008" /><testcase classname="tests.test_independence" name="test_declared_overlap_ignores_undeclared" time="0.007" /><testcase classname="tests.test_independence" name="test_declared_serialization_global_cross_story" time="0.007" /><testcase classname="tests.test_independence" name="test_global_pass_serializes_cross_story_shared_file" time="0.012" /><testcase classname="tests.test_independence" name="test_enforce_independence_injects_depends_on" time="0.014" /><testcase classname="tests.test_independence" name="test_scheduler_never_coruns_declared_overlap" time="50.414"><failure message="TimeoutError">fut = &lt;coroutine object Pipeline._abuild_phase at 0x00000224081268F0&gt;
+timeout = 40
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+    
+        Coroutine will be wrapped in Task.
+    
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+    
+        If the wait is cancelled, the task is also cancelled.
+    
+        If the task suppresses the cancellation and returns a value instead,
+        that value is returned.
+    
+        This function is a coroutine.
+        """
+        # The special case for timeout &lt;= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+    
+    
+        if timeout is not None and timeout &lt;= 0:
+            fut = ensure_future(fut)
+    
+            if fut.done():
+                return fut.result()
+    
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+    
+        async with timeouts.timeout(timeout):
+&gt;           return await fut
+                   ^^^^^^^^^
+
+C:\Program Files\Python314\Lib\asyncio\tasks.py:488: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+autospec\orchestrator\pipeline.py:5481: in _abuild_phase
+    await self._abuild_phase_streams(all_iterations=all_iterations)
+autospec\orchestrator\pipeline.py:6065: in _abuild_phase_streams
+    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+C:\Program Files\Python314\Lib\asyncio\tasks.py:432: in wait
+    return await _wait(fs, timeout, return_when, loop)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fs = {&lt;Task finished name='Task-41' coro=&lt;Pipeline._abuild_work_item() done, defined at C:\Users\e.millerioux\.codex\worktr...ask cancelled name='Task-42' coro=&lt;Event.wait() done, defined at C:\Program Files\Python314\Lib\asyncio\locks.py:200&gt;&gt;}
+timeout = None, return_when = 'FIRST_COMPLETED'
+loop = &lt;ProactorEventLoop running=False closed=False debug=False&gt;
+
+    async def _wait(fs, timeout, return_when, loop):
+        """Internal helper for wait().
+    
+        The fs argument must be a collection of Futures.
+        """
+        assert fs, 'Set of Futures is empty.'
+        waiter = loop.create_future()
+        timeout_handle = None
+        if timeout is not None:
+            timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        counter = len(fs)
+        cur_task = current_task()
+    
+        def _on_completion(f):
+            nonlocal counter
+            counter -= 1
+            if (counter &lt;= 0 or
+                return_when == FIRST_COMPLETED or
+                return_when == FIRST_EXCEPTION and (not f.cancelled() and
+                                                    f.exception() is not None)):
+                if timeout_handle is not None:
+                    timeout_handle.cancel()
+                if not waiter.done():
+                    waiter.set_result(None)
+            futures.future_discard_from_awaited_by(f, cur_task)
+    
+        for f in fs:
+            f.add_done_callback(_on_completion)
+            futures.future_add_to_awaited_by(f, cur_task)
+    
+        try:
+&gt;           await waiter
+E           asyncio.exceptions.CancelledError
+
+C:\Program Files\Python314\Lib\asyncio\tasks.py:521: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+streams_on = None
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000224082AEDD0&gt;
+
+    async def test_scheduler_never_coruns_declared_overlap(streams_on, monkeypatch):
+        """Two same-stream tasks that DECLARE the same file must never build at the
+        same time (the todo_list_2 fix), yet both still reach DONE."""
+        state = _streams_state([
+            _us("US-1", tasks=[
+                _task("T-A", "US-1", stream="frontend", globs=("frontend/src/App.tsx",)),
+                _task("T-B", "US-1", stream="frontend", globs=("frontend/src/App.tsx",)),
+            ])
+        ])
+        # No injected deps here: prove the SCHEDULER guard alone prevents co-running.
+        pipeline = Pipeline(state, ScriptedRunner())
+    
+        concurrent = {"max": 0, "now": 0}
+    
+        async def _spy(subject, worktree, pkg, is_frontend):
+            concurrent["now"] += 1
+            concurrent["max"] = max(concurrent["max"], concurrent["now"])
+            await asyncio.sleep(0.02)
+            concurrent["now"] -= 1
+            return True, ""
+    
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
+&gt;       await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+tests\test_independence.py:208: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python314\Lib\asyncio\tasks.py:487: in wait_for
+    async with timeouts.timeout(timeout):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;Timeout [expired]&gt;
+exc_type = &lt;class 'asyncio.exceptions.CancelledError'&gt;
+exc_val = CancelledError(), exc_tb = &lt;traceback object at 0x000002240830BE80&gt;
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -&gt; bool | None:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+    
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+    
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+    
+            if self._task.uncancel() &lt;= self._cancelling and exc_type is not None:
+                # Since there are no new cancel requests, we're
+                # handling this.
+                if issubclass(exc_type, exceptions.CancelledError):
+&gt;                   raise TimeoutError from exc_val
+E                   TimeoutError
+
+C:\Program Files\Python314\Lib\asyncio\timeouts.py:115: TimeoutError</failure></testcase><testcase classname="tests.test_independence" name="test_reset_orphan_items_unsticks_in_progress" time="0.005" /><testcase classname="tests.test_independence" name="test_one_worker_crash_does_not_kill_the_build" time="45.081"><failure message="TimeoutError">fut = &lt;coroutine object Pipeline._abuild_phase at 0x0000022408127B50&gt;
+timeout = 40
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+    
+        Coroutine will be wrapped in Task.
+    
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+    
+        If the wait is cancelled, the task is also cancelled.
+    
+        If the task suppresses the cancellation and returns a value instead,
+        that value is returned.
+    
+        This function is a coroutine.
+        """
+        # The special case for timeout &lt;= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+    
+    
+        if timeout is not None and timeout &lt;= 0:
+            fut = ensure_future(fut)
+    
+            if fut.done():
+                return fut.result()
+    
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+    
+        async with timeouts.timeout(timeout):
+&gt;           return await fut
+                   ^^^^^^^^^
+
+C:\Program Files\Python314\Lib\asyncio\tasks.py:488: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+autospec\orchestrator\pipeline.py:5481: in _abuild_phase
+    await self._abuild_phase_streams(all_iterations=all_iterations)
+autospec\orchestrator\pipeline.py:6065: in _abuild_phase_streams
+    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+C:\Program Files\Python314\Lib\asyncio\tasks.py:432: in wait
+    return await _wait(fs, timeout, return_when, loop)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fs = {&lt;Task cancelled name='Task-54' coro=&lt;Event.wait() done, defined at C:\Program Files\Python314\Lib\asyncio\locks.py:20...c-remediation-integration\squad-ai\Brainstorming\Autospec\backend\autospec\orchestrator\pipeline.py:7423&gt; result=None&gt;}
+timeout = None, return_when = 'FIRST_COMPLETED'
+loop = &lt;ProactorEventLoop running=False closed=False debug=False&gt;
+
+    async def _wait(fs, timeout, return_when, loop):
+        """Internal helper for wait().
+    
+        The fs argument must be a collection of Futures.
+        """
+        assert fs, 'Set of Futures is empty.'
+        waiter = loop.create_future()
+        timeout_handle = None
+        if timeout is not None:
+            timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        counter = len(fs)
+        cur_task = current_task()
+    
+        def _on_completion(f):
+            nonlocal counter
+            counter -= 1
+            if (counter &lt;= 0 or
+                return_when == FIRST_COMPLETED or
+                return_when == FIRST_EXCEPTION and (not f.cancelled() and
+                                                    f.exception() is not None)):
+                if timeout_handle is not None:
+                    timeout_handle.cancel()
+                if not waiter.done():
+                    waiter.set_result(None)
+            futures.future_discard_from_awaited_by(f, cur_task)
+    
+        for f in fs:
+            f.add_done_callback(_on_completion)
+            futures.future_add_to_awaited_by(f, cur_task)
+    
+        try:
+&gt;           await waiter
+E           asyncio.exceptions.CancelledError
+
+C:\Program Files\Python314\Lib\asyncio\tasks.py:521: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+streams_on = None
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x00000224082AEF20&gt;
+
+    async def test_one_worker_crash_does_not_kill_the_build(streams_on, monkeypatch):
+        """P0b: a worker that raises an unexpected exception is isolated as FAILED;
+        the independent sibling still reaches DONE (old behaviour tore down both)."""
+        state = _streams_state([
+            _us("US-1", stream="backend"),
+            _us("US-2", stream="frontend"),
+        ])
+        pipeline = Pipeline(state, ScriptedRunner())
+    
+        async def _spy(subject, worktree, pkg, is_frontend):
+            if subject.id == "US-1":
+                raise RuntimeError("boom (simulated CLI crash)")
+            return True, ""
+    
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
+&gt;       await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+tests\test_independence.py:245: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python314\Lib\asyncio\tasks.py:487: in wait_for
+    async with timeouts.timeout(timeout):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;Timeout [expired]&gt;
+exc_type = &lt;class 'asyncio.exceptions.CancelledError'&gt;
+exc_val = CancelledError(), exc_tb = &lt;traceback object at 0x000002240836BC80&gt;
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -&gt; bool | None:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+    
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+    
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+    
+            if self._task.uncancel() &lt;= self._cancelling and exc_type is not None:
+                # Since there are no new cancel requests, we're
+                # handling this.
+                if issubclass(exc_type, exceptions.CancelledError):
+&gt;                   raise TimeoutError from exc_val
+E                   TimeoutError
+
+C:\Program Files\Python314\Lib\asyncio\timeouts.py:115: TimeoutError</failure></testcase><testcase classname="tests.test_independence" name="test_commit_excludes_bookkeeping_files" time="10.815" /></testsuite></testsuites>

@@ -1,0 +1,47 @@
+FFFF.FF                                                                  [100%]
+================================== FAILURES ===================================
+__ test_historical_unknown_usage_blocks_direct_serialized_admission[budget0] __
+tests\test_rem24_budget_and_cache_counterreview.py:54: in test_historical_unknown_usage_blocks_direct_serialized_admission
+    assert runner.calls == 0, f'unreconciled history dispatched {runner.calls} offline calls; allowances={runner.allowances}'
+E   AssertionError: unreconciled history dispatched 1 offline calls; allowances=[0.9]
+E   assert 1 == 0
+E    +  where 1 = <tests.test_rem24_budget_and_cache_counterreview.OfflineReceiptRunner object at 0x000001AD8D87CAD0>.calls
+__ test_historical_unknown_usage_blocks_direct_serialized_admission[budget1] __
+tests\test_rem24_budget_and_cache_counterreview.py:54: in test_historical_unknown_usage_blocks_direct_serialized_admission
+    assert runner.calls == 0, f'unreconciled history dispatched {runner.calls} offline calls; allowances={runner.allowances}'
+E   AssertionError: unreconciled history dispatched 1 offline calls; allowances=[None]
+E   assert 1 == 0
+E    +  where 1 = <tests.test_rem24_budget_and_cache_counterreview.OfflineReceiptRunner object at 0x000001AD8D92E850>.calls
+________ test_explicit_resume_does_not_silently_reconcile_unknown_cost ________
+tests\test_rem24_budget_and_cache_counterreview.py:70: in test_explicit_resume_does_not_silently_reconcile_unknown_cost
+    assert runner.calls == 0, 'resume dispatched with an unreconciled interrupted call'
+E   AssertionError: resume dispatched with an unreconciled interrupted call
+E   assert 1 == 0
+E    +  where 1 = <tests.test_rem24_budget_and_cache_counterreview.OfflineReceiptRunner object at 0x000001AD8D92FD90>.calls
+____________ test_new_feedback_does_not_bypass_unreconciled_budget ____________
+tests\test_rem24_budget_and_cache_counterreview.py:79: in test_new_feedback_does_not_bypass_unreconciled_budget
+    assert runner.calls == 0, 'feedback reactivated inference against the unknown remaining allowance'
+E   AssertionError: feedback reactivated inference against the unknown remaining allowance
+E   assert 1 == 0
+E    +  where 1 = <tests.test_rem24_budget_and_cache_counterreview.OfflineReceiptRunner object at 0x000001AD8D6A9A70>.calls
+________ test_final_report_cache_must_revalidate_current_review_engine ________
+tests\test_rem24_budget_and_cache_counterreview.py:121: in test_final_report_cache_must_revalidate_current_review_engine
+    assert not admitted and not state.delivery_ready, 'final cache bypassed current review-engine revalidation'
+E   AssertionError: final cache bypassed current review-engine revalidation
+E   assert (not True)
+_____ test_reviewed_supervisor_browser_plan_seal_preserves_its_exact_mode _____
+tests\test_rem24_budget_and_cache_counterreview.py:155: in test_reviewed_supervisor_browser_plan_seal_preserves_its_exact_mode
+    assert _quality_seal(SupervisorEvidenceStore(supervisor, snapshot, contract), seal, source) == review
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\validation\coordinator.py:441: in _quality_seal
+    if digest!=data["plan_hash"]: raise AdapterUnavailable("quality plan content/fingerprint mismatch")
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E   autospec.validation.support_adapter.AdapterUnavailable: quality plan content/fingerprint mismatch
+=========================== short test summary info ===========================
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_historical_unknown_usage_blocks_direct_serialized_admission[budget0]
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_historical_unknown_usage_blocks_direct_serialized_admission[budget1]
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_explicit_resume_does_not_silently_reconcile_unknown_cost
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_new_feedback_does_not_bypass_unreconciled_budget
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_final_report_cache_must_revalidate_current_review_engine
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_reviewed_supervisor_browser_plan_seal_preserves_its_exact_mode
+6 failed, 1 passed in 1.03s

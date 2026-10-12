@@ -1,0 +1,60 @@
+{
+  "autospec_inventory": {
+    "environment_fingerprint": "c8558fb53a8fc6c4606b2d0c1bcb84ac0183e44045ca678c9b79d9977e46f1b7",
+    "files": {
+      "src/App.tsx": "0549a333a0adcccfaef5b0a865822298c3c65c3c02f8e23b0919d82f27a8442b",
+      "src/main.tsx": "be6832ce15f8e9c6c733283b29ac426af6b1b477e0c9ca4032cda841b9e51e93"
+    },
+    "image": "sha256:42e4e645c53d48c2975da1aaf82bf835a3be0c39a5033b6400ac3632f776f354",
+    "source": "src",
+    "source_fingerprint": "bebda18489fd519f6467d15a338812b83c3e01deb68e2f50ef2a9ce50496c9a1",
+    "version": 1
+  },
+  "files": {
+    "src/App.tsx": {
+      "executed_lines": [
+        9,
+        20,
+        24,
+        25,
+        26,
+        27
+      ],
+      "missing_lines": [
+        21,
+        29,
+        32,
+        33
+      ],
+      "summary": {
+        "covered_branches": 2,
+        "covered_lines": 6,
+        "missing_lines": 4,
+        "num_branches": 6,
+        "num_statements": 10
+      }
+    },
+    "src/main.tsx": {
+      "executed_lines": [],
+      "missing_lines": [
+        5
+      ],
+      "summary": {
+        "covered_branches": 0,
+        "covered_lines": 0,
+        "missing_lines": 1,
+        "num_branches": 0,
+        "num_statements": 1
+      }
+    }
+  },
+  "format": "istanbul-executable-lines-branch-arms",
+  "totals": {
+    "covered_branches": 2,
+    "covered_lines": 6,
+    "missing_lines": 5,
+    "num_branches": 6,
+    "num_statements": 11,
+    "percent_covered": 47.05882352941177
+  }
+}

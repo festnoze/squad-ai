@@ -31,13 +31,22 @@ async def test_bootstrap_requires_live_unpublished_netnone(tmp_path,monkeypatch,
     finally:session.server.server_close()
 
 
-@pytest.mark.parametrize("problem",["none","host_browser","client_network","parent_restart","parent_stopped","bad_http","page_error","guard_failure","driver_failure"])
+@pytest.mark.parametrize("problem",["none","host_browser","client_network","parent_restart","parent_stopped","bad_http","bad_api","wrong_nonce","page_error","guard_failure","driver_failure"])
 async def test_bootstrap_remote_receipt_and_cleanup_required(tmp_path,monkeypatch,problem):
     session,state=runtime(tmp_path,monkeypatch);constructed=[];closed=[];functions=[]
+    expected=dict(status="ok",service="autospec-bootstrap",database="ok",probe="synthetic-supervisor-nonce")
     class Page:
         def set_default_timeout(self,ms):assert 1<=ms<=15000
         def on(self,*args):pass
         async def goto(self,*a,**k):return SimpleNamespace(status=404 if problem=="bad_http" else 200)
+        def expect_response(self,predicate,**options):
+            from contextlib import asynccontextmanager
+            async def body():return {**expected,"probe":"wrong"} if problem=="wrong_nonce" else expected
+            async def response():
+                return SimpleNamespace(status=500 if problem=="bad_api" else 200,json=body)
+            @asynccontextmanager
+            async def observed():yield SimpleNamespace(value=response())
+            return observed()
         async def wait_for_function(self,script):
             functions.append(script)
             if problem=="parent_restart":state["container_id"]="b"*64
@@ -47,8 +56,8 @@ async def test_bootstrap_remote_receipt_and_cleanup_required(tmp_path,monkeypatc
             constructed.append((adapter,options))
             self.browser_environment=dict(host_chromium=problem=="host_browser",parent_id="a"*64,
                 network_mode="container:"+"a"*64,client_network_exposed=problem=="client_network")
-        async def page(self,case,width):
-            assert width==1280
+        async def page(self,case,width,*,auto_navigate=True):
+            assert width==1280 and auto_navigate is False
             if problem=="driver_failure":raise RuntimeError("private-token must not be published")
             if problem=="page_error":case.console_errors.append("untrusted secret")
             if problem=="guard_failure":case.check("external",False,True)
@@ -57,12 +66,12 @@ async def test_bootstrap_remote_receipt_and_cleanup_required(tmp_path,monkeypatc
     monkeypatch.setattr(browser_contracts,"PlaywrightHarness",Harness)
     try:
         if problem=="none":
-            detail=await bootstrap._browser_preflight(session,timeout_s=1,require_api=True)
+            detail=await bootstrap._browser_preflight(session,timeout_s=1,require_api=True,expected_health=expected)
             assert "Chromium Docker" in detail and "frontend → API probe OK" in detail
             assert len(functions)==2
         else:
             with pytest.raises(bootstrap.BootstrapFailure) as error:
-                await bootstrap._browser_preflight(session,timeout_s=1,require_api=True)
+                await bootstrap._browser_preflight(session,timeout_s=1,require_api=True,expected_health=expected)
             assert "private-token" not in str(error.value) and "untrusted secret" not in str(error.value)
         assert closed==[True]
         adapter,options=constructed[0]

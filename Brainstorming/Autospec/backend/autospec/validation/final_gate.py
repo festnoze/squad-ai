@@ -101,6 +101,34 @@ class FinalAdmission:
         return asdict(self)
 
 
+def verification_cache_context(contract_hash: str, snapshot_hash: str, supervisor_root: Path) -> dict:
+    """Bind report reuse to the actual factory and external reviewed seals.
+
+    This is cache identity, not acceptance evidence. Hashing the whole small
+    factory source prevents a newly fixed harness from inheriting its old PASS.
+    A changed source-review protocol is revalidated by the caller FIRST.
+    """
+    factory = Path(__file__).resolve().parents[1]
+    engines = {}
+    for path in sorted(path for path in factory.rglob("*") if path.suffix in {".py", ".cjs"}):
+        if path.is_symlink() or not path.resolve().is_relative_to(factory):
+            raise ValueError("factory cache identity cannot follow a source link")
+        engines[path.relative_to(factory).as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    broker = FileBroker(ExecutionContext("verification-cache", Path(supervisor_root).resolve()))
+    seals = {}
+    for name in ("product-bindings.json", "reviewed-fixtures.json", "quality-plan.json",
+                 "reviewed-delivery-plan.json", "reviewed-dependency-audit.json",
+                 f"source-reviews/{snapshot_hash}/review-context.json",
+                 f"source-reviews/{snapshot_hash}/final-review.json",
+                 f"source-reviews/{snapshot_hash}/quality-plan-review.json"):
+        path = broker.path(name)
+        if path.exists() and (not path.is_file() or path.stat().st_size > 16_000_000):
+            raise ValueError("bounded reviewed cache seal required")
+        seals[name] = hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+    return {"version":1,"contract_hash":contract_hash,"snapshot_hash":snapshot_hash,
+            "engine_hashes":engines,"reviewed_seals":seals}
+
+
 def _valid_proof(proof: dict, requirement_id: str, *, root: Path, snapshot: str, contract: str) -> bool:
     try:
         path = Path(proof["path"]).resolve()

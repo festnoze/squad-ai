@@ -28,9 +28,54 @@ from .sandbox import _docker_call, _unavailable
 
 BASE_IMAGES = {"python": "ghcr.io/astral-sh/uv:python3.12-bookworm-slim",
                "node": "node:22-bookworm-slim"}
-RECIPE_VERSION = 4
+RECIPE_VERSION = 5
+# npm10's peer resolver crashes on Vitest4's optional-peer graph. This is a
+# source-free supervisor tool, not a producer dependency or a peer bypass.
+NPM_VERSION = "11.6.4"
+NPM_INTEGRITY = "sha512-ERjKtGoFpQrua/9bG0+h3xiv/4nVdGViCjUYA1AmlV24fFvfnSB7B7dIfZnySQ1FDLd0ZVrWPsLLp78dCtJdRQ=="
+_NPM_BOOTSTRAP = r'''const fs=require('node:fs'),crypto=require('node:crypto'),cp=require('node:child_process');
+const version=__NPM_VERSION__,integrity=__NPM_INTEGRITY__;
+(async()=>{
+ const [major,minor]=process.versions.node.split('.').map(Number);
+ if(!((major===20&&minor>=17)||(major===22&&minor>=9)||major>22))throw Error('Factory npm requires Node20.17 or Node22.9+');
+ const args=process.argv.slice(1),provision=args[0]==='__autospec_provision_only__';
+ if(provision&&args.length!==1)throw Error('Invalid supervisor provisioning operation');
+ const prefix=provision?'/opt/autospec-npm':'/tmp/autospec-npm';
+ const response=await fetch('https://registry.npmjs.org/npm/-/npm-'+version+'.tgz',{redirect:'error'});
+ if(response.status!==200||!response.body)throw Error('Factory npm download failed');
+ let size=0;const parts=[];
+ for await(const part of response.body){size+=part.length;if(size>20000000)throw Error('Factory npm download exceeds limit');parts.push(Buffer.from(part));}
+ const bytes=Buffer.concat(parts);
+ if('sha512-'+crypto.createHash('sha512').update(bytes).digest('base64')!==integrity)throw Error('Factory npm integrity mismatch');
+ fs.mkdirSync(prefix,{recursive:true,mode:provision?0o755:0o700});
+ const archive=prefix+'/npm.tgz';fs.writeFileSync(archive,bytes,{flag:'wx'});
+ const extracted=cp.spawnSync('/bin/tar',['-xzf',archive,'-C',prefix],{stdio:'inherit'});
+ if(extracted.error||extracted.status!==0)throw Error('Factory npm extraction failed');
+ fs.unlinkSync(archive);
+ if(JSON.parse(fs.readFileSync(prefix+'/package/package.json','utf8')).version!==version)throw Error('Factory npm version mismatch');
+ fs.mkdirSync(prefix+'/bin',{mode:provision?0o755:0o700});
+ fs.symlinkSync('../package/bin/npm-cli.js',prefix+'/bin/npm');
+ fs.symlinkSync('../package/bin/npx-cli.js',prefix+'/bin/npx');
+ if(provision){console.log('Factory npm '+version+' provisioned with exact SHA512');return;}
+ const result=cp.spawnSync(process.execPath,[prefix+'/package/bin/npm-cli.js',...args],{stdio:'inherit'});
+ if(result.error)throw Error('Factory npm invocation failed');
+ process.exit(result.status===null?1:result.status);
+})().catch(error=>{console.error(error.message);process.exit(1);});
+'''
 FACTORY_FILES = {".autospec-bootstrap.json", ".autospec-environment.json", ".mcp.json",
                  "claude.md", "agents.md", "gemini.md"}
+
+
+def _npm_profile_script() -> str:
+    return _NPM_BOOTSTRAP.replace("__NPM_VERSION__", json.dumps(NPM_VERSION)).replace(
+        "__NPM_INTEGRITY__", json.dumps(NPM_INTEGRITY))
+
+
+def _node_npm_command(command: list[str]) -> list[str]:
+    """Pinned factory npm in writable /tmp; remaining argv stays literal."""
+    if not command or command[0] != "npm":
+        raise _unavailable("A literal factory npm operation is required")
+    return ["/usr/local/bin/node", "--input-type=commonjs", "-e", _npm_profile_script(), "--", *command[1:]]
 
 
 def dependency_resolver(argv: list[str], *, cwd: Path, env=None) -> subprocess.CompletedProcess:
@@ -58,7 +103,7 @@ def dependency_resolver(argv: list[str], *, cwd: Path, env=None) -> subprocess.C
         options = argv[2:-1]
         if options not in (["--package-lock-only", "--ignore-scripts", "--save-dev"], ["--package-lock-only", "--ignore-scripts", "--save-prod"]) or not re.fullmatch(r"(?:@[a-zA-Z0-9_.-]+/)?[a-zA-Z0-9_.-]+@[0-9A-Za-z.*<>=~^|+ \-]+", argv[-1]):
             raise _unavailable("Invalid coordinator Node add")
-        command = ["npm", *argv[1:], "--no-audit", "--no-fund", "--userconfig=/dev/null", "--globalconfig=/tmp/autospec-empty-global-npmrc"]
+        command = _node_npm_command(["npm", *argv[1:], "--no-audit", "--no-fund", "--userconfig=/dev/null", "--globalconfig=/tmp/autospec-empty-global-npmrc"])
     root = Path(cwd)
     manifest, lock = admit_manifest(root, ecosystem, require_lock=False)
     manager = LinuxEnvironmentManager(Path(tempfile.gettempdir()).resolve() / "autospec-linux-environments", docker=settings.docker_cmd)
@@ -266,7 +311,7 @@ class LinuxEnvironmentManager:
             name = "autospec-sandbox-" + __import__("uuid").uuid4().hex
             owner = __import__("uuid").uuid4().hex
             from .sandbox import docker_run_cmd, _cleanup_container
-            command = ["uv", "lock", "--no-build", "--no-config"] if ecosystem == "python" else ["npm", "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund", "--userconfig=/dev/null", "--globalconfig=/tmp/autospec-empty-global-npmrc"]
+            command = ["uv", "lock", "--no-build", "--no-config"] if ecosystem == "python" else _node_npm_command(["npm", "install", "--package-lock-only", "--ignore-scripts", "--no-audit", "--no-fund", "--userconfig=/dev/null", "--globalconfig=/tmp/autospec-empty-global-npmrc"])
             argv = docker_run_cmd(command, str(stage), base["Id"], self.docker, run_id=owner, container_name=name)
             # Network exists exclusively during resolution, manifest-only stage;
             # generated code and package scripts cannot run in this phase.
@@ -381,7 +426,12 @@ class LinuxEnvironmentManager:
                 common += "ENV PYTHONPATH=/opt/reporters\n"
             common += 'ENV PATH="/opt/venv/bin:$PATH"\n'
         else:
+            # Download/extract only the fixed supervisor tool before any producer
+            # manifest enters the image; integrity is checked before execution.
+            common += "RUN " + json.dumps(["/usr/local/bin/node", "--input-type=commonjs", "-e", _npm_profile_script(), "--", "__autospec_provision_only__"]) + "\n"
+            common += 'ENV PATH="/opt/autospec-npm/bin:$PATH"\n'
             common += "COPY package.json package-lock.json ./\nRUN npm ci --ignore-scripts --no-audit --no-fund --userconfig=/dev/null --globalconfig=/tmp/autospec-empty-global-npmrc" + (" --omit=dev" if mode == "runtime" else " --include=dev") + "\n"
             common += "RUN mv node_modules /opt/node_modules\n"
             common += "RUN ln -s /tmp/vite-cache /opt/node_modules/.vite\n"
+            common += "RUN ln -s /tmp/vite-config-cache /opt/node_modules/.vite-temp\n"
         return common + f"LABEL autospec.environment={fingerprint}\nWORKDIR /app\nUSER 65532:65532\n"

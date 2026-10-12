@@ -437,10 +437,15 @@ def _quality_seal(store,seal,source_root):
     if len({suite.name for suite in suites})!=len(suites):
         raise AdapterUnavailable("distinct native suite names required")
     mutation=AuthorizationMutationSpec(**data["mutation"]) if data.get("mutation") else None
-    digest=native_quality_plan_hash(suites,mapping,mutation)
+    mode=data.get("e2e_mode")
+    if not isinstance(mode,str) or mode not in {"native","supervisor_browser"}:
+        raise AdapterUnavailable("explicit reviewed native E2E mode required")
+    digest=native_quality_plan_hash(suites,mapping,mutation,e2e_mode=mode)
     if digest!=data["plan_hash"]: raise AdapterUnavailable("quality plan content/fingerprint mismatch")
     proof=store._proof(seal["review"],"QUALITY:plan:"+digest)
     if proof.type!="R" or not proof.passed: raise AdapterUnavailable("quality plan independent R missing")
+    if mode=="supervisor_browser" and "QUALITY:e2e:supervisor_browser" not in proof.checks:
+        raise AdapterUnavailable("supervisor browser mode needs its exact independent R tag")
     root=Path(source_root).resolve()
     for suite in suites:
         suite_root=(root/suite.root).resolve()
@@ -582,9 +587,9 @@ async def _operations(contract,snapshot_root,snapshot_hash,supervisor_root):
         for raw in audit["artifacts"]:
             proof=store._proof(raw,"OBS:audit_raw")
             if proof.type!="X" or not proof.passed: raise AdapterUnavailable("raw audit observation was not obtained")
-        dangerous=[f for f in audit["findings"] if f.get("severity","").lower() in {"critical","high"} and f.get("exploitable") is True and not f.get("arbitration")]
-        if any(type(f.get("exploitable")) is not bool for f in audit["findings"]): raise AdapterUnavailable("audit exploitability assessment unavailable")
-        check(checks,"audit_no_unarbitrated_exploitable_high",not dangerous,{"date":audit["date"],"tool":audit["tool"],"findings":audit["findings"]})
+        from .delivery_evidence import audit_disposition_checks
+        checks.extend(audit_disposition_checks(audit, evidence_root=supervisor_root,
+            snapshot_hash=snapshot_hash, contract_hash=contract.contract_hash))
     except Exception as exc: limits.append("README/configuration/audit unavailable: "+type(exc).__name__)
     await finish("OPS-05",checks,limits,repro=("reproduce documented argv inside isolation and inspect dated dependency audit with independent source review",))
     checks=[];limits=[]

@@ -11,6 +11,7 @@ import contextvars
 import contextlib
 import copy
 import fnmatch
+import hashlib
 import json
 import logging
 import os
@@ -711,6 +712,13 @@ class _UsageTracker:
 
     async def arun(self, prompt, system_prompt, cwd=None, session_id=None, model=None):
         from .budget_reservations import BudgetReservationError, BudgetReservations
+        # A new cap, resume, feedback or changed provider cannot turn an
+        # interrupted call into known/free usage. Reject before activity,
+        # reservation, dispatch checkpoint or any provider invocation.
+        if self.pipeline.state.usage.unreported_calls:
+            self.pipeline._enforce_budget()
+            raise AgentError("Appel agent non lancé : COST_UNREPORTED — usage historique à réconcilier.",
+                             code="COST_UNREPORTED")
         try:
             proof = self._concurrent_proof()
         except BudgetReservationError as exc:
@@ -892,7 +900,7 @@ class _UsageTracker:
             self.pipeline._resume_event.set()
             self.pipeline._chat(ChatRole.SYSTEM,
                 "💰 Usage non remonté : le budget restant ne peut plus être vérifié. "
-                "Arrêt des appels automatiques ; une reprise explicite est nécessaire.")
+                "Arrêt des appels automatiques ; une reprise explicite après réconciliation attestée est nécessaire.")
         self.pipeline._sync()
         return cost
 
@@ -1933,6 +1941,14 @@ class Pipeline:
 
     def _enforce_budget(self) -> None:
         """Request a clean stop when the project's token/cost budget is reached."""
+        if self.state.usage.unreported_calls:
+            if not self._stop_requested:
+                self._stop_requested = True
+                self._resume_event.set()
+                self._chat(ChatRole.SYSTEM,
+                    "💰 COST_UNREPORTED : usage historique non réconcilié ; aucun nouvel appel agent autorisé. "
+                    "Changer le plafond ou demander une reprise explicite ne constitue pas une réconciliation.")
+            return
         if not self._stop_requested and self._budget_reached():
             self._stop_requested = True
             self._resume_event.set()  # unblock a paused loop so it can finish
@@ -2978,15 +2994,21 @@ class Pipeline:
             self._sync()
 
     async def aundeploy(self) -> None:
-        """Tear down this project's Docker container/image and reset the deploy
-        STATUS/DETAIL. The image/container names and the allocated host port are
-        deliberately KEPT in state (stable identity across redeploys — see
-        ``delivery_state.set_deploy``). Raises ValueError (-> 409) while a
-        deploy pass is running."""
+        """Withdraw confirmed owned delivery, preserving its database volume.
+
+        Contract artifacts use external ownership journals, never legacy names
+        or a missing CID as deletion authority. Clear state only after confirmed
+        withdrawal. Raises ValueError (-> 409) during another deploy pass.
+        """
         if self._deployment_lock.locked() or (self._deploy_task and not self._deploy_task.done()):
             raise ValueError("un déploiement Docker est en cours")
         async with self._deployment_lock:
-            result = await asyncio.to_thread(docker_deploy.undeploy, self.state.id)
+            options = {}
+            if self.state.acceptance_contract_hash:
+                resource = "packages" if self._is_packaged_delivery() else "publication"
+                argument = "packaging_root" if resource == "packages" else "publication_root"
+                options[argument] = acceptance.supervisor_root(self.state.id) / resource
+            result = await asyncio.to_thread(docker_deploy.undeploy, self.state.id, **options)
             if not result.ok:
                 delivery_state.set_deploy(self.state, status="failed", detail=result.detail)
                 self._sync()
@@ -3002,24 +3024,45 @@ class Pipeline:
             "frontend_root": frontend.relative_to(ws).as_posix() if frontend else "frontend",
         }
 
+    def _is_packaged_delivery(self) -> bool:
+        """Choose registry type, not ownership; only its journal grants that.
+
+        A persisted structured stack also covers crash-before-state-flush. The
+        image/port heuristic is retained only for legacy non-contract callers.
+        """
+        return self._is_packaged_state(self.state)
+
+    @staticmethod
+    def _is_packaged_state(state: ProjectState) -> bool:
+        """Classify a persisted state without starting or constructing a runner."""
+        kind = state.technical_stack.get("kind")
+        if kind in ("cli", "library"):
+            return True
+        if kind in ("api", "frontend", "fullstack", "web-ssr"):
+            return False
+        if state.product_profile in ("cli", "library-fast"):
+            return True
+        if state.deployed_container or state.deploy_host_port:
+            return False
+        return state.deploy_status == "packaged" or (
+            not state.acceptance_contract_hash and bool(state.deployed_image))
+
     async def areconcile_deploy(self) -> None:
         if self._deployment_lock.locked() or (self._deploy_task and not self._deploy_task.done()):
             return
-        if not (self.state.deployed_container or self.state.deployed_image or self.state.deploy_status):
+        if not (self.state.acceptance_contract_hash or self.state.deployed_container or self.state.deployed_image or self.state.deploy_status):
             return
         async with self._deployment_lock:
             # A daemon outage changes the verdict to failed, not the resource
             # type. Keep inspecting a packaged image on subsequent refreshes.
-            packaged = self.state.deploy_status == "packaged" or (
-                not self.state.deployed_container
-                and (
-                    self.state.technical_stack.get("kind") in ("cli", "library")
-                    or self.state.product_profile in ("cli", "library-fast")
-                    or (bool(self.state.deployed_image) and not self.state.deploy_host_port)
-                )
-            )
+            packaged = self._is_packaged_delivery()
             inspect = docker_deploy.inspect_packaged_image if packaged else docker_deploy.inspect_deployment
-            result = await asyncio.to_thread(inspect, self.state.id)
+            options = {}
+            if self.state.acceptance_contract_hash:
+                argument = "packaging_root" if packaged else "publication_root"
+                resource = "packages" if packaged else "publication"
+                options[argument] = acceptance.supervisor_root(self.state.id) / resource
+            result = await asyncio.to_thread(inspect, self.state.id, **options)
             if result.skipped:
                 delivery_state.clear_deploy(self.state)
             else:
@@ -3027,7 +3070,50 @@ class Pipeline:
                     self.state, status=("packaged" if result.packaged else "deployed") if result.ok else "failed", detail=result.detail,
                     image=result.image, container=result.container, host_port=result.host_port,
                 )
+                if self.state.acceptance_contract_hash and not result.ok:
+                    self.state.delivery_ready = False
             self._sync()
+
+    async def arecover_publication(self) -> None:
+        """Factory-start recovery of an exact durable journal, never a rebuild.
+
+        Read-only status refresh does not adopt processes or restart stopped
+        services. Only this startup hook may recover a formerly live ingress.
+        """
+        if not self.state.acceptance_contract_hash or self._is_packaged_delivery():
+            return
+        root = acceptance.supervisor_root(self.state.id) / "publication"
+        async with self._deployment_lock:
+            status = await asyncio.to_thread(docker_deploy.inspect_deployment, self.state.id, publication_root=root)
+            if status.ok or status.skipped:
+                return
+            # An intentional undeploy clears the CID. A live journal left by
+            # factory death is re-attested by ID/creation/configuration first.
+            self._docker_cancel.clear()
+            self._docker_worker = asyncio.create_task(asyncio.to_thread(docker_deploy.recover_publication, self.state.id, root,
+                timeout=self._setting("docker_deploy_timeout_s"), intended_active_only=True, cancel_event=self._docker_cancel))
+            cancelled = False
+            try:
+                result = await asyncio.shield(self._docker_worker)
+            except asyncio.CancelledError:
+                cancelled = True
+                self._docker_cancel.set()
+                result = await self._adrain_docker_worker()
+            if result.skipped:
+                delivery_state.clear_deploy(self.state)
+                self._sync()
+                if cancelled:
+                    raise asyncio.CancelledError
+                return
+            delivery_state.set_deploy(self.state, status="deployed" if result.ok else "failed",
+                detail=result.detail, image=result.image, container=result.container, host_port=result.host_port)
+            if not result.ok:
+                self.state.delivery_ready = False
+            self._sync()
+            if cancelled:
+                # Recovery does not grant a fresh-call deletion receipt. Keep
+                # the prior owned CID/database, after draining new ingress.
+                raise asyncio.CancelledError
 
     async def adocument(self) -> None:
         """Tech-writer pass in the background: write the GENERATED project's
@@ -3906,7 +3992,7 @@ class Pipeline:
 
     async def _adelivery_gates(self, *, all_iterations: bool = False) -> bool:
         """Run the FULL delivery-gate chain on the current iteration:
-        smoke run → runtime acceptance → Definition of Done → Docker delivery.
+        smoke → runtime → DoD → independent qualification → publication.
 
         Single source of truth for gate ORDER, shared by the main lifecycle and
         the rebuild/resume finishers — an iteration completed through a story
@@ -3922,6 +4008,13 @@ class Pipeline:
             return False
         if not self._apply_definition_of_done(all_iterations=all_iterations):
             return False
+        if self.state.acceptance_contract_hash:
+            if not await self._aindependent_acceptance_phase():
+                return False
+            # Qualification includes the final image even when public delivery
+            # is explicitly disabled. It is not a claim of public deployment.
+            if not self._setting("docker_delivery"):
+                return True
         # Docker delivery gate (D1): build the accepted delivery into an image,
         # deploy it on the shared network and network-verify it; a failure parks
         # the iteration in needs_attention (no-op unless DOCKER_DELIVERY /
@@ -3936,13 +4029,11 @@ class Pipeline:
                     "requiert une validation humaine (bouton « Déployer »).",
                 )
             if self.state.acceptance_contract_hash:
-                self._block_delivery("Image finale non vérifiée : validation humaine requise.", source="acceptance")
+                self._block_delivery("Image qualifiée, publication non autorisée : validation humaine requise.", source="acceptance")
                 return False
             return True
         if not await self._adocker_delivery_phase():
             return False
-        if self.state.acceptance_contract_hash:
-            return await self._aindependent_acceptance_phase()
         return True
 
     async def _alifecycle(self) -> None:
@@ -4404,7 +4495,7 @@ class Pipeline:
             self._sync()
 
     async def _aindependent_acceptance_phase(self) -> bool:
-        from ..validation.final_gate import admit_reports, freeze_snapshot
+        from ..validation.final_gate import admit_reports, freeze_snapshot, verification_cache_context
         from .dependencies import atomic_json
         contract = self._acceptance_contract()
         supervisor = acceptance.supervisor_root(self.state.id)
@@ -4413,11 +4504,20 @@ class Pipeline:
         self._sync()
         try:
             snapshot, source = await asyncio.to_thread(freeze_snapshot, workspace_dir(self.state.id), supervisor / "snapshots")
+            # Revalidate source review even when all old report proofs survive.
+            # An old PASS cannot bypass a changed protocol/engine/seal.
+            await self._await_reviewed_configuration(contract, source, snapshot.digest, phase="final")
+            context = verification_cache_context(contract.contract_hash, snapshot.digest, supervisor)
             # Re-admit cached reports: proof files and code identities may have
             # changed since the previous run. State/model narration is ignored.
             reports_path = supervisor / "reports" / snapshot.digest / "verification-reports.json"
-            if reports_path.is_file():
-                reports = json.loads(reports_path.read_text(encoding="utf-8"))
+            context_path = reports_path.with_name("verification-context.json")
+            if (reports_path.is_file() and reports_path.stat().st_size <= 16_000_000 and
+                context_path.is_file() and context_path.stat().st_size <= 128_000 and
+                json.loads(context_path.read_bytes()).get("context") == context and
+                json.loads(context_path.read_bytes()).get("reports_sha256") ==
+                    hashlib.sha256(reports_path.read_bytes()).hexdigest()):
+                reports = json.loads(reports_path.read_bytes())
                 cached = admit_reports(contract, reports, snapshot_hash=snapshot.digest, evidence_root=supervisor)
             else:
                 cached = None
@@ -4429,7 +4529,6 @@ class Pipeline:
                 # The baked command is a reviewed operational fact. Advisory
                 # collection precedes review; final-image construction follows
                 # it, so verification cannot silently repair CMD by overriding.
-                await self._await_reviewed_configuration(contract, source, snapshot.digest, phase="final")
                 try:
                     native_build=await collect_native_delivery_build(contract,source,snapshot.digest,
                         supervisor,timing_recorder=timing_recorder)
@@ -4445,7 +4544,16 @@ class Pipeline:
                 self.monitor.event("native_final_facts",status=facts["status"],
                     snapshot_hash=snapshot.digest,limits=facts["limits"])
                 reports = await verify_project(self.state, contract, source, snapshot.digest, supervisor)
+                if verification_cache_context(contract.contract_hash, snapshot.digest, supervisor) != context:
+                    raise ValueError("verification engine or reviewed configuration changed during verification")
+                if reports_path.exists():
+                    # Keep superseded reports for audit; never relabel them as
+                    # current-engine observations merely because source matches.
+                    previous = reports_path.with_name("verification-reports-prior-"+uuid.uuid4().hex+".json")
+                    previous.write_bytes(reports_path.read_bytes())
                 atomic_json(reports_path, reports)
+                atomic_json(context_path, {"context":context,
+                    "reports_sha256":hashlib.sha256(reports_path.read_bytes()).hexdigest()})
             admission = admit_reports(contract, reports, snapshot_hash=snapshot.digest, evidence_root=supervisor)
             atomic_json(supervisor / "reports" / snapshot.digest / "final-admission.json", admission.payload())
             self.state.acceptance_result = {"status": admission.status, "contract_hash": contract.contract_hash,
@@ -10308,6 +10416,7 @@ class Pipeline:
     async def _adocker_delivery_phase(self, *, force: bool = False) -> bool:
         async with self._deployment_lock:
             self._docker_cancel.clear()
+            self._docker_worker = None
             try:
                 return await self._adocker_delivery_run(force=force)
             except asyncio.CancelledError:
@@ -10315,11 +10424,23 @@ class Pipeline:
                 # asyncio cancellation does not stop a worker thread. Wait for
                 # its rollback/cleanup before disposal can delete the workspace.
                 if self._docker_worker:
-                    await asyncio.shield(self._docker_worker)
-                delivery_state.set_deploy(self.state, status="failed", detail="Déploiement interrompu.")
+                    await self._adrain_docker_worker()
+                if self.state.deploy_status != "failed":
+                    delivery_state.set_deploy(self.state, status="failed", detail="Déploiement interrompu.")
+                self._sync()
                 raise
             finally:
                 docker_deploy.release_host_port(self.state.id)
+
+    async def _adrain_docker_worker(self):
+        """Repeated cancellation cannot release ownership of a live thread."""
+        while True:
+            try:
+                return await asyncio.shield(self._docker_worker)
+            except asyncio.CancelledError:
+                self._docker_cancel.set()
+                if self._docker_worker.done():
+                    return self._docker_worker.result()
 
     async def _adocker_delivery_run(self, *, force: bool = False) -> bool:
         """Docker delivery gate (D1): build the DoD-accepted delivery into an
@@ -10345,6 +10466,9 @@ class Pipeline:
                 delivery_state.set_deploy(self.state, status="skipped", detail=reason)
                 self._sync()
             return True
+
+        if self.state.acceptance_contract_hash:
+            return await self._adocker_qualified_delivery(ws, kind=kind)
 
         self.monitor.phase("docker")
         port = self._resolve_web_port(ws)
@@ -10504,6 +10628,104 @@ class Pipeline:
         self.state.regressions.append(msg)
         self._notify("error", "Livraison Docker échouée", msg[:200])
         return False
+
+    async def _adocker_qualified_delivery(self, ws: Path, *, kind: str) -> bool:
+        """Publish only re-admitted immutable qualification, without paid repair.
+
+        No Dockerfile regeneration, runtime override, shared network probe or
+        legacy rebuild is permitted on this path. A missing publication
+        isolation capability is a visible infrastructure limit, never green.
+        """
+        from ..validation.delivery_raccord import load_qualified_delivery_image
+        publication_root = acceptance.supervisor_root(self.state.id) / "publication"
+        cancelled = False
+        try:
+            qualified = await load_qualified_delivery_image(self._acceptance_contract(), ws,
+                acceptance.supervisor_root(self.state.id))
+            ownership = ({"packaging_root": acceptance.supervisor_root(self.state.id) / "packages"}
+                if kind in {"cli", "library"} else dict(
+                    publication_root=publication_root,
+                    publication_contract_hash=self.state.acceptance_contract_hash,
+                    publication_internal_port=qualified["internal_port"],
+                    publication_local_cookie_mode=qualified["local_cookie_mode"],
+                    publication_database_path=qualified["database_path"],
+                    publication_health_path=qualified["health_path"],
+                    publication_migration_command=qualified["migration_command"]))
+            self._docker_worker = asyncio.create_task(asyncio.to_thread(docker_deploy.deploy_and_verify, self.state, ws,
+                network="none", host_port=0, kind=kind,
+                build_timeout=self._setting("docker_build_timeout_s"),
+                deploy_timeout=self._setting("docker_deploy_timeout_s"),
+                qualified_image_id=qualified["image_id"], expected_snapshot=qualified["snapshot_hash"],
+                expected_runtime_command=qualified["runtime_command"], cancel_event=self._docker_cancel,
+                **ownership))
+            try:
+                result = await asyncio.shield(self._docker_worker)
+            except asyncio.CancelledError:
+                cancelled = True
+                self._docker_cancel.set()
+                # Drain and process the actual receipt. A thread may already
+                # have published when cancellation arrives; cleanup below may
+                # withdraw only resources created by THIS call, never reuse.
+                result = await self._adrain_docker_worker()
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            detail = "Qualification Docker non réadmise : " + type(exc).__name__
+            delivery_state.set_deploy(self.state, status="failed", detail=detail)
+            self._block_delivery(detail, source="docker")
+            self._sync()
+            if cancelled:
+                raise asyncio.CancelledError
+            return False
+        self.monitor.event("docker", ok=result.ok, infra=result.infra, immutable=True,
+            packaged=result.packaged, detail=result.detail[:300])
+        if cancelled or result.cancelled or self._stop_requested:
+            detail = "Publication interrompue ; aucune nouvelle application déployée."
+        else:
+            detail = result.detail
+        successful = result.ok and not cancelled and not result.cancelled and not self._stop_requested
+        if not successful and result.ok and getattr(result, "created_publication_container", ""):
+            # Cancellation can arrive after publish returned. Stop only a newly
+            # admitted owned runtime, not a previous still-working service.
+            self._docker_worker = asyncio.create_task(asyncio.to_thread(docker_deploy.undeploy, self.state.id,
+                publication_root=publication_root,
+                expected_publication_container=result.created_publication_container))
+            stopped = await self._adrain_docker_worker()
+            if stopped.ok:
+                delivery_state.clear_deploy(self.state)
+            else:
+                detail = "Publication interrompue ; retrait non confirmé : " + stopped.detail
+                delivery_state.set_deploy(self.state,status="failed",image=result.image,
+                    container=result.container,host_port=result.host_port,detail=detail)
+        if (not successful and result.ok and result.packaged and
+                getattr(result, "created_package_alias", "")):
+            # The registry returns a fresh-call ownership receipt. State image
+            # comparison cannot distinguish a new alias from crash recovery.
+            self._docker_worker = asyncio.create_task(asyncio.to_thread(docker_deploy.undeploy, self.state.id,
+                packaging_root=acceptance.supervisor_root(self.state.id) / "packages",
+                expected_package_alias=result.created_package_alias,
+                expected_package_image_id=result.image))
+            stopped = await self._adrain_docker_worker()
+            if stopped.ok:
+                delivery_state.clear_deploy(self.state)
+            else:
+                detail = "Packaging interrompu ; retrait non confirmé : " + stopped.detail
+                delivery_state.set_deploy(self.state, status="failed", image=result.image, detail=detail)
+        delivery_state.set_deploy(self.state,
+            status=("packaged" if result.packaged else "deployed") if successful else "failed",
+            image=result.image if successful else "", container=result.container if successful else "",
+            host_port=result.host_port if successful else 0, detail=detail)
+        if not successful:
+            self._block_delivery(detail, source="docker")
+            if result.infra:
+                self._apark_infra("docker", detail)
+            self._sync()
+            if cancelled:
+                raise asyncio.CancelledError
+            return False
+        self._log("docker", "✅ Image qualifiée conservée : " + detail)
+        self._sync()
+        return True
 
     @staticmethod
     def _terminate_tree(proc) -> None:

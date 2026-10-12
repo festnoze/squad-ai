@@ -1,0 +1,44 @@
+{
+  "timing": {
+    "phase": "tests",
+    "seconds": 1.9303397999610752,
+    "started_at": "2026-10-12T11:53:03.086827+00:00",
+    "ended_at": "2026-10-12T11:53:05.017164+00:00",
+    "scope": "actual elapsed supervisor action, including attestation/cache checks"
+  },
+  "argv": [
+    "/bin/sh",
+    "-c",
+    "mkdir -p /tmp/product /tmp/vite-cache /tmp/vite-config-cache; cp -r /app/. /tmp/product/; ln -s /opt/node_modules /tmp/product/node_modules; cd /tmp/product; \"$@\"; status=$?; if [ -f suite-report.json ] && [ ! -L suite-report.json ]; then cp suite-report.json /app/suite-report.json; fi; if [ -f /tmp/autospec-coverage-e69665e4c9774e07ae671e36ec411afe/coverage-final.json ] && [ ! -L /tmp/autospec-coverage-e69665e4c9774e07ae671e36ec411afe/coverage-final.json ]; then cp /tmp/autospec-coverage-e69665e4c9774e07ae671e36ec411afe/coverage-final.json /app/suite-coverage.json; fi; exit \"$status\"",
+    "autospec",
+    "node",
+    "/opt/node_modules/vitest/vitest.mjs",
+    "run",
+    "--reporter=json",
+    "--outputFile=suite-report.json",
+    "--maxWorkers=1",
+    "--fileParallelism=false",
+    "--coverage.enabled",
+    "--coverage.provider=v8",
+    "--coverage.include=src/**/*.{js,jsx,cjs,mjs,ts,tsx,cts,mts}",
+    "--coverage.exclude=**/*.{test,spec,config}.*",
+    "--coverage.exclude=**/{test,tests,__tests__}/**",
+    "--coverage.exclude=**/*.d.ts",
+    "--coverage.exclude=**/{setupTests,testSetup}.*",
+    "--coverage.reporter=json",
+    "--coverage.reportsDirectory=/tmp/autospec-coverage-e69665e4c9774e07ae671e36ec411afe",
+    "--coverage.clean=true"
+  ],
+  "return_code": 0,
+  "environment_fingerprint": "c8558fb53a8fc6c4606b2d0c1bcb84ac0183e44045ca678c9b79d9977e46f1b7",
+  "image_id": "sha256:42e4e645c53d48c2975da1aaf82bf835a3be0c39a5033b6400ac3632f776f354",
+  "environment_preparation": {
+    "phase": "install",
+    "seconds": 0.54500470001949,
+    "started_at": "2026-10-12T11:53:02.456224+00:00",
+    "ended_at": "2026-10-12T11:53:03.001227+00:00",
+    "scope": "actual elapsed supervisor action, including attestation/cache checks"
+  },
+  "source_fingerprint": "bebda18489fd519f6467d15a338812b83c3e01deb68e2f50ef2a9ce50496c9a1",
+  "scope": "actual container inner argv and observed return code"
+}

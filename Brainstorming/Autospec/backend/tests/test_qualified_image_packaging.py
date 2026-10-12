@@ -53,11 +53,11 @@ def test_web_image_is_packaged_but_not_deployed_and_never_rebuilt(tmp_path,monke
 
 
 @pytest.mark.parametrize('kind',['cli','library'])
-def test_qualified_cli_library_package_does_not_execute_help_or_change_previous_container(tmp_path,monkeypatch,kind):
+def test_qualified_cli_library_without_registry_never_uses_legacy_or_unowned_alias(tmp_path,monkeypatch,kind):
     root,state,args,image=fixture(tmp_path);calls=fake(monkeypatch,image);args['kind']=kind
     result=deployment.deploy_and_verify(state,root,**args)
-    assert result.ok and result.packaged and result.container=='' and result.image==image['Id']
-    assert not any(a[0] in {'run','exec','stop','rm','network','build'} for a in calls)
+    assert not result.ok and result.packaged and result.container=='' and result.image==image['Id']
+    assert 'PACKAGING_REGISTRY_REQUIRED' in result.detail and calls==[]
 
 
 @pytest.mark.parametrize('wrong',['source','id','cmd','entrypoint','label','os'])

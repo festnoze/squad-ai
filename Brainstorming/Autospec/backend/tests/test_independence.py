@@ -10,6 +10,7 @@ Covers:
 """
 
 import asyncio
+import os
 
 import pytest
 
@@ -27,6 +28,12 @@ from autospec.models import (
 from autospec.orchestrator import independence
 from autospec.orchestrator.pipeline import Pipeline
 from autospec.storage import workspace_dir
+
+# These two scheduler integration tests run actual hermetic Git bookkeeping.
+# Native Windows owned-process launches cost ~0.3–0.6s per command in the
+# recorded latency probe; the former 40s cap cancelled correct 45s rollups.
+# Keep a finite outer deadline without changing overlap/DONE/crash assertions.
+_NATIVE_SCHEDULER_DEADLINE = 90 if os.name == "nt" else 40
 
 
 # --------------------------------------------------------------- pure analyzer
@@ -205,7 +212,7 @@ async def test_scheduler_never_coruns_declared_overlap(streams_on, monkeypatch):
         return True, ""
 
     monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
-    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=_NATIVE_SCHEDULER_DEADLINE)
 
     assert concurrent["max"] == 1, "overlapping-file tasks ran concurrently"
     assert all(t.status == StoryStatus.DONE for t in state.story("US-1").tasks)
@@ -242,7 +249,7 @@ async def test_one_worker_crash_does_not_kill_the_build(streams_on, monkeypatch)
         return True, ""
 
     monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
-    await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+    await asyncio.wait_for(pipeline._abuild_phase(), timeout=_NATIVE_SCHEDULER_DEADLINE)
 
     assert state.story("US-2").status == StoryStatus.DONE   # sibling survived
     assert state.story("US-1").status == StoryStatus.FAILED  # crash isolated

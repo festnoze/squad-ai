@@ -18,7 +18,7 @@ from ..orchestrator.isolated_validation import build_delivery_image
 from .coordinator import SupervisorEvidenceStore, _context
 from .delivery_evidence import (NativeDeliveryCollector, NativeTimingRecorder,
                                NativeTimingUnavailable, delivery_build_checks)
-from .final_gate import source_snapshot
+from .final_gate import source_snapshot, admit_reports
 from .native_quality_raccord import collect_native_quality
 from .review_delivery import delivery_required, load_reviewed_delivery_plan
 from .review_plans import quality_required
@@ -28,6 +28,61 @@ from .support_adapter import AdapterUnavailable, Proof
 def native_timing_recorder(contract, snapshot, root):
     return NativeTimingRecorder(evidence_root=root,snapshot_hash=snapshot,
         contract_hash=contract.contract_hash,docker=settings.docker_cmd)
+
+
+async def load_qualified_delivery_image(contract, source, root):
+    """Re-admit actual reports/build/bindings, never trust a state ready flag.
+
+    Publication must consume the very immutable image qualified against the
+    current product, not rebuild it or repair its entrypoint afterwards.
+    """
+    from ..agents.file_broker import ExecutionContext, FileBroker
+    from .product_harness import ReviewedProductBindings
+    source, root = Path(source).resolve(), Path(root).resolve()
+    if root.is_relative_to(source):
+        raise AdapterUnavailable("qualification evidence must be outside product")
+    snapshot = source_snapshot(source).digest
+    broker = FileBroker(ExecutionContext("qualified-publication", root))
+    reports_path = broker.path("reports/" + snapshot + "/verification-reports.json")
+    if not reports_path.is_file() or reports_path.stat().st_size > 16_000_000:
+        raise AdapterUnavailable("bounded exact qualification reports unavailable")
+    admitted = admit_reports(contract, json.loads(reports_path.read_bytes()),
+        snapshot_hash=snapshot, evidence_root=root)
+    if not admitted.ready:
+        raise AdapterUnavailable("current product was not independently accepted")
+    binding_path = broker.path("product-bindings.json")
+    if not binding_path.is_file() or binding_path.stat().st_size > 1_000_000:
+        raise AdapterUnavailable("bounded reviewed runtime command unavailable")
+    binding = ReviewedProductBindings.from_dict(json.loads(binding_path.read_bytes()))
+    if (binding.snapshot_hash, binding.contract_hash) != (snapshot, contract.contract_hash):
+        raise AdapterUnavailable("qualification binding identity drift")
+    binding.validate(source)
+    receipt = await SupervisorEvidenceStore(root, snapshot, contract.contract_hash).observe("delivery_build")
+    checks = await asyncio.to_thread(delivery_build_checks, receipt, source, snapshot)
+    if receipt.get("status") != "PASS" or not checks or any(c.get("passed") is not True for c in checks):
+        raise AdapterUnavailable("immutable qualification image is not currently valid")
+    command = list(binding.runtime_command)
+    if receipt.get("runtime_command") != command:
+        raise AdapterUnavailable("qualified baked command differs from reviewed command")
+    if source_snapshot(source).digest != snapshot:
+        raise AdapterUnavailable("product changed while re-admitting publication")
+    # Operational ports remain independently source-reviewed bindings, not
+    # artifact guesses. A source-only oracle route is usable only when its
+    # literal is present in the frozen brief; never synthesize a health URL.
+    health = binding.browser_routes.get("health")
+    if not health:
+        for fact in contract.facts:
+            if fact.kind == "security_profile":
+                candidate = fact.expected.get("api", {}).get("health")
+                if isinstance(candidate, str) and candidate in contract.brief:
+                    health = candidate
+    migration = binding.commands.get("migrate_fresh")
+    if migration is not None and migration.parameters:
+        raise AdapterUnavailable("publication migration needs literal reviewed argv, not fixture stdin")
+    return dict(image_id=receipt["image_id"], snapshot_hash=snapshot, runtime_command=command,
+        internal_port=binding.internal_port, local_cookie_mode=binding.local_cookie_mode,
+        database_path=binding.database_path, health_path=health,
+        migration_command=list(migration.argv) if migration is not None else None)
 
 
 async def collect_native_delivery_build(contract, source, snapshot, root, *, timing_recorder=None):

@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="55" time="20.082" timestamp="2026-10-12T14:31:03.029543+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_owned_packages" name="test_package_external_journal_reconcile_and_detach_only_exact_uuid_alias" time="0.068" /><testcase classname="tests.test_owned_packages" name="test_image_facts_rejected_before_tag[id]" time="0.012" /><testcase classname="tests.test_owned_packages" name="test_image_facts_rejected_before_tag[os]" time="0.007" /><testcase classname="tests.test_owned_packages" name="test_image_facts_rejected_before_tag[cmd]" time="0.007" /><testcase classname="tests.test_owned_packages" name="test_image_facts_rejected_before_tag[entrypoint]" time="0.007" /><testcase classname="tests.test_owned_packages" name="test_image_facts_rejected_before_tag[label]" time="0.007" /><testcase classname="tests.test_owned_packages" name="test_image_facts_rejected_before_tag[workdir]" time="0.007" /><testcase classname="tests.test_owned_packages" name="test_foreign_replaced_alias_and_unknown_journal_never_grant_cleanup" time="0.020" /><testcase classname="tests.test_owned_packages" name="test_cancel_during_tag_detaches_only_alias_recorded_before_mutation" time="0.018" /><testcase classname="tests.test_owned_packages" name="test_update_refused_without_explicit_detach_keeps_previous_alias" time="0.017" /><testcase classname="tests.test_owned_packages" name="test_missing_alias_does_not_silently_repackage_or_adopt_latest" time="0.026" /><testcase classname="tests.test_owned_packages" name="test_facade_qualified_package_is_inspected_by_sha_and_detached_without_legacy" time="0.027" /><testcase classname="tests.test_owned_packages" name="test_late_cancel_receipt_cannot_detach_newer_package_journal" time="0.040" /><testcase classname="tests.test_owned_packages" name="test_facade_reuse_has_no_new_creation_receipt_even_without_state_flush" time="0.029" /><testcase classname="tests.test_owned_packages" name="test_uncertain_or_missing_live_package_does_not_become_intentional_skip" time="0.032" /><testcase classname="tests.test_owned_packages" name="test_source_edit_during_cached_alias_inspection_refused_preserving_old_package" time="0.026" /><testcase classname="tests.test_owned_publication" name="test_durable_record_handoff_recovers_exact_same_container_port_and_db" time="1.574" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[owner]" time="0.553" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[created]" time="0.553" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[network]" time="0.560" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[caps]" time="0.547" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[mount]" time="0.550" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[image]" time="0.554" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[env]" time="0.550" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[volume]" time="0.600" /><testcase classname="tests.test_owned_publication" name="test_foreign_port_occupation_refused_without_kill_or_daemon_mutation" time="0.642" /><testcase classname="tests.test_owned_publication" name="test_update_refused_preserves_existing_service_and_source_exact" time="0.597" /><testcase classname="tests.test_owned_publication" name="test_migration_exactly_once_only_on_new_volume_and_unknown_blocks_resume" time="1.229" /><testcase classname="tests.test_owned_publication" name="test_failed_migration_preserves_data_and_requires_explicit_disposition" time="0.123" /><testcase classname="tests.test_owned_publication" name="test_interrupted_prelaunch_migration_cleans_exact_daemon_resource_but_keeps_pending_data" time="0.134" /><testcase classname="tests.test_owned_publication" name="test_cancelled_creation_retains_external_intent_no_product_execution" time="0.056" /><testcase classname="tests.test_owned_publication" name="test_registry_inside_source_and_invalid_journal_fail_closed" time="0.041" /><testcase classname="tests.test_owned_publication" name="test_publication_cached_reuse_has_no_creation_receipt_even_when_state_never_flushed" time="0.641" /><testcase classname="tests.test_owned_publication" name="test_publication_late_cancel_receipt_never_stops_replacement_cid" time="1.194" /><testcase classname="tests.test_owned_publication" name="test_publication_source_changes_during_reuse_never_admit_or_stop_old_service[False]" time="0.589" /><testcase classname="tests.test_owned_publication" name="test_publication_source_changes_during_reuse_never_admit_or_stop_old_service[True]" time="1.143" /><testcase classname="tests.test_owned_publication" name="test_cold_cancel_only_releases_new_ingress_not_existing_daemon_app_or_db" time="1.151" /><testcase classname="tests.test_owned_publication" name="test_recovery_facade_forwards_cancel_event_without_creation_receipt_or_old_resource_cleanup" time="1.169"><failure message="TypeError: test_recovery_facade_forwards_cancel_event_without_creation_receipt_or_old_resource_cleanup.&lt;locals&gt;.cancel() takes from 3 to 4 positional arguments but 5 were given">tmp_path = WindowsPath('C:/Users/e.millerioux/AppData/Local/Temp/pytest-of-e.millerioux/pytest-3371/test_recovery_facade_forwards_0')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000002B114681DA0&gt;
+
+    def test_recovery_facade_forwards_cancel_event_without_creation_receipt_or_old_resource_cleanup(tmp_path,monkeypatch):
+        source,spec,fake,registry=setup(tmp_path,monkeypatch);first=registry.publish('project',source,spec)
+        registry.release_ingress('project');event=threading.Event();event.set()
+        def cancel(session,spec,timeout,cancel_event=None):
+            assert cancel_event is event
+            raise PublicationError('PUBLICATION_CANCELLED')
+        monkeypatch.setattr(PublicationRegistry,'_healthy',cancel);before=len(fake.calls)
+        try:
+&gt;           result=docker_deploy.recover_publication('project',registry.root,cancel_event=event)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_owned_publication.py:327: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+autospec\orchestrator\docker_deploy.py:744: in recover_publication
+    record=PublicationRegistry(publication_root).recover(project_id,timeout=timeout,cancel_event=cancel_event)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\orchestrator\owned_publication.py:394: in recover
+    return self._recover(row,PublicationSpec(**row['spec']),timeout,cancel_event)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = &lt;autospec.orchestrator.owned_publication.PublicationRegistry object at 0x000002B1146801A0&gt;
+row = {'container_created': '2026-10-12T01:00:01Z', 'container_fingerprint': '0495e6750aef7cb1cd3fcb11705de5ca336b1cedf80db2...00000000000000000000000000000000000000001', 'container_name': 'autospec-sandbox-08bfb2d0a6d84af5b1b67191425b8b1a', ...}
+spec = PublicationSpec(image_id='sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', snapshot_hash='b6a...e=True, database_path='/var/lib/autospec-validation/support.sqlite', health_path='/api/health', migration_command=None)
+timeout = 30, cancel_event = &lt;threading.Event at 0x2b1146a84d0: set&gt;
+
+    def _recover(self,row,spec,timeout,cancel_event,*,source_guard=None):
+        if row['status'] in {'stopping','destroyed','uncertain'} or row['migration'] in {'pending','failed','not_started'}:
+            raise PublicationError('PUBLICATION_RECOVERY_BLOCKED: unresolved data/journal operation')
+        current=_LIVE.get(self._key(row['project_id']))
+        if current is not None and not current.closed:
+            actual=self._capture(row,spec)
+            if (actual and current.identifier==actual[0]['Id'] and current.owner==row['owner'] and
+                current.image==spec.image_id and current.volume_identity==row['volume_identity']):
+                self._healthy(current,spec,timeout,cancel_event)
+                if source_guard is not None:source_guard()
+                return {**json.loads(json.dumps(row)),'created_this_call':False}
+            current.release_ingress();_LIVE.pop(self._key(row['project_id']),None)
+        _image(self.docker,spec)
+        volume=_volume(self.docker,row)
+        if volume is None:
+            # A prepared intent without any data/container is safe to retry;
+            # a known volume disappearing is never silently replaced.
+            if row['status']!='creating' or row['volume_identity'] is not None:
+                raise PublicationError('PUBLICATION_OWNED_VOLUME_MISSING')
+        else:row['volume_identity']=volume
+        actual=_container(self.docker,row,spec)
+        session=self._session(row,spec)  # reserve recorded port before mutation
+        adopted_existing=False
+        try:
+            if actual and actual[0].get('State',{}).get('Running') is True:
+                adopted_existing=True
+                data,fingerprint=actual
+                row.update(container_id=data['Id'],container_created=data['Created'],container_fingerprint=fingerprint)
+                session.restore_owned_container(data['Id'])
+            else:
+                if actual:_cleanup_container(self.docker,actual[0]['Id'],row['owner'])
+                row.update(container_id=None,container_created=None,container_fingerprint=None,status='creating')
+                self._write(row)
+                session.__enter__()
+            self._capture(row,spec)
+&gt;           self._healthy(session,spec,timeout,cancel_event)
+E           TypeError: test_recovery_facade_forwards_cancel_event_without_creation_receipt_or_old_resource_cleanup.&lt;locals&gt;.cancel() takes from 3 to 4 positional arguments but 5 were given
+
+autospec\orchestrator\owned_publication.py:376: TypeError</failure></testcase><testcase classname="tests.test_owned_publication" name="test_publication_intentional_stop_destroy_skip_but_failed_start_is_not_skip" time="0.687" /><testcase classname="tests.test_owned_publication" name="test_completed_stop_status_needs_no_daemon_query_or_image_recreation" time="0.653" /><testcase classname="tests.test_owned_publication" name="test_stop_terminal_flush_failure_keeps_durable_intent_and_never_revives" time="0.714" /><testcase classname="tests.test_owned_publication" name="test_stop_intent_flush_failure_does_not_touch_daemon_or_owned_ingress" time="0.590" /><testcase classname="tests.test_owned_publication" name="test_stop_cleanup_failure_blocks_recovery_and_preserves_explicit_retry" time="0.745" /><testcase classname="tests.test_qualified_image_packaging" name="test_web_image_is_packaged_but_not_deployed_and_never_rebuilt" time="0.035" /><testcase classname="tests.test_qualified_image_packaging" name="test_qualified_cli_library_without_registry_never_uses_legacy_or_unowned_alias[cli]" time="0.015" /><testcase classname="tests.test_qualified_image_packaging" name="test_qualified_cli_library_without_registry_never_uses_legacy_or_unowned_alias[library]" time="0.014" /><testcase classname="tests.test_qualified_image_packaging" name="test_bad_qualified_facts_are_refused_before_tag_or_publication[source]" time="0.022" /><testcase classname="tests.test_qualified_image_packaging" name="test_bad_qualified_facts_are_refused_before_tag_or_publication[id]" time="0.017" /><testcase classname="tests.test_qualified_image_packaging" name="test_bad_qualified_facts_are_refused_before_tag_or_publication[cmd]" time="0.017" /><testcase classname="tests.test_qualified_image_packaging" name="test_bad_qualified_facts_are_refused_before_tag_or_publication[entrypoint]" time="0.021" /><testcase classname="tests.test_qualified_image_packaging" name="test_bad_qualified_facts_are_refused_before_tag_or_publication[label]" time="0.018" /><testcase classname="tests.test_qualified_image_packaging" name="test_bad_qualified_facts_are_refused_before_tag_or_publication[os]" time="0.021" /><testcase classname="tests.test_qualified_image_packaging" name="test_contract_missing_qualified_facts_never_falls_back_to_legacy" time="0.013" /><testcase classname="tests.test_qualified_image_packaging" name="test_existing_alias_name_is_not_adopted_or_retagged" time="0.018" /><testcase classname="tests.test_qualified_image_packaging" name="test_cancelled_tag_request_cleans_only_exact_owned_alias_without_cancellation_block" time="0.026" /></testsuite></testsuites>

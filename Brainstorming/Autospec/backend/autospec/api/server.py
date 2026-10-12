@@ -215,16 +215,11 @@ def recover_projects(states: list[ProjectState] | None = None) -> list[str]:
 
 
 async def _asweep_workspace_orphans() -> int:
-    """FACTORY_IMPROVEMENTS (completes fixes #10/#13): at boot, reap every
-    process a previous backend left behind under ``workspace_root`` (a leaked
-    smoke run, a uvicorn reload supervisor, a repair-agent child). Nothing of
-    ours runs there yet, so whatever is found is an orphan; the sweep never
-    leaves the workspace root and never touches this process or its ancestors.
+    """Compatibility hook, now a no-op: paths cannot establish ownership.
 
-    Offloaded to a thread (it shells out to PowerShell/ps) and strictly
-    best-effort: startup must never fail because a cleanup did. Returns the
-    number of process trees killed (0 when the flag is off or in fake-agents
-    mode, where no real process is ever spawned)."""
+    Recovery uses retained handles and external resource journals. Unknown
+    legacy processes are not swept by path, executable name or listening port.
+    """
     if not settings.orphan_sweep_on_boot or settings.fake_agents:
         return 0
     try:
@@ -255,8 +250,9 @@ async def _arecover_projects() -> None:
     states = await asyncio.to_thread(list_states)
     recover_projects(states)
     for pipeline in list(pipelines.values()):
-        if pipeline.state.deployed_container or pipeline.state.deploy_status:
+        if pipeline.state.deployed_container or pipeline.state.deploy_status or pipeline.state.acceptance_contract_hash:
             try:
+                await pipeline.arecover_publication()
                 await pipeline.areconcile_deploy()
             except Exception as exc:
                 pipeline.state.deploy_status = "failed"
@@ -330,7 +326,7 @@ class CreateProjectRequest(BaseModel):
     acceptance_reference: str = ""
     acceptance_facts: list[AcceptanceFactInput] = Field(default_factory=list)
     acceptance_reviewed_by: str = ""
-    acceptance_max_lots: int = Field(default=7, ge=1, le=100)
+    acceptance_max_lots: int = Field(default=7, strict=True, ge=1, le=100)
 
 
 class MessageRequest(BaseModel):
@@ -586,6 +582,7 @@ async def acreate_project(req: CreateProjectRequest) -> dict:
             contract = import_contract(req.brief, req.acceptance_reference,
                 reviewed_by=req.acceptance_reviewed_by,
                 facts=[ContractFact.create(**fact.model_dump()) for fact in req.acceptance_facts])
+            acceptance.validate_plan_limits(contract, req.acceptance_max_lots)
         except (ContractError, ValueError, TypeError) as exc:
             raise HTTPException(422, f"Contrat d'acceptation invalide : {exc}") from exc
     state = ProjectState(
@@ -728,15 +725,47 @@ def _force_delete_workspace(project_id: str) -> bool:
 async def adelete_project(project_id: str) -> dict:
     pipeline = pipelines.pop(project_id, None)
     if pipeline:
-        await pipeline.adispose()
+        try:
+            await pipeline.adispose()
+        except BaseException:
+            pipelines[project_id] = pipeline
+            raise
     # Preserve the state needed to retry cleanup if the daemon is unavailable.
     stored = pipeline.state if pipeline else load_state(project_id)
-    if stored and (stored.deployed_image or stored.deployed_container or stored.deploy_status in ("deployed", "packaged")):
-        result = await asyncio.to_thread(docker_deploy.undeploy, project_id)
-        if not result.ok:
-            if pipeline:
-                pipelines[project_id] = pipeline
-            raise HTTPException(409, f"Retrait Docker non confirmé : {result.detail}")
+    try:
+        if stored and stored.acceptance_contract_hash:
+            # External journals survive a crash BEFORE the UI state flush.
+            # Check both types: a later stack edit must not orphan an earlier
+            # package/publication. The registries re-attest exact ownership;
+            # no legacy name, image SHA or missing CID grants removal rights.
+            root = acceptance.supervisor_root(project_id)
+            packaged = Pipeline._is_packaged_state(stored)
+            resources = [("packaging_root", "packages", "PACKAGE_NOT_REGISTERED"),
+                         ("publication_root", "publication", "PUBLICATION_NOT_REGISTERED")]
+            if not packaged:
+                resources.reverse()
+            claimed = bool(stored.deployed_image or stored.deployed_container or
+                           stored.deploy_host_port or stored.deploy_status in ("deployed", "packaged"))
+            registered = False
+            for argument, resource, absent in resources:
+                result = await asyncio.to_thread(docker_deploy.undeploy, project_id,
+                                                **{argument: root / resource})
+                # A strict absent-journal result has performed no Docker call.
+                if result.ok:
+                    registered = True
+                elif result.detail != absent:
+                    raise HTTPException(409, f"Retrait Docker non confirmé : {result.detail}")
+            if claimed and not registered:
+                raise HTTPException(409, "Retrait Docker non confirmé : ressources revendiquées sans journal d'appartenance.")
+        elif stored and (stored.deployed_image or stored.deployed_container or
+                         stored.deploy_status in ("deployed", "packaged")):
+            result = await asyncio.to_thread(docker_deploy.undeploy, project_id)
+            if not result.ok:
+                raise HTTPException(409, f"Retrait Docker non confirmé : {result.detail}")
+    except BaseException:
+        if pipeline:
+            pipelines[project_id] = pipeline
+        raise
     try:
         # rmtree of a git workspace (read-only packs + chmod retries on Windows)
         # is slow; off the event loop so uvicorn keeps accepting connections

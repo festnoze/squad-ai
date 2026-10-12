@@ -255,7 +255,8 @@ FE_PACKAGE_JSON_TEMPLATE = """{{
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage --coverage.include=src/** --coverage.reporter=json"
   }},
   "dependencies": {{
     "react": "^18.2.0",
@@ -266,11 +267,12 @@ FE_PACKAGE_JSON_TEMPLATE = """{{
     "@testing-library/react": "^14.2.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
-    "@vitejs/plugin-react": "^4.2.0",
+    "@vitejs/plugin-react": "4.7.0",
     "jsdom": "^24.0.0",
     "typescript": "^5.4.0",
-    "vite": "^5.2.0",
-    "vitest": "^1.4.0"
+    "vite": "6.4.4",
+    "vitest": "4.1.11",
+    "@vitest/coverage-v8": "4.1.11"
   }}
 }}
 """

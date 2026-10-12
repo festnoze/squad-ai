@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="1" skipped="0" tests="19" time="75.428" timestamp="2026-10-12T13:53:37.106400+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_owned_publication" name="test_durable_record_handoff_recovers_exact_same_container_port_and_db" time="1.602" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[owner]" time="0.584" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[created]" time="0.054"><failure message="PermissionError: [WinError 5] Accès refusé: 'C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\remediation-20261011\\owned-publication-parent-20261012\\test_drift_or_foreign_resource1\\supervisor\\.project.json-nw2c3me1' -&gt; 'C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\remediation-20261011\\owned-publication-parent-20261012\\test_drift_or_foreign_resource1\\supervisor\\project.json'">tmp_path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/owned-publication-parent-20261012/test_drift_or_foreign_resource1')
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x0000026D56C04170&gt;
+wrong = 'created'
+
+    @pytest.mark.parametrize('wrong',['owner','created','network','caps','mount','image','env','volume'])
+    def test_drift_or_foreign_resource_never_adopted_executed_or_removed(tmp_path,monkeypatch,wrong):
+&gt;       source,spec,fake,registry=setup(tmp_path,monkeypatch);row=registry.publish('project',source,spec)
+                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests\test_owned_publication.py:135: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+autospec\orchestrator\owned_publication.py:304: in publish
+    self._write(row)
+autospec\orchestrator\owned_publication.py:223: in _write
+    atomic_json(path,record)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+path = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/remediation-20261011/owned-publication-parent-20261012/test_drift_or_foreign_resource1/supervisor/project.json')
+data = {'container_created': None, 'container_fingerprint': None, 'container_id': None, 'container_name': 'autospec-sandbox-94d30d13324648e0ba10986a1ced269b', ...}
+
+    def atomic_json(path: Path, data: dict) -&gt; None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}-")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                json.dump(data, fh, sort_keys=True, indent=2)
+                fh.flush()
+                os.fsync(fh.fileno())
+&gt;           os.replace(name, path)
+E           PermissionError: [WinError 5] Accès refusé: 'C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\remediation-20261011\\owned-publication-parent-20261012\\test_drift_or_foreign_resource1\\supervisor\\.project.json-nw2c3me1' -&gt; 'C:\\Dev\\squad-ai\\Brainstorming\\Autospec\\workspace\\remediation-20261011\\owned-publication-parent-20261012\\test_drift_or_foreign_resource1\\supervisor\\project.json'
+
+autospec\orchestrator\dependencies.py:96: PermissionError</failure></testcase><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[network]" time="0.542" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[caps]" time="0.545" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[mount]" time="0.541" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[image]" time="0.542" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[env]" time="0.543" /><testcase classname="tests.test_owned_publication" name="test_drift_or_foreign_resource_never_adopted_executed_or_removed[volume]" time="0.543" /><testcase classname="tests.test_owned_publication" name="test_foreign_port_occupation_refused_without_kill_or_daemon_mutation" time="0.538" /><testcase classname="tests.test_owned_publication" name="test_update_refused_preserves_existing_service_and_source_exact" time="0.534" /><testcase classname="tests.test_owned_publication" name="test_migration_exactly_once_only_on_new_volume_and_unknown_blocks_resume" time="1.180" /><testcase classname="tests.test_owned_publication" name="test_failed_migration_preserves_data_and_requires_explicit_disposition" time="0.130" /><testcase classname="tests.test_owned_publication" name="test_interrupted_prelaunch_migration_cleans_exact_daemon_resource_but_keeps_pending_data" time="0.078" /><testcase classname="tests.test_owned_publication" name="test_cancelled_creation_retains_external_intent_no_product_execution" time="0.031" /><testcase classname="tests.test_owned_publication" name="test_registry_inside_source_and_invalid_journal_fail_closed" time="0.022" /><testcase classname="tests.test_owned_publication" name="test_facade_contract_publishes_real_ids_and_undeploy_preserves_db" time="1.117" /><testcase classname="tests.test_owned_publication" name="test_real_baked_netnone_http_persistence_recovery_and_canaries" time="42.112" /><testcase classname="tests.test_owned_publication" name="test_real_schema_migration_precedes_app_that_refuses_empty_database" time="23.862" /></testsuite></testsuites>

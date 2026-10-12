@@ -85,6 +85,32 @@ class DependencyRequest:
         return hashlib.sha256(json.dumps(asdict(self), sort_keys=True).encode()).hexdigest()[:24]
 
 
+_ATOMIC_REPLACE_ATTEMPTS = 5
+_ATOMIC_REPLACE_BACKOFF_S = 0.05
+_WINDOWS_REPLACE_RETRY_ERRORS = frozenset({5, 32, 33})
+
+
+def _replace_json_file(source: str, destination: Path) -> None:
+    """Retry only Windows access/sharing/lock refusals, never weaken the swap.
+
+    These codes can also mean a permanent denial: five attempts (0.50s total
+    backoff) are the limit, after which the original exception propagates.
+    Reuse the fsynced same-directory temp; never chmod or remove the old file.
+    Other errors, including POSIX EACCES without a winerror, fail immediately.
+    """
+    for attempt in range(_ATOMIC_REPLACE_ATTEMPTS):
+        try:
+            os.replace(source, destination)
+            return
+        except OSError as exc:
+            if (
+                getattr(exc, "winerror", None) not in _WINDOWS_REPLACE_RETRY_ERRORS
+                or attempt == _ATOMIC_REPLACE_ATTEMPTS - 1
+            ):
+                raise
+            time.sleep(_ATOMIC_REPLACE_BACKOFF_S * (attempt + 1))
+
+
 def atomic_json(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fd, name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}-")
@@ -93,7 +119,7 @@ def atomic_json(path: Path, data: dict) -> None:
             json.dump(data, fh, sort_keys=True, indent=2)
             fh.flush()
             os.fsync(fh.fileno())
-        os.replace(name, path)
+        _replace_json_file(name, path)
     finally:
         if os.path.exists(name):
             os.unlink(name)
