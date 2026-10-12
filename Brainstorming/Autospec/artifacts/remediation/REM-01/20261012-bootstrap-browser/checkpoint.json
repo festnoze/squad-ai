@@ -1,0 +1,12 @@
+{
+  "status":"REVIEW",
+  "risk_addressed":"P0: bootstrap's installed host Node driver still launched host Chromium against generated frontend JavaScript",
+  "change":"_isolated_preflight now invokes _browser_preflight on its actual owned RuntimeSession; mandatory PlaywrightHarness/DockerBrowserSession, remote connect with no client network exposure; legacy isolated_browser.cjs is a refusal-only stub",
+  "tests":[
+    {"command":"python -m pytest tests/test_bootstrap_browser_boundary.py tests/test_bootstrap_processes.py tests/test_bootstrap.py tests/test_docker_browser.py -q","passed":107,"skipped":15,"seconds":4.47,"limits":"15 existing opt-in Linux integration tests skipped; not claimed as executed"},
+    {"command":"AUTOSPEC_DOCKER_BOOTSTRAP_BROWSER=1 python -m pytest tests/test_bootstrap_browser_real.py -q --junitxml=<artifact root>/real-junit.xml","passed":2,"seconds":96.52,"report":"real-junit.xml","scope":"actual React frontend-only and FastAPI/SQLite/React deterministic bootstrap, Chromium Docker NETNONE"}
+  ],
+  "negative_guards":["model-shaped runtime refused before driver creation","bridge/host/published/stopped runtime refused","parent restart/stopped during render refused","host browser receipt refused","client network exposure refused","HTTP non-200 refused","console/page/network violation refused","private driver token not published","legacy host browser launch/script absent from active preflight"],
+  "proofs":["frontend/receipt.json","fullstack/receipt.json"],
+  "limits":["Deterministic bootstrap fixture is a narrow connectivity/rendering proof, not a 57-ID product acceptance campaign","Exact source/profile independent review still required for campaign; no paid generation or Claude source-review call","Outer Docker/Linux boundary qualified by inspection and tests; Chromium internal sandbox not qualified"]
+}
