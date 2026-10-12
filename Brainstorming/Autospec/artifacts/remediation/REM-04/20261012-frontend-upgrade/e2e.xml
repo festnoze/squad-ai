@@ -1,0 +1,10 @@
+<testsuites id="" name="" tests="2" failures="0" skipped="0" errors="0" time="125.343251">
+<testsuite name="autospec.spec.ts" timestamp="2026-10-12T10:49:32.282Z" hostname="chromium" tests="1" failures="0" skipped="0" time="95.59" errors="0">
+<testcase name="exhaustive: every feature in one scenario" classname="autospec.spec.ts" time="95.59">
+</testcase>
+</testsuite>
+<testsuite name="improve-ux.spec.ts" timestamp="2026-10-12T10:49:32.282Z" hostname="chromium" tests="1" failures="0" skipped="0" time="25.932" errors="0">
+<testcase name="improve_UX: Activité stepper + targeted chat + extend" classname="improve-ux.spec.ts" time="25.932">
+</testcase>
+</testsuite>
+</testsuites>
