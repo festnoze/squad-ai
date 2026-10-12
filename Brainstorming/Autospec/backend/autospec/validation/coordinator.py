@@ -407,6 +407,84 @@ async def _execute_e2e(contract,harness,store,snapshot_hash,*,modes=("alone","to
     return runs
 
 
+def _quality_seal(store,seal,source_root):
+    """Reverify the exact candidate plan/mapping/source and external R bytes."""
+    from .quality_contracts import NativeSuiteSpec,AuthorizationMutationSpec,native_quality_plan_hash,NativeQualityCollector
+    path=Path(seal["path"]).resolve()
+    if not path.is_relative_to(store.root) or hashlib.sha256(path.read_bytes()).hexdigest()!=seal["sha256"]:
+        raise AdapterUnavailable("quality plan seal changed/outside supervisor")
+    data=store._read(path)
+    if (data.get("snapshot_hash"),data.get("contract_hash"))!=(store.snapshot,store.contract):
+        raise AdapterUnavailable("quality plan identity drift")
+    mapping=Path(data["mapping_path"]).resolve()
+    if not mapping.is_relative_to(store.root) or hashlib.sha256(mapping.read_bytes()).hexdigest()!=data["mapping_sha256"]:
+        raise AdapterUnavailable("quality assertion mapping changed")
+    suites=tuple(NativeSuiteSpec(**s) for s in data["suites"])
+    mutation=AuthorizationMutationSpec(**data["mutation"]) if data.get("mutation") else None
+    digest=native_quality_plan_hash(suites,mapping,mutation)
+    if digest!=data["plan_hash"]: raise AdapterUnavailable("quality plan content/fingerprint mismatch")
+    proof=store._proof(seal["review"],"QUALITY:plan:"+digest)
+    if proof.type!="R" or not proof.passed: raise AdapterUnavailable("quality plan independent R missing")
+    root=Path(source_root).resolve()
+    for suite in suites:
+        suite_root=(root/suite.root).resolve()
+        if not suite_root.is_relative_to(root): raise AdapterUnavailable("quality suite root escaped source")
+        actual={p:hashlib.sha256(NativeQualityCollector._source(suite_root,p).read_bytes()).hexdigest() for p in suite.source_inventory}
+        if actual!=data["source_inventory"][suite.name]: raise AdapterUnavailable("quality reviewed source inventory changed")
+    return proof
+
+
+async def publish_reviewed_e2e(store,runs,*,plan_path,review,source_root):
+    """Root collection handoff: seal actual twelve X/V rows for one reuse.
+
+    A source-reviewed plan is checked here and again at reuse. No annotations
+    from a producer are trusted and no image-stage receipts reuse source runs.
+    """
+    path=Path(plan_path).resolve()
+    seal=dict(path=str(path),sha256=hashlib.sha256(path.read_bytes()).hexdigest(),review=asdict(review))
+    _quality_seal(store,seal,source_root)
+    rows=[dict(row,quality_plan=seal) for row in runs]
+    proofs=[Proof(**p) for row in rows for p in row.get("proofs",[])]
+    await store.record_native_observation("browser_e2e",rows,source_proofs=proofs)
+    return rows
+
+
+async def _reuse_reviewed_e2e(contract,store,source_root):
+    """Cached native observations only; narration/missing mode/proof => rerun."""
+    from .quality_contracts import source_e2e_scenarios
+    rows=await store.observe("browser_e2e")
+    expected={r["id"]:r["expected"] for r in source_e2e_scenarios(contract)}
+    if not isinstance(rows,list) or len(rows)!=12 or {(r.get("id"),r.get("mode")) for r in rows}!={(rid,mode) for rid in expected for mode in ("alone","together")}:
+        raise AdapterUnavailable("exact twelve source scenario/mode observations required")
+    seals=[r.get("quality_plan") for r in rows]
+    if any(not isinstance(s,dict) or s!=seals[0] for s in seals): raise AdapterUnavailable("uniform independent quality plan seal absent")
+    _quality_seal(store,seals[0],source_root)
+    proofs=[]
+    for row in rows:
+        if row.get("image_id") or row.get("expected")!=expected[row["id"]] or (row.get("snapshot_hash"),row.get("contract_hash"))!=(store.snapshot,store.contract) or row.get("status") not in {"PASS","FAIL"}:
+            raise AdapterUnavailable("native E2E source expectation/identity/scope drift")
+        if row.get("real_ui_api_db") is not True or row.get("nominal_mocks") is not False or row.get("fixture_reset_before") is not True or not row.get("observed"):
+            raise AdapterUnavailable("real independent E2E execution absent")
+        scoped=[];actual=[]
+        for raw in row.get("proofs",[]):
+            proof=store._proof(raw,"TST-05:"+row["id"])
+            if proof.type not in {"X","V"}: continue
+            scoped.append(proof)
+            if proof.type=="X":
+                body=store._read(proof.path)
+                if body.get("mode")==row["mode"] and body.get("source_expected")==expected[row["id"]] and body.get("checks")==row["observed"]:
+                    actual.append(proof)
+        if not actual or not {"X","V"}<={p.type for p in scoped}:
+            raise AdapterUnavailable("exact mode/source/observed native X+V required")
+        if row["status"]=="PASS" and (row.get("nonblank") is not True or row.get("unhandled_console_errors")!=[] or any(c.get("passed") is not True for c in row["observed"]) or any(p.passed is not True for p in scoped)):
+            raise AdapterUnavailable("incomplete native E2E success claim")
+        if row["status"]=="FAIL" and not (any(c.get("passed") is False for c in row["observed"]) or any(p.passed is False for p in scoped) or row.get("nonblank") is False or row.get("unhandled_console_errors")):
+            raise AdapterUnavailable("native E2E failure is not backed by observations")
+        proofs.extend(scoped)
+    store.contributions.setdefault("TST-05",[]).extend(proofs)
+    return rows
+
+
 async def _operation_row(requirement,store,checks,limits,*,extra_proofs=(),reproduction=()):
     """Typed native predicates + actual mapped files; review never synthesized."""
     rid=requirement.id;proofs=list(extra_proofs)
@@ -448,24 +526,9 @@ async def _operations(contract,snapshot_root,snapshot_hash,supervisor_root):
     checks=[];limits=[]
     try:
         build=await store.observe("delivery_build")
-        if not isinstance(build,dict) or not isinstance(build.get("commands"),list) or not isinstance(build.get("locks"),dict):
-            raise AdapterUnavailable("typed isolated delivery build record absent")
-        image=build.get("image_id","")
-        if not re.fullmatch(r"sha256:[a-f0-9]{64}",image): raise AdapterUnavailable("immutable delivery image identity absent")
-        check(checks,"clean_install",build.get("isolated") is True and build.get("no_host_dependencies") is True and build.get("manifest_only_install") is True,
-            {k:build.get(k) for k in ("isolated","no_host_dependencies","manifest_only_install")})
-        source=Path(snapshot_root).resolve()
-        required={"pyproject.toml","uv.lock"}
-        if (source/"frontend/package.json").exists(): required|={"frontend/package.json","frontend/package-lock.json"}
-        check(checks,"locks",required<=build["locks"].keys() and all((source/path).is_file() and hashlib.sha256((source/path).read_bytes()).hexdigest()==build["locks"][path] for path in required),
-            {path:build["locks"].get(path) for path in sorted(required)})
-        expected={"backend_install","image_build"}|({"frontend_install","typecheck","frontend_build"} if (source/"frontend/package.json").exists() else set())
-        names={c.get("kind") for c in build["commands"]}
-        if not expected<=names: raise AdapterUnavailable("required clean install/typecheck/build/image command receipts missing")
-        for command in build["commands"]:
-            if not isinstance(command.get("argv"),list) or not command["argv"] or type(command.get("return_code")) is not int:
-                raise AdapterUnavailable("literal command/return-code receipt missing")
-            check(checks,"command_"+str(command["kind"]),command["return_code"]==0,{"argv":command["argv"],"return_code":command["return_code"]})
+        import asyncio
+        from .delivery_evidence import delivery_build_checks
+        checks.extend(await asyncio.to_thread(delivery_build_checks,build,Path(snapshot_root),snapshot_hash))
     except Exception as exc: limits.append("clean final-image build unavailable: "+type(exc).__name__)
     await finish("OPS-01",checks,limits,repro=("independent isolated manifest/lock install, native typecheck/build, trusted final-image recipe",))
     # Audits/README are their own gate. A valid image or restarted DB does not
@@ -477,9 +540,12 @@ async def _operations(contract,snapshot_root,snapshot_hash,supervisor_root):
         if not path.is_relative_to(source) or not path.is_file() or path.is_symlink(): raise AdapterUnavailable("actual README source unavailable")
         check(checks,"README_source",hashlib.sha256(path.read_bytes()).hexdigest()==readme["sha256"],readme)
         commands=data["documented_commands"]
-        if not isinstance(commands,list) or not commands or any(type(c.get("return_code")) is not int or not c.get("argv") for c in commands):
+        from .delivery_evidence import REQUIRED_DOC_OBLIGATIONS
+        if not REQUIRED_DOC_OBLIGATIONS<={c.get("obligation") for c in commands}:
+            raise AdapterUnavailable("complete source README obligations unavailable")
+        if not isinstance(commands,list) or not commands or any(not c.get("argv") or (type(c.get("return_code")) is not int and not (c.get("return_code") is None and c.get("execution") in {"attested-cache","attested-layer","failed-build","observed-runtime"} and type(c.get("passed")) is bool)) for c in commands):
             raise AdapterUnavailable("documented isolated command executions unavailable")
-        check(checks,"README_reproduction",all(c["return_code"]==0 for c in commands),commands)
+        check(checks,"README_reproduction",all(c["return_code"]==0 if type(c.get("return_code")) is int else c["passed"] is True for c in commands),commands)
         configs=data["configuration"]
         if not isinstance(configs,list) or not configs: raise AdapterUnavailable("actual expurgated configuration records absent")
         from ..agents.file_broker import ExecutionContext,FileBroker
@@ -616,7 +682,8 @@ async def verify_project(state,contract,snapshot_root,snapshot_hash,evidence_roo
                 # invented coverage/E2E success if runner has not produced them.
             except Exception as exc: limits.append("browser unavailable: "+type(exc).__name__)
             try:
-                await _execute_e2e(contract,harness,store,snapshot_hash)
+                try: await _reuse_reviewed_e2e(contract,store,snapshot_root)
+                except Exception: await _execute_e2e(contract,harness,store,snapshot_hash)
             except Exception as exc: limits.append("source six-scenario E2E execution unavailable: "+type(exc).__name__)
             try:
                 report=await QualityVerifier(contract,adapter).verify(snapshot_hash)
