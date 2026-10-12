@@ -1,0 +1,36 @@
+{
+  "remediation": "REM-01 browser OS frontier supporting REM-18/19",
+  "status": "REVIEW",
+  "scope": "Independent observer meta-tests and a real narrow product-harness smoke; not a 57-ID acceptance campaign",
+  "python": "Locked factory-env, Python 3.14.6, Playwright 1.63.0",
+  "runtime_dependency": "RuntimeSession.open_control_port from e69f58f860bb6b5be5e20b53beed59f61807289f",
+  "adapter_dependency": "ProductHarness.supervised_runtime from 2ad4f52f",
+  "factory": {
+    "official_tag": "mcr.microsoft.com/playwright:v1.63.0-noble",
+    "manifest_digest": "sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27",
+    "version": "1.63.0",
+    "source_free_context": ["Dockerfile", "package.json", "package-lock.json"],
+    "package_scripts": "disabled with npm ci --ignore-scripts",
+    "credentials_or_product_mounts": false,
+    "public_sources": ["https://mcr.microsoft.com/v2/playwright/tags/list", "https://registry.npmjs.org/playwright/1.63.0", "https://registry.npmjs.org/playwright-core/1.63.0", "https://playwright.dev/docs/docker", "https://playwright.dev/docs/api/class-browsertype#browser-type-launch-server", "https://playwright.dev/python/docs/api/class-browsertype#browser-type-connect"]
+  },
+  "interfaces": {
+    "session": "DockerBrowserSession(actual RuntimeSession, origin=runtime.origin).start(); endpoint private; close(); receipt without WS token",
+    "driver": "chromium.connect(endpoint, timeout=10000, expose_network=''); never host launch for supervised/live_sqlite products",
+    "local_exception": "trusted_fixture_local_browser=True explicitly supplied by a supervisor-owned fixture constructor only; ignored when live_sqlite requires absent runtime; no failure fallback",
+    "lifecycle": "Close contexts and browser connection, stop/remove exact owned browser, then close owned control tunnel; parent untouched",
+    "product_scripts": "No product config, scripts or imports on host; JS renderer inside separate hardened Docker container"
+  },
+  "tests": [
+    {"report":"checkpoint-junit.xml", "passed":53, "seconds":38.91, "scope":"40 structural negatives + real Docker OS proof + real Argon2/UI/API/SQLite/persistence smoke + 11 tunnel tests"},
+    {"report":"final-boundary-junit.xml", "passed":58, "seconds":8.20, "scope":"46 structural/cancellation/token tests + real Docker OS proof + 11 tunnel tests, after final argv/env checks"}
+  ],
+  "actual_os_observations": {"uid":65532, "root_write":"EROFS", "external_udp":"ENETUNREACH", "host_loopback_canary_requests":0, "database_mount":false, "docker_socket":false, "product_source":false, "origin_preserved":true, "cookie_roundtrip":true},
+  "proofs": ["receipt.json", "remote-netnone.png", "product-smoke/nominal/receipt.json", "product-smoke/nominal/persistence.json"],
+  "limits": [
+    "Docker daemon, Linux kernel and the pinned trusted factory image remain trusted dependencies; not a general container-escape proof.",
+    "Chromium internal sandbox is not qualified. The outer NETNONE/nonroot/readonly/cap-drop/no-new-privileges boundary is independently inspected.",
+    "The browser shares the product's loopback namespace, not PID/IPC/filesystem namespaces. The exact product and private browser control remain reachable there.",
+    "No generated-product acceptance is inferred from the smoke or these fixture observations. External independent source/profile reviews and a same-snapshot full campaign remain required."
+  ]
+}

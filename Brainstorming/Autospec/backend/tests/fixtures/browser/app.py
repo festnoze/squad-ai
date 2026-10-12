@@ -283,4 +283,4 @@ class BrowserSubject(SQLiteSupportSubject):
 
     def harness(self):
         return PlaywrightHarness(self.adapter, bindings=CONTROLS, routes={"home":"/", "ticket":"/tickets/{id}", "admin":"/admin"},
-                                 executable_path=os.environ.get("AUTOSPEC_TRUSTED_CHROMIUM"))
+                                 executable_path=os.environ.get("AUTOSPEC_TRUSTED_CHROMIUM"),trusted_fixture_local_browser=True)
