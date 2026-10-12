@@ -161,3 +161,18 @@ def test_request_validation(kwargs):
 def test_supervisor_state_cannot_live_in_product_root(tmp_path):
     with pytest.raises(DependencyError, match="outside"):
         DependencyCoordinator(tmp_path, tmp_path / "state")
+
+
+@pytest.mark.parametrize("runner",[None,False,"uv"])
+def test_missing_isolated_runner_never_dispatches_host_source_or_environment(tmp_path,monkeypatch,runner):
+    import subprocess
+    root=tmp_path/"product";root.mkdir()
+    source=b'raise RuntimeError("product must not execute on host")\n'
+    (root/"sitecustomize.py").write_bytes(source)
+    (root/"pyproject.toml").write_bytes(b'[project]\nname="never-host"\nversion="1"\ndependencies=[]\n')
+    monkeypatch.setenv("AUTOSPEC_TEST_SENTINEL_SECRET","do-not-inherit")
+    monkeypatch.setattr(subprocess,"run",lambda *a,**k:pytest.fail("unconfigured coordinator dispatched host subprocess"))
+    with pytest.raises(DependencyError,match="isolated.*runner.*host fallback"):
+        DependencyCoordinator(root,tmp_path/"supervisor",runner)
+    assert not (tmp_path/"supervisor").exists()
+    assert (root/"sitecustomize.py").read_bytes()==source
