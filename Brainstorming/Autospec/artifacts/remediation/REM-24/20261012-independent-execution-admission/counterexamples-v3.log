@@ -1,0 +1,44 @@
+FFFF.FF                                                                  [100%]
+================================== FAILURES ===================================
+__ test_historical_unknown_usage_blocks_direct_serialized_admission[budget0] __
+tests\test_rem24_budget_and_cache_counterreview.py:53: in test_historical_unknown_usage_blocks_direct_serialized_admission
+    assert runner.calls == 0, f'unreconciled history dispatched {runner.calls} offline calls; allowances={runner.allowances}'
+E   AssertionError: unreconciled history dispatched 1 offline calls; allowances=[0.9]
+E   assert 1 == 0
+E    +  where 1 = <tests.test_rem24_budget_and_cache_counterreview.OfflineReceiptRunner object at 0x0000020B3AA9CC20>.calls
+__ test_historical_unknown_usage_blocks_direct_serialized_admission[budget1] __
+tests\test_rem24_budget_and_cache_counterreview.py:53: in test_historical_unknown_usage_blocks_direct_serialized_admission
+    assert runner.calls == 0, f'unreconciled history dispatched {runner.calls} offline calls; allowances={runner.allowances}'
+E   AssertionError: unreconciled history dispatched 1 offline calls; allowances=[None]
+E   assert 1 == 0
+E    +  where 1 = <tests.test_rem24_budget_and_cache_counterreview.OfflineReceiptRunner object at 0x0000020B3AB56850>.calls
+________ test_explicit_resume_does_not_silently_reconcile_unknown_cost ________
+tests\test_rem24_budget_and_cache_counterreview.py:69: in test_explicit_resume_does_not_silently_reconcile_unknown_cost
+    assert runner.calls == 0, 'resume dispatched with an unreconciled interrupted call'
+E   AssertionError: resume dispatched with an unreconciled interrupted call
+E   assert 1 == 0
+E    +  where 1 = <tests.test_rem24_budget_and_cache_counterreview.OfflineReceiptRunner object at 0x0000020B3AB57D90>.calls
+____________ test_new_feedback_does_not_bypass_unreconciled_budget ____________
+tests\test_rem24_budget_and_cache_counterreview.py:78: in test_new_feedback_does_not_bypass_unreconciled_budget
+    assert runner.calls == 0, 'feedback reactivated inference against the unknown remaining allowance'
+E   AssertionError: feedback reactivated inference against the unknown remaining allowance
+E   assert 1 == 0
+E    +  where 1 = <tests.test_rem24_budget_and_cache_counterreview.OfflineReceiptRunner object at 0x0000020B3A986780>.calls
+________ test_final_report_cache_must_revalidate_current_review_engine ________
+tests\test_rem24_budget_and_cache_counterreview.py:120: in test_final_report_cache_must_revalidate_current_review_engine
+    assert not admitted and not state.delivery_ready, 'final cache bypassed current review-engine revalidation'
+E   AssertionError: final cache bypassed current review-engine revalidation
+E   assert (not True)
+____ test_actual_review_context_refusal_cannot_be_bypassed_by_final_cache _____
+tests\test_rem24_budget_and_cache_counterreview.py:166: in test_actual_review_context_refusal_cannot_be_bypassed_by_final_cache
+    assert not await pipeline._aindependent_acceptance_phase(), 'a genuinely rejected review context was bypassed'
+E   AssertionError: a genuinely rejected review context was bypassed
+E   assert not True
+=========================== short test summary info ===========================
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_historical_unknown_usage_blocks_direct_serialized_admission[budget0]
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_historical_unknown_usage_blocks_direct_serialized_admission[budget1]
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_explicit_resume_does_not_silently_reconcile_unknown_cost
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_new_feedback_does_not_bypass_unreconciled_budget
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_final_report_cache_must_revalidate_current_review_engine
+FAILED tests/test_rem24_budget_and_cache_counterreview.py::test_actual_review_context_refusal_cannot_be_bypassed_by_final_cache
+6 failed, 1 passed in 1.69s
