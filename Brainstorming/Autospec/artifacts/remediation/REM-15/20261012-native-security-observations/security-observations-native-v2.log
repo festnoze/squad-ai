@@ -1,0 +1,26 @@
+...................FF                                                    [100%]
+================================== FAILURES ===================================
+______ test_real_dynamic_scan_sees_pre_tail_secret_and_refuses_overflow _______
+tests\test_security_observations_native.py:144: in test_real_dynamic_scan_sees_pre_tail_secret_and_refuses_overflow
+    before=await adapter.observe('secret_scan',scope='logs_artifacts')
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\validation\coordinator.py:253: in observe
+    value,proofs=await callback(name,**options)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\validation\product_harness.py:969: in collect_security_observation
+    root=artifact_broker.path(relative).resolve()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+autospec\agents\file_broker.py:115: in path
+    raise IsolationViolation(f"Chemin hors du workspace ou ambigu refus� : {relative!r}")
+E   autospec.agents.file_broker.IsolationViolation: Chemin hors du workspace ou ambigu refus� : '.'
+__________ test_real_image_layer_scan_exact_digest_and_source_label ___________
+tests\test_security_observations_native.py:169: in test_real_image_layer_scan_exact_digest_and_source_label
+    assert value['findings']==[] and set(value['scopes'])=={'source','image','logs'}
+E   AssertionError: assert ([{'file': 'bl...1389ae'}, ...] == []
+E     
+E     Left contains 9 more items, first extra item: {'file': 'blobs/sha256/e48af84b2108a5d73effd9e16685b42ac33e7994e606398c46690918f5f3604a:usr/lib/x86_64-linux-gnu/libgn...': 'private_key', 'scope': 'image', 'value_sha256': 'a4d138d7ef9748464117b44fb9c0a4b5b85a1599a127d02690abaa96d03c16e6'}
+E     Use -v to get more diff)
+=========================== short test summary info ===========================
+FAILED tests/test_security_observations_native.py::test_real_dynamic_scan_sees_pre_tail_secret_and_refuses_overflow
+FAILED tests/test_security_observations_native.py::test_real_image_layer_scan_exact_digest_and_source_label
+2 failed, 19 passed in 93.32s (0:01:33)

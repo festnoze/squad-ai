@@ -53,6 +53,9 @@ async def test_browser_contribution_cannot_claim_complete_backend_requirement(tm
     assert result["status"] == "NOT_VERIFIED", result
     assert all(c["passed"] for c in result["observed"]), result
     assert any("backend" in limit for limit in result["limits"])
+    alias = {"FUN-02":"ui_clear", "FUN-06":"ui_draft", "FUN-12":"ui_refresh"}.get(rid)
+    if alias:
+        assert any(p["type"] == "X" and rid + ":" + alias in p["checks"] for p in result["proofs"])
 
 
 async def test_real_browser_xss_fixture_defect_detected(tmp_path):

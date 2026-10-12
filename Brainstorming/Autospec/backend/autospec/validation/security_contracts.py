@@ -172,21 +172,26 @@ class SecurityVerifier:
         body = {"content": content, "visibility": visibility, "client_request_id": request_id or str(uuid4())} | extra
         return await c.request(actor, "POST", self.route("messages", id=ticket), json=body)
 
-    async def verify(self, snapshot_hash: str) -> list[dict]:
+    async def verify(self, snapshot_hash: str, *, ids=None) -> list[dict]:
         try:
-            return await self._verify(snapshot_hash)
+            return await self._verify(snapshot_hash, ids=ids)
         finally:
             await self.adapter.close()
 
-    async def _verify(self, snapshot_hash: str) -> list[dict]:
+    async def _verify(self, snapshot_hash: str, *, ids=None) -> list[dict]:
         if not snapshot_hash:
             raise SecurityIdentityError("identified snapshot required")
+        selected = SECURITY_IDS if ids is None else ids
+        if (not isinstance(selected, (tuple, list)) or not selected or
+                any(not isinstance(rid, str) or rid not in SECURITY_IDS for rid in selected) or
+                len(set(selected)) != len(selected)):
+            raise ValueError("explicit unique security requirement IDs required")
         self.snapshot = snapshot_hash
         await self._identity()
         requirements = {r.id: r for r in self.contract.requirements}
         results = []
         valid_profile = _source_security_profile(self.profile)
-        for rid in SECURITY_IDS:
+        for rid in selected:
             requirement = requirements.get(rid)
             c = _Case(self, rid)
             self._active_case = c
@@ -204,6 +209,10 @@ class SecurityVerifier:
                     # A provider/HTTP exception is not an observed product FAIL.
                     limits.append(f"execution incomplete: {type(exc).__name__}")
             await self._identity()
+            # Only actual completion of this native handler grants a backend
+            # receipt. Missing later R/V remains separate; observed FAIL is
+            # retained and never promoted by the browser contribution.
+            native_complete = bool(c.checks) and not limits
             proofs = list(c.proofs)
             if c.checks or c.reproduction:
                 payload = {"id": rid, "contract_hash": self.pinned_contract_hash, "snapshot_hash": self.snapshot,
@@ -241,7 +250,7 @@ class SecurityVerifier:
                 "expected": requirement.expected if requirement else "requirement absent from frozen source",
                 "observed": c.checks, "reproduction": c.reproduction,
                 "proofs": [p.__dict__ for p in proofs], "impact": "source security invariant violated" if failed else "",
-                "limits": limits})
+                "limits": limits, "native_complete": native_complete})
         await self._identity()
         return results
 

@@ -1,0 +1,485 @@
+........................................................................ [  2%]
+........................................................................ [  4%]
+......................................sssssssssssssss................sss [  6%]
+ssssssssssssssssssss.................................................... [  9%]
+........................................................................ [ 11%]
+.................................s...................................... [ 13%]
+........................................................................ [ 16%]
+.....s.....................s.................................sssss...... [ 18%]
+....................................................s................... [ 20%]
+........................................................................ [ 22%]
+..................ss.................................................... [ 25%]
+........................................................................ [ 27%]
+........................................................................ [ 29%]
+............s........................................................... [ 32%]
+..........................FFFFFFF....................................... [ 34%]
+........................................................................ [ 36%]
+....................................................................F... [ 38%]
+...............................................sssss...................s [ 41%]
+s....................................................................... [ 43%]
+...................................................s.................... [ 45%]
+........ss........ss.................................................... [ 48%]
+...........................................ss................s.......... [ 50%]
+..................ss.................................................... [ 52%]
+........................................F...................s........ss. [ 54%]
+........................................................................ [ 57%]
+........................................................................ [ 59%]
+..........ssssssssss............s....................................... [ 61%]
+........................................................................ [ 64%]
+........................................................................ [ 66%]
+................................................sss..................... [ 68%]
+...s.................................................................... [ 70%]
+........................................................................ [ 73%]
+.......................................s................................ [ 75%]
+........................................................................ [ 77%]
+.....s.................................................................. [ 80%]
+................................................................sss..... [ 82%]
+........................................................................ [ 84%]
+........................................................................ [ 86%]
+..............................................F......................... [ 89%]
+........................................................................ [ 91%]
+...............................................ss....................... [ 93%]
+........................................................................ [ 96%]
+..............................................s......................... [ 98%]
+...................................................                      [100%]
+================================== FAILURES ===================================
+_ test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[openai] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CB8749F0>
+provider = 'openai'
+
+    @pytest.mark.parametrize('provider', ['openai', 'openrouter', 'ollama', 'claude', 'anthropic', 'codex'])
+    async def test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch(monkeypatch, provider):
+        campaign(monkeypatch)
+        inner = FakeRunner(['{}'])
+        current = GenerationOnlyRunner(inner)
+        pipeline = Pipeline(ProjectState(id='policy-endpoint', name='Offline', goal='Mechanical only'), current)
+        monkeypatch.setattr(server, '_runner', current)
+        monkeypatch.setattr(server, 'pipelines', {pipeline.state.id: pipeline})
+        def forbidden(*args, **kwargs):
+            pytest.fail('a forbidden provider constructor was reached')
+        for name in ('OpenAiRunner', 'OpenRouterRunner', 'OllamaRunner', 'AnthropicRunner', 'CodexCliRunner'):
+            monkeypatch.setattr(providers, name, forbidden)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+            response = await client.post('/api/provider', json={'provider': provider})
+>       assert response.status_code == 422 and 'GENERATION_ONLY' in response.json()['detail']
+E       assert (403 == 422)
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend\tests\test_generation_policy_counterreview.py:41: AssertionError
+_ test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[openrouter] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CBB07620>
+provider = 'openrouter'
+
+    @pytest.mark.parametrize('provider', ['openai', 'openrouter', 'ollama', 'claude', 'anthropic', 'codex'])
+    async def test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch(monkeypatch, provider):
+        campaign(monkeypatch)
+        inner = FakeRunner(['{}'])
+        current = GenerationOnlyRunner(inner)
+        pipeline = Pipeline(ProjectState(id='policy-endpoint', name='Offline', goal='Mechanical only'), current)
+        monkeypatch.setattr(server, '_runner', current)
+        monkeypatch.setattr(server, 'pipelines', {pipeline.state.id: pipeline})
+        def forbidden(*args, **kwargs):
+            pytest.fail('a forbidden provider constructor was reached')
+        for name in ('OpenAiRunner', 'OpenRouterRunner', 'OllamaRunner', 'AnthropicRunner', 'CodexCliRunner'):
+            monkeypatch.setattr(providers, name, forbidden)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+            response = await client.post('/api/provider', json={'provider': provider})
+>       assert response.status_code == 422 and 'GENERATION_ONLY' in response.json()['detail']
+E       assert (403 == 422)
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend\tests\test_generation_policy_counterreview.py:41: AssertionError
+_ test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[ollama] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CBB05BE0>
+provider = 'ollama'
+
+    @pytest.mark.parametrize('provider', ['openai', 'openrouter', 'ollama', 'claude', 'anthropic', 'codex'])
+    async def test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch(monkeypatch, provider):
+        campaign(monkeypatch)
+        inner = FakeRunner(['{}'])
+        current = GenerationOnlyRunner(inner)
+        pipeline = Pipeline(ProjectState(id='policy-endpoint', name='Offline', goal='Mechanical only'), current)
+        monkeypatch.setattr(server, '_runner', current)
+        monkeypatch.setattr(server, 'pipelines', {pipeline.state.id: pipeline})
+        def forbidden(*args, **kwargs):
+            pytest.fail('a forbidden provider constructor was reached')
+        for name in ('OpenAiRunner', 'OpenRouterRunner', 'OllamaRunner', 'AnthropicRunner', 'CodexCliRunner'):
+            monkeypatch.setattr(providers, name, forbidden)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+            response = await client.post('/api/provider', json={'provider': provider})
+>       assert response.status_code == 422 and 'GENERATION_ONLY' in response.json()['detail']
+E       assert (403 == 422)
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend\tests\test_generation_policy_counterreview.py:41: AssertionError
+_ test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[claude] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CB874EC0>
+provider = 'claude'
+
+    @pytest.mark.parametrize('provider', ['openai', 'openrouter', 'ollama', 'claude', 'anthropic', 'codex'])
+    async def test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch(monkeypatch, provider):
+        campaign(monkeypatch)
+        inner = FakeRunner(['{}'])
+        current = GenerationOnlyRunner(inner)
+        pipeline = Pipeline(ProjectState(id='policy-endpoint', name='Offline', goal='Mechanical only'), current)
+        monkeypatch.setattr(server, '_runner', current)
+        monkeypatch.setattr(server, 'pipelines', {pipeline.state.id: pipeline})
+        def forbidden(*args, **kwargs):
+            pytest.fail('a forbidden provider constructor was reached')
+        for name in ('OpenAiRunner', 'OpenRouterRunner', 'OllamaRunner', 'AnthropicRunner', 'CodexCliRunner'):
+            monkeypatch.setattr(providers, name, forbidden)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+            response = await client.post('/api/provider', json={'provider': provider})
+>       assert response.status_code == 422 and 'GENERATION_ONLY' in response.json()['detail']
+E       assert (403 == 422)
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend\tests\test_generation_policy_counterreview.py:41: AssertionError
+_ test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[anthropic] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CBB07380>
+provider = 'anthropic'
+
+    @pytest.mark.parametrize('provider', ['openai', 'openrouter', 'ollama', 'claude', 'anthropic', 'codex'])
+    async def test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch(monkeypatch, provider):
+        campaign(monkeypatch)
+        inner = FakeRunner(['{}'])
+        current = GenerationOnlyRunner(inner)
+        pipeline = Pipeline(ProjectState(id='policy-endpoint', name='Offline', goal='Mechanical only'), current)
+        monkeypatch.setattr(server, '_runner', current)
+        monkeypatch.setattr(server, 'pipelines', {pipeline.state.id: pipeline})
+        def forbidden(*args, **kwargs):
+            pytest.fail('a forbidden provider constructor was reached')
+        for name in ('OpenAiRunner', 'OpenRouterRunner', 'OllamaRunner', 'AnthropicRunner', 'CodexCliRunner'):
+            monkeypatch.setattr(providers, name, forbidden)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+            response = await client.post('/api/provider', json={'provider': provider})
+>       assert response.status_code == 422 and 'GENERATION_ONLY' in response.json()['detail']
+E       assert (403 == 422)
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend\tests\test_generation_policy_counterreview.py:41: AssertionError
+_ test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[codex] _
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CBB05710>
+provider = 'codex'
+
+    @pytest.mark.parametrize('provider', ['openai', 'openrouter', 'ollama', 'claude', 'anthropic', 'codex'])
+    async def test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch(monkeypatch, provider):
+        campaign(monkeypatch)
+        inner = FakeRunner(['{}'])
+        current = GenerationOnlyRunner(inner)
+        pipeline = Pipeline(ProjectState(id='policy-endpoint', name='Offline', goal='Mechanical only'), current)
+        monkeypatch.setattr(server, '_runner', current)
+        monkeypatch.setattr(server, 'pipelines', {pipeline.state.id: pipeline})
+        def forbidden(*args, **kwargs):
+            pytest.fail('a forbidden provider constructor was reached')
+        for name in ('OpenAiRunner', 'OpenRouterRunner', 'OllamaRunner', 'AnthropicRunner', 'CodexCliRunner'):
+            monkeypatch.setattr(providers, name, forbidden)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+            response = await client.post('/api/provider', json={'provider': provider})
+>       assert response.status_code == 422 and 'GENERATION_ONLY' in response.json()['detail']
+E       assert (403 == 422)
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend\tests\test_generation_policy_counterreview.py:41: AssertionError
+______ test_endpoint_model_switch_cannot_make_next_inference_non_sonnet _______
+
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CBB05630>
+
+    async def test_endpoint_model_switch_cannot_make_next_inference_non_sonnet(monkeypatch):
+        campaign(monkeypatch)
+        inner = FakeRunner(['{}'])
+        current = GenerationOnlyRunner(inner)
+        pipeline = Pipeline(ProjectState(id='policy-model', name='Offline', goal='Mechanical only'), current)
+        monkeypatch.setattr(server, '_runner', current)
+        monkeypatch.setattr(server, 'pipelines', {pipeline.state.id: pipeline})
+        # make_runner still executes its real policy guard, with only the final
+        # trusted CLI object replaced by an entirely offline recording port.
+        monkeypatch.setattr(providers, 'ClaudeCliRunner', lambda: inner)
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=server.app), base_url='http://offline.test') as client:
+            response = await client.post('/api/provider', json={'provider': 'claude code', 'model': 'opus'})
+>       assert response.status_code == 200  # current API stores the requested setting
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       assert 403 == 200
+E        +  where 403 = <Response [403 Forbidden]>.status_code
+
+backend\tests\test_generation_policy_counterreview.py:58: AssertionError
+________________________ test_failed_call_is_captured _________________________
+
+green_pytest = None
+
+    async def test_failed_call_is_captured(green_pytest):
+        """An agent error on a build call is captured (ok=False) so the operator can
+        inspect the prompt that failed."""
+        # PM brief + PO plan succeed; the QA design-tests call raises (no reply left).
+        replies = [PM_BRIEF, po_plan_reply(1, with_dep=False)]
+        state = ProjectState(id="proj-int-err", name="todo", goal="g", auto_spec=False)
+        pipeline = Pipeline(state, FakeRunner(replies))
+        pipeline.start()
+>       await wait_until(lambda: pipeline.state.phase in (PipelinePhase.DONE, PipelinePhase.ERROR))
+
+backend\tests\test_interactions.py:99: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function test_failed_call_is_captured.<locals>.<lambda> at 0x00000259CB6D1D20>
+timeout = 90.0, interval = 0.01
+
+    async def wait_until(predicate, timeout=90.0 if os.name=="nt" else 20.0, interval=0.01):
+        import asyncio
+    
+        deadline = asyncio.get_event_loop().time() + timeout
+        while not predicate():
+            if asyncio.get_event_loop().time() > deadline:
+>               raise TimeoutError("condition not met in time")
+E               TimeoutError: condition not met in time
+
+backend\tests\conftest.py:234: TimeoutError
+__________________ test_dev_refine_failure_keeps_story_done ___________________
+
+green_pytest = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CB20FAF0>
+
+    async def test_dev_refine_failure_keeps_story_done(green_pytest, monkeypatch):
+        from autospec.config import settings
+    
+        monkeypatch.setattr(settings, "refine_enabled", True)
+        monkeypatch.setattr(settings, "refine_po", False)
+        monkeypatch.setattr(settings, "refine_dev", True)
+        judge_low = json.dumps({"score": 10, "verdict": "faible"})
+        critic = json.dumps({"reflection": "r", "issues": ["i"], "suggestions": ["s"]})
+        # After the dev goes green: judge(10) -> critic -> the revise call has NO
+        # queued reply -> AgentError. Refinement is opportunistic: the story must
+        # stay DONE instead of being downgraded to TODO/FAILED.
+        pipeline, _ = make_pipeline(
+            [PM_BRIEF, po_plan_reply(1, with_dep=False), QA_PLAN, DEV_GREEN, judge_low, critic]
+        )
+        pipeline.start()
+>       await wait_until(lambda: pipeline.state.phase == PipelinePhase.DONE)
+
+backend\tests\test_pipeline.py:1355: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+predicate = <function test_dev_refine_failure_keeps_story_done.<locals>.<lambda> at 0x00000259CD8C81A0>
+timeout = 90.0, interval = 0.01
+
+    async def wait_until(predicate, timeout=90.0 if os.name=="nt" else 20.0, interval=0.01):
+        import asyncio
+    
+        deadline = asyncio.get_event_loop().time() + timeout
+        while not predicate():
+            if asyncio.get_event_loop().time() > deadline:
+>               raise TimeoutError("condition not met in time")
+E               TimeoutError: condition not met in time
+
+backend\tests\conftest.py:234: TimeoutError
+_________ test_dynamic_scheduler_starts_dependent_before_slow_sibling _________
+
+fut = <coroutine object Pipeline._abuild_phase at 0x00000259CBF35150>
+timeout = 40
+
+    async def wait_for(fut, timeout):
+        """Wait for the single Future or coroutine to complete, with timeout.
+    
+        Coroutine will be wrapped in Task.
+    
+        Returns result of the Future or coroutine.  When a timeout occurs,
+        it cancels the task and raises TimeoutError.  To avoid the task
+        cancellation, wrap it in shield().
+    
+        If the wait is cancelled, the task is also cancelled.
+    
+        If the task suppresses the cancellation and returns a value instead,
+        that value is returned.
+    
+        This function is a coroutine.
+        """
+        # The special case for timeout <= 0 is for the following case:
+        #
+        # async def test_waitfor():
+        #     func_started = False
+        #
+        #     async def func():
+        #         nonlocal func_started
+        #         func_started = True
+        #
+        #     try:
+        #         await asyncio.wait_for(func(), 0)
+        #     except asyncio.TimeoutError:
+        #         assert not func_started
+        #     else:
+        #         assert False
+        #
+        # asyncio.run(test_waitfor())
+    
+    
+        if timeout is not None and timeout <= 0:
+            fut = ensure_future(fut)
+    
+            if fut.done():
+                return fut.result()
+    
+            await _cancel_and_wait(fut)
+            try:
+                return fut.result()
+            except exceptions.CancelledError as exc:
+                raise TimeoutError from exc
+    
+        async with timeouts.timeout(timeout):
+>           return await fut
+                   ^^^^^^^^^
+
+C:\Program Files\Python314\Lib\asyncio\tasks.py:488: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+backend\autospec\orchestrator\pipeline.py:5612: in _abuild_phase
+    await self._abuild_phase_streams(all_iterations=all_iterations)
+backend\autospec\orchestrator\pipeline.py:6196: in _abuild_phase_streams
+    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+C:\Program Files\Python314\Lib\asyncio\tasks.py:432: in wait
+    return await _wait(fs, timeout, return_when, loop)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+fs = {<Task finished name='Task-13056' coro=<Pipeline._abuild_work_item() done, defined at C:\Users\e.millerioux\.codex\wor...ospec-regression-snapshot\squad-ai\Brainstorming\Autospec\backend\autospec\orchestrator\pipeline.py:7554> result=None>}
+timeout = None, return_when = 'FIRST_COMPLETED'
+loop = <ProactorEventLoop running=False closed=False debug=False>
+
+    async def _wait(fs, timeout, return_when, loop):
+        """Internal helper for wait().
+    
+        The fs argument must be a collection of Futures.
+        """
+        assert fs, 'Set of Futures is empty.'
+        waiter = loop.create_future()
+        timeout_handle = None
+        if timeout is not None:
+            timeout_handle = loop.call_later(timeout, _release_waiter, waiter)
+        counter = len(fs)
+        cur_task = current_task()
+    
+        def _on_completion(f):
+            nonlocal counter
+            counter -= 1
+            if (counter <= 0 or
+                return_when == FIRST_COMPLETED or
+                return_when == FIRST_EXCEPTION and (not f.cancelled() and
+                                                    f.exception() is not None)):
+                if timeout_handle is not None:
+                    timeout_handle.cancel()
+                if not waiter.done():
+                    waiter.set_result(None)
+            futures.future_discard_from_awaited_by(f, cur_task)
+    
+        for f in fs:
+            f.add_done_callback(_on_completion)
+            futures.future_add_to_awaited_by(f, cur_task)
+    
+        try:
+>           await waiter
+E           asyncio.exceptions.CancelledError
+
+C:\Program Files\Python314\Lib\asyncio\tasks.py:521: CancelledError
+
+The above exception was the direct cause of the following exception:
+
+streams_on = None
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x00000259CBD3E740>
+
+    async def test_dynamic_scheduler_starts_dependent_before_slow_sibling(streams_on, monkeypatch):
+        """Dynamic dataflow: a dependent item starts as soon as its dependency merges,
+        WITHOUT waiting for a slow independent sibling to finish � proof there is no
+        batch barrier. The old batched gather() would deadlock this exact shape (A
+        waits for C, but C couldn't start until A's batch finished)."""
+        # One story, three tasks: A (slow, independent), B (fast, independent),
+        # C (depends on B). cap = max_parallel_devs = 2 (conftest) \u2192 A and B start
+        # together; C must slot in the instant B merges, while A is still running.
+        state = _streams_state([
+            _us("US-1", tasks=[
+                _task("T-A", "US-1", stream="backend"),
+                _task("T-B", "US-1", stream="backend"),
+                _task("T-C", "US-1", stream="backend", depends_on=["T-B"]),
+            ])
+        ])
+        pipeline = Pipeline(state, ScriptedRunner())
+    
+        started: list[str] = []
+        c_started = asyncio.Event()
+    
+        async def _spy(subject, worktree, pkg, is_frontend):
+            started.append(subject.id)
+            if subject.id == "T-C":
+                c_started.set()
+            if subject.id == "T-A":
+                # The slow sibling blocks until the dependent C has started. Under a
+                # batch barrier C can't start while A runs \u2192 this would time out.
+                await asyncio.wait_for(c_started.wait(), timeout=20)
+            return True, ""
+    
+        monkeypatch.setattr(pipeline, "_arun_item_dev", _spy)
+    
+>       await asyncio.wait_for(pipeline._abuild_phase(), timeout=40)
+
+backend\tests\test_streams_build.py:380: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+C:\Program Files\Python314\Lib\asyncio\tasks.py:487: in wait_for
+    async with timeouts.timeout(timeout):
+               ^^^^^^^^^^^^^^^^^^^^^^^^^
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = <Timeout [expired]>
+exc_type = <class 'asyncio.exceptions.CancelledError'>
+exc_val = CancelledError(), exc_tb = <traceback object at 0x00000259CA5C80C0>
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_val: BaseException | None,
+        exc_tb: TracebackType | None,
+    ) -> bool | None:
+        assert self._state in (_State.ENTERED, _State.EXPIRING)
+    
+        if self._timeout_handler is not None:
+            self._timeout_handler.cancel()
+            self._timeout_handler = None
+    
+        if self._state is _State.EXPIRING:
+            self._state = _State.EXPIRED
+    
+            if self._task.uncancel() <= self._cancelling and exc_type is not None:
+                # Since there are no new cancel requests, we're
+                # handling this.
+                if issubclass(exc_type, exceptions.CancelledError):
+>                   raise TimeoutError from exc_val
+E                   TimeoutError
+
+C:\Program Files\Python314\Lib\asyncio\timeouts.py:115: TimeoutError
+============================== warnings summary ===============================
+tests/test_bootstrap.py::test_fastapi_feature_register_receives_application
+  C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\factory-env\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_factory_control_boundary.py::test_real_loopback_factory_control_cli_served_gui_and_dev_proxy
+  C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\factory-env\Lib\site-packages\websockets\legacy\__init__.py:6: DeprecationWarning: websockets.legacy is deprecated; see https://websockets.readthedocs.io/en/stable/howto/upgrade.html for upgrade instructions
+    warnings.warn(  # deprecated in 14.0 - 2024-11-09
+
+tests/test_factory_control_boundary.py::test_real_loopback_factory_control_cli_served_gui_and_dev_proxy
+  C:\Dev\squad-ai\Brainstorming\Autospec\workspace\remediation-20261011\factory-env\Lib\site-packages\uvicorn\protocols\websockets\websockets_impl.py:17: DeprecationWarning: websockets.server.WebSocketServerProtocol is deprecated
+    from websockets.server import WebSocketServerProtocol
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED backend\tests\test_generation_policy_counterreview.py::test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[openai]
+FAILED backend\tests\test_generation_policy_counterreview.py::test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[openrouter]
+FAILED backend\tests\test_generation_policy_counterreview.py::test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[ollama]
+FAILED backend\tests\test_generation_policy_counterreview.py::test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[claude]
+FAILED backend\tests\test_generation_policy_counterreview.py::test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[anthropic]
+FAILED backend\tests\test_generation_policy_counterreview.py::test_real_provider_endpoint_refuses_api_before_constructor_or_dispatch[codex]
+FAILED backend\tests\test_generation_policy_counterreview.py::test_endpoint_model_switch_cannot_make_next_inference_non_sonnet
+FAILED backend\tests\test_interactions.py::test_failed_call_is_captured - Tim...
+FAILED backend\tests\test_pipeline.py::test_dev_refine_failure_keeps_story_done
+FAILED backend\tests\test_streams_build.py::test_dynamic_scheduler_starts_dependent_before_slow_sibling
+10 failed, 3044 passed, 93 skipped, 3 warnings in 1931.01s (0:32:11)

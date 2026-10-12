@@ -25,6 +25,8 @@ from uuid import uuid4
 from .support_adapter import AdapterUnavailable, FixtureAccount, FixtureManifest, HttpxSupportAdapter, Proof
 from .entropy_protocol import (ENTROPY_BOOTSTRAP, ENTROPY_INSTALL, ENTROPY_PRIMITIVES,
     ENTROPY_CHECK, correlate_entropy, entropy_execution_proof)
+from .security_observations import (SecurityObservationBindings, BoundedSecretScanner,
+    COOKIE_MODE_LAUNCHER, COOKIE_MODE_REQUEST)
 
 
 class OwnedRuntime(Protocol):
@@ -133,6 +135,7 @@ class ReviewedProductBindings:
     browser_bindings: dict[str,str] = field(default_factory=dict)
     browser_routes: dict[str,str] = field(default_factory=dict)
     fixture_fingerprint: str = ""  # pair identity; empty only for legacy explicit fixtures
+    security_observations: SecurityObservationBindings | None = None
 
     @classmethod
     def from_dict(cls, value: dict) -> "ReviewedProductBindings":
@@ -143,6 +146,8 @@ class ReviewedProductBindings:
             data["tables"]={k:TableBinding(**v) for k,v in data["tables"].items()}
             data["commands"]={k:CommandBinding(tuple(v["argv"]),tuple(v.get("parameters",())),v.get("timeout",30)) for k,v in data["commands"].items()}
             data["runtime_command"]=tuple(data["runtime_command"])
+            if data.get("security_observations") is not None:
+                data["security_observations"] = SecurityObservationBindings.from_dict(data["security_observations"])
             if data.get("instrumentation"):
                 if "proxy_headers" not in data["instrumentation"]:
                     raise ValueError("source-reviewed proxy-header mode must be explicit")
@@ -202,6 +207,9 @@ class ReviewedProductBindings:
         if "{id}" not in self.ticket_path or not _NAME.fullmatch(self.csrf_field):
             raise ValueError("ticket route/CSRF field binding absent")
         if self.instrumentation: self.instrumentation.validate()
+        if self.security_observations:
+            if not self.auth_required: raise ValueError("security cookie observations require source auth")
+            self.security_observations.validate()
         if any(not _NAME.fullmatch(k) or not isinstance(v,str) or not v or len(v)>1024 for k,v in self.browser_bindings.items()):
             raise ValueError("explicit bounded reviewed browser locator bindings required")
         if any(not isinstance(p,str) or not p.startswith("/") or p.startswith("//") for p in self.browser_routes.values()):
@@ -491,6 +499,34 @@ FixtureFactory = Callable[..., Awaitable[tuple[FixtureManifest, dict[str, Any]]]
 ProofProvider = Callable[[str], Awaitable[list[Proof]]]
 
 
+class SecurityObservedAdapter(HttpxSupportAdapter):
+    """Remember fictitious probe secrets in memory, never in receipts."""
+    def __init__(self, *, known_secrets, negative_output, **kwargs):
+        self._known_secrets = known_secrets
+        self._negative_output = negative_output
+        super().__init__(**kwargs)
+
+    def _remember(self, response):
+        if response.status_code >= 400:
+            self._negative_output(response.content)
+        for value in response.cookies.values():
+            self._known_secrets.add(value)
+        try: token = response.json().get(self.csrf_field)
+        except (ValueError, AttributeError): token = None
+        if isinstance(token, str) and token: self._known_secrets.add(token)
+        return response
+
+    async def login(self, actor, **kwargs):
+        if actor in self.manifest.accounts: self._known_secrets.add(self.manifest.accounts[actor].password)
+        return self._remember(await super().login(actor, **kwargs))
+
+    async def request(self, actor, method, path, **kwargs):
+        data = kwargs.get("json")
+        if isinstance(data, dict) and isinstance(data.get("password"), str):
+            self._known_secrets.add(data["password"])
+        return self._remember(await super().request(actor, method, path, **kwargs))
+
+
 class ReviewedFixtureFactory:
     """Usable JSON fixture inputs, frozen independently of observed product.
 
@@ -587,8 +623,15 @@ class ProductHarness:
         self.manifest = FixtureManifest()
         self._command_receipts=[]
         self._ip_transport_observations=set()
+        self._security_secrets=set()
+        self._security_outputs=[]
+        self._security_output_bytes=0
+        self._security_output_overflow=False
+        self._security_child_logs=[]
         import httpx
-        self.adapter = HttpxSupportAdapter(base_url=runtime.origin, origin=runtime.origin,
+        self.adapter = SecurityObservedAdapter(known_secrets=self._security_secrets,
+            negative_output=lambda raw:self._security_output("artifacts","negative-http-response",raw),
+            base_url=runtime.origin, origin=runtime.origin,
             auth_path=bindings.auth_path, csrf_field=bindings.csrf_field, evidence_root=self.evidence_root,
             prepare=self.prepare_case, observe=self.observe, snapshot=snapshot_hash, oracle=contract_hash,
             command=self.command, clock=self.advance_clock, proofs=self.proofs, race=self.arm_race,
@@ -599,6 +642,8 @@ class ProductHarness:
                 limits=httpx.Limits(max_keepalive_connections=0)) if ip=="127.0.0.1" else LinuxLoopbackTransport(self,ip))
         self.adapter.live_sqlite=True # supervisor capability, never a product claim
         self.adapter.supervised_runtime=runtime # exact owned namespace; no browser host fallback
+        self.adapter.native_security_observation=self.collect_security_observation
+        self.adapter.security_snapshot_root=self.snapshot_root
 
     async def _identity(self):
         if await self._snapshot()!=self.bindings.snapshot_hash or await self._contract()!=self.bindings.contract_hash:
@@ -657,6 +702,7 @@ class ProductHarness:
             if result["exit_code"]!=0:
                 raise AdapterUnavailable("isolated fixture provisioning failed; previous DB cannot stand in for fixture")
         self.manifest=manifest
+        self._security_secrets.update(a.password for a in manifest.accounts.values())
         manifest.metadata["sqlite_tables"]={k:v.name for k,v in self.bindings.tables.items()}
         return manifest
 
@@ -693,7 +739,8 @@ class ProductHarness:
             raise AdapterUnavailable(f"reviewed isolated command unavailable: {action}")
         await self._identity()
         before=await self.observe("business_state") if action=="seed_collision" else None
-        rc,_,_=await asyncio.to_thread(self.runtime.exec,list(binding.argv),stdin=json.dumps(parameters),timeout=binding.timeout)
+        rc,out,err=await asyncio.to_thread(self.runtime.exec,list(binding.argv),stdin=json.dumps(parameters),timeout=binding.timeout)
+        self._security_output("logs","reviewed-command-"+action,(out+err).encode("utf-8"))
         await self._identity()
         result={"exit_code":rc,"command":action,"output":"withheld: may contain credentials"}
         self._command_receipts.append({"command":action,"exit_code":rc})
@@ -701,6 +748,9 @@ class ProductHarness:
         return result
 
     async def observe(self, name, **params):
+        if name in {"secret_scan", "cookie_modes"}:
+            value, _ = await self.collect_security_observation(name, **params)
+            return value
         if name=="session_entropy":
             hook=self.bindings.instrumentation
             if not hook or not hook.entropy_module:
@@ -876,6 +926,127 @@ class ProductHarness:
         raise AdapterUnavailable("isolated runtime did not become HTTP-ready within 15s")
     async def proofs(self, requirement_id):
         return [] if self._proof_provider is None else await self._proof_provider(requirement_id)
+
+    def _security_output(self, scope, name, raw):
+        self._security_output_bytes+=len(raw)
+        if self._security_output_bytes>4*1024*1024:
+            self._security_output_overflow=True
+        elif not self._security_output_overflow:
+            self._security_outputs.append((scope,name,raw))
+
+    async def collect_security_observation(self, name, *, scope=None, image_id=None):
+        """Dynamic observation after the actual case, never a cached narrative."""
+        await self._identity()
+        binding=self.bindings.security_observations
+        if binding is None: raise AdapterUnavailable("source-reviewed native security observation facts absent")
+        if name=="cookie_modes":
+            if scope is not None or image_id is not None: raise AdapterUnavailable("unknown cookie observation parameters")
+            return await self._cookie_modes(binding)
+        if name!="secret_scan" or scope not in {"source_image_logs","logs_artifacts"}:
+            raise AdapterUnavailable("exact native security scan scope required")
+        scanner=BoundedSecretScanner(self._security_secrets)
+        if self._security_output_overflow:
+            raise AdapterUnavailable("complete probe command/negative-response scan exceeded bound")
+        provenance={"instrumented_runtime":self.instrumented}
+        logs, log_identity=await asyncio.to_thread(self.runtime.capture_security_logs)
+        import io
+        scanner.scan(io.BytesIO(logs),scope="logs",name="complete-owned-current-container-log")
+        for index,(kind,label,raw) in enumerate(self._security_outputs):
+            if kind=="logs" or scope=="logs_artifacts":
+                scanner.scan(io.BytesIO(raw),scope=kind,name=label+"-"+str(index))
+        provenance["logs"]=log_identity
+        provenance["cookie_mode_logs"]=list(self._security_child_logs)
+        if scope=="source_image_logs":
+            if image_id is None: raise AdapterUnavailable("qualified immutable delivery image is required, not the dependency runtime image")
+            scanner.scan_tree(self.snapshot_root,scope="source")
+            provenance["image"]=await asyncio.to_thread(self.runtime.scan_security_image,
+                image_id,self.bindings.snapshot_hash,scanner.scan_image)
+            scopes=["source","image","logs"]
+        else:
+            if image_id is not None: raise AdapterUnavailable("negative-path scan cannot substitute unrelated image evidence")
+            self.evidence_root.mkdir(parents=True,exist_ok=True)
+            from ..agents.file_broker import ExecutionContext,FileBroker
+            artifact_broker=FileBroker(ExecutionContext("owned-security-artifacts",self.evidence_root))
+            for relative in binding.artifact_roots:
+                # An exact "." declares this already-attested supervisor root,
+                # not a producer file path or a relaxed broker navigation rule.
+                root=self.evidence_root if relative=="." else artifact_broker.path(relative).resolve()
+                if not root.is_relative_to(self.evidence_root): raise AdapterUnavailable("artifact scope escapes owned campaign evidence")
+                scanner.scan_tree(root,scope="artifacts")
+            scopes=["logs","artifacts"]
+        await self._identity()
+        value,proof=scanner.receipt(self.evidence_root,scopes=scopes,snapshot=self.bindings.snapshot_hash,
+            contract=self.bindings.contract_hash,provenance=provenance)
+        return value,[proof]
+
+    async def _cookie_modes(self, binding):
+        """Real isolated requests under reviewed deployment configurations.
+
+        Factory ASGI/TLS launch only, same code/image, no auth mock. Each mode
+        owns a fresh DB; certificates/keys stay in its /tmp, never in receipts.
+        This checks cookie deployment behavior, not the delivered image CMD.
+        """
+        from ..orchestrator.isolated_validation import RuntimeSession
+        image=(await asyncio.to_thread(self.runtime.inspect_configuration))["image_id"]
+        if not re.fullmatch(r"sha256:[a-f0-9]{64}",image): raise AdapterUnavailable("immutable cookie probe image identity absent")
+        rows=[];proofs=[]
+        for name,mode in binding.modes.items():
+            command=["/opt/venv/bin/python","-I","-u","-c",COOKIE_MODE_LAUNCHER,
+                json.dumps(dict(module=binding.app_module,attribute=binding.app_attribute,tls=mode.tls,port=self.bindings.internal_port))]
+            runtime=RuntimeSession(self.snapshot_root,image,command,port=self.bindings.internal_port,
+                docker=self.runtime.docker,application_origin=True,persistent_database=True,
+                mount_stage=getattr(self.runtime,"mount_stage",True),security_environment=mode.environment,
+                application_origin_scheme="https" if mode.tls else "http")
+            child=None
+            try:
+                await asyncio.to_thread(runtime.__enter__)
+                child=ProductHarness(runtime,self.bindings,snapshot_root=self.snapshot_root,
+                    evidence_root=self.evidence_root/("cookie-mode-"+uuid4().hex),fixture_factory=self.fixture_factory,
+                    snapshot_hash=self._snapshot,contract_hash=self._contract)
+                await child.prepare_case(binding.fixture_case)
+                if binding.actor not in child.manifest.accounts: raise AdapterUnavailable("reviewed cookie fixture actor absent")
+                account=child.manifest.accounts[binding.actor]
+                self._security_secrets.add(account.password)
+                observed=await child._exec(("/usr/local/bin/python","-I","-c",COOKIE_MODE_REQUEST),dict(
+                    tls=mode.tls,port=self.bindings.internal_port,path=self.bindings.auth_path,cookie_name=binding.cookie_name,csrf_field=self.bindings.csrf_field,
+                    origin=runtime.env["APP_ORIGIN"],credentials=dict(email=account.email,password=account.password)),timeout=20)
+                private=observed.pop("_probe_secrets",None)
+                if not isinstance(private,list) or any(not isinstance(s,str) for s in private):
+                    raise AdapterUnavailable("private observer auth-secret trace unavailable")
+                self._security_secrets.update(private)
+                if observed.get("status")!=200 or not observed.get("cookie_present") or (mode.tls and not observed.get("tls_version")):
+                    raise AdapterUnavailable("real reviewed cookie mode login/header evidence unavailable")
+                configuration=await asyncio.to_thread(runtime.inspect_configuration)
+                row=dict(mode=name,**observed,image_id=image,source_snapshot=self.bindings.snapshot_hash,
+                    container_id=runtime.identifier,environment=mode.environment,
+                    scope="actual cookie header from same-code factory ASGI deployment; not delivered CMD certification")
+                rows.append(row)
+                child.evidence_root.mkdir(parents=True,exist_ok=True)
+                path=child.evidence_root/"cookie-mode.json"
+                path.write_bytes(json.dumps(dict(snapshot_hash=self.bindings.snapshot_hash,contract_hash=self.bindings.contract_hash,
+                    observed=row,configuration=configuration),sort_keys=True).encode())
+                proofs.append(Proof("X",str(path),hashlib.sha256(path.read_bytes()).hexdigest(),self.bindings.snapshot_hash,
+                    self.bindings.contract_hash,("SEC-05:cookie_mode:"+name,),True,"obtained real isolated header; oracle decides secure attribute"))
+            finally:
+                try:
+                    if child:
+                        self._security_secrets.update(child._security_secrets)
+                        if child._security_output_overflow: self._security_output_overflow=True
+                        for kind,label,raw in child._security_outputs:
+                            self._security_output(kind,"cookie-mode-"+name+":"+label,raw)
+                        try:
+                            raw,identity=await asyncio.to_thread(runtime.capture_security_logs)
+                            self._security_output("logs","cookie-mode-"+name,raw)
+                            self._security_child_logs.append(dict(mode=name,**identity))
+                        except Exception:
+                            # Missing a removed container's log cannot become
+                            # a later clean SEC-15 observation.
+                            self._security_output_overflow=True
+                finally:
+                    if child: await child.adapter.close()
+                    await asyncio.to_thread(runtime.close)
+        await self._identity()
+        return rows,proofs
 
     def _proof(self, stage, observed, passed, snapshot, contract):
         self.evidence_root.mkdir(parents=True,exist_ok=True)

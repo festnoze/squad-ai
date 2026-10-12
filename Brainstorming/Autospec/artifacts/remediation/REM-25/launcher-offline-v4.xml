@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="2" skipped="0" tests="32" time="0.656" timestamp="2026-10-12T15:46:52.373015+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_support_benchmark_campaign" name="test_preflight_nominal_is_read_only" time="0.010" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[AGENT_PROVIDER-anthropic]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[CLAUDE_MODEL-opus]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[MODEL_CHECKER-haiku]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[GENERATION_ONLY_AGENTS-false]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[FAKE_AGENTS-true]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[REFINE-true]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[ROLE_ROUTING-true]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[LANGFUSE-true]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[CONCURRENT_BUDGET_RESERVATIONS-true]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[SANDBOX-false]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_config_tamper_refused_before_probe[ANTHROPIC_API_KEY-secret]" time="0.003" /><testcase classname="tests.test_support_benchmark_campaign" name="test_forbidden_port[18004]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_forbidden_port[8126]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_forbidden_port[0]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_forbidden_port[65536]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_old_campaign_refused" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[commit]" time="0.004" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[dirty]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[docker]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[auth]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_admission_failure[help]" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_hash_tamper[docs/validation/support-client/01_specification.md]" time="0.009" /><testcase classname="tests.test_support_benchmark_campaign" name="test_hash_tamper[docs/validation/support-client/02_requirements_verification.md]" time="0.009" /><testcase classname="tests.test_support_benchmark_campaign" name="test_hash_tamper[artifacts/remediation/REM-25/source-facts-v02.json]" time="0.010" /><testcase classname="tests.test_support_benchmark_campaign" name="test_complete_payload" time="0.005" /><testcase classname="tests.test_support_benchmark_campaign" name="test_creation_exactly_once_and_unknown_never_retries" time="0.009" /><testcase classname="tests.test_support_benchmark_campaign" name="test_nominal_creation_inert" time="0.008" /><testcase classname="tests.test_support_benchmark_campaign" name="test_main_modes_offline[--preflight]" time="0.007" /><testcase classname="tests.test_support_benchmark_campaign" name="test_main_modes_offline[--launch]" time="0.014" /><testcase classname="tests.test_support_benchmark_campaign" name="test_supervisor_owned_job_and_readiness_offline[False]" time="0.010"><failure message="AttributeError: module 'subprocess' has no attribute 'CREATE_SUSPENDED'">setup = (WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/rem25-launcher-offline-temp-v4/test_supervisor_owned_jo...'--json']], &lt;function setup.&lt;locals&gt;.run at 0x000001E3110C1900&gt;, &lt;function setup.&lt;locals&gt;.check at 0x000001E3110C1850&gt;)
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001E3110462E0&gt;
+wrong_identity = False
+
+    @pytest.mark.parametrize('wrong_identity',[False,True])
+    def test_supervisor_owned_job_and_readiness_offline(setup,monkeypatch,wrong_identity):
+        from autospec.agents import runner
+        campaign,env,calls,run,check = setup
+        receipt = check()
+        campaign.mkdir()
+        reviews = campaign/'projects'/'p'/'source-reviews'/'snapshot'
+        reviews.mkdir(parents=True)
+        (reviews/'review-request.json').write_text('{"phase":"vertical"}')
+        identity = dict(pid=42,started_at=123,source_stamp='sha')
+        (campaign/'factory-identity.json').write_text(json.dumps(identity))
+        events = []
+        class Process:
+            pid = 42
+            def poll(self): return None
+            def wait(self,timeout): events.append('wait')
+        class Job:
+            def assign_and_resume(self,p): events.append('assigned')
+            def close(self): events.append('closed')
+        monkeypatch.setattr(runner,'_WindowsJob',Job)
+        monkeypatch.setattr(runner,'_process_identity',lambda p: 'owned-handle')
+        monkeypatch.setattr(c,'trusted_imports',lambda *a: None)
+        spawned = []
+        def spawn(*a,**kw):
+            spawned.append(kw)
+            assert kw['env']['GENERATION_ONLY_AGENTS'] == 'true'
+            assert kw['env']['AUTOSPEC_CAMPAIGN_COMMIT'] == SHA
+            return Process()
+        monkeypatch.setattr(c.subprocess,'Popen',spawn)
+        ticks = iter([0,100])
+        monkeypatch.setattr(c.time,'monotonic',lambda: next(ticks))
+        requests = []
+        def request(method,url,body=None):
+            requests.append((method,url))
+            if url.endswith('/api/health'):
+                return dict(ok=True,started_at=999 if wrong_identity else 123,
+                            source_stamp='sha',source_stamp_now='sha')
+            if method == 'POST': return {'id':'p'}
+            return {'phase':'build','cost_usd':0,'budget_usd':40}
+        monkeypatch.setattr(c,'http',request)
+        # create_once binds its default at import; inject inert request explicitly.
+        original_create = c.create_once
+        monkeypatch.setattr(c,'create_once',lambda *a: original_create(*a,request=request))
+        monkeypatch.setattr(c.time,'sleep',lambda s: (_ for _ in ()).throw(KeyboardInterrupt()))
+        with pytest.raises(c.AdmissionError if wrong_identity else KeyboardInterrupt):
+&gt;           c.supervise(ROOT,campaign,8130,env,receipt)
+
+backend\tests\test_support_benchmark_campaign.py:186: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+root = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-rem-execution/squad-ai/Brainstorming/Autospec')
+campaign = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/rem25-launcher-offline-temp-v4/test_supervisor_owned_job_and_0/relais-support-rem25-offline')
+port = 8130
+env = {'AGENT_PROVIDER': 'claude code', 'AUTOSPEC_CAMPAIGN_COMMIT': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'AUTOSPEC_CONTROL_HOSTS': '["127.0.0.1:8130"]', 'AUTOSPEC_CONTROL_ORIGINS': '[]', ...}
+receipt = {'auth': {'apiProvider': 'firstParty', 'authMethod': 'claude.ai', 'loggedIn': True, 'subscriptionType': 'team'}, 'camp..._job_and_0\\relais-support-rem25-offline', 'checked_at': '2026-10-12T13:46:52.715999+00:00', 'docker_os': 'linux', ...}
+
+    def supervise(root,campaign,port,env,receipt):
+        if os.name != 'nt':
+            raise AdmissionError('owned Windows Jobs required')
+        env = dict(env,AUTOSPEC_CAMPAIGN_COMMIT=receipt['factory_commit'])
+        trusted_imports(root,env)
+        from autospec.agents.runner import _WindowsJob, _process_identity
+        job = _WindowsJob()
+        proc = None
+        try:
+            with (campaign/'factory.log').open('xb') as log:
+                proc = subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--factory','--port',str(port)],
+                    cwd=root,env=env,stdout=log,stderr=log,
+&gt;                   creationflags=subprocess.CREATE_SUSPENDED|subprocess.CREATE_NO_WINDOW)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E                   AttributeError: module 'subprocess' has no attribute 'CREATE_SUSPENDED'
+
+tools\support_benchmark_campaign.py:198: AttributeError</failure></testcase><testcase classname="tests.test_support_benchmark_campaign" name="test_supervisor_owned_job_and_readiness_offline[True]" time="0.009"><failure message="AttributeError: module 'subprocess' has no attribute 'CREATE_SUSPENDED'">setup = (WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/rem25-launcher-offline-temp-v4/test_supervisor_owned_jo...'--json']], &lt;function setup.&lt;locals&gt;.run at 0x000001E3110C0460&gt;, &lt;function setup.&lt;locals&gt;.check at 0x000001E3112C01A0&gt;)
+monkeypatch = &lt;_pytest.monkeypatch.MonkeyPatch object at 0x000001E31136F070&gt;
+wrong_identity = True
+
+    @pytest.mark.parametrize('wrong_identity',[False,True])
+    def test_supervisor_owned_job_and_readiness_offline(setup,monkeypatch,wrong_identity):
+        from autospec.agents import runner
+        campaign,env,calls,run,check = setup
+        receipt = check()
+        campaign.mkdir()
+        reviews = campaign/'projects'/'p'/'source-reviews'/'snapshot'
+        reviews.mkdir(parents=True)
+        (reviews/'review-request.json').write_text('{"phase":"vertical"}')
+        identity = dict(pid=42,started_at=123,source_stamp='sha')
+        (campaign/'factory-identity.json').write_text(json.dumps(identity))
+        events = []
+        class Process:
+            pid = 42
+            def poll(self): return None
+            def wait(self,timeout): events.append('wait')
+        class Job:
+            def assign_and_resume(self,p): events.append('assigned')
+            def close(self): events.append('closed')
+        monkeypatch.setattr(runner,'_WindowsJob',Job)
+        monkeypatch.setattr(runner,'_process_identity',lambda p: 'owned-handle')
+        monkeypatch.setattr(c,'trusted_imports',lambda *a: None)
+        spawned = []
+        def spawn(*a,**kw):
+            spawned.append(kw)
+            assert kw['env']['GENERATION_ONLY_AGENTS'] == 'true'
+            assert kw['env']['AUTOSPEC_CAMPAIGN_COMMIT'] == SHA
+            return Process()
+        monkeypatch.setattr(c.subprocess,'Popen',spawn)
+        ticks = iter([0,100])
+        monkeypatch.setattr(c.time,'monotonic',lambda: next(ticks))
+        requests = []
+        def request(method,url,body=None):
+            requests.append((method,url))
+            if url.endswith('/api/health'):
+                return dict(ok=True,started_at=999 if wrong_identity else 123,
+                            source_stamp='sha',source_stamp_now='sha')
+            if method == 'POST': return {'id':'p'}
+            return {'phase':'build','cost_usd':0,'budget_usd':40}
+        monkeypatch.setattr(c,'http',request)
+        # create_once binds its default at import; inject inert request explicitly.
+        original_create = c.create_once
+        monkeypatch.setattr(c,'create_once',lambda *a: original_create(*a,request=request))
+        monkeypatch.setattr(c.time,'sleep',lambda s: (_ for _ in ()).throw(KeyboardInterrupt()))
+        with pytest.raises(c.AdmissionError if wrong_identity else KeyboardInterrupt):
+&gt;           c.supervise(ROOT,campaign,8130,env,receipt)
+
+backend\tests\test_support_benchmark_campaign.py:186: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+root = WindowsPath('C:/Users/e.millerioux/.codex/worktrees/autospec-rem-execution/squad-ai/Brainstorming/Autospec')
+campaign = WindowsPath('C:/Dev/squad-ai/Brainstorming/Autospec/workspace/rem25-launcher-offline-temp-v4/test_supervisor_owned_job_and_1/relais-support-rem25-offline')
+port = 8130
+env = {'AGENT_PROVIDER': 'claude code', 'AUTOSPEC_CAMPAIGN_COMMIT': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 'AUTOSPEC_CONTROL_HOSTS': '["127.0.0.1:8130"]', 'AUTOSPEC_CONTROL_ORIGINS': '[]', ...}
+receipt = {'auth': {'apiProvider': 'firstParty', 'authMethod': 'claude.ai', 'loggedIn': True, 'subscriptionType': 'team'}, 'camp..._job_and_1\\relais-support-rem25-offline', 'checked_at': '2026-10-12T13:46:53.002573+00:00', 'docker_os': 'linux', ...}
+
+    def supervise(root,campaign,port,env,receipt):
+        if os.name != 'nt':
+            raise AdmissionError('owned Windows Jobs required')
+        env = dict(env,AUTOSPEC_CAMPAIGN_COMMIT=receipt['factory_commit'])
+        trusted_imports(root,env)
+        from autospec.agents.runner import _WindowsJob, _process_identity
+        job = _WindowsJob()
+        proc = None
+        try:
+            with (campaign/'factory.log').open('xb') as log:
+                proc = subprocess.Popen([sys.executable,str(Path(__file__).resolve()),'--factory','--port',str(port)],
+                    cwd=root,env=env,stdout=log,stderr=log,
+&gt;                   creationflags=subprocess.CREATE_SUSPENDED|subprocess.CREATE_NO_WINDOW)
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+E                   AttributeError: module 'subprocess' has no attribute 'CREATE_SUSPENDED'
+
+tools\support_benchmark_campaign.py:198: AttributeError</failure></testcase></testsuite></testsuites>

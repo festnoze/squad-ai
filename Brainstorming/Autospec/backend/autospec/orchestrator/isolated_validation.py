@@ -657,7 +657,8 @@ class RuntimeSession:
                  connection_timeout: float = 15, application_origin: bool = False,
                  local_cookie_mode: bool = False, persistent_database: bool = False,
                  mount_stage: bool = True,use_image_command: bool = False,
-                 host_port: int = 0, preserve_database: bool = False):
+                 host_port: int = 0, preserve_database: bool = False,
+                 security_environment: dict[str, str] | None = None, application_origin_scheme: str = "http"):
         if not 1 <= port <= 65535 or ecosystem not in {"python", "node"}:
             raise _unavailable("Invalid runtime port/ecosystem")
         if not math.isfinite(connection_timeout) or connection_timeout <= 0:
@@ -665,6 +666,13 @@ class RuntimeSession:
         command = _runtime_argv(command)
         if local_cookie_mode and not application_origin:
             raise _unavailable("Local cookie mode requires the controlled application origin")
+        if application_origin_scheme not in {"http", "https"} or (application_origin_scheme == "https" and not application_origin):
+            raise _unavailable("Security mode requires an explicit controlled HTTP/TLS origin")
+        if security_environment is not None:
+            from ..validation.security_observations import validate_security_environment
+            validate_security_environment(security_environment)
+            if not application_origin:
+                raise _unavailable("Security mode environment requires controlled application origin")
         if type(mount_stage) is not bool or not mount_stage and not re.fullmatch(r"sha256:[a-f0-9]{64}", image):
             raise _unavailable("Baked runtime requires an immutable local image ID")
         if type(use_image_command) is not bool or use_image_command and mount_stage:
@@ -720,11 +728,13 @@ class RuntimeSession:
         self.host_port = self.server.server_address[1]
         self.origin = f"http://127.0.0.1:{self.host_port}"
         if application_origin:
-            self.env["APP_ORIGIN"] = self.origin
+            self.env["APP_ORIGIN"] = self.origin.replace("http://", application_origin_scheme + "://", 1)
         if local_cookie_mode:
             self.env["SESSION_COOKIE_SECURE"] = "false"
         if persistent_database:
             self.env["DATABASE_URL"] = self.DATABASE_URL
+        if security_environment is not None:
+            self.env.update(security_environment)
 
     def __enter__(self):
         with self.operation_lock:
@@ -1159,6 +1169,83 @@ class RuntimeSession:
             identifier = self._assert_owned()
             result = _docker_call([self.docker, "logs", "--tail", "100", identifier], capture_output=True, text=True, timeout=3, check=False)
             return (result.stdout + result.stderr)[-12000:]
+
+    def _capture_security_export(self, argv, *, limit, timeout, output=None):
+        """Complete bounded daemon read, never host shell or partial green."""
+        process = spawn_owned_process(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        failed = threading.Event(); lock = threading.Lock(); size = [0]; buffers = [bytearray(), bytearray()]
+        def read(index, stream):
+            try:
+                while chunk := stream.read(65536):
+                    with lock:
+                        size[0] += len(chunk)
+                        if size[0] > limit:
+                            failed.set(); return
+                        if index == 0 and output is not None: output.write(chunk)
+                        else: buffers[index].extend(chunk)
+            except (OSError, ValueError): failed.set()
+        threads = [threading.Thread(target=read, args=(i, stream), daemon=True)
+            for i, stream in enumerate((process.stdout, process.stderr))]
+        for thread in threads: thread.start()
+        deadline = time.monotonic() + timeout
+        try:
+            while process.poll() is None and not failed.is_set() and time.monotonic() < deadline:
+                time.sleep(.02)
+            if process.poll() is None or failed.is_set():
+                raise _unavailable("Security export exceeded its complete-scope byte/time bound")
+            for thread in threads: thread.join(timeout=1)
+            if any(thread.is_alive() for thread in threads) or failed.is_set() or process.returncode:
+                raise _unavailable("Complete native security export unavailable (output withheld)")
+            return bytes(buffers[0]) + bytes(buffers[1])
+        finally:
+            close_owned_process(process)
+            for stream in (process.stdout, process.stderr): stream.close()
+            for thread in threads: thread.join(timeout=1)
+
+    def capture_security_logs(self, *, limit=4*1024*1024):
+        """All logs of this exact owned current container, or unavailable."""
+        if type(limit) is not int or not 0 < limit <= 16*1024*1024:
+            raise _unavailable("Bounded complete log limit required")
+        with self.operation_lock:
+            identifier = self._assert_owned()
+            raw = self._capture_security_export([self.docker, "logs", identifier], limit=limit, timeout=15)
+            if self._assert_owned() != identifier:
+                raise _unavailable("Runtime identity changed during complete log scan")
+            return raw, {"container_id": identifier, "owner": self.owner,
+                "complete": True, "bytes": len(raw), "image_id": self.inspect_configuration()["image_id"]}
+
+    def scan_security_image(self, image_id, snapshot_hash, consumer):
+        """Read every layer of the exact supervisor-built source-labelled image.
+
+        Only the owned temporary save archive is materialized; no path is
+        extracted. It is removed even when scanner/provenance fails.
+        """
+        if not re.fullmatch(r"sha256:[a-f0-9]{64}", image_id) or not re.fullmatch(r"[a-f0-9]{64}", snapshot_hash):
+            raise _unavailable("Exact immutable source-labelled delivery image required")
+        with self.operation_lock:
+            identifier = self._assert_owned()
+            inspected = _docker_call([self.docker, "image", "inspect", image_id], capture_output=True,
+                text=True, check=False, timeout=3)
+            try:
+                data = json.loads(inspected.stdout)[0]
+                if inspected.returncode or data["Id"] != image_id or data["Config"]["Labels"]["autospec.snapshot"] != snapshot_hash:
+                    raise ValueError("image subject differs")
+            except (ValueError, KeyError, IndexError, TypeError) as exc:
+                raise _unavailable("Delivery image source identity cannot be attested") from exc
+            with tempfile.TemporaryDirectory(prefix="autospec-security-image-") as owned:
+                archive = Path(owned) / "image.tar"
+                with archive.open("wb") as output:
+                    self._capture_security_export([self.docker, "image", "save", image_id],
+                        limit=1024*1024*1024, timeout=90, output=output)
+                consumer(archive, image_id)
+                if self._assert_owned() != identifier:
+                    raise _unavailable("Owned runtime changed during image scan")
+                with archive.open("rb") as stream: archive_hash = hashlib.file_digest(stream, "sha256").hexdigest()
+                return {"image_id": image_id, "source_snapshot": snapshot_hash,
+                    "archive_sha256": archive_hash,
+                    "archive_bytes": archive.stat().st_size, "complete": True,
+                    "runtime_container_id": identifier, "runtime_image_id": self.inspect_configuration()["image_id"]}
 
     def close(self, *, preserve_database: bool | None = None):
         with self.operation_lock:
