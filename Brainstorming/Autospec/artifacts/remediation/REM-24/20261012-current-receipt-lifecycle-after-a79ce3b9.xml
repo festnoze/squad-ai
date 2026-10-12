@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="0" failures="0" skipped="0" tests="19" time="1.988" timestamp="2026-10-12T15:22:16.891610+02:00" hostname="635ROM-IT-L157"><testcase classname="tests.test_current_admission_receipt" name="test_current_receipt_never_remains_pass_after_image_revalidation_failure[missing]" time="0.245"><system-out>--------------------------------- Captured Out ---------------------------------
+{"acceptance_result": {"detail": "AdapterUnavailable: CURRENT_IMAGE_UNAVAILABLE", "status": "NOT_VERIFIED"}, "admitted": false, "case": "missing", "delivery_ready": false, "historical_receipts_unchanged": true, "port_calls": {"facts": 0, "image": 1, "rebuild": 0, "review": 1, "verify": 0}, "provider_calls": 0, "scope": "offline factory mechanism; no actual product proof", "with_readme": true}
+
+</system-out></testcase><testcase classname="tests.test_current_admission_receipt" name="test_current_receipt_never_remains_pass_after_image_revalidation_failure[cmd_drift]" time="0.228"><system-out>--------------------------------- Captured Out ---------------------------------
+{"acceptance_result": {"detail": "AdapterUnavailable: CURRENT_IMAGE_CMD_IDENTITY_DIFFER", "status": "NOT_VERIFIED"}, "admitted": false, "case": "cmd_drift", "delivery_ready": false, "historical_receipts_unchanged": true, "port_calls": {"facts": 0, "image": 1, "rebuild": 0, "review": 1, "verify": 0}, "provider_calls": 0, "scope": "offline factory mechanism; no actual product proof", "with_readme": true}
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_uses_both_owned_journals_before_workspace_removal[False-False-fullstack]" time="0.014"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_uses_both_owned_journals_before_workspace_removal[False-False-cli]" time="0.013"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_uses_both_owned_journals_before_workspace_removal[False-True-fullstack]" time="0.011"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_uses_both_owned_journals_before_workspace_removal[False-True-cli]" time="0.011"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_uses_both_owned_journals_before_workspace_removal[True-False-fullstack]" time="0.012"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_uses_both_owned_journals_before_workspace_removal[True-False-cli]" time="0.012"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_uses_both_owned_journals_before_workspace_removal[True-True-fullstack]" time="0.012"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_uses_both_owned_journals_before_workspace_removal[True-True-cli]" time="0.012"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_absence_only_safe_when_no_resource_claimed[PUBLICATION_NOT_REGISTERED-False]" time="0.009"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_absence_only_safe_when_no_resource_claimed[PUBLICATION_NOT_REGISTERED-True]" time="0.008"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_absence_only_safe_when_no_resource_claimed[PUBLICATION_JOURNAL_INVALID-False]" time="0.008"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_absence_only_safe_when_no_resource_claimed[PUBLICATION_JOURNAL_INVALID-True]" time="0.008"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_absence_only_safe_when_no_resource_claimed[daemon unavailable-False]" time="0.008"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_delete_absence_only_safe_when_no_resource_claimed[daemon unavailable-True]" time="0.008"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_cancelled_publication_drains_worker_and_only_withdraws_created_receipt[False]" time="0.137"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_cancelled_publication_drains_worker_and_only_withdraws_created_receipt[True]" time="0.137"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase><testcase classname="tests.test_owned_delivery_lifecycle_guards" name="test_cancelled_startup_recovery_drains_thread_without_stopping_previous_cid" time="0.139"><system-out>--------------------------------- Captured Out ---------------------------------
+
+</system-out></testcase></testsuite></testsuites>
